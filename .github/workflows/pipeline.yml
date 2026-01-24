@@ -92,7 +92,7 @@ jobs:
             -o hitkeep-linux-arm64 \
             ./cmd/hitkeep/main.go
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         with:
           name: hitkeep-binaries-${{ inputs.version }}
           path: |
