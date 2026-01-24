@@ -52,7 +52,7 @@
     "angular-eslint": "21.1.0",
     "baseline-browser-mapping": "^2.9.17",
     "eslint": "^9.39.2",
-    "jasmine-core": "~5.13.0",
+    "jasmine-core": "~6.0.1",
     "karma": "~6.4.4",
     "karma-chrome-launcher": "~3.2.0",
     "karma-coverage": "~2.2.1",
