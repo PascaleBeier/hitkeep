@@ -34,7 +34,7 @@
     },
     "devDependencies": {
         "@angular/build": "^21.1.1",
-        "@angular/cli": "^21.1.1",
+        "@angular/cli": "^21.1.2",
         "@angular/compiler-cli": "^21.1.1",
         "@types/jasmine": "~5.1.15",
         "angular-eslint": "21.1.0",
