@@ -4,7 +4,7 @@ go 1.25.6
 
 require (
 	github.com/Boostport/mjml-go v0.16.0
-	github.com/duckdb/duckdb-go/v2 v2.5.4
+	github.com/duckdb/duckdb-go/v2 v2.5.5
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/memberlist v0.5.4
@@ -19,23 +19,16 @@ require (
 
 require (
 	github.com/andybalholm/brotli v1.2.0 // indirect
-	github.com/apache/arrow-go/v18 v18.5.0 // indirect
+	github.com/apache/arrow-go/v18 v18.5.1 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/bmizerany/perks v0.0.0-20230307044200-03f9df79da1e // indirect
-	github.com/duckdb/duckdb-go-bindings v0.3.2 // indirect
-	github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.24 // indirect
-	github.com/duckdb/duckdb-go-bindings/darwin-arm64 v0.1.24 // indirect
-	github.com/duckdb/duckdb-go-bindings/lib/darwin-amd64 v0.3.2 // indirect
-	github.com/duckdb/duckdb-go-bindings/lib/darwin-arm64 v0.3.2 // indirect
-	github.com/duckdb/duckdb-go-bindings/lib/linux-amd64 v0.3.2 // indirect
-	github.com/duckdb/duckdb-go-bindings/lib/linux-arm64 v0.3.2 // indirect
-	github.com/duckdb/duckdb-go-bindings/lib/windows-amd64 v0.3.2 // indirect
-	github.com/duckdb/duckdb-go-bindings/linux-amd64 v0.1.24 // indirect
-	github.com/duckdb/duckdb-go-bindings/linux-arm64 v0.1.24 // indirect
-	github.com/duckdb/duckdb-go-bindings/windows-amd64 v0.1.24 // indirect
-	github.com/duckdb/duckdb-go/arrowmapping v0.0.27 // indirect
-	github.com/duckdb/duckdb-go/mapping v0.0.27 // indirect
+	github.com/duckdb/duckdb-go-bindings v0.3.3 // indirect
+	github.com/duckdb/duckdb-go-bindings/lib/darwin-amd64 v0.3.3 // indirect
+	github.com/duckdb/duckdb-go-bindings/lib/darwin-arm64 v0.3.3 // indirect
+	github.com/duckdb/duckdb-go-bindings/lib/linux-amd64 v0.3.3 // indirect
+	github.com/duckdb/duckdb-go-bindings/lib/linux-arm64 v0.3.3 // indirect
+	github.com/duckdb/duckdb-go-bindings/lib/windows-amd64 v0.3.3 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
