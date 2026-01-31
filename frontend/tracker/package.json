@@ -7,7 +7,7 @@
     "build": "rolldown -c"
   },
   "devDependencies": {
-    "rolldown": "^1.0.0-rc.1"
+    "rolldown": "^1.0.0-rc.2"
   },
   "engines": {
     "node": "24"
