@@ -10,7 +10,7 @@ require (
 	github.com/hashicorp/memberlist v0.5.4
 	github.com/nsqio/go-nsq v1.1.0
 	github.com/nsqio/nsq v1.3.0
-	github.com/phuslu/iploc v1.0.20260115
+	github.com/phuslu/iploc v1.0.20260201
 	github.com/wneessen/go-mail v0.7.2
 	golang.org/x/crypto v0.47.0
 	golang.org/x/sync v0.19.0
