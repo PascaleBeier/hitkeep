@@ -25,7 +25,7 @@
         "@fontsource-variable/lexend": "^5.2.11",
         "@jsverse/transloco-locale": "^8.2.1",
         "@primeuix/themes": "^2.0.3",
-        "@scalar/api-reference": "^1.44.24",
+        "@scalar/api-reference": "^1.44.25",
         "@tailwindcss/postcss": "^4.1.18",
         "chart.js": "^4.5.1",
         "circle-flags": "^2.8.2",
