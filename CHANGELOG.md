@@ -1,5 +1,55 @@
 # Changelog
 
+## [1.7.0](https://github.com/PascaleBeier/hitkeep/compare/v1.6.0...v1.7.0) (2026-02-22)
+
+
+### Features
+
+* **admin:** include instance roles and site owner emails in listings ([08a30c6](https://github.com/PascaleBeier/hitkeep/commit/08a30c6f7b15df81b6b1908978941426ed1cfce6))
+* **analytics:** add filterable UTM dimensions to site stats ([a5c3564](https://github.com/PascaleBeier/hitkeep/commit/a5c3564e9cfd46c78afa506824b8acf045569695))
+* **analytics:** add UTM tracking and dashboard KPIs ([d2505f8](https://github.com/PascaleBeier/hitkeep/commit/d2505f814115a6d7b28aab2a5dec44eefa69cab7))
+* **api:** publish complete OpenAPI 3.1 spec with Scalar viewer ([6b9ef12](https://github.com/PascaleBeier/hitkeep/commit/6b9ef12b47bc77809add9b0f534ba502a574e88d))
+* **auth:** add password recovery pages ([e9613a4](https://github.com/PascaleBeier/hitkeep/commit/e9613a4b6ee10b82a99b0276cbe36891cb124824))
+* **auth:** add TOTP and passkey MFA flows ([e599ebf](https://github.com/PascaleBeier/hitkeep/commit/e599ebfa57b6973308d23a67e66c3bc07d196769))
+* **auth:** enhance security handlers and permissions ([e693269](https://github.com/PascaleBeier/hitkeep/commit/e693269c261cae88f2fa36e20de78270d7e66ab4))
+* **backend:** add user profile management ([60b13f4](https://github.com/PascaleBeier/hitkeep/commit/60b13f4f9aee752c3c013441e1e1399b8de2f8d3))
+* **backend:** update API types and server configuration ([c6a3885](https://github.com/PascaleBeier/hitkeep/commit/c6a3885e153823a19b3205c9c9ffb862ef3857c9))
+* **dashboard:** add filterable UTM analytics page ([c696af5](https://github.com/PascaleBeier/hitkeep/commit/c696af5c29413248289e58035c02a484f7f76718))
+* **dashboard:** add MFA and passkey security UX ([5082b40](https://github.com/PascaleBeier/hitkeep/commit/5082b40537f9f8c8bc866c121355f27a7be95403))
+* **dashboard:** add relative-date-time component ([d809487](https://github.com/PascaleBeier/hitkeep/commit/d809487b2bd388e5439748537ef4833477892c2f))
+* **dashboard:** add user settings page ([516e785](https://github.com/PascaleBeier/hitkeep/commit/516e785cf00eef4fda2853f202031ec9e75666f7))
+* **dashboard:** enhance API reference documentation ([9a4241c](https://github.com/PascaleBeier/hitkeep/commit/9a4241ca85dfaa52895efccf7a273406259fdf83))
+* **dashboard:** enhance settings and site management components ([f39a55f](https://github.com/PascaleBeier/hitkeep/commit/f39a55f066df3daca275829a1801dc2313c7fe5b))
+* **dashboard:** standardize CRUD datatables and add exclusion settings ([59f3680](https://github.com/PascaleBeier/hitkeep/commit/59f368001f70e6521628fecb67777e63d5a8de58))
+* **dashboard:** update admin and sharing features ([2708407](https://github.com/PascaleBeier/hitkeep/commit/27084078fc43149da25d2ca5b5cadbeb601fe58d))
+* **dashboard:** update app routing ([8f5f175](https://github.com/PascaleBeier/hitkeep/commit/8f5f175d53dea7de507f98a3faf1f53d9fd7fc0b))
+* **dashboard:** update core layout and services ([94b1ab1](https://github.com/PascaleBeier/hitkeep/commit/94b1ab1fc5cee1b5aee5a5959c6d0759fd03bab8))
+* **dashboard:** update main pages and navigation ([8374d77](https://github.com/PascaleBeier/hitkeep/commit/8374d77ffa2737a9c3e3c1709bf3b4ade34beaa3))
+* **frontend:** Add CRUD for share links ([6d3c2cd](https://github.com/PascaleBeier/hitkeep/commit/6d3c2cdb778f6bdf160c07b0d0219e52ec1900f2))
+* **frontend:** Add UTM Builder ([94558e5](https://github.com/PascaleBeier/hitkeep/commit/94558e51707cf4cc1bbd57d02ba4e5f9cc11f851))
+* **frontend:** Unify user settings UI ([c84bbb9](https://github.com/PascaleBeier/hitkeep/commit/c84bbb9658fc7d89758ff53aa18e7a846e0aa2c5))
+* **i18n:** add es fr it locales and transloco optimize build ([8cea8bf](https://github.com/PascaleBeier/hitkeep/commit/8cea8bf7d7822a9fd5e67c918141eb5401634c75))
+* **integration:** add API client CRUD, docs viewer, and auth hardening ([4b3c56e](https://github.com/PascaleBeier/hitkeep/commit/4b3c56e925db54c41b5b5fe38e1672a14e1fff21))
+* **reports:** Add configurable E-Mail Reports for sites and user digests ([2b15017](https://github.com/PascaleBeier/hitkeep/commit/2b1501708f2842d87efbf667d55eda52162c7f9f))
+* **security:** Add 2fa recovery command ([69559d8](https://github.com/PascaleBeier/hitkeep/commit/69559d85df9a89710f6c10aca75c1dd839073ab9))
+* **security:** add IP exclusion filtering and fetch metadata guards ([9c65e45](https://github.com/PascaleBeier/hitkeep/commit/9c65e451ebb2c6ab34e261d850d128cb1f57f24c))
+* **takeout:** add json and ndjson exports with centralized format handling ([32a620a](https://github.com/PascaleBeier/hitkeep/commit/32a620a13beda60083082d096c1973ddf6225307))
+
+
+### Bug Fixes
+
+* **auth:** preserve mfa challenge on invalid totp attempts ([d2b25aa](https://github.com/PascaleBeier/hitkeep/commit/d2b25aa9960d82d471a6077ade745d7ce1f7074d))
+* **auth:** require mfa on password login when passkeys are configured ([1c28ee6](https://github.com/PascaleBeier/hitkeep/commit/1c28ee6ea8ac8c47ba400def425472f0b9e72e56))
+* **backend:** update ingest and test utilities ([f951e94](https://github.com/PascaleBeier/hitkeep/commit/f951e9488ea06b171c11db7e6001db5ed40e5148))
+* **dashboard:** simplify locale labels and stabilize API reference mount ([beb4c42](https://github.com/PascaleBeier/hitkeep/commit/beb4c420ef2343584d86db6326ca2ad76b1a834d))
+* **frontend:** make user settings takeout action primary for consistent UX ([ace37b4](https://github.com/PascaleBeier/hitkeep/commit/ace37b4f75a0f91b6d3f1c6b9ceb9e5d2a2046a0))
+* **frontend:** stabilize dashboard unit tests with updated providers ([0331af3](https://github.com/PascaleBeier/hitkeep/commit/0331af34f4c91d183f19b6216c9393714af4fb82))
+* **frontend:** stop overriding dashboard production output hashing ([d3ced19](https://github.com/PascaleBeier/hitkeep/commit/d3ced1992f019433241dc917a1d96c74c9f23695))
+* **mailer:** Correctly provide plain text Mailtemplates ([393647c](https://github.com/PascaleBeier/hitkeep/commit/393647c9245d50380bbdf9db15cef1880aa1b76d))
+* **security:** address gosec v2.10 findings with targeted hardening ([b1b7f7c](https://github.com/PascaleBeier/hitkeep/commit/b1b7f7c0717474a55b5c5e6f24b79ed739292fa0))
+* **security:** Reduce JWT token duration ([83dc981](https://github.com/PascaleBeier/hitkeep/commit/83dc9815a3db316bffde76eb18c0e4fb06d87852))
+* **security:** Update tests for sec-fetch changes ([f6aa80d](https://github.com/PascaleBeier/hitkeep/commit/f6aa80d3b6e9c131c7573e5843860d3f3cf0e4b1))
+
 ## [1.6.0](https://github.com/PascaleBeier/hitkeep/compare/v1.5.4...v1.6.0) (2026-02-15)
 
 ### Features
