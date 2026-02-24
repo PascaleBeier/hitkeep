@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.0](https://github.com/PascaleBeier/hitkeep/compare/v1.7.0...v1.8.0) (2026-02-24)
+
+
+### Features
+
+* **analytics:** add period-over-period comparison ([c394b81](https://github.com/PascaleBeier/hitkeep/commit/c394b817a80a8e68f7c4e489a48b15171d5e6dfa))
+* **events:** add event timeseries, property breakdown and audience analytics ([513333c](https://github.com/PascaleBeier/hitkeep/commit/513333c610e63121a71b856058eaf8eee3b8adf4))
+
 ## [1.7.0](https://github.com/PascaleBeier/hitkeep/compare/v1.6.0...v1.7.0) (2026-02-22)
 
 
