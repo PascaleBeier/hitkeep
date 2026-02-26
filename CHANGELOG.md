@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.1](https://github.com/PascaleBeier/hitkeep/compare/v1.8.0...v1.8.1) (2026-02-26)
+
+
+### Bug Fixes
+
+* **frontend:** Remove translation fragments from angular core l18n ([8b23ecd](https://github.com/PascaleBeier/hitkeep/commit/8b23ecd53f6345ead03a14144fc1a453c460fdef))
+* **frontend:** Update and migrate angular to v21.2.0 ([f25f6b1](https://github.com/PascaleBeier/hitkeep/commit/f25f6b14fb8a153ef008befbcfbb9bf924031999))
+
 ## [1.8.0](https://github.com/PascaleBeier/hitkeep/compare/v1.7.0...v1.8.0) (2026-02-24)
 
 
