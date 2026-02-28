@@ -107,7 +107,7 @@ jobs:
           retention-days: 5
 
       - name: Attest Binaries
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             hitkeep-linux-amd64
@@ -147,14 +147,14 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: Attest GHCR Image
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-name: ghcr.io/${{ github.repository }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
 
       - name: Attest Docker Hub Image
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-name: index.docker.io/${{ secrets.DOCKERHUB_USERNAME }}/hitkeep
           subject-digest: ${{ steps.push.outputs.digest }}
