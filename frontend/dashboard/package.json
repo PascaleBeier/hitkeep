@@ -51,7 +51,7 @@
     "@vitest/browser-playwright": "^4.0.18",
     "angular-eslint": "21.2.0",
     "baseline-browser-mapping": "^2.10.0",
-    "eslint": "^9.39.3",
+    "eslint": "^10.0.3",
     "jasmine-core": "~6.1.0",
     "jsdom": "^28.1.0",
     "oxfmt": "^0.36.0",
