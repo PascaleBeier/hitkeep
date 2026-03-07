@@ -10,7 +10,7 @@ require (
 	github.com/hashicorp/memberlist v0.5.4
 	github.com/nsqio/go-nsq v1.1.0
 	github.com/nsqio/nsq v1.3.0
-	github.com/phuslu/iploc v1.0.20260215
+	github.com/phuslu/iploc v1.0.20260301
 	github.com/wneessen/go-mail v0.7.2
 	golang.org/x/crypto v0.48.0
 	golang.org/x/sync v0.19.0
@@ -24,18 +24,11 @@ require (
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/bmizerany/perks v0.0.0-20230307044200-03f9df79da1e // indirect
 	github.com/duckdb/duckdb-go-bindings v0.3.4 // indirect
-	github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.24 // indirect
-	github.com/duckdb/duckdb-go-bindings/darwin-arm64 v0.1.24 // indirect
 	github.com/duckdb/duckdb-go-bindings/lib/darwin-amd64 v0.3.3 // indirect
 	github.com/duckdb/duckdb-go-bindings/lib/darwin-arm64 v0.3.3 // indirect
 	github.com/duckdb/duckdb-go-bindings/lib/linux-amd64 v0.3.3 // indirect
 	github.com/duckdb/duckdb-go-bindings/lib/linux-arm64 v0.3.3 // indirect
 	github.com/duckdb/duckdb-go-bindings/lib/windows-amd64 v0.3.3 // indirect
-	github.com/duckdb/duckdb-go-bindings/linux-amd64 v0.1.24 // indirect
-	github.com/duckdb/duckdb-go-bindings/linux-arm64 v0.1.24 // indirect
-	github.com/duckdb/duckdb-go-bindings/windows-amd64 v0.1.24 // indirect
-	github.com/duckdb/duckdb-go/arrowmapping v0.0.27 // indirect
-	github.com/duckdb/duckdb-go/mapping v0.0.27 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
