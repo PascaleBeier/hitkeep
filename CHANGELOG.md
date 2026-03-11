@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/PascaleBeier/hitkeep/compare/v2.0.0...v2.0.1) (2026-03-11)
+
+
+### Bug Fixes
+
+* **frontend:** simplify password inputs across the app ([7ea010e](https://github.com/PascaleBeier/hitkeep/commit/7ea010efa05de8b454470de01bb313bf8bf6b057))
+
 ## [2.0.0](https://github.com/PascaleBeier/hitkeep/compare/v1.8.1...v2.0.0) (2026-03-11)
 
 
