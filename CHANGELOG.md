@@ -1,5 +1,75 @@
 # Changelog
 
+## [2.0.0](https://github.com/PascaleBeier/hitkeep/compare/v1.8.1...v2.0.0) (2026-03-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* **teams:** GET /api/user/teams/{id}/audit now returns a paginated object with entries, total, limit, offset, has_more, and optional action instead of a bare array.
+
+### Features
+
+* Add Ecommerce Tracking ([628c882](https://github.com/PascaleBeier/hitkeep/commit/628c882ea67f930c55cc60b541ac8e25a838bd64))
+* **api:** add team-owned api clients ([4223a1a](https://github.com/PascaleBeier/hitkeep/commit/4223a1a00399d72b2051aa3ff2e1b528d2e0ec64))
+* **cli:** seed multitenant demo data [wip] ([04417fb](https://github.com/PascaleBeier/hitkeep/commit/04417fb142a0cd04fe2dc480366bf564e1ab5931))
+* **cloud:** add hosted billing and signup backend ([f795cf6](https://github.com/PascaleBeier/hitkeep/commit/f795cf6d38384caa30e1e50ed208add1bc624b34))
+* **cloud:** add hosted signup and billing surfaces ([bdbf94b](https://github.com/PascaleBeier/hitkeep/commit/bdbf94b97ff69402c109886892d68453620cc87f))
+* **config:** add data path and backup settings [wip] ([da423c9](https://github.com/PascaleBeier/hitkeep/commit/da423c9526c7174e5b8a7c2a0d98aee153b7ab42))
+* **db:** add tenant database migrations [wip] ([f460ab9](https://github.com/PascaleBeier/hitkeep/commit/f460ab91dc12a686dbde8dc95b865a9b750928f5))
+* **db:** add tenant store manager and analytics helpers [wip] ([228843a](https://github.com/PascaleBeier/hitkeep/commit/228843a4ef337841d7cc281c4f2d1d74b7cd1481))
+* **db:** add tenant team store core [wip] ([589f0fc](https://github.com/PascaleBeier/hitkeep/commit/589f0fcad8ba823f1612a7531f9f6edca8b8380f))
+* **ecommerce:** add ga4-inspired analytics endpoints ([47b0227](https://github.com/PascaleBeier/hitkeep/commit/47b022761a35231dc019115f4280fc5694e33e18))
+* **frontend:** add confirm popups to admin and site management [wip] ([ec1799e](https://github.com/PascaleBeier/hitkeep/commit/ec1799ea2495f5ff7e2d3649ca6f0b4678e286b9))
+* **frontend:** add create team dialog [wip] ([7780626](https://github.com/PascaleBeier/hitkeep/commit/7780626cfb5d060c0f187b06b083c9f2b85da452))
+* **frontend:** add ecommerce analytics dashboard ([09d99af](https://github.com/PascaleBeier/hitkeep/commit/09d99af234508f629d075241aca22df0d8ec9a0c))
+* **frontend:** add return-url auth redirect support [wip] ([aaa5160](https://github.com/PascaleBeier/hitkeep/commit/aaa5160880b305cff2f22d8965e8e706c3b27276))
+* **frontend:** add team admin pages [wip] ([7e1a160](https://github.com/PascaleBeier/hitkeep/commit/7e1a1602c7f08da65c06df7085204dedb8a7c603))
+* **frontend:** add team models service and guard [wip] ([4b9484f](https://github.com/PascaleBeier/hitkeep/commit/4b9484fbed4b97e7b7742872dae473bd32df2592))
+* **frontend:** add team switcher component [wip] ([98ba1e6](https://github.com/PascaleBeier/hitkeep/commit/98ba1e60bbb5f5fb888454d3024b20e107286a9c))
+* **frontend:** move team switcher into account cluster ([7a3c6ab](https://github.com/PascaleBeier/hitkeep/commit/7a3c6ab3b0602c819b82396837a753c50ab46018))
+* **frontend:** polish team admin surfaces ([bd48e69](https://github.com/PascaleBeier/hitkeep/commit/bd48e69349a5000d113566261736be3123328998))
+* **frontend:** refresh analytics pages for linked ranges [wip] ([af93257](https://github.com/PascaleBeier/hitkeep/commit/af93257adde336c588e51a8f2cb97e30bc5b8615))
+* **frontend:** wire team context into main layout [wip] ([512bc70](https://github.com/PascaleBeier/hitkeep/commit/512bc7028b1c187e65f23dba2a18425551179276))
+* **mail:** add team invite email support [wip] ([92f5aea](https://github.com/PascaleBeier/hitkeep/commit/92f5aea0243a5a08a9fa9cded02ea9ea35037da5))
+* **runtime:** wire tenant stores and entitlements [wip] ([ba97fae](https://github.com/PascaleBeier/hitkeep/commit/ba97fae77b00748820ef23003f0e79c6b0fca2a9))
+* **seed:** add ecommerce demo funnel data ([9bbb34c](https://github.com/PascaleBeier/hitkeep/commit/9bbb34c4804fec519c8be89e79e62bbb3757517c))
+* **server:** add team management endpoints [wip] ([c1a96e8](https://github.com/PascaleBeier/hitkeep/commit/c1a96e82dff4b787b634272681d16119f358d5c4))
+* **server:** resolve analytics through tenant stores [wip] ([f0bff51](https://github.com/PascaleBeier/hitkeep/commit/f0bff51ebe7951705f395ad067b2392f09e4da53))
+* **teams:** add archived team purge endpoint ([58b038c](https://github.com/PascaleBeier/hitkeep/commit/58b038c6180b864258faf5453b9475581e80e3b7))
+* **teams:** add empty team onboarding cues ([8f79fde](https://github.com/PascaleBeier/hitkeep/commit/8f79fde0d2034639810066a59293e0d7021c818d))
+* **teams:** add invite and ownership transfer admin flows ([4641b73](https://github.com/PascaleBeier/hitkeep/commit/4641b73eb3cdbe591c671d7901f124156bed887f))
+* **teams:** add ownership transfer safeguards ([91d3442](https://github.com/PascaleBeier/hitkeep/commit/91d344248251c7527e2220aa3838f9da724de59a))
+* **teams:** add paginated audit responses ([77ff1e1](https://github.com/PascaleBeier/hitkeep/commit/77ff1e194e8c7ee5828e2e2dfe3cc12566b0ec1e))
+* **teams:** add persistent invite lifecycle ([2d74412](https://github.com/PascaleBeier/hitkeep/commit/2d74412f85b15200a922f6263aa43ff1c9dfecad))
+* **teams:** add safe team archive lifecycle ([d25dcb7](https://github.com/PascaleBeier/hitkeep/commit/d25dcb7cc8827e2c6dd623792b5c17dc042db210))
+* **teams:** add site transfer between teams ([af01e48](https://github.com/PascaleBeier/hitkeep/commit/af01e48ffc1e67a75b17909b7373dc6b3a379b13))
+* **teams:** add team archive danger zone ([3a8a963](https://github.com/PascaleBeier/hitkeep/commit/3a8a9632aac0867196816dc67ba4c248f4426781))
+* **teams:** document multitenant release notes ([15e31e5](https://github.com/PascaleBeier/hitkeep/commit/15e31e5c2c866a1a160a2dfb9f1f3d973b7c5914))
+* **teams:** expose entitlements and usage metrics ([f2eb6a2](https://github.com/PascaleBeier/hitkeep/commit/f2eb6a247c21a06cb9df23aee77b21b9dd23010e))
+* **worker:** add tenant backup worker [wip] ([5663dc5](https://github.com/PascaleBeier/hitkeep/commit/5663dc5b41fa7b262c07cc324cde6bd72575c9cb))
+* **worker:** add tenant-aware retention and restore [wip] ([1cdc638](https://github.com/PascaleBeier/hitkeep/commit/1cdc638a2f5790c0534739f2a411a2394d119b05))
+
+
+### Bug Fixes
+
+* **ci:** lower binary glibc target ([1753289](https://github.com/PascaleBeier/hitkeep/commit/17532894796a039648554a55a979a30a3c6a0f26))
+* **ci:** lower binary glibc target ([5be3ae3](https://github.com/PascaleBeier/hitkeep/commit/5be3ae3230bcc5c26bc1fcb55b9fcbc945cbd355))
+* **ci:** lower binary glibc target ([23262df](https://github.com/PascaleBeier/hitkeep/commit/23262df114d2793fed5bb5a6a7a27b0558e8cac0))
+* **cloud:** enforce single billed tenant per account ([9c6ddc5](https://github.com/PascaleBeier/hitkeep/commit/9c6ddc5acc9979f73dfc2e0d23f1d18e077b2b5d))
+* **cloud:** hide plan limits in oss team overview ([74ae47d](https://github.com/PascaleBeier/hitkeep/commit/74ae47de3b7192fb170ef804b23938b97db0092b))
+* **database:** force duckdb session timezone to utc ([23118d9](https://github.com/PascaleBeier/hitkeep/commit/23118d90696319d60a339eeac238309fe0f4d69f))
+* **frontend:** localize range toolbar better ([38c1a3c](https://github.com/PascaleBeier/hitkeep/commit/38c1a3cd809f1dded6e074a12b24025293b59eea))
+* **frontend:** Make multi-currency and missing ECommerce data a bit more resilient ([3487323](https://github.com/PascaleBeier/hitkeep/commit/348732384d90a9345859bad485f34fe099b9d8e1))
+* **frontend:** restore site settings and embedded builds ([cff982f](https://github.com/PascaleBeier/hitkeep/commit/cff982f477bf8d4d32ff27c05e1c1d915fbb0c07))
+* **i18n:** Missing ecommerce translations ([d24c5e2](https://github.com/PascaleBeier/hitkeep/commit/d24c5e2a0a73b103d0ecd7b638fc25839d01a928))
+* **lint:** deduplicate tenant analytics handlers ([961733b](https://github.com/PascaleBeier/hitkeep/commit/961733baa2ed2e08e234d643b7b1de674a471631))
+* **reports:** harden tenant boundaries ([0b82770](https://github.com/PascaleBeier/hitkeep/commit/0b8277079b64914230eac92599c13e4b3fdfc493))
+* **sec:** suppress false-positive gravatar ssrf lint ([8e23fd2](https://github.com/PascaleBeier/hitkeep/commit/8e23fd2560613ba34fae0047af258130bb45729b))
+* **security:** Add Recovery Codes and harden queries for gosec ([3d7d962](https://github.com/PascaleBeier/hitkeep/commit/3d7d962c41a12fba1af10cf79a0ac62f33cf0568))
+* **teams:** block deleting users who still own teams ([a7db2d2](https://github.com/PascaleBeier/hitkeep/commit/a7db2d216f1e154c06d34f97f56a3cef4d5851e5))
+* **teams:** gate audit activity to admins and owners ([cc32ec8](https://github.com/PascaleBeier/hitkeep/commit/cc32ec8a56b976e5496aa83b8aaf93f700f5402b))
+* **teams:** normalize json payloads during site transfer ([5c218f6](https://github.com/PascaleBeier/hitkeep/commit/5c218f683609ca18ebcaa381c3a8f366900b8bb7))
+
 ## [1.8.1](https://github.com/PascaleBeier/hitkeep/compare/v1.8.0...v1.8.1) (2026-02-26)
 
 
