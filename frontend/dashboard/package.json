@@ -43,7 +43,7 @@
     "devDependencies": {
         "@angular/build": "^21.2.2",
         "@angular/cli": "^21.2.2",
-        "@angular/compiler-cli": "^21.2.3",
+        "@angular/compiler-cli": "^21.2.4",
         "@eslint/js": "^10.0.1",
         "@jsverse/transloco": "^8.2.1",
         "@jsverse/transloco-optimize": "^8.2.1",
