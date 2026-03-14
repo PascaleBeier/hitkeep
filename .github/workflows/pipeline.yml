@@ -85,7 +85,7 @@ jobs:
           cp -r frontend/dashboard/dist/dashboard/browser/* public/
 
       - name: Restore Go Build Cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cache/hitkeep-go-build
