@@ -1,5 +1,29 @@
 # Changelog
 
+## [2.1.0](https://github.com/PascaleBeier/hitkeep/compare/v2.0.1...v2.1.0) (2026-03-15)
+
+
+### Features
+
+* **dashboard:** add landing and exit modes to pages card ([6a09365](https://github.com/PascaleBeier/hitkeep/commit/6a0936520563fc7cd2fe94e32de3acc038b8db51))
+* **dashboard:** add language metrics to country selector kpi ([21c563a](https://github.com/PascaleBeier/hitkeep/commit/21c563a790a663e67985693512521596f12e0294))
+
+
+### Bug Fixes
+
+* **auth:** Support legacy passkeys in migration path and clear wording for leader / follower mfa ([e089eb8](https://github.com/PascaleBeier/hitkeep/commit/e089eb8f573e559f3648be637f2e21f7eee01572))
+* **billing:** fix pending registration flow and API Docs for billing ([d127e84](https://github.com/PascaleBeier/hitkeep/commit/d127e8494ae2f181434296b40dc36db7ad9c060d))
+* **deps:** Bump angular to v21.2.4 ([a79d1d4](https://github.com/PascaleBeier/hitkeep/commit/a79d1d4776e1fffe11682bac59ce872e5aa72e5f))
+* **i18n:** Revise translations for missing special characters ([ca6f627](https://github.com/PascaleBeier/hitkeep/commit/ca6f6270f7cb0405e51485d4a8567e562bceeb82))
+
+
+### Performance Improvements
+
+* **auth:** Use lru for auth and limiters and remove handgrown totp and webauthn impl ([865ee8a](https://github.com/PascaleBeier/hitkeep/commit/865ee8ac714943b61f269d94989b390274de0e65))
+* **frontend:** Cache country flags ([3062804](https://github.com/PascaleBeier/hitkeep/commit/3062804f083b68ceb891e3cecda48c69f6226884))
+* **frontend:** Proxy duckduckgo favicons instead of io.copy ([33140a0](https://github.com/PascaleBeier/hitkeep/commit/33140a04ab4b24c4160aea0842df46e626c1dc09))
+* **ingest:** batch analytics writes with duckdb appender ([06d82a9](https://github.com/PascaleBeier/hitkeep/commit/06d82a975630a1e7143b77ce9668a559632cfe80))
+
 ## [2.0.1](https://github.com/PascaleBeier/hitkeep/compare/v2.0.0...v2.0.1) (2026-03-11)
 
 
