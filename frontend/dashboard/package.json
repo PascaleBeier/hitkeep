@@ -48,7 +48,7 @@
         "@jsverse/transloco": "^8.2.1",
         "@jsverse/transloco-optimize": "^8.2.1",
         "@types/jasmine": "~6.0.0",
-        "@vitest/browser-playwright": "^4.1.1",
+        "@vitest/browser-playwright": "^4.1.2",
         "angular-eslint": "21.3.1",
         "baseline-browser-mapping": "^2.10.10",
         "eslint": "^10.1.0",
