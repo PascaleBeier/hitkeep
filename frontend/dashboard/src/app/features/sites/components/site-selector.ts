@@ -49,16 +49,16 @@ import { ShareService } from "@services/share.service";
                             [attr.aria-label]="'sites.selector.selectSiteAria' | transloco"
                         >
                             <ng-template pTemplate="selectedItem" let-selected>
-                                <div class="flex items-center shrink-0 grow-0 gap-2">
-                                    <app-site-favicon [site]="selected" />
-                                    <span class="text-sm font-medium truncate">{{ selected.domain }}</span>
+                                <div class="flex items-center w-full min-w-0 gap-2">
+                                    <app-site-favicon class="shrink-0" [site]="selected" />
+                                    <span class="text-sm font-medium truncate block">{{ selected.domain }}</span>
                                 </div>
                             </ng-template>
 
                             <ng-template pTemplate="item" let-site>
-                                <div class="flex items-center shrink-0 grow-0 gap-2">
-                                    <app-site-favicon [site]="site" />
-                                    <span>{{ site.domain }}</span>
+                                <div class="flex items-center w-full min-w-0 gap-2">
+                                    <app-site-favicon class="shrink-0" [site]="site" />
+                                    <span class="truncate block">{{ site.domain }}</span>
                                 </div>
                             </ng-template>
                         </p-select>
