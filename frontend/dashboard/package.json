@@ -53,7 +53,7 @@
         "@types/jasmine": "~6.0.0",
         "@vitest/browser-playwright": "^4.1.2",
         "angular-eslint": "21.3.1",
-        "baseline-browser-mapping": "^2.10.13",
+        "baseline-browser-mapping": "^2.10.14",
         "eslint": "^10.1.0",
         "jasmine-core": "~6.1.0",
         "jsdom": "^29.0.1",
