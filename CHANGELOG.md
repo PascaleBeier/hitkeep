@@ -1,5 +1,31 @@
 # Changelog
 
+## [2.2.0](https://github.com/PascaleBeier/hitkeep/compare/v2.1.0...v2.2.0) (2026-04-09)
+
+
+### Features
+
+* Allow users to sign via mail for 2fa ([f301d9d](https://github.com/PascaleBeier/hitkeep/commit/f301d9d1008ff49de9d13c8c01ccdf4225782607))
+* **backend:** Add AI visibility and AI Chatbot backends ([9e9f83a](https://github.com/PascaleBeier/hitkeep/commit/9e9f83a76eafd0f1a218a2fd1966abfc7d92a79a))
+* **dashboard:** Add browser tracking ([0d6a124](https://github.com/PascaleBeier/hitkeep/commit/0d6a1241add3e05e099c5e7b58d166efc6b4d54c))
+* **dashboard:** Allow deep links for share links ([3792b78](https://github.com/PascaleBeier/hitkeep/commit/3792b78f75d13864defd45be1ea8016bd4e31d3c))
+* **l18n:** Localize mails ([6e6cd39](https://github.com/PascaleBeier/hitkeep/commit/6e6cd398ff4bac4a8e036df893266369cde7179e))
+* **security:** add spam filtering pipeline and hostname analytics support ([0c1da67](https://github.com/PascaleBeier/hitkeep/commit/0c1da671c0b405113b917412f1ea28752f41069a))
+
+
+### Bug Fixes
+
+* **backend:** Include AI fetch and in takeout and harden tkeout handler ([794731a](https://github.com/PascaleBeier/hitkeep/commit/794731a56838757c99d9deb387e799182ec0220e))
+* **backend:** Move bucket boundary fixes to mailable and improve mailable wording ([ab0a2cd](https://github.com/PascaleBeier/hitkeep/commit/ab0a2cd15b3e7063e83abfe4a416f7d587222e38))
+* **ci:** enforce hitkeep binary execute bit in docker image ([ae596c3](https://github.com/PascaleBeier/hitkeep/commit/ae596c33e1f79afb984a5983d669bb7a8c51f61d)), closes [#97](https://github.com/PascaleBeier/hitkeep/issues/97)
+* **deps:** bump frontend deps ([861c6d1](https://github.com/PascaleBeier/hitkeep/commit/861c6d173c43605ad1e4185e7c531ecf0834fb64))
+* **deps:** update go to 1.26.2 and update dependencies ([f8b395c](https://github.com/PascaleBeier/hitkeep/commit/f8b395cac97f91b1279868a7c2bb2e98e64569d7))
+* Ensure all handlers use spam filtering ([4617523](https://github.com/PascaleBeier/hitkeep/commit/461752320ab016ffedf94bcf1e446863c6fc4a36))
+* **frontend:** long domain names break sidebar UI (closes [#87](https://github.com/PascaleBeier/hitkeep/issues/87)) ([#88](https://github.com/PascaleBeier/hitkeep/issues/88)) ([98e1283](https://github.com/PascaleBeier/hitkeep/commit/98e1283676eed8d7b4c1384a6ff146df0c837389))
+* **frontend:** Update site selector to truncate ([7ac94d0](https://github.com/PascaleBeier/hitkeep/commit/7ac94d09b89843ada00d05c152304e5dfbbd2292))
+* harden rollup invalidation and session KPI safety ([5d4682b](https://github.com/PascaleBeier/hitkeep/commit/5d4682b046602675d7633324a6c5a980536f4117))
+* **tracker:** Pass on referer ([8287a92](https://github.com/PascaleBeier/hitkeep/commit/8287a929777018c78cce71cf1a822136b5ec31fc))
+
 ## [2.1.0](https://github.com/PascaleBeier/hitkeep/compare/v2.0.1...v2.1.0) (2026-03-15)
 
 
