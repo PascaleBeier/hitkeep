@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.1](https://github.com/PascaleBeier/hitkeep/compare/v2.2.0...v2.2.1) (2026-04-11)
+
+
+### Bug Fixes
+
+* **frontend:** regenerate dashboard lockfile with npm 11.11 ([2c609a3](https://github.com/PascaleBeier/hitkeep/commit/2c609a35ecd69afa78036d2cf2e01149433fbfae))
+* **ingestion:** use explicit column order for batch ingestion with legacy schema, resolves [#99](https://github.com/PascaleBeier/hitkeep/issues/99) ([3c4129f](https://github.com/PascaleBeier/hitkeep/commit/3c4129f60717c8915ba80bf7ad76c2da6976ae60))
+
 ## [2.2.0](https://github.com/PascaleBeier/hitkeep/compare/v2.1.0...v2.2.0) (2026-04-09)
 
 
