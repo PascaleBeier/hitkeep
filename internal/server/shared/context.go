@@ -277,7 +277,7 @@ func extractAPIClientToken(r *http.Request) string {
 		}
 	}
 
-	return strings.TrimSpace(r.Header.Get("X-API-Key"))
+	return strings.TrimSpace(r.Header.Get("X-Api-Key"))
 }
 
 // WithRateLimit wraps a handler with IP-based rate limiting.

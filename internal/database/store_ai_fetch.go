@@ -585,6 +585,9 @@ func (s *Store) ExportAIFetchCSV(ctx context.Context, params api.AIFetchQueryPar
 			return fmt.Errorf("failed to write csv record: %w", err)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed to read ai fetch export rows: %w", err)
+	}
 
 	writer.Flush()
 	if err := writer.Error(); err != nil {

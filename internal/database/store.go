@@ -41,7 +41,7 @@ func (s *Store) Connect() error {
 	}
 	db := sql.OpenDB(connector)
 
-	if err := db.Ping(); err != nil {
+	if err := db.PingContext(context.Background()); err != nil {
 		_ = db.Close()
 		return fmt.Errorf("could not connect to database: %w", err)
 	}

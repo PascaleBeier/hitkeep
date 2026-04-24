@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/netip"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -41,6 +42,12 @@ type Config struct {
 	MailPassword                string
 	MailPort                    int
 	MailUsername                string
+	MCPDocsCacheMinutes         int
+	MCPDocsEnabled              bool
+	MCPDocsURL                  string
+	MCPEnabled                  bool
+	MCPMaxRangeDays             int
+	MCPPath                     string
 	NodeName                    string
 	NSQHTTPAddress              string
 	NSQTCPAddress               string
@@ -215,6 +222,12 @@ func load(args []string, getEnv func(string, string) string) *Config {
 	defS3UseSSL := getBool("HITKEEP_S3_USE_SSL", true)
 
 	defTrustedProxies := getEnv("HITKEEP_TRUSTED_PROXIES", "*")
+	defMCPEnabled := getBool("HITKEEP_MCP_ENABLED", false)
+	defMCPPath := getEnv("HITKEEP_MCP_PATH", "/mcp")
+	defMCPMaxRangeDays := getInt("HITKEEP_MCP_MAX_RANGE_DAYS", 366)
+	defMCPDocsEnabled := getBool("HITKEEP_MCP_DOCS_ENABLED", true)
+	defMCPDocsURL := getEnv("HITKEEP_MCP_DOCS_URL", "https://hitkeep.com")
+	defMCPDocsCacheMinutes := getInt("HITKEEP_MCP_DOCS_CACHE_MINUTES", 60)
 
 	hostname, _ := os.Hostname()
 	defNodeName := getEnv("HITKEEP_NODE_NAME", fmt.Sprintf("%s-%d", hostname, time.Now().UnixNano()))
@@ -271,6 +284,13 @@ func load(args []string, getEnv func(string, string) string) *Config {
 	fs.StringVar(&conf.S3URLStyle, "s3-url-style", defS3URLStyle, "S3 URL style: path or vhost")
 	fs.BoolVar(&conf.S3UseSSL, "s3-use-ssl", defS3UseSSL, "S3 use SSL (set false for local MinIO over HTTP)")
 
+	fs.BoolVar(&conf.MCPEnabled, "mcp-enabled", defMCPEnabled, "Enable the optional leader-only MCP server")
+	fs.StringVar(&conf.MCPPath, "mcp-path", defMCPPath, "MCP server HTTP path on the main HitKeep HTTP server")
+	fs.IntVar(&conf.MCPMaxRangeDays, "mcp-max-range-days", defMCPMaxRangeDays, "Maximum analytics date range in days for MCP tools")
+	fs.BoolVar(&conf.MCPDocsEnabled, "mcp-docs-enabled", defMCPDocsEnabled, "Enable MCP tools and resources that read official HitKeep docs")
+	fs.StringVar(&conf.MCPDocsURL, "mcp-docs-url", defMCPDocsURL, "Base URL for official HitKeep docs used by MCP docs tools")
+	fs.IntVar(&conf.MCPDocsCacheMinutes, "mcp-docs-cache-minutes", defMCPDocsCacheMinutes, "Minutes to cache fetched docs for MCP tools")
+
 	registerCloudFlags(fs, &conf, getEnv, getInt, getInt64, getBool)
 
 	fs.StringVar(&conf.TrustedProxies, "trusted-proxies", defTrustedProxies, "Trusted proxy CIDRs (comma-separated) or '*' to trust all")
@@ -295,8 +315,34 @@ func load(args []string, getEnv func(string, string) string) *Config {
 			slog.Info("Loaded trusted proxy networks", "count", len(conf.trustedProxyNets))
 		}
 	}
+	normalizeMCPConfig(&conf)
 
 	return &conf
+}
+
+func normalizeMCPConfig(conf *Config) {
+	conf.MCPPath = strings.TrimSpace(conf.MCPPath)
+	if conf.MCPPath == "" {
+		conf.MCPPath = "/mcp"
+	}
+	if !strings.HasPrefix(conf.MCPPath, "/") {
+		conf.MCPPath = "/" + conf.MCPPath
+	}
+
+	if conf.MCPMaxRangeDays <= 0 {
+		conf.MCPMaxRangeDays = 366
+	}
+	if conf.MCPDocsCacheMinutes <= 0 {
+		conf.MCPDocsCacheMinutes = 60
+	}
+
+	docsURL := strings.TrimRight(strings.TrimSpace(conf.MCPDocsURL), "/")
+	parsed, err := url.Parse(docsURL)
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		slog.Warn("Invalid MCP docs URL, using default", "value", conf.MCPDocsURL)
+		docsURL = "https://hitkeep.com"
+	}
+	conf.MCPDocsURL = docsURL
 }
 
 // parseTrustedProxies parses a comma-separated list of CIDR ranges.

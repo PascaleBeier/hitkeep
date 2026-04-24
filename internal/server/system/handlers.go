@@ -21,7 +21,6 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 	mux.HandleFunc("GET /api/docs/v1/openapi.json", h.handleGetAPIDocV1())
 }
 
-// handleHealthz checks the health of the node.
 func (h *handler) handleHealthz() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if h.ctx.Store != nil {
@@ -39,7 +38,6 @@ func (h *handler) handleHealthz() http.HandlerFunc {
 	}
 }
 
-// handleReadyz checks if the node is ready to serve traffic.
 func (h *handler) handleReadyz() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !h.ctx.Cluster.IsLeader() {

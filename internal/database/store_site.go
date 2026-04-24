@@ -192,6 +192,10 @@ func (s *Store) GetSites(ctx context.Context, userID uuid.UUID) ([]api.Site, err
 		}
 		sites = append(sites, site)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read site rows: %w", err)
+	}
+
 	return sites, nil
 }
 
@@ -280,6 +284,10 @@ func (s *Store) ListAllSites(ctx context.Context) ([]api.Site, error) {
 		}
 		sites = append(sites, site)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read all site rows: %w", err)
+	}
+
 	return sites, nil
 }
 

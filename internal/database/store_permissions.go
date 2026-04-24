@@ -214,6 +214,9 @@ func (s *Store) GetSiteMembers(ctx context.Context, siteID uuid.UUID) ([]api.Sit
 		}
 		members = append(members, m)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read site member rows: %w", err)
+	}
 
 	return members, nil
 }

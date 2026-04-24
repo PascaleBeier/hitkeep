@@ -9,6 +9,7 @@ linters:
     - asciicheck
     - bidichk
     - bodyclose
+    - canonicalheader
     - copyloopvar
     - decorder
     - dogsled
@@ -16,6 +17,7 @@ linters:
     - dupword
     - durationcheck
     - errcheck
+    - errchkjson
     - errname
     - exhaustive
     - gosec
@@ -23,8 +25,11 @@ linters:
     - importas
     - ineffassign
     - misspell
+    - noctx
     - prealloc
     - promlinter
+    - rowserrcheck
+    - sqlclosecheck
     - staticcheck
     - testableexamples
     - tparallel

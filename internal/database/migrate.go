@@ -100,6 +100,10 @@ func (s *Store) getAppliedMigrations(ctx context.Context) (map[string]bool, erro
 		}
 		applied[migration] = true
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("could not read migration rows: %w", err)
+	}
+
 	return applied, nil
 }
 

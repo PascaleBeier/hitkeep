@@ -95,6 +95,9 @@ func (s *Store) ExportChatbotEventsCSV(ctx context.Context, params api.ChatbotEx
 			return fmt.Errorf("failed to write chatbot csv record: %w", err)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed to read chatbot export rows: %w", err)
+	}
 
 	writer.Flush()
 	if err := writer.Error(); err != nil {

@@ -34,6 +34,24 @@ jobs:
       - name: Test API
         run: go test -race ./...
 
+  mcp-audit:
+    name: Audit MCP surface
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Audit MCP protocol surface
+        run: go test ./internal/mcpserver -run 'TestMCP.*Audit'
+      - name: Validate MCP registry metadata
+        run: .github/scripts/audit-mcp.sh --schema-only
+
   lint-dashboard:
     name: Lint Dashboard (Angular)
     runs-on: ubuntu-latest

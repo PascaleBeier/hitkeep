@@ -250,6 +250,97 @@ func TestLoadBackupConfigFromEnv(t *testing.T) {
 	}
 }
 
+func TestLoadMCPConfigDefaults(t *testing.T) {
+	conf := load([]string{}, func(key, fallback string) string {
+		return fallback
+	})
+
+	if conf.MCPEnabled {
+		t.Fatalf("expected MCP disabled by default")
+	}
+	if conf.MCPPath != "/mcp" {
+		t.Fatalf("expected default MCPPath /mcp, got %q", conf.MCPPath)
+	}
+	if conf.MCPMaxRangeDays != 366 {
+		t.Fatalf("expected default MCPMaxRangeDays 366, got %d", conf.MCPMaxRangeDays)
+	}
+	if !conf.MCPDocsEnabled {
+		t.Fatalf("expected MCP docs enabled by default")
+	}
+	if conf.MCPDocsURL != "https://hitkeep.com" {
+		t.Fatalf("expected default MCPDocsURL, got %q", conf.MCPDocsURL)
+	}
+	if conf.MCPDocsCacheMinutes != 60 {
+		t.Fatalf("expected default MCPDocsCacheMinutes 60, got %d", conf.MCPDocsCacheMinutes)
+	}
+}
+
+func TestLoadMCPConfigFromEnvAndFlags(t *testing.T) {
+	env := map[string]string{
+		"HITKEEP_MCP_ENABLED":            "true",
+		"HITKEEP_MCP_PATH":               "agent",
+		"HITKEEP_MCP_MAX_RANGE_DAYS":     "90",
+		"HITKEEP_MCP_DOCS_ENABLED":       "false",
+		"HITKEEP_MCP_DOCS_URL":           "https://docs.example.com/",
+		"HITKEEP_MCP_DOCS_CACHE_MINUTES": "15",
+	}
+
+	conf := load([]string{"-mcp-path", "/custom-mcp"}, func(key, fallback string) string {
+		if val, ok := env[key]; ok {
+			return val
+		}
+		return fallback
+	})
+
+	if !conf.MCPEnabled {
+		t.Fatalf("expected MCP enabled from env")
+	}
+	if conf.MCPPath != "/custom-mcp" {
+		t.Fatalf("expected flag MCPPath to win, got %q", conf.MCPPath)
+	}
+	if conf.MCPMaxRangeDays != 90 {
+		t.Fatalf("expected MCPMaxRangeDays 90, got %d", conf.MCPMaxRangeDays)
+	}
+	if conf.MCPDocsEnabled {
+		t.Fatalf("expected MCP docs disabled from env")
+	}
+	if conf.MCPDocsURL != "https://docs.example.com" {
+		t.Fatalf("expected trimmed MCPDocsURL, got %q", conf.MCPDocsURL)
+	}
+	if conf.MCPDocsCacheMinutes != 15 {
+		t.Fatalf("expected MCPDocsCacheMinutes 15, got %d", conf.MCPDocsCacheMinutes)
+	}
+}
+
+func TestLoadMCPConfigNormalizesInvalidValues(t *testing.T) {
+	env := map[string]string{
+		"HITKEEP_MCP_PATH":               "",
+		"HITKEEP_MCP_MAX_RANGE_DAYS":     "-2",
+		"HITKEEP_MCP_DOCS_URL":           "://bad",
+		"HITKEEP_MCP_DOCS_CACHE_MINUTES": "0",
+	}
+
+	conf := load([]string{}, func(key, fallback string) string {
+		if val, ok := env[key]; ok {
+			return val
+		}
+		return fallback
+	})
+
+	if conf.MCPPath != "/mcp" {
+		t.Fatalf("expected normalized MCPPath, got %q", conf.MCPPath)
+	}
+	if conf.MCPMaxRangeDays != 366 {
+		t.Fatalf("expected normalized MCPMaxRangeDays, got %d", conf.MCPMaxRangeDays)
+	}
+	if conf.MCPDocsURL != "https://hitkeep.com" {
+		t.Fatalf("expected normalized MCPDocsURL, got %q", conf.MCPDocsURL)
+	}
+	if conf.MCPDocsCacheMinutes != 60 {
+		t.Fatalf("expected normalized MCPDocsCacheMinutes, got %d", conf.MCPDocsCacheMinutes)
+	}
+}
+
 func isIPInNetworksForTest(ip netip.Addr, networks []netip.Prefix) bool {
 	for _, network := range networks {
 		if network.Contains(ip.Unmap()) {

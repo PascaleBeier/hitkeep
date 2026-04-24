@@ -196,6 +196,9 @@ func (s *Store) GetHits(ctx context.Context, params api.HitQueryParams) (*api.Pa
 		}
 		hits = append(hits, hit)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read hit rows: %w", err)
+	}
 
 	return &api.PaginatedHits{
 		Data:  hits,
@@ -303,6 +306,9 @@ func (s *Store) ExportHitsCSV(ctx context.Context, params api.HitQueryParams, w 
 		if err := writer.Write(record); err != nil {
 			return fmt.Errorf("failed to write csv record: %w", err)
 		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed to read hit export rows: %w", err)
 	}
 
 	writer.Flush()

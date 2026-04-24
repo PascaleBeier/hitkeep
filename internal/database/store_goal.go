@@ -79,6 +79,10 @@ func (s *Store) GetGoals(ctx context.Context, siteID uuid.UUID) ([]api.Goal, err
 		}
 		goals = append(goals, g)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read goal rows: %w", err)
+	}
+
 	return goals, nil
 }
 
@@ -188,6 +192,10 @@ func (s *Store) GetFunnels(ctx context.Context, siteID uuid.UUID) ([]api.Funnel,
 		}
 		funnels = append(funnels, f)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read funnel rows: %w", err)
+	}
+
 	return funnels, nil
 }
 

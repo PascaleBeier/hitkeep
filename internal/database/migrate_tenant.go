@@ -80,6 +80,10 @@ func (s *Store) getTenantAppliedMigrations(ctx context.Context) (map[string]bool
 		}
 		applied[migration] = true
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("could not read tenant migration rows: %w", err)
+	}
+
 	return applied, nil
 }
 

@@ -163,7 +163,13 @@ func (h *handler) handleIngestLeader(w http.ResponseWriter, r *http.Request) {
 		IsUnique:       &payload.IsUnique,
 	}
 
-	body, _ := json.Marshal(hit)
+	body, err := json.Marshal(hit)
+	if err != nil {
+		slog.Error("Failed to encode hit for NSQ", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
 	if err := h.ctx.Producer.Publish("hits", body); err != nil {
 		slog.Error("Failed to publish hit to NSQ", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -274,7 +280,13 @@ func (h *handler) handleIngestEventLeader(w http.ResponseWriter, r *http.Request
 		Timestamp:  time.Now().UTC(),
 	}
 
-	body, _ := json.Marshal(event)
+	body, err := json.Marshal(event)
+	if err != nil {
+		slog.Error("Failed to encode event for NSQ", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
 	if err := h.ctx.Producer.Publish("events", body); err != nil {
 		slog.Error("Failed to publish event to NSQ", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)

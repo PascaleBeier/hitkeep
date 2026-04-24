@@ -156,6 +156,9 @@ func Run() {
 		})
 	} else {
 		slog.Debug("Node is a follower, skipping stateful service initialization.")
+		if conf.MCPEnabled {
+			slog.Info("MCP server is leader-only and will not start on this follower")
+		}
 	}
 
 	httpServer := server.New(conf, publicFS, store, tenantMgr, ent, clusterManager, producer, mailSvc)
@@ -268,9 +271,17 @@ func runHealthcheck(conf *config.Config) error {
 		Timeout: 2 * time.Second,
 	}
 
-	resp, err := client.Get(url)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("build healthcheck request: %w", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("healthcheck request: %w", err)
 	}
 	defer resp.Body.Close()
 

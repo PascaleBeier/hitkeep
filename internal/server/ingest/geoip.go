@@ -70,17 +70,17 @@ func (e *CountryCodeExtractor) strategies(r *http.Request, language *string) ite
 // fromCDNHeaders extracts country code from CDN-provided headers.
 func (e *CountryCodeExtractor) fromCDNHeaders(r *http.Request) string {
 	// Cloudflare (most common)
-	if code := r.Header.Get("CF-IPCountry"); code != "" {
+	if code := r.Header.Get("Cf-Ipcountry"); code != "" {
 		return code
 	}
 
 	// Fastly
-	if code := r.Header.Get("Fastly-Client-IP-Country"); code != "" {
+	if code := r.Header.Get("Fastly-Client-Ip-Country"); code != "" {
 		return code
 	}
 
 	// AWS CloudFront
-	if code := r.Header.Get("CloudFront-Viewer-Country"); code != "" {
+	if code := r.Header.Get("Cloudfront-Viewer-Country"); code != "" {
 		return code
 	}
 
@@ -103,7 +103,7 @@ func (e *CountryCodeExtractor) fromProxyHeaders(r *http.Request) string {
 		return code
 	}
 
-	if code := r.Header.Get("X-GeoIP-Country-Code"); code != "" {
+	if code := r.Header.Get("X-Geoip-Country-Code"); code != "" {
 		return code
 	}
 
