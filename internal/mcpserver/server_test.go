@@ -6,7 +6,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -197,6 +200,36 @@ func TestMCPToolRejectsRangeBeyondConfiguredLimit(t *testing.T) {
 	}
 }
 
+func TestMCPToolRejectsComparisonRangeBeyondConfiguredLimit(t *testing.T) {
+	store, site, token := setupMCPStore(t)
+	conf := testMCPConfig(t, "")
+	conf.MCPMaxRangeDays = 1
+	handler := NewHandler(conf, store, nil, nil, nil)
+	ts := httptest.NewServer(handler)
+	defer ts.Close()
+
+	session := connectMCPClient(t, ts.URL+conf.MCPPath, token)
+	defer session.Close()
+
+	now := time.Now().UTC()
+	res, err := session.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "hitkeep_get_site_overview",
+		Arguments: map[string]any{
+			"site_id":      site.ID.String(),
+			"from":         now.Add(-time.Hour).Format(time.RFC3339),
+			"to":           now.Format(time.RFC3339),
+			"compare_from": now.Add(-48 * time.Hour).Format(time.RFC3339),
+			"compare_to":   now.Format(time.RFC3339),
+		},
+	})
+	if err != nil {
+		t.Fatalf("CallTool: %v", err)
+	}
+	if !res.IsError {
+		t.Fatalf("expected comparison range limit tool error")
+	}
+}
+
 func TestMCPResourcesListAndReadHelp(t *testing.T) {
 	store, _, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
@@ -329,6 +362,59 @@ func TestDocsClientBlocksOtherOriginsAndCachesMarkdown(t *testing.T) {
 	}
 	if _, err := client.GetMarkdown(context.Background(), "/guides/%2e%2e/secret"); err == nil {
 		t.Fatalf("expected encoded parent traversal to be rejected")
+	}
+}
+
+func TestDocsClientCoalescesConcurrentFetches(t *testing.T) {
+	var requests atomic.Int32
+	docsTS := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		time.Sleep(50 * time.Millisecond)
+		w.Header().Set("Content-Type", "text/markdown")
+		_, _ = w.Write([]byte("# MCP Integration\n"))
+	}))
+	defer docsTS.Close()
+
+	client := newDocsClient(docsTS.URL, time.Hour)
+	var wg sync.WaitGroup
+	errs := make(chan error, 20)
+	for range 20 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := client.GetMarkdown(context.Background(), "/guides/integrations/mcp/")
+			errs <- err
+		}()
+	}
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("GetMarkdown: %v", err)
+		}
+	}
+	if got := requests.Load(); got != 1 {
+		t.Fatalf("expected concurrent requests to coalesce to one fetch, got %d", got)
+	}
+}
+
+func TestDocsClientCapsCachedPages(t *testing.T) {
+	docsTS := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/markdown")
+		_, _ = w.Write([]byte("# " + r.URL.Path + "\n"))
+	}))
+	defer docsTS.Close()
+
+	client := newDocsClient(docsTS.URL, time.Hour)
+	for i := range maxDocCacheEntries + 5 {
+		if _, err := client.GetMarkdown(context.Background(), "/guides/page-"+strconv.Itoa(i)+"/"); err != nil {
+			t.Fatalf("GetMarkdown page %d: %v", i, err)
+		}
+	}
+
+	if got := client.pages.Len(); got != maxDocCacheEntries {
+		t.Fatalf("expected docs cache to cap at %d entries, got %d", maxDocCacheEntries, got)
 	}
 }
 

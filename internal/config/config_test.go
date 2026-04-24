@@ -341,6 +341,23 @@ func TestLoadMCPConfigNormalizesInvalidValues(t *testing.T) {
 	}
 }
 
+func TestLoadMCPConfigRejectsRootPath(t *testing.T) {
+	env := map[string]string{
+		"HITKEEP_MCP_PATH": "/",
+	}
+
+	conf := load([]string{}, func(key, fallback string) string {
+		if val, ok := env[key]; ok {
+			return val
+		}
+		return fallback
+	})
+
+	if conf.MCPPath != "/mcp" {
+		t.Fatalf("expected root MCPPath to normalize to /mcp, got %q", conf.MCPPath)
+	}
+}
+
 func isIPInNetworksForTest(ip netip.Addr, networks []netip.Prefix) bool {
 	for _, network := range networks {
 		if network.Contains(ip.Unmap()) {

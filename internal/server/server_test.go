@@ -37,6 +37,33 @@ func TestServerMountsMCPRouteWhenEnabled(t *testing.T) {
 	}
 }
 
+func TestServerNormalizesRootMCPPath(t *testing.T) {
+	conf := testServerConfig(t)
+	conf.MCPEnabled = true
+	conf.MCPPath = "/"
+	store := testServerStore(t)
+	defer store.Close()
+
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil)
+	defer func() {
+		_ = srv.Shutdown(context.Background())
+	}()
+
+	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`))
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	srv.httpServer.Handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected normalized MCP route to require bearer auth with 401, got %d", rec.Code)
+	}
+	if conf.MCPPath != "/mcp" {
+		t.Fatalf("expected server to normalize root MCPPath to /mcp, got %q", conf.MCPPath)
+	}
+}
+
 func TestServerDoesNotMountMCPRouteWhenDisabled(t *testing.T) {
 	conf := testServerConfig(t)
 	store := testServerStore(t)

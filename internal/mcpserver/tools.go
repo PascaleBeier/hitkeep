@@ -131,7 +131,7 @@ func (s *service) getSiteOverview(ctx context.Context, _ *mcp.CallToolRequest, i
 		Filters: filters,
 	}
 	if input.CompareFrom != "" || input.CompareTo != "" {
-		compareStart, compareEnd, err := parseExplicitRange(input.CompareFrom, input.CompareTo)
+		compareStart, compareEnd, err := parseExplicitRange(input.CompareFrom, input.CompareTo, s.conf.MCPMaxRangeDays)
 		if err != nil {
 			return nil, siteOverviewOutput{}, err
 		}
@@ -360,7 +360,7 @@ func parseRange(input rangeInput, maxDays int) (time.Time, time.Time, error) {
 	return start.UTC(), end.UTC(), nil
 }
 
-func parseExplicitRange(from, to string) (time.Time, time.Time, error) {
+func parseExplicitRange(from, to string, maxDays int) (time.Time, time.Time, error) {
 	if strings.TrimSpace(from) == "" || strings.TrimSpace(to) == "" {
 		return time.Time{}, time.Time{}, errors.New("compare_from and compare_to are required together")
 	}
@@ -374,6 +374,12 @@ func parseExplicitRange(from, to string) (time.Time, time.Time, error) {
 	}
 	if !end.After(start) {
 		return time.Time{}, time.Time{}, errors.New("compare_to must be after compare_from")
+	}
+	if maxDays <= 0 {
+		maxDays = 366
+	}
+	if end.Sub(start) > time.Duration(maxDays)*24*time.Hour {
+		return time.Time{}, time.Time{}, fmt.Errorf("comparison date range exceeds %d days", maxDays)
 	}
 	return start.UTC(), end.UTC(), nil
 }

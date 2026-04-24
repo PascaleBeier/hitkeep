@@ -315,14 +315,14 @@ func load(args []string, getEnv func(string, string) string) *Config {
 			slog.Info("Loaded trusted proxy networks", "count", len(conf.trustedProxyNets))
 		}
 	}
-	normalizeMCPConfig(&conf)
+	NormalizeMCPConfig(&conf)
 
 	return &conf
 }
 
-func normalizeMCPConfig(conf *Config) {
+func NormalizeMCPConfig(conf *Config) {
 	conf.MCPPath = strings.TrimSpace(conf.MCPPath)
-	if conf.MCPPath == "" {
+	if conf.MCPPath == "" || conf.MCPPath == "/" {
 		conf.MCPPath = "/mcp"
 	}
 	if !strings.HasPrefix(conf.MCPPath, "/") {

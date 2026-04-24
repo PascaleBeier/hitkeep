@@ -202,8 +202,3 @@ func rawSiteID(raw json.RawMessage) string {
 	}
 	return strings.TrimSpace(payload.SiteID)
 }
-
-//go:fix inline
-func boolPtr(v bool) *bool {
-	return new(v)
-}

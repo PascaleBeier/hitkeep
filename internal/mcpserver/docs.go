@@ -9,25 +9,24 @@ import (
 	"net/url"
 	"sort"
 	"strings"
-	"sync"
 	"time"
+
+	lru "github.com/hashicorp/golang-lru/v2/expirable"
+	"golang.org/x/sync/singleflight"
 )
 
-const maxDocBytes = 2 << 20
+const (
+	maxDocBytes        = 2 << 20
+	maxDocCacheEntries = 128
+)
 
 type docsClient struct {
 	base       *url.URL
 	ttl        time.Duration
 	httpClient *http.Client
 
-	mu    sync.Mutex
-	llms  docCacheEntry
-	pages map[string]docCacheEntry
-}
-
-type docCacheEntry struct {
-	page      docPage
-	expiresAt time.Time
+	fetches singleflight.Group
+	pages   *lru.LRU[string, docPage]
 }
 
 type docPage struct {
@@ -65,7 +64,7 @@ func newDocsClient(baseURL string, ttl time.Duration) *docsClient {
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
-		pages: make(map[string]docCacheEntry),
+		pages: lru.NewLRU[string, docPage](maxDocCacheEntries, nil, ttl),
 	}
 }
 
@@ -95,23 +94,21 @@ func (c *docsClient) Search(ctx context.Context, query string, limit int) ([]doc
 		})
 	}
 
-	c.mu.Lock()
-	for _, cached := range c.pages {
-		if cached.page.Path == "/llms.txt" {
+	for _, page := range c.pages.Values() {
+		if page.Path == "" || page.Path == "/llms.txt" {
 			continue
 		}
-		snippet, score := markdownSnippet(terms, cached.page.Markdown)
+		snippet, score := markdownSnippet(terms, page.Markdown)
 		if score > 0 {
 			results = append(results, docSearchResult{
-				Title:   titleFromMarkdown(cached.page.Markdown, cached.page.Path),
-				URL:     cached.page.URL,
-				Path:    cached.page.Path,
+				Title:   titleFromMarkdown(page.Markdown, page.Path),
+				URL:     page.URL,
+				Path:    page.Path,
 				Snippet: snippet,
 				Score:   score,
 			})
 		}
 	}
-	c.mu.Unlock()
 
 	sort.SliceStable(results, func(i, j int) bool {
 		if results[i].Score == results[j].Score {
@@ -128,30 +125,29 @@ func (c *docsClient) GetMarkdown(ctx context.Context, rawPath string) (docPage, 
 		return docPage{}, err
 	}
 
-	now := time.Now()
-	c.mu.Lock()
-	if cached, ok := c.pages[path]; ok && now.Before(cached.expiresAt) {
-		c.mu.Unlock()
-		return cached.page, nil
-	}
-	if path == "/llms.txt" && now.Before(c.llms.expiresAt) {
-		page := c.llms.page
-		c.mu.Unlock()
+	if page, ok := c.pages.Get(path); ok {
 		return page, nil
 	}
-	c.mu.Unlock()
 
-	page, err := c.fetchMarkdown(ctx, path)
+	value, err, _ := c.fetches.Do(path, func() (any, error) {
+		if page, ok := c.pages.Get(path); ok {
+			return page, nil
+		}
+
+		page, err := c.fetchMarkdown(ctx, path)
+		if err != nil {
+			return docPage{}, err
+		}
+		c.pages.Add(path, page)
+		return page, nil
+	})
 	if err != nil {
 		return docPage{}, err
 	}
-	entry := docCacheEntry{page: page, expiresAt: now.Add(c.ttl)}
-	c.mu.Lock()
-	c.pages[path] = entry
-	if path == "/llms.txt" {
-		c.llms = entry
+	page, ok := value.(docPage)
+	if !ok {
+		return docPage{}, errors.New("unexpected docs cache value")
 	}
-	c.mu.Unlock()
 	return page, nil
 }
 
