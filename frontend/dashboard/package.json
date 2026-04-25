@@ -32,7 +32,7 @@
         "@jsverse/transloco-locale": "^8.3.0",
         "@primeuix/themes": "^2.0.3",
         "@scalar/api-reference": "^1.52.3",
-        "@tailwindcss/postcss": "^4.2.3",
+        "@tailwindcss/postcss": "^4.2.4",
         "chart.js": "^4.5.1",
         "circle-flags": "^2.8.3",
         "primeicons": "^7.0.0",
