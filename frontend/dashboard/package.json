@@ -44,7 +44,7 @@
     },
     "devDependencies": {
         "@angular/build": "^21.2.7",
-        "@angular/cli": "^21.2.7",
+        "@angular/cli": "^21.2.8",
         "@angular/compiler-cli": "^21.2.9",
         "@hitkeep/ng-e2e-builder": "file:tools/ng-e2e-builder",
         "@eslint/js": "^10.0.1",
