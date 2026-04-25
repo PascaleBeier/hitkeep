@@ -27,7 +27,7 @@
         "@angular/core": "^21.2.9",
         "@angular/forms": "^21.2.9",
         "@angular/platform-browser": "^21.2.9",
-        "@angular/router": "^21.2.9",
+        "@angular/router": "^21.2.10",
         "@fontsource-variable/lexend": "^5.2.11",
         "@jsverse/transloco-locale": "^8.3.0",
         "@primeuix/themes": "^2.0.3",
