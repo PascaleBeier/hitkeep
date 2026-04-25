@@ -50,6 +50,15 @@ describe('MetricList', () => {
         expect(fixture.nativeElement.textContent).toContain('30%');
     });
 
+    it('should show an empty state instead of a zero-value row when there is no data', () => {
+        fixture.componentRef.setInput('data', []);
+        fixture.detectChanges();
+
+        expect(fixture.debugElement.query(By.css('.metric-list__row--empty'))).not.toBeNull();
+        expect(fixture.nativeElement.textContent).toContain('common.empty.noDataTitle');
+        expect(fixture.nativeElement.textContent).not.toContain('0');
+    });
+
     it('should render distinct device icons', () => {
         fixture.componentRef.setInput('data', [
             { name: 'Desktop', value: 70 },

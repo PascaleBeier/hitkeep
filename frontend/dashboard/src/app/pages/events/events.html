@@ -137,8 +137,8 @@
                 [comparisonData]="comparisonEventSeriesChart()"
                 [isLoading]="isLoadingEventSeries()"
                 [isShortRange]="isShortRange()"
-                [emptyTitle]="'events.series.emptyTitle' | transloco"
-                [emptyDescription]="'events.series.emptyDescription' | transloco"
+                [emptyTitle]="(selectedEvent() ? 'events.series.emptySelectedTitle' : 'events.series.emptyTitle') | transloco"
+                [emptyDescription]="(selectedEvent() ? 'events.series.emptySelectedDescription' : 'events.series.emptyDescription') | transloco"
                 [comparisonLabel]="comparisonLabel()"
             />
         </p-card>

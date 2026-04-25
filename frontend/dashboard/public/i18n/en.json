@@ -1220,7 +1220,9 @@
             "title": "Event activity",
             "description": "Event occurrences over the selected period.",
             "emptyTitle": "No event data",
-            "emptyDescription": "Select an event to view activity over time."
+            "emptyDescription": "Select an event to view activity over time.",
+            "emptySelectedTitle": "No activity for this event",
+            "emptySelectedDescription": "There are no matching events in the selected period."
         },
         "breakdown": {
             "title": "Property breakdown",

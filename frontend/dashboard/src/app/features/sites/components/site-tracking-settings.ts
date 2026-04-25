@@ -19,20 +19,20 @@ import { ToggleSwitchModule } from 'primeng/toggleswitch';
             <div class="flex flex-col gap-4 py-4">
                 <h4 class="sr-only">{{ "sites.tracking.trackingCodeConfiguration" | transloco }}</h4>
 
-                <div class="flex items-center justify-between">
-                    <div class="flex flex-col">
-                        <span class="font-medium">{{ "sites.tracking.collectDntLabel" | transloco }}</span>
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex min-w-0 flex-col pr-3">
+                        <label id="collect-dnt-label" for="collect-dnt-switch" class="font-medium">{{ "sites.tracking.collectDntLabel" | transloco }}</label>
                         <span class="text-xs text-[var(--p-text-muted-color)]">{{ "sites.tracking.collectDntDescription" | transloco }}</span>
                     </div>
-                    <p-toggleswitch [formControl]="trackingForm.collectDnt().control()"></p-toggleswitch>
+                    <p-toggleswitch inputId="collect-dnt-switch" ariaLabelledBy="collect-dnt-label" styleClass="shrink-0" [formControl]="trackingForm.collectDnt().control()"></p-toggleswitch>
                 </div>
 
-                <div class="flex items-center justify-between">
-                    <div class="flex flex-col">
-                        <span class="font-medium">{{ "sites.tracking.disableBeaconLabel" | transloco }}</span>
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex min-w-0 flex-col pr-3">
+                        <label id="disable-beacon-label" for="disable-beacon-switch" class="font-medium">{{ "sites.tracking.disableBeaconLabel" | transloco }}</label>
                         <span class="text-xs text-[var(--p-text-muted-color)]">{{ "sites.tracking.disableBeaconDescription" | transloco }}</span>
                     </div>
-                    <p-toggleswitch [formControl]="trackingForm.disableBeacon().control()"></p-toggleswitch>
+                    <p-toggleswitch inputId="disable-beacon-switch" ariaLabelledBy="disable-beacon-label" styleClass="shrink-0" [formControl]="trackingForm.disableBeacon().control()"></p-toggleswitch>
                 </div>
 
                 <div class="pt-2 border-t border-[var(--p-surface-border)]">
@@ -40,28 +40,28 @@ import { ToggleSwitchModule } from 'primeng/toggleswitch';
                     <p class="text-xs text-[var(--p-text-muted-color)] mt-1">{{ "sites.tracking.autoTrackingDescription" | transloco }}</p>
                 </div>
 
-                <div class="flex items-center justify-between">
-                    <div class="flex flex-col">
-                        <span class="font-medium">{{ "sites.tracking.outboundTrackingLabel" | transloco }}</span>
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex min-w-0 flex-col pr-3">
+                        <label id="outbound-tracking-label" for="outbound-tracking-switch" class="font-medium">{{ "sites.tracking.outboundTrackingLabel" | transloco }}</label>
                         <span class="text-xs text-[var(--p-text-muted-color)]">{{ "sites.tracking.outboundTrackingDescription" | transloco }}</span>
                     </div>
-                    <p-toggleswitch [formControl]="trackingForm.trackOutbound().control()"></p-toggleswitch>
+                    <p-toggleswitch inputId="outbound-tracking-switch" ariaLabelledBy="outbound-tracking-label" styleClass="shrink-0" [formControl]="trackingForm.trackOutbound().control()"></p-toggleswitch>
                 </div>
 
-                <div class="flex items-center justify-between">
-                    <div class="flex flex-col">
-                        <span class="font-medium">{{ "sites.tracking.downloadTrackingLabel" | transloco }}</span>
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex min-w-0 flex-col pr-3">
+                        <label id="download-tracking-label" for="download-tracking-switch" class="font-medium">{{ "sites.tracking.downloadTrackingLabel" | transloco }}</label>
                         <span class="text-xs text-[var(--p-text-muted-color)]">{{ "sites.tracking.downloadTrackingDescription" | transloco }}</span>
                     </div>
-                    <p-toggleswitch [formControl]="trackingForm.trackDownloads().control()"></p-toggleswitch>
+                    <p-toggleswitch inputId="download-tracking-switch" ariaLabelledBy="download-tracking-label" styleClass="shrink-0" [formControl]="trackingForm.trackDownloads().control()"></p-toggleswitch>
                 </div>
 
-                <div class="flex items-center justify-between">
-                    <div class="flex flex-col">
-                        <span class="font-medium">{{ "sites.tracking.formTrackingLabel" | transloco }}</span>
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex min-w-0 flex-col pr-3">
+                        <label id="form-tracking-label" for="form-tracking-switch" class="font-medium">{{ "sites.tracking.formTrackingLabel" | transloco }}</label>
                         <span class="text-xs text-[var(--p-text-muted-color)]">{{ "sites.tracking.formTrackingDescription" | transloco }}</span>
                     </div>
-                    <p-toggleswitch [formControl]="trackingForm.trackForms().control()"></p-toggleswitch>
+                    <p-toggleswitch inputId="form-tracking-switch" ariaLabelledBy="form-tracking-label" styleClass="shrink-0" [formControl]="trackingForm.trackForms().control()"></p-toggleswitch>
                 </div>
             </div>
 

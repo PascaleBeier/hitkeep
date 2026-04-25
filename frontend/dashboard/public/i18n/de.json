@@ -1220,7 +1220,9 @@
             "title": "Event-Aktivität",
             "description": "Event-Vorkommen im ausgewählten Zeitraum.",
             "emptyTitle": "Keine Event-Daten",
-            "emptyDescription": "Wähle ein Event, um die Aktivität im Zeitverlauf anzuzeigen."
+            "emptyDescription": "Wähle ein Event, um die Aktivität im Zeitverlauf anzuzeigen.",
+            "emptySelectedTitle": "Keine Aktivität für dieses Event",
+            "emptySelectedDescription": "Im ausgewählten Zeitraum gibt es keine passenden Events."
         },
         "breakdown": {
             "title": "Eigenschaftsaufschlüsselung",

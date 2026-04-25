@@ -1220,7 +1220,9 @@
             "title": "Actividad de eventos",
             "description": "Ocurrencias de eventos en el período seleccionado.",
             "emptyTitle": "Sin datos de eventos",
-            "emptyDescription": "Selecciona un evento para ver la actividad a lo largo del tiempo."
+            "emptyDescription": "Selecciona un evento para ver la actividad a lo largo del tiempo.",
+            "emptySelectedTitle": "Sin actividad para este evento",
+            "emptySelectedDescription": "No hay eventos coincidentes en el período seleccionado."
         },
         "breakdown": {
             "title": "Desglose de propiedades",

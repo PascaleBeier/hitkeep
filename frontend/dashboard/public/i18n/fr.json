@@ -1220,7 +1220,9 @@
             "title": "Activité des événements",
             "description": "Occurrences d'événements sur la période sélectionnée.",
             "emptyTitle": "Aucune donnée d'événement",
-            "emptyDescription": "Sélectionnez un événement pour voir l'activité dans le temps."
+            "emptyDescription": "Sélectionnez un événement pour voir l'activité dans le temps.",
+            "emptySelectedTitle": "Aucune activité pour cet événement",
+            "emptySelectedDescription": "Aucun événement correspondant sur la période sélectionnée."
         },
         "breakdown": {
             "title": "Ventilation des propriétés",

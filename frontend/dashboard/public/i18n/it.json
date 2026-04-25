@@ -1220,7 +1220,9 @@
             "title": "Attività degli eventi",
             "description": "Occorrenze di eventi nel periodo selezionato.",
             "emptyTitle": "Nessun dato di evento",
-            "emptyDescription": "Seleziona un evento per visualizzare l'attività nel tempo."
+            "emptyDescription": "Seleziona un evento per visualizzare l'attività nel tempo.",
+            "emptySelectedTitle": "Nessuna attività per questo evento",
+            "emptySelectedDescription": "Non ci sono eventi corrispondenti nel periodo selezionato."
         },
         "breakdown": {
             "title": "Suddivisione delle proprietà",

@@ -19,10 +19,8 @@
     </div>
     } @else if (!data() || data().length === 0) {
     <ul class="metric-list__rows">
-        <li class="metric-list__row metric-list__row--empty relative flex items-center justify-between p-2 text-sm">
-            <div class="metric-list__row-fill metric-list__row-fill--empty"></div>
-            <span class="metric-list__label">{{ "common.unspecified" | transloco }}</span>
-            <span class="metric-list__value">0</span>
+        <li class="metric-list__row metric-list__row--empty">
+            <span class="metric-list__empty-label">{{ "common.empty.noDataTitle" | transloco }}</span>
         </li>
     </ul>
     } @else {
