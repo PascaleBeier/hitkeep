@@ -283,8 +283,3 @@ func TestFetchSpamFeedDataAllFeedsFail(t *testing.T) {
 		t.Fatalf("unexpected error message: %v", err)
 	}
 }
-
-//go:fix inline
-func strPtr(value string) *string {
-	return new(value)
-}

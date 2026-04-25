@@ -128,16 +128,12 @@ func TestTeamAPIClientLifecycle(t *testing.T) {
 	defer store.Close()
 
 	ctx := context.Background()
-	tenantID, err := store.GetDefaultTenantID(ctx)
-	if err != nil {
-		t.Fatalf("get default tenant: %v", err)
-	}
 
 	team, err := store.CreateTenant(ctx, userID, "Automation Team", "")
 	if err != nil {
 		t.Fatalf("create tenant: %v", err)
 	}
-	tenantID = team.ID
+	tenantID := team.ID
 	if err := store.SetActiveTenantID(ctx, userID, tenantID); err != nil {
 		t.Fatalf("set active tenant: %v", err)
 	}

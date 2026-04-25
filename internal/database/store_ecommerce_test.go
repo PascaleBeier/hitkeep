@@ -274,13 +274,3 @@ func TestGetEcommerceSummaryWithoutPurchasesLeavesCurrencyEmpty(t *testing.T) {
 		t.Fatalf("expected zeroed summary, got %+v", summary)
 	}
 }
-
-//go:fix inline
-func stringPtr(value string) *string {
-	return new(value)
-}
-
-//go:fix inline
-func intPtr(value int) *int {
-	return new(value)
-}

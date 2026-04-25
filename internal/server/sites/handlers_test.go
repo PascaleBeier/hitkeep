@@ -669,16 +669,6 @@ func TestHandleGetSiteHits(t *testing.T) {
 	}
 }
 
-//go:fix inline
-func siteStringPtr(value string) *string {
-	return new(value)
-}
-
-//go:fix inline
-func siteIntPtr(value int) *int {
-	return new(value)
-}
-
 func TestHandleExportSiteHitsSupportsAllFormats(t *testing.T) {
 	h, store, userID := setupTestEnv(t)
 	t.Cleanup(func() { _ = store.Close() })

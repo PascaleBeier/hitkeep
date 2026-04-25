@@ -1,5 +1,7 @@
 all: run
 
+STATICCHECK_VERSION ?= v0.7.0
+
 build: frontend-build go-build
 
 go-build:
@@ -76,4 +78,8 @@ dev-cloud-backend:
 		HITKEEP_PUBLIC_URL=$${HITKEEP_PUBLIC_URL:-http://localhost:4200} \
 		air -c .air-cloud.toml
 
-.PHONY: all build go-build frontend-build frontend-dashboard-build run clean update-default-spam-filter dev dev-seed dev-backend dev-frontend dev-cloud dev-cloud-backend
+staticcheck:
+	@echo "Running Staticcheck..."
+	go run honnef.co/go/tools/cmd/staticcheck@$(STATICCHECK_VERSION) ./...
+
+.PHONY: all build go-build frontend-build frontend-dashboard-build run clean update-default-spam-filter dev dev-seed dev-backend dev-frontend dev-cloud dev-cloud-backend staticcheck
