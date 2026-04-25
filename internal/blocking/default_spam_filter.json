@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-24T07:26:33.874056Z",
+  "generated_at": "2026-04-25T18:16:28.227108Z",
   "sources": {
     "matomo_referrer_spam_list": "https://raw.githubusercontent.com/matomo-org/referrer-spam-list/master/spammers.txt",
     "spamhaus_drop": "https://www.spamhaus.org/drop/drop.txt",
