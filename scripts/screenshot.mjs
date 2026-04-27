@@ -151,15 +151,44 @@ async function selectFirstVisibleOption(page, selector) {
   return true;
 }
 
+async function selectVisibleOptionMatching(page, selector, pattern) {
+  const select = page.locator(`${selector}:visible`).first();
+  if (!(await select.count())) return false;
+  if (!(await select.isEnabled())) return false;
+  if ((await select.getAttribute("aria-disabled")) === "true") return false;
+
+  await select.click({ timeout: 2_000 });
+  await page.waitForSelector('[role="option"]:visible', { timeout: 5_000 });
+
+  const options = page.locator('[role="option"]:visible');
+  const count = await options.count();
+  for (let i = 0; i < count; i += 1) {
+    const option = options.nth(i);
+    const optionText = ((await option.textContent()) ?? "").trim();
+    if (!pattern.test(optionText)) continue;
+
+    await option.click();
+    await page.waitForTimeout(TABLE_SETTLE);
+    await page.waitForFunction(
+      ({ cssSelector, expectedText }) => {
+        const el = document.querySelector(cssSelector);
+        return !!el && (el.textContent || "").includes(expectedText);
+      },
+      { cssSelector: selector, expectedText: optionText.replace(/\s*Auto\s*$/i, "") },
+      { timeout: 5_000 },
+    );
+    return true;
+  }
+
+  await page.keyboard.press("Escape");
+  return false;
+}
+
 async function prepareEventBreakdown(page) {
   const eventSelector = "#event-name-select";
   const propertySelector = "#property-key-select";
 
-  const automaticQuickPick = page.getByRole("button", { name: /outbound clicks/i }).first();
-  if (await automaticQuickPick.count()) {
-    await automaticQuickPick.click();
-    await page.waitForTimeout(TABLE_SETTLE);
-  } else if (!(await selectFirstVisibleOption(page, eventSelector))) {
+  if (!(await selectVisibleOptionMatching(page, eventSelector, /outbound_click/i)) && !(await selectFirstVisibleOption(page, eventSelector))) {
     console.warn("    ! Event selector could not pick a value");
     return false;
   }
