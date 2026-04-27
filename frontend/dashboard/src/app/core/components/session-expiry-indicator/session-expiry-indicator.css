@@ -1,0 +1,63 @@
+:host {
+    display: contents;
+}
+
+.hk-session-dialog {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 1rem;
+}
+
+.hk-session-dialog__icon {
+    display: grid;
+    width: 2.5rem;
+    height: 2.5rem;
+    place-items: center;
+    border-radius: 999px;
+    color: var(--p-amber-700);
+    background: var(--p-amber-50);
+}
+
+.hk-session-dialog__body {
+    min-width: 0;
+}
+
+.hk-session-dialog__body h2 {
+    margin: 0;
+    color: var(--p-text-color);
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.hk-session-dialog__body p {
+    margin: 0.5rem 0 0;
+    color: var(--p-text-muted-color);
+    line-height: 1.5;
+}
+
+.hk-session-dialog__meta {
+    font-size: 0.875rem;
+}
+
+.hk-session-dialog__error {
+    color: var(--p-red-600) !important;
+    font-weight: 600;
+}
+
+.hk-session-dialog__actions {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding-top: 0.5rem;
+}
+
+@media (max-width: 640px) {
+    .hk-session-dialog {
+        grid-template-columns: 1fr;
+    }
+
+    .hk-session-dialog__actions {
+        flex-direction: column-reverse;
+    }
+}

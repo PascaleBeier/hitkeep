@@ -1076,7 +1076,22 @@
         "administration": "Amministrazione",
         "userSettings": "Impostazioni utente",
         "preferences": "Preferenze",
+        "sessionStatus": "Sessione: ancora {{remaining}}",
+        "rememberedSessionStatus": "Ricordami: ancora {{remaining}}",
+        "extendSession": "Estendi sessione",
         "signOut": "Disconnetti"
+    },
+    "session": {
+        "label": "Sessione",
+        "rememberedLabel": "Ricordami",
+        "tooltip": "La sessione della dashboard dura {{duration}}. HitKeep ti avvisa {{warning}} prima della scadenza.",
+        "rememberedTooltip": "Ricordami è attivo. Il timer segue il periodo di accesso ricordato.",
+        "warningTitle": "La sessione sta per scadere",
+        "warningDescription": "Verrai disconnesso tra {{remaining}} se non estendi la sessione.",
+        "policyDescription": "Questa istanza è configurata con sessioni dashboard di {{duration}}.",
+        "extendAction": "Resta connesso",
+        "signOutAction": "Disconnetti",
+        "extendError": "Non siamo riusciti a estendere la sessione. Accedi di nuovo se scade."
     },
     "login": {
         "subtitle": "Accedi alla tua dashboard",
@@ -1092,6 +1107,7 @@
         "passwordRequired": "La password è obbligatoria.",
         "forgotPassword": "Password dimenticata?",
         "rememberMe": "Ricordami",
+        "sessionHelp": "Mantiene l’accesso su questo dispositivo secondo la policy dell’istanza. HitKeep mostra comunque gli avvisi di scadenza e chiede conferma prima di estendere quando serve.",
         "signIn": "Accedi",
         "or": "o",
         "signInWithPasskey": "Accedi con passkey",

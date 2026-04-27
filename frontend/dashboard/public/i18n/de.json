@@ -1076,7 +1076,22 @@
         "administration": "Verwaltung",
         "userSettings": "Benutzereinstellungen",
         "preferences": "Einstellungen",
+        "sessionStatus": "Session: noch {{remaining}}",
+        "rememberedSessionStatus": "Angemeldet bleiben: noch {{remaining}}",
+        "extendSession": "Session verlängern",
         "signOut": "Abmelden"
+    },
+    "session": {
+        "label": "Session",
+        "rememberedLabel": "Angemeldet bleiben",
+        "tooltip": "Deine Dashboard-Session läuft {{duration}}. HitKeep warnt dich {{warning}} vor Ablauf.",
+        "rememberedTooltip": "Angemeldet bleiben ist aktiv. Der Timer folgt dem gespeicherten Anmeldezeitraum.",
+        "warningTitle": "Deine Session läuft bald ab",
+        "warningDescription": "Du wirst in {{remaining}} abgemeldet, wenn du die Session nicht verlängerst.",
+        "policyDescription": "Diese Instanz ist für Dashboard-Sessions von {{duration}} konfiguriert.",
+        "extendAction": "Angemeldet bleiben",
+        "signOutAction": "Abmelden",
+        "extendError": "Die Session konnte nicht verlängert werden. Melde dich erneut an, falls sie abläuft."
     },
     "login": {
         "subtitle": "Melde dich an, um dein Dashboard zu öffnen.",
@@ -1092,6 +1107,7 @@
         "passwordRequired": "Passwort ist erforderlich.",
         "forgotPassword": "Passwort vergessen?",
         "rememberMe": "Angemeldet bleiben",
+        "sessionHelp": "Hält dich auf diesem Gerät gemäß Instanzrichtlinie angemeldet. HitKeep zeigt weiterhin Ablaufwarnungen und fragt vor einer Verlängerung, wenn eine Aktion nötig ist.",
         "signIn": "Anmelden",
         "or": "oder",
         "signInWithPasskey": "Mit Passkey anmelden",

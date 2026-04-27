@@ -217,5 +217,16 @@ describe('MainLayout', () => {
         httpMock.expectOne('/api/user/preferences').flush({
             default_locale: 'en'
         });
+        httpMock.expectOne('/api/auth/session').flush({
+            expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+            issued_at: new Date().toISOString(),
+            duration_seconds: 900,
+            warning_seconds: 120,
+            extendable: true,
+            timing_adjustable: true,
+            remembered: false,
+            remember_expires_at: null,
+            remember_me_duration_days: 30
+        });
     }
 });

@@ -121,6 +121,18 @@ type UserPreferences struct {
 	DefaultLocale string `json:"default_locale"`
 }
 
+type AuthSession struct {
+	ExpiresAt              time.Time  `json:"expires_at"`
+	IssuedAt               time.Time  `json:"issued_at"`
+	DurationSeconds        int        `json:"duration_seconds"`
+	WarningSeconds         int        `json:"warning_seconds"`
+	Extendable             bool       `json:"extendable"`
+	TimingAdjustable       bool       `json:"timing_adjustable"`
+	Remembered             bool       `json:"remembered"`
+	RememberExpiresAt      *time.Time `json:"remember_expires_at,omitempty"`
+	RememberMeDurationDays int        `json:"remember_me_duration_days"`
+}
+
 type UserPasskey struct {
 	ID        uuid.UUID `json:"id"`
 	Name      string    `json:"name"`

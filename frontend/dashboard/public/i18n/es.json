@@ -1076,7 +1076,22 @@
         "administration": "Administración",
         "userSettings": "Configuración de usuario",
         "preferences": "Preferencias",
+        "sessionStatus": "Sesión: quedan {{remaining}}",
+        "rememberedSessionStatus": "Recordarme: quedan {{remaining}}",
+        "extendSession": "Extender sesión",
         "signOut": "Cerrar sesión"
+    },
+    "session": {
+        "label": "Sesión",
+        "rememberedLabel": "Recordarme",
+        "tooltip": "Tu sesión del panel dura {{duration}}. HitKeep te avisa {{warning}} antes de que caduque.",
+        "rememberedTooltip": "Recordarme está activo. El temporizador sigue el periodo de acceso recordado.",
+        "warningTitle": "Tu sesión está por caducar",
+        "warningDescription": "Se cerrará tu sesión en {{remaining}} si no la extiendes.",
+        "policyDescription": "Esta instancia está configurada con sesiones del panel de {{duration}}.",
+        "extendAction": "Mantener sesión",
+        "signOutAction": "Cerrar sesión",
+        "extendError": "No pudimos extender la sesión. Vuelve a iniciar sesión si caduca."
     },
     "login": {
         "subtitle": "Inicia sesión en tu panel",
@@ -1092,6 +1107,7 @@
         "passwordRequired": "La contraseña es obligatoria.",
         "forgotPassword": "¿Olvidaste tu contraseña?",
         "rememberMe": "Recordarme",
+        "sessionHelp": "Mantiene la sesión iniciada en este dispositivo según la política de la instancia. HitKeep sigue mostrando avisos de caducidad y pide confirmación antes de extender cuando hace falta.",
         "signIn": "Iniciar sesión",
         "or": "o",
         "signInWithPasskey": "Iniciar sesión con passkey",

@@ -335,6 +335,183 @@ func TestHandleLogout(t *testing.T) {
 	}
 }
 
+func TestHandleGetSession(t *testing.T) {
+	h, store := setupAuthTestEnv(t)
+	defer store.Close()
+	h.ctx.Config.AuthSessionMinutes = 30
+	h.ctx.Config.AuthSessionWarningSeconds = 90
+
+	expiresAt := time.Now().UTC().Add(30 * time.Minute)
+	issuedAt := time.Now().UTC()
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/session", nil)
+	req = req.WithContext(context.WithValue(req.Context(), shared.AuthSessionKey, shared.AuthSessionContext{
+		ExpiresAt: expiresAt,
+		IssuedAt:  issuedAt,
+	}))
+	w := httptest.NewRecorder()
+
+	h.handleGetSession().ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
+	}
+
+	var resp api.AuthSession
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.DurationSeconds != 1800 {
+		t.Fatalf("expected 1800 duration seconds, got %d", resp.DurationSeconds)
+	}
+	if resp.WarningSeconds != 90 {
+		t.Fatalf("expected 90 warning seconds, got %d", resp.WarningSeconds)
+	}
+	if !resp.Extendable || !resp.TimingAdjustable {
+		t.Fatalf("expected extendable timing-adjustable session, got %+v", resp)
+	}
+}
+
+func TestHandleGetSessionReflectsRememberMe(t *testing.T) {
+	h, store := setupAuthTestEnv(t)
+	defer store.Close()
+	h.ctx.Config.AuthRememberMeDays = 14
+
+	userID, err := store.CreateUser(context.Background(), "remembered-session@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	rememberToken, _, err := store.CreateRememberMeSessionWithDuration(context.Background(), userID, h.ctx.Config.AuthRememberMeDuration())
+	if err != nil {
+		t.Fatalf("create remember me token: %v", err)
+	}
+
+	expiresAt := time.Now().UTC().Add(30 * time.Minute)
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/session", nil)
+	req.AddCookie(&http.Cookie{Name: auth.RememberMeCookieName, Value: rememberToken})
+	ctx := context.WithValue(req.Context(), shared.UserIDKey, userID)
+	ctx = context.WithValue(ctx, shared.AuthSessionKey, shared.AuthSessionContext{
+		ExpiresAt: expiresAt,
+		IssuedAt:  time.Now().UTC(),
+	})
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+
+	h.handleGetSession().ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
+	}
+
+	var resp api.AuthSession
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if !resp.Remembered {
+		t.Fatalf("expected remembered session, got %+v", resp)
+	}
+	if resp.RememberMeDurationDays != 14 {
+		t.Fatalf("expected configured remember me duration in response, got %d", resp.RememberMeDurationDays)
+	}
+	if resp.RememberExpiresAt == nil || time.Until(*resp.RememberExpiresAt) < 13*24*time.Hour {
+		t.Fatalf("expected remember me expiry around 14 days, got %+v", resp.RememberExpiresAt)
+	}
+}
+
+func TestHandleExtendSessionIssuesConfiguredCookie(t *testing.T) {
+	h, store := setupAuthTestEnv(t)
+	defer store.Close()
+	h.ctx.Config.AuthSessionMinutes = 30
+	h.ctx.Config.AuthSessionWarningSeconds = 90
+
+	userID, err := store.CreateUser(context.Background(), "session@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/session/extend", nil)
+	req = req.WithContext(context.WithValue(req.Context(), shared.UserIDKey, userID))
+	w := httptest.NewRecorder()
+
+	h.handleExtendSession().ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
+	}
+
+	var resp api.AuthSession
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.DurationSeconds != 1800 || resp.WarningSeconds != 90 {
+		t.Fatalf("expected configured policy in response, got %+v", resp)
+	}
+	if time.Until(resp.ExpiresAt) < 29*time.Minute {
+		t.Fatalf("expected renewed expiry around 30 minutes, got %s", resp.ExpiresAt)
+	}
+
+	cookies := w.Header().Values("Set-Cookie")
+	if !slices.ContainsFunc(cookies, func(cookie string) bool {
+		return strings.Contains(cookie, auth.CookieName+"=")
+	}) {
+		t.Fatalf("expected auth cookie to be set, got %v", cookies)
+	}
+}
+
+func TestHandleExtendSessionRenewsRememberMeCookie(t *testing.T) {
+	h, store := setupAuthTestEnv(t)
+	defer store.Close()
+	h.ctx.Config.AuthRememberMeDays = 14
+
+	userID, err := store.CreateUser(context.Background(), "extend-remember@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	rememberToken, err := store.CreateRememberMeToken(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("create remember me token: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/session/extend", nil)
+	req.AddCookie(&http.Cookie{Name: auth.RememberMeCookieName, Value: rememberToken})
+	req = req.WithContext(context.WithValue(req.Context(), shared.UserIDKey, userID))
+	w := httptest.NewRecorder()
+
+	h.handleExtendSession().ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
+	}
+
+	var resp api.AuthSession
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if !resp.Remembered || resp.RememberExpiresAt == nil {
+		t.Fatalf("expected renewed remember me session, got %+v", resp)
+	}
+	if resp.RememberMeDurationDays != 14 {
+		t.Fatalf("expected configured remember me duration in response, got %d", resp.RememberMeDurationDays)
+	}
+	if time.Until(*resp.RememberExpiresAt) < 13*24*time.Hour {
+		t.Fatalf("expected remember me expiry around 14 days, got %s", resp.RememberExpiresAt)
+	}
+
+	cookies := w.Header().Values("Set-Cookie")
+	if !slices.ContainsFunc(cookies, func(cookie string) bool {
+		return strings.Contains(cookie, auth.RememberMeCookieName+"=")
+	}) {
+		t.Fatalf("expected remember me cookie to be set, got %v", cookies)
+	}
+
+	resolvedUserID, err := store.ValidateRememberMeToken(context.Background(), rememberToken)
+	if err != nil {
+		t.Fatalf("validate old remember token: %v", err)
+	}
+	if resolvedUserID != uuid.Nil {
+		t.Fatalf("expected old remember me token to be rotated, got %s", resolvedUserID)
+	}
+}
+
 func TestHandleForgotPasswordFallsBackToAcceptLanguageLocale(t *testing.T) {
 	h, store := setupAuthTestEnv(t)
 	defer store.Close()

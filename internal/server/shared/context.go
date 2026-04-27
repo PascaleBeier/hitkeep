@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/nsqio/go-nsq"
@@ -25,11 +26,17 @@ type contextKey string
 const UserIDKey contextKey = "user_id"
 const PermissionKey contextKey = "permissions"
 const APIClientAuthKey contextKey = "api_client_auth"
+const AuthSessionKey contextKey = "auth_session"
 
 type PermissionContext struct {
 	UserID       uuid.UUID
 	InstanceRole auth.InstanceRole
 	SiteRole     auth.SiteRole // Only set if checking site permission.
+}
+
+type AuthSessionContext struct {
+	ExpiresAt time.Time
+	IssuedAt  time.Time
 }
 
 type HandlerConfig struct {
@@ -217,11 +224,17 @@ func (c *Context) RequireAuth(allowAPIKey bool, next http.HandlerFunc) http.Hand
 		var userID uuid.UUID
 		var err error
 		var apiClientAuth *database.APIClientAuth
+		var sessionCtx *AuthSessionContext
 
 		// 1. Try to validate the short-lived JWT.
 		cookie, err := r.Cookie(auth.CookieName)
 		if err == nil {
-			userID, err = auth.ValidateToken(cookie.Value, c.Config.JWTSecret, c.Config.PublicURL)
+			var claims *auth.Claims
+			claims, err = auth.ValidateTokenClaims(cookie.Value, c.Config.JWTSecret, c.Config.PublicURL)
+			if err == nil {
+				userID = claims.UserID
+				sessionCtx = authSessionContextFromClaims(claims)
+			}
 		}
 
 		// 2. If JWT is missing or invalid, try the Remember Me token.
@@ -231,10 +244,12 @@ func (c *Context) RequireAuth(allowAPIKey bool, next http.HandlerFunc) http.Hand
 				userID, err = c.Store.ValidateRememberMeToken(r.Context(), rememberCookie.Value)
 				if err == nil && userID != uuid.Nil {
 					// Valid remember me token! Issue a new JWT.
-					newToken, err := auth.GenerateToken(c.Config.JWTSecret, c.Config.PublicURL, userID)
+					duration := c.Config.AuthSessionDuration()
+					newToken, expiresAt, err := auth.GenerateTokenWithDuration(c.Config.JWTSecret, c.Config.PublicURL, userID, duration)
 					if err == nil {
 						isSecure := strings.HasPrefix(c.Config.PublicURL, "https://")
-						auth.SetTokenCookie(w, newToken, isSecure)
+						auth.SetTokenCookieWithDuration(w, newToken, isSecure, duration)
+						sessionCtx = &AuthSessionContext{ExpiresAt: expiresAt.UTC(), IssuedAt: time.Now().UTC()}
 					}
 				}
 			}
@@ -261,8 +276,23 @@ func (c *Context) RequireAuth(allowAPIKey bool, next http.HandlerFunc) http.Hand
 		if apiClientAuth != nil {
 			ctx = context.WithValue(ctx, APIClientAuthKey, apiClientAuth)
 		}
+		if sessionCtx != nil {
+			ctx = context.WithValue(ctx, AuthSessionKey, *sessionCtx)
+		}
 		next(w, r.WithContext(ctx))
 	}
+}
+
+func authSessionContextFromClaims(claims *auth.Claims) *AuthSessionContext {
+	if claims == nil || claims.ExpiresAt == nil {
+		return nil
+	}
+
+	session := &AuthSessionContext{ExpiresAt: claims.ExpiresAt.Time.UTC()}
+	if claims.IssuedAt != nil {
+		session.IssuedAt = claims.IssuedAt.Time.UTC()
+	}
+	return session
 }
 
 func extractAPIClientToken(r *http.Request) string {

@@ -20,6 +20,7 @@ import (
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/text/language"
 
+	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/mailer"
@@ -94,6 +95,14 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 	mux.HandleFunc("POST /api/logout", ctx.Handler(shared.HandlerConfig{
 		RateLimiter: ctx.AuthLimiter,
 	}, h.handleLogout()))
+	mux.HandleFunc("GET /api/auth/session", ctx.Handler(shared.HandlerConfig{
+		RequireAuth: true,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleGetSession()))
+	mux.HandleFunc("POST /api/auth/session/extend", ctx.Handler(shared.HandlerConfig{
+		RequireAuth: true,
+		RateLimiter: ctx.AuthLimiter,
+	}, h.handleExtendSession()))
 	mux.HandleFunc("POST /api/auth/forgot-password", ctx.Handler(shared.HandlerConfig{
 		RateLimiter: ctx.AuthLimiter,
 	}, h.handleForgotPassword()))
@@ -182,7 +191,8 @@ func (h *handler) handleCreateInitialUser() http.HandlerFunc {
 			return
 		}
 
-		token, err := authcore.GenerateToken(h.ctx.Config.JWTSecret, h.ctx.Config.PublicURL, userID)
+		duration := h.ctx.Config.AuthSessionDuration()
+		token, _, err := authcore.GenerateTokenWithDuration(h.ctx.Config.JWTSecret, h.ctx.Config.PublicURL, userID, duration)
 		if err != nil {
 			slog.Error("Failed to generate auth token", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -190,7 +200,7 @@ func (h *handler) handleCreateInitialUser() http.HandlerFunc {
 		}
 
 		isSecure := strings.HasPrefix(h.ctx.Config.PublicURL, "https://")
-		authcore.SetTokenCookie(w, token, isSecure)
+		authcore.SetTokenCookieWithDuration(w, token, isSecure, duration)
 
 		//nolint:gosec // email/user_id are expected audit fields after successful account setup.
 		slog.Info("Initial admin user created", "email", req.Email, "user_id", userID)
@@ -382,23 +392,138 @@ type loginResponse struct {
 }
 
 func (h *handler) issueLoginSession(ctx context.Context, w http.ResponseWriter, userID uuid.UUID, rememberMe bool) error {
-	token, err := authcore.GenerateToken(h.ctx.Config.JWTSecret, h.ctx.Config.PublicURL, userID)
+	duration := h.ctx.Config.AuthSessionDuration()
+	token, _, err := authcore.GenerateTokenWithDuration(h.ctx.Config.JWTSecret, h.ctx.Config.PublicURL, userID, duration)
 	if err != nil {
 		return fmt.Errorf("could not generate auth token: %w", err)
 	}
 
 	isSecure := strings.HasPrefix(h.ctx.Config.PublicURL, "https://")
-	authcore.SetTokenCookie(w, token, isSecure)
+	authcore.SetTokenCookieWithDuration(w, token, isSecure, duration)
 
 	if rememberMe {
-		rememberToken, err := h.ctx.Store.CreateRememberMeToken(ctx, userID)
+		rememberDuration := h.ctx.Config.AuthRememberMeDuration()
+		rememberToken, err := h.ctx.Store.CreateRememberMeTokenWithDuration(ctx, userID, rememberDuration)
 		if err != nil {
 			slog.Error("Failed to create remember me token", "error", err, "user_id", userID)
 			return nil
 		}
-		authcore.SetRememberMeCookie(w, rememberToken, isSecure)
+		authcore.SetRememberMeCookieWithDuration(w, rememberToken, isSecure, rememberDuration)
 	}
 	return nil
+}
+
+func (h *handler) handleGetSession() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		session, ok := r.Context().Value(shared.AuthSessionKey).(shared.AuthSessionContext)
+		if !ok || session.ExpiresAt.IsZero() {
+			http.Error(w, "Session unavailable", http.StatusUnauthorized)
+			return
+		}
+
+		writeSessionResponse(w, h.sessionResponseForRequest(r, shared.GetUserIDFromContext(r), session))
+	}
+}
+
+func (h *handler) handleExtendSession() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := shared.GetUserIDFromContext(r)
+		if userID == uuid.Nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		duration := h.ctx.Config.AuthSessionDuration()
+		token, expiresAt, err := authcore.GenerateTokenWithDuration(h.ctx.Config.JWTSecret, h.ctx.Config.PublicURL, userID, duration)
+		if err != nil {
+			slog.Error("Failed to extend auth session", "error", err, "user_id", userID)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		isSecure := strings.HasPrefix(h.ctx.Config.PublicURL, "https://")
+		authcore.SetTokenCookieWithDuration(w, token, isSecure, duration)
+		resp := h.sessionResponse(shared.AuthSessionContext{
+			ExpiresAt: expiresAt.UTC(),
+			IssuedAt:  time.Now().UTC(),
+		})
+		if rememberExpiresAt := h.renewRememberedSession(r, w, userID, isSecure); rememberExpiresAt != nil {
+			resp.Remembered = true
+			resp.RememberExpiresAt = rememberExpiresAt
+		}
+		writeSessionResponse(w, resp)
+	}
+}
+
+func (h *handler) sessionResponse(session shared.AuthSessionContext) api.AuthSession {
+	duration := h.ctx.Config.AuthSessionDuration()
+	warning := h.ctx.Config.AuthSessionWarningDuration()
+	return api.AuthSession{
+		ExpiresAt:              session.ExpiresAt.UTC(),
+		IssuedAt:               session.IssuedAt.UTC(),
+		DurationSeconds:        int(duration.Seconds()),
+		WarningSeconds:         int(warning.Seconds()),
+		Extendable:             true,
+		TimingAdjustable:       true,
+		RememberMeDurationDays: int(h.ctx.Config.AuthRememberMeDuration().Hours() / 24),
+	}
+}
+
+func (h *handler) sessionResponseForRequest(r *http.Request, userID uuid.UUID, session shared.AuthSessionContext) api.AuthSession {
+	resp := h.sessionResponse(session)
+	if remembered, rememberExpiresAt := h.rememberedSession(r, userID); remembered {
+		resp.Remembered = true
+		resp.RememberExpiresAt = &rememberExpiresAt
+	}
+	return resp
+}
+
+func (h *handler) renewRememberedSession(r *http.Request, w http.ResponseWriter, userID uuid.UUID, isSecure bool) *time.Time {
+	if h.ctx.Store == nil || userID == uuid.Nil {
+		return nil
+	}
+	cookie, err := r.Cookie(authcore.RememberMeCookieName)
+	if err != nil || strings.TrimSpace(cookie.Value) == "" {
+		return nil
+	}
+	rememberedUserID, currentExpiresAt, err := h.ctx.Store.ValidateRememberMeSession(r.Context(), cookie.Value)
+	if err != nil || rememberedUserID != userID || currentExpiresAt.IsZero() {
+		return nil
+	}
+	if err := h.ctx.Store.DeleteRememberMeToken(r.Context(), cookie.Value); err != nil {
+		slog.Error("Failed to rotate remember me token during session extension", "error", err, "user_id", userID)
+		return &currentExpiresAt
+	}
+	rememberDuration := h.ctx.Config.AuthRememberMeDuration()
+	rememberToken, rememberExpiresAt, err := h.ctx.Store.CreateRememberMeSessionWithDuration(r.Context(), userID, rememberDuration)
+	if err != nil {
+		slog.Error("Failed to renew remember me token during session extension", "error", err, "user_id", userID)
+		return &currentExpiresAt
+	}
+	authcore.SetRememberMeCookieWithDuration(w, rememberToken, isSecure, rememberDuration)
+	return &rememberExpiresAt
+}
+
+func (h *handler) rememberedSession(r *http.Request, userID uuid.UUID) (bool, time.Time) {
+	if h.ctx.Store == nil || userID == uuid.Nil {
+		return false, time.Time{}
+	}
+	cookie, err := r.Cookie(authcore.RememberMeCookieName)
+	if err != nil || strings.TrimSpace(cookie.Value) == "" {
+		return false, time.Time{}
+	}
+	rememberedUserID, expiresAt, err := h.ctx.Store.ValidateRememberMeSession(r.Context(), cookie.Value)
+	if err != nil || rememberedUserID != userID || expiresAt.IsZero() {
+		return false, time.Time{}
+	}
+	return true, expiresAt.UTC()
+}
+
+func writeSessionResponse(w http.ResponseWriter, resp api.AuthSession) {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		slog.Error("Failed to encode auth session response", "error", err)
+	}
 }
 
 func HashPassword(password string) (string, error) {

@@ -228,13 +228,14 @@ func checkoutCancelURL(conf *config.Config) string {
 }
 
 func issueLoginSession(w http.ResponseWriter, conf *config.Config, userID uuid.UUID) error {
-	token, err := authcore.GenerateToken(conf.JWTSecret, conf.PublicURL, userID)
+	duration := conf.AuthSessionDuration()
+	token, _, err := authcore.GenerateTokenWithDuration(conf.JWTSecret, conf.PublicURL, userID, duration)
 	if err != nil {
 		return fmt.Errorf("generate auth token: %w", err)
 	}
 
 	isSecure := strings.HasPrefix(conf.PublicURL, "https://")
-	authcore.SetTokenCookie(w, token, isSecure)
+	authcore.SetTokenCookieWithDuration(w, token, isSecure, duration)
 	return nil
 }
 

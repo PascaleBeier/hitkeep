@@ -76,6 +76,14 @@ func openAPIV1CorePaths() map[string]any {
 		"/api/logout": map[string]any{
 			"post": op([]string{"Auth"}, "Logout", "Clears session and remember-me cookies.", secCookie(), nil, nil, map[string]any{"200": jsonRefResp("Status", "#/components/schemas/Status")}),
 		},
+		"/api/auth/session": map[string]any{
+			"get": op([]string{"Auth"}, "Get session policy", "Returns the authenticated session expiry and configured accessibility warning policy.", secCookie(), nil, nil,
+				map[string]any{"200": jsonRefResp("Auth session", "#/components/schemas/AuthSession")}),
+		},
+		"/api/auth/session/extend": map[string]any{
+			"post": op([]string{"Auth"}, "Extend session", "Issues a fresh session cookie and returns the updated expiry policy.", secCookie(), nil, nil,
+				map[string]any{"200": jsonRefResp("Auth session", "#/components/schemas/AuthSession")}),
+		},
 		"/api/auth/forgot-password": map[string]any{
 			"post": op([]string{"Auth"}, "Request password reset", "Sends password reset email if account exists.", nil, nil,
 				jsonBody(map[string]any{"type": "object", "properties": map[string]any{"email": map[string]any{"type": "string", "format": "email"}}, "required": []string{"email"}}),

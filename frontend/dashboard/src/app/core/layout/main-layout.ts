@@ -6,11 +6,13 @@ import { DrawerModule } from 'primeng/drawer';
 import { Brand } from '@components/brand/brand';
 import { TeamSwitcher } from '@components/team-switcher/team-switcher';
 import { UserControls } from '@components/user-controls/user-controls';
+import { SessionExpiryIndicator } from '@components/session-expiry-indicator/session-expiry-indicator';
 import { AddSiteDialog } from '@features/sites/components/add-site-dialog';
 import { SiteSettingsDrawer } from '@features/sites/components/site-settings-drawer';
 import { SiteSelector } from '@features/sites/components/site-selector';
 import { CreateTeamDialog } from '@components/create-team-dialog/create-team-dialog';
 import { MainLayoutContextService } from '@layout/main-layout-context.service';
+import { AuthService } from '@services/auth.service';
 
 @Component({
     selector: 'app-main-layout',
@@ -19,7 +21,7 @@ import { MainLayoutContextService } from '@layout/main-layout-context.service';
         '(document:keydown)': 'handleKeyboard($event)'
     },
     providers: [MainLayoutContextService],
-    imports: [RouterOutlet, RouterLink, RouterLinkActive, NgTemplateOutlet, Brand, SiteSelector, TeamSwitcher, AddSiteDialog, CreateTeamDialog, SiteSettingsDrawer, UserControls, DrawerModule, TranslocoPipe],
+    imports: [RouterOutlet, RouterLink, RouterLinkActive, NgTemplateOutlet, Brand, SiteSelector, TeamSwitcher, SessionExpiryIndicator, AddSiteDialog, CreateTeamDialog, SiteSettingsDrawer, UserControls, DrawerModule, TranslocoPipe],
     templateUrl: './main-layout.html',
     styleUrl: './main-layout.css'
 })
@@ -27,6 +29,7 @@ export class MainLayout {
     private static readonly docsURL = 'https://hitkeep.com/guides/introduction/';
     private static readonly supportFallbackURL = 'https://hitkeep.com/support/help/';
     protected readonly context = inject(MainLayoutContextService);
+    protected readonly auth = inject(AuthService);
     protected readonly siteService = this.context.siteService;
     protected readonly shareService = this.context.shareService;
     protected readonly teamService = this.context.teamService;
@@ -69,5 +72,8 @@ export class MainLayout {
 
     constructor() {
         this.context.init();
+        if (!this.shareService.isShareMode()) {
+            this.auth.loadSession().subscribe();
+        }
     }
 }

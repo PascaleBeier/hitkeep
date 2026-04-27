@@ -26,6 +26,10 @@ export function resolveCurrentReturnUrl(router: ReturnUrlRouterContext): string 
     return candidate;
 }
 
+export function shouldRedirectAfterUnauthorized(currentUrl: string): boolean {
+    return !currentUrl.startsWith('/login') && !currentUrl.startsWith('/setup');
+}
+
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
     const router = inject(Router);
     const auth = inject(AuthService);
@@ -47,17 +51,17 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
             // If we receive a 401 Unauthorized, it means the cookie is missing or invalid.
             if (error.status === 401 && !share.isShareMode() && !isAuthRequest) {
-                const shouldNavigate = auth.status() !== 'unauthenticated';
                 auth.markUnauthenticated();
 
-                if (shouldNavigate) {
-                    // Avoid redirect loops if already on login or setup.
-                    const currentUrl = resolveCurrentReturnUrl(router);
-                    if (!currentUrl.startsWith('/login') && !currentUrl.startsWith('/setup')) {
-                        void router.navigate(['/login'], {
-                            queryParams: { returnUrl: currentUrl }
-                        });
-                    }
+                // Avoid redirect loops if already on login or setup. We still navigate
+                // when the local session timer already marked the user unauthenticated;
+                // background dashboard refreshes are often the first server-confirmed
+                // signal that the cookie expired.
+                const currentUrl = resolveCurrentReturnUrl(router);
+                if (shouldRedirectAfterUnauthorized(currentUrl)) {
+                    void router.navigate(['/login'], {
+                        queryParams: { returnUrl: currentUrl }
+                    });
                 }
 
                 // Complete the request stream so late 401s do not crash screens with

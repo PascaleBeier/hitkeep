@@ -1,0 +1,21 @@
+@if (auth.session(); as session) {
+<p-dialog [visible]="warningVisible()" [modal]="true" [closable]="false" [draggable]="false" [resizable]="false" [style]="{ width: '28rem', maxWidth: '94vw' }">
+    <section role="alertdialog" aria-modal="true" aria-labelledby="session-expiry-title" aria-describedby="session-expiry-description" class="hk-session-dialog">
+        <div class="hk-session-dialog__icon" aria-hidden="true">
+            <i class="pi pi-clock"></i>
+        </div>
+        <div class="hk-session-dialog__body">
+            <h2 id="session-expiry-title">{{ "session.warningTitle" | transloco }}</h2>
+            <p id="session-expiry-description">{{ "session.warningDescription" | transloco : { remaining: remainingLabel() } }}</p>
+            <p class="hk-session-dialog__meta">{{ "session.policyDescription" | transloco : { duration: policyDurationLabel() } }}</p>
+            @if (extendError()) {
+            <p class="hk-session-dialog__error" role="alert">{{ "session.extendError" | transloco }}</p>
+            }
+        </div>
+        <div class="hk-session-dialog__actions">
+            <p-button [label]="'session.signOutAction' | transloco" severity="secondary" [outlined]="true" (onClick)="signOut()" />
+            <p-button [label]="'session.extendAction' | transloco" icon="pi pi-refresh" [loading]="auth.sessionExtending()" [disabled]="auth.sessionExtending()" (onClick)="extendSession()" />
+        </div>
+    </section>
+</p-dialog>
+}

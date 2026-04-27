@@ -1076,7 +1076,22 @@
         "administration": "Administration",
         "userSettings": "Paramètres utilisateur",
         "preferences": "Préférences",
+        "sessionStatus": "Session : encore {{remaining}}",
+        "rememberedSessionStatus": "Se souvenir de moi : encore {{remaining}}",
+        "extendSession": "Prolonger la session",
         "signOut": "Se déconnecter"
+    },
+    "session": {
+        "label": "Session",
+        "rememberedLabel": "Se souvenir de moi",
+        "tooltip": "Votre session du tableau de bord dure {{duration}}. HitKeep vous avertit {{warning}} avant son expiration.",
+        "rememberedTooltip": "Se souvenir de moi est activé. Le minuteur suit la période de connexion mémorisée.",
+        "warningTitle": "Votre session va bientôt expirer",
+        "warningDescription": "Vous serez déconnecté dans {{remaining}} si vous ne prolongez pas la session.",
+        "policyDescription": "Cette instance est configurée avec des sessions de tableau de bord de {{duration}}.",
+        "extendAction": "Rester connecté",
+        "signOutAction": "Se déconnecter",
+        "extendError": "Impossible de prolonger la session. Reconnectez-vous si elle expire."
     },
     "login": {
         "subtitle": "Connectez-vous à votre tableau de bord",
@@ -1092,6 +1107,7 @@
         "passwordRequired": "Le mot de passe est obligatoire.",
         "forgotPassword": "Mot de passe oublié ?",
         "rememberMe": "Se souvenir de moi",
+        "sessionHelp": "Vous restez connecté sur cet appareil selon la politique de l’instance. HitKeep affiche toujours les avertissements d’expiration et demande confirmation avant de prolonger lorsque c’est nécessaire.",
         "signIn": "Se connecter",
         "or": "ou",
         "signInWithPasskey": "Se connecter avec une passkey",

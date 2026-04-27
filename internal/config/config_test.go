@@ -23,6 +23,9 @@ func TestLoadConfig(t *testing.T) {
 					c.IngestBurst == 40 &&
 					c.WebhookRateLimit == 30.0 &&
 					c.WebhookBurst == 60 &&
+					c.AuthRememberMeDays == 30 &&
+					c.AuthSessionMinutes == 15 &&
+					c.AuthSessionWarningSeconds == 120 &&
 					len(c.JWTSecret) >= 32
 			},
 			errMessage: "Defaults failed",
@@ -31,12 +34,15 @@ func TestLoadConfig(t *testing.T) {
 			name: "Environment Variables Override Defaults",
 			args: []string{},
 			env: map[string]string{
-				"HITKEEP_HTTP_ADDR":          ":9000",
-				"HITKEEP_MAIL_PORT":          "25",
-				"HITKEEP_INGEST_RATE_LIMIT":  "100.5",
-				"HITKEEP_MAIL_DRIVER":        "log",
-				"HITKEEP_WEBHOOK_RATE_LIMIT": "55.5",
-				"HITKEEP_WEBHOOK_BURST":      "80",
+				"HITKEEP_HTTP_ADDR":                    ":9000",
+				"HITKEEP_MAIL_PORT":                    "25",
+				"HITKEEP_INGEST_RATE_LIMIT":            "100.5",
+				"HITKEEP_MAIL_DRIVER":                  "log",
+				"HITKEEP_WEBHOOK_RATE_LIMIT":           "55.5",
+				"HITKEEP_WEBHOOK_BURST":                "80",
+				"HITKEEP_AUTH_REMEMBER_ME_DAYS":        "14",
+				"HITKEEP_AUTH_SESSION_MINUTES":         "45",
+				"HITKEEP_AUTH_SESSION_WARNING_SECONDS": "180",
 			},
 			check: func(c *Config) bool {
 				return c.HTTPAddr == ":9000" &&
@@ -44,19 +50,24 @@ func TestLoadConfig(t *testing.T) {
 					c.IngestRateLimit == 100.5 &&
 					c.MailDriver == "log" &&
 					c.WebhookRateLimit == 55.5 &&
-					c.WebhookBurst == 80
+					c.WebhookBurst == 80 &&
+					c.AuthRememberMeDays == 14 &&
+					c.AuthSessionMinutes == 45 &&
+					c.AuthSessionWarningSeconds == 180
 			},
 			errMessage: "Environment variables did not override defaults",
 		},
 		{
 			name: "Flags Override Environment Variables",
-			args: []string{"-http", ":9999", "-mail-port", "1025"},
+			args: []string{"-http", ":9999", "-mail-port", "1025", "-auth-session-minutes", "30", "-auth-remember-me-days", "7"},
 			env: map[string]string{
-				"HITKEEP_HTTP_ADDR": ":8080",
-				"HITKEEP_MAIL_PORT": "587",
+				"HITKEEP_HTTP_ADDR":             ":8080",
+				"HITKEEP_MAIL_PORT":             "587",
+				"HITKEEP_AUTH_SESSION_MINUTES":  "45",
+				"HITKEEP_AUTH_REMEMBER_ME_DAYS": "30",
 			},
 			check: func(c *Config) bool {
-				return c.HTTPAddr == ":9999" && c.MailPort == 1025
+				return c.HTTPAddr == ":9999" && c.MailPort == 1025 && c.AuthSessionMinutes == 30 && c.AuthRememberMeDays == 7
 			},
 			errMessage: "Flags did not override environment variables",
 		},
@@ -110,6 +121,26 @@ func TestLoadConfig(t *testing.T) {
 				t.Errorf("%s: %s", tc.name, tc.errMessage)
 			}
 		})
+	}
+}
+
+func TestNormalizeAuthSessionConfig(t *testing.T) {
+	conf := &Config{AuthSessionMinutes: -1, AuthRememberMeDays: -2, AuthSessionWarningSeconds: 5}
+	NormalizeAuthSessionConfig(conf)
+	if conf.AuthSessionMinutes != 15 {
+		t.Fatalf("expected default session minutes, got %d", conf.AuthSessionMinutes)
+	}
+	if conf.AuthRememberMeDays != 30 {
+		t.Fatalf("expected default remember-me days, got %d", conf.AuthRememberMeDays)
+	}
+	if conf.AuthSessionWarningSeconds != 20 {
+		t.Fatalf("expected warning to normalize to WCAG-safe minimum, got %d", conf.AuthSessionWarningSeconds)
+	}
+
+	conf = &Config{AuthSessionMinutes: 10, AuthSessionWarningSeconds: 900}
+	NormalizeAuthSessionConfig(conf)
+	if conf.AuthSessionWarningSeconds != 300 {
+		t.Fatalf("expected warning to stay before expiry, got %d", conf.AuthSessionWarningSeconds)
 	}
 }
 

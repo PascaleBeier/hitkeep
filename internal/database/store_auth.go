@@ -85,25 +85,47 @@ func (s *Store) UpdatePasswordByID(ctx context.Context, userID string, newHashed
 }
 
 func (s *Store) CreateRememberMeToken(ctx context.Context, userID uuid.UUID) (string, error) {
+	token, _, err := s.CreateRememberMeSession(ctx, userID)
+	return token, err
+}
+
+func (s *Store) CreateRememberMeSession(ctx context.Context, userID uuid.UUID) (string, time.Time, error) {
+	return s.CreateRememberMeSessionWithDuration(ctx, userID, 30*24*time.Hour)
+}
+
+func (s *Store) CreateRememberMeTokenWithDuration(ctx context.Context, userID uuid.UUID, duration time.Duration) (string, error) {
+	token, _, err := s.CreateRememberMeSessionWithDuration(ctx, userID, duration)
+	return token, err
+}
+
+func (s *Store) CreateRememberMeSessionWithDuration(ctx context.Context, userID uuid.UUID, duration time.Duration) (string, time.Time, error) {
+	if duration <= 0 {
+		duration = 30 * 24 * time.Hour
+	}
 	bytes := make([]byte, 32)
 	if _, err := rand.Read(bytes); err != nil {
-		return "", err
+		return "", time.Time{}, err
 	}
 	token := hex.EncodeToString(bytes)
 	now := time.Now().UTC()
-	expiresAt := now.Add(30 * 24 * time.Hour)
+	expiresAt := now.Add(duration)
 
 	err := s.Exec(ctx,
 		"INSERT INTO remember_me_tokens (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
 		token, userID, now, expiresAt,
 	)
 	if err != nil {
-		return "", fmt.Errorf("failed to insert remember me token: %w", err)
+		return "", time.Time{}, fmt.Errorf("failed to insert remember me token: %w", err)
 	}
-	return token, nil
+	return token, expiresAt.UTC(), nil
 }
 
 func (s *Store) ValidateRememberMeToken(ctx context.Context, token string) (uuid.UUID, error) {
+	userID, _, err := s.ValidateRememberMeSession(ctx, token)
+	return userID, err
+}
+
+func (s *Store) ValidateRememberMeSession(ctx context.Context, token string) (uuid.UUID, time.Time, error) {
 	var userID uuid.UUID
 	var expiresAt time.Time
 
@@ -113,17 +135,17 @@ func (s *Store) ValidateRememberMeToken(ctx context.Context, token string) (uuid
 		token,
 	)
 	if err != nil {
-		return uuid.Nil, err
+		return uuid.Nil, time.Time{}, err
 	}
 	if userID == uuid.Nil {
-		return uuid.Nil, nil
+		return uuid.Nil, time.Time{}, nil
 	}
 
 	if time.Now().After(expiresAt) {
 		_ = s.DeleteRememberMeToken(ctx, token)
-		return uuid.Nil, nil
+		return uuid.Nil, time.Time{}, nil
 	}
-	return userID, nil
+	return userID, expiresAt.UTC(), nil
 }
 
 func (s *Store) DeleteRememberMeToken(ctx context.Context, token string) error {

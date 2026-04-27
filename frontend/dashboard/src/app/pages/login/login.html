@@ -64,8 +64,18 @@
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <p-checkbox [formControl]="loginForm.rememberMe().control()" [binary]="true" inputId="rememberMe"></p-checkbox>
+                    <p-checkbox [formControl]="loginForm.rememberMe().control()" [binary]="true" inputId="rememberMe" [attr.aria-describedby]="'rememberMeHelp'"></p-checkbox>
                     <label for="rememberMe" class="text-sm text-[var(--p-text-color)] cursor-pointer select-none">{{ "login.rememberMe" | transloco }}</label>
+                    <button
+                        id="rememberMeHelp"
+                        type="button"
+                        class="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted-color transition-colors hover:bg-surface-100 hover:text-[var(--p-text-color)] focus:outline-none focus:ring-2 focus:ring-primary-500 dark:hover:bg-surface-800"
+                        [attr.aria-label]="'login.sessionHelp' | transloco"
+                        [pTooltip]="'login.sessionHelp' | transloco"
+                        tooltipPosition="top"
+                    >
+                        <i class="pi pi-question-circle text-sm" aria-hidden="true"></i>
+                    </button>
                 </div>
 
                 <p-button [label]="'login.signIn' | transloco" type="submit" [loading]="isLoading()" class="w-full" [disabled]="isLoading() || loginForm.email().invalid() || loginForm.password().invalid()"> </p-button>

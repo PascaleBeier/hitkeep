@@ -13,6 +13,7 @@ import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { CheckboxModule } from 'primeng/checkbox';
 import { InputOtpModule } from 'primeng/inputotp';
+import { TooltipModule } from 'primeng/tooltip';
 
 import { Brand } from '@components/brand/brand';
 import { CloudStatus } from '@models/analytics.types';
@@ -26,7 +27,7 @@ type MfaFactor = 'totp' | 'passkey' | 'recovery_code' | 'email_link';
 @Component({
     selector: 'app-login',
     standalone: true,
-    imports: [Brand, ReactiveFormsModule, PasswordModule, ButtonModule, InputTextModule, CheckboxModule, InputOtpModule, RouterLink, TranslocoPipe],
+    imports: [Brand, ReactiveFormsModule, PasswordModule, ButtonModule, InputTextModule, CheckboxModule, InputOtpModule, TooltipModule, RouterLink, TranslocoPipe],
     templateUrl: './login.html',
     styleUrl: './login.css',
     changeDetection: ChangeDetectionStrategy.OnPush

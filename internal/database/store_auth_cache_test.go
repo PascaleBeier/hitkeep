@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -79,5 +80,51 @@ func TestPasswordResetTokensAreReplacedAndConsumedFromCache(t *testing.T) {
 	}
 	if resolvedUserID != uuid.Nil {
 		t.Fatalf("expected remember me token to be invalidated, got %s", resolvedUserID)
+	}
+}
+
+func TestValidateRememberMeSessionReturnsExpiry(t *testing.T) {
+	store := setupAuthStore(t)
+	ctx := context.Background()
+
+	userID, err := store.CreateUser(ctx, "remember@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	token, err := store.CreateRememberMeToken(ctx, userID)
+	if err != nil {
+		t.Fatalf("create remember me token: %v", err)
+	}
+
+	resolvedUserID, expiresAt, err := store.ValidateRememberMeSession(ctx, token)
+	if err != nil {
+		t.Fatalf("validate remember me session: %v", err)
+	}
+	if resolvedUserID != userID {
+		t.Fatalf("expected user %s, got %s", userID, resolvedUserID)
+	}
+	if expiresAt.IsZero() {
+		t.Fatal("expected remember me expiry")
+	}
+}
+
+func TestCreateRememberMeSessionWithDuration(t *testing.T) {
+	store := setupAuthStore(t)
+	ctx := context.Background()
+
+	userID, err := store.CreateUser(ctx, "remember-duration@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	token, expiresAt, err := store.CreateRememberMeSessionWithDuration(ctx, userID, 7*24*time.Hour)
+	if err != nil {
+		t.Fatalf("create remember me session: %v", err)
+	}
+	if token == "" {
+		t.Fatal("expected remember me token")
+	}
+	if time.Until(expiresAt) < 6*24*time.Hour || time.Until(expiresAt) > 8*24*time.Hour {
+		t.Fatalf("expected remember me expiry around 7 days, got %s", expiresAt)
 	}
 }

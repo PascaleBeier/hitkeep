@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { resolveCurrentReturnUrl } from './auth.interceptor';
+import { resolveCurrentReturnUrl, shouldRedirectAfterUnauthorized } from './auth.interceptor';
 
 describe('resolveCurrentReturnUrl', () => {
     beforeEach(() => {
@@ -45,5 +45,16 @@ describe('resolveCurrentReturnUrl', () => {
         } as const;
 
         expect(resolveCurrentReturnUrl(router)).toBe('/dashboard');
+    });
+});
+
+describe('shouldRedirectAfterUnauthorized', () => {
+    it('redirects expired dashboard API traffic back to login', () => {
+        expect(shouldRedirectAfterUnauthorized('/dashboard?range=7d')).toBe(true);
+    });
+
+    it('avoids login and setup redirect loops', () => {
+        expect(shouldRedirectAfterUnauthorized('/login?returnUrl=/dashboard')).toBe(false);
+        expect(shouldRedirectAfterUnauthorized('/setup')).toBe(false);
     });
 });

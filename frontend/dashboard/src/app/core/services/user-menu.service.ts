@@ -3,6 +3,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { MenuItem } from 'primeng/api';
 import { TranslocoService } from '@jsverse/transloco';
+import { formatDurationInterval } from '@core/i18n/duration-format';
 import { PermissionService } from '@services/permission.service';
 import { AuthService } from '@services/auth.service';
 import { catchError, finalize, of } from 'rxjs';
@@ -17,7 +18,27 @@ export class UserMenuService {
     private activeLanguage = toSignal(this.transloco.langChanges$, { initialValue: this.transloco.getActiveLang() });
 
     readonly menuItems = computed<MenuItem[]>(() => {
-        this.activeLanguage();
+        const language = this.activeLanguage();
+        const session = this.auth.session();
+        const remainingSeconds = this.auth.sessionDisplayRemainingSeconds();
+        const sessionItems: MenuItem[] = session
+            ? [
+                  {
+                      label: this.transloco.translate(session.remembered ? 'userMenu.rememberedSessionStatus' : 'userMenu.sessionStatus', {
+                          remaining: formatDurationInterval(remainingSeconds, language)
+                      }),
+                      icon: 'pi pi-clock',
+                      disabled: true
+                  },
+                  {
+                      label: this.transloco.translate('userMenu.extendSession'),
+                      icon: 'pi pi-refresh',
+                      disabled: this.auth.sessionExtending() || !session.extendable,
+                      command: () => this.extendSession()
+                  }
+              ]
+            : [];
+
         return [
             {
                 label: this.transloco.translate('userMenu.administration'),
@@ -30,6 +51,7 @@ export class UserMenuService {
                 icon: 'pi pi-user',
                 command: () => this.router.navigate(['/settings'])
             },
+            ...sessionItems,
             { separator: true },
             {
                 label: this.transloco.translate('userMenu.signOut'),
@@ -51,6 +73,14 @@ export class UserMenuService {
                     this.router.navigate(['/login']);
                 })
             )
+            .subscribe();
+    }
+
+    private extendSession() {
+        if (this.auth.sessionExtending()) return;
+        this.auth
+            .extendSession()
+            .pipe(catchError(() => of(null)))
             .subscribe();
     }
 }

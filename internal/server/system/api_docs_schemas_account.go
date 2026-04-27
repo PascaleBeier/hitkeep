@@ -224,6 +224,20 @@ func openAPIV1AccountSchemas() map[string]any {
 				"default_locale": map[string]any{"type": "string"},
 			},
 		},
+		"AuthSession": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"expires_at":                map[string]any{"type": "string", "format": "date-time"},
+				"issued_at":                 map[string]any{"type": "string", "format": "date-time"},
+				"duration_seconds":          map[string]any{"type": "integer"},
+				"warning_seconds":           map[string]any{"type": "integer"},
+				"extendable":                map[string]any{"type": "boolean"},
+				"timing_adjustable":         map[string]any{"type": "boolean"},
+				"remembered":                map[string]any{"type": "boolean"},
+				"remember_expires_at":       map[string]any{"type": "string", "format": "date-time"},
+				"remember_me_duration_days": map[string]any{"type": "integer"},
+			},
+		},
 		"UserPasskey": map[string]any{
 			"type": "object",
 			"properties": map[string]any{

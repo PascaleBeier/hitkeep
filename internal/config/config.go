@@ -15,21 +15,24 @@ import (
 )
 
 type Config struct {
-	ApiBurst         int
-	ApiRateLimit     float64
-	AuthBurst        int
-	AuthRateLimit    float64
-	WebhookBurst     int
-	WebhookRateLimit float64
-	ArchivePath      string
-	BindAddr         string
-	DataPath         string
-	DBPath           string
-	Healthcheck      bool
-	HTTPAddr         string
-	IngestBurst      int
-	IngestRateLimit  float64
-	JoinAddr         string
+	ApiBurst                  int
+	ApiRateLimit              float64
+	AuthBurst                 int
+	AuthRateLimit             float64
+	AuthRememberMeDays        int
+	AuthSessionMinutes        int
+	AuthSessionWarningSeconds int
+	WebhookBurst              int
+	WebhookRateLimit          float64
+	ArchivePath               string
+	BindAddr                  string
+	DataPath                  string
+	DBPath                    string
+	Healthcheck               bool
+	HTTPAddr                  string
+	IngestBurst               int
+	IngestRateLimit           float64
+	JoinAddr                  string
 	//nolint:gosec // runtime configuration intentionally carries the JWT signing secret.
 	JWTSecret                   string
 	LogLevel                    string
@@ -194,6 +197,9 @@ func load(args []string, getEnv func(string, string) string) *Config {
 	defApiBurst := getInt("HITKEEP_API_BURST", 20)
 	defAuthRate := getFloat("HITKEEP_AUTH_RATE_LIMIT", 2.0)
 	defAuthBurst := getInt("HITKEEP_AUTH_BURST", 5)
+	defAuthRememberMeDays := getInt("HITKEEP_AUTH_REMEMBER_ME_DAYS", 30)
+	defAuthSessionMinutes := getInt("HITKEEP_AUTH_SESSION_MINUTES", 15)
+	defAuthSessionWarningSeconds := getInt("HITKEEP_AUTH_SESSION_WARNING_SECONDS", 120)
 	defWebhookRate := getFloat("HITKEEP_WEBHOOK_RATE_LIMIT", 30.0)
 	defWebhookBurst := getInt("HITKEEP_WEBHOOK_BURST", 60)
 
@@ -257,6 +263,9 @@ func load(args []string, getEnv func(string, string) string) *Config {
 	fs.IntVar(&conf.ApiBurst, "api-burst", defApiBurst, "API burst")
 	fs.Float64Var(&conf.AuthRateLimit, "auth-rate", defAuthRate, "Auth rate limit")
 	fs.IntVar(&conf.AuthBurst, "auth-burst", defAuthBurst, "Auth burst")
+	fs.IntVar(&conf.AuthRememberMeDays, "auth-remember-me-days", defAuthRememberMeDays, "Remember-me session lifetime in days")
+	fs.IntVar(&conf.AuthSessionMinutes, "auth-session-minutes", defAuthSessionMinutes, "Authenticated dashboard session lifetime in minutes")
+	fs.IntVar(&conf.AuthSessionWarningSeconds, "auth-session-warning-seconds", defAuthSessionWarningSeconds, "Seconds before session expiry to warn users")
 	fs.Float64Var(&conf.WebhookRateLimit, "webhook-rate", defWebhookRate, "Webhook rate limit")
 	fs.IntVar(&conf.WebhookBurst, "webhook-burst", defWebhookBurst, "Webhook burst")
 
@@ -316,8 +325,50 @@ func load(args []string, getEnv func(string, string) string) *Config {
 		}
 	}
 	NormalizeMCPConfig(&conf)
+	NormalizeAuthSessionConfig(&conf)
 
 	return &conf
+}
+
+func (c *Config) AuthSessionDuration() time.Duration {
+	if c.AuthSessionMinutes <= 0 {
+		return 15 * time.Minute
+	}
+	return time.Duration(c.AuthSessionMinutes) * time.Minute
+}
+
+func (c *Config) AuthSessionWarningDuration() time.Duration {
+	if c.AuthSessionWarningSeconds <= 0 {
+		return 2 * time.Minute
+	}
+	return time.Duration(c.AuthSessionWarningSeconds) * time.Second
+}
+
+func (c *Config) AuthRememberMeDuration() time.Duration {
+	if c.AuthRememberMeDays <= 0 {
+		return 30 * 24 * time.Hour
+	}
+	return time.Duration(c.AuthRememberMeDays) * 24 * time.Hour
+}
+
+func NormalizeAuthSessionConfig(conf *Config) {
+	if conf.AuthSessionMinutes <= 0 {
+		conf.AuthSessionMinutes = 15
+	}
+	if conf.AuthRememberMeDays <= 0 {
+		conf.AuthRememberMeDays = 30
+	}
+	if conf.AuthSessionWarningSeconds < 20 {
+		conf.AuthSessionWarningSeconds = 20
+	}
+
+	maxWarningSeconds := int((time.Duration(conf.AuthSessionMinutes) * time.Minute / 2).Seconds())
+	if maxWarningSeconds < 20 {
+		maxWarningSeconds = 20
+	}
+	if conf.AuthSessionWarningSeconds >= conf.AuthSessionMinutes*60 {
+		conf.AuthSessionWarningSeconds = maxWarningSeconds
+	}
 }
 
 func NormalizeMCPConfig(conf *Config) {

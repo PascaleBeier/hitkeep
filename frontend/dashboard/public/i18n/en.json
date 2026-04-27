@@ -1076,7 +1076,22 @@
         "administration": "Administration",
         "userSettings": "User settings",
         "preferences": "Preferences",
+        "sessionStatus": "Session: {{remaining}} left",
+        "rememberedSessionStatus": "Remember me: {{remaining}} left",
+        "extendSession": "Extend session",
         "signOut": "Sign out"
+    },
+    "session": {
+        "label": "Session",
+        "rememberedLabel": "Remember me",
+        "tooltip": "Your dashboard session lasts {{duration}}. HitKeep warns you {{warning}} before expiry.",
+        "rememberedTooltip": "Remember me is active. The timer follows the remembered sign-in period.",
+        "warningTitle": "Your session is about to expire",
+        "warningDescription": "You will be signed out in {{remaining}} unless you extend the session.",
+        "policyDescription": "This instance is configured for {{duration}} dashboard sessions.",
+        "extendAction": "Stay signed in",
+        "signOutAction": "Sign out",
+        "extendError": "We could not extend the session. Sign in again if it expires."
     },
     "login": {
         "subtitle": "Sign in to your dashboard",
@@ -1092,6 +1107,7 @@
         "passwordRequired": "Password is required.",
         "forgotPassword": "Forgot password?",
         "rememberMe": "Remember me",
+        "sessionHelp": "Keeps you signed in on this device according to the instance policy. HitKeep still shows expiry warnings and asks before extending when action is needed.",
         "signIn": "Sign in",
         "or": "or",
         "signInWithPasskey": "Sign in with passkey",
