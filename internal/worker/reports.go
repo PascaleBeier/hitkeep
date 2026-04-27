@@ -177,7 +177,7 @@ func (w *ReportWorker) processSiteReports(ctx context.Context, freq api.ReportFr
 		}
 
 		dashURL := fmt.Sprintf("%s/dashboard", w.pubURL)
-		settingsURL := fmt.Sprintf("%s/settings", w.pubURL)
+		settingsURL := fmt.Sprintf("%s/settings/reports", w.pubURL)
 		report := mailables.NewSiteAnalyticsReport(p.UserLocale, p.Domain, periodLabel, freqLabel, dashURL, settingsURL, cur, prev, dailyPVs)
 
 		if err := w.mailer.Send(p.UserEmail, report); err != nil {
@@ -258,7 +258,7 @@ func (w *ReportWorker) processDigests(ctx context.Context, freq api.ReportFreque
 		}
 
 		dashURL := fmt.Sprintf("%s/dashboard", w.pubURL)
-		settingsURL := fmt.Sprintf("%s/settings", w.pubURL)
+		settingsURL := fmt.Sprintf("%s/settings/reports", w.pubURL)
 		digest := mailables.NewAnalyticsDigestWithSubjectLabel(p.UserLocale, periodLabel, freqLabel, subjectFreqLabel, dashURL, settingsURL, entries)
 
 		if err := w.mailer.Send(p.UserEmail, digest); err != nil {
