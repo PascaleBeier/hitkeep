@@ -288,9 +288,9 @@ func authSessionContextFromClaims(claims *auth.Claims) *AuthSessionContext {
 		return nil
 	}
 
-	session := &AuthSessionContext{ExpiresAt: claims.ExpiresAt.Time.UTC()}
+	session := &AuthSessionContext{ExpiresAt: claims.ExpiresAt.UTC()}
 	if claims.IssuedAt != nil {
-		session.IssuedAt = claims.IssuedAt.Time.UTC()
+		session.IssuedAt = claims.IssuedAt.UTC()
 	}
 	return session
 }

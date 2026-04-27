@@ -1223,14 +1223,7 @@
         "propertyKeyLabel": "Desglosar por",
         "propertyKeyPlaceholder": "Seleccionar propiedad",
         "automatic": {
-            "title": "Eventos automáticos",
-            "description": "Entra directamente en los eventos integrados del tracker cuando este sitio tenga clics salientes, descargas o envíos de formularios.",
-            "badge": "Auto",
-            "quickPicks": {
-                "outboundClick": "Clics salientes",
-                "fileDownload": "Descargas de archivos",
-                "formSubmit": "Envíos de formularios"
-            }
+            "badge": "Auto"
         },
         "series": {
             "title": "Actividad de eventos",

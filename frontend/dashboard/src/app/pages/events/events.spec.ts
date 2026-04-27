@@ -51,14 +51,7 @@ describe('Events', () => {
                                 propertyKeyLabel: 'Break down by',
                                 propertyKeyPlaceholder: 'Select a property',
                                 automatic: {
-                                    title: 'Automatic events',
-                                    description: 'Jump straight into built-in tracker events when this site has outbound clicks, downloads, or form submissions.',
-                                    badge: 'Auto',
-                                    quickPicks: {
-                                        outboundClick: 'Outbound clicks',
-                                        fileDownload: 'File downloads',
-                                        formSubmit: 'Form submissions'
-                                    }
+                                    badge: 'Auto'
                                 },
                                 series: {
                                     title: 'Event activity',

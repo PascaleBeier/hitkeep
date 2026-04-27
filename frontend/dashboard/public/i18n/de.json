@@ -1223,14 +1223,7 @@
         "propertyKeyLabel": "Aufschlüsseln nach",
         "propertyKeyPlaceholder": "Eigenschaft auswählen",
         "automatic": {
-            "title": "Automatische Events",
-            "description": "Springe direkt in die integrierten Tracker-Events, wenn diese Website ausgehende Klicks, Downloads oder Formularübermittlungen hat.",
-            "badge": "Auto",
-            "quickPicks": {
-                "outboundClick": "Ausgehende Klicks",
-                "fileDownload": "Dateidownloads",
-                "formSubmit": "Formularübermittlungen"
-            }
+            "badge": "Auto"
         },
         "series": {
             "title": "Event-Aktivität",

@@ -1223,14 +1223,7 @@
         "propertyKeyLabel": "Suddividi per",
         "propertyKeyPlaceholder": "Seleziona una proprietà",
         "automatic": {
-            "title": "Eventi automatici",
-            "description": "Vai direttamente agli eventi integrati del tracker quando questo sito registra clic in uscita, download o invii di moduli.",
-            "badge": "Auto",
-            "quickPicks": {
-                "outboundClick": "Clic in uscita",
-                "fileDownload": "Download di file",
-                "formSubmit": "Invii di moduli"
-            }
+            "badge": "Auto"
         },
         "series": {
             "title": "Attività degli eventi",

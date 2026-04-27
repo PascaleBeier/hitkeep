@@ -1223,14 +1223,7 @@
         "propertyKeyLabel": "Ventiler par",
         "propertyKeyPlaceholder": "Sélectionner une propriété",
         "automatic": {
-            "title": "Événements automatiques",
-            "description": "Accédez directement aux événements intégrés du tracker lorsque ce site enregistre des clics sortants, des téléchargements ou des soumissions de formulaires.",
-            "badge": "Auto",
-            "quickPicks": {
-                "outboundClick": "Clics sortants",
-                "fileDownload": "Téléchargements",
-                "formSubmit": "Soumissions de formulaires"
-            }
+            "badge": "Auto"
         },
         "series": {
             "title": "Activité des événements",
