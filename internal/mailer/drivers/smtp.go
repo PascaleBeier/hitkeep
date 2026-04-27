@@ -3,6 +3,9 @@ package drivers
 import (
 	"crypto/tls"
 	"fmt"
+	"net"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/wneessen/go-mail"
@@ -20,7 +23,7 @@ func NewSMTPDriver(conf *config.Config) (*SMTPDriver, error) {
 	opts := []mail.Option{
 		mail.WithPort(conf.MailPort),
 		mail.WithTimeout(10 * time.Second),
-		mail.WithHELO(conf.PublicURL),
+		mail.WithHELO(heloNameFromPublicURL(conf.PublicURL)),
 	}
 
 	if conf.MailUsername != "" {
@@ -56,6 +59,31 @@ func NewSMTPDriver(conf *config.Config) (*SMTPDriver, error) {
 		from:   conf.MailFromAddress,
 		name:   conf.MailFromName,
 	}, nil
+}
+
+func heloNameFromPublicURL(publicURL string) string {
+	publicURL = strings.TrimSpace(publicURL)
+	if publicURL == "" {
+		return "localhost"
+	}
+
+	if parsed, err := url.Parse(publicURL); err == nil {
+		if hostname := parsed.Hostname(); hostname != "" {
+			return hostname
+		}
+	}
+
+	if host, _, err := net.SplitHostPort(publicURL); err == nil && host != "" {
+		return strings.Trim(host, "[]")
+	}
+
+	if parsed, err := url.Parse("http://" + publicURL); err == nil {
+		if hostname := parsed.Hostname(); hostname != "" {
+			return hostname
+		}
+	}
+
+	return publicURL
 }
 
 func (s *SMTPDriver) Send(to []string, subject string, htmlBody string, textBody string) error {
