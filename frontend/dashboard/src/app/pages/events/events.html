@@ -40,35 +40,6 @@
     <!-- Selectors — placed first so the user picks context before the chart renders -->
     <p-card class="shadow-sm border border-surface-200 dark:border-surface-700 surface-card mb-6">
         <div class="events-filter-panel">
-            @if (automaticEventQuickPicks().length > 0) {
-            <div class="events-auto-row">
-                <span id="automatic-events-label" class="events-auto-row__label">
-                    <i class="pi pi-bolt" aria-hidden="true"></i>
-                    <span>{{ "events.automatic.title" | transloco }}</span>
-                </span>
-                <div class="events-auto-row__control">
-                    <p-selectbutton
-                        [options]="automaticEventQuickPicks()"
-                        [ngModel]="selectedEvent()"
-                        (ngModelChange)="selectedEvent.set($event)"
-                        optionLabel="label"
-                        optionValue="name"
-                        size="small"
-                        [allowEmpty]="false"
-                        ariaLabelledBy="automatic-events-label"
-                        styleClass="events-auto-select-item"
-                    >
-                        <ng-template #item let-option>
-                            <span class="events-auto-select-content">
-                                <i [class]="option.icon" aria-hidden="true"></i>
-                                <span>{{ option.label }}</span>
-                            </span>
-                        </ng-template>
-                    </p-selectbutton>
-                </div>
-            </div>
-            }
-
             <div class="events-filter-grid">
                 <div class="events-filter-field">
                     <label for="event-name-select" class="events-filter-field__label">{{ 'events.eventNameLabel' | transloco }}</label>
@@ -83,7 +54,30 @@
                         [loading]="isLoadingNames()"
                         [disabled]="isLoadingNames()"
                         class="w-full"
-                    />
+                    >
+                        <ng-template #selectedItem let-option>
+                            <span class="events-event-option">
+                                @if (option.isAutomatic) {
+                                <i class="pi pi-bolt events-event-option__auto-icon" aria-hidden="true"></i>
+                                }
+                                <span class="events-event-option__name">{{ option.label }}</span>
+                                @if (option.isAutomatic) {
+                                <span class="events-event-option__badge">{{ 'events.automatic.badge' | transloco }}</span>
+                                }
+                            </span>
+                        </ng-template>
+                        <ng-template #item let-option>
+                            <span class="events-event-option">
+                                @if (option.isAutomatic) {
+                                <i class="pi pi-bolt events-event-option__auto-icon" aria-hidden="true"></i>
+                                }
+                                <span class="events-event-option__name">{{ option.label }}</span>
+                                @if (option.isAutomatic) {
+                                <span class="events-event-option__badge">{{ 'events.automatic.badge' | transloco }}</span>
+                                }
+                            </span>
+                        </ng-template>
+                    </p-select>
                 </div>
                 <div class="events-filter-field">
                     <label for="property-key-select" class="events-filter-field__label">{{ 'events.propertyKeyLabel' | transloco }}</label>

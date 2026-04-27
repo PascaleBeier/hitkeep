@@ -3,7 +3,6 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { TranslocoLocaleService } from '@jsverse/transloco-locale';
 import { SelectModule } from 'primeng/select';
-import { SelectButtonModule } from 'primeng/selectbutton';
 import { CardModule } from 'primeng/card';
 import { SkeletonModule } from 'primeng/skeleton';
 import { ButtonModule } from 'primeng/button';
@@ -24,21 +23,23 @@ interface EventFilterChip {
     remove: 'property' | 'dimension';
 }
 
-interface AutomaticEventQuickPick {
-    name: string;
+interface EventOption {
     label: string;
+    value: string;
+    isAutomatic: boolean;
     icon: string;
 }
 
-const AUTOMATIC_EVENT_META: Record<string, { labelKey: string; icon: string }> = {
-    outbound_click: { labelKey: 'events.automatic.quickPicks.outboundClick', icon: 'pi pi-external-link' },
-    file_download: { labelKey: 'events.automatic.quickPicks.fileDownload', icon: 'pi pi-download' },
-    form_submit: { labelKey: 'events.automatic.quickPicks.formSubmit', icon: 'pi pi-send' }
+const AUTOMATIC_EVENT_META: Record<string, { icon: string }> = {
+    outbound_click: { icon: 'pi pi-external-link' },
+    file_download: { icon: 'pi pi-download' },
+    form_submit: { icon: 'pi pi-send' }
 };
+const AUTOMATIC_EVENT_NAMES = Object.keys(AUTOMATIC_EVENT_META);
 
 @Component({
     selector: 'app-events',
-    imports: [FormsModule, ReactiveFormsModule, TranslocoPipe, SelectModule, SelectButtonModule, CardModule, SkeletonModule, ButtonModule, MetricList, RangeToolbar, PageHeader, PageHeaderLeft, PageBreadcrumb, SeriesChart],
+    imports: [FormsModule, ReactiveFormsModule, TranslocoPipe, SelectModule, CardModule, SkeletonModule, ButtonModule, MetricList, RangeToolbar, PageHeader, PageHeaderLeft, PageBreadcrumb, SeriesChart],
     templateUrl: './events.html',
     styleUrl: './events.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -98,18 +99,18 @@ export class Events {
 
     protected readonly activeSite = computed(() => this.siteService.activeSite());
     protected readonly noSite = computed(() => !this.activeSite());
-    protected eventOptions = computed(() => this.eventNames().map((name) => ({ label: name, value: name })));
+    protected eventOptions = computed<EventOption[]>(() =>
+        this.eventNames().map((name) => {
+            const meta = AUTOMATIC_EVENT_META[name];
+            return {
+                label: name,
+                value: name,
+                isAutomatic: !!meta,
+                icon: meta?.icon ?? ''
+            };
+        })
+    );
     protected propertyOptions = computed(() => this.propertyKeys().map((key) => ({ label: key, value: key })));
-    protected readonly automaticEventQuickPicks = computed<AutomaticEventQuickPick[]>(() => {
-        this.activeLanguage();
-        return this.eventNames()
-            .filter((name) => name in AUTOMATIC_EVENT_META)
-            .map((name) => ({
-                name,
-                label: this.transloco.translate(AUTOMATIC_EVENT_META[name]!.labelKey),
-                icon: AUTOMATIC_EVENT_META[name]!.icon
-            }));
-    });
 
     protected comparisonLabel = computed(() => {
         this.activeLanguage();
@@ -374,12 +375,18 @@ export class Events {
         const currentSelection = this.selectedEvent();
         this.analyticsService.getEventNames(siteId, from, to).subscribe({
             next: (names) => {
-                this.eventNames.set(names);
-                this.selectedEvent.set(currentSelection && names.includes(currentSelection) ? currentSelection : null);
+                const mergedNames = this.mergeAutomaticEventNames(names);
+                this.eventNames.set(mergedNames);
+                this.selectedEvent.set(currentSelection && mergedNames.includes(currentSelection) ? currentSelection : null);
                 this.isLoadingNames.set(false);
             },
             error: () => this.isLoadingNames.set(false)
         });
+    }
+
+    private mergeAutomaticEventNames(names: string[]): string[] {
+        const automaticNames = AUTOMATIC_EVENT_NAMES.filter((name) => !names.includes(name));
+        return [...automaticNames, ...names];
     }
 
     private loadPropertyKeys(siteId: string, from: string, to: string, eventName: string) {

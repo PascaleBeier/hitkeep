@@ -131,13 +131,28 @@ describe('Events', () => {
         expect(component).toBeTruthy();
     });
 
-    it('shows automatic event quick picks when built-in events exist', async () => {
+    it('marks automatic events in the event dropdown', async () => {
         fixture.detectChanges();
         await fixture.whenStable();
         fixture.detectChanges();
 
-        const compiled = fixture.nativeElement as HTMLElement;
-        expect(compiled.textContent).toContain('Automatic events');
-        expect(compiled.textContent).toContain('Outbound clicks');
+        const options = (component as unknown as { eventOptions: () => { value: string; isAutomatic: boolean; icon: string }[] }).eventOptions();
+        const outboundOption = options.find((option) => option.value === 'outbound_click');
+
+        expect(outboundOption?.isAutomatic).toBeTruthy();
+        expect(outboundOption?.icon).toBe('pi pi-external-link');
+    });
+
+    it('keeps automatic events available even without data in the selected range', async () => {
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+
+        const optionValues = (component as unknown as { eventOptions: () => { value: string }[] }).eventOptions().map((option) => option.value);
+
+        expect(optionValues).toContain('outbound_click');
+        expect(optionValues).toContain('file_download');
+        expect(optionValues).toContain('form_submit');
+        expect(optionValues).toContain('newsletter_signup');
     });
 });
