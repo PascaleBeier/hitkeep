@@ -16,6 +16,32 @@ import (
 	"hitkeep/internal/database"
 )
 
+func deleteSiteAnalyticsData(ctx context.Context, store *database.Store, siteID uuid.UUID) {
+	tables := []string{
+		"hits", "events", "ai_fetches", "rollup_dirty_buckets",
+		"hit_rollups_hourly", "hit_rollups_daily", "hit_rollups_monthly",
+		"session_rollups_hourly", "session_rollups_daily", "session_rollups_monthly",
+		"goal_rollups_hourly", "goal_rollups_daily", "goal_rollups_monthly",
+		"funnel_rollups_hourly", "funnel_rollups_daily", "funnel_rollups_monthly",
+	}
+	for _, table := range tables {
+		if err := store.Exec(ctx, fmt.Sprintf("DELETE FROM %s WHERE site_id = ?", table), siteID); err != nil {
+			slog.Warn("Failed to clear analytics data", "table", table, "error", err)
+		}
+	}
+	slog.Info("Cleared existing analytics data", "site_id", siteID)
+}
+
+func deleteSiteGoalsAndFunnels(ctx context.Context, store *database.Store, siteID uuid.UUID) {
+	if err := store.Exec(ctx, "DELETE FROM goals WHERE site_id = ?", siteID); err != nil {
+		slog.Warn("Failed to clear goals", "error", err)
+	}
+	if err := store.Exec(ctx, "DELETE FROM funnels WHERE site_id = ?", siteID); err != nil {
+		slog.Warn("Failed to clear funnels", "error", err)
+	}
+	slog.Info("Cleared existing goals and funnels", "site_id", siteID)
+}
+
 func ensureUser(ctx context.Context, store *database.Store, email, password string) uuid.UUID {
 	existing, err := store.GetUserByEmail(ctx, email)
 	if err != nil {
@@ -226,7 +252,7 @@ func (b *seedWriteBatch) addAIFetch(fetch *api.AIFetch) {
 
 func (b *seedWriteBatch) flush(ctx context.Context, store *database.Store) error {
 	if len(b.hits) > 0 {
-		if err := store.CreateHitsBulk(ctx, b.hits); err != nil {
+		if err := store.CreateHitsBulkUnsafe(ctx, b.hits); err != nil {
 			return fmt.Errorf("insert %d hits: %w", len(b.hits), err)
 		}
 		b.hits = b.hits[:0]

@@ -133,6 +133,9 @@ func main() {
 	}
 	slog.Info("Resolved tenant analytics store", "tenant_id", siteTenantID)
 
+	deleteSiteAnalyticsData(ctx, analyticsStore, siteID)
+	deleteSiteGoalsAndFunnels(ctx, analyticsStore, siteID)
+
 	goalIDs := createGoals(ctx, analyticsStore, siteID)
 	createFunnels(ctx, analyticsStore, siteID)
 

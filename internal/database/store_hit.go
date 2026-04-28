@@ -48,26 +48,49 @@ func (s *Store) CreateHit(ctx context.Context, hit *api.Hit) error {
 }
 
 func (s *Store) CreateHitsBulk(ctx context.Context, hits []*api.Hit) error {
+	return s.createHitsBulk(ctx, hits, false)
+}
+
+// CreateHitsBulkUnsafe is like CreateHitsBulk but skips dirty rollup bucket tracking.
+// Use when BackfillRollups will follow shortly after (e.g. during seeding).
+func (s *Store) CreateHitsBulkUnsafe(ctx context.Context, hits []*api.Hit) error {
+	return s.createHitsBulk(ctx, hits, true)
+}
+
+func (s *Store) createHitsBulk(ctx context.Context, hits []*api.Hit, skipDirtyBuckets bool) error {
 	if len(hits) == 0 {
 		return nil
 	}
 
-	dirtyBuckets := make([]dirtyRollupBucket, 0, len(hits)*6)
-	for _, hit := range hits {
-		if hit == nil {
-			continue
+	if !skipDirtyBuckets {
+		dirtyBuckets := make([]dirtyRollupBucket, 0, len(hits)*6)
+		for _, hit := range hits {
+			if hit == nil {
+				continue
+			}
+			if hit.ID == uuid.Nil {
+				hit.ID = uuid.New()
+			}
+			if hit.Timestamp.IsZero() {
+				hit.Timestamp = time.Now()
+			}
+			dirtyBuckets = append(dirtyBuckets, dirtyBucketsForHit(hit)...)
 		}
-		if hit.ID == uuid.Nil {
-			hit.ID = uuid.New()
+		if err := s.markDirtyRollupBuckets(ctx, dirtyBuckets); err != nil {
+			return fmt.Errorf("mark dirty rollups before hit insert: %w", err)
 		}
-		if hit.Timestamp.IsZero() {
-			hit.Timestamp = time.Now()
+	} else {
+		for _, hit := range hits {
+			if hit == nil {
+				continue
+			}
+			if hit.ID == uuid.Nil {
+				hit.ID = uuid.New()
+			}
+			if hit.Timestamp.IsZero() {
+				hit.Timestamp = time.Now()
+			}
 		}
-		dirtyBuckets = append(dirtyBuckets, dirtyBucketsForHit(hit)...)
-	}
-
-	if err := s.markDirtyRollupBuckets(ctx, dirtyBuckets); err != nil {
-		return fmt.Errorf("mark dirty rollups before hit insert: %w", err)
 	}
 
 	if err := s.withAppenderColumns(ctx, "hits", hitAppenderColumns, func(appender rowAppender) error {
