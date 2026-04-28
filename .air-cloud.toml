@@ -4,7 +4,7 @@ tmp_dir = "tmp"
 [build]
 cmd = "go build -tags billing -o ./tmp/main ./cmd/hitkeep/main.go"
 bin = "./tmp/main"
-args_bin = ["-log-level=debug", "-dev=true"]
+args_bin = ["-log-level=debug"]
 include_ext = ["go", "tpl", "tmpl", "html", "sql"]
 exclude_dir = ["assets", "tmp", "vendor", "frontend", "public", "node_modules", "hitkeep.db"]
 delay = 1000

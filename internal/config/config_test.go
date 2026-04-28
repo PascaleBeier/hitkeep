@@ -1,7 +1,9 @@
 package config
 
 import (
+	"flag"
 	"net/netip"
+	"strings"
 	"testing"
 )
 
@@ -386,6 +388,191 @@ func TestLoadMCPConfigRejectsRootPath(t *testing.T) {
 
 	if conf.MCPPath != "/mcp" {
 		t.Fatalf("expected root MCPPath to normalize to /mcp, got %q", conf.MCPPath)
+	}
+}
+
+func TestDeprecatedFlagsStillWork(t *testing.T) {
+	conf := load([]string{"-http", ":3000", "-db", "/tmp/test.db"}, func(key, fallback string) string {
+		return fallback
+	})
+	if conf.HTTPAddr != ":3000" {
+		t.Fatalf("expected deprecated --http to set HTTPAddr, got %q", conf.HTTPAddr)
+	}
+	if conf.DBPath != "/tmp/test.db" {
+		t.Fatalf("expected deprecated --db to set DBPath, got %q", conf.DBPath)
+	}
+}
+
+func TestNewFlagsOverrideDeprecated(t *testing.T) {
+	conf := load([]string{"--http", ":3000", "--http-addr", ":4000"}, func(key, fallback string) string {
+		return fallback
+	})
+	if conf.HTTPAddr != ":4000" {
+		t.Fatalf("expected --http-addr to override --http, got %q", conf.HTTPAddr)
+	}
+}
+
+func TestEnvMappedToCorrectFields(t *testing.T) {
+	env := map[string]string{
+		"HITKEEP_HTTP_ADDR":        ":5000",
+		"HITKEEP_MAIL_DRIVER":      "log",
+		"HITKEEP_S3_REGION":        "eu-west-2",
+		"HITKEEP_MCP_ENABLED":      "true",
+		"HITKEEP_SPAM_FILTER_PATH": "/data/spam.json",
+	}
+	conf := load([]string{}, func(key, fallback string) string {
+		if val, ok := env[key]; ok {
+			return val
+		}
+		return fallback
+	})
+	if conf.HTTPAddr != ":5000" {
+		t.Fatalf("expected HTTPAddr :5000, got %q", conf.HTTPAddr)
+	}
+	if conf.MailDriver != "log" {
+		t.Fatalf("expected MailDriver log, got %q", conf.MailDriver)
+	}
+	if conf.S3Region != "eu-west-2" {
+		t.Fatalf("expected S3Region eu-west-2, got %q", conf.S3Region)
+	}
+	if !conf.MCPEnabled {
+		t.Fatalf("expected MCPEnabled true")
+	}
+	if conf.SpamFilterPath != "/data/spam.json" {
+		t.Fatalf("expected SpamFilterPath /data/spam.json, got %q", conf.SpamFilterPath)
+	}
+}
+
+func TestDeprecatedFlagsDoNotAppearInNewHelp(t *testing.T) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	var conf Config
+	registerFlags(fs, &conf)
+	displayedFlags := make(map[string]bool)
+	fs.VisitAll(func(f *flag.Flag) {
+		displayedFlags[f.Name] = true
+	})
+	if !displayedFlags["http-addr"] {
+		t.Fatal("expected --http-addr in registered flags")
+	}
+	if !displayedFlags["http"] {
+		t.Fatal("expected --http (deprecated) in registered flags")
+	}
+}
+
+func TestLogValueRedactsSecrets(t *testing.T) {
+	conf := &Config{
+		JWTSecret:         "my-secret-key-12345",
+		MailPassword:      "smtp-pass",
+		S3AccessKeyID:     "AKIA123456",
+		S3SecretAccessKey: "super-secret",
+	}
+	logVal := conf.LogValue()
+	got := logVal.String()
+
+	if strings.Contains(got, "my-secret-key-12345") {
+		t.Fatal("LogValue leaked JWTSecret")
+	}
+	if strings.Contains(got, "smtp-pass") {
+		t.Fatal("LogValue leaked MailPassword")
+	}
+	if strings.Contains(got, "super-secret") {
+		t.Fatal("LogValue leaked S3SecretAccessKey")
+	}
+	if !strings.Contains(got, "AKIA") {
+		t.Fatal("LogValue should show masked S3AccessKeyID prefix")
+	}
+	if !strings.Contains(got, "[redacted]") {
+		t.Fatal("LogValue should contain [redacted] markers")
+	}
+}
+
+func TestFlagHealthcheckRegistered(t *testing.T) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	var conf Config
+	registerFlags(fs, &conf)
+	f := fs.Lookup("healthcheck")
+	if f == nil {
+		t.Fatal("expected --healthcheck flag to be registered")
+	}
+	if f.DefValue != "false" {
+		t.Fatalf("expected default false, got %q", f.DefValue)
+	}
+}
+
+func TestLogValueDefaultConfig(t *testing.T) {
+	conf := load([]string{}, func(key, fallback string) string {
+		return fallback
+	})
+	_ = conf.LogValue() // must not panic
+}
+
+func TestS3UseSSLDefaultsTrue(t *testing.T) {
+	conf := load([]string{}, func(key, fallback string) string {
+		return fallback
+	})
+	if !conf.S3UseSSL {
+		t.Fatal("expected S3UseSSL to default to true")
+	}
+}
+
+func TestS3UseSSLCanBeDisabledByEnv(t *testing.T) {
+	conf := load([]string{}, func(key, fallback string) string {
+		if key == "HITKEEP_S3_USE_SSL" {
+			return "false"
+		}
+		return fallback
+	})
+	if conf.S3UseSSL {
+		t.Fatal("expected S3UseSSL to be false when env set to false")
+	}
+}
+
+func TestInvalidEnvVarValueLogsWarning(t *testing.T) {
+	conf := load([]string{}, func(key, fallback string) string {
+		if key == "HITKEEP_MAIL_PORT" {
+			return "not-a-number"
+		}
+		return fallback
+	})
+	if conf.MailPort != 587 {
+		t.Fatalf("expected MailPort to stay at default 587, got %d", conf.MailPort)
+	}
+}
+
+func TestLogValueExcludesCloudFields(t *testing.T) {
+	conf := load([]string{}, func(key, fallback string) string {
+		return fallback
+	})
+	logVal := conf.LogValue()
+	output := logVal.String()
+
+	if strings.Contains(output, "CloudHosted") {
+		t.Fatal("LogValue should not contain CloudHosted in OSS builds")
+	}
+	if strings.Contains(output, "StripeSecretKey") {
+		t.Fatal("LogValue should not contain StripeSecretKey in OSS builds")
+	}
+	if !strings.Contains(output, "HTTPAddr") {
+		t.Fatal("LogValue should contain non-cloud fields")
+	}
+}
+
+func TestFlagDerivationConsistency(t *testing.T) {
+	tests := []struct {
+		env    string
+		expect string
+	}{
+		{"HITKEEP_HTTP_ADDR", "http-addr"},
+		{"HITKEEP_DB_PATH", "db-path"},
+		{"HITKEEP_MAIL_PASSWORD", "mail-password"},
+		{"HITKEEP_S3_SECRET_ACCESS_KEY", "s3-secret-access-key"},
+		{"HITKEEP_CLOUD_MAX_TEAMS", "cloud-max-teams"},
+	}
+	for _, tc := range tests {
+		got := flagName(tc.env)
+		if got != tc.expect {
+			t.Errorf("flagName(%q) = %q, want %q", tc.env, got, tc.expect)
+		}
 	}
 }
 

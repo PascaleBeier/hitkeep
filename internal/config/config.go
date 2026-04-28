@@ -9,325 +9,115 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
 )
 
 type Config struct {
-	ApiBurst                  int
-	ApiRateLimit              float64
-	AuthBurst                 int
-	AuthRateLimit             float64
-	AuthRememberMeDays        int
-	AuthSessionMinutes        int
-	AuthSessionWarningSeconds int
-	WebhookBurst              int
-	WebhookRateLimit          float64
-	ArchivePath               string
-	BindAddr                  string
-	DataPath                  string
-	DBPath                    string
-	Healthcheck               bool
-	HTTPAddr                  string
-	IngestBurst               int
-	IngestRateLimit           float64
-	JoinAddr                  string
-	//nolint:gosec // runtime configuration intentionally carries the JWT signing secret.
-	JWTSecret                   string
-	LogLevel                    string
-	MailDriver                  string
-	MailEncryption              string
-	MailInsecureSkipVerify      bool
-	MailFromAddress             string
-	MailFromName                string
-	MailHost                    string
-	MailPassword                string
-	MailPort                    int
-	MailUsername                string
-	MCPDocsCacheMinutes         int
-	MCPDocsEnabled              bool
-	MCPDocsURL                  string
-	MCPEnabled                  bool
-	MCPMaxRangeDays             int
-	MCPPath                     string
-	NodeName                    string
-	NSQHTTPAddress              string
-	NSQTCPAddress               string
-	PublicURL                   string
-	SpamFilterAutoUpdate        bool
-	SpamFilterPath              string
-	SpamFilterUpdateIntervalMin int
-	Version                     string
-	DataRetentionDays           int
-	BackupPath                  string
-	BackupIntervalMinutes       int
-	BackupRetentionCount        int
-	S3AccessKeyID               string
-	S3SecretAccessKey           string
-	S3SessionToken              string
-	S3Region                    string
-	S3Endpoint                  string
-	S3URLStyle                  string
-	S3UseSSL                    bool
-	CloudHosted                 bool
-	CloudSignupEnabled          bool
-	CloudJurisdiction           string
-	CloudRegion                 string
-	CloudUpgradeURL             string
-	CloudSupportURL             string
-	CloudPlanCode               string
-	CloudPlanName               string
-	CloudMaxTeams               int
-	CloudMaxSitesPerTeam        int
-	CloudMaxRetentionDays       int
-	CloudMaxTeamMembers         int
-	CloudAllowSSO               bool
-	CloudAllowCustomBranding    bool
-	StripeSecretKey             string
-	StripePublishableKey        string
-	StripeWebhookSecret         string
-	StripePortalConfigurationID string
-	StripePriceProMonthly       string
-	StripePriceBusinessMonthly  string
-	CloudCheckoutSuccessURL     string
-	CloudCheckoutCancelURL      string
-	TrustedProxies              string
-	trustedProxyNets            []netip.Prefix
+	HTTPAddr          string  `env:"HITKEEP_HTTP_ADDR"        default:":8080"                               desc:"HTTP listen address"                                    deprecated:"http"`
+	DBPath            string  `env:"HITKEEP_DB_PATH"          default:"hitkeep.db"                          desc:"Database file path"                                     deprecated:"db"`
+	BindAddr          string  `env:"HITKEEP_BIND_ADDR"        default:"0.0.0.0:7946"                       desc:"Address for cluster gossip"                             deprecated:"bind"`
+	JoinAddr          string  `env:"HITKEEP_JOIN_ADDR"        default:""                                   desc:"Address of a peer to join"                              deprecated:"join"`
+	IngestRateLimit   float64 `env:"HITKEEP_INGEST_RATE_LIMIT" default:"20"                                desc:"Ingest rate limit"                                      deprecated:"ingest-rate"`
+	ApiRateLimit      float64 `env:"HITKEEP_API_RATE_LIMIT"    default:"10"                                desc:"API rate limit"                                         deprecated:"api-rate"`
+	AuthRateLimit     float64 `env:"HITKEEP_AUTH_RATE_LIMIT"   default:"2"                                 desc:"Auth rate limit"                                        deprecated:"auth-rate"`
+	WebhookRateLimit  float64 `env:"HITKEEP_WEBHOOK_RATE_LIMIT" default:"30"                               desc:"Webhook rate limit"                                     deprecated:"webhook-rate"`
+	DataRetentionDays int     `env:"HITKEEP_DATA_RETENTION_DAYS" default:"365"                             desc:"Default data retention in days"                         deprecated:"retention-days"`
+	NodeName          string  `env:"HITKEEP_NODE_NAME"         default:""                                  desc:"Unique node name"                                       deprecated:"name"`
+
+	DataPath       string `env:"HITKEEP_DATA_PATH"          default:"data"           desc:"Base directory for per-tenant data files"`
+	ArchivePath    string `env:"HITKEEP_ARCHIVE_PATH"       default:"archive"        desc:"Data archive path"`
+	PublicURL      string `env:"HITKEEP_PUBLIC_URL"         default:"http://localhost:8080" desc:"Public URL"`
+	LogLevel       string `env:"HITKEEP_LOG_LEVEL"          default:"info"           desc:"Log level (debug/info/warn/error)"`
+	JWTSecret      string `env:"HITKEEP_JWT_SECRET"         default:""               desc:"Secret key for JWT"                                                     sensitive:"redact"`
+	Healthcheck    bool   `flag:"healthcheck"               default:"false"          desc:"Run as healthcheck client"`
+	TrustedProxies string `env:"HITKEEP_TRUSTED_PROXIES"    default:"*"              desc:"Trusted proxy CIDRs (comma-separated) or '*' to trust all"`
+
+	NSQTCPAddress  string `env:"HITKEEP_NSQ_TCP_ADDRESS"  default:"127.0.0.1:4150" desc:"Internal NSQ TCP"`
+	NSQHTTPAddress string `env:"HITKEEP_NSQ_HTTP_ADDRESS" default:"127.0.0.1:4151" desc:"Internal NSQ HTTP"`
+
+	ApiBurst                  int `env:"HITKEEP_API_BURST"                  default:"20"    desc:"API burst"`
+	AuthBurst                 int `env:"HITKEEP_AUTH_BURST"                 default:"5"     desc:"Auth burst"`
+	IngestBurst               int `env:"HITKEEP_INGEST_BURST"               default:"40"    desc:"Ingest burst"`
+	WebhookBurst              int `env:"HITKEEP_WEBHOOK_BURST"              default:"60"    desc:"Webhook burst"`
+	AuthRememberMeDays        int `env:"HITKEEP_AUTH_REMEMBER_ME_DAYS"      default:"30"    desc:"Remember-me session lifetime in days"`
+	AuthSessionMinutes        int `env:"HITKEEP_AUTH_SESSION_MINUTES"       default:"15"    desc:"Authenticated dashboard session lifetime in minutes"`
+	AuthSessionWarningSeconds int `env:"HITKEEP_AUTH_SESSION_WARNING_SECONDS" default:"120" desc:"Seconds before session expiry to warn users"`
+
+	MailDriver             string `env:"HITKEEP_MAIL_DRIVER"              default:"smtp"     desc:"Mail driver"`
+	MailEncryption         string `env:"HITKEEP_MAIL_ENCRYPTION"          default:"tls"      desc:"Mail encryption"`
+	MailInsecureSkipVerify bool   `env:"HITKEEP_MAIL_INSECURE_SKIP_VERIFY" default:"false"   desc:"Disable Cert validation"`
+	MailHost               string `env:"HITKEEP_MAIL_HOST"                default:""         desc:"SMTP Host"`
+	MailPort               int    `env:"HITKEEP_MAIL_PORT"                default:"587"      desc:"SMTP Port"`
+	MailUsername           string `env:"HITKEEP_MAIL_USERNAME"            default:""         desc:"SMTP Username"`
+	MailPassword           string `env:"HITKEEP_MAIL_PASSWORD"            default:""         desc:"SMTP Password"                                            sensitive:"redact"`
+	MailFromAddress        string `env:"HITKEEP_MAIL_FROM_ADDRESS"        default:"hitkeep@localhost" desc:"From Email"`
+	MailFromName           string `env:"HITKEEP_MAIL_FROM_NAME"           default:"HitKeep"  desc:"From Name"`
+
+	SpamFilterAutoUpdate        bool   `env:"HITKEEP_SPAM_FILTER_AUTO_UPDATE"         default:"false" desc:"Automatically refresh OSS spam filter feeds on the leader node (disabled by default for airgapped/offline installs)"`
+	SpamFilterPath              string `env:"HITKEEP_SPAM_FILTER_PATH"                 default:""     desc:"Path to cached spam filter data (defaults to <data-path>/spam-filter.json)"`
+	SpamFilterUpdateIntervalMin int    `env:"HITKEEP_SPAM_FILTER_UPDATE_INTERVAL"      default:"1440" desc:"Minutes between OSS spam filter feed refreshes"`
+
+	BackupPath            string `env:"HITKEEP_BACKUP_PATH"      default:""   desc:"Backup destination path (local dir or s3://)"`
+	BackupIntervalMinutes int    `env:"HITKEEP_BACKUP_INTERVAL"  default:"60" desc:"Minutes between backups"`
+	BackupRetentionCount  int    `env:"HITKEEP_BACKUP_RETENTION" default:"24" desc:"Number of backup snapshots to keep"`
+
+	S3AccessKeyID     string `env:"HITKEEP_S3_ACCESS_KEY_ID"     default:""         desc:"S3 access key ID (static credentials)"                  sensitive:"mask"`
+	S3SecretAccessKey string `env:"HITKEEP_S3_SECRET_ACCESS_KEY" default:""         desc:"S3 secret access key (static credentials)"              sensitive:"redact"`
+	S3SessionToken    string `env:"HITKEEP_S3_SESSION_TOKEN"     default:""         desc:"S3 session token (STS temporary credentials)"           sensitive:"redact"`
+	S3Region          string `env:"HITKEEP_S3_REGION"            default:"us-east-1" desc:"S3 region"`
+	S3Endpoint        string `env:"HITKEEP_S3_ENDPOINT"          default:""         desc:"S3 custom endpoint (MinIO, R2, Spaces)"`
+	S3URLStyle        string `env:"HITKEEP_S3_URL_STYLE"         default:""         desc:"S3 URL style: path or vhost"`
+	S3UseSSL          bool   `env:"HITKEEP_S3_USE_SSL"           default:"true"     desc:"S3 use SSL (set false for local MinIO over HTTP)"`
+
+	MCPEnabled          bool   `env:"HITKEEP_MCP_ENABLED"            default:"false"  desc:"Enable the optional leader-only MCP server"`
+	MCPPath             string `env:"HITKEEP_MCP_PATH"               default:"/mcp"   desc:"MCP server HTTP path on the main HitKeep HTTP server"`
+	MCPMaxRangeDays     int    `env:"HITKEEP_MCP_MAX_RANGE_DAYS"     default:"366"    desc:"Maximum analytics date range in days for MCP tools"`
+	MCPDocsEnabled      bool   `env:"HITKEEP_MCP_DOCS_ENABLED"       default:"true"   desc:"Enable MCP tools and resources that read official HitKeep docs"`
+	MCPDocsURL          string `env:"HITKEEP_MCP_DOCS_URL"           default:"https://hitkeep.com" desc:"Base URL for official HitKeep docs used by MCP docs tools"`
+	MCPDocsCacheMinutes int    `env:"HITKEEP_MCP_DOCS_CACHE_MINUTES" default:"60"     desc:"Minutes to cache fetched docs for MCP tools"`
+
+	CloudHosted                 bool   `env:"HITKEEP_CLOUD_HOSTED"                   default:"true"  desc:"Enable managed cloud runtime surfaces"                              cloud:"true"`
+	CloudSignupEnabled          bool   `env:"HITKEEP_CLOUD_SIGNUP_ENABLED"           default:"false" desc:"Enable hosted self-serve onboarding surfaces"                      cloud:"true"`
+	CloudJurisdiction           string `env:"HITKEEP_CLOUD_JURISDICTION"             default:""      desc:"Managed cloud jurisdiction label"                                   cloud:"true"`
+	CloudRegion                 string `env:"HITKEEP_CLOUD_REGION"                   default:""      desc:"Managed cloud region label"                                        cloud:"true"`
+	CloudUpgradeURL             string `env:"HITKEEP_CLOUD_UPGRADE_URL"              default:""      desc:"Managed cloud upgrade URL"                                         cloud:"true"`
+	CloudSupportURL             string `env:"HITKEEP_CLOUD_SUPPORT_URL"              default:""      desc:"Managed cloud support URL"                                         cloud:"true"`
+	CloudPlanCode               string `env:"HITKEEP_CLOUD_PLAN_CODE"                default:"free"  desc:"Managed cloud plan code"                                           cloud:"true"`
+	CloudPlanName               string `env:"HITKEEP_CLOUD_PLAN_NAME"                default:"Free"  desc:"Managed cloud plan name"                                           cloud:"true"`
+	CloudMaxTeams               int    `env:"HITKEEP_CLOUD_MAX_TEAMS"                default:"1"     desc:"Managed cloud max teams per user"                                  cloud:"true"`
+	CloudMaxSitesPerTeam        int    `env:"HITKEEP_CLOUD_MAX_SITES_PER_TEAM"       default:"3"     desc:"Managed cloud max sites per team"                                  cloud:"true"`
+	CloudMaxRetentionDays       int    `env:"HITKEEP_CLOUD_MAX_RETENTION_DAYS"       default:"60"    desc:"Managed cloud max retention days"                                  cloud:"true"`
+	CloudMaxTeamMembers         int    `env:"HITKEEP_CLOUD_MAX_TEAM_MEMBERS"         default:"3"     desc:"Managed cloud max members per team"                                cloud:"true"`
+	CloudAllowSSO               bool   `env:"HITKEEP_CLOUD_ALLOW_SSO"                default:"false" desc:"Managed cloud SSO entitlement"                                     cloud:"true"`
+	CloudAllowCustomBranding    bool   `env:"HITKEEP_CLOUD_ALLOW_CUSTOM_BRANDING"    default:"false" desc:"Managed cloud custom branding entitlement"                          cloud:"true"`
+	StripeSecretKey             string `env:"HITKEEP_STRIPE_SECRET_KEY"              default:""      desc:"Stripe secret key for managed cloud billing"                       cloud:"true" sensitive:"redact"`
+	StripePublishableKey        string `env:"HITKEEP_STRIPE_PUBLISHABLE_KEY"         default:""      desc:"Stripe publishable key for managed cloud billing"                  cloud:"true" sensitive:"redact"`
+	StripeWebhookSecret         string `env:"HITKEEP_STRIPE_WEBHOOK_SECRET"          default:""      desc:"Stripe webhook signing secret for managed cloud billing"           cloud:"true" sensitive:"redact"`
+	StripePortalConfigurationID string `env:"HITKEEP_STRIPE_PORTAL_CONFIGURATION_ID" default:""   desc:"Stripe customer portal configuration ID for managed cloud billing" cloud:"true"`
+	StripePriceProMonthly       string `env:"HITKEEP_STRIPE_PRICE_PRO_MONTHLY"       default:""      desc:"Stripe monthly recurring price ID for the Pro plan"               cloud:"true"`
+	StripePriceBusinessMonthly  string `env:"HITKEEP_STRIPE_PRICE_BUSINESS_MONTHLY" default:""     desc:"Stripe monthly recurring price ID for the Business plan"          cloud:"true"`
+	CloudCheckoutSuccessURL     string `env:"HITKEEP_CLOUD_CHECKOUT_SUCCESS_URL"     default:""      desc:"Managed cloud checkout success URL override"                      cloud:"true"`
+	CloudCheckoutCancelURL      string `env:"HITKEEP_CLOUD_CHECKOUT_CANCEL_URL"      default:""      desc:"Managed cloud checkout cancel URL override"                       cloud:"true"`
+
+	Version          string
+	trustedProxyNets []netip.Prefix
 }
 
-// GetTrustedProxyNetworks returns the parsed trusted proxy networks.
-func (c *Config) GetTrustedProxyNetworks() []netip.Prefix {
-	return c.trustedProxyNets
-}
+func (c *Config) GetTrustedProxyNetworks() []netip.Prefix { return c.trustedProxyNets }
 
-// IsTrustedProxy checks if an IP is in the trusted proxy list.
 func (c *Config) IsTrustedProxy(ip netip.Addr) bool {
 	if len(c.trustedProxyNets) == 0 {
 		return false
 	}
-
 	for _, network := range c.trustedProxyNets {
 		if network.Contains(ip.Unmap()) {
 			return true
 		}
 	}
 	return false
-}
-
-func Load() *Config {
-	return load(os.Args[1:], func(key, fallback string) string {
-		if val := os.Getenv(key); val != "" {
-			return val
-		}
-		return fallback
-	})
-}
-
-// load internal
-func load(args []string, getEnv func(string, string) string) *Config {
-	var conf Config
-
-	fs := flag.NewFlagSet("hitkeep", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
-
-	getInt := func(key string, fallback int) int {
-		val := getEnv(key, "")
-		if val != "" {
-			if i, err := strconv.Atoi(val); err == nil {
-				return i
-			}
-			slog.Warn("Invalid integer in env var, using default", "key", key, "val", val, "default", fallback)
-		}
-		return fallback
-	}
-
-	getFloat := func(key string, fallback float64) float64 {
-		val := getEnv(key, "")
-		if val != "" {
-			if f, err := strconv.ParseFloat(val, 64); err == nil {
-				return f
-			}
-			slog.Warn("Invalid float in env var, using default", "key", key, "val", val, "default", fallback)
-		}
-		return fallback
-	}
-
-	getBool := func(key string, fallback bool) bool {
-		val := getEnv(key, "")
-		if val != "" {
-			if b, err := strconv.ParseBool(val); err == nil {
-				return b
-			}
-			slog.Warn("Invalid boolean in env var, using default", "key", key, "val", val, "default", fallback)
-		}
-		return fallback
-	}
-
-	getInt64 := func(key string, fallback int64) int64 {
-		val := getEnv(key, "")
-		if val != "" {
-			if i, err := strconv.ParseInt(val, 10, 64); err == nil {
-				return i
-			}
-			slog.Warn("Invalid int64 in env var, using default", "key", key, "val", val, "default", fallback)
-		}
-		return fallback
-	}
-
-	defDB := getEnv("HITKEEP_DB_PATH", "hitkeep.db")
-	defDataPath := getEnv("HITKEEP_DATA_PATH", "data")
-	defArchive := getEnv("HITKEEP_ARCHIVE_PATH", "archive")
-	defHTTP := getEnv("HITKEEP_HTTP_ADDR", ":8080")
-	defBind := getEnv("HITKEEP_BIND_ADDR", "0.0.0.0:7946")
-	defJoin := getEnv("HITKEEP_JOIN_ADDR", "")
-	defPublicURL := getEnv("HITKEEP_PUBLIC_URL", "http://localhost:8080")
-	defLogLevel := getEnv("HITKEEP_LOG_LEVEL", "info")
-	defJWT := getEnv("HITKEEP_JWT_SECRET", "")
-	defSpamFilterPath := getEnv("HITKEEP_SPAM_FILTER_PATH", "")
-	defSpamFilterAutoUpdate := getBool("HITKEEP_SPAM_FILTER_AUTO_UPDATE", false)
-	defSpamFilterUpdateInterval := getInt("HITKEEP_SPAM_FILTER_UPDATE_INTERVAL", 1440)
-
-	defNSQTCP := getEnv("HITKEEP_NSQ_TCP_ADDRESS", "127.0.0.1:4150")
-	defNSQHTTP := getEnv("HITKEEP_NSQ_HTTP_ADDRESS", "127.0.0.1:4151")
-
-	defIngestRate := getFloat("HITKEEP_INGEST_RATE_LIMIT", 20.0)
-	defIngestBurst := getInt("HITKEEP_INGEST_BURST", 40)
-	defApiRate := getFloat("HITKEEP_API_RATE_LIMIT", 10.0)
-	defApiBurst := getInt("HITKEEP_API_BURST", 20)
-	defAuthRate := getFloat("HITKEEP_AUTH_RATE_LIMIT", 2.0)
-	defAuthBurst := getInt("HITKEEP_AUTH_BURST", 5)
-	defAuthRememberMeDays := getInt("HITKEEP_AUTH_REMEMBER_ME_DAYS", 30)
-	defAuthSessionMinutes := getInt("HITKEEP_AUTH_SESSION_MINUTES", 15)
-	defAuthSessionWarningSeconds := getInt("HITKEEP_AUTH_SESSION_WARNING_SECONDS", 120)
-	defWebhookRate := getFloat("HITKEEP_WEBHOOK_RATE_LIMIT", 30.0)
-	defWebhookBurst := getInt("HITKEEP_WEBHOOK_BURST", 60)
-
-	defMailDriver := getEnv("HITKEEP_MAIL_DRIVER", "smtp")
-	defMailEnc := getEnv("HITKEEP_MAIL_ENCRYPTION", "tls")
-	defMailSkipVerify := getBool("HITKEEP_MAIL_INSECURE_SKIP_VERIFY", false)
-	defMailHost := getEnv("HITKEEP_MAIL_HOST", "")
-	defMailPort := getInt("HITKEEP_MAIL_PORT", 587)
-	defMailUser := getEnv("HITKEEP_MAIL_USERNAME", "")
-	defMailPass := getEnv("HITKEEP_MAIL_PASSWORD", "")
-	defMailFrom := getEnv("HITKEEP_MAIL_FROM_ADDRESS", "hitkeep@localhost")
-	defMailName := getEnv("HITKEEP_MAIL_FROM_NAME", "HitKeep")
-
-	defRetention := getInt("HITKEEP_DATA_RETENTION_DAYS", 365)
-
-	defBackupPath := getEnv("HITKEEP_BACKUP_PATH", "")
-	defBackupInterval := getInt("HITKEEP_BACKUP_INTERVAL", 60)
-	defBackupRetention := getInt("HITKEEP_BACKUP_RETENTION", 24)
-
-	defS3AccessKeyID := getEnv("HITKEEP_S3_ACCESS_KEY_ID", "")
-	defS3SecretAccessKey := getEnv("HITKEEP_S3_SECRET_ACCESS_KEY", "")
-	defS3SessionToken := getEnv("HITKEEP_S3_SESSION_TOKEN", "")
-	defS3Region := getEnv("HITKEEP_S3_REGION", "us-east-1")
-	defS3Endpoint := getEnv("HITKEEP_S3_ENDPOINT", "")
-	defS3URLStyle := getEnv("HITKEEP_S3_URL_STYLE", "")
-	defS3UseSSL := getBool("HITKEEP_S3_USE_SSL", true)
-
-	defTrustedProxies := getEnv("HITKEEP_TRUSTED_PROXIES", "*")
-	defMCPEnabled := getBool("HITKEEP_MCP_ENABLED", false)
-	defMCPPath := getEnv("HITKEEP_MCP_PATH", "/mcp")
-	defMCPMaxRangeDays := getInt("HITKEEP_MCP_MAX_RANGE_DAYS", 366)
-	defMCPDocsEnabled := getBool("HITKEEP_MCP_DOCS_ENABLED", true)
-	defMCPDocsURL := getEnv("HITKEEP_MCP_DOCS_URL", "https://hitkeep.com")
-	defMCPDocsCacheMinutes := getInt("HITKEEP_MCP_DOCS_CACHE_MINUTES", 60)
-
-	hostname, _ := os.Hostname()
-	defNodeName := getEnv("HITKEEP_NODE_NAME", fmt.Sprintf("%s-%d", hostname, time.Now().UnixNano()))
-
-	fs.StringVar(&conf.HTTPAddr, "http", defHTTP, "HTTP listen address")
-	fs.StringVar(&conf.BindAddr, "bind", defBind, "Address for cluster gossip")
-	fs.StringVar(&conf.JoinAddr, "join", defJoin, "Address of a peer to join")
-	fs.StringVar(&conf.PublicURL, "public-url", defPublicURL, "Public URL")
-	fs.StringVar(&conf.SpamFilterPath, "spam-filter-path", defSpamFilterPath, "Path to cached spam filter data (defaults to <data-path>/spam-filter.json)")
-	fs.BoolVar(&conf.SpamFilterAutoUpdate, "spam-filter-auto-update", defSpamFilterAutoUpdate, "Automatically refresh OSS spam filter feeds on the leader node (disabled by default for airgapped/offline installs)")
-	fs.IntVar(&conf.SpamFilterUpdateIntervalMin, "spam-filter-update-interval", defSpamFilterUpdateInterval, "Minutes between OSS spam filter feed refreshes")
-
-	fs.StringVar(&conf.DBPath, "db", defDB, "Database file path")
-	fs.StringVar(&conf.DataPath, "data-path", defDataPath, "Base directory for per-tenant data files")
-	fs.StringVar(&conf.ArchivePath, "archive-path", defArchive, "Data archive path")
-	fs.StringVar(&conf.LogLevel, "log-level", defLogLevel, "Log level")
-	fs.StringVar(&conf.JWTSecret, "jwt-secret", defJWT, "Secret key for JWT")
-
-	fs.StringVar(&conf.NSQTCPAddress, "nsq-tcp-address", defNSQTCP, "Internal NSQ TCP")
-	fs.StringVar(&conf.NSQHTTPAddress, "nsq-http-address", defNSQHTTP, "Internal NSQ HTTP")
-
-	fs.BoolVar(&conf.Healthcheck, "healthcheck", false, "Run as healthcheck client")
-
-	fs.Float64Var(&conf.IngestRateLimit, "ingest-rate", defIngestRate, "Ingest rate limit")
-	fs.IntVar(&conf.IngestBurst, "ingest-burst", defIngestBurst, "Ingest burst")
-	fs.Float64Var(&conf.ApiRateLimit, "api-rate", defApiRate, "API rate limit")
-	fs.IntVar(&conf.ApiBurst, "api-burst", defApiBurst, "API burst")
-	fs.Float64Var(&conf.AuthRateLimit, "auth-rate", defAuthRate, "Auth rate limit")
-	fs.IntVar(&conf.AuthBurst, "auth-burst", defAuthBurst, "Auth burst")
-	fs.IntVar(&conf.AuthRememberMeDays, "auth-remember-me-days", defAuthRememberMeDays, "Remember-me session lifetime in days")
-	fs.IntVar(&conf.AuthSessionMinutes, "auth-session-minutes", defAuthSessionMinutes, "Authenticated dashboard session lifetime in minutes")
-	fs.IntVar(&conf.AuthSessionWarningSeconds, "auth-session-warning-seconds", defAuthSessionWarningSeconds, "Seconds before session expiry to warn users")
-	fs.Float64Var(&conf.WebhookRateLimit, "webhook-rate", defWebhookRate, "Webhook rate limit")
-	fs.IntVar(&conf.WebhookBurst, "webhook-burst", defWebhookBurst, "Webhook burst")
-
-	fs.StringVar(&conf.MailDriver, "mail-driver", defMailDriver, "Mail driver")
-	fs.StringVar(&conf.MailEncryption, "mail-encryption", defMailEnc, "Mail encryption")
-	fs.BoolVar(&conf.MailInsecureSkipVerify, "mail-insecure-skip-verify", defMailSkipVerify, "Disable Cert validation")
-	fs.StringVar(&conf.MailHost, "mail-host", defMailHost, "SMTP Host")
-	fs.IntVar(&conf.MailPort, "mail-port", defMailPort, "SMTP Port")
-	fs.StringVar(&conf.MailUsername, "mail-username", defMailUser, "SMTP Username")
-	fs.StringVar(&conf.MailPassword, "mail-password", defMailPass, "SMTP Password")
-	fs.StringVar(&conf.MailFromAddress, "mail-from-address", defMailFrom, "From Email")
-	fs.StringVar(&conf.MailFromName, "mail-from-name", defMailName, "From Name")
-
-	fs.IntVar(&conf.DataRetentionDays, "retention-days", defRetention, "Default data retention in days")
-
-	fs.StringVar(&conf.BackupPath, "backup-path", defBackupPath, "Backup destination path (local dir or s3://)")
-	fs.IntVar(&conf.BackupIntervalMinutes, "backup-interval", defBackupInterval, "Minutes between backups")
-	fs.IntVar(&conf.BackupRetentionCount, "backup-retention", defBackupRetention, "Number of backup snapshots to keep")
-
-	fs.StringVar(&conf.S3AccessKeyID, "s3-access-key-id", defS3AccessKeyID, "S3 access key ID (static credentials)")
-	fs.StringVar(&conf.S3SecretAccessKey, "s3-secret-access-key", defS3SecretAccessKey, "S3 secret access key (static credentials)")
-	fs.StringVar(&conf.S3SessionToken, "s3-session-token", defS3SessionToken, "S3 session token (STS temporary credentials)")
-	fs.StringVar(&conf.S3Region, "s3-region", defS3Region, "S3 region")
-	fs.StringVar(&conf.S3Endpoint, "s3-endpoint", defS3Endpoint, "S3 custom endpoint (MinIO, R2, Spaces)")
-	fs.StringVar(&conf.S3URLStyle, "s3-url-style", defS3URLStyle, "S3 URL style: path or vhost")
-	fs.BoolVar(&conf.S3UseSSL, "s3-use-ssl", defS3UseSSL, "S3 use SSL (set false for local MinIO over HTTP)")
-
-	fs.BoolVar(&conf.MCPEnabled, "mcp-enabled", defMCPEnabled, "Enable the optional leader-only MCP server")
-	fs.StringVar(&conf.MCPPath, "mcp-path", defMCPPath, "MCP server HTTP path on the main HitKeep HTTP server")
-	fs.IntVar(&conf.MCPMaxRangeDays, "mcp-max-range-days", defMCPMaxRangeDays, "Maximum analytics date range in days for MCP tools")
-	fs.BoolVar(&conf.MCPDocsEnabled, "mcp-docs-enabled", defMCPDocsEnabled, "Enable MCP tools and resources that read official HitKeep docs")
-	fs.StringVar(&conf.MCPDocsURL, "mcp-docs-url", defMCPDocsURL, "Base URL for official HitKeep docs used by MCP docs tools")
-	fs.IntVar(&conf.MCPDocsCacheMinutes, "mcp-docs-cache-minutes", defMCPDocsCacheMinutes, "Minutes to cache fetched docs for MCP tools")
-
-	registerCloudFlags(fs, &conf, getEnv, getInt, getInt64, getBool)
-
-	fs.StringVar(&conf.TrustedProxies, "trusted-proxies", defTrustedProxies, "Trusted proxy CIDRs (comma-separated) or '*' to trust all")
-
-	fs.StringVar(&conf.NodeName, "name", defNodeName, "Unique node name")
-
-	_ = fs.Parse(args)
-
-	if conf.JWTSecret == "" {
-		bytes := make([]byte, 32)
-		if _, err := rand.Read(bytes); err == nil {
-			conf.JWTSecret = hex.EncodeToString(bytes)
-		} else {
-			conf.JWTSecret = fmt.Sprintf("fallback-secret-%d", time.Now().UnixNano())
-		}
-	}
-
-	// Parse trusted proxies
-	if conf.TrustedProxies != "" {
-		conf.trustedProxyNets = parseTrustedProxies(conf.TrustedProxies)
-		if len(conf.trustedProxyNets) > 0 {
-			slog.Info("Loaded trusted proxy networks", "count", len(conf.trustedProxyNets))
-		}
-	}
-	NormalizeMCPConfig(&conf)
-	NormalizeAuthSessionConfig(&conf)
-
-	return &conf
 }
 
 func (c *Config) AuthSessionDuration() time.Duration {
@@ -351,6 +141,194 @@ func (c *Config) AuthRememberMeDuration() time.Duration {
 	return time.Duration(c.AuthRememberMeDays) * 24 * time.Hour
 }
 
+func Load() *Config {
+	return load(os.Args[1:], func(key, fallback string) string {
+		if val := os.Getenv(key); val != "" {
+			return val
+		}
+		return fallback
+	})
+}
+
+func load(args []string, getEnv func(string, string) string) *Config {
+	var conf Config
+	loadEnvDefaults(&conf)
+	loadEnvOverrides(&conf, getEnv)
+
+	fs := flag.NewFlagSet("hitkeep", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	registerFlags(fs, &conf)
+	registerCloudFlags(fs, &conf)
+	_ = fs.Parse(args)
+
+	normalizeConfig(&conf)
+	return &conf
+}
+
+func flagName(envKey string) string {
+	return strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(envKey, "HITKEEP_")), "_", "-")
+}
+
+func loadEnvDefaults(conf *Config) {
+	v := reflect.ValueOf(conf).Elem()
+	t := v.Type()
+	for i := range t.NumField() {
+		f := t.Field(i)
+		if !f.IsExported() || f.Tag.Get("cloud") == "true" {
+			continue
+		}
+		def := f.Tag.Get("default")
+		if def == "" {
+			continue
+		}
+		fv := v.Field(i)
+		setDefault(fv, def)
+	}
+}
+
+func setDefault(fv reflect.Value, def string) {
+	switch fv.Kind() { //nolint:exhaustive // only handling config-relevant kinds
+	case reflect.String:
+		fv.SetString(def)
+	case reflect.Int:
+		if n, err := strconv.Atoi(def); err == nil {
+			fv.SetInt(int64(n))
+		}
+	case reflect.Bool:
+		if b, err := strconv.ParseBool(def); err == nil {
+			fv.SetBool(b)
+		}
+	case reflect.Float64:
+		if f, err := strconv.ParseFloat(def, 64); err == nil {
+			fv.SetFloat(f)
+		}
+	}
+}
+
+func loadEnvOverrides(conf *Config, getEnv func(string, string) string) {
+	v := reflect.ValueOf(conf).Elem()
+	t := v.Type()
+	for i := range t.NumField() {
+		f := t.Field(i)
+		if !f.IsExported() || f.Tag.Get("cloud") == "true" {
+			continue
+		}
+		env := f.Tag.Get("env")
+		if env == "" {
+			continue
+		}
+		val := getEnv(env, "")
+		if val == "" {
+			continue
+		}
+		fv := v.Field(i)
+		if !setEnvValue(fv, val) {
+			slog.Warn("Invalid value in env var, using default", "key", env, "val", val)
+		}
+	}
+}
+
+func setEnvValue(fv reflect.Value, val string) bool {
+	switch fv.Kind() { //nolint:exhaustive // only handling config-relevant kinds
+	case reflect.String:
+		fv.SetString(val)
+		return true
+	case reflect.Int:
+		n, err := strconv.Atoi(val)
+		if err != nil {
+			return false
+		}
+		fv.SetInt(int64(n))
+		return true
+	case reflect.Bool:
+		b, err := strconv.ParseBool(val)
+		if err != nil {
+			return false
+		}
+		fv.SetBool(b)
+		return true
+	case reflect.Float64:
+		f, err := strconv.ParseFloat(val, 64)
+		if err != nil {
+			return false
+		}
+		fv.SetFloat(f)
+		return true
+	}
+	return false
+}
+
+func registerFlags(fs *flag.FlagSet, conf *Config) {
+	v := reflect.ValueOf(conf).Elem()
+	t := v.Type()
+	for i := range t.NumField() {
+		f := t.Field(i)
+		if !f.IsExported() {
+			continue
+		}
+		if f.Tag.Get("cloud") == "true" {
+			continue
+		}
+		registerOneField(fs, v.Field(i), f)
+	}
+}
+
+func registerOneField(fs *flag.FlagSet, fv reflect.Value, sf reflect.StructField) {
+	fname := sf.Tag.Get("flag")
+	if fname == "" {
+		env := sf.Tag.Get("env")
+		if env == "" {
+			return
+		}
+		fname = flagName(env)
+	}
+	desc := sf.Tag.Get("desc")
+
+	if dep := sf.Tag.Get("deprecated"); dep != "" {
+		registerFlagVar(fs, fv, dep, "(deprecated, use --"+fname+")")
+	}
+	registerFlagVar(fs, fv, fname, desc)
+}
+
+func registerFlagVar(fs *flag.FlagSet, fv reflect.Value, name, desc string) {
+	switch fv.Kind() { //nolint:exhaustive // only handling config-relevant kinds
+	case reflect.String:
+		fs.StringVar(fv.Addr().Interface().(*string), name, fv.String(), desc)
+	case reflect.Int:
+		fs.IntVar(fv.Addr().Interface().(*int), name, int(fv.Int()), desc)
+	case reflect.Bool:
+		fs.BoolVar(fv.Addr().Interface().(*bool), name, fv.Bool(), desc)
+	case reflect.Float64:
+		fs.Float64Var(fv.Addr().Interface().(*float64), name, fv.Float(), desc)
+	}
+}
+
+func normalizeConfig(conf *Config) {
+	if conf.JWTSecret == "" {
+		bytes := make([]byte, 32)
+		if _, err := rand.Read(bytes); err == nil {
+			conf.JWTSecret = hex.EncodeToString(bytes)
+		} else {
+			conf.JWTSecret = fmt.Sprintf("fallback-secret-%d", time.Now().UnixNano())
+		}
+	}
+
+	if conf.NodeName == "" {
+		hostname, _ := os.Hostname()
+		conf.NodeName = fmt.Sprintf("%s-%d", hostname, time.Now().UnixNano())
+	}
+
+	if conf.TrustedProxies != "" {
+		conf.trustedProxyNets = parseTrustedProxies(conf.TrustedProxies)
+		if len(conf.trustedProxyNets) > 0 {
+			slog.Info("Loaded trusted proxy networks", "count", len(conf.trustedProxyNets))
+		}
+	}
+
+	NormalizeMCPConfig(conf)
+	NormalizeAuthSessionConfig(conf)
+}
+
 func NormalizeAuthSessionConfig(conf *Config) {
 	if conf.AuthSessionMinutes <= 0 {
 		conf.AuthSessionMinutes = 15
@@ -362,10 +340,7 @@ func NormalizeAuthSessionConfig(conf *Config) {
 		conf.AuthSessionWarningSeconds = 20
 	}
 
-	maxWarningSeconds := int((time.Duration(conf.AuthSessionMinutes) * time.Minute / 2).Seconds())
-	if maxWarningSeconds < 20 {
-		maxWarningSeconds = 20
-	}
+	maxWarningSeconds := max(int((time.Duration(conf.AuthSessionMinutes) * time.Minute / 2).Seconds()), 20)
 	if conf.AuthSessionWarningSeconds >= conf.AuthSessionMinutes*60 {
 		conf.AuthSessionWarningSeconds = maxWarningSeconds
 	}
@@ -396,16 +371,12 @@ func NormalizeMCPConfig(conf *Config) {
 	conf.MCPDocsURL = docsURL
 }
 
-// parseTrustedProxies parses a comma-separated list of CIDR ranges.
-// The wildcard "*" expands to both IPv4 and IPv6 all-network CIDRs.
 func parseTrustedProxies(cidrs string) []netip.Prefix {
 	if cidrs == "" {
 		return nil
 	}
-
 	parts := strings.Split(cidrs, ",")
 	networks := make([]netip.Prefix, 0, len(parts))
-
 	for _, cidr := range parts {
 		cidr = strings.TrimSpace(cidr)
 		if cidr == "" {
@@ -414,16 +385,13 @@ func parseTrustedProxies(cidrs string) []netip.Prefix {
 		if cidr == "*" {
 			return trustAllProxyNetworks()
 		}
-
 		network, err := netip.ParsePrefix(cidr)
 		if err != nil {
 			slog.Warn("Invalid trusted proxy CIDR, skipping", "cidr", cidr, "error", err)
 			continue
 		}
-
 		networks = append(networks, network.Masked())
 	}
-
 	return networks
 }
 
@@ -435,4 +403,49 @@ func trustAllProxyNetworks() []netip.Prefix {
 		return nil
 	}
 	return []netip.Prefix{allV4.Masked(), allV6.Masked()}
+}
+
+func maskKey(s string) string {
+	if len(s) <= 4 {
+		return "****"
+	}
+	return s[:4] + "****"
+}
+
+func (c *Config) LogValue() slog.Value {
+	v := reflect.ValueOf(c).Elem()
+	t := v.Type()
+	attrs := make([]slog.Attr, 0, t.NumField())
+	for i := range t.NumField() {
+		f := t.Field(i)
+		if !f.IsExported() || f.Tag.Get("cloud") == "true" {
+			continue
+		}
+		kind := f.Tag.Get("sensitive")
+		name := f.Name
+		fv := v.Field(i)
+		switch fv.Kind() { //nolint:exhaustive // only handling config-relevant kinds
+		case reflect.String:
+			s := fv.String()
+			switch kind {
+			case "redact":
+				if s == "" {
+					attrs = append(attrs, slog.String(name, ""))
+				} else {
+					attrs = append(attrs, slog.String(name, "[redacted]"))
+				}
+			case "mask":
+				attrs = append(attrs, slog.String(name, maskKey(s)))
+			default:
+				attrs = append(attrs, slog.String(name, s))
+			}
+		case reflect.Int:
+			attrs = append(attrs, slog.Int64(name, fv.Int()))
+		case reflect.Bool:
+			attrs = append(attrs, slog.Bool(name, fv.Bool()))
+		case reflect.Float64:
+			attrs = append(attrs, slog.Float64(name, fv.Float()))
+		}
+	}
+	return slog.GroupValue(attrs...)
 }
