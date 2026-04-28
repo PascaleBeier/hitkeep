@@ -8,7 +8,7 @@ cmd = "go build -o ./tmp/main ./cmd/hitkeep/main.go"
 bin = "./tmp/main"
 # Arguments to pass to the binary when running
 # We use the defaults from your config.go, but you can override here
-args_bin = ["-log-level=debug", "-dev=true"]
+args_bin = ["-log-level=debug"]
 # Watch for changes in these file extensions
 include_ext = ["go", "tpl", "tmpl", "html", "sql"]
 # Ignore these directories to prevent infinite loops or unnecessary rebuilds
