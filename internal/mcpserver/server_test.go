@@ -379,12 +379,10 @@ func TestDocsClientCoalescesConcurrentFetches(t *testing.T) {
 	var wg sync.WaitGroup
 	errs := make(chan error, 20)
 	for range 20 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, err := client.GetMarkdown(context.Background(), "/guides/integrations/mcp/")
 			errs <- err
-		}()
+		})
 	}
 	wg.Wait()
 	close(errs)
