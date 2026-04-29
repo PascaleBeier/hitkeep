@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.3.0](https://github.com/PascaleBeier/hitkeep/compare/v2.2.1...v2.3.0) (2026-04-29)
+
+
+### Features
+
+* **activation:** add installation and activation center ([9fc6e74](https://github.com/PascaleBeier/hitkeep/commit/9fc6e74bf3420928f3794b29f93705056e6a91a8))
+* Add automatic event ingestion ([d58a281](https://github.com/PascaleBeier/hitkeep/commit/d58a2814e4f326d0d66a5285aa77086ce49cd8c6))
+* Add readonly MCP Server to be used with Team oder user api token ([84777b4](https://github.com/PascaleBeier/hitkeep/commit/84777b4b4bf20c7983d6de05d7022612fa343735))
+* **admin:** add system status and audit console ([f861347](https://github.com/PascaleBeier/hitkeep/commit/f861347f730e21ac9e07512ece7e89454a1647eb))
+* **events:** support multiple dimension filters ([51cf9af](https://github.com/PascaleBeier/hitkeep/commit/51cf9af8db33368b208864fc158dbe9b66d8b6b8))
+
+
+### Bug Fixes
+
+* **admin:** harden system status APIs ([a0dc422](https://github.com/PascaleBeier/hitkeep/commit/a0dc4220acd901b9c48d661feb8da2468246dfe4))
+* **auth:** grant admins scoped site and system access ([7762abb](https://github.com/PascaleBeier/hitkeep/commit/7762abbcc2687620fbdb25deb340a586b15a72d4))
+* **cloud:** load cloud config in billing builds ([9503033](https://github.com/PascaleBeier/hitkeep/commit/9503033d266e40651bd80ff8d2745a4268394483))
+* **frontend:** polish settings layouts and action feedback ([6413695](https://github.com/PascaleBeier/hitkeep/commit/6413695b42db034131de2f0b69ad75247670ac32))
+* **frontend:** show admin status action feedback ([85570a4](https://github.com/PascaleBeier/hitkeep/commit/85570a4e73443cf6011d139680f324fde1267d3d))
+* **frontend:** show settings action feedback ([d293562](https://github.com/PascaleBeier/hitkeep/commit/d293562ae372864307a4268cc89d7afa6f9709ec))
+* **mailer:** use hostname for SMTP HELO, resolves [#112](https://github.com/PascaleBeier/hitkeep/issues/112) ([00ef55c](https://github.com/PascaleBeier/hitkeep/commit/00ef55c6ba1466f869b06a93792ceef5303e6d0e))
+
 ## [2.2.1](https://github.com/PascaleBeier/hitkeep/compare/v2.2.0...v2.2.1) (2026-04-11)
 
 
