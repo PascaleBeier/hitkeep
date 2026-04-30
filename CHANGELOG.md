@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.3.1](https://github.com/PascaleBeier/hitkeep/compare/v2.3.0...v2.3.1) (2026-04-30)
+
+
+### Bug Fixes
+
+* **admin:** surface degraded worker health ([5aaab49](https://github.com/PascaleBeier/hitkeep/commit/5aaab492ff60e580b49a9b31c1c5628d46d9bc4a))
+* **cloud:** report backup worker status ([77e046d](https://github.com/PascaleBeier/hitkeep/commit/77e046d15fdc3c1e646218b48b16bae13980dcb6)), closes [#124](https://github.com/PascaleBeier/hitkeep/issues/124)
+* **frontend:** link managed cloud status page ([ad2dde7](https://github.com/PascaleBeier/hitkeep/commit/ad2dde791c8705167f198f8f8282dbc6cf82b4e1))
+* **ingest:** count spam and rejected traffic ([ffb6de3](https://github.com/PascaleBeier/hitkeep/commit/ffb6de38728b42e7d96493c011ff24db08dfa063)), closes [#125](https://github.com/PascaleBeier/hitkeep/issues/125) [#126](https://github.com/PascaleBeier/hitkeep/issues/126)
+
 ## [2.3.0](https://github.com/PascaleBeier/hitkeep/compare/v2.2.1...v2.3.0) (2026-04-29)
 
 
