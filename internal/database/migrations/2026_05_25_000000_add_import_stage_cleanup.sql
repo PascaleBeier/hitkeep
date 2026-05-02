@@ -1,0 +1,1 @@
+ALTER TABLE site_import_files ADD COLUMN IF NOT EXISTS cleaned_at TIMESTAMPTZ;

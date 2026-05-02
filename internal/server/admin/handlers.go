@@ -57,6 +57,14 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		InstancePerm: authcore.PermInstanceRunMaintenance,
 		RateLimiter:  ctx.ApiLimiter,
 	}, h.handleRefreshSpamFilter()))
+	mux.HandleFunc("GET /api/admin/system/import-stage-cleanup", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceViewSystem,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleGetImportStageCleanup()))
+	mux.HandleFunc("POST /api/admin/system/import-stage-cleanup/run", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceRunMaintenance,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleRunImportStageCleanup()))
 	mux.HandleFunc("GET /api/admin/system/caches", ctx.Handler(shared.HandlerConfig{
 		InstancePerm: authcore.PermInstanceViewSystem,
 		RateLimiter:  ctx.ApiLimiter,
@@ -372,6 +380,11 @@ func (h *handler) handleUpdateUserRole() http.HandlerFunc {
 		}
 
 		actorID := shared.GetUserIDFromContext(r)
+		oldRole, _ := h.ctx.Store.GetInstanceRole(r.Context(), targetUserID)
+		targetLabel := targetUserID.String()
+		if target, targetErr := h.ctx.Store.GetUserByID(r.Context(), targetUserID); targetErr == nil && target != nil {
+			targetLabel = target.Email
+		}
 
 		err = h.ctx.Store.UpdateInstanceRole(r.Context(), targetUserID, authcore.InstanceRole(req.Role), actorID)
 		if err != nil {
@@ -379,6 +392,16 @@ func (h *handler) handleUpdateUserRole() http.HandlerFunc {
 			http.Error(w, "Failed to update role", http.StatusInternalServerError)
 			return
 		}
+		h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
+			ActorID:      actorID,
+			TargetUserID: targetUserID,
+			Action:       "role.updated",
+			TargetType:   "permission",
+			TargetID:     targetUserID.String(),
+			TargetLabel:  targetLabel,
+			Outcome:      "success",
+			Details:      "Instance role changed from " + string(oldRole) + " to " + strings.TrimSpace(req.Role),
+		})
 
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {

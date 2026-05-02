@@ -84,6 +84,71 @@ func TestGetEventNames(t *testing.T) {
 	}
 }
 
+func TestEventQueriesIncludeImportedAggregates(t *testing.T) {
+	store, userID := setupEventBreakdownStore(t)
+	ctx := context.Background()
+
+	site, err := store.CreateSite(ctx, userID, "imported-events.example.com")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	importID := uuid.New()
+	day := time.Date(2026, 4, 8, 0, 0, 0, 0, time.UTC)
+	if _, err := store.DB().ExecContext(ctx, `
+		INSERT INTO imported_event_daily (site_id, import_id, date, event_name, path, link_url, visitors, events, source_file)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, site.ID, importID, day, "outbound_click", "", "https://example.com", 1, 3, "imported_custom_events.csv"); err != nil {
+		t.Fatalf("insert imported event: %v", err)
+	}
+	if _, err := store.DB().ExecContext(ctx, `
+		INSERT INTO imported_event_properties_daily (site_id, import_id, date, event_name, property_key, property_value, visitors, events, source_file)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, site.ID, importID, day, "outbound_click", "url", "https://example.com", 1, 3, "imported_custom_events.csv"); err != nil {
+		t.Fatalf("insert imported event property: %v", err)
+	}
+
+	names, err := store.GetEventNames(ctx, api.EventNamesParams{
+		SiteID: site.ID,
+		Start:  day.AddDate(0, 0, -1),
+		End:    day.AddDate(0, 0, 1),
+	})
+	if err != nil {
+		t.Fatalf("GetEventNames: %v", err)
+	}
+	if len(names) != 1 || names[0] != "outbound_click" {
+		t.Fatalf("expected imported event name, got %#v", names)
+	}
+
+	keys, err := store.GetEventPropertyKeys(ctx, api.EventNamesParams{
+		SiteID: site.ID,
+		Start:  day.AddDate(0, 0, -1),
+		End:    day.AddDate(0, 0, 1),
+	}, "outbound_click")
+	if err != nil {
+		t.Fatalf("GetEventPropertyKeys: %v", err)
+	}
+	if len(keys) != 1 || keys[0] != "url" {
+		t.Fatalf("expected imported property key, got %#v", keys)
+	}
+
+	series, err := store.GetEventTimeseries(ctx, api.EventTimeseriesParams{
+		SiteID:    site.ID,
+		Start:     day.AddDate(0, 0, -1),
+		End:       day.AddDate(0, 0, 2),
+		EventName: "outbound_click",
+	})
+	if err != nil {
+		t.Fatalf("GetEventTimeseries: %v", err)
+	}
+	var total int
+	for _, point := range series {
+		total += point.Count
+	}
+	if total != 3 {
+		t.Fatalf("expected imported event count 3, got %d (%#v)", total, series)
+	}
+}
+
 func TestGetEventNamesEmpty(t *testing.T) {
 	store, userID := setupEventBreakdownStore(t)
 	ctx := context.Background()

@@ -119,6 +119,16 @@ func (s *Store) GetGoalTimeseries(ctx context.Context, params api.AnalyticsParam
 		}
 	}
 
+	if canIncludeImportedSiteAggregates(params, truncUnit) && len(eventValues) > 0 {
+		importedCounts, err := s.queryImportedEventGoalSeries(ctx, params, truncUnit, eventValues)
+		if err != nil {
+			return nil, err
+		}
+		for bucket, count := range importedCounts {
+			counts[bucket] += count
+		}
+	}
+
 	buckets := buildSeriesBuckets(params.Start, params.End, truncUnit)
 	series := make([]api.GoalSeriesPoint, 0, len(buckets))
 	for _, bucket := range buckets {

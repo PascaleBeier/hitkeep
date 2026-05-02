@@ -4,10 +4,11 @@ import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { AdminSystemService } from '@services/admin-system.service';
+import { AuditPresentationService } from '@services/audit-presentation.service';
 import { SystemAudit } from './system-audit';
 
 interface SystemAuditTestAccess {
-    selectedTargetType: { set(value: string): void };
+    query: { set(value: { target_type?: string; limit: number; offset: number }): void };
     exportAudit(): void;
     exportStatus(): { severity: 'success' | 'error'; key: string } | null;
     isExporting(): boolean;
@@ -53,6 +54,14 @@ describe('SystemAudit', () => {
                         listAudit: vi.fn(),
                         exportAudit: exportAuditMock
                     }
+                },
+                {
+                    provide: AuditPresentationService,
+                    useValue: {
+                        actionOptions: vi.fn(() => []),
+                        outcomeOptions: vi.fn(() => []),
+                        targetTypeOptions: vi.fn(() => [])
+                    }
                 }
             ]
         });
@@ -66,7 +75,7 @@ describe('SystemAudit', () => {
 
     it('exports the active audit filters and reports success in place', () => {
         exportAuditMock.mockReturnValue(of(new Blob(['[]'], { type: 'application/json' })));
-        component.selectedTargetType.set('mail');
+        component.query.set({ target_type: 'mail', limit: 25, offset: 0 });
 
         component.exportAudit();
 

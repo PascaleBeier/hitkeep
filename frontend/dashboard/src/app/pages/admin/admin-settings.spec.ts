@@ -54,6 +54,14 @@ interface AdminSettingsTestAccess {
         params?: Record<string, string | number>;
     } | null;
     spamActionStatusMessage(): string;
+    isRunningImportCleanup(): boolean;
+    runImportStageCleanup(): void;
+    importCleanupActionStatus(): {
+        severity: 'success' | 'error';
+        key: string;
+        params?: Record<string, string | number>;
+    } | null;
+    importCleanupActionStatusMessage(): string;
     canDisableUserMfa(): boolean;
     currentUserId: { set(value: string): void };
     users: {
@@ -108,6 +116,10 @@ describe('AdminSettings', () => {
                                     spam: {
                                         refreshTriggered: 'Spam filter refreshed.',
                                         refreshFailed: 'Could not refresh the spam filter.'
+                                    },
+                                    importCleanup: {
+                                        runSuccess: 'Cleaned {{files}} staged file(s), freeing {{bytes}}.',
+                                        runFailed: 'Could not clean staged import files.'
                                     }
                                 }
                             }
@@ -302,6 +314,60 @@ describe('AdminSettings', () => {
             key: 'admin.system.spam.refreshFailed'
         });
         expect(component.spamActionStatusMessage()).toBe('Could not refresh the spam filter.');
+    });
+
+    it('shows in-place feedback after running import stage cleanup', () => {
+        component.runImportStageCleanup();
+
+        expect(component.isRunningImportCleanup()).toBe(true);
+        const runRequest = httpMock.expectOne('/api/admin/system/import-stage-cleanup/run');
+        expect(runRequest.request.method).toBe('POST');
+        runRequest.flush({
+            status: 'ok',
+            message: 'completed',
+            result: {
+                imports_cleaned: 1,
+                files_cleaned: 2,
+                bytes_cleaned: 2048,
+                imports_marked_failed: 1
+            }
+        });
+
+        const reloadRequest = httpMock.expectOne('/api/admin/system/import-stage-cleanup');
+        reloadRequest.flush({
+            enabled: true,
+            retention_days: 7,
+            stale_imports: 0,
+            stale_files: 0,
+            stale_bytes: 0,
+            recent_failures: 0,
+            last_cleaned_imports: 1,
+            last_cleaned_files: 2,
+            last_cleaned_bytes: 2048,
+            last_marked_failed: 1
+        });
+
+        expect(component.isRunningImportCleanup()).toBe(false);
+        expect(component.importCleanupActionStatus()).toEqual({
+            severity: 'success',
+            key: 'admin.system.importCleanup.runSuccess',
+            params: { files: 2, bytes: '2 KB' }
+        });
+        expect(component.importCleanupActionStatusMessage()).toBe('Cleaned 2 staged file(s), freeing 2 KB.');
+    });
+
+    it('shows in-place error feedback when import stage cleanup fails', () => {
+        component.runImportStageCleanup();
+
+        const runRequest = httpMock.expectOne('/api/admin/system/import-stage-cleanup/run');
+        runRequest.flush('cleanup failed', { status: 500, statusText: 'Server Error' });
+
+        expect(component.isRunningImportCleanup()).toBe(false);
+        expect(component.importCleanupActionStatus()).toEqual({
+            severity: 'error',
+            key: 'admin.system.importCleanup.runFailed'
+        });
+        expect(component.importCleanupActionStatusMessage()).toBe('Could not clean staged import files.');
     });
 
     it('allows MFA recovery actions when the current user is an instance owner', () => {

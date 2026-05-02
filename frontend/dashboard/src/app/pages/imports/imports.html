@@ -1,0 +1,324 @@
+<div class="imports-page flex h-full w-full flex-col bg-[var(--p-surface-ground)] transition-colors duration-200">
+    <app-page-header>
+        <ng-template appPageHeaderLeft>
+            <app-page-breadcrumb [items]="breadcrumbItems()" />
+        </ng-template>
+    </app-page-header>
+
+    @if (!activeSite()) {
+    <div class="imports-empty">
+        <i class="pi pi-globe" aria-hidden="true"></i>
+        <h2>{{ "common.noSiteSelected" | transloco }}</h2>
+        <p>{{ "imports.noSiteDescription" | transloco }}</p>
+    </div>
+    } @else if (!canImport()) {
+    <div class="imports-empty">
+        <i class="pi pi-lock" aria-hidden="true"></i>
+        <h2>{{ "imports.permission.title" | transloco }}</h2>
+        <p>{{ "imports.permission.description" | transloco }}</p>
+    </div>
+    } @else {
+    <div class="grid w-full grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
+        <p-card styleClass="imports-card shadow-sm border border-surface-200 dark:border-surface-700 surface-card">
+            <section class="space-y-5" aria-labelledby="imports-flow-title">
+                <div class="flex flex-col gap-3 border-b border-surface-200 pb-5 dark:border-surface-700 md:flex-row md:items-start md:justify-between">
+                    <h2 id="imports-flow-title" class="m-0 text-lg font-semibold">{{ "imports.flow.title" | transloco }}</h2>
+                    @if (currentJob()) {
+                    <p-button [label]="'imports.actions.newImport' | transloco" icon="pi pi-plus" severity="secondary" size="small" [outlined]="true" (onClick)="resetFlow()" />
+                    }
+                </div>
+
+                @if (errorMessage()) {
+                <p-message severity="error" styleClass="w-full">{{ errorMessage() }}</p-message>
+                } @if (step() === 'driver') {
+                <section class="space-y-3" aria-labelledby="imports-provider-title">
+                    <h3 id="imports-provider-title" class="m-0 text-base font-semibold">{{ "imports.providers.title" | transloco }}</h3>
+                    @if (isLoadingProviders()) {
+                    <div class="flex items-center gap-2 rounded-lg border border-surface-200 bg-surface-card p-4 text-sm text-[var(--p-text-muted-color)] dark:border-surface-700">
+                        <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
+                        <span>{{ "imports.providers.loading" | transloco }}</span>
+                    </div>
+                    } @else {
+                    <div class="imports-provider-grid">
+                        @for (provider of providers(); track provider.key) {
+                        <div class="imports-provider-card">
+                            <button type="button" class="imports-provider-option" (click)="selectProvider(provider)" [attr.aria-label]="'imports.providers.selectAria' | transloco: { provider: provider.name }">
+                                <span class="imports-provider-option__body">
+                                    <strong>{{ provider.name }}</strong>
+                                    <span class="imports-extension-row">
+                                        @for (extension of provider.accepted_extensions; track extension) {
+                                        <p-tag [value]="extension" severity="secondary" [rounded]="true" />
+                                        }
+                                    </span>
+                                </span>
+                            </button>
+                            @if (importGuideUrl(provider.key); as guideUrl) {
+                            <a class="imports-provider-guide" [href]="guideUrl" target="_blank" rel="noopener noreferrer" [attr.aria-label]="'imports.providers.guideAria' | transloco: { provider: provider.name }">
+                                <i class="pi pi-book" aria-hidden="true"></i>
+                                <span>{{ "imports.providers.guide" | transloco }}</span>
+                                <i class="pi pi-external-link" aria-hidden="true"></i>
+                            </a>
+                            }
+                        </div>
+                        } @empty {
+                        <p-message severity="secondary" styleClass="w-full">{{ "imports.providers.empty" | transloco }}</p-message>
+                        }
+                    </div>
+                    }
+                </section>
+                } @else if (!currentJob()) {
+                <section class="space-y-4" aria-labelledby="imports-upload-title">
+                    <div class="imports-upload-toolbar">
+                        <div class="min-w-0">
+                            <h3 id="imports-upload-title">{{ selectedProviderName() }}</h3>
+                        </div>
+                        <p-button [label]="'imports.actions.changeProvider' | transloco" icon="pi pi-sync" severity="secondary" size="small" [outlined]="true" (onClick)="changeProvider()" />
+                    </div>
+
+                    <p-fileupload
+                        #fileUpload
+                        mode="advanced"
+                        styleClass="imports-fileupload"
+                        [multiple]="true"
+                        [customUpload]="true"
+                        [accept]="acceptedFileInput()"
+                        [disabled]="isBusy()"
+                        [showUploadButton]="false"
+                        [showCancelButton]="false"
+                        [invalidFileTypeMessageSummary]="'imports.files.rejectedUnsupportedSummary' | transloco"
+                        [invalidFileTypeMessageDetail]="'imports.files.rejectedUnsupportedDetail' | transloco: { expected: acceptedFileHint() }"
+                        (onSelect)="onFilesSelected($event)"
+                        (onRemove)="onFileRemoved($event)"
+                        (onClear)="onFilesCleared()"
+                        (uploadHandler)="uploadAndValidate($event)"
+                    >
+                        <ng-template pTemplate="header" let-files let-chooseCallback="chooseCallback" let-clearCallback="clearCallback" let-uploadCallback="uploadCallback">
+                            <div class="imports-fileupload__header">
+                                <div class="imports-fileupload__summary">
+                                    <strong>{{ files.length | number }}</strong>
+                                    <span>{{ "imports.files.count" | transloco }}</span>
+                                    <small>{{ formatBytes(selectedFileBytes()) }}</small>
+                                </div>
+                                <div class="imports-fileupload__actions">
+                                    <p-button [label]="'imports.files.addMore' | transloco" icon="pi pi-folder-open" severity="secondary" [outlined]="true" [disabled]="isBusy()" (onClick)="chooseCallback()" />
+                                    <p-button [label]="'imports.actions.clearFiles' | transloco" icon="pi pi-times" severity="secondary" [text]="true" [disabled]="isBusy() || files.length === 0" (onClick)="clearCallback()" />
+                                    <p-button [label]="'imports.actions.uploadValidate' | transloco" icon="pi pi-check-circle" [loading]="isBusy()" [disabled]="files.length === 0" (onClick)="uploadCallback()" />
+                                </div>
+                            </div>
+                        </ng-template>
+
+                        <ng-template pTemplate="content" let-files let-messages="messages" let-removeFileCallback="removeFileCallback" let-chooseCallback="chooseCallback">
+                            <div class="imports-fileupload__content">
+                                @for (message of messages || []; track message.text) {
+                                <p-message [severity]="message.severity" styleClass="w-full">{{ message.text }}</p-message>
+                                } @if (files.length === 0) {
+                                <button type="button" class="imports-upload-empty" [disabled]="isBusy()" (click)="chooseCallback()">
+                                    <i class="pi pi-upload" aria-hidden="true"></i>
+                                    <span>{{ "imports.dropzone.title" | transloco }}</span>
+                                </button>
+                                } @else {
+                                <div class="imports-file-list">
+                                    @for (file of files; track file.name + file.size) {
+                                    <div class="imports-file-row">
+                                        <i class="pi" [class.pi-file-zip]="isZipFile(file)" [class.pi-file]="!isZipFile(file)" aria-hidden="true"></i>
+                                        <span>{{ file.name }}</span>
+                                        <small>{{ formatBytes(file.size) }}</small>
+                                        <button type="button" (click)="removeFileCallback($event, $index)" [disabled]="isBusy()" [attr.aria-label]="'imports.actions.removeFile' | transloco">
+                                            <i class="pi pi-times" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                    }
+                                </div>
+                                } @if (isBusy()) {
+                                <p-progressbar [value]="uploadProgress()" [showValue]="true" />
+                                }
+                            </div>
+                        </ng-template>
+                    </p-fileupload>
+                </section>
+                } @if (currentJob(); as job) {
+                <section class="space-y-5" aria-labelledby="imports-validation-title">
+                    <div class="flex flex-col gap-3 border-b border-surface-200 pb-4 dark:border-surface-700 sm:flex-row sm:items-start sm:justify-between">
+                        <h3 id="imports-validation-title" class="m-0 text-base font-semibold">{{ "imports.validation.title" | transloco }}</h3>
+                        <p-tag [value]="('imports.status.' + job.status) | transloco" [severity]="statusSeverity(job.status)" />
+                    </div>
+
+                    @if (manifest(); as manifest) {
+                    <div class="imports-manifest-grid grid grid-cols-1 gap-3 md:grid-cols-4">
+                        <div class="imports-metric rounded-lg border border-surface-200 bg-surface-50 p-3 dark:border-surface-700 dark:bg-surface-800">
+                            <span>{{ "imports.metrics.rowsAccepted" | transloco }}</span>
+                            <strong>{{ manifest.rows_accepted | number }}</strong>
+                        </div>
+                        <div class="imports-metric rounded-lg border border-surface-200 bg-surface-50 p-3 dark:border-surface-700 dark:bg-surface-800">
+                            <span>{{ "imports.metrics.rowsSkipped" | transloco }}</span>
+                            <strong>{{ manifest.rows_skipped | number }}</strong>
+                        </div>
+                        <div class="imports-metric rounded-lg border border-surface-200 bg-surface-50 p-3 dark:border-surface-700 dark:bg-surface-800">
+                            <span>{{ "imports.metrics.files" | transloco }}</span>
+                            <strong>{{ listLength(manifest.files) | number }}</strong>
+                        </div>
+                        <div class="imports-metric rounded-lg border border-surface-200 bg-surface-50 p-3 dark:border-surface-700 dark:bg-surface-800">
+                            <span>{{ "imports.metrics.range" | transloco }}</span>
+                            <strong> @if (manifest.date_start && manifest.date_end) { {{ manifest.date_start | date: "mediumDate" }} - {{ manifest.date_end | date: "mediumDate" }} } @else { {{ "common.unknown" | transloco }} } </strong>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <h4 class="m-0 text-sm font-semibold">{{ "imports.datasets.title" | transloco }}</h4>
+                        <p-table [value]="manifestDatasets()" styleClass="p-datatable-sm imports-table" responsiveLayout="scroll">
+                            <ng-template pTemplate="header">
+                                <tr>
+                                    <th>{{ "imports.datasets.dataset" | transloco }}</th>
+                                    <th>{{ "imports.datasets.rows" | transloco }}</th>
+                                    <th>{{ "imports.datasets.pageviews" | transloco }}</th>
+                                    @if (showDatasetEventsColumn()) {
+                                    <th>{{ "imports.datasets.events" | transloco }}</th>
+                                    }
+                                </tr>
+                            </ng-template>
+                            <ng-template pTemplate="body" let-row>
+                                <tr>
+                                    <td>{{ row.name }}</td>
+                                    <td>{{ row.rows_accepted | number }}</td>
+                                    <td>{{ row.pageviews || 0 | number }}</td>
+                                    @if (showDatasetEventsColumn()) {
+                                    <td>{{ row.events || 0 | number }}</td>
+                                    }
+                                </tr>
+                            </ng-template>
+                        </p-table>
+                    </div>
+
+                    @if (showEventValidationDetails()) { @if (showEventCoverage()) {
+                    <div class="imports-event-panel rounded-lg border border-surface-200 bg-surface-50 p-4 dark:border-surface-700 dark:bg-surface-800">
+                        <h4>{{ "imports.events.title" | transloco }}</h4>
+                        <div class="imports-event-stats">
+                            <span>{{ "imports.events.total" | transloco }} <strong>{{ manifest.event_coverage.events | number }}</strong></span>
+                            <span>{{ "imports.events.names" | transloco }} <strong>{{ listLength(manifest.event_coverage.event_names) | number }}</strong></span>
+                            <span>{{ "imports.events.properties" | transloco }} <strong>{{ listLength(manifest.event_property_coverage.attributed_property_keys) | number }}</strong></span>
+                        </div>
+                        @if (eventNamesPreview().length > 0) {
+                        <div class="imports-chip-row">
+                            @for (name of eventNamesPreview(); track name) {
+                            <p-tag [value]="name" severity="secondary" [rounded]="true" />
+                            }
+                        </div>
+                        }
+                    </div>
+                    } @if (showEventProperties()) {
+                    <div class="imports-event-panel rounded-lg border border-surface-200 bg-surface-50 p-4 dark:border-surface-700 dark:bg-surface-800">
+                        <h4>{{ "imports.properties.title" | transloco }}</h4>
+                        <div class="imports-event-stats">
+                            <span>{{ "imports.properties.attributed" | transloco }} <strong>{{ manifest.event_property_coverage.attributed_rows | number }}</strong></span>
+                            <span>{{ "imports.properties.unattributed" | transloco }} <strong>{{ manifest.event_property_coverage.unattributed_rows | number }}</strong></span>
+                            <span>{{ "imports.properties.unattributedEvents" | transloco }} <strong>{{ manifest.event_property_coverage.unattributed_events | number }}</strong></span>
+                        </div>
+                        @if (eventPropertyKeysPreview().length > 0) {
+                        <div class="imports-chip-row">
+                            @for (key of eventPropertyKeysPreview(); track key) {
+                            <p-tag [value]="key" severity="secondary" [rounded]="true" />
+                            }
+                        </div>
+                        } @if (manifest.event_property_coverage.unavailable_relationship_message) {
+                        <p-message severity="warn" styleClass="w-full">{{ manifest.event_property_coverage.unavailable_relationship_message }}</p-message>
+                        }
+                    </div>
+                    } @if (showEventDimensions()) {
+                    <div class="imports-event-panel rounded-lg border border-surface-200 bg-surface-50 p-4 dark:border-surface-700 dark:bg-surface-800">
+                        <h4>{{ "imports.dimensions.title" | transloco }}</h4>
+                        <div class="imports-event-stats">
+                            <span>{{ "imports.dimensions.available" | transloco }} <strong>{{ listLength(manifest.event_dimension_coverage.available) | number }}</strong></span>
+                            <span>{{ "imports.dimensions.unavailable" | transloco }} <strong>{{ listLength(manifest.event_dimension_coverage.unavailable) | number }}</strong></span>
+                        </div>
+                        <div class="imports-chip-row">
+                            @for (dimension of availableEventDimensionsPreview(); track dimension) {
+                            <p-tag [value]="dimension" severity="success" [rounded]="true" />
+                            }
+                        </div>
+                        @if (unavailableEventDimensionsPreview().length > 0) {
+                        <div class="imports-chip-row">
+                            @for (dimension of unavailableEventDimensionsPreview(); track dimension) {
+                            <p-tag [value]="dimension" severity="secondary" [rounded]="true" />
+                            }
+                        </div>
+                        }
+                    </div>
+                    } } @if (hasOverlapEstimate()) {
+                    <p-message severity="warn" styleClass="w-full">
+                        <strong>{{ "imports.overlap.title" | transloco }}</strong>
+                        <span class="block"
+                            >{{ "imports.overlap.description" | transloco : { policy: manifest.overlap.policy, days: manifest.overlap.native_traffic_days, eventDays: manifest.overlap.native_event_days, rows: manifest.overlap.estimated_skipped_rows,
+                            pageviews: manifest.overlap.estimated_skipped_pageviews, events: manifest.overlap.estimated_skipped_events } }}</span
+                        >
+                    </p-message>
+                    } @if (manifest.warnings.length > 0) {
+                    <p-message severity="warn" styleClass="w-full">
+                        <strong>{{ "imports.warnings.title" | transloco }}</strong>
+                        @for (warning of manifest.warnings; track warning.code + warning.file + warning.message) {
+                        <span class="block">{{ warning.file ? warning.file + ": " : "" }}{{ warning.message }}</span>
+                        }
+                    </p-message>
+                    } } @if (job.status === 'validated') {
+                    <div class="flex justify-end border-t border-surface-200 pt-5 dark:border-surface-700">
+                        <p-button [label]="'imports.actions.startImport' | transloco" icon="pi pi-play" [loading]="isBusy()" (onClick)="startImport()" />
+                    </div>
+                    } @else if (['queued', 'running'].includes(job.status)) {
+                    <div class="space-y-3">
+                        <p-progressbar mode="indeterminate" />
+                        <span class="text-sm text-[var(--p-text-muted-color)]">{{ "imports.running" | transloco }}</span>
+                    </div>
+                    } @else if (job.status === 'completed') {
+                    <p-message severity="success" styleClass="w-full">{{ "imports.completed" | transloco }}</p-message>
+                    } @else if (job.status === 'failed' || job.status === 'validation_failed') {
+                    <p-message severity="error" styleClass="w-full">{{ job.error || ("imports.errors.generic" | transloco) }}</p-message>
+                    }
+                </section>
+                }
+            </section>
+        </p-card>
+
+        <p-card styleClass="imports-card shadow-sm border border-surface-200 dark:border-surface-700 surface-card">
+            <section class="space-y-4" aria-labelledby="imports-history-title">
+                <div class="flex items-start justify-between gap-3">
+                    <h2 id="imports-history-title" class="m-0 text-lg font-semibold">{{ "imports.history.title" | transloco }}</h2>
+                    <p-button [label]="'common.actions.refresh' | transloco" icon="pi pi-refresh" severity="secondary" size="small" [text]="true" (onClick)="refreshHistory()" />
+                </div>
+
+                @if (history().length === 0) {
+                <p-message severity="secondary" styleClass="w-full">{{ "imports.history.empty" | transloco }}</p-message>
+                } @else {
+                <p-table [value]="history()" styleClass="p-datatable-sm imports-history-table" responsiveLayout="scroll">
+                    <ng-template pTemplate="header">
+                        <tr>
+                            <th>{{ "imports.history.importer" | transloco }}</th>
+                            <th>{{ "imports.history.status" | transloco }}</th>
+                            <th>{{ "imports.history.rows" | transloco }}</th>
+                            <th></th>
+                        </tr>
+                    </ng-template>
+                    <ng-template pTemplate="body" let-job>
+                        <tr>
+                            <td>{{ job.provider }}</td>
+                            <td><p-tag [value]="('imports.status.' + job.status) | transloco" [severity]="statusSeverity(job.status)" /></td>
+                            <td>{{ job.rows_imported || job.rows_scanned | number }}</td>
+                            <td>
+                                <p-button
+                                    icon="pi pi-trash"
+                                    severity="danger"
+                                    size="small"
+                                    [text]="true"
+                                    [rounded]="true"
+                                    [ariaLabel]="'imports.actions.delete' | transloco"
+                                    [disabled]="['queued', 'running', 'validating'].includes(job.status)"
+                                    (onClick)="deleteImport(job)"
+                                />
+                            </td>
+                        </tr>
+                    </ng-template>
+                </p-table>
+                }
+            </section>
+        </p-card>
+    </div>
+    }
+</div>

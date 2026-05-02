@@ -55,6 +55,11 @@ export interface ChartDataPoint {
     visitors: number;
 }
 
+export interface ImportExclusionReason {
+    reason: string;
+    detail?: string;
+}
+
 export interface SiteStats {
     live_visitors: number;
     total_pageviews: number;
@@ -76,6 +81,7 @@ export interface SiteStats {
     utm_source_hits: number;
     utm_term_hits: number;
     goals: GoalStats[];
+    imported_excluded?: ImportExclusionReason[];
 }
 
 export interface MetricStat {

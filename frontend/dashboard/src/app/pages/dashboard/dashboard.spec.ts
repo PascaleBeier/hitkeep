@@ -10,6 +10,7 @@ import { SiteService } from '@features/sites/services/site.service';
 import { StatsService } from '@features/analytics/services/stats.service';
 import { HitService } from '@features/hits/services/hit.service';
 import { TeamService } from '@services/team.service';
+import { OnboardingService } from '@services/onboarding.service';
 
 describe('Dashboard', () => {
     let component: Dashboard;
@@ -70,6 +71,30 @@ describe('Dashboard', () => {
         fixture.detectChanges();
 
         expect(fixture.nativeElement.textContent).toContain('dashboard.empty.teamTitle');
+    });
+
+    it('should render onboarding progress as a non-clickable rail', () => {
+        const onboardingService = TestBed.inject(OnboardingService);
+
+        onboardingService.onboarding.set({
+            dismissed: false,
+            complete: false,
+            steps: [
+                { key: 'create_site', complete: true },
+                { key: 'verify_tracking', complete: false },
+                { key: 'automatic_events', complete: false },
+                { key: 'invite_teammate', complete: false },
+                { key: 'schedule_report', complete: false }
+            ]
+        });
+
+        fixture.detectChanges();
+
+        const rail = fixture.nativeElement.querySelector('app-workflow-progress') as HTMLElement;
+        expect(rail).toBeTruthy();
+        expect(rail.querySelectorAll('button, a, [role="button"]').length).toBe(0);
+        expect(rail.querySelectorAll('[aria-current="step"]').length).toBe(1);
+        expect(rail.querySelector('[aria-current="step"]')?.textContent).toContain('dashboard.onboarding.steps.verify_tracking');
     });
 
     it('should switch the pages card data between top, landing, and exit pages', () => {

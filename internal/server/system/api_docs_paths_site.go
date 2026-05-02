@@ -22,7 +22,7 @@ func eventFilteredParams(prefix ...any) []any {
 func openAPIV1AdminSitePaths() map[string]any {
 	return map[string]any{
 		"/api/admin/system": map[string]any{
-			"get": op([]string{"Admin"}, "Get system overview", "Returns version, build, runtime mode, uptime, public URL, and operator feature switch status.", secCookie(), nil, nil,
+			"get": op([]string{"Admin"}, "Get system overview", "Returns version, runtime mode, uptime, public URL, and operator feature switch status.", secCookie(), nil, nil,
 				map[string]any{"200": jsonRefResp("System overview", "#/components/schemas/SystemInfo")}),
 		},
 		"/api/admin/system/health": map[string]any{
@@ -50,6 +50,22 @@ func openAPIV1AdminSitePaths() map[string]any {
 				map[string]any{
 					"200": jsonRefResp("Refresh result", "#/components/schemas/SystemActionResponse"),
 					"503": errResp("Spam filter not available"),
+				}),
+		},
+		"/api/admin/system/import-stage-cleanup": map[string]any{
+			"get": op([]string{"Admin"}, "Get import staging cleanup status", "Returns stale staged import file counts, byte totals, retention policy, and the latest cleanup run state.", secCookie(), nil, nil,
+				map[string]any{
+					"200": jsonRefResp("Import staging cleanup status", "#/components/schemas/SystemImportStageCleanupStatus"),
+					"503": errResp("Store not available"),
+				}),
+		},
+		"/api/admin/system/import-stage-cleanup/run": map[string]any{
+			"post": op([]string{"Admin"}, "Run import staging cleanup", "Removes stale staged import upload files immediately and writes an instance audit log entry with the actor and outcome.", secCookie(), nil, nil,
+				map[string]any{
+					"200": jsonRefResp("Import staging cleanup result", "#/components/schemas/SystemImportStageCleanupRunResponse"),
+					"409": errResp("Cleanup disabled"),
+					"500": jsonRefResp("Cleanup failed", "#/components/schemas/SystemImportStageCleanupRunResponse"),
+					"503": errResp("Store not available"),
 				}),
 		},
 		"/api/admin/system/caches": map[string]any{
@@ -169,6 +185,65 @@ func openAPIV1AdminSitePaths() map[string]any {
 				paramRef("#/components/parameters/filter"), paramRef("#/components/parameters/filterType"), paramRef("#/components/parameters/filterValue"),
 				paramRef("#/components/parameters/goalIDQuery"), paramRef("#/components/parameters/funnelIDQuery"),
 			}, nil, map[string]any{"200": jsonRefResp("Site stats", "#/components/schemas/SiteStats")}),
+		},
+		"/api/sites/{id}/importers": map[string]any{
+			"get": op([]string{"Imports"}, "List site importers", "Lists available historical data import providers for the selected site.", secAnyAuth(), []any{paramRef("#/components/parameters/siteID")}, nil,
+				map[string]any{"200": jsonSchemaResp("Importers", map[string]any{
+					"type": "array",
+					"items": map[string]any{
+						"type":                 "object",
+						"additionalProperties": false,
+						"properties": map[string]any{
+							"key":                 map[string]any{"type": "string"},
+							"name":                map[string]any{"type": "string"},
+							"accepted_extensions": map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+							"capabilities":        map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+						},
+						"required": []string{"key", "name", "accepted_extensions", "capabilities"},
+					},
+				})}),
+		},
+		"/api/sites/{id}/imports/{provider}/uploads": map[string]any{
+			"post": op([]string{"Imports"}, "Create import upload", "Creates a staged import upload session. Use chunk upload endpoints to send the declared ZIP or CSV files.", secAnyAuth(), []any{
+				paramRef("#/components/parameters/siteID"),
+				map[string]any{"name": "provider", "in": "path", "required": true, "schema": map[string]any{"type": "string", "enum": []string{"plausible", "simpleanalytics"}}},
+			}, jsonBody(map[string]any{"type": "object", "properties": map[string]any{"files": map[string]any{"type": "array", "items": map[string]any{"type": "object", "properties": map[string]any{"filename": map[string]any{"type": "string"}, "size_bytes": map[string]any{"type": "integer"}, "sha256": map[string]any{"type": "string", "description": "Optional lowercase or uppercase hex SHA-256 checksum for the staged file."}}, "required": []string{"filename", "size_bytes"}}}}, "required": []string{"files"}}),
+				map[string]any{"200": jsonSchemaResp("Upload session", map[string]any{"type": "object", "additionalProperties": true}), "400": errResp("Invalid upload"), "413": errResp("Import exceeds maximum staged size")}),
+		},
+		"/api/sites/{id}/imports/uploads/{importID}/files/{fileID}/chunks": map[string]any{
+			"put": op([]string{"Imports"}, "Upload import chunk", "Uploads one raw file chunk at the requested byte offset.", secAnyAuth(), []any{
+				paramRef("#/components/parameters/siteID"),
+				map[string]any{"name": "importID", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
+				map[string]any{"name": "fileID", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
+				map[string]any{"name": "offset", "in": "query", "required": true, "schema": map[string]any{"type": "integer", "minimum": 0}},
+			}, map[string]any{"required": true, "content": map[string]any{"application/octet-stream": map[string]any{"schema": map[string]any{"type": "string", "format": "binary"}}}},
+				map[string]any{"200": jsonSchemaResp("Chunk progress", map[string]any{"type": "object", "additionalProperties": true}), "409": errResp("Upload not accepting chunks")}),
+		},
+		"/api/sites/{id}/imports/uploads/{importID}/validate": map[string]any{
+			"post": op([]string{"Imports"}, "Validate import upload", "Scans staged files row by row and returns the validation manifest without committing analytics rows.", secAnyAuth(), []any{
+				paramRef("#/components/parameters/siteID"),
+				map[string]any{"name": "importID", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
+			}, nil, map[string]any{"200": jsonRefResp("Import job", "#/components/schemas/ImportJob"), "400": errResp("Validation failed")}),
+		},
+		"/api/sites/{id}/imports": map[string]any{
+			"get": op([]string{"Imports"}, "List site imports", "Lists import jobs for the site.", secAnyAuth(), []any{paramRef("#/components/parameters/siteID")}, nil,
+				map[string]any{"200": jsonSchemaResp("Import list", map[string]any{"type": "object", "properties": map[string]any{"imports": map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/ImportJob"}}}})}),
+		},
+		"/api/sites/{id}/imports/{importID}": map[string]any{
+			"get": op([]string{"Imports"}, "Get import", "Returns import status, files, and validation manifest.", secAnyAuth(), []any{
+				paramRef("#/components/parameters/siteID"),
+				map[string]any{"name": "importID", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
+			}, nil, map[string]any{"200": jsonRefResp("Import job", "#/components/schemas/ImportJob")}),
+			"delete": op([]string{"Imports"}, "Delete import", "Deletes imported aggregate rows for the selected import and marks its history row deleted.", secAnyAuth(), []any{
+				paramRef("#/components/parameters/siteID"),
+				map[string]any{"name": "importID", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
+			}, nil, map[string]any{"200": jsonRefResp("Status", "#/components/schemas/Status"), "409": errResp("Import still running")}),
+		},
+		"/api/sites/{id}/imports/{importID}/start": map[string]any{
+			"post": op([]string{"Imports"}, "Start validated import", "Starts a previously validated import job in the background.", secAnyAuth(), []any{
+				paramRef("#/components/parameters/siteID"),
+				map[string]any{"name": "importID", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
+			}, nil, map[string]any{"200": jsonRefResp("Import job", "#/components/schemas/ImportJob"), "409": errResp("Import is not validated")}),
 		},
 		"/api/sites/{id}/hits": map[string]any{
 			"get": op([]string{"Sites"}, "Get site hits", "Returns paginated raw hits.", secAnyAuth(), []any{

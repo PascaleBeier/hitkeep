@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -62,19 +63,23 @@ func setupSystemTestEnv(t *testing.T) (*handler, *database.Store, *database.Tena
 	systemCounters := &database.SystemCounter{}
 	backupStatus := &database.BackupStatusTracker{}
 	backupStatus.SetConfig(false, "", 0, 0)
+	importStageCleanupStatus := &database.ImportStageCleanupStatusTracker{}
+	importStageCleanupStatus.SetConfig(true, 7)
 	mailTestTracker := &database.MailTestTracker{}
 
 	ctx := &shared.Context{
-		Store:           store,
-		TenantStores:    tenantStores,
-		SystemCounters:  systemCounters,
-		BackupStatus:    backupStatus,
-		MailTestTracker: mailTestTracker,
+		Store:                    store,
+		TenantStores:             tenantStores,
+		SystemCounters:           systemCounters,
+		BackupStatus:             backupStatus,
+		ImportStageCleanupStatus: importStageCleanupStatus,
+		MailTestTracker:          mailTestTracker,
 		Config: &config.Config{
-			PublicURL: "http://localhost:8080",
-			JWTSecret: "test-secret",
-			DBPath:    filepath.Join(basePath, "shared.db"),
-			DataPath:  basePath,
+			PublicURL:                "http://localhost:8080",
+			JWTSecret:                "test-secret",
+			DBPath:                   filepath.Join(basePath, "shared.db"),
+			DataPath:                 basePath,
+			ImportStageRetentionDays: 7,
 		},
 		StartedAt: time.Now().UTC(),
 	}
@@ -137,22 +142,6 @@ func TestHandleGetSystem(t *testing.T) {
 	}
 	if features["managed_cloud"].Detail != "Pro" {
 		t.Fatalf("expected managed cloud detail Pro, got %q", features["managed_cloud"].Detail)
-	}
-}
-
-func TestShortBuildRevision(t *testing.T) {
-	tests := map[string]string{
-		"":             "",
-		"abc":          "abc",
-		"12345678":     "12345678",
-		"123456789abc": "12345678",
-		"  abcdefghij": "abcdefgh",
-	}
-
-	for input, want := range tests {
-		if got := shortBuildRevision(input); got != want {
-			t.Fatalf("shortBuildRevision(%q) = %q, want %q", input, got, want)
-		}
 	}
 }
 
@@ -433,6 +422,126 @@ func TestHandleSpamRefreshAction(t *testing.T) {
 	h.handleRefreshSpamFilter().ServeHTTP(w, req)
 	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandleGetImportStageCleanup(t *testing.T) {
+	h, store, _, ownerID, _, _ := setupSystemTestEnv(t)
+	ctx := context.Background()
+
+	userID, err := store.CreateUser(ctx, "cleanup-status@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	site, err := store.CreateSite(ctx, userID, "cleanup-status.example")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	fileID := uuid.New()
+	importJob, err := store.CreateSiteImportUpload(ctx, site.ID, userID, "plausible", []database.ImportFileCreate{
+		{
+			ID:           fileID,
+			Filename:     "status.csv",
+			RelativePath: filepath.Join("imports", site.ID.String(), fileID.String()+"-status.csv"),
+			SizeBytes:    42,
+		},
+	})
+	if err != nil {
+		t.Fatalf("create import upload: %v", err)
+	}
+	old := time.Now().UTC().AddDate(0, 0, -8)
+	if _, err := store.DB().ExecContext(ctx, `
+		UPDATE site_imports
+		SET status = ?, created_at = ?, updated_at = ?, validated_at = ?, finished_at = ?
+		WHERE id = ?
+	`, database.ImportStatusCompleted, old, old, old, old, importJob.ID); err != nil {
+		t.Fatalf("age import: %v", err)
+	}
+
+	req := withAdminTestUser(httptest.NewRequest(http.MethodGet, "/api/admin/system/import-stage-cleanup", nil), ownerID)
+	w := httptest.NewRecorder()
+	h.handleGetImportStageCleanup().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var status api.SystemImportStageCleanupStatus
+	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if !status.Enabled || status.RetentionDays != 7 || status.StaleImports != 1 || status.StaleFiles != 1 || status.StaleBytes != 42 {
+		t.Fatalf("unexpected cleanup status: %+v", status)
+	}
+}
+
+func TestHandleRunImportStageCleanup(t *testing.T) {
+	h, store, _, ownerID, _, _ := setupSystemTestEnv(t)
+	ctx := context.Background()
+
+	userID, err := store.CreateUser(ctx, "cleanup-run@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	site, err := store.CreateSite(ctx, userID, "cleanup-run.example")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	fileID := uuid.New()
+	relativePath := filepath.Join("imports", site.ID.String(), fileID.String()+"-run.csv")
+	importJob, err := store.CreateSiteImportUpload(ctx, site.ID, userID, "plausible", []database.ImportFileCreate{
+		{
+			ID:           fileID,
+			Filename:     "run.csv",
+			RelativePath: relativePath,
+			SizeBytes:    6,
+		},
+	})
+	if err != nil {
+		t.Fatalf("create import upload: %v", err)
+	}
+	path := filepath.Join(h.ctx.Config.DataPath, relativePath)
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatalf("create stage dir: %v", err)
+	}
+	if err := os.WriteFile(path, []byte("abcdef"), 0600); err != nil {
+		t.Fatalf("write stage file: %v", err)
+	}
+	if err := store.UpdateImportFileProgress(ctx, importJob.ID, fileID, 6, ""); err != nil {
+		t.Fatalf("mark uploaded: %v", err)
+	}
+	old := time.Now().UTC().AddDate(0, 0, -8)
+	if _, err := store.DB().ExecContext(ctx, `
+		UPDATE site_imports
+		SET status = ?, created_at = ?, updated_at = ?, validated_at = ?, finished_at = ?
+		WHERE id = ?
+	`, database.ImportStatusValidated, old, old, old, old, importJob.ID); err != nil {
+		t.Fatalf("age import: %v", err)
+	}
+
+	req := withAdminTestUser(httptest.NewRequest(http.MethodPost, "/api/admin/system/import-stage-cleanup/run", nil), ownerID)
+	w := httptest.NewRecorder()
+	h.handleRunImportStageCleanup().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp api.SystemImportStageCleanupRunResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Result.FilesCleaned != 1 || resp.Result.ImportsMarkedFailed != 1 {
+		t.Fatalf("unexpected run response: %+v", resp)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("expected staged file removed, stat err: %v", err)
+	}
+
+	entries, _, err := store.ListInstanceAuditEntries(ctx, database.InstanceAuditFilter{Action: "import_stage_cleanup.run", Limit: 10})
+	if err != nil {
+		t.Fatalf("list audit: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Outcome != "success" {
+		t.Fatalf("expected success audit entry, got %+v", entries)
 	}
 }
 

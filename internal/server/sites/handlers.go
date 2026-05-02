@@ -234,6 +234,19 @@ func (h *handler) handleCreateSite() http.HandlerFunc {
 			}
 		}
 
+		if teamID, err := h.ctx.Store.GetSiteTenantID(r.Context(), site.ID); err == nil {
+			h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
+				ActorID:     userID,
+				TeamID:      teamID,
+				Action:      "site.created",
+				TargetType:  "site",
+				TargetID:    site.ID.String(),
+				TargetLabel: site.Domain,
+				Outcome:     "success",
+				Details:     fmt.Sprintf("Site %s created", site.Domain),
+			})
+		}
+
 		slog.Info("Site created", "id", site.ID, "domain", domain, "user_id", userID)
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(site); err != nil {
@@ -256,6 +269,14 @@ func (h *handler) handleDeleteSite() http.HandlerFunc {
 			return
 		}
 
+		userID := shared.GetUserIDFromContext(r)
+		site, _ := h.ctx.Store.GetSiteByID(r.Context(), siteID)
+		siteLabel := siteID.String()
+		if site != nil && strings.TrimSpace(site.Domain) != "" {
+			siteLabel = site.Domain
+		}
+		teamID, teamErr := h.ctx.Store.GetSiteTenantID(r.Context(), siteID)
+
 		if h.ctx.TenantStores != nil {
 			if err := h.ctx.TenantStores.DeleteSite(r.Context(), siteID); err != nil {
 				slog.Error("Failed to delete site", "error", err, "site_id", siteID)
@@ -266,6 +287,19 @@ func (h *handler) handleDeleteSite() http.HandlerFunc {
 			slog.Error("Failed to delete site", "error", err, "site_id", siteID)
 			http.Error(w, "Failed to delete site", http.StatusInternalServerError)
 			return
+		}
+
+		if teamErr == nil {
+			h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
+				ActorID:     userID,
+				TeamID:      teamID,
+				Action:      "site.deleted",
+				TargetType:  "site",
+				TargetID:    siteID.String(),
+				TargetLabel: siteLabel,
+				Outcome:     "success",
+				Details:     fmt.Sprintf("Site %s deleted", siteLabel),
+			})
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -323,6 +357,19 @@ func (h *handler) handleUpdateSiteRetention() http.HandlerFunc {
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
+		}
+
+		if teamID, err := h.ctx.Store.GetSiteTenantID(r.Context(), siteID); err == nil {
+			h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
+				ActorID:     userID,
+				TeamID:      teamID,
+				Action:      "site.retention_updated",
+				TargetType:  "site",
+				TargetID:    siteID.String(),
+				TargetLabel: site.Domain,
+				Outcome:     "success",
+				Details:     fmt.Sprintf("Retention updated to %d days for %s", req.Days, site.Domain),
+			})
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -394,12 +441,26 @@ func (h *handler) handleTransferSiteTeam() http.HandlerFunc {
 		if site != nil && site.Domain != "" {
 			siteLabel = site.Domain
 		}
-		if err := h.ctx.Store.AppendTeamAuditEntry(r.Context(), sourceTeamID, userID, "site.transferred_out", fmt.Sprintf("Site %s moved to team %s", siteLabel, destinationTeamID), nil); err != nil {
-			slog.Warn("Failed to append source team site transfer audit entry", "error", err, "site_id", siteID, "team_id", sourceTeamID)
-		}
-		if err := h.ctx.Store.AppendTeamAuditEntry(r.Context(), destinationTeamID, userID, "site.transferred_in", fmt.Sprintf("Site %s moved into this team", siteLabel), nil); err != nil {
-			slog.Warn("Failed to append destination team site transfer audit entry", "error", err, "site_id", siteID, "team_id", destinationTeamID)
-		}
+		h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
+			ActorID:     userID,
+			TeamID:      sourceTeamID,
+			Action:      "site.transferred_out",
+			TargetType:  "site",
+			TargetID:    siteID.String(),
+			TargetLabel: siteLabel,
+			Outcome:     "success",
+			Details:     fmt.Sprintf("Site %s moved to team %s", siteLabel, destinationTeamID),
+		})
+		h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
+			ActorID:     userID,
+			TeamID:      destinationTeamID,
+			Action:      "site.transferred_in",
+			TargetType:  "site",
+			TargetID:    siteID.String(),
+			TargetLabel: siteLabel,
+			Outcome:     "success",
+			Details:     fmt.Sprintf("Site %s moved into this team", siteLabel),
+		})
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(map[string]any{

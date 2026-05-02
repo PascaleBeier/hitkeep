@@ -103,7 +103,7 @@ test("team admin page shows seeded members and settings", async ({ page }) => {
     await expect(page.getByRole("heading", { name: "Team API clients" })).toBeVisible();
 
     await page.getByRole("tab", { name: /^Activity$/i }).click();
-    await expect(page.getByText("Filter activity")).toBeVisible();
+    await expect(page.getByRole("search", { name: "Audit filters" })).toBeVisible();
 });
 
 test("public share links render seeded analytics without login", async ({ page }) => {

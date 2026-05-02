@@ -6,6 +6,7 @@ import { SelectModule } from 'primeng/select';
 import { CardModule } from 'primeng/card';
 import { SkeletonModule } from 'primeng/skeleton';
 import { ButtonModule } from 'primeng/button';
+import { MessageModule } from 'primeng/message';
 import { SiteService } from '@features/sites/services/site.service';
 import { AnalyticsService, EventDimensionFilter } from '@core/services/analytics.service';
 import { MetricList } from '@features/analytics/components/metric-list';
@@ -41,7 +42,7 @@ const AUTOMATIC_EVENT_NAMES = Object.keys(AUTOMATIC_EVENT_META);
 
 @Component({
     selector: 'app-events',
-    imports: [FormsModule, ReactiveFormsModule, TranslocoPipe, SelectModule, CardModule, SkeletonModule, ButtonModule, MetricList, RangeToolbar, PageHeader, PageHeaderLeft, PageBreadcrumb, SeriesChart],
+    imports: [FormsModule, ReactiveFormsModule, TranslocoPipe, SelectModule, CardModule, SkeletonModule, ButtonModule, MessageModule, MetricList, RangeToolbar, PageHeader, PageHeaderLeft, PageBreadcrumb, SeriesChart],
     templateUrl: './events.html',
     styleUrl: './events.css',
     changeDetection: ChangeDetectionStrategy.OnPush

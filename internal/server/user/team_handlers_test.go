@@ -818,6 +818,9 @@ func TestHandleGetTeamAudit(t *testing.T) {
 		"role":  database.TenantRoleAdmin,
 	})
 	updateReq := withTestUser(httptest.NewRequest(http.MethodPost, "/api/user/teams/"+defaultTenantID.String()+"/members", bytes.NewReader(body)), ownerID)
+	updateReq.RemoteAddr = "203.0.113.11:1234"
+	updateReq.Header.Set("User-Agent", "team-audit-test")
+	updateReq.Header.Set("X-Request-Id", "req-team-audit")
 	updateReq.SetPathValue("id", defaultTenantID.String())
 	updateW := httptest.NewRecorder()
 	h.handleAddTeamMember().ServeHTTP(updateW, updateReq)
@@ -825,7 +828,7 @@ func TestHandleGetTeamAudit(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, updateW.Code)
 	}
 
-	req := withTestUser(httptest.NewRequest(http.MethodGet, "/api/user/teams/"+defaultTenantID.String()+"/audit?limit=5&action=member.role_updated", nil), ownerID)
+	req := withTestUser(httptest.NewRequest(http.MethodGet, "/api/user/teams/"+defaultTenantID.String()+"/audit?limit=5&action=member.role_updated&outcome=success&target_type=user&query=audit-member%40team.test", nil), ownerID)
 	req.SetPathValue("id", defaultTenantID.String())
 	w := httptest.NewRecorder()
 	h.handleGetTeamAudit().ServeHTTP(w, req)
@@ -845,6 +848,25 @@ func TestHandleGetTeamAudit(t *testing.T) {
 	}
 	if response.Limit != 5 {
 		t.Fatalf("expected limit 5, got %d", response.Limit)
+	}
+	entry := response.Entries[0]
+	if entry.TargetType != "user" {
+		t.Fatalf("expected target type user, got %q", entry.TargetType)
+	}
+	if entry.TargetLabel != "audit-member@team.test" {
+		t.Fatalf("expected target label, got %q", entry.TargetLabel)
+	}
+	if entry.Outcome != "success" {
+		t.Fatalf("expected success outcome, got %q", entry.Outcome)
+	}
+	if entry.TargetUserID == nil || *entry.TargetUserID != memberID {
+		t.Fatalf("expected target user %s, got %v", memberID, entry.TargetUserID)
+	}
+	if entry.IPAddress != "203.0.113.11" {
+		t.Fatalf("expected request IP, got %q", entry.IPAddress)
+	}
+	if entry.UserAgent != "team-audit-test" || entry.RequestID != "req-team-audit" {
+		t.Fatalf("expected request evidence, got user_agent=%q request_id=%q", entry.UserAgent, entry.RequestID)
 	}
 }
 

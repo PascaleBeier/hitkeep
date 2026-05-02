@@ -60,6 +60,9 @@ type Config struct {
 	SpamFilterPath              string `env:"HITKEEP_SPAM_FILTER_PATH"                 default:""     desc:"Path to cached spam filter data (defaults to <data-path>/spam-filter.json)"`
 	SpamFilterUpdateIntervalMin int    `env:"HITKEEP_SPAM_FILTER_UPDATE_INTERVAL"      default:"1440" desc:"Minutes between OSS spam filter feed refreshes"`
 
+	ImportMaxStageBytes      int `env:"HITKEEP_IMPORT_MAX_STAGE_BYTES"        default:"107374182400" desc:"Maximum staged import upload size in bytes"`
+	ImportStageRetentionDays int `env:"HITKEEP_IMPORT_STAGE_RETENTION_DAYS" default:"7"            desc:"Days to keep stale staged import upload files; 0 disables import staging cleanup"`
+
 	BackupPath            string `env:"HITKEEP_BACKUP_PATH"      default:""   desc:"Backup destination path (local dir or s3://)"`
 	BackupIntervalMinutes int    `env:"HITKEEP_BACKUP_INTERVAL"  default:"60" desc:"Minutes between backups"`
 	BackupRetentionCount  int    `env:"HITKEEP_BACKUP_RETENTION" default:"24" desc:"Number of backup snapshots to keep"`

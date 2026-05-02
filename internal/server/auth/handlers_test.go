@@ -1403,6 +1403,26 @@ func TestHandleAcceptInviteActivatesPendingTeamInvite(t *testing.T) {
 	if len(invites) != 0 {
 		t.Fatalf("expected no pending invites after acceptance, got %d", len(invites))
 	}
+
+	for _, action := range []string{"member.invite_accepted", "member.added"} {
+		entries, total, err := store.ListInstanceAuditEntries(context.Background(), database.InstanceAuditFilter{
+			Action: action,
+			Limit:  10,
+		})
+		if err != nil {
+			t.Fatalf("list %s audit entries: %v", action, err)
+		}
+		if total != 1 || len(entries) != 1 {
+			t.Fatalf("expected one %s audit entry, total=%d len=%d", action, total, len(entries))
+		}
+		entry := entries[0]
+		if entry.TeamID == nil || *entry.TeamID != teamID {
+			t.Fatalf("expected %s team_id %s, got %v", action, teamID, entry.TeamID)
+		}
+		if entry.TargetUserID == nil || *entry.TargetUserID != inviteeID {
+			t.Fatalf("expected %s target_user_id %s, got %v", action, inviteeID, entry.TargetUserID)
+		}
+	}
 }
 
 func TestHandleLoginIncludesRecoveryCodeFactor(t *testing.T) {

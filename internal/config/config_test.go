@@ -28,6 +28,7 @@ func TestLoadConfig(t *testing.T) {
 					c.AuthRememberMeDays == 30 &&
 					c.AuthSessionMinutes == 15 &&
 					c.AuthSessionWarningSeconds == 120 &&
+					c.ImportStageRetentionDays == 7 &&
 					len(c.JWTSecret) >= 32
 			},
 			errMessage: "Defaults failed",
@@ -45,6 +46,7 @@ func TestLoadConfig(t *testing.T) {
 				"HITKEEP_AUTH_REMEMBER_ME_DAYS":        "14",
 				"HITKEEP_AUTH_SESSION_MINUTES":         "45",
 				"HITKEEP_AUTH_SESSION_WARNING_SECONDS": "180",
+				"HITKEEP_IMPORT_STAGE_RETENTION_DAYS":  "14",
 			},
 			check: func(c *Config) bool {
 				return c.HTTPAddr == ":9000" &&
@@ -55,7 +57,8 @@ func TestLoadConfig(t *testing.T) {
 					c.WebhookBurst == 80 &&
 					c.AuthRememberMeDays == 14 &&
 					c.AuthSessionMinutes == 45 &&
-					c.AuthSessionWarningSeconds == 180
+					c.AuthSessionWarningSeconds == 180 &&
+					c.ImportStageRetentionDays == 14
 			},
 			errMessage: "Environment variables did not override defaults",
 		},

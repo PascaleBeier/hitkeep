@@ -32,6 +32,11 @@ type TenantStoreManager struct {
 }
 
 var siteAnalyticsTransferTables = []string{
+	"imported_event_properties_daily",
+	"imported_event_dimensions_daily",
+	"imported_event_daily",
+	"imported_dimension_daily",
+	"imported_traffic_daily",
 	"goal_rollups_hourly",
 	"goal_rollups_daily",
 	"goal_rollups_monthly",

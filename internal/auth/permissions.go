@@ -34,6 +34,7 @@ const (
 	PermInstanceViewAudit            Permission = "instance.view_audit"
 	PermInstanceExportAudit          Permission = "instance.export_audit"
 	PermInstanceManageSiteExclusions Permission = "instance.manage_site_exclusions"
+	PermInstanceManageImports        Permission = "instance.manage_imports"
 
 	// Site permissions
 	PermSiteView        Permission = "site.view"
@@ -56,6 +57,7 @@ var instancePermissions = map[InstanceRole][]Permission{
 		PermInstanceViewAudit,
 		PermInstanceExportAudit,
 		PermInstanceManageSiteExclusions,
+		PermInstanceManageImports,
 		PermSiteView,
 		PermSiteManageData,
 		PermSiteManageGoals,
@@ -68,6 +70,7 @@ var instancePermissions = map[InstanceRole][]Permission{
 		PermInstanceRunMaintenance,
 		PermInstanceViewAudit,
 		PermInstanceManageSiteExclusions,
+		PermInstanceManageImports,
 		PermSiteView,
 	},
 	InstanceUser: {},
@@ -104,12 +107,20 @@ func (r InstanceRole) HasPermission(perm Permission) bool {
 	return slices.Contains(perms, perm)
 }
 
+func (r InstanceRole) Permissions() []Permission {
+	return slices.Clone(instancePermissions[r])
+}
+
 func (r SiteRole) HasPermission(perm Permission) bool {
 	perms, ok := sitePermissions[r]
 	if !ok {
 		return false
 	}
 	return slices.Contains(perms, perm)
+}
+
+func (r SiteRole) Permissions() []Permission {
+	return slices.Clone(sitePermissions[r])
 }
 
 func IsValidInstanceRole(role InstanceRole) bool {

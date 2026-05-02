@@ -436,11 +436,11 @@ func cleanupUserRows(ctx context.Context, tx *sql.Tx, userID uuid.UUID) error {
 	if err := execIfTableExists("team_invites", "UPDATE team_invites SET invited_user_id = NULL WHERE invited_user_id = ?", userID); err != nil {
 		return fmt.Errorf("could not null team invite invited_user_id: %w", err)
 	}
-	if err := execIfTableExists("team_audit_log", "UPDATE team_audit_log SET actor_id = NULL WHERE actor_id = ?", userID); err != nil {
-		return fmt.Errorf("could not null team audit actor_id: %w", err)
+	if err := execIfTableExists("instance_audit_log", "UPDATE instance_audit_log SET actor_id = NULL WHERE actor_id = ?", userID); err != nil {
+		return fmt.Errorf("could not null audit actor_id: %w", err)
 	}
-	if err := execIfTableExists("team_audit_log", "UPDATE team_audit_log SET target_user_id = NULL WHERE target_user_id = ?", userID); err != nil {
-		return fmt.Errorf("could not null team audit target_user_id: %w", err)
+	if err := execIfTableExists("instance_audit_log", "UPDATE instance_audit_log SET target_user_id = NULL WHERE target_user_id = ?", userID); err != nil {
+		return fmt.Errorf("could not null audit target_user_id: %w", err)
 	}
 	if err := execIfTableExists("site_members", "DELETE FROM site_members WHERE user_id = ?", userID); err != nil {
 		return fmt.Errorf("could not delete user site memberships: %w", err)

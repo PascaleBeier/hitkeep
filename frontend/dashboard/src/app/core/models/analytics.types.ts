@@ -81,6 +81,16 @@ export interface TeamAuditEntry {
     details: string;
     actor_user_id?: string;
     actor_email?: string;
+    actor_email_snapshot?: string;
+    actor_role_snapshot?: string;
+    target_type?: string;
+    target_id?: string;
+    target_label?: string;
+    outcome?: string;
+    ip_address?: string;
+    ip_country_code?: string;
+    user_agent?: string;
+    request_id?: string;
     target_user_id?: string;
     target_email?: string;
     created_at: string;
@@ -236,6 +246,7 @@ export interface EventAudience {
     top_referrers: MetricStat[];
     top_devices: MetricStat[];
     top_countries: MetricStat[];
+    imported_excluded?: ImportExclusionReason[];
 }
 
 export interface EcommerceSummary {
@@ -273,6 +284,11 @@ export interface EcommerceSourceStat {
 export interface MetricStat {
     name: string;
     value: number;
+}
+
+export interface ImportExclusionReason {
+    reason: string;
+    detail?: string;
 }
 
 export interface ComparisonStats {
@@ -324,6 +340,7 @@ export interface SiteStats {
     goals: GoalStats[];
     funnels: Funnel[];
     comparison?: ComparisonStats;
+    imported_excluded?: ImportExclusionReason[];
 }
 
 export interface GoalStats {

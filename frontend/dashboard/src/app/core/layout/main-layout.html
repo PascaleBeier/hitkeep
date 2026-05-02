@@ -94,7 +94,16 @@
             >
                 <i class="pi pi-link" aria-hidden="true"></i> <span>{{ "nav.utmBuilder" | transloco }}</span>
             </a>
-            } @if (!shareService.isShareMode()) {
+            @if (canImportActiveSite()) {
+            <a
+                routerLink="/imports"
+                routerLinkActive="bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400"
+                class="flex items-center gap-3 px-3 py-2 rounded-md font-medium transition-colors hover:bg-surface-100 dark:hover:bg-surface-800 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500"
+                [attr.aria-label]="'nav.importsAria' | transloco"
+            >
+                <i class="pi pi-upload" aria-hidden="true"></i> <span>{{ "nav.imports" | transloco }}</span>
+            </a>
+            } } @if (!shareService.isShareMode()) {
             <div class="text-xs font-semibold text-muted-color uppercase px-2 mt-4 mb-2" role="presentation">{{ "nav.integration" | transloco }}</div>
             <a
                 routerLink="/integration/api-clients"
@@ -355,6 +364,17 @@
                 >
                     <i class="pi pi-link" aria-hidden="true"></i> <span>{{ "nav.utmBuilder" | transloco }}</span>
                 </a>
+                @if (canImportActiveSite()) {
+                <a
+                    routerLink="/imports"
+                    (click)="isMobileDrawerOpen.set(false)"
+                    routerLinkActive="bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400"
+                    class="flex items-center gap-3 px-3 py-2 rounded-md font-medium"
+                    [attr.aria-label]="'nav.importsAria' | transloco"
+                >
+                    <i class="pi pi-upload" aria-hidden="true"></i> <span>{{ "nav.imports" | transloco }}</span>
+                </a>
+                }
                 <div class="text-xs font-semibold text-muted-color uppercase px-3 mt-4 mb-2" role="presentation">{{ "nav.integration" | transloco }}</div>
                 <a
                     routerLink="/integration/api-clients"

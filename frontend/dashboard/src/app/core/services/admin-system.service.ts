@@ -9,7 +9,6 @@ export interface SystemFeatureStatus {
 
 export interface SystemInfo {
     version: string;
-    build: string;
     runtime_mode: string;
     uptime: string;
     public_url: string;
@@ -71,6 +70,36 @@ export interface SystemSpamStatus {
     last_error?: string;
 }
 
+export interface ImportStageCleanupRunResult {
+    imports_cleaned: number;
+    files_cleaned: number;
+    bytes_cleaned: number;
+    imports_marked_failed: number;
+    errors?: string[];
+}
+
+export interface SystemImportStageCleanupStatus {
+    enabled: boolean;
+    retention_days: number;
+    stale_imports: number;
+    stale_files: number;
+    stale_bytes: number;
+    last_run?: string;
+    last_failed_at?: string;
+    last_error?: string;
+    recent_failures: number;
+    last_cleaned_imports: number;
+    last_cleaned_files: number;
+    last_cleaned_bytes: number;
+    last_marked_failed: number;
+}
+
+export interface SystemImportStageCleanupRunResponse {
+    status: string;
+    message?: string;
+    result: ImportStageCleanupRunResult;
+}
+
 export interface SystemCacheEntry {
     size: number;
     max_size: number;
@@ -104,12 +133,15 @@ export interface InstanceAuditEntry {
     actor_id?: string;
     actor_email_snapshot: string;
     actor_role_snapshot: string;
+    team_id?: string;
     action: string;
     target_type: string;
     target_id: string;
+    target_user_id?: string;
     target_label: string;
     outcome: string;
     ip_address: string;
+    ip_country_code?: string;
     user_agent: string;
     request_id: string;
     details: string;
@@ -210,6 +242,14 @@ export class AdminSystemService {
 
     refreshSpamFilter() {
         return this.http.post<{ status: string; message: string }>('/api/admin/system/spam-filter/refresh', {});
+    }
+
+    getImportStageCleanup() {
+        return this.http.get<SystemImportStageCleanupStatus>('/api/admin/system/import-stage-cleanup');
+    }
+
+    runImportStageCleanup() {
+        return this.http.post<SystemImportStageCleanupRunResponse>('/api/admin/system/import-stage-cleanup/run', {});
     }
 
     getCaches() {

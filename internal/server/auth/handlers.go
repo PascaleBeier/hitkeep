@@ -84,6 +84,40 @@ func (h *handler) loginErrorRedirectURL(code string) string {
 	return strings.TrimRight(h.ctx.Config.PublicURL, "/") + "/login?error=" + code
 }
 
+func (h *handler) appendAuthAuditForUserTeams(r *http.Request, userID uuid.UUID, action, outcome, details string, actorVerified bool) {
+	if h.ctx.Store == nil || userID == uuid.Nil {
+		return
+	}
+	targetLabel := userID.String()
+	if user, err := h.ctx.Store.GetUserByID(r.Context(), userID); err == nil && user != nil {
+		targetLabel = user.Email
+	}
+	actorID := uuid.Nil
+	if actorVerified {
+		actorID = userID
+	}
+	h.ctx.AppendAuditEventForUserTeams(r.Context(), r, userID, shared.AuditEvent{
+		ActorID:      actorID,
+		TargetUserID: userID,
+		Action:       action,
+		TargetType:   "user",
+		TargetID:     userID.String(),
+		TargetLabel:  targetLabel,
+		Outcome:      outcome,
+		Details:      details,
+	})
+}
+
+func (h *handler) appendAuthAuditSystem(r *http.Request, action, outcome, targetLabel, details string) {
+	h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
+		Action:      action,
+		TargetType:  "user",
+		TargetLabel: strings.ToLower(strings.TrimSpace(targetLabel)),
+		Outcome:     outcome,
+		Details:     details,
+	})
+}
+
 func Register(mux *http.ServeMux, ctx *shared.Context) {
 	h := &handler{ctx: ctx}
 	mux.HandleFunc("POST /api/initial-user", ctx.Handler(shared.HandlerConfig{
@@ -243,6 +277,7 @@ func (h *handler) handleLogin() http.HandlerFunc {
 		}
 		if user == nil {
 			burnLoginKDF(req.Password)
+			h.appendAuthAuditSystem(r, "auth.login_failed", "failure", req.Email, "Login failed because no matching user was resolved")
 			http.Error(w, "Invalid email or password", http.StatusUnauthorized)
 			return
 		}
@@ -254,6 +289,7 @@ func (h *handler) handleLogin() http.HandlerFunc {
 			return
 		}
 		if !match {
+			h.appendAuthAuditForUserTeams(r, user.ID, "auth.login_failed", "failure", "Login failed because the password was invalid", false)
 			http.Error(w, "Invalid email or password", http.StatusUnauthorized)
 			return
 		}
@@ -361,6 +397,8 @@ func (h *handler) handleLogin() http.HandlerFunc {
 				resp.Passkey = passkeyOptions
 			}
 
+			h.appendAuthAuditForUserTeams(r, user.ID, "auth.mfa_required", "success", "Login requires multi-factor authentication", true)
+
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			if err := json.NewEncoder(w).Encode(resp); err != nil {
@@ -375,6 +413,7 @@ func (h *handler) handleLogin() http.HandlerFunc {
 			return
 		}
 
+		h.appendAuthAuditForUserTeams(r, user.ID, "auth.login_succeeded", "success", "Login succeeded", true)
 		slog.Info("User logged in", "user_id", user.ID)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -451,6 +490,7 @@ func (h *handler) handleExtendSession() http.HandlerFunc {
 			resp.Remembered = true
 			resp.RememberExpiresAt = rememberExpiresAt
 		}
+		h.appendAuthAuditForUserTeams(r, userID, "auth.session_extended", "success", "Session extended", true)
 		writeSessionResponse(w, resp)
 	}
 }

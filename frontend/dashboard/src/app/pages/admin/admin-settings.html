@@ -369,10 +369,6 @@
                                     <dd>{{ info.version || "-" }}</dd>
                                 </div>
                                 <div>
-                                    <dt>{{ "admin.system.overview.build" | transloco }}</dt>
-                                    <dd>{{ info.build || "-" }}</dd>
-                                </div>
-                                <div>
                                     <dt>{{ "admin.system.overview.uptime" | transloco }}</dt>
                                     <dd>{{ info.uptime || "-" }}</dd>
                                 </div>
@@ -632,6 +628,61 @@
                             } @if (spamActionStatus(); as status) {
                             <p-message [severity]="status.severity" styleClass="w-full mt-3" [text]="spamActionStatusMessage()" />
                             } } @else if (isLoadingSpam()) {
+                            <div class="admin-loading"><i class="pi pi-spin pi-spinner" aria-hidden="true"></i>{{ "common.loading" | transloco }}</div>
+                            }
+                        </app-system-status-card>
+
+                        <app-system-status-card
+                            titleId="operations-import-cleanup-title"
+                            [title]="'admin.system.importCleanup.title' | transloco"
+                            [loading]="isLoadingImportCleanup()"
+                            [refreshLabel]="'admin.system.console.refreshCard' | transloco"
+                            [metricLabel]="'admin.system.importCleanup.staleBytes' | transloco"
+                            [metricValue]="formatBytesValue(systemImportCleanup()?.stale_bytes ?? 0)"
+                            [actionLabel]="perms.isInstanceAdmin() ? ('admin.system.importCleanup.actions.run' | transloco) : ''"
+                            actionIcon="pi pi-eraser"
+                            actionSeverity="warn"
+                            [actionLoading]="isRunningImportCleanup()"
+                            [actionDisabled]="importCleanupActionDisabled()"
+                            (refreshClicked)="loadImportStageCleanup()"
+                            (actionClicked)="runImportStageCleanup()"
+                        >
+                            @if (systemImportCleanup(); as cleanup) {
+                            <dl class="admin-definition-list">
+                                <div>
+                                    <dt>{{ "admin.system.importCleanup.enabled" | transloco }}</dt>
+                                    <dd><p-tag [value]="cleanup.enabled ? ('common.yes' | transloco) : ('common.no' | transloco)" [severity]="cleanup.enabled ? 'success' : 'warn'" /></dd>
+                                </div>
+                                <div>
+                                    <dt>{{ "admin.system.importCleanup.retention" | transloco }}</dt>
+                                    <dd>{{ cleanup.retention_days | number }}</dd>
+                                </div>
+                                <div>
+                                    <dt>{{ "admin.system.importCleanup.staleImports" | transloco }}</dt>
+                                    <dd>{{ cleanup.stale_imports | number }}</dd>
+                                </div>
+                                <div>
+                                    <dt>{{ "admin.system.importCleanup.staleFiles" | transloco }}</dt>
+                                    <dd>{{ cleanup.stale_files | number }}</dd>
+                                </div>
+                                <div>
+                                    <dt>{{ "admin.system.importCleanup.lastRun" | transloco }}</dt>
+                                    <dd>
+                                        @if (cleanup.last_run) {
+                                        <app-relative-date-time [value]="cleanup.last_run" />
+                                        } @else { - }
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt>{{ "admin.system.importCleanup.lastCleaned" | transloco }}</dt>
+                                    <dd>{{ cleanup.last_cleaned_files | number }} / {{ formatBytesValue(cleanup.last_cleaned_bytes) }}</dd>
+                                </div>
+                            </dl>
+                            @if (cleanup.last_error) {
+                            <p-message severity="error" styleClass="w-full mt-3" [text]="cleanup.last_error" />
+                            } @if (importCleanupActionStatus(); as status) {
+                            <p-message [severity]="status.severity" styleClass="w-full mt-3" [text]="importCleanupActionStatusMessage()" />
+                            } } @else if (isLoadingImportCleanup()) {
                             <div class="admin-loading"><i class="pi pi-spin pi-spinner" aria-hidden="true"></i>{{ "common.loading" | transloco }}</div>
                             }
                         </app-system-status-card>

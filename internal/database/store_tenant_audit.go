@@ -20,49 +20,119 @@ func (s *Store) AppendTeamAuditEntry(ctx context.Context, tenantID, actorID uuid
 	}
 
 	details = strings.TrimSpace(details)
-	var targetArg any
+	targetUserIDValue := uuid.Nil
 	if targetUserID != nil && *targetUserID != uuid.Nil {
-		targetArg = *targetUserID
+		targetUserIDValue = *targetUserID
 	}
 
-	if err := s.Exec(ctx, `
-		INSERT INTO team_audit_log (tenant_id, actor_id, target_user_id, action, details)
-		VALUES (?, ?, ?, ?, ?)
-	`, tenantID, nullableUUID(actorID), targetArg, action, details); err != nil {
+	actorEmail := ""
+	actorRole := ""
+	if actorID != uuid.Nil {
+		if actor, err := s.GetUserByID(ctx, actorID); err == nil && actor != nil {
+			actorEmail = actor.Email
+		}
+		if role, err := s.GetTenantRole(ctx, tenantID, actorID); err == nil {
+			actorRole = role
+		}
+	}
+
+	targetLabel := ""
+	if team, err := s.GetTenant(ctx, tenantID); err == nil && team != nil {
+		targetLabel = team.Name
+	}
+
+	if err := s.AppendAuditEntry(ctx, AuditEntryParams{
+		ActorID:      actorID,
+		ActorEmail:   actorEmail,
+		ActorRole:    actorRole,
+		TeamID:       tenantID,
+		TargetUserID: targetUserIDValue,
+		Action:       action,
+		TargetType:   "team",
+		TargetID:     tenantID.String(),
+		TargetLabel:  targetLabel,
+		Outcome:      "success",
+		Details:      details,
+	}); err != nil {
 		return fmt.Errorf("could not append team audit entry: %w", err)
 	}
 	return nil
 }
 
+type TeamAuditFilter struct {
+	Action     string
+	TargetType string
+	Outcome    string
+	Query      string
+	From       time.Time
+	To         time.Time
+	Limit      int
+	Offset     int
+}
+
+const (
+	DefaultTeamAuditListLimit = 25
+	MaxTeamAuditListLimit     = 200
+)
+
 func (s *Store) ListTeamAuditEntries(ctx context.Context, tenantID uuid.UUID, action string, limit int, offset int) ([]api.TeamAuditEntry, int, error) {
-	if limit <= 0 || limit > 200 {
-		limit = 100
-	}
-	if offset < 0 {
-		offset = 0
-	}
+	return s.ListTeamAuditEntriesFiltered(ctx, tenantID, TeamAuditFilter{
+		Action: action,
+		Limit:  limit,
+		Offset: offset,
+	})
+}
 
-	action = strings.TrimSpace(action)
-
-	whereClause := "WHERE ta.tenant_id = ?"
-	countArgs := []any{tenantID}
-	queryArgs := []any{tenantID}
-	if action != "" {
-		whereClause += " AND ta.action = ?"
-		countArgs = append(countArgs, action)
-		queryArgs = append(queryArgs, action)
+func (s *Store) ListTeamAuditEntriesFiltered(ctx context.Context, tenantID uuid.UUID, filter TeamAuditFilter) ([]api.TeamAuditEntry, int, error) {
+	limit := filter.Limit
+	if limit <= 0 || limit > MaxTeamAuditListLimit {
+		limit = DefaultTeamAuditListLimit
 	}
+	offset := max(filter.Offset, 0)
+
+	whereClauses := []string{"ta.tenant_id = ?"}
+	args := []any{tenantID}
+	if action := strings.TrimSpace(filter.Action); action != "" {
+		whereClauses = append(whereClauses, "ta.action = ?")
+		args = append(args, action)
+	}
+	if targetType := strings.TrimSpace(filter.TargetType); targetType != "" {
+		whereClauses = append(whereClauses, "ta.target_type = ?")
+		args = append(args, targetType)
+	}
+	if outcome := strings.TrimSpace(filter.Outcome); outcome != "" {
+		whereClauses = append(whereClauses, "ta.outcome = ?")
+		args = append(args, outcome)
+	}
+	if !filter.From.IsZero() {
+		whereClauses = append(whereClauses, "ta.created_at >= ?")
+		args = append(args, filter.From)
+	}
+	if !filter.To.IsZero() {
+		whereClauses = append(whereClauses, "ta.created_at <= ?")
+		args = append(args, filter.To)
+	}
+	if query := strings.TrimSpace(filter.Query); query != "" {
+		q := "%" + query + "%"
+		whereClauses = append(whereClauses, "(ta.actor_email_snapshot ILIKE ? OR ta.target_label ILIKE ? OR ta.details ILIKE ? OR ta.ip_address ILIKE ? OR ta.ip_country_code ILIKE ? OR ta.request_id ILIKE ?)")
+		args = append(args, q, q, q, q, q, q)
+	}
+	whereClause := "WHERE " + strings.Join(whereClauses, " AND ")
 
 	var total int
+	// #nosec G202 -- whereClause is assembled only from fixed SQL fragments above; user values stay parameterized.
 	if err := s.db.QueryRowContext(ctx, `
 		SELECT COUNT(*)
 		FROM team_audit_log ta
-	`+whereClause, countArgs...).Scan(&total); err != nil {
+	`+whereClause, args...).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("could not count team audit entries: %w", err)
 	}
 
+	queryArgs := make([]any, 0, len(args)+2)
+	queryArgs = append(queryArgs, args...)
 	queryArgs = append(queryArgs, limit, offset)
 
+	// #nosec G202 -- whereClause is assembled only from fixed SQL fragments above; user values stay parameterized.
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT
 			ta.id,
@@ -71,9 +141,19 @@ func (s *Store) ListTeamAuditEntries(ctx context.Context, tenantID uuid.UUID, ac
 			ta.details,
 			ta.created_at,
 			CAST(ta.actor_id AS VARCHAR),
-			COALESCE(actor.email, ''),
+			ta.actor_email_snapshot,
+			ta.actor_role_snapshot,
+			COALESCE(actor.email, ta.actor_email_snapshot, ''),
 			CAST(ta.target_user_id AS VARCHAR),
-			COALESCE(target.email, '')
+			COALESCE(target.email, CASE WHEN ta.target_type = 'user' THEN ta.target_label ELSE '' END, ''),
+			ta.target_type,
+			ta.target_id,
+			ta.target_label,
+			ta.outcome,
+			ta.ip_address,
+			ta.ip_country_code,
+			ta.user_agent,
+			ta.request_id
 		FROM team_audit_log ta
 		LEFT JOIN users actor ON actor.id = ta.actor_id
 		LEFT JOIN users target ON target.id = ta.target_user_id
@@ -99,9 +179,19 @@ func (s *Store) ListTeamAuditEntries(ctx context.Context, tenantID uuid.UUID, ac
 			&entry.Details,
 			&entry.CreatedAt,
 			&actorIDRaw,
+			&entry.ActorEmailSnapshot,
+			&entry.ActorRoleSnapshot,
 			&entry.ActorEmail,
 			&targetIDRaw,
 			&entry.TargetEmail,
+			&entry.TargetType,
+			&entry.TargetID,
+			&entry.TargetLabel,
+			&entry.Outcome,
+			&entry.IPAddress,
+			&entry.IPCountryCode,
+			&entry.UserAgent,
+			&entry.RequestID,
 		); err != nil {
 			return nil, 0, fmt.Errorf("could not scan team audit entry: %w", err)
 		}

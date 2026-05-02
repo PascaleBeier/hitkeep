@@ -2,6 +2,7 @@ package admin
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/mail"
@@ -10,7 +11,9 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/internal/api"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/worker"
 )
 
 // testMailable satisfies mailer.Mailable for sending a test email.
@@ -47,6 +50,56 @@ func (h *handler) handleRefreshSpamFilter() http.HandlerFunc {
 		h.appendAudit(r, "spam_filter.refresh", "system", "", "", "success", "Spam filter refreshed manually")
 		writeJSON(w, http.StatusOK, map[string]string{
 			"status": "ok", "message": "Spam filter refreshed successfully",
+		})
+	}
+}
+
+func (h *handler) handleRunImportStageCleanup() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if h.ctx.Store == nil {
+			h.appendAudit(r, "import_stage_cleanup.run", "system", "", "", "failure", "Store not available")
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+				"status": "error", "message": "Store not available",
+			})
+			return
+		}
+		if h.ctx.Config.ImportStageRetentionDays <= 0 {
+			h.appendAudit(r, "import_stage_cleanup.run", "system", "", "", "failure", "Import stage cleanup is disabled")
+			writeJSON(w, http.StatusConflict, map[string]string{
+				"status": "error", "message": "Import stage cleanup is disabled",
+			})
+			return
+		}
+
+		result, err := worker.RunImportStageCleanup(
+			r.Context(),
+			h.ctx.Store,
+			h.ctx.Config.DataPath,
+			h.ctx.Config.ImportStageRetentionDays,
+			h.ctx.ImportStageCleanupStatus,
+		)
+		if err != nil {
+			slog.Error("Failed to clean import staging files", "error", err)
+			h.appendAudit(r, "import_stage_cleanup.run", "system", "", "", "failure", err.Error())
+			writeJSON(w, http.StatusInternalServerError, api.SystemImportStageCleanupRunResponse{
+				Status:  "error",
+				Message: "Import stage cleanup failed: " + err.Error(),
+				Result:  result,
+			})
+			return
+		}
+
+		details := fmt.Sprintf(
+			"Import stage cleanup removed %d staged file(s), cleared %d byte(s), and marked %d stale import(s) failed",
+			result.FilesCleaned,
+			result.BytesCleaned,
+			result.ImportsMarkedFailed,
+		)
+		h.appendAudit(r, "import_stage_cleanup.run", "system", "", "", "success", details)
+		writeJSON(w, http.StatusOK, api.SystemImportStageCleanupRunResponse{
+			Status:  "ok",
+			Message: "Import stage cleanup completed",
+			Result:  result,
 		})
 	}
 }

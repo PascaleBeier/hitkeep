@@ -130,7 +130,8 @@ func (h *handler) handlePasskeyLoginFinish() http.HandlerFunc {
 			validatedCredential *webauthnlib.Credential
 		)
 
-		switch strings.TrimSpace(challenge.Flow) {
+		flow := strings.TrimSpace(challenge.Flow)
+		switch flow {
 		case "mfa":
 			if !challenge.HasUserID {
 				http.Error(w, "Invalid MFA challenge context", http.StatusForbidden)
@@ -192,13 +193,19 @@ func (h *handler) handlePasskeyLoginFinish() http.HandlerFunc {
 		}
 
 		rememberMe := req.RememberMe
-		if strings.TrimSpace(challenge.Flow) == "mfa" {
+		if flow == "mfa" {
 			rememberMe = challenge.RememberMe
 		}
 		if err := h.issueLoginSession(r.Context(), w, userID, rememberMe); err != nil {
 			slog.Error("Failed to issue login session after passkey verification", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
+		}
+		if flow == "mfa" {
+			h.appendAuthAuditForUserTeams(r, userID, "auth.mfa_succeeded", "success", "Passkey multi-factor authentication succeeded", true)
+			h.appendAuthAuditForUserTeams(r, userID, "auth.login_succeeded", "success", "Login succeeded after multi-factor authentication", true)
+		} else {
+			h.appendAuthAuditForUserTeams(r, userID, "auth.login_succeeded", "success", "Passkey login succeeded", true)
 		}
 
 		w.Header().Set("Content-Type", "application/json")

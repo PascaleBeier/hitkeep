@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/importables"
 )
 
 func newSharedTestStore(t *testing.T) *Store {
@@ -363,6 +364,66 @@ func TestDeleteSiteRemovesTenantAndSharedData(t *testing.T) {
 	}
 	if tenantCount != 0 {
 		t.Fatalf("expected tenant site mirror deleted, got count=%d", tenantCount)
+	}
+}
+
+func TestDeleteSiteWithImportedUnattributedPropertiesDoesNotInvalidateTenantDB(t *testing.T) {
+	ctx := context.Background()
+	store := newSharedTestStore(t)
+	basePath := t.TempDir()
+	mgr := NewTenantStoreManager(store, basePath)
+	t.Cleanup(func() { _ = mgr.Close() })
+
+	userID, err := store.CreateUser(ctx, "delete-imported-site@test.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	team, err := store.CreateTenant(ctx, userID, "Delete Imported Team", "")
+	if err != nil {
+		t.Fatalf("create team: %v", err)
+	}
+	if err := store.SetActiveTenantID(ctx, userID, team.ID); err != nil {
+		t.Fatalf("set active tenant: %v", err)
+	}
+	site, err := store.CreateSite(ctx, userID, "delete-imported-team.test")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	tenantStore, _, err := mgr.ResolveSiteStore(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("ResolveSiteStore: %v", err)
+	}
+
+	importID := uuid.New()
+	sink, err := NewImportedDataSink(ctx, tenantStore, site.ID, importID)
+	if err != nil {
+		t.Fatalf("new sink: %v", err)
+	}
+	for _, date := range []time.Time{
+		time.Date(2026, 4, 8, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 4, 14, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 4, 17, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 4, 29, 0, 0, 0, 0, time.UTC),
+	} {
+		if err := sink.PutEventProperty(ctx, importables.EventPropertyRow{Date: date, EventName: "outbound_click", PropertyKey: "url", PropertyValue: "https://example.com", Visitors: 1, Events: 1, SourceFile: "imported_custom_events.csv"}); err != nil {
+			t.Fatalf("put attributed property: %v", err)
+		}
+		if err := sink.PutEventProperty(ctx, importables.EventPropertyRow{Date: date, PropertyKey: "url", PropertyValue: "https://example.com", Visitors: 1, Events: 1, SourceFile: "imported_unattributed_properties.csv"}); err != nil {
+			t.Fatalf("put unattributed property: %v", err)
+		}
+		if err := sink.PutEventDimension(ctx, importables.EventDimensionRow{Date: date, EventName: "outbound_click", Dimension: "url", Name: "https://example.com", Visitors: 1, Events: 1, SourceFile: "imported_event_dimensions.csv"}); err != nil {
+			t.Fatalf("put event dimension: %v", err)
+		}
+	}
+	if err := sink.Flush(ctx); err != nil {
+		t.Fatalf("flush: %v", err)
+	}
+
+	if err := mgr.DeleteSite(ctx, site.ID); err != nil {
+		t.Fatalf("DeleteSite: %v", err)
+	}
+	if err := tenantStore.DB().PingContext(ctx); err != nil {
+		t.Fatalf("tenant DB should remain usable after deleting imported properties: %v", err)
 	}
 }
 

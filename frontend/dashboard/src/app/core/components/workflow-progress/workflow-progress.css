@@ -1,0 +1,136 @@
+:host {
+    display: block;
+}
+
+.hk-workflow-progress {
+    --hk-workflow-marker-size: 1.75rem;
+
+    display: flex;
+    gap: 0;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.hk-workflow-progress__item {
+    color: var(--p-text-muted-color);
+    display: grid;
+    flex: 1 1 0;
+    gap: 0.5rem;
+    grid-template-rows: var(--hk-workflow-marker-size) auto;
+    justify-items: center;
+    min-width: 0;
+    position: relative;
+    text-align: center;
+    user-select: none;
+}
+
+.hk-workflow-progress__item:not(:last-child)::after {
+    background: var(--p-content-border-color);
+    content: "";
+    height: 1px;
+    left: calc(50% + (var(--hk-workflow-marker-size) / 2) + 0.5rem);
+    position: absolute;
+    right: calc(-50% + (var(--hk-workflow-marker-size) / 2) + 0.5rem);
+    top: calc(var(--hk-workflow-marker-size) / 2);
+    transform: translateY(-50%);
+}
+
+.hk-workflow-progress__marker {
+    align-items: center;
+    background: var(--p-surface-100);
+    border: 1px solid var(--p-content-border-color);
+    border-radius: 999px;
+    color: var(--p-text-muted-color);
+    display: inline-flex;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    height: var(--hk-workflow-marker-size);
+    justify-content: center;
+    line-height: 1;
+    position: relative;
+    width: var(--hk-workflow-marker-size);
+    z-index: 1;
+}
+
+.hk-workflow-progress__label {
+    color: var(--p-text-muted-color);
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.25;
+    max-width: 11rem;
+    overflow-wrap: anywhere;
+}
+
+.hk-workflow-progress__item.is-complete {
+    color: var(--p-primary-color);
+}
+
+.hk-workflow-progress__item.is-complete:not(:last-child)::after {
+    background: color-mix(in srgb, var(--p-primary-color) 58%, var(--p-content-border-color));
+}
+
+.hk-workflow-progress__item.is-complete .hk-workflow-progress__marker {
+    background: var(--p-primary-color);
+    border-color: var(--p-primary-color);
+    color: var(--p-primary-contrast-color);
+}
+
+.hk-workflow-progress__item.is-complete .hk-workflow-progress__label {
+    color: var(--p-text-color);
+}
+
+.hk-workflow-progress__item.is-current .hk-workflow-progress__marker {
+    background: color-mix(in srgb, var(--p-primary-color) 12%, var(--p-surface-card));
+    border-color: var(--p-primary-color);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--p-primary-color) 14%, transparent);
+    color: var(--p-primary-color);
+}
+
+.hk-workflow-progress__item.is-current .hk-workflow-progress__label {
+    color: var(--p-text-color);
+}
+
+:host-context(.p-dark) .hk-workflow-progress__marker {
+    background: var(--p-surface-800);
+}
+
+:host-context(.p-dark) .hk-workflow-progress__item.is-current .hk-workflow-progress__marker {
+    background: color-mix(in srgb, var(--p-primary-color) 18%, var(--p-surface-900));
+}
+
+@media (max-width: 640px) {
+    .hk-workflow-progress {
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .hk-workflow-progress__item {
+        column-gap: 0.75rem;
+        grid-template-columns: var(--hk-workflow-marker-size) minmax(0, 1fr);
+        grid-template-rows: minmax(2.75rem, auto);
+        justify-items: start;
+        padding-bottom: 0.75rem;
+        text-align: left;
+    }
+
+    .hk-workflow-progress__item:not(:last-child) {
+        padding-right: 0;
+    }
+
+    .hk-workflow-progress__item:not(:last-child)::after {
+        bottom: 0.25rem;
+        height: auto;
+        left: calc(var(--hk-workflow-marker-size) / 2);
+        right: auto;
+        top: calc(var(--hk-workflow-marker-size) + 0.25rem);
+        transform: translateX(-50%);
+        width: 1px;
+    }
+
+    .hk-workflow-progress__label {
+        align-self: center;
+        max-width: none;
+    }
+}

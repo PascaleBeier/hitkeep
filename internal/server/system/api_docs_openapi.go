@@ -23,6 +23,7 @@ func openAPISpecV1(publicURL string) map[string]any {
 			{"name": "Permissions", "description": "Authenticated permission context endpoints."},
 			{"name": "Admin", "description": "Instance-level admin and membership management endpoints."},
 			{"name": "Sites", "description": "Site lifecycle, stats, hits, and retention endpoints."},
+			{"name": "Imports", "description": "Historical analytics import validation, upload, and lifecycle endpoints."},
 			{"name": "Goals", "description": "Goal and goal-timeseries endpoints."},
 			{"name": "Funnels", "description": "Funnel CRUD and analytics endpoints."},
 			{"name": "Share", "description": "Share-link management and public shared analytics endpoints."},

@@ -43,6 +43,11 @@ func TestHandleGetUserPermissions(t *testing.T) {
 	ctx, store, userID := setupTestEnv(t)
 	defer store.Close()
 
+	site, err := store.CreateSite(context.Background(), userID, "permissions.example.com")
+	if err != nil {
+		t.Fatalf("failed to create site: %v", err)
+	}
+
 	tests := []struct {
 		name           string
 		injectAuth     bool
@@ -60,25 +65,26 @@ func TestHandleGetUserPermissions(t *testing.T) {
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
 				type response struct {
-					InstanceRole auth.InstanceRole `json:"instance_role"`
-					Permissions  []auth.Permission `json:"permissions"`
+					InstanceRole        auth.InstanceRole        `json:"instance_role"`
+					Permissions         map[string]auth.SiteRole `json:"permissions"`
+					InstancePermissions []auth.Permission        `json:"instance_permissions"`
 				}
 				var resp response
 				if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 					t.Fatalf("failed to decode response: %v", err)
 				}
 
-				// By default, setupTestEnv creates a user which is likely an InstanceOwner (first user)
-				// or just a regular user depending on how CreateUser works.
-				// In database/store.go, CreateUser usually makes the first user an owner.
-				// Let's check what we got.
 				if resp.InstanceRole == "" {
 					t.Error("expected instance role, got empty")
 				}
-				// We expect at least some permissions or empty list, but not nil if we initialized it
 				if resp.Permissions == nil {
-					// It might be nil if empty, which is fine for JSON, but let's check if we expected some.
-					// If it's a regular user, it might have no permissions.
+					t.Fatal("expected site permissions map")
+				}
+				if resp.Permissions[site.ID.String()] != auth.SiteOwner {
+					t.Fatalf("expected site owner role for created site, got %q", resp.Permissions[site.ID.String()])
+				}
+				if resp.InstancePermissions == nil {
+					t.Fatal("expected instance permissions list")
 				}
 			},
 		},

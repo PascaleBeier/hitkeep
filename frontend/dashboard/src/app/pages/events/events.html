@@ -172,7 +172,14 @@
     }
 
     <!-- Audience panels — only shown when an event is selected -->
-    @if (selectedEvent()) {
+    @if (selectedEvent()) { @if ((audience()?.imported_excluded?.length ?? 0) > 0) {
+    <p-message severity="info" styleClass="w-full mt-6">
+        <strong>{{ "events.importedLimitations.title" | transloco }}</strong>
+        @for (reason of audience()?.imported_excluded ?? []; track reason.reason + reason.detail) {
+        <span class="block">{{ reason.detail || reason.reason }}</span>
+        }
+    </p-message>
+    }
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mt-6">
         <app-metric-list
             [title]="'common.metrics.topPages' | transloco"

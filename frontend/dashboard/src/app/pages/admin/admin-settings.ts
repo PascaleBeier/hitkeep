@@ -41,6 +41,7 @@ import {
     SystemIngestStats,
     SystemBackupStatus,
     SystemSpamStatus,
+    SystemImportStageCleanupStatus,
     SystemCacheStatus,
     SystemMailStatus
 } from '@services/admin-system.service';
@@ -160,6 +161,7 @@ export class AdminSettings implements OnInit {
     protected systemIngest = signal<SystemIngestStats | null>(null);
     protected systemBackups = signal<SystemBackupStatus | null>(null);
     protected systemSpam = signal<SystemSpamStatus | null>(null);
+    protected systemImportCleanup = signal<SystemImportStageCleanupStatus | null>(null);
     protected systemCaches = signal<SystemCacheStatus | null>(null);
     protected systemMail = signal<SystemMailStatus | null>(null);
     protected systemActivation = signal<SystemActivationResponse | null>(null);
@@ -170,10 +172,12 @@ export class AdminSettings implements OnInit {
     protected isLoadingIngest = signal(false);
     protected isLoadingBackups = signal(false);
     protected isLoadingSpam = signal(false);
+    protected isLoadingImportCleanup = signal(false);
     protected isLoadingCaches = signal(false);
     protected isLoadingMail = signal(false);
     protected isLoadingActivation = signal(false);
     protected isRefreshingSpam = signal(false);
+    protected isRunningImportCleanup = signal(false);
     protected isTestingMail = signal(false);
     protected activationStatusFilter = signal('');
     protected activationTeamFilter = signal('');
@@ -185,6 +189,7 @@ export class AdminSettings implements OnInit {
     private activationRequestID = 0;
 
     protected spamActionStatus = signal<StatusState | null>(null);
+    protected importCleanupActionStatus = signal<StatusState | null>(null);
     protected mailTestResult = signal<{ severity: 'success' | 'error'; message: string } | null>(null);
     protected mailTestRecipient = new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.email, Validators.maxLength(320)] });
 
@@ -248,6 +253,10 @@ export class AdminSettings implements OnInit {
         return Math.round((used / storage.disk_total_bytes) * 100);
     });
     protected readonly recentHits = computed(() => this.systemIngest()?.recent_hits ?? 0);
+    protected readonly importCleanupActionDisabled = computed(() => {
+        const cleanup = this.systemImportCleanup();
+        return !cleanup?.enabled || cleanup.stale_files === 0;
+    });
     protected readonly activationRows = computed(() => this.systemActivation()?.rows ?? []);
     protected readonly activationLiveSites = computed(() => this.activationRows().filter((row) => row.status === 'live').length);
     protected readonly activationStatusOptions = computed(() => {
@@ -314,6 +323,7 @@ export class AdminSettings implements OnInit {
         return this.actionStatusMessage(this.userMfaStatus());
     });
     protected readonly spamActionStatusMessage = computed(() => this.actionStatusMessage(this.spamActionStatus()));
+    protected readonly importCleanupActionStatusMessage = computed(() => this.actionStatusMessage(this.importCleanupActionStatus()));
     protected readonly userActionStatusMessage = computed(() => this.actionStatusMessage(this.userActionStatus()));
     protected readonly siteActionStatusMessage = computed(() => this.actionStatusMessage(this.siteActionStatus()));
     protected readonly teamActionStatusMessage = computed(() => this.actionStatusMessage(this.teamActionStatus()));
@@ -492,6 +502,16 @@ export class AdminSettings implements OnInit {
             });
     }
 
+    protected loadImportStageCleanup() {
+        this.isLoadingImportCleanup.set(true);
+        this.system
+            .getImportStageCleanup()
+            .pipe(finalize(() => this.isLoadingImportCleanup.set(false)))
+            .subscribe({
+                next: (s) => this.systemImportCleanup.set(s)
+            });
+    }
+
     protected loadSystemCaches() {
         this.isLoadingCaches.set(true);
         this.system
@@ -535,6 +555,33 @@ export class AdminSettings implements OnInit {
             });
     }
 
+    protected runImportStageCleanup() {
+        this.isRunningImportCleanup.set(true);
+        this.importCleanupActionStatus.set(null);
+        this.system
+            .runImportStageCleanup()
+            .pipe(finalize(() => this.isRunningImportCleanup.set(false)))
+            .subscribe({
+                next: (res) => {
+                    this.importCleanupActionStatus.set({
+                        severity: 'success',
+                        key: 'admin.system.importCleanup.runSuccess',
+                        params: {
+                            files: res.result.files_cleaned,
+                            bytes: this.formatBytesValue(res.result.bytes_cleaned)
+                        }
+                    });
+                    this.loadImportStageCleanup();
+                },
+                error: () => {
+                    this.importCleanupActionStatus.set({
+                        severity: 'error',
+                        key: 'admin.system.importCleanup.runFailed'
+                    });
+                }
+            });
+    }
+
     protected testMail() {
         this.mailTestRecipient.markAsTouched();
         if (this.mailTestRecipient.invalid) {
@@ -569,6 +616,7 @@ export class AdminSettings implements OnInit {
     protected refreshOperations() {
         this.loadSystemBackups();
         this.loadSystemSpam();
+        this.loadImportStageCleanup();
         this.loadSystemCaches();
         this.loadSystemMail();
     }

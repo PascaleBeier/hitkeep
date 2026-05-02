@@ -396,3 +396,88 @@ func TestHandleAddSiteMemberUsesInviterLocaleForNewUserInvite(t *testing.T) {
 		t.Fatalf("expected localized German CTA, got:\n%s", drv.textBody)
 	}
 }
+
+func TestHandleSiteMemberPermissionMutationsAppendCentralAudit(t *testing.T) {
+	h, store, _, _, actorUserID, targetUserID := setupAdminTestEnv(t)
+	ctx := context.Background()
+
+	site, err := store.CreateSite(ctx, actorUserID, "audit-permissions.example")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	teamID, err := store.GetSiteTenantID(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("get site tenant: %v", err)
+	}
+
+	addBody := strings.NewReader(`{"email":"target-owner@example.com","role":"viewer"}`)
+	addReq := withAdminTestUser(httptest.NewRequest(http.MethodPost, "/api/admin/sites/"+site.ID.String()+"/members", addBody), actorUserID)
+	addReq.RemoteAddr = "203.0.113.10:1234"
+	addReq.Header.Set("User-Agent", "audit-permission-test")
+	addReq.Header.Set("X-Request-Id", "req-permission-grant")
+	addReq.SetPathValue("id", site.ID.String())
+	addW := httptest.NewRecorder()
+
+	h.handleAddSiteMember().ServeHTTP(addW, addReq)
+	if addW.Code != http.StatusOK {
+		t.Fatalf("expected add status %d, got %d: %s", http.StatusOK, addW.Code, addW.Body.String())
+	}
+	assertPermissionAuditEntry(t, store, "permission.site_member_granted", teamID, targetUserID, site.ID, "203.0.113.10", "audit-permission-test", "req-permission-grant")
+
+	updateBody := strings.NewReader(`{"email":"target-owner@example.com","role":"admin"}`)
+	updateReq := withAdminTestUser(httptest.NewRequest(http.MethodPost, "/api/admin/sites/"+site.ID.String()+"/members", updateBody), actorUserID)
+	updateReq.SetPathValue("id", site.ID.String())
+	updateW := httptest.NewRecorder()
+
+	h.handleAddSiteMember().ServeHTTP(updateW, updateReq)
+	if updateW.Code != http.StatusOK {
+		t.Fatalf("expected update status %d, got %d: %s", http.StatusOK, updateW.Code, updateW.Body.String())
+	}
+	assertPermissionAuditEntry(t, store, "permission.site_member_role_updated", teamID, targetUserID, site.ID, "", "", "")
+
+	removeReq := withAdminTestUser(httptest.NewRequest(http.MethodDelete, "/api/admin/sites/"+site.ID.String()+"/members/"+targetUserID.String(), nil), actorUserID)
+	removeReq.SetPathValue("id", site.ID.String())
+	removeReq.SetPathValue("userId", targetUserID.String())
+	removeW := httptest.NewRecorder()
+
+	h.handleRemoveSiteMember().ServeHTTP(removeW, removeReq)
+	if removeW.Code != http.StatusOK {
+		t.Fatalf("expected remove status %d, got %d: %s", http.StatusOK, removeW.Code, removeW.Body.String())
+	}
+	assertPermissionAuditEntry(t, store, "permission.site_member_revoked", teamID, targetUserID, site.ID, "", "", "")
+}
+
+func assertPermissionAuditEntry(t *testing.T, store *database.Store, action string, teamID, targetUserID, siteID uuid.UUID, expectedIP, expectedUserAgent, expectedRequestID string) {
+	t.Helper()
+
+	entries, total, err := store.ListInstanceAuditEntries(context.Background(), database.InstanceAuditFilter{
+		Action: action,
+		Limit:  10,
+	})
+	if err != nil {
+		t.Fatalf("list audit entries for %s: %v", action, err)
+	}
+	if total != 1 || len(entries) != 1 {
+		t.Fatalf("expected one %s audit entry, total=%d len=%d", action, total, len(entries))
+	}
+
+	entry := entries[0]
+	if entry.TeamID == nil || *entry.TeamID != teamID {
+		t.Fatalf("expected team_id %s, got %v", teamID, entry.TeamID)
+	}
+	if entry.TargetUserID == nil || *entry.TargetUserID != targetUserID {
+		t.Fatalf("expected target_user_id %s, got %v", targetUserID, entry.TargetUserID)
+	}
+	if entry.TargetType != "permission" || entry.TargetID != siteID.String() || entry.TargetLabel != "audit-permissions.example" {
+		t.Fatalf("expected permission target fields, got type=%q id=%q label=%q", entry.TargetType, entry.TargetID, entry.TargetLabel)
+	}
+	if expectedIP != "" && entry.IPAddress != expectedIP {
+		t.Fatalf("expected IP %q, got %q", expectedIP, entry.IPAddress)
+	}
+	if expectedUserAgent != "" && entry.UserAgent != expectedUserAgent {
+		t.Fatalf("expected user agent %q, got %q", expectedUserAgent, entry.UserAgent)
+	}
+	if expectedRequestID != "" && entry.RequestID != expectedRequestID {
+		t.Fatalf("expected request ID %q, got %q", expectedRequestID, entry.RequestID)
+	}
+}

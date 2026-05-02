@@ -126,7 +126,7 @@ func (w *RetentionWorker) Run(ctx context.Context) error {
 		}
 		db := tenantStore.DB()
 
-		var hitCount, eventCount, fetchCount int64
+		var hitCount, eventCount, fetchCount, importedTrafficCount, importedDimensionCount, importedEventCount, importedEventPropertyCount int64
 		err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM hits WHERE site_id = ? AND timestamp < ?", p.ID, cutoff).Scan(&hitCount)
 		if err != nil {
 			slog.Error("Failed to count hits for retention", "error", err, "site_id", p.ID)
@@ -142,12 +142,32 @@ func (w *RetentionWorker) Run(ctx context.Context) error {
 			slog.Error("Failed to count ai fetches for retention", "error", err, "site_id", p.ID)
 			continue
 		}
-
-		if hitCount == 0 && eventCount == 0 && fetchCount == 0 {
+		err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM imported_traffic_daily WHERE site_id = ? AND date < ?", p.ID, cutoff).Scan(&importedTrafficCount)
+		if err != nil {
+			slog.Error("Failed to count imported traffic for retention", "error", err, "site_id", p.ID)
+			continue
+		}
+		err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM imported_dimension_daily WHERE site_id = ? AND date < ?", p.ID, cutoff).Scan(&importedDimensionCount)
+		if err != nil {
+			slog.Error("Failed to count imported dimensions for retention", "error", err, "site_id", p.ID)
+			continue
+		}
+		err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM imported_event_daily WHERE site_id = ? AND date < ?", p.ID, cutoff).Scan(&importedEventCount)
+		if err != nil {
+			slog.Error("Failed to count imported events for retention", "error", err, "site_id", p.ID)
+			continue
+		}
+		err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM imported_event_properties_daily WHERE site_id = ? AND date < ?", p.ID, cutoff).Scan(&importedEventPropertyCount)
+		if err != nil {
+			slog.Error("Failed to count imported event properties for retention", "error", err, "site_id", p.ID)
 			continue
 		}
 
-		slog.Info("Archiving old data", "site_id", p.ID, "hits", hitCount, "events", eventCount, "ai_fetches", fetchCount, "cutoff", cutoff.Format(time.DateOnly))
+		if hitCount == 0 && eventCount == 0 && fetchCount == 0 && importedTrafficCount == 0 && importedDimensionCount == 0 && importedEventCount == 0 && importedEventPropertyCount == 0 {
+			continue
+		}
+
+		slog.Info("Archiving old data", "site_id", p.ID, "hits", hitCount, "events", eventCount, "ai_fetches", fetchCount, "imported_traffic", importedTrafficCount, "imported_dimensions", importedDimensionCount, "imported_events", importedEventCount, "imported_event_properties", importedEventPropertyCount, "cutoff", cutoff.Format(time.DateOnly))
 
 		filename := w.archiveFilename(p.ID, p.TenantID, defaultTenantID)
 		if !IsS3ArchivePath(filename) {
@@ -167,8 +187,16 @@ func (w *RetentionWorker) Run(ctx context.Context) error {
 					SELECT 'events' AS _source, * FROM events WHERE site_id = '%s' AND timestamp < '%s'
 					UNION BY NAME
 					SELECT 'ai_fetches' AS _source, * FROM ai_fetches WHERE site_id = '%s' AND timestamp < '%s'
+					UNION BY NAME
+					SELECT 'imported_traffic_daily' AS _source, * FROM imported_traffic_daily WHERE site_id = '%s' AND date < '%s'
+					UNION BY NAME
+					SELECT 'imported_dimension_daily' AS _source, * FROM imported_dimension_daily WHERE site_id = '%s' AND date < '%s'
+					UNION BY NAME
+					SELECT 'imported_event_daily' AS _source, * FROM imported_event_daily WHERE site_id = '%s' AND date < '%s'
+					UNION BY NAME
+					SELECT 'imported_event_properties_daily' AS _source, * FROM imported_event_properties_daily WHERE site_id = '%s' AND date < '%s'
 				) TO '%s' (FORMAT PARQUET, COMPRESSION 'SNAPPY');
-			`, p.ID, cutoff.Format(time.RFC3339), p.ID, cutoff.Format(time.RFC3339), p.ID, cutoff.Format(time.RFC3339), safeFilename)
+			`, p.ID, cutoff.Format(time.RFC3339), p.ID, cutoff.Format(time.RFC3339), p.ID, cutoff.Format(time.RFC3339), p.ID, cutoff.Format(time.DateOnly), p.ID, cutoff.Format(time.DateOnly), p.ID, cutoff.Format(time.DateOnly), p.ID, cutoff.Format(time.DateOnly), safeFilename)
 
 		err = database.WithDuckDBSession(ctx, db, database.DuckDBSessionOptions{
 			S3: s3ConfigForSession(IsS3ArchivePath(w.path), w.s3Config),
@@ -208,6 +236,35 @@ func (w *RetentionWorker) Run(ctx context.Context) error {
 		if fetchCount > 0 {
 			if _, err := tx.ExecContext(ctx, "DELETE FROM ai_fetches WHERE site_id = ? AND timestamp < ?", p.ID, cutoff); err != nil {
 				slog.Error("Failed to prune ai fetches", "error", err, "site_id", p.ID)
+				_ = tx.Rollback()
+				continue
+			}
+		}
+
+		if importedTrafficCount > 0 {
+			if _, err := tx.ExecContext(ctx, "DELETE FROM imported_traffic_daily WHERE site_id = ? AND date < ?", p.ID, cutoff); err != nil {
+				slog.Error("Failed to prune imported traffic", "error", err, "site_id", p.ID)
+				_ = tx.Rollback()
+				continue
+			}
+		}
+		if importedDimensionCount > 0 {
+			if _, err := tx.ExecContext(ctx, "DELETE FROM imported_dimension_daily WHERE site_id = ? AND date < ?", p.ID, cutoff); err != nil {
+				slog.Error("Failed to prune imported dimensions", "error", err, "site_id", p.ID)
+				_ = tx.Rollback()
+				continue
+			}
+		}
+		if importedEventCount > 0 {
+			if _, err := tx.ExecContext(ctx, "DELETE FROM imported_event_daily WHERE site_id = ? AND date < ?", p.ID, cutoff); err != nil {
+				slog.Error("Failed to prune imported events", "error", err, "site_id", p.ID)
+				_ = tx.Rollback()
+				continue
+			}
+		}
+		if importedEventPropertyCount > 0 {
+			if _, err := tx.ExecContext(ctx, "DELETE FROM imported_event_properties_daily WHERE site_id = ? AND date < ?", p.ID, cutoff); err != nil {
+				slog.Error("Failed to prune imported event properties", "error", err, "site_id", p.ID)
 				_ = tx.Rollback()
 				continue
 			}

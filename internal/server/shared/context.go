@@ -65,10 +65,11 @@ type Context struct {
 	SpamFilter     *blocking.SpamFilter
 
 	// Runtime system monitoring
-	StartedAt       time.Time
-	SystemCounters  *database.SystemCounter
-	BackupStatus    *database.BackupStatusTracker
-	MailTestTracker *database.MailTestTracker
+	StartedAt                time.Time
+	SystemCounters           *database.SystemCounter
+	BackupStatus             *database.BackupStatusTracker
+	ImportStageCleanupStatus *database.ImportStageCleanupStatusTracker
+	MailTestTracker          *database.MailTestTracker
 }
 
 // AnalyticsStore resolves the tenant-specific store that holds analytics data for the given site.

@@ -1,0 +1,182 @@
+<div class="audit-table">
+    <div class="audit-table__toolbar" role="search" [attr.aria-label]="'auditTable.filters.aria' | transloco">
+        <div class="audit-table__filters">
+            @if (resolvedFilterConfig().action) {
+            <label class="audit-table__control" [for]="idPrefix + '-action'">
+                <span>{{ "auditTable.filters.action" | transloco }}</span>
+                <p-select
+                    [inputId]="idPrefix + '-action'"
+                    [options]="actionOptions()"
+                    [ngModel]="query().action ?? ''"
+                    (ngModelChange)="updateFilter('action', $event)"
+                    optionLabel="label"
+                    optionValue="value"
+                    appendTo="body"
+                    styleClass="audit-table__select"
+                />
+            </label>
+            } @if (resolvedFilterConfig().outcome) {
+            <label class="audit-table__control" [for]="idPrefix + '-outcome'">
+                <span>{{ "auditTable.filters.outcome" | transloco }}</span>
+                <p-select
+                    [inputId]="idPrefix + '-outcome'"
+                    [options]="outcomeOptions()"
+                    [ngModel]="query().outcome ?? ''"
+                    (ngModelChange)="updateFilter('outcome', $event)"
+                    optionLabel="label"
+                    optionValue="value"
+                    appendTo="body"
+                    styleClass="audit-table__select audit-table__select--compact"
+                />
+            </label>
+            } @if (resolvedFilterConfig().targetType) {
+            <label class="audit-table__control" [for]="idPrefix + '-target-type'">
+                <span>{{ "auditTable.filters.targetType" | transloco }}</span>
+                <p-select
+                    [inputId]="idPrefix + '-target-type'"
+                    [options]="targetTypeOptions()"
+                    [ngModel]="query().target_type ?? ''"
+                    (ngModelChange)="updateFilter('target_type', $event)"
+                    optionLabel="label"
+                    optionValue="value"
+                    appendTo="body"
+                    styleClass="audit-table__select audit-table__select--compact"
+                />
+            </label>
+            } @if (resolvedFilterConfig().dateRange) {
+            <label class="audit-table__control audit-table__control--date" [for]="idPrefix + '-date-range'">
+                <span>{{ "auditTable.filters.dateRange" | transloco }}</span>
+                <p-datepicker
+                    [inputId]="idPrefix + '-date-range'"
+                    [ngModel]="dateRange()"
+                    (ngModelChange)="onDateRangeChange($event)"
+                    selectionMode="range"
+                    [readonlyInput]="true"
+                    [showIcon]="true"
+                    [showButtonBar]="true"
+                    [placeholder]="'auditTable.filters.dateRangePlaceholder' | transloco"
+                    styleClass="audit-table__datepicker"
+                />
+            </label>
+            } @if (resolvedFilterConfig().search) {
+            <label class="audit-table__control audit-table__control--search" [for]="idPrefix + '-search'">
+                <span>{{ "auditTable.filters.search" | transloco }}</span>
+                <p-iconfield class="audit-table__search">
+                    <p-inputicon class="pi pi-search" />
+                    <input [id]="idPrefix + '-search'" pInputText [ngModel]="searchText()" (ngModelChange)="onSearchInput($event)" [placeholder]="'auditTable.filters.searchPlaceholder' | transloco" />
+                </p-iconfield>
+            </label>
+            } @if (hasActiveFilters()) {
+            <p-button [label]="'auditTable.actions.clearFilters' | transloco" icon="pi pi-filter-slash" severity="secondary" [text]="true" (onClick)="clearFilters()" />
+            }
+        </div>
+
+        <div class="audit-table__actions">
+            @if (exportEnabled()) {
+            <p-button
+                [label]="'auditTable.actions.export' | transloco"
+                icon="pi pi-download"
+                severity="secondary"
+                [loading]="exportLoading()"
+                [disabled]="exportLoading()"
+                [ariaLabel]="'auditTable.actions.export' | transloco"
+                (onClick)="exportRequest.emit()"
+            />
+            }
+            <p-button [label]="'auditTable.actions.refresh' | transloco" icon="pi pi-refresh" severity="secondary" [text]="true" [disabled]="loading()" [ariaLabel]="'auditTable.actions.refresh' | transloco" (onClick)="refresh.emit()" />
+        </div>
+    </div>
+
+    @if (errorKey(); as error) {
+    <p-message severity="error" [text]="error | transloco" styleClass="audit-table__message" />
+    } @if (exportStatus(); as status) {
+    <p-message [severity]="status.severity" [text]="status.key | transloco" styleClass="audit-table__message" />
+    }
+
+    <div class="hk-crud-table-wrap audit-table__table-wrap">
+        <p-table
+            [value]="rows()"
+            [loading]="loading()"
+            [rowHover]="true"
+            [sortField]="'created_at'"
+            [sortOrder]="-1"
+            [tableStyle]="{ 'min-width': '92rem' }"
+            styleClass="hk-crud-table p-datatable-sm audit-table__data"
+            dataKey="id"
+            responsiveLayout="scroll"
+        >
+            <ng-template pTemplate="header">
+                <tr>
+                    <th class="audit-table__expander-col"><span class="sr-only">{{ "auditTable.columns.evidence" | transloco }}</span></th>
+                    <th class="audit-table__time-col">{{ "auditTable.columns.time" | transloco }}</th>
+                    <th class="audit-table__actor-col">{{ "auditTable.columns.actor" | transloco }}</th>
+                    <th>{{ "auditTable.columns.action" | transloco }}</th>
+                    <th>{{ "auditTable.columns.targetType" | transloco }}</th>
+                    <th class="audit-table__target-col">{{ "auditTable.columns.target" | transloco }}</th>
+                    <th>{{ "auditTable.columns.outcome" | transloco }}</th>
+                    <th>{{ "auditTable.columns.ipAddress" | transloco }}</th>
+                    <th>{{ "auditTable.columns.country" | transloco }}</th>
+                    <th class="audit-table__details-col">{{ "auditTable.columns.details" | transloco }}</th>
+                </tr>
+            </ng-template>
+
+            <ng-template pTemplate="body" let-row>
+                <tr>
+                    <td class="audit-table__expander-cell">
+                        <p-button [icon]="expandIcon(row)" [rounded]="true" [text]="true" severity="secondary" size="small" [disabled]="!hasEvidence(row)" [ariaLabel]="expandLabel(row) | transloco" (onClick)="toggleRow(row)" />
+                    </td>
+                    <td><app-relative-date-time [value]="row.created_at" /></td>
+                    <td>
+                        <div class="audit-table__actor">
+                            <span class="audit-table__truncate" [pTooltip]="actorLabel(row)" tooltipPosition="top">{{ actorLabel(row) }}</span>
+                            @if (row.actor_role_snapshot) {
+                            <span class="audit-table__role">{{ roleLabel(row.actor_role_snapshot) }}</span>
+                            }
+                        </div>
+                    </td>
+                    <td>
+                        <p-tag [value]="actionLabel(row)" [severity]="actionSeverity(row)" [rounded]="true" />
+                    </td>
+                    <td>{{ targetTypeLabel(row) }}</td>
+                    <td><span class="audit-table__truncate" [pTooltip]="targetLabel(row)" tooltipPosition="top">{{ targetLabel(row) }}</span></td>
+                    <td>
+                        <p-tag [value]="outcomeLabel(row)" [severity]="outcomeSeverity(row)" />
+                    </td>
+                    <td><span class="audit-table__mono">{{ row.ip_address || "-" }}</span></td>
+                    <td><span class="audit-table__country">{{ row.ip_country_code || "-" }}</span></td>
+                    <td><span class="audit-table__details" [pTooltip]="row.details || '-'" tooltipPosition="top">{{ row.details || "-" }}</span></td>
+                </tr>
+                @if (isExpanded(row)) {
+                <tr class="audit-table__evidence-row">
+                    <td colspan="10">
+                        <div class="audit-table__evidence">
+                            @if (row.details) {
+                            <div class="audit-table__evidence-full">
+                                <span class="audit-table__evidence-label">{{ "auditTable.evidence.details" | transloco }}</span>
+                                <span>{{ row.details }}</span>
+                            </div>
+                            } @for (field of evidenceFields(row); track trackEvidenceField($index, field)) {
+                            <div class="audit-table__evidence-field">
+                                <span class="audit-table__evidence-label">{{ field.labelKey | transloco }}</span>
+                                <span [class.audit-table__mono]="field.mono">{{ field.value }}</span>
+                            </div>
+                            }
+                        </div>
+                    </td>
+                </tr>
+                }
+            </ng-template>
+
+            <ng-template pTemplate="emptymessage">
+                <tr>
+                    <td colspan="10" class="audit-table__empty">{{ emptyTextKey() | transloco }}</td>
+                </tr>
+            </ng-template>
+        </p-table>
+    </div>
+
+    <div class="audit-table__pagination" aria-live="polite">
+        <span class="audit-table__pagination-summary">{{ visibleRangeLabelKey() | transloco: pageSummaryParams() }}</span>
+        <p-paginator [first]="firstRow()" [rows]="pageSize()" [totalRecords]="total()" [rowsPerPageOptions]="pageSizeOptions()" [showCurrentPageReport]="false" (onPageChange)="onPageChange($event)" />
+    </div>
+</div>

@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -31,9 +32,38 @@ func canManageTeam(role string) bool {
 }
 
 func (h *handler) appendTeamAudit(r *http.Request, teamID, actorID uuid.UUID, action, details string, targetUserID *uuid.UUID) {
-	if err := h.ctx.Store.AppendTeamAuditEntry(r.Context(), teamID, actorID, action, details, targetUserID); err != nil {
-		slog.Warn("Failed to append team audit entry", "error", err, "team_id", teamID, "actor_id", actorID, "action", action)
+	targetType := "team"
+	targetID := teamID.String()
+	targetLabel := ""
+	resolvedTargetUserID := uuid.Nil
+	if team, err := h.ctx.Store.GetTenant(r.Context(), teamID); err == nil && team != nil {
+		targetLabel = team.Name
 	}
+	if targetUserID != nil && *targetUserID != uuid.Nil {
+		resolvedTargetUserID = *targetUserID
+		targetID = (*targetUserID).String()
+		if user, err := h.ctx.Store.GetUserByID(r.Context(), *targetUserID); err == nil && user != nil {
+			targetLabel = user.Email
+		}
+	}
+	if strings.HasPrefix(action, "member.") || strings.HasPrefix(action, "ownership.") {
+		targetType = "user"
+	}
+	if strings.HasPrefix(action, "api_client.") {
+		targetType = "api_client"
+	}
+
+	h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
+		ActorID:      actorID,
+		TeamID:       teamID,
+		TargetUserID: resolvedTargetUserID,
+		Action:       action,
+		TargetType:   targetType,
+		TargetID:     targetID,
+		TargetLabel:  targetLabel,
+		Outcome:      "success",
+		Details:      details,
+	})
 }
 
 func writeTeamActionError(w http.ResponseWriter, statusCode int, code string, message string) {
@@ -325,6 +355,7 @@ func (h *handler) handleSetActiveTeam() http.HandlerFunc {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
+		h.appendTeamAudit(r, teamID, userID, "team.active_changed", fmt.Sprintf("Active team changed to %s", teamID), nil)
 
 		teams, activeTeamID, teamsErr := h.ctx.Store.ListUserTeams(r.Context(), userID)
 		if teamsErr != nil {
@@ -431,29 +462,13 @@ func (h *handler) handleGetTeamAudit() http.HandlerFunc {
 			return
 		}
 
-		limit := 25
-		if rawLimit := strings.TrimSpace(r.URL.Query().Get("limit")); rawLimit != "" {
-			parsedLimit, parseErr := strconv.Atoi(rawLimit)
-			if parseErr != nil {
-				http.Error(w, "Invalid limit", http.StatusBadRequest)
-				return
-			}
-			limit = parsedLimit
+		filter, err := parseTeamAuditFilter(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
 
-		offset := 0
-		if rawOffset := strings.TrimSpace(r.URL.Query().Get("offset")); rawOffset != "" {
-			parsedOffset, parseErr := strconv.Atoi(rawOffset)
-			if parseErr != nil {
-				http.Error(w, "Invalid offset", http.StatusBadRequest)
-				return
-			}
-			offset = parsedOffset
-		}
-
-		action := strings.TrimSpace(r.URL.Query().Get("action"))
-
-		entries, total, err := h.ctx.Store.ListTeamAuditEntries(r.Context(), teamID, action, limit, offset)
+		entries, total, err := h.ctx.Store.ListTeamAuditEntriesFiltered(r.Context(), teamID, filter)
 		if err != nil {
 			slog.Error("Failed to list team audit entries", "error", err, "user_id", userID, "team_id", teamID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -464,12 +479,59 @@ func (h *handler) handleGetTeamAudit() http.HandlerFunc {
 		if err := json.NewEncoder(w).Encode(api.TeamAuditListResponse{
 			Entries: entries,
 			Total:   total,
-			Limit:   limit,
-			Offset:  offset,
-			HasMore: offset+len(entries) < total,
-			Action:  action,
+			Limit:   normalizedTeamAuditLimit(filter.Limit),
+			Offset:  filter.Offset,
+			HasMore: filter.Offset+len(entries) < total,
+			Action:  filter.Action,
 		}); err != nil {
 			slog.Error("Failed to encode team audit response", "error", err, "user_id", userID, "team_id", teamID)
 		}
 	}
+}
+
+func parseTeamAuditFilter(r *http.Request) (database.TeamAuditFilter, error) {
+	q := r.URL.Query()
+	filter := database.TeamAuditFilter{
+		Action:     strings.TrimSpace(q.Get("action")),
+		TargetType: strings.TrimSpace(q.Get("target_type")),
+		Outcome:    strings.TrimSpace(q.Get("outcome")),
+		Query:      strings.TrimSpace(q.Get("query")),
+		Limit:      database.DefaultTeamAuditListLimit,
+	}
+	if rawLimit := strings.TrimSpace(q.Get("limit")); rawLimit != "" {
+		limit, err := strconv.Atoi(rawLimit)
+		if err != nil || limit < 0 {
+			return filter, fmt.Errorf("invalid limit")
+		}
+		filter.Limit = normalizedTeamAuditLimit(limit)
+	}
+	if rawOffset := strings.TrimSpace(q.Get("offset")); rawOffset != "" {
+		offset, err := strconv.Atoi(rawOffset)
+		if err != nil || offset < 0 {
+			return filter, fmt.Errorf("invalid offset")
+		}
+		filter.Offset = offset
+	}
+	if fromStr := strings.TrimSpace(q.Get("from")); fromStr != "" {
+		from, err := time.Parse(time.RFC3339, fromStr)
+		if err != nil {
+			return filter, fmt.Errorf("invalid from date, expected RFC3339")
+		}
+		filter.From = from
+	}
+	if toStr := strings.TrimSpace(q.Get("to")); toStr != "" {
+		to, err := time.Parse(time.RFC3339, toStr)
+		if err != nil {
+			return filter, fmt.Errorf("invalid to date, expected RFC3339")
+		}
+		filter.To = to
+	}
+	return filter, nil
+}
+
+func normalizedTeamAuditLimit(limit int) int {
+	if limit <= 0 || limit > database.MaxTeamAuditListLimit {
+		return database.DefaultTeamAuditListLimit
+	}
+	return limit
 }

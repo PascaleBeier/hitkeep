@@ -256,39 +256,45 @@ type MetricStat struct {
 	Value int    `json:"value"`
 }
 
+type ImportExclusionReason struct {
+	Reason string `json:"reason"`
+	Detail string `json:"detail,omitempty"`
+}
+
 type SiteStats struct {
 	LiveVisitors int `json:"live_visitors"`
 
-	TotalPageviews     int              `json:"total_pageviews"`
-	UniqueSessions     int              `json:"unique_sessions"`
-	BounceRate         float64          `json:"bounce_rate"`
-	AvgSessionDuration float64          `json:"avg_session_duration"`
-	PagesPerSession    float64          `json:"pages_per_session"`
-	ChartData          []ChartDataPoint `json:"chart_data"`
-	TopPages           []MetricStat     `json:"top_pages"`
-	TopLandingPages    []MetricStat     `json:"top_landing_pages"`
-	TopExitPages       []MetricStat     `json:"top_exit_pages"`
-	TopReferrers       []MetricStat     `json:"top_referrers"`
-	TopDevices         []MetricStat     `json:"top_devices"`
-	TopCountries       []MetricStat     `json:"top_countries"`
-	TopBrowsers        []MetricStat     `json:"top_browsers"`
-	TopAIBots          []MetricStat     `json:"top_ai_bots"`
-	TopAISources       []MetricStat     `json:"top_ai_sources"`
-	TopLanguages       []MetricStat     `json:"top_languages"`
-	TopUTMCampaigns    []MetricStat     `json:"top_utm_campaigns"`
-	TopUTMContents     []MetricStat     `json:"top_utm_contents"`
-	TopUTMMediums      []MetricStat     `json:"top_utm_mediums"`
-	TopUTMSources      []MetricStat     `json:"top_utm_sources"`
-	TopUTMTerms        []MetricStat     `json:"top_utm_terms"`
-	AIBotHits          int              `json:"ai_bot_hits"`
-	AISourceVisits     int              `json:"ai_source_visits"`
-	UTMCampaignHits    int              `json:"utm_campaign_hits"`
-	UTMContentHits     int              `json:"utm_content_hits"`
-	UTMMediumHits      int              `json:"utm_medium_hits"`
-	UTMSourceHits      int              `json:"utm_source_hits"`
-	UTMTermHits        int              `json:"utm_term_hits"`
-	Goals              []GoalStats      `json:"goals"`
-	Comparison         *ComparisonStats `json:"comparison,omitempty"`
+	TotalPageviews     int                     `json:"total_pageviews"`
+	UniqueSessions     int                     `json:"unique_sessions"`
+	BounceRate         float64                 `json:"bounce_rate"`
+	AvgSessionDuration float64                 `json:"avg_session_duration"`
+	PagesPerSession    float64                 `json:"pages_per_session"`
+	ChartData          []ChartDataPoint        `json:"chart_data"`
+	TopPages           []MetricStat            `json:"top_pages"`
+	TopLandingPages    []MetricStat            `json:"top_landing_pages"`
+	TopExitPages       []MetricStat            `json:"top_exit_pages"`
+	TopReferrers       []MetricStat            `json:"top_referrers"`
+	TopDevices         []MetricStat            `json:"top_devices"`
+	TopCountries       []MetricStat            `json:"top_countries"`
+	TopBrowsers        []MetricStat            `json:"top_browsers"`
+	TopAIBots          []MetricStat            `json:"top_ai_bots"`
+	TopAISources       []MetricStat            `json:"top_ai_sources"`
+	TopLanguages       []MetricStat            `json:"top_languages"`
+	TopUTMCampaigns    []MetricStat            `json:"top_utm_campaigns"`
+	TopUTMContents     []MetricStat            `json:"top_utm_contents"`
+	TopUTMMediums      []MetricStat            `json:"top_utm_mediums"`
+	TopUTMSources      []MetricStat            `json:"top_utm_sources"`
+	TopUTMTerms        []MetricStat            `json:"top_utm_terms"`
+	AIBotHits          int                     `json:"ai_bot_hits"`
+	AISourceVisits     int                     `json:"ai_source_visits"`
+	UTMCampaignHits    int                     `json:"utm_campaign_hits"`
+	UTMContentHits     int                     `json:"utm_content_hits"`
+	UTMMediumHits      int                     `json:"utm_medium_hits"`
+	UTMSourceHits      int                     `json:"utm_source_hits"`
+	UTMTermHits        int                     `json:"utm_term_hits"`
+	Goals              []GoalStats             `json:"goals"`
+	Comparison         *ComparisonStats        `json:"comparison,omitempty"`
+	ImportedExcluded   []ImportExclusionReason `json:"imported_excluded,omitempty"`
 }
 
 type EventNamesParams struct {
@@ -338,15 +344,209 @@ type ChatbotExportParams struct {
 }
 
 type EventAudience struct {
-	TopPages     []MetricStat `json:"top_pages"`
-	TopReferrers []MetricStat `json:"top_referrers"`
-	TopDevices   []MetricStat `json:"top_devices"`
-	TopCountries []MetricStat `json:"top_countries"`
+	TopPages         []MetricStat            `json:"top_pages"`
+	TopReferrers     []MetricStat            `json:"top_referrers"`
+	TopDevices       []MetricStat            `json:"top_devices"`
+	TopCountries     []MetricStat            `json:"top_countries"`
+	ImportedExcluded []ImportExclusionReason `json:"imported_excluded,omitempty"`
 }
 
 type EventSeriesPoint struct {
 	Time  time.Time `json:"time"`
 	Count int       `json:"count"`
+}
+
+type ImportProviderDescriptor struct {
+	Key                string   `json:"key"`
+	Name               string   `json:"name"`
+	AcceptedExtensions []string `json:"accepted_extensions"`
+	Capabilities       []string `json:"capabilities"`
+}
+
+type ImportUploadFileInput struct {
+	Filename  string `json:"filename"`
+	SizeBytes int64  `json:"size_bytes"`
+	SHA256    string `json:"sha256,omitempty"`
+}
+
+type ImportUploadCreateRequest struct {
+	Files []ImportUploadFileInput `json:"files"`
+}
+
+type ImportUploadFile struct {
+	ID            uuid.UUID `json:"id"`
+	Filename      string    `json:"filename"`
+	SizeBytes     int64     `json:"size_bytes"`
+	BytesReceived int64     `json:"bytes_received"`
+	SHA256        string    `json:"sha256,omitempty"`
+	Status        string    `json:"status"`
+}
+
+type ImportUploadCreateResponse struct {
+	ImportID  uuid.UUID          `json:"import_id"`
+	Provider  string             `json:"provider"`
+	Status    string             `json:"status"`
+	ChunkSize int64              `json:"chunk_size"`
+	Files     []ImportUploadFile `json:"files"`
+}
+
+type ImportChunkResponse struct {
+	ImportID      uuid.UUID `json:"import_id"`
+	FileID        uuid.UUID `json:"file_id"`
+	BytesReceived int64     `json:"bytes_received"`
+	Complete      bool      `json:"complete"`
+}
+
+type ImportWarning struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	File    string `json:"file,omitempty"`
+}
+
+type ImportDatasetSummary struct {
+	Key          string   `json:"key"`
+	Name         string   `json:"name"`
+	Files        []string `json:"files"`
+	RowsScanned  int64    `json:"rows_scanned"`
+	RowsAccepted int64    `json:"rows_accepted"`
+	RowsSkipped  int64    `json:"rows_skipped"`
+	Visitors     int64    `json:"visitors,omitempty"`
+	Visits       int64    `json:"visits,omitempty"`
+	Pageviews    int64    `json:"pageviews,omitempty"`
+	Events       int64    `json:"events,omitempty"`
+}
+
+type ImportEventCoverage struct {
+	RowsScanned  int64    `json:"rows_scanned"`
+	RowsAccepted int64    `json:"rows_accepted"`
+	Events       int64    `json:"events"`
+	Visitors     int64    `json:"visitors"`
+	EventNames   []string `json:"event_names"`
+	PropertyKeys []string `json:"property_keys"`
+}
+
+type ImportEventPropertyCoverage struct {
+	AttributedRows             int64    `json:"attributed_rows"`
+	AttributedEvents           int64    `json:"attributed_events"`
+	AttributedVisitors         int64    `json:"attributed_visitors"`
+	AttributedPropertyKeys     []string `json:"attributed_property_keys"`
+	UnattributedRows           int64    `json:"unattributed_rows"`
+	UnattributedEvents         int64    `json:"unattributed_events"`
+	UnattributedVisitors       int64    `json:"unattributed_visitors"`
+	UnattributedPropertyKeys   []string `json:"unattributed_property_keys"`
+	UnattributedRelationship   string   `json:"unattributed_relationship,omitempty"`
+	UnavailableRelationshipMsg string   `json:"unavailable_relationship_message,omitempty"`
+}
+
+type ImportEventDimensionCoverage struct {
+	Available   []string `json:"available"`
+	Unavailable []string `json:"unavailable"`
+	Reason      string   `json:"reason,omitempty"`
+}
+
+type ImportOverlapSummary struct {
+	Policy                    string `json:"policy"`
+	NativeTrafficDays         int    `json:"native_traffic_days"`
+	NativeEventDays           int    `json:"native_event_days"`
+	NativeEventKeys           int    `json:"native_event_keys"`
+	EstimatedSkippedRows      int64  `json:"estimated_skipped_rows"`
+	EstimatedSkippedPageviews int64  `json:"estimated_skipped_pageviews"`
+	EstimatedSkippedEvents    int64  `json:"estimated_skipped_events"`
+}
+
+type ImportOverlapMetrics struct {
+	Rows      int64
+	Pageviews int64
+	Events    int64
+}
+
+type ImportOverlapCandidates struct {
+	TrafficByDate            map[string]ImportOverlapMetrics
+	DimensionByDate          map[string]ImportOverlapMetrics
+	EventByDateName          map[string]ImportOverlapMetrics
+	EventDimensionByDateName map[string]ImportOverlapMetrics
+	EventPropertyByDateName  map[string]ImportOverlapMetrics
+}
+
+type ImportManifest struct {
+	Provider               string                       `json:"provider"`
+	SourceHash             string                       `json:"source_hash"`
+	DateStart              *time.Time                   `json:"date_start,omitempty"`
+	DateEnd                *time.Time                   `json:"date_end,omitempty"`
+	Files                  []string                     `json:"files"`
+	IgnoredFiles           []string                     `json:"ignored_files"`
+	MissingFiles           []string                     `json:"missing_files"`
+	Datasets               []ImportDatasetSummary       `json:"datasets"`
+	EventCoverage          ImportEventCoverage          `json:"event_coverage"`
+	EventPropertyCoverage  ImportEventPropertyCoverage  `json:"event_property_coverage"`
+	EventDimensionCoverage ImportEventDimensionCoverage `json:"event_dimension_coverage"`
+	Overlap                ImportOverlapSummary         `json:"overlap"`
+	Warnings               []ImportWarning              `json:"warnings"`
+	RowsScanned            int64                        `json:"rows_scanned"`
+	RowsAccepted           int64                        `json:"rows_accepted"`
+	RowsSkipped            int64                        `json:"rows_skipped"`
+	OverlapCandidates      *ImportOverlapCandidates     `json:"-"`
+}
+
+type ImportJob struct {
+	ID            uuid.UUID          `json:"id"`
+	SiteID        uuid.UUID          `json:"site_id"`
+	Provider      string             `json:"provider"`
+	Status        string             `json:"status"`
+	SourceHash    string             `json:"source_hash,omitempty"`
+	BytesTotal    int64              `json:"bytes_total"`
+	BytesReceived int64              `json:"bytes_received"`
+	RowsScanned   int64              `json:"rows_scanned"`
+	RowsImported  int64              `json:"rows_imported"`
+	Error         string             `json:"error,omitempty"`
+	Manifest      *ImportManifest    `json:"manifest,omitempty"`
+	Files         []ImportUploadFile `json:"files,omitempty"`
+	CreatedBy     *uuid.UUID         `json:"-"`
+	CreatedAt     time.Time          `json:"created_at"`
+	UpdatedAt     time.Time          `json:"updated_at"`
+	ValidatedAt   *time.Time         `json:"validated_at,omitempty"`
+	StartedAt     *time.Time         `json:"started_at,omitempty"`
+	FinishedAt    *time.Time         `json:"finished_at,omitempty"`
+}
+
+type ImportListResponse struct {
+	Imports []ImportJob `json:"imports"`
+}
+
+type ImportStageCleanupEstimate struct {
+	Imports int   `json:"imports"`
+	Files   int   `json:"files"`
+	Bytes   int64 `json:"bytes"`
+}
+
+type ImportStageCleanupRunResult struct {
+	ImportsCleaned      int      `json:"imports_cleaned"`
+	FilesCleaned        int      `json:"files_cleaned"`
+	BytesCleaned        int64    `json:"bytes_cleaned"`
+	ImportsMarkedFailed int      `json:"imports_marked_failed"`
+	Errors              []string `json:"errors,omitempty"`
+}
+
+type SystemImportStageCleanupStatus struct {
+	Enabled            bool       `json:"enabled"`
+	RetentionDays      int        `json:"retention_days"`
+	StaleImports       int        `json:"stale_imports"`
+	StaleFiles         int        `json:"stale_files"`
+	StaleBytes         int64      `json:"stale_bytes"`
+	LastRun            *time.Time `json:"last_run,omitempty"`
+	LastFailedAt       *time.Time `json:"last_failed_at,omitempty"`
+	LastError          string     `json:"last_error,omitempty"`
+	RecentFailures     int        `json:"recent_failures"`
+	LastCleanedImports int        `json:"last_cleaned_imports"`
+	LastCleanedFiles   int        `json:"last_cleaned_files"`
+	LastCleanedBytes   int64      `json:"last_cleaned_bytes"`
+	LastMarkedFailed   int        `json:"last_marked_failed"`
+}
+
+type SystemImportStageCleanupRunResponse struct {
+	Status  string                      `json:"status"`
+	Message string                      `json:"message,omitempty"`
+	Result  ImportStageCleanupRunResult `json:"result"`
 }
 
 type AIFetch struct {
@@ -610,15 +810,25 @@ type TeamInvite struct {
 }
 
 type TeamAuditEntry struct {
-	ID           uuid.UUID  `json:"id"`
-	TeamID       uuid.UUID  `json:"team_id"`
-	Action       string     `json:"action"`
-	Details      string     `json:"details"`
-	ActorUserID  *uuid.UUID `json:"actor_user_id,omitempty"`
-	ActorEmail   string     `json:"actor_email,omitempty"`
-	TargetUserID *uuid.UUID `json:"target_user_id,omitempty"`
-	TargetEmail  string     `json:"target_email,omitempty"`
-	CreatedAt    time.Time  `json:"created_at"`
+	ID                 uuid.UUID  `json:"id"`
+	TeamID             uuid.UUID  `json:"team_id"`
+	Action             string     `json:"action"`
+	Details            string     `json:"details"`
+	ActorUserID        *uuid.UUID `json:"actor_user_id,omitempty"`
+	ActorEmail         string     `json:"actor_email,omitempty"`
+	ActorEmailSnapshot string     `json:"actor_email_snapshot,omitempty"`
+	ActorRoleSnapshot  string     `json:"actor_role_snapshot,omitempty"`
+	TargetUserID       *uuid.UUID `json:"target_user_id,omitempty"`
+	TargetEmail        string     `json:"target_email,omitempty"`
+	TargetType         string     `json:"target_type,omitempty"`
+	TargetID           string     `json:"target_id,omitempty"`
+	TargetLabel        string     `json:"target_label,omitempty"`
+	Outcome            string     `json:"outcome,omitempty"`
+	IPAddress          string     `json:"ip_address,omitempty"`
+	IPCountryCode      string     `json:"ip_country_code,omitempty"`
+	UserAgent          string     `json:"user_agent,omitempty"`
+	RequestID          string     `json:"request_id,omitempty"`
+	CreatedAt          time.Time  `json:"created_at"`
 }
 
 type TeamAuditListResponse struct {
@@ -706,6 +916,8 @@ type InstanceAuditEntry struct {
 	ID                 uuid.UUID  `json:"id"`
 	CreatedAt          time.Time  `json:"created_at"`
 	ActorID            *uuid.UUID `json:"actor_id,omitempty"`
+	TeamID             *uuid.UUID `json:"team_id,omitempty"`
+	TargetUserID       *uuid.UUID `json:"target_user_id,omitempty"`
 	ActorEmailSnapshot string     `json:"actor_email_snapshot"`
 	ActorRoleSnapshot  string     `json:"actor_role_snapshot"`
 	Action             string     `json:"action"`
@@ -714,6 +926,7 @@ type InstanceAuditEntry struct {
 	TargetLabel        string     `json:"target_label,omitempty"`
 	Outcome            string     `json:"outcome"`
 	IPAddress          string     `json:"ip_address,omitempty"`
+	IPCountryCode      string     `json:"ip_country_code,omitempty"`
 	UserAgent          string     `json:"user_agent,omitempty"`
 	RequestID          string     `json:"request_id,omitempty"`
 	Details            string     `json:"details,omitempty"`
@@ -736,7 +949,6 @@ type SystemFeatureStatus struct {
 
 type SystemInfo struct {
 	Version         string                `json:"version"`
-	Build           string                `json:"build"`
 	RuntimeMode     string                `json:"runtime_mode"`
 	Uptime          string                `json:"uptime"`
 	PublicURL       string                `json:"public_url"`

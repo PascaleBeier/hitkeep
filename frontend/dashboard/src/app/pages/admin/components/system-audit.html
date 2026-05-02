@@ -1,85 +1,17 @@
-<div class="system-audit">
-    <div class="system-audit__toolbar">
-        <div class="system-audit__filters">
-            <p-select [options]="actionOptions()" [(ngModel)]="selectedAction" (onChange)="onFilterChange()" optionLabel="label" optionValue="value" [style]="{ 'min-width': '180px' }" appendTo="body" />
-            <p-select [options]="outcomeOptions()" [(ngModel)]="selectedOutcome" (onChange)="onFilterChange()" optionLabel="label" optionValue="value" [style]="{ 'min-width': '140px' }" appendTo="body" />
-            <p-select [options]="targetTypeOptions()" [(ngModel)]="selectedTargetType" (onChange)="onFilterChange()" optionLabel="label" optionValue="value" [style]="{ 'min-width': '150px' }" appendTo="body" />
-            <p-datepicker
-                [(ngModel)]="dateRange"
-                (onSelect)="onFilterChange()"
-                selectionMode="range"
-                [readonlyInput]="true"
-                [showIcon]="true"
-                placeholder="{{ 'admin.system.audit.filter.dateRange' | transloco }}"
-                styleClass="system-audit__datepicker"
-            />
-            <p-iconfield class="system-audit__search">
-                <p-inputicon class="pi pi-search" />
-                <input pInputText [(ngModel)]="searchQuery" (input)="onFilterChange()" [placeholder]="'admin.system.audit.filter.search' | transloco" />
-            </p-iconfield>
-        </div>
-        <div class="system-audit__actions">
-            <p-button icon="pi pi-download" [label]="'admin.system.audit.actions.export' | transloco" severity="secondary" [loading]="isExporting()" [disabled]="isExporting()" (onClick)="exportAudit()" />
-        </div>
-    </div>
-
-    @if (hasError()) {
-    <p-message severity="error" [text]="'admin.system.audit.loadError' | transloco" styleClass="w-full mb-4" />
-    } @if (exportStatus(); as status) {
-    <p-message [severity]="status.severity" [text]="status.key | transloco" styleClass="w-full mb-4" />
-    }
-
-    <div class="system-audit__table-wrap">
-        <p-table [value]="entries()" [loading]="isLoading()" [scrollable]="false" [rowHover]="true" styleClass="p-datatable-sm admin-data-table">
-            <ng-template pTemplate="header">
-                <tr>
-                    <th>{{ "admin.system.audit.columns.created" | transloco }}</th>
-                    <th>{{ "admin.system.audit.columns.actor" | transloco }}</th>
-                    <th>{{ "admin.system.audit.columns.action" | transloco }}</th>
-                    <th>{{ "admin.system.audit.columns.targetType" | transloco }}</th>
-                    <th>{{ "admin.system.audit.columns.target" | transloco }}</th>
-                    <th>{{ "admin.system.audit.columns.outcome" | transloco }}</th>
-                    <th>{{ "admin.system.audit.columns.details" | transloco }}</th>
-                </tr>
-            </ng-template>
-
-            <ng-template pTemplate="body" let-entry>
-                <tr>
-                    <td><app-relative-date-time [value]="entry.created_at" /></td>
-                    <td>
-                        <div class="system-audit__actor">
-                            <span>{{ entry.actor_email_snapshot || ('common.unknown' | transloco) }}</span>
-                            @if (entry.actor_role_snapshot) {
-                            <span class="system-audit__role-tag">{{ auditRoleLabel(entry.actor_role_snapshot) }}</span>
-                            }
-                        </div>
-                    </td>
-                    <td>{{ auditActionLabel(entry.action) }}</td>
-                    <td>{{ auditTargetTypeLabel(entry.target_type) }}</td>
-                    <td>{{ auditTargetLabel(entry) }}</td>
-                    <td>
-                        <p-tag [value]="auditOutcomeLabel(entry.outcome)" [severity]="outcomeSeverity(entry.outcome)" />
-                    </td>
-                    <td>
-                        <span class="system-audit__details" [title]="entry.details">{{ entry.details || "-" }}</span>
-                    </td>
-                </tr>
-            </ng-template>
-
-            <ng-template pTemplate="emptymessage">
-                <tr>
-                    <td colspan="7" class="text-center text-[var(--p-text-muted-color)] py-8">{{ "admin.system.audit.empty" | transloco }}</td>
-                </tr>
-            </ng-template>
-        </p-table>
-    </div>
-
-    @if (entries().length > 0) {
-    <div class="system-audit__footer">
-        <span class="text-sm text-[var(--p-text-muted-color)]"> {{ 'admin.system.audit.pagination.total' | transloco: { loaded: entries().length, total: total() } }} </span>
-        @if (hasMore()) {
-        <p-button [label]="'admin.system.audit.loadMore' | transloco" severity="secondary" [text]="true" [loading]="isLoading()" (onClick)="loadMore()" />
-        }
-    </div>
-    }
-</div>
+<app-audit-table
+    [rows]="entries()"
+    [total]="total()"
+    [loading]="isLoading()"
+    [errorKey]="hasError() ? 'admin.system.audit.loadError' : null"
+    emptyTextKey="admin.system.audit.empty"
+    [actionOptions]="actionOptions()"
+    [outcomeOptions]="outcomeOptions()"
+    [targetTypeOptions]="targetTypeOptions()"
+    [query]="query()"
+    [exportEnabled]="true"
+    [exportLoading]="isExporting()"
+    [exportStatus]="exportStatus()"
+    (queryChange)="onQueryChange($event)"
+    (refresh)="refresh()"
+    (exportRequest)="exportAudit()"
+/>

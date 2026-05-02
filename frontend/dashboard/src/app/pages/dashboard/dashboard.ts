@@ -34,6 +34,7 @@ import { Funnel } from '@models/analytics.types';
 import { MetricStat } from '@models/analytics.types';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
+import { WorkflowProgress, type WorkflowProgressStep } from '@components/workflow-progress/workflow-progress';
 import { KpiCard } from '@features/analytics/components/kpi-card';
 import { ShareService } from '@services/share.service';
 import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar } from '@components/range-toolbar/range-toolbar';
@@ -78,6 +79,7 @@ interface KpiCardData {
         PageHeader,
         PageHeaderLeft,
         PageBreadcrumb,
+        WorkflowProgress,
         RangeToolbar,
         RelativeDateTime,
         KpiCard,
@@ -169,6 +171,20 @@ export class Dashboard {
         return !this.isShareMode() && !!onboarding && !onboarding.dismissed && !onboarding.complete;
     });
     protected readonly onboardingSteps = computed(() => this.onboarding.onboarding()?.steps ?? []);
+    protected readonly onboardingRailSteps = computed<WorkflowProgressStep[]>(() => {
+        this.activeLanguage();
+        const steps = this.onboardingSteps();
+        const activeIndex = steps.findIndex((step) => !step.complete);
+        return steps.map((step, index) => {
+            const state: WorkflowProgressStep['state'] = step.complete ? 'complete' : index === activeIndex ? 'current' : 'pending';
+            return {
+                id: step.key,
+                label: this.onboardingStepLabel(step),
+                state
+            };
+        });
+    });
+    protected readonly currentOnboardingStep = computed(() => this.onboardingSteps().find((step) => !step.complete) ?? null);
     protected readonly onboardingProgress = computed(() => {
         const steps = this.onboardingSteps();
         if (!steps.length) {

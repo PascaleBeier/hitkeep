@@ -22,6 +22,13 @@ var siteDeleteSteps = []siteDeleteStep{
 	{table: "api_client_site_roles", query: "DELETE FROM api_client_site_roles WHERE site_id = ?"},
 	{table: "site_members", query: "DELETE FROM site_members WHERE site_id = ?"},
 	{table: "site_tenants", query: "DELETE FROM site_tenants WHERE site_id = ?"},
+	{table: "site_import_files", query: "DELETE FROM site_import_files WHERE import_id IN (SELECT id FROM site_imports WHERE site_id = ?)"},
+	{table: "site_imports", query: "DELETE FROM site_imports WHERE site_id = ?"},
+	{table: "imported_event_properties_daily", query: "DELETE FROM imported_event_properties_daily WHERE site_id = ?"},
+	{table: "imported_event_dimensions_daily", query: "DELETE FROM imported_event_dimensions_daily WHERE site_id = ?"},
+	{table: "imported_event_daily", query: "DELETE FROM imported_event_daily WHERE site_id = ?"},
+	{table: "imported_dimension_daily", query: "DELETE FROM imported_dimension_daily WHERE site_id = ?"},
+	{table: "imported_traffic_daily", query: "DELETE FROM imported_traffic_daily WHERE site_id = ?"},
 	{table: "goal_rollups_hourly", query: "DELETE FROM goal_rollups_hourly WHERE site_id = ?"},
 	{table: "goal_rollups_daily", query: "DELETE FROM goal_rollups_daily WHERE site_id = ?"},
 	{table: "goal_rollups_monthly", query: "DELETE FROM goal_rollups_monthly WHERE site_id = ?"},
@@ -52,6 +59,11 @@ var knownSiteDeleteTables = func() map[string]struct{} {
 }()
 
 var siteAnalyticsDeleteSteps = []siteDeleteStep{
+	{table: "imported_event_properties_daily", query: "DELETE FROM imported_event_properties_daily WHERE site_id = ?"},
+	{table: "imported_event_dimensions_daily", query: "DELETE FROM imported_event_dimensions_daily WHERE site_id = ?"},
+	{table: "imported_event_daily", query: "DELETE FROM imported_event_daily WHERE site_id = ?"},
+	{table: "imported_dimension_daily", query: "DELETE FROM imported_dimension_daily WHERE site_id = ?"},
+	{table: "imported_traffic_daily", query: "DELETE FROM imported_traffic_daily WHERE site_id = ?"},
 	{table: "goal_rollups_hourly", query: "DELETE FROM goal_rollups_hourly WHERE site_id = ?"},
 	{table: "goal_rollups_daily", query: "DELETE FROM goal_rollups_daily WHERE site_id = ?"},
 	{table: "goal_rollups_monthly", query: "DELETE FROM goal_rollups_monthly WHERE site_id = ?"},

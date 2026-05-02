@@ -218,9 +218,28 @@ func (h *handler) handleAcceptInvite() http.HandlerFunc {
 			return
 		}
 		for _, invite := range acceptedInvites {
-			if err := h.ctx.Store.AppendTeamAuditEntry(r.Context(), invite.TeamID, user.ID, "member.invite_accepted", fmt.Sprintf("Invitation accepted by %s", email), &user.ID); err != nil {
-				slog.Warn("Failed to append invite acceptance audit entry", "error", err, "team_id", invite.TeamID, "user_id", user.ID)
-			}
+			h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
+				ActorID:      user.ID,
+				TeamID:       invite.TeamID,
+				TargetUserID: user.ID,
+				Action:       "member.invite_accepted",
+				TargetType:   "user",
+				TargetID:     user.ID.String(),
+				TargetLabel:  email,
+				Outcome:      "success",
+				Details:      fmt.Sprintf("Invitation accepted by %s", email),
+			})
+			h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
+				ActorID:      user.ID,
+				TeamID:       invite.TeamID,
+				TargetUserID: user.ID,
+				Action:       "member.added",
+				TargetType:   "user",
+				TargetID:     user.ID.String(),
+				TargetLabel:  email,
+				Outcome:      "success",
+				Details:      fmt.Sprintf("Member %s added after accepting an invitation", email),
+			})
 		}
 
 		slog.Info("Invite accepted", "token_mask", req.Token[:4]+"...")
@@ -298,9 +317,32 @@ func (h *handler) handleChangePassword() http.HandlerFunc {
 	}
 }
 
+func (h *handler) userIDFromLogoutRequest(r *http.Request) uuid.UUID {
+	userID := shared.GetUserIDFromContext(r)
+	if userID != uuid.Nil {
+		return userID
+	}
+	if h.ctx == nil || h.ctx.Store == nil || h.ctx.Config == nil {
+		return uuid.Nil
+	}
+
+	if cookie, err := r.Cookie(authcore.CookieName); err == nil && strings.TrimSpace(cookie.Value) != "" {
+		if claims, err := authcore.ValidateTokenClaims(cookie.Value, h.ctx.Config.JWTSecret, h.ctx.Config.PublicURL); err == nil && claims != nil {
+			return claims.UserID
+		}
+	}
+	if cookie, err := r.Cookie(authcore.RememberMeCookieName); err == nil && strings.TrimSpace(cookie.Value) != "" {
+		if rememberedUserID, err := h.ctx.Store.ValidateRememberMeToken(r.Context(), cookie.Value); err == nil {
+			return rememberedUserID
+		}
+	}
+	return uuid.Nil
+}
+
 func (h *handler) handleLogout() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		isSecure := strings.HasPrefix(h.ctx.Config.PublicURL, "https://")
+		userID := h.userIDFromLogoutRequest(r)
 
 		if cookie, err := r.Cookie(authcore.RememberMeCookieName); err == nil {
 			if err := h.ctx.Store.DeleteRememberMeToken(r.Context(), cookie.Value); err != nil {
@@ -309,6 +351,9 @@ func (h *handler) handleLogout() http.HandlerFunc {
 		}
 
 		authcore.ClearCookies(w, isSecure)
+		if userID != uuid.Nil {
+			h.appendAuthAuditForUserTeams(r, userID, "auth.logout", "success", "User logged out", true)
+		}
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	}

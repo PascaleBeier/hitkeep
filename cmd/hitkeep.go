@@ -143,6 +143,10 @@ func Run() {
 	}
 
 	httpServer := server.New(conf, publicFS, store, tenantMgr, ent, clusterManager, producer, mailSvc)
+	if store != nil {
+		importCleanupWorker := worker.NewImportStageCleanupWorker(store, conf.DataPath, conf.ImportStageRetentionDays, httpServer.ImportStageCleanupStatus())
+		go importCleanupWorker.Start(gCtx)
+	}
 	if tenantMgr != nil && conf.BackupPath != "" {
 		var backupS3 *worker.S3Config
 		if worker.IsS3ArchivePath(conf.BackupPath) {

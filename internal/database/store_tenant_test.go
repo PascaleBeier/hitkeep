@@ -718,6 +718,157 @@ func TestAppendAndListTeamAuditEntries(t *testing.T) {
 	if entry.TargetUserID == nil || *entry.TargetUserID != targetID {
 		t.Fatalf("expected target %s, got %v", targetID, entry.TargetUserID)
 	}
+
+	var centralCount int
+	if err := store.DB().QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM instance_audit_log WHERE team_id = ? AND action = ?",
+		tenantID, "member.added",
+	).Scan(&centralCount); err != nil {
+		t.Fatalf("count central audit rows: %v", err)
+	}
+	if centralCount != 1 {
+		t.Fatalf("expected team audit wrapper to write one central audit row, got %d", centralCount)
+	}
+}
+
+func TestAppendCentralAuditPersistsNetworkContext(t *testing.T) {
+	store := setupTenantStore(t)
+	ctx := context.Background()
+
+	actorID, err := store.CreateUser(ctx, "central-audit-actor@tenant.test", "hash")
+	if err != nil {
+		t.Fatalf("create actor user: %v", err)
+	}
+	tenantID, err := store.GetDefaultTenantID(ctx)
+	if err != nil {
+		t.Fatalf("get default tenant: %v", err)
+	}
+
+	if err := store.AppendAuditEntry(ctx, AuditEntryParams{
+		ActorID:       actorID,
+		TeamID:        tenantID,
+		Action:        "team.updated",
+		TargetType:    "team",
+		TargetID:      tenantID.String(),
+		TargetLabel:   "Default Tenant",
+		Outcome:       "success",
+		IPAddress:     "203.0.113.10",
+		IPCountryCode: "de",
+		UserAgent:     "audit-test",
+		RequestID:     "req-audit-test",
+		Details:       "Updated settings",
+	}); err != nil {
+		t.Fatalf("append central audit entry: %v", err)
+	}
+
+	entries, total, err := store.ListInstanceAuditEntries(ctx, InstanceAuditFilter{Action: "team.updated", Limit: 10})
+	if err != nil {
+		t.Fatalf("list instance audit entries: %v", err)
+	}
+	if total != 1 || len(entries) != 1 {
+		t.Fatalf("expected one audit entry, total=%d len=%d", total, len(entries))
+	}
+	entry := entries[0]
+	if entry.IPAddress != "203.0.113.10" {
+		t.Fatalf("expected IP address to persist, got %q", entry.IPAddress)
+	}
+	if entry.IPCountryCode != "DE" {
+		t.Fatalf("expected country code DE, got %q", entry.IPCountryCode)
+	}
+	if entry.RequestID != "req-audit-test" {
+		t.Fatalf("expected request ID to persist, got %q", entry.RequestID)
+	}
+}
+
+func TestListTeamAuditEntriesFilteredReturnsCentralEvidence(t *testing.T) {
+	store := setupTenantStore(t)
+	ctx := context.Background()
+
+	actorID, err := store.CreateUser(ctx, "audit-filter-actor@tenant.test", "hash")
+	if err != nil {
+		t.Fatalf("create actor user: %v", err)
+	}
+	targetID, err := store.CreateUser(ctx, "audit-filter-target@tenant.test", "hash")
+	if err != nil {
+		t.Fatalf("create target user: %v", err)
+	}
+	tenantID, err := store.GetDefaultTenantID(ctx)
+	if err != nil {
+		t.Fatalf("get default tenant: %v", err)
+	}
+
+	if err := store.AppendAuditEntry(ctx, AuditEntryParams{
+		ActorID:       actorID,
+		ActorEmail:    "audit-filter-actor@tenant.test",
+		ActorRole:     string(TenantRoleOwner),
+		TeamID:        tenantID,
+		TargetUserID:  targetID,
+		Action:        "permission.site_member_granted",
+		TargetType:    "permission",
+		TargetID:      "site-1",
+		TargetLabel:   "example.com",
+		Outcome:       "success",
+		IPAddress:     "203.0.113.99",
+		IPCountryCode: "us",
+		UserAgent:     "audit-filter-agent",
+		RequestID:     "req-team-filter",
+		Details:       "Granted site access",
+	}); err != nil {
+		t.Fatalf("append matching audit entry: %v", err)
+	}
+	if err := store.AppendAuditEntry(ctx, AuditEntryParams{
+		ActorID:    actorID,
+		TeamID:     tenantID,
+		Action:     "permission.site_member_revoked",
+		TargetType: "permission",
+		TargetID:   "site-1",
+		Outcome:    "success",
+		Details:    "Revoked site access",
+	}); err != nil {
+		t.Fatalf("append non-matching audit entry: %v", err)
+	}
+
+	from := time.Now().Add(-time.Minute)
+	to := time.Now().Add(time.Minute)
+	entries, total, err := store.ListTeamAuditEntriesFiltered(ctx, tenantID, TeamAuditFilter{
+		Action:     "permission.site_member_granted",
+		Outcome:    "success",
+		TargetType: "permission",
+		Query:      "203.0.113.99",
+		From:       from,
+		To:         to,
+		Limit:      10,
+		Offset:     0,
+	})
+	if err != nil {
+		t.Fatalf("list filtered team audit entries: %v", err)
+	}
+	if total != 1 || len(entries) != 1 {
+		t.Fatalf("expected one filtered audit entry, total=%d len=%d", total, len(entries))
+	}
+
+	entry := entries[0]
+	if entry.ActorEmailSnapshot != "audit-filter-actor@tenant.test" {
+		t.Fatalf("expected actor email snapshot, got %q", entry.ActorEmailSnapshot)
+	}
+	if entry.ActorRoleSnapshot != string(TenantRoleOwner) {
+		t.Fatalf("expected actor role snapshot, got %q", entry.ActorRoleSnapshot)
+	}
+	if entry.TargetType != "permission" || entry.TargetID != "site-1" || entry.TargetLabel != "example.com" {
+		t.Fatalf("expected permission target fields, got type=%q id=%q label=%q", entry.TargetType, entry.TargetID, entry.TargetLabel)
+	}
+	if entry.TargetUserID == nil || *entry.TargetUserID != targetID {
+		t.Fatalf("expected target user %s, got %v", targetID, entry.TargetUserID)
+	}
+	if entry.Outcome != "success" {
+		t.Fatalf("expected success outcome, got %q", entry.Outcome)
+	}
+	if entry.IPAddress != "203.0.113.99" || entry.IPCountryCode != "US" {
+		t.Fatalf("expected network evidence, got ip=%q country=%q", entry.IPAddress, entry.IPCountryCode)
+	}
+	if entry.UserAgent != "audit-filter-agent" || entry.RequestID != "req-team-filter" {
+		t.Fatalf("expected request evidence, got user_agent=%q request_id=%q", entry.UserAgent, entry.RequestID)
+	}
 }
 
 func TestCreateAndListTeamInvites(t *testing.T) {

@@ -386,6 +386,10 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 		return nil, fmt.Errorf("failed to read landing and exit rows: %w", err)
 	}
 
+	if err := s.augmentImportedSiteStats(ctx, params, truncUnit, stats); err != nil {
+		return nil, err
+	}
+
 	goals, err := s.GetGoals(ctx, params.SiteID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch goals: %w", err)
@@ -408,6 +412,13 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 				FROM events
 				WHERE site_id = ? AND timestamp >= ? AND timestamp <= ? AND name = ?
 			`, params.SiteID, params.Start, params.End, goal.Value).Scan(&conversions)
+			if err == nil && canIncludeImportedSiteAggregates(params, truncUnit) {
+				importedConversions, importErr := s.queryImportedEventGoalConversions(ctx, params, goal.Value)
+				if importErr != nil {
+					return nil, importErr
+				}
+				conversions += importedConversions
+			}
 		}
 
 		if err != nil {

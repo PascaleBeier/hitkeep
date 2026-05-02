@@ -1,0 +1,5 @@
+added_iso,country_code,datapoint,device_type,document_referrer,duration_seconds,is_unique,path,session_id,utm_source,browser_name,browser_version,lang_language,lang_region
+2026-04-01T10:00:00.000Z,DE,pageview,desktop,https://google.com/,12,true,/pricing,s1,newsletter,Firefox,125.0,de,DE
+2026-04-01T10:02:00.000Z,DE,pageview,mobile,,4,false,/docs,s1,,Safari,17.4,en,US
+2026-04-02T09:00:00.000Z,US,pageview,desktop,https://example.com/internal,7,true,/pricing,s2,,Firefox,125.0,de,DE
+2026-04-02T09:03:00.000Z,US,event,desktop,,1,true,/docs,s3,,Firefox,125.0,de,DE

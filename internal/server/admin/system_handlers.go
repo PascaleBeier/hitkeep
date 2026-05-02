@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -22,6 +21,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	"hitkeep/internal/worker"
 )
 
 type nsqPinger interface {
@@ -42,25 +42,8 @@ func (h *handler) handleGetSystem() http.HandlerFunc {
 			ConfigFlags:     map[string]any{},
 		}
 
-		if buildInfo, ok := debug.ReadBuildInfo(); ok {
-			info.Build = buildInfo.Main.Version
-			for _, setting := range buildInfo.Settings {
-				if setting.Key == "vcs.revision" {
-					info.Build = shortBuildRevision(setting.Value)
-				}
-			}
-		}
-
 		writeJSON(w, http.StatusOK, info)
 	}
-}
-
-func shortBuildRevision(revision string) string {
-	revision = strings.TrimSpace(revision)
-	if len(revision) <= 8 {
-		return revision
-	}
-	return revision[:8]
 }
 
 func systemFeatureStatuses(cfg *config.Config, mailerConfigured bool) []api.SystemFeatureStatus {
@@ -156,7 +139,7 @@ func workerHealthStatus(isLeader bool, producer nsqPinger) (string, bool) {
 	if !isLeader {
 		return "standby", true
 	}
-	if producer == nil || (reflect.ValueOf(producer).Kind() == reflect.Ptr && reflect.ValueOf(producer).IsNil()) {
+	if producer == nil || (reflect.ValueOf(producer).Kind() == reflect.Pointer && reflect.ValueOf(producer).IsNil()) {
 		return "unavailable", false
 	}
 	if err := producer.Ping(); err != nil {
@@ -285,6 +268,41 @@ func (h *handler) handleGetSpamFilter() http.HandlerFunc {
 		if h.ctx.SpamFilter != nil {
 			status.RuleCount = h.ctx.SpamFilter.RuleCount()
 			status.LastRefresh = h.ctx.SpamFilter.LastRefresh()
+		}
+
+		writeJSON(w, http.StatusOK, status)
+	}
+}
+
+func (h *handler) handleGetImportStageCleanup() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if h.ctx.Store == nil {
+			http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
+			return
+		}
+
+		retentionDays := h.ctx.Config.ImportStageRetentionDays
+		estimate := api.ImportStageCleanupEstimate{}
+		if retentionDays > 0 {
+			cleaner := worker.NewImportStageCleaner(h.ctx.Store, h.ctx.Config.DataPath, retentionDays)
+			var err error
+			estimate, err = cleaner.Estimate(r.Context())
+			if err != nil {
+				slog.Error("Failed to estimate import stage cleanup", "error", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		status := api.SystemImportStageCleanupStatus{
+			Enabled:       retentionDays > 0,
+			RetentionDays: retentionDays,
+			StaleImports:  estimate.Imports,
+			StaleFiles:    estimate.Files,
+			StaleBytes:    estimate.Bytes,
+		}
+		if h.ctx.ImportStageCleanupStatus != nil {
+			status = h.ctx.ImportStageCleanupStatus.Status(estimate)
 		}
 
 		writeJSON(w, http.StatusOK, status)
@@ -469,7 +487,7 @@ func (h *handler) handleExportAudit() http.HandlerFunc {
 			w.Header().Set("Content-Disposition", "attachment; filename=instance-audit-export.csv")
 
 			writer := csv.NewWriter(w)
-			if err := writer.Write([]string{"id", "created_at", "actor_id", "actor_email", "actor_role", "action", "target_type", "target_id", "target_label", "outcome", "ip_address", "details"}); err != nil {
+			if err := writer.Write([]string{"id", "created_at", "actor_id", "team_id", "target_user_id", "actor_email", "actor_role", "action", "target_type", "target_id", "target_label", "outcome", "ip_address", "ip_country_code", "request_id", "user_agent", "details"}); err != nil {
 				slog.Error("Failed to write instance audit CSV header", "error", err)
 				return
 			}
@@ -479,10 +497,20 @@ func (h *handler) handleExportAudit() http.HandlerFunc {
 				if entry.ActorID != nil {
 					actorID = entry.ActorID.String()
 				}
+				teamID := ""
+				if entry.TeamID != nil {
+					teamID = entry.TeamID.String()
+				}
+				targetUserID := ""
+				if entry.TargetUserID != nil {
+					targetUserID = entry.TargetUserID.String()
+				}
 				if err := writer.Write([]string{
 					entry.ID.String(),
 					entry.CreatedAt.Format(time.RFC3339),
 					actorID,
+					teamID,
+					targetUserID,
 					entry.ActorEmailSnapshot,
 					entry.ActorRoleSnapshot,
 					entry.Action,
@@ -491,6 +519,9 @@ func (h *handler) handleExportAudit() http.HandlerFunc {
 					entry.TargetLabel,
 					entry.Outcome,
 					entry.IPAddress,
+					entry.IPCountryCode,
+					entry.RequestID,
+					entry.UserAgent,
 					entry.Details,
 				}); err != nil {
 					slog.Error("Failed to write instance audit CSV row", "error", err, "audit_id", entry.ID)

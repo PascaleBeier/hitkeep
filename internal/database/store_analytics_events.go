@@ -2,18 +2,36 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"hitkeep/internal/api"
 )
 
+var importedEventAudienceDimensions = []string{"path", "referrer", "device", "country"}
+
+var importedEventAudienceDimensionLabels = map[string]string{
+	"path":     "page",
+	"referrer": "referrer",
+	"device":   "device",
+	"country":  "country",
+}
+
 func (s *Store) GetEventNames(ctx context.Context, params api.EventNamesParams) ([]string, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT DISTINCT name FROM events
-		WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?
+		SELECT name FROM (
+			SELECT DISTINCT name
+			FROM events
+			WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?
+			UNION
+			SELECT DISTINCT event_name AS name
+			FROM imported_event_daily
+			WHERE site_id = ? AND date >= CAST(? AS DATE) AND date <= CAST(? AS DATE)
+		)
 		ORDER BY name
-	`, params.SiteID, params.Start, params.End)
+	`, params.SiteID, params.Start, params.End, params.SiteID, params.Start, params.End)
 	if err != nil {
 		return nil, err
 	}
@@ -40,11 +58,17 @@ func (s *Store) GetEventNames(ctx context.Context, params api.EventNamesParams) 
 // GetEventPropertyKeys returns the distinct JSON property keys for a given event name.
 func (s *Store) GetEventPropertyKeys(ctx context.Context, params api.EventNamesParams, eventName string) ([]string, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT DISTINCT unnest(json_keys(CAST(properties AS JSON))) AS key
-		FROM events
-		WHERE site_id = ? AND timestamp >= ? AND timestamp <= ? AND name = ? AND properties IS NOT NULL
+		SELECT key FROM (
+			SELECT DISTINCT unnest(json_keys(CAST(properties AS JSON))) AS key
+			FROM events
+			WHERE site_id = ? AND timestamp >= ? AND timestamp <= ? AND name = ? AND properties IS NOT NULL
+			UNION
+			SELECT DISTINCT property_key AS key
+			FROM imported_event_properties_daily
+			WHERE site_id = ? AND date >= CAST(? AS DATE) AND date <= CAST(? AS DATE) AND event_name = ?
+		)
 		ORDER BY key
-	`, params.SiteID, params.Start, params.End, eventName)
+	`, params.SiteID, params.Start, params.End, eventName, params.SiteID, params.Start, params.End, eventName)
 	if err != nil {
 		return nil, err
 	}
@@ -102,6 +126,40 @@ func (s *Store) GetEventPropertyBreakdown(ctx context.Context, params api.EventB
 
 	if results == nil {
 		results = []api.MetricStat{}
+	}
+	imported, err := s.getImportedEventPropertyBreakdown(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	results = mergeMetricList(results, imported, 20)
+	return results, nil
+}
+
+func (s *Store) getImportedEventPropertyBreakdown(ctx context.Context, params api.EventBreakdownParams) ([]api.MetricStat, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT property_value, SUM(events) AS cnt
+		FROM imported_event_properties_daily
+		WHERE site_id = ? AND date >= CAST(? AS DATE) AND date <= CAST(? AS DATE)
+			AND event_name = ? AND property_key = ?
+		GROUP BY property_value
+		ORDER BY cnt DESC
+		LIMIT 20
+	`, params.SiteID, params.Start, params.End, params.EventName, params.PropertyKey)
+	if err != nil {
+		return nil, fmt.Errorf("query imported event property breakdown: %w", err)
+	}
+	defer rows.Close()
+
+	results := []api.MetricStat{}
+	for rows.Next() {
+		var m api.MetricStat
+		if err := rows.Scan(&m.Name, &m.Value); err != nil {
+			return nil, fmt.Errorf("scan imported event property breakdown: %w", err)
+		}
+		results = append(results, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read imported event property breakdown: %w", err)
 	}
 	return results, nil
 }
@@ -204,7 +262,173 @@ func (s *Store) GetEventAudience(ctx context.Context, params api.EventAudiencePa
 		return nil, err
 	}
 
+	if len(params.Filters) == 0 && params.DimensionKey == "" && params.DimensionValue == "" && params.PropertyKey == "" && params.PropertyValue == "" {
+		importedDimensions, err := s.getImportedEventAudienceDimensions(ctx, params)
+		if err != nil {
+			return nil, err
+		}
+		result.TopPages = mergeMetricList(result.TopPages, importedDimensions["path"], 10)
+		result.TopReferrers = mergeMetricList(result.TopReferrers, importedDimensions["referrer"], 10)
+		result.TopDevices = mergeMetricList(result.TopDevices, importedDimensions["device"], 10)
+		result.TopCountries = mergeMetricList(result.TopCountries, importedDimensions["country"], 10)
+		if err := s.addImportedEventDimensionLimitation(ctx, params, result); err != nil {
+			return nil, err
+		}
+	} else if err := s.addImportedEventAudienceExclusion(ctx, params, result); err != nil {
+		return nil, err
+	}
+
 	return result, nil
+}
+
+func (s *Store) addImportedEventAudienceExclusion(ctx context.Context, params api.EventAudienceParams, result *api.EventAudience) error {
+	exists, err := s.hasImportedEventAudience(ctx, params)
+	if err != nil {
+		return err
+	}
+	if exists {
+		result.ImportedExcluded = append(result.ImportedExcluded, api.ImportExclusionReason{
+			Reason: "aggregate_filter",
+			Detail: "The active event audience filters require raw session relationships that aggregate imports cannot prove.",
+		})
+	}
+	return nil
+}
+
+func (s *Store) addImportedEventDimensionLimitation(ctx context.Context, params api.EventAudienceParams, result *api.EventAudience) error {
+	exists, err := s.hasImportedEventAudience(ctx, params)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return nil
+	}
+	available, err := s.importedEventAudienceAvailableDimensions(ctx, params)
+	if err != nil {
+		return err
+	}
+	missing := make([]string, 0, len(importedEventAudienceDimensions))
+	for _, dimension := range importedEventAudienceDimensions {
+		if _, ok := available[dimension]; ok {
+			continue
+		}
+		missing = append(missing, importedEventAudienceDimensionLabels[dimension])
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	result.ImportedExcluded = append(result.ImportedExcluded, api.ImportExclusionReason{
+		Reason: "missing_event_dimension_relationships",
+		Detail: "Imported aggregate event data does not include event-level " + strings.Join(missing, ", ") + " relationships for this report.",
+	})
+	return nil
+}
+
+func (s *Store) hasImportedEventAudience(ctx context.Context, params api.EventAudienceParams) (bool, error) {
+	var exists bool
+	if err := s.db.QueryRowContext(ctx, `
+		SELECT EXISTS(
+			SELECT 1
+			FROM imported_event_daily
+			WHERE site_id = ? AND date >= CAST(? AS DATE) AND date <= CAST(? AS DATE) AND event_name = ?
+			LIMIT 1
+		)
+	`, params.SiteID, params.Start, params.End, params.EventName).Scan(&exists); err != nil {
+		return false, fmt.Errorf("query imported event audience coverage: %w", err)
+	}
+	return exists, nil
+}
+
+func (s *Store) getImportedEventAudienceDimensions(ctx context.Context, params api.EventAudienceParams) (map[string][]api.MetricStat, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		WITH imported_dims AS (
+			SELECT dimension, name, SUM(visitors) AS val
+			FROM imported_event_dimensions_daily
+			WHERE site_id = ? AND date >= CAST(? AS DATE) AND date <= CAST(? AS DATE)
+				AND event_name = ? AND dimension IN ('path', 'referrer', 'device', 'country')
+			GROUP BY dimension, name
+			UNION ALL
+			SELECT 'path' AS dimension, path AS name, SUM(visitors) AS val
+			FROM imported_event_daily e
+			WHERE site_id = ? AND date >= CAST(? AS DATE) AND date <= CAST(? AS DATE)
+				AND event_name = ? AND path IS NOT NULL AND path <> ''
+				AND NOT EXISTS (
+					SELECT 1
+					FROM imported_event_dimensions_daily d
+					WHERE d.site_id = e.site_id
+						AND d.import_id = e.import_id
+						AND d.date = e.date
+						AND d.event_name = e.event_name
+						AND d.dimension = 'path'
+				)
+			GROUP BY path
+		),
+		aggregated AS (
+			SELECT dimension, name, SUM(val) AS val
+			FROM imported_dims
+			GROUP BY dimension, name
+		),
+		ranked AS (
+			SELECT dimension, name, val,
+				ROW_NUMBER() OVER (PARTITION BY dimension ORDER BY val DESC, name ASC) AS rn
+			FROM aggregated
+		)
+		SELECT dimension, name, val
+		FROM ranked
+		WHERE rn <= 10
+		ORDER BY dimension, val DESC, name ASC
+	`, params.SiteID, params.Start, params.End, params.EventName, params.SiteID, params.Start, params.End, params.EventName)
+	if err != nil {
+		return nil, fmt.Errorf("query imported event audience dimensions: %w", err)
+	}
+	defer rows.Close()
+
+	results := map[string][]api.MetricStat{}
+	for rows.Next() {
+		var (
+			dimension string
+			m         api.MetricStat
+		)
+		if err := rows.Scan(&dimension, &m.Name, &m.Value); err != nil {
+			return nil, fmt.Errorf("scan imported event audience dimensions: %w", err)
+		}
+		results[dimension] = append(results[dimension], m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read imported event audience dimensions: %w", err)
+	}
+	return results, nil
+}
+
+func (s *Store) importedEventAudienceAvailableDimensions(ctx context.Context, params api.EventAudienceParams) (map[string]struct{}, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT DISTINCT dimension
+		FROM imported_event_dimensions_daily
+		WHERE site_id = ? AND date >= CAST(? AS DATE) AND date <= CAST(? AS DATE)
+			AND event_name = ? AND dimension IN ('path', 'referrer', 'device', 'country')
+		UNION
+		SELECT DISTINCT 'path' AS dimension
+		FROM imported_event_daily
+		WHERE site_id = ? AND date >= CAST(? AS DATE) AND date <= CAST(? AS DATE)
+			AND event_name = ? AND path IS NOT NULL AND path <> ''
+	`, params.SiteID, params.Start, params.End, params.EventName, params.SiteID, params.Start, params.End, params.EventName)
+	if err != nil {
+		return nil, fmt.Errorf("query imported event audience dimension coverage: %w", err)
+	}
+	defer rows.Close()
+
+	available := map[string]struct{}{}
+	for rows.Next() {
+		var dimension string
+		if err := rows.Scan(&dimension); err != nil {
+			return nil, fmt.Errorf("scan imported event audience dimension coverage: %w", err)
+		}
+		available[dimension] = struct{}{}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read imported event audience dimension coverage: %w", err)
+	}
+	return available, nil
 }
 
 // GetEventTimeseries returns event occurrence counts per time bucket for a given event name.
@@ -264,6 +488,12 @@ func (s *Store) GetEventTimeseries(ctx context.Context, params api.EventTimeseri
 		return nil, err
 	}
 
+	if truncUnit != "hour" && len(params.Filters) == 0 && params.DimensionKey == "" && params.DimensionValue == "" {
+		if err := s.mergeImportedEventTimeseries(ctx, params, truncUnit, counts); err != nil {
+			return nil, err
+		}
+	}
+
 	buckets := buildSeriesBuckets(params.Start, params.End, truncUnit)
 	series := make([]api.EventSeriesPoint, 0, len(buckets))
 	for _, bucket := range buckets {
@@ -273,4 +503,49 @@ func (s *Store) GetEventTimeseries(ctx context.Context, params api.EventTimeseri
 		})
 	}
 	return series, nil
+}
+
+func (s *Store) mergeImportedEventTimeseries(ctx context.Context, params api.EventTimeseriesParams, truncUnit string, counts map[time.Time]int) error {
+	var (
+		rows *sql.Rows
+		err  error
+	)
+	if params.PropertyKey != "" && params.PropertyValue != "" {
+		//nolint:gosec // truncUnit is chosen from the event bucket allowlist before this helper is called.
+		query := fmt.Sprintf(`
+			SELECT date_trunc('%s', date)::TIMESTAMPTZ AS bucket, SUM(events)
+			FROM imported_event_properties_daily
+			WHERE site_id = ? AND date >= CAST(? AS DATE) AND date <= CAST(? AS DATE)
+				AND event_name = ? AND property_key = ? AND property_value = ?
+			GROUP BY bucket
+		`, truncUnit)
+		rows, err = s.db.QueryContext(ctx, query, params.SiteID, params.Start, params.End, params.EventName, params.PropertyKey, params.PropertyValue)
+	} else {
+		//nolint:gosec // truncUnit is chosen from the event bucket allowlist before this helper is called.
+		query := fmt.Sprintf(`
+			SELECT date_trunc('%s', date)::TIMESTAMPTZ AS bucket, SUM(events)
+			FROM imported_event_daily
+			WHERE site_id = ? AND date >= CAST(? AS DATE) AND date <= CAST(? AS DATE)
+				AND event_name = ?
+			GROUP BY bucket
+		`, truncUnit)
+		rows, err = s.db.QueryContext(ctx, query, params.SiteID, params.Start, params.End, params.EventName)
+	}
+	if err != nil {
+		return fmt.Errorf("query imported event timeseries: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var bucket time.Time
+		var count int
+		if err := rows.Scan(&bucket, &count); err != nil {
+			return fmt.Errorf("scan imported event timeseries: %w", err)
+		}
+		counts[truncToUnit(bucket, truncUnit)] += count
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("read imported event timeseries: %w", err)
+	}
+	return nil
 }

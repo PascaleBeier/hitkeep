@@ -279,7 +279,7 @@ func (s *Store) DeleteArchivedTenantMetadata(ctx context.Context, tenantID uuid.
 			{table: "api_clients", query: "DELETE FROM api_clients WHERE tenant_id = ?", args: []any{tenantID}},
 			{table: "cloud_billing_events", query: "DELETE FROM cloud_billing_events WHERE tenant_id = ?", args: []any{tenantID}},
 			{table: "cloud_billing_accounts", query: "DELETE FROM cloud_billing_accounts WHERE tenant_id = ?", args: []any{tenantID}},
-			{table: "team_audit_log", query: "DELETE FROM team_audit_log WHERE tenant_id = ?", args: []any{tenantID}},
+			{table: "instance_audit_log", query: "DELETE FROM instance_audit_log WHERE team_id = ?", args: []any{tenantID}},
 			{table: "team_invites", query: "DELETE FROM team_invites WHERE tenant_id = ?", args: []any{tenantID}},
 			{table: "tenant_members", query: "DELETE FROM tenant_members WHERE tenant_id = ?", args: []any{tenantID}},
 			{table: "tenant_archives", query: "DELETE FROM tenant_archives WHERE tenant_id = ?", args: []any{tenantID}},

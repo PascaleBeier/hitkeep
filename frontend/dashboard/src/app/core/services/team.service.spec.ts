@@ -195,13 +195,32 @@ describe('TeamService', () => {
     });
 
     it('should list team audit entries', () => {
-        service.listTeamAudit('team-id').subscribe((response) => {
-            expect(response.entries.length).toBe(1);
-            expect(response.entries[0].action).toBe('member.role_updated');
-        });
+        service
+            .listTeamAudit('team-id', {
+                action: 'member.role_updated',
+                outcome: 'success',
+                target_type: 'user',
+                query: 'member@example.com',
+                from: '2026-01-01T00:00:00Z',
+                to: '2026-01-31T23:59:59Z',
+                limit: 50,
+                offset: 100
+            })
+            .subscribe((response) => {
+                expect(response.entries.length).toBe(1);
+                expect(response.entries[0].action).toBe('member.role_updated');
+            });
 
-        const req = httpMock.expectOne('/api/user/teams/team-id/audit');
+        const req = httpMock.expectOne((request) => request.url === '/api/user/teams/team-id/audit');
         expect(req.request.method).toBe('GET');
+        expect(req.request.params.get('action')).toBe('member.role_updated');
+        expect(req.request.params.get('outcome')).toBe('success');
+        expect(req.request.params.get('target_type')).toBe('user');
+        expect(req.request.params.get('query')).toBe('member@example.com');
+        expect(req.request.params.get('from')).toBe('2026-01-01T00:00:00Z');
+        expect(req.request.params.get('to')).toBe('2026-01-31T23:59:59Z');
+        expect(req.request.params.get('limit')).toBe('50');
+        expect(req.request.params.get('offset')).toBe('100');
         req.flush({
             entries: [
                 {

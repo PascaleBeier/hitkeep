@@ -121,6 +121,10 @@ export const routes: Routes = [
                 loadComponent: () => import('@pages/integration/api-reference/api-reference').then((m) => m.APIReferencePage)
             },
             {
+                path: 'imports',
+                loadComponent: () => import('@pages/imports/imports').then((m) => m.ImportsPage)
+            },
+            {
                 path: 'admin',
                 children: [
                     {

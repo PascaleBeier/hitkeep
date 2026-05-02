@@ -1,0 +1,8 @@
+<ol class="hk-workflow-progress" [attr.aria-label]="ariaLabel()">
+    @for (step of steps(); track step.id; let index = $index) {
+    <li class="hk-workflow-progress__item" [class.is-complete]="step.state === 'complete'" [class.is-current]="step.state === 'current'" [attr.aria-current]="step.state === 'current' ? 'step' : null">
+        <span class="hk-workflow-progress__marker" aria-hidden="true">{{ index + 1 }}</span>
+        <span class="hk-workflow-progress__label">{{ step.label }}</span>
+    </li>
+    }
+</ol>

@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { finalize, of, tap } from 'rxjs';
 import { Team, TeamAuditListResponse, TeamInvite, TeamMember, TeamRole, UserTeamsResponse } from '@models/analytics.types';
 
@@ -101,20 +101,46 @@ export class TeamService {
         return this.http.delete<RemoveTeamMemberResponse>(`/api/user/teams/${encodeURIComponent(teamID)}/members/${encodeURIComponent(userID)}`);
     }
 
-    listTeamAudit(teamID: string, params: { action?: string; limit?: number; offset?: number } = {}) {
-        const search = new URLSearchParams();
+    listTeamAudit(
+        teamID: string,
+        params: {
+            action?: string;
+            outcome?: string;
+            target_type?: string;
+            query?: string;
+            from?: string;
+            to?: string;
+            limit?: number;
+            offset?: number;
+        } = {}
+    ) {
+        let httpParams = new HttpParams();
         if (params.action) {
-            search.set('action', params.action);
+            httpParams = httpParams.set('action', params.action);
+        }
+        if (params.outcome) {
+            httpParams = httpParams.set('outcome', params.outcome);
+        }
+        if (params.target_type) {
+            httpParams = httpParams.set('target_type', params.target_type);
+        }
+        if (params.query) {
+            httpParams = httpParams.set('query', params.query);
+        }
+        if (params.from) {
+            httpParams = httpParams.set('from', params.from);
+        }
+        if (params.to) {
+            httpParams = httpParams.set('to', params.to);
         }
         if (typeof params.limit === 'number') {
-            search.set('limit', String(params.limit));
+            httpParams = httpParams.set('limit', String(params.limit));
         }
         if (typeof params.offset === 'number') {
-            search.set('offset', String(params.offset));
+            httpParams = httpParams.set('offset', String(params.offset));
         }
 
-        const query = search.toString();
-        return this.http.get<TeamAuditListResponse>(`/api/user/teams/${encodeURIComponent(teamID)}/audit${query ? `?${query}` : ''}`);
+        return this.http.get<TeamAuditListResponse>(`/api/user/teams/${encodeURIComponent(teamID)}/audit`, { params: httpParams });
     }
 
     transferTeamOwnership(teamID: string, targetUserID: string) {

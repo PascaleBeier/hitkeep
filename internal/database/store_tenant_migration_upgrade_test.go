@@ -80,6 +80,66 @@ func TestTenantMigrationUpgradeWithExistingSiteReferences(t *testing.T) {
 	}
 }
 
+func TestCentralAuditMigrationBackfillsTeamAuditView(t *testing.T) {
+	ctx := context.Background()
+	store := NewStore(":memory:")
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	if err := applyMigrationsThrough(t, store, "2026_05_22_000000_normalize_imported_property_event_names.sql"); err != nil {
+		t.Fatalf("apply baseline migrations: %v", err)
+	}
+
+	actorID, err := store.CreateUser(ctx, "legacy-audit-actor@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create actor: %v", err)
+	}
+	targetID, err := store.CreateUser(ctx, "legacy-audit-target@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create target: %v", err)
+	}
+	tenantID, err := store.GetDefaultTenantID(ctx)
+	if err != nil {
+		t.Fatalf("get default tenant: %v", err)
+	}
+	legacyAuditID := uuid.New()
+	if _, err := store.DB().ExecContext(ctx, `
+		INSERT INTO team_audit_log (id, tenant_id, actor_id, target_user_id, action, details)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, legacyAuditID, tenantID, actorID, targetID, "member.added", "legacy row"); err != nil {
+		t.Fatalf("insert legacy team audit row: %v", err)
+	}
+
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("migrate central audit: %v", err)
+	}
+
+	var centralCount int
+	if err := store.DB().QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM instance_audit_log
+		WHERE id = ? AND team_id = ? AND target_user_id = ? AND action = ?
+	`, legacyAuditID, tenantID, targetID, "member.added").Scan(&centralCount); err != nil {
+		t.Fatalf("count central backfill rows: %v", err)
+	}
+	if centralCount != 1 {
+		t.Fatalf("expected one central backfill row, got %d", centralCount)
+	}
+
+	entries, total, err := store.ListTeamAuditEntries(ctx, tenantID, "member.added", 10, 0)
+	if err != nil {
+		t.Fatalf("list team audit view entries: %v", err)
+	}
+	if total != 1 || len(entries) != 1 {
+		t.Fatalf("expected one projected team audit row, total=%d len=%d", total, len(entries))
+	}
+	if entries[0].ID != legacyAuditID {
+		t.Fatalf("expected projected legacy audit id %s, got %s", legacyAuditID, entries[0].ID)
+	}
+}
+
 func applyMigrationsThrough(t *testing.T, store *Store, maxFileName string) error {
 	t.Helper()
 

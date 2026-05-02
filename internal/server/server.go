@@ -24,6 +24,7 @@ import (
 	cloudhandlers "hitkeep/internal/server/cloud"
 	"hitkeep/internal/server/events"
 	"hitkeep/internal/server/goals"
+	importhandlers "hitkeep/internal/server/imports"
 	"hitkeep/internal/server/ingest"
 	"hitkeep/internal/server/permissions"
 	sharehandlers "hitkeep/internal/server/share"
@@ -128,28 +129,31 @@ func New(conf *config.Config, publicFS fs.FS, store *database.Store, tenantStore
 		conf.BackupIntervalMinutes,
 		conf.BackupRetentionCount,
 	)
+	importStageCleanupStatus := &database.ImportStageCleanupStatusTracker{}
+	importStageCleanupStatus.SetConfig(conf.ImportStageRetentionDays > 0, conf.ImportStageRetentionDays)
 	mailTestTracker := &database.MailTestTracker{}
 
 	s.ctx = &shared.Context{
-		Store:           store,
-		TenantStores:    tenantStores,
-		Cluster:         cluster,
-		Producer:        producer,
-		Mailer:          mailService,
-		Config:          conf,
-		Takeout:         takeoutService,
-		Entitlements:    ent,
-		IngestLimiter:   ingestLim,
-		ApiLimiter:      apiLim,
-		AuthLimiter:     authLim,
-		WebhookLimiter:  webhookLim,
-		AuthState:       authState,
-		IPFilter:        ipFilter,
-		SpamFilter:      spamFilter,
-		StartedAt:       time.Now().UTC(),
-		SystemCounters:  systemCounters,
-		BackupStatus:    backupStatus,
-		MailTestTracker: mailTestTracker,
+		Store:                    store,
+		TenantStores:             tenantStores,
+		Cluster:                  cluster,
+		Producer:                 producer,
+		Mailer:                   mailService,
+		Config:                   conf,
+		Takeout:                  takeoutService,
+		Entitlements:             ent,
+		IngestLimiter:            ingestLim,
+		ApiLimiter:               apiLim,
+		AuthLimiter:              authLim,
+		WebhookLimiter:           webhookLim,
+		AuthState:                authState,
+		IPFilter:                 ipFilter,
+		SpamFilter:               spamFilter,
+		StartedAt:                time.Now().UTC(),
+		SystemCounters:           systemCounters,
+		BackupStatus:             backupStatus,
+		ImportStageCleanupStatus: importStageCleanupStatus,
+		MailTestTracker:          mailTestTracker,
 	}
 
 	// Load static HTML into memory
@@ -177,6 +181,14 @@ func (s *Server) BackupStatus() *database.BackupStatusTracker {
 		return nil
 	}
 	return s.ctx.BackupStatus
+}
+
+// ImportStageCleanupStatus returns the runtime tracker shared with import cleanup workers.
+func (s *Server) ImportStageCleanupStatus() *database.ImportStageCleanupStatusTracker {
+	if s == nil || s.ctx == nil {
+		return nil
+	}
+	return s.ctx.ImportStageCleanupStatus
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
@@ -227,6 +239,7 @@ func (s *Server) setupRoutes(mux *http.ServeMux, publicFS fs.FS) {
 	admin.Register(mux, ctx)
 	sites.Register(mux, ctx)
 	goals.Register(mux, ctx)
+	importhandlers.Register(mux, ctx)
 	events.Register(mux, ctx)
 	aifetch.Register(mux, ctx)
 	takeouthandlers.Register(mux, ctx)

@@ -1,0 +1,244 @@
+:host ::ng-deep .imports-card.p-card {
+    border-radius: 8px;
+    box-shadow: none;
+}
+
+:host ::ng-deep .imports-card > .p-card-body {
+    padding: 1.25rem;
+}
+
+.imports-empty {
+    align-items: center;
+    color: var(--p-text-muted-color);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    justify-content: center;
+    min-height: 50vh;
+    text-align: center;
+}
+
+.imports-empty h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.imports-provider-grid {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+.imports-provider-card,
+.imports-upload-toolbar,
+:host ::ng-deep .imports-fileupload.p-fileupload,
+.imports-file-row,
+:host ::ng-deep .imports-table,
+:host ::ng-deep .imports-history-table {
+    border: 1px solid var(--p-content-border-color);
+    border-radius: 0.5rem;
+}
+
+.imports-provider-card,
+:host ::ng-deep .imports-fileupload .p-fileupload-header,
+:host ::ng-deep .imports-fileupload .p-fileupload-content {
+    background: var(--p-surface-card);
+}
+
+.imports-provider-card,
+.imports-fileupload__content,
+.imports-file-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.imports-provider-option {
+    background: transparent;
+    border: 0;
+    color: var(--p-text-color);
+    cursor: pointer;
+    padding: 1rem;
+    text-align: left;
+    width: 100%;
+}
+
+.imports-provider-guide {
+    align-items: center;
+    border-top: 1px solid var(--p-content-border-color);
+    color: var(--p-primary-color);
+    display: inline-flex;
+    font-size: 0.875rem;
+    font-weight: 600;
+    gap: 0.5rem;
+    padding: 0.625rem 1rem;
+    text-decoration: none;
+}
+
+.imports-extension-row,
+.imports-chip-row,
+.imports-event-stats,
+.imports-fileupload__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.imports-extension-row,
+.imports-chip-row,
+.imports-event-stats {
+    margin-top: 0.75rem;
+}
+
+.imports-upload-toolbar,
+.imports-fileupload__header {
+    align-items: center;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    padding: 0.875rem 1rem;
+}
+
+.imports-upload-toolbar h3 {
+    margin: 0;
+}
+
+.imports-event-panel h4 {
+    font-weight: 700;
+    margin: 0;
+}
+
+.imports-upload-toolbar h3,
+.imports-upload-empty span {
+    font-weight: 700;
+}
+
+:host ::ng-deep .imports-fileupload.p-fileupload,
+:host ::ng-deep .imports-table,
+:host ::ng-deep .imports-history-table {
+    overflow: hidden;
+}
+
+:host ::ng-deep .imports-fileupload .p-fileupload-header {
+    border: 0;
+    border-bottom: 1px solid var(--p-content-border-color);
+    padding: 0;
+}
+
+:host ::ng-deep .imports-fileupload .p-fileupload-content {
+    border: 0;
+    padding: 0;
+}
+
+.imports-fileupload__header {
+    width: 100%;
+}
+
+.imports-fileupload__summary {
+    color: var(--p-text-muted-color);
+    display: grid;
+    gap: 0.25rem 0.5rem;
+    grid-template-columns: auto auto;
+}
+
+.imports-fileupload__summary strong,
+.imports-metric strong {
+    color: var(--p-text-color);
+    font-size: 1.125rem;
+}
+
+.imports-fileupload__summary span,
+.imports-fileupload__summary small,
+.imports-metric span {
+    font-size: 0.75rem;
+}
+
+.imports-fileupload__summary small {
+    grid-column: 1 / -1;
+}
+
+.imports-fileupload__actions {
+    justify-content: flex-end;
+}
+
+.imports-fileupload__content {
+    padding: 1rem;
+}
+
+.imports-fileupload__content,
+.imports-file-list {
+    gap: 0.75rem;
+}
+
+.imports-upload-empty {
+    align-items: center;
+    background: var(--p-surface-50);
+    border: 1px dashed var(--p-surface-300);
+    border-radius: 0.5rem;
+    color: var(--p-text-color);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    justify-content: center;
+    min-height: 11rem;
+    padding: 1.5rem;
+    width: 100%;
+}
+
+.imports-upload-empty i {
+    color: var(--p-primary-color);
+    font-size: 1.75rem;
+}
+
+.imports-file-row {
+    align-items: center;
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    min-height: 2.5rem;
+    padding: 0.5rem 0.625rem;
+}
+
+.imports-file-row span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.imports-file-row small,
+.imports-event-stats {
+    color: var(--p-text-muted-color);
+}
+
+.imports-file-row button {
+    background: transparent;
+    border: 0;
+    color: var(--p-text-muted-color);
+}
+
+.imports-metric span,
+.imports-metric strong {
+    display: block;
+}
+
+.imports-metric strong {
+    margin-top: 0.25rem;
+}
+
+.imports-event-stats {
+    font-size: 0.875rem;
+    gap: 0.75rem;
+}
+
+.imports-event-stats strong {
+    color: var(--p-text-color);
+}
+
+@media (max-width: 720px) {
+    .imports-upload-toolbar,
+    .imports-fileupload__header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}

@@ -25,6 +25,8 @@
         "utm": "UTM",
         "apiClients": "Clientes API",
         "apiReference": "Referencia API",
+        "imports": "Importaciones",
+        "importsAria": "Ir a importaciones",
         "account": "Cuenta",
         "resources": "Recursos",
         "docs": "Docs",
@@ -51,6 +53,236 @@
         "ecommerceAria": "Ir a la analítica de comercio electrónico",
         "systemStatus": "Estado del sistema",
         "systemStatusAria": "Ir al estado del sistema"
+    },
+    "auditTable": {
+        "empty": "No audit entries found",
+        "filters": {
+            "aria": "Audit filters",
+            "action": "Action",
+            "outcome": "Outcome",
+            "targetType": "Target type",
+            "dateRange": "Date range",
+            "dateRangePlaceholder": "Date range",
+            "search": "Search",
+            "searchPlaceholder": "Search actors, targets, IPs, request IDs...",
+            "allActions": "All actions",
+            "allTargets": "All targets",
+            "allOutcomes": "All outcomes"
+        },
+        "actions": {
+            "refresh": "Refresh",
+            "export": "Export",
+            "clearFilters": "Clear filters",
+            "expandRow": "Show evidence",
+            "collapseRow": "Hide evidence",
+            "roleUpdated": "Role changed",
+            "mfaDisabled": "MFA disabled",
+            "backupTriggered": "Backup triggered",
+            "backupCompleted": "Backup completed",
+            "backupFailed": "Backup failed",
+            "spamRefreshed": "Spam refresh",
+            "mailTested": "Mail test",
+            "diagnosticsExported": "Diagnostics exported",
+            "accessDenied": "Access denied",
+            "authLoginSucceeded": "Login succeeded",
+            "authLoginFailed": "Login failed",
+            "authMfaRequired": "MFA required",
+            "authMfaSucceeded": "MFA succeeded",
+            "authLogout": "Logout",
+            "authSessionExtended": "Session extended",
+            "teamCreated": "Team created",
+            "teamUpdated": "Team updated",
+            "teamArchived": "Team archived",
+            "teamActiveChanged": "Active team changed",
+            "memberInvited": "Member invited",
+            "memberInviteAccepted": "Invite accepted",
+            "memberInviteResent": "Invite resent",
+            "memberInviteRevoked": "Invite revoked",
+            "memberAdded": "Member added",
+            "memberRoleUpdated": "Member role updated",
+            "memberRemoved": "Member removed",
+            "memberLeft": "Member left",
+            "ownershipTransferred": "Ownership transferred",
+            "siteCreated": "Site created",
+            "siteDeleted": "Site deleted",
+            "siteRetentionUpdated": "Retention updated",
+            "siteTransferredIn": "Site moved in",
+            "siteTransferredOut": "Site moved out",
+            "siteExclusionCreated": "Exclusion created",
+            "siteExclusionDeleted": "Exclusion deleted",
+            "permissionSiteMemberGranted": "Site access granted",
+            "permissionSiteMemberRoleUpdated": "Site access role changed",
+            "permissionSiteMemberRevoked": "Site access revoked",
+            "importUploadCreated": "Import upload created",
+            "importFileUploaded": "Import file uploaded",
+            "importValidationStarted": "Import validation started",
+            "importValidated": "Import validated",
+            "importValidationFailed": "Import validation failed",
+            "importQueued": "Import queued",
+            "importRequeued": "Import requeued",
+            "importStarted": "Import started",
+            "importFailed": "Import failed",
+            "importCompleted": "Import completed",
+            "importDeleted": "Import deleted",
+            "importDataCleared": "Imported data cleared",
+            "importDataWritten": "Imported data written"
+        },
+        "columns": {
+            "evidence": "Evidence",
+            "time": "Time",
+            "actor": "Actor",
+            "action": "Action",
+            "targetType": "Area",
+            "target": "Target",
+            "outcome": "Outcome",
+            "ipAddress": "IP address",
+            "country": "Country",
+            "details": "Details"
+        },
+        "outcomes": {
+            "success": "Success",
+            "failure": "Failure",
+            "denied": "Denied"
+        },
+        "targetTypes": {
+            "system": "System",
+            "mail": "Email",
+            "user": "User",
+            "team": "Team",
+            "site": "Site",
+            "import": "Import",
+            "siteExclusion": "Site exclusion",
+            "apiClient": "API client",
+            "backup": "Backup",
+            "spamFilter": "Spam filter",
+            "diagnostics": "Diagnostics",
+            "permission": "Permission"
+        },
+        "roles": {
+            "owner": "Owner",
+            "admin": "Admin",
+            "member": "Member",
+            "user": "User"
+        },
+        "evidence": {
+            "details": "Full details",
+            "actorId": "Actor ID",
+            "actorRole": "Actor role",
+            "teamId": "Team ID",
+            "targetType": "Target type",
+            "targetId": "Target ID",
+            "targetUserId": "Target user ID",
+            "requestId": "Request ID",
+            "userAgent": "User agent"
+        },
+        "pagination": {
+            "summary": "Showing {{start}}-{{end}} of {{total}} entries",
+            "empty": "No entries to show"
+        }
+    },
+    "imports": {
+        "title": "Importaciones",
+        "noSiteDescription": "Selecciona un sitio antes de importar datos históricos.",
+        "providerFallback": "Importador seleccionado",
+        "running": "La importación está en curso. Esta página se actualizará automáticamente.",
+        "completed": "Importación completada.",
+        "flow": {
+            "title": "Importación del sitio"
+        },
+        "permission": {
+            "title": "Se requiere acceso de importación",
+            "description": "Los propietarios del sitio, administradores del sitio y administradores de instancia pueden importar datos."
+        },
+        "providers": {
+            "title": "Elegir importador",
+            "loading": "Cargando importadores...",
+            "selectAria": "Seleccionar importador de {{provider}}",
+            "guide": "Guía de importación",
+            "guideAria": "Abrir guía de importación de {{provider}}",
+            "empty": "No hay importadores disponibles para este sitio."
+        },
+        "dropzone": {
+            "title": "Suelta los archivos aquí"
+        },
+        "files": {
+            "count": "archivos",
+            "addMore": "Añadir archivos",
+            "rejectedUnsupportedSummary": "{0}:",
+            "rejectedUnsupportedDetail": "Se esperaba {{expected}}."
+        },
+        "actions": {
+            "removeFile": "Quitar archivo",
+            "clearFiles": "Limpiar",
+            "uploadValidate": "Subir y validar",
+            "startImport": "Iniciar importación",
+            "newImport": "Nueva importación",
+            "changeProvider": "Cambiar importador",
+            "delete": "Eliminar"
+        },
+        "validation": {
+            "title": "Manifiesto de validación"
+        },
+        "metrics": {
+            "rowsAccepted": "Filas aceptadas",
+            "rowsSkipped": "Filas omitidas",
+            "files": "Archivos",
+            "range": "Rango de fechas"
+        },
+        "datasets": {
+            "title": "Conjuntos de datos",
+            "dataset": "Conjunto",
+            "rows": "Filas",
+            "pageviews": "Páginas vistas",
+            "events": "Eventos"
+        },
+        "events": {
+            "title": "Cobertura de eventos",
+            "total": "Eventos",
+            "names": "Nombres",
+            "properties": "Propiedades"
+        },
+        "properties": {
+            "title": "Propiedades de evento",
+            "attributed": "Filas atribuidas",
+            "unattributed": "Filas sin atribuir",
+            "unattributedEvents": "Eventos sin atribuir"
+        },
+        "dimensions": {
+            "title": "Dimensiones de evento",
+            "available": "Disponibles",
+            "unavailable": "No disponibles"
+        },
+        "overlap": {
+            "title": "Solapamiento con datos nativos",
+            "description": "{{rows}} filas importadas se solapan con datos existentes de HitKeep y se omitirán."
+        },
+        "warnings": {
+            "title": "Advertencias"
+        },
+        "history": {
+            "title": "Historial de importaciones",
+            "empty": "Aún no hay importaciones.",
+            "importer": "Importador",
+            "status": "Estado",
+            "rows": "Filas",
+            "created": "Creado"
+        },
+        "status": {
+            "uploading": "Subiendo",
+            "validating": "Validando",
+            "validated": "Validado",
+            "validation_failed": "Validación fallida",
+            "queued": "En cola",
+            "running": "En curso",
+            "completed": "Completado",
+            "failed": "Fallido",
+            "deleted": "Eliminado"
+        },
+        "errors": {
+            "generic": "La importación falló. Inténtalo de nuevo.",
+            "loadImporters": "No se pudieron cargar los importadores.",
+            "loadHistory": "No se pudo cargar el historial de importaciones."
+        }
     },
     "teams": {
         "switcher": {
@@ -300,6 +532,7 @@
             "progress": "{{complete}} de {{total}} completados",
             "dismiss": "Ocultar lista",
             "done": "Completo",
+            "current": "Paso actual",
             "steps": {
                 "create_site": "Crear primer sitio",
                 "verify_tracking": "Recibir primer hit",
@@ -1131,6 +1364,7 @@
                 "actions": {
                     "teamCreated": "Equipo creado",
                     "teamUpdated": "Equipo actualizado",
+                    "teamActiveChanged": "Active team changed",
                     "memberInvited": "Miembro invitado",
                     "memberInviteAccepted": "Invitación aceptada",
                     "memberInviteResent": "Invitación reenviada",
@@ -1141,8 +1375,32 @@
                     "memberLeft": "Miembro salió del equipo",
                     "ownershipTransferred": "Propiedad transferida",
                     "teamArchived": "Equipo archivado",
+                    "siteCreated": "Site created",
+                    "siteDeleted": "Site deleted",
+                    "siteRetentionUpdated": "Retention updated",
                     "siteTransferredIn": "Sitio trasladado aquí",
                     "siteTransferredOut": "Sitio trasladado fuera",
+                    "siteExclusionCreated": "Exclusion created",
+                    "siteExclusionDeleted": "Exclusion deleted",
+                    "authLoginSucceeded": "Login succeeded",
+                    "authLoginFailed": "Login failed",
+                    "authMfaRequired": "MFA required",
+                    "authMfaSucceeded": "MFA succeeded",
+                    "authLogout": "Logout",
+                    "authSessionExtended": "Session extended",
+                    "importUploadCreated": "Import upload created",
+                    "importFileUploaded": "Import file uploaded",
+                    "importValidationStarted": "Import validation started",
+                    "importValidated": "Import validated",
+                    "importValidationFailed": "Import validation failed",
+                    "importQueued": "Import queued",
+                    "importRequeued": "Import requeued",
+                    "importStarted": "Import started",
+                    "importFailed": "Import failed",
+                    "importCompleted": "Import completed",
+                    "importDeleted": "Import deleted",
+                    "importDataCleared": "Imported data cleared",
+                    "importDataWritten": "Imported data written",
                     "unknown": "Acción desconocida"
                 }
             }
@@ -1151,7 +1409,6 @@
             "overview": {
                 "title": "Resumen del sistema",
                 "version": "Versión",
-                "build": "Build",
                 "uptime": "Tiempo activo",
                 "publicUrl": "URL pública",
                 "runtimeMode": "Modo",
@@ -1261,6 +1518,21 @@
                 "refreshTriggered": "Filtro de spam actualizado",
                 "refreshFailed": "No se pudo actualizar el filtro de spam"
             },
+            "importCleanup": {
+                "title": "Staging de importaciones",
+                "enabled": "Limpieza activada",
+                "retention": "Días de retención",
+                "staleImports": "Importaciones obsoletas",
+                "staleFiles": "Archivos obsoletos",
+                "staleBytes": "Datos obsoletos",
+                "lastRun": "Última limpieza",
+                "lastCleaned": "Último limpiado",
+                "actions": {
+                    "run": "Limpiar archivos en staging"
+                },
+                "runSuccess": "Se limpiaron {{files}} archivo(s) en staging y se liberaron {{bytes}}.",
+                "runFailed": "No se pudieron limpiar los archivos de importación en staging."
+            },
             "caches": {
                 "title": "Cachés",
                 "status": {
@@ -1322,6 +1594,8 @@
                     "targetType": "Área",
                     "target": "Destino",
                     "outcome": "Resultado",
+                    "ipAddress": "IP address",
+                    "country": "Country",
                     "details": "Detalles"
                 },
                 "outcome": {
@@ -1335,6 +1609,9 @@
                     "user": "Usuario",
                     "team": "Equipo",
                     "site": "Sitio",
+                    "import": "Import",
+                    "siteExclusion": "Site exclusion",
+                    "apiClient": "API client",
                     "backup": "Copia",
                     "spamFilter": "Filtro de spam",
                     "diagnostics": "Diagnóstico"
@@ -1349,7 +1626,46 @@
                     "spamRefreshed": "Actualización de spam",
                     "mailTested": "Prueba de correo",
                     "diagnosticsExported": "Diagnóstico exportado",
-                    "accessDenied": "Acceso denegado"
+                    "accessDenied": "Acceso denegado",
+                    "authLoginSucceeded": "Login succeeded",
+                    "authLoginFailed": "Login failed",
+                    "authMfaRequired": "MFA required",
+                    "authMfaSucceeded": "MFA succeeded",
+                    "authLogout": "Logout",
+                    "authSessionExtended": "Session extended",
+                    "teamCreated": "Team created",
+                    "teamUpdated": "Team updated",
+                    "teamArchived": "Team archived",
+                    "teamActiveChanged": "Active team changed",
+                    "memberInvited": "Member invited",
+                    "memberInviteAccepted": "Invite accepted",
+                    "memberInviteResent": "Invite resent",
+                    "memberInviteRevoked": "Invite revoked",
+                    "memberAdded": "Member added",
+                    "memberRoleUpdated": "Member role updated",
+                    "memberRemoved": "Member removed",
+                    "memberLeft": "Member left",
+                    "ownershipTransferred": "Ownership transferred",
+                    "siteCreated": "Site created",
+                    "siteDeleted": "Site deleted",
+                    "siteRetentionUpdated": "Retention updated",
+                    "siteTransferredIn": "Site moved in",
+                    "siteTransferredOut": "Site moved out",
+                    "siteExclusionCreated": "Exclusion created",
+                    "siteExclusionDeleted": "Exclusion deleted",
+                    "importUploadCreated": "Import upload created",
+                    "importFileUploaded": "Import file uploaded",
+                    "importValidationStarted": "Import validation started",
+                    "importValidated": "Import validated",
+                    "importValidationFailed": "Import validation failed",
+                    "importQueued": "Import queued",
+                    "importRequeued": "Import requeued",
+                    "importStarted": "Import started",
+                    "importFailed": "Import failed",
+                    "importCompleted": "Import completed",
+                    "importDeleted": "Import deleted",
+                    "importDataCleared": "Imported data cleared",
+                    "importDataWritten": "Imported data written"
                 },
                 "pagination": {
                     "total": "Mostrando {{ loaded }} de {{ total }} entradas"
@@ -1616,6 +1932,9 @@
         },
         "kpis": {
             "totalEvents": "Total de eventos"
+        },
+        "importedLimitations": {
+            "title": "Limitaciones de agregados importados"
         }
     },
     "aiChatbots": {

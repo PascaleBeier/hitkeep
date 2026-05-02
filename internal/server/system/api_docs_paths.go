@@ -404,6 +404,36 @@ func openAPIV1CorePaths() map[string]any {
 					"schema":      map[string]any{"type": "string"},
 				},
 				map[string]any{
+					"name":        "outcome",
+					"in":          "query",
+					"description": "Optional exact audit outcome to filter by.",
+					"schema":      map[string]any{"type": "string"},
+				},
+				map[string]any{
+					"name":        "target_type",
+					"in":          "query",
+					"description": "Optional exact audit target type to filter by.",
+					"schema":      map[string]any{"type": "string"},
+				},
+				map[string]any{
+					"name":        "query",
+					"in":          "query",
+					"description": "Searches actor, target, details, IP, country, and request ID fields.",
+					"schema":      map[string]any{"type": "string"},
+				},
+				map[string]any{
+					"name":        "from",
+					"in":          "query",
+					"description": "Inclusive RFC3339 start timestamp.",
+					"schema":      map[string]any{"type": "string", "format": "date-time"},
+				},
+				map[string]any{
+					"name":        "to",
+					"in":          "query",
+					"description": "Inclusive RFC3339 end timestamp.",
+					"schema":      map[string]any{"type": "string", "format": "date-time"},
+				},
+				map[string]any{
 					"name":        "limit",
 					"in":          "query",
 					"description": "Maximum number of audit rows to return (default 25, max 200).",

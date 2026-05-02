@@ -3,6 +3,7 @@ package admin
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -267,12 +268,45 @@ func (h *handler) handleAddSiteMember() http.HandlerFunc {
 		}
 
 		actorID := shared.GetUserIDFromContext(r)
+		teamID, teamErr := h.ctx.Store.GetSiteTenantID(r.Context(), siteID)
+		siteLabel := siteID.String()
+		if site, siteErr := h.ctx.Store.GetSiteByID(r.Context(), siteID); siteErr == nil && site != nil && strings.TrimSpace(site.Domain) != "" {
+			siteLabel = site.Domain
+		}
+		previousRole := ""
+		if members, membersErr := h.ctx.Store.GetSiteMembers(r.Context(), siteID); membersErr == nil {
+			for _, member := range members {
+				if member.UserID == userID {
+					previousRole = member.Role
+					break
+				}
+			}
+		}
 
 		err = h.ctx.Store.AddSiteMember(r.Context(), siteID, userID, authcore.SiteRole(req.Role), actorID)
 		if err != nil {
 			slog.Error("Failed to add member", "error", err)
 			http.Error(w, "Failed to add member", http.StatusInternalServerError)
 			return
+		}
+		if teamErr == nil {
+			action := "permission.site_member_granted"
+			details := fmt.Sprintf("Site member %s granted %s on %s", req.Email, strings.TrimSpace(req.Role), siteLabel)
+			if previousRole != "" {
+				action = "permission.site_member_role_updated"
+				details = fmt.Sprintf("Site member %s role changed from %s to %s on %s", req.Email, previousRole, strings.TrimSpace(req.Role), siteLabel)
+			}
+			h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
+				ActorID:      actorID,
+				TeamID:       teamID,
+				TargetUserID: userID,
+				Action:       action,
+				TargetType:   "permission",
+				TargetID:     siteID.String(),
+				TargetLabel:  siteLabel,
+				Outcome:      "success",
+				Details:      details,
+			})
 		}
 
 		if isNewUser && inviteToken != "" {
@@ -326,6 +360,24 @@ func (h *handler) handleRemoveSiteMember() http.HandlerFunc {
 		}
 
 		actorID := shared.GetUserIDFromContext(r)
+		teamID, teamErr := h.ctx.Store.GetSiteTenantID(r.Context(), siteID)
+		siteLabel := siteID.String()
+		if site, siteErr := h.ctx.Store.GetSiteByID(r.Context(), siteID); siteErr == nil && site != nil && strings.TrimSpace(site.Domain) != "" {
+			siteLabel = site.Domain
+		}
+		targetEmail := userID.String()
+		previousRole := ""
+		if members, membersErr := h.ctx.Store.GetSiteMembers(r.Context(), siteID); membersErr == nil {
+			for _, member := range members {
+				if member.UserID == userID {
+					if strings.TrimSpace(member.Email) != "" {
+						targetEmail = member.Email
+					}
+					previousRole = member.Role
+					break
+				}
+			}
+		}
 
 		if actorID == userID {
 			role, _ := h.ctx.Store.GetSiteRole(r.Context(), userID, siteID)
@@ -343,6 +395,23 @@ func (h *handler) handleRemoveSiteMember() http.HandlerFunc {
 			slog.Error("Failed to remove member", "error", err)
 			http.Error(w, "Failed to remove member", http.StatusInternalServerError)
 			return
+		}
+		if teamErr == nil {
+			details := fmt.Sprintf("Site member %s revoked from %s", targetEmail, siteLabel)
+			if previousRole != "" {
+				details = fmt.Sprintf("Site member %s role %s revoked from %s", targetEmail, previousRole, siteLabel)
+			}
+			h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
+				ActorID:      actorID,
+				TeamID:       teamID,
+				TargetUserID: userID,
+				Action:       "permission.site_member_revoked",
+				TargetType:   "permission",
+				TargetID:     siteID.String(),
+				TargetLabel:  siteLabel,
+				Outcome:      "success",
+				Details:      details,
+			})
 		}
 
 		w.WriteHeader(http.StatusOK)

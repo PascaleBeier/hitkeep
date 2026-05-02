@@ -3,6 +3,7 @@ package sites
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -90,6 +91,18 @@ func (h *handler) handleCreateSiteExclusion() http.HandlerFunc {
 		}
 
 		h.refreshIPFilter(r.Context())
+		if teamID, err := h.ctx.Store.GetSiteTenantID(r.Context(), siteID); err == nil {
+			h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
+				ActorID:     userID,
+				TeamID:      teamID,
+				Action:      "site.exclusion_created",
+				TargetType:  "site_exclusion",
+				TargetID:    rule.ID.String(),
+				TargetLabel: normalizedCIDR,
+				Outcome:     "success",
+				Details:     fmt.Sprintf("Site exclusion %s created", normalizedCIDR),
+			})
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
@@ -130,6 +143,18 @@ func (h *handler) handleDeleteSiteExclusion() http.HandlerFunc {
 		}
 
 		h.refreshIPFilter(r.Context())
+		if teamID, err := h.ctx.Store.GetSiteTenantID(r.Context(), siteID); err == nil {
+			h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
+				ActorID:     shared.GetUserIDFromContext(r),
+				TeamID:      teamID,
+				Action:      "site.exclusion_deleted",
+				TargetType:  "site_exclusion",
+				TargetID:    ruleID.String(),
+				TargetLabel: ruleID.String(),
+				Outcome:     "success",
+				Details:     fmt.Sprintf("Site exclusion %s deleted", ruleID),
+			})
+		}
 
 		w.WriteHeader(http.StatusNoContent)
 	}

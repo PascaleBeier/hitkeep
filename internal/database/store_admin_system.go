@@ -39,6 +39,21 @@ type BackupStatusTracker struct {
 	Retention      int
 }
 
+// ImportStageCleanupStatusTracker holds the latest staged import cleanup run.
+type ImportStageCleanupStatusTracker struct {
+	mu                 sync.Mutex
+	Enabled            bool
+	RetentionDays      int
+	LastRun            *time.Time
+	LastFailedAt       *time.Time
+	LastError          string
+	RecentFailures     int
+	LastCleanedImports int
+	LastCleanedFiles   int
+	LastCleanedBytes   int64
+	LastMarkedFailed   int
+}
+
 func (b *BackupStatusTracker) SetLastBackup(t time.Time) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -82,6 +97,56 @@ func (b *BackupStatusTracker) Status() api.SystemBackupStatus {
 		LastFailedAt:   b.LastFailedAt,
 		LastError:      b.LastError,
 		RecentFailures: b.RecentFailures,
+	}
+}
+
+func (t *ImportStageCleanupStatusTracker) SetConfig(enabled bool, retentionDays int) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.Enabled = enabled
+	t.RetentionDays = retentionDays
+}
+
+func (t *ImportStageCleanupStatusTracker) SetLastRun(at time.Time, result api.ImportStageCleanupRunResult) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.LastRun = &at
+	t.LastError = ""
+	t.LastCleanedImports = result.ImportsCleaned
+	t.LastCleanedFiles = result.FilesCleaned
+	t.LastCleanedBytes = result.BytesCleaned
+	t.LastMarkedFailed = result.ImportsMarkedFailed
+}
+
+func (t *ImportStageCleanupStatusTracker) SetFailed(at time.Time, errStr string, result api.ImportStageCleanupRunResult) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.LastFailedAt = &at
+	t.LastError = errStr
+	t.RecentFailures++
+	t.LastCleanedImports = result.ImportsCleaned
+	t.LastCleanedFiles = result.FilesCleaned
+	t.LastCleanedBytes = result.BytesCleaned
+	t.LastMarkedFailed = result.ImportsMarkedFailed
+}
+
+func (t *ImportStageCleanupStatusTracker) Status(estimate api.ImportStageCleanupEstimate) api.SystemImportStageCleanupStatus {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return api.SystemImportStageCleanupStatus{
+		Enabled:            t.Enabled,
+		RetentionDays:      t.RetentionDays,
+		StaleImports:       estimate.Imports,
+		StaleFiles:         estimate.Files,
+		StaleBytes:         estimate.Bytes,
+		LastRun:            t.LastRun,
+		LastFailedAt:       t.LastFailedAt,
+		LastError:          t.LastError,
+		RecentFailures:     t.RecentFailures,
+		LastCleanedImports: t.LastCleanedImports,
+		LastCleanedFiles:   t.LastCleanedFiles,
+		LastCleanedBytes:   t.LastCleanedBytes,
+		LastMarkedFailed:   t.LastMarkedFailed,
 	}
 }
 

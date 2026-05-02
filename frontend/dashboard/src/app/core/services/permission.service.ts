@@ -5,6 +5,7 @@ import { tap } from 'rxjs';
 export interface UserPermissions {
     instance_role: 'owner' | 'admin' | 'user';
     permissions: Record<string, 'owner' | 'admin' | 'editor' | 'viewer'>;
+    instance_permissions?: string[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -25,7 +26,7 @@ export class PermissionService {
         const perms = this.permissions();
         if (!perms) return false;
 
-        if (perms.instance_role === 'owner') return true;
+        if (['owner', 'admin'].includes(perms.instance_role)) return true;
 
         const siteRole = perms.permissions[siteId];
         return ['owner', 'admin'].includes(siteRole);
