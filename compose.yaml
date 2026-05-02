@@ -7,11 +7,32 @@ services:
       - "8080:8080"
     volumes:
       - hitkeep-data:/var/lib/hitkeep/data
-    command:
-      - "-db=/var/lib/hitkeep/data/hitkeep.db"
-      # Change 'http://localhost:8080' to your server / loadbalancer domain.
-      - "-public-url=http://localhost:8080"
-      - "-jwt-secret=change-this-to-a-very-long-and-random-secret-key"
+      - hitkeep-archive:/var/lib/hitkeep/archive
+      - hitkeep-backups:/var/lib/hitkeep/backups
+    environment:
+      HITKEEP_PUBLIC_URL: ${HITKEEP_PUBLIC_URL:-http://localhost:8080}
+      HITKEEP_JWT_SECRET: ${HITKEEP_JWT_SECRET:?set HITKEEP_JWT_SECRET in .env}
+      HITKEEP_DB_PATH: /var/lib/hitkeep/data/hitkeep.db
+      HITKEEP_DATA_PATH: /var/lib/hitkeep/data
+      HITKEEP_ARCHIVE_PATH: /var/lib/hitkeep/archive
+      HITKEEP_BACKUP_PATH: /var/lib/hitkeep/backups
+      HITKEEP_BACKUP_INTERVAL: ${HITKEEP_BACKUP_INTERVAL:-60}
+      HITKEEP_BACKUP_RETENTION: ${HITKEEP_BACKUP_RETENTION:-24}
+      HITKEEP_SPAM_FILTER_AUTO_UPDATE: "true"
+      HITKEEP_SPAM_FILTER_UPDATE_INTERVAL: ${HITKEEP_SPAM_FILTER_UPDATE_INTERVAL:-1440}
+      HITKEEP_SPAM_FILTER_PATH: /var/lib/hitkeep/data/spam-filter.json
+      HITKEEP_MCP_ENABLED: "true"
+      HITKEEP_MCP_PATH: /mcp
+      HITKEEP_MCP_MAX_RANGE_DAYS: ${HITKEEP_MCP_MAX_RANGE_DAYS:-366}
+      HITKEEP_MAIL_HOST: ${HITKEEP_MAIL_HOST:-}
+      HITKEEP_MAIL_PORT: ${HITKEEP_MAIL_PORT:-587}
+      HITKEEP_MAIL_USERNAME: ${HITKEEP_MAIL_USERNAME:-}
+      HITKEEP_MAIL_PASSWORD: ${HITKEEP_MAIL_PASSWORD:-}
+      HITKEEP_MAIL_ENCRYPTION: ${HITKEEP_MAIL_ENCRYPTION:-tls}
+      HITKEEP_MAIL_FROM_ADDRESS: ${HITKEEP_MAIL_FROM_ADDRESS:-hitkeep@localhost}
+      HITKEEP_MAIL_FROM_NAME: ${HITKEEP_MAIL_FROM_NAME:-HitKeep}
 
 volumes:
   hitkeep-data: {}
+  hitkeep-archive: {}
+  hitkeep-backups: {}

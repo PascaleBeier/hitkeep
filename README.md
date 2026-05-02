@@ -1,6 +1,6 @@
 # HitKeep
 
-> Privacy-first web analytics you can self-host or run in managed EU/US cloud.
+> Privacy-first analytics for humans and AI agents, self-hosted or in EU/US cloud.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-1.26.2-00ADD8?logo=go)](https://go.dev/)
@@ -9,12 +9,13 @@
 [![Documentation](https://img.shields.io/badge/Docs-hitkeep.com-0ea5e9)](https://hitkeep.com)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/11990/badge)](https://www.bestpractices.dev/projects/11990)
 
-HitKeep is an open source web analytics platform built for people who want a simpler stack than the usual PostgreSQL, Redis, ClickHouse, and reverse-proxy pileup.
+HitKeep is an open source analytics platform for teams that need clear product reporting for humans and governed analytics access for AI-assisted workflows, without adopting the usual PostgreSQL, Redis, ClickHouse, and reverse-proxy pileup.
 
 - Single binary runtime
 - Embedded DuckDB and NSQ with batched ingest writes
 - Privacy-first tracking
-- Goals, funnels, ecommerce, AI visibility, AI chatbot analytics, email reports, and API clients
+- Traffic, goals, funnels, ecommerce, AI visibility, AI chatbot analytics, and email reports
+- Scoped API clients and read-only MCP access for agents, assistants, and internal reporting tools
 - Self-hosted or managed cloud with EU/US region choice
 
 [Website](https://hitkeep.com) · [Cloud](https://hitkeep.com/cloud) · [Live Demo](https://demo.hitkeep.com/share/7a55968bb42df256512fbe7ff73ab88f29dd45c236eddc818bd66420b4ffbaad) · [Docs](https://hitkeep.com/guides/introduction/) · [API](https://hitkeep.com/api/) · [Releases](https://github.com/PascaleBeier/hitkeep/releases)

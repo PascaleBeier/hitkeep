@@ -10,7 +10,7 @@ ARG TARGETARCH
 ARG HITKEEP_VERSION='snapshot'
 
 LABEL org.opencontainers.image.title="HitKeep" \
-    org.opencontainers.image.description="A self-hostable, privacy-first web analytics service in a single Go binary." \
+    org.opencontainers.image.description="Privacy-first analytics for humans and AI agents, self-hosted or in EU/US cloud." \
     org.opencontainers.image.url="https://hitkeep.com" \
     org.opencontainers.image.source="https://github.com/pascalebeier/hitkeep.git" \
     org.opencontainers.image.version="${HITKEEP_VERSION}" \

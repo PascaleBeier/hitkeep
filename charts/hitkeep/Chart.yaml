@@ -1,6 +1,6 @@
 apiVersion: v2
 name: hitkeep
-description: A self-hostable, privacy-first web analytics service in a single Go binary.
+description: Privacy-first analytics for humans and AI agents, self-hosted or in EU/US cloud.
 type: application
 version: 0.1.0
 appVersion: "v1.0.0"
