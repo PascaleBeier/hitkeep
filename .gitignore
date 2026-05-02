@@ -13,4 +13,5 @@ hitkeep.db
 !/scripts/update-default-spam-filter.sh
 frontend/dashboard/test-results
 frontend/dashboard/playwright-report
+.playwright-mcp
 data

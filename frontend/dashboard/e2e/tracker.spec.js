@@ -1,4 +1,40 @@
+const path = require("node:path");
 const { test, expect } = require("playwright/test");
+
+const TRACKER_FIXTURE_DIR = path.resolve(__dirname, "../../../tests/fixtures/tracker");
+const TRACKER_SCRIPT_PATH = path.resolve(__dirname, "../dist/dashboard/browser/hk.js");
+
+test.beforeEach(async ({ context }) => {
+    await context.route("**/ingest", async (route) => {
+        await route.fulfill({ status: 204, body: "" });
+    });
+
+    await context.route("**/ingest/event", async (route) => {
+        await route.fulfill({ status: 204, body: "" });
+    });
+
+    await context.route("**/hk.js", async (route) => {
+        await route.fulfill({
+            path: TRACKER_SCRIPT_PATH,
+            contentType: "application/javascript"
+        });
+    });
+
+    await context.route("**/tracker-fixtures/**", async (route) => {
+        const url = new URL(route.request().url());
+        const relativePath = decodeURIComponent(url.pathname).replace(/^\/tracker-fixtures\/?/, "");
+        const fixturePath = path.resolve(TRACKER_FIXTURE_DIR, relativePath);
+        if (!fixturePath.startsWith(`${TRACKER_FIXTURE_DIR}${path.sep}`)) {
+            await route.fulfill({ status: 403, body: "Forbidden" });
+            return;
+        }
+
+        await route.fulfill({
+            path: fixturePath,
+            contentType: trackerFixtureContentType(fixturePath)
+        });
+    });
+});
 
 function trackerFixtureUrl(baseURL, search = "") {
     const base = new URL(baseURL);
@@ -8,6 +44,22 @@ function trackerFixtureUrl(baseURL, search = "") {
     }
     const query = params.toString() ? `?${params.toString()}` : "";
     return `${base.protocol}//lvh.me:${base.port}/tracker-fixtures/auto-events.html${query}`;
+}
+
+async function gotoTrackerFixture(page, baseURL, search = "") {
+    await page.goto(trackerFixtureUrl(baseURL, search));
+    await expect.poll(() => page.evaluate(() => Boolean(window.hk?._bootstrapped))).toBe(true);
+}
+
+function trackerFixtureContentType(filePath) {
+    switch (path.extname(filePath)) {
+        case ".csv":
+            return "text/csv";
+        case ".html":
+            return "text/html";
+        default:
+            return "application/octet-stream";
+    }
 }
 
 function collectEventPayloads(page) {
@@ -35,7 +87,7 @@ async function waitForEventRequest(page) {
 }
 
 test("tracks outbound clicks and still navigates", async ({ page, baseURL }) => {
-    await page.goto(trackerFixtureUrl(baseURL));
+    await gotoTrackerFixture(page, baseURL);
 
     const requestPromise = waitForEventRequest(page);
     await Promise.all([page.waitForURL(/external\.lvh\.me.*external-target\.html/), page.locator("#outbound-link").click()]);
@@ -50,7 +102,7 @@ test("tracks outbound clicks and still navigates", async ({ page, baseURL }) => 
 });
 
 test("tracks middle-click outbound links without hijacking the current tab", async ({ page, baseURL, context }) => {
-    await page.goto(trackerFixtureUrl(baseURL));
+    await gotoTrackerFixture(page, baseURL);
 
     const requestPromise = waitForEventRequest(page);
     const newPagePromise = context.waitForEvent("page");
@@ -67,7 +119,7 @@ test("tracks middle-click outbound links without hijacking the current tab", asy
 });
 
 test("tracks local downloads once and only downloads once", async ({ page, baseURL }) => {
-    await page.goto(trackerFixtureUrl(baseURL));
+    await gotoTrackerFixture(page, baseURL);
 
     let downloadCount = 0;
     page.on("download", () => {
@@ -95,7 +147,7 @@ test("tracks local downloads once and only downloads once", async ({ page, baseU
 test("prefers outbound_click over file_download for outbound downloads", async ({ page, baseURL }) => {
     const payloads = collectEventPayloads(page);
 
-    await page.goto(trackerFixtureUrl(baseURL));
+    await gotoTrackerFixture(page, baseURL);
 
     const requestPromise = waitForEventRequest(page);
     await page.locator("#outbound-download-link").click();
@@ -108,7 +160,7 @@ test("prefers outbound_click over file_download for outbound downloads", async (
 });
 
 test("tracks form_submit for click-based submissions", async ({ page, baseURL }) => {
-    await page.goto(trackerFixtureUrl(baseURL));
+    await gotoTrackerFixture(page, baseURL);
 
     const requestPromise = waitForEventRequest(page);
     await Promise.all([page.waitForURL(/form-complete\.html\?source=click/), page.locator("#click-submit-button").click()]);
@@ -125,7 +177,7 @@ test("tracks form_submit for click-based submissions", async ({ page, baseURL })
 });
 
 test("tracks form_submit for enter-key submissions", async ({ page, baseURL }) => {
-    await page.goto(trackerFixtureUrl(baseURL));
+    await gotoTrackerFixture(page, baseURL);
 
     const requestPromise = waitForEventRequest(page);
     await page.locator("#enter-submit-input").fill("analytics");
@@ -145,7 +197,7 @@ test("tracks form_submit for enter-key submissions", async ({ page, baseURL }) =
 test("does not track outbound link clicks inside forms", async ({ page, baseURL, context }) => {
     const payloads = collectEventPayloads(page);
 
-    await page.goto(trackerFixtureUrl(baseURL));
+    await gotoTrackerFixture(page, baseURL);
 
     const newPagePromise = context.waitForEvent("page");
     await page.locator("#inside-form-link").click();
@@ -161,7 +213,7 @@ test("does not track outbound link clicks inside forms", async ({ page, baseURL,
 test("disabling outbound auto-tracking only suppresses outbound_click", async ({ page, baseURL, context }) => {
     const payloads = collectEventPayloads(page);
 
-    await page.goto(trackerFixtureUrl(baseURL, "disableOutbound=1&disableBeacon=1"));
+    await gotoTrackerFixture(page, baseURL, "disableOutbound=1&disableBeacon=1");
 
     const downloadPromise = page.waitForEvent("download");
     await page.locator("#local-download-link").click();
@@ -181,7 +233,7 @@ test("disabling outbound auto-tracking only suppresses outbound_click", async ({
 test("disabling download auto-tracking only suppresses file_download", async ({ page, baseURL }) => {
     const payloads = collectEventPayloads(page);
 
-    await page.goto(trackerFixtureUrl(baseURL, "disableDownload=1&disableBeacon=1"));
+    await gotoTrackerFixture(page, baseURL, "disableDownload=1&disableBeacon=1");
 
     const requestPromise = waitForEventRequest(page);
     await Promise.all([page.waitForURL(/form-complete\.html\?source=click/), page.locator("#click-submit-button").click()]);
@@ -194,7 +246,7 @@ test("disabling download auto-tracking only suppresses file_download", async ({ 
 test("disabling form auto-tracking only suppresses form_submit", async ({ page, baseURL, context }) => {
     const payloads = collectEventPayloads(page);
 
-    await page.goto(trackerFixtureUrl(baseURL, "disableForm=1&disableBeacon=1"));
+    await gotoTrackerFixture(page, baseURL, "disableForm=1&disableBeacon=1");
 
     const newPagePromise = context.waitForEvent("page");
     await page.locator("#outbound-link").click({ button: "middle" });
@@ -203,7 +255,7 @@ test("disabling form auto-tracking only suppresses form_submit", async ({ page, 
     await page.waitForTimeout(300);
     await newPage.close();
 
-    await page.goto(trackerFixtureUrl(baseURL, "disableForm=1&disableBeacon=1"));
+    await gotoTrackerFixture(page, baseURL, "disableForm=1&disableBeacon=1");
     await Promise.all([page.waitForURL(/form-complete\.html\?source=click/), page.locator("#click-submit-button").click()]);
     await page.waitForTimeout(400);
 

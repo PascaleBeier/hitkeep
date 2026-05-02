@@ -135,6 +135,7 @@ The binary embeds the `public/` directory, so the build order matters.
 go test ./...
 go test -race ./...
 golangci-lint run
+tests/scripts/check-binary-paths.sh
 
 # Angular checks
 cd frontend/dashboard && npm run fmt:check
@@ -190,22 +191,30 @@ make clean
 
 ```
 hitkeep/
-├── cmd/hitkeep/           # Application entry point & flag definitions
-│   ├── main.go            # Boots the modular registry
-│   └── mod_*.go           # Module registration files (build-tag gated)
+├── cmd/
+│   ├── hitkeep/           # Main application entry point
+│   └── seed/              # Local/demo data seeding
 ├── internal/
-│   ├── modular/           # Plugin kernel — Registry and Module interface
-│   ├── modules/           # Feature modules (auth, analytics, ingest, ...)
 │   ├── database/          # DuckDB store — all SQL queries live here
 │   ├── server/            # HTTP server setup, middleware, shared handlers
+│   ├── ingest/            # In-process ingest consumers
 │   └── worker/            # Background workers (retention, rollups, reports)
 ├── frontend/
 │   └── dashboard/         # Angular v21 SPA + tracker snippet (src/tracker/index.ts)
 ├── public/                # Embedded static assets (built frontend output)
-├── scripts/               # Developer tooling scripts
+├── scripts/               # Runtime/development scripts used outside tests
+├── tests/
+│   ├── e2e/               # E2E launchers and test-only harness scripts
+│   ├── fixtures/          # Shared test fixtures, outside app public/embed trees
+│   └── scripts/           # Test-only verification scripts, such as MCP audit
+├── .github/               # GitHub-native config only: workflows, templates, assets
 ├── Makefile               # Development and build commands
 └── .air.toml              # Air (live-reload) configuration
 ```
+
+Keep reusable fixtures, browser test harnesses, and test-only audit scripts under
+`tests/`. The `.github/` directory should contain GitHub configuration and
+presentation assets only, not build or test implementation files.
 
 ## Commit Conventions
 

@@ -5,5 +5,5 @@
     "trailingComma": "none",
     "printWidth": 250,
     "sortPackageJson": false,
-    "ignorePatterns": ["dist", "internal", "cmd", "out-tsc", "node_modules", "coverage", ".angular", "public"]
+    "ignorePatterns": ["dist", "internal", "cmd", "out-tsc", "node_modules", "coverage", ".angular", "public", "playwright-report", "test-results"]
 }

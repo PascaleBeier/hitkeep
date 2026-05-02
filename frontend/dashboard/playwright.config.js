@@ -24,7 +24,7 @@ module.exports = defineConfig({
     webServer: process.env.HITKEEP_BASE_URL
         ? undefined
         : {
-              command: "bash .github/e2e/serve-e2e.sh",
+              command: "bash tests/e2e/serve-dashboard.sh",
               cwd: repoRoot,
               url: `${baseURL}/healthz`,
               timeout: 300_000,

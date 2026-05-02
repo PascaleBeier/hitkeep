@@ -35,6 +35,8 @@ jobs:
         run: go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 ./...
       - name: Test API
         run: go test -race ./...
+      - name: Check binary excludes test support paths
+        run: tests/scripts/check-binary-paths.sh
 
   mcp-audit:
     name: Audit MCP surface
@@ -52,7 +54,7 @@ jobs:
       - name: Audit MCP protocol surface
         run: go test ./internal/mcpserver -run 'TestMCP.*Audit'
       - name: Validate MCP registry metadata
-        run: .github/scripts/audit-mcp.sh --schema-only
+        run: tests/scripts/mcp-audit.sh --schema-only
 
   lint-dashboard:
     name: Lint Dashboard (Angular)

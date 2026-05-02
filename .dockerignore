@@ -8,4 +8,4 @@ examples
 charts
 .githooks
 scripts
-frontend/dashboard/public/tracker-fixtures
+tests
