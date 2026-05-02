@@ -5,10 +5,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 jobs:
-  snapshot:
-    if: "${{ !startsWith(github.event.head_commit.message, 'chore(main): release') }}"
+  main-snapshot:
+    if: "${{ github.event_name == 'push' && !startsWith(github.event.head_commit.message, 'chore(main): release') }}"
     uses: ./.github/workflows/pipeline.yml
     permissions:
       contents: write
@@ -27,6 +28,49 @@ jobs:
       upload_to_release: ${{ github.event_name == 'push' }}
       release_prerelease: ${{ github.event_name == 'push' }}
       release_tag_name: snapshot-${{ github.sha }}
+      release_notes: |
+        Automated snapshot build for main.
+
+        - Commit: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+        - Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      docker_tags_summary: |
+        - `snapshot`
+        - `main`
+      docker_sha_tag_prefix: sha-
+    secrets:
+      token: ${{ secrets.GHT }}
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  pr-snapshot:
+    if: "${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository && contains(fromJSON('[\"OWNER\",\"MEMBER\",\"COLLABORATOR\"]'), github.event.pull_request.author_association) }}"
+    uses: ./.github/workflows/pipeline.yml
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    with:
+      version: snapshot-pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+      checkout_ref: ${{ github.event.pull_request.head.sha }}
+      meta_config: |
+        type=raw,value=pr-${{ github.event.pull_request.number }}
+        type=sha,prefix=pr-${{ github.event.pull_request.number }}-sha-,format=short
+      upload_to_release: true
+      release_prerelease: true
+      release_tag_name: snapshot-pr-${{ github.event.pull_request.number }}
+      release_target_sha: ${{ github.event.pull_request.head.sha }}
+      release_title: "Snapshot PR #${{ github.event.pull_request.number }}"
+      release_notes: |
+        Automated prerelease build for PR #${{ github.event.pull_request.number }}.
+
+        - Pull request: ${{ github.event.pull_request.html_url }}
+        - Commit: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.event.pull_request.head.sha }}
+        - Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      docker_tags_summary: |
+        - `pr-${{ github.event.pull_request.number }}`
+      docker_sha_tag_prefix: pr-${{ github.event.pull_request.number }}-sha-
     secrets:
       token: ${{ secrets.GHT }}
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}

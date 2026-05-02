@@ -11,6 +11,11 @@ on:
         required: true
         type: string
         description: "Configuration for docker/metadata-action tags"
+      checkout_ref:
+        required: false
+        type: string
+        default: ""
+        description: "Git ref or SHA to check out for build jobs (defaults to the workflow SHA)"
       cloud_go_build_tags:
         required: false
         type: string
@@ -30,6 +35,31 @@ on:
         required: false
         type: string
         description: "The tag name of the release to upload to (required if upload_to_release is true)"
+      release_target_sha:
+        required: false
+        type: string
+        default: ""
+        description: "Commit SHA to target when creating or updating a prerelease"
+      release_title:
+        required: false
+        type: string
+        default: ""
+        description: "Title to use when creating or updating a prerelease"
+      release_notes:
+        required: false
+        type: string
+        default: ""
+        description: "Markdown release notes to use when creating or updating a prerelease"
+      docker_tags_summary:
+        required: false
+        type: string
+        default: ""
+        description: "Markdown list of Docker tags to append to prerelease notes"
+      docker_sha_tag_prefix:
+        required: false
+        type: string
+        default: ""
+        description: "Prefix for the short-SHA Docker tag shown in prerelease notes"
     secrets:
       token:
         required: true
@@ -47,6 +77,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
 
       - uses: actions/setup-node@v6
         with:
@@ -105,6 +137,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
 
       - uses: actions/download-artifact@v8
         with:
@@ -180,6 +214,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
 
       - uses: actions/download-artifact@v8
         with:
@@ -190,6 +226,12 @@ jobs:
       - name: Upload binaries to GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.token }}
+          RELEASE_NOTES: ${{ inputs.release_notes }}
+          DOCKER_TAGS_SUMMARY: ${{ inputs.docker_tags_summary }}
+          DOCKER_SHA_TAG_PREFIX: ${{ inputs.docker_sha_tag_prefix }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          RELEASE_TARGET_SHA: ${{ inputs.release_target_sha || github.sha }}
+          RELEASE_TITLE: ${{ inputs.release_title }}
         run: |
           set -euo pipefail
           mapfile -t files < <(find . -maxdepth 1 -type f -name 'hitkeep*' -print | sort)
@@ -198,27 +240,53 @@ jobs:
           files+=(SHA256SUMS)
 
           if [[ "${{ inputs.release_prerelease }}" == "true" ]]; then
-            short_sha="${GITHUB_SHA::7}"
-            cat > release-notes.md <<EOF
-          Automated prerelease build for ${GITHUB_SHA}.
+            short_sha="${RELEASE_TARGET_SHA::7}"
+            release_title="${RELEASE_TITLE:-Snapshot ${short_sha}}"
 
-          - Commit: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}
+            if [[ -n "$RELEASE_NOTES" ]]; then
+              printf '%s\n' "$RELEASE_NOTES" > release-notes.md
+            else
+              cat > release-notes.md <<EOF
+          Automated prerelease build for ${RELEASE_TARGET_SHA}.
+
+          - Commit: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${RELEASE_TARGET_SHA}
           - Workflow run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
           EOF
+            fi
+
+            if [[ -n "$DOCKER_TAGS_SUMMARY" ]]; then
+              {
+                dockerhub_repo="${DOCKERHUB_USERNAME}/hitkeep"
+                ghcr_repo="ghcr.io/${GITHUB_REPOSITORY}"
+                ghcr_package_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pkgs/container/hitkeep"
+                dockerhub_tags_url="https://hub.docker.com/r/${dockerhub_repo}/tags"
+
+                printf '\n## Docker images\n\n'
+                printf '- GHCR: [%s](%s)\n' "$ghcr_repo" "$ghcr_package_url"
+                printf '- Docker Hub: [%s](%s)\n\n' "$dockerhub_repo" "$dockerhub_tags_url"
+                printf 'Tags:\n\n'
+                printf '%s\n' "$DOCKER_TAGS_SUMMARY"
+
+                if [[ -n "$DOCKER_SHA_TAG_PREFIX" ]]; then
+                  sha_tag="${DOCKER_SHA_TAG_PREFIX}${short_sha}"
+                  printf -- '- `%s`\n' "$sha_tag"
+                fi
+              } >> release-notes.md
+            fi
 
             if gh release view "${{ inputs.release_tag_name }}" >/dev/null 2>&1; then
               gh release edit "${{ inputs.release_tag_name }}" \
                 --prerelease \
-                --target "${GITHUB_SHA}" \
-                --title "Snapshot ${short_sha}" \
+                --target "${RELEASE_TARGET_SHA}" \
+                --title "${release_title}" \
                 --notes-file release-notes.md
               gh release upload "${{ inputs.release_tag_name }}" "${files[@]}" --clobber
             else
               gh release create "${{ inputs.release_tag_name }}" "${files[@]}" \
-                --target "${GITHUB_SHA}" \
+                --target "${RELEASE_TARGET_SHA}" \
                 --prerelease \
                 --latest=false \
-                --title "Snapshot ${short_sha}" \
+                --title "${release_title}" \
                 --notes-file release-notes.md
             fi
 
@@ -242,6 +310,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
 
       - uses: actions/download-artifact@v8
         with:
@@ -306,45 +376,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-
-      - name: Sync Docker Hub README
-        shell: bash
-        env:
-          DOCKERHUB_DESCRIPTION: Privacy-first analytics for humans and AI agents, self-hosted or in EU/US cloud.
-          DOCKERHUB_NAMESPACE: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_REPOSITORY: hitkeep
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          .github/scripts/render-dockerhub-readme.sh "$GITHUB_SHA" > dockerhub-readme.md
-
-          token="$(
-            jq -n \
-              --arg username "$DOCKERHUB_USERNAME" \
-              --arg password "$DOCKERHUB_TOKEN" \
-              '{username: $username, password: $password}' |
-            curl -fsSL \
-              -H "Content-Type: application/json" \
-              -d @- \
-              https://hub.docker.com/v2/users/login/ |
-            jq -r .token
-          )"
-
-          test -n "$token"
-          test "$token" != "null"
-
-          jq -n \
-            --arg description "$DOCKERHUB_DESCRIPTION" \
-            --rawfile full_description dockerhub-readme.md \
-            '{description: $description, full_description: $full_description}' |
-          curl -fsSL \
-            -X PATCH \
-            -H "Authorization: JWT ${token}" \
-            -H "Content-Type: application/json" \
-            -d @- \
-            "https://hub.docker.com/v2/repositories/${DOCKERHUB_NAMESPACE}/${DOCKERHUB_REPOSITORY}/" >/dev/null
 
       - name: Attest GHCR Image
         uses: actions/attest@v4
