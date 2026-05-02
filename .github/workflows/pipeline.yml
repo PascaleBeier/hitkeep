@@ -262,8 +262,8 @@ jobs:
                 dockerhub_tags_url="https://hub.docker.com/r/${dockerhub_repo}/tags"
 
                 printf '\n## Docker images\n\n'
-                printf '- GHCR: [%s](%s)\n' "$ghcr_repo" "$ghcr_package_url"
-                printf '- Docker Hub: [%s](%s)\n\n' "$dockerhub_repo" "$dockerhub_tags_url"
+                printf -- '- GHCR: [%s](%s)\n' "$ghcr_repo" "$ghcr_package_url"
+                printf -- '- Docker Hub: [%s](%s)\n\n' "$dockerhub_repo" "$dockerhub_tags_url"
                 printf 'Tags:\n\n'
                 printf '%s\n' "$DOCKER_TAGS_SUMMARY"
 
