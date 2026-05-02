@@ -135,8 +135,6 @@ The binary embeds the `public/` directory, so the build order matters.
 go test ./...
 go test -race ./...
 golangci-lint run
-tests/scripts/check-binary-paths.sh
-
 # Angular checks
 cd frontend/dashboard && npm run fmt:check
 cd frontend/dashboard && npm run lint
