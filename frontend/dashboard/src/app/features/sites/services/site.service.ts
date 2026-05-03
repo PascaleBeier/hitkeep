@@ -37,21 +37,24 @@ export class SiteService {
         this.isLoading.set(true);
         this.http.get<Site[]>('/api/sites').subscribe({
             next: (data) => {
-                this.sites.set(data);
-
-                if (data.length === 0) {
-                    this.activeSite.set(null);
-                    localStorage.removeItem(LAST_SITE_KEY);
-                } else if (!this.activeSite() || !data.some((site) => site.id === this.activeSite()?.id)) {
-                    const lastId = localStorage.getItem(LAST_SITE_KEY);
-                    const matchedSite = lastId ? data.find((s) => s.id === lastId) : null;
-                    this.activeSite.set(matchedSite || data[0]);
-                }
-
+                this.applySites(data);
                 this.isLoading.set(false);
             },
             error: () => this.isLoading.set(false)
         });
+    }
+
+    applySites(data: Site[]) {
+        this.sites.set(data);
+
+        if (data.length === 0) {
+            this.activeSite.set(null);
+            localStorage.removeItem(LAST_SITE_KEY);
+        } else if (!this.activeSite() || !data.some((site) => site.id === this.activeSite()?.id)) {
+            const lastId = localStorage.getItem(LAST_SITE_KEY);
+            const matchedSite = lastId ? data.find((s) => s.id === lastId) : null;
+            this.activeSite.set(matchedSite || data[0]);
+        }
     }
 
     selectSite(site: Site) {

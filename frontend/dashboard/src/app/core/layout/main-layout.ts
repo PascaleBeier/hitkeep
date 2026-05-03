@@ -12,7 +12,6 @@ import { SiteSettingsDrawer } from '@features/sites/components/site-settings-dra
 import { SiteSelector } from '@features/sites/components/site-selector';
 import { CreateTeamDialog } from '@components/create-team-dialog/create-team-dialog';
 import { MainLayoutContextService } from '@layout/main-layout-context.service';
-import { AuthService } from '@services/auth.service';
 
 @Component({
     selector: 'app-main-layout',
@@ -29,13 +28,10 @@ export class MainLayout {
     private static readonly docsURL = 'https://hitkeep.com/guides/introduction/';
     private static readonly supportFallbackURL = 'https://hitkeep.com/support/help/';
     protected readonly context = inject(MainLayoutContextService);
-    protected readonly auth = inject(AuthService);
     protected readonly siteService = this.context.siteService;
     protected readonly shareService = this.context.shareService;
     protected readonly teamService = this.context.teamService;
     protected readonly perms = this.context.perms;
-    protected readonly profile = this.context.profile;
-    protected readonly preferences = this.context.preferences;
     protected readonly cloudHosted = this.context.cloudHosted;
     protected readonly cloudSupportUrl = this.context.cloudSupportUrl;
     protected readonly canCreateTeams = computed(() => !this.cloudHosted());
@@ -78,8 +74,5 @@ export class MainLayout {
 
     constructor() {
         this.context.init();
-        if (!this.shareService.isShareMode()) {
-            this.auth.loadSession().subscribe();
-        }
     }
 }

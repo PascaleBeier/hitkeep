@@ -158,7 +158,7 @@ export class AuthService {
         this.clearSession();
     }
 
-    private applySession(session: AuthSession) {
+    applySession(session: AuthSession) {
         this.session.set(session);
         this.status.set('authenticated');
         this.startTicker();

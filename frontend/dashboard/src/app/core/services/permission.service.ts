@@ -19,7 +19,11 @@ export class PermissionService {
     readonly isInstanceAdmin = computed(() => ['owner', 'admin'].includes(this.permissions()?.instance_role || ''));
 
     loadPermissions() {
-        return this.http.get<UserPermissions>('/api/user/permissions').pipe(tap((perms) => this.permissions.set(perms)));
+        return this.http.get<UserPermissions>('/api/user/permissions').pipe(tap((perms) => this.applyPermissions(perms)));
+    }
+
+    applyPermissions(perms: UserPermissions) {
+        this.permissions.set(perms);
     }
 
     canManageSite(siteId: string): boolean {

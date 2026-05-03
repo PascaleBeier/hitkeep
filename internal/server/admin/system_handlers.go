@@ -35,7 +35,7 @@ func (h *handler) handleGetSystem() http.HandlerFunc {
 		uptime := time.Since(h.ctx.StartedAt).String()
 		info := api.SystemInfo{
 			Version:         cfg.Version,
-			RuntimeMode:     "oss",
+			RuntimeMode:     systemRuntimeMode(cfg),
 			Uptime:          uptime,
 			PublicURL:       cfg.PublicURL,
 			EnabledFeatures: systemFeatureStatuses(cfg, h.ctx.Mailer != nil),
@@ -44,6 +44,13 @@ func (h *handler) handleGetSystem() http.HandlerFunc {
 
 		writeJSON(w, http.StatusOK, info)
 	}
+}
+
+func systemRuntimeMode(cfg *config.Config) string {
+	if cfg.CloudHosted {
+		return "cloud"
+	}
+	return "oss"
 }
 
 func systemFeatureStatuses(cfg *config.Config, mailerConfigured bool) []api.SystemFeatureStatus {

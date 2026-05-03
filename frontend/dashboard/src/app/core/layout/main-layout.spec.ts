@@ -5,6 +5,8 @@ import { By } from '@angular/platform-browser';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TranslocoTestingModule } from '@jsverse/transloco';
+import { DashboardBootstrapService } from '@services/dashboard-bootstrap.service';
+import { PermissionService } from '@services/permission.service';
 import { TeamService } from '@services/team.service';
 import { vi } from 'vitest';
 
@@ -14,20 +16,13 @@ interface MainLayoutTestAccess {
         (): boolean;
         set(value: boolean): void;
     };
-    cloudHosted: {
-        (): boolean;
-        set(value: boolean): void;
-    };
-    cloudSupportUrl: {
-        (): string;
-        set(value: string): void;
-    };
 }
 
 describe('MainLayout', () => {
     let component: MainLayout;
     let fixture: ComponentFixture<MainLayout>;
     let httpMock: HttpTestingController;
+    let bootstrap: DashboardBootstrapService;
 
     beforeEach(async () => {
         await TestBed.configureTestingModule({
@@ -48,8 +43,9 @@ describe('MainLayout', () => {
         fixture = TestBed.createComponent(MainLayout);
         component = fixture.componentInstance;
         httpMock = TestBed.inject(HttpTestingController);
+        bootstrap = TestBed.inject(DashboardBootstrapService);
+        seedLayoutState();
         fixture.detectChanges();
-        flushBootstrapRequests();
         fixture.detectChanges();
     });
 
@@ -109,8 +105,11 @@ describe('MainLayout', () => {
     });
 
     it('should hide create team actions in hosted cloud', () => {
-        const access = component as unknown as MainLayoutTestAccess;
-        access.cloudHosted.set(true);
+        bootstrap.status.set({
+            needs_setup: false,
+            version: 'v2.0.0',
+            cloud: { hosted: true, signup_enabled: false }
+        });
         fixture.detectChanges();
 
         const switchers = fixture.debugElement.queryAll(By.css('app-team-switcher'));
@@ -132,9 +131,15 @@ describe('MainLayout', () => {
     });
 
     it('should show support link in hosted cloud mode', () => {
-        const access = component as unknown as MainLayoutTestAccess;
-        access.cloudHosted.set(true);
-        access.cloudSupportUrl.set('https://hitkeep.com/support/help/');
+        bootstrap.status.set({
+            needs_setup: false,
+            version: 'v2.0.0',
+            cloud: {
+                hosted: true,
+                signup_enabled: false,
+                support_url: 'https://hitkeep.com/support/help/'
+            }
+        });
         fixture.detectChanges();
 
         const links = Array.from(fixture.nativeElement.querySelectorAll('a[href]')) as HTMLAnchorElement[];
@@ -173,8 +178,11 @@ describe('MainLayout', () => {
         expect(access.isSiteSettingsVisible()).toBe(false);
     });
 
-    function flushBootstrapRequests() {
-        httpMock.expectOne('/api/user/teams').flush({
+    function seedLayoutState() {
+        const teamService = TestBed.inject(TeamService);
+        const permissions = TestBed.inject(PermissionService);
+
+        teamService.applyTeams({
             active_team_id: '00000000-0000-0000-0000-000000000001',
             teams: [
                 {
@@ -195,7 +203,7 @@ describe('MainLayout', () => {
             ]
         });
 
-        httpMock.expectOne('/api/status').flush({
+        bootstrap.status.set({
             needs_setup: false,
             version: 'v2.0.0',
             cloud: {
@@ -203,30 +211,10 @@ describe('MainLayout', () => {
                 signup_enabled: false
             }
         });
-        httpMock.expectOne('/api/sites').flush([]);
-        httpMock.expectOne('/api/user/permissions').flush({
+
+        permissions.applyPermissions({
             instance_role: 'owner',
             permissions: {}
-        });
-        httpMock.expectOne('/api/user/profile').flush({
-            id: '00000000-0000-0000-0000-0000000000aa',
-            email: 'owner@example.com',
-            display_name: 'Owner',
-            avatar_url: ''
-        });
-        httpMock.expectOne('/api/user/preferences').flush({
-            default_locale: 'en'
-        });
-        httpMock.expectOne('/api/auth/session').flush({
-            expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-            issued_at: new Date().toISOString(),
-            duration_seconds: 900,
-            warning_seconds: 120,
-            extendable: true,
-            timing_adjustable: true,
-            remembered: false,
-            remember_expires_at: null,
-            remember_me_duration_days: 30
         });
     }
 });

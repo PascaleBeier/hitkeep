@@ -117,6 +117,9 @@ func TestHandleGetSystem(t *testing.T) {
 	if info.PublicURL != "http://localhost:8080" {
 		t.Fatalf("expected public_url 'http://localhost:8080', got %q", info.PublicURL)
 	}
+	if info.RuntimeMode != "cloud" {
+		t.Fatalf("expected runtime_mode cloud, got %q", info.RuntimeMode)
+	}
 	if _, ok := info.ConfigFlags["user_count"]; ok {
 		t.Fatal("did not expect user_count to be reported as a config flag")
 	}
@@ -142,6 +145,13 @@ func TestHandleGetSystem(t *testing.T) {
 	}
 	if features["managed_cloud"].Detail != "Pro" {
 		t.Fatalf("expected managed cloud detail Pro, got %q", features["managed_cloud"].Detail)
+	}
+}
+
+func TestSystemRuntimeModeDefaultsToOSS(t *testing.T) {
+	conf := &config.Config{}
+	if mode := systemRuntimeMode(conf); mode != "oss" {
+		t.Fatalf("expected oss runtime mode, got %q", mode)
 	}
 }
 

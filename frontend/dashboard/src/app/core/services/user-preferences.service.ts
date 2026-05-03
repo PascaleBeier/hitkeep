@@ -7,6 +7,7 @@ import { SKIP_AUTH_REDIRECT } from '@core/interceptors/auth.interceptor';
 
 export interface UserPreferences {
     default_locale: string;
+    dismissed_onboarding_at?: string;
 }
 
 type AvailableLang = string | { id: string; label: string };
@@ -45,9 +46,7 @@ export class UserPreferencesService {
         this.isLoading.set(true);
         const context = options?.skipAuthRedirect ? new HttpContext().set(SKIP_AUTH_REDIRECT, true) : undefined;
         return this.http.get<UserPreferences>('/api/user/preferences', { context }).pipe(
-            tap((prefs) => {
-                this.preferences.set(prefs);
-            }),
+            tap((prefs) => this.applyPreferences(prefs)),
             finalize(() => {
                 this.isLoading.set(false);
             })
@@ -57,13 +56,15 @@ export class UserPreferencesService {
     save(preferences: UserPreferences) {
         this.isSaving.set(true);
         return this.http.put<UserPreferences>('/api/user/preferences', preferences).pipe(
-            tap((prefs) => {
-                this.preferences.set(prefs);
-            }),
+            tap((prefs) => this.applyPreferences(prefs)),
             finalize(() => {
                 this.isSaving.set(false);
             })
         );
+    }
+
+    applyPreferences(prefs: UserPreferences) {
+        this.preferences.set(prefs);
     }
 
     private resolveTranslationLang(locale: string): string {

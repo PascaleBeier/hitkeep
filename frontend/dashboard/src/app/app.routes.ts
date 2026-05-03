@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { setupGuard } from '@guards/setup-guard';
+import { authGuard } from '@guards/auth-guard';
 import { adminGuard } from '@guards/admin-guard';
 import { teamAdminGuard } from '@guards/team-admin-guard';
 import { cloudSignupGuard } from '@guards/cloud-signup-guard';
@@ -31,7 +32,7 @@ export const routes: Routes = [
     {
         path: '',
         loadComponent: () => import('@layout/main-layout').then((m) => m.MainLayout),
-        canActivate: [setupGuard],
+        canActivate: [setupGuard, authGuard],
         children: [
             {
                 path: 'share/:token',

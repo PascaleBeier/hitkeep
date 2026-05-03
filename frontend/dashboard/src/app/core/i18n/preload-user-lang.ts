@@ -2,7 +2,6 @@ import { inject, provideAppInitializer } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 import { getBaseLanguage, getLocaleDirection, normalizeLocaleTag } from '@core/i18n/locale-utils';
-import { UserPreferencesService } from '@services/user-preferences.service';
 
 type AvailableLang = string | { id: string; label: string };
 
@@ -49,7 +48,6 @@ async function activateLanguage(transloco: TranslocoService, lang: string, local
 
 export function preloadUserLang() {
     const transloco = inject(TranslocoService);
-    const preferences = inject(UserPreferencesService);
 
     return (async () => {
         const available = availableLangIds(transloco);
@@ -58,17 +56,6 @@ export function preloadUserLang() {
         const browserLocale = browserLocaleCandidates()[0] ?? defaultLang;
         const browserLang = resolveTranslationLang(browserLocale, available, defaultLang);
         await activateLanguage(transloco, browserLang, browserLocale);
-
-        try {
-            const prefs = await firstValueFrom(preferences.load({ skipAuthRedirect: true }));
-            const userLocale = normalizeLocaleTag(prefs.default_locale);
-            if (!userLocale) return;
-
-            const userLang = resolveTranslationLang(userLocale, available, browserLang);
-            await activateLanguage(transloco, userLang, userLocale);
-        } catch {
-            // Unauthenticated users won't have preferences yet; keep browser language fallback.
-        }
     })();
 }
 

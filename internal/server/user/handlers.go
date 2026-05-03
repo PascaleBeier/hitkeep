@@ -29,6 +29,10 @@ type handler struct {
 
 func Register(mux *http.ServeMux, ctx *shared.Context) {
 	h := &handler{ctx: ctx}
+	mux.HandleFunc("GET /api/user/bootstrap", ctx.Handler(shared.HandlerConfig{
+		RequireAuth: true,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleGetUserBootstrap()))
 	mux.HandleFunc("GET /api/user/profile", ctx.Handler(shared.HandlerConfig{
 		RequireAuth: true,
 		RateLimiter: ctx.ApiLimiter,
@@ -209,24 +213,15 @@ func (h *handler) handleGetUserProfile() http.HandlerFunc {
 			return
 		}
 
-		user, err := h.ctx.Store.GetUserByID(r.Context(), userID)
+		resp, err := h.userProfileResponse(r.Context(), userID)
 		if err != nil {
+			if errors.Is(err, errBootstrapUserNotFound) {
+				http.Error(w, "User not found", http.StatusNotFound)
+				return
+			}
 			slog.Error("Failed to load user profile", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
-		}
-		if user == nil {
-			http.Error(w, "User not found", http.StatusNotFound)
-			return
-		}
-
-		resp := api.UserProfile{
-			ID:          user.ID,
-			Email:       user.Email,
-			GivenName:   user.GivenName,
-			LastName:    user.LastName,
-			DisplayName: displayNameForUser(user),
-			AvatarURL:   "/api/user/avatar?s=96",
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -383,24 +378,11 @@ func (h *handler) handleGetUserPreferences() http.HandlerFunc {
 			return
 		}
 
-		prefs, err := h.ctx.Store.GetUserPreferences(r.Context(), userID)
+		prefs, err := h.userPreferencesResponse(r, userID)
 		if err != nil {
 			slog.Error("Failed to load user preferences", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
-		}
-
-		if prefs == nil {
-			fallback := defaultPreferencesFromHeader(r.Header.Get("Accept-Language"))
-			prefs = &fallback
-		} else {
-			normalized := normalizeLocaleTag(prefs.DefaultLocale)
-			if normalized == "" {
-				fallback := defaultPreferencesFromHeader(r.Header.Get("Accept-Language"))
-				prefs = &fallback
-			} else {
-				prefs.DefaultLocale = normalized
-			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")

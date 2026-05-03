@@ -30,10 +30,7 @@ export class UserProfileService {
     loadProfile() {
         this.isLoading.set(true);
         return this.http.get<UserProfile>('/api/user/profile').pipe(
-            tap((profile) => {
-                this.profile.set(profile);
-                this.auth.markAuthenticated();
-            }),
+            tap((profile) => this.applyProfile(profile)),
             catchError((error) => {
                 if (error?.status === 401) {
                     this.auth.markUnauthenticated();
@@ -49,12 +46,15 @@ export class UserProfileService {
     updateProfile(payload: { email: string; given_name: string; last_name: string }) {
         this.isSaving.set(true);
         return this.http.put<UserProfile>('/api/user/profile', payload).pipe(
-            tap((profile) => {
-                this.profile.set(profile);
-            }),
+            tap((profile) => this.applyProfile(profile)),
             finalize(() => {
                 this.isSaving.set(false);
             })
         );
+    }
+
+    applyProfile(profile: UserProfile) {
+        this.profile.set(profile);
+        this.auth.markAuthenticated();
     }
 }

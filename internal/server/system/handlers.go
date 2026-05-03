@@ -70,20 +70,11 @@ func (h *handler) handleGetStatus() http.HandlerFunc {
 			return
 		}
 
-		userCount, err := h.ctx.Store.GetUserCount(r.Context())
+		response, err := h.ctx.SystemStatusResponse(r.Context())
 		if err != nil {
 			slog.Error("Failed to get user count", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
-		}
-
-		needsSetup := userCount == 0 && !h.ctx.Config.CloudHosted
-		response := map[string]any{
-			"needs_setup": needsSetup,
-			"version":     h.ctx.Config.Version,
-		}
-		if cloud := h.cloudStatus(); cloud != nil {
-			response["cloud"] = cloud
 		}
 
 		w.Header().Set("Content-Type", "application/json")

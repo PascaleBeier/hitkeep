@@ -464,6 +464,26 @@ func openAPIV1AccountSchemas() map[string]any {
 				"dismissed_onboarding_at": map[string]any{"type": "string", "format": "date-time"},
 			},
 		},
+		"SystemStatus": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"needs_setup": map[string]any{"type": "boolean"},
+				"version":     map[string]any{"type": "string"},
+				"cloud":       map[string]any{"$ref": "#/components/schemas/CloudStatus"},
+			},
+		},
+		"UserBootstrap": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"session":     map[string]any{"$ref": "#/components/schemas/AuthSession"},
+				"profile":     map[string]any{"$ref": "#/components/schemas/UserProfile"},
+				"preferences": map[string]any{"$ref": "#/components/schemas/UserPreferences"},
+				"teams":       map[string]any{"$ref": "#/components/schemas/TeamListResponse"},
+				"permissions": map[string]any{"$ref": "#/components/schemas/PermissionContext"},
+				"sites":       map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/Site"}},
+				"status":      map[string]any{"$ref": "#/components/schemas/SystemStatus"},
+			},
+		},
 		"OnboardingStep": map[string]any{
 			"type": "object",
 			"properties": map[string]any{

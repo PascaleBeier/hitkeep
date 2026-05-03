@@ -460,7 +460,7 @@ func (h *handler) handleGetSession() http.HandlerFunc {
 			return
 		}
 
-		writeSessionResponse(w, h.sessionResponseForRequest(r, shared.GetUserIDFromContext(r), session))
+		writeSessionResponse(w, h.ctx.AuthSessionResponseForRequest(r, shared.GetUserIDFromContext(r), session))
 	}
 }
 
@@ -482,7 +482,7 @@ func (h *handler) handleExtendSession() http.HandlerFunc {
 
 		isSecure := strings.HasPrefix(h.ctx.Config.PublicURL, "https://")
 		authcore.SetTokenCookieWithDuration(w, token, isSecure, duration)
-		resp := h.sessionResponse(shared.AuthSessionContext{
+		resp := h.ctx.AuthSessionResponse(shared.AuthSessionContext{
 			ExpiresAt: expiresAt.UTC(),
 			IssuedAt:  time.Now().UTC(),
 		})
@@ -493,29 +493,6 @@ func (h *handler) handleExtendSession() http.HandlerFunc {
 		h.appendAuthAuditForUserTeams(r, userID, "auth.session_extended", "success", "Session extended", true)
 		writeSessionResponse(w, resp)
 	}
-}
-
-func (h *handler) sessionResponse(session shared.AuthSessionContext) api.AuthSession {
-	duration := h.ctx.Config.AuthSessionDuration()
-	warning := h.ctx.Config.AuthSessionWarningDuration()
-	return api.AuthSession{
-		ExpiresAt:              session.ExpiresAt.UTC(),
-		IssuedAt:               session.IssuedAt.UTC(),
-		DurationSeconds:        int(duration.Seconds()),
-		WarningSeconds:         int(warning.Seconds()),
-		Extendable:             true,
-		TimingAdjustable:       true,
-		RememberMeDurationDays: int(h.ctx.Config.AuthRememberMeDuration().Hours() / 24),
-	}
-}
-
-func (h *handler) sessionResponseForRequest(r *http.Request, userID uuid.UUID, session shared.AuthSessionContext) api.AuthSession {
-	resp := h.sessionResponse(session)
-	if remembered, rememberExpiresAt := h.rememberedSession(r, userID); remembered {
-		resp.Remembered = true
-		resp.RememberExpiresAt = &rememberExpiresAt
-	}
-	return resp
 }
 
 func (h *handler) renewRememberedSession(r *http.Request, w http.ResponseWriter, userID uuid.UUID, isSecure bool) *time.Time {
@@ -542,21 +519,6 @@ func (h *handler) renewRememberedSession(r *http.Request, w http.ResponseWriter,
 	}
 	authcore.SetRememberMeCookieWithDuration(w, rememberToken, isSecure, rememberDuration)
 	return &rememberExpiresAt
-}
-
-func (h *handler) rememberedSession(r *http.Request, userID uuid.UUID) (bool, time.Time) {
-	if h.ctx.Store == nil || userID == uuid.Nil {
-		return false, time.Time{}
-	}
-	cookie, err := r.Cookie(authcore.RememberMeCookieName)
-	if err != nil || strings.TrimSpace(cookie.Value) == "" {
-		return false, time.Time{}
-	}
-	rememberedUserID, expiresAt, err := h.ctx.Store.ValidateRememberMeSession(r.Context(), cookie.Value)
-	if err != nil || rememberedUserID != userID || expiresAt.IsZero() {
-		return false, time.Time{}
-	}
-	return true, expiresAt.UTC()
 }
 
 func writeSessionResponse(w http.ResponseWriter, resp api.AuthSession) {

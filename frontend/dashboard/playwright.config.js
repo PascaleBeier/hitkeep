@@ -28,7 +28,7 @@ module.exports = defineConfig({
               cwd: repoRoot,
               url: `${baseURL}/healthz`,
               timeout: 300_000,
-              reuseExistingServer: false,
+              reuseExistingServer: !process.env.CI,
               stdout: "pipe",
               stderr: "pipe"
           }

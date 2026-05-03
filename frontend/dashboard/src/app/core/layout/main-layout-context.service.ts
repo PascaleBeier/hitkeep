@@ -2,14 +2,12 @@ import { Injectable, TemplateRef, computed, effect, inject, signal } from '@angu
 import { Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { Team } from '@models/analytics.types';
+import { DashboardBootstrapService } from '@services/dashboard-bootstrap.service';
 import { PermissionService } from '@services/permission.service';
 import { ShareService } from '@services/share.service';
 import { SiteSettingsService } from '@services/site-settings.service';
 import { TeamService } from '@services/team.service';
-import { UserPreferencesService } from '@services/user-preferences.service';
-import { UserProfileService } from '@services/user-profile.service';
 import { SiteService } from '@features/sites/services/site.service';
-import { AnalyticsService } from '@services/analytics.service';
 
 @Injectable()
 export class MainLayoutContextService {
@@ -17,15 +15,13 @@ export class MainLayoutContextService {
     readonly siteService = inject(SiteService);
     readonly shareService = inject(ShareService);
     private readonly siteSettings = inject(SiteSettingsService);
+    private readonly bootstrap = inject(DashboardBootstrapService);
     readonly teamService = inject(TeamService);
     readonly perms = inject(PermissionService);
-    readonly profile = inject(UserProfileService);
-    readonly preferences = inject(UserPreferencesService);
-    private readonly analytics = inject(AnalyticsService);
     private readonly transloco = inject(TranslocoService);
 
-    readonly cloudHosted = signal(false);
-    readonly cloudSupportUrl = signal('');
+    readonly cloudHosted = this.bootstrap.cloudHosted;
+    readonly cloudSupportUrl = this.bootstrap.cloudSupportUrl;
     readonly canCreateTeams = computed(() => !this.cloudHosted());
     readonly isTeamAdmin = computed(() => {
         const role = this.teamService.activeTeam()?.role;
@@ -61,27 +57,6 @@ export class MainLayoutContextService {
             return;
         }
         this.initialized = true;
-
-        const currentUrl = this.router.routerState.snapshot.url;
-        if (currentUrl.startsWith('/share') || this.shareService.isShareMode()) {
-            return;
-        }
-
-        this.teamService.loadTeams().subscribe({ error: () => undefined });
-        this.analytics.getSystemStatus().subscribe({
-            next: (status) => {
-                this.cloudHosted.set(Boolean(status.cloud?.hosted));
-                this.cloudSupportUrl.set(status.cloud?.support_url?.trim() ?? '');
-            },
-            error: () => {
-                this.cloudHosted.set(false);
-                this.cloudSupportUrl.set('');
-            }
-        });
-        this.siteService.loadSites();
-        this.perms.loadPermissions().subscribe({ error: () => undefined });
-        this.profile.loadProfile().subscribe({ error: () => undefined });
-        this.preferences.load().subscribe({ error: () => undefined });
 
         effect(() => {
             const tab = this.siteSettings.request();

@@ -292,21 +292,11 @@ func (h *handler) handleGetTeams() http.HandlerFunc {
 			return
 		}
 
-		teams, activeTeamID, err := h.ctx.Store.ListUserTeams(r.Context(), userID)
+		resp, err := h.userTeamsResponse(r, userID)
 		if err != nil {
 			slog.Error("Failed to list teams", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
-		}
-
-		resp := struct {
-			ActiveTeamID  uuid.UUID   `json:"active_team_id"`
-			RecentTeamIDs []uuid.UUID `json:"recent_team_ids"`
-			Teams         []api.Team  `json:"teams"`
-		}{
-			ActiveTeamID:  activeTeamID,
-			RecentTeamIDs: orderedRecentTeamIDs(teams, activeTeamID),
-			Teams:         h.hydrateTeamSummaries(r, teams),
 		}
 
 		w.Header().Set("Content-Type", "application/json")

@@ -247,6 +247,12 @@ func openAPIV1CorePaths() map[string]any {
 					"409": errResp("Email already exists"),
 				}),
 		},
+		"/api/user/bootstrap": map[string]any{
+			"get": op([]string{"User"}, "Get dashboard bootstrap", "Returns authenticated dashboard startup context in one response.", secCookie(), nil, nil, map[string]any{
+				"200": jsonRefResp("Dashboard bootstrap", "#/components/schemas/UserBootstrap"),
+				"401": errResp("Unauthorized"),
+			}),
+		},
 		"/api/user/avatar": map[string]any{
 			"get": op([]string{"User"}, "Get avatar", "Proxies authenticated user's avatar image.", secCookie(), []any{paramRef("#/components/parameters/avatarSize")}, nil, map[string]any{"200": desc("Avatar image")}),
 		},

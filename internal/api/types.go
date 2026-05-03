@@ -152,6 +152,34 @@ type UserPreferences struct {
 	DismissedOnboardingAt *time.Time `json:"dismissed_onboarding_at,omitempty"`
 }
 
+type UserTeamsResponse struct {
+	ActiveTeamID  uuid.UUID   `json:"active_team_id"`
+	RecentTeamIDs []uuid.UUID `json:"recent_team_ids"`
+	Teams         []Team      `json:"teams"`
+}
+
+type PermissionContext struct {
+	InstanceRole        string            `json:"instance_role"`
+	Permissions         map[string]string `json:"permissions"`
+	InstancePermissions []string          `json:"instance_permissions"`
+}
+
+type SystemStatus struct {
+	NeedsSetup bool         `json:"needs_setup"`
+	Version    string       `json:"version"`
+	Cloud      *CloudStatus `json:"cloud,omitempty"`
+}
+
+type UserBootstrap struct {
+	Session     AuthSession       `json:"session"`
+	Profile     UserProfile       `json:"profile"`
+	Preferences UserPreferences   `json:"preferences"`
+	Teams       UserTeamsResponse `json:"teams"`
+	Permissions PermissionContext `json:"permissions"`
+	Sites       []Site            `json:"sites"`
+	Status      SystemStatus      `json:"status"`
+}
+
 type OnboardingStep struct {
 	Key        string `json:"key"`
 	Complete   bool   `json:"complete"`

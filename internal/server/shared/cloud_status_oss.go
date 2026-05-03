@@ -1,9 +1,9 @@
 //go:build !billing
 
-package system
+package shared
 
 import "hitkeep/internal/api"
 
-func (h *handler) cloudStatus() *api.CloudStatus {
+func (c *Context) CloudStatus() *api.CloudStatus {
 	return nil
 }

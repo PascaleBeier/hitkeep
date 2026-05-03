@@ -8,8 +8,8 @@ import { map, switchMap } from 'rxjs';
  * the language changes and the translation file is fully loaded.
  *
  * Safe to use without null guards: `preloadUserLang()` (APP_INITIALIZER)
- * guarantees the initial language is loaded before any component mounts,
- * so the signal always starts with a non-empty string.
+ * loads the browser/default language before any component mounts. User
+ * preferences can switch the active language after dashboard bootstrap.
  */
 export function injectActiveLang(): Signal<string> {
     const transloco = inject(TranslocoService);

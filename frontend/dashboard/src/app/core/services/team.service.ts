@@ -51,13 +51,15 @@ export class TeamService {
     loadTeams() {
         this.isLoading.set(true);
         return this.http.get<UserTeamsResponse>('/api/user/teams').pipe(
-            tap((response) => {
-                const teams = response.teams ?? [];
-                this.teams.set(teams);
-                this.activeTeamId.set(response.active_team_id || teams[0]?.id || '');
-            }),
+            tap((response) => this.applyTeams(response)),
             finalize(() => this.isLoading.set(false))
         );
+    }
+
+    applyTeams(response: UserTeamsResponse) {
+        const teams = response.teams ?? [];
+        this.teams.set(teams);
+        this.activeTeamId.set(response.active_team_id || teams[0]?.id || '');
     }
 
     setActiveTeam(teamID: string) {
