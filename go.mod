@@ -5,7 +5,7 @@ go 1.26.2
 require (
 	github.com/Boostport/mjml-go v0.16.0
 	github.com/duckdb/duckdb-go/v2 v2.10502.0
-	github.com/go-webauthn/webauthn v0.17.0
+	github.com/go-webauthn/webauthn v0.17.2
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
