@@ -5,6 +5,7 @@ import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { TagModule } from 'primeng/tag';
+import { CopyControl } from '@components/copy-control/copy-control';
 import { TeamService } from '@services/team.service';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { AnalyticsService } from '@services/analytics.service';
@@ -13,7 +14,7 @@ import { CloudPlanTier, SystemStatus, TeamRole } from '@models/analytics.types';
 
 @Component({
     selector: 'app-team-overview',
-    imports: [ButtonModule, CardModule, ProgressBarModule, TagModule, TranslocoPipe],
+    imports: [ButtonModule, CardModule, ProgressBarModule, TagModule, CopyControl, TranslocoPipe],
     templateUrl: './team-overview.html',
     styleUrl: './team-overview.css',
     changeDetection: ChangeDetectionStrategy.OnPush

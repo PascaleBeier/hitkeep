@@ -117,6 +117,12 @@ describe('SettingsAPIClients', () => {
                             },
                             common: {
                                 copyLink: 'Copy',
+                                copyControl: {
+                                    copy: 'Copy',
+                                    copied: 'Copied',
+                                    failed: 'Copy failed',
+                                    ariaLabel: 'Copy to clipboard'
+                                },
                                 columns: {
                                     name: 'Name',
                                     actions: 'Actions'

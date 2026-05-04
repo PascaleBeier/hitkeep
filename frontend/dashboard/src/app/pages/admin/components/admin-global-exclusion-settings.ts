@@ -16,6 +16,7 @@ import { TableModule } from 'primeng/table';
 
 import { IPExclusion } from '@models/analytics.types';
 import { ExclusionsService } from '@services/exclusions.service';
+import { CopyControl } from '@components/copy-control/copy-control';
 import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
 
 const ipOrCIDRPattern = /^(([0-9]{1,3}\.){3}[0-9]{1,3}(\/(3[0-2]|[12]?[0-9]))?|([0-9A-Fa-f:]+)(\/(12[0-8]|1[01][0-9]|[1-9]?[0-9]))?)$/;
@@ -29,7 +30,7 @@ interface ActionStatus {
 @Component({
     selector: 'app-admin-global-exclusion-settings',
     standalone: true,
-    imports: [ReactiveFormsModule, ButtonModule, ConfirmPopupModule, IconFieldModule, InputIconModule, InputTextModule, MessageModule, TableModule, RelativeDateTime, TranslocoPipe],
+    imports: [ReactiveFormsModule, ButtonModule, ConfirmPopupModule, IconFieldModule, InputIconModule, InputTextModule, MessageModule, TableModule, CopyControl, RelativeDateTime, TranslocoPipe],
     templateUrl: './admin-global-exclusion-settings.html',
     styleUrl: './admin-global-exclusion-settings.css',
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -136,18 +137,6 @@ export class AdminGlobalExclusionSettings {
 
     protected reload(): void {
         this.loadExclusions();
-    }
-
-    protected copyCurrentIP(): void {
-        const cidr = this.currentIPCIDR();
-        if (!cidr || typeof navigator === 'undefined' || !navigator.clipboard) {
-            return;
-        }
-
-        this.actionStatus.set(null);
-        navigator.clipboard.writeText(cidr).catch(() => {
-            this.error.set('admin.exclusions.errors.copyFailed');
-        });
     }
 
     private loadCurrentIP(): void {

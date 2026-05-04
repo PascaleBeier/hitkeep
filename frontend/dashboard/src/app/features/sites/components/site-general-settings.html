@@ -13,6 +13,15 @@
                 <span class="site-settings-field-label">{{ "sites.settings.general.domainLabel" | transloco }}</span>
                 <div class="site-settings-value font-mono">{{ site()?.domain }}</div>
             </div>
+            @if (site(); as activeSite) {
+            <div class="site-settings-field">
+                <span class="site-settings-field-label">{{ "sites.settings.general.siteIdLabel" | transloco }}</span>
+                <div class="site-settings-resource-row">
+                    <code class="site-settings-value site-settings-resource-value">{{ activeSite.id }}</code>
+                    <app-copy-control [value]="activeSite.id" [text]="true" [rounded]="true" size="small" styleClass="p-button-sm" />
+                </div>
+            </div>
+            }
         </div>
     </section>
 

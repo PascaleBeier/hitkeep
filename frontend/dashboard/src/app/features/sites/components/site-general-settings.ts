@@ -5,6 +5,7 @@ import { finalize } from 'rxjs';
 
 import { SplitButtonModule } from 'primeng/splitbutton';
 import { MenuItem } from 'primeng/api';
+import { CopyControl } from '@components/copy-control/copy-control';
 import { Site } from '@models/analytics.types';
 import { buildTakeoutExportMenuItems, DEFAULT_TAKEOUT_EXPORT_FORMAT, TakeoutExportFormat } from '@core/export/export-formats';
 import { TakeoutDownloadService } from '@services/takeout-download.service';
@@ -12,7 +13,7 @@ import { TakeoutDownloadService } from '@services/takeout-download.service';
 @Component({
     selector: 'app-site-general-settings',
     standalone: true,
-    imports: [SplitButtonModule, TranslocoPipe],
+    imports: [SplitButtonModule, CopyControl, TranslocoPipe],
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './site-general-settings.html',
     styleUrl: './site-general-settings.css'

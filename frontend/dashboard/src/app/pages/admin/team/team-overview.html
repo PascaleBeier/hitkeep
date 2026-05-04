@@ -7,7 +7,13 @@
             <div class="team-overview__card-body">
                 <span class="team-overview__card-label">{{ "admin.team.overview.title" | transloco }}</span>
                 <span class="team-overview__card-value">{{ t.name }}</span>
-                <span class="team-overview__card-meta">{{ t.id }}</span>
+                <div class="team-overview__resource-row">
+                    <div class="team-overview__resource-copy">
+                        <span class="team-overview__card-meta">{{ "admin.team.overview.teamIdLabel" | transloco }}</span>
+                        <code>{{ t.id }}</code>
+                    </div>
+                    <app-copy-control [value]="t.id" [text]="true" [rounded]="true" size="small" styleClass="p-button-sm" />
+                </div>
             </div>
         </p-card>
 

@@ -48,6 +48,29 @@
     font-weight: 650;
 }
 
+.settings-resource-label {
+    color: var(--p-text-color);
+    font-size: 0.84rem;
+    font-weight: 650;
+    line-height: 1.2;
+}
+
+.settings-resource-row {
+    align-items: center;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: space-between;
+    min-width: 0;
+}
+
+.settings-resource-row code {
+    color: var(--p-text-color);
+    font-size: 0.82rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .settings-field-hint {
     margin: 0;
     color: var(--p-text-muted-color);

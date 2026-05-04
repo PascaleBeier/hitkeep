@@ -13,7 +13,7 @@
                     <p>{{ "sites.exclusions.suggestionsHint" | transloco }}</p>
                 </div>
             </div>
-            <p-button [label]="'sites.exclusions.copySuggestionsAction' | transloco" icon="pi pi-copy" [text]="true" [type]="'button'" [disabled]="isCurrentIPLoading() || !currentIPCIDR()" (onClick)="copyCurrentIP()" />
+            <app-copy-control [value]="currentIPCIDR()" [text]="true" [disabled]="isCurrentIPLoading() || !currentIPCIDR()" />
         </header>
         <div class="site-settings-card__body">
             <code class="site-exclusions__code">

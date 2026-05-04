@@ -111,13 +111,7 @@
                 @if (generatedUrl()) {
                 <div class="utm-builder-generated-url" role="textbox" aria-readonly="true" [attr.aria-label]="'utmBuilder.preview.title' | transloco">{{ generatedUrl() }}</div>
 
-                <p-button
-                    [icon]="copied() ? 'pi pi-check' : 'pi pi-copy'"
-                    [label]="(copied() ? 'common.copied' : 'utmBuilder.preview.copyAction') | transloco"
-                    [severity]="copied() ? 'success' : 'primary'"
-                    styleClass="w-full justify-center"
-                    (onClick)="copyUrl()"
-                />
+                <app-copy-control [value]="generatedUrl()" [fluid]="true" styleClass="w-full justify-center" />
                 } @else {
                 <div class="utm-builder-empty-preview">
                     <i class="pi pi-link" style="color: var(--p-primary-color)" aria-hidden="true"></i>

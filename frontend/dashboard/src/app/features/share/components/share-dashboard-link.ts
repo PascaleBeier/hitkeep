@@ -9,6 +9,7 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
 import { ShareLink, ShareService } from '@services/share.service';
 import { SiteService } from '@features/sites/services/site.service';
+import { CopyControl } from '@components/copy-control/copy-control';
 import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
 
 interface ShareNotice {
@@ -18,7 +19,7 @@ interface ShareNotice {
 
 @Component({
     selector: 'app-share-dashboard-link',
-    imports: [ButtonModule, DialogModule, InputTextModule, TableModule, ConfirmDialogModule, RelativeDateTime, TranslocoPipe],
+    imports: [ButtonModule, DialogModule, InputTextModule, TableModule, ConfirmDialogModule, CopyControl, RelativeDateTime, TranslocoPipe],
     providers: [ConfirmationService],
     templateUrl: './share-dashboard-link.html',
     styleUrl: './share-dashboard-link.css',
@@ -90,22 +91,6 @@ export class ShareDashboardLink {
                 this.notice.set({ kind: 'error', key: 'share.dialog.generateFailed' });
             }
         });
-    }
-
-    protected copyShareLink(link: ShareLink) {
-        if (!link.url) {
-            this.notice.set({ kind: 'error', key: 'share.dialog.copyUnavailable' });
-            return;
-        }
-
-        navigator.clipboard
-            .writeText(link.url)
-            .then(() => {
-                this.notice.set({ kind: 'success', key: 'share.dialog.copySuccess' });
-            })
-            .catch(() => {
-                this.notice.set({ kind: 'error', key: 'share.dialog.copyFailed' });
-            });
     }
 
     protected confirmDeleteShareLink(link: ShareLink) {

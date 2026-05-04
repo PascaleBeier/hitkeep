@@ -60,6 +60,28 @@
     font-size: 0.82rem;
 }
 
+.team-overview__resource-row {
+    align-items: center;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: space-between;
+    min-width: 0;
+}
+
+.team-overview__resource-copy {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.team-overview__resource-copy code {
+    color: var(--p-text-color);
+    font-size: 0.8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .team-overview__usage {
     display: flex;
     flex-direction: column;

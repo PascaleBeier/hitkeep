@@ -13,6 +13,7 @@ import { SelectModule } from 'primeng/select';
 import { TableModule } from 'primeng/table';
 
 import { SettingsCard } from '@features/settings/components/settings-card';
+import { CopyControl } from '@components/copy-control/copy-control';
 import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
 import { APIClient, APIClientSiteRole, APIClientsService, CreateAPIClientRequest, InstanceRole, SiteRole } from '@services/api-clients.service';
 import { PermissionService } from '@services/permission.service';
@@ -50,7 +51,7 @@ const expiresAtNotPastValidator = (): ValidatorFn => {
 
 @Component({
     selector: 'app-settings-api-clients',
-    imports: [ReactiveFormsModule, ButtonModule, ConfirmPopupModule, InputTextModule, SelectModule, TableModule, SettingsCard, RelativeDateTime, TranslocoPipe],
+    imports: [ReactiveFormsModule, ButtonModule, ConfirmPopupModule, InputTextModule, SelectModule, TableModule, SettingsCard, CopyControl, RelativeDateTime, TranslocoPipe],
     templateUrl: './settings-api-clients.html',
     styleUrl: './settings-api-clients.css',
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -353,15 +354,6 @@ export class SettingsAPIClients {
 
     protected siteDomain(siteID: string): string {
         return this.sites().find((site) => site.id === siteID)?.domain ?? siteID;
-    }
-
-    protected copyCreatedToken(): void {
-        const token = this.createdToken();
-        if (!token || typeof navigator === 'undefined' || !navigator.clipboard) {
-            return;
-        }
-
-        navigator.clipboard.writeText(token).catch(() => undefined);
     }
 
     protected expiresAtMin(): string {

@@ -14,7 +14,7 @@
                     @if (isCurrentIPLoading()) { {{ "admin.exclusions.currentIpLoading" | transloco }} } @else if (currentIPCIDR(); as currentIPCIDR) { {{ currentIPCIDR }} } @else { {{ "admin.exclusions.currentIpUnavailable" | transloco }} }
                 </code>
             </div>
-            <p-button [label]="'admin.exclusions.copySuggestionsAction' | transloco" icon="pi pi-copy" [text]="true" size="small" [type]="'button'" [disabled]="isCurrentIPLoading() || !currentIPCIDR()" (onClick)="copyCurrentIP()" />
+            <app-copy-control [value]="currentIPCIDR()" [text]="true" size="small" [disabled]="isCurrentIPLoading() || !currentIPCIDR()" />
         </div>
     </div>
 

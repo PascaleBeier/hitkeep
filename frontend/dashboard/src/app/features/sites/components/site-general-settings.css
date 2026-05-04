@@ -1,0 +1,22 @@
+:host {
+    display: block;
+}
+
+.site-settings-card__body {
+    display: grid;
+    gap: 1rem;
+}
+
+.site-settings-resource-row {
+    align-items: center;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: space-between;
+    min-width: 0;
+}
+
+.site-settings-resource-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

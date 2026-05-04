@@ -12,6 +12,7 @@ import { TableModule } from 'primeng/table';
 
 import { IPExclusion, Site } from '@models/analytics.types';
 import { ExclusionsService } from '@services/exclusions.service';
+import { CopyControl } from '@components/copy-control/copy-control';
 import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
 
 const ipOrCIDRPattern = /^(([0-9]{1,3}\.){3}[0-9]{1,3}(\/(3[0-2]|[12]?[0-9]))?|([0-9A-Fa-f:]+)(\/(12[0-8]|1[01][0-9]|[1-9]?[0-9]))?)$/;
@@ -19,7 +20,7 @@ const ipOrCIDRPattern = /^(([0-9]{1,3}\.){3}[0-9]{1,3}(\/(3[0-2]|[12]?[0-9]))?|(
 @Component({
     selector: 'app-site-exclusion-settings',
     standalone: true,
-    imports: [ReactiveFormsModule, ButtonModule, ConfirmPopupModule, InputTextModule, TableModule, RelativeDateTime, TranslocoPipe],
+    imports: [ReactiveFormsModule, ButtonModule, ConfirmPopupModule, InputTextModule, TableModule, CopyControl, RelativeDateTime, TranslocoPipe],
     templateUrl: './site-exclusion-settings.html',
     styleUrl: './site-exclusion-settings.css',
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -121,17 +122,6 @@ export class SiteExclusionSettings {
             error: () => {
                 this.error.set('sites.exclusions.errors.deleteFailed');
             }
-        });
-    }
-
-    protected copyCurrentIP(): void {
-        const cidr = this.currentIPCIDR();
-        if (!cidr || typeof navigator === 'undefined' || !navigator.clipboard) {
-            return;
-        }
-
-        navigator.clipboard.writeText(cidr).catch(() => {
-            this.error.set('sites.exclusions.errors.copyFailed');
         });
     }
 

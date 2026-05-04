@@ -82,6 +82,16 @@
                                 <small class="settings-field-error">{{ "settings.user.profile.validation.emailTooLong" | transloco }}</small>
                                 }
                             </div>
+
+                            @if (profile(); as signedInProfile) {
+                            <div class="settings-field">
+                                <span class="settings-resource-label">{{ "settings.user.profile.userIdLabel" | transloco }}</span>
+                                <div class="settings-resource-row">
+                                    <code>{{ signedInProfile.id }}</code>
+                                    <app-copy-control [value]="signedInProfile.id" [text]="true" [rounded]="true" size="small" styleClass="p-button-sm" />
+                                </div>
+                            </div>
+                            }
                         </div>
 
                         <div settings-card-footer>

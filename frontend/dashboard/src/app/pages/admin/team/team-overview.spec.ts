@@ -81,6 +81,7 @@ describe('TeamOverviewPage', () => {
                                 team: {
                                     overview: {
                                         title: 'Team',
+                                        teamIdLabel: 'Team ID',
                                         memberCount: 'Members',
                                         usage: {
                                             title: 'Usage and limits',
@@ -126,7 +127,15 @@ describe('TeamOverviewPage', () => {
                                     }
                                 }
                             },
-                            common: { columns: { role: 'Role' } },
+                            common: {
+                                columns: { role: 'Role' },
+                                copyControl: {
+                                    copy: 'Copy',
+                                    copied: 'Copied',
+                                    failed: 'Copy failed',
+                                    ariaLabel: 'Copy to clipboard'
+                                }
+                            },
                             teams: { roles: { owner: 'Owner' } },
                             signup: {
                                 plans: {
@@ -195,6 +204,16 @@ describe('TeamOverviewPage', () => {
         expect(text).toContain('Sites');
         expect(text).toContain('Members');
         expect(text).toContain('2 pending invites');
+    });
+
+    it('renders the active team ID with a copy control', () => {
+        const text = fixture.nativeElement.textContent;
+        const copyButton = fixture.nativeElement.querySelector('app-copy-control button') as HTMLButtonElement | null;
+
+        expect(text).toContain('Team ID');
+        expect(text).toContain('00000000-0000-0000-0000-000000000001');
+        expect(copyButton).not.toBeNull();
+        expect(copyButton?.getAttribute('aria-label')).toBe('Copy to clipboard');
     });
 
     it('renders cloud plan with inline upgrade comparison for free users', () => {

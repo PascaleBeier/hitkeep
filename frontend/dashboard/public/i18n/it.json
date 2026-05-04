@@ -484,8 +484,13 @@
         "unknownError": "Errore sconosciuto",
         "unspecified": "Non specificato",
         "visitors": "visitatori",
-        "copyLink": "Copia link",
         "copied": "Copiato",
+        "copyControl": {
+            "copy": "Copia",
+            "copied": "Copiato",
+            "failed": "Copia non riuscita",
+            "ariaLabel": "Copia negli appunti"
+        },
         "yes": "Sì",
         "no": "No",
         "enabled": "Abilitato",
@@ -690,8 +695,7 @@
         },
         "preview": {
             "title": "URL generato",
-            "description": "Compila l'URL del sito web e la sorgente campagna per generare un link taggato.",
-            "copyAction": "Copia URL"
+            "description": "Compila l'URL del sito web e la sorgente campagna per generare un link taggato."
         },
         "reference": {
             "title": "Riferimento parametri",
@@ -797,6 +801,7 @@
                 "givenNamePlaceholder": "Ada",
                 "lastNameLabel": "Cognome",
                 "lastNamePlaceholder": "Lovelace",
+                "userIdLabel": "ID utente",
                 "saveAction": "Salva profilo",
                 "status": {
                     "saved": "Profilo salvato"
@@ -978,10 +983,7 @@
             "deleteConfirmMessage": "Chiunque usi questo link perderà subito l'accesso.",
             "createSuccess": "Link condiviso creato.",
             "deleteSuccess": "Link condiviso eliminato.",
-            "deleteFailed": "Impossibile eliminare il link condiviso ora.",
-            "copySuccess": "URL condiviso copiato.",
-            "copyFailed": "Impossibile copiare l'URL condiviso.",
-            "copyUnavailable": "Solo i link appena creati possono essere copiati da questa sessione."
+            "deleteFailed": "Impossibile eliminare il link condiviso ora."
         },
         "page": {
             "loading": "Caricamento dashboard condivisa...",
@@ -1033,7 +1035,6 @@
             "confirmDelete": "Eliminare l'esclusione {{cidr}}?",
             "suggestionsTitle": "Il tuo IP attuale",
             "suggestionsHint": "Copia questo CIDR e incollalo nel campo IP o CIDR.",
-            "copySuggestionsAction": "Copia IP attuale",
             "currentIpLoading": "Risoluzione del tuo IP...",
             "currentIpUnavailable": "Impossibile risolvere il tuo IP attuale.",
             "columns": {
@@ -1046,8 +1047,7 @@
                 "descriptionTooLong": "La descrizione deve essere di massimo 255 caratteri.",
                 "loadFailed": "Impossibile caricare le esclusioni.",
                 "createFailed": "Impossibile creare l'esclusione.",
-                "deleteFailed": "Impossibile eliminare l'esclusione.",
-                "copyFailed": "Impossibile copiare l'IP attuale."
+                "deleteFailed": "Impossibile eliminare l'esclusione."
             }
         },
         "selector": {
@@ -1077,6 +1077,7 @@
             "general": {
                 "title": "Impostazioni generali",
                 "domainLabel": "Dominio",
+                "siteIdLabel": "ID sito",
                 "dataExportTitle": "Esportazione dati",
                 "exportSiteDataTitle": "Esporta dati sito",
                 "exportSiteDataDescription": "Scarica tutti gli hit e gli eventi di questo sito in CSV, XLSX, Parquet, JSON o NDJSON.",
@@ -1187,7 +1188,6 @@
             "confirmDelete": "Eliminare il filtro globale {{cidr}}?",
             "suggestionsTitle": "Il tuo IP attuale",
             "suggestionsHint": "Copia questo CIDR e incollalo nel campo IP o CIDR.",
-            "copySuggestionsAction": "Copia IP attuale",
             "currentIpLoading": "Risoluzione del tuo IP...",
             "currentIpUnavailable": "Impossibile risolvere il tuo IP attuale.",
             "columns": {
@@ -1200,8 +1200,7 @@
                 "descriptionTooLong": "La descrizione deve essere di massimo 255 caratteri.",
                 "loadFailed": "Impossibile caricare i filtri globali.",
                 "createFailed": "Impossibile creare il filtro globale.",
-                "deleteFailed": "Impossibile eliminare il filtro globale.",
-                "copyFailed": "Impossibile copiare l'IP attuale."
+                "deleteFailed": "Impossibile eliminare il filtro globale."
             },
             "status": {
                 "deleteSuccess": "Filtro globale {{cidr}} eliminato."
@@ -1254,6 +1253,7 @@
             "overview": {
                 "breadcrumb": "Panoramica del team",
                 "title": "Team",
+                "teamIdLabel": "ID team",
                 "memberCount": "Membri",
                 "quickActions": "Azioni rapide",
                 "manageMembers": "Gestisci membri",

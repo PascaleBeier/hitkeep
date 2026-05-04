@@ -7,6 +7,7 @@ import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { compatForm } from '@angular/forms/signals/compat';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
+import { CopyControl } from '@components/copy-control/copy-control';
 import { PageFrame } from '@components/page-frame/page-frame';
 import { localeFlagUrl } from '@core/i18n/flag-utils';
 import { getBaseLanguage, getLocaleDirection, normalizeLocaleTag, TextDirection } from '@core/i18n/locale-utils';
@@ -42,7 +43,7 @@ type UserSettingsTab = 'account' | 'security' | 'export';
 
 @Component({
     selector: 'app-user-settings',
-    imports: [ReactiveFormsModule, ButtonModule, InputTextModule, SelectModule, SplitButtonModule, TabsModule, SettingsCard, SettingsSecurity, PageFrame, TranslocoPipe, NgOptimizedImage],
+    imports: [ReactiveFormsModule, ButtonModule, InputTextModule, SelectModule, SplitButtonModule, TabsModule, SettingsCard, SettingsSecurity, PageFrame, CopyControl, TranslocoPipe, NgOptimizedImage],
     templateUrl: './user-settings.html',
     styleUrl: './user-settings.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -73,6 +74,7 @@ export class UserSettings {
     protected readonly profileSaveError = signal<string | null>(null);
     protected readonly profileSaveState = signal<'idle' | 'saved' | 'error'>('idle');
     protected readonly initialProfile = signal<EditableProfile | null>(null);
+    protected readonly profile = this.profileService.profile;
 
     protected readonly isLoading = this.preferencesService.isLoading;
     protected readonly isSaving = this.preferencesService.isSaving;

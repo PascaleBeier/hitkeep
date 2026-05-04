@@ -8,6 +8,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { SelectModule } from 'primeng/select';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
+import { CopyControl } from '@components/copy-control/copy-control';
 import { SiteService } from '@features/sites/services/site.service';
 import { SiteFavicon } from '@features/sites/components/site-favicon';
 import { Site } from '@models/analytics.types';
@@ -30,13 +31,12 @@ function urlValidator(): ValidatorFn {
     templateUrl: './utm-builder.html',
     styleUrl: './utm-builder.css',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, ReactiveFormsModule, TranslocoPipe, ButtonModule, InputTextModule, SelectModule, SiteFavicon, PageHeader, PageHeaderLeft, PageBreadcrumb]
+    imports: [FormsModule, ReactiveFormsModule, TranslocoPipe, ButtonModule, InputTextModule, SelectModule, SiteFavicon, PageHeader, PageHeaderLeft, PageBreadcrumb, CopyControl]
 })
 export class UtmBuilder {
     private transloco = inject(TranslocoService);
     protected siteService = inject(SiteService);
 
-    protected copied = signal(false);
     protected selectedSite = signal<Site | null>(null);
 
     protected form = new FormGroup({
@@ -77,18 +77,6 @@ export class UtmBuilder {
 
     protected readonly utmParamKeys = ['source', 'medium', 'campaign', 'term', 'content'] as const;
 
-    protected async copyUrl() {
-        const url = this.generatedUrl();
-        if (!url) return;
-        try {
-            await navigator.clipboard.writeText(url);
-            this.copied.set(true);
-            setTimeout(() => this.copied.set(false), 2000);
-        } catch {
-            // clipboard unavailable
-        }
-    }
-
     protected prefillFromSite(site: Site | null): void {
         if (!site) return;
         this.form.controls.url.setValue(`https://${site.domain}`);
@@ -99,7 +87,6 @@ export class UtmBuilder {
 
     protected clearForm() {
         this.form.reset();
-        this.copied.set(false);
         this.selectedSite.set(null);
     }
 }

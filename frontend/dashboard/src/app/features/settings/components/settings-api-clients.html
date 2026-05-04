@@ -11,7 +11,7 @@
             <p class="mb-2">{{ "settings.apiClients.tokenNotice.description" | transloco }}</p>
             <code class="api-client-token">{{ token }}</code>
             <div class="mt-2">
-                <p-button [label]="'common.copyLink' | transloco" icon="pi pi-copy" [text]="true" [type]="'button'" (onClick)="copyCreatedToken()" />
+                <app-copy-control [value]="token" [text]="true" />
             </div>
         </div>
         }
