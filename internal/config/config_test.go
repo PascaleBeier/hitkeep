@@ -502,6 +502,28 @@ func TestFlagHealthcheckRegistered(t *testing.T) {
 	}
 }
 
+func TestHealthcheckLoadSkipsRuntimeNormalization(t *testing.T) {
+	conf := load([]string{"-healthcheck", "-http-addr", ":9090"}, func(key, fallback string) string {
+		return fallback
+	})
+
+	if !conf.Healthcheck {
+		t.Fatal("expected healthcheck mode")
+	}
+	if conf.HTTPAddr != ":9090" {
+		t.Fatalf("expected HTTPAddr from flag, got %q", conf.HTTPAddr)
+	}
+	if conf.JWTSecret != "" {
+		t.Fatal("expected healthcheck config load to skip JWT secret generation")
+	}
+	if conf.NodeName != "" {
+		t.Fatal("expected healthcheck config load to skip node name generation")
+	}
+	if len(conf.GetTrustedProxyNetworks()) != 0 {
+		t.Fatal("expected healthcheck config load to skip trusted proxy parsing")
+	}
+}
+
 func TestLogValueDefaultConfig(t *testing.T) {
 	conf := load([]string{}, func(key, fallback string) string {
 		return fallback

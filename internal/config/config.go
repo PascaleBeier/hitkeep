@@ -164,6 +164,10 @@ func load(args []string, getEnv func(string, string) string) *Config {
 	registerCloudFlags(fs, &conf)
 	_ = fs.Parse(args)
 
+	if conf.Healthcheck {
+		return &conf
+	}
+
 	normalizeConfig(&conf)
 	return &conf
 }
@@ -334,7 +338,7 @@ func normalizeConfig(conf *Config) {
 	if conf.TrustedProxies != "" {
 		conf.trustedProxyNets = parseTrustedProxies(conf.TrustedProxies)
 		if len(conf.trustedProxyNets) > 0 {
-			slog.Info("Loaded trusted proxy networks", "count", len(conf.trustedProxyNets))
+			slog.Debug("Loaded trusted proxy networks", "count", len(conf.trustedProxyNets))
 		}
 	}
 
