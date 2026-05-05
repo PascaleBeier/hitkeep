@@ -190,10 +190,21 @@ func TestOpenAPISpecV1IncludesAdminSystemPaths(t *testing.T) {
 		"/api/admin/system/mail/test",
 		"/api/admin/system/audit",
 		"/api/admin/system/audit/export",
+		"/api/admin/teams",
+		"/api/admin/teams/{id}",
+		"/api/admin/teams/{id}/archive",
 	}
 	for _, path := range expectedPaths {
 		if _, ok := paths[path]; !ok {
 			t.Fatalf("expected %s path to exist", path)
+		}
+	}
+
+	adminTeamsSchema := requireMap(t, schemas, "AdminTeam")
+	adminTeamsProps := requireMap(t, adminTeamsSchema, "properties")
+	for _, prop := range []string{"id", "name", "is_default", "is_archived", "member_count", "site_count", "created_at"} {
+		if _, ok := adminTeamsProps[prop]; !ok {
+			t.Fatalf("expected AdminTeam.%s property to exist", prop)
 		}
 	}
 

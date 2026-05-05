@@ -349,9 +349,7 @@ func (h *handler) handleExportAIChatbots() http.HandlerFunc {
 		}
 
 		downloadName := fmt.Sprintf("ai-chatbots_%s_%d.%s", params.SiteID, time.Now().Unix(), format)
-		w.Header().Set("Content-Disposition", "attachment; filename="+downloadName)
-		w.Header().Set("Content-Type", exportfmt.ContentType(format))
-		http.ServeFile(w, r, filename)
+		shared.ServeTempExportFile(w, r, filename, downloadName, exportfmt.ContentType(format), "hitkeep_ai_chatbots_")
 
 		go cleanupAIChatbotExportFile(filename)
 	}

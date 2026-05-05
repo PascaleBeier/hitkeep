@@ -135,6 +135,17 @@ func openAPIV1AdminSitePaths() map[string]any {
 		"/api/admin/sites/{id}": map[string]any{
 			"delete": op([]string{"Admin"}, "Delete site (admin)", "Deletes site by admin endpoint.", secCookie(), []any{paramRef("#/components/parameters/siteID")}, nil, map[string]any{"200": jsonRefResp("Status", "#/components/schemas/Status")}),
 		},
+		"/api/admin/teams": map[string]any{
+			"get": op([]string{"Admin"}, "List all teams", "Lists teams for instance-level administration, including default/archive state and member/site counts.", secCookie(), nil, nil, map[string]any{
+				"200": jsonSchemaResp("Admin team list", map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/AdminTeam"}}),
+			}),
+		},
+		"/api/admin/teams/{id}/archive": map[string]any{
+			"post": op([]string{"Admin"}, "Archive team (admin)", "Archives a non-default team from the instance admin surface after its sites have been moved or deleted.", secCookie(), []any{paramRef("#/components/parameters/teamID")}, nil, map[string]any{
+				"200": jsonRefResp("Status", "#/components/schemas/Status"),
+				"400": errResp("The default team cannot be archived, or the team is not found or already archived"),
+			}),
+		},
 		"/api/admin/teams/{id}": map[string]any{
 			"delete": op([]string{"Admin"}, "Delete archived team", "Permanently deletes an archived non-default team and removes its per-tenant analytics database directory.", secCookie(), []any{paramRef("#/components/parameters/teamID")}, nil, map[string]any{
 				"200": jsonRefResp("Delete archived team response", "#/components/schemas/AdminDeleteTeamResponse"),

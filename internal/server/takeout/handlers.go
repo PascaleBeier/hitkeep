@@ -2,7 +2,6 @@ package takeout
 
 import (
 	"net/http"
-	"path/filepath"
 
 	"github.com/google/uuid"
 
@@ -50,10 +49,7 @@ func (h *TakeoutHandler) handleUserTakeout() http.HandlerFunc {
 			return
 		}
 
-		// Serve the file
-		w.Header().Set("Content-Disposition", "attachment; filename="+filepath.Base(filename))
-		w.Header().Set("Content-Type", exportfmt.ContentTypeForFilename(filename))
-		http.ServeFile(w, r, filename)
+		h.serveTakeoutFile(w, r, filename)
 
 		go func() {
 			h.service.CleanupExportFile(filename)
@@ -79,12 +75,26 @@ func (h *TakeoutHandler) handleSiteTakeout() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Disposition", "attachment; filename="+filepath.Base(filename))
-		w.Header().Set("Content-Type", exportfmt.ContentTypeForFilename(filename))
-		http.ServeFile(w, r, filename)
+		h.serveTakeoutFile(w, r, filename)
 
 		go func() {
 			h.service.CleanupExportFile(filename)
 		}()
 	}
+}
+
+func (h *TakeoutHandler) serveTakeoutFile(w http.ResponseWriter, r *http.Request, filename string) {
+	exportFile, err := h.service.OpenExportFile(filename)
+	if err != nil {
+		http.Error(w, "Failed to export file", http.StatusInternalServerError)
+		return
+	}
+	defer func() {
+		_ = exportFile.File.Close()
+	}()
+
+	downloadName := exportFile.Name
+	w.Header().Set("Content-Disposition", "attachment; filename="+downloadName)
+	w.Header().Set("Content-Type", exportfmt.ContentTypeForFilename(downloadName))
+	http.ServeContent(w, r, downloadName, exportFile.Info.ModTime(), exportFile.File)
 }

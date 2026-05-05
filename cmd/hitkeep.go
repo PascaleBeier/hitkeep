@@ -269,14 +269,20 @@ func runHealthcheck(conf *config.Config) error {
 
 	url := fmt.Sprintf("http://127.0.0.1:%s/healthz", port)
 
+	transport := &http.Transport{
+		DisableKeepAlives: true,
+	}
+	defer transport.CloseIdleConnections()
+
 	client := http.Client{
-		Timeout: 2 * time.Second,
+		Timeout:   2 * time.Second,
+		Transport: transport,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
 	if err != nil {
 		return fmt.Errorf("build healthcheck request: %w", err)
 	}

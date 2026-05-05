@@ -463,9 +463,7 @@ func (h *handler) handleExportShareHits() http.HandlerFunc {
 			return
 		}
 		downloadName := fmt.Sprintf("hits_%s_%d.%s", site.ID, time.Now().Unix(), format)
-		w.Header().Set("Content-Disposition", "attachment; filename="+downloadName)
-		w.Header().Set("Content-Type", exportfmt.ContentType(format))
-		http.ServeFile(w, r, filename)
+		shared.ServeTempExportFile(w, r, filename, downloadName, exportfmt.ContentType(format), "hitkeep_hits_")
 
 		go func() {
 			cleanupShareHitsExportFile(filename)

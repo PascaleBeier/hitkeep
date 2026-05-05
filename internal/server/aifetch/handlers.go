@@ -374,9 +374,7 @@ func (h *handler) handleExportAIFetch() http.HandlerFunc {
 			return
 		}
 		downloadName := fmt.Sprintf("ai-fetches_%s_%d.%s", params.SiteID, time.Now().Unix(), format)
-		w.Header().Set("Content-Disposition", "attachment; filename="+downloadName)
-		w.Header().Set("Content-Type", exportfmt.ContentType(format))
-		http.ServeFile(w, r, tmpFile)
+		shared.ServeTempExportFile(w, r, tmpFile, downloadName, exportfmt.ContentType(format), "hitkeep_aifetch_")
 
 		go func() {
 			cleanupAIFetchExportFile(tmpFile)

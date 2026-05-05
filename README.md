@@ -14,11 +14,12 @@ HitKeep is an open source analytics platform for teams that need clear product r
 - Single binary runtime
 - Embedded DuckDB and NSQ with batched ingest writes
 - Privacy-first tracking
-- Traffic, goals, funnels, ecommerce, AI visibility, AI chatbot analytics, and email reports
+- AI visibility analytics for server-side crawler fetches and AI-referred visits
+- Traffic, goals, funnels, ecommerce, AI chatbot analytics, and email reports
 - Scoped API clients and read-only MCP access for agents, assistants, and internal reporting tools
 - Self-hosted or managed cloud with EU/US region choice
 
-[Website](https://hitkeep.com) · [Cloud](https://hitkeep.com/cloud) · [Live Demo](https://demo.hitkeep.com/share/7a55968bb42df256512fbe7ff73ab88f29dd45c236eddc818bd66420b4ffbaad) · [Docs](https://hitkeep.com/guides/introduction/) · [API](https://hitkeep.com/api/) · [Releases](https://github.com/PascaleBeier/hitkeep/releases)
+[AI Performance](https://hitkeep.com/ai-performance/) · [Website](https://hitkeep.com) · [Cloud](https://hitkeep.com/cloud) · [Live Demo](https://demo.hitkeep.com/share/7a55968bb42df256512fbe7ff73ab88f29dd45c236eddc818bd66420b4ffbaad) · [Docs](https://hitkeep.com/guides/introduction/) · [API](https://hitkeep.com/api/) · [Releases](https://github.com/PascaleBeier/hitkeep/releases)
 
 ![HitKeep analytics dashboard — traffic overview, geographic breakdown, goals, funnels, and UTM attribution](./.github/assets/dashboard-overview.png)
 
@@ -29,10 +30,19 @@ HitKeep is for teams that want product analytics without adopting a full analyti
 - **Simple to run:** one binary, one data directory, no external database required
 - **Efficient write path:** NSQ buffers ingest bursts and DuckDB appender batches smooth out disk-heavy per-row inserts
 - **Privacy-first by default:** cookie-less tracking, Do Not Track support, focused data collection
+- **Ready for AI visibility work:** server-side AI crawler fetch analytics, AI-referred visits from the browser tracker, and correlation reports for pages that get crawler interest but weak downstream traffic
 - **Useful out of the box:** traffic analytics with countries/languages audience toggles, top/landing/exit page views, custom events, goals, funnels, ecommerce, UTM attribution, and scheduled email reports
-- **Ready for modern discovery:** AI visibility analytics for server-side AI crawler fetches and downstream AI-referred visits, plus on-site AI chatbot analytics built on structured custom events
 - **Built for teams:** passkeys, TOTP, site and team permissions, API clients, share links, and audit visibility
 - **Flexible deployment:** self-host it yourself or use HitKeep Cloud and still keep the migration path open
+
+## For SEO Agencies
+
+HitKeep can run a 14-day AI visibility pilot for one client site. Install `hk.js` for normal pageviews and AI-referred human visits, then forward server-side crawler fetches from CloudFront, nginx, Caddy, or an app server into HitKeep. The AI Visibility dashboard shows which pages GPTBot, ClaudeBot, PerplexityBot, and other crawlers request, which fetched pages later receive AI-referred visits, and where crawler errors create SEO work.
+
+- [AI performance landing page](https://hitkeep.com/ai-performance/)
+- [AI visibility analytics for SEO agencies](https://hitkeep.com/use-cases/ai-visibility-seo-agencies/)
+- [CloudFront AI crawler tracking](https://hitkeep.com/guides/tracking/cloudfront-ai-crawler-tracking/)
+- [AI Fetch on AWS setup guide](https://hitkeep.com/guides/tracking/ai-fetch-aws/)
 
 ## Quick Start
 
@@ -102,6 +112,7 @@ Tracker options, ecommerce events, custom events, and advanced tracking examples
 - [Custom events](https://hitkeep.com/guides/tracking/custom-events/)
 - [Ecommerce analytics](https://hitkeep.com/guides/analytics/ecommerce/)
 - [AI visibility analytics](https://hitkeep.com/guides/analytics/ai-visibility/)
+- [CloudFront AI crawler tracking](https://hitkeep.com/guides/tracking/cloudfront-ai-crawler-tracking/)
 - [AI chatbot analytics](https://hitkeep.com/guides/analytics/ai-chatbot-analytics/)
 
 ## Product Tour

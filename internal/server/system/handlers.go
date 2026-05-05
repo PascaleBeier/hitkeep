@@ -23,14 +23,6 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 
 func (h *handler) handleHealthz() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if h.ctx.Store != nil {
-			if err := h.ctx.Store.DB().Ping(); err != nil {
-				slog.Error("Healthcheck failed: database unreachable", "error", err)
-				http.Error(w, "Database unavailable", http.StatusServiceUnavailable)
-				return
-			}
-		}
-
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte("ok")); err != nil {
 			slog.Error("Failed to write healthcheck response", "error", err)

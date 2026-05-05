@@ -180,6 +180,18 @@ func openAPIV1AccountSchemas() map[string]any {
 				},
 			},
 		},
+		"AdminTeam": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"id":           map[string]any{"type": "string", "format": "uuid"},
+				"name":         map[string]any{"type": "string"},
+				"is_default":   map[string]any{"type": "boolean"},
+				"is_archived":  map[string]any{"type": "boolean"},
+				"member_count": map[string]any{"type": "integer"},
+				"site_count":   map[string]any{"type": "integer"},
+				"created_at":   map[string]any{"type": "string", "format": "date-time"},
+			},
+		},
 		"AdminDeleteTeamResponse": map[string]any{
 			"type": "object",
 			"properties": map[string]any{

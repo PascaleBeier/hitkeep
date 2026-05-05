@@ -93,7 +93,7 @@ func SetTokenCookieWithDuration(w http.ResponseWriter, token string, secure bool
 	if duration <= 0 {
 		duration = TokenDuration
 	}
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // Secure is set from the configured public URL; local HTTP dev intentionally uses insecure cookies.
 		Name:     CookieName,
 		Value:    token,
 		Path:     "/",
@@ -113,7 +113,7 @@ func SetRememberMeCookieWithDuration(w http.ResponseWriter, token string, secure
 	if duration <= 0 {
 		duration = RememberMeDuration
 	}
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // Secure is set from the configured public URL; local HTTP dev intentionally uses insecure cookies.
 		Name:     RememberMeCookieName,
 		Value:    token,
 		Path:     "/",
@@ -126,7 +126,7 @@ func SetRememberMeCookieWithDuration(w http.ResponseWriter, token string, secure
 
 // ClearCookies removes both auth and remember me cookies.
 func ClearCookies(w http.ResponseWriter, secure bool) {
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // Secure is set from the configured public URL; local HTTP dev intentionally uses insecure cookies.
 		Name:     CookieName,
 		Value:    "",
 		Path:     "/",
@@ -135,7 +135,7 @@ func ClearCookies(w http.ResponseWriter, secure bool) {
 		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
 	})
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // Secure is set from the configured public URL; local HTTP dev intentionally uses insecure cookies.
 		Name:     RememberMeCookieName,
 		Value:    "",
 		Path:     "/",

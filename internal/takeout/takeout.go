@@ -20,6 +20,12 @@ type TakeoutService struct {
 	path  string
 }
 
+type ExportFile struct {
+	File *os.File
+	Info os.FileInfo
+	Name string
+}
+
 func NewTakeoutService(store *database.Store, path string) *TakeoutService {
 	return &TakeoutService{
 		store: store,
@@ -76,20 +82,53 @@ func (s *TakeoutService) CleanupExportFile(filename string) {
 		return
 	}
 
-	cleanedFile := filepath.Clean(filename)
-	base := filepath.Base(cleanedFile)
-	if !strings.HasPrefix(base, "user_takeout_") && !strings.HasPrefix(base, "site_takeout_") {
-		return
-	}
-
-	exportDir := filepath.Clean(s.path)
-	rel, err := filepath.Rel(exportDir, cleanedFile)
-	if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+	cleanedFile, ok := s.cleanExportPath(filename)
+	if !ok {
 		return
 	}
 
 	//nolint:gosec // cleaned path is constrained to a takeout export under the configured export directory.
 	_ = os.Remove(cleanedFile)
+}
+
+func (s *TakeoutService) OpenExportFile(filename string) (*ExportFile, error) {
+	cleanedFile, ok := s.cleanExportPath(filename)
+	if !ok {
+		return nil, fmt.Errorf("invalid takeout export path")
+	}
+
+	file, err := os.Open(cleanedFile) //nolint:gosec // cleaned path is constrained to a takeout export under the configured export directory.
+	if err != nil {
+		return nil, fmt.Errorf("open takeout export: %w", err)
+	}
+
+	info, err := file.Stat()
+	if err != nil {
+		_ = file.Close()
+		return nil, fmt.Errorf("stat takeout export: %w", err)
+	}
+
+	return &ExportFile{
+		File: file,
+		Info: info,
+		Name: filepath.Base(cleanedFile),
+	}, nil
+}
+
+func (s *TakeoutService) cleanExportPath(filename string) (string, bool) {
+	cleanedFile := filepath.Clean(filename)
+	base := filepath.Base(cleanedFile)
+	if !strings.HasPrefix(base, "user_takeout_") && !strings.HasPrefix(base, "site_takeout_") {
+		return "", false
+	}
+
+	exportDir := filepath.Clean(s.path)
+	rel, err := filepath.Rel(exportDir, cleanedFile)
+	if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+		return "", false
+	}
+
+	return cleanedFile, true
 }
 
 func buildTakeoutQuery(whereClause, filename, format string) string {
