@@ -53,6 +53,32 @@ func openAPIV1CorePaths() map[string]any {
 				}, "required": []string{"n", "sid"}}}}},
 				map[string]any{"202": desc("Accepted"), "400": errResp("Invalid request")}),
 		},
+		"/api/ingest/server/pageview": map[string]any{
+			"post": op([]string{"Ingest"}, "Ingest server-side pageview", "Accepts one trusted server-side pageview from an API client. This server-to-server endpoint does not require browser Origin or Referer headers. HitKeep resolves the site from the submitted URL hostname, requires site.manage_data for that resolved site, and uses visitor_ip for ingest-time exclusions, spam filtering, and geolocation. Stored analytics records contain derived context instead of the visitor IP. This endpoint uses the ingest rate limiter.", secAPIClient(), nil,
+				jsonBody(serverPageviewIngestSchema()),
+				map[string]any{
+					"202": desc("Accepted. Empty response body."),
+					"400": errResp("Invalid request"),
+					"401": errResp("Unauthorized"),
+					"403": errResp("Access denied"),
+					"404": errResp("Site not found"),
+					"429": errResp("Too many requests"),
+					"503": errResp("Service not available"),
+				}),
+		},
+		"/api/ingest/server/event": map[string]any{
+			"post": op([]string{"Ingest"}, "Ingest server-side event", "Accepts one trusted server-side custom event from an API client. This server-to-server endpoint does not require browser Origin or Referer headers. HitKeep resolves the site from the submitted URL hostname, requires site.manage_data for that resolved site, and uses visitor_ip for ingest-time exclusions and spam filtering. Stored analytics records contain derived context instead of the visitor IP. This endpoint uses the ingest rate limiter.", secAPIClient(), nil,
+				jsonBody(serverEventIngestSchema()),
+				map[string]any{
+					"202": desc("Accepted. Empty response body."),
+					"400": errResp("Invalid request"),
+					"401": errResp("Unauthorized"),
+					"403": errResp("Access denied"),
+					"404": errResp("Site not found"),
+					"429": errResp("Too many requests"),
+					"503": errResp("Service not available"),
+				}),
+		},
 
 		"/api/initial-user": map[string]any{
 			"post": op([]string{"Auth"}, "Create initial admin", "Bootstraps first user account during setup.", nil, nil,
@@ -589,5 +615,45 @@ func openAPIV1CorePaths() map[string]any {
 		"/api/user/permissions": map[string]any{
 			"get": op([]string{"Permissions"}, "Get permission context", "Returns authenticated user's instance permissions.", secCookie(), nil, nil, map[string]any{"200": jsonRefResp("Permission context", "#/components/schemas/PermissionContext")}),
 		},
+	}
+}
+
+func serverPageviewIngestSchema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"url":             map[string]any{"type": "string", "format": "uri", "description": "Absolute page URL. The hostname resolves the configured HitKeep site."},
+			"timestamp":       map[string]any{"type": "string", "format": "date-time", "description": "Canonical analytics time in RFC3339 format."},
+			"visitor_ip":      map[string]any{"type": "string", "format": "ip", "description": "Trusted transient visitor IP context. Used for filtering and enrichment, then discarded."},
+			"user_agent":      map[string]any{"type": "string", "description": "User agent from the original visitor request context."},
+			"referrer":        map[string]any{"type": "string"},
+			"viewport_width":  map[string]any{"type": "integer"},
+			"viewport_height": map[string]any{"type": "integer"},
+			"screen_width":    map[string]any{"type": "integer"},
+			"screen_height":   map[string]any{"type": "integer"},
+			"language":        map[string]any{"type": "string"},
+			"dnt":             map[string]any{"type": "boolean", "description": "When true, HitKeep drops the record consistently with browser tracker privacy behavior."},
+			"session_id":      map[string]any{"type": "string", "format": "uuid", "description": "Optional visitor grouping key. If omitted, this record gets its own standalone session."},
+			"page_id":         map[string]any{"type": "string", "format": "uuid", "description": "Optional page identifier. Generated when omitted."},
+		},
+		"required": []string{"url", "timestamp", "visitor_ip", "user_agent"},
+	}
+}
+
+func serverEventIngestSchema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"url":        map[string]any{"type": "string", "format": "uri", "description": "Absolute page or event context URL. The hostname resolves the configured HitKeep site."},
+			"timestamp":  map[string]any{"type": "string", "format": "date-time", "description": "Canonical analytics time in RFC3339 format."},
+			"visitor_ip": map[string]any{"type": "string", "format": "ip", "description": "Trusted transient visitor IP context. Used for filtering and enrichment, then discarded."},
+			"user_agent": map[string]any{"type": "string", "description": "User agent from the original visitor request context."},
+			"name":       map[string]any{"type": "string", "description": "Custom event name."},
+			"properties": map[string]any{"type": "object", "additionalProperties": true},
+			"referrer":   map[string]any{"type": "string"},
+			"dnt":        map[string]any{"type": "boolean", "description": "When true, HitKeep drops the record consistently with browser tracker privacy behavior."},
+			"session_id": map[string]any{"type": "string", "format": "uuid", "description": "Optional visitor grouping key. If omitted, this event gets its own standalone session."},
+		},
+		"required": []string{"url", "timestamp", "visitor_ip", "user_agent", "name"},
 	}
 }

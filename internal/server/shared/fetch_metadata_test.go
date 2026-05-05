@@ -125,6 +125,24 @@ func TestFetchMetadataMiddleware_AllowsStripeWebhookWithoutBrowserHeaders(t *tes
 	}
 }
 
+func TestFetchMetadataMiddleware_AllowsServerIngestWithoutBrowserHeaders(t *testing.T) {
+	handler := FetchMetadataMiddleware("https://hitkeep.example", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	for _, path := range []string{"/api/ingest/server/pageview", "/api/ingest/server/event"} {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, path, nil)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusNoContent {
+				t.Fatalf("expected status %d, got %d", http.StatusNoContent, rec.Code)
+			}
+		})
+	}
+}
+
 func TestFetchMetadataMiddleware_AllowsStateChangingAPIWithMatchingRefererFallback(t *testing.T) {
 	handler := FetchMetadataMiddleware("https://hitkeep.example", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)

@@ -14,13 +14,14 @@ func FetchMetadataMiddleware(publicURL string, next http.Handler) http.Handler {
 		secFetchSite := strings.ToLower(strings.TrimSpace(r.Header.Get("Sec-Fetch-Site")))
 		path := r.URL.Path
 		isStripeWebhook := path == "/api/cloud/webhooks/stripe"
+		isServerIngest := path == "/api/ingest/server/pageview" || path == "/api/ingest/server/event"
 		isSignupVerify := path == "/api/cloud/signup/verify"
 		isMFAEmailLinkVerify := path == "/api/auth/mfa/email-link/verify"
 
 		if secFetchSite == "" {
 			// Older/limited browsers fallback: for state-changing API requests, enforce
 			// same-origin via Origin or Referer validation.
-			if strings.HasPrefix(path, "/api/") && isStateChangingMethod(r.Method) && !isStripeWebhook {
+			if strings.HasPrefix(path, "/api/") && isStateChangingMethod(r.Method) && !isStripeWebhook && !isServerIngest {
 				expectedOrigin := configuredOrigin
 				if expectedOrigin == "" {
 					expectedOrigin = requestOrigin(r)
@@ -35,7 +36,7 @@ func FetchMetadataMiddleware(publicURL string, next http.Handler) http.Handler {
 			return
 		}
 
-		if strings.HasPrefix(path, "/api/") && secFetchSite != "same-origin" && !isStripeWebhook && !isSignupVerify && !isMFAEmailLinkVerify {
+		if strings.HasPrefix(path, "/api/") && secFetchSite != "same-origin" && !isStripeWebhook && !isServerIngest && !isSignupVerify && !isMFAEmailLinkVerify {
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}

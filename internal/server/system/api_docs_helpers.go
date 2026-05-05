@@ -44,6 +44,13 @@ func secAnyAuth() []any {
 	}
 }
 
+func secAPIClient() []any {
+	return []any{
+		map[string]any{"bearerAuth": []any{}},
+		map[string]any{"apiKeyAuth": []any{}},
+	}
+}
+
 func jsonBody(schema map[string]any) map[string]any {
 	return map[string]any{
 		"required": true,

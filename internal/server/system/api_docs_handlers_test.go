@@ -385,6 +385,63 @@ func TestOpenAPISpecV1IncludesEventAnalyticsPaths(t *testing.T) {
 	}
 }
 
+func TestOpenAPISpecV1IncludesServerSideIngestPaths(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+
+	for _, path := range []string{"/api/ingest/server/pageview", "/api/ingest/server/event"} {
+		t.Run(path, func(t *testing.T) {
+			pathItem := requireMap(t, paths, path)
+			postOp := requireMap(t, pathItem, "post")
+
+			description, ok := postOp["description"].(string)
+			if !ok || !strings.Contains(description, "trusted server-side") || !strings.Contains(description, "API client") {
+				t.Fatalf("expected trusted API client description, got %q", description)
+			}
+			if !operationHasAPIClientOnlySecurity(postOp) {
+				t.Fatalf("expected %s to use API-client-only security, got %+v", path, postOp["security"])
+			}
+			responses := requireMap(t, postOp, "responses")
+			if _, ok := responses["429"]; !ok {
+				t.Fatalf("expected %s to document 429 rate limit response", path)
+			}
+
+			requestBody := requireMap(t, postOp, "requestBody")
+			content := requireMap(t, requestBody, "content")
+			jsonContent := requireMap(t, content, "application/json")
+			schema := requireMap(t, jsonContent, "schema")
+
+			required := asStringSlice(t, schema["required"])
+			for _, field := range []string{"url", "timestamp", "visitor_ip", "user_agent"} {
+				if !containsString(required, field) {
+					t.Fatalf("expected %s request to require %q, got %v", path, field, required)
+				}
+			}
+
+			properties := requireMap(t, schema, "properties")
+			if _, ok := properties["dnt"]; !ok {
+				t.Fatalf("expected %s request schema to include optional dnt", path)
+			}
+			if _, ok := properties["is_unique"]; ok {
+				t.Fatalf("did not expect %s request schema to expose is_unique", path)
+			}
+			if _, ok := properties["tracker_source"]; ok {
+				t.Fatalf("did not expect %s request schema to expose tracker_source", path)
+			}
+			if _, ok := properties["tracker_version"]; ok {
+				t.Fatalf("did not expect %s request schema to expose tracker_version", path)
+			}
+			if path == "/api/ingest/server/pageview" {
+				for _, field := range []string{"utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"} {
+					if _, ok := properties[field]; ok {
+						t.Fatalf("did not expect %s request schema to expose %s; UTM values come from url", path, field)
+					}
+				}
+			}
+		})
+	}
+}
+
 func hasFormatParamRef(params []any) bool {
 	return hasParamRef(params, "#/components/parameters/format")
 }
@@ -417,6 +474,39 @@ func hasNamedParam(params []any, name string) bool {
 		}
 	}
 	return false
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
+func operationHasAPIClientOnlySecurity(op map[string]any) bool {
+	security, ok := op["security"].([]any)
+	if !ok || len(security) != 2 {
+		return false
+	}
+	var bearer, apiKey bool
+	for _, item := range security {
+		entry, ok := item.(map[string]any)
+		if !ok || len(entry) != 1 {
+			return false
+		}
+		if _, ok := entry["bearerAuth"]; ok {
+			bearer = true
+		}
+		if _, ok := entry["apiKeyAuth"]; ok {
+			apiKey = true
+		}
+		if _, ok := entry["cookieAuth"]; ok {
+			return false
+		}
+	}
+	return bearer && apiKey
 }
 
 func requireMap(t *testing.T, m map[string]any, key string) map[string]any {

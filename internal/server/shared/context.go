@@ -9,11 +9,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/nsqio/go-nsq"
 
 	"hitkeep/internal/auth"
 	"hitkeep/internal/blocking"
-	"hitkeep/internal/cluster"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
@@ -40,18 +38,29 @@ type AuthSessionContext struct {
 }
 
 type HandlerConfig struct {
-	RequireAuth  bool
-	InstancePerm auth.Permission
-	SitePerm     auth.Permission
-	AllowAPIKey  bool
-	RateLimiter  *IPRateLimiter
+	RequireAuth   bool
+	InstancePerm  auth.Permission
+	SitePerm      auth.Permission
+	AllowAPIKey   bool
+	APIClientOnly bool
+	RateLimiter   *IPRateLimiter
+}
+
+type MessageProducer interface {
+	Publish(topic string, body []byte) error
+	Ping() error
+}
+
+type ClusterState interface {
+	IsLeader() bool
+	GetLeaderAddr() string
 }
 
 type Context struct {
 	Store          *database.Store
 	TenantStores   *database.TenantStoreManager
-	Cluster        *cluster.Manager
-	Producer       *nsq.Producer
+	Cluster        ClusterState
+	Producer       MessageProducer
 	Mailer         *mailer.Mailer
 	Config         *config.Config
 	Takeout        *takeout.TakeoutService
@@ -123,7 +132,9 @@ func (c *Context) Handler(config HandlerConfig, fn http.HandlerFunc) http.Handle
 	}
 
 	// Apply auth if needed.
-	if config.RequireAuth || config.InstancePerm != "" || config.SitePerm != "" {
+	if config.APIClientOnly {
+		handler = c.RequireAPIClientAuth(handler)
+	} else if config.RequireAuth || config.InstancePerm != "" || config.SitePerm != "" {
 		allowAPIKey := config.AllowAPIKey || config.InstancePerm != "" || config.SitePerm != ""
 		handler = c.RequireAuth(allowAPIKey, handler)
 	}
@@ -303,6 +314,32 @@ func siteIDFromRequest(r *http.Request) (uuid.UUID, error) {
 	}
 
 	return siteID, nil
+}
+
+// RequireAPIClientAuth wraps a handler and accepts only API client tokens.
+func (c *Context) RequireAPIClientAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := extractAPIClientToken(r)
+		if token == "" {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		apiClientAuth, err := c.Store.GetAPIClientAuth(r.Context(), token)
+		if err != nil {
+			slog.Error("Failed to validate api client token", "error", err)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if apiClientAuth == nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), UserIDKey, apiClientAuth.UserID)
+		ctx = context.WithValue(ctx, APIClientAuthKey, apiClientAuth)
+		next(w, r.WithContext(ctx))
+	}
 }
 
 // RequireAuth wraps a handler and ensures the user is authenticated.

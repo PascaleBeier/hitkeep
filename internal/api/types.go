@@ -80,6 +80,34 @@ type Event struct {
 	TrackerVersion string         `json:"-"`
 }
 
+type ServerPageviewIngestRequest struct {
+	URL       string    `json:"url"`
+	Timestamp string    `json:"timestamp"`
+	VisitorIP string    `json:"visitor_ip"`
+	UserAgent string    `json:"user_agent"`
+	Referrer  *string   `json:"referrer"`
+	VPWidth   *int      `json:"viewport_width"`
+	VPHeight  *int      `json:"viewport_height"`
+	SCWidth   *int      `json:"screen_width"`
+	SCHeight  *int      `json:"screen_height"`
+	Language  *string   `json:"language"`
+	DNT       bool      `json:"dnt"`
+	SessionID uuid.UUID `json:"session_id"`
+	PageID    uuid.UUID `json:"page_id"`
+}
+
+type ServerEventIngestRequest struct {
+	URL        string         `json:"url"`
+	Timestamp  string         `json:"timestamp"`
+	VisitorIP  string         `json:"visitor_ip"`
+	UserAgent  string         `json:"user_agent"`
+	Name       string         `json:"name"`
+	Properties map[string]any `json:"properties"`
+	Referrer   *string        `json:"referrer"`
+	DNT        bool           `json:"dnt"`
+	SessionID  uuid.UUID      `json:"session_id"`
+}
+
 type TrackingStatus string
 
 const (
