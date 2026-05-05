@@ -25,6 +25,20 @@ const rows: AuditTableRow[] = [
         request_id: 'req-1',
         user_agent: 'Mozilla/5.0',
         details: 'Granted site access.'
+    },
+    {
+        id: 'audit-2',
+        created_at: '2026-05-01T11:55:00Z',
+        actor_id: 'actor-1',
+        actor_email_snapshot: 'admin@example.com',
+        actor_role_snapshot: 'owner',
+        team_id: 'team-1',
+        action: 'google_search_console.connected',
+        target_type: 'google_search_console_connection',
+        target_id: 'team-1',
+        target_label: 'Search Console',
+        outcome: 'success',
+        details: 'Search Console connected.'
     }
 ];
 
@@ -62,7 +76,8 @@ describe('AuditTableComponent', () => {
                                     clearFilters: 'Clear filters',
                                     expandRow: 'Show evidence',
                                     collapseRow: 'Hide evidence',
-                                    permissionSiteMemberGranted: 'Site access granted'
+                                    permissionSiteMemberGranted: 'Site access granted',
+                                    googleSearchConsoleConnected: 'Search Console connected'
                                 },
                                 columns: {
                                     evidence: 'Evidence',
@@ -77,7 +92,7 @@ describe('AuditTableComponent', () => {
                                     details: 'Details'
                                 },
                                 outcomes: { success: 'Success' },
-                                targetTypes: { permission: 'Permission' },
+                                targetTypes: { permission: 'Permission', googleSearchConsoleConnection: 'Search Console connection' },
                                 roles: { owner: 'Owner' },
                                 evidence: {
                                     details: 'Full details',
@@ -118,7 +133,7 @@ describe('AuditTableComponent', () => {
         emittedQueries = [];
         component.queryChange.subscribe((query) => emittedQueries.push(query));
         fixture.componentRef.setInput('rows', rows);
-        fixture.componentRef.setInput('total', 1);
+        fixture.componentRef.setInput('total', 2);
         fixture.componentRef.setInput('query', { limit: 25, offset: 0 });
         fixture.componentRef.setInput('actionOptions', [
             { label: 'All actions', value: '' },
@@ -143,6 +158,14 @@ describe('AuditTableComponent', () => {
         expect(text).toContain('example.com');
         expect(text).toContain('203.0.113.10');
         expect(text).toContain('US');
+    });
+
+    it('renders Search Console audit actions and target types from translations', () => {
+        const text = fixture.nativeElement.textContent as string;
+
+        expect(text).toContain('Search Console connected');
+        expect(text).toContain('Search Console connection');
+        expect(text).not.toContain('Google Search Console Connected');
     });
 
     it('expands evidence without requiring an API call', () => {

@@ -247,7 +247,7 @@ func (m *TenantStoreManager) PurgeArchivedTenant(ctx context.Context, tenantID u
 // TransferSite copies site-scoped analytics into the destination tenant store,
 // updates the shared site->tenant mapping, and removes stale analytics from the
 // previous tenant's data plane.
-func (m *TenantStoreManager) TransferSite(ctx context.Context, siteID, destinationTenantID uuid.UUID) error {
+func (m *TenantStoreManager) TransferSite(ctx context.Context, siteID, destinationTenantID uuid.UUID, auditEntries ...AuditEntryParams) error {
 	sourceTenantID, err := m.shared.GetSiteTenantID(ctx, siteID)
 	if err != nil {
 		return fmt.Errorf("resolve source tenant for site %s: %w", siteID, err)
@@ -272,8 +272,21 @@ func (m *TenantStoreManager) TransferSite(ctx context.Context, siteID, destinati
 	if err != nil {
 		return err
 	}
+	searchConsoleMapping, err := m.shared.GetGoogleSearchConsoleSiteMappingForTeam(ctx, siteID, sourceTenantID)
+	if err != nil {
+		return fmt.Errorf("load Search Console mapping before site transfer: %w", err)
+	}
+	if !hasSiteTransferAudit(auditEntries, siteID, sourceTenantID, destinationTenantID) {
+		return fmt.Errorf("site transfer audit is required")
+	}
+	if searchConsoleMapping != nil && !hasSearchConsoleTransferAudit(auditEntries, siteID, sourceTenantID) {
+		return fmt.Errorf("search console transfer audit is required")
+	}
 
 	if sourceStore != destinationStore {
+		if err := m.shared.AppendAuditEntry(ctx, siteTransferDataMovePreparedAudit(site, sourceTenantID, destinationTenantID, auditEntries)); err != nil {
+			return fmt.Errorf("append site transfer data move audit: %w", err)
+		}
 		if err := copySiteAnalyticsBetweenStores(ctx, sourceStore, destinationStore, siteID); err != nil {
 			return err
 		}
@@ -282,8 +295,8 @@ func (m *TenantStoreManager) TransferSite(ctx context.Context, siteID, destinati
 		}
 	}
 
-	if err := m.shared.UpdateSiteTenant(ctx, siteID, destinationTenantID); err != nil {
-		return fmt.Errorf("update shared site tenant mapping: %w", err)
+	if err := m.shared.TransferSiteTeamWithAudit(ctx, siteID, destinationTenantID, searchConsoleMapping != nil, auditEntries); err != nil {
+		return fmt.Errorf("update shared site transfer records: %w", err)
 	}
 
 	defaultID, err := m.DefaultTenantID(ctx)
@@ -300,6 +313,60 @@ func (m *TenantStoreManager) TransferSite(ctx context.Context, siteID, destinati
 	}
 
 	return nil
+}
+
+func siteTransferDataMovePreparedAudit(site *api.Site, sourceTenantID, destinationTenantID uuid.UUID, audits []AuditEntryParams) AuditEntryParams {
+	entry := AuditEntryParams{
+		TeamID:      sourceTenantID,
+		Action:      "site.transfer_data_move_prepared",
+		TargetType:  "site",
+		TargetID:    site.ID.String(),
+		TargetLabel: site.Domain,
+		Outcome:     "success",
+		Details:     fmt.Sprintf("outcome=prepared;destination_team_id=%s", destinationTenantID),
+	}
+	if len(audits) == 0 {
+		return entry
+	}
+	base := audits[0]
+	entry.ActorID = base.ActorID
+	entry.ActorEmail = base.ActorEmail
+	entry.ActorRole = base.ActorRole
+	entry.IPAddress = base.IPAddress
+	entry.IPCountryCode = base.IPCountryCode
+	entry.UserAgent = base.UserAgent
+	entry.RequestID = base.RequestID
+	return entry
+}
+
+func hasSiteTransferAudit(audits []AuditEntryParams, siteID, sourceTeamID, destinationTeamID uuid.UUID) bool {
+	var hasTransferredOut bool
+	var hasTransferredIn bool
+	for _, audit := range audits {
+		if audit.TargetType != "site" || audit.TargetID != siteID.String() || audit.Outcome != "success" {
+			continue
+		}
+		if audit.TeamID == sourceTeamID && audit.Action == "site.transferred_out" {
+			hasTransferredOut = true
+		}
+		if audit.TeamID == destinationTeamID && audit.Action == "site.transferred_in" {
+			hasTransferredIn = true
+		}
+	}
+	return hasTransferredOut && hasTransferredIn
+}
+
+func hasSearchConsoleTransferAudit(audits []AuditEntryParams, siteID, teamID uuid.UUID) bool {
+	for _, audit := range audits {
+		if audit.TeamID == teamID &&
+			audit.Action == "google_search_console.property_unmapped" &&
+			audit.TargetType == "site" &&
+			audit.TargetID == siteID.String() &&
+			audit.Outcome == "success" {
+			return true
+		}
+	}
+	return false
 }
 
 // Close closes all per-tenant stores. The caller is responsible for

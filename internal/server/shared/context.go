@@ -16,6 +16,7 @@ import (
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailer"
+	"hitkeep/internal/searchconsole"
 	"hitkeep/internal/takeout"
 )
 
@@ -70,6 +71,7 @@ type Context struct {
 	AuthLimiter    *IPRateLimiter
 	WebhookLimiter *IPRateLimiter
 	AuthState      *AuthStateStore
+	SearchConsole  searchconsole.Client
 	IPFilter       *blocking.IPFilter
 	SpamFilter     *blocking.SpamFilter
 

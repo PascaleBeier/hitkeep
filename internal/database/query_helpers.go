@@ -7,6 +7,10 @@ import (
 	"fmt"
 )
 
+type sqlExecContext interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
 // QueryRowOrNil executes a query expecting a single row.
 // Returns nil error if no rows are found.
 func (s *Store) QueryRowOrNil(ctx context.Context, query string, dest []any, args ...any) error {

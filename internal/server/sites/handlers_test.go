@@ -443,6 +443,19 @@ func TestHandleTransferSiteTeam(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create site: %v", err)
 	}
+	sourceTeamID, err := store.GetSiteTenantID(context.Background(), site.ID)
+	if err != nil {
+		t.Fatalf("get source team: %v", err)
+	}
+	if err := store.UpsertGoogleSearchConsoleSiteMapping(context.Background(), database.GoogleSearchConsoleSiteMappingInput{
+		SiteID:      site.ID,
+		TeamID:      sourceTeamID,
+		PropertyURI: "sc-domain:move-me.test",
+		MappedBy:    userID,
+		MappedAt:    time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("seed Search Console mapping: %v", err)
+	}
 
 	destinationTeam, err := store.CreateTenant(context.Background(), userID, "Destination", "")
 	if err != nil {
@@ -466,6 +479,16 @@ func TestHandleTransferSiteTeam(t *testing.T) {
 	}
 	if tenantID != destinationTeam.ID {
 		t.Fatalf("expected destination team %s, got %s", destinationTeam.ID, tenantID)
+	}
+	entries, total, err := store.ListTeamAuditEntries(context.Background(), sourceTeamID, "google_search_console.property_unmapped", 5, 0)
+	if err != nil {
+		t.Fatalf("list Search Console transfer audit: %v", err)
+	}
+	if total != 1 || len(entries) != 1 {
+		t.Fatalf("expected one Search Console unmap audit on transfer, got total=%d entries=%+v", total, entries)
+	}
+	if entries[0].TargetID != site.ID.String() || !strings.Contains(entries[0].Details, "old_property_uri=sc-domain:move-me.test") || !strings.Contains(entries[0].Details, "reason=site_transfer") {
+		t.Fatalf("unexpected Search Console transfer audit: %+v", entries[0])
 	}
 }
 

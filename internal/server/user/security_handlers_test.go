@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	appauth "hitkeep/internal/auth"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
@@ -58,6 +59,10 @@ func setupUserSecurityTestEnv(t *testing.T) (*handler, *database.Store, uuid.UUI
 }
 
 func withTestUser(req *http.Request, userID uuid.UUID) *http.Request {
+	token, _, err := appauth.GenerateTokenWithDuration("test-secret", "http://localhost:8080", userID, 15*time.Minute)
+	if err == nil {
+		req.AddCookie(&http.Cookie{Name: appauth.CookieName, Value: token})
+	}
 	return req.WithContext(context.WithValue(req.Context(), shared.UserIDKey, userID))
 }
 

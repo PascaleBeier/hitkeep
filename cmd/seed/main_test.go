@@ -8,9 +8,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/argon2"
 
+	"hitkeep/internal/api"
 	"hitkeep/internal/database"
 )
 
@@ -88,6 +90,178 @@ func TestSeedActivationFixturesKeepsPrimaryDemoSiteFirst(t *testing.T) {
 	if sites[0].ID != primary.ID {
 		t.Fatalf("expected primary demo site first, got %s (%s)", sites[0].Domain, sites[0].ID)
 	}
+}
+
+func TestSeedGoogleSearchConsoleAndActivationFixturesKeepMappedPrimarySiteFirst(t *testing.T) {
+	ctx := context.Background()
+	store := database.NewStore(filepath.Join(t.TempDir(), "seed.db"))
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect store: %v", err)
+	}
+	defer store.Close()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("migrate store: %v", err)
+	}
+	tenantMgr := database.NewTenantStoreManager(store, t.TempDir())
+	defer tenantMgr.Close()
+
+	userID := ensureUser(ctx, store, "demo@example.com", "demo1234")
+	seedTeam(ctx, store, userID)
+	primary, err := ensureSiteInActiveTeam(ctx, store, userID, "acme-analytics.io")
+	if err != nil {
+		t.Fatalf("ensure primary site: %v", err)
+	}
+	if err := tenantMgr.SyncSite(ctx, primary.ID); err != nil {
+		t.Fatalf("sync primary site: %v", err)
+	}
+
+	seedGoogleSearchConsoleFixtures(ctx, store, tenantMgr, userID, primary.ID, 90)
+	seedActivationFixtures(ctx, store, userID, primary.ID)
+
+	sites, err := store.GetSites(ctx, userID)
+	if err != nil {
+		t.Fatalf("get sites: %v", err)
+	}
+	if len(sites) < 6 {
+		t.Fatalf("expected primary plus Search Console and activation fixture sites, got %d", len(sites))
+	}
+	if sites[0].ID != primary.ID {
+		t.Fatalf("expected mapped primary demo site first, got %s (%s)", sites[0].Domain, sites[0].ID)
+	}
+}
+
+func TestSeedGoogleSearchConsoleFixturesCreatesMappedReportRows(t *testing.T) {
+	ctx := context.Background()
+	store := database.NewStore(filepath.Join(t.TempDir(), "seed.db"))
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect store: %v", err)
+	}
+	defer store.Close()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("migrate store: %v", err)
+	}
+	tenantMgr := database.NewTenantStoreManager(store, t.TempDir())
+	defer tenantMgr.Close()
+
+	userID := ensureUser(ctx, store, "demo@example.com", "demo1234")
+	seedTeam(ctx, store, userID)
+	primary, err := ensureSiteInActiveTeam(ctx, store, userID, "acme-analytics.io")
+	if err != nil {
+		t.Fatalf("ensure primary site: %v", err)
+	}
+	if err := tenantMgr.SyncSite(ctx, primary.ID); err != nil {
+		t.Fatalf("sync primary site: %v", err)
+	}
+
+	stats := seedGoogleSearchConsoleFixtures(ctx, store, tenantMgr, userID, primary.ID, 90)
+	if stats.facts == 0 {
+		t.Fatalf("expected seeded Search Console facts")
+	}
+
+	teamID, err := store.GetSiteTenantID(ctx, primary.ID)
+	if err != nil {
+		t.Fatalf("GetSiteTenantID: %v", err)
+	}
+	conn, err := store.GetGoogleSearchConsoleConnection(ctx, teamID)
+	if err != nil {
+		t.Fatalf("GetGoogleSearchConsoleConnection: %v", err)
+	}
+	if conn == nil || !conn.Connected || conn.GoogleAccountEmail != "demo-search-console@example.com" {
+		t.Fatalf("expected connected demo Search Console account, got %+v", conn)
+	}
+	mapping, err := store.GetGoogleSearchConsoleSiteMappingForTeam(ctx, primary.ID, teamID)
+	if err != nil {
+		t.Fatalf("GetGoogleSearchConsoleSiteMappingForTeam: %v", err)
+	}
+	if mapping == nil || mapping.PropertyURI != "sc-domain:acme-analytics.io" {
+		t.Fatalf("expected primary Search Console mapping, got %+v", mapping)
+	}
+	state, err := store.GetGoogleSearchConsoleSyncState(ctx, primary.ID)
+	if err != nil {
+		t.Fatalf("GetGoogleSearchConsoleSyncState: %v", err)
+	}
+	if state == nil || state.State != "succeeded" || state.LastSuccessAt == nil {
+		t.Fatalf("expected successful primary sync state, got %+v", state)
+	}
+
+	tenantStore, _, err := tenantMgr.ResolveSiteStore(ctx, primary.ID)
+	if err != nil {
+		t.Fatalf("ResolveSiteStore: %v", err)
+	}
+	overview, err := tenantStore.GetSearchConsoleOverview(ctx, api.SearchConsoleReportParams{
+		SiteID:      primary.ID,
+		PropertyURI: "sc-domain:acme-analytics.io",
+		Start:       time.Now().UTC().AddDate(0, 0, -30),
+		End:         time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("GetSearchConsoleOverview: %v", err)
+	}
+	if overview.Clicks == 0 || overview.Impressions == 0 || overview.DataSource != "google_search_console" {
+		t.Fatalf("expected useful Search Console overview, got %+v", overview)
+	}
+}
+
+func TestSeedGoogleSearchConsoleFixturesCreatesStatusExamples(t *testing.T) {
+	ctx := context.Background()
+	store := database.NewStore(filepath.Join(t.TempDir(), "seed.db"))
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect store: %v", err)
+	}
+	defer store.Close()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("migrate store: %v", err)
+	}
+	tenantMgr := database.NewTenantStoreManager(store, t.TempDir())
+	defer tenantMgr.Close()
+
+	userID := ensureUser(ctx, store, "demo@example.com", "demo1234")
+	seedTeam(ctx, store, userID)
+	primary, err := ensureSiteInActiveTeam(ctx, store, userID, "acme-analytics.io")
+	if err != nil {
+		t.Fatalf("ensure primary site: %v", err)
+	}
+
+	seedGoogleSearchConsoleFixtures(ctx, store, tenantMgr, userID, primary.ID, 90)
+
+	expectedStates := map[string]string{
+		"search-pending.example.com":   "pending",
+		"search-quota.example.com":     "failed",
+		"search-reconnect.example.com": "needs_attention",
+	}
+	for domain, expectedState := range expectedStates {
+		site := requireSeedSiteByDomain(t, ctx, store, domain)
+		state, err := store.GetGoogleSearchConsoleSyncState(ctx, site.ID)
+		if err != nil {
+			t.Fatalf("GetGoogleSearchConsoleSyncState(%s): %v", domain, err)
+		}
+		if state == nil || state.State != expectedState {
+			t.Fatalf("expected %s state %q, got %+v", domain, expectedState, state)
+		}
+	}
+
+	unmapped := requireSeedSiteByDomain(t, ctx, store, "search-unmapped.example.com")
+	mapping, err := store.GetGoogleSearchConsoleSiteMapping(ctx, unmapped.ID)
+	if err != nil {
+		t.Fatalf("GetGoogleSearchConsoleSiteMapping: %v", err)
+	}
+	if mapping != nil {
+		t.Fatalf("expected unmapped fixture site, got %+v", mapping)
+	}
+}
+
+func requireSeedSiteByDomain(t *testing.T, ctx context.Context, store *database.Store, domain string) *api.Site {
+	t.Helper()
+	var site api.Site
+	if err := store.DB().QueryRowContext(ctx, `
+		SELECT id, user_id, domain, data_retention_days, created_at
+		FROM sites
+		WHERE lower(domain) = lower(?)
+		LIMIT 1
+	`, domain).Scan(&site.ID, &site.UserID, &site.Domain, &site.DataRetentionDays, &site.CreatedAt); err != nil {
+		t.Fatalf("load seed site %s: %v", domain, err)
+	}
+	return &site
 }
 
 func seedPasswordMatches(t *testing.T, password string, encoded string) bool {

@@ -493,8 +493,38 @@ func TestTransferSiteMovesAnalyticsToDestinationTenant(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create destination team: %v", err)
 	}
+	seedGoogleSearchConsoleSiteMappingForTransfer(t, store, site.ID, userID)
 
-	if err := mgr.TransferSite(ctx, site.ID, destinationTeam.ID); err != nil {
+	sourceTeamID, err := store.GetSiteTenantID(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("GetSiteTenantID before transfer: %v", err)
+	}
+	if err := mgr.TransferSite(ctx, site.ID, destinationTeam.ID, AuditEntryParams{
+		ActorID:     userID,
+		TeamID:      sourceTeamID,
+		Action:      "site.transferred_out",
+		TargetType:  "site",
+		TargetID:    site.ID.String(),
+		TargetLabel: site.Domain,
+		Outcome:     "success",
+	}, AuditEntryParams{
+		ActorID:     userID,
+		TeamID:      destinationTeam.ID,
+		Action:      "site.transferred_in",
+		TargetType:  "site",
+		TargetID:    site.ID.String(),
+		TargetLabel: site.Domain,
+		Outcome:     "success",
+	}, AuditEntryParams{
+		ActorID:     userID,
+		TeamID:      sourceTeamID,
+		Action:      "google_search_console.property_unmapped",
+		TargetType:  "site",
+		TargetID:    site.ID.String(),
+		TargetLabel: site.Domain,
+		Outcome:     "success",
+		Details:     "old_property_uri=sc-domain:source-team.example.com;new_property_uri=;reason=site_transfer",
+	}); err != nil {
 		t.Fatalf("TransferSite: %v", err)
 	}
 
@@ -556,5 +586,139 @@ func TestTransferSiteMovesAnalyticsToDestinationTenant(t *testing.T) {
 	}
 	if sharedHitCount != 0 {
 		t.Fatalf("expected shared analytics to be cleared after transfer, got %d hit rows", sharedHitCount)
+	}
+
+	requireNoGoogleSearchConsoleSiteMapping(t, store, site.ID)
+	entries, total, err := store.ListTeamAuditEntries(ctx, sourceTeamID, "google_search_console.property_unmapped", 5, 0)
+	if err != nil {
+		t.Fatalf("ListTeamAuditEntries: %v", err)
+	}
+	if total != 1 || len(entries) != 1 {
+		t.Fatalf("expected one Search Console transfer audit, got total=%d entries=%+v", total, entries)
+	}
+	entries, total, err = store.ListTeamAuditEntries(ctx, sourceTeamID, "site.transfer_data_move_prepared", 5, 0)
+	if err != nil {
+		t.Fatalf("ListTeamAuditEntries transfer data move: %v", err)
+	}
+	if total != 1 || len(entries) != 1 {
+		t.Fatalf("expected one site transfer data move audit, got total=%d entries=%+v", total, entries)
+	}
+	if entries[0].Outcome != "success" || !strings.Contains(entries[0].Details, "destination_team_id="+destinationTeam.ID.String()) {
+		t.Fatalf("unexpected site transfer data move audit: %+v", entries[0])
+	}
+}
+
+func TestTransferSiteRequiresTransferAudit(t *testing.T) {
+	ctx := context.Background()
+	store := newSharedTestStore(t)
+	mgr := NewTenantStoreManager(store, t.TempDir())
+	t.Cleanup(func() { _ = mgr.Close() })
+
+	userID, err := store.CreateUser(ctx, "transfer-audit@test.dev", "hash")
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	site, err := store.CreateSite(ctx, userID, "transfer-audit.example.com")
+	if err != nil {
+		t.Fatalf("CreateSite: %v", err)
+	}
+	destinationTeam, err := store.CreateTenant(ctx, userID, "Destination Team", "")
+	if err != nil {
+		t.Fatalf("CreateTenant: %v", err)
+	}
+
+	err = mgr.TransferSite(ctx, site.ID, destinationTeam.ID)
+	if err == nil {
+		t.Fatalf("expected transfer without audit to fail")
+	}
+	if !strings.Contains(err.Error(), "site transfer audit is required") {
+		t.Fatalf("expected missing audit error, got %v", err)
+	}
+}
+
+func TestTransferSiteRequiresSearchConsoleAuditWhenMappingExists(t *testing.T) {
+	ctx := context.Background()
+	store := newSharedTestStore(t)
+	mgr := NewTenantStoreManager(store, t.TempDir())
+	t.Cleanup(func() { _ = mgr.Close() })
+
+	userID, err := store.CreateUser(ctx, "transfer-gsc-audit@test.dev", "hash")
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	site, err := store.CreateSite(ctx, userID, "transfer-gsc-audit.example.com")
+	if err != nil {
+		t.Fatalf("CreateSite: %v", err)
+	}
+	sourceTeamID, err := store.GetSiteTenantID(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("GetSiteTenantID: %v", err)
+	}
+	destinationTeam, err := store.CreateTenant(ctx, userID, "Destination Team", "")
+	if err != nil {
+		t.Fatalf("CreateTenant: %v", err)
+	}
+	seedGoogleSearchConsoleSiteMappingForTransfer(t, store, site.ID, userID)
+
+	err = mgr.TransferSite(ctx, site.ID, destinationTeam.ID,
+		AuditEntryParams{
+			ActorID:     userID,
+			TeamID:      sourceTeamID,
+			Action:      "site.transferred_out",
+			TargetType:  "site",
+			TargetID:    site.ID.String(),
+			TargetLabel: site.Domain,
+			Outcome:     "success",
+		},
+		AuditEntryParams{
+			ActorID:     userID,
+			TeamID:      destinationTeam.ID,
+			Action:      "site.transferred_in",
+			TargetType:  "site",
+			TargetID:    site.ID.String(),
+			TargetLabel: site.Domain,
+			Outcome:     "success",
+		},
+	)
+	if err == nil {
+		t.Fatalf("expected transfer without Search Console audit to fail")
+	}
+	if !strings.Contains(err.Error(), "search console transfer audit is required") {
+		t.Fatalf("expected missing Search Console audit error, got %v", err)
+	}
+	mapping, err := store.GetGoogleSearchConsoleSiteMapping(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("GetGoogleSearchConsoleSiteMapping: %v", err)
+	}
+	if mapping == nil {
+		t.Fatalf("expected Search Console mapping to remain after failed unaudited transfer")
+	}
+}
+
+func seedGoogleSearchConsoleSiteMappingForTransfer(t *testing.T, store *Store, siteID, userID uuid.UUID) {
+	t.Helper()
+	sourceTeamID, err := store.GetSiteTenantID(context.Background(), siteID)
+	if err != nil {
+		t.Fatalf("get source site tenant: %v", err)
+	}
+	if err := store.UpsertGoogleSearchConsoleSiteMapping(context.Background(), GoogleSearchConsoleSiteMappingInput{
+		SiteID:      siteID,
+		TeamID:      sourceTeamID,
+		PropertyURI: "sc-domain:source-team.example.com",
+		MappedBy:    userID,
+		MappedAt:    time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("seed Search Console mapping: %v", err)
+	}
+}
+
+func requireNoGoogleSearchConsoleSiteMapping(t *testing.T, store *Store, siteID uuid.UUID) {
+	t.Helper()
+	mapping, err := store.GetGoogleSearchConsoleSiteMapping(context.Background(), siteID)
+	if err != nil {
+		t.Fatalf("get Search Console mapping after transfer: %v", err)
+	}
+	if mapping != nil {
+		t.Fatalf("expected Search Console mapping to be cleared on team transfer, got %+v", mapping)
 	}
 }

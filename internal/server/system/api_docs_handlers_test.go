@@ -161,6 +161,7 @@ func TestOpenAPISpecV1IncludesAdminSystemPaths(t *testing.T) {
 		"SystemFeatureStatus",
 		"SystemInfo",
 		"SystemHealth",
+		"SystemSearchConsoleStatus",
 		"SystemStorage",
 		"SystemIngestStats",
 		"SystemBackupStatus",
@@ -180,6 +181,7 @@ func TestOpenAPISpecV1IncludesAdminSystemPaths(t *testing.T) {
 	expectedPaths := []string{
 		"/api/admin/system",
 		"/api/admin/system/health",
+		"/api/admin/system/search-console",
 		"/api/admin/system/storage",
 		"/api/admin/system/ingest",
 		"/api/admin/system/backups",
@@ -393,6 +395,78 @@ func TestOpenAPISpecV1IncludesEventAnalyticsPaths(t *testing.T) {
 	}
 	if !hasParamRef(timeseriesParams, "#/components/parameters/eventDimensionKey") {
 		t.Fatalf("expected event timeseries to document deprecated dimension_key parameter")
+	}
+}
+
+func TestOpenAPISpecV1IncludesGoogleSearchConsoleConnectionPaths(t *testing.T) {
+	spec := OpenAPISpecV1("https://hitkeep.test")
+	paths := requireMap(t, spec, "paths")
+
+	expected := map[string]string{
+		"/api/user/teams/{id}/integrations/google-search-console/status":     "get",
+		"/api/user/teams/{id}/integrations/google-search-console/connect":    "post",
+		"/api/user/teams/{id}/integrations/google-search-console/properties": "get",
+		"/api/sites/{id}/integrations/google-search-console":                 "get",
+		"/api/sites/{id}/integrations/google-search-console/property":        "put",
+		"/api/sites/{id}/integrations/google-search-console/sync":            "post",
+		"/api/user/teams/{id}/integrations/google-search-console":            "delete",
+		"/api/integrations/google-search-console/oauth/callback":             "get",
+	}
+	for path, method := range expected {
+		pathItem := requireMap(t, paths, path)
+		if _, ok := pathItem[method]; !ok {
+			t.Fatalf("expected %s %s in OpenAPI paths", method, path)
+		}
+	}
+
+	mappingPath := requireMap(t, paths, "/api/sites/{id}/integrations/google-search-console")
+	getOp := requireMap(t, mappingPath, "get")
+	responses := requireMap(t, getOp, "responses")
+	okResp := requireMap(t, responses, "200")
+	content := requireMap(t, okResp, "content")
+	jsonContent := requireMap(t, content, "application/json")
+	schema := requireMap(t, jsonContent, "schema")
+	properties := requireMap(t, schema, "properties")
+	if _, ok := properties["sync_status"]; !ok {
+		t.Fatalf("expected site mapping schema to expose sync_status")
+	}
+}
+
+func TestOpenAPISpecV1IncludesSearchConsoleReportPaths(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	for _, schemaName := range []string{
+		"SearchConsoleOverview",
+		"SearchConsoleSeriesResponse",
+		"SearchConsoleDimensionResponse",
+	} {
+		if _, ok := schemas[schemaName]; !ok {
+			t.Fatalf("expected %s schema to exist", schemaName)
+		}
+	}
+
+	overviewPath := requireMap(t, paths, "/api/sites/{id}/search-console/overview")
+	overviewOp := requireMap(t, overviewPath, "get")
+	overviewResponses := requireMap(t, overviewOp, "responses")
+	overviewOK := requireMap(t, overviewResponses, "200")
+	overviewContent := requireMap(t, overviewOK, "content")
+	overviewJSON := requireMap(t, overviewContent, "application/json")
+	overviewSchema := requireMap(t, overviewJSON, "schema")
+	if ref, _ := overviewSchema["$ref"].(string); ref != "#/components/schemas/SearchConsoleOverview" {
+		t.Fatalf("expected Search Console overview schema ref, got %q", ref)
+	}
+
+	breakdownPath := requireMap(t, paths, "/api/sites/{id}/search-console/breakdowns")
+	breakdownOp := requireMap(t, breakdownPath, "get")
+	breakdownParams, ok := breakdownOp["parameters"].([]any)
+	if !ok {
+		t.Fatalf("expected parameters to be []any, got %T", breakdownOp["parameters"])
+	}
+	if !hasNamedParam(breakdownParams, "dimension") {
+		t.Fatalf("expected Search Console breakdowns to document dimension parameter")
 	}
 }
 

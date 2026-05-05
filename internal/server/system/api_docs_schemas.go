@@ -356,6 +356,56 @@ func openAPIV1AnalyticsSchemas() map[string]any {
 				"failure_hotspots":  map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/AIFetchFailureHotspot"}},
 			},
 		},
+		"SearchConsoleOverview": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"data_source":      map[string]any{"type": "string", "const": "google_search_console"},
+				"clicks":           map[string]any{"type": "integer"},
+				"impressions":      map[string]any{"type": "integer"},
+				"ctr":              map[string]any{"type": "number"},
+				"average_position": map[string]any{"type": "number"},
+			},
+			"required": []string{"data_source", "clicks", "impressions", "ctr", "average_position"},
+		},
+		"SearchConsoleMetricPoint": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"date":             map[string]any{"type": "string", "format": "date"},
+				"clicks":           map[string]any{"type": "integer"},
+				"impressions":      map[string]any{"type": "integer"},
+				"ctr":              map[string]any{"type": "number"},
+				"average_position": map[string]any{"type": "number"},
+			},
+			"required": []string{"date", "clicks", "impressions", "ctr", "average_position"},
+		},
+		"SearchConsoleSeriesResponse": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"data_source": map[string]any{"type": "string", "const": "google_search_console"},
+				"series":      map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/SearchConsoleMetricPoint"}},
+			},
+			"required": []string{"data_source", "series"},
+		},
+		"SearchConsoleDimensionRow": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"value":            map[string]any{"type": "string"},
+				"clicks":           map[string]any{"type": "integer"},
+				"impressions":      map[string]any{"type": "integer"},
+				"ctr":              map[string]any{"type": "number"},
+				"average_position": map[string]any{"type": "number"},
+			},
+			"required": []string{"value", "clicks", "impressions", "ctr", "average_position"},
+		},
+		"SearchConsoleDimensionResponse": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"data_source": map[string]any{"type": "string", "const": "google_search_console"},
+				"dimension":   map[string]any{"type": "string", "enum": []string{"query", "page", "country", "device"}},
+				"rows":        map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/SearchConsoleDimensionRow"}},
+			},
+			"required": []string{"data_source", "dimension", "rows"},
+		},
 		"ChartDataPoint": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -515,5 +565,78 @@ func openAPIV1AnalyticsSchemas() map[string]any {
 				"overall_conversion_rate": map[string]any{"type": "number"},
 			},
 		},
+	}
+}
+
+func googleSearchConsoleStatusSchema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"status":                   map[string]any{"type": "string", "enum": []string{"connected", "disconnected", "credentials_missing"}},
+			"configured":               map[string]any{"type": "boolean"},
+			"connected":                map[string]any{"type": "boolean"},
+			"credential_status":        map[string]any{"type": "string", "enum": []string{"configured", "missing"}},
+			"connected_account_label":  map[string]any{"type": "string"},
+			"last_connected_at":        map[string]any{"type": "string", "format": "date-time"},
+			"last_disconnected_at":     map[string]any{"type": "string", "format": "date-time"},
+			"needs_admin_action":       map[string]any{"type": "boolean"},
+			"can_manage":               map[string]any{"type": "boolean"},
+			"managed_credentials_mode": map[string]any{"type": "string", "enum": []string{"managed", "self_hosted"}},
+		},
+		"required": []string{"status", "configured", "connected", "credential_status", "needs_admin_action", "can_manage", "managed_credentials_mode"},
+	}
+}
+
+func googleSearchConsolePropertiesSchema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"properties": map[string]any{
+				"type": "array",
+				"items": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"uri":              map[string]any{"type": "string"},
+						"permission_level": map[string]any{"type": "string"},
+					},
+					"required": []string{"uri", "permission_level"},
+				},
+			},
+		},
+		"required": []string{"properties"},
+	}
+}
+
+func googleSearchConsoleSiteMappingSchema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"site_id":                   map[string]any{"type": "string", "format": "uuid"},
+			"team_id":                   map[string]any{"type": "string", "format": "uuid"},
+			"mapped":                    map[string]any{"type": "boolean"},
+			"property_uri":              map[string]any{"type": "string"},
+			"property_permission_level": map[string]any{"type": "string"},
+			"mapped_at":                 map[string]any{"type": "string", "format": "date-time"},
+			"can_manage":                map[string]any{"type": "boolean"},
+			"sync_status":               googleSearchConsoleSyncStatusSchema(),
+		},
+		"required": []string{"site_id", "team_id", "mapped", "can_manage"},
+	}
+}
+
+func googleSearchConsoleSyncStatusSchema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"state":               map[string]any{"type": "string", "enum": []string{"pending", "running", "succeeded", "failed", "needs_attention"}},
+			"imported_start_date": map[string]any{"type": "string", "format": "date"},
+			"imported_end_date":   map[string]any{"type": "string", "format": "date"},
+			"last_success_at":     map[string]any{"type": "string", "format": "date-time"},
+			"last_attempt_at":     map[string]any{"type": "string", "format": "date-time"},
+			"last_error_category": map[string]any{"type": "string"},
+			"next_retry_at":       map[string]any{"type": "string", "format": "date-time"},
+			"manual":              map[string]any{"type": "boolean"},
+		},
+		"required": []string{"state", "manual"},
 	}
 }

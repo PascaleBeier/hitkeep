@@ -63,6 +63,10 @@ type Config struct {
 	ImportMaxStageBytes      int `env:"HITKEEP_IMPORT_MAX_STAGE_BYTES"        default:"107374182400" desc:"Maximum staged import upload size in bytes"`
 	ImportStageRetentionDays int `env:"HITKEEP_IMPORT_STAGE_RETENTION_DAYS" default:"7"            desc:"Days to keep stale staged import upload files; 0 disables import staging cleanup"`
 
+	GoogleSearchConsoleClientID     string `env:"HITKEEP_GOOGLE_SEARCH_CONSOLE_CLIENT_ID"     default:"" desc:"Google Search Console OAuth client ID"`
+	GoogleSearchConsoleClientSecret string `env:"HITKEEP_GOOGLE_SEARCH_CONSOLE_CLIENT_SECRET" default:"" desc:"Google Search Console OAuth client secret" sensitive:"redact"`
+	GoogleSearchConsoleRedirectURL  string `env:"HITKEEP_GOOGLE_SEARCH_CONSOLE_REDIRECT_URL"  default:"" desc:"Google Search Console OAuth callback URL override"`
+
 	BackupPath            string `env:"HITKEEP_BACKUP_PATH"      default:""   desc:"Backup destination path (local dir or s3://)"`
 	BackupIntervalMinutes int    `env:"HITKEEP_BACKUP_INTERVAL"  default:"60" desc:"Minutes between backups"`
 	BackupRetentionCount  int    `env:"HITKEEP_BACKUP_RETENTION" default:"24" desc:"Number of backup snapshots to keep"`

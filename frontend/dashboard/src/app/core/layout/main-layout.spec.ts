@@ -104,6 +104,23 @@ describe('MainLayout', () => {
         expect(hasTeamLink).toBeFalsy();
     });
 
+    it('should show Search Console setup navigation for team owner/admin role', () => {
+        const navLinks = Array.from(fixture.nativeElement.querySelectorAll('nav a')) as HTMLElement[];
+        const hasSearchConsoleLink = navLinks.some((link: HTMLElement) => link.getAttribute('href') === '/integration/google-search-console');
+        expect(hasSearchConsoleLink).toBeTruthy();
+    });
+
+    it('should hide Search Console setup navigation for team member role', () => {
+        const teamService = TestBed.inject(TeamService);
+        teamService.teams.set([{ id: '00000000-0000-0000-0000-000000000001', name: 'Alpha Team', logo_url: '', role: 'member', created_at: '2026-01-01T00:00:00Z' }]);
+        teamService.activeTeamId.set('00000000-0000-0000-0000-000000000001');
+        fixture.detectChanges();
+
+        const navLinks = Array.from(fixture.nativeElement.querySelectorAll('nav a')) as HTMLElement[];
+        const hasSearchConsoleLink = navLinks.some((link: HTMLElement) => link.getAttribute('href') === '/integration/google-search-console');
+        expect(hasSearchConsoleLink).toBeFalsy();
+    });
+
     it('should hide create team actions in hosted cloud', () => {
         bootstrap.status.set({
             needs_setup: false,

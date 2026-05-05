@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 	"hitkeep/internal/hklog"
 	"hitkeep/internal/ingest"
 	"hitkeep/internal/mailer"
+	"hitkeep/internal/searchconsole"
 	"hitkeep/internal/server"
 	"hitkeep/internal/worker"
 	"hitkeep/public"
@@ -129,6 +131,8 @@ func Run() {
 		reportWorker := worker.NewReportWorker(tenantMgr, mailSvc, conf.PublicURL)
 		go reportWorker.Start(gCtx)
 
+		startSearchConsoleSyncWorker(gCtx, conf, tenantMgr)
+
 		g.Go(func() error {
 			<-gCtx.Done()
 			tenantMgr.Close()
@@ -184,6 +188,17 @@ func Run() {
 	slog.Info("Application is running. Press Ctrl+C to exit.")
 
 	check(g.Wait())
+}
+
+func startSearchConsoleSyncWorker(ctx context.Context, conf *config.Config, tenantMgr *database.TenantStoreManager) {
+	if strings.TrimSpace(conf.GoogleSearchConsoleClientID) == "" || strings.TrimSpace(conf.GoogleSearchConsoleClientSecret) == "" {
+		return
+	}
+	searchConsoleWorker := worker.NewSearchConsoleSyncWorker(tenantMgr, searchconsole.NewGoogleClient(searchconsole.OAuthConfig{
+		ClientID:     conf.GoogleSearchConsoleClientID,
+		ClientSecret: conf.GoogleSearchConsoleClientSecret,
+	}))
+	go searchConsoleWorker.Start(ctx)
 }
 
 func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.Logger, logLevel slog.Level) (*database.Store, *database.TenantStoreManager, *nsq.Producer, func(), error) {

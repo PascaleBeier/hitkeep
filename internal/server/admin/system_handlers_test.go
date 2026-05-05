@@ -97,6 +97,8 @@ func TestHandleGetSystem(t *testing.T) {
 	h.ctx.Config.SpamFilterAutoUpdate = true
 	h.ctx.Config.SpamFilterUpdateIntervalMin = 60
 	h.ctx.Config.MailDriver = "smtp"
+	h.ctx.Config.GoogleSearchConsoleClientID = "gsc-client-id"
+	h.ctx.Config.GoogleSearchConsoleClientSecret = "gsc-client-secret"
 	h.ctx.Config.CloudHosted = true
 	h.ctx.Config.CloudPlanName = "Pro"
 	h.ctx.Config.CloudSignupEnabled = true
@@ -128,7 +130,7 @@ func TestHandleGetSystem(t *testing.T) {
 	}
 
 	features := featureStatusByKey(info.EnabledFeatures)
-	for _, key := range []string{"mcp", "mcp_docs", "automatic_backups", "spam_auto_update", "mail_delivery", "managed_cloud", "cloud_signup", "billing"} {
+	for _, key := range []string{"mcp", "mcp_docs", "automatic_backups", "spam_auto_update", "mail_delivery", "google_search_console", "managed_cloud", "cloud_signup", "billing"} {
 		feature, ok := features[key]
 		if !ok {
 			t.Fatalf("expected feature %q to be reported", key)
@@ -145,6 +147,9 @@ func TestHandleGetSystem(t *testing.T) {
 	}
 	if features["managed_cloud"].Detail != "Pro" {
 		t.Fatalf("expected managed cloud detail Pro, got %q", features["managed_cloud"].Detail)
+	}
+	if features["google_search_console"].Detail != "oauth" {
+		t.Fatalf("expected Search Console oauth detail, got %q", features["google_search_console"].Detail)
 	}
 }
 
@@ -179,6 +184,109 @@ func TestHandleGetHealth(t *testing.T) {
 	}
 	if health.Database != "ok" {
 		t.Fatalf("expected database 'ok', got %q", health.Database)
+	}
+}
+
+func TestHandleGetSearchConsoleReportsCredentialAndSyncHealth(t *testing.T) {
+	h, store, _, ownerID, _, _ := setupSystemTestEnv(t)
+	h.ctx.Config.GoogleSearchConsoleClientID = "client-id"
+	h.ctx.Config.GoogleSearchConsoleClientSecret = "client-secret"
+	seedSearchConsoleNeedsAttentionSystemStatus(t, store, ownerID)
+
+	req := withAdminTestUser(httptest.NewRequest(http.MethodGet, "/api/admin/system/search-console", nil), ownerID)
+	w := httptest.NewRecorder()
+	h.handleGetSearchConsole().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var status api.SystemSearchConsoleStatus
+	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if status.Status != "needs_attention" {
+		t.Fatalf("expected needs_attention status, got %q", status.Status)
+	}
+	if status.CredentialsStatus != "configured" || status.WorkerStatus != "enabled" {
+		t.Fatalf("expected configured credentials and enabled worker, got credentials=%q worker=%q", status.CredentialsStatus, status.WorkerStatus)
+	}
+	if status.ConnectedTeams != 1 || status.MappedSites != 1 || status.NeedsAttentionSyncs != 1 {
+		t.Fatalf("unexpected Search Console counts: %+v", status)
+	}
+	if status.LastAttemptAt == nil {
+		t.Fatalf("expected last_attempt_at")
+	}
+}
+
+func seedSearchConsoleNeedsAttentionSystemStatus(t *testing.T, store *database.Store, ownerID uuid.UUID) {
+	t.Helper()
+
+	ctx := context.Background()
+	team, err := store.CreateTenant(ctx, ownerID, "Search Console Team", "")
+	if err != nil {
+		t.Fatalf("create tenant: %v", err)
+	}
+	site, err := store.CreateSite(ctx, ownerID, "gsc-status.example")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	now := time.Now().UTC()
+	upsertSearchConsoleSystemFixtures(t, store, team.ID, site.ID, ownerID, now)
+}
+
+func upsertSearchConsoleSystemFixtures(t *testing.T, store *database.Store, teamID, siteID, ownerID uuid.UUID, now time.Time) {
+	t.Helper()
+
+	ctx := context.Background()
+	if err := store.UpsertGoogleSearchConsoleConnection(ctx, database.GoogleSearchConsoleConnectionInput{
+		TeamID:             teamID,
+		ConnectedByUserID:  ownerID,
+		GoogleAccountEmail: "owner@example.com",
+		AccessToken:        "access-token",
+		RefreshToken:       "refresh-token",
+		ConnectedAt:        now,
+	}); err != nil {
+		t.Fatalf("upsert Search Console connection: %v", err)
+	}
+	if err := store.UpsertGoogleSearchConsoleSiteMapping(ctx, database.GoogleSearchConsoleSiteMappingInput{
+		SiteID:      siteID,
+		TeamID:      teamID,
+		PropertyURI: "sc-domain:gsc-status.example",
+		MappedBy:    ownerID,
+		MappedAt:    now,
+	}); err != nil {
+		t.Fatalf("upsert Search Console mapping: %v", err)
+	}
+	if err := store.UpsertGoogleSearchConsoleSyncState(ctx, database.GoogleSearchConsoleSyncStateInput{
+		SiteID:            siteID,
+		TeamID:            teamID,
+		State:             "needs_attention",
+		LastAttemptAt:     &now,
+		LastErrorCategory: "authorization_revoked",
+	}); err != nil {
+		t.Fatalf("upsert Search Console sync state: %v", err)
+	}
+}
+
+func TestHandleGetSearchConsoleReportsMissingCredentialsWithoutSecrets(t *testing.T) {
+	h, _, _, ownerID, _, _ := setupSystemTestEnv(t)
+
+	req := withAdminTestUser(httptest.NewRequest(http.MethodGet, "/api/admin/system/search-console", nil), ownerID)
+	w := httptest.NewRecorder()
+	h.handleGetSearchConsole().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var status api.SystemSearchConsoleStatus
+	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if status.Status != "not_configured" || status.CredentialsStatus != "missing" || status.WorkerStatus != "disabled" {
+		t.Fatalf("expected not configured status, got %+v", status)
+	}
+	if strings.Contains(w.Body.String(), "client") || strings.Contains(w.Body.String(), "secret") || strings.Contains(w.Body.String(), "token") {
+		t.Fatalf("Search Console system status leaked sensitive credential wording: %s", w.Body.String())
 	}
 }
 

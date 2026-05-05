@@ -429,10 +429,9 @@ func (h *handler) handleTransferSiteTeam() http.HandlerFunc {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-
-		if err := h.ctx.TenantStores.TransferSite(r.Context(), siteID, destinationTeamID); err != nil {
-			slog.Error("Failed to transfer site to team", "error", err, "site_id", siteID, "source_team_id", sourceTeamID, "destination_team_id", destinationTeamID, "user_id", userID)
-			http.Error(w, "Failed to transfer site", http.StatusInternalServerError)
+		searchConsoleMapping, err := h.googleSearchConsoleMappingForTransfer(r, siteID, sourceTeamID)
+		if err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
@@ -441,26 +440,18 @@ func (h *handler) handleTransferSiteTeam() http.HandlerFunc {
 		if site != nil && site.Domain != "" {
 			siteLabel = site.Domain
 		}
-		h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
-			ActorID:     userID,
-			TeamID:      sourceTeamID,
-			Action:      "site.transferred_out",
-			TargetType:  "site",
-			TargetID:    siteID.String(),
-			TargetLabel: siteLabel,
-			Outcome:     "success",
-			Details:     fmt.Sprintf("Site %s moved to team %s", siteLabel, destinationTeamID),
-		})
-		h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
-			ActorID:     userID,
-			TeamID:      destinationTeamID,
-			Action:      "site.transferred_in",
-			TargetType:  "site",
-			TargetID:    siteID.String(),
-			TargetLabel: siteLabel,
-			Outcome:     "success",
-			Details:     fmt.Sprintf("Site %s moved into this team", siteLabel),
-		})
+		auditEntries, err := h.siteTransferAuditEntries(r, userID, sourceTeamID, destinationTeamID, siteID, siteLabel, searchConsoleMapping)
+		if err != nil {
+			slog.Error("Failed to build site transfer audit entries", "error", err, "site_id", siteID, "source_team_id", sourceTeamID, "destination_team_id", destinationTeamID, "user_id", userID)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		if err := h.ctx.TenantStores.TransferSite(r.Context(), siteID, destinationTeamID, auditEntries...); err != nil {
+			slog.Error("Failed to transfer site to team", "error", err, "site_id", siteID, "source_team_id", sourceTeamID, "destination_team_id", destinationTeamID, "user_id", userID)
+			http.Error(w, "Failed to transfer site", http.StatusInternalServerError)
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(map[string]any{
@@ -472,4 +463,65 @@ func (h *handler) handleTransferSiteTeam() http.HandlerFunc {
 			slog.Error("Failed to encode site transfer response", "error", err, "site_id", siteID, "user_id", userID)
 		}
 	}
+}
+
+func (h *handler) googleSearchConsoleMappingForTransfer(r *http.Request, siteID, sourceTeamID uuid.UUID) (*database.GoogleSearchConsoleSiteMapping, error) {
+	mapping, err := h.ctx.Store.GetGoogleSearchConsoleSiteMappingForTeam(r.Context(), siteID, sourceTeamID)
+	if err != nil {
+		slog.Error("Failed to load Search Console mapping before site transfer", "error", err, "site_id", siteID, "source_team_id", sourceTeamID)
+		return nil, err
+	}
+	return mapping, nil
+}
+
+func (h *handler) siteTransferAuditEntries(r *http.Request, userID, sourceTeamID, destinationTeamID, siteID uuid.UUID, siteLabel string, mapping *database.GoogleSearchConsoleSiteMapping) ([]database.AuditEntryParams, error) {
+	events := make([]shared.AuditEvent, 0, 3)
+	events = append(events,
+		shared.AuditEvent{
+			ActorID:     userID,
+			TeamID:      sourceTeamID,
+			Action:      "site.transferred_out",
+			TargetType:  "site",
+			TargetID:    siteID.String(),
+			TargetLabel: siteLabel,
+			Outcome:     "success",
+			Details:     fmt.Sprintf("Site %s moved to team %s", siteLabel, destinationTeamID),
+		},
+		shared.AuditEvent{
+			ActorID:     userID,
+			TeamID:      destinationTeamID,
+			Action:      "site.transferred_in",
+			TargetType:  "site",
+			TargetID:    siteID.String(),
+			TargetLabel: siteLabel,
+			Outcome:     "success",
+			Details:     fmt.Sprintf("Site %s moved into this team", siteLabel),
+		},
+	)
+	if mapping == nil {
+		return h.auditParamsForEvents(r, events)
+	}
+	events = append(events, shared.AuditEvent{
+		ActorID:     userID,
+		TeamID:      sourceTeamID,
+		Action:      "google_search_console.property_unmapped",
+		TargetType:  "site",
+		TargetID:    siteID.String(),
+		TargetLabel: siteLabel,
+		Outcome:     "success",
+		Details:     fmt.Sprintf("old_property_uri=%s;new_property_uri=;reason=site_transfer", mapping.PropertyURI),
+	})
+	return h.auditParamsForEvents(r, events)
+}
+
+func (h *handler) auditParamsForEvents(r *http.Request, events []shared.AuditEvent) ([]database.AuditEntryParams, error) {
+	entries := make([]database.AuditEntryParams, 0, len(events))
+	for _, event := range events {
+		params, err := h.ctx.BuildAuditEntryParams(r.Context(), r, event)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, params)
+	}
+	return entries, nil
 }

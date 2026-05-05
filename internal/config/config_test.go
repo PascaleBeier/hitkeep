@@ -464,10 +464,11 @@ func TestDeprecatedFlagsDoNotAppearInNewHelp(t *testing.T) {
 
 func TestLogValueRedactsSecrets(t *testing.T) {
 	conf := &Config{
-		JWTSecret:         "my-secret-key-12345",
-		MailPassword:      "smtp-pass",
-		S3AccessKeyID:     "AKIA123456",
-		S3SecretAccessKey: "super-secret",
+		JWTSecret:                       "my-secret-key-12345",
+		MailPassword:                    "smtp-pass",
+		S3AccessKeyID:                   "AKIA123456",
+		S3SecretAccessKey:               "super-secret",
+		GoogleSearchConsoleClientSecret: "google-client-secret",
 	}
 	logVal := conf.LogValue()
 	got := logVal.String()
@@ -481,11 +482,39 @@ func TestLogValueRedactsSecrets(t *testing.T) {
 	if strings.Contains(got, "super-secret") {
 		t.Fatal("LogValue leaked S3SecretAccessKey")
 	}
+	if strings.Contains(got, "google-client-secret") {
+		t.Fatal("LogValue leaked GoogleSearchConsoleClientSecret")
+	}
 	if !strings.Contains(got, "AKIA") {
 		t.Fatal("LogValue should show masked S3AccessKeyID prefix")
 	}
 	if !strings.Contains(got, "[redacted]") {
 		t.Fatal("LogValue should contain [redacted] markers")
+	}
+}
+
+func TestLoadGoogleSearchConsoleConfigFromEnv(t *testing.T) {
+	env := map[string]string{
+		"HITKEEP_GOOGLE_SEARCH_CONSOLE_CLIENT_ID":     "gsc-client-id",
+		"HITKEEP_GOOGLE_SEARCH_CONSOLE_CLIENT_SECRET": "gsc-client-secret",
+		"HITKEEP_GOOGLE_SEARCH_CONSOLE_REDIRECT_URL":  "https://analytics.example.com/api/integrations/google-search-console/oauth/callback",
+	}
+
+	conf := load([]string{}, func(key, fallback string) string {
+		if val, ok := env[key]; ok {
+			return val
+		}
+		return fallback
+	})
+
+	if conf.GoogleSearchConsoleClientID != "gsc-client-id" {
+		t.Fatalf("expected GoogleSearchConsoleClientID from env, got %q", conf.GoogleSearchConsoleClientID)
+	}
+	if conf.GoogleSearchConsoleClientSecret != "gsc-client-secret" {
+		t.Fatalf("expected GoogleSearchConsoleClientSecret from env, got %q", conf.GoogleSearchConsoleClientSecret)
+	}
+	if conf.GoogleSearchConsoleRedirectURL != "https://analytics.example.com/api/integrations/google-search-console/oauth/callback" {
+		t.Fatalf("expected GoogleSearchConsoleRedirectURL from env, got %q", conf.GoogleSearchConsoleRedirectURL)
 	}
 }
 

@@ -1,0 +1,63 @@
+@if (error() || visible() || setupVisible()) {
+<p-card class="search-console-drilldown surface-card border border-surface-200 shadow-sm dark:border-surface-700" data-testid="search-console-drilldown">
+    <div class="search-console-drilldown__header">
+        <div class="search-console-drilldown__title-wrap">
+            <i class="pi pi-search search-console-drilldown__title-icon" aria-hidden="true"></i>
+            <div class="min-w-0">
+                <h3 class="search-console-drilldown__title">{{ "searchConsole.title" | transloco }}</h3>
+                <p class="search-console-drilldown__description">{{ "searchConsole.description" | transloco }}</p>
+            </div>
+        </div>
+        @if (pending()) {
+        <p-tag [value]="'searchConsole.states.pending' | transloco" severity="warn" />
+        }
+    </div>
+    @if (contextTags().length) {
+    <div class="search-console-drilldown__context" [attr.aria-label]="'searchConsole.context.label' | transloco">
+        @for (tag of contextTags(); track tag) {
+        <p-tag [value]="tag" severity="secondary" />
+        }
+    </div>
+    } @if (error()) {
+    <p-message severity="error" styleClass="w-full" [text]="'searchConsole.states.error' | transloco" />
+    } @else if (setupVisible()) {
+    <p-message severity="secondary" styleClass="w-full" data-testid="search-console-setup-prompt">
+        <div class="search-console-drilldown__setup-message">
+            <span class="search-console-drilldown__setup-copy">
+                <strong>{{ "searchConsole.setup.title" | transloco }}</strong>
+                @if (setupCanManage()) {
+                <span>{{ "searchConsole.setup.manageText" | transloco }}</span>
+                } @else {
+                <span>{{ "searchConsole.setup.readonlyText" | transloco }}</span>
+                }
+            </span>
+            @if (setupCanManage()) {
+            <p-button data-testid="search-console-setup-action" routerLink="/integration/google-search-console" icon="pi pi-search" [label]="'searchConsole.setup.action' | transloco" severity="secondary" size="small" [outlined]="true" />
+            }
+        </div>
+    </p-message>
+    } @else {
+    <div class="search-console-drilldown__kpis">
+        @for (card of kpiCards(); track card.label) {
+        <app-kpi-card [label]="card.label" [value]="card.value" [loading]="loading()" valueClass="text-2xl font-bold" />
+        }
+    </div>
+
+    <section class="search-console-drilldown__chart" aria-labelledby="search-console-trend-title">
+        <h4 id="search-console-trend-title" class="search-console-drilldown__section-title">{{ "searchConsole.sections.trend" | transloco }}</h4>
+        <app-series-chart [data]="chartData()" [series]="chartSeries()" [isLoading]="loading()" [emptyTitle]="'searchConsole.states.empty' | transloco" />
+    </section>
+
+    @if (!loading() && !hasRows()) {
+    <p-message severity="info" styleClass="w-full" [text]="'searchConsole.states.empty' | transloco" />
+    }
+
+    <div class="search-console-drilldown__content">
+        <app-metric-list [title]="'searchConsole.sections.topQueries' | transloco" icon="pi-search" [data]="queryMetrics()" [isLoading]="loading()" />
+        <app-metric-list [title]="'searchConsole.sections.topPages' | transloco" icon="pi-file" [data]="pageMetrics()" [isLoading]="loading()" linkMode="path" [siteDomain]="siteDomain()" />
+        <app-metric-list [title]="'searchConsole.sections.countries' | transloco" icon="pi-globe" [data]="countryMetrics()" [isLoading]="loading()" [showCountryFlags]="true" [showCountryNames]="true" />
+        <app-metric-list [title]="'searchConsole.sections.devices' | transloco" icon="pi-mobile" [data]="deviceMetrics()" [isLoading]="loading()" />
+    </div>
+    }
+</p-card>
+}

@@ -1,0 +1,273 @@
+<div class="flex flex-col w-full">
+    <p-confirmdialog />
+    <app-page-header>
+        <ng-template appPageHeaderLeft>
+            <div>
+                <app-page-breadcrumb [items]="breadcrumbItems()" />
+                <p class="text-sm text-[var(--p-text-muted-color)]">{{ "integration.googleSearchConsole.subtitle" | transloco }}</p>
+            </div>
+        </ng-template>
+    </app-page-header>
+
+    <div class="google-search-console-content max-w-5xl mx-auto w-full">
+        @if (errorKey(); as error) {
+        <p-message severity="error" styleClass="w-full" [text]="error | transloco" />
+        } @if (notice(); as currentNotice) {
+        <p-message [severity]="currentNotice.kind === 'success' ? 'success' : 'warn'" styleClass="w-full" [text]="currentNotice.key | transloco" />
+        }
+
+        <section class="google-search-console-panel" aria-labelledby="gsc-status-title">
+            <div class="google-search-console-panel__header">
+                <div>
+                    <h2 id="gsc-status-title">{{ "integration.googleSearchConsole.title" | transloco }}</h2>
+                    @if (stateMessageKey(); as stateMessage) {
+                    <p>{{ stateMessage | transloco }}</p>
+                    }
+                </div>
+                <div class="google-search-console-panel__header-actions">
+                    <a
+                        pButton
+                        data-testid="gsc-docs-link"
+                        [href]="docsURL"
+                        target="_blank"
+                        rel="noopener"
+                        size="small"
+                        severity="secondary"
+                        [outlined]="true"
+                        icon="pi pi-external-link"
+                        iconPos="right"
+                        [label]="'integration.googleSearchConsole.actions.docs' | transloco"
+                        [attr.aria-label]="'integration.googleSearchConsole.actions.docs' | transloco"
+                    ></a>
+                    <p-tag [value]="statusKey() | transloco" [severity]="status()?.connected ? 'success' : status()?.status === 'credentials_missing' ? 'warn' : 'secondary'" />
+                </div>
+            </div>
+
+            @if (status()?.connected_account_label; as account) {
+            <dl class="google-search-console-meta">
+                <div>
+                    <dt>{{ "integration.googleSearchConsole.labels.account" | transloco }}</dt>
+                    <dd>{{ account }}</dd>
+                </div>
+            </dl>
+            }
+
+            <div class="google-search-console-actions">
+                <p-button
+                    icon="pi pi-refresh"
+                    severity="secondary"
+                    size="small"
+                    [outlined]="true"
+                    styleClass="flex h-9 w-9 cursor-pointer items-center justify-center p-0"
+                    [loading]="loading()"
+                    [disabled]="actionBusy()"
+                    [pTooltip]="'common.actions.refresh' | transloco"
+                    tooltipPosition="bottom"
+                    [ariaLabel]="'common.actions.refresh' | transloco"
+                    (onClick)="loadStatus()"
+                />
+                @if (status()?.connected) { @if (status()?.can_manage) {
+                <button
+                    pButton
+                    type="button"
+                    data-testid="gsc-reconnect"
+                    severity="secondary"
+                    [outlined]="true"
+                    size="small"
+                    icon="pi pi-refresh"
+                    [label]="'integration.googleSearchConsole.actions.reconnect' | transloco"
+                    [loading]="actionBusy()"
+                    (click)="connect()"
+                    [disabled]="actionBusy() || loading() || !status()?.configured"
+                ></button>
+                <button
+                    pButton
+                    type="button"
+                    data-testid="gsc-disconnect"
+                    severity="danger"
+                    size="small"
+                    icon="pi pi-unlink"
+                    [label]="'integration.googleSearchConsole.actions.disconnect' | transloco"
+                    [loading]="actionBusy()"
+                    (click)="confirmDisconnect()"
+                    [disabled]="actionBusy()"
+                ></button>
+                } } @else {
+                <button
+                    pButton
+                    type="button"
+                    size="small"
+                    icon="pi pi-link"
+                    [label]="'integration.googleSearchConsole.actions.connect' | transloco"
+                    [loading]="actionBusy()"
+                    (click)="connect()"
+                    [disabled]="actionBusy() || loading() || !status()?.configured || !status()?.can_manage"
+                ></button>
+                }
+            </div>
+        </section>
+
+        @if (status()?.connected) {
+        <section class="google-search-console-panel" aria-labelledby="gsc-property-title">
+            <div class="google-search-console-panel__header">
+                <div>
+                    <h2 id="gsc-property-title">{{ "integration.googleSearchConsole.labels.propertyMapping" | transloco }}</h2>
+                    <p>{{ mappingMessageKey() | transloco: { property: mapping()?.property_uri || selectedPropertyURI() } }}</p>
+                </div>
+                @if (mappingLoading()) {
+                <p-tag [value]="'integration.googleSearchConsole.status.loading' | transloco" severity="secondary" />
+                } @else if (mapping()?.mapped) {
+                <p-tag [value]="'integration.googleSearchConsole.status.mapped' | transloco" severity="success" />
+                } @else {
+                <p-tag [value]="'integration.googleSearchConsole.status.unmapped' | transloco" severity="secondary" />
+                }
+            </div>
+
+            @if (propertyErrorKey(); as propertyError) {
+            <p-message severity="error" styleClass="w-full" [text]="propertyError | transloco" />
+            } @if (mapping() && !canManageMapping()) {
+            <p-message severity="info" styleClass="w-full" [text]="'integration.googleSearchConsole.states.readonly' | transloco" />
+            } @if (activeSite(); as site) {
+            <dl class="google-search-console-meta">
+                <div>
+                    <dt>{{ "integration.googleSearchConsole.labels.site" | transloco }}</dt>
+                    <dd>{{ site.domain }}</dd>
+                </div>
+                @if (mapping()?.property_uri; as propertyURI) {
+                <div>
+                    <dt>{{ "integration.googleSearchConsole.labels.property" | transloco }}</dt>
+                    <dd>{{ propertyURI }}</dd>
+                </div>
+                } @if (mapping()?.property_permission_level; as permission) {
+                <div>
+                    <dt>{{ "integration.googleSearchConsole.labels.permission" | transloco }}</dt>
+                    <dd>{{ permission }}</dd>
+                </div>
+                }
+            </dl>
+
+            @if (showPropertyPicker()) {
+            <div class="google-search-console-field">
+                <label for="gsc-property-select">{{ "integration.googleSearchConsole.labels.property" | transloco }}</label>
+                <p-select
+                    inputId="gsc-property-select"
+                    data-testid="gsc-property-select"
+                    [options]="propertyOptions()"
+                    [ngModel]="selectedPropertyURI()"
+                    (ngModelChange)="selectProperty($event)"
+                    optionLabel="label"
+                    optionValue="value"
+                    appendTo="body"
+                    class="w-full"
+                    [loading]="propertyLoading()"
+                    [disabled]="propertyLoading() || propertyActionBusy() || !mapping()?.can_manage || properties().length === 0"
+                />
+            </div>
+
+            <div class="google-search-console-actions">
+                <button
+                    pButton
+                    type="button"
+                    size="small"
+                    icon="pi pi-link"
+                    data-testid="gsc-map-property"
+                    [label]="'integration.googleSearchConsole.actions.mapProperty' | transloco"
+                    [loading]="propertyActionBusy()"
+                    (click)="mapSelectedProperty()"
+                    [disabled]="propertyActionBusy() || propertyLoading() || !mapping()?.can_manage || !canMapSelectedProperty()"
+                ></button>
+            </div>
+            } @else if (canManageMapping() && mapping()?.mapped) {
+            <div class="google-search-console-actions">
+                <button
+                    pButton
+                    type="button"
+                    size="small"
+                    severity="danger"
+                    [outlined]="true"
+                    icon="pi pi-unlink"
+                    data-testid="gsc-remove-mapping"
+                    [label]="'integration.googleSearchConsole.actions.removeMapping' | transloco"
+                    [loading]="propertyActionBusy()"
+                    (click)="confirmRemoveMapping()"
+                    [disabled]="propertyActionBusy()"
+                ></button>
+            </div>
+            } @if (!mappingLoading()) {
+            <div class="google-search-console-sync" aria-labelledby="gsc-sync-title">
+                <div class="google-search-console-panel__header">
+                    <div>
+                        <h3 id="gsc-sync-title">{{ "integration.googleSearchConsole.labels.syncStatus" | transloco }}</h3>
+                        <p>{{ syncSummaryKey() | transloco: syncSummaryParams() }}</p>
+                    </div>
+                    <p-tag
+                        [value]="syncStatusKey() | transloco"
+                        [severity]="syncStatus()?.state === 'succeeded' ? 'success' : syncStatus()?.state === 'failed' || syncStatus()?.state === 'needs_attention' ? 'danger' : syncInProgress() ? 'warn' : 'secondary'"
+                    />
+                </div>
+
+                @if (syncErrorKey(); as syncError) {
+                <p-message severity="warn" styleClass="w-full">
+                    <ng-template #container>
+                        <div>
+                            <strong>{{ "integration.googleSearchConsole.labels.lastError" | transloco }}:</strong> {{ syncError | transloco }} @if (showReconnectHint()) {
+                            <span>{{ "integration.googleSearchConsole.states.reconnectHint" | transloco }}</span>
+                            }
+                        </div>
+                    </ng-template>
+                </p-message>
+                } @if (syncFeedbackKey(); as syncFeedback) {
+                <p-message severity="success" styleClass="w-full" data-testid="gsc-sync-feedback" [text]="syncFeedback | transloco" />
+                } @if (syncActionErrorKey(); as syncActionError) {
+                <p-message severity="error" styleClass="w-full" data-testid="gsc-sync-error" [text]="syncActionError | transloco" />
+                }
+
+                <dl class="google-search-console-meta">
+                    <div>
+                        <dt>{{ "integration.googleSearchConsole.labels.lastSuccess" | transloco }}</dt>
+                        <dd><app-relative-date-time [value]="syncStatus()?.last_success_at" /></dd>
+                    </div>
+                    <div>
+                        <dt>{{ "integration.googleSearchConsole.labels.lastAttempt" | transloco }}</dt>
+                        <dd><app-relative-date-time [value]="syncStatus()?.last_attempt_at" /></dd>
+                    </div>
+                    <div>
+                        <dt>{{ "integration.googleSearchConsole.labels.importedRange" | transloco }}</dt>
+                        <dd>{{ syncImportedRangeLabel() }}</dd>
+                    </div>
+                    @if (syncStatus()?.next_retry_at) {
+                    <div>
+                        <dt>{{ "integration.googleSearchConsole.labels.nextRetry" | transloco }}</dt>
+                        <dd><app-relative-date-time [value]="syncStatus()?.next_retry_at" /></dd>
+                    </div>
+                    }
+                </dl>
+
+                @if (canManageMapping()) {
+                <div class="google-search-console-actions">
+                    <button
+                        pButton
+                        type="button"
+                        size="small"
+                        severity="secondary"
+                        [outlined]="true"
+                        icon="pi pi-sync"
+                        data-testid="gsc-sync-now"
+                        [label]="syncButtonKey() | transloco"
+                        [loading]="syncActionBusy()"
+                        (click)="requestSync()"
+                        [disabled]="syncActionBusy() || syncInProgress() || !mapping()?.mapped"
+                    ></button>
+                    @if (!mapping()?.mapped) {
+                    <span class="google-search-console-hint">{{ "integration.googleSearchConsole.states.noMappingSync" | transloco }}</span>
+                    }
+                </div>
+                }
+            </div>
+            } } @else {
+            <p-message severity="info" styleClass="w-full" [text]="'integration.googleSearchConsole.states.noSite' | transloco" />
+            }
+        </section>
+        }
+    </div>
+</div>

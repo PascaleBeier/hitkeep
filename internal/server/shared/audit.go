@@ -33,9 +33,17 @@ type AuditEvent struct {
 }
 
 func (c *Context) AppendAuditEvent(ctx context.Context, r *http.Request, event AuditEvent) {
-	if err := c.appendAuditEvent(ctx, r, event); err != nil {
+	if err := c.AppendAuditEventChecked(ctx, r, event); err != nil {
 		slog.Error("Failed to append audit entry", "error", err, "action", event.Action)
 	}
+}
+
+func (c *Context) AppendAuditEventChecked(ctx context.Context, r *http.Request, event AuditEvent) error {
+	params, err := c.BuildAuditEntryParams(ctx, r, event)
+	if err != nil {
+		return err
+	}
+	return c.Store.AppendAuditEntry(ctx, params)
 }
 
 func (c *Context) AppendAuditEventForUserTeams(ctx context.Context, r *http.Request, userID uuid.UUID, event AuditEvent) {
@@ -71,9 +79,9 @@ func (c *Context) AppendAuditEventForUserTeams(ctx context.Context, r *http.Requ
 	}
 }
 
-func (c *Context) appendAuditEvent(ctx context.Context, r *http.Request, event AuditEvent) error {
+func (c *Context) BuildAuditEntryParams(ctx context.Context, r *http.Request, event AuditEvent) (database.AuditEntryParams, error) {
 	if c == nil || c.Store == nil {
-		return fmt.Errorf("audit store is not configured")
+		return database.AuditEntryParams{}, fmt.Errorf("audit store is not configured")
 	}
 	if ctx == nil {
 		if r != nil {
@@ -92,7 +100,7 @@ func (c *Context) appendAuditEvent(ctx context.Context, r *http.Request, event A
 	}
 	event = c.withAuditActorSnapshot(ctx, r, event)
 
-	return c.Store.AppendAuditEntry(ctx, database.AuditEntryParams{
+	return database.AuditEntryParams{
 		ActorID:       event.ActorID,
 		ActorEmail:    event.ActorEmail,
 		ActorRole:     event.ActorRole,
@@ -109,7 +117,7 @@ func (c *Context) appendAuditEvent(ctx context.Context, r *http.Request, event A
 		RequestID:     event.RequestID,
 		Details:       event.Details,
 		MetadataJSON:  event.MetadataJSON,
-	})
+	}, nil
 }
 
 func (c *Context) withAuditRequestMetadata(r *http.Request, event AuditEvent) AuditEvent {

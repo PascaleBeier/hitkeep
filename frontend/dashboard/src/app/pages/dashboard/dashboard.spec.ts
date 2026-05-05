@@ -3,6 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { provideTranslocoLocale } from '@jsverse/transloco-locale';
+import { of } from 'rxjs';
 import { vi } from 'vitest';
 
 import { Dashboard } from '@pages/dashboard/dashboard';
@@ -11,6 +12,7 @@ import { StatsService } from '@features/analytics/services/stats.service';
 import { HitService } from '@features/hits/services/hit.service';
 import { TeamService } from '@services/team.service';
 import { OnboardingService } from '@services/onboarding.service';
+import { GoogleSearchConsoleService } from '@services/google-search-console.service';
 
 describe('Dashboard', () => {
     let component: Dashboard;
@@ -38,7 +40,18 @@ describe('Dashboard', () => {
                         en: 'en-US',
                         'en-US': 'en-US'
                     }
-                })
+                }),
+                {
+                    provide: GoogleSearchConsoleService,
+                    useValue: {
+                        getSiteMapping: vi.fn(() => of({ site_id: 'site-1', team_id: 'team-1', mapped: false, can_manage: false })),
+                        getOverview: vi.fn(),
+                        getSeries: vi.fn(),
+                        getQueries: vi.fn(),
+                        getPages: vi.fn(),
+                        getBreakdown: vi.fn()
+                    }
+                }
             ]
         }).compileComponents();
 
@@ -206,5 +219,79 @@ describe('Dashboard', () => {
 
         expect(statsService.stats()?.top_countries).toEqual([{ name: 'DE', value: 4 }]);
         expect(statsService.stats()?.top_languages).toEqual([{ name: 'de', value: 3 }]);
+    });
+
+    it('should refresh Search Console drilldown data from the shared dashboard refresh action', async () => {
+        const siteService = TestBed.inject(SiteService);
+        const statsService = TestBed.inject(StatsService);
+        const hitService = TestBed.inject(HitService);
+        const searchConsoleService = TestBed.inject(GoogleSearchConsoleService) as unknown as {
+            getSiteMapping: ReturnType<typeof vi.fn>;
+            getOverview: ReturnType<typeof vi.fn>;
+            getSeries: ReturnType<typeof vi.fn>;
+            getQueries: ReturnType<typeof vi.fn>;
+            getPages: ReturnType<typeof vi.fn>;
+            getBreakdown: ReturnType<typeof vi.fn>;
+        };
+
+        vi.spyOn(statsService, 'loadStats').mockImplementation(() => undefined);
+        vi.spyOn(hitService, 'loadHits').mockImplementation(() => undefined);
+        searchConsoleService.getSiteMapping.mockReturnValue(
+            of({
+                site_id: 'site-1',
+                team_id: 'team-1',
+                mapped: true,
+                property_uri: 'sc-domain:example.com',
+                can_manage: true
+            })
+        );
+        searchConsoleService.getOverview.mockReturnValue(of({ data_source: 'google_search_console', clicks: 1, impressions: 10, ctr: 0.1, average_position: 2 }));
+        searchConsoleService.getSeries.mockReturnValue(of({ data_source: 'google_search_console', series: [] }));
+        searchConsoleService.getQueries.mockReturnValue(of({ data_source: 'google_search_console', rows: [] }));
+        searchConsoleService.getPages.mockReturnValue(of({ data_source: 'google_search_console', rows: [] }));
+        searchConsoleService.getBreakdown.mockReturnValue(of({ data_source: 'google_search_console', rows: [] }));
+
+        siteService.activeSite.set({
+            id: 'site-1',
+            user_id: 'user-1',
+            domain: 'example.com',
+            created_at: '2026-01-01T00:00:00Z'
+        });
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        searchConsoleService.getSiteMapping.mockClear();
+        searchConsoleService.getOverview.mockClear();
+        component.refreshAll();
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        expect(searchConsoleService.getSiteMapping).not.toHaveBeenCalled();
+        expect(searchConsoleService.getOverview).toHaveBeenCalledTimes(1);
+    });
+
+    it('should render Search Console after the primary dashboard sections', async () => {
+        const siteService = TestBed.inject(SiteService);
+        const statsService = TestBed.inject(StatsService);
+        const hitService = TestBed.inject(HitService);
+
+        vi.spyOn(statsService, 'loadStats').mockImplementation(() => undefined);
+        vi.spyOn(hitService, 'loadHits').mockImplementation(() => undefined);
+
+        siteService.activeSite.set({
+            id: 'site-1',
+            user_id: 'user-1',
+            domain: 'example.com',
+            created_at: '2026-01-01T00:00:00Z'
+        });
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        const rawHitsTable = fixture.nativeElement.querySelector('p-table') as HTMLElement | null;
+        const searchConsoleDrilldown = fixture.nativeElement.querySelector('app-search-console-drilldown') as HTMLElement | null;
+
+        expect(rawHitsTable).toBeTruthy();
+        expect(searchConsoleDrilldown).toBeTruthy();
+        expect(rawHitsTable!.compareDocumentPosition(searchConsoleDrilldown!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 });

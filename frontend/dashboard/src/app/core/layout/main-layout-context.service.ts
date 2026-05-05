@@ -118,7 +118,8 @@ export class MainLayoutContextService {
     }
 
     private redirectIfTeamAdminAccessWasLost() {
-        if (this.router.routerState.snapshot.url.startsWith('/admin/team') && !this.isTeamAdmin()) {
+        const currentURL = this.router.routerState.snapshot.url;
+        if ((currentURL.startsWith('/admin/team') || currentURL.startsWith('/integration/google-search-console')) && !this.isTeamAdmin()) {
             this.router.navigateByUrl('/dashboard');
         }
     }

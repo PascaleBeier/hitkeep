@@ -356,6 +356,75 @@
                         </app-system-status-card>
 
                         <app-system-status-card
+                            titleId="runtime-search-console-title"
+                            [title]="'admin.system.searchConsole.title' | transloco"
+                            [loading]="isLoadingSearchConsole()"
+                            [refreshLabel]="'admin.system.console.refreshCard' | transloco"
+                            [metricLabel]="'admin.system.searchConsole.issues' | transloco"
+                            [metricValue]="searchConsoleSyncIssueMetric()"
+                            (refreshClicked)="loadSearchConsoleStatus()"
+                        >
+                            @if (systemSearchConsole(); as searchConsole) {
+                            <p-tag system-status-card-status [value]="'admin.system.searchConsole.status.' + searchConsole.status | transloco" [severity]="statusSeverity(searchConsole.status)" />
+                            } @if (systemSearchConsole(); as searchConsole) {
+                            <dl class="admin-definition-list">
+                                <div>
+                                    <dt>{{ "admin.system.searchConsole.credentials" | transloco }}</dt>
+                                    <dd>
+                                        <p-tag [value]="'admin.system.searchConsole.credentialsStatus.' + searchConsole.credentials_status | transloco" [severity]="statusSeverity(searchConsole.credentials_status)" />
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt>{{ "admin.system.searchConsole.worker" | transloco }}</dt>
+                                    <dd><p-tag [value]="'admin.system.searchConsole.workerStatus.' + searchConsole.worker_status | transloco" [severity]="statusSeverity(searchConsole.worker_status)" /></dd>
+                                </div>
+                                <div>
+                                    <dt>{{ "admin.system.searchConsole.sync" | transloco }}</dt>
+                                    <dd><p-tag [value]="'admin.system.searchConsole.syncStatus.' + searchConsole.sync_status | transloco" [severity]="statusSeverity(searchConsole.sync_status)" /></dd>
+                                </div>
+                                @if (searchConsole.last_attempt_at) {
+                                <div>
+                                    <dt>{{ "admin.system.searchConsole.lastAttempt" | transloco }}</dt>
+                                    <dd><app-relative-date-time [value]="searchConsole.last_attempt_at" /></dd>
+                                </div>
+                                } @if (searchConsole.last_success_at) {
+                                <div>
+                                    <dt>{{ "admin.system.searchConsole.lastSuccess" | transloco }}</dt>
+                                    <dd><app-relative-date-time [value]="searchConsole.last_success_at" /></dd>
+                                </div>
+                                } @if (searchConsole.next_retry_at) {
+                                <div>
+                                    <dt>{{ "admin.system.searchConsole.nextRetry" | transloco }}</dt>
+                                    <dd><app-relative-date-time [value]="searchConsole.next_retry_at" /></dd>
+                                </div>
+                                }
+                            </dl>
+                            <div class="admin-metric-grid admin-metric-grid--compact">
+                                <div class="admin-metric">
+                                    <span>{{ "admin.system.searchConsole.connectedTeams" | transloco }}</span>
+                                    <strong>{{ searchConsole.connected_teams | number }}</strong>
+                                </div>
+                                <div class="admin-metric">
+                                    <span>{{ "admin.system.searchConsole.mappedSites" | transloco }}</span>
+                                    <strong>{{ searchConsole.mapped_sites | number }}</strong>
+                                </div>
+                                <div class="admin-metric">
+                                    <span>{{ "admin.system.searchConsole.inFlight" | transloco }}</span>
+                                    <strong>{{ searchConsole.pending_syncs + searchConsole.running_syncs | number }}</strong>
+                                </div>
+                                <div class="admin-metric">
+                                    <span>{{ "admin.system.searchConsole.issues" | transloco }}</span>
+                                    <strong>{{ searchConsoleSyncIssueCount() | number }}</strong>
+                                </div>
+                            </div>
+                            } @else if (isLoadingSearchConsole()) {
+                            <div class="admin-loading"><i class="pi pi-spin pi-spinner" aria-hidden="true"></i>{{ "common.loading" | transloco }}</div>
+                            } @else {
+                            <p-message severity="error" [text]="'admin.system.console.loadFailed' | transloco" styleClass="w-full" />
+                            }
+                        </app-system-status-card>
+
+                        <app-system-status-card
                             titleId="runtime-overview-title"
                             [title]="'admin.system.overview.title' | transloco"
                             [loading]="isLoadingSystem()"

@@ -9,40 +9,30 @@
 [![Documentation](https://img.shields.io/badge/Docs-hitkeep.com-0ea5e9)](https://hitkeep.com)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/11990/badge)](https://www.bestpractices.dev/projects/11990)
 
-HitKeep is an open source analytics platform for teams that need clear product reporting for humans and governed analytics access for AI-assisted workflows, without adopting the usual PostgreSQL, Redis, ClickHouse, and reverse-proxy pileup.
+HitKeep is open source web analytics for teams that want useful product reporting without running PostgreSQL, Redis, ClickHouse, or a separate queue.
 
-- Single binary runtime
-- Embedded DuckDB and NSQ with batched ingest writes
-- Privacy-first tracking
-- AI visibility analytics for server-side crawler fetches and AI-referred visits
-- Traffic, goals, funnels, ecommerce, AI chatbot analytics, and email reports
-- Scoped API clients and read-only MCP access for agents, assistants, and internal reporting tools
+- Single Go binary with embedded DuckDB and NSQ
+- Cookie-less tracker by default, with Do Not Track support
+- Traffic, events, goals, funnels, ecommerce, UTM, and email reports
+- Google Search Console aggregate import for query, page, country, and device reporting
+- AI visibility analytics for crawler fetches and AI-referred visits
+- Scoped API clients and a read-only MCP analytics server for approved agents
 - Self-hosted or managed cloud with EU/US region choice
 
 [AI Performance](https://hitkeep.com/ai-performance/) · [Website](https://hitkeep.com) · [Cloud](https://hitkeep.com/cloud) · [Live Demo](https://demo.hitkeep.com/share/7a55968bb42df256512fbe7ff73ab88f29dd45c236eddc818bd66420b4ffbaad) · [Docs](https://hitkeep.com/guides/introduction/) · [API](https://hitkeep.com/api/) · [Releases](https://github.com/PascaleBeier/hitkeep/releases)
 
-![HitKeep analytics dashboard — traffic overview, geographic breakdown, goals, funnels, and UTM attribution](./.github/assets/dashboard-overview.png)
+![HitKeep analytics dashboard with traffic overview, geographic breakdown, goals, funnels, and UTM attribution](./.github/assets/dashboard-overview.png)
 
 ## Why HitKeep
 
-HitKeep is for teams that want product analytics without adopting a full analytics platform stack.
+HitKeep is for teams that need clear web analytics, conversion reporting, and AI-era search visibility in one small operational footprint.
 
-- **Simple to run:** one binary, one data directory, no external database required
-- **Efficient write path:** NSQ buffers ingest bursts and DuckDB appender batches smooth out disk-heavy per-row inserts
-- **Privacy-first by default:** cookie-less tracking, Do Not Track support, focused data collection
-- **Ready for AI visibility work:** server-side AI crawler fetch analytics, AI-referred visits from the browser tracker, and correlation reports for pages that get crawler interest but weak downstream traffic
-- **Useful out of the box:** traffic analytics with countries/languages audience toggles, top/landing/exit page views, custom events, goals, funnels, ecommerce, UTM attribution, and scheduled email reports
-- **Built for teams:** passkeys, TOTP, site and team permissions, API clients, share links, and audit visibility
-- **Flexible deployment:** self-host it yourself or use HitKeep Cloud and still keep the migration path open
-
-## For SEO Agencies
-
-HitKeep can run a 14-day AI visibility pilot for one client site. Install `hk.js` for normal pageviews and AI-referred human visits, then forward server-side crawler fetches from CloudFront, nginx, Caddy, or an app server into HitKeep. The AI Visibility dashboard shows which pages GPTBot, ClaudeBot, PerplexityBot, and other crawlers request, which fetched pages later receive AI-referred visits, and where crawler errors create SEO work.
-
-- [AI performance landing page](https://hitkeep.com/ai-performance/)
-- [AI visibility analytics for SEO agencies](https://hitkeep.com/use-cases/ai-visibility-seo-agencies/)
-- [CloudFront AI crawler tracking](https://hitkeep.com/guides/tracking/cloudfront-ai-crawler-tracking/)
-- [AI Fetch on AWS setup guide](https://hitkeep.com/guides/tracking/ai-fetch-aws/)
+- **Low-ops self-hosting:** one binary, one data directory, embedded DuckDB and NSQ
+- **Useful reports:** top pages, landing and exit pages, events, goals, funnels, ecommerce, UTM attribution, and Search Console aggregates
+- **Privacy defaults:** focused data collection, cookie-less tracking, and DNT handling
+- **AI visibility:** server-side crawler fetch analytics, AI-referred visits, and correlation reports
+- **Team controls:** passkeys, TOTP, site/team permissions, share links, audit logs, API clients, and read-only MCP access
+- **Deployment choice:** run it yourself or use managed cloud in the EU or US
 
 ## Quick Start
 
@@ -89,7 +79,7 @@ For production setup, reverse proxies, SMTP, systemd, Kubernetes, S3 archiving, 
 - [Configuration reference](https://hitkeep.com/reference/configuration/)
 - [Cloud documentation](https://hitkeep.com/cloud)
 
-## Tracking Snippet
+## Track Your Site
 
 Once your instance is running and a site is created, add:
 
@@ -111,53 +101,34 @@ Tracker options, ecommerce events, custom events, and advanced tracking examples
 - [Tracking docs](https://hitkeep.com/guides/tracking/)
 - [Custom events](https://hitkeep.com/guides/tracking/custom-events/)
 - [Ecommerce analytics](https://hitkeep.com/guides/analytics/ecommerce/)
+- [Google Search Console integration](https://hitkeep.com/guides/integrations/google-search-console/)
+- [MCP analytics access](https://hitkeep.com/guides/integrations/mcp/)
+- [WordPress integration](https://hitkeep.com/guides/integrations/wordpress/)
 - [AI visibility analytics](https://hitkeep.com/guides/analytics/ai-visibility/)
 - [CloudFront AI crawler tracking](https://hitkeep.com/guides/tracking/cloudfront-ai-crawler-tracking/)
 - [AI chatbot analytics](https://hitkeep.com/guides/analytics/ai-chatbot-analytics/)
+- [REST API reference](https://hitkeep.com/api/)
+- [Compliance overview](https://hitkeep.com/compliance/overview/)
 
 ## Product Tour
 
 <details>
-<summary>See more screenshots</summary>
+<summary>See five product screenshots</summary>
 
-### Comparison
-![HitKeep period-over-period comparison with delta badges and overlay charts](./.github/assets/dashboard-comparison.png)
-
-### Events
-![HitKeep custom event analytics with timeseries chart and property breakdown](./.github/assets/analytics-events.png)
-
-### Goals
-![HitKeep goals and conversion tracking](./.github/assets/analytics-goals.png)
-
-### Funnels
-![HitKeep multi-step funnel analytics](./.github/assets/analytics-funnels.png)
+### Dashboard
+![HitKeep analytics dashboard with traffic overview, geographic breakdown, goals, funnels, and UTM attribution](./.github/assets/dashboard-overview.png)
 
 ### Ecommerce
 ![HitKeep ecommerce analytics with revenue KPIs, chart, top products, and revenue sources](./.github/assets/analytics-ecommerce.png)
 
-### AI Chatbots
-![HitKeep AI chatbot analytics with KPI cards, conversation activity chart, and chatbot breakdowns](./.github/assets/analytics-ai-chatbots.png)
+### Search Console
+![HitKeep Search Console drilldown with clicks, impressions, CTR, position, trends, top queries, pages, countries, and devices](./.github/assets/analytics-search-console.png)
 
 ### AI Visibility
 ![HitKeep AI visibility analytics with fetch KPIs, assistant filters, and fetch volume chart](./.github/assets/analytics-ai-visibility.png)
 
-### AI Visibility Correlation
-![HitKeep AI visibility correlation with summary KPIs and tabbed citation yield, opportunity pages, and failure hotspots tables](./.github/assets/analytics-ai-visibility-correlation.png)
-
-### Email Reports
-![HitKeep scheduled email reports](./.github/assets/feature-email-reports.png)
-
-### API Clients
-![HitKeep API client management](./.github/assets/security-api-clients.png)
-
-### Create Team
-![HitKeep create team dialog with name and logo setup](./.github/assets/feature-create-team.png)
-
-### Admin Users
-![HitKeep administration users view with roles and security controls](./.github/assets/admin-users.png)
-
-### Team Overview
-![HitKeep team administration overview](./.github/assets/admin-team-overview.png)
+### MCP Access
+![HitKeep MCP integration overview for read-only analytics access](./.github/assets/mcp.png)
 
 </details>
 

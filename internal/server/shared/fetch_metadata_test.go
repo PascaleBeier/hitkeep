@@ -35,6 +35,26 @@ func TestFetchMetadataMiddleware_BlocksCrossSiteAPIRequests(t *testing.T) {
 	}
 }
 
+func TestFetchMetadataMiddleware_AllowsGoogleSearchConsoleOAuthCallback(t *testing.T) {
+	handler := FetchMetadataMiddleware("https://hitkeep.example", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	for _, site := range []string{"cross-site", "none"} {
+		t.Run(site, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/integrations/google-search-console/oauth/callback?state=state-token&code=oauth-code", nil)
+			req.Header.Set("Sec-Fetch-Site", site)
+			req.Header.Set("Sec-Fetch-Mode", "navigate")
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusNoContent {
+				t.Fatalf("Sec-Fetch-Site=%s: expected status %d, got %d", site, http.StatusNoContent, rec.Code)
+			}
+		})
+	}
+}
+
 func TestFetchMetadataMiddleware_AllowsSameOriginAPIRequests(t *testing.T) {
 	handler := FetchMetadataMiddleware("https://hitkeep.example", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)

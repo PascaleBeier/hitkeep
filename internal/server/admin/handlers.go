@@ -33,6 +33,10 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		InstancePerm: authcore.PermInstanceViewSystem,
 		RateLimiter:  ctx.ApiLimiter,
 	}, h.handleGetHealth()))
+	mux.HandleFunc("GET /api/admin/system/search-console", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceViewSystem,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleGetSearchConsole()))
 	mux.HandleFunc("GET /api/admin/system/storage", ctx.Handler(shared.HandlerConfig{
 		InstancePerm: authcore.PermInstanceViewSystem,
 		RateLimiter:  ctx.ApiLimiter,

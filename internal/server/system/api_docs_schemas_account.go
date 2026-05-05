@@ -239,6 +239,25 @@ func openAPIV1AccountSchemas() map[string]any {
 				"is_leader": map[string]any{"type": "boolean"},
 			},
 		},
+		"SystemSearchConsoleStatus": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"status":                map[string]any{"type": "string", "enum": []string{"healthy", "idle", "syncing", "degraded", "needs_attention", "not_configured"}},
+				"credentials_status":    map[string]any{"type": "string", "enum": []string{"configured", "missing"}},
+				"worker_status":         map[string]any{"type": "string", "enum": []string{"enabled", "disabled"}},
+				"sync_status":           map[string]any{"type": "string", "enum": []string{"healthy", "idle", "pending", "running", "failed", "needs_attention"}},
+				"connected_teams":       map[string]any{"type": "integer"},
+				"mapped_sites":          map[string]any{"type": "integer"},
+				"pending_syncs":         map[string]any{"type": "integer"},
+				"running_syncs":         map[string]any{"type": "integer"},
+				"failed_syncs":          map[string]any{"type": "integer"},
+				"needs_attention_syncs": map[string]any{"type": "integer"},
+				"last_success_at":       map[string]any{"type": "string", "format": "date-time"},
+				"last_attempt_at":       map[string]any{"type": "string", "format": "date-time"},
+				"next_retry_at":         map[string]any{"type": "string", "format": "date-time"},
+			},
+			"required": []string{"status", "credentials_status", "worker_status", "sync_status", "connected_teams", "mapped_sites", "pending_syncs", "running_syncs", "failed_syncs", "needs_attention_syncs"},
+		},
 		"TenantDBInfo": map[string]any{
 			"type": "object",
 			"properties": map[string]any{

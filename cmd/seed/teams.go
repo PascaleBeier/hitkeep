@@ -173,7 +173,7 @@ func ensureSiteInActiveTeam(ctx context.Context, store *database.Store, userID u
 }
 
 func seedActivationFixtures(ctx context.Context, store *database.Store, userID, primarySiteID uuid.UUID) {
-	now := time.Now().UTC().Truncate(time.Minute)
+	now := time.Now().UTC()
 
 	primary, err := store.GetSiteByID(ctx, primarySiteID)
 	if err != nil || primary == nil {

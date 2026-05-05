@@ -4,6 +4,8 @@ func openAPIV1Paths() map[string]any {
 	return mergeOpenAPIPathMaps(
 		openAPIV1CorePaths(),
 		openAPIV1AdminSitePaths(),
+		openAPIV1IntegrationPaths(),
+		openAPIV1SearchConsoleReportPaths(),
 	)
 }
 

@@ -29,6 +29,10 @@ func openAPIV1AdminSitePaths() map[string]any {
 			"get": op([]string{"Admin"}, "Get system health", "Returns instance health, database status, worker status, and cluster leader state.", secCookie(), nil, nil,
 				map[string]any{"200": jsonRefResp("System health", "#/components/schemas/SystemHealth")}),
 		},
+		"/api/admin/system/search-console": map[string]any{
+			"get": op([]string{"Admin"}, "Get Search Console system status", "Returns Google Search Console credential, worker, and sync health without exposing OAuth secrets or raw Google payloads.", secCookie(), nil, nil,
+				map[string]any{"200": jsonRefResp("Search Console system status", "#/components/schemas/SystemSearchConsoleStatus")}),
+		},
 		"/api/admin/system/storage": map[string]any{
 			"get": op([]string{"Admin"}, "Get system storage", "Returns configured data paths, shared and tenant database sizes, backup path, spam cache path, and disk capacity fields when available.", secCookie(), nil, nil,
 				map[string]any{"200": jsonRefResp("System storage", "#/components/schemas/SystemStorage")}),

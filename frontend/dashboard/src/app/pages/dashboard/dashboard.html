@@ -294,7 +294,20 @@
             </ng-template>
         </p-table>
     </p-card>
-    } @else {
+    @if (searchConsoleDateRange(); as searchConsoleRange) {
+    <app-search-console-drilldown
+        class="mt-6 block"
+        [siteId]="siteService.activeSite()?.id || null"
+        [siteDomain]="siteService.activeSite()?.domain || null"
+        [from]="searchConsoleRange.from"
+        [to]="searchConsoleRange.to"
+        [path]="searchConsoleFilters().path"
+        [country]="searchConsoleFilters().country"
+        [device]="searchConsoleFilters().device"
+        [shareMode]="isShareMode()"
+        [refreshKey]="searchConsoleRefreshKey()"
+    />
+    } } @else {
     <div class="flex flex-col items-center justify-center h-[50vh] gap-4">
         <i class="pi pi-globe text-6xl text-primary opacity-20"></i>
         @if (emptyTeamName(); as teamName) {

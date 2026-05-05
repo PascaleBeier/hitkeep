@@ -18,6 +18,7 @@ import (
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/mcpserver"
+	"hitkeep/internal/searchconsole"
 	"hitkeep/internal/server/admin"
 	"hitkeep/internal/server/aifetch"
 	serverauth "hitkeep/internal/server/auth"
@@ -27,6 +28,7 @@ import (
 	importhandlers "hitkeep/internal/server/imports"
 	"hitkeep/internal/server/ingest"
 	"hitkeep/internal/server/permissions"
+	searchconsolereports "hitkeep/internal/server/searchconsolereports"
 	sharehandlers "hitkeep/internal/server/share"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/server/sites"
@@ -134,19 +136,23 @@ func New(conf *config.Config, publicFS fs.FS, store *database.Store, tenantStore
 	mailTestTracker := &database.MailTestTracker{}
 
 	s.ctx = &shared.Context{
-		Store:                    store,
-		TenantStores:             tenantStores,
-		Cluster:                  cluster,
-		Producer:                 producer,
-		Mailer:                   mailService,
-		Config:                   conf,
-		Takeout:                  takeoutService,
-		Entitlements:             ent,
-		IngestLimiter:            ingestLim,
-		ApiLimiter:               apiLim,
-		AuthLimiter:              authLim,
-		WebhookLimiter:           webhookLim,
-		AuthState:                authState,
+		Store:          store,
+		TenantStores:   tenantStores,
+		Cluster:        cluster,
+		Producer:       producer,
+		Mailer:         mailService,
+		Config:         conf,
+		Takeout:        takeoutService,
+		Entitlements:   ent,
+		IngestLimiter:  ingestLim,
+		ApiLimiter:     apiLim,
+		AuthLimiter:    authLim,
+		WebhookLimiter: webhookLim,
+		AuthState:      authState,
+		SearchConsole: searchconsole.NewGoogleClient(searchconsole.OAuthConfig{
+			ClientID:     conf.GoogleSearchConsoleClientID,
+			ClientSecret: conf.GoogleSearchConsoleClientSecret,
+		}),
 		IPFilter:                 ipFilter,
 		SpamFilter:               spamFilter,
 		StartedAt:                time.Now().UTC(),
@@ -242,6 +248,7 @@ func (s *Server) setupRoutes(mux *http.ServeMux, publicFS fs.FS) {
 	importhandlers.Register(mux, ctx)
 	events.Register(mux, ctx)
 	aifetch.Register(mux, ctx)
+	searchconsolereports.Register(mux, ctx)
 	takeouthandlers.Register(mux, ctx)
 	sharehandlers.Register(mux, ctx)
 	if s.conf.MCPEnabled && s.store != nil && (s.cluster == nil || s.cluster.IsLeader()) {

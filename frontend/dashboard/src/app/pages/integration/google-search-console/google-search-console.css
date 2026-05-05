@@ -1,0 +1,124 @@
+.google-search-console-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.google-search-console-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    border: 1px solid var(--p-surface-200);
+    border-radius: 8px;
+    background: var(--p-surface-card);
+    padding: 1rem;
+}
+
+:host-context(.dark) .google-search-console-panel {
+    border-color: var(--p-surface-700);
+}
+
+.google-search-console-panel__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.google-search-console-panel__header h2 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 650;
+}
+
+.google-search-console-panel__header h3 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 650;
+}
+
+.google-search-console-panel__header p {
+    margin: 0.25rem 0 0;
+    color: var(--p-text-muted-color);
+    font-size: 0.875rem;
+}
+
+.google-search-console-panel__header-actions {
+    display: flex;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.google-search-console-meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    gap: 0.75rem;
+    margin: 0;
+}
+
+.google-search-console-meta div {
+    min-width: 0;
+}
+
+.google-search-console-meta dt {
+    color: var(--p-text-muted-color);
+    font-size: 0.75rem;
+    font-weight: 650;
+    text-transform: uppercase;
+}
+
+.google-search-console-meta dd {
+    margin: 0.25rem 0 0;
+    overflow-wrap: anywhere;
+}
+
+.google-search-console-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.google-search-console-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    max-width: 32rem;
+}
+
+.google-search-console-field label {
+    color: var(--p-text-muted-color);
+    font-size: 0.75rem;
+    font-weight: 650;
+    text-transform: uppercase;
+}
+
+.google-search-console-sync {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    border-top: 1px solid var(--p-surface-200);
+    padding-top: 1rem;
+}
+
+:host-context(.dark) .google-search-console-sync {
+    border-color: var(--p-surface-700);
+}
+
+.google-search-console-hint {
+    align-self: center;
+    color: var(--p-text-muted-color);
+    font-size: 0.875rem;
+}
+
+@media (max-width: 640px) {
+    .google-search-console-panel__header {
+        flex-direction: column;
+    }
+
+    .google-search-console-panel__header-actions {
+        justify-content: flex-start;
+    }
+}

@@ -19,6 +19,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
 )
@@ -181,6 +182,38 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		RequireAuth: true,
 		RateLimiter: ctx.ApiLimiter,
 	}, h.handleGetTeamAudit()))
+	mux.HandleFunc("GET /api/user/teams/{id}/integrations/google-search-console/status", ctx.Handler(shared.HandlerConfig{
+		RequireAuth: true,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleGetGoogleSearchConsoleStatus()))
+	mux.HandleFunc("POST /api/user/teams/{id}/integrations/google-search-console/connect", ctx.Handler(shared.HandlerConfig{
+		RequireAuth: true,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleConnectGoogleSearchConsole()))
+	mux.HandleFunc("GET /api/user/teams/{id}/integrations/google-search-console/properties", ctx.Handler(shared.HandlerConfig{
+		RequireAuth: true,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleListGoogleSearchConsoleProperties()))
+	mux.HandleFunc("GET /api/sites/{id}/integrations/google-search-console", ctx.Handler(shared.HandlerConfig{
+		SitePerm:    authcore.PermSiteView,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleGetGoogleSearchConsoleSiteMapping()))
+	mux.HandleFunc("PUT /api/sites/{id}/integrations/google-search-console/property", ctx.Handler(shared.HandlerConfig{
+		SitePerm:    authcore.PermSiteManageTeam,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleMapGoogleSearchConsoleSiteProperty()))
+	mux.HandleFunc("DELETE /api/sites/{id}/integrations/google-search-console/property", ctx.Handler(shared.HandlerConfig{
+		SitePerm:    authcore.PermSiteManageTeam,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleUnmapGoogleSearchConsoleSiteProperty()))
+	mux.HandleFunc("POST /api/sites/{id}/integrations/google-search-console/sync", ctx.Handler(shared.HandlerConfig{
+		SitePerm:    authcore.PermSiteManageTeam,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleRequestGoogleSearchConsoleSiteSync()))
+	mux.HandleFunc("DELETE /api/user/teams/{id}/integrations/google-search-console", ctx.Handler(shared.HandlerConfig{
+		RequireAuth: true,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleDisconnectGoogleSearchConsole()))
 	mux.HandleFunc("POST /api/user/teams/{id}/members", ctx.Handler(shared.HandlerConfig{
 		RequireAuth: true,
 		RateLimiter: ctx.ApiLimiter,
@@ -201,6 +234,10 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		RequireAuth: true,
 		RateLimiter: ctx.ApiLimiter,
 	}, h.handleLeaveTeam()))
+	mux.HandleFunc("GET /api/integrations/google-search-console/oauth/callback", ctx.Handler(shared.HandlerConfig{
+		RequireAuth: true,
+		RateLimiter: ctx.AuthLimiter,
+	}, h.handleGoogleSearchConsoleCallback()))
 }
 
 const gravatarBaseURL = "https://www.gravatar.com"

@@ -1,10 +1,50 @@
 package api
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+type DateOnly time.Time
+
+func NewDateOnly(value time.Time) DateOnly {
+	return DateOnly(dateOnlyTime(value))
+}
+
+func NewDateOnlyPtr(value *time.Time) *DateOnly {
+	if value == nil {
+		return nil
+	}
+	date := NewDateOnly(*value)
+	return &date
+}
+
+func (d DateOnly) MarshalJSON() ([]byte, error) {
+	return []byte(strconv.Quote(time.Time(d).UTC().Format(time.DateOnly))), nil
+}
+
+func (d *DateOnly) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		return nil
+	}
+	value, err := strconv.Unquote(string(data))
+	if err != nil {
+		return err
+	}
+	parsed, err := time.Parse(time.DateOnly, value)
+	if err != nil {
+		return err
+	}
+	*d = DateOnly(parsed)
+	return nil
+}
+
+func dateOnlyTime(value time.Time) time.Time {
+	year, month, day := value.UTC().Date()
+	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
+}
 
 type Hit struct {
 	ID             uuid.UUID `json:"id"`
@@ -67,6 +107,105 @@ type APIClient struct {
 type APIClientSiteRole struct {
 	SiteID uuid.UUID `json:"site_id"`
 	Role   string    `json:"role"`
+}
+
+type GoogleSearchConsoleStatus struct {
+	Status                 string     `json:"status"`
+	Configured             bool       `json:"configured"`
+	Connected              bool       `json:"connected"`
+	CredentialStatus       string     `json:"credential_status"`
+	ConnectedAccountLabel  string     `json:"connected_account_label,omitempty"`
+	LastConnectedAt        *time.Time `json:"last_connected_at,omitempty"`
+	LastDisconnectedAt     *time.Time `json:"last_disconnected_at,omitempty"`
+	NeedsAdminAction       bool       `json:"needs_admin_action"`
+	CanManage              bool       `json:"can_manage"`
+	ManagedCredentialsMode string     `json:"managed_credentials_mode"`
+}
+
+type GoogleSearchConsoleConnectResponse struct {
+	AuthURL string `json:"auth_url"`
+}
+
+type GoogleSearchConsoleProperty struct {
+	URI             string `json:"uri"`
+	PermissionLevel string `json:"permission_level"`
+}
+
+type GoogleSearchConsolePropertiesResponse struct {
+	Properties []GoogleSearchConsoleProperty `json:"properties"`
+}
+
+type GoogleSearchConsoleSiteMappingResponse struct {
+	SiteID                  uuid.UUID                      `json:"site_id"`
+	TeamID                  uuid.UUID                      `json:"team_id"`
+	Mapped                  bool                           `json:"mapped"`
+	PropertyURI             string                         `json:"property_uri,omitempty"`
+	PropertyPermissionLevel string                         `json:"property_permission_level,omitempty"`
+	MappedAt                *time.Time                     `json:"mapped_at,omitempty"`
+	CanManage               bool                           `json:"can_manage"`
+	SyncStatus              *GoogleSearchConsoleSyncStatus `json:"sync_status,omitempty"`
+}
+
+type GoogleSearchConsoleMapPropertyRequest struct {
+	PropertyURI string `json:"property_uri"`
+}
+
+type GoogleSearchConsoleSyncStatus struct {
+	State             string     `json:"state"`
+	ImportedStartDate *DateOnly  `json:"imported_start_date,omitempty"`
+	ImportedEndDate   *DateOnly  `json:"imported_end_date,omitempty"`
+	LastSuccessAt     *time.Time `json:"last_success_at,omitempty"`
+	LastAttemptAt     *time.Time `json:"last_attempt_at,omitempty"`
+	LastErrorCategory string     `json:"last_error_category,omitempty"`
+	NextRetryAt       *time.Time `json:"next_retry_at,omitempty"`
+	Manual            bool       `json:"manual"`
+}
+
+type SearchConsoleReportParams struct {
+	SiteID      uuid.UUID
+	PropertyURI string
+	Start       time.Time
+	End         time.Time
+	Page        string
+	Path        string
+	Country     string
+	Device      string
+	Limit       int
+}
+
+type SearchConsoleOverview struct {
+	DataSource      string  `json:"data_source"`
+	Clicks          int     `json:"clicks"`
+	Impressions     int     `json:"impressions"`
+	CTR             float64 `json:"ctr"`
+	AveragePosition float64 `json:"average_position"`
+}
+
+type SearchConsoleMetricPoint struct {
+	Date            DateOnly `json:"date"`
+	Clicks          int      `json:"clicks"`
+	Impressions     int      `json:"impressions"`
+	CTR             float64  `json:"ctr"`
+	AveragePosition float64  `json:"average_position"`
+}
+
+type SearchConsoleSeriesResponse struct {
+	DataSource string                     `json:"data_source"`
+	Series     []SearchConsoleMetricPoint `json:"series"`
+}
+
+type SearchConsoleDimensionRow struct {
+	Value           string  `json:"value"`
+	Clicks          int     `json:"clicks"`
+	Impressions     int     `json:"impressions"`
+	CTR             float64 `json:"ctr"`
+	AveragePosition float64 `json:"average_position"`
+}
+
+type SearchConsoleDimensionResponse struct {
+	DataSource string                      `json:"data_source"`
+	Dimension  string                      `json:"dimension"`
+	Rows       []SearchConsoleDimensionRow `json:"rows"`
 }
 
 type Event struct {
@@ -1017,6 +1156,22 @@ type SystemHealth struct {
 	Database string `json:"database"`
 	Workers  string `json:"workers"`
 	IsLeader bool   `json:"is_leader"`
+}
+
+type SystemSearchConsoleStatus struct {
+	Status              string     `json:"status"`
+	CredentialsStatus   string     `json:"credentials_status"`
+	WorkerStatus        string     `json:"worker_status"`
+	SyncStatus          string     `json:"sync_status"`
+	ConnectedTeams      int        `json:"connected_teams"`
+	MappedSites         int        `json:"mapped_sites"`
+	PendingSyncs        int        `json:"pending_syncs"`
+	RunningSyncs        int        `json:"running_syncs"`
+	FailedSyncs         int        `json:"failed_syncs"`
+	NeedsAttentionSyncs int        `json:"needs_attention_syncs"`
+	LastSuccessAt       *time.Time `json:"last_success_at,omitempty"`
+	LastAttemptAt       *time.Time `json:"last_attempt_at,omitempty"`
+	NextRetryAt         *time.Time `json:"next_retry_at,omitempty"`
 }
 
 type TenantDBInfo struct {

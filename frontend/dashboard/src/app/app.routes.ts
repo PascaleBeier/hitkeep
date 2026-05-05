@@ -122,6 +122,11 @@ export const routes: Routes = [
                 loadComponent: () => import('@pages/integration/api-reference/api-reference').then((m) => m.APIReferencePage)
             },
             {
+                path: 'integration/google-search-console',
+                loadComponent: () => import('@pages/integration/google-search-console/google-search-console').then((m) => m.GoogleSearchConsolePage),
+                canActivate: [teamAdminGuard]
+            },
+            {
                 path: 'imports',
                 loadComponent: () => import('@pages/imports/imports').then((m) => m.ImportsPage)
             },

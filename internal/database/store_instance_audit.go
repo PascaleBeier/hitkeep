@@ -49,6 +49,14 @@ type AuditEntryParams struct {
 }
 
 func (s *Store) AppendAuditEntry(ctx context.Context, params AuditEntryParams) error {
+	return appendAuditEntry(ctx, s.db, params)
+}
+
+func appendAuditEntryTx(ctx context.Context, tx *sql.Tx, params AuditEntryParams) error {
+	return appendAuditEntry(ctx, tx, params)
+}
+
+func appendAuditEntry(ctx context.Context, exec sqlExecContext, params AuditEntryParams) error {
 	action := strings.TrimSpace(params.Action)
 	if action == "" {
 		return fmt.Errorf("audit action is required")
@@ -66,7 +74,7 @@ func (s *Store) AppendAuditEntry(ctx context.Context, params AuditEntryParams) e
 		metadataJSON = "{}"
 	}
 
-	_, err := s.db.ExecContext(ctx, `
+	_, err := exec.ExecContext(ctx, `
 		INSERT INTO instance_audit_log (
 			actor_id, actor_email_snapshot, actor_role_snapshot, team_id, target_user_id,
 			action, target_type, target_id, target_label,

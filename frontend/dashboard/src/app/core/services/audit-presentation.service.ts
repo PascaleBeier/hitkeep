@@ -50,7 +50,19 @@ const SHARED_ACTIONS = [
     'import.completed',
     'import.deleted',
     'import.data_cleared',
-    'import.data_written'
+    'import.data_written',
+    'google_search_console.connected',
+    'google_search_console.connect_failed',
+    'google_search_console.disconnected',
+    'google_search_console.properties_refreshed',
+    'google_search_console.properties_refresh_failed',
+    'google_search_console.property_mapped',
+    'google_search_console.property_unmapped',
+    'google_search_console.sync_requested',
+    'google_search_console.sync_started',
+    'google_search_console.sync_import_prepared',
+    'google_search_console.sync_imported',
+    'google_search_console.sync_failed'
 ];
 
 const ACTION_KEYS: Record<string, string> = {
@@ -104,7 +116,19 @@ const ACTION_KEYS: Record<string, string> = {
     'import.completed': 'auditTable.actions.importCompleted',
     'import.deleted': 'auditTable.actions.importDeleted',
     'import.data_cleared': 'auditTable.actions.importDataCleared',
-    'import.data_written': 'auditTable.actions.importDataWritten'
+    'import.data_written': 'auditTable.actions.importDataWritten',
+    'google_search_console.connected': 'auditTable.actions.googleSearchConsoleConnected',
+    'google_search_console.connect_failed': 'auditTable.actions.googleSearchConsoleConnectFailed',
+    'google_search_console.disconnected': 'auditTable.actions.googleSearchConsoleDisconnected',
+    'google_search_console.properties_refreshed': 'auditTable.actions.googleSearchConsolePropertiesRefreshed',
+    'google_search_console.properties_refresh_failed': 'auditTable.actions.googleSearchConsolePropertiesRefreshFailed',
+    'google_search_console.property_mapped': 'auditTable.actions.googleSearchConsolePropertyMapped',
+    'google_search_console.property_unmapped': 'auditTable.actions.googleSearchConsolePropertyUnmapped',
+    'google_search_console.sync_requested': 'auditTable.actions.googleSearchConsoleSyncRequested',
+    'google_search_console.sync_started': 'auditTable.actions.googleSearchConsoleSyncStarted',
+    'google_search_console.sync_import_prepared': 'auditTable.actions.googleSearchConsoleSyncImportPrepared',
+    'google_search_console.sync_imported': 'auditTable.actions.googleSearchConsoleSyncImported',
+    'google_search_console.sync_failed': 'auditTable.actions.googleSearchConsoleSyncFailed'
 };
 
 const TARGET_TYPE_KEYS: Record<string, string> = {
@@ -119,7 +143,10 @@ const TARGET_TYPE_KEYS: Record<string, string> = {
     backup: 'auditTable.targetTypes.backup',
     spam_filter: 'auditTable.targetTypes.spamFilter',
     diagnostics: 'auditTable.targetTypes.diagnostics',
-    permission: 'auditTable.targetTypes.permission'
+    permission: 'auditTable.targetTypes.permission',
+    google_search_console_connection: 'auditTable.targetTypes.googleSearchConsoleConnection',
+    google_search_console_property: 'auditTable.targetTypes.googleSearchConsoleProperty',
+    google_search_console_sync: 'auditTable.targetTypes.googleSearchConsoleSync'
 };
 
 const TARGET_TYPES = Object.keys(TARGET_TYPE_KEYS);

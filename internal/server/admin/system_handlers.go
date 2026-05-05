@@ -54,42 +54,51 @@ func systemRuntimeMode(cfg *config.Config) string {
 }
 
 func systemFeatureStatuses(cfg *config.Config, mailerConfigured bool) []api.SystemFeatureStatus {
-	backupDetail := ""
-	if cfg.BackupPath != "" {
-		backupDetail = "local"
-		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(cfg.BackupPath)), "s3://") {
-			backupDetail = "s3"
-		}
-	}
-
-	mailDetail := ""
-	if mailerConfigured {
-		mailDetail = strings.TrimSpace(cfg.MailDriver)
-		if mailDetail == "" {
-			mailDetail = "smtp"
-		}
-	}
-
-	cloudDetail := ""
-	if cfg.CloudHosted {
-		cloudDetail = strings.TrimSpace(cfg.CloudPlanName)
-		if cloudDetail == "" {
-			cloudDetail = strings.TrimSpace(cfg.CloudPlanCode)
-		}
-	}
-
 	billingEnabled := cfg.CloudHosted && strings.TrimSpace(cfg.StripeSecretKey) != ""
+	searchConsoleEnabled := googleSearchConsoleCredentialsConfigured(cfg)
 
 	return []api.SystemFeatureStatus{
 		{Key: "mcp", Enabled: cfg.MCPEnabled, Detail: enabledDetail(cfg.MCPEnabled, cfg.MCPPath)},
 		{Key: "mcp_docs", Enabled: cfg.MCPEnabled && cfg.MCPDocsEnabled, Detail: enabledDetail(cfg.MCPEnabled && cfg.MCPDocsEnabled, cfg.MCPDocsURL)},
-		{Key: "automatic_backups", Enabled: cfg.BackupPath != "", Detail: backupDetail},
+		{Key: "automatic_backups", Enabled: cfg.BackupPath != "", Detail: backupFeatureDetail(cfg)},
 		{Key: "spam_auto_update", Enabled: cfg.SpamFilterAutoUpdate, Detail: enabledDetail(cfg.SpamFilterAutoUpdate, formatFeatureInterval(cfg.SpamFilterUpdateIntervalMin))},
-		{Key: "mail_delivery", Enabled: mailerConfigured, Detail: mailDetail},
-		{Key: "managed_cloud", Enabled: cfg.CloudHosted, Detail: cloudDetail},
+		{Key: "mail_delivery", Enabled: mailerConfigured, Detail: mailFeatureDetail(cfg, mailerConfigured)},
+		{Key: "google_search_console", Enabled: searchConsoleEnabled, Detail: enabledDetail(searchConsoleEnabled, "oauth")},
+		{Key: "managed_cloud", Enabled: cfg.CloudHosted, Detail: cloudFeatureDetail(cfg)},
 		{Key: "cloud_signup", Enabled: cfg.CloudHosted && cfg.CloudSignupEnabled},
 		{Key: "billing", Enabled: billingEnabled, Detail: enabledDetail(billingEnabled, "stripe")},
 	}
+}
+
+func backupFeatureDetail(cfg *config.Config) string {
+	if cfg.BackupPath == "" {
+		return ""
+	}
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(cfg.BackupPath)), "s3://") {
+		return "s3"
+	}
+	return "local"
+}
+
+func mailFeatureDetail(cfg *config.Config, mailerConfigured bool) string {
+	if !mailerConfigured {
+		return ""
+	}
+	detail := strings.TrimSpace(cfg.MailDriver)
+	if detail != "" {
+		return detail
+	}
+	return "smtp"
+}
+
+func cloudFeatureDetail(cfg *config.Config) string {
+	if !cfg.CloudHosted {
+		return ""
+	}
+	if detail := strings.TrimSpace(cfg.CloudPlanName); detail != "" {
+		return detail
+	}
+	return strings.TrimSpace(cfg.CloudPlanCode)
 }
 
 func enabledDetail(enabled bool, detail string) string {
@@ -110,6 +119,13 @@ func formatFeatureInterval(minutes int) string {
 		return fmt.Sprintf("%dh", minutes/60)
 	}
 	return fmt.Sprintf("%dm", minutes)
+}
+
+func googleSearchConsoleCredentialsConfigured(cfg *config.Config) bool {
+	if cfg == nil {
+		return false
+	}
+	return strings.TrimSpace(cfg.GoogleSearchConsoleClientID) != "" && strings.TrimSpace(cfg.GoogleSearchConsoleClientSecret) != ""
 }
 
 func (h *handler) handleGetHealth() http.HandlerFunc {
@@ -140,6 +156,99 @@ func (h *handler) handleGetHealth() http.HandlerFunc {
 
 		writeJSON(w, http.StatusOK, health)
 	}
+}
+
+func (h *handler) handleGetSearchConsole() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if h.ctx.Store == nil {
+			http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
+			return
+		}
+
+		storeStatus, err := h.ctx.Store.GetGoogleSearchConsoleSystemStatus(r.Context())
+		if err != nil {
+			slog.Error("Failed to read Google Search Console system status", "error", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		status := googleSearchConsoleSystemStatus(h.ctx.Config, h.ctx.TenantStores != nil, storeStatus)
+		writeJSON(w, http.StatusOK, status)
+	}
+}
+
+func googleSearchConsoleSystemStatus(cfg *config.Config, tenantStoresConfigured bool, storeStatus database.GoogleSearchConsoleSystemStatus) api.SystemSearchConsoleStatus {
+	credentialsStatus := searchConsoleCredentialsStatus(cfg)
+	workerStatus := searchConsoleWorkerStatus(credentialsStatus, tenantStoresConfigured)
+	syncStatus := searchConsoleSystemSyncStatus(storeStatus)
+
+	return api.SystemSearchConsoleStatus{
+		Status:              searchConsoleOverallStatus(credentialsStatus, workerStatus, syncStatus, storeStatus.MappedSites),
+		CredentialsStatus:   credentialsStatus,
+		WorkerStatus:        workerStatus,
+		SyncStatus:          syncStatus,
+		ConnectedTeams:      storeStatus.ConnectedTeams,
+		MappedSites:         storeStatus.MappedSites,
+		PendingSyncs:        storeStatus.PendingSyncs,
+		RunningSyncs:        storeStatus.RunningSyncs,
+		FailedSyncs:         storeStatus.FailedSyncs,
+		NeedsAttentionSyncs: storeStatus.NeedsAttentionSyncs,
+		LastSuccessAt:       storeStatus.LastSuccessAt,
+		LastAttemptAt:       storeStatus.LastAttemptAt,
+		NextRetryAt:         storeStatus.NextRetryAt,
+	}
+}
+
+func searchConsoleCredentialsStatus(cfg *config.Config) string {
+	if googleSearchConsoleCredentialsConfigured(cfg) {
+		return "configured"
+	}
+	return "missing"
+}
+
+func searchConsoleWorkerStatus(credentialsStatus string, tenantStoresConfigured bool) string {
+	if credentialsStatus == "configured" && tenantStoresConfigured {
+		return "enabled"
+	}
+	return "disabled"
+}
+
+func searchConsoleSystemSyncStatus(status database.GoogleSearchConsoleSystemStatus) string {
+	if status.NeedsAttentionSyncs > 0 {
+		return "needs_attention"
+	}
+	if status.FailedSyncs > 0 {
+		return "failed"
+	}
+	if status.RunningSyncs > 0 {
+		return "running"
+	}
+	if status.PendingSyncs > 0 {
+		return "pending"
+	}
+	if status.MappedSites > 0 {
+		return "healthy"
+	}
+	return "idle"
+}
+
+func searchConsoleOverallStatus(credentialsStatus, workerStatus, syncStatus string, mappedSites int) string {
+	if credentialsStatus != "configured" {
+		return "not_configured"
+	}
+	if workerStatus != "enabled" || syncStatus == "failed" {
+		return "degraded"
+	}
+	if syncStatus == "needs_attention" {
+		return "needs_attention"
+	}
+	if syncStatus == "pending" || syncStatus == "running" {
+		return "syncing"
+	}
+	if mappedSites == 0 {
+		return "idle"
+	}
+	return "healthy"
 }
 
 func workerHealthStatus(isLeader bool, producer nsqPinger) (string, bool) {

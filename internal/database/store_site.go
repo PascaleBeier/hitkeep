@@ -130,8 +130,12 @@ func (s *Store) CreateSite(ctx context.Context, userID uuid.UUID, domain string)
 }
 
 func (s *Store) UpdateSiteTenant(ctx context.Context, siteID, tenantID uuid.UUID) error {
+	return updateSiteTenant(ctx, s.db, siteID, tenantID)
+}
+
+func updateSiteTenant(ctx context.Context, exec sqlExecContext, siteID, tenantID uuid.UUID) error {
 	now := time.Now().UTC()
-	_, err := s.db.ExecContext(ctx, `
+	_, err := exec.ExecContext(ctx, `
 		INSERT INTO site_tenants (site_id, tenant_id, created_at)
 		VALUES (?, ?, ?)
 		ON CONFLICT (site_id) DO UPDATE SET

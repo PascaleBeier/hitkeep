@@ -62,6 +62,21 @@ interface AdminSettingsTestAccess {
         params?: Record<string, string | number>;
     } | null;
     importCleanupActionStatusMessage(): string;
+    isLoadingSearchConsole(): boolean;
+    loadSearchConsoleStatus(): void;
+    systemSearchConsole(): {
+        status: string;
+        credentials_status: string;
+        worker_status: string;
+        sync_status: string;
+        connected_teams: number;
+        mapped_sites: number;
+        pending_syncs: number;
+        running_syncs: number;
+        failed_syncs: number;
+        needs_attention_syncs: number;
+    } | null;
+    searchConsoleSyncIssueCount(): number;
     canDisableUserMfa(): boolean;
     currentUserId: { set(value: string): void };
     users: {
@@ -368,6 +383,30 @@ describe('AdminSettings', () => {
             key: 'admin.system.importCleanup.runFailed'
         });
         expect(component.importCleanupActionStatusMessage()).toBe('Could not clean staged import files.');
+    });
+
+    it('loads Search Console system status for the runtime console', () => {
+        component.loadSearchConsoleStatus();
+
+        expect(component.isLoadingSearchConsole()).toBe(true);
+        const request = httpMock.expectOne('/api/admin/system/search-console');
+        expect(request.request.method).toBe('GET');
+        request.flush({
+            status: 'needs_attention',
+            credentials_status: 'configured',
+            worker_status: 'enabled',
+            sync_status: 'needs_attention',
+            connected_teams: 1,
+            mapped_sites: 2,
+            pending_syncs: 1,
+            running_syncs: 0,
+            failed_syncs: 1,
+            needs_attention_syncs: 2
+        });
+
+        expect(component.isLoadingSearchConsole()).toBe(false);
+        expect(component.systemSearchConsole()?.status).toBe('needs_attention');
+        expect(component.searchConsoleSyncIssueCount()).toBe(3);
     });
 
     it('allows MFA recovery actions when the current user is an instance owner', () => {

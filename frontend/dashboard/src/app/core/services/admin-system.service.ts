@@ -23,6 +23,22 @@ export interface SystemHealth {
     is_leader: boolean;
 }
 
+export interface SystemSearchConsoleStatus {
+    status: string;
+    credentials_status: string;
+    worker_status: string;
+    sync_status: string;
+    connected_teams: number;
+    mapped_sites: number;
+    pending_syncs: number;
+    running_syncs: number;
+    failed_syncs: number;
+    needs_attention_syncs: number;
+    last_success_at?: string;
+    last_attempt_at?: string;
+    next_retry_at?: string;
+}
+
 export interface TenantDBInfo {
     tenant_id: string;
     name: string;
@@ -222,6 +238,10 @@ export class AdminSystemService {
 
     getHealth() {
         return this.http.get<SystemHealth>('/api/admin/system/health');
+    }
+
+    getSearchConsole() {
+        return this.http.get<SystemSearchConsoleStatus>('/api/admin/system/search-console');
     }
 
     getStorage() {

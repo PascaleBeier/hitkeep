@@ -70,6 +70,28 @@ describe('AdminSystemService', () => {
         });
     });
 
+    it('loads Search Console credential and sync status through the system endpoint', () => {
+        service.getSearchConsole().subscribe((status) => {
+            expect(status.credentials_status).toBe('configured');
+            expect(status.needs_attention_syncs).toBe(1);
+        });
+
+        const req = httpMock.expectOne('/api/admin/system/search-console');
+        expect(req.request.method).toBe('GET');
+        req.flush({
+            status: 'needs_attention',
+            credentials_status: 'configured',
+            worker_status: 'enabled',
+            sync_status: 'needs_attention',
+            connected_teams: 1,
+            mapped_sites: 1,
+            pending_syncs: 0,
+            running_syncs: 0,
+            failed_syncs: 0,
+            needs_attention_syncs: 1
+        });
+    });
+
     it('exports audit filters with the backend export cap instead of the visible page size', () => {
         service.exportAudit({ action: 'spam_filter.refresh', target_type: 'spam_filter', limit: 25, offset: 50 }).subscribe();
 

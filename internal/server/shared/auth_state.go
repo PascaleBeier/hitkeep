@@ -13,10 +13,11 @@ import (
 )
 
 const (
-	authStateCacheSize       = 4096
-	pendingTOTPSetupTTL      = 10 * time.Minute
-	passkeyRegistrationTTL   = 5 * time.Minute
-	passkeyLoginChallengeTTL = 5 * time.Minute
+	authStateCacheSize               = 4096
+	pendingTOTPSetupTTL              = 10 * time.Minute
+	passkeyRegistrationTTL           = 5 * time.Minute
+	passkeyLoginChallengeTTL         = 5 * time.Minute
+	googleSearchConsoleOAuthStateTTL = 10 * time.Minute
 )
 
 type PendingTOTPSetup struct {
@@ -37,10 +38,18 @@ type MFAEmailLink struct {
 	ExpiresAt   time.Time
 }
 
+type GoogleSearchConsoleOAuthState struct {
+	UserID     uuid.UUID
+	TeamID     uuid.UUID
+	ReturnPath string
+	ExpiresAt  time.Time
+}
+
 type AuthStateStore struct {
 	pendingTOTP          *lru.LRU[uuid.UUID, PendingTOTPSetup]
 	passkeyRegistrations *lru.LRU[uuid.UUID, PasskeyRegistrationChallenge]
 	mfaEmailLinks        *lru.LRU[uuid.UUID, MFAEmailLink]
+	googleSearchConsole  *lru.LRU[uuid.UUID, GoogleSearchConsoleOAuthState]
 
 	loginChallengesMu       sync.Mutex
 	loginChallenges         *lru.LRU[uuid.UUID, database.LoginChallenge]
@@ -52,6 +61,7 @@ func NewAuthStateStore() *AuthStateStore {
 		pendingTOTP:          lru.NewLRU[uuid.UUID, PendingTOTPSetup](authStateCacheSize, nil, pendingTOTPSetupTTL),
 		passkeyRegistrations: lru.NewLRU[uuid.UUID, PasskeyRegistrationChallenge](authStateCacheSize, nil, passkeyRegistrationTTL),
 		mfaEmailLinks:        lru.NewLRU[uuid.UUID, MFAEmailLink](authStateCacheSize, nil, passkeyLoginChallengeTTL),
+		googleSearchConsole:  lru.NewLRU[uuid.UUID, GoogleSearchConsoleOAuthState](authStateCacheSize, nil, googleSearchConsoleOAuthStateTTL),
 		loginChallenges:      lru.NewLRU[uuid.UUID, database.LoginChallenge](authStateCacheSize, nil, passkeyLoginChallengeTTL),
 		loginChallengeIDsByUser: lru.NewLRU[uuid.UUID, map[uuid.UUID]struct{}](
 			authStateCacheSize,
@@ -207,6 +217,39 @@ func (s *AuthStateStore) ConsumeMFAEmailLink(tokenID uuid.UUID) (MFAEmailLink, b
 	}
 
 	s.mfaEmailLinks.Remove(tokenID)
+	return entry, true
+}
+
+func (s *AuthStateStore) CreateGoogleSearchConsoleOAuthState(userID, teamID uuid.UUID, returnPath string, expiresAt time.Time) string {
+	stateID := uuid.New()
+	if s == nil {
+		return stateID.String()
+	}
+	s.googleSearchConsole.Add(stateID, GoogleSearchConsoleOAuthState{
+		UserID:     userID,
+		TeamID:     teamID,
+		ReturnPath: strings.TrimSpace(returnPath),
+		ExpiresAt:  expiresAt.UTC(),
+	})
+	return stateID.String()
+}
+
+func (s *AuthStateStore) ConsumeGoogleSearchConsoleOAuthState(rawState string) (GoogleSearchConsoleOAuthState, bool) {
+	if s == nil {
+		return GoogleSearchConsoleOAuthState{}, false
+	}
+	stateID, err := uuid.Parse(strings.TrimSpace(rawState))
+	if err != nil || stateID == uuid.Nil {
+		return GoogleSearchConsoleOAuthState{}, false
+	}
+	entry, ok := s.googleSearchConsole.Get(stateID)
+	if !ok {
+		return GoogleSearchConsoleOAuthState{}, false
+	}
+	s.googleSearchConsole.Remove(stateID)
+	if isExpired(entry.ExpiresAt) {
+		return GoogleSearchConsoleOAuthState{}, false
+	}
 	return entry, true
 }
 

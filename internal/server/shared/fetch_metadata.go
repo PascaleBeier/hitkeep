@@ -17,6 +17,7 @@ func FetchMetadataMiddleware(publicURL string, next http.Handler) http.Handler {
 		isServerIngest := path == "/api/ingest/server/pageview" || path == "/api/ingest/server/event"
 		isSignupVerify := path == "/api/cloud/signup/verify"
 		isMFAEmailLinkVerify := path == "/api/auth/mfa/email-link/verify"
+		isGoogleSearchConsoleOAuthCallback := path == "/api/integrations/google-search-console/oauth/callback"
 
 		if secFetchSite == "" {
 			// Older/limited browsers fallback: for state-changing API requests, enforce
@@ -36,7 +37,7 @@ func FetchMetadataMiddleware(publicURL string, next http.Handler) http.Handler {
 			return
 		}
 
-		if strings.HasPrefix(path, "/api/") && secFetchSite != "same-origin" && !isStripeWebhook && !isServerIngest && !isSignupVerify && !isMFAEmailLinkVerify {
+		if strings.HasPrefix(path, "/api/") && secFetchSite != "same-origin" && !isStripeWebhook && !isServerIngest && !isSignupVerify && !isMFAEmailLinkVerify && !isGoogleSearchConsoleOAuthCallback {
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}

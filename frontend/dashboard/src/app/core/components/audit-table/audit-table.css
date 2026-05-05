@@ -84,12 +84,14 @@
     font-size: 0.73rem;
     font-weight: 700;
     letter-spacing: 0;
+    padding: 0.55rem 0.75rem;
     text-transform: uppercase;
     white-space: nowrap;
 }
 
 :host ::ng-deep .audit-table__data .p-datatable-tbody > tr > td {
     height: 3rem;
+    padding: 0.5rem 0.75rem;
     vertical-align: middle;
 }
 
@@ -98,12 +100,14 @@
 }
 
 .audit-table__expander-col {
-    width: 3rem;
+    width: 2.75rem;
 }
 
 .audit-table__expander-cell {
+    padding-left: 0.35rem !important;
+    padding-right: 0.35rem !important;
     text-align: center;
-    width: 3rem;
+    width: 2.75rem;
 }
 
 .audit-table__time-col {
@@ -158,13 +162,14 @@
 .audit-table__evidence-row > td {
     background: color-mix(in srgb, var(--p-content-hover-background) 70%, transparent);
     border-top: 0;
+    padding: 0.75rem 1rem 1rem !important;
 }
 
 .audit-table__evidence {
     display: grid;
     gap: 0.65rem 1rem;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    padding: 0.65rem 0.2rem 0.85rem;
+    padding: 0;
 }
 
 .audit-table__evidence-full {

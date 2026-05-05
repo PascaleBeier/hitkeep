@@ -180,6 +180,7 @@ func main() {
 	stats.hits += aiSeedStats.hits
 	stats.sessions += aiSeedStats.sessions
 
+	searchConsoleStats := seedGoogleSearchConsoleFixtures(ctx, store, tenantMgr, userID, siteID, *days)
 	seedActivationFixtures(ctx, store, userID, siteID)
 
 	slog.Info("Running rollup backfill...")
@@ -200,6 +201,7 @@ func main() {
 	fmt.Printf("  Sessions:      %d\n", stats.sessions)
 	fmt.Printf("  Events:        %d\n", stats.events)
 	fmt.Printf("  AI Fetches:    %d\n", stats.aiFetches)
+	fmt.Printf("  Search Console Rows: %d\n", searchConsoleStats.facts)
 	fmt.Printf("  Period:        last %d days\n", *days)
 	fmt.Println()
 }

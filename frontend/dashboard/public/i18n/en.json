@@ -52,7 +52,9 @@
         "ecommerce": "Ecommerce",
         "ecommerceAria": "Go to ecommerce analytics",
         "systemStatus": "System status",
-        "systemStatusAria": "Go to system status"
+        "systemStatusAria": "Go to system status",
+        "googleSearchConsole": "Search Console",
+        "googleSearchConsoleAria": "Go to Google Search Console integration"
     },
     "auditTable": {
         "empty": "No audit entries found",
@@ -125,7 +127,19 @@
             "importCompleted": "Import completed",
             "importDeleted": "Import deleted",
             "importDataCleared": "Imported data cleared",
-            "importDataWritten": "Imported data written"
+            "importDataWritten": "Imported data written",
+            "googleSearchConsoleConnected": "Search Console connected",
+            "googleSearchConsoleConnectFailed": "Search Console connection failed",
+            "googleSearchConsoleDisconnected": "Search Console disconnected",
+            "googleSearchConsolePropertiesRefreshed": "Search Console properties refreshed",
+            "googleSearchConsolePropertiesRefreshFailed": "Search Console property refresh failed",
+            "googleSearchConsolePropertyMapped": "Search Console property mapped",
+            "googleSearchConsolePropertyUnmapped": "Search Console property unmapped",
+            "googleSearchConsoleSyncRequested": "Search Console sync requested",
+            "googleSearchConsoleSyncStarted": "Search Console sync started",
+            "googleSearchConsoleSyncImportPrepared": "Search Console import prepared",
+            "googleSearchConsoleSyncImported": "Search Console data imported",
+            "googleSearchConsoleSyncFailed": "Search Console sync failed"
         },
         "columns": {
             "evidence": "Evidence",
@@ -156,7 +170,10 @@
             "backup": "Backup",
             "spamFilter": "Spam filter",
             "diagnostics": "Diagnostics",
-            "permission": "Permission"
+            "permission": "Permission",
+            "googleSearchConsoleConnection": "Search Console connection",
+            "googleSearchConsoleProperty": "Search Console property",
+            "googleSearchConsoleSync": "Search Console sync"
         },
         "roles": {
             "owner": "Owner",
@@ -1434,6 +1451,9 @@
                 "mail_delivery": {
                     "label": "Mail delivery"
                 },
+                "google_search_console": {
+                    "label": "Google Search Console"
+                },
                 "managed_cloud": {
                     "label": "Managed cloud"
                 },
@@ -1462,6 +1482,43 @@
                 "isLeader": "Is Leader",
                 "actions": {
                     "check": "Run check"
+                }
+            },
+            "searchConsole": {
+                "title": "Search Console",
+                "credentials": "Credentials",
+                "worker": "Worker",
+                "sync": "Sync",
+                "connectedTeams": "Connected teams",
+                "mappedSites": "Mapped sites",
+                "inFlight": "In flight",
+                "issues": "Issues",
+                "lastAttempt": "Last attempt",
+                "lastSuccess": "Last success",
+                "nextRetry": "Next retry",
+                "status": {
+                    "healthy": "Healthy",
+                    "idle": "Idle",
+                    "syncing": "Syncing",
+                    "degraded": "Degraded",
+                    "needs_attention": "Needs attention",
+                    "not_configured": "Not configured"
+                },
+                "credentialsStatus": {
+                    "configured": "Configured",
+                    "missing": "Missing"
+                },
+                "workerStatus": {
+                    "enabled": "Enabled",
+                    "disabled": "Disabled"
+                },
+                "syncStatus": {
+                    "healthy": "Healthy",
+                    "idle": "Idle",
+                    "pending": "Pending",
+                    "running": "Running",
+                    "failed": "Failed",
+                    "needs_attention": "Needs attention"
                 }
             },
             "storage": {
@@ -2096,6 +2153,135 @@
                 "loadVersions": "Failed to load API doc versions.",
                 "loadSpec": "Failed to load API reference for this version."
             }
+        },
+        "googleSearchConsole": {
+            "title": "Google Search Console",
+            "subtitle": "Connect properties.",
+            "status": {
+                "credentials_missing": "Credentials missing",
+                "connected": "Connected",
+                "disconnected": "Disconnected",
+                "loading": "Loading",
+                "mapped": "Mapped",
+                "unmapped": "Unmapped"
+            },
+            "labels": {
+                "account": "Account",
+                "site": "Site",
+                "property": "Property",
+                "propertyMapping": "Property mapping",
+                "permission": "Permission",
+                "syncStatus": "Sync status",
+                "lastSuccess": "Last success",
+                "lastAttempt": "Last attempt",
+                "importedRange": "Imported range",
+                "nextRetry": "Next retry",
+                "lastError": "Last error"
+            },
+            "actions": {
+                "refresh": "Refresh",
+                "docs": "Setup docs",
+                "connect": "Connect",
+                "reconnect": "Reconnect",
+                "disconnect": "Disconnect",
+                "confirmDisconnect": "Disconnect Search Console?",
+                "mapProperty": "Map property",
+                "removeMapping": "Remove mapping",
+                "confirmRemoveMapping": "Remove mapping?",
+                "syncNow": "Sync now",
+                "syncRequesting": "Requesting...",
+                "syncQueued": "Queued",
+                "syncRunning": "Running"
+            },
+            "sync": {
+                "pending": "Pending",
+                "running": "Running",
+                "succeeded": "Succeeded",
+                "failed": "Failed",
+                "needs_attention": "Needs attention",
+                "idle": "No sync yet",
+                "manualPending": "Manual sync queued.",
+                "queuedFeedback": "Sync queued.",
+                "runningFeedback": "Sync running.",
+                "succeededWithRange": "{{start}}-{{end}} imported.",
+                "noHistory": "No imports yet.",
+                "quota_limited": "Quota limited",
+                "authorization_revoked": "Authorization revoked",
+                "token_refresh_failed": "Token refresh failed",
+                "property_access_lost": "Property access lost",
+                "credentials_invalid": "Invalid credentials",
+                "credentials_missing": "Credentials missing",
+                "api_disabled": "Search Console API disabled",
+                "google_unavailable": "Google unavailable",
+                "unknown": "Unknown sync error"
+            },
+            "states": {
+                "missingCredentials": "OAuth credentials required.",
+                "connected": "Connected.",
+                "disconnected": "Not connected.",
+                "propertyMapped": "Mapped to {{property}}.",
+                "propertyUnmapped": "No property mapped.",
+                "loadingMapping": "Loading mapping.",
+                "noProperties": "No properties returned.",
+                "noSite": "Select a site first.",
+                "readonly": "Read-only for your role.",
+                "noMappingSync": "Map a property first.",
+                "syncRequested": "Sync requested.",
+                "disconnectSuccess": "Disconnected.",
+                "reconnectHint": "Reconnect to refresh access."
+            },
+            "confirm": {
+                "disconnectMessage": "Future imports stop. Imported data stays.",
+                "removeMappingMessage": "Future imports stop for this site.",
+                "disconnectAccept": "Disconnect",
+                "removeMappingAccept": "Remove mapping",
+                "cancel": "Cancel"
+            },
+            "errors": {
+                "load": "Status unavailable.",
+                "connect": "Connection failed.",
+                "disconnect": "Disconnect failed.",
+                "properties": "Properties unavailable.",
+                "apiDisabled": "Enable the Search Console API, then refresh.",
+                "reconnect": "Reconnect to refresh access.",
+                "propertyAccess": "Property access lost.",
+                "mapping": "Mapping unavailable.",
+                "mapProperty": "Mapping failed.",
+                "unmapProperty": "Unmap failed.",
+                "sync": "Sync request failed."
+            }
+        }
+    },
+    "searchConsole": {
+        "title": "Search Console",
+        "description": "Aggregated Search Console data.",
+        "kpis": {
+            "clicks": "Clicks",
+            "impressions": "Impressions",
+            "ctr": "CTR",
+            "position": "Avg. position"
+        },
+        "sections": {
+            "trend": "Trend",
+            "topQueries": "Top queries",
+            "topPages": "Top pages",
+            "countries": "Countries",
+            "devices": "Devices"
+        },
+        "context": {
+            "label": "Search Console scope",
+            "range": "Range: {{value}}"
+        },
+        "states": {
+            "pending": "Importing Search Console data.",
+            "empty": "No rows for this range.",
+            "error": "Search Console data unavailable."
+        },
+        "setup": {
+            "title": "Connect Search Console",
+            "manageText": "Connect or map Search Console to add search query data here.",
+            "readonlyText": "Ask your team or site operator to connect Search Console.",
+            "action": "Set up Search Console"
         }
     },
     "ecommerce": {

@@ -45,6 +45,11 @@ if (!EMAIL || !PASSWORD) {
 const CHART_SETTLE = 2500;
 const TABLE_SETTLE = 1000;
 const FORM_SETTLE = 600;
+const DEMO_SITE_DOMAIN = process.env.HITKEEP_SCREENSHOT_SITE ?? "acme-analytics.io";
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 async function login(page) {
   await page.goto(`${BASE_URL}/login`, { waitUntil: "domcontentloaded", timeout: 20_000 });
@@ -293,6 +298,81 @@ async function captureRoute(page, record, slug, path, settle = TABLE_SETTLE) {
   record(slug, await shoot(page, slug));
 }
 
+async function selectSiteByDomain(page, domain = DEMO_SITE_DOMAIN) {
+  const anySelector = page.locator("app-site-selector").first();
+  if (await anySelector.count()) {
+    const currentText = ((await anySelector.textContent()) ?? "").trim();
+    if (currentText.includes(domain)) {
+      return true;
+    }
+  }
+
+  const selector = page.locator("app-site-selector:visible").first();
+  if (!(await selector.count())) {
+    console.warn(`    ! Site selector not found while selecting ${domain}`);
+    return false;
+  }
+
+  const currentText = ((await selector.textContent()) ?? "").trim();
+  if (currentText.includes(domain)) {
+    return true;
+  }
+
+  const combobox = selector.getByRole("combobox").first();
+  if (!(await combobox.count())) {
+    console.warn(`    ! Site combobox not found while selecting ${domain}`);
+    return false;
+  }
+
+  await combobox.click({ timeout: 3_000 });
+  const exactOption = page.getByRole("option", { name: new RegExp(`^${escapeRegExp(domain)}$`, "i") }).first();
+  const fuzzyOption = page.getByRole("option", { name: new RegExp(escapeRegExp(domain), "i") }).first();
+  const option = (await exactOption.count()) ? exactOption : fuzzyOption;
+  if (!(await option.count())) {
+    await page.keyboard.press("Escape");
+    console.warn(`    ! Site option not found: ${domain}`);
+    return false;
+  }
+
+  await option.click();
+  await page.waitForFunction(
+    (expectedDomain) => {
+      const selector = document.querySelector("app-site-selector");
+      return !!selector && (selector.textContent || "").includes(expectedDomain);
+    },
+    domain,
+    { timeout: 8_000 },
+  );
+  await page.waitForTimeout(CHART_SETTLE);
+  return true;
+}
+
+async function captureSearchConsoleDrilldown(page, record, slug) {
+  await nav(page, "/dashboard", CHART_SETTLE);
+  await selectSiteByDomain(page);
+  const drilldown = page.locator('[data-testid="search-console-drilldown"]').first();
+  if (!(await drilldown.count())) {
+    console.warn("    ! Search Console drilldown not found, skipping screenshot");
+    return;
+  }
+  await drilldown.evaluate((el) => el.scrollIntoView({ behavior: "instant", block: "start" }));
+  await page.waitForSelector('[data-testid="search-console-setup-prompt"]', { state: "detached", timeout: 8_000 }).catch(() => {});
+  await page.getByText(/privacy friendly analytics|self hosted web analytics|cookie free analytics/i).first().waitFor({ state: "visible", timeout: 8_000 }).catch(() => {
+    console.warn("    ! Search Console data rows were not visible before capture");
+  });
+  await page.waitForTimeout(TABLE_SETTLE);
+  record(slug, await shoot(page, slug));
+}
+
+async function captureGoogleSearchConsoleIntegration(page, record, slug) {
+  await nav(page, "/integration/google-search-console", FORM_SETTLE);
+  await selectSiteByDomain(page);
+  await page.getByText(/sc-domain:acme-analytics\.io/i).first().waitFor({ state: "visible", timeout: 8_000 }).catch(() => {
+    console.warn("    ! Mapped Search Console property was not visible before capture");
+  });
+  record(slug, await shoot(page, slug));
+}
+
 async function openTeamSwitcher(page) {
   const trigger = page.locator('[data-testid="team-switcher-trigger"]:visible').first();
   if (!(await trigger.count())) return false;
@@ -440,6 +520,7 @@ async function run() {
     await captureRoute(page, record, "analytics-ai-chatbots", "/ai-chatbots", CHART_SETTLE);
     await captureRoute(page, record, "analytics-utm", "/utm", CHART_SETTLE);
     await captureRoute(page, record, "dashboard-comparison", "/dashboard", CHART_SETTLE);
+    await captureSearchConsoleDrilldown(page, record, "analytics-search-console");
 
     console.log("\n  Settings:");
     await captureRoute(page, record, "settings-profile", "/settings", FORM_SETTLE);
@@ -456,9 +537,16 @@ async function run() {
     console.log("\n  Integrations:");
     await captureRoute(page, record, "security-api-clients", "/integration/api-clients", TABLE_SETTLE);
     await captureRoute(page, record, "integration-api-reference", "/integration/api-reference", TABLE_SETTLE);
+    await captureGoogleSearchConsoleIntegration(page, record, "integration-google-search-console");
+
+    console.log("\n  Mobile spot checks:");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await captureGoogleSearchConsoleIntegration(page, record, "integration-google-search-console-mobile");
+    await captureSearchConsoleDrilldown(page, record, "analytics-search-console-mobile");
+    await page.setViewportSize({ width: 1440, height: 1024 });
 
     console.log("\n  Admin:");
-    await captureRoute(page, record, "admin-users", "/admin/system", TABLE_SETTLE);
+    await nav(page, "/admin/system", TABLE_SETTLE);
     let adminSitesCaptured = false;
     if (await clickTab(page, "sites")) {
       record("admin-sites-list", await shoot(page, "admin-sites-list"));

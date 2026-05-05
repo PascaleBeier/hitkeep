@@ -28,6 +28,7 @@ import { TrafficChart } from '@features/analytics/components/traffic-chart';
 import { MetricList, MetricListViewOption } from '@features/analytics/components/metric-list';
 import { GoalList } from '@features/analytics/components/goal-list';
 import { FunnelList } from '@features/analytics/components/funnel-list';
+import { SearchConsoleDrilldown } from '@features/analytics/components/search-console-drilldown';
 import { FunnelManager } from '@features/funnels/components/funnel-manager';
 import { FunnelViewer } from '@features/funnels/components/funnel-viewer';
 import { Funnel } from '@models/analytics.types';
@@ -87,6 +88,7 @@ interface KpiCardData {
         MetricList,
         GoalList,
         FunnelList,
+        SearchConsoleDrilldown,
         FunnelManager,
         FunnelViewer,
         NgOptimizedImage,
@@ -124,8 +126,15 @@ export class Dashboard {
     protected showFunnelManager = signal(false);
     protected showFunnelViewer = signal(false);
     protected selectedFunnelId = signal<string | null>(null);
+    protected searchConsoleRefreshKey = signal(0);
     protected isAddSiteVisible = signal(false);
     protected funnelDateRange = computed(() => this.getCurrentDateRange());
+    protected searchConsoleDateRange = computed(() => this.getCurrentDateRange());
+    protected searchConsoleFilters = computed(() => ({
+        path: this.activeFilterValue('path'),
+        country: this.activeFilterValue('country'),
+        device: this.activeFilterValue('device')
+    }));
     protected siteDomain = computed(() => this.siteService.activeSite()?.domain ?? null);
     protected emptyTeamName = computed(() => this.teamService.activeTeam()?.name ?? null);
     protected siteFaviconUrl = computed(() => {
@@ -353,6 +362,7 @@ export class Dashboard {
         this.loadStatsForCurrentRange();
         this.refreshHits();
         this.refreshOnboarding();
+        this.searchConsoleRefreshKey.update((key) => key + 1);
     }
 
     private refreshOnboarding() {

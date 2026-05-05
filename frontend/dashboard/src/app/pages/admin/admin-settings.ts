@@ -37,6 +37,7 @@ import {
     SystemFeatureStatus,
     SystemInfo,
     SystemHealth,
+    SystemSearchConsoleStatus,
     SystemStorage,
     SystemIngestStats,
     SystemBackupStatus,
@@ -157,6 +158,7 @@ export class AdminSettings implements OnInit {
     // System console data
     protected systemInfo = signal<SystemInfo | null>(null);
     protected systemHealth = signal<SystemHealth | null>(null);
+    protected systemSearchConsole = signal<SystemSearchConsoleStatus | null>(null);
     protected systemStorage = signal<SystemStorage | null>(null);
     protected systemIngest = signal<SystemIngestStats | null>(null);
     protected systemBackups = signal<SystemBackupStatus | null>(null);
@@ -168,6 +170,7 @@ export class AdminSettings implements OnInit {
 
     protected isLoadingSystem = signal(false);
     protected isLoadingHealth = signal(false);
+    protected isLoadingSearchConsole = signal(false);
     protected isLoadingStorage = signal(false);
     protected isLoadingIngest = signal(false);
     protected isLoadingBackups = signal(false);
@@ -287,6 +290,12 @@ export class AdminSettings implements OnInit {
         if (!health) return 'secondary';
         return health.status === 'healthy' && health.database === 'ok' && health.workers === 'ok' ? 'success' : 'warn';
     });
+    protected readonly searchConsoleSyncIssueCount = computed(() => {
+        const status = this.systemSearchConsole();
+        if (!status) return 0;
+        return status.failed_syncs + status.needs_attention_syncs;
+    });
+    protected readonly searchConsoleSyncIssueMetric = computed(() => `${this.searchConsoleSyncIssueCount()}`);
     protected readonly pageTitleKey = computed(() => (this.routeData()['adminPage'] === 'settings' ? 'nav.systemSettings' : 'nav.systemStatus'));
     protected readonly isSettingsPage = computed(() => this.routeData()['adminPage'] === 'settings');
 
@@ -461,6 +470,16 @@ export class AdminSettings implements OnInit {
         });
     }
 
+    protected loadSearchConsoleStatus() {
+        this.isLoadingSearchConsole.set(true);
+        this.system
+            .getSearchConsole()
+            .pipe(finalize(() => this.isLoadingSearchConsole.set(false)))
+            .subscribe({
+                next: (status) => this.systemSearchConsole.set(status)
+            });
+    }
+
     protected loadSystemStorage() {
         this.isLoadingStorage.set(true);
         this.system.getStorage().subscribe({
@@ -609,6 +628,7 @@ export class AdminSettings implements OnInit {
     protected refreshRuntime() {
         this.loadSystemInfo();
         this.loadSystemHealth();
+        this.loadSearchConsoleStatus();
         this.loadSystemStorage();
         this.loadSystemIngest();
     }
@@ -766,15 +786,25 @@ export class AdminSettings implements OnInit {
             case 'ok':
             case 'success':
             case 'active':
+            case 'configured':
+            case 'enabled':
                 return 'success';
             case 'failed':
             case 'failure':
             case 'error':
             case 'unhealthy':
+            case 'needs_attention':
                 return 'danger';
             case 'warn':
             case 'warning':
             case 'pressure':
+            case 'missing':
+            case 'disabled':
+            case 'not_configured':
+            case 'pending':
+            case 'running':
+            case 'syncing':
+            case 'degraded':
                 return 'warn';
             default:
                 return 'secondary';
