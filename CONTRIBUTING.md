@@ -124,7 +124,7 @@ This:
 1. Runs `npm ci && ng build --configuration production` for the dashboard (output: `frontend/dashboard/dist/`)
 2. Minifies the tracker snippet (`src/tracker/index.ts` → `dist/dashboard/browser/hk.js`) via esbuild
 3. Copies the dashboard bundle to `public/`
-4. Compiles the Go binary: `go build -o hitkeep ./cmd/hitkeep/main.go`
+4. Compiles the Go binary with HashiCorp metrics enabled: `go build -tags hashicorpmetrics -o hitkeep ./cmd/hitkeep/main.go`
 
 The binary embeds the `public/` directory, so the build order matters.
 
@@ -132,9 +132,9 @@ The binary embeds the `public/` directory, so the build order matters.
 
 ```bash
 # Go checks
-go test ./...
-go test -race ./...
-golangci-lint run
+go test -tags hashicorpmetrics ./...
+go test -tags hashicorpmetrics -race ./...
+golangci-lint run --build-tags=hashicorpmetrics
 # Angular checks
 cd frontend/dashboard && npm run fmt:check
 cd frontend/dashboard && npm run lint
@@ -165,7 +165,7 @@ cd frontend/dashboard && npm run test:e2e -- e2e/auth.seeded.spec.js --workers=1
 
 ```bash
 # Backend
-go test ./...
+go test -tags hashicorpmetrics ./...
 
 # Frontend
 cd frontend/dashboard && npm run fmt:check
@@ -260,7 +260,7 @@ BREAKING CHANGE: The /api/login endpoint now requires 2FA if enabled.
 
 3. **Test your changes:**
    ```bash
-   go test ./...
+   go test -tags hashicorpmetrics ./...
    cd frontend/dashboard && npm run fmt:check
    cd frontend/dashboard && npm run lint
    cd frontend/dashboard && npm run test -- --watch=false --no-progress

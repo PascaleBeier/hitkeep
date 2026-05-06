@@ -2,7 +2,7 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-cmd = "go build -tags \"s3 billing tenancy\" -o ./tmp/main ./cmd/hitkeep/main.go"
+cmd = "go build -tags \"hashicorpmetrics s3 billing tenancy\" -o ./tmp/main ./cmd/hitkeep/main.go"
 bin = "./tmp/main"
 args_bin = ["-log-level=debug"]
 include_ext = ["go", "tpl", "tmpl", "html", "sql"]

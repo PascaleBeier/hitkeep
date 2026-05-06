@@ -1,12 +1,13 @@
 all: run
 
 STATICCHECK_VERSION ?= v0.7.0
+GO_BUILD_TAGS ?= hashicorpmetrics
 
 build: frontend-build go-build
 
 go-build:
 	@echo "Building Go application..."
-	CGO_ENABLED=1 go build -ldflags="-w -s -X 'hitkeep/cmd.Version=snapshot'" -o hitkeep ./cmd/hitkeep/main.go
+	CGO_ENABLED=1 go build -tags "$(GO_BUILD_TAGS)" -ldflags="-w -s -X 'hitkeep/cmd.Version=snapshot'" -o hitkeep ./cmd/hitkeep/main.go
 
 frontend-build: frontend-dashboard-build
 
@@ -49,7 +50,7 @@ clean:
 
 build-docker:
 	@echo "Building binary for local platform..."
-	CGO_ENABLED=1 go build -ldflags="-w -s -X 'hitkeep/cmd.Version=snapshot'" -o hitkeep-linux-amd64 ./cmd/hitkeep/main.go
+	CGO_ENABLED=1 go build -tags "$(GO_BUILD_TAGS)" -ldflags="-w -s -X 'hitkeep/cmd.Version=snapshot'" -o hitkeep-linux-amd64 ./cmd/hitkeep/main.go
 	docker buildx build . \
 		--platform linux/amd64 \
 		--tag ghcr.io/pascalebeier/hitkeep:snapshot \
@@ -91,6 +92,6 @@ dev-cloud-backend:
 
 staticcheck:
 	@echo "Running Staticcheck..."
-	go run honnef.co/go/tools/cmd/staticcheck@$(STATICCHECK_VERSION) ./...
+	go run honnef.co/go/tools/cmd/staticcheck@$(STATICCHECK_VERSION) -tags "$(GO_BUILD_TAGS)" ./...
 
 .PHONY: all build go-build frontend-build frontend-dashboard-build run clean update-default-spam-filter dev dev-seed dev-backend dev-frontend dev-cloud dev-cloud-seed dev-cloud-backend staticcheck

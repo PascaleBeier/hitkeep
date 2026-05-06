@@ -19,6 +19,8 @@ jobs:
   lint:
     name: Lint Golang codebase
     runs-on: ubuntu-latest
+    env:
+      GOFLAGS: -tags=hashicorpmetrics
     steps:
       - uses: actions/checkout@v6
       - name: Setup Go
@@ -29,6 +31,7 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.11
+          args: --build-tags=hashicorpmetrics
       - name: Vet API
         run: go vet ./...
       - name: Staticcheck API
@@ -38,6 +41,8 @@ jobs:
   mcp-audit:
     name: Audit MCP surface
     runs-on: ubuntu-latest
+    env:
+      GOFLAGS: -tags=hashicorpmetrics
     steps:
       - uses: actions/checkout@v6
       - name: Setup Go

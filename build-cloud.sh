@@ -27,7 +27,7 @@ done
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GO_VERSION="$(grep '^go ' "$ROOT_DIR/go.mod" | awk '{print $2}')"
 OUTPUT="$ROOT_DIR/hitkeep-cloud-linux-${GOARCH}"
-BUILD_TAGS="s3 billing tenancy"
+BUILD_TAGS="${BUILD_TAGS:-hashicorpmetrics s3 billing tenancy}"
 VERSION="snapshot-$(date -u +%Y%m%dT%H%M%S)"
 
 echo "Building HitKeep Cloud (linux/${GOARCH}) with Go ${GO_VERSION}..."

@@ -41,7 +41,7 @@ echo "[e2e] building dashboard assets"
 (cd "${REPO_DIR}/frontend/dashboard" && npm run build:prod)
 
 echo "[e2e] building hitkeep binary"
-(cd "${REPO_DIR}" && go build -o "${BIN_PATH}" ./cmd/hitkeep/)
+(cd "${REPO_DIR}" && go build -tags hashicorpmetrics -o "${BIN_PATH}" ./cmd/hitkeep/)
 
 echo "[e2e] seeding demo data"
 (cd "${REPO_DIR}" && go run ./cmd/seed \

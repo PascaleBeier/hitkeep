@@ -168,7 +168,7 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           HITKEEP_VERSION: ${{ inputs.version }}
-          CLOUD_GO_BUILD_TAGS: ${{ inputs.cloud_go_build_tags }}
+          CLOUD_GO_BUILD_TAGS: hashicorpmetrics ${{ inputs.cloud_go_build_tags }}
         run: |
           set -euo pipefail
 
@@ -178,6 +178,7 @@ jobs:
           export CXX=g++
 
           go build \
+            -tags "hashicorpmetrics" \
             -ldflags="-w -s -X 'hitkeep/cmd.Version=${HITKEEP_VERSION}'" \
             -o "hitkeep-linux-${{ matrix.goarch }}" \
             ./cmd/hitkeep/main.go

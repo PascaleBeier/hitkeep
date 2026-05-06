@@ -2,6 +2,15 @@ module hitkeep
 
 go 1.26.2
 
+exclude (
+	github.com/armon/go-metrics v0.4.2
+	github.com/armon/go-metrics v0.5.0
+	github.com/armon/go-metrics v0.5.1
+	github.com/armon/go-metrics v0.5.2
+	github.com/armon/go-metrics v0.5.3
+	github.com/armon/go-metrics v0.5.4
+)
+
 require (
 	github.com/Boostport/mjml-go v0.16.0
 	github.com/duckdb/duckdb-go/v2 v2.10502.0
