@@ -1,5 +1,28 @@
 # Changelog
 
+## [2.4.0](https://github.com/PascaleBeier/hitkeep/compare/v2.3.1...v2.4.0) (2026-05-06)
+
+
+### Features
+
+* Add Google Search Console integration ([5e5c891](https://github.com/PascaleBeier/hitkeep/commit/5e5c8918c336872a826315cbb50bc5f97225bf77)), closes [#139](https://github.com/PascaleBeier/hitkeep/issues/139)
+* **backend:** Add dutch language to mails ([e837c95](https://github.com/PascaleBeier/hitkeep/commit/e837c95045dda12bf89bf51a777335dacf7e7648))
+* **backend:** Expose search console tools to MCP ([5b84185](https://github.com/PascaleBeier/hitkeep/commit/5b8418525dd8d3d51e53dc5f49c5226d10a6e3e1))
+* **frontend:** Add dutch language ([4358497](https://github.com/PascaleBeier/hitkeep/commit/435849722a937f1ba20cd2af1dfbb66c09b97f4e))
+* **imports:** add Plausible and Simple Analytics imports ([b714a39](https://github.com/PascaleBeier/hitkeep/commit/b714a394bb20ab04b7c2cde70b7fecac0f861fc4))
+* **ingest:** add server-side ingestion ([66cd78d](https://github.com/PascaleBeier/hitkeep/commit/66cd78d8f51f6d0252847618a9be99b54b72c499)), closes [#129](https://github.com/PascaleBeier/hitkeep/issues/129)
+
+
+### Bug Fixes
+
+* **backend:** Optimize Healthckeck endpoint ([7617ba7](https://github.com/PascaleBeier/hitkeep/commit/7617ba74a134cbc46628db17ecca8dd38b2e446f))
+* Consolidate frontend and auth bootstrap, resolving [#137](https://github.com/PascaleBeier/hitkeep/issues/137) ([9155cc1](https://github.com/PascaleBeier/hitkeep/commit/9155cc1bb35c431be34533380172ac9c92bf9c8e))
+* **deps:** Bump iploc for may ([6de9693](https://github.com/PascaleBeier/hitkeep/commit/6de9693328e7fd12d291b41a5f1433bbc9836e55))
+* **docker:** adjust healthcheck interval to 30s ([d2a45a3](https://github.com/PascaleBeier/hitkeep/commit/d2a45a3db46dcce7a82b573b569820acd4b13392))
+* **dx:** Clarify server-side pageview description ([5b2bded](https://github.com/PascaleBeier/hitkeep/commit/5b2bded23caac8862c0c6a440452a58af5de9097))
+* **frontend:** Unify copy actions across frontend and expose copyable team, site, and user IDs ([5d49768](https://github.com/PascaleBeier/hitkeep/commit/5d49768a4dab4548deb5a858ccd4d6e8d47a0baf))
+* **ux:** Consolidate import and export ([7a83e17](https://github.com/PascaleBeier/hitkeep/commit/7a83e1742e87e90870cff4fd9f146fc8b77d6471))
+
 ## [2.3.1](https://github.com/PascaleBeier/hitkeep/compare/v2.3.0...v2.3.1) (2026-04-30)
 
 
