@@ -11,13 +11,15 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/internal/api"
 	"hitkeep/internal/database"
 	"hitkeep/internal/exportfmt"
 )
 
 type TakeoutService struct {
-	store *database.Store
-	path  string
+	store        *database.Store
+	tenantStores *database.TenantStoreManager
+	path         string
 }
 
 type ExportFile struct {
@@ -33,17 +35,39 @@ func NewTakeoutService(store *database.Store, path string) *TakeoutService {
 	}
 }
 
+func NewTakeoutServiceWithTenantStores(store *database.Store, tenantStores *database.TenantStoreManager, path string) *TakeoutService {
+	return &TakeoutService{
+		store:        store,
+		tenantStores: tenantStores,
+		path:         path,
+	}
+}
+
 func (s *TakeoutService) ExportUserData(ctx context.Context, userID uuid.UUID, format string) (string, error) {
 	// Ensure export directory exists
 	if err := os.MkdirAll(s.path, 0755); err != nil {
 		return "", fmt.Errorf("failed to create export directory: %w", err)
 	}
 
+	sites, err := s.store.ListAccessibleSitesForTakeout(ctx, userID)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve accessible sites: %w", err)
+	}
+
 	normalizedFormat := exportfmt.Normalize(format, exportfmt.FormatXLSX)
 	filename := filepath.Join(s.path, fmt.Sprintf("user_takeout_%s_%d.%s", userID, time.Now().Unix(), normalizedFormat))
-	whereClause := fmt.Sprintf("site_id IN (SELECT site_id FROM site_members WHERE user_id = '%s')", userID)
 
-	return s.exportTakeout(ctx, "user", filename, normalizedFormat, exportfmt.DuckDBCopyOptions(normalizedFormat), whereClause)
+	if s.tenantStores != nil {
+		sources, err := s.takeoutSourcesForSites(ctx, sites)
+		if err != nil {
+			return "", err
+		}
+		return s.exportTakeoutFromSources(ctx, "user", filename, normalizedFormat, exportfmt.DuckDBCopyOptions(normalizedFormat), sources)
+	}
+
+	return s.exportTakeoutFromStore(ctx, s.store, "user", filename, normalizedFormat, exportfmt.DuckDBCopyOptions(normalizedFormat), []takeoutQuerySource{
+		{WhereClause: takeoutWhereClauseForSites(sites)},
+	})
 }
 
 // ExportSiteData exports active data to the specified format.
@@ -57,11 +81,56 @@ func (s *TakeoutService) ExportSiteData(ctx context.Context, siteID uuid.UUID, f
 	filename := filepath.Join(s.path, fmt.Sprintf("site_takeout_%s_%d.%s", siteID, time.Now().Unix(), normalizedFormat))
 	whereClause := fmt.Sprintf("site_id = '%s'", siteID)
 
-	return s.exportTakeout(ctx, "site", filename, normalizedFormat, exportfmt.DuckDBCopyOptions(normalizedFormat), whereClause)
+	store := s.store
+	if s.tenantStores != nil {
+		analyticsStore, _, err := s.tenantStores.ResolveSiteStore(ctx, siteID)
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve site analytics store: %w", err)
+		}
+		store = analyticsStore
+	}
+
+	return s.exportTakeoutFromStore(ctx, store, "site", filename, normalizedFormat, exportfmt.DuckDBCopyOptions(normalizedFormat), []takeoutQuerySource{
+		{WhereClause: whereClause},
+	})
 }
 
-func (s *TakeoutService) exportTakeout(ctx context.Context, label, filename, normalizedFormat, duckFormat string, whereClause string) (string, error) {
-	query := buildTakeoutQuery(whereClause, filename, duckFormat)
+type takeoutQuerySource struct {
+	WhereClause string
+}
+
+type takeoutStoreSource struct {
+	Store  *database.Store
+	Source takeoutQuerySource
+}
+
+func (s *TakeoutService) exportTakeoutFromSources(ctx context.Context, label, filename, normalizedFormat, duckFormat string, sources []takeoutStoreSource) (string, error) {
+	if len(sources) == 0 {
+		return s.exportTakeoutFromStore(ctx, s.store, label, filename, normalizedFormat, duckFormat, []takeoutQuerySource{{WhereClause: "FALSE"}})
+	}
+	if len(sources) == 1 {
+		return s.exportTakeoutFromStore(ctx, sources[0].Store, label, filename, normalizedFormat, duckFormat, []takeoutQuerySource{sources[0].Source})
+	}
+
+	tempFiles := make([]string, 0, len(sources))
+	defer func() {
+		for _, tempFile := range tempFiles {
+			_ = os.Remove(tempFile)
+		}
+	}()
+
+	for i, source := range sources {
+		tempFile := filepath.Join(s.path, fmt.Sprintf("takeout_merge_%d_%d.parquet", time.Now().UnixNano(), i))
+		tempFiles = append(tempFiles, tempFile)
+		if _, err := s.exportTakeoutFromStore(ctx, source.Store, label, tempFile, exportfmt.FormatParquet, exportfmt.DuckDBCopyOptions(exportfmt.FormatParquet), []takeoutQuerySource{source.Source}); err != nil {
+			return "", err
+		}
+	}
+	if len(tempFiles) == 0 {
+		return s.exportTakeoutFromStore(ctx, s.store, label, filename, normalizedFormat, duckFormat, []takeoutQuerySource{{WhereClause: "FALSE"}})
+	}
+
+	query := buildTakeoutMergeQuery(tempFiles, filename, duckFormat)
 	err := s.store.WithDuckDBSession(ctx, database.DuckDBSessionOptions{
 		Excel: normalizedFormat == exportfmt.FormatXLSX,
 	}, func(conn *sql.Conn) error {
@@ -75,6 +144,62 @@ func (s *TakeoutService) exportTakeout(ctx context.Context, label, filename, nor
 	}
 
 	return filename, nil
+}
+
+func (s *TakeoutService) exportTakeoutFromStore(ctx context.Context, store *database.Store, label, filename, normalizedFormat, duckFormat string, sources []takeoutQuerySource) (string, error) {
+	query := buildTakeoutQuery(sources, filename, duckFormat)
+	err := store.WithDuckDBSession(ctx, database.DuckDBSessionOptions{
+		Excel: normalizedFormat == exportfmt.FormatXLSX,
+	}, func(conn *sql.Conn) error {
+		if _, err := conn.ExecContext(ctx, query); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to export %s data: %w", label, err)
+	}
+
+	return filename, nil
+}
+
+func (s *TakeoutService) takeoutSourcesForSites(ctx context.Context, sites []api.Site) ([]takeoutStoreSource, error) {
+	if len(sites) == 0 {
+		return []takeoutStoreSource{{Store: s.store, Source: takeoutQuerySource{WhereClause: "FALSE"}}}, nil
+	}
+
+	sharedIDs := make([]uuid.UUID, 0)
+	tenantIDsByStore := make(map[*database.Store][]uuid.UUID)
+	for _, site := range sites {
+		analyticsStore, _, err := s.tenantStores.ResolveSiteStore(ctx, site.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve analytics store for site %s: %w", site.ID, err)
+		}
+		if analyticsStore == s.store {
+			sharedIDs = append(sharedIDs, site.ID)
+			continue
+		}
+		tenantIDsByStore[analyticsStore] = append(tenantIDsByStore[analyticsStore], site.ID)
+	}
+
+	sources := make([]takeoutStoreSource, 0, len(tenantIDsByStore)+1)
+	if len(sharedIDs) > 0 {
+		sources = append(sources, takeoutStoreSource{
+			Store:  s.store,
+			Source: takeoutQuerySource{WhereClause: takeoutWhereClauseForSiteIDs(sharedIDs)},
+		})
+	}
+
+	for store, ids := range tenantIDsByStore {
+		sources = append(sources, takeoutStoreSource{
+			Store:  store,
+			Source: takeoutQuerySource{WhereClause: takeoutWhereClauseForSiteIDs(ids)},
+		})
+	}
+	if len(sources) == 0 {
+		return []takeoutStoreSource{{Store: s.store, Source: takeoutQuerySource{WhereClause: "FALSE"}}}, nil
+	}
+	return sources, nil
 }
 
 func (s *TakeoutService) CleanupExportFile(filename string) {
@@ -131,18 +256,65 @@ func (s *TakeoutService) cleanExportPath(filename string) (string, bool) {
 	return cleanedFile, true
 }
 
-func buildTakeoutQuery(whereClause, filename, format string) string {
+func buildTakeoutQuery(sources []takeoutQuerySource, filename, format string) string {
+	if len(sources) == 0 {
+		sources = []takeoutQuerySource{{WhereClause: "FALSE"}}
+	}
+
+	selects := make([]string, 0, len(sources)*5)
+	for _, source := range sources {
+		whereClause := source.WhereClause
+		if whereClause == "" {
+			whereClause = "FALSE"
+		}
+		selects = append(selects,
+			fmt.Sprintf("SELECT 'hit' as record_type, * FROM hits WHERE %s", whereClause),
+			fmt.Sprintf("SELECT 'event' as record_type, * FROM events WHERE %s", whereClause),
+			fmt.Sprintf("SELECT 'ai_fetch' as record_type, * FROM ai_fetches WHERE %s", whereClause),
+			fmt.Sprintf("SELECT 'goal' as record_type, * FROM goals WHERE %s", whereClause),
+			fmt.Sprintf("SELECT 'funnel' as record_type, * FROM funnels WHERE %s", whereClause),
+		)
+	}
+
 	return fmt.Sprintf(`
 	COPY (
-		SELECT 'hit' as record_type, * FROM hits WHERE %s
-		UNION BY NAME
-		SELECT 'event' as record_type, * FROM events WHERE %s
-		UNION BY NAME
-		SELECT 'ai_fetch' as record_type, * FROM ai_fetches WHERE %s
-		UNION BY NAME
-		SELECT 'goal' as record_type, * FROM goals WHERE %s
-		UNION BY NAME
-		SELECT 'funnel' as record_type, * FROM funnels WHERE %s
+		%s
 	) TO '%s' (FORMAT %s);
-`, whereClause, whereClause, whereClause, whereClause, whereClause, filename, format)
+`, strings.Join(selects, "\n\t\tUNION BY NAME\n\t\t"), escapeTakeoutSQLString(filename), format)
+}
+
+func buildTakeoutMergeQuery(filenames []string, filename, format string) string {
+	escapedFiles := make([]string, 0, len(filenames))
+	for _, sourceFile := range filenames {
+		escapedFiles = append(escapedFiles, fmt.Sprintf("'%s'", escapeTakeoutSQLString(sourceFile)))
+	}
+	return fmt.Sprintf(`
+	COPY (
+		SELECT * FROM read_parquet([%s], union_by_name = true)
+	) TO '%s' (FORMAT %s);
+`, strings.Join(escapedFiles, ", "), escapeTakeoutSQLString(filename), format)
+}
+
+func takeoutWhereClauseForSites(sites []api.Site) string {
+	ids := make([]uuid.UUID, 0, len(sites))
+	for _, site := range sites {
+		ids = append(ids, site.ID)
+	}
+	return takeoutWhereClauseForSiteIDs(ids)
+}
+
+func takeoutWhereClauseForSiteIDs(siteIDs []uuid.UUID) string {
+	if len(siteIDs) == 0 {
+		return "FALSE"
+	}
+
+	ids := make([]string, 0, len(siteIDs))
+	for _, siteID := range siteIDs {
+		ids = append(ids, fmt.Sprintf("'%s'", siteID))
+	}
+	return fmt.Sprintf("site_id IN (%s)", strings.Join(ids, ", "))
+}
+
+func escapeTakeoutSQLString(value string) string {
+	return strings.ReplaceAll(value, "'", "''")
 }

@@ -27,6 +27,8 @@
         "apiReference": "API Reference",
         "imports": "Imports",
         "importsAria": "Go to imports",
+        "importExport": "Import & Export",
+        "importExportAria": "Go to import and export",
         "account": "Account",
         "resources": "Resources",
         "docs": "Docs",
@@ -195,6 +197,36 @@
         "pagination": {
             "summary": "Showing {{start}}-{{end}} of {{total}} entries",
             "empty": "No entries to show"
+        }
+    },
+    "importExport": {
+        "title": "Import & Export",
+        "tabs": {
+            "import": "Import",
+            "export": "Export"
+        },
+        "import": {
+            "title": "Import"
+        },
+        "export": {
+            "title": "Export",
+            "allSites": {
+                "title": "All accessible sites",
+                "description": "Download analytics data for every site you can access.",
+                "primaryAction": "Download all sites",
+                "otherFormats": "Other formats",
+                "success": "All accessible site analytics export downloaded.",
+                "error": "Export failed. Try again."
+            },
+            "siteExports": {
+                "title": "Site exports",
+                "description": "Download one site at a time when you only need a specific property.",
+                "primaryAction": "Download site",
+                "loading": "Loading sites...",
+                "empty": "No sites available to export.",
+                "success": "Site export downloaded.",
+                "error": "Export failed. Try again or choose another format."
+            }
         }
     },
     "imports": {
@@ -843,6 +875,11 @@
             "exportStatus": {
                 "success": "Download started.",
                 "error": "Failed to export data. Please try again."
+            },
+            "exportShortcut": {
+                "title": "Analytics export",
+                "description": "Export all accessible sites or individual site takeouts from the Import & Export hub.",
+                "action": "Open Import & Export"
             }
         },
         "reports": {
@@ -1101,7 +1138,10 @@
                 "exportStatus": {
                     "success": "Download started.",
                     "error": "Failed to export site data. Please try again."
-                }
+                },
+                "exportShortcutTitle": "Analytics export",
+                "exportShortcutDescription": "Export this site, or any other accessible site, from the Import & Export hub.",
+                "exportShortcutAction": "Open Import & Export"
             },
             "unsavedChangesConfirm": "You have unsaved changes. Discard them?"
         },
@@ -2169,6 +2209,7 @@
                 "account": "Account",
                 "site": "Site",
                 "property": "Property",
+                "searchProperties": "Search properties",
                 "propertyMapping": "Property mapping",
                 "permission": "Permission",
                 "syncStatus": "Sync status",
@@ -2223,9 +2264,10 @@
                 "propertyUnmapped": "No property mapped.",
                 "loadingMapping": "Loading mapping.",
                 "noProperties": "No properties returned.",
+                "noMatchingProperties": "No matching Search Console properties for this site.",
                 "noSite": "Select a site first.",
                 "readonly": "Read-only for your role.",
-                "noMappingSync": "Map a property first.",
+                "noMappingSync": "Map a Search Console property before syncing.",
                 "syncRequested": "Sync requested.",
                 "disconnectSuccess": "Disconnected.",
                 "reconnectHint": "Reconnect to refresh access."

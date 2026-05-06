@@ -1,29 +1,25 @@
 import { NgOptimizedImage } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 
-import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, DestroyRef } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { compatForm } from '@angular/forms/signals/compat';
+import { RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { CopyControl } from '@components/copy-control/copy-control';
 import { PageFrame } from '@components/page-frame/page-frame';
 import { localeFlagUrl } from '@core/i18n/flag-utils';
 import { getBaseLanguage, getLocaleDirection, normalizeLocaleTag, TextDirection } from '@core/i18n/locale-utils';
-import { buildTakeoutExportMenuItems, DEFAULT_TAKEOUT_EXPORT_FORMAT, TakeoutExportFormat } from '@core/export/export-formats';
 import { SettingsCard } from '@features/settings/components/settings-card';
 import { SettingsSecurity } from '@features/settings/components/settings-security';
 import { UserPreferences, UserPreferencesService } from '@services/user-preferences.service';
 import { UserProfile, UserProfileService } from '@services/user-profile.service';
-import { TakeoutDownloadService } from '@services/takeout-download.service';
-import { MenuItem } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { SelectModule } from 'primeng/select';
-import { SplitButtonModule } from 'primeng/splitbutton';
 import { TabsModule } from 'primeng/tabs';
-import { finalize } from 'rxjs';
 
 interface LanguageOption {
     label: string;
@@ -39,11 +35,11 @@ interface EditableProfile {
 }
 
 type AvailableLang = string | { id: string; label: string };
-type UserSettingsTab = 'account' | 'security' | 'export';
+type UserSettingsTab = 'account' | 'security';
 
 @Component({
     selector: 'app-user-settings',
-    imports: [ReactiveFormsModule, ButtonModule, InputTextModule, SelectModule, SplitButtonModule, TabsModule, SettingsCard, SettingsSecurity, PageFrame, CopyControl, TranslocoPipe, NgOptimizedImage],
+    imports: [ReactiveFormsModule, RouterLink, ButtonModule, InputTextModule, SelectModule, TabsModule, SettingsCard, SettingsSecurity, PageFrame, CopyControl, TranslocoPipe, NgOptimizedImage],
     templateUrl: './user-settings.html',
     styleUrl: './user-settings.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -51,9 +47,7 @@ type UserSettingsTab = 'account' | 'security' | 'export';
 export class UserSettings {
     private preferencesService = inject(UserPreferencesService);
     private profileService = inject(UserProfileService);
-    private takeoutDownloadService = inject(TakeoutDownloadService);
     private transloco = inject(TranslocoService);
-    private destroyRef = inject(DestroyRef);
     private activeLanguage = toSignal(this.transloco.langChanges$, { initialValue: this.transloco.getActiveLang() });
 
     private readonly profileFormModel = signal({
@@ -81,17 +75,11 @@ export class UserSettings {
     protected readonly loadError = signal<string | null>(null);
     protected readonly saveState = signal<'idle' | 'saved' | 'error'>('idle');
     protected readonly initialPreferences = signal<UserPreferences | null>(null);
-    protected readonly isExporting = signal(false);
-    protected readonly exportState = signal<'idle' | 'success' | 'error'>('idle');
     protected readonly activeTab = signal<UserSettingsTab>('account');
 
     protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
         this.activeLanguage();
         return [{ label: this.transloco.translate('settings.user.breadcrumb'), isCurrent: true }];
-    });
-    protected readonly exportMenuItems = computed<MenuItem[]>(() => {
-        this.activeLanguage();
-        return buildTakeoutExportMenuItems(this.transloco, (format) => this.downloadData(format));
     });
 
     protected readonly languageOptions = computed(() => {
@@ -260,24 +248,6 @@ export class UserSettings {
         const language = normalized.split('-')[0];
         const languageName = languageNames?.of(language) ?? language;
         return languageName;
-    }
-
-    protected downloadData(format: TakeoutExportFormat = DEFAULT_TAKEOUT_EXPORT_FORMAT): void {
-        if (this.isExporting()) return;
-
-        this.isExporting.set(true);
-        this.exportState.set('idle');
-
-        this.takeoutDownloadService
-            .downloadUserTakeout(format)
-            .pipe(
-                takeUntilDestroyed(this.destroyRef),
-                finalize(() => this.isExporting.set(false))
-            )
-            .subscribe({
-                next: () => this.exportState.set('success'),
-                error: () => this.exportState.set('error')
-            });
     }
 
     protected currentPreferences(): UserPreferences {

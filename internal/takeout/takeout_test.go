@@ -1,10 +1,14 @@
 package takeout
 
 import (
+	"archive/zip"
 	"bufio"
 	"context"
+	"database/sql"
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,9 +18,15 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/exportfmt"
 )
+
+type takeoutSentinel struct {
+	RecordType string
+	Path       string
+}
 
 func TestExportSiteDataCSVIncludesUTMFields(t *testing.T) {
 	ctx := context.Background()
@@ -181,6 +191,160 @@ func TestExportSiteDataCSVIncludesAIFetchesAndAIChatbotEvents(t *testing.T) {
 	}
 }
 
+func TestExportUserDataCSVIncludesTenantManagedSites(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "takeout.db")
+	exportDir := filepath.Join(t.TempDir(), "exports")
+
+	store := database.NewStore(dbPath)
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	tenantOwnerID, err := store.CreateUser(ctx, "tenant-owner-takeout@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create tenant owner user: %v", err)
+	}
+	memberID, err := store.CreateUser(ctx, "tenant-member-takeout@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create tenant member user: %v", err)
+	}
+
+	ownedSite, err := store.CreateSite(ctx, tenantOwnerID, "owned-takeout.test")
+	if err != nil {
+		t.Fatalf("create owned site: %v", err)
+	}
+	tenantManagedSite, err := store.CreateSite(ctx, memberID, "tenant-managed-takeout.test")
+	if err != nil {
+		t.Fatalf("create tenant managed site: %v", err)
+	}
+
+	createTakeoutHit(t, store, ownedSite.ID, "/owned")
+	createTakeoutHit(t, store, tenantManagedSite.ID, "/tenant-managed")
+
+	service := NewTakeoutService(store, exportDir)
+	filename, err := service.ExportUserData(ctx, tenantOwnerID, "csv")
+	if err != nil {
+		t.Fatalf("export user data: %v", err)
+	}
+
+	f, err := os.Open(filename)
+	if err != nil {
+		t.Fatalf("open export file: %v", err)
+	}
+	defer f.Close()
+
+	rows, err := csv.NewReader(f).ReadAll()
+	if err != nil {
+		t.Fatalf("read csv: %v", err)
+	}
+	if len(rows) < 3 {
+		t.Fatalf("expected header and two hit rows, got %d rows", len(rows))
+	}
+
+	header := rows[0]
+	index := make(map[string]int, len(header))
+	for i, name := range header {
+		index[name] = i
+	}
+	for _, col := range []string{"record_type", "path"} {
+		if _, ok := index[col]; !ok {
+			t.Fatalf("expected column %q in takeout export header", col)
+		}
+	}
+
+	paths := make(map[string]bool)
+	for _, row := range rows[1:] {
+		if row[index["record_type"]] == "hit" {
+			paths[row[index["path"]]] = true
+		}
+	}
+
+	if !paths["/owned"] {
+		t.Fatalf("expected user takeout to include directly owned site hit, got paths %#v", paths)
+	}
+	if !paths["/tenant-managed"] {
+		t.Fatalf("expected user takeout to include tenant-managed accessible site hit, got paths %#v", paths)
+	}
+}
+
+func TestExportUserDataCSVIncludesAccessibleSitesOutsideActiveTenant(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "takeout.db")
+	exportDir := filepath.Join(t.TempDir(), "exports")
+
+	store := database.NewStore(dbPath)
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	ownerID, err := store.CreateUser(ctx, "cross-tenant-owner-takeout@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create owner user: %v", err)
+	}
+	userID, err := store.CreateUser(ctx, "cross-tenant-user-takeout@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	defaultTenantID, err := store.GetDefaultTenantID(ctx)
+	if err != nil {
+		t.Fatalf("get default tenant: %v", err)
+	}
+
+	defaultSite, err := store.CreateSite(ctx, userID, "cross-tenant-default.test")
+	if err != nil {
+		t.Fatalf("create default site: %v", err)
+	}
+
+	team, err := store.CreateTenant(ctx, ownerID, "Cross Tenant Takeout", "")
+	if err != nil {
+		t.Fatalf("create team: %v", err)
+	}
+	if err := store.AddTeamMember(ctx, team.ID, userID, database.TenantRoleMember, ownerID); err != nil {
+		t.Fatalf("add user to team: %v", err)
+	}
+	if err := store.SetActiveTenantID(ctx, ownerID, team.ID); err != nil {
+		t.Fatalf("set owner active tenant: %v", err)
+	}
+	teamSite, err := store.CreateSite(ctx, ownerID, "cross-tenant-shared.test")
+	if err != nil {
+		t.Fatalf("create team site: %v", err)
+	}
+	if err := store.AddSiteMember(ctx, teamSite.ID, userID, auth.SiteViewer, ownerID); err != nil {
+		t.Fatalf("add user as site viewer: %v", err)
+	}
+	if err := store.SetActiveTenantID(ctx, userID, defaultTenantID); err != nil {
+		t.Fatalf("set user active tenant back to default: %v", err)
+	}
+
+	createTakeoutHit(t, store, defaultSite.ID, "/default-tenant")
+	createTakeoutHit(t, store, teamSite.ID, "/other-tenant")
+
+	service := NewTakeoutService(store, exportDir)
+	filename, err := service.ExportUserData(ctx, userID, "csv")
+	if err != nil {
+		t.Fatalf("export user data: %v", err)
+	}
+
+	paths := readTakeoutHitPaths(t, filename)
+	if !paths["/default-tenant"] {
+		t.Fatalf("expected default tenant hit in user takeout, got paths %#v", paths)
+	}
+	if !paths["/other-tenant"] {
+		t.Fatalf("expected other tenant accessible hit in user takeout, got paths %#v", paths)
+	}
+}
+
 func TestExportSiteDataNDJSONIncludesUTMFields(t *testing.T) {
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "takeout.db")
@@ -332,13 +496,7 @@ func TestExportSiteDataSupportsAllFormats(t *testing.T) {
 			if ext := strings.ToLower(filepath.Ext(filename)); ext != tc.ext {
 				t.Fatalf("expected extension %q, got %q", tc.ext, ext)
 			}
-			info, err := os.Stat(filename)
-			if err != nil {
-				t.Fatalf("stat exported file: %v", err)
-			}
-			if info.Size() == 0 {
-				t.Fatalf("expected non-empty exported file for format %s", tc.format)
-			}
+			assertTakeoutContainsSentinel(t, store, filename, tc.format, takeoutSentinel{RecordType: "hit", Path: "/utm"})
 		})
 	}
 }
@@ -368,13 +526,215 @@ func TestExportUserDataSupportsAllFormats(t *testing.T) {
 			if ext := strings.ToLower(filepath.Ext(filename)); ext != tc.ext {
 				t.Fatalf("expected extension %q, got %q", tc.ext, ext)
 			}
-			info, err := os.Stat(filename)
+			assertTakeoutContainsSentinel(t, store, filename, tc.format, takeoutSentinel{RecordType: "hit", Path: "/utm"})
+		})
+	}
+}
+
+func TestExportUserDataWithTenantStoresIncludesCrossTenantRowsInAllFormats(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "shared.db")
+	exportDir := filepath.Join(tmpDir, "exports")
+
+	store := database.NewStore(dbPath)
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect shared store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("migrate shared store: %v", err)
+	}
+
+	tenantStores := database.NewTenantStoreManager(store, filepath.Join(tmpDir, "tenants"))
+	t.Cleanup(func() { _ = tenantStores.Close() })
+
+	userID, err := store.CreateUser(ctx, "tenant-aware-takeout@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	defaultSite, err := store.CreateSite(ctx, userID, "tenant-aware-default.test")
+	if err != nil {
+		t.Fatalf("create default site: %v", err)
+	}
+	createTakeoutHit(t, store, defaultSite.ID, "/default-scope")
+
+	team, err := store.CreateTenant(ctx, userID, "Tenant Takeout", "")
+	if err != nil {
+		t.Fatalf("create tenant: %v", err)
+	}
+	if err := store.SetActiveTenantID(ctx, userID, team.ID); err != nil {
+		t.Fatalf("set active tenant: %v", err)
+	}
+	teamSite, err := store.CreateSite(ctx, userID, "tenant-aware-team.test")
+	if err != nil {
+		t.Fatalf("create team site: %v", err)
+	}
+	teamStore, _, err := tenantStores.ResolveSiteStore(ctx, teamSite.ID)
+	if err != nil {
+		t.Fatalf("resolve team analytics store: %v", err)
+	}
+	createTakeoutHit(t, teamStore, teamSite.ID, "/team-scope")
+
+	service := NewTakeoutServiceWithTenantStores(store, tenantStores, exportDir)
+	for _, format := range []string{"csv", "xlsx", "parquet", "json", "ndjson"} {
+		t.Run(format, func(t *testing.T) {
+			filename, err := service.ExportUserData(ctx, userID, format)
 			if err != nil {
-				t.Fatalf("stat exported file: %v", err)
+				t.Fatalf("export user data %s: %v", format, err)
 			}
-			if info.Size() == 0 {
-				t.Fatalf("expected non-empty exported file for format %s", tc.format)
+			assertTakeoutContainsSentinel(t, store, filename, format, takeoutSentinel{RecordType: "hit", Path: "/default-scope"})
+			assertTakeoutContainsSentinel(t, store, filename, format, takeoutSentinel{RecordType: "hit", Path: "/team-scope"})
+		})
+	}
+}
+
+func TestExportUserDataWithTenantStoresCleansEmptyMergeFiles(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	exportDir := filepath.Join(tmpDir, "exports")
+
+	store := database.NewStore(filepath.Join(tmpDir, "shared.db"))
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect shared store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("migrate shared store: %v", err)
+	}
+	if err := os.MkdirAll(exportDir, 0755); err != nil {
+		t.Fatalf("create export dir: %v", err)
+	}
+
+	service := NewTakeoutService(store, exportDir)
+	filename := filepath.Join(exportDir, "user_takeout_empty.csv")
+	if _, err := service.exportTakeoutFromSources(ctx, "user", filename, exportfmt.FormatCSV, exportfmt.DuckDBCopyOptions(exportfmt.FormatCSV), []takeoutStoreSource{
+		{Store: store, Source: takeoutQuerySource{WhereClause: "FALSE"}},
+		{Store: store, Source: takeoutQuerySource{WhereClause: "FALSE"}},
+	}); err != nil {
+		t.Fatalf("export empty merge sources: %v", err)
+	}
+
+	matches, err := filepath.Glob(filepath.Join(exportDir, "takeout_merge_*"))
+	if err != nil {
+		t.Fatalf("glob merge files: %v", err)
+	}
+	if len(matches) != 0 {
+		t.Fatalf("expected merge temp files to be cleaned up, got %v", matches)
+	}
+}
+
+func TestExportUserDataWithTenantStoresPreservesParquetSchema(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	exportDir := filepath.Join(tmpDir, "exports")
+
+	store := database.NewStore(filepath.Join(tmpDir, "shared.db"))
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect shared store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("migrate shared store: %v", err)
+	}
+
+	userID, err := store.CreateUser(ctx, "schema-takeout@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	defaultSite, err := store.CreateSite(ctx, userID, "schema-default.test")
+	if err != nil {
+		t.Fatalf("create default site: %v", err)
+	}
+	createTakeoutHit(t, store, defaultSite.ID, "/schema-default")
+
+	plainService := NewTakeoutService(store, filepath.Join(tmpDir, "plain-exports"))
+	plainFilename, err := plainService.ExportUserData(ctx, userID, "parquet")
+	if err != nil {
+		t.Fatalf("export direct user data: %v", err)
+	}
+	wantSchema := parquetTakeoutSchema(t, store, plainFilename)
+
+	tenantStores := database.NewTenantStoreManager(store, filepath.Join(tmpDir, "tenants"))
+	t.Cleanup(func() { _ = tenantStores.Close() })
+	team, err := store.CreateTenant(ctx, userID, "Schema Team", "")
+	if err != nil {
+		t.Fatalf("create tenant: %v", err)
+	}
+	if err := store.SetActiveTenantID(ctx, userID, team.ID); err != nil {
+		t.Fatalf("set active tenant: %v", err)
+	}
+	teamSite, err := store.CreateSite(ctx, userID, "schema-team.test")
+	if err != nil {
+		t.Fatalf("create team site: %v", err)
+	}
+	teamStore, _, err := tenantStores.ResolveSiteStore(ctx, teamSite.ID)
+	if err != nil {
+		t.Fatalf("resolve team analytics store: %v", err)
+	}
+	createTakeoutHit(t, teamStore, teamSite.ID, "/schema-team")
+
+	tenantService := NewTakeoutServiceWithTenantStores(store, tenantStores, exportDir)
+	mergedFilename, err := tenantService.ExportUserData(ctx, userID, "parquet")
+	if err != nil {
+		t.Fatalf("export tenant-aware user data: %v", err)
+	}
+	gotSchema := parquetTakeoutSchema(t, store, mergedFilename)
+
+	for column, wantType := range wantSchema {
+		if gotType, ok := gotSchema[column]; !ok {
+			t.Fatalf("expected merged parquet schema to include column %q", column)
+		} else if gotType != wantType {
+			t.Fatalf("expected merged parquet column %q type %q, got %q", column, wantType, gotType)
+		}
+	}
+}
+
+func TestExportSiteDataWithTenantStoresIncludesTeamSiteRowsInAllFormats(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	exportDir := filepath.Join(tmpDir, "exports")
+
+	store := database.NewStore(filepath.Join(tmpDir, "shared.db"))
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect shared store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("migrate shared store: %v", err)
+	}
+	tenantStores := database.NewTenantStoreManager(store, filepath.Join(tmpDir, "tenants"))
+	t.Cleanup(func() { _ = tenantStores.Close() })
+
+	userID, err := store.CreateUser(ctx, "site-tenant-aware-takeout@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	team, err := store.CreateTenant(ctx, userID, "Site Takeout Team", "")
+	if err != nil {
+		t.Fatalf("create tenant: %v", err)
+	}
+	if err := store.SetActiveTenantID(ctx, userID, team.ID); err != nil {
+		t.Fatalf("set active tenant: %v", err)
+	}
+	teamSite, err := store.CreateSite(ctx, userID, "site-tenant-aware.test")
+	if err != nil {
+		t.Fatalf("create team site: %v", err)
+	}
+	teamStore, _, err := tenantStores.ResolveSiteStore(ctx, teamSite.ID)
+	if err != nil {
+		t.Fatalf("resolve team analytics store: %v", err)
+	}
+	createTakeoutHit(t, teamStore, teamSite.ID, "/team-site-export")
+
+	service := NewTakeoutServiceWithTenantStores(store, tenantStores, exportDir)
+	for _, format := range []string{"csv", "xlsx", "parquet", "json", "ndjson"} {
+		t.Run(format, func(t *testing.T) {
+			filename, err := service.ExportSiteData(ctx, teamSite.ID, format)
+			if err != nil {
+				t.Fatalf("export site data %s: %v", format, err)
 			}
+			assertTakeoutContainsSentinel(t, store, filename, format, takeoutSentinel{RecordType: "hit", Path: "/team-site-export"})
 		})
 	}
 }
@@ -567,4 +927,273 @@ func setupTakeoutFixture(t *testing.T) (context.Context, *database.Store, *Takeo
 
 	service := NewTakeoutService(store, exportDir)
 	return ctx, store, service, userID, site.ID
+}
+
+func createTakeoutHit(t *testing.T, store *database.Store, siteID uuid.UUID, path string) {
+	t.Helper()
+
+	isUnique := true
+	if err := store.CreateHit(context.Background(), &api.Hit{
+		SiteID:    siteID,
+		SessionID: uuid.New(),
+		PageID:    uuid.New(),
+		Timestamp: time.Now().UTC(),
+		Path:      path,
+		IsUnique:  &isUnique,
+	}); err != nil {
+		t.Fatalf("create hit for %s: %v", path, err)
+	}
+}
+
+func readTakeoutHitPaths(t *testing.T, filename string) map[string]bool {
+	t.Helper()
+
+	f, err := os.Open(filename)
+	if err != nil {
+		t.Fatalf("open export file: %v", err)
+	}
+	defer f.Close()
+
+	rows, err := csv.NewReader(f).ReadAll()
+	if err != nil {
+		t.Fatalf("read csv: %v", err)
+	}
+	if len(rows) < 2 {
+		t.Fatalf("expected header and at least one row, got %d rows", len(rows))
+	}
+
+	header := rows[0]
+	index := make(map[string]int, len(header))
+	for i, name := range header {
+		index[name] = i
+	}
+	for _, col := range []string{"record_type", "path"} {
+		if _, ok := index[col]; !ok {
+			t.Fatalf("expected column %q in takeout export header", col)
+		}
+	}
+
+	paths := make(map[string]bool)
+	for _, row := range rows[1:] {
+		if row[index["record_type"]] == "hit" {
+			paths[row[index["path"]]] = true
+		}
+	}
+	return paths
+}
+
+func assertTakeoutContainsSentinel(t *testing.T, store *database.Store, filename string, format string, sentinel takeoutSentinel) {
+	t.Helper()
+
+	info, err := os.Stat(filename)
+	if err != nil {
+		t.Fatalf("stat exported file: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatalf("expected non-empty exported file for format %s", format)
+	}
+
+	switch exportfmt.Normalize(format, exportfmt.FormatXLSX) {
+	case exportfmt.FormatCSV:
+		assertCSVTakeoutContainsSentinel(t, filename, sentinel)
+	case exportfmt.FormatJSON:
+		assertJSONTakeoutContainsSentinel(t, filename, sentinel)
+	case exportfmt.FormatNDJSON:
+		assertNDJSONTakeoutContainsSentinel(t, filename, sentinel)
+	case exportfmt.FormatParquet:
+		assertParquetTakeoutContainsSentinel(t, store, filename, sentinel)
+	case exportfmt.FormatXLSX:
+		assertXLSXTakeoutContainsSentinel(t, filename, sentinel)
+	default:
+		t.Fatalf("unsupported takeout format %q", format)
+	}
+}
+
+func assertCSVTakeoutContainsSentinel(t *testing.T, filename string, sentinel takeoutSentinel) {
+	t.Helper()
+
+	f, err := os.Open(filename)
+	if err != nil {
+		t.Fatalf("open csv takeout: %v", err)
+	}
+	defer f.Close()
+
+	rows, err := csv.NewReader(f).ReadAll()
+	if err != nil {
+		t.Fatalf("read csv takeout: %v", err)
+	}
+	if len(rows) < 2 {
+		t.Fatalf("expected csv takeout header and data row, got %d rows", len(rows))
+	}
+
+	index := takeoutHeaderIndex(t, rows[0], "record_type", "path")
+	for _, row := range rows[1:] {
+		if row[index["record_type"]] == sentinel.RecordType && row[index["path"]] == sentinel.Path {
+			return
+		}
+	}
+	t.Fatalf("expected csv takeout to contain %s path %q", sentinel.RecordType, sentinel.Path)
+}
+
+func assertJSONTakeoutContainsSentinel(t *testing.T, filename string, sentinel takeoutSentinel) {
+	t.Helper()
+
+	f, err := os.Open(filename)
+	if err != nil {
+		t.Fatalf("open json takeout: %v", err)
+	}
+	defer f.Close()
+
+	var rows []map[string]any
+	if err := json.NewDecoder(f).Decode(&rows); err != nil {
+		t.Fatalf("decode json takeout: %v", err)
+	}
+	if len(rows) == 0 {
+		t.Fatalf("expected json takeout data rows")
+	}
+	for _, row := range rows {
+		if takeoutString(row["record_type"]) == sentinel.RecordType && takeoutString(row["path"]) == sentinel.Path {
+			return
+		}
+	}
+	t.Fatalf("expected json takeout to contain %s path %q", sentinel.RecordType, sentinel.Path)
+}
+
+func assertNDJSONTakeoutContainsSentinel(t *testing.T, filename string, sentinel takeoutSentinel) {
+	t.Helper()
+
+	f, err := os.Open(filename)
+	if err != nil {
+		t.Fatalf("open ndjson takeout: %v", err)
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	rows := 0
+	for scanner.Scan() {
+		rows++
+		var row map[string]any
+		if err := json.Unmarshal(scanner.Bytes(), &row); err != nil {
+			t.Fatalf("decode ndjson takeout row: %v", err)
+		}
+		if takeoutString(row["record_type"]) == sentinel.RecordType && takeoutString(row["path"]) == sentinel.Path {
+			return
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		t.Fatalf("scan ndjson takeout: %v", err)
+	}
+	if rows == 0 {
+		t.Fatalf("expected ndjson takeout data rows")
+	}
+	t.Fatalf("expected ndjson takeout to contain %s path %q", sentinel.RecordType, sentinel.Path)
+}
+
+func assertParquetTakeoutContainsSentinel(t *testing.T, store *database.Store, filename string, sentinel takeoutSentinel) {
+	t.Helper()
+
+	safePath := strings.ReplaceAll(filename, "'", "''")
+	var count int
+	if err := store.DB().QueryRowContext(context.Background(),
+		fmt.Sprintf("SELECT COUNT(*) FROM read_parquet('%s') WHERE record_type = ? AND path = ?", safePath),
+		sentinel.RecordType,
+		sentinel.Path,
+	).Scan(&count); err != nil {
+		t.Fatalf("query parquet takeout: %v", err)
+	}
+	if count == 0 {
+		t.Fatalf("expected parquet takeout to contain %s path %q", sentinel.RecordType, sentinel.Path)
+	}
+}
+
+func parquetTakeoutSchema(t *testing.T, store *database.Store, filename string) map[string]string {
+	t.Helper()
+
+	safePath := strings.ReplaceAll(filename, "'", "''")
+	rows, err := store.DB().QueryContext(context.Background(), fmt.Sprintf("DESCRIBE SELECT * FROM read_parquet('%s')", safePath))
+	if err != nil {
+		t.Fatalf("describe parquet takeout: %v", err)
+	}
+	defer rows.Close()
+
+	schema := make(map[string]string)
+	for rows.Next() {
+		var columnName, columnType, nullValue, keyValue, defaultValue, extraValue sql.NullString
+		if err := rows.Scan(&columnName, &columnType, &nullValue, &keyValue, &defaultValue, &extraValue); err != nil {
+			t.Fatalf("scan parquet schema row: %v", err)
+		}
+		if columnName.Valid && columnType.Valid {
+			schema[columnName.String] = columnType.String
+		}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("read parquet schema rows: %v", err)
+	}
+	if len(schema) == 0 {
+		t.Fatalf("expected parquet schema columns")
+	}
+	return schema
+}
+
+func assertXLSXTakeoutContainsSentinel(t *testing.T, filename string, sentinel takeoutSentinel) {
+	t.Helper()
+
+	archive, err := zip.OpenReader(filename)
+	if err != nil {
+		t.Fatalf("open xlsx takeout: %v", err)
+	}
+	defer archive.Close()
+
+	var xmlText strings.Builder
+	for _, file := range archive.File {
+		if !strings.HasSuffix(strings.ToLower(file.Name), ".xml") {
+			continue
+		}
+		rc, err := file.Open()
+		if err != nil {
+			t.Fatalf("open xlsx xml %s: %v", file.Name, err)
+		}
+		content, readErr := io.ReadAll(rc)
+		closeErr := rc.Close()
+		if readErr != nil {
+			t.Fatalf("read xlsx xml %s: %v", file.Name, readErr)
+		}
+		if closeErr != nil {
+			t.Fatalf("close xlsx xml %s: %v", file.Name, closeErr)
+		}
+		xmlText.Write(content)
+		xmlText.WriteByte('\n')
+	}
+
+	payload := xmlText.String()
+	for _, value := range []string{"record_type", sentinel.RecordType, sentinel.Path} {
+		if !strings.Contains(payload, value) {
+			t.Fatalf("expected xlsx takeout XML to contain %q", value)
+		}
+	}
+}
+
+func takeoutHeaderIndex(t *testing.T, header []string, columns ...string) map[string]int {
+	t.Helper()
+
+	index := make(map[string]int, len(header))
+	for i, name := range header {
+		index[name] = i
+	}
+	for _, col := range columns {
+		if _, ok := index[col]; !ok {
+			t.Fatalf("expected column %q in takeout export header", col)
+		}
+	}
+	return index
+}
+
+func takeoutString(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return typed
+	default:
+		return fmt.Sprint(typed)
+	}
 }

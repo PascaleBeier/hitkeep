@@ -1,10 +1,4 @@
 <div class="imports-page flex h-full w-full flex-col bg-[var(--p-surface-ground)] transition-colors duration-200">
-    <app-page-header>
-        <ng-template appPageHeaderLeft>
-            <app-page-breadcrumb [items]="breadcrumbItems()" />
-        </ng-template>
-    </app-page-header>
-
     @if (!activeSite()) {
     <div class="imports-empty">
         <i class="pi pi-globe" aria-hidden="true"></i>

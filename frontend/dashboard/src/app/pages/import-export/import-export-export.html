@@ -1,0 +1,73 @@
+<section class="import-export-export-page" [attr.aria-label]="'importExport.export.title' | transloco">
+    <p-card styleClass="import-export-export-card">
+        <section class="import-export-export-card__content" aria-labelledby="import-export-all-sites-title">
+            <header class="import-export-export-card__header">
+                <span class="import-export-export-card__icon"><i class="pi pi-database" aria-hidden="true"></i></span>
+                <div>
+                    <h2 id="import-export-all-sites-title">{{ "importExport.export.allSites.title" | transloco }}</h2>
+                    <p>{{ "importExport.export.allSites.description" | transloco }}</p>
+                </div>
+            </header>
+
+            @if (allSitesExportState() === "success") {
+            <p-message severity="success" styleClass="w-full">{{ "importExport.export.allSites.success" | transloco }}</p-message>
+            } @else if (allSitesExportState() === "error") {
+            <p-message severity="error" styleClass="w-full">{{ "importExport.export.allSites.error" | transloco }}</p-message>
+            }
+
+            <footer class="import-export-export-card__footer">
+                <p-splitButton
+                    data-testid="all-sites-export-primary"
+                    styleClass="import-export-export-card__split-button"
+                    [label]="isAllSitesExporting() ? ('common.preparing' | transloco) : ('importExport.export.allSites.primaryAction' | transloco)"
+                    icon="pi pi-download"
+                    [model]="allSitesExportMenuItems()"
+                    [disabled]="isAllSitesExporting()"
+                    (onClick)="downloadAllSites('xlsx')"
+                />
+            </footer>
+        </section>
+    </p-card>
+
+    <p-card styleClass="import-export-export-card">
+        <section class="import-export-export-card__content" aria-labelledby="import-export-sites-title">
+            <header class="import-export-export-card__header">
+                <span class="import-export-export-card__icon"><i class="pi pi-list" aria-hidden="true"></i></span>
+                <div>
+                    <h2 id="import-export-sites-title">{{ "importExport.export.siteExports.title" | transloco }}</h2>
+                    <p>{{ "importExport.export.siteExports.description" | transloco }}</p>
+                </div>
+            </header>
+
+            @if (isSitesLoading()) {
+            <div class="import-export-export-card__state"><i class="pi pi-spin pi-spinner" aria-hidden="true"></i>{{ "importExport.export.siteExports.loading" | transloco }}</div>
+            } @else if (sites().length === 0) {
+            <div class="import-export-export-card__state">{{ "importExport.export.siteExports.empty" | transloco }}</div>
+            } @else {
+            <div class="site-export-list" role="list">
+                @for (site of sites(); track site.id) {
+                <section class="site-export-row" role="listitem" [attr.data-testid]="'site-export-row-' + site.id">
+                    <div class="site-export-row__main">
+                        <span class="site-export-row__domain" [title]="site.domain">{{ site.domain }}</span>
+                        @if (siteExportState(site.id) === "success") {
+                        <p-message severity="success" styleClass="site-export-row__message">{{ "importExport.export.siteExports.success" | transloco }}</p-message>
+                        } @else if (siteExportState(site.id) === "error") {
+                        <p-message severity="error" styleClass="site-export-row__message">{{ "importExport.export.siteExports.error" | transloco }}</p-message>
+                        }
+                    </div>
+                    <p-splitButton
+                        [attr.data-testid]="'site-export-primary-' + site.id"
+                        styleClass="site-export-row__split-button"
+                        [label]="isSiteExporting(site.id) ? ('common.preparing' | transloco) : ('importExport.export.siteExports.primaryAction' | transloco)"
+                        icon="pi pi-download"
+                        [model]="siteExportMenuItems(site.id)"
+                        [disabled]="isSiteExporting(site.id)"
+                        (onClick)="downloadSite(site, 'xlsx')"
+                    />
+                </section>
+                }
+            </div>
+            }
+        </section>
+    </p-card>
+</section>

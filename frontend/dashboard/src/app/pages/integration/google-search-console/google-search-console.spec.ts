@@ -132,6 +132,7 @@ describe('GoogleSearchConsolePage', () => {
                                         account: 'Account',
                                         site: 'Site',
                                         property: 'Property',
+                                        searchProperties: 'Search properties',
                                         propertyMapping: 'Property mapping',
                                         permission: 'Permission',
                                         syncStatus: 'Sync status',
@@ -186,9 +187,10 @@ describe('GoogleSearchConsolePage', () => {
                                         propertyUnmapped: 'No property mapped.',
                                         loadingMapping: 'Loading mapping.',
                                         noProperties: 'No properties returned.',
+                                        noMatchingProperties: 'No matching Search Console properties for this site.',
                                         noSite: 'Select a site first.',
                                         readonly: 'Read-only for your role.',
-                                        noMappingSync: 'Map a property first.',
+                                        noMappingSync: 'Map a Search Console property before syncing.',
                                         syncRequested: 'Sync requested.',
                                         disconnectSuccess: 'Disconnected.',
                                         reconnectHint: 'Reconnect to refresh access.'
@@ -341,6 +343,77 @@ describe('GoogleSearchConsolePage', () => {
 
         expect(integrationService.mapSiteProperty).toHaveBeenCalledWith('site-1', 'sc-domain:example.com');
         expect(fixture.nativeElement.textContent).toContain('Mapped to sc-domain:example.com.');
+    });
+
+    it('only offers Search Console properties that match the active site', async () => {
+        status = {
+            status: 'connected',
+            configured: true,
+            connected: true,
+            credential_status: 'configured',
+            connected_account_label: 'owner@example.com',
+            needs_admin_action: false,
+            can_manage: true,
+            managed_credentials_mode: 'managed'
+        };
+        integrationService.listProperties = vi.fn(() =>
+            of({
+                properties: [
+                    { uri: 'https://www.example.com/', permission_level: 'siteOwner' },
+                    { uri: 'sc-domain:other.example', permission_level: 'siteOwner' },
+                    { uri: 'sc-domain:example.com', permission_level: 'siteOwner' },
+                    { uri: 'https://vest-hv.de/', permission_level: 'siteOwner' }
+                ]
+            })
+        );
+
+        fixture = TestBed.createComponent(GoogleSearchConsolePage);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+
+        const options = (fixture.componentInstance as unknown as { propertyOptions: () => { label: string; value: string }[] }).propertyOptions();
+        expect(options).toEqual([
+            { label: 'sc-domain:example.com', value: 'sc-domain:example.com' },
+            { label: 'https://www.example.com/', value: 'https://www.example.com/' }
+        ]);
+
+        const button = fixture.nativeElement.querySelector('[data-testid="gsc-map-property"]') as HTMLButtonElement;
+        button.click();
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        expect(integrationService.mapSiteProperty).toHaveBeenCalledWith('site-1', 'sc-domain:example.com');
+    });
+
+    it('shows a no-matching-properties state when Google only returns unrelated properties', async () => {
+        status = {
+            status: 'connected',
+            configured: true,
+            connected: true,
+            credential_status: 'configured',
+            connected_account_label: 'owner@example.com',
+            needs_admin_action: false,
+            can_manage: true,
+            managed_credentials_mode: 'managed'
+        };
+        integrationService.listProperties = vi.fn(() =>
+            of({
+                properties: [{ uri: 'sc-domain:other.example', permission_level: 'siteOwner' }]
+            })
+        );
+
+        fixture = TestBed.createComponent(GoogleSearchConsolePage);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.textContent).toContain('No matching Search Console properties for this site.');
+        expect(fixture.nativeElement.textContent).not.toContain('No properties returned.');
+        const button = fixture.nativeElement.querySelector('[data-testid="gsc-map-property"]') as HTMLButtonElement;
+        expect(button.disabled).toBe(true);
+        button.click();
+        expect(integrationService.mapSiteProperty).not.toHaveBeenCalled();
     });
 
     it('does not apply a stale mapping response after the active site changes', async () => {
@@ -593,8 +666,8 @@ describe('GoogleSearchConsolePage', () => {
         await fixture.whenStable();
         fixture.detectChanges();
 
-        let syncButton = fixture.nativeElement.querySelector('[data-testid="gsc-sync-now"]') as HTMLButtonElement;
-        expect(syncButton.disabled).toBe(true);
+        expect(fixture.nativeElement.querySelector('[data-testid="gsc-sync-now"]')).toBeNull();
+        expect(fixture.nativeElement.querySelector('[data-testid="gsc-sync-mapping-required"]')?.textContent).toContain('Map a Search Console property before syncing.');
 
         integrationService.getSiteMapping = vi.fn(() =>
             of({
@@ -611,7 +684,7 @@ describe('GoogleSearchConsolePage', () => {
         await fixture.whenStable();
         fixture.detectChanges();
 
-        syncButton = fixture.nativeElement.querySelector('[data-testid="gsc-sync-now"]') as HTMLButtonElement;
+        const syncButton = fixture.nativeElement.querySelector('[data-testid="gsc-sync-now"]') as HTMLButtonElement;
         syncButton.click();
         fixture.detectChanges();
         await fixture.whenStable();

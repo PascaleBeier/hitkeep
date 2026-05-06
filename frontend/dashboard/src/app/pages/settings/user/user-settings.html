@@ -3,7 +3,6 @@
         <p-tablist>
             <p-tab value="account">{{ "nav.account" | transloco }}</p-tab>
             <p-tab value="security">{{ "settings.security.title" | transloco }}</p-tab>
-            <p-tab value="export">{{ "settings.user.dataExportTitle" | transloco }}</p-tab>
         </p-tablist>
 
         <p-tabpanels>
@@ -152,36 +151,19 @@
                             <p-button [label]="'preferences.actions.saveChanges' | transloco" icon="pi pi-save" [loading]="isSaving()" [disabled]="!canSave()" styleClass="settings-action-btn" (onClick)="save()" />
                         </div>
                     </app-settings-card>
+
+                    <app-settings-card [title]="'settings.user.exportShortcut.title' | transloco" [subtitle]="'settings.user.exportShortcut.description' | transloco" icon="pi pi-download">
+                        <div settings-card-footer>
+                            <a pButton routerLink="/import-export/export" class="settings-action-btn" icon="pi pi-arrow-right" [attr.aria-label]="'settings.user.exportShortcut.action' | transloco">
+                                <span pButtonLabel>{{ "settings.user.exportShortcut.action" | transloco }}</span>
+                            </a>
+                        </div>
+                    </app-settings-card>
                 </div>
             </p-tabpanel>
 
             <p-tabpanel value="security">
                 <app-settings-security />
-            </p-tabpanel>
-
-            <p-tabpanel value="export">
-                <div class="settings-panel-grid settings-panel-grid--single">
-                    <app-settings-card [title]="'settings.user.dataExportTitle' | transloco" [subtitle]="'settings.user.exportAllDescription' | transloco" icon="pi pi-download">
-                        <div settings-card-body class="settings-form-stack">
-                            @if (exportState() === "success") {
-                            <div class="settings-alert settings-alert--success">{{ "settings.user.exportStatus.success" | transloco }}</div>
-                            } @if (exportState() === "error") {
-                            <div class="settings-alert settings-alert--error">{{ "settings.user.exportStatus.error" | transloco }}</div>
-                            }
-                            <div class="settings-export-title">{{ "settings.user.exportAllTitle" | transloco }}</div>
-                        </div>
-                        <div settings-card-footer>
-                            <p-splitButton
-                                [label]="isExporting() ? ('common.preparing' | transloco) : ('common.actions.downloadXlsx' | transloco)"
-                                icon="pi pi-download"
-                                [model]="exportMenuItems()"
-                                styleClass="settings-action-split"
-                                [disabled]="isExporting()"
-                                (onClick)="downloadData('xlsx')"
-                            />
-                        </div>
-                    </app-settings-card>
-                </div>
             </p-tabpanel>
         </p-tabpanels>
     </p-tabs>

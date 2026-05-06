@@ -270,6 +270,97 @@ describe('Dashboard', () => {
         expect(searchConsoleService.getOverview).toHaveBeenCalledTimes(1);
     });
 
+    it('should render Search Console data for a mapped site even when HitKeep has no hits', async () => {
+        const siteService = TestBed.inject(SiteService);
+        const statsService = TestBed.inject(StatsService);
+        const hitService = TestBed.inject(HitService);
+        const searchConsoleService = TestBed.inject(GoogleSearchConsoleService) as unknown as {
+            getSiteMapping: ReturnType<typeof vi.fn>;
+            getOverview: ReturnType<typeof vi.fn>;
+            getSeries: ReturnType<typeof vi.fn>;
+            getQueries: ReturnType<typeof vi.fn>;
+            getPages: ReturnType<typeof vi.fn>;
+            getBreakdown: ReturnType<typeof vi.fn>;
+        };
+
+        vi.spyOn(statsService, 'loadStats').mockImplementation(() => undefined);
+        vi.spyOn(hitService, 'loadHits').mockImplementation(() => undefined);
+        statsService.stats.set({
+            live_visitors: 0,
+            total_pageviews: 0,
+            unique_sessions: 0,
+            bounce_rate: 0,
+            avg_session_duration: 0,
+            pages_per_session: 0,
+            chart_data: [],
+            top_pages: [],
+            top_landing_pages: [],
+            top_exit_pages: [],
+            top_referrers: [],
+            top_devices: [],
+            top_countries: [],
+            top_browsers: [],
+            top_ai_bots: [],
+            top_ai_sources: [],
+            top_languages: [],
+            top_utm_campaigns: [],
+            top_utm_contents: [],
+            top_utm_mediums: [],
+            top_utm_sources: [],
+            top_utm_terms: [],
+            ai_bot_hits: 0,
+            ai_source_visits: 0,
+            utm_campaign_hits: 0,
+            utm_content_hits: 0,
+            utm_medium_hits: 0,
+            utm_source_hits: 0,
+            utm_term_hits: 0,
+            goals: [],
+            funnels: []
+        });
+        hitService.hits.set([]);
+        hitService.total.set(0);
+        searchConsoleService.getSiteMapping.mockReturnValue(
+            of({
+                site_id: 'site-1',
+                team_id: 'team-1',
+                mapped: true,
+                property_uri: 'sc-domain:example.com',
+                can_manage: true
+            })
+        );
+        searchConsoleService.getOverview.mockReturnValue(of({ data_source: 'google_search_console', clicks: 24, impressions: 180, ctr: 0.1333, average_position: 3.4 }));
+        searchConsoleService.getSeries.mockReturnValue(
+            of({
+                data_source: 'google_search_console',
+                series: [{ date: '2026-05-01', clicks: 24, impressions: 180, ctr: 0.1333, average_position: 3.4 }]
+            })
+        );
+        searchConsoleService.getQueries.mockReturnValue(of({ data_source: 'google_search_console', rows: [{ value: 'privacy analytics', clicks: 24, impressions: 180, ctr: 0.1333, average_position: 3.4 }] }));
+        searchConsoleService.getPages.mockReturnValue(of({ data_source: 'google_search_console', rows: [{ value: 'https://example.com/pricing', clicks: 10, impressions: 90, ctr: 0.1111, average_position: 4.1 }] }));
+        searchConsoleService.getBreakdown.mockImplementation((_siteID: string, dimension: string) =>
+            of({
+                data_source: 'google_search_console',
+                rows: dimension === 'country' ? [{ value: 'usa', clicks: 14, impressions: 100, ctr: 0.14, average_position: 3 }] : [{ value: 'desktop', clicks: 12, impressions: 80, ctr: 0.15, average_position: 2.8 }]
+            })
+        );
+
+        siteService.activeSite.set({
+            id: 'site-1',
+            user_id: 'user-1',
+            domain: 'example.com',
+            created_at: '2026-01-01T00:00:00Z'
+        });
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.textContent).toContain('privacy analytics');
+        expect(fixture.nativeElement.textContent).toContain('/pricing');
+        expect(searchConsoleService.getOverview).toHaveBeenCalled();
+        expect(hitService.hits()).toEqual([]);
+    });
+
     it('should render Search Console after the primary dashboard sections', async () => {
         const siteService = TestBed.inject(SiteService);
         const statsService = TestBed.inject(StatsService);

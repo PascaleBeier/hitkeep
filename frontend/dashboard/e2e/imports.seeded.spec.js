@@ -36,9 +36,9 @@ test("imports the provided Plausible CSV fixture set through the dashboard", asy
 
 async function runPlausibleImportFlow(page, files, mode, testInfo) {
     await page.setViewportSize(DESKTOP_VIEWPORT);
-    await login(page, "/imports");
+    await login(page, "/import-export/import");
     const targetSite = await createImportTargetSite(page, mode);
-    await page.goto("/imports", { waitUntil: "domcontentloaded" });
+    await page.goto("/import-export/import", { waitUntil: "domcontentloaded" });
     await selectSeededSite(page, targetSite.domain);
     await expect(page.getByRole("heading", { name: "Site import" })).toBeVisible();
 

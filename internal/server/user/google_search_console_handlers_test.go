@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -277,7 +278,7 @@ func TestGoogleSearchConsoleCallbackStoresConnectionAndAudit(t *testing.T) {
 func TestGoogleSearchConsoleAdminCanMapAndReadSiteProperty(t *testing.T) {
 	h, store, userID := setupUserSecurityTestEnv(t)
 	defer store.Close()
-	teamID, site := seedGoogleSearchConsoleMappableSite(t, store, userID, "map-site.example.com", "sc-domain:example.com")
+	teamID, site := seedGoogleSearchConsoleMappableSite(t, store, userID, "example.com", "sc-domain:example.com")
 	mux := googleSearchConsoleUserMux(h)
 
 	body := strings.NewReader(`{"property_uri":"sc-domain:example.com"}`)
@@ -316,6 +317,73 @@ func TestGoogleSearchConsoleAdminCanMapAndReadSiteProperty(t *testing.T) {
 	}
 	if strings.Contains(entries[0].Details, "access-token") || strings.Contains(entries[0].Details, "refresh-token") {
 		t.Fatalf("audit details leaked token material: %q", entries[0].Details)
+	}
+}
+
+func TestGoogleSearchConsoleMappingRequiresPropertyToMatchSite(t *testing.T) {
+	h, store, userID := setupUserSecurityTestEnv(t)
+	defer store.Close()
+	teamID, site := seedGoogleSearchConsoleMappableSite(t, store, userID, "example.com", "sc-domain:other.example")
+	mux := googleSearchConsoleUserMux(h)
+
+	req := withTestUser(httptest.NewRequest(http.MethodPut, "/api/sites/"+site.ID.String()+"/integrations/google-search-console/property", strings.NewReader(`{"property_uri":"sc-domain:other.example"}`)), userID)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected mismatch status %d, got %d: %s", http.StatusBadRequest, w.Code, w.Body.String())
+	}
+	mapping, err := store.GetGoogleSearchConsoleSiteMappingForTeam(context.Background(), site.ID, teamID)
+	if err != nil {
+		t.Fatalf("load mapping: %v", err)
+	}
+	if mapping != nil {
+		t.Fatalf("expected no mapping after rejected property, got %+v", mapping)
+	}
+	entries, _, err := store.ListTeamAuditEntries(context.Background(), teamID, "google_search_console.property_mapped", 5, 0)
+	if err != nil {
+		t.Fatalf("list map audits: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("expected no success audit for rejected property, got %d", len(entries))
+	}
+}
+
+func TestGoogleSearchConsoleMappingAllowsDomainAndURLPrefixMatches(t *testing.T) {
+	tests := []struct {
+		name        string
+		siteDomain  string
+		propertyURI string
+	}{
+		{
+			name:        "domain property parent",
+			siteDomain:  "www.example.com",
+			propertyURI: "sc-domain:example.com",
+		},
+		{
+			name:        "url prefix www equivalent",
+			siteDomain:  "example.com",
+			propertyURI: "https://www.example.com/",
+		},
+		{
+			name:        "url prefix bare equivalent",
+			siteDomain:  "www.example.com",
+			propertyURI: "https://example.com/",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h, store, userID := setupUserSecurityTestEnv(t)
+			defer store.Close()
+			_, site := seedGoogleSearchConsoleMappableSite(t, store, userID, tt.siteDomain, tt.propertyURI)
+			mux := googleSearchConsoleUserMux(h)
+
+			req := withTestUser(httptest.NewRequest(http.MethodPut, "/api/sites/"+site.ID.String()+"/integrations/google-search-console/property", strings.NewReader(fmt.Sprintf(`{"property_uri":%q}`, tt.propertyURI))), userID)
+			w := httptest.NewRecorder()
+			mux.ServeHTTP(w, req)
+			if w.Code != http.StatusOK {
+				t.Fatalf("expected map status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
+			}
+		})
 	}
 }
 
@@ -394,7 +462,7 @@ func TestGoogleSearchConsoleMappingRequiresConnectedTeam(t *testing.T) {
 func TestGoogleSearchConsoleMappingIgnoresStaleMappingFromPreviousTeam(t *testing.T) {
 	h, store, userID := setupUserSecurityTestEnv(t)
 	defer store.Close()
-	currentTeamID, site := seedGoogleSearchConsoleMappableSite(t, store, userID, "stale-map.example.com", "sc-domain:current-team.example.com")
+	currentTeamID, site := seedGoogleSearchConsoleMappableSite(t, store, userID, "current-team.example.com", "sc-domain:current-team.example.com")
 	seedStaleGoogleSearchConsoleMapping(t, store, site.ID, userID)
 	mux := googleSearchConsoleUserMux(h)
 

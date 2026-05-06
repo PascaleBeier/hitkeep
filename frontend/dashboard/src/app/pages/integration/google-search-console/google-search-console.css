@@ -107,12 +107,6 @@
     border-color: var(--p-surface-700);
 }
 
-.google-search-console-hint {
-    align-self: center;
-    color: var(--p-text-muted-color);
-    font-size: 0.875rem;
-}
-
 @media (max-width: 640px) {
     .google-search-console-panel__header {
         flex-direction: column;

@@ -239,6 +239,9 @@ func (h *handler) handleMapGoogleSearchConsoleSiteProperty() http.HandlerFunc {
 			http.Error(w, "Google Search Console property is not available for this team", http.StatusBadRequest)
 			return
 		}
+		if !h.requireGoogleSearchConsolePropertyMatchesSite(w, r, teamID, siteID, propertyURI) {
+			return
+		}
 
 		oldMapping, err := h.ctx.Store.GetGoogleSearchConsoleSiteMappingForTeam(r.Context(), siteID, teamID)
 		if err != nil {
@@ -607,6 +610,20 @@ func (h *handler) requireGoogleSearchConsoleConnectedTeam(w http.ResponseWriter,
 	return true
 }
 
+func (h *handler) requireGoogleSearchConsolePropertyMatchesSite(w http.ResponseWriter, r *http.Request, teamID, siteID uuid.UUID, propertyURI string) bool {
+	site, err := h.ctx.Store.GetSiteByID(r.Context(), siteID)
+	if err != nil {
+		slog.Error("Failed to load site for Google Search Console property validation", "error", err, "team_id", teamID, "site_id", siteID)
+		http.Error(w, "Could not validate Google Search Console property", http.StatusInternalServerError)
+		return false
+	}
+	if site == nil || !googleSearchConsolePropertyMatchesSite(site.Domain, propertyURI) {
+		http.Error(w, "Google Search Console property does not match this site", http.StatusBadRequest)
+		return false
+	}
+	return true
+}
+
 func (h *handler) googleSearchConsoleSiteMappingResponse(ctx context.Context, siteID, teamID uuid.UUID, canManage bool) (api.GoogleSearchConsoleSiteMappingResponse, error) {
 	resp := api.GoogleSearchConsoleSiteMappingResponse{
 		SiteID:    siteID,
@@ -815,6 +832,43 @@ func googleSearchConsoleConnectionToken(conn *database.GoogleSearchConsoleConnec
 		Scope:        conn.Scope,
 		Expiry:       conn.TokenExpiry,
 	}
+}
+
+func googleSearchConsolePropertyMatchesSite(siteDomain, propertyURI string) bool {
+	siteHost := googleSearchConsoleNormalizeHost(siteDomain)
+	if siteHost == "" {
+		return false
+	}
+	property := strings.ToLower(strings.TrimSpace(propertyURI))
+	if strings.HasPrefix(property, "sc-domain:") {
+		propertyDomain := googleSearchConsoleNormalizeHost(strings.TrimPrefix(property, "sc-domain:"))
+		return propertyDomain != "" && (siteHost == propertyDomain || strings.HasSuffix(siteHost, "."+propertyDomain))
+	}
+	parsed, err := url.Parse(property)
+	if err != nil {
+		return false
+	}
+	propertyHost := googleSearchConsoleNormalizeHost(parsed.Hostname())
+	if propertyHost == "" {
+		return false
+	}
+	return googleSearchConsoleHostWithoutWWW(siteHost) == googleSearchConsoleHostWithoutWWW(propertyHost)
+}
+
+func googleSearchConsoleNormalizeHost(value string) string {
+	host := strings.ToLower(strings.TrimSpace(value))
+	if strings.Contains(host, "://") {
+		parsed, err := url.Parse(host)
+		if err != nil {
+			return ""
+		}
+		host = parsed.Hostname()
+	}
+	return strings.TrimSuffix(host, ".")
+}
+
+func googleSearchConsoleHostWithoutWWW(host string) string {
+	return strings.TrimPrefix(host, "www.")
 }
 
 func googleSearchConsoleConnectionTargetType() string {

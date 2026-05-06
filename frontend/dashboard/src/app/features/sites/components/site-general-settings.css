@@ -20,3 +20,18 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+.site-settings-card__footer--shortcut {
+    justify-content: flex-start;
+}
+
+.site-settings-action-link {
+    justify-content: center;
+    max-width: 100%;
+}
+
+@media (max-width: 640px) {
+    .site-settings-action-link {
+        width: 100%;
+    }
+}

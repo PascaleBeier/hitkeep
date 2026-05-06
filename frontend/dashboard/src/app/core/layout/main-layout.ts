@@ -55,10 +55,6 @@ export class MainLayout {
     protected readonly siteSettingsTab = this.context.siteSettingsTab;
     protected readonly beforeTeamSwitch = this.context.beforeTeamSwitch;
     protected readonly canViewSystemStatus = this.perms.isInstanceAdmin;
-    protected readonly canImportActiveSite = computed(() => {
-        const site = this.siteService.activeSite();
-        return !!site && this.perms.canManageSite(site.id);
-    });
     protected readonly isAdministrationVisible = computed(() => this.canViewSystemStatus() || this.isTeamAdmin());
 
     handleKeyboard(event: KeyboardEvent) {

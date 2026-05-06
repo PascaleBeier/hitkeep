@@ -9,8 +9,6 @@ import { MessageModule } from 'primeng/message';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { TagModule } from 'primeng/tag';
 import { TableModule } from 'primeng/table';
-import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
-import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { SiteService } from '@features/sites/services/site.service';
 import { PermissionService } from '@services/permission.service';
 import { ImportJob, ImportManifest, ImportProviderDescriptor, ImportsService } from '@services/imports.service';
@@ -79,7 +77,7 @@ function safeList<T>(value: readonly T[] | null | undefined): T[] {
 
 @Component({
     selector: 'app-imports',
-    imports: [DatePipe, DecimalPipe, TranslocoPipe, ButtonModule, CardModule, FileUploadModule, MessageModule, ProgressBarModule, TagModule, TableModule, PageHeader, PageHeaderLeft, PageBreadcrumb],
+    imports: [DatePipe, DecimalPipe, TranslocoPipe, ButtonModule, CardModule, FileUploadModule, MessageModule, ProgressBarModule, TagModule, TableModule],
     templateUrl: './imports.html',
     styleUrl: './imports.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -126,16 +124,6 @@ export class ImportsPage {
         return this.selectedProviderDescriptor()?.name ?? this.transloco.translate('imports.providerFallback');
     });
     protected readonly importGuideUrl = importGuideUrl;
-
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
-        const site = this.activeSite();
-        if (!site) return [{ label: this.transloco.translate('imports.title'), isCurrent: true }];
-        return [
-            { label: site.domain, favicon: site, routerLink: '/dashboard' },
-            { label: this.transloco.translate('imports.title'), isCurrent: true }
-        ];
-    });
 
     protected readonly selectedFileBytes = computed(() => this.selectedFiles().reduce((sum, file) => sum + file.size, 0));
     protected readonly manifest = computed(() => this.currentJob()?.manifest ?? null);

@@ -27,6 +27,8 @@
         "apiReference": "API-Referenz",
         "imports": "Importe",
         "importsAria": "Zu den Importen",
+        "importExport": "Import & Export",
+        "importExportAria": "Zu Import und Export",
         "account": "Konto",
         "resources": "Ressourcen",
         "docs": "Docs",
@@ -195,6 +197,36 @@
         "pagination": {
             "summary": "{{start}}-{{end}} von {{total}} Einträgen",
             "empty": "Keine Einträge anzuzeigen"
+        }
+    },
+    "importExport": {
+        "title": "Import & Export",
+        "tabs": {
+            "import": "Import",
+            "export": "Export"
+        },
+        "import": {
+            "title": "Import"
+        },
+        "export": {
+            "title": "Export",
+            "allSites": {
+                "title": "Alle zugänglichen Sites",
+                "description": "Lade Analysedaten für jede Site herunter, auf die du Zugriff hast.",
+                "primaryAction": "Alle Sites herunterladen",
+                "otherFormats": "Weitere Formate",
+                "success": "Analytics-Export für alle zugänglichen Sites wurde heruntergeladen.",
+                "error": "Export fehlgeschlagen. Bitte erneut versuchen."
+            },
+            "siteExports": {
+                "title": "Site-Exporte",
+                "description": "Lade eine einzelne Site herunter, wenn du nur eine bestimmte Property brauchst.",
+                "primaryAction": "Site herunterladen",
+                "loading": "Sites werden geladen ...",
+                "empty": "Keine Sites für den Export verfügbar.",
+                "success": "Site-Export wurde heruntergeladen.",
+                "error": "Export fehlgeschlagen. Bitte erneut versuchen oder ein anderes Format wählen."
+            }
         }
     },
     "imports": {
@@ -843,6 +875,11 @@
             "exportStatus": {
                 "success": "Download wurde gestartet.",
                 "error": "Datenexport fehlgeschlagen. Bitte versuche es erneut."
+            },
+            "exportShortcut": {
+                "title": "Analytics-Export",
+                "description": "Exportiere alle zugänglichen Websites oder einzelne Site-Takeouts im Import-&-Export-Hub.",
+                "action": "Import & Export öffnen"
             }
         },
         "reports": {
@@ -1101,7 +1138,10 @@
                 "exportStatus": {
                     "success": "Download wurde gestartet.",
                     "error": "Seitendatenexport fehlgeschlagen. Bitte versuche es erneut."
-                }
+                },
+                "exportShortcutTitle": "Analytics-Export",
+                "exportShortcutDescription": "Exportiere diese Website oder jede andere zugängliche Website im Import-&-Export-Hub.",
+                "exportShortcutAction": "Import & Export öffnen"
             },
             "unsavedChangesConfirm": "Du hast ungespeicherte Änderungen. Verwerfen?"
         },
@@ -2169,6 +2209,7 @@
                 "account": "Konto",
                 "site": "Site",
                 "property": "Property",
+                "searchProperties": "Properties suchen",
                 "propertyMapping": "Property-Zuordnung",
                 "permission": "Berechtigung",
                 "syncStatus": "Sync-Status",
@@ -2223,9 +2264,10 @@
                 "propertyUnmapped": "Keine Property zugeordnet.",
                 "loadingMapping": "Zuordnung wird geladen.",
                 "noProperties": "Keine Properties zurückgegeben.",
+                "noMatchingProperties": "Keine passenden Search-Console-Properties für diese Site.",
                 "noSite": "Zuerst Site wählen.",
                 "readonly": "Für deine Rolle schreibgeschützt.",
-                "noMappingSync": "Zuerst Property zuordnen.",
+                "noMappingSync": "Ordne zuerst eine Search-Console-Property zu.",
                 "syncRequested": "Sync angefordert.",
                 "disconnectSuccess": "Getrennt.",
                 "reconnectHint": "Erneut verbinden, um Zugriff zu erneuern."

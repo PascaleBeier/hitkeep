@@ -208,6 +208,69 @@ func (s *Store) GetSites(ctx context.Context, userID uuid.UUID) ([]api.Site, err
 	return sites, nil
 }
 
+func (s *Store) ListAccessibleSitesForTakeout(ctx context.Context, userID uuid.UUID) ([]api.Site, error) {
+	instanceRole, err := s.GetInstanceRole(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get instance role: %w", err)
+	}
+	defaultTenantID, err := s.GetDefaultTenantID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("could not resolve default tenant: %w", err)
+	}
+
+	var rows *sql.Rows
+	if instanceRole.HasPermission(auth.PermInstanceViewAllSites) {
+		rows, err = s.db.QueryContext(ctx, `
+			SELECT s.id, s.user_id, s.domain, s.data_retention_days, s.created_at
+			FROM sites s
+			LEFT JOIN site_tenants st ON st.site_id = s.id
+			LEFT JOIN tenant_archives ta ON ta.tenant_id = COALESCE(st.tenant_id, ?)
+			WHERE ta.tenant_id IS NULL
+			ORDER BY s.created_at DESC
+		`, defaultTenantID)
+	} else {
+		rows, err = s.db.QueryContext(ctx, `
+			SELECT DISTINCT s.id, s.user_id, s.domain, s.data_retention_days, s.created_at
+			FROM sites s
+			LEFT JOIN site_tenants st ON st.site_id = s.id
+			LEFT JOIN tenant_archives ta ON ta.tenant_id = COALESCE(st.tenant_id, ?)
+			LEFT JOIN site_members sm ON sm.site_id = s.id AND sm.user_id = ?
+			LEFT JOIN tenant_members tm ON tm.tenant_id = COALESCE(st.tenant_id, ?)
+				AND tm.user_id = ?
+				AND LOWER(TRIM(tm.role)) IN (?, ?)
+			WHERE ta.tenant_id IS NULL
+				AND (s.user_id = ? OR sm.user_id IS NOT NULL OR tm.user_id IS NOT NULL)
+			ORDER BY s.created_at DESC
+		`,
+			defaultTenantID,
+			userID,
+			defaultTenantID,
+			userID,
+			TenantRoleOwner,
+			TenantRoleAdmin,
+			userID,
+		)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("could not list takeout sites: %w", err)
+	}
+	defer rows.Close()
+
+	sites := make([]api.Site, 0)
+	for rows.Next() {
+		var site api.Site
+		if err := rows.Scan(&site.ID, &site.UserID, &site.Domain, &site.DataRetentionDays, &site.CreatedAt); err != nil {
+			return nil, fmt.Errorf("could not scan takeout site: %w", err)
+		}
+		sites = append(sites, site)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("could not read takeout sites: %w", err)
+	}
+
+	return sites, nil
+}
+
 func (s *Store) ListSitesForTenant(ctx context.Context, tenantID uuid.UUID) ([]api.Site, error) {
 	defaultTenantID, err := s.GetDefaultTenantID(ctx)
 	if err != nil {

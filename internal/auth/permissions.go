@@ -142,14 +142,14 @@ func IsValidSiteRole(role SiteRole) bool {
 }
 
 func MinInstanceRole(a, b InstanceRole) InstanceRole {
-	if instanceRoleRank(a) <= instanceRoleRank(b) {
+	if instanceRoleRank(a) >= instanceRoleRank(b) {
 		return a
 	}
 	return b
 }
 
 func MinSiteRole(a, b SiteRole) SiteRole {
-	if siteRoleRank(a) <= siteRoleRank(b) {
+	if siteRoleRank(a) >= siteRoleRank(b) {
 		return a
 	}
 	return b

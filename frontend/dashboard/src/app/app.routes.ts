@@ -4,6 +4,7 @@ import { authGuard } from '@guards/auth-guard';
 import { adminGuard } from '@guards/admin-guard';
 import { teamAdminGuard } from '@guards/team-admin-guard';
 import { cloudSignupGuard } from '@guards/cloud-signup-guard';
+import { importExportDefaultGuard } from '@pages/import-export/import-export-default.guard';
 
 export const routes: Routes = [
     {
@@ -127,8 +128,24 @@ export const routes: Routes = [
                 canActivate: [teamAdminGuard]
             },
             {
-                path: 'imports',
-                loadComponent: () => import('@pages/imports/imports').then((m) => m.ImportsPage)
+                path: 'import-export',
+                loadComponent: () => import('@pages/import-export/import-export').then((m) => m.ImportExportPage),
+                children: [
+                    {
+                        path: '',
+                        pathMatch: 'full',
+                        canActivate: [importExportDefaultGuard],
+                        children: []
+                    },
+                    {
+                        path: 'import',
+                        loadComponent: () => import('@pages/imports/imports').then((m) => m.ImportsPage)
+                    },
+                    {
+                        path: 'export',
+                        loadComponent: () => import('@pages/import-export/import-export-export').then((m) => m.ImportExportExportPage)
+                    }
+                ]
             },
             {
                 path: 'admin',

@@ -1,0 +1,16 @@
+.import-export-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.import-export-tab-label {
+    align-items: center;
+    display: inline-flex;
+    gap: 0.5rem;
+    white-space: nowrap;
+}
+
+.import-export-content {
+    min-height: 18rem;
+}

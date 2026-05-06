@@ -1,0 +1,24 @@
+<app-page-frame [breadcrumbItems]="breadcrumbItems()">
+    <section class="import-export-shell" [attr.aria-label]="'importExport.title' | transloco">
+        <p-tabs class="hk-page-tabs import-export-tabs" [value]="activeTab()" (valueChange)="onTabChange($event)">
+            <p-tablist>
+                <p-tab value="import">
+                    <span class="import-export-tab-label">
+                        <i class="pi pi-upload" aria-hidden="true"></i>
+                        <span>{{ "importExport.tabs.import" | transloco }}</span>
+                    </span>
+                </p-tab>
+                <p-tab value="export">
+                    <span class="import-export-tab-label">
+                        <i class="pi pi-download" aria-hidden="true"></i>
+                        <span>{{ "importExport.tabs.export" | transloco }}</span>
+                    </span>
+                </p-tab>
+            </p-tablist>
+        </p-tabs>
+
+        <div class="import-export-content">
+            <router-outlet />
+        </div>
+    </section>
+</app-page-frame>

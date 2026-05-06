@@ -7,7 +7,9 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { DashboardBootstrapService } from '@services/dashboard-bootstrap.service';
 import { PermissionService } from '@services/permission.service';
+import { ShareService } from '@services/share.service';
 import { TeamService } from '@services/team.service';
+import { SiteService } from '@features/sites/services/site.service';
 import { vi } from 'vitest';
 
 interface MainLayoutTestAccess {
@@ -29,7 +31,14 @@ describe('MainLayout', () => {
             imports: [
                 MainLayout,
                 TranslocoTestingModule.forRoot({
-                    langs: { en: {} },
+                    langs: {
+                        en: {
+                            nav: {
+                                importExport: 'Import & Export',
+                                importExportAria: 'Go to import and export'
+                            }
+                        }
+                    },
                     translocoConfig: {
                         availableLangs: ['en'],
                         defaultLang: 'en'
@@ -119,6 +128,43 @@ describe('MainLayout', () => {
         const navLinks = Array.from(fixture.nativeElement.querySelectorAll('nav a')) as HTMLElement[];
         const hasSearchConsoleLink = navLinks.some((link: HTMLElement) => link.getAttribute('href') === '/integration/google-search-console');
         expect(hasSearchConsoleLink).toBeFalsy();
+    });
+
+    it('should show Import & Export navigation to site viewers through the smart hub route', () => {
+        const permissions = TestBed.inject(PermissionService);
+        const siteService = TestBed.inject(SiteService);
+        siteService.applySites([
+            {
+                id: '00000000-0000-0000-0000-0000000000aa',
+                user_id: '00000000-0000-0000-0000-000000000001',
+                domain: 'viewer.example.com',
+                created_at: '2026-01-01T00:00:00Z'
+            }
+        ]);
+        permissions.applyPermissions({
+            instance_role: 'user',
+            permissions: {
+                '00000000-0000-0000-0000-0000000000aa': 'viewer'
+            }
+        });
+        fixture.detectChanges();
+
+        const navLinks = Array.from(fixture.nativeElement.querySelectorAll('nav a')) as HTMLAnchorElement[];
+        const importExportLink = navLinks.find((link) => link.textContent?.includes('Import & Export'));
+
+        expect(importExportLink).toBeTruthy();
+        expect(importExportLink?.getAttribute('href')).toBe('/import-export');
+        expect(importExportLink?.getAttribute('aria-label')).toBe('Go to import and export');
+    });
+
+    it('should hide Import & Export navigation in share mode', () => {
+        TestBed.inject(ShareService).setToken('share-token');
+        fixture.detectChanges();
+
+        const navLinks = Array.from(fixture.nativeElement.querySelectorAll('nav a')) as HTMLAnchorElement[];
+        const importExportLink = navLinks.find((link) => link.getAttribute('href') === '/import-export');
+
+        expect(importExportLink).toBeFalsy();
     });
 
     it('should hide create team actions in hosted cloud', () => {

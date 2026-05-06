@@ -27,6 +27,8 @@
         "apiReference": "Riferimento API",
         "imports": "Importazioni",
         "importsAria": "Vai alle importazioni",
+        "importExport": "Importazione ed esportazione",
+        "importExportAria": "Vai a importazione ed esportazione",
         "account": "Account",
         "resources": "Risorse",
         "docs": "Docs",
@@ -195,6 +197,36 @@
         "pagination": {
             "summary": "{{start}}-{{end}} di {{total}} voci",
             "empty": "Nessuna voce da mostrare"
+        }
+    },
+    "importExport": {
+        "title": "Importazione ed esportazione",
+        "tabs": {
+            "import": "Importa",
+            "export": "Esporta"
+        },
+        "import": {
+            "title": "Importa"
+        },
+        "export": {
+            "title": "Esporta",
+            "allSites": {
+                "title": "Tutti i siti accessibili",
+                "description": "Scarica i dati di analisi per tutti i siti a cui hai accesso.",
+                "primaryAction": "Scarica tutti i siti",
+                "otherFormats": "Altri formati",
+                "success": "Esportazione dei dati di analisi per tutti i siti accessibili scaricata.",
+                "error": "Esportazione non riuscita. Riprova."
+            },
+            "siteExports": {
+                "title": "Esportazioni dei siti",
+                "description": "Scarica un sito alla volta quando ti serve solo una proprietà specifica.",
+                "primaryAction": "Scarica sito",
+                "loading": "Caricamento siti...",
+                "empty": "Nessun sito disponibile per l’esportazione.",
+                "success": "Esportazione del sito scaricata.",
+                "error": "Esportazione non riuscita. Riprova o scegli un altro formato."
+            }
         }
     },
     "imports": {
@@ -843,6 +875,11 @@
             "exportStatus": {
                 "success": "Download avviato.",
                 "error": "Impossibile esportare i dati. Riprova."
+            },
+            "exportShortcut": {
+                "title": "Esportazione analytics",
+                "description": "Esporta tutti i siti accessibili o i takeout dei singoli siti dall'hub Importa ed esporta.",
+                "action": "Apri Importa ed esporta"
             }
         },
         "reports": {
@@ -1101,7 +1138,10 @@
                 "exportStatus": {
                     "success": "Download avviato.",
                     "error": "Impossibile esportare i dati del sito. Riprova."
-                }
+                },
+                "exportShortcutTitle": "Esportazione analytics",
+                "exportShortcutDescription": "Esporta questo sito o qualsiasi altro sito accessibile dall'hub Importa ed esporta.",
+                "exportShortcutAction": "Apri Importa ed esporta"
             },
             "unsavedChangesConfirm": "Hai modifiche non salvate. Vuoi annullarle?"
         },
@@ -2169,6 +2209,7 @@
                 "account": "Account",
                 "site": "Sito",
                 "property": "Proprietà",
+                "searchProperties": "Cerca proprietà",
                 "propertyMapping": "Mappatura proprietà",
                 "permission": "Permesso",
                 "syncStatus": "Stato sincronizzazione",
@@ -2223,9 +2264,10 @@
                 "propertyUnmapped": "Nessuna proprietà mappata.",
                 "loadingMapping": "Caricamento mappatura.",
                 "noProperties": "Nessuna proprietà restituita.",
+                "noMatchingProperties": "Nessuna proprietà Search Console corrisponde a questo sito.",
                 "noSite": "Seleziona prima un sito.",
                 "readonly": "Sola lettura per il tuo ruolo.",
-                "noMappingSync": "Mappa prima una proprietà.",
+                "noMappingSync": "Mappa prima una proprietà Search Console.",
                 "syncRequested": "Sincronizzazione richiesta.",
                 "disconnectSuccess": "Disconnesso.",
                 "reconnectHint": "Riconnetti per rinnovare l’accesso."

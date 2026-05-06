@@ -75,34 +75,19 @@
                     [outlined]="true"
                     size="small"
                     icon="pi pi-refresh"
-                    [label]="'integration.googleSearchConsole.actions.reconnect' | transloco"
                     [loading]="actionBusy()"
                     (click)="connect()"
                     [disabled]="actionBusy() || loading() || !status()?.configured"
-                ></button>
-                <button
-                    pButton
-                    type="button"
-                    data-testid="gsc-disconnect"
-                    severity="danger"
-                    size="small"
-                    icon="pi pi-unlink"
-                    [label]="'integration.googleSearchConsole.actions.disconnect' | transloco"
-                    [loading]="actionBusy()"
-                    (click)="confirmDisconnect()"
-                    [disabled]="actionBusy()"
-                ></button>
+                >
+                    {{ "integration.googleSearchConsole.actions.reconnect" | transloco }}
+                </button>
+                <button pButton type="button" data-testid="gsc-disconnect" severity="danger" size="small" icon="pi pi-unlink" [loading]="actionBusy()" (click)="confirmDisconnect()" [disabled]="actionBusy()">
+                    {{ "integration.googleSearchConsole.actions.disconnect" | transloco }}
+                </button>
                 } } @else {
-                <button
-                    pButton
-                    type="button"
-                    size="small"
-                    icon="pi pi-link"
-                    [label]="'integration.googleSearchConsole.actions.connect' | transloco"
-                    [loading]="actionBusy()"
-                    (click)="connect()"
-                    [disabled]="actionBusy() || loading() || !status()?.configured || !status()?.can_manage"
-                ></button>
+                <button pButton type="button" size="small" icon="pi pi-link" [loading]="actionBusy()" (click)="connect()" [disabled]="actionBusy() || loading() || !status()?.configured || !status()?.can_manage">
+                    {{ "integration.googleSearchConsole.actions.connect" | transloco }}
+                </button>
                 }
             </div>
         </section>
@@ -157,10 +142,13 @@
                     (ngModelChange)="selectProperty($event)"
                     optionLabel="label"
                     optionValue="value"
+                    [filter]="true"
+                    filterBy="label,value"
+                    [filterPlaceholder]="'integration.googleSearchConsole.labels.searchProperties' | transloco"
                     appendTo="body"
                     class="w-full"
                     [loading]="propertyLoading()"
-                    [disabled]="propertyLoading() || propertyActionBusy() || !mapping()?.can_manage || properties().length === 0"
+                    [disabled]="propertyLoading() || propertyActionBusy() || !mapping()?.can_manage || propertyOptions().length === 0"
                 />
             </div>
 
@@ -171,27 +159,18 @@
                     size="small"
                     icon="pi pi-link"
                     data-testid="gsc-map-property"
-                    [label]="'integration.googleSearchConsole.actions.mapProperty' | transloco"
                     [loading]="propertyActionBusy()"
                     (click)="mapSelectedProperty()"
                     [disabled]="propertyActionBusy() || propertyLoading() || !mapping()?.can_manage || !canMapSelectedProperty()"
-                ></button>
+                >
+                    {{ "integration.googleSearchConsole.actions.mapProperty" | transloco }}
+                </button>
             </div>
             } @else if (canManageMapping() && mapping()?.mapped) {
             <div class="google-search-console-actions">
-                <button
-                    pButton
-                    type="button"
-                    size="small"
-                    severity="danger"
-                    [outlined]="true"
-                    icon="pi pi-unlink"
-                    data-testid="gsc-remove-mapping"
-                    [label]="'integration.googleSearchConsole.actions.removeMapping' | transloco"
-                    [loading]="propertyActionBusy()"
-                    (click)="confirmRemoveMapping()"
-                    [disabled]="propertyActionBusy()"
-                ></button>
+                <button pButton type="button" size="small" severity="danger" [outlined]="true" icon="pi pi-unlink" data-testid="gsc-remove-mapping" [loading]="propertyActionBusy()" (click)="confirmRemoveMapping()" [disabled]="propertyActionBusy()">
+                    {{ "integration.googleSearchConsole.actions.removeMapping" | transloco }}
+                </button>
             </div>
             } @if (!mappingLoading()) {
             <div class="google-search-console-sync" aria-labelledby="gsc-sync-title">
@@ -243,25 +222,14 @@
                     }
                 </dl>
 
-                @if (canManageMapping()) {
+                @if (canManageMapping() && mapping()?.mapped) {
                 <div class="google-search-console-actions">
-                    <button
-                        pButton
-                        type="button"
-                        size="small"
-                        severity="secondary"
-                        [outlined]="true"
-                        icon="pi pi-sync"
-                        data-testid="gsc-sync-now"
-                        [label]="syncButtonKey() | transloco"
-                        [loading]="syncActionBusy()"
-                        (click)="requestSync()"
-                        [disabled]="syncActionBusy() || syncInProgress() || !mapping()?.mapped"
-                    ></button>
-                    @if (!mapping()?.mapped) {
-                    <span class="google-search-console-hint">{{ "integration.googleSearchConsole.states.noMappingSync" | transloco }}</span>
-                    }
+                    <button pButton type="button" size="small" severity="secondary" [outlined]="true" icon="pi pi-sync" data-testid="gsc-sync-now" [loading]="syncActionBusy()" (click)="requestSync()" [disabled]="syncActionBusy() || syncInProgress()">
+                        {{ syncButtonKey() | transloco }}
+                    </button>
                 </div>
+                } @else if (canManageMapping()) {
+                <p-message severity="info" styleClass="w-full" data-testid="gsc-sync-mapping-required" [text]="'integration.googleSearchConsole.states.noMappingSync' | transloco" />
                 }
             </div>
             } } @else {

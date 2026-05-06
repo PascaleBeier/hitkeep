@@ -77,7 +77,7 @@ func New(conf *config.Config, publicFS fs.FS, store *database.Store, tenantStore
 		authState = shared.NewAuthStateStore()
 	}
 
-	takeoutService := takeout.NewTakeoutService(store, "archive/takeout")
+	takeoutService := takeout.NewTakeoutServiceWithTenantStores(store, tenantStores, "archive/takeout")
 
 	var ipFilter *blocking.IPFilter
 	var ipFilterStop context.CancelFunc

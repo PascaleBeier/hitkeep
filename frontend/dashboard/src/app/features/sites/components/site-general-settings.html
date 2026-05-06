@@ -30,29 +30,15 @@
             <div class="site-settings-card__title-row">
                 <span class="site-settings-card__icon"><i class="pi pi-database" aria-hidden="true"></i></span>
                 <div>
-                    <h3>{{ "sites.settings.general.dataExportTitle" | transloco }}</h3>
-                    <p>{{ "sites.settings.general.exportSiteDataDescription" | transloco }}</p>
+                    <h3>{{ "sites.settings.general.exportShortcutTitle" | transloco }}</h3>
+                    <p>{{ "sites.settings.general.exportShortcutDescription" | transloco }}</p>
                 </div>
             </div>
         </header>
-        @if (exportState() !== "idle") {
-        <div class="site-settings-card__body">
-            @if (exportState() === "success") {
-            <div class="site-settings-alert site-settings-alert--success">{{ "sites.settings.general.exportStatus.success" | transloco }}</div>
-            } @if (exportState() === "error") {
-            <div class="site-settings-alert site-settings-alert--error">{{ "sites.settings.general.exportStatus.error" | transloco }}</div>
-            }
-        </div>
-        }
-        <footer class="site-settings-card__footer">
-            <p-splitButton
-                styleClass="site-settings-split-button"
-                [label]="isExporting() ? ('common.preparing' | transloco) : ('common.actions.downloadXlsx' | transloco)"
-                icon="pi pi-download"
-                [model]="exportMenuItems()"
-                [disabled]="isExporting()"
-                (onClick)="downloadData('xlsx')"
-            />
+        <footer class="site-settings-card__footer site-settings-card__footer--shortcut">
+            <a pButton routerLink="/import-export/export" class="site-settings-action-link" icon="pi pi-arrow-right" [attr.aria-label]="'sites.settings.general.exportShortcutAction' | transloco">
+                <span pButtonLabel>{{ "sites.settings.general.exportShortcutAction" | transloco }}</span>
+            </a>
         </footer>
     </section>
 </div>

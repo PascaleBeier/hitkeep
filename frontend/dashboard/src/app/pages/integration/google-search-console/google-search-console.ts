@@ -96,15 +96,19 @@ export class GoogleSearchConsolePage {
         if (this.showPropertyPicker() && this.properties().length === 0 && !this.propertyLoading() && !this.propertyErrorKey()) {
             return 'integration.googleSearchConsole.states.noProperties';
         }
+        if (this.showPropertyPicker() && this.compatibleProperties().length === 0 && !this.propertyLoading() && !this.propertyErrorKey()) {
+            return 'integration.googleSearchConsole.states.noMatchingProperties';
+        }
         return 'integration.googleSearchConsole.states.propertyUnmapped';
     });
 
     protected readonly canManageMapping = computed(() => Boolean(this.status()?.can_manage && this.mapping()?.can_manage));
     protected readonly showPropertyPicker = computed(() => Boolean(this.canManageMapping() && !this.mapping()?.mapped));
-    protected readonly propertyOptions = computed(() => this.properties().map((property) => ({ label: property.uri, value: property.uri })));
+    protected readonly compatibleProperties = computed(() => filterGoogleSearchConsolePropertiesForSite(this.properties(), this.activeSite()?.domain));
+    protected readonly propertyOptions = computed(() => this.compatibleProperties().map((property) => ({ label: property.uri, value: property.uri })));
     protected readonly canMapSelectedProperty = computed(() => {
         const selected = this.selectedPropertyURI();
-        return Boolean(selected && this.properties().some((property) => property.uri === selected));
+        return Boolean(selected && this.compatibleProperties().some((property) => property.uri === selected));
     });
 
     protected readonly syncStatus = computed(() => this.mapping()?.sync_status ?? null);
@@ -283,8 +287,9 @@ export class GoogleSearchConsolePage {
                     }
                     this.properties.set(response.properties);
                     const selected = this.selectedPropertyURI();
-                    if (!selected || !response.properties.some((property) => property.uri === selected)) {
-                        this.selectedPropertyURI.set(response.properties[0]?.uri ?? '');
+                    const compatibleProperties = this.compatibleProperties();
+                    if (!selected || !compatibleProperties.some((property) => property.uri === selected)) {
+                        this.selectedPropertyURI.set(compatibleProperties[0]?.uri ?? '');
                     }
                 },
                 error: (error: unknown) => {
@@ -528,4 +533,55 @@ function googleSearchConsolePropertyErrorKey(error: unknown): string {
         }
     }
     return 'integration.googleSearchConsole.errors.properties';
+}
+
+function filterGoogleSearchConsolePropertiesForSite(properties: GoogleSearchConsoleProperty[], siteDomain: string | null | undefined): GoogleSearchConsoleProperty[] {
+    return properties
+        .filter((property) => googleSearchConsolePropertyMatchesSite(siteDomain, property.uri))
+        .sort((left, right) => {
+            const leftDomain = left.uri.trim().toLowerCase().startsWith('sc-domain:');
+            const rightDomain = right.uri.trim().toLowerCase().startsWith('sc-domain:');
+            if (leftDomain !== rightDomain) {
+                return leftDomain ? -1 : 1;
+            }
+            return left.uri.localeCompare(right.uri);
+        });
+}
+
+function googleSearchConsolePropertyMatchesSite(siteDomain: string | null | undefined, propertyURI: string): boolean {
+    const siteHost = googleSearchConsoleNormalizeHost(siteDomain ?? '');
+    if (!siteHost) {
+        return false;
+    }
+    const property = propertyURI.trim().toLowerCase();
+    if (property.startsWith('sc-domain:')) {
+        const propertyDomain = googleSearchConsoleNormalizeHost(property.slice('sc-domain:'.length));
+        return Boolean(propertyDomain && (siteHost === propertyDomain || siteHost.endsWith(`.${propertyDomain}`)));
+    }
+    let propertyHost: string;
+    try {
+        propertyHost = googleSearchConsoleNormalizeHost(new URL(property).hostname);
+    } catch {
+        return false;
+    }
+    return Boolean(propertyHost && googleSearchConsoleHostWithoutWWW(siteHost) === googleSearchConsoleHostWithoutWWW(propertyHost));
+}
+
+function googleSearchConsoleNormalizeHost(value: string): string {
+    const trimmed = value.trim().toLowerCase();
+    if (!trimmed) {
+        return '';
+    }
+    if (trimmed.includes('://')) {
+        try {
+            return new URL(trimmed).hostname.toLowerCase().replace(/\.$/, '');
+        } catch {
+            return '';
+        }
+    }
+    return trimmed.replace(/\.$/, '');
+}
+
+function googleSearchConsoleHostWithoutWWW(host: string): string {
+    return host.startsWith('www.') ? host.slice(4) : host;
 }

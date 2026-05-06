@@ -27,6 +27,8 @@
         "apiReference": "Referencia API",
         "imports": "Importaciones",
         "importsAria": "Ir a importaciones",
+        "importExport": "Importación y exportación",
+        "importExportAria": "Ir a importación y exportación",
         "account": "Cuenta",
         "resources": "Recursos",
         "docs": "Docs",
@@ -195,6 +197,36 @@
         "pagination": {
             "summary": "Mostrando {{start}}-{{end}} de {{total}} entradas",
             "empty": "No hay entradas para mostrar"
+        }
+    },
+    "importExport": {
+        "title": "Importación y exportación",
+        "tabs": {
+            "import": "Importar",
+            "export": "Exportar"
+        },
+        "import": {
+            "title": "Importar"
+        },
+        "export": {
+            "title": "Exportar",
+            "allSites": {
+                "title": "Todos los sitios accesibles",
+                "description": "Descarga datos de analítica de todos los sitios a los que tienes acceso.",
+                "primaryAction": "Descargar todos los sitios",
+                "otherFormats": "Otros formatos",
+                "success": "Exportación de analítica de todos los sitios accesibles descargada.",
+                "error": "Error al exportar. Inténtalo de nuevo."
+            },
+            "siteExports": {
+                "title": "Exportaciones de sitios",
+                "description": "Descarga un sitio a la vez cuando solo necesitas una propiedad concreta.",
+                "primaryAction": "Descargar sitio",
+                "loading": "Cargando sitios...",
+                "empty": "No hay sitios disponibles para exportar.",
+                "success": "Exportación del sitio descargada.",
+                "error": "Error al exportar. Inténtalo de nuevo o elige otro formato."
+            }
         }
     },
     "imports": {
@@ -843,6 +875,11 @@
             "exportStatus": {
                 "success": "La descarga se ha iniciado.",
                 "error": "No se pudieron exportar los datos. Inténtalo de nuevo."
+            },
+            "exportShortcut": {
+                "title": "Exportación de analíticas",
+                "description": "Exporta todos los sitios accesibles o takeouts de sitios individuales desde el hub Importar y exportar.",
+                "action": "Abrir Importar y exportar"
             }
         },
         "reports": {
@@ -1101,7 +1138,10 @@
                 "exportStatus": {
                     "success": "La descarga se ha iniciado.",
                     "error": "No se pudieron exportar los datos del sitio. Inténtalo de nuevo."
-                }
+                },
+                "exportShortcutTitle": "Exportación de analíticas",
+                "exportShortcutDescription": "Exporta este sitio o cualquier otro sitio accesible desde el hub Importar y exportar.",
+                "exportShortcutAction": "Abrir Importar y exportar"
             },
             "unsavedChangesConfirm": "Tienes cambios sin guardar. ¿Deseas descartarlos?"
         },
@@ -2169,6 +2209,7 @@
                 "account": "Cuenta",
                 "site": "Sitio",
                 "property": "Propiedad",
+                "searchProperties": "Buscar propiedades",
                 "propertyMapping": "Asignación de propiedad",
                 "permission": "Permiso",
                 "syncStatus": "Estado de sincronización",
@@ -2223,9 +2264,10 @@
                 "propertyUnmapped": "Sin propiedad asignada.",
                 "loadingMapping": "Cargando asignación.",
                 "noProperties": "No se devolvieron propiedades.",
+                "noMatchingProperties": "No hay propiedades de Search Console que coincidan con este sitio.",
                 "noSite": "Selecciona un sitio primero.",
                 "readonly": "Solo lectura para tu rol.",
-                "noMappingSync": "Asigna una propiedad primero.",
+                "noMappingSync": "Asigna una propiedad de Search Console antes de sincronizar.",
                 "syncRequested": "Sincronización solicitada.",
                 "disconnectSuccess": "Desconectado.",
                 "reconnectHint": "Reconecta para renovar el acceso."

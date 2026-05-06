@@ -27,6 +27,8 @@
         "apiReference": "Référence API",
         "imports": "Imports",
         "importsAria": "Aller aux imports",
+        "importExport": "Import et export",
+        "importExportAria": "Aller à l’import et à l’export",
         "account": "Compte",
         "resources": "Ressources",
         "docs": "Docs",
@@ -195,6 +197,36 @@
         "pagination": {
             "summary": "{{start}}-{{end}} sur {{total}} entrées",
             "empty": "Aucune entrée à afficher"
+        }
+    },
+    "importExport": {
+        "title": "Import et export",
+        "tabs": {
+            "import": "Importer",
+            "export": "Exporter"
+        },
+        "import": {
+            "title": "Importer"
+        },
+        "export": {
+            "title": "Exporter",
+            "allSites": {
+                "title": "Tous les sites accessibles",
+                "description": "Téléchargez les données d’analyse de tous les sites auxquels vous avez accès.",
+                "primaryAction": "Télécharger tous les sites",
+                "otherFormats": "Autres formats",
+                "success": "Export des données d’analyse de tous les sites accessibles téléchargé.",
+                "error": "Échec de l’export. Veuillez réessayer."
+            },
+            "siteExports": {
+                "title": "Exports de sites",
+                "description": "Téléchargez un site à la fois lorsque vous avez seulement besoin d’une propriété précise.",
+                "primaryAction": "Télécharger le site",
+                "loading": "Chargement des sites...",
+                "empty": "Aucun site disponible à exporter.",
+                "success": "Export du site téléchargé.",
+                "error": "Échec de l’export. Réessayez ou choisissez un autre format."
+            }
         }
     },
     "imports": {
@@ -843,6 +875,11 @@
             "exportStatus": {
                 "success": "Le téléchargement a démarré.",
                 "error": "Échec de l'export des données. Veuillez réessayer."
+            },
+            "exportShortcut": {
+                "title": "Export des analyses",
+                "description": "Exportez tous les sites accessibles ou les takeouts de sites individuels depuis le hub Importer et exporter.",
+                "action": "Ouvrir Importer et exporter"
             }
         },
         "reports": {
@@ -1101,7 +1138,10 @@
                 "exportStatus": {
                     "success": "Le téléchargement a démarré.",
                     "error": "Échec de l'export des données du site. Veuillez réessayer."
-                }
+                },
+                "exportShortcutTitle": "Export des analyses",
+                "exportShortcutDescription": "Exportez ce site, ou tout autre site accessible, depuis le hub Importer et exporter.",
+                "exportShortcutAction": "Ouvrir Importer et exporter"
             },
             "unsavedChangesConfirm": "Vous avez des modifications non enregistrées. Les ignorer ?"
         },
@@ -2169,6 +2209,7 @@
                 "account": "Compte",
                 "site": "Site",
                 "property": "Propriété",
+                "searchProperties": "Rechercher des propriétés",
                 "propertyMapping": "Association de propriété",
                 "permission": "Autorisation",
                 "syncStatus": "État de synchronisation",
@@ -2223,9 +2264,10 @@
                 "propertyUnmapped": "Aucune propriété associée.",
                 "loadingMapping": "Chargement de l’association.",
                 "noProperties": "Aucune propriété retournée.",
+                "noMatchingProperties": "Aucune propriété Search Console ne correspond à ce site.",
                 "noSite": "Sélectionnez d’abord un site.",
                 "readonly": "Lecture seule pour votre rôle.",
-                "noMappingSync": "Associez d’abord une propriété.",
+                "noMappingSync": "Associez d’abord une propriété Search Console.",
                 "syncRequested": "Synchronisation demandée.",
                 "disconnectSuccess": "Déconnecté.",
                 "reconnectHint": "Reconnectez pour renouveler l’accès."
