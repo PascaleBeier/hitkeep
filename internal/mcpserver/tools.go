@@ -52,6 +52,18 @@ func (s *service) registerTools(server *mcp.Server) {
 		Description: "Read AI crawler fetch overview, timeseries, and optional fetch-to-visit correlation for one site.",
 		Annotations: readOnly,
 	}, s.getAIVisibility)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "hitkeep_get_search_console_status",
+		Title:       "Get HitKeep Search Console Status",
+		Description: "Read Google Search Console mapping and sync status for one HitKeep site.",
+		Annotations: readOnly,
+	}, s.getSearchConsoleStatus)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "hitkeep_get_search_console",
+		Title:       "Get HitKeep Search Console",
+		Description: "Read imported Google Search Console overview, series, and optional dimension reports for one site.",
+		Annotations: readOnly,
+	}, s.getSearchConsole)
 	if s.docs != nil {
 		docsReadOnly := &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: new(true)}
 		mcp.AddTool(server, &mcp.Tool{
@@ -279,6 +291,253 @@ func (s *service) getAIVisibility(ctx context.Context, _ *mcp.CallToolRequest, i
 		output.Correlation = correlation
 	}
 	return nil, output, nil
+}
+
+func (s *service) getSearchConsoleStatus(ctx context.Context, _ *mcp.CallToolRequest, input searchConsoleStatusInput) (*mcp.CallToolResult, searchConsoleStatusOutput, error) {
+	siteID, err := uuid.Parse(strings.TrimSpace(input.SiteID))
+	if err != nil {
+		return nil, searchConsoleStatusOutput{}, errors.New("invalid site_id")
+	}
+	if _, err := s.requireSiteView(ctx, siteID); err != nil {
+		return nil, searchConsoleStatusOutput{}, err
+	}
+	status, err := s.searchConsoleStatus(ctx, siteID)
+	if err != nil {
+		return nil, searchConsoleStatusOutput{}, err
+	}
+	return nil, status, nil
+}
+
+func (s *service) getSearchConsole(ctx context.Context, _ *mcp.CallToolRequest, input searchConsoleInput) (*mcp.CallToolResult, searchConsoleOutput, error) {
+	siteID, start, end, err := s.parseSiteRange(input.SiteID, input.rangeInput)
+	if err != nil {
+		return nil, searchConsoleOutput{}, err
+	}
+	if _, err := s.requireSiteView(ctx, siteID); err != nil {
+		return nil, searchConsoleOutput{}, err
+	}
+	status, err := s.searchConsoleStatus(ctx, siteID)
+	if err != nil {
+		return nil, searchConsoleOutput{}, err
+	}
+	if !status.Mapped {
+		return nil, searchConsoleOutput{}, errors.New("Search Console property is not mapped")
+	}
+
+	analyticsStore, err := s.analyticsStore(ctx, siteID)
+	if err != nil {
+		return nil, searchConsoleOutput{}, err
+	}
+	params := api.SearchConsoleReportParams{
+		SiteID:      siteID,
+		PropertyURI: status.PropertyURI,
+		Start:       start,
+		End:         end,
+		Page:        strings.TrimSpace(input.Page),
+		Path:        strings.TrimSpace(input.Path),
+		Country:     strings.TrimSpace(input.Country),
+		Device:      strings.TrimSpace(input.Device),
+		Limit:       normalizeSearchConsoleLimit(input.Limit),
+	}
+	output := searchConsoleOutput{
+		SiteID:      siteID.String(),
+		From:        formatMCPTime(start),
+		To:          formatMCPTime(end),
+		PropertyURI: status.PropertyURI,
+		SyncStatus:  status.SyncStatus,
+		Warnings:    searchConsoleWarnings(status, start, end),
+	}
+	sections, err := parseSearchConsoleSections(input.Sections)
+	if err != nil {
+		return nil, searchConsoleOutput{}, err
+	}
+	if err := loadSearchConsoleSections(ctx, analyticsStore, params, sections, &output); err != nil {
+		return nil, searchConsoleOutput{}, err
+	}
+	return nil, output, nil
+}
+
+func (s *service) searchConsoleStatus(ctx context.Context, siteID uuid.UUID) (searchConsoleStatusOutput, error) {
+	teamID, err := s.store.GetSiteTenantID(ctx, siteID)
+	if err != nil {
+		return searchConsoleStatusOutput{}, err
+	}
+	output := searchConsoleStatusOutput{
+		SiteID: siteID.String(),
+		TeamID: teamID.String(),
+		Reason: "unmapped",
+	}
+	mapping, err := s.store.GetGoogleSearchConsoleSiteMappingForTeam(ctx, siteID, teamID)
+	if err != nil {
+		return searchConsoleStatusOutput{}, err
+	}
+	if mapping == nil {
+		return output, nil
+	}
+	output.Mapped = true
+	output.PropertyURI = mapping.PropertyURI
+	if err := s.applySearchConsoleProperty(ctx, teamID, mapping.PropertyURI, &output); err != nil {
+		return searchConsoleStatusOutput{}, err
+	}
+	if err := s.applySearchConsoleSyncState(ctx, siteID, &output); err != nil {
+		return searchConsoleStatusOutput{}, err
+	}
+	output.Reason = searchConsoleStatusReason(output)
+	return output, nil
+}
+
+func (s *service) applySearchConsoleProperty(ctx context.Context, teamID uuid.UUID, propertyURI string, output *searchConsoleStatusOutput) error {
+	property, err := s.store.GetGoogleSearchConsoleProperty(ctx, teamID, propertyURI)
+	if err != nil {
+		return err
+	}
+	if property != nil {
+		output.PropertyPermissionLevel = property.PermissionLevel
+	}
+	return nil
+}
+
+func (s *service) applySearchConsoleSyncState(ctx context.Context, siteID uuid.UUID, output *searchConsoleStatusOutput) error {
+	state, err := s.store.GetGoogleSearchConsoleSyncState(ctx, siteID)
+	if err != nil {
+		return err
+	}
+	output.SyncStatus = toMCPSearchConsoleSyncStatus(state)
+	output.DataAvailable = state != nil && state.ImportedStartDate != nil && state.ImportedEndDate != nil
+	if output.DataAvailable {
+		output.AvailableFrom = formatMCPDate(*state.ImportedStartDate)
+		output.AvailableTo = formatMCPDate(*state.ImportedEndDate)
+	}
+	output.NeedsAttention = state != nil && state.State == "needs_attention"
+	return nil
+}
+
+func searchConsoleStatusReason(status searchConsoleStatusOutput) string {
+	switch {
+	case !status.Mapped:
+		return "unmapped"
+	case status.NeedsAttention:
+		return "needs_attention"
+	case searchConsoleSyncState(status) == "failed":
+		return "failed"
+	case !status.DataAvailable:
+		return "not_synced"
+	default:
+		return "ready"
+	}
+}
+
+func normalizeSearchConsoleLimit(limit int) int {
+	if limit <= 0 {
+		return defaultLimit
+	}
+	if limit > maxLimit {
+		return maxLimit
+	}
+	return limit
+}
+
+func searchConsoleWarnings(status searchConsoleStatusOutput, start, end time.Time) []string {
+	warnings := make([]string, 0, 3)
+	if status.NeedsAttention {
+		warnings = append(warnings, "search_console_sync_needs_attention")
+	}
+	if searchConsoleSyncState(status) == "failed" {
+		warnings = append(warnings, "search_console_sync_failed")
+	}
+	if !status.DataAvailable {
+		return append(warnings, "search_console_data_not_synced")
+	}
+	if status.AvailableFrom != "" && formatMCPDate(start) < status.AvailableFrom {
+		warnings = append(warnings, "requested_range_starts_before_imported_data")
+	}
+	if status.AvailableTo != "" && formatMCPDate(end) > status.AvailableTo {
+		warnings = append(warnings, "requested_range_ends_after_imported_data")
+	}
+	return warnings
+}
+
+func searchConsoleSyncState(status searchConsoleStatusOutput) string {
+	if status.SyncStatus == nil {
+		return ""
+	}
+	return status.SyncStatus.State
+}
+
+type searchConsoleReportStore interface {
+	GetSearchConsoleOverview(context.Context, api.SearchConsoleReportParams) (api.SearchConsoleOverview, error)
+	GetSearchConsoleSeries(context.Context, api.SearchConsoleReportParams) (api.SearchConsoleSeriesResponse, error)
+	GetSearchConsoleDimension(context.Context, api.SearchConsoleReportParams, string) (api.SearchConsoleDimensionResponse, error)
+}
+
+func loadSearchConsoleSections(ctx context.Context, store searchConsoleReportStore, params api.SearchConsoleReportParams, sections map[string]bool, output *searchConsoleOutput) error {
+	loaders := map[string]func() error{
+		"overview": func() error { return loadSearchConsoleOverview(ctx, store, params, output) },
+		"series":   func() error { return loadSearchConsoleSeries(ctx, store, params, output) },
+		"queries":  func() error { return loadSearchConsoleDimension(ctx, store, params, output, "query") },
+		"pages":    func() error { return loadSearchConsoleDimension(ctx, store, params, output, "page") },
+		"country":  func() error { return loadSearchConsoleDimension(ctx, store, params, output, "country") },
+		"device":   func() error { return loadSearchConsoleDimension(ctx, store, params, output, "device") },
+	}
+	for section := range sections {
+		if err := loaders[section](); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func loadSearchConsoleOverview(ctx context.Context, store searchConsoleReportStore, params api.SearchConsoleReportParams, output *searchConsoleOutput) error {
+	overview, err := store.GetSearchConsoleOverview(ctx, params)
+	if err != nil {
+		return err
+	}
+	output.Overview = &overview
+	return nil
+}
+
+func loadSearchConsoleSeries(ctx context.Context, store searchConsoleReportStore, params api.SearchConsoleReportParams, output *searchConsoleOutput) error {
+	series, err := store.GetSearchConsoleSeries(ctx, params)
+	if err != nil {
+		return err
+	}
+	output.Series = toMCPSearchConsoleSeries(series)
+	return nil
+}
+
+func loadSearchConsoleDimension(ctx context.Context, store searchConsoleReportStore, params api.SearchConsoleReportParams, output *searchConsoleOutput, dimension string) error {
+	rows, err := store.GetSearchConsoleDimension(ctx, params, dimension)
+	if err != nil {
+		return err
+	}
+	switch dimension {
+	case "query":
+		output.Queries = &rows
+	case "page":
+		output.Pages = &rows
+	case "country":
+		output.Country = &rows
+	case "device":
+		output.Device = &rows
+	}
+	return nil
+}
+
+func parseSearchConsoleSections(input []string) (map[string]bool, error) {
+	if len(input) == 0 {
+		return map[string]bool{"overview": true, "series": true}, nil
+	}
+	sections := make(map[string]bool, len(input))
+	for _, section := range input {
+		normalized := strings.ToLower(strings.TrimSpace(section))
+		switch normalized {
+		case "overview", "series", "queries", "pages", "country", "device":
+			sections[normalized] = true
+		default:
+			return nil, fmt.Errorf("invalid Search Console section %q", section)
+		}
+	}
+	return sections, nil
 }
 
 func (s *service) searchDocs(ctx context.Context, _ *mcp.CallToolRequest, input docQueryInput) (*mcp.CallToolResult, docSearchOutput, error) {

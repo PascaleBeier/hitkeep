@@ -202,3 +202,33 @@ func rawSiteID(raw json.RawMessage) string {
 	}
 	return strings.TrimSpace(payload.SiteID)
 }
+
+func toMCPSearchConsoleSyncStatus(state *database.GoogleSearchConsoleSyncState) *mcpSearchConsoleSyncStatus {
+	if state == nil {
+		return nil
+	}
+	return &mcpSearchConsoleSyncStatus{
+		State:             state.State,
+		ImportedStartDate: formatOptionalMCPDate(state.ImportedStartDate),
+		ImportedEndDate:   formatOptionalMCPDate(state.ImportedEndDate),
+		LastSuccessAt:     formatOptionalMCPTime(state.LastSuccessAt),
+		LastAttemptAt:     formatOptionalMCPTime(state.LastAttemptAt),
+		LastErrorCategory: state.LastErrorCategory,
+		NextRetryAt:       formatOptionalMCPTime(state.NextRetryAt),
+		Manual:            state.Manual,
+	}
+}
+
+func formatOptionalMCPDate(ts *time.Time) string {
+	if ts == nil {
+		return ""
+	}
+	return formatMCPDate(*ts)
+}
+
+func formatOptionalMCPTime(ts *time.Time) string {
+	if ts == nil {
+		return ""
+	}
+	return formatMCPTime(*ts)
+}

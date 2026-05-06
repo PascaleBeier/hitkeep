@@ -53,10 +53,17 @@ const expectedTools = new Set([
   "hitkeep_get_event_breakdown",
   "hitkeep_get_ecommerce",
   "hitkeep_get_ai_visibility",
+  "hitkeep_get_search_console_status",
+  "hitkeep_get_search_console",
   "hitkeep_search_docs",
   "hitkeep_get_doc",
   "hitkeep_get_api_reference",
   "hitkeep_get_mcp_help",
+]);
+const openWorldTools = new Set([
+  "hitkeep_search_docs",
+  "hitkeep_get_doc",
+  "hitkeep_get_api_reference",
 ]);
 const forbidden = [
   "create",
@@ -80,6 +87,9 @@ for (const tool of tools.result.tools) {
   assert(tool.name?.startsWith("hitkeep_"), `unexpected tool namespace ${tool.name}`);
   assert(tool.title && tool.description, `tool ${tool.name} needs title and description`);
   assert(tool.annotations?.readOnlyHint === true, `tool ${tool.name} must be read-only`);
+  if (!openWorldTools.has(tool.name)) {
+    assert(tool.annotations?.openWorldHint === false, `tool ${tool.name} must be closed-world`);
+  }
   assert(!forbidden.some((part) => tool.name.includes(part)), `forbidden tool surface ${tool.name}`);
 }
 

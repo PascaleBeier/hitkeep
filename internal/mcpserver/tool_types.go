@@ -59,6 +59,21 @@ type aiVisibilityInput struct {
 	rangeInput
 }
 
+type searchConsoleStatusInput struct {
+	SiteID string `json:"site_id" jsonschema:"HitKeep site UUID."`
+}
+
+type searchConsoleInput struct {
+	SiteID   string   `json:"site_id" jsonschema:"HitKeep site UUID."`
+	Sections []string `json:"sections,omitempty" jsonschema:"Optional sections: overview, series, queries, pages, country, or device. Defaults to overview and series."`
+	Page     string   `json:"page,omitempty" jsonschema:"Optional exact Google Search Console page URL filter."`
+	Path     string   `json:"path,omitempty" jsonschema:"Optional normalized page path filter."`
+	Country  string   `json:"country,omitempty" jsonschema:"Optional country filter. Accepts alpha-2 or alpha-3 country code."`
+	Device   string   `json:"device,omitempty" jsonschema:"Optional Google Search Console device filter."`
+	Limit    int      `json:"limit,omitempty" jsonschema:"Maximum rows to return. Defaults to 10 and is capped at 50."`
+	rangeInput
+}
+
 type docQueryInput struct {
 	Query string `json:"query" jsonschema:"Search query for official HitKeep docs."`
 	Limit int    `json:"limit,omitempty" jsonschema:"Maximum rows to return. Defaults to 10 and is capped at 50."`
@@ -113,6 +128,59 @@ type aiVisibilityOutput struct {
 	Overview    *api.AIFetchOverview          `json:"overview"`
 	Timeseries  []mcpAIFetchSeriesPoint       `json:"timeseries"`
 	Correlation *api.AIFetchCorrelationReport `json:"correlation,omitempty"`
+}
+
+type searchConsoleStatusOutput struct {
+	SiteID                  string                      `json:"site_id"`
+	TeamID                  string                      `json:"team_id,omitempty"`
+	Mapped                  bool                        `json:"mapped"`
+	PropertyURI             string                      `json:"property_uri,omitempty"`
+	PropertyPermissionLevel string                      `json:"property_permission_level,omitempty"`
+	SyncStatus              *mcpSearchConsoleSyncStatus `json:"sync_status,omitempty"`
+	DataAvailable           bool                        `json:"data_available"`
+	AvailableFrom           string                      `json:"available_from,omitempty"`
+	AvailableTo             string                      `json:"available_to,omitempty"`
+	NeedsAttention          bool                        `json:"needs_attention"`
+	Reason                  string                      `json:"reason"`
+}
+
+type searchConsoleOutput struct {
+	SiteID      string                              `json:"site_id"`
+	From        string                              `json:"from"`
+	To          string                              `json:"to"`
+	PropertyURI string                              `json:"property_uri,omitempty"`
+	SyncStatus  *mcpSearchConsoleSyncStatus         `json:"sync_status,omitempty"`
+	Overview    *api.SearchConsoleOverview          `json:"overview,omitempty"`
+	Series      *mcpSearchConsoleSeriesResponse     `json:"series,omitempty"`
+	Queries     *api.SearchConsoleDimensionResponse `json:"queries,omitempty"`
+	Pages       *api.SearchConsoleDimensionResponse `json:"pages,omitempty"`
+	Country     *api.SearchConsoleDimensionResponse `json:"country,omitempty"`
+	Device      *api.SearchConsoleDimensionResponse `json:"device,omitempty"`
+	Warnings    []string                            `json:"warnings"`
+}
+
+type mcpSearchConsoleSyncStatus struct {
+	State             string `json:"state"`
+	ImportedStartDate string `json:"imported_start_date,omitempty"`
+	ImportedEndDate   string `json:"imported_end_date,omitempty"`
+	LastSuccessAt     string `json:"last_success_at,omitempty"`
+	LastAttemptAt     string `json:"last_attempt_at,omitempty"`
+	LastErrorCategory string `json:"last_error_category,omitempty"`
+	NextRetryAt       string `json:"next_retry_at,omitempty"`
+	Manual            bool   `json:"manual"`
+}
+
+type mcpSearchConsoleSeriesResponse struct {
+	DataSource string                        `json:"data_source"`
+	Series     []mcpSearchConsoleMetricPoint `json:"series"`
+}
+
+type mcpSearchConsoleMetricPoint struct {
+	Date            string  `json:"date"`
+	Clicks          int     `json:"clicks"`
+	Impressions     int     `json:"impressions"`
+	CTR             float64 `json:"ctr"`
+	AveragePosition float64 `json:"average_position"`
 }
 
 type docSearchOutput struct {

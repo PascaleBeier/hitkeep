@@ -2,11 +2,13 @@
 
 > Privacy-first analytics for humans and AI agents, self-hosted or in EU/US cloud.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Go Version](https://img.shields.io/badge/Go-1.26.2-00ADD8?logo=go)](https://go.dev/)
-[![Docker Image (GHCR)](https://img.shields.io/badge/Docker-ghcr.io-blue?logo=docker)](https://github.com/pascalebeier/hitkeep/pkgs/container/hitkeep)
-[![Docker Image (Hub)](https://img.shields.io/badge/Docker-Docker_Hub-2496ED?logo=docker)](https://hub.docker.com/r/pascalebeier/hitkeep)
-[![Documentation](https://img.shields.io/badge/Docs-hitkeep.com-0ea5e9)](https://hitkeep.com)
+[![Continuous Integration](https://github.com/PascaleBeier/hitkeep/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/PascaleBeier/hitkeep/actions/workflows/ci.yml)
+[![Latest Release](https://img.shields.io/github/v/release/PascaleBeier/hitkeep?sort=semver)](https://github.com/PascaleBeier/hitkeep/releases)
+[![License](https://img.shields.io/github/license/PascaleBeier/hitkeep)](./LICENSE)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/PascaleBeier/hitkeep?logo=go)](https://github.com/PascaleBeier/hitkeep/blob/main/go.mod)
+[![Angular Version](https://img.shields.io/github/package-json/dependency-version/PascaleBeier/hitkeep/%40angular%2Fcore?filename=frontend%2Fdashboard%2Fpackage.json&logo=angular&label=Angular)](https://github.com/PascaleBeier/hitkeep/blob/main/frontend/dashboard/package.json)
+[![Docker Pulls](https://img.shields.io/docker/pulls/pascalebeier/hitkeep?logo=docker&label=docker%20pulls)](https://hub.docker.com/r/pascalebeier/hitkeep)
+[![Documentation](https://img.shields.io/website?url=https%3A%2F%2Fhitkeep.com%2Fguides%2Fintroduction%2F&label=docs)](https://hitkeep.com/guides/introduction/)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/11990/badge)](https://www.bestpractices.dev/projects/11990)
 
 HitKeep is open source web analytics for teams that want useful product reporting without running PostgreSQL, Redis, ClickHouse, or a separate queue.
@@ -141,13 +143,9 @@ The maintained reference lives on `hitkeep.com`.
 - [Configuration](https://hitkeep.com/reference/configuration/)
 - [REST API reference](https://hitkeep.com/api/)
 - [Compliance](https://hitkeep.com/compliance/overview/)
-- [Privacy policy for cloud](https://hitkeep.com/legal/privacy-policy/)
-- [Terms of service](https://hitkeep.com/legal/terms-of-service/)
 - [Comparison pages](https://hitkeep.com/vs/)
 
 ## Cloud
-
-HitKeep Cloud is live.
 
 If you want the same product without running it yourself, start here:
 

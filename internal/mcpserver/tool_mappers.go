@@ -10,6 +10,10 @@ func formatMCPTime(ts time.Time) string {
 	return ts.UTC().Format(time.RFC3339)
 }
 
+func formatMCPDate(ts time.Time) string {
+	return ts.UTC().Format(time.DateOnly)
+}
+
 func toMCPSites(sites []api.Site) []mcpSite {
 	out := make([]mcpSite, 0, len(sites))
 	for _, site := range sites {
@@ -121,6 +125,23 @@ func toMCPAIFetchSeries(points []api.AIFetchSeriesPoint) []mcpAIFetchSeriesPoint
 	return out
 }
 
+func toMCPSearchConsoleSeries(series api.SearchConsoleSeriesResponse) *mcpSearchConsoleSeriesResponse {
+	out := &mcpSearchConsoleSeriesResponse{
+		DataSource: series.DataSource,
+		Series:     make([]mcpSearchConsoleMetricPoint, 0, len(series.Series)),
+	}
+	for _, point := range series.Series {
+		out.Series = append(out.Series, mcpSearchConsoleMetricPoint{
+			Date:            formatMCPDate(time.Time(point.Date)),
+			Clicks:          point.Clicks,
+			Impressions:     point.Impressions,
+			CTR:             point.CTR,
+			AveragePosition: point.AveragePosition,
+		})
+	}
+	return out
+}
+
 func isAllowedFilter(filterType string) bool {
 	switch filterType {
 	case "path", "hostname", "referrer", "referrer_host", "device", "country", "browser", "language", "utm_campaign", "utm_content", "utm_medium", "utm_source", "utm_term":
@@ -167,6 +188,8 @@ Team API clients are recommended for shared assistants and automations.
 Analytics tools require a ` + "`site_id`" + ` that the API client can view. The server returns aggregate KPIs, event summaries, ecommerce summaries, and AI visibility reports. It does not expose raw hit exports or write/admin actions.
 
 Date inputs use RFC3339 timestamps. If omitted, tools default to the last 30 days. Filters support path, hostname, referrer, referrer_host, device, country, browser, language, and UTM fields.
+
+Search Console tools read imported Google Search Console facts stored in HitKeep. They do not call Google live, refresh OAuth credentials, or trigger syncs. Use ` + "`hitkeep_get_search_console_status`" + ` to check whether a site is mapped, synced, stale, failed, or needs attention before interpreting empty reports. ` + "`hitkeep_get_search_console`" + ` returns overview and series by default. Query, page, country, and device rows are aggregate imported provider data and are returned only when explicitly requested. Report warnings flag missing imported data, failed or needs-attention syncs, and requested ranges outside the imported date range.
 
 ## Docs Scope
 

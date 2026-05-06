@@ -24,16 +24,18 @@ func TestMCPPublishedSurfaceAudit(t *testing.T) {
 		t.Fatalf("ListTools: %v", err)
 	}
 	wantTools := map[string]bool{
-		"hitkeep_list_sites":          true,
-		"hitkeep_get_site_overview":   true,
-		"hitkeep_get_event_names":     true,
-		"hitkeep_get_event_breakdown": true,
-		"hitkeep_get_ecommerce":       true,
-		"hitkeep_get_ai_visibility":   true,
-		"hitkeep_search_docs":         true,
-		"hitkeep_get_doc":             true,
-		"hitkeep_get_api_reference":   true,
-		"hitkeep_get_mcp_help":        true,
+		"hitkeep_list_sites":                true,
+		"hitkeep_get_site_overview":         true,
+		"hitkeep_get_event_names":           true,
+		"hitkeep_get_event_breakdown":       true,
+		"hitkeep_get_ecommerce":             true,
+		"hitkeep_get_ai_visibility":         true,
+		"hitkeep_get_search_console_status": true,
+		"hitkeep_get_search_console":        true,
+		"hitkeep_search_docs":               true,
+		"hitkeep_get_doc":                   true,
+		"hitkeep_get_api_reference":         true,
+		"hitkeep_get_mcp_help":              true,
 	}
 	if len(tools.Tools) != len(wantTools) {
 		t.Fatalf("expected %d tools, got %d: %v", len(wantTools), len(tools.Tools), toolNames(tools.Tools))
