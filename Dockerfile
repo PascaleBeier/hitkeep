@@ -27,7 +27,7 @@ ENV HITKEEP_DB_PATH="/var/lib/hitkeep/data/hitkeep.db"
 ENV HITKEEP_ARCHIVE_PATH="/var/lib/hitkeep/data/archive"
 VOLUME /var/lib/hitkeep/data
 
-HEALTHCHECK --start-period=60s --start-interval=3s --interval=10s --timeout=3s --retries=3 \
+HEALTHCHECK --start-period=60s --start-interval=3s --interval=30s --timeout=5s --retries=3 \
   CMD ["hitkeep", "-healthcheck"]
 
 EXPOSE 8080 7946
