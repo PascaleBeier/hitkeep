@@ -8,6 +8,7 @@ describe('flag-utils', () => {
     it('should resolve representative flags for language codes', () => {
         expect(languageFlagUrl('en')).toBe('/flags/gb.svg');
         expect(languageFlagUrl('cs')).toBe('/flags/cz.svg');
+        expect(languageFlagUrl('nl')).toBe('/flags/nl.svg');
     });
 
     it('should use dedicated language assets when available', () => {

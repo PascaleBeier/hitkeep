@@ -475,10 +475,13 @@ func TestMonthNameUsesUTF8LocaleData(t *testing.T) {
 	if got := MonthName("fr", time.August, false); got != "août" {
 		t.Fatalf("expected French August to be août, got %q", got)
 	}
+	if got := MonthName("nl", time.March, false); got != "maart" {
+		t.Fatalf("expected Dutch March to be maart, got %q", got)
+	}
 }
 
 func TestSupportedLocalesAreStable(t *testing.T) {
-	want := []string{"de", "en", "es", "fr", "it"}
+	want := []string{"de", "en", "es", "fr", "it", "nl"}
 	got := SupportedLocales()
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("expected supported locales %v, got %v", want, got)

@@ -70,6 +70,15 @@ func TestLocalizedFrequencyLabelsUseMailContext(t *testing.T) {
 			digestTitle:   "Riepilogo di analitica settimanale",
 			digestSubject: "Il tuo riepilogo settimanale di analitica - 16 aprile 2026",
 		},
+		{
+			locale:        "nl",
+			freq:          "weekly",
+			reportLabel:   "Wekelijks",
+			digestLabel:   "Wekelijks",
+			subjectLabel:  "wekelijkse",
+			digestTitle:   "Wekelijks Analytics-overzicht",
+			digestSubject: "Je wekelijkse Analytics-overzicht - 16 april 2026",
+		},
 	}
 
 	for _, tt := range tests {
@@ -104,6 +113,8 @@ func localizedExampleDate(locale string) string {
 		return "16 de abril de 2026"
 	case "it":
 		return "16 aprile 2026"
+	case "nl":
+		return "16 april 2026"
 	default:
 		return "April 16, 2026"
 	}
