@@ -1,7 +1,7 @@
 all: run
 
 STATICCHECK_VERSION ?= v0.7.0
-GO_BUILD_TAGS ?= hashicorpmetrics
+GO_BUILD_TAGS ?= $(shell ./scripts/go-build-tags.sh)
 
 build: frontend-build go-build
 
@@ -24,6 +24,12 @@ dev:
 
 dev-seed:
 	@bash ./scripts/dev.sh --seed
+
+dev-cloud:
+	@bash ./scripts/dev.sh --cloud
+
+dev-cloud-seed:
+	@bash ./scripts/dev.sh --cloud --seed
 
 dev-backend:
 	@echo "Starting Backend with Live Reload..."
@@ -56,24 +62,13 @@ build-docker:
 		--tag ghcr.io/pascalebeier/hitkeep:snapshot \
 		--load
 
-build-cloud:
-	@./build-cloud.sh arm64
-
-build-cloud-deploy:
-	@./build-cloud.sh arm64 --deploy
-
 update-default-spam-filter:
 	@./scripts/update-default-spam-filter.sh
 
-dev-cloud:
-	@bash ./scripts/dev.sh --cloud
-
-dev-cloud-seed:
-	@bash ./scripts/dev.sh --cloud --seed
-
 dev-cloud-backend:
-	@echo "Starting Backend with Live Reload (billing tags)..."
-	@HITKEEP_JWT_SECRET=$${HITKEEP_JWT_SECRET:-hitkeep-dev-jwt-secret} \
+	@echo "Starting Backend with Live Reload (cloud tags)..."
+	@HITKEEP_GO_BUILD_TAGS="$$(./scripts/go-build-tags.sh cloud)" \
+		HITKEEP_JWT_SECRET=$${HITKEEP_JWT_SECRET:-hitkeep-dev-jwt-secret} \
 		HITKEEP_PUBLIC_URL=$${HITKEEP_PUBLIC_URL:-http://localhost:4200} \
 		HITKEEP_MAIL_DRIVER=$${HITKEEP_MAIL_DRIVER:-smtp} \
 		HITKEEP_MAIL_HOST=$${HITKEEP_MAIL_HOST:-localhost} \
@@ -88,7 +83,7 @@ dev-cloud-backend:
 		HITKEEP_CLOUD_SUPPORT_URL=$${HITKEEP_CLOUD_SUPPORT_URL:-https://hitkeep.com/support/help/} \
 		HITKEEP_CLOUD_CHECKOUT_SUCCESS_URL=$${HITKEEP_CLOUD_CHECKOUT_SUCCESS_URL:-http://localhost:4200/admin/team?checkout=success} \
 		HITKEEP_CLOUD_CHECKOUT_CANCEL_URL=$${HITKEEP_CLOUD_CHECKOUT_CANCEL_URL:-http://localhost:4200/admin/team?checkout=cancelled} \
-		air -c .air-cloud.toml
+		air
 
 staticcheck:
 	@echo "Running Staticcheck..."

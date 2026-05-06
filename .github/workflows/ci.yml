@@ -19,10 +19,15 @@ jobs:
   lint:
     name: Lint Golang codebase
     runs-on: ubuntu-latest
-    env:
-      GOFLAGS: -tags=hashicorpmetrics
     steps:
       - uses: actions/checkout@v6
+      - name: Resolve Go build tags
+        id: go-build-tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "goflags=$(./scripts/go-build-tags.sh goflags)" >> "$GITHUB_OUTPUT"
+          echo "golangci_args=$(./scripts/go-build-tags.sh golangci)" >> "$GITHUB_OUTPUT"
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
@@ -31,20 +36,26 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.11
-          args: --build-tags=hashicorpmetrics
+          args: ${{ steps.go-build-tags.outputs.golangci_args }}
       - name: Vet API
+        env:
+          GOFLAGS: ${{ steps.go-build-tags.outputs.goflags }}
         run: go vet ./...
       - name: Staticcheck API
-        run: go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 ./...
+        run: go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 -tags "$(./scripts/go-build-tags.sh)" ./...
       - name: Test API
+        env:
+          GOFLAGS: ${{ steps.go-build-tags.outputs.goflags }}
         run: go test -race ./...
   mcp-audit:
     name: Audit MCP surface
     runs-on: ubuntu-latest
-    env:
-      GOFLAGS: -tags=hashicorpmetrics
     steps:
       - uses: actions/checkout@v6
+      - name: Resolve Go build tags
+        id: go-build-tags
+        shell: bash
+        run: echo "goflags=$(./scripts/go-build-tags.sh goflags)" >> "$GITHUB_OUTPUT"
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
@@ -54,6 +65,8 @@ jobs:
         with:
           node-version: 24
       - name: Audit MCP protocol surface
+        env:
+          GOFLAGS: ${{ steps.go-build-tags.outputs.goflags }}
         run: go test ./internal/mcpserver -run 'TestMCP.*Audit'
       - name: Validate MCP registry metadata
         run: tests/scripts/mcp-audit.sh --schema-only

@@ -168,9 +168,11 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           HITKEEP_VERSION: ${{ inputs.version }}
-          CLOUD_GO_BUILD_TAGS: hashicorpmetrics ${{ inputs.cloud_go_build_tags }}
+          INPUT_CLOUD_GO_BUILD_TAGS: ${{ inputs.cloud_go_build_tags }}
         run: |
           set -euo pipefail
+          common_go_build_tags="$(./scripts/go-build-tags.sh)"
+          cloud_go_build_tags="$(./scripts/go-build-tags.sh cloud "${INPUT_CLOUD_GO_BUILD_TAGS}")"
 
           # DuckDB's prebuilt linux bindings currently need a newer libstdc++
           # than Bullseye provides; Ubuntu 22.04 satisfies that requirement.
@@ -178,13 +180,13 @@ jobs:
           export CXX=g++
 
           go build \
-            -tags "hashicorpmetrics" \
+            -tags "${common_go_build_tags}" \
             -ldflags="-w -s -X 'hitkeep/cmd.Version=${HITKEEP_VERSION}'" \
             -o "hitkeep-linux-${{ matrix.goarch }}" \
             ./cmd/hitkeep/main.go
 
           go build \
-            -tags "${CLOUD_GO_BUILD_TAGS}" \
+            -tags "${cloud_go_build_tags}" \
             -ldflags="-w -s -X 'hitkeep/cmd.Version=${HITKEEP_VERSION}'" \
             -o "hitkeep-cloud-linux-${{ matrix.goarch }}" \
             ./cmd/hitkeep/main.go

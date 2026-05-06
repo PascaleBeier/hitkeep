@@ -3,7 +3,7 @@ tmp_dir = "tmp"
 
 [build]
 # Build the binary to the tmp directory
-cmd = "go build -tags hashicorpmetrics -o ./tmp/main ./cmd/hitkeep/main.go"
+cmd = "go build -tags \"$(./scripts/go-build-tags.sh)\" -o ./tmp/main ./cmd/hitkeep/main.go"
 # Binary location
 bin = "./tmp/main"
 # Arguments to pass to the binary when running

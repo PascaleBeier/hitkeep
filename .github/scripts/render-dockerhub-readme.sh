@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ref="${1:-${GITHUB_SHA:-main}}"
-repo="${GITHUB_REPOSITORY:-PascaleBeier/hitkeep}"
+repo="pascalebeier/hitkeep"
 blob_base="${HITKEEP_README_BLOB_BASE:-https://github.com/${repo}/blob/${ref}}"
 raw_base="${HITKEEP_README_RAW_BASE:-https://raw.githubusercontent.com/${repo}/${ref}}"
 

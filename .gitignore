@@ -8,10 +8,6 @@ hitkeep.db
 !/charts/
 !/charts/hitkeep/
 !/charts/hitkeep/**
-/scripts
-!/scripts/dev.sh
-!/scripts/update-default-spam-filter.sh
 frontend/dashboard/test-results
 frontend/dashboard/playwright-report
-.playwright-mcp
 data
