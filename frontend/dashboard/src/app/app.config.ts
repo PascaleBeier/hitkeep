@@ -27,7 +27,7 @@ export const appConfig: ApplicationConfig = {
         }),
         provideTransloco({
             config: {
-                availableLangs: ['en', 'de', 'es', 'fr', 'it'],
+                availableLangs: ['en', 'de', 'es', 'fr', 'it', 'nl'],
                 defaultLang: 'en',
                 fallbackLang: 'en',
                 reRenderOnLangChange: true,
@@ -46,11 +46,13 @@ export const appConfig: ApplicationConfig = {
                 es: 'es-ES',
                 fr: 'fr-FR',
                 it: 'it-IT',
+                nl: 'nl-NL',
                 'en-US': 'en-US',
                 'de-DE': 'de-DE',
                 'es-ES': 'es-ES',
                 'fr-FR': 'fr-FR',
-                'it-IT': 'it-IT'
+                'it-IT': 'it-IT',
+                'nl-NL': 'nl-NL'
             }
         }),
         provideEnvironmentInitializer(() => inject(PrimeLocaleSyncService)),

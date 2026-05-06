@@ -15,7 +15,8 @@ const LANGUAGE_LOCALES: Record<string, string> = {
     de: 'de-DE',
     es: 'es-ES',
     fr: 'fr-FR',
-    it: 'it-IT'
+    it: 'it-IT',
+    nl: 'nl-NL'
 };
 
 export function localeForLanguage(language: string): string {

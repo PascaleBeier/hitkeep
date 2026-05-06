@@ -1,0 +1,2382 @@
+{
+    "nav": {
+        "mainSidebarAria": "Hoofdzijbalk",
+        "primaryNavigationAria": "Primaire navigatie",
+        "contentAreaAria": "Inhoudsgebied",
+        "analytics": "Analytics",
+        "integration": "Integratie",
+        "dashboardAria": "Ga naar dashboard",
+        "goalsAria": "Ga naar doelen",
+        "funnelsAria": "Ga naar funnels",
+        "eventsAria": "Ga naar events",
+        "events": "Events",
+        "aiVisibility": "AI-zichtbaarheid",
+        "aiVisibilityAria": "Ga naar AI-zichtbaarheidsanalytics",
+        "aiChatbots": "AI-chatbots",
+        "aiChatbotsAria": "Ga naar AI-chatbotanalytics",
+        "utmAria": "Ga naar UTM-dashboard",
+        "utmBuilder": "UTM-builder",
+        "utmBuilderAria": "Ga naar UTM-builder",
+        "apiClientsAria": "Ga naar API-clients",
+        "apiReferenceAria": "Ga naar API-referentie",
+        "dashboard": "Dashboard",
+        "goals": "Doelen",
+        "funnels": "Funnels",
+        "utm": "UTM",
+        "apiClients": "API-clients",
+        "apiReference": "API-referentie",
+        "imports": "Imports",
+        "importsAria": "Ga naar imports",
+        "importExport": "Import & export",
+        "importExportAria": "Ga naar importeren en exporteren",
+        "account": "Account",
+        "resources": "Resources",
+        "docs": "Docs",
+        "docsAria": "Open HitKeep-docs in een nieuw tabblad",
+        "support": "Support",
+        "supportAria": "Open HitKeep-support in een nieuw tabblad",
+        "settings": "Gebruikersinstellingen",
+        "settingsAria": "Ga naar gebruikersinstellingen",
+        "emailReports": "E-mailrapporten",
+        "emailReportsAria": "Ga naar e-mailrapporten",
+        "administration": "Administratie",
+        "systemSettings": "Systeeminstellingen",
+        "systemSettingsAria": "Ga naar systeeminstellingen",
+        "teamOverview": "Teamoverzicht",
+        "teamOverviewAria": "Ga naar het teamoverzicht",
+        "teamMembers": "Teamleden",
+        "teamMembersAria": "Ga naar teamleden",
+        "team": "Team",
+        "teamAria": "Ga naar teambeheer",
+        "teamSectionToggleAria": "Teamnavigatie wisselen",
+        "teamSettings": "Teaminstellingen",
+        "teamSettingsAria": "Ga naar teaminstellingen",
+        "ecommerce": "E-commerce",
+        "ecommerceAria": "Ga naar e-commerceanalyses",
+        "systemStatus": "Systeemstatus",
+        "systemStatusAria": "Ga naar systeemstatus",
+        "googleSearchConsole": "Search Console",
+        "googleSearchConsoleAria": "Ga naar Google Search Console-integratie"
+    },
+    "auditTable": {
+        "empty": "Geen auditgegevens gevonden",
+        "filters": {
+            "aria": "Controlefilters",
+            "action": "Actie",
+            "outcome": "Resultaat",
+            "targetType": "Doeltype",
+            "dateRange": "Datumbereik",
+            "dateRangePlaceholder": "Datumbereik",
+            "search": "Zoeken",
+            "searchPlaceholder": "Zoek actoren, doelen, IP-adressen, request-ID's...",
+            "allActions": "Alle acties",
+            "allTargets": "Alle doelen",
+            "allOutcomes": "Alle uitkomsten"
+        },
+        "actions": {
+            "refresh": "Vernieuwen",
+            "export": "Exporteren",
+            "clearFilters": "Filters wissen",
+            "expandRow": "Toon bewijs",
+            "collapseRow": "Bewijs verbergen",
+            "roleUpdated": "Rol veranderd",
+            "mfaDisabled": "MFA uitgeschakeld",
+            "backupTriggered": "Back-up geactiveerd",
+            "backupCompleted": "Back-up voltooid",
+            "backupFailed": "Back-up mislukt",
+            "spamRefreshed": "Spam vernieuwen",
+            "mailTested": "Mail-test",
+            "diagnosticsExported": "Diagnostiek geëxporteerd",
+            "accessDenied": "Toegang geweigerd",
+            "authLoginSucceeded": "Inloggen is gelukt",
+            "authLoginFailed": "Inloggen mislukt",
+            "authMfaRequired": "MFA vereist",
+            "authMfaSucceeded": "MFA is geslaagd",
+            "authLogout": "Uitloggen",
+            "authSessionExtended": "Sessie verlengd",
+            "teamCreated": "Team gemaakt",
+            "teamUpdated": "Team bijgewerkt",
+            "teamArchived": "Team gearchiveerd",
+            "teamActiveChanged": "Actief team gewijzigd",
+            "memberInvited": "Lid uitgenodigd",
+            "memberInviteAccepted": "Uitnodiging geaccepteerd",
+            "memberInviteResent": "Uitnodiging opnieuw verzonden",
+            "memberInviteRevoked": "Uitnodiging ingetrokken",
+            "memberAdded": "Lid toegevoegd",
+            "memberRoleUpdated": "Rol van lid bijgewerkt",
+            "memberRemoved": "Lid verwijderd",
+            "memberLeft": "Lid is vertrokken",
+            "ownershipTransferred": "Eigendom overgedragen",
+            "siteCreated": "Site gemaakt",
+            "siteDeleted": "Site verwijderd",
+            "siteRetentionUpdated": "Retentie bijgewerkt",
+            "siteTransferredIn": "Site is verhuisd",
+            "siteTransferredOut": "Site is verhuisd",
+            "siteExclusionCreated": "Uitsluiting gemaakt",
+            "siteExclusionDeleted": "Uitsluiting verwijderd",
+            "permissionSiteMemberGranted": "Toegang tot de site verleend",
+            "permissionSiteMemberRoleUpdated": "Rol voor sitetoegang gewijzigd",
+            "permissionSiteMemberRevoked": "Toegang tot de site is ingetrokken",
+            "importUploadCreated": "Importupload gemaakt",
+            "importFileUploaded": "Importbestand geüpload",
+            "importValidationStarted": "Importvalidatie gestart",
+            "importValidated": "Importeren gevalideerd",
+            "importValidationFailed": "Importvalidatie mislukt",
+            "importQueued": "Importeren in wachtrij",
+            "importRequeued": "Import opnieuw in de wachtrij geplaatst",
+            "importStarted": "Importeren is gestart",
+            "importFailed": "Importeren is mislukt",
+            "importCompleted": "Importeren voltooid",
+            "importDeleted": "Import verwijderd",
+            "importDataCleared": "Geïmporteerde gegevens gewist",
+            "importDataWritten": "Geïmporteerde gegevens geschreven",
+            "googleSearchConsoleConnected": "Search Console aangesloten",
+            "googleSearchConsoleConnectFailed": "Search Console-verbinding mislukt",
+            "googleSearchConsoleDisconnected": "Search Console verbinding verbroken",
+            "googleSearchConsolePropertiesRefreshed": "Search Console-eigenschappen vernieuwd",
+            "googleSearchConsolePropertiesRefreshFailed": "Vernieuwen van Search Console-eigenschap is mislukt",
+            "googleSearchConsolePropertyMapped": "Search Console-eigenschap in kaart gebracht",
+            "googleSearchConsolePropertyUnmapped": "Search Console-eigenschap niet toegewezen",
+            "googleSearchConsoleSyncRequested": "Search Console-synchronisatie aangevraagd",
+            "googleSearchConsoleSyncStarted": "Search Console-synchronisatie gestart",
+            "googleSearchConsoleSyncImportPrepared": "Search Console-import voorbereid",
+            "googleSearchConsoleSyncImported": "Search Console-gegevens geïmporteerd",
+            "googleSearchConsoleSyncFailed": "Search Console-synchronisatie mislukt"
+        },
+        "columns": {
+            "evidence": "Bewijs",
+            "time": "Tijd",
+            "actor": "Actor",
+            "action": "Actie",
+            "targetType": "Doeltype",
+            "target": "Doel",
+            "outcome": "Resultaat",
+            "ipAddress": "IP-adres",
+            "country": "Land",
+            "details": "Details"
+        },
+        "outcomes": {
+            "success": "Succes",
+            "failure": "Mislukking",
+            "denied": "Geweigerd"
+        },
+        "targetTypes": {
+            "system": "Systeem",
+            "mail": "E-mail",
+            "user": "Gebruiker",
+            "team": "Team",
+            "site": "Site",
+            "import": "Importeren",
+            "siteExclusion": "Uitsluiting van sites",
+            "apiClient": "API-client",
+            "backup": "Back-up",
+            "spamFilter": "Spamfilter",
+            "diagnostics": "Diagnostiek",
+            "permission": "Toestemming",
+            "googleSearchConsoleConnection": "Search Console-verbinding",
+            "googleSearchConsoleProperty": "Search Console-eigenschap",
+            "googleSearchConsoleSync": "Search Console-synchronisatie"
+        },
+        "roles": {
+            "owner": "Eigenaar",
+            "admin": "Beheerder",
+            "member": "Lid",
+            "user": "Gebruiker"
+        },
+        "evidence": {
+            "details": "Volledige details",
+            "actorId": "ActeurID",
+            "actorRole": "Acteur rol",
+            "teamId": "TeamID",
+            "targetType": "Doeltype",
+            "targetId": "DoelID",
+            "targetUserId": "DoelgebruikerID",
+            "requestId": "VraagIDaan",
+            "userAgent": "Gebruikersagent"
+        },
+        "pagination": {
+            "summary": "Toont {{start}}-{{end}} van {{total}}-items",
+            "empty": "Geen vermeldingen om te tonen"
+        }
+    },
+    "importExport": {
+        "title": "Importeren en exporteren",
+        "tabs": {
+            "import": "Importeren",
+            "export": "Exporteren"
+        },
+        "import": {
+            "title": "Importeren"
+        },
+        "export": {
+            "title": "Exporteren",
+            "allSites": {
+                "title": "Alle toegankelijke sites",
+                "description": "Download analytics-gegevens voor elke site waartoe je toegang hebt.",
+                "primaryAction": "Alle sites downloaden",
+                "otherFormats": "Andere formaten",
+                "success": "Alle toegankelijke export van siteanalyses gedownload.",
+                "error": "Exporteren is mislukt. Probeer het opnieuw."
+            },
+            "siteExports": {
+                "title": "Site-exports",
+                "description": "Download één site tegelijk wanneer je alleen een specifieke woning nodig heeft.",
+                "primaryAction": "Downloadsite",
+                "loading": "Websites laden...",
+                "empty": "Er zijn geen sites beschikbaar om te exporteren.",
+                "success": "Site-export gedownload.",
+                "error": "Exporteren is mislukt. Probeer het opnieuw of kies een ander formaat."
+            }
+        }
+    },
+    "imports": {
+        "title": "Importeert",
+        "noSiteDescription": "Selecteer een site voordat je historische gegevens importeert.",
+        "providerFallback": "Geselecteerde importeur",
+        "running": "Importeren is actief. Deze pagina wordt automatisch bijgewerkt.",
+        "completed": "Importeren voltooid.",
+        "flow": {
+            "title": "Site-import"
+        },
+        "permission": {
+            "title": "Importtoegang vereist",
+            "description": "Site-eigenaren, sitebeheerders en instantiebeheerders kunnen gegevens importeren."
+        },
+        "providers": {
+            "title": "Kies importeur",
+            "loading": "Importeurs laden...",
+            "selectAria": "Selecteer {{provider}}-importeur",
+            "guide": "Gids voor importeren",
+            "guideAria": "Open de {{provider}}-importgids",
+            "empty": "Er zijn geen importeurs beschikbaar voor deze site."
+        },
+        "dropzone": {
+            "title": "Zet hier bestanden neer"
+        },
+        "files": {
+            "count": "bestanden",
+            "addMore": "Bestanden toevoegen",
+            "rejectedUnsupportedSummary": "{0}:",
+            "rejectedUnsupportedDetail": "Verwachte {{expected}}."
+        },
+        "actions": {
+            "removeFile": "Bestand verwijderen",
+            "clearFiles": "Duidelijk",
+            "uploadValidate": "Uploaden en valideren",
+            "startImport": "Begin met importeren",
+            "newImport": "Nieuwe import",
+            "changeProvider": "Importeur wijzigen",
+            "delete": "Verwijderen"
+        },
+        "validation": {
+            "title": "Validatiemanifest"
+        },
+        "metrics": {
+            "rowsAccepted": "Rijen geaccepteerd",
+            "rowsSkipped": "Rijen overgeslagen",
+            "files": "Bestanden",
+            "range": "Datumbereik"
+        },
+        "datasets": {
+            "title": "Gegevenssets",
+            "dataset": "Gegevensset",
+            "rows": "Rijen",
+            "pageviews": "Paginaweergaven",
+            "events": "Events"
+        },
+        "events": {
+            "title": "Evenementverslaggeving",
+            "total": "Events",
+            "names": "Namen",
+            "properties": "Eigenschappen"
+        },
+        "properties": {
+            "title": "Gebeurteniseigenschappen",
+            "attributed": "Toegeschreven rijen",
+            "unattributed": "Niet-toegeschreven rijen",
+            "unattributedEvents": "Niet-toegeschreven gebeurtenissen"
+        },
+        "dimensions": {
+            "title": "Afmetingen van event",
+            "available": "Beschikbaar",
+            "unavailable": "Niet beschikbaar"
+        },
+        "overlap": {
+            "title": "Native gegevens overlappen elkaar",
+            "description": "Geïmporteerde {{rows}}-rijen overlappen bestaande HitKeep-gegevens en worden overgeslagen."
+        },
+        "warnings": {
+            "title": "Waarschuwingen"
+        },
+        "history": {
+            "title": "Geschiedenis importeren",
+            "empty": "Nog geen import.",
+            "importer": "Importeur",
+            "status": "Status",
+            "rows": "Rijen",
+            "created": "Gemaakt"
+        },
+        "status": {
+            "uploading": "Uploaden",
+            "validating": "Valideren",
+            "validated": "Gevalideerd",
+            "validation_failed": "Validatie mislukt",
+            "queued": "In de wachtrij",
+            "running": "Rennen",
+            "completed": "Voltooid",
+            "failed": "Mislukt",
+            "deleted": "Verwijderd"
+        },
+        "errors": {
+            "generic": "Importeren is mislukt. Probeer het opnieuw.",
+            "loadImporters": "Kan importeurs niet laden.",
+            "loadHistory": "Kan de importgeschiedenis niet laden."
+        }
+    },
+    "teams": {
+        "switcher": {
+            "label": "Teams",
+            "regionAria": "Teamkiezer",
+            "selectAria": "Selecteer actief team",
+            "placeholder": "Selecteer een team",
+            "currentTeamAria": "Huidig ​​team:{{name}}",
+            "addTeamAria": "Creëer een nieuw team",
+            "openMenuAria": "Open het teammenu voor {{name}}",
+            "menuAria": "Teammenu",
+            "currentLabel": "Huidig ​​team"
+        },
+        "roles": {
+            "owner": "Eigenaar",
+            "admin": "Beheerder",
+            "member": "Lid"
+        },
+        "management": {
+            "title": "Teamleden",
+            "subtitle": "Beheer toegang en rollen voor {{team}}.",
+            "openAction": "Beheer team",
+            "openAria": "Open teammanagement",
+            "dialogTitle": "Beheer {{team}}",
+            "noTeam": "Geen actief team geselecteerd.",
+            "readOnly": "Je kunt leden bekijken, maar geen teamlidmaatschap beheren met je huidige rol.",
+            "notAllowed": "Niet toegestaan",
+            "empty": "Geen teamleden gevonden.",
+            "removeAction": "Verwijderen",
+            "removeAria": "Verwijder {{email}} uit het team",
+            "resendAction": "Uitnodiging opnieuw verzenden",
+            "revokeInviteAction": "Uitnodiging intrekken",
+            "transferOwnershipAction": "Eigendom overdragen",
+            "transferOwnershipAria": "Draag het teameigendom over aan {{email}}",
+            "resendInviteAria": "Uitnodiging voor {{email}} opnieuw verzenden",
+            "revokeInviteAria": "Uitnodiging voor {{email}} intrekken",
+            "confirmRemove": "{{email}} uit dit team verwijderen?",
+            "confirmResendInvite": "De uitnodiging voor {{email}} opnieuw verzenden?",
+            "confirmRevokeInvite": "De uitnodiging voor {{email}} intrekken?",
+            "confirmTransferOwnership": "Teameigendom overdragen aan {{email}}? Je wordt beheerder.",
+            "pendingTitle": "Uitnodigingen in behandeling",
+            "pendingSubtitle": "Uitnodigingen die nog niet zijn geaccepteerd.",
+            "pendingEmpty": "Geen openstaande uitnodigingen.",
+            "expiresLabel": "Verloopt",
+            "invite": {
+                "emailLabel": "E-mailadres",
+                "emailPlaceholder": "gebruiker@voorbeeld.com",
+                "emailInvalid": "Voer een geldig e-mailadres in.",
+                "roleLabel": "Rol",
+                "submitAction": "Nodig lid uit"
+            },
+            "status": {
+                "inviteSent": "Uitnodiging succesvol verzonden.",
+                "inviteResent": "Uitnodigen opnieuw succesvol verzonden.",
+                "inviteRevoked": "Uitnodiging succesvol ingetrokken.",
+                "memberUpdated": "Lid is succesvol bijgewerkt.",
+                "roleUpdated": "Rol succesvol bijgewerkt.",
+                "memberRemoved": "Lid is succesvol verwijderd.",
+                "ownershipTransferred": "Eigendomsoverdracht is succesvol verlopen."
+            },
+            "errors": {
+                "loadFailed": "Kan teamleden niet laden.",
+                "inviteFailed": "Kan lid niet uitnodigen.",
+                "inviteResendFailed": "Kan de uitnodiging niet opnieuw verzenden.",
+                "inviteRevokeFailed": "Kan de uitnodiging niet intrekken.",
+                "roleUpdateFailed": "Kan de rol van het lid niet updaten.",
+                "ownershipTransferFailed": "Kan het eigendom niet overdragen.",
+                "removeFailed": "Kan lid niet verwijderen.",
+                "forbidden": "Je heeft geen toestemming om dit team te beheren.",
+                "alreadyMember": "Deze gebruiker is al lid van het team.",
+                "lastOwner": "Er moet minimaal één eigenaar in het team blijven.",
+                "transferRequired": "Gebruik de speciale actie voor eigendomsoverdracht om de rol van eigenaar toe te wijzen.",
+                "transferTargetInvalid": "Het eigendom kan alleen worden overgedragen aan een bestaand teamlid.",
+                "ownershipTransferConflict": "De eigendomsoverdracht kon niet worden voltooid."
+            }
+        },
+        "createDialog": {
+            "title": "Maak een team",
+            "nameLabel": "Teamnaam",
+            "namePlaceholder": "bijv. Marketing",
+            "nameRequired": "Teamnaam is vereist.",
+            "createAction": "Maak een team",
+            "errors": {
+                "createFailed": "Kan team niet maken. Probeer het opnieuw.",
+                "limitReached": "Teamlimiet bereikt. Upgrade je plan om meer teams te creëren."
+            }
+        }
+    },
+    "common": {
+        "actions": {
+            "apply": "Toepassen",
+            "cancel": "Annuleren",
+            "clearAll": "Alles wissen",
+            "close": "Sluiten",
+            "downloadXlsx": "XLSX downloaden",
+            "exportCsv": "CSV exporteren",
+            "open": "Openen",
+            "refresh": "Vernieuwen",
+            "save": "Opslaan"
+        },
+        "yes": "Ja",
+        "no": "Nee",
+        "previous": "Vorig",
+        "next": "Volgende",
+        "enabled": "Ingeschakeld",
+        "disabled": "Gehandicapt",
+        "unknown": "Onbekend",
+        "saved": "Opgeslagen",
+        "saveFailed": "Opslaan mislukt. Probeer het opnieuw.",
+        "loading": "Laden...",
+        "columns": {
+            "actions": "Acties",
+            "added": "Toegevoegd",
+            "created": "Gemaakt",
+            "device": "Apparaat",
+            "domain": "Domein",
+            "email": "E-mail",
+            "name": "Naam",
+            "owner": "Eigenaar",
+            "path": "Pad",
+            "referrer": "Verwijzer",
+            "members": "Leden",
+            "role": "Rol",
+            "sites": "Sites",
+            "status": "Status",
+            "time": "Tijd",
+            "type": "Type",
+            "value": "Waarde"
+        },
+        "devices": {
+            "desktop": "Bureaublad",
+            "mobile": "Mobiel"
+        },
+        "direct": "Direct",
+        "durationMinutesSeconds": "{{minutes}} m {{seconds}} s",
+        "durationSeconds": "{{seconds}}'s",
+        "emailAddress": "E-mailadres",
+        "emailPlaceholder": "jij@voorbeeld.com",
+        "empty": {
+            "noDataDescription": "Er zijn geen gegevens voor deze periode.",
+            "noDataTitle": "Nog geen gegevens"
+        },
+        "exportFormats": {
+            "csv": "CSV",
+            "xlsx": "XLSX",
+            "parquet": "Parquet",
+            "json": "JSON",
+            "ndjson": "NDJSON"
+        },
+        "filters": {
+            "country": "Land:{{value}}",
+            "device": "Apparaat:{{value}}",
+            "language": "Taal:{{value}}",
+            "page": "Pagina:{{value}}",
+            "source": "Bron:{{value}}",
+            "browser": "Browser:{{value}}"
+        },
+        "kpis": {
+            "conversionRate": "Conversiepercentage"
+        },
+        "loadingSiteData": "Sitegegevens laden...",
+        "metrics": {
+            "audience": "Audience",
+            "browsers": "Browsers",
+            "countries": "Landen",
+            "devices": "Apparaten",
+            "languages": "Talen",
+            "pages": "Pagina's",
+            "landingPages": "Landingspagina's",
+            "exitPages": "Exitpagina's",
+            "geoModeAria": "Selecteer doelgroepstatistiek",
+            "pageModeAria": "Selecteer paginastatistiek",
+            "topPages": "Top pagina's",
+            "topSources": "Top bronnen"
+        },
+        "noActiveFilter": "Geen actief filter",
+        "noSiteSelected": "Geen site geselecteerd",
+        "openInNewTabAria": "Openen in nieuw tabblad",
+        "openUserMenuAria": "Gebruikersmenu openen",
+        "password": "Wachtwoord",
+        "passwordPlaceholder": "••••••••",
+        "preparing": "Voorbereiden...",
+        "refreshDataTooltip": "Gegevens vernieuwen",
+        "removeFilterAria": "Filter verwijderen",
+        "searchPlaceholder": "Zoekopdracht...",
+        "selectDateRange": "Selecteer een datumbereik",
+        "seriesChartAria": "Tijdreeksgrafiek met gegevens voor de laatste {{count}}-intervallen",
+        "switchToDarkModeAria": "Schakel over naar de donkere modus",
+        "switchToLightModeAria": "Schakel over naar de lichtmodus",
+        "timeRangeSelectorAria": "Keuzeschakelaar voor tijdsbereik",
+        "timeRanges": {
+            "last24Hours": "Afgelopen 24 uur",
+            "last7Days": "Laatste 7 dagen",
+            "last30Days": "Laatste 30 dagen",
+            "lastYear": "Vorig jaar",
+            "customRange": "Aangepast bereik",
+            "customShort": "Aangepast",
+            "customRangeSummary": "{{start}}-{{end}}",
+            "customRangeHint": "Kies een exacte start- en eindtijd tot op de minuut nauwkeurig.",
+            "customStart": "Van",
+            "customEnd": "Naar",
+            "openCustomRangeAria": "Open een aangepast tijdsbereik"
+        },
+        "unknownError": "Onbekende fout",
+        "unspecified": "Niet gespecificeerd",
+        "visitors": "bezoekers",
+        "copied": "Gekopieerd!",
+        "copyControl": {
+            "copy": "Kopiëren",
+            "copied": "Gekopieerd",
+            "failed": "Kopiëren mislukt",
+            "ariaLabel": "Kopiëren naar klembord"
+        }
+    },
+    "dashboard": {
+        "breadcrumbOverview": "Overzicht",
+        "filteredBadge": "Gefilterd",
+        "rawHitsTitle": "Laatste hits",
+        "noSiteDescription": "Selecteer of maak een site om analytics te bekijken.",
+        "openPageInNewTabAria": "Pagina openen in nieuw tabblad",
+        "openReferrerInNewTabAria": "Open de verwijzer in een nieuw tabblad",
+        "exportStatus": {
+            "success": "Exportdownload gestart.",
+            "error": "Kan gefilterde gegevens niet exporteren. Probeer het opnieuw."
+        },
+        "chartTitleWithRange": "Verkeer:{{range}}",
+        "chartTitleCustomRange": "Verkeer:{{start}}-{{end}}",
+        "chartTitleOverview": "Verkeersoverzicht",
+        "trafficChartAria": "Verkeerskaart met gegevens voor de laatste {{count}}-intervallen",
+        "traffic": {
+            "visitors": "Bezoekers",
+            "trendLine": "Trendlijn"
+        },
+        "kpis": {
+            "liveVisitors": "Levende bezoekers",
+            "pageviews": "Paginaweergaven",
+            "uniqueSessions": "Unieke sessies",
+            "bounceRate": "Bouncepercentage",
+            "avgDuration": "Gem. duur",
+            "pagesPerSession": "Pagina's / sessie"
+        },
+        "empty": {
+            "noTrafficTitle": "Er is nog geen verkeer geregistreerd",
+            "noTrafficDescription": "Installeer het trackingfragment op je website om analytics-gegevens te verzamelen.",
+            "teamTitle": "Nog geen sites in {{team}}",
+            "teamDescription": "Creëer de eerste site in {{team}} die begint met het verzamelen van analytics-gegevens voor dit team.",
+            "getTrackingCode": "Ontvang trackingcode",
+            "createSite": "Maak een site"
+        },
+        "onboarding": {
+            "title": "Controlelijst voor installatie",
+            "progress": "{{complete}} of {{total}} compleet",
+            "dismiss": "Controlelijst afwijzen",
+            "done": "Compleet",
+            "current": "Huidige stap",
+            "steps": {
+                "create_site": "Maak de eerste site",
+                "verify_tracking": "Ontvang de eerste hit",
+                "automatic_events": "Bevestig automatische gebeurtenissen",
+                "invite_teammate": "Nodig een teamgenoot uit",
+                "schedule_report": "Plan een e-mailrapport"
+            },
+            "actions": {
+                "create_site": "Maak een site",
+                "verify_tracking": "Controleer tracking",
+                "automatic_events": "Volgen openen",
+                "invite_teammate": "Uitnodiging",
+                "schedule_report": "Schema"
+            }
+        }
+    },
+    "goals": {
+        "manageAction": "Beheer doelen",
+        "noSiteDescription": "Selecteer of maak een site om doelen te bekijken.",
+        "series": {
+            "title": "Doelen",
+            "description": "Filter de reeks op doel.",
+            "addFilterPlaceholder": "Doelfilter toevoegen",
+            "emptyTitle": "Nog geen doelconversies",
+            "emptyDescription": "Creëer een doel en genereer verkeer om in de loop van de tijd conversies te zien."
+        },
+        "kpis": {
+            "totalGoals": "Totaal doelen",
+            "conversions": "Conversies"
+        },
+        "list": {
+            "title": "Doelen",
+            "manageTooltip": "Beheer doelen",
+            "emptyTitle": "Nog geen doelpunten",
+            "emptyDescription": "Houd specifieke conversiegebeurtenissen bij, zoals aanmeldingen of aankopen.",
+            "createAction": "Doel creëren",
+            "conversionsSuffix": "conversies",
+            "conversionRateShort": "CR"
+        },
+        "manager": {
+            "dialogTitle": "Beheer doelen",
+            "dialogDescription": "Definieer conversiedoelen om specifieke gebruikersacties of paginabezoeken bij te houden.",
+            "empty": "Er zijn nog geen doelen gedefinieerd.",
+            "addTitle": "Nieuw doel toevoegen",
+            "namePlaceholder": "bijv. Succes met aanmelden",
+            "typePagePath": "Pad",
+            "typeCustomEvent": "Event",
+            "urlPathLabel": "Pad",
+            "eventNameLabel": "Event",
+            "urlPathPlaceholder": "/Bedankt",
+            "eventNamePlaceholder": "aanmelding_voltooid",
+            "urlPathHelp": "Wordt geactiveerd wanneer een gebruiker een specifiekeURLbezoekt.",
+            "eventNameHelpPrefix": "Wordt geactiveerd wanneer je belt",
+            "eventNameHelpSuffix": ".",
+            "createAction": "Doel creëren"
+        }
+    },
+    "funnels": {
+        "manageAction": "Beheer funnels",
+        "createAction": "Funnel maken",
+        "noSiteDescription": "Selecteer of maak een site om funnels te bekijken.",
+        "series": {
+            "title": "Funnels",
+            "description": "Filter de reeks op funnel.",
+            "addFilterPlaceholder": "Trechterfilter toevoegen",
+            "emptyTitle": "Nog geen trechteractiviteit",
+            "emptyDescription": "Creëer een funnel en genereer verkeer om inzendingen en voltooiingen in de loop van de tijd te zien."
+        },
+        "kpis": {
+            "funnels": "Funnels",
+            "entries": "Inzendingen",
+            "completions": "Voltooiingen",
+            "completionRate": "Voltooiingspercentage"
+        },
+        "list": {
+            "title": "Funnels",
+            "manageTooltip": "Beheer funnels",
+            "emptyTitle": "Nog geen funnels",
+            "emptyDescription": "Bouw een pad van gebeurtenissen om het aantal drop-offs en conversies te meten.",
+            "createAction": "Funnel maken",
+            "stepsCount": "{{count}} stappen"
+        },
+        "manager": {
+            "dialogTitle": "Beheer funnels",
+            "dialogDescription": "Volg gebruikerstrajecten over meerdere stappen.",
+            "stepsLabel": "Stappen",
+            "viewStats": "Bekijk statistieken",
+            "empty": "Er zijn nog geen funnels gedefinieerd.",
+            "createTitle": "Maak een nieuwe funnel",
+            "namePlaceholder": "bijv. Afrekenstroom",
+            "stepPathPlaceholder": "/pad",
+            "stepEventPlaceholder": "gebeurtenisnaam",
+            "addStep": "Stap toevoegen",
+            "createAction": "Funnel maken",
+            "typePagePath": "Pad",
+            "typeCustomEvent": "Event"
+        },
+        "viewer": {
+            "dialogTitle": "Trechteranalyse",
+            "droppedSuffix": "gedaald",
+            "retention": "behoud",
+            "entry": "Binnenkomst"
+        }
+    },
+    "utm": {
+        "noSiteDescription": "Selecteer of maak een site om UTM-statistieken te bekijken.",
+        "series": {
+            "title": "UTM-prestaties",
+            "description": "Volg UTM-aangedreven verkeer in de loop van de tijd.",
+            "emptyTitle": "Nog geen UTM-activiteit",
+            "emptyDescription": "Tag campagnelinks met UTM-parameters om hun prestaties te zien."
+        },
+        "metrics": {
+            "topCampaigns": "Topcampagnes",
+            "topContents": "Topinhoud",
+            "topMediums": "Topmedia",
+            "topSources": "Topbronnen",
+            "topTerms": "Topvoorwaarden"
+        },
+        "filters": {
+            "campaign": "Campagne:{{value}}",
+            "content": "Inhoud:{{value}}",
+            "medium": "Middel:{{value}}",
+            "source": "Bron:{{value}}",
+            "term": "Termijn:{{value}}"
+        },
+        "kpis": {
+            "campaign": "Campagne",
+            "content": "Inhoud",
+            "medium": "Medium",
+            "source": "Bron",
+            "term": "Termijn"
+        }
+    },
+    "utmBuilder": {
+        "breadcrumb": "UTM-bouwer",
+        "subtitle": "Genereer getagde campagnelinks om verkeersbronnen in je analytics bij te houden.",
+        "form": {
+            "title": "Bouw je link",
+            "siteSelectLabel": "Vooraf invullen vanaf de locatie",
+            "siteSelectPlaceholder": "Selecteer een site…",
+            "siteSelectHint": "Als je een site selecteert, wordt het websiteURL-veld hieronder ingevuld.",
+            "websiteUrlLabel": "WebsiteURL",
+            "websiteUrlHint": "De volledigeURLdie je wilt volgen, inclusiefURL",
+            "sourceLabel": "Campagnebron",
+            "sourceHint": "Waar het verkeer vandaan komt – b.v. google, nieuwsbrief, twitter.",
+            "mediumLabel": "Campagne medium",
+            "mediumHint": "Het marketingkanaal — b.v. cpc, e-mail, sociaal.",
+            "campaignLabel": "Campagnenaam",
+            "campaignHint": "Naam om deze campagne te identificeren — bijv. zomer_uitverkoop.",
+            "termLabel": "Campagne termijn",
+            "termHint": "Identificeert betaalde zoekwoorden.",
+            "contentLabel": "Campagne-inhoud",
+            "contentHint": "Onderscheidt advertenties of links binnen dezelfde campagne."
+        },
+        "preview": {
+            "title": "GegenereerdURL",
+            "description": "Vul de websiteURLen de campagnebron in om een ​​getagde link te genereren."
+        },
+        "reference": {
+            "title": "Parameterreferentie",
+            "source": "Identificeert waar het verkeer vandaan komt (bijvoorbeeld Google, nieuwsbrief).",
+            "medium": "Het marketingkanaal (bijvoorbeeld cpc, e-mail, sociaal).",
+            "campaign": "Koppelt een of meer links aan een specifieke campagne.",
+            "term": "Identificeert betaalde zoekwoorden.",
+            "content": "Onderscheidt advertenties of links binnen dezelfde campagne."
+        },
+        "validation": {
+            "urlRequired": "WebsiteURLis vereist.",
+            "urlInvalid": "Voer een geldigeURLin, beginnend met https:// ofURL",
+            "sourceRequired": "Campagnebron is vereist."
+        }
+    },
+    "settings": {
+        "security": {
+            "title": "Beveiliging",
+            "loading": "Beveiligingsinstellingen laden...",
+            "changePasswordTitle": "Wachtwoord wijzigen",
+            "changePasswordDescription": "Update het wachtwoord voor dit account.",
+            "passwordUpdated": "Wachtwoord succesvol bijgewerkt.",
+            "currentPasswordLabel": "Huidig ​​wachtwoord",
+            "newPasswordLabel": "Nieuw wachtwoord",
+            "minimumLengthHint": "Minimaal 8 tekens",
+            "updatePassword": "Wachtwoord bijwerken",
+            "twoFactor": {
+                "title": "Tweefactorauthenticatie",
+                "description": "Bescherm je account met een eenmalige code van een authenticator-app.",
+                "setupDescription": "Start de setup om een secret te genereren en een 6-cijferige TOTP-code te verifiëren.",
+                "enabledDescription": "Tweefactorauthenticatie is momenteel ingeschakeld voor je account.",
+                "secretLabel": "Handmatige instelsleutel",
+                "otpauthLabel": "OTPAuth URI",
+                "verifyCodeLabel": "Verificatiecode",
+                "disableCodeLabel": "Huidige authenticatiecode",
+                "disableHint": "Voer een geldige 6-cijferige code in om tweefactorauthenticatie uit te schakelen.",
+                "startSetupAction": "Begin met instellen",
+                "verifyAction": "Tweefactor inschakelen",
+                "disableAction": "Tweefactor uitschakelen",
+                "enabled": "Tweefactorauthenticatie ingeschakeld.",
+                "disabled": "Tweefactorauthenticatie uitgeschakeld.",
+                "errors": {
+                    "startFailed": "Kan de twee-factor-installatie niet starten. Probeer het opnieuw.",
+                    "verifyFailed": "Verificatie mislukt. Controleer je code en probeer het opnieuw.",
+                    "disableFailed": "Kan tweefactorauthenticatie niet uitschakelen."
+                }
+            },
+            "passkeys": {
+                "title": "Wachtwoorden",
+                "description": "Registreer een toegangssleutel om apparaatgebaseerde authenticatie te gebruiken.",
+                "empty": "Er zijn nog geen toegangscodes geregistreerd.",
+                "nameLabel": "Wachtwoordnaam",
+                "namePlaceholder": "bijv. Werklaptop",
+                "nameHint": "Optioneel label om het apparaat te identificeren.",
+                "addAction": "Wachtwoord toevoegen",
+                "removeAction": "Verwijderen",
+                "registered": "Wachtwoord geregistreerd.",
+                "deleted": "Wachtwoord verwijderd.",
+                "errors": {
+                    "notSupported": "Deze browser ondersteunt geen wachtwoordregistratie.",
+                    "registrationFailed": "Wachtwoordregistratie mislukt. Probeer het opnieuw.",
+                    "deleteFailed": "Kan deze toegangssleutel momenteel niet verwijderen."
+                }
+            },
+            "recoveryCodes": {
+                "title": "Herstelcodes",
+                "description": "Genereer back-upcodes voor eenmalig gebruik voor accountherstel als je je authenticator of wachtwoordsleutel kwijtraakt.",
+                "remainingLabel": "Back-upcodes",
+                "remainingValue": "{{count}}-codes over",
+                "generatedBadge": "Gegenereerd",
+                "requiresMfa": "SchakelTOTPin of registreer een wachtwoord voordat je herstelcodes genereert.",
+                "codesTitle": "Bewaar deze herstelcodes nu",
+                "codesHint": "Elke code kan één keer worden gebruikt. Ze worden alleen weergegeven als je ze genereert of opnieuw genereert.",
+                "copyAction": "Kopieer alles",
+                "downloadAction": "Download.txt",
+                "generateAction": "Codes genereren",
+                "regenerateAction": "Codes opnieuw genereren",
+                "generated": "Herstelcodes opnieuw gegenereerd.",
+                "copied": "Herstelcodes gekopieerd.",
+                "downloaded": "Herstelcodes gedownload.",
+                "errors": {
+                    "copyFailed": "Kan herstelcodes niet kopiëren.",
+                    "downloadFailed": "Kan herstelcodes niet downloaden.",
+                    "generateFailed": "Kan herstelcodes niet genereren. Probeer het opnieuw.",
+                    "mfaRequired": "SchakelTOTPin of registreer een wachtwoord voordat je herstelcodes genereert."
+                }
+            },
+            "errors": {
+                "loadFailed": "Kan beveiligingsinstellingen niet laden.",
+                "invalidCurrentPassword": "Onjuist huidig ​​wachtwoord.",
+                "updateFailed": "Kan wachtwoord niet updaten. Probeer het opnieuw."
+            }
+        },
+        "user": {
+            "breadcrumb": "Gebruikersinstellingen",
+            "subtitle": "Beheer je accountbeveiliging en voorkeuren.",
+            "profile": {
+                "title": "Profiel",
+                "description": "Update je persoonlijke gegevens en inlog-e-mail.",
+                "emailLabel": "E-mailadres",
+                "emailPlaceholder": "jij@voorbeeld.com",
+                "givenNameLabel": "Voornaam",
+                "givenNamePlaceholder": "Ad",
+                "lastNameLabel": "Achternaam",
+                "lastNamePlaceholder": "lovelace",
+                "userIdLabel": "GebruikerID",
+                "saveAction": "Profiel opslaan",
+                "status": {
+                    "saved": "Profiel opgeslagen"
+                },
+                "validation": {
+                    "emailRequired": "E-mail is vereist.",
+                    "emailInvalid": "Voer een geldig e-mailadres in.",
+                    "emailTooLong": "E-mail moet 320 tekens of minder bevatten.",
+                    "nameTooLong": "Namen moeten 120 tekens of minder bevatten."
+                },
+                "errors": {
+                    "loadFailed": "Kan je profiel niet laden.",
+                    "invalidInput": "Controleer de gemarkeerde velden en probeer het opnieuw.",
+                    "emailTaken": "Dat e-mailadres is al in gebruik.",
+                    "notFound": "Je account kan niet worden gevonden.",
+                    "updateFailed": "Kan profiel niet updaten. Probeer het opnieuw."
+                }
+            },
+            "dataExportTitle": "Gegevens exporteren",
+            "exportAllTitle": "Exporteer alle gegevens",
+            "exportAllDescription": "Download al je gegevens op alle sites als CSV,XLSX,Parquet,JSON ofNDJSON.",
+            "exportStatus": {
+                "success": "Het downloaden is gestart.",
+                "error": "Kan gegevens niet exporteren. Probeer het opnieuw."
+            },
+            "exportShortcut": {
+                "title": "Analytics-export",
+                "description": "Exporteer alle toegankelijke sites of individuele site-afnames vanuit de Import & Export-hub.",
+                "action": "Open Importeren en exporteren"
+            }
+        },
+        "reports": {
+            "breadcrumb": "E-mailrapporten",
+            "subtitle": "Configureer geplande analyse-e-mails voor je sites.",
+            "digest": {
+                "title": "Geconsolideerde samenvatting",
+                "description": "Ontvang één samenvattende e-mail voor al je sites."
+            },
+            "perSite": {
+                "title": "Rapporten per site",
+                "description": "Individuele e-mails voor elke site.",
+                "empty": "Geen sites gevonden. Voeg een site toe om rapporten per site te configureren."
+            },
+            "frequency": {
+                "daily": {
+                    "label": "Dagelijks",
+                    "hint": "Statistieken van de vorige dag"
+                },
+                "weekly": {
+                    "label": "Wekelijks",
+                    "hint": "Elke maandag, bestrijkt de afgelopen 7 dagen"
+                },
+                "monthly": {
+                    "label": "Maandelijks",
+                    "hint": "1e van elke maand, heeft betrekking op de afgelopen maand"
+                }
+            }
+        },
+        "apiClients": {
+            "title": "API-clients",
+            "description": "Creëer gedelegeerde API-clients met machtigingen die beperkt zijn tot je eigen toegang.",
+            "loading": "API-clients laden...",
+            "empty": "Nog geen API-clients.",
+            "listTitle": "Bestaande API-clients",
+            "confirmDelete": "API-client \"{{name}}\" verwijderen?",
+            "status": {
+                "active": "Actief",
+                "revoked": "Ingetrokken"
+            },
+            "meta": {
+                "instanceRole": "Instantierol",
+                "created": "Gemaakt",
+                "lastUsed": "Laatst gebruikt",
+                "expires": "Verloopt"
+            },
+            "actions": {
+                "create": "Klant aanmaken",
+                "save": "Wijzigingen opslaan",
+                "edit": "Bewerking",
+                "revoke": "Herroepen",
+                "reactivate": "Opnieuw activeren",
+                "delete": "Verwijderen",
+                "addScope": "Voeg bereik toe",
+                "refresh": "Vernieuwen"
+            },
+            "form": {
+                "nameLabel": "Klantnaam",
+                "namePlaceholder": "bijv.CI-analysesynchronisatie",
+                "descriptionLabel": "Beschrijving",
+                "descriptionPlaceholder": "Waar deze client voor wordt gebruikt",
+                "instanceRoleLabel": "Instantierol",
+                "expiresAtLabel": "Vervaldatum",
+                "expiresAtHint": "Als je dit leeg laat, wordt een token zonder vervaldatum gemaakt, wat niet wordt aanbevolen.",
+                "siteScopesLabel": "Sitebereiken",
+                "siteScopesHint": "Optioneel: beperk deze client tot specifieke sites en siterollen.",
+                "selectSitePlaceholder": "Selecteer locatie",
+                "validation": {
+                    "nameRequired": "Klantnaam is vereist.",
+                    "nameTooLong": "De klantnaam moet 120 tekens of minder bevatten.",
+                    "instanceRoleRequired": "Instantierol is vereist.",
+                    "expiresAtPast": "De vervaldatum moet in de toekomst liggen.",
+                    "expiresAtInvalid": "Vervaltijdstempel is ongeldig.",
+                    "scopeSiteRequired": "Selecteer een site voordat je een bereik toevoegt."
+                },
+                "teamSiteScopesHint": "Beperk deze klant tot specifieke sites binnen het geselecteerde team."
+            },
+            "tokenNotice": {
+                "title": "Kopieer dit token nu",
+                "description": "Om veiligheidsredenen wordt het token slechts één keer getoond. Bewaar het in je geheime manager."
+            },
+            "messages": {
+                "created": "API-client gemaakt.",
+                "updated": "API-client bijgewerkt.",
+                "deleted": "API-client verwijderd.",
+                "revoked": "API-client ingetrokken.",
+                "reactivated": "API-client opnieuw geactiveerd."
+            },
+            "errors": {
+                "loadFailed": "Kan API-clients niet laden.",
+                "createFailed": "Kan API-client niet maken.",
+                "updateFailed": "Kan de API-client niet updaten.",
+                "deleteFailed": "Kan API-client niet verwijderen.",
+                "invalidExpiration": "Vervaltijdstempel is ongeldig.",
+                "notFound": "API-client niet gevonden."
+            },
+            "teamTitle": "Team API-klanten",
+            "teamDescription": "Creëer API-clients die eigendom zijn van een team voor gedeelde automatiseringen zonder ze aan één gebruikersaccount te koppelen."
+        }
+    },
+    "setup": {
+        "description": "Maak je beheerdersaccount aan om aan de slag te gaan.",
+        "givenNameLabel": "Voornaam",
+        "givenNamePlaceholder": "Ad",
+        "lastNameLabel": "Achternaam",
+        "lastNamePlaceholder": "lovelace",
+        "emailPlaceholder": "beheerder@voorbeeld.com",
+        "createAdminAction": "Maak een beheerdersaccount aan",
+        "createAdminAndContinueAction": "Maak een beheerdersaccount aan en ga verder",
+        "errors": {
+            "unexpected": "Er is een onverwachte fout opgetreden. Probeer het opnieuw."
+        }
+    },
+    "password": {
+        "forgot": {
+            "title": "Wachtwoord opnieuw instellen",
+            "description": "Vul je e-mailadres in en wij sturen je een link om je wachtwoord opnieuw in te stellen.",
+            "successTitle": "Controleer je inbox!",
+            "successDescription": "Als er een account bestaat voor {{email}}, hebben we een resetlink verzonden.",
+            "returnToSignIn": "Keer terug om in te loggen",
+            "sendResetLink": "Resetlink verzenden",
+            "backToSignIn": "Terug naar inloggen",
+            "errors": {
+                "unexpected": "Er is iets misgegaan. Probeer het later opnieuw."
+            }
+        },
+        "reset": {
+            "title": "Nieuw wachtwoord instellen",
+            "success": "Wachtwoord succesvol bijgewerkt!",
+            "signInNow": "Meld je nu aan",
+            "newPasswordLabel": "Nieuw wachtwoord",
+            "minimumLength": "Moet minimaal 8 tekens lang zijn.",
+            "submit": "Wachtwoord opnieuw instellen",
+            "errors": {
+                "tokenMissing": "Ongeldige link. Het token ontbreekt.",
+                "invalidLink": "Ongeldige link voor wachtwoordherstel.",
+                "expiredOrInvalid": "Deze link is verlopen of ongeldig.",
+                "resetFailed": "Kan het wachtwoord niet opnieuw instellen. Probeer het opnieuw."
+            }
+        }
+    },
+    "share": {
+        "dialog": {
+            "title": "Dashboard delen",
+            "description": "Iedereen met deze link kan het dashboard in de alleen-lezenmodus bekijken.",
+            "generateAction": "Koppeling genereren",
+            "shareUrlLabel": "DeelURL",
+            "tokenHintLabel": "Token",
+            "urlUnavailable": "URLverborgen voor bestaande links",
+            "empty": "Nog geen deellinks.",
+            "generateFailed": "Kan momenteel geen deellink maken. Probeer het opnieuw.",
+            "loadFailed": "Kan deellinks momenteel niet laden. Probeer het opnieuw.",
+            "deleteAction": "Verwijderen",
+            "deleteConfirmTitle": "Deellink verwijderen",
+            "deleteConfirmMessage": "Iedereen die deze link gebruikt, verliest onmiddellijk de toegang.",
+            "createSuccess": "Deellink gemaakt.",
+            "deleteSuccess": "Deellink verwijderd.",
+            "deleteFailed": "Kan de deellink momenteel niet verwijderen."
+        },
+        "page": {
+            "loading": "Gedeeld dashboard laden...",
+            "missingToken": "Ontbrekende deeltoken.",
+            "invalidOrExpired": "De deellink is ongeldig of verlopen."
+        }
+    },
+    "sites": {
+        "addDialog": {
+            "title": "Site toevoegen",
+            "instructionsLine1": "Voer je root- of subdomein in (bijvoorbeeld {{apex}},{{subdomain}}).",
+            "instructionsLine2": "We volgen {{www}} automatisch met je Apex-domein.",
+            "domainLabel": "Domeinnaam",
+            "domainPlaceholder": "voorbeeld.com",
+            "addAction": "Site toevoegen",
+            "errors": {
+                "domainRequired": "Domein is vereist.",
+                "domainInvalid": "Ongeldig domeinformaat.",
+                "removeProtocol": "Verwijder http:// of https://",
+                "removeWww": "Verwijder 'www.'. Voer alleen het hoofddomein in.",
+                "createFailed": "Kan site niet maken. Domein bestaat mogelijk al."
+            }
+        },
+        "danger": {
+            "deleteTitle": "Site verwijderen",
+            "deleteDescription": "Verwijdert deze site en alle bijbehorende analytics-gegevens definitief.",
+            "confirmLabel": "Typ \"{{domain}}\" om te bevestigen",
+            "confirmPlaceholder": "voorbeeld.com",
+            "deleteAction": "Site verwijderen",
+            "deleteFailed": "Kan site niet verwijderen."
+        },
+        "retention": {
+            "infoTitle": "Hoe retentie werkt",
+            "infoDescription": "Ruwe treffers die ouder zijn dan de bewaarperiode worden gearchiveerd inParquet-bestanden voor langdurige opslag en verwijderd uit de actieve database om de prestaties te verbeteren.",
+            "periodLabel": "Bewaartermijn (dagen)",
+            "hotDataSuffix": "dagen vol hete data",
+            "defaultHint": "Standaard is 365 dagen.",
+            "savePolicy": "Beleid opslaan"
+        },
+        "exclusions": {
+            "description": "Sluit intern verkeer, monitoringverkeer of botverkeer vanIPofCIDRuit, zodat het nooit de analytische opslag bereikt.",
+            "cidrLabel": "IPofCIDR",
+            "cidrPlaceholder": "203.0.113.5 of 192.168.0.0/24",
+            "descriptionLabel": "Beschrijving",
+            "descriptionPlaceholder": "OfficeVPN, synthetische monitor, etc.",
+            "addAction": "Uitsluiting toevoegen",
+            "loading": "Uitsluitingen laden...",
+            "empty": "Er zijn geen uitsluitingen geconfigureerd voor deze site.",
+            "confirmDelete": "Uitsluiting {{cidr}} verwijderen?",
+            "suggestionsTitle": "Je huidigeIP",
+            "suggestionsHint": "Kopieer dezeCIDRen plak deze in het veldIPofCIDR.",
+            "currentIpLoading": "UwIPoplossen...",
+            "currentIpUnavailable": "Kan je huidigeIPniet oplossen.",
+            "columns": {
+                "cidr": "CIDR",
+                "description": "Beschrijving",
+                "created": "Gemaakt"
+            },
+            "errors": {
+                "invalidCidr": "Voer een geldigeIP- ofCIDR-waarde in.",
+                "descriptionTooLong": "De beschrijving moet 255 tekens of minder bevatten.",
+                "loadFailed": "Kan uitsluitingen niet laden.",
+                "createFailed": "Kan geen uitsluiting maken.",
+                "deleteFailed": "Kan de uitsluiting niet verwijderen."
+            }
+        },
+        "selector": {
+            "regionAria": "Locatieselectie",
+            "sitesLabel": "Sites",
+            "addSiteAria": "Voeg een nieuwe site toe",
+            "selectPlaceholder": "Selecteer locatie",
+            "selectSiteAria": "Selecteer een site om statistieken te bekijken",
+            "siteSettingsAria": "Site-instellingen",
+            "trackingCodeAria": "Trackingcode",
+            "shareDashboardAria": "Dashboard delen"
+        },
+        "settings": {
+            "breadcrumb": {
+                "sites": "Sites",
+                "settings": "Instellingen"
+            },
+            "title": "Site-instellingen",
+            "tabs": {
+                "general": "Algemeen",
+                "tracking": "Volgen",
+                "filtering": "Filteren",
+                "retention": "Behoud",
+                "team": "Team",
+                "dangerZone": "Gevarenzone"
+            },
+            "general": {
+                "title": "Algemene instellingen",
+                "domainLabel": "Domein",
+                "siteIdLabel": "SiteID",
+                "dataExportTitle": "Gegevens exporteren",
+                "exportSiteDataTitle": "Sitegegevens exporteren",
+                "exportSiteDataDescription": "Download alle hits en events voor deze site als CSV,XLSX,Parquet,JSON ofNDJSON.",
+                "exportStatus": {
+                    "success": "Het downloaden is gestart.",
+                    "error": "Kan sitegegevens niet exporteren. Probeer het opnieuw."
+                },
+                "exportShortcutTitle": "Analytics-export",
+                "exportShortcutDescription": "Exporteer deze site, of een andere toegankelijke site, vanuit de Import & Export-hub.",
+                "exportShortcutAction": "Open Importeren en exporteren"
+            },
+            "unsavedChangesConfirm": "Je heeft niet-opgeslagen wijzigingen. Gooi ze weg?"
+        },
+        "team": {
+            "emailPlaceholder": "gebruiker@voorbeeld.com",
+            "addMemberAction": "Lid toevoegen",
+            "confirmRemove": "{{email}} van de site verwijderen?",
+            "transfer": {
+                "title": "Overdrachtsplaats",
+                "description": "Verplaats deze site en de bijbehorende analytics-gegevens naar een ander team dat je kunt beheren.",
+                "teamLabel": "Bestemmingsteam",
+                "teamPlaceholder": "Selecteer een bestemmingsteam",
+                "action": "Overdrachtsplaats",
+                "success": "Site succesvol overgedragen.",
+                "errors": {
+                    "forbidden": "Je heeft geen toestemming om deze site over te dragen aan het geselecteerde team.",
+                    "generic": "Kan de site niet overbrengen."
+                }
+            },
+            "errors": {
+                "addFailed": "Kan lid niet toevoegen. Zorg ervoor dat de gebruiker bestaat.",
+                "removeFailed": "Kan lid niet verwijderen:{{error}}"
+            }
+        },
+        "tracking": {
+            "description": "Kopieer en plak de onderstaande code in deHTMLvan je website. Automatische tracking is standaard ingeschakeld voor uitgaande klikken, downloads en formulierinzendingen.",
+            "trackingCodeConfiguration": "Configuratie van trackingcode",
+            "collectDntLabel": "VerzamelDNT",
+            "collectDntDescription": "Volg gebruikers, zelfs als \"Do Not Track\" is ingeschakeld in hun browser.",
+            "disableBeaconLabel": "Schakel sendBeacon uit",
+            "disableBeaconDescription": "Gebruik standaard ophaalverzoeken in plaats van navigator.sendBeacon.",
+            "autoTrackingTitle": "Automatische tracking van gebeurtenissen",
+            "autoTrackingDescription": "HitKeep kan automatisch privacyveilige outbound_click-, file_download- en form_submit-gebeurtenissen verzenden vanuit hk.js.",
+            "outboundTrackingLabel": "Houd uitgaande klikken bij",
+            "outboundTrackingDescription": "Stuur outbound_click wanneer bezoekers links naar een andere hostnaam volgen.",
+            "downloadTrackingLabel": "Bestandsdownloads bijhouden",
+            "downloadTrackingDescription": "Stuur file_download voor links met downloadkenmerken of bekende bestandsextensies.",
+            "formTrackingLabel": "Volg formulierinzendingen",
+            "formTrackingDescription": "Verzend form_submit voor door de browser waargenomen formulierinzendingen zonder formulierwaarden vast te leggen.",
+            "htmlLabel": "HTML",
+            "copyCode": "Kopieer code",
+            "verifier": {
+                "title": "Live tracking-verificateur",
+                "description": "Bevestig dat deze site operationele volgsignalen ontvangt.",
+                "status": {
+                    "waiting": "Wachten",
+                    "live": "Live",
+                    "dormant": "Slaperig",
+                    "domain_mismatch": "Domein komt niet overeen"
+                },
+                "waitingHint": "Wachten op de eerste geaccepteerde hit. Dit paneel wordt automatisch gedurende twee minuten vernieuwd.",
+                "mismatchHint": "De laatst gedetecteerde hostnaam komt niet overeen met het geconfigureerde domein van deze site.",
+                "fields": {
+                    "firstHit": "Eerste klap",
+                    "lastHit": "Laatste treffer",
+                    "lastEvent": "Laatste event",
+                    "detectedHostname": "Hostnaam gedetecteerd",
+                    "automaticEvent": "Laatste automatische gebeurtenis",
+                    "tracker": "Volger",
+                    "updated": "Bijgewerkt"
+                },
+                "empty": "Nog niet gezien"
+            }
+        }
+    },
+    "admin": {
+        "breadcrumb": "Instantiebeheer",
+        "tabs": {
+            "users": "Gebruikers",
+            "sites": "Sites",
+            "teams": "Teams",
+            "globalFilters": "Globale filters",
+            "overview": "Overzicht",
+            "health": "Gezondheid",
+            "storage": "Opslag",
+            "ingest": "Innemen",
+            "backups": "Back-ups",
+            "spam": "Spam",
+            "caches": "Caches",
+            "mail": "Mail",
+            "audit": "Controle"
+        },
+        "users": {
+            "title": "Gebruikers",
+            "disable2faAction": "Schakel MFA uit"
+        },
+        "sites": {
+            "title": "Sites",
+            "ownerUnknown": "Onbekende eigenaar"
+        },
+        "exclusions": {
+            "title": "GlobaleIP/CIDR-filters",
+            "description": "Verwijder verkeer van geselecteerde netwerken voor elke site in dit HitKeep-exemplaar.",
+            "cidrLabel": "IPofCIDR",
+            "cidrPlaceholder": "203.0.113.5 of 192.168.0.0/24",
+            "descriptionLabel": "Beschrijving",
+            "descriptionPlaceholder": "Uptime-monitor, kantoorbereik, etc.",
+            "addAction": "Globaal filter toevoegen",
+            "loading": "Algemene filters laden...",
+            "empty": "Geen globale filters geconfigureerd.",
+            "confirmDelete": "Globaal filter {{cidr}} verwijderen?",
+            "suggestionsTitle": "Je huidigeIP",
+            "suggestionsHint": "Kopieer dezeCIDRen plak deze in het veldIPofCIDR.",
+            "currentIpLoading": "UwIPoplossen...",
+            "currentIpUnavailable": "Kan je huidigeIPniet oplossen.",
+            "columns": {
+                "cidr": "CIDR",
+                "description": "Beschrijving",
+                "created": "Gemaakt"
+            },
+            "errors": {
+                "invalidCidr": "Voer een geldigeIP- ofCIDR-waarde in.",
+                "descriptionTooLong": "De beschrijving moet 255 tekens of minder bevatten.",
+                "loadFailed": "Kan globale filters niet laden.",
+                "createFailed": "Kan globaal filter niet maken.",
+                "deleteFailed": "Kan het globale filter niet verwijderen."
+            },
+            "status": {
+                "deleteSuccess": "Globaal filter {{cidr}} verwijderd."
+            }
+        },
+        "roles": {
+            "instanceOwner": "Instantie-eigenaar",
+            "instanceAdmin": "Instantiebeheerder",
+            "user": "Gebruiker"
+        },
+        "errors": {
+            "deleteUserBlockedOwnership": "Kan {{email}} pas verwijderen nadat het eigendom is overgedragen voor:{{teams}}.",
+            "deleteUserFailed": "Kan gebruiker {{email}} niet verwijderen.",
+            "deleteSiteFailed": "Kan site {{domain}} niet verwijderen.",
+            "deleteTeamFailed": "Kan team \"{{name}}\" niet verwijderen.",
+            "deleteForbidden": "Je heeft geen toestemming om deze bron te verwijderen.",
+            "deleteNotFound": "Deze bron bestaat niet meer.",
+            "deleteUnavailable": "Verwijderen is alleen beschikbaar op het actieve exemplaarknooppunt.",
+            "deleteDefaultTeam": "Het standaardteam kan niet worden verwijderd.",
+            "deleteTeamNotArchived": "Archiveer het team voordat je het verwijdert.",
+            "deleteTeamHasSites": "Zet alle sites over of verwijder ze voordat je dit team verwijdert.",
+            "disable2faFailed": "Kan MFA voor {{email}} niet uitschakelen."
+        },
+        "status": {
+            "deleteUserSuccess": "Gebruiker {{email}} verwijderd.",
+            "deleteSiteSuccess": "Site {{domain}} verwijderd.",
+            "deleteTeamSuccess": "Team \"{{name}}\" verwijderd.",
+            "disable2faSuccess": "MFA is uitgeschakeld voor {{email}}."
+        },
+        "confirmDisable2fa": "Alle MFA-methoden uitschakelen voor {{email}}? Dit maakt ook onthouden sessies ongeldig.",
+        "confirmDeleteUser": "Gebruiker {{email}} verwijderen?",
+        "confirmDeleteSite": "Site {{domain}} verwijderen? Deze actie kan niet ongedaan worden gemaakt.",
+        "confirmDeleteTeam": "Team \"{{name}}\" definitief verwijderen? Dit kan niet ongedaan worden gemaakt.",
+        "confirmDeleteTeamWithSites": "Team \"{{name}}\" en zijn {{sites}}-site(s) permanent verwijderen? Alle analytics-gegevens gaan verloren. Dit kan niet ongedaan worden gemaakt.",
+        "teams": {
+            "title": "Teams",
+            "status": {
+                "active": "Actief",
+                "archived": "Gearchiveerd",
+                "default": "Standaard"
+            }
+        },
+        "team": {
+            "tabs": {
+                "overview": "Overzicht",
+                "members": "Leden",
+                "settings": "Instellingen",
+                "activity": "Activiteit"
+            },
+            "overview": {
+                "breadcrumb": "Teamoverzicht",
+                "title": "Team",
+                "teamIdLabel": "TeamID",
+                "memberCount": "Leden",
+                "quickActions": "Snelle acties",
+                "manageMembers": "Leden beheren",
+                "teamSettings": "Teaminstellingen",
+                "usage": {
+                    "title": "Gebruik en limieten",
+                    "description": "Houd het huidige teamgebruik bij aan de hand van de planlimieten voordat de opname wordt geblokkeerd.",
+                    "currentUsage": "{{count}} gebruikt",
+                    "unlimited": "Onbeperkt",
+                    "unlimitedFootnote": "Onbeperkt met het huidige abonnement",
+                    "limitValue": "Limiet {{count}}",
+                    "progressLabel": "{{count}}% van limiet",
+                    "pendingInviteOne": "1 openstaande uitnodiging",
+                    "pendingInviteMany": "{{count}} openstaande uitnodigingen",
+                    "metrics": {
+                        "sites": "Sites",
+                        "members": "Leden"
+                    }
+                },
+                "cloud": {
+                    "title": "Cloud-abonnement",
+                    "managed": "Beheerde wolk",
+                    "description": "Dit team draait op de gehoste HitKeep cloud footprint. Behoud het gratis abonnement voor validatie of upgrade wanneer je meer retentie, leden of volume nodig heeft.",
+                    "jurisdiction": "Jurisdictie",
+                    "region": "Regio",
+                    "retention": "Behoud",
+                    "retentionDays": "{{count}} dagen",
+                    "unlimitedRetention": "Onbeperkte retentie",
+                    "manageBillingAction": "Beheer de facturering",
+                    "upgradeAction": "Upgradeplan",
+                    "supportAction": "Neem contact op met ondersteuning"
+                },
+                "plans": {
+                    "title": "Upgrade je abonnement",
+                    "description": "Ontgrendel langere retentie, meer sites en teamcapaciteit.",
+                    "currentPlan": "Huidig ​​abonnement",
+                    "recommended": "Aanbevolen",
+                    "upgradeAction": "Upgrade naar {{plan}}",
+                    "features": {
+                        "sites": "Tot {{count}}-sites",
+                        "members": "Maximaal {{count}}-teamleden",
+                        "retention": "{{count}} jaar gegevensretentie",
+                        "retentionDays": "{{count}}-dag gegevensretentie"
+                    }
+                }
+            },
+            "members": {
+                "breadcrumb": "Teamleden",
+                "title": "Teamleden"
+            },
+            "settings": {
+                "breadcrumb": "Teaminstellingen",
+                "title": "Teaminstellingen",
+                "nameSectionTitle": "Teamnaam",
+                "nameSectionDescription": "De weergavenaam voor dit team. Eigenaren en beheerders kunnen het updaten.",
+                "nameRequired": "Teamnaam is vereist.",
+                "logoSectionTitle": "Teamlogo",
+                "logoSectionDescription": "EenURLdie verwijst naar de logoafbeelding van dit team.",
+                "logoPlaceholder": "https://example.com/logo.png",
+                "logoPreviewAlt": "Voorbeeld van teamlogo",
+                "saveAction": "Instellingen opslaan",
+                "saveSuccess": "Teaminstellingen opgeslagen.",
+                "saveError": "Kan teaminstellingen niet opslaan. Probeer het opnieuw.",
+                "leaveSectionTitle": "Verlaat het team",
+                "leaveSectionDescription": "Verwijder jezelf uit dit team en stap over naar een ander team waartoe je behoort.",
+                "leaveConfirm": "Dit team verlaten? Je actieve teamcontext verandert onmiddellijk.",
+                "leaveAction": "Verlaat het team",
+                "leaveSuccess": "Je hebt het team verlaten.",
+                "archiveSectionTitle": "Archiefteam",
+                "archiveSectionDescription": "Archiveer dit team nadat alle sites zijn overgedragen of verwijderd.",
+                "archiveSectionHint": "Door te archiveren wordt het team verborgen voor de normale teamlijsten. Draag eerst elke site in dit team over of verwijder deze.",
+                "archiveConfirm": "Dit team archiveren? Leden verliezen de toegang ertoe in de actieve teamwisselaar.",
+                "archiveAction": "Archiefteam",
+                "archiveSuccess": "Het team is gearchiveerd.",
+                "archiveErrors": {
+                    "hasSites": "Breng alle teamsites over of verwijder ze voordat je ze archiveert.",
+                    "defaultTeam": "Het standaardteam kan niet worden gearchiveerd.",
+                    "forbidden": "Alleen teameigenaren kunnen dit team archiveren.",
+                    "generic": "Kan het team niet archiveren. Probeer het opnieuw."
+                },
+                "leaveErrors": {
+                    "lastOwner": "Je kunt niet als laatste eigenaar vertrekken.",
+                    "onlyTeam": "Je kunt je enige team niet verlaten.",
+                    "generic": "Het is niet gelukt om het team te verlaten. Probeer het opnieuw."
+                }
+            },
+            "audit": {
+                "readOnly": "Je heeft geen toestemming om teamactiviteiten te bekijken.",
+                "empty": "Nog geen teamactiviteit.",
+                "loadError": "Kan teamactiviteit niet laden.",
+                "loadMore": "Laad meer activiteit",
+                "forbidden": "Je heeft geen toestemming om teamactiviteiten te bekijken.",
+                "filterLabel": "Activiteit filteren",
+                "filters": {
+                    "all": "Alle activiteit"
+                },
+                "summary": {
+                    "empty": "Er zijn nog geen vermeldingen geladen.",
+                    "partial": "{{loaded}} van {{total}}-activiteiten weergeven",
+                    "complete": "Toont alle {{total}}-activiteiten"
+                },
+                "columns": {
+                    "actor": "Acteur",
+                    "action": "Actie",
+                    "target": "Doel",
+                    "details": "Details"
+                },
+                "actions": {
+                    "teamCreated": "Team gemaakt",
+                    "teamUpdated": "Team bijgewerkt",
+                    "teamActiveChanged": "Actief team gewijzigd",
+                    "memberInvited": "Lid uitgenodigd",
+                    "memberInviteAccepted": "Uitnodiging geaccepteerd",
+                    "memberInviteResent": "Nodig kwalijk uit",
+                    "memberInviteRevoked": "Uitnodiging ingetrokken",
+                    "memberAdded": "Lid toegevoegd",
+                    "memberRoleUpdated": "Rol van lid bijgewerkt",
+                    "memberRemoved": "Lid verwijderd",
+                    "memberLeft": "Lid is vertrokken",
+                    "ownershipTransferred": "Eigendom overgedragen",
+                    "teamArchived": "Team gearchiveerd",
+                    "siteCreated": "Site gemaakt",
+                    "siteDeleted": "Site verwijderd",
+                    "siteRetentionUpdated": "Retentie bijgewerkt",
+                    "siteTransferredIn": "Site is verhuisd",
+                    "siteTransferredOut": "Site is verhuisd",
+                    "siteExclusionCreated": "Uitsluiting gemaakt",
+                    "siteExclusionDeleted": "Uitsluiting verwijderd",
+                    "authLoginSucceeded": "Inloggen is gelukt",
+                    "authLoginFailed": "Inloggen mislukt",
+                    "authMfaRequired": "MFA vereist",
+                    "authMfaSucceeded": "MFA is geslaagd",
+                    "authLogout": "Uitloggen",
+                    "authSessionExtended": "Sessie verlengd",
+                    "importUploadCreated": "Importupload gemaakt",
+                    "importFileUploaded": "Importbestand geüpload",
+                    "importValidationStarted": "Importvalidatie gestart",
+                    "importValidated": "Importeren gevalideerd",
+                    "importValidationFailed": "Importvalidatie mislukt",
+                    "importQueued": "Importeren in wachtrij",
+                    "importRequeued": "Import opnieuw in de wachtrij geplaatst",
+                    "importStarted": "Importeren is gestart",
+                    "importFailed": "Importeren is mislukt",
+                    "importCompleted": "Importeren voltooid",
+                    "importDeleted": "Import verwijderd",
+                    "importDataCleared": "Geïmporteerde gegevens gewist",
+                    "importDataWritten": "Geïmporteerde gegevens geschreven",
+                    "unknown": "Onbekende actie"
+                }
+            }
+        },
+        "system": {
+            "overview": {
+                "title": "Systeemoverzicht",
+                "version": "Versie",
+                "uptime": "Uptime",
+                "publicUrl": "OpenbareURL",
+                "runtimeMode": "Modus",
+                "healthStatus": "Gezondheid",
+                "enabledFeatures": "Functieschakelaars",
+                "actions": {
+                    "refresh": "Vernieuwen"
+                }
+            },
+            "features": {
+                "mcp": {
+                    "label": "MCP-server"
+                },
+                "mcp_docs": {
+                    "label": "MCPdocumentatietools"
+                },
+                "automatic_backups": {
+                    "label": "Automatische back-ups"
+                },
+                "spam_auto_update": {
+                    "label": "Automatische spam-update"
+                },
+                "mail_delivery": {
+                    "label": "Postbezorging"
+                },
+                "google_search_console": {
+                    "label": "Google Search Console"
+                },
+                "managed_cloud": {
+                    "label": "Beheerde wolk"
+                },
+                "cloud_signup": {
+                    "label": "Cloud-aanmelding"
+                },
+                "billing": {
+                    "label": "Facturering"
+                }
+            },
+            "featureDetails": {
+                "backup": {
+                    "local": "Lokaal doelwit",
+                    "s3": "S3-doel"
+                },
+                "driver": "{{driver}}-stuurprogramma",
+                "interval": "Elke {{interval}}",
+                "stripe": "Streep geconfigureerd",
+                "plan": "{{plan}}-abonnement"
+            },
+            "health": {
+                "title": "Gezondheidscontrole",
+                "status": "Status",
+                "database": "Database",
+                "workers": "Werknemers",
+                "isLeader": "Is Leider",
+                "actions": {
+                    "check": "Controle uitvoeren"
+                }
+            },
+            "searchConsole": {
+                "title": "Search Console",
+                "credentials": "Referenties",
+                "worker": "Werknemer",
+                "sync": "Synchroniseren",
+                "connectedTeams": "Verbonden teams",
+                "mappedSites": "In kaart gebrachte locaties",
+                "inFlight": "Tijdens de vlucht",
+                "issues": "Problemen",
+                "lastAttempt": "Laatste poging",
+                "lastSuccess": "Laatste succes",
+                "nextRetry": "Volgende nieuwe poging",
+                "status": {
+                    "healthy": "Gezond",
+                    "idle": "Inactief",
+                    "syncing": "Synchroniseren",
+                    "degraded": "Gedegradeerd",
+                    "needs_attention": "Heeft aandacht nodig",
+                    "not_configured": "Niet geconfigureerd"
+                },
+                "credentialsStatus": {
+                    "configured": "Geconfigureerd",
+                    "missing": "Ontbreekt"
+                },
+                "workerStatus": {
+                    "enabled": "Ingeschakeld",
+                    "disabled": "Gehandicapt"
+                },
+                "syncStatus": {
+                    "healthy": "Gezond",
+                    "idle": "Inactief",
+                    "pending": "In behandeling",
+                    "running": "Rennen",
+                    "failed": "Mislukt",
+                    "needs_attention": "Heeft aandacht nodig"
+                }
+            },
+            "storage": {
+                "title": "Opslag",
+                "sharedDb": "Gedeelde database",
+                "sharedDbSize": "Maat",
+                "dataPath": "Gegevenspad",
+                "tenantDbs": "Databases van huurders",
+                "diskUsage": "Schijfgebruik",
+                "diskAvailable": "Beschikbaar",
+                "columns": {
+                    "tenant": "Huurder",
+                    "size": "Maat",
+                    "path": "Pad"
+                }
+            },
+            "ingest": {
+                "title": "Innemen",
+                "hits": "Hits (24u)",
+                "events": "Events (24u)",
+                "rejections": "Afwijzingen",
+                "spam": "Spam geblokkeerd",
+                "hitsPerSecond": "Hits/sec"
+            },
+            "backups": {
+                "title": "Back-ups",
+                "configPath": "Pad / doel",
+                "enabled": "Ingeschakeld",
+                "disabled": "Gehandicapt",
+                "interval": "Interval",
+                "retention": "Behoud",
+                "lastBackup": "Laatste back-up",
+                "nextBackup": "Volgende back-up",
+                "lastFailed": "Laatste mislukking",
+                "lastError": "Laatste fout",
+                "recentFailures": "Recente mislukkingen",
+                "actions": {
+                    "backupNow": "Maak nu een back-up",
+                    "backupNowConfirm": "Nu een back-up starten?"
+                },
+                "backupTriggered": "Back-up gestart",
+                "backupFailed": "Back-up mislukt"
+            },
+            "spam": {
+                "title": "Spamfilter",
+                "dbPath": "Databasepad",
+                "lastRefresh": "Laatste vernieuwing",
+                "ruleCount": "Regels",
+                "autoUpdate": "Automatische update",
+                "lastError": "Laatste fout",
+                "actions": {
+                    "refresh": "Vernieuw de spamdatabase"
+                },
+                "refreshTriggered": "Spamfilter vernieuwd",
+                "refreshFailed": "Kon het spamfilter niet vernieuwen"
+            },
+            "importCleanup": {
+                "title": "Staging importeren",
+                "enabled": "Opschonen ingeschakeld",
+                "retention": "Retentie dagen",
+                "staleImports": "Oude import",
+                "staleFiles": "Verouderde bestanden",
+                "staleBytes": "Verouderde bytes",
+                "lastRun": "Laatste schoonmaakbeurt",
+                "lastCleaned": "Laatst schoongemaakt",
+                "actions": {
+                    "run": "Geënsceneerde bestanden opschonen"
+                },
+                "runSuccess": "Geënsceneerde {{files}}-bestanden opgeschoond, waardoor {{bytes}} wordt vrijgegeven.",
+                "runFailed": "Kan gefaseerde importbestanden niet opschonen."
+            },
+            "caches": {
+                "title": "Caches",
+                "status": {
+                    "healthy": "Gezond",
+                    "pressure": "Onder druk"
+                },
+                "permissions": "Machtigingen",
+                "apiClients": "API-clients",
+                "rateLimiter": "Snelheidsbegrenzer",
+                "columns": {
+                    "cache": "Cache",
+                    "size": "Maat",
+                    "maxSize": "Maximale grootte",
+                    "ttl": "TTL"
+                }
+            },
+            "mail": {
+                "title": "Mail",
+                "configured": "Geconfigureerd",
+                "notConfigured": "Niet geconfigureerd",
+                "driver": "Bestuurder",
+                "host": "Gastheer",
+                "port": "Haven",
+                "encryption": "Encryptie",
+                "fromAddress": "Van adres",
+                "username": "Gebruikersnaam",
+                "passwordSet": "Wachtwoord geconfigureerd",
+                "lastTest": "Laatste proef",
+                "actions": {
+                    "test": "Test-e-mail verzenden"
+                },
+                "testSuccess": "Test-e-mail verzonden",
+                "testFailed": "Test-e-mail mislukt",
+                "recipientLabel": "Ontvanger testen",
+                "recipientPlaceholder": "ops@voorbeeld.com",
+                "recipientInvalid": "Voer een geldig e-mailadres in."
+            },
+            "audit": {
+                "title": "Instantie-auditlogboek",
+                "filters": {
+                    "all": "Alle"
+                },
+                "filter": {
+                    "action": "Actie",
+                    "targetType": "Doeltype",
+                    "outcome": "Resultaat",
+                    "dateRange": "Datumbereik",
+                    "search": "Zoekopdracht..."
+                },
+                "empty": "Geen auditgegevens gevonden",
+                "loadError": "Kan auditgegevens niet laden",
+                "exportSuccess": "Controle-export gedownload",
+                "exportFailed": "Kan auditlogboek niet exporteren",
+                "loadMore": "Laad meer",
+                "columns": {
+                    "created": "Tijd",
+                    "actor": "Acteur",
+                    "action": "Actie",
+                    "targetType": "Gebied",
+                    "target": "Doel",
+                    "outcome": "Resultaat",
+                    "ipAddress": "IP-adres",
+                    "country": "Land",
+                    "details": "Details"
+                },
+                "outcome": {
+                    "success": "Succes",
+                    "failure": "Mislukking",
+                    "denied": "Geweigerd"
+                },
+                "targetTypes": {
+                    "system": "Systeem",
+                    "mail": "E-mail",
+                    "user": "Gebruiker",
+                    "team": "Team",
+                    "site": "Locatie",
+                    "import": "Importeren",
+                    "siteExclusion": "Uitsluiting van sites",
+                    "apiClient": "API-client",
+                    "backup": "Back-up",
+                    "spamFilter": "Spamfilter",
+                    "diagnostics": "Diagnostiek"
+                },
+                "actions": {
+                    "export": "Exporteren",
+                    "roleUpdated": "Rol veranderd",
+                    "mfaDisabled": "MFA uitgeschakeld",
+                    "backupTriggered": "Back-up geactiveerd",
+                    "backupCompleted": "Back-up voltooid",
+                    "backupFailed": "Back-up mislukt",
+                    "spamRefreshed": "Spam vernieuwen",
+                    "mailTested": "Mail-test",
+                    "diagnosticsExported": "Diagnostiek geëxporteerd",
+                    "accessDenied": "Toegang geweigerd",
+                    "authLoginSucceeded": "Inloggen is gelukt",
+                    "authLoginFailed": "Inloggen mislukt",
+                    "authMfaRequired": "MFA vereist",
+                    "authMfaSucceeded": "MFA is geslaagd",
+                    "authLogout": "Uitloggen",
+                    "authSessionExtended": "Sessie verlengd",
+                    "teamCreated": "Team gemaakt",
+                    "teamUpdated": "Team bijgewerkt",
+                    "teamArchived": "Team gearchiveerd",
+                    "teamActiveChanged": "Actief team gewijzigd",
+                    "memberInvited": "Lid uitgenodigd",
+                    "memberInviteAccepted": "Uitnodiging geaccepteerd",
+                    "memberInviteResent": "Nodig kwalijk uit",
+                    "memberInviteRevoked": "Uitnodiging ingetrokken",
+                    "memberAdded": "Lid toegevoegd",
+                    "memberRoleUpdated": "Rol van lid bijgewerkt",
+                    "memberRemoved": "Lid verwijderd",
+                    "memberLeft": "Lid is vertrokken",
+                    "ownershipTransferred": "Eigendom overgedragen",
+                    "siteCreated": "Site gemaakt",
+                    "siteDeleted": "Site verwijderd",
+                    "siteRetentionUpdated": "Retentie bijgewerkt",
+                    "siteTransferredIn": "Site is verhuisd",
+                    "siteTransferredOut": "Site is verhuisd",
+                    "siteExclusionCreated": "Uitsluiting gemaakt",
+                    "siteExclusionDeleted": "Uitsluiting verwijderd",
+                    "importUploadCreated": "Importupload gemaakt",
+                    "importFileUploaded": "Importbestand geüpload",
+                    "importValidationStarted": "Importvalidatie gestart",
+                    "importValidated": "Importeren gevalideerd",
+                    "importValidationFailed": "Importvalidatie mislukt",
+                    "importQueued": "Importeren in wachtrij",
+                    "importRequeued": "Import opnieuw in de wachtrij geplaatst",
+                    "importStarted": "Importeren is gestart",
+                    "importFailed": "Importeren is mislukt",
+                    "importCompleted": "Importeren voltooid",
+                    "importDeleted": "Import verwijderd",
+                    "importDataCleared": "Geïmporteerde gegevens gewist",
+                    "importDataWritten": "Geïmporteerde gegevens geschreven"
+                },
+                "pagination": {
+                    "total": "Toont {{ loaded }} van {{ total }}-items"
+                }
+            },
+            "console": {
+                "eyebrow": "Instantiebewerkingen",
+                "title": "Systeemstatus",
+                "subtitle": "Bewaak de runtimestatus, opslagstatus, e-mailbezorging, spambescherming en beheerdersactiviteiten vanaf één operatoroppervlak.",
+                "runtimePosture": "Runtime-houding",
+                "summaryAria": "Samenvatting van de systeemstatus",
+                "healthHint": "Database-, werkrollen- en knooppuntgereedheid",
+                "managedData": "beheerde gegevens",
+                "noRecentRun": "Geen recente run",
+                "autoUpdated": "Automatisch bijgewerkt",
+                "manualOnly": "Handmatig vernieuwen",
+                "refreshCard": "Status vernieuwen",
+                "cloudStatus": "Cloud-status",
+                "leader": "Leider",
+                "follower": "Volgeling",
+                "loadFailed": "Systeemstatus kan niet worden geladen.",
+                "noFeatures": "Er zijn geen functiewisselingen gerapporteerd.",
+                "noTenantDbs": "Er zijn geen tenantdatabases gerapporteerd.",
+                "pressure": "Druk",
+                "tabs": {
+                    "runtime": "Looptijd",
+                    "operations": "Operaties",
+                    "access": "Toegang",
+                    "activation": "Activering",
+                    "audit": "Controle"
+                },
+                "status": {
+                    "healthy": "Gezond",
+                    "attention": "Heeft aandacht nodig",
+                    "loading": "Laden",
+                    "unknown": "Onbekend"
+                },
+                "healthDescription": "Gereedheidssignalen voor het huidige knooppunt en de ingebedde gegevensopslag.",
+                "overviewDescription": "Build, versie, openbareURLen runtime-modus.",
+                "featuresDescription": "Operatorfunctieschakelaars en runtime-mogelijkheden gerapporteerd door de instance.",
+                "storageDescription": "DuckDB-bestanden, tenantopslag en schijfbeschikbaarheid.",
+                "ingestDescription": "Recent trackingvolume en geblokkeerd verkeer in de hele instantie.",
+                "cachesDescription": "LRU-cachebezetting voor authenticatie,API-clients en snelheidsbeperking.",
+                "backupsDescription": "Geconfigureerd back-updoel, retentie en recente uitvoeringsstatus.",
+                "spamDescription": "Spamfiltercacheversheid en handmatige vernieuwingscontrole.",
+                "mailDescription": "Geredigeerde configuratie voor e-mailtransport en een veilige test-verzendactie.",
+                "usersDescription": "Instantierollen, herstelacties en beheerderstoegang.",
+                "sitesDescription": "Alle sites zichtbaar voor exemplaarbeheerders.",
+                "teamsDescription": "Teamcontainers en hun operationele status.",
+                "auditDescription": "Alleen-toevoegen-activiteit voor bewerkingen van gevoelige exemplaren.",
+                "settingsSubtitle": "Beheer exemplaargebruikers, sites, teams en globale filters."
+            },
+            "activation": {
+                "title": "Activering van de gebruiker",
+                "subtitle": "Bekijk welke teams en sites live zijn, wachten, inactief zijn of vastzitten zonder huurdergegevens te inspecteren.",
+                "empty": "Er zijn geen activeringsrijen die overeenkomen met de huidige filters.",
+                "copySuccess": "Ondersteuningscontext gekopieerd.",
+                "copyError": "Ondersteuningscontext kan niet worden gekopieerd.",
+                "pagination": "{{loaded}} van {{total}}-rijen weergeven",
+                "filters": {
+                    "anyStatus": "Elke status",
+                    "team": "Filterteam",
+                    "domain": "Domein filteren"
+                },
+                "metrics": {
+                    "liveSites": "Live geladen sites",
+                    "loadedRows": "Geladen rijen",
+                    "totalRows": "Totaal aantal rijen"
+                },
+                "columns": {
+                    "team": "Team",
+                    "lastHit": "Laatste treffer",
+                    "lastEvent": "Laatste event",
+                    "hits24h": "Hits 24 uur",
+                    "hits7d": "Hits 7d",
+                    "events7d": "Events 7d"
+                },
+                "status": {
+                    "waiting": "Wachten",
+                    "live": "Live",
+                    "dormant": "Slaperig",
+                    "domain_mismatch": "Domein komt niet overeen"
+                },
+                "actions": {
+                    "filterTeam": "Filter op dit team",
+                    "copyContext": "Kopieer ondersteuningscontext",
+                    "openTeam": "Open teambeheerder"
+                }
+            }
+        }
+    },
+    "roles": {
+        "owner": "Eigenaar",
+        "admin": "Beheerder",
+        "member": "Lid",
+        "editor": "Editor",
+        "viewer": "Kijker"
+    },
+    "userMenu": {
+        "administration": "Administratie",
+        "userSettings": "Gebruikersinstellingen",
+        "preferences": "Voorkeuren",
+        "sessionStatus": "Sessie:{{remaining}} over",
+        "rememberedSessionStatus": "Onthoud mij:{{remaining}} over",
+        "extendSession": "Sessie verlengen",
+        "signOut": "Meld je af"
+    },
+    "session": {
+        "label": "Sessie",
+        "rememberedLabel": "Onthoud mij",
+        "tooltip": "Je dashboardsessie duurt {{duration}}.HitKeep waarschuwt je {{warning}} vóór de vervaldatum.",
+        "rememberedTooltip": "Onthoud dat ik actief ben. De timer volgt de onthouden aanmeldingsperiode.",
+        "warningTitle": "Je sessie loopt bijna af",
+        "warningDescription": "Je wordt afgemeld in {{remaining}}, tenzij je de sessie verlengt.",
+        "policyDescription": "Dit exemplaar is geconfigureerd voor {{duration}}-dashboardsessies.",
+        "extendAction": "Blijf ingelogd",
+        "signOutAction": "Meld je af",
+        "extendError": "We konden de sessie niet verlengen. Meld je opnieuw aan als deze verloopt."
+    },
+    "login": {
+        "subtitle": "Log in op je dashboard",
+        "cloudSignupPrompt": "Nieuw bij HitKeep Cloud?",
+        "cloudSignupAction": "Maak {{jurisdiction}}-workspace",
+        "cloudSignupAlternatePrompt": "Een andere wettelijke grens nodig?",
+        "cloudSignupAlternateAction": "Gebruik de {{jurisdiction}} cloud",
+        "emailLabel": "E-mailadres",
+        "emailPlaceholder": "jij@voorbeeld.com",
+        "emailInvalid": "Voer een geldig e-mailadres in.",
+        "passwordLabel": "Wachtwoord",
+        "passwordPlaceholder": "••••••••",
+        "passwordRequired": "Wachtwoord is vereist.",
+        "forgotPassword": "Wachtwoord vergeten?",
+        "rememberMe": "Onthoud mij",
+        "sessionHelp": "Houdt je ingelogd op dit apparaat volgens het instancebeleid. HitKeep toont nog steeds waarschuwingen voordat je sessie verloopt en vraagt om actie wanneer verlengen nodig is.",
+        "signIn": "Log in",
+        "or": "of",
+        "signInWithPasskey": "Inloggen met passkey",
+        "mfaTitle": "Tweefactorauthenticatie",
+        "mfaSubtitle": "Voltooi het inloggen met je authenticatiecode, een herstelcode, een inloglink of een toegangssleutel.",
+        "sendEmailLink": "E-mail mij een inloglink",
+        "emailLinkSent": "We hebben een inloglink naar je e-mailadres gestuurd.",
+        "totpCodeLabel": "Authenticatiecode",
+        "recoveryCodeLabel": "Herstelcode",
+        "recoveryCodePlaceholder": "ABCD-EFGH",
+        "verifyTotp": "Verifieer code",
+        "verifyRecoveryCode": "Gebruik herstelcode",
+        "footerRights": "HitKeep. Alle rechten voorbehouden.",
+        "errors": {
+            "invalidCredentials": "Ongeldig e-mailadres of wachtwoord.",
+            "passkeyNotSupported": "Inloggen met passkey wordt niet ondersteund op dit apparaat.",
+            "passkeyFailed": "Inloggen met passkey is mislukt. Probeer het opnieuw.",
+            "invalidTotp": "Ongeldige authenticatiecode.",
+            "invalidRecoveryCode": "Ongeldige herstelcode.",
+            "emailLinkFailed": "We kunnen je inloglink niet verzenden. Probeer het opnieuw.",
+            "mfaEmailLinkInvalid": "Deze inloglink is ongeldig of verlopen. Vraag een nieuwe aan om door te gaan.",
+            "unexpected": "Er is een onverwachte fout opgetreden. Probeer het opnieuw."
+        }
+    },
+    "signup": {
+        "title": "Ga gratis aan de slag",
+        "subtitle": "Creëer je werkruimte en begin binnen een minuut met volgen. Geen creditcard vereist.",
+        "jurisdictionLabel": "Jurisdictie",
+        "jurisdictionDescription": "Deze werkruimte blijft vastgemaakt aan de geselecteerde juridische enAWS-regiogrens.",
+        "jurisdictionRedirectHint": "Je hebt {{jurisdiction}} geselecteerd. Ga verder en wij sturen je door naar de juiste regionale aanmelding.",
+        "jurisdictions": {
+            "eu": "EU",
+            "us": "US"
+        },
+        "givenNameLabel": "Voornaam",
+        "givenNamePlaceholder": "Ad",
+        "lastNameLabel": "Achternaam",
+        "lastNamePlaceholder": "lovelace",
+        "teamNameLabel": "Teamnaam",
+        "teamNamePlaceholder": "Acme-analyse",
+        "teamNameRequired": "Teamnaam is vereist.",
+        "emailPlaceholder": "jij@voorbeeld.com",
+        "submit": "Creëer werkruimte",
+        "haveAccount": "Heeft je al een account?",
+        "signInAction": "Log in",
+        "otherJurisdictionPrompt": "Een andere wettelijke grens nodig?",
+        "otherJurisdictionAction": "Gebruik de {{jurisdiction}}-aanmelding",
+        "plans": {
+            "free": {
+                "name": "Vrij",
+                "price": "€ 0",
+                "description": "Retentie van 60 dagen om je sites te valideren voordat je een upgrade uitvoert."
+            },
+            "pro": {
+                "name": "Pro",
+                "price": "€ 15/maand",
+                "description": "Langere retentie en meer ruimte voor een klein team."
+            },
+            "business": {
+                "name": "Bedrijf",
+                "price": "€ 39/maand",
+                "description": "Meer schaalgrootte voor bureaus, productteams en een hoger evenementenvolume."
+            }
+        },
+        "selfHostLink": "Wil je zelf hosten? Zie de documenten →",
+        "tosLabel": "Ik ga akkoord met de",
+        "tosLink": "Servicevoorwaarden",
+        "tosAnd": "En",
+        "privacyLink": "Privacybeleid",
+        "tosRequired": "Je moet de Servicevoorwaarden en het Privacybeleid accepteren.",
+        "verifyTitle": "Controleer je inbox",
+        "verifySubtitle": "We hebben een verificatielink naar {{email}} gestuurd. Klik erop om je workspace te activeren.",
+        "errors": {
+            "emailExists": "Er bestaat al een account met dit e-mailadres.",
+            "planUnavailable": "Deze aanmeldingsoptie is momenteel niet beschikbaar.",
+            "unexpected": "Er is een onverwachte fout opgetreden. Probeer het opnieuw.",
+            "verificationExpired": "Deze verificatielink is verlopen. Meld je opnieuw aan."
+        }
+    },
+    "preferences": {
+        "breadcrumb": "Voorkeuren",
+        "subtitle": "Beheer je applicatievoorkeuren.",
+        "actions": {
+            "saveChanges": "Wijzigingen opslaan"
+        },
+        "status": {
+            "saved": "Voorkeuren opgeslagen",
+            "saveFailed": "Voorkeuren konden niet worden opgeslagen"
+        },
+        "errors": {
+            "loadFailed": "Kan voorkeuren niet laden. Vernieuw de pagina en probeer het opnieuw."
+        },
+        "language": {
+            "heading": "Taalvoorkeuren",
+            "description": "Standaard gebruiken we je browsertaal totdat je deze instelling aanpast.",
+            "defaultLabel": "Standaardtaal",
+            "defaultPlaceholder": "Selecteer een standaardtaal",
+            "defaultHint": "Dit is de hoofdtaal voor de dashboard-UI.",
+            "rtlBadge": "RTL"
+        }
+    },
+    "comparison": {
+        "vsLabel": "vs.",
+        "pageviewsLabel": "Pageviews (vorige periode)",
+        "visitorsLabel": "Bezoekers (vorige periode)"
+    },
+    "events": {
+        "title": "Events",
+        "docsAction": "Gids voor automatisch volgen",
+        "noSiteDescription": "Selecteer of maak een site om gebeurtenisanalyses te bekijken.",
+        "eventNameLabel": "Event",
+        "eventNamePlaceholder": "Selecteer een event",
+        "propertyKeyLabel": "Opsplitsen door",
+        "propertyKeyPlaceholder": "Selecteer een eigenschap",
+        "automatic": {
+            "badge": "Auto"
+        },
+        "series": {
+            "title": "Event activiteit",
+            "description": "Gebeurtenissen gedurende de geselecteerde periode.",
+            "emptyTitle": "Geen gebeurtenisgegevens",
+            "emptyDescription": "Selecteer een gebeurtenis om de activiteit in de loop van de tijd te bekijken.",
+            "emptySelectedTitle": "Geen activiteit voor dit event",
+            "emptySelectedDescription": "Er zijn geen overeenkomende events in de geselecteerde periode."
+        },
+        "breakdown": {
+            "title": "Uitsplitsing van eigendommen",
+            "selectEventFirst": "Selecteer een gebeurtenis om een ​​overzicht van de eigendommen te bekijken.",
+            "selectPropertyFirst": "Selecteer een woning om de specificatie te bekijken."
+        },
+        "kpis": {
+            "totalEvents": "Totaal events"
+        },
+        "importedLimitations": {
+            "title": "Geïmporteerde geaggregeerde beperkingen"
+        }
+    },
+    "aiChatbots": {
+        "title": "AI-chatbots",
+        "docsAction": "Instrumentatie gids",
+        "noSiteDescription": "Selecteer of maak een site om AI-chatbotanalyses te bekijken.",
+        "header": {
+            "title": "On-site AI chatbot-analyse",
+            "description": "Houd het begin van gesprekken, prompts, reacties, overdrachten en ondersteunde conversies bij via je chatbotinstrumentatie."
+        },
+        "filters": {
+            "groupBy": "Domein",
+            "value": "Waarde",
+            "allValues": "Alle waarden",
+            "unfiltered": "Toont al het chatbotverkeer",
+            "provider": "Aanbieder",
+            "botId": "Bot",
+            "surface": "Oppervlak",
+            "model": "Model"
+        },
+        "kpis": {
+            "conversations": "Gesprekken",
+            "prompts": "Prompts",
+            "responses": "Reacties",
+            "assistedConversions": "Ondersteunde conversies",
+            "handoffRate": "Overdrachtspercentage",
+            "citationCtr": "CitaatCTR",
+            "handoffs": "Overdrachten"
+        },
+        "chart": {
+            "title": "Gespreksactiviteit",
+            "description": "Bekijk hoe chatbotsessies in de loop van de tijd verlopen, vanaf het eerste bericht tot de overdracht en de ondersteunde resultaten.",
+            "emptyTitle": "Geen chatbotactiviteit",
+            "emptyDescription": "Volg assistent.chat_started en gerelateerde gebeurtenissen om dit rapport in te vullen."
+        },
+        "breakdowns": {
+            "intents": "Top bedoelingen",
+            "providers": "Topaanbieders",
+            "surfaces": "Bovenoppervlakken"
+        },
+        "exportStatus": {
+            "success": "Exportdownload gestart.",
+            "error": "Kan AI-chatbotgegevens niet exporteren. Probeer het opnieuw."
+        }
+    },
+    "aiVisibility": {
+        "title": "AIZichtbaarheid",
+        "docsAction": "AI-zichtbaarheidsgids",
+        "noSiteDescription": "Selecteer of maak een site om AI-ophaal- en correlatieanalyses te bekijken.",
+        "setup": {
+            "title": "Ophaalopname aan de serverzijde vereist",
+            "badge": "Instelling vereist",
+            "description": "Op deze pagina worden de ophaalacties van de AI-crawler alleen bijgehouden nadat je ze doorstuurt naar HitKeep via edge- of log-gebaseerde opname.",
+            "detail": "Als je alleen hk.js installeert, worden bot-ophaalacties niet vastgelegd. Door AI verwezen bezoeken van ChatGPT, Gemini, Perplexity en vergelijkbare assistenten kunnen nog steeds elders in de analytics van verwijzers verschijnen.",
+            "action": "Installatiehandleiding openen"
+        },
+        "header": {
+            "title": "AI zichtbaarheidsanalyses",
+            "description": "Volg ophaalacties van de AI-crawler op de server, waar crawlfouten zich concentreren, en welke opgehaalde pagina's later door AI verwezen bezoeken aantrekken."
+        },
+        "filters": {
+            "assistant": "Assistent",
+            "family": "Exploitant",
+            "resourceType": "Brontype",
+            "allAssistants": "Alle assistenten",
+            "allFamilies": "Alle exploitanten",
+            "allResourceTypes": "Alle resourcetypen",
+            "unfiltered": "Alle AI-ophaalactiviteiten worden weergegeven"
+        },
+        "kpis": {
+            "totalFetches": "Totaal aantal opgehaald",
+            "uniquePaths": "Unieke paden",
+            "uniqueAssistants": "Unieke assistenten",
+            "errorRate4xx": "4xx tarief",
+            "errorRate5xx": "5xx tarief",
+            "medianResponse": "Gemiddelde reactie",
+            "bytesServed": "Bytes geserveerd"
+        },
+        "chart": {
+            "title": "Volume in de loop van de tijd ophalen",
+            "description": "Bekijk wanneer doorgestuurde AI-crawlerophaalacties je inhoud bereiken en hoe de ophaalvraag verandert gedurende de geselecteerde periode.",
+            "fetches": "Haalt op",
+            "emptyTitle": "Geen AI-ophaalactiviteit",
+            "emptyDescription": "Stuur AI-ophaalrecords door naar /api/sites/{id}/ingest/ai-fetch om dit rapport in te vullen. hk.js zelf registreert geen crawler-ophaalacties."
+        },
+        "breakdowns": {
+            "assistants": "Top assistenten",
+            "families": "Topoperators",
+            "paths": "Top opgehaalde paden",
+            "errorPaths": "Belangrijkste foutpaden",
+            "resourceTypes": "Resourcetype gesplitst"
+        },
+        "correlation": {
+            "title": "Correlatie tussen ophalen en bezoeken",
+            "description": "Meet welke opgehaalde paden later door AI verwezen menselijke bezoeken aantrekken en welke hoog opgehaalde pagina's nog steeds niet worden omgezet in downstream verkeer.",
+            "note": "Assistent-, operator- en resourcetypefilters zijn alleen van toepassing op ophaalacties. Gecorreleerde bezoeken omvatten alle latere, door AI verwezen menselijke bezoeken op hetzelfde pad binnen het geselecteerde venster.",
+            "kpis": {
+                "correlatedPaths": "Gecorreleerde paden",
+                "aiVisits": "AI-verwezen bezoeken",
+                "uncorrelatedFetches": "Niet-gecorreleerde ophaalacties"
+            }
+        },
+        "tables": {
+            "citationYield": {
+                "title": "Citaatopbrengst",
+                "description": "Paden waar AI het vaakst ophaalt, veranderen in latere AI-verwezen bezoeken.",
+                "empty": "Geen van de opgehaalde paden produceerde gecorreleerde AI-bezoeken in dit bereik."
+            },
+            "opportunityPages": {
+                "title": "Mogelijkheidspagina's",
+                "description": "Pagina's met een hoge ophaalsnelheid, weinig downstream-bezoeken of een verhoogde foutdruk.",
+                "empty": "Er zijn geen opportunitypagina's die overeenkomen met de huidige filters."
+            },
+            "failureHotspots": {
+                "title": "Fout-hotspots",
+                "description": "De assistent- en pad-voorvoegselcombinaties met de hoogste ophaalfoutdruk.",
+                "empty": "Er zijn geen storingshotspots die overeenkomen met de huidige filters."
+            }
+        },
+        "columns": {
+            "path": "Pad",
+            "assistant": "Assistent",
+            "pathPrefix": "Padvoorvoegsel",
+            "fetches": "Haalt op",
+            "requests": "Verzoeken",
+            "aiVisits": "AI-bezoeken",
+            "errors": "Fouten",
+            "errorRate": "Foutpercentage",
+            "yield": "Opbrengst"
+        },
+        "exportStatus": {
+            "success": "Exportdownload gestart.",
+            "error": "Kan AI-ophaalgegevens niet exporteren. Probeer het opnieuw."
+        }
+    },
+    "integration": {
+        "apiClients": {
+            "subtitle": "Creëer en beheer API-clients voor integraties."
+        },
+        "apiReference": {
+            "subtitle": "VersieversieRESTAPI-referentie met sessie- en API-sleutelauthenticatiedetails.",
+            "versionLabel": "API-versie",
+            "searchLabel": "Eindpunten zoeken",
+            "searchPlaceholder": "Zoek op methode, pad, tag of samenvatting",
+            "refresh": "Vernieuwen",
+            "latest": "laatste",
+            "operationsTitle": "Operaties",
+            "loading": "API-referentie laden...",
+            "empty": "Er zijn geen API-bewerkingen die overeenkomen met je zoekopdracht.",
+            "noSummary": "Geen samenvatting",
+            "auth": {
+                "title": "Authenticatie",
+                "description": "Gebruik een van deze referenties, afhankelijk van de eindpuntbeveiligingsvereisten.",
+                "bearerLabel": "Token aan toonder",
+                "apiKeyLabel": "X-API-Key-header",
+                "cookieLabel": "Sessiecookie"
+            },
+            "errors": {
+                "loadVersions": "Kan API-documentversies niet laden.",
+                "loadSpec": "Kan de API-referentie voor deze versie niet laden."
+            }
+        },
+        "googleSearchConsole": {
+            "title": "Google Search Console",
+            "subtitle": "Eigenschappen verbinden.",
+            "status": {
+                "credentials_missing": "Referenties ontbreken",
+                "connected": "Aangesloten",
+                "disconnected": "Verbinding verbroken",
+                "loading": "Laden",
+                "mapped": "In kaart gebracht",
+                "unmapped": "Niet in kaart gebracht"
+            },
+            "labels": {
+                "account": "Rekening",
+                "site": "Locatie",
+                "property": "Eigendom",
+                "searchProperties": "Zoek eigenschappen",
+                "propertyMapping": "Eigenschap in kaart brengen",
+                "permission": "Toestemming",
+                "syncStatus": "Synchronisatiestatus",
+                "lastSuccess": "Laatste succes",
+                "lastAttempt": "Laatste poging",
+                "importedRange": "Geïmporteerd bereik",
+                "nextRetry": "Volgende nieuwe poging",
+                "lastError": "Laatste fout"
+            },
+            "actions": {
+                "refresh": "Vernieuwen",
+                "docs": "Installatiedocumentatie",
+                "connect": "Verbinden",
+                "reconnect": "Maak opnieuw verbinding",
+                "disconnect": "Verbreek de verbinding",
+                "confirmDisconnect": "Search Console loskoppelen?",
+                "mapProperty": "Kaart eigendom",
+                "removeMapping": "Mapping verwijderen",
+                "confirmRemoveMapping": "Toewijzing verwijderen?",
+                "syncNow": "Synchroniseer nu",
+                "syncRequesting": "Aanvragen...",
+                "syncQueued": "In de wachtrij",
+                "syncRunning": "Rennen"
+            },
+            "sync": {
+                "pending": "In behandeling",
+                "running": "Rennen",
+                "succeeded": "Geslaagd",
+                "failed": "Mislukt",
+                "needs_attention": "Heeft aandacht nodig",
+                "idle": "Nog geen synchronisatie",
+                "manualPending": "Handmatige synchronisatie in wachtrij.",
+                "queuedFeedback": "Synchronisatie in wachtrij.",
+                "runningFeedback": "Synchroniseren actief.",
+                "succeededWithRange": "{{start}}-{{end}} geïmporteerd.",
+                "noHistory": "Nog geen import.",
+                "quota_limited": "Quotum beperkt",
+                "authorization_revoked": "Toestemming ingetrokken",
+                "token_refresh_failed": "Tokenvernieuwing is mislukt",
+                "property_access_lost": "Toegang tot eigendom verloren",
+                "credentials_invalid": "Ongeldige inloggegevens",
+                "credentials_missing": "Referenties ontbreken",
+                "api_disabled": "Search Console API uitgeschakeld",
+                "google_unavailable": "Google is niet beschikbaar",
+                "unknown": "Onbekende synchronisatiefout"
+            },
+            "states": {
+                "missingCredentials": "OAuth-inloggegevens vereist.",
+                "connected": "Aangesloten.",
+                "disconnected": "Niet verbonden.",
+                "propertyMapped": "Toegewezen aan {{property}}.",
+                "propertyUnmapped": "Geen eigendom in kaart gebracht.",
+                "loadingMapping": "Kaart laden.",
+                "noProperties": "Er zijn geen eigenschappen geretourneerd.",
+                "noMatchingProperties": "Geen overeenkomende Search Console-eigenschappen voor deze site.",
+                "noSite": "Selecteer eerst een site.",
+                "readonly": "Alleen-lezen voor je rol.",
+                "noMappingSync": "Wijs een Search Console-eigenschap toe voordat je gaat synchroniseren.",
+                "syncRequested": "Synchronisatie aangevraagd.",
+                "disconnectSuccess": "Verbinding verbroken.",
+                "reconnectHint": "Maak opnieuw verbinding om de toegang te vernieuwen."
+            },
+            "confirm": {
+                "disconnectMessage": "De toekomstige import stopt. Geïmporteerde gegevens blijven.",
+                "removeMappingMessage": "Toekomstige import stopt voor deze site.",
+                "disconnectAccept": "Verbreek de verbinding",
+                "removeMappingAccept": "Mapping verwijderen",
+                "cancel": "Annuleren"
+            },
+            "errors": {
+                "load": "Status niet beschikbaar.",
+                "connect": "Verbinding mislukt.",
+                "disconnect": "De verbinding verbreken is mislukt.",
+                "properties": "Eigenschappen niet beschikbaar.",
+                "apiDisabled": "Schakel de Search Console API in en vernieuw vervolgens.",
+                "reconnect": "Maak opnieuw verbinding om de toegang te vernieuwen.",
+                "propertyAccess": "Toegang tot eigendom verloren.",
+                "mapping": "Mapping niet beschikbaar.",
+                "mapProperty": "Het in kaart brengen is mislukt.",
+                "unmapProperty": "Het verwijderen van de kaart is mislukt.",
+                "sync": "Synchronisatieverzoek mislukt."
+            }
+        }
+    },
+    "searchConsole": {
+        "title": "Search Console",
+        "description": "Geaggregeerde Search Console-gegevens.",
+        "kpis": {
+            "clicks": "Klikken",
+            "impressions": "Indrukken",
+            "ctr": "CTR",
+            "position": "Gem. positie"
+        },
+        "sections": {
+            "trend": "Trend",
+            "topQueries": "Belangrijkste zoekopdrachten",
+            "topPages": "Toppagina's",
+            "countries": "Landen",
+            "devices": "Apparaten"
+        },
+        "context": {
+            "label": "Search Console-bereik",
+            "range": "Bereik:{{value}}"
+        },
+        "states": {
+            "pending": "Search Console-gegevens importeren.",
+            "empty": "Geen rijen voor dit bereik.",
+            "error": "Search Console-gegevens niet beschikbaar."
+        },
+        "setup": {
+            "title": "Sluit Search Console aan",
+            "manageText": "Verbind of wijs Search Console toe om hier zoekopdrachtgegevens toe te voegen.",
+            "readonlyText": "Vraag je team of locatiebeheerder om Search Console aan te sluiten.",
+            "action": "Stel Search Console in"
+        }
+    },
+    "ecommerce": {
+        "docsAction": "E-commerce instellen",
+        "kpis": {
+            "revenue": "Winst",
+            "orders": "Bestellingen",
+            "averageOrderValue": "Gem. bestelwaarde",
+            "checkoutConversion": "Conversie bij het afrekenen"
+        },
+        "chart": {
+            "title": "Inkomsten in de loop van de tijd",
+            "description": "Houd de omzet en voltooide aankopen bij voor de actieve periode.",
+            "revenue": "Winst",
+            "orders": "Bestellingen"
+        },
+        "filters": {
+            "product": "Product:{{value}}",
+            "utmSource": "UTM-bron: {{value}}"
+        },
+        "filtersPanels": {
+            "sources": "Topbronnen",
+            "referrers": "Topverwijzers",
+            "devices": "Topapparaten",
+            "countries": "Toplanden"
+        },
+        "products": {
+            "title": "Topproducten",
+            "description": "Bekijk welke producten de meeste omzet en voltooide bestellingen genereren.",
+            "empty": "Er zijn geen aankoopartikelen die overeenkomen met de huidige filters."
+        },
+        "sources": {
+            "title": "Inkomstenbronnen",
+            "description": "Wijs de opbrengst toe aan bron, medium, campagne en verwijzer.",
+            "empty": "Er zijn geen inkomstenbronnen die overeenkomen met de huidige filters."
+        },
+        "columns": {
+            "product": "Product",
+            "quantity": "Hoeveelheid",
+            "orders": "Bestellingen",
+            "revenue": "Winst",
+            "source": "Bron",
+            "campaign": "Campagne",
+            "referrer": "Verwijzer"
+        },
+        "actions": {
+            "filterProduct": "Filter",
+            "clearProductFilter": "Duidelijk"
+        },
+        "empty": {
+            "title": "Nog geen e-commercegegevens",
+            "description": "Houd aankoop-, begin_checkout-, add_to_cart- en view_item-gebeurtenissen bij om e-commerceanalyses in te vullen."
+        },
+        "noSiteDescription": "Selecteer een site om e-commerceanalyses te bekijken."
+    }
+}
