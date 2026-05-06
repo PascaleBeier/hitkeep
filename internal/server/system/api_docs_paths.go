@@ -38,7 +38,7 @@ func openAPIV1CorePaths() map[string]any {
 
 		"/ingest": map[string]any{
 			"options": op([]string{"Ingest"}, "Preflight ingest", "CORS preflight for pageview ingest.", nil, nil, nil, map[string]any{"200": desc("Preflight response")}),
-			"post": op([]string{"Ingest"}, "Ingest pageview", "Ingests a pageview hit from the browser tracker.", nil, nil,
+			"post": op([]string{"Ingest"}, "Ingest pageview", "Ingests a pageview hit from the browser tracker. This public endpoint expects the compact hk.js payload and browser Origin request context. Trusted server-side pageviews should use POST /api/ingest/server/pageview instead.", nil, nil,
 				map[string]any{"required": true, "content": map[string]any{"application/json": map[string]any{"schema": map[string]any{"type": "object", "properties": map[string]any{
 					"path": map[string]any{"type": "string"}, "referrer": map[string]any{"type": "string"}, "ua": map[string]any{"type": "string"},
 					"vp_w": map[string]any{"type": "integer"}, "vp_h": map[string]any{"type": "integer"}, "sc_w": map[string]any{"type": "integer"}, "sc_h": map[string]any{"type": "integer"},
@@ -56,7 +56,7 @@ func openAPIV1CorePaths() map[string]any {
 				map[string]any{"202": desc("Accepted"), "400": errResp("Invalid request")}),
 		},
 		"/api/ingest/server/pageview": map[string]any{
-			"post": op([]string{"Ingest"}, "Ingest server-side pageview", "Accepts one trusted server-side pageview from an API client. This server-to-server endpoint does not require browser Origin or Referer headers. HitKeep resolves the site from the submitted URL hostname, requires site.manage_data for that resolved site, and uses visitor_ip for ingest-time exclusions, spam filtering, and geolocation. Stored analytics records contain derived context instead of the visitor IP. This endpoint uses the ingest rate limiter.", secAPIClient(), nil,
+			"post": op([]string{"Ingest"}, "Ingest server-side pageview", "Accepts one trusted server-side pageview from an API client. Use this endpoint for backend forwarding, CMS plugins, reverse proxy forwarding, edge workers, and historical pageview replay. It does not require browser Origin or Referer headers. HitKeep resolves the site from the submitted URL hostname, requires site.manage_data for that resolved site, and uses visitor_ip for ingest-time exclusions, spam filtering, and geolocation. UTM values are read from the query string in url, for example utm_source and utm_campaign on the visitor-facing URL, not from top-level JSON fields. Stored analytics records contain derived context instead of the visitor IP. This endpoint uses the ingest rate limiter.", secAPIClient(), nil,
 				jsonBody(serverPageviewIngestSchema()),
 				map[string]any{
 					"202": desc("Accepted. Empty response body."),

@@ -483,6 +483,9 @@ func TestOpenAPISpecV1IncludesServerSideIngestPaths(t *testing.T) {
 			if !ok || !strings.Contains(description, "trusted server-side") || !strings.Contains(description, "API client") {
 				t.Fatalf("expected trusted API client description, got %q", description)
 			}
+			if path == "/api/ingest/server/pageview" && (!strings.Contains(description, "UTM values are read from the query string in url") || !strings.Contains(description, "not from top-level JSON fields")) {
+				t.Fatalf("expected server-side pageview description to document URL-based UTM extraction, got %q", description)
+			}
 			if !operationHasAPIClientOnlySecurity(postOp) {
 				t.Fatalf("expected %s to use API-client-only security, got %+v", path, postOp["security"])
 			}
