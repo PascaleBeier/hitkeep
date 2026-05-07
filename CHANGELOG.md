@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.4.1](https://github.com/PascaleBeier/hitkeep/compare/v2.4.0...v2.4.1) (2026-05-07)
+
+
+### Bug Fixes
+
+* **backend:** Fix mcp server request host validation, fixes [#148](https://github.com/PascaleBeier/hitkeep/issues/148) ([af94bfe](https://github.com/PascaleBeier/hitkeep/commit/af94bfe6b5760b0df8f1f9bbcecc6fff077ecb03))
+* **frontend:** Bump Angular packages ([3cbd329](https://github.com/PascaleBeier/hitkeep/commit/3cbd3295ed3d54127d140c3d98861a485c1d9665))
+
 ## [2.4.0](https://github.com/PascaleBeier/hitkeep/compare/v2.3.1...v2.4.0) (2026-05-06)
 
 
