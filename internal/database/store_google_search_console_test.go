@@ -299,11 +299,6 @@ func seedGoogleSearchConsoleCandidateSite(t *testing.T, store *Store, userID, te
 	return site.ID
 }
 
-//go:fix inline
-func ptrTime(value time.Time) *time.Time {
-	return new(value)
-}
-
 func requireDatabaseGoogleSearchConsoleConnection(t *testing.T, store *Store, teamID uuid.UUID) *GoogleSearchConsoleConnection {
 	t.Helper()
 	conn, err := store.GetGoogleSearchConsoleConnection(context.Background(), teamID)
