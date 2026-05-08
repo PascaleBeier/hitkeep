@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.2](https://github.com/PascaleBeier/hitkeep/compare/v2.4.1...v2.4.2) (2026-05-08)
+
+
+### Bug Fixes
+
+* **frontend:** keep site export format menus clickable ([3a0f453](https://github.com/PascaleBeier/hitkeep/commit/3a0f45366b7d123a0786d774069c2818ac6bb241))
+
 ## [2.4.1](https://github.com/PascaleBeier/hitkeep/compare/v2.4.0...v2.4.1) (2026-05-08)
 
 
