@@ -153,6 +153,173 @@ func TestHandleGetSystem(t *testing.T) {
 	}
 }
 
+func TestHandleGetAIStatusIsNonSecret(t *testing.T) {
+	h, store, _, ownerID, _, _ := setupSystemTestEnv(t)
+	h.ctx.Config.AIEnabled = true
+	h.ctx.Config.AIProvider = "openai-compatible"
+	h.ctx.Config.AIModel = "gpt-test"
+	h.ctx.Config.AIBaseURL = "https://gateway.example/v1"
+	h.ctx.Config.AIRegion = "eu-central-1"
+	h.ctx.Config.AIAPIKey = "super-secret-ai-key"
+	h.ctx.Config.AIRequestLimit = 1
+	h.ctx.Config.AITokenLimit = 100
+	h.ctx.Config.AIBudgetWindowMinutes = 60
+
+	_, err := store.AppendAIRun(context.Background(), database.AIRunParams{
+		Feature:       "opportunities",
+		Provider:      "openai-compatible",
+		Model:         "gpt-test",
+		OutputJSON:    `{}`,
+		TotalTokens:   12,
+		Status:        "failure",
+		ErrorCategory: "budget_exhausted",
+	})
+	if err != nil {
+		t.Fatalf("append ai run: %v", err)
+	}
+
+	req := withAdminTestUser(httptest.NewRequest(http.MethodGet, "/api/admin/system/ai", nil), ownerID)
+	w := httptest.NewRecorder()
+	h.handleGetAI().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "super-secret-ai-key") {
+		t.Fatalf("AI system status leaked provider secret: %s", w.Body.String())
+	}
+
+	var status api.SystemAIStatus
+	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if !status.Enabled || !status.Configured {
+		t.Fatalf("expected enabled configured AI status: %#v", status)
+	}
+	if status.Provider != "openai-compatible" || status.Model != "gpt-test" {
+		t.Fatalf("unexpected provider/model: %#v", status)
+	}
+	if status.BudgetExhausted || status.Status != "needs_attention" {
+		t.Fatalf("expected exhausted audit to stay visible without consuming current budget, got %#v", status)
+	}
+	if status.LastErrorCategory != "budget_exhausted" {
+		t.Fatalf("expected safe error category, got %q", status.LastErrorCategory)
+	}
+}
+
+func TestHandleGetAIStatusReportsCloudManagedMode(t *testing.T) {
+	h, _, _, ownerID, _, _ := setupSystemTestEnv(t)
+	h.ctx.Config.CloudHosted = true
+	h.ctx.Config.AIEnabled = true
+	h.ctx.Config.AIProvider = "bedrock"
+	h.ctx.Config.AIModel = "claude-test"
+	h.ctx.Config.AIAPIKey = "cloud-secret-ai-key"
+
+	req := withAdminTestUser(httptest.NewRequest(http.MethodGet, "/api/admin/system/ai", nil), ownerID)
+	w := httptest.NewRecorder()
+	h.handleGetAI().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "cloud-secret-ai-key") {
+		t.Fatalf("AI system status leaked cloud provider secret: %s", w.Body.String())
+	}
+
+	var status api.SystemAIStatus
+	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if status.ConfigMode != "cloud_managed" {
+		t.Fatalf("expected cloud_managed config mode, got %#v", status)
+	}
+}
+
+func TestAIStatusRejectsUnsupportedProviderConfig(t *testing.T) {
+	h, _, _, ownerID, _, _ := setupSystemTestEnv(t)
+	h.ctx.Config.AIEnabled = true
+	h.ctx.Config.AIProvider = "not-a-provider"
+	h.ctx.Config.AIModel = "gpt-test"
+	h.ctx.Config.AIAPIKey = "super-secret-ai-key"
+
+	req := withAdminTestUser(httptest.NewRequest(http.MethodGet, "/api/admin/system/ai", nil), ownerID)
+	w := httptest.NewRecorder()
+	h.handleGetAI().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "super-secret-ai-key") {
+		t.Fatalf("AI system status leaked provider secret: %s", w.Body.String())
+	}
+
+	var status api.SystemAIStatus
+	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if status.Configured || status.Status != "not_configured" {
+		t.Fatalf("expected unsupported provider to be not configured, got %#v", status)
+	}
+
+	systemReq := withAdminTestUser(httptest.NewRequest(http.MethodGet, "/api/admin/system", nil), ownerID)
+	systemW := httptest.NewRecorder()
+	h.handleGetSystem().ServeHTTP(systemW, systemReq)
+	if systemW.Code != http.StatusOK {
+		t.Fatalf("expected system 200, got %d: %s", systemW.Code, systemW.Body.String())
+	}
+	var info api.SystemInfo
+	if err := json.NewDecoder(systemW.Body).Decode(&info); err != nil {
+		t.Fatalf("decode system response: %v", err)
+	}
+	features := featureStatusByKey(info.EnabledFeatures)
+	for _, key := range []string{"ai", "ai_opportunities"} {
+		if features[key].Enabled {
+			t.Fatalf("expected feature %q disabled for unsupported provider config, got %#v", key, features[key])
+		}
+	}
+}
+
+func TestAIStatusReportsMissingRequiredProviderKeyAsNotConfigured(t *testing.T) {
+	h, _, _, ownerID, _, _ := setupSystemTestEnv(t)
+	h.ctx.Config.AIEnabled = true
+	h.ctx.Config.AIProvider = "openai"
+	h.ctx.Config.AIModel = "gpt-test"
+
+	req := withAdminTestUser(httptest.NewRequest(http.MethodGet, "/api/admin/system/ai", nil), ownerID)
+	w := httptest.NewRecorder()
+	h.handleGetAI().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var status api.SystemAIStatus
+	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if status.Configured || status.Status != "not_configured" {
+		t.Fatalf("expected missing provider key to be not configured, got %#v", status)
+	}
+}
+
+func TestAIStatusAllowsKeylessLocalProviderConfig(t *testing.T) {
+	h, _, _, ownerID, _, _ := setupSystemTestEnv(t)
+	h.ctx.Config.AIEnabled = true
+	h.ctx.Config.AIProvider = "ollama"
+	h.ctx.Config.AIModel = "llama3"
+
+	req := withAdminTestUser(httptest.NewRequest(http.MethodGet, "/api/admin/system/ai", nil), ownerID)
+	w := httptest.NewRecorder()
+	h.handleGetAI().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var status api.SystemAIStatus
+	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if !status.Configured || status.Status != "configured" {
+		t.Fatalf("expected keyless local provider to be configured, got %#v", status)
+	}
+}
+
 func TestSystemRuntimeModeDefaultsToOSS(t *testing.T) {
 	conf := &config.Config{}
 	if mode := systemRuntimeMode(conf); mode != "oss" {

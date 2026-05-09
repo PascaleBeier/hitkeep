@@ -49,6 +49,10 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		RateLimiter: ctx.ApiLimiter,
 	}, h.handleGetShareSiteStats()))
 
+	mux.HandleFunc("GET /api/share/{token}/sites/{id}/opportunities", ctx.Handler(shared.HandlerConfig{
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleGetShareOpportunities()))
+
 	mux.HandleFunc("GET /api/share/{token}/sites/{id}/hits", ctx.Handler(shared.HandlerConfig{
 		RateLimiter: ctx.ApiLimiter,
 	}, h.handleGetShareHits()))
@@ -303,6 +307,67 @@ func (h *handler) handleGetShareSiteStats() http.HandlerFunc {
 			slog.Error("Failed to encode response", "error", err)
 		}
 	}
+}
+
+func (h *handler) handleGetShareOpportunities() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		site, ok := h.loadShareSite(w, r)
+		if !ok {
+			return
+		}
+		if !h.ensureSiteMatch(w, r, site) {
+			return
+		}
+
+		opportunities, err := h.ctx.Store.ListOpportunities(r.Context(), site.ID)
+		if err != nil {
+			slog.Error("Failed to get share opportunities", "error", err, "site_id", site.ID)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(api.SharedOpportunityListResponse{Opportunities: sharedOpportunities(opportunities)}); err != nil {
+			slog.Error("Failed to encode response", "error", err)
+		}
+	}
+}
+
+func sharedOpportunities(opportunities []api.Opportunity) []api.SharedOpportunity {
+	out := make([]api.SharedOpportunity, 0, len(opportunities))
+	for _, opportunity := range opportunities {
+		if opportunity.Status == "dismissed" {
+			continue
+		}
+		out = append(out, api.SharedOpportunity{
+			ID:               opportunity.ID,
+			SiteID:           opportunity.SiteID,
+			Kind:             opportunity.Kind,
+			TypeKey:          opportunity.TypeKey,
+			TitleKey:         opportunity.TitleKey,
+			SummaryKey:       opportunity.SummaryKey,
+			ActionKey:        opportunity.ActionKey,
+			DigestKey:        opportunity.DigestKey,
+			CopyParams:       opportunity.CopyParams,
+			ImpactValue:      opportunity.ImpactValue,
+			ImpactLabelKey:   opportunity.ImpactLabelKey,
+			MonthlyUpside:    opportunity.MonthlyUpside,
+			Confidence:       opportunity.Confidence,
+			Score:            opportunity.Score,
+			ScoreBreakdown:   opportunity.ScoreBreakdown,
+			Status:           opportunity.Status,
+			RouteLabelKey:    opportunity.RouteLabelKey,
+			RouteParams:      opportunity.RouteParams,
+			RouteIcon:        opportunity.RouteIcon,
+			DetectorVersion:  opportunity.DetectorVersion,
+			Evidence:         opportunity.Evidence,
+			CitedEvidenceIDs: opportunity.CitedEvidenceIDs,
+			GeneratedAt:      opportunity.GeneratedAt,
+			CreatedAt:        opportunity.CreatedAt,
+			UpdatedAt:        opportunity.UpdatedAt,
+		})
+	}
+	return out
 }
 
 func (h *handler) handleGetShareHits() http.HandlerFunc {

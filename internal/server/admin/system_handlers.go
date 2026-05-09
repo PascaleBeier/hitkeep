@@ -18,6 +18,7 @@ import (
 
 	"github.com/google/uuid"
 
+	hitai "hitkeep/internal/ai"
 	"hitkeep/internal/api"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
@@ -56,10 +57,13 @@ func systemRuntimeMode(cfg *config.Config) string {
 func systemFeatureStatuses(cfg *config.Config, mailerConfigured bool) []api.SystemFeatureStatus {
 	billingEnabled := cfg.CloudHosted && strings.TrimSpace(cfg.StripeSecretKey) != ""
 	searchConsoleEnabled := googleSearchConsoleCredentialsConfigured(cfg)
+	aiConfigured := aiConfigured(cfg)
 
 	return []api.SystemFeatureStatus{
 		{Key: "mcp", Enabled: cfg.MCPEnabled, Detail: enabledDetail(cfg.MCPEnabled, cfg.MCPPath)},
 		{Key: "mcp_docs", Enabled: cfg.MCPEnabled && cfg.MCPDocsEnabled, Detail: enabledDetail(cfg.MCPEnabled && cfg.MCPDocsEnabled, cfg.MCPDocsURL)},
+		{Key: "ai", Enabled: cfg.AIEnabled && aiConfigured, Detail: aiFeatureDetail(cfg, aiConfigured)},
+		{Key: "ai_opportunities", Enabled: cfg.AIEnabled && aiConfigured, Detail: aiFeatureDetail(cfg, aiConfigured)},
 		{Key: "automatic_backups", Enabled: cfg.BackupPath != "", Detail: backupFeatureDetail(cfg)},
 		{Key: "spam_auto_update", Enabled: cfg.SpamFilterAutoUpdate, Detail: enabledDetail(cfg.SpamFilterAutoUpdate, formatFeatureInterval(cfg.SpamFilterUpdateIntervalMin))},
 		{Key: "mail_delivery", Enabled: mailerConfigured, Detail: mailFeatureDetail(cfg, mailerConfigured)},
@@ -68,6 +72,36 @@ func systemFeatureStatuses(cfg *config.Config, mailerConfigured bool) []api.Syst
 		{Key: "cloud_signup", Enabled: cfg.CloudHosted && cfg.CloudSignupEnabled},
 		{Key: "billing", Enabled: billingEnabled, Detail: enabledDetail(billingEnabled, "stripe")},
 	}
+}
+
+func aiConfigured(cfg *config.Config) bool {
+	return aiConfigError(cfg) == nil
+}
+
+func aiConfigError(cfg *config.Config) error {
+	if cfg == nil {
+		return hitai.ErrNotConfigured
+	}
+	return hitai.ValidateConfig(hitai.Config{
+		Provider: strings.TrimSpace(cfg.AIProvider),
+		Model:    strings.TrimSpace(cfg.AIModel),
+		APIKey:   strings.TrimSpace(cfg.AIAPIKey),
+	})
+}
+
+func aiFeatureDetail(cfg *config.Config, configured bool) string {
+	if !configured {
+		return ""
+	}
+	provider := strings.TrimSpace(cfg.AIProvider)
+	model := strings.TrimSpace(cfg.AIModel)
+	if model == "" {
+		return provider
+	}
+	if provider == "" {
+		return model
+	}
+	return provider + "/" + model
 }
 
 func backupFeatureDetail(cfg *config.Config) string {
@@ -175,6 +209,65 @@ func (h *handler) handleGetSearchConsole() http.HandlerFunc {
 		status := googleSearchConsoleSystemStatus(h.ctx.Config, h.ctx.TenantStores != nil, storeStatus)
 		writeJSON(w, http.StatusOK, status)
 	}
+}
+
+func (h *handler) handleGetAI() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		status := aiSystemStatus(h.ctx.Config, h.ctx.Store)
+		writeJSON(w, http.StatusOK, status)
+	}
+}
+
+func aiSystemStatus(cfg *config.Config, store *database.Store) api.SystemAIStatus {
+	status := api.SystemAIStatus{
+		ConfigMode: "self_hosted",
+	}
+	if cfg != nil {
+		status.Enabled = cfg.AIEnabled
+		status.Configured = aiConfigured(cfg)
+		status.RequestLimit = cfg.AIRequestLimit
+		status.TokenLimit = cfg.AITokenLimit
+		status.BudgetWindowMinutes = cfg.AIBudgetWindowMinutes
+		status.Provider = strings.TrimSpace(cfg.AIProvider)
+		status.Model = strings.TrimSpace(cfg.AIModel)
+		status.BaseURLConfigured = strings.TrimSpace(cfg.AIBaseURL) != ""
+		status.Region = strings.TrimSpace(cfg.AIRegion)
+		if cfg.CloudHosted {
+			status.ConfigMode = "cloud_managed"
+		}
+	}
+	switch {
+	case !status.Enabled:
+		status.Status = "disabled"
+	case !status.Configured:
+		status.Status = "not_configured"
+	default:
+		status.Status = "configured"
+	}
+	if store == nil {
+		return status
+	}
+	window := time.Duration(status.BudgetWindowMinutes) * time.Minute
+	if window <= 0 {
+		window = 24 * time.Hour
+	}
+	if usage, err := store.GetAIUsageSince(context.Background(), time.Now().UTC().Add(-window)); err == nil {
+		status.RequestsUsed = usage.Requests
+		status.TokensUsed = usage.Tokens
+		status.BudgetExhausted = (status.RequestLimit > 0 && status.RequestsUsed >= status.RequestLimit) || (status.TokenLimit > 0 && status.TokensUsed >= status.TokenLimit)
+		if status.BudgetExhausted && status.Status == "configured" {
+			status.Status = "budget_exhausted"
+		}
+	}
+	if summary, err := store.GetAIRunSummary(context.Background()); err == nil {
+		status.LastSuccessAt = summary.LastSuccessAt
+		status.LastAttemptAt = summary.LastAttemptAt
+		status.LastErrorCategory = summary.LastErrorCategory
+		if status.Status == "configured" && summary.LastErrorCategory != "" && summary.LastSuccessAt == nil {
+			status.Status = "needs_attention"
+		}
+	}
+	return status
 }
 
 func googleSearchConsoleSystemStatus(cfg *config.Config, tenantStoresConfigured bool, storeStatus database.GoogleSearchConsoleSystemStatus) api.SystemSearchConsoleStatus {

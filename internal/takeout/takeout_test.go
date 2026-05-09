@@ -847,6 +847,114 @@ func TestExportUserDataJSONIncludesAIFetchesAndAIChatbotEvents(t *testing.T) {
 	}
 }
 
+func TestExportSiteDataJSONIncludesSafeOpportunitiesAndAIRunMetadata(t *testing.T) {
+	ctx, store, service, _, siteID := setupTakeoutFixture(t)
+	t.Cleanup(func() { _ = store.Close() })
+
+	teamID, err := store.GetSiteTenantID(ctx, siteID)
+	if err != nil {
+		t.Fatalf("resolve team: %v", err)
+	}
+	requireTakeoutAIRunRejectsRawProviderPayload(t, ctx, store, teamID, siteID)
+
+	runID, err := store.AppendAIRun(ctx, database.AIRunParams{
+		TeamID:          teamID,
+		SiteID:          siteID,
+		ActorType:       "user",
+		Feature:         "opportunities",
+		Provider:        "openai",
+		Model:           "gpt-test",
+		TemplateVersion: "opportunities-v1",
+		EvidenceIDs:     []string{"checkout_starts"},
+		InputHash:       "input-hash",
+		OutputHash:      "output-hash",
+		OutputJSON:      `{"title_key":"opportunities.catalog.checkout_conversion.title"}`,
+		TotalTokens:     42,
+		Status:          "success",
+	})
+	if err != nil {
+		t.Fatalf("append ai run: %v", err)
+	}
+	_, err = store.UpsertOpportunities(ctx, []database.OpportunityInput{{
+		TeamID:           teamID,
+		SiteID:           siteID,
+		Kind:             "conversion",
+		TypeKey:          "opportunities.types.checkout_conversion",
+		TitleKey:         "opportunities.catalog.checkout_conversion.title",
+		SummaryKey:       "opportunities.catalog.checkout_conversion.summary",
+		ActionKey:        "opportunities.catalog.checkout_conversion.action",
+		DigestKey:        "opportunities.catalog.checkout_conversion.digest",
+		CopyParams:       map[string]any{"conversion_rate": "42%", "monthly_upside": "$8,500"},
+		ImpactValue:      "$8,500",
+		ImpactLabelKey:   "opportunities.impact.estimated_monthly_upside",
+		MonthlyUpside:    8500,
+		Confidence:       "high",
+		Score:            92,
+		Status:           "new",
+		RouteLabelKey:    "opportunities.routes.checkout",
+		RouteParams:      map[string]any{"path": "/checkout"},
+		DetectorVersion:  "opportunities-detectors-v1",
+		Evidence:         []api.OpportunityEvidence{{ID: "checkout_starts", LabelKey: "opportunities.evidence.checkout_starts", Value: "120"}},
+		CitedEvidenceIDs: []string{"checkout_starts"},
+		AIRunID:          runID,
+	}})
+	if err != nil {
+		t.Fatalf("upsert opportunity: %v", err)
+	}
+
+	filename, err := service.ExportSiteData(ctx, siteID, "json")
+	if err != nil {
+		t.Fatalf("export site json: %v", err)
+	}
+	rows := readJSONTakeoutRows(t, filename)
+
+	opportunity := findTakeoutRow(t, rows, "opportunity")
+	if takeoutString(opportunity["title_key"]) != "opportunities.catalog.checkout_conversion.title" {
+		t.Fatalf("expected opportunity title key in takeout, got %#v", opportunity)
+	}
+	if !strings.Contains(takeoutString(opportunity["copy_params_json"]), "conversion_rate") {
+		t.Fatalf("expected opportunity copy params in takeout, got %#v", opportunity)
+	}
+	if !strings.Contains(takeoutString(opportunity["cited_evidence_ids_json"]), "checkout_starts") {
+		t.Fatalf("expected opportunity cited evidence ids in takeout, got %#v", opportunity)
+	}
+
+	aiRun := findTakeoutRow(t, rows, "ai_run")
+	if takeoutString(aiRun["feature"]) != "opportunities" || takeoutString(aiRun["output_hash"]) != "output-hash" {
+		t.Fatalf("expected safe ai run metadata in takeout, got %#v", aiRun)
+	}
+	if _, ok := aiRun["output_json"]; ok {
+		t.Fatalf("did not expect raw ai run output_json in takeout: %#v", aiRun)
+	}
+	encodedRows, err := json.Marshal(rows)
+	if err != nil {
+		t.Fatalf("marshal rows: %v", err)
+	}
+	for _, forbidden := range []string{"do not export", "raw_provider_response", "sk-", "provider_error_body", "raw_prompt"} {
+		if strings.Contains(string(encodedRows), forbidden) {
+			t.Fatalf("takeout leaked forbidden AI payload marker %q: %s", forbidden, string(encodedRows))
+		}
+	}
+}
+
+func requireTakeoutAIRunRejectsRawProviderPayload(t *testing.T, ctx context.Context, store *database.Store, teamID, siteID uuid.UUID) {
+	t.Helper()
+	_, err := store.AppendAIRun(ctx, database.AIRunParams{
+		TeamID:          teamID,
+		SiteID:          siteID,
+		ActorType:       "user",
+		Feature:         "opportunities",
+		Provider:        "openai",
+		Model:           "gpt-test",
+		TemplateVersion: "opportunities-v1",
+		OutputJSON:      `{"raw_provider_response":"do not persist","title_key":"opportunities.catalog.checkout_conversion.title"}`,
+		Status:          "success",
+	})
+	if err == nil || !strings.Contains(err.Error(), "provider payload") {
+		t.Fatalf("expected raw provider payload to be rejected before takeout, got %v", err)
+	}
+}
+
 func setupTakeoutFixture(t *testing.T) (context.Context, *database.Store, *TakeoutService, uuid.UUID, uuid.UUID) {
 	t.Helper()
 
@@ -1038,6 +1146,21 @@ func assertCSVTakeoutContainsSentinel(t *testing.T, filename string, sentinel ta
 func assertJSONTakeoutContainsSentinel(t *testing.T, filename string, sentinel takeoutSentinel) {
 	t.Helper()
 
+	rows := readJSONTakeoutRows(t, filename)
+	if len(rows) == 0 {
+		t.Fatalf("expected json takeout data rows")
+	}
+	for _, row := range rows {
+		if takeoutString(row["record_type"]) == sentinel.RecordType && takeoutString(row["path"]) == sentinel.Path {
+			return
+		}
+	}
+	t.Fatalf("expected json takeout to contain %s path %q", sentinel.RecordType, sentinel.Path)
+}
+
+func readJSONTakeoutRows(t *testing.T, filename string) []map[string]any {
+	t.Helper()
+
 	f, err := os.Open(filename)
 	if err != nil {
 		t.Fatalf("open json takeout: %v", err)
@@ -1048,15 +1171,19 @@ func assertJSONTakeoutContainsSentinel(t *testing.T, filename string, sentinel t
 	if err := json.NewDecoder(f).Decode(&rows); err != nil {
 		t.Fatalf("decode json takeout: %v", err)
 	}
-	if len(rows) == 0 {
-		t.Fatalf("expected json takeout data rows")
-	}
+	return rows
+}
+
+func findTakeoutRow(t *testing.T, rows []map[string]any, recordType string) map[string]any {
+	t.Helper()
+
 	for _, row := range rows {
-		if takeoutString(row["record_type"]) == sentinel.RecordType && takeoutString(row["path"]) == sentinel.Path {
-			return
+		if takeoutString(row["record_type"]) == recordType {
+			return row
 		}
 	}
-	t.Fatalf("expected json takeout to contain %s path %q", sentinel.RecordType, sentinel.Path)
+	t.Fatalf("expected takeout row with record_type %q in %#v", recordType, rows)
+	return nil
 }
 
 func assertNDJSONTakeoutContainsSentinel(t *testing.T, filename string, sentinel takeoutSentinel) {

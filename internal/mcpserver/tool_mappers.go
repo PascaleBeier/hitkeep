@@ -185,9 +185,11 @@ Team API clients are recommended for shared assistants and automations.
 
 ## Analytics Scope
 
-Analytics tools require a ` + "`site_id`" + ` that the API client can view. The server returns aggregate KPIs, event summaries, ecommerce summaries, and AI visibility reports. It does not expose raw hit exports or write/admin actions.
+Analytics tools require a ` + "`site_id`" + ` that the API client can view. The server returns aggregate KPIs, event summaries, ecommerce summaries, AI visibility reports, and saved Opportunities recommendations. It does not expose raw hit exports or write/admin actions.
 
 Date inputs use RFC3339 timestamps. If omitted, tools default to the last 30 days. Filters support path, hostname, referrer, referrer_host, device, country, browser, language, and UTM fields.
+
+Opportunities are returned as final customer-visible records with localization keys, interpolation params, cited evidence, detector metadata, and status. MCP does not expose raw prompts, raw provider payloads, unrestricted tool calls, or visitor-level rows.
 
 Search Console tools read imported Google Search Console facts stored in HitKeep. They do not call Google live, refresh OAuth credentials, or trigger syncs. Use ` + "`hitkeep_get_search_console_status`" + ` to check whether a site is mapped, synced, stale, failed, or needs attention before interpreting empty reports. ` + "`hitkeep_get_search_console`" + ` returns overview and series by default. Query, page, country, and device rows are aggregate imported provider data and are returned only when explicitly requested. Report warnings flag missing imported data, failed or needs-attention syncs, and requested ranges outside the imported date range.
 

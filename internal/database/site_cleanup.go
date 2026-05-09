@@ -16,6 +16,8 @@ type siteDeleteStep struct {
 
 var siteDeleteSteps = []siteDeleteStep{
 	{table: "share_links", query: "DELETE FROM share_links WHERE site_id = ?"},
+	{table: "opportunities", query: "DELETE FROM opportunities WHERE site_id = ?"},
+	{table: "ai_runs", query: "DELETE FROM ai_runs WHERE site_id = ?"},
 	{table: "site_activity_hourly_counts", query: "DELETE FROM site_activity_hourly_counts WHERE site_id = ?"},
 	{table: "site_activity_summary", query: "DELETE FROM site_activity_summary WHERE site_id = ?"},
 	{table: "site_exclusions", query: "DELETE FROM site_exclusions WHERE site_id = ?"},

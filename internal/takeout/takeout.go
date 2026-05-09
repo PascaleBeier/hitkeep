@@ -66,7 +66,7 @@ func (s *TakeoutService) ExportUserData(ctx context.Context, userID uuid.UUID, f
 	}
 
 	return s.exportTakeoutFromStore(ctx, s.store, "user", filename, normalizedFormat, exportfmt.DuckDBCopyOptions(normalizedFormat), []takeoutQuerySource{
-		{WhereClause: takeoutWhereClauseForSites(sites)},
+		{WhereClause: takeoutWhereClauseForSites(sites), IncludeAnalytics: true, IncludeControl: true},
 	})
 }
 
@@ -88,15 +88,23 @@ func (s *TakeoutService) ExportSiteData(ctx context.Context, siteID uuid.UUID, f
 			return "", fmt.Errorf("failed to resolve site analytics store: %w", err)
 		}
 		store = analyticsStore
+		if analyticsStore != s.store {
+			return s.exportTakeoutFromSources(ctx, "site", filename, normalizedFormat, exportfmt.DuckDBCopyOptions(normalizedFormat), []takeoutStoreSource{
+				{Store: analyticsStore, Source: takeoutQuerySource{WhereClause: whereClause, IncludeAnalytics: true}},
+				{Store: s.store, Source: takeoutQuerySource{WhereClause: whereClause, IncludeControl: true}},
+			})
+		}
 	}
 
 	return s.exportTakeoutFromStore(ctx, store, "site", filename, normalizedFormat, exportfmt.DuckDBCopyOptions(normalizedFormat), []takeoutQuerySource{
-		{WhereClause: whereClause},
+		{WhereClause: whereClause, IncludeAnalytics: true, IncludeControl: true},
 	})
 }
 
 type takeoutQuerySource struct {
-	WhereClause string
+	WhereClause      string
+	IncludeAnalytics bool
+	IncludeControl   bool
 }
 
 type takeoutStoreSource struct {
@@ -165,7 +173,7 @@ func (s *TakeoutService) exportTakeoutFromStore(ctx context.Context, store *data
 
 func (s *TakeoutService) takeoutSourcesForSites(ctx context.Context, sites []api.Site) ([]takeoutStoreSource, error) {
 	if len(sites) == 0 {
-		return []takeoutStoreSource{{Store: s.store, Source: takeoutQuerySource{WhereClause: "FALSE"}}}, nil
+		return []takeoutStoreSource{{Store: s.store, Source: takeoutQuerySource{WhereClause: "FALSE", IncludeAnalytics: true, IncludeControl: true}}}, nil
 	}
 
 	sharedIDs := make([]uuid.UUID, 0)
@@ -186,18 +194,22 @@ func (s *TakeoutService) takeoutSourcesForSites(ctx context.Context, sites []api
 	if len(sharedIDs) > 0 {
 		sources = append(sources, takeoutStoreSource{
 			Store:  s.store,
-			Source: takeoutQuerySource{WhereClause: takeoutWhereClauseForSiteIDs(sharedIDs)},
+			Source: takeoutQuerySource{WhereClause: takeoutWhereClauseForSiteIDs(sharedIDs), IncludeAnalytics: true},
 		})
 	}
+	sources = append(sources, takeoutStoreSource{
+		Store:  s.store,
+		Source: takeoutQuerySource{WhereClause: takeoutWhereClauseForSites(sites), IncludeControl: true},
+	})
 
 	for store, ids := range tenantIDsByStore {
 		sources = append(sources, takeoutStoreSource{
 			Store:  store,
-			Source: takeoutQuerySource{WhereClause: takeoutWhereClauseForSiteIDs(ids)},
+			Source: takeoutQuerySource{WhereClause: takeoutWhereClauseForSiteIDs(ids), IncludeAnalytics: true},
 		})
 	}
 	if len(sources) == 0 {
-		return []takeoutStoreSource{{Store: s.store, Source: takeoutQuerySource{WhereClause: "FALSE"}}}, nil
+		return []takeoutStoreSource{{Store: s.store, Source: takeoutQuerySource{WhereClause: "FALSE", IncludeAnalytics: true, IncludeControl: true}}}, nil
 	}
 	return sources, nil
 }
@@ -261,19 +273,36 @@ func buildTakeoutQuery(sources []takeoutQuerySource, filename, format string) st
 		sources = []takeoutQuerySource{{WhereClause: "FALSE"}}
 	}
 
-	selects := make([]string, 0, len(sources)*5)
+	selects := make([]string, 0, len(sources)*7)
 	for _, source := range sources {
 		whereClause := source.WhereClause
 		if whereClause == "" {
 			whereClause = "FALSE"
 		}
-		selects = append(selects,
-			fmt.Sprintf("SELECT 'hit' as record_type, * FROM hits WHERE %s", whereClause),
-			fmt.Sprintf("SELECT 'event' as record_type, * FROM events WHERE %s", whereClause),
-			fmt.Sprintf("SELECT 'ai_fetch' as record_type, * FROM ai_fetches WHERE %s", whereClause),
-			fmt.Sprintf("SELECT 'goal' as record_type, * FROM goals WHERE %s", whereClause),
-			fmt.Sprintf("SELECT 'funnel' as record_type, * FROM funnels WHERE %s", whereClause),
-		)
+		includeAnalytics := source.IncludeAnalytics
+		includeControl := source.IncludeControl
+		if !includeAnalytics && !includeControl {
+			includeAnalytics = true
+			includeControl = true
+		}
+		if includeAnalytics {
+			selects = append(selects,
+				fmt.Sprintf("SELECT 'hit' as record_type, * FROM hits WHERE %s", whereClause),
+				fmt.Sprintf("SELECT 'event' as record_type, * FROM events WHERE %s", whereClause),
+				fmt.Sprintf("SELECT 'ai_fetch' as record_type, * FROM ai_fetches WHERE %s", whereClause),
+				fmt.Sprintf("SELECT 'goal' as record_type, * FROM goals WHERE %s", whereClause),
+				fmt.Sprintf("SELECT 'funnel' as record_type, * FROM funnels WHERE %s", whereClause),
+			)
+		}
+		if includeControl {
+			selects = append(selects,
+				opportunityTakeoutSelect(whereClause),
+				aiRunTakeoutSelect(whereClause),
+			)
+		}
+	}
+	if len(selects) == 0 {
+		selects = append(selects, "SELECT 'empty' as record_type WHERE FALSE")
 	}
 
 	return fmt.Sprintf(`
@@ -281,6 +310,72 @@ func buildTakeoutQuery(sources []takeoutQuerySource, filename, format string) st
 		%s
 	) TO '%s' (FORMAT %s);
 `, strings.Join(selects, "\n\t\tUNION BY NAME\n\t\t"), escapeTakeoutSQLString(filename), format)
+}
+
+func opportunityTakeoutSelect(whereClause string) string {
+	return fmt.Sprintf(`
+		SELECT
+			'opportunity' AS record_type,
+			id,
+			team_id,
+			site_id,
+			kind,
+			type_key,
+			title_key,
+			summary_key,
+			action_key,
+			digest_key,
+			copy_params_json,
+			impact_value,
+			impact_label_key,
+			monthly_upside,
+			confidence,
+			score,
+			score_breakdown_json,
+			status,
+			route_label_key,
+			route_params_json,
+			route_icon,
+			detector_version,
+			evidence_json,
+			cited_evidence_ids_json,
+			ai_run_id,
+			generated_at,
+			created_at,
+			updated_at
+		FROM opportunities
+		WHERE %s
+	`, whereClause)
+}
+
+func aiRunTakeoutSelect(whereClause string) string {
+	return fmt.Sprintf(`
+		SELECT
+			'ai_run' AS record_type,
+			id,
+			team_id,
+			site_id,
+			actor_id,
+			actor_type,
+			feature,
+			provider,
+			model,
+			template_version,
+			evidence_ids_json,
+			input_hash,
+			output_hash,
+			input_tokens,
+			output_tokens,
+			total_tokens,
+			tool_call_count,
+			lifecycle_events_json,
+			status,
+			error_category,
+			latency_ms,
+			created_at
+		FROM ai_runs
+		WHERE %s
+	`, whereClause)
 }
 
 func buildTakeoutMergeQuery(filenames []string, filename, format string) string {

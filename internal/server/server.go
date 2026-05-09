@@ -11,6 +11,7 @@ import (
 	"github.com/nsqio/go-nsq"
 	"golang.org/x/time/rate"
 
+	hitai "hitkeep/internal/ai"
 	"hitkeep/internal/blocking"
 	"hitkeep/internal/cluster"
 	"hitkeep/internal/config"
@@ -27,6 +28,7 @@ import (
 	"hitkeep/internal/server/goals"
 	importhandlers "hitkeep/internal/server/imports"
 	"hitkeep/internal/server/ingest"
+	opportunityhandlers "hitkeep/internal/server/opportunities"
 	"hitkeep/internal/server/permissions"
 	searchconsolereports "hitkeep/internal/server/searchconsolereports"
 	sharehandlers "hitkeep/internal/server/share"
@@ -134,6 +136,25 @@ func New(conf *config.Config, publicFS fs.FS, store *database.Store, tenantStore
 	importStageCleanupStatus := &database.ImportStageCleanupStatusTracker{}
 	importStageCleanupStatus.SetConfig(conf.ImportStageRetentionDays > 0, conf.ImportStageRetentionDays)
 	mailTestTracker := &database.MailTestTracker{}
+	aiService, err := hitai.NewService(hitai.Config{
+		Enabled:             conf.AIEnabled,
+		Provider:            conf.AIProvider,
+		Model:               conf.AIModel,
+		BaseURL:             conf.AIBaseURL,
+		Region:              conf.AIRegion,
+		APIKey:              conf.AIAPIKey,
+		Timeout:             time.Duration(conf.AITimeoutSeconds) * time.Second,
+		RequestLimit:        conf.AIRequestLimit,
+		TokenLimit:          conf.AITokenLimit,
+		BudgetWindowMinutes: conf.AIBudgetWindowMinutes,
+		ConfigMode:          aiConfigMode(conf),
+	}, hitai.StoreRecorder{Store: store})
+	if err != nil {
+		slog.Warn("AI provider is not configured", "error", err)
+		if aiService == nil {
+			slog.Warn("AI service disabled because provider setup returned no service")
+		}
+	}
 
 	s.ctx = &shared.Context{
 		Store:          store,
@@ -153,6 +174,7 @@ func New(conf *config.Config, publicFS fs.FS, store *database.Store, tenantStore
 			ClientID:     conf.GoogleSearchConsoleClientID,
 			ClientSecret: conf.GoogleSearchConsoleClientSecret,
 		}),
+		AI:                       aiService,
 		IPFilter:                 ipFilter,
 		SpamFilter:               spamFilter,
 		StartedAt:                time.Now().UTC(),
@@ -247,6 +269,7 @@ func (s *Server) setupRoutes(mux *http.ServeMux, publicFS fs.FS) {
 	goals.Register(mux, ctx)
 	importhandlers.Register(mux, ctx)
 	events.Register(mux, ctx)
+	opportunityhandlers.Register(mux, ctx)
 	aifetch.Register(mux, ctx)
 	searchconsolereports.Register(mux, ctx)
 	takeouthandlers.Register(mux, ctx)
@@ -258,6 +281,13 @@ func (s *Server) setupRoutes(mux *http.ServeMux, publicFS fs.FS) {
 
 	// Static & SPA Handling
 	mux.Handle("/", s.spaHandler(publicFS))
+}
+
+func aiConfigMode(conf *config.Config) string {
+	if conf.CloudHosted {
+		return "cloud_managed"
+	}
+	return "self_hosted"
 }
 
 func (s *Server) spaHandler(publicFS fs.FS) http.HandlerFunc {

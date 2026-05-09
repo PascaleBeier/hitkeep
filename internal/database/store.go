@@ -22,6 +22,7 @@ type Store struct {
 	db                  *sql.DB
 	path                string
 	analyticsMu         sync.Mutex
+	aiBudgetMu          sync.Mutex
 	analyticsStatements *analyticsStatements
 	runtime             *runtimeCache
 }

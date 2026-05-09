@@ -880,6 +880,101 @@ type EcommerceSourceStat struct {
 	Orders      int     `json:"orders"`
 }
 
+type OpportunityEvidence struct {
+	ID           string         `json:"id"`
+	LabelKey     string         `json:"label_key"`
+	Value        string         `json:"value"`
+	DetailKey    string         `json:"detail_key,omitempty"`
+	DetailParams map[string]any `json:"detail_params,omitempty"`
+}
+
+type OpportunityScoreBreakdown struct {
+	Sample        int `json:"sample"`
+	Impact        int `json:"impact"`
+	Urgency       int `json:"urgency"`
+	Effort        int `json:"effort"`
+	Actionability int `json:"actionability"`
+	EvidenceFit   int `json:"evidence_fit"`
+	Freshness     int `json:"freshness"`
+	Total         int `json:"total"`
+}
+
+type Opportunity struct {
+	ID               uuid.UUID                 `json:"id"`
+	TeamID           uuid.UUID                 `json:"-"`
+	SiteID           uuid.UUID                 `json:"site_id"`
+	Kind             string                    `json:"kind"`
+	TypeKey          string                    `json:"type_key"`
+	TitleKey         string                    `json:"title_key"`
+	SummaryKey       string                    `json:"summary_key"`
+	ActionKey        string                    `json:"action_key"`
+	DigestKey        string                    `json:"digest_key"`
+	CopyParams       map[string]any            `json:"copy_params"`
+	ImpactValue      string                    `json:"impact_value"`
+	ImpactLabelKey   string                    `json:"impact_label_key"`
+	MonthlyUpside    float64                   `json:"monthly_upside"`
+	Confidence       string                    `json:"confidence"`
+	Score            int                       `json:"score"`
+	ScoreBreakdown   OpportunityScoreBreakdown `json:"score_breakdown"`
+	Status           string                    `json:"status"`
+	RouteLabelKey    string                    `json:"route_label_key"`
+	RouteParams      map[string]any            `json:"route_params"`
+	RouteIcon        string                    `json:"route_icon"`
+	DetectorVersion  string                    `json:"detector_version"`
+	Evidence         []OpportunityEvidence     `json:"evidence"`
+	CitedEvidenceIDs []string                  `json:"cited_evidence_ids"`
+	AIRunID          *uuid.UUID                `json:"-"`
+	GeneratedAt      time.Time                 `json:"generated_at"`
+	CreatedAt        time.Time                 `json:"created_at"`
+	UpdatedAt        time.Time                 `json:"updated_at"`
+}
+
+type SharedOpportunity struct {
+	ID               uuid.UUID                 `json:"id"`
+	SiteID           uuid.UUID                 `json:"site_id"`
+	Kind             string                    `json:"kind"`
+	TypeKey          string                    `json:"type_key"`
+	TitleKey         string                    `json:"title_key"`
+	SummaryKey       string                    `json:"summary_key"`
+	ActionKey        string                    `json:"action_key"`
+	DigestKey        string                    `json:"digest_key"`
+	CopyParams       map[string]any            `json:"copy_params"`
+	ImpactValue      string                    `json:"impact_value"`
+	ImpactLabelKey   string                    `json:"impact_label_key"`
+	MonthlyUpside    float64                   `json:"monthly_upside"`
+	Confidence       string                    `json:"confidence"`
+	Score            int                       `json:"score"`
+	ScoreBreakdown   OpportunityScoreBreakdown `json:"score_breakdown"`
+	Status           string                    `json:"status"`
+	RouteLabelKey    string                    `json:"route_label_key"`
+	RouteParams      map[string]any            `json:"route_params"`
+	RouteIcon        string                    `json:"route_icon"`
+	DetectorVersion  string                    `json:"detector_version"`
+	Evidence         []OpportunityEvidence     `json:"evidence"`
+	CitedEvidenceIDs []string                  `json:"cited_evidence_ids"`
+	GeneratedAt      time.Time                 `json:"generated_at"`
+	CreatedAt        time.Time                 `json:"created_at"`
+	UpdatedAt        time.Time                 `json:"updated_at"`
+}
+
+type OpportunityListResponse struct {
+	Opportunities []Opportunity `json:"opportunities"`
+}
+
+type SharedOpportunityListResponse struct {
+	Opportunities []SharedOpportunity `json:"opportunities"`
+}
+
+type OpportunityStatusUpdateRequest struct {
+	Status string `json:"status"`
+}
+
+type OpportunityGenerateResponse struct {
+	Opportunities []Opportunity `json:"opportunities"`
+	AIRunID       *uuid.UUID    `json:"-"`
+	AIStatus      string        `json:"ai_status"`
+}
+
 type GoalStats struct {
 	GoalID         uuid.UUID `json:"goal_id"`
 	Name           string    `json:"name"`
@@ -1149,6 +1244,26 @@ type SystemInfo struct {
 	PublicURL       string                `json:"public_url"`
 	EnabledFeatures []SystemFeatureStatus `json:"enabled_features"`
 	ConfigFlags     map[string]any        `json:"config_flags"`
+}
+
+type SystemAIStatus struct {
+	Status              string     `json:"status"`
+	Enabled             bool       `json:"enabled"`
+	Configured          bool       `json:"configured"`
+	ConfigMode          string     `json:"config_mode"`
+	Provider            string     `json:"provider,omitempty"`
+	Model               string     `json:"model,omitempty"`
+	BaseURLConfigured   bool       `json:"base_url_configured"`
+	Region              string     `json:"region,omitempty"`
+	LastSuccessAt       *time.Time `json:"last_success_at,omitempty"`
+	LastAttemptAt       *time.Time `json:"last_attempt_at,omitempty"`
+	LastErrorCategory   string     `json:"last_error_category,omitempty"`
+	RequestsUsed        int        `json:"requests_used"`
+	RequestLimit        int        `json:"request_limit"`
+	TokensUsed          int        `json:"tokens_used"`
+	TokenLimit          int        `json:"token_limit"`
+	BudgetWindowMinutes int        `json:"budget_window_minutes"`
+	BudgetExhausted     bool       `json:"budget_exhausted"`
 }
 
 type SystemHealth struct {

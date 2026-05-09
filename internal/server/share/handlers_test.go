@@ -74,6 +74,117 @@ func TestHandleExportShareHitsSupportsAllFormats(t *testing.T) {
 	}
 }
 
+func TestShareOpportunitiesListIsScopedToShareTokenSite(t *testing.T) {
+	ctx := context.Background()
+	store := database.NewStore(":memory:")
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	userID, err := store.CreateUser(ctx, "share-opportunities@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	site, err := store.CreateSite(ctx, userID, "share-opportunities.test")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	teamID, err := store.GetSiteTenantID(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("get site tenant: %v", err)
+	}
+	opportunityID := uuid.New()
+	seedShareOpportunities(t, ctx, store, teamID, site.ID, opportunityID)
+	_, token, err := store.CreateShareLink(ctx, site.ID, userID)
+	if err != nil {
+		t.Fatalf("create share link: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	Register(mux, &shared.Context{Store: store, Config: &config.Config{}})
+
+	t.Run("valid token and site returns saved opportunities", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/share/"+token+"/sites/"+site.ID.String()+"/opportunities", nil)
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+		}
+		var body map[string][]map[string]any
+		if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		opportunities := body["opportunities"]
+		if len(opportunities) != 1 || opportunities[0]["id"] != opportunityID.String() {
+			t.Fatalf("expected shared opportunity %s, got %#v", opportunityID, opportunities)
+		}
+		if _, ok := opportunities[0]["ai_run_id"]; ok {
+			t.Fatalf("share response leaked ai_run_id: %#v", opportunities[0])
+		}
+		if _, ok := opportunities[0]["team_id"]; ok {
+			t.Fatalf("share response leaked team_id: %#v", opportunities[0])
+		}
+		scoreBreakdown, ok := opportunities[0]["score_breakdown"].(map[string]any)
+		if !ok || scoreBreakdown["total"] != float64(84) {
+			t.Fatalf("expected shared score breakdown, got %#v", opportunities[0]["score_breakdown"])
+		}
+	})
+
+	t.Run("token cannot read another site id", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/share/"+token+"/sites/"+uuid.New().String()+"/opportunities", nil)
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, req)
+
+		if w.Code != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+		}
+	})
+}
+
+func seedShareOpportunities(t *testing.T, ctx context.Context, store *database.Store, teamID, siteID, activeID uuid.UUID) {
+	t.Helper()
+	active := shareOpportunityInput(teamID, siteID, activeID, "new", 84, "42%")
+	active.ScoreBreakdown = api.OpportunityScoreBreakdown{Sample: 82, Impact: 70, Urgency: 55, EvidenceFit: 99, Total: 84}
+	active.AIRunID = uuid.New()
+	dismissed := shareOpportunityInput(teamID, siteID, uuid.New(), "dismissed", 40, "12%")
+	if _, err := store.UpsertOpportunities(ctx, []database.OpportunityInput{active, dismissed}); err != nil {
+		t.Fatalf("upsert opportunities: %v", err)
+	}
+}
+
+func shareOpportunityInput(teamID, siteID, id uuid.UUID, status string, score int, rate string) database.OpportunityInput {
+	return database.OpportunityInput{
+		ID:               id,
+		TeamID:           teamID,
+		SiteID:           siteID,
+		Kind:             "conversion",
+		TypeKey:          "opportunities.types.checkout_conversion",
+		TitleKey:         "opportunities.catalog.checkout_conversion.title",
+		SummaryKey:       "opportunities.catalog.checkout_conversion.summary",
+		ActionKey:        "opportunities.catalog.checkout_conversion.action",
+		DigestKey:        "opportunities.catalog.checkout_conversion.digest",
+		CopyParams:       map[string]any{"conversion_rate": rate},
+		ImpactValue:      "EUR 900",
+		ImpactLabelKey:   "opportunities.impact.estimated_monthly_upside",
+		MonthlyUpside:    900,
+		Confidence:       "medium",
+		Score:            score,
+		Status:           status,
+		RouteLabelKey:    "opportunities.routes.checkout",
+		RouteParams:      map[string]any{"path": "/checkout"},
+		RouteIcon:        "pi pi-shopping-cart",
+		DetectorVersion:  "opportunities-detectors-v1",
+		Evidence:         []api.OpportunityEvidence{{ID: "conversion_rate", LabelKey: "opportunities.evidence.checkout_conversion_rate", Value: rate}},
+		CitedEvidenceIDs: []string{"conversion_rate"},
+		GeneratedAt:      time.Now().UTC(),
+	}
+}
+
 // setupShareEventsTestEnv creates a store with a site, share link, hits, and custom events
 // that exercise the event names, property keys, breakdown, timeseries, and audience endpoints.
 func setupShareEventsTestEnv(t *testing.T) (*handler, *database.Store, string, uuid.UUID) {

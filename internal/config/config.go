@@ -86,6 +86,17 @@ type Config struct {
 	MCPDocsURL          string `env:"HITKEEP_MCP_DOCS_URL"           default:"https://hitkeep.com" desc:"Base URL for official HitKeep docs used by MCP docs tools"`
 	MCPDocsCacheMinutes int    `env:"HITKEEP_MCP_DOCS_CACHE_MINUTES" default:"60"     desc:"Minutes to cache fetched docs for MCP tools"`
 
+	AIEnabled             bool   `env:"HITKEEP_AI_ENABLED"             default:"false" desc:"Enable optional AI-powered product features"`
+	AIProvider            string `env:"HITKEEP_AI_PROVIDER"            default:""      desc:"AI provider key supported by GoAI (openai, openai-compatible, bedrock, anthropic, google, mistral, ollama, openrouter)"`
+	AIModel               string `env:"HITKEEP_AI_MODEL"               default:""      desc:"AI model identifier for the configured provider"`
+	AIBaseURL             string `env:"HITKEEP_AI_BASE_URL"            default:""      desc:"Optional AI provider or gateway base URL"`
+	AIRegion              string `env:"HITKEEP_AI_REGION"              default:""      desc:"Optional AI provider region"`
+	AIAPIKey              string `env:"HITKEEP_AI_API_KEY"             default:""      desc:"AI provider API key, bearer token, or gateway key" sensitive:"redact"`
+	AITimeoutSeconds      int    `env:"HITKEEP_AI_TIMEOUT_SECONDS"     default:"30"    desc:"AI provider request timeout in seconds"`
+	AIRequestLimit        int    `env:"HITKEEP_AI_REQUEST_LIMIT"       default:"100"   desc:"Maximum AI requests per budget window; 0 disables local request cap"`
+	AITokenLimit          int    `env:"HITKEEP_AI_TOKEN_LIMIT"         default:"100000" desc:"Maximum AI tokens per budget window; 0 disables local token cap"`
+	AIBudgetWindowMinutes int    `env:"HITKEEP_AI_BUDGET_WINDOW"       default:"1440"  desc:"AI local budget window in minutes"`
+
 	CloudHosted                 bool   `env:"HITKEEP_CLOUD_HOSTED"                   default:"true"  desc:"Enable managed cloud runtime surfaces"                              cloud:"true"`
 	CloudSignupEnabled          bool   `env:"HITKEEP_CLOUD_SIGNUP_ENABLED"           default:"false" desc:"Enable hosted self-serve onboarding surfaces"                      cloud:"true"`
 	CloudJurisdiction           string `env:"HITKEEP_CLOUD_JURISDICTION"             default:""      desc:"Managed cloud jurisdiction label"                                   cloud:"true"`

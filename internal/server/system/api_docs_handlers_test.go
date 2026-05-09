@@ -162,6 +162,7 @@ func TestOpenAPISpecV1IncludesAdminSystemPaths(t *testing.T) {
 		"SystemFeatureStatus",
 		"SystemInfo",
 		"SystemHealth",
+		"SystemAIStatus",
 		"SystemSearchConsoleStatus",
 		"SystemStorage",
 		"SystemIngestStats",
@@ -178,10 +179,20 @@ func TestOpenAPISpecV1IncludesAdminSystemPaths(t *testing.T) {
 			t.Fatalf("expected %s schema to exist", schemaName)
 		}
 	}
+	aiStatusSchema := requireMap(t, schemas, "SystemAIStatus")
+	aiStatusProps := requireMap(t, aiStatusSchema, "properties")
+	configModeSchema := requireMap(t, aiStatusProps, "config_mode")
+	configModeEnum := asStringSlice(t, configModeSchema["enum"])
+	for _, want := range []string{"cloud_managed", "self_hosted"} {
+		if !slices.Contains(configModeEnum, want) {
+			t.Fatalf("expected SystemAIStatus.config_mode enum to include %q, got %v", want, configModeEnum)
+		}
+	}
 
 	expectedPaths := []string{
 		"/api/admin/system",
 		"/api/admin/system/health",
+		"/api/admin/system/ai",
 		"/api/admin/system/search-console",
 		"/api/admin/system/storage",
 		"/api/admin/system/ingest",
@@ -248,6 +259,75 @@ func TestOpenAPISpecV1IncludesAdminSystemPaths(t *testing.T) {
 	}
 	if _, ok := exportResponses["403"]; !ok {
 		t.Fatalf("expected audit export to document owner-only response")
+	}
+}
+
+func TestOpenAPISpecV1IncludesOpportunityPaths(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	for _, schemaName := range []string{"Opportunity", "OpportunityEvidence", "OpportunityScoreBreakdown", "OpportunityListResponse", "SharedOpportunity", "SharedOpportunityListResponse", "OpportunityGenerateResponse", "OpportunityStatusUpdateRequest"} {
+		if _, ok := schemas[schemaName]; !ok {
+			t.Fatalf("expected %s schema to exist", schemaName)
+		}
+	}
+	opportunitySchema := requireMap(t, schemas, "Opportunity")
+	opportunityProperties := requireMap(t, opportunitySchema, "properties")
+	for _, forbidden := range []string{"title", "summary", "next_action", "impact_label", "route_label", "plan"} {
+		if _, ok := opportunityProperties[forbidden]; ok {
+			t.Fatalf("Opportunity schema leaked prose field %q", forbidden)
+		}
+	}
+	for _, required := range []string{"type_key", "title_key", "summary_key", "action_key", "copy_params", "impact_label_key", "route_label_key", "score_breakdown", "cited_evidence_ids"} {
+		if _, ok := opportunityProperties[required]; !ok {
+			t.Fatalf("Opportunity schema missing localization field %q", required)
+		}
+	}
+	evidenceSchema := requireMap(t, schemas, "OpportunityEvidence")
+	evidenceProperties := requireMap(t, evidenceSchema, "properties")
+	if _, ok := evidenceProperties["label"]; ok {
+		t.Fatalf("OpportunityEvidence schema leaked prose label")
+	}
+	if _, ok := evidenceProperties["label_key"]; !ok {
+		t.Fatalf("OpportunityEvidence schema missing label_key")
+	}
+	for _, forbidden := range []string{"team_id", "ai_run_id"} {
+		if _, ok := opportunityProperties[forbidden]; ok {
+			t.Fatalf("Opportunity schema leaked internal field %q", forbidden)
+		}
+	}
+	generateResponseSchema := requireMap(t, schemas, "OpportunityGenerateResponse")
+	generateResponseProperties := requireMap(t, generateResponseSchema, "properties")
+	if _, ok := generateResponseProperties["ai_run_id"]; ok {
+		t.Fatalf("OpportunityGenerateResponse schema leaked internal ai_run_id")
+	}
+	sharedOpportunitySchema := requireMap(t, schemas, "SharedOpportunity")
+	sharedOpportunityProperties := requireMap(t, sharedOpportunitySchema, "properties")
+	for _, forbidden := range []string{"team_id", "ai_run_id"} {
+		if _, ok := sharedOpportunityProperties[forbidden]; ok {
+			t.Fatalf("SharedOpportunity schema leaked internal field %q", forbidden)
+		}
+	}
+
+	expected := map[string]string{
+		"/api/sites/{id}/opportunities":                 "get",
+		"/api/sites/{id}/opportunities/generate":        "post",
+		"/api/sites/{id}/opportunities/{opportunityID}": "patch",
+		"/api/share/{token}/sites/{id}/opportunities":   "get",
+	}
+	for path, method := range expected {
+		pathItem := requireMap(t, paths, path)
+		if _, ok := pathItem[method]; !ok {
+			t.Fatalf("expected %s %s in OpenAPI paths", method, path)
+		}
+	}
+
+	generatePath := requireMap(t, paths, "/api/sites/{id}/opportunities/generate")
+	postOp := requireMap(t, generatePath, "post")
+	if !strings.Contains(postOp["description"].(string), "deterministic opportunity detectors") {
+		t.Fatalf("expected generate description to mention deterministic detectors, got %q", postOp["description"])
 	}
 }
 
@@ -480,54 +560,72 @@ func TestOpenAPISpecV1IncludesServerSideIngestPaths(t *testing.T) {
 			pathItem := requireMap(t, paths, path)
 			postOp := requireMap(t, pathItem, "post")
 
-			description, ok := postOp["description"].(string)
-			if !ok || !strings.Contains(description, "trusted server-side") || !strings.Contains(description, "API client") {
-				t.Fatalf("expected trusted API client description, got %q", description)
-			}
-			if path == "/api/ingest/server/pageview" && (!strings.Contains(description, "UTM values are read from the query string in url") || !strings.Contains(description, "not from top-level JSON fields")) {
-				t.Fatalf("expected server-side pageview description to document URL-based UTM extraction, got %q", description)
-			}
-			if !operationHasAPIClientOnlySecurity(postOp) {
-				t.Fatalf("expected %s to use API-client-only security, got %+v", path, postOp["security"])
-			}
-			responses := requireMap(t, postOp, "responses")
-			if _, ok := responses["429"]; !ok {
-				t.Fatalf("expected %s to document 429 rate limit response", path)
-			}
-
-			requestBody := requireMap(t, postOp, "requestBody")
-			content := requireMap(t, requestBody, "content")
-			jsonContent := requireMap(t, content, "application/json")
-			schema := requireMap(t, jsonContent, "schema")
-
-			required := asStringSlice(t, schema["required"])
-			for _, field := range []string{"url", "timestamp", "visitor_ip", "user_agent"} {
-				if !containsString(required, field) {
-					t.Fatalf("expected %s request to require %q, got %v", path, field, required)
-				}
-			}
-
-			properties := requireMap(t, schema, "properties")
-			if _, ok := properties["dnt"]; !ok {
-				t.Fatalf("expected %s request schema to include optional dnt", path)
-			}
-			if _, ok := properties["is_unique"]; ok {
-				t.Fatalf("did not expect %s request schema to expose is_unique", path)
-			}
-			if _, ok := properties["tracker_source"]; ok {
-				t.Fatalf("did not expect %s request schema to expose tracker_source", path)
-			}
-			if _, ok := properties["tracker_version"]; ok {
-				t.Fatalf("did not expect %s request schema to expose tracker_version", path)
-			}
-			if path == "/api/ingest/server/pageview" {
-				for _, field := range []string{"utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"} {
-					if _, ok := properties[field]; ok {
-						t.Fatalf("did not expect %s request schema to expose %s; UTM values come from url", path, field)
-					}
-				}
-			}
+			assertServerSideIngestDescription(t, path, postOp)
+			assertAPIClientOnlyOperation(t, path, postOp)
+			assertServerSideIngestSchema(t, path, requestJSONSchema(t, postOp))
 		})
+	}
+}
+
+func assertServerSideIngestDescription(t *testing.T, path string, postOp map[string]any) {
+	t.Helper()
+	description, ok := postOp["description"].(string)
+	if !ok || !strings.Contains(description, "trusted server-side") || !strings.Contains(description, "API client") {
+		t.Fatalf("expected trusted API client description, got %q", description)
+	}
+	if path == "/api/ingest/server/pageview" && (!strings.Contains(description, "UTM values are read from the query string in url") || !strings.Contains(description, "not from top-level JSON fields")) {
+		t.Fatalf("expected server-side pageview description to document URL-based UTM extraction, got %q", description)
+	}
+}
+
+func assertAPIClientOnlyOperation(t *testing.T, path string, postOp map[string]any) {
+	t.Helper()
+	if !operationHasAPIClientOnlySecurity(postOp) {
+		t.Fatalf("expected %s to use API-client-only security, got %+v", path, postOp["security"])
+	}
+	responses := requireMap(t, postOp, "responses")
+	if _, ok := responses["429"]; !ok {
+		t.Fatalf("expected %s to document 429 rate limit response", path)
+	}
+}
+
+func requestJSONSchema(t *testing.T, postOp map[string]any) map[string]any {
+	t.Helper()
+	requestBody := requireMap(t, postOp, "requestBody")
+	content := requireMap(t, requestBody, "content")
+	jsonContent := requireMap(t, content, "application/json")
+	return requireMap(t, jsonContent, "schema")
+}
+
+func assertServerSideIngestSchema(t *testing.T, path string, schema map[string]any) {
+	t.Helper()
+	required := asStringSlice(t, schema["required"])
+	for _, field := range []string{"url", "timestamp", "visitor_ip", "user_agent"} {
+		if !containsString(required, field) {
+			t.Fatalf("expected %s request to require %q, got %v", path, field, required)
+		}
+	}
+	properties := requireMap(t, schema, "properties")
+	assertServerSideIngestProperties(t, path, properties)
+}
+
+func assertServerSideIngestProperties(t *testing.T, path string, properties map[string]any) {
+	t.Helper()
+	if _, ok := properties["dnt"]; !ok {
+		t.Fatalf("expected %s request schema to include optional dnt", path)
+	}
+	for _, field := range []string{"is_unique", "tracker_source", "tracker_version"} {
+		if _, ok := properties[field]; ok {
+			t.Fatalf("did not expect %s request schema to expose %s", path, field)
+		}
+	}
+	if path != "/api/ingest/server/pageview" {
+		return
+	}
+	for _, field := range []string{"utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"} {
+		if _, ok := properties[field]; ok {
+			t.Fatalf("did not expect %s request schema to expose %s; UTM values come from url", path, field)
+		}
 	}
 }
 

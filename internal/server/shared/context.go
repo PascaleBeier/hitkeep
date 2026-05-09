@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
+	hitai "hitkeep/internal/ai"
 	"hitkeep/internal/auth"
 	"hitkeep/internal/blocking"
 	"hitkeep/internal/config"
@@ -72,6 +73,7 @@ type Context struct {
 	WebhookLimiter *IPRateLimiter
 	AuthState      *AuthStateStore
 	SearchConsole  searchconsole.Client
+	AI             hitai.Client
 	IPFilter       *blocking.IPFilter
 	SpamFilter     *blocking.SpamFilter
 

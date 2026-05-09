@@ -33,6 +33,10 @@ func openAPIV1AdminSitePaths() map[string]any {
 			"get": op([]string{"Admin"}, "Get Search Console system status", "Returns Google Search Console credential, worker, and sync health without exposing OAuth secrets or raw Google payloads.", secCookie(), nil, nil,
 				map[string]any{"200": jsonRefResp("Search Console system status", "#/components/schemas/SystemSearchConsoleStatus")}),
 		},
+		"/api/admin/system/ai": map[string]any{
+			"get": op([]string{"Admin"}, "Get AI system status", "Returns non-sensitive AI gateway configuration status, provider/model labels, local budget usage, and the latest safe run state without exposing provider secrets, prompts, or raw provider payloads.", secCookie(), nil, nil,
+				map[string]any{"200": jsonRefResp("AI system status", "#/components/schemas/SystemAIStatus")}),
+		},
 		"/api/admin/system/storage": map[string]any{
 			"get": op([]string{"Admin"}, "Get system storage", "Returns configured data paths, shared and tenant database sizes, backup path, spam cache path, and disk capacity fields when available.", secCookie(), nil, nil,
 				map[string]any{"200": jsonRefResp("System storage", "#/components/schemas/SystemStorage")}),
@@ -200,6 +204,21 @@ func openAPIV1AdminSitePaths() map[string]any {
 				paramRef("#/components/parameters/filter"), paramRef("#/components/parameters/filterType"), paramRef("#/components/parameters/filterValue"),
 				paramRef("#/components/parameters/goalIDQuery"), paramRef("#/components/parameters/funnelIDQuery"),
 			}, nil, map[string]any{"200": jsonRefResp("Site stats", "#/components/schemas/SiteStats")}),
+		},
+		"/api/sites/{id}/opportunities": map[string]any{
+			"get": op([]string{"Opportunities"}, "List opportunities", "Lists saved opportunity recommendations for a site. Requires site.view and returns only validated customer-visible outputs with cited evidence.", secAnyAuth(), []any{paramRef("#/components/parameters/siteID")}, nil,
+				map[string]any{"200": jsonRefResp("Opportunity list", "#/components/schemas/OpportunityListResponse")}),
+		},
+		"/api/sites/{id}/opportunities/generate": map[string]any{
+			"post": op([]string{"Opportunities"}, "Generate opportunities", "Runs deterministic opportunity detectors for the selected range and, when AI is configured and budget is available, asks the provider only for structured copy from cited evidence. Requires site.manage_data.", secAnyAuth(), []any{paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/from"), paramRef("#/components/parameters/to")}, nil,
+				map[string]any{"200": jsonRefResp("Generated opportunities", "#/components/schemas/OpportunityGenerateResponse")}),
+		},
+		"/api/sites/{id}/opportunities/{opportunityID}": map[string]any{
+			"patch": op([]string{"Opportunities"}, "Update opportunity status", "Marks an opportunity saved, done, or dismissed. Requires site.manage_data.", secAnyAuth(), []any{
+				paramRef("#/components/parameters/siteID"),
+				map[string]any{"name": "opportunityID", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
+			}, jsonBody(map[string]any{"$ref": "#/components/schemas/OpportunityStatusUpdateRequest"}),
+				map[string]any{"200": jsonRefResp("Opportunity", "#/components/schemas/Opportunity")}),
 		},
 		"/api/sites/{id}/importers": map[string]any{
 			"get": op([]string{"Imports"}, "List site importers", "Lists available historical data import providers for the selected site.", secAnyAuth(), []any{paramRef("#/components/parameters/siteID")}, nil,
@@ -476,6 +495,10 @@ func openAPIV1AdminSitePaths() map[string]any {
 		},
 		"/api/share/{token}/sites/{id}/stats": map[string]any{
 			"get": op([]string{"Share"}, "Shared site stats", "Returns stats through share token.", nil, []any{paramRef("#/components/parameters/token"), paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/from"), paramRef("#/components/parameters/to"), paramRef("#/components/parameters/filter"), paramRef("#/components/parameters/filterType"), paramRef("#/components/parameters/filterValue"), paramRef("#/components/parameters/goalIDQuery"), paramRef("#/components/parameters/funnelIDQuery")}, nil, map[string]any{"200": jsonRefResp("Site stats", "#/components/schemas/SiteStats")}),
+		},
+		"/api/share/{token}/sites/{id}/opportunities": map[string]any{
+			"get": op([]string{"Share"}, "Shared opportunities", "Lists saved opportunity recommendations through a read-only share token. Returns only validated customer-visible outputs with cited evidence.", nil, []any{paramRef("#/components/parameters/token"), paramRef("#/components/parameters/siteID")}, nil,
+				map[string]any{"200": jsonRefResp("Opportunity list", "#/components/schemas/SharedOpportunityListResponse")}),
 		},
 		"/api/share/{token}/sites/{id}/hits": map[string]any{
 			"get": op([]string{"Share"}, "Shared hits", "Returns paginated raw hits through share token.", nil, []any{paramRef("#/components/parameters/token"), paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/from"), paramRef("#/components/parameters/to"), paramRef("#/components/parameters/limit"), paramRef("#/components/parameters/offset"), paramRef("#/components/parameters/query"), paramRef("#/components/parameters/sort"), paramRef("#/components/parameters/order"), paramRef("#/components/parameters/filter"), paramRef("#/components/parameters/filterType"), paramRef("#/components/parameters/filterValue")}, nil, map[string]any{"200": jsonRefResp("Paginated hits", "#/components/schemas/PaginatedHits")}),

@@ -59,6 +59,12 @@ type aiVisibilityInput struct {
 	rangeInput
 }
 
+type opportunitiesInput struct {
+	SiteID string `json:"site_id" jsonschema:"HitKeep site UUID."`
+	Status string `json:"status,omitempty" jsonschema:"Optional opportunity status filter: new, saved, done, dismissed, or all. Defaults to all statuses."`
+	Limit  int    `json:"limit,omitempty" jsonschema:"Maximum rows to return. Defaults to 10 and is capped at 50."`
+}
+
 type searchConsoleStatusInput struct {
 	SiteID string `json:"site_id" jsonschema:"HitKeep site UUID."`
 }
@@ -128,6 +134,39 @@ type aiVisibilityOutput struct {
 	Overview    *api.AIFetchOverview          `json:"overview"`
 	Timeseries  []mcpAIFetchSeriesPoint       `json:"timeseries"`
 	Correlation *api.AIFetchCorrelationReport `json:"correlation,omitempty"`
+}
+
+type opportunitiesOutput struct {
+	SiteID        string           `json:"site_id"`
+	Opportunities []mcpOpportunity `json:"opportunities"`
+}
+
+type mcpOpportunity struct {
+	ID               string                        `json:"id"`
+	SiteID           string                        `json:"site_id"`
+	Kind             string                        `json:"kind"`
+	TypeKey          string                        `json:"type_key"`
+	TitleKey         string                        `json:"title_key"`
+	SummaryKey       string                        `json:"summary_key"`
+	ActionKey        string                        `json:"action_key"`
+	DigestKey        string                        `json:"digest_key"`
+	CopyParams       map[string]any                `json:"copy_params"`
+	ImpactValue      string                        `json:"impact_value"`
+	ImpactLabelKey   string                        `json:"impact_label_key"`
+	MonthlyUpside    float64                       `json:"monthly_upside"`
+	Confidence       string                        `json:"confidence"`
+	Score            int                           `json:"score"`
+	ScoreBreakdown   api.OpportunityScoreBreakdown `json:"score_breakdown"`
+	Status           string                        `json:"status"`
+	RouteLabelKey    string                        `json:"route_label_key"`
+	RouteParams      map[string]any                `json:"route_params"`
+	RouteIcon        string                        `json:"route_icon"`
+	DetectorVersion  string                        `json:"detector_version"`
+	Evidence         []api.OpportunityEvidence     `json:"evidence"`
+	CitedEvidenceIDs []string                      `json:"cited_evidence_ids"`
+	GeneratedAt      string                        `json:"generated_at"`
+	CreatedAt        string                        `json:"created_at"`
+	UpdatedAt        string                        `json:"updated_at"`
 }
 
 type searchConsoleStatusOutput struct {

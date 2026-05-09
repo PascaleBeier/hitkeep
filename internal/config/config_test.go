@@ -88,15 +88,6 @@ func TestLoadConfig(t *testing.T) {
 			errMessage: "Boolean logic failed",
 		},
 		{
-			name: "JWT Secret Generation",
-			args: []string{},
-			env:  map[string]string{},
-			check: func(c *Config) bool {
-				return c.JWTSecret != ""
-			},
-			errMessage: "JWT Secret was not generated",
-		},
-		{
 			name: "JWT Secret Supplied",
 			args: []string{},
 			env: map[string]string{
@@ -129,6 +120,15 @@ func TestLoadConfig(t *testing.T) {
 	}
 }
 
+func TestJWTSecretGeneratedWhenMissing(t *testing.T) {
+	conf := load([]string{}, func(key, fallback string) string {
+		return fallback
+	})
+	if conf.JWTSecret == "" {
+		t.Fatal("expected JWT secret to be generated")
+	}
+}
+
 func TestNormalizeAuthSessionConfig(t *testing.T) {
 	conf := &Config{AuthSessionMinutes: -1, AuthRememberMeDays: -2, AuthSessionWarningSeconds: 5}
 	NormalizeAuthSessionConfig(conf)
@@ -146,6 +146,71 @@ func TestNormalizeAuthSessionConfig(t *testing.T) {
 	NormalizeAuthSessionConfig(conf)
 	if conf.AuthSessionWarningSeconds != 300 {
 		t.Fatalf("expected warning to stay before expiry, got %d", conf.AuthSessionWarningSeconds)
+	}
+}
+
+func TestLoadAIConfigDefaultsDisabled(t *testing.T) {
+	conf := load([]string{}, func(key, fallback string) string {
+		return fallback
+	})
+
+	if conf.AIEnabled {
+		t.Fatal("expected AI to be disabled by default")
+	}
+	if conf.AIProvider != "" {
+		t.Fatalf("expected empty AIProvider by default, got %q", conf.AIProvider)
+	}
+	if conf.AIModel != "" {
+		t.Fatalf("expected empty AIModel by default, got %q", conf.AIModel)
+	}
+	if conf.AITimeoutSeconds != 30 {
+		t.Fatalf("expected default AITimeoutSeconds=30, got %d", conf.AITimeoutSeconds)
+	}
+	if conf.AIRequestLimit != 100 {
+		t.Fatalf("expected default AIRequestLimit=100, got %d", conf.AIRequestLimit)
+	}
+	if conf.AITokenLimit != 100000 {
+		t.Fatalf("expected default AITokenLimit=100000, got %d", conf.AITokenLimit)
+	}
+	if conf.AIBudgetWindowMinutes != 1440 {
+		t.Fatalf("expected default AIBudgetWindowMinutes=1440, got %d", conf.AIBudgetWindowMinutes)
+	}
+}
+
+func TestLoadAIConfigFromEnv(t *testing.T) {
+	env := map[string]string{
+		"HITKEEP_AI_ENABLED":         "true",
+		"HITKEEP_AI_PROVIDER":        "openai-compatible",
+		"HITKEEP_AI_MODEL":           "gpt-4.1-mini",
+		"HITKEEP_AI_BASE_URL":        "https://ai-gateway.example/v1",
+		"HITKEEP_AI_REGION":          "eu-central-1",
+		"HITKEEP_AI_API_KEY":         "provider-secret",
+		"HITKEEP_AI_TIMEOUT_SECONDS": "45",
+		"HITKEEP_AI_REQUEST_LIMIT":   "25",
+		"HITKEEP_AI_TOKEN_LIMIT":     "50000",
+		"HITKEEP_AI_BUDGET_WINDOW":   "60",
+	}
+	conf := load([]string{}, func(key, fallback string) string {
+		if val, ok := env[key]; ok {
+			return val
+		}
+		return fallback
+	})
+
+	if !conf.AIEnabled {
+		t.Fatal("expected AIEnabled true")
+	}
+	if conf.AIProvider != "openai-compatible" || conf.AIModel != "gpt-4.1-mini" {
+		t.Fatalf("unexpected AI provider/model: %q/%q", conf.AIProvider, conf.AIModel)
+	}
+	if conf.AIBaseURL != "https://ai-gateway.example/v1" || conf.AIRegion != "eu-central-1" {
+		t.Fatalf("unexpected AI route config: base=%q region=%q", conf.AIBaseURL, conf.AIRegion)
+	}
+	if conf.AIAPIKey != "provider-secret" {
+		t.Fatalf("expected AIAPIKey to load from env")
+	}
+	if conf.AITimeoutSeconds != 45 || conf.AIRequestLimit != 25 || conf.AITokenLimit != 50000 || conf.AIBudgetWindowMinutes != 60 {
+		t.Fatalf("unexpected AI caps: timeout=%d requests=%d tokens=%d window=%d", conf.AITimeoutSeconds, conf.AIRequestLimit, conf.AITokenLimit, conf.AIBudgetWindowMinutes)
 	}
 }
 
@@ -469,6 +534,7 @@ func TestLogValueRedactsSecrets(t *testing.T) {
 		S3AccessKeyID:                   "AKIA123456",
 		S3SecretAccessKey:               "super-secret",
 		GoogleSearchConsoleClientSecret: "google-client-secret",
+		AIAPIKey:                        "ai-provider-secret",
 	}
 	logVal := conf.LogValue()
 	got := logVal.String()
@@ -484,6 +550,9 @@ func TestLogValueRedactsSecrets(t *testing.T) {
 	}
 	if strings.Contains(got, "google-client-secret") {
 		t.Fatal("LogValue leaked GoogleSearchConsoleClientSecret")
+	}
+	if strings.Contains(got, "ai-provider-secret") {
+		t.Fatal("LogValue leaked AIAPIKey")
 	}
 	if !strings.Contains(got, "AKIA") {
 		t.Fatal("LogValue should show masked S3AccessKeyID prefix")
