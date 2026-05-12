@@ -149,6 +149,35 @@ func TestEventQueriesIncludeImportedAggregates(t *testing.T) {
 	}
 }
 
+func TestGetEventCountsIncludesImportedAggregates(t *testing.T) {
+	store, userID := setupEventBreakdownStore(t)
+	ctx := context.Background()
+
+	site, err := store.CreateSite(ctx, userID, "imported-event-counts.example.com")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	day := time.Date(2026, 4, 8, 0, 0, 0, 0, time.UTC)
+	if _, err := store.DB().ExecContext(ctx, `
+		INSERT INTO imported_event_daily (site_id, import_id, date, event_name, path, link_url, visitors, events, source_file)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, site.ID, uuid.New(), day, "outbound_click", "", "https://example.com", 1, 3, "imported_custom_events.csv"); err != nil {
+		t.Fatalf("insert imported event: %v", err)
+	}
+
+	counts, err := store.GetEventCounts(ctx, api.EventNamesParams{
+		SiteID: site.ID,
+		Start:  day.AddDate(0, 0, -1),
+		End:    day.AddDate(0, 0, 1),
+	})
+	if err != nil {
+		t.Fatalf("GetEventCounts: %v", err)
+	}
+	if len(counts) != 1 || counts[0].Name != "outbound_click" || counts[0].Value != 3 {
+		t.Fatalf("expected imported event count, got %#v", counts)
+	}
+}
+
 func TestGetEventNamesEmpty(t *testing.T) {
 	store, userID := setupEventBreakdownStore(t)
 	ctx := context.Background()

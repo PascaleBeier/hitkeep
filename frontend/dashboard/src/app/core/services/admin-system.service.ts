@@ -39,6 +39,26 @@ export interface SystemSearchConsoleStatus {
     next_retry_at?: string;
 }
 
+export interface SystemAIStatus {
+    status: string;
+    enabled: boolean;
+    configured: boolean;
+    config_mode: string;
+    provider?: string;
+    model?: string;
+    base_url_configured: boolean;
+    region?: string;
+    last_success_at?: string;
+    last_attempt_at?: string;
+    last_error_category?: string;
+    requests_used: number;
+    request_limit: number;
+    tokens_used: number;
+    token_limit: number;
+    budget_window_minutes: number;
+    budget_exhausted: boolean;
+}
+
 export interface TenantDBInfo {
     tenant_id: string;
     name: string;
@@ -242,6 +262,10 @@ export class AdminSystemService {
 
     getSearchConsole() {
         return this.http.get<SystemSearchConsoleStatus>('/api/admin/system/search-console');
+    }
+
+    getAI() {
+        return this.http.get<SystemAIStatus>('/api/admin/system/ai');
     }
 
     getStorage() {

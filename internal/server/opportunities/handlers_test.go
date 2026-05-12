@@ -131,6 +131,119 @@ func TestHandleListOpportunitiesReturnsLocalizationContract(t *testing.T) {
 	}
 }
 
+func TestHandleListOpportunitiesRanksActionableWorkFirst(t *testing.T) {
+	store, ctx, siteID, teamID := setupOpportunityHandlerTestEnv(t)
+	lowActiveID := uuid.New()
+	highActiveID := uuid.New()
+	doneID := uuid.New()
+
+	_, err := store.UpsertOpportunities(context.Background(), []database.OpportunityInput{
+		listRankingOpportunity(teamID, siteID, lowActiveID, "new", 60, api.OpportunityScoreBreakdown{Impact: 55, Actionability: 70, EvidenceFit: 70, Total: 60}),
+		listRankingOpportunity(teamID, siteID, doneID, "done", 99, api.OpportunityScoreBreakdown{Impact: 99, Actionability: 99, EvidenceFit: 99, Total: 99}),
+		listRankingOpportunity(teamID, siteID, highActiveID, "saved", 80, api.OpportunityScoreBreakdown{Impact: 75, Actionability: 90, EvidenceFit: 90, Total: 80}),
+	})
+	if err != nil {
+		t.Fatalf("upsert opportunities: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/sites/"+siteID.String()+"/opportunities", nil)
+	req.SetPathValue("id", siteID.String())
+	rec := httptest.NewRecorder()
+	h := &handler{ctx: ctx}
+	h.handleList().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var body api.OpportunityListResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	got := listedOpportunityIDs(body.Opportunities)
+	want := []uuid.UUID{highActiveID, lowActiveID, doneID}
+	if !sameListedUUIDs(got, want) {
+		t.Fatalf("expected ranked opportunities %v, got %v", want, got)
+	}
+}
+
+func TestHandleDigestPreviewReturnsSafeLocalizationContract(t *testing.T) {
+	store, ctx, siteID, teamID := setupOpportunityHandlerTestEnv(t)
+	lowActiveID := uuid.New()
+	highActiveID := uuid.New()
+	doneID := uuid.New()
+
+	_, err := store.UpsertOpportunities(context.Background(), []database.OpportunityInput{
+		listRankingOpportunity(teamID, siteID, lowActiveID, "new", 60, api.OpportunityScoreBreakdown{Impact: 55, Actionability: 70, EvidenceFit: 70, Total: 60}),
+		listRankingOpportunity(teamID, siteID, doneID, "done", 99, api.OpportunityScoreBreakdown{Impact: 99, Actionability: 99, EvidenceFit: 99, Total: 99}),
+		listRankingOpportunity(teamID, siteID, highActiveID, "saved", 88, api.OpportunityScoreBreakdown{Impact: 86, Actionability: 90, EvidenceFit: 90, Total: 88}),
+	})
+	if err != nil {
+		t.Fatalf("upsert opportunities: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/sites/"+siteID.String()+"/opportunities/digest-preview?frequency=weekly", nil)
+	req.SetPathValue("id", siteID.String())
+	rec := httptest.NewRecorder()
+	h := &handler{ctx: ctx}
+	h.handleDigestPreview().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	body := requireJSONMap(t, rec.Body.Bytes())
+	requireDigestPreviewMetadata(t, body, "weekly", true, "ready")
+	items := requireJSONArrayLen(t, body["items"], 2)
+	first := requireJSONObject(t, items[0])
+	if first["id"] != highActiveID.String() {
+		t.Fatalf("expected high-scoring saved opportunity first, got %#v", first["id"])
+	}
+	requireFieldsPresent(t, first, "digest item", "title_key", "action_key", "digest_key", "copy_params", "impact_label_key", "score_breakdown", "evidence", "cited_evidence_ids")
+	requireFieldsAbsent(t, first, "digest preview", "title", "summary", "digest", "action", "team_id", "ai_run_id", "raw_prompt", "raw_provider_response")
+	requireSafeDigestEvidence(t, first)
+}
+
+func TestHandleDigestPreviewRejectsUnsupportedFrequency(t *testing.T) {
+	_, ctx, siteID, _ := setupOpportunityHandlerTestEnv(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/sites/"+siteID.String()+"/opportunities/digest-preview?frequency=monthly", nil)
+	req.SetPathValue("id", siteID.String())
+	rec := httptest.NewRecorder()
+	h := &handler{ctx: ctx}
+
+	h.handleDigestPreview().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "Unsupported opportunity digest frequency") {
+		t.Fatalf("expected stable unsupported-frequency error, got %q", rec.Body.String())
+	}
+}
+
+func TestHandleDigestPreviewDefaultsToWeeklyNoSendState(t *testing.T) {
+	_, ctx, siteID, _ := setupOpportunityHandlerTestEnv(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/sites/"+siteID.String()+"/opportunities/digest-preview", nil)
+	req.SetPathValue("id", siteID.String())
+	rec := httptest.NewRecorder()
+	h := &handler{ctx: ctx}
+
+	h.handleDigestPreview().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var body api.OpportunityDigestPreviewResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Frequency != api.ReportFrequencyWeekly || body.ShouldSend || body.Reason != "no_opportunities" {
+		t.Fatalf("expected default weekly no-opportunity preview, got %#v", body)
+	}
+	if len(body.Items) != 0 {
+		t.Fatalf("expected no preview items, got %#v", body.Items)
+	}
+}
+
 func TestHandleGenerateRejectsInvalidRanges(t *testing.T) {
 	_, ctx, siteID, _ := setupOpportunityHandlerTestEnv(t)
 	h := &handler{ctx: ctx}
@@ -157,6 +270,115 @@ func TestHandleGenerateRejectsInvalidRanges(t *testing.T) {
 			}
 		})
 	}
+}
+
+func listRankingOpportunity(teamID, siteID, id uuid.UUID, status string, score int, breakdown api.OpportunityScoreBreakdown) database.OpportunityInput {
+	return database.OpportunityInput{
+		ID:               id,
+		TeamID:           teamID,
+		SiteID:           siteID,
+		Kind:             "conversion",
+		TypeKey:          "opportunities.types.checkout_conversion",
+		TitleKey:         "opportunities.catalog.checkout_conversion.title",
+		SummaryKey:       "opportunities.catalog.checkout_conversion.summary",
+		ActionKey:        "opportunities.catalog.checkout_conversion.action",
+		DigestKey:        "opportunities.catalog.checkout_conversion.digest",
+		CopyParams:       map[string]any{"conversion_rate": "42%"},
+		ImpactValue:      "$900",
+		ImpactLabelKey:   "opportunities.impact.estimated_monthly_upside",
+		MonthlyUpside:    900,
+		Confidence:       "medium",
+		Score:            score,
+		ScoreBreakdown:   breakdown,
+		Status:           status,
+		RouteLabelKey:    "opportunities.routes.checkout",
+		RouteParams:      map[string]any{"path": "/checkout"},
+		RouteIcon:        "pi pi-filter",
+		DetectorVersion:  "opportunities-v1",
+		Evidence:         []api.OpportunityEvidence{{ID: "checkout-rate", LabelKey: "opportunities.evidence.checkout_conversion_rate", Value: "42%"}},
+		CitedEvidenceIDs: []string{"checkout-rate"},
+		GeneratedAt:      time.Now().UTC(),
+	}
+}
+
+func listedOpportunityIDs(opportunities []api.Opportunity) []uuid.UUID {
+	out := make([]uuid.UUID, 0, len(opportunities))
+	for _, opportunity := range opportunities {
+		out = append(out, opportunity.ID)
+	}
+	return out
+}
+
+func sameListedUUIDs(a, b []uuid.UUID) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func requireJSONMap(t *testing.T, raw []byte) map[string]any {
+	t.Helper()
+	var body map[string]any
+	if err := json.Unmarshal(raw, &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	return body
+}
+
+func requireDigestPreviewMetadata(t *testing.T, body map[string]any, frequency string, shouldSend bool, reason string) {
+	t.Helper()
+	if body["frequency"] != frequency || body["should_send"] != shouldSend || body["reason"] != reason {
+		t.Fatalf("unexpected digest preview metadata: %#v", body)
+	}
+}
+
+func requireJSONArrayLen(t *testing.T, value any, want int) []any {
+	t.Helper()
+	items, ok := value.([]any)
+	if !ok || len(items) != want {
+		t.Fatalf("expected %d array items, got %#v", want, value)
+	}
+	return items
+}
+
+func requireJSONObject(t *testing.T, value any) map[string]any {
+	t.Helper()
+	object, ok := value.(map[string]any)
+	if !ok {
+		t.Fatalf("expected JSON object, got %#v", value)
+	}
+	return object
+}
+
+func requireFieldsPresent(t *testing.T, object map[string]any, label string, fields ...string) {
+	t.Helper()
+	for _, field := range fields {
+		if _, ok := object[field]; !ok {
+			t.Fatalf("%s missing field %q: %#v", label, field, object)
+		}
+	}
+}
+
+func requireFieldsAbsent(t *testing.T, object map[string]any, label string, fields ...string) {
+	t.Helper()
+	for _, field := range fields {
+		if _, ok := object[field]; ok {
+			t.Fatalf("%s leaked forbidden field %q: %#v", label, field, object)
+		}
+	}
+}
+
+func requireSafeDigestEvidence(t *testing.T, item map[string]any) {
+	t.Helper()
+	evidence := requireJSONArrayLen(t, item["evidence"], 1)
+	evidenceItem := requireJSONObject(t, evidence[0])
+	requireFieldsAbsent(t, evidenceItem, "digest evidence", "label")
+	requireFieldsPresent(t, evidenceItem, "digest evidence", "label_key")
 }
 
 func TestOpportunityRoutesEnforceSitePermissions(t *testing.T) {
@@ -189,6 +411,14 @@ func TestOpportunityRoutesEnforceSitePermissions(t *testing.T) {
 	mux.ServeHTTP(listRec, listReq)
 	if listRec.Code != http.StatusOK {
 		t.Fatalf("expected viewer list 200, got %d: %s", listRec.Code, listRec.Body.String())
+	}
+
+	previewReq := httptest.NewRequest(http.MethodGet, "/api/sites/"+siteID.String()+"/opportunities/digest-preview?frequency=weekly", nil)
+	previewReq.Header.Set("Authorization", "Bearer "+viewerToken)
+	previewRec := httptest.NewRecorder()
+	mux.ServeHTTP(previewRec, previewReq)
+	if previewRec.Code != http.StatusOK {
+		t.Fatalf("expected viewer digest preview 200, got %d: %s", previewRec.Code, previewRec.Body.String())
 	}
 
 	viewerGenerateReq := httptest.NewRequest(http.MethodPost, "/api/sites/"+siteID.String()+"/opportunities/generate", nil)

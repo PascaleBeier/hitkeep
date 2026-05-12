@@ -6,6 +6,7 @@
         "analytics": "Analytiques",
         "integration": "Intégrations",
         "dashboardAria": "Aller au tableau de bord",
+        "opportunitiesAria": "Aller aux opportunités",
         "goalsAria": "Aller aux objectifs",
         "funnelsAria": "Aller aux entonnoirs",
         "eventsAria": "Aller aux événements",
@@ -20,6 +21,7 @@
         "apiClientsAria": "Aller aux clients API",
         "apiReferenceAria": "Aller à la référence API",
         "dashboard": "Tableau de bord",
+        "opportunities": "Opportunités",
         "goals": "Objectifs",
         "funnels": "Entonnoirs",
         "utm": "UTM",
@@ -2378,5 +2380,211 @@
             "description": "Suivez les événements purchase, begin_checkout, add_to_cart et view_item pour alimenter l’analyse e-commerce."
         },
         "noSiteDescription": "Sélectionnez un site pour afficher l’analyse e-commerce."
+    },
+    "opportunities": {
+        "header": {
+            "eyebrow": "Conseils revenus",
+            "title": "Gagnez plus avec le trafic que vous avez déjà",
+            "subtitle": "HitKeep priorise les fuites de conversion, moteurs de chiffre d’affaires, écarts de visibilité IA, opportunités search et angles morts de configuration selon leur impact probable.",
+            "scoreLabel": "Score",
+            "scoreAria": "Score des opportunités",
+            "scoreHint": "Signal fort"
+        },
+        "kpis": {
+            "open": "Opportunités ouvertes",
+            "upside": "Potentiel mensuel estimé",
+            "highConfidence": "Forte confiance",
+            "aiSearchWins": "Gains IA/search"
+        },
+        "filters": {
+            "ariaLabel": "Filtres des opportunités",
+            "typeTitle": "Type d’opportunité",
+            "statusTitle": "Statut du workflow",
+            "types": {
+                "all": "Toutes",
+                "conversion": "Fuites de conversion",
+                "revenue": "Moteurs revenus",
+                "ai": "Visibilité IA",
+                "search": "Search",
+                "setup": "Configuration"
+            },
+            "statuses": {
+                "all": "Toutes",
+                "new": "Nouvelle",
+                "saved": "Enregistrée",
+                "done": "Terminée",
+                "dismissed": "Ignorée"
+            }
+        },
+        "confidence": {
+            "high": "Forte confiance",
+            "medium": "Confiance moyenne"
+        },
+        "actions": {
+            "previewDigest": "Aperçu du résumé",
+            "previewOn": "Aperçu actif",
+            "generate": "Actualiser les opportunités",
+            "generating": "Actualisation",
+            "save": "Enregistrer",
+            "inspect": "Inspecter",
+            "markDone": "Marquer terminé",
+            "dismiss": "Ignorer"
+        },
+        "errors": {
+            "load": "Impossible de charger les opportunités.",
+            "generate": "Impossible d'actualiser les opportunités.",
+            "status": "Impossible de mettre à jour l'opportunité."
+        },
+        "digest": {
+            "title": "Aperçu du digest hebdomadaire",
+            "subtitle": "Principales recommandations qui seraient envoyées par email pour ce site.",
+            "statusReady": "Serait envoyé",
+            "frequency": {
+                "daily": "Quotidien",
+                "weekly": "Hebdomadaire"
+            },
+            "nextAction": "Prochaine action",
+            "evidence": "Preuve",
+            "confidence": "Confiance",
+            "noSend": "Aucun email d'opportunités ne serait encore envoyé pour ce site.",
+            "error": "Impossible de charger l'aperçu du digest."
+        },
+        "inbox": {
+            "ariaLabel": "Boîte d’opportunités",
+            "title": "Boîte d’opportunités",
+            "subtitle": "{{count}} suggestions priorisées pour cette période",
+            "cloudBadge": "Copy IA prêt pour Cloud"
+        },
+        "topActions": {
+            "ariaLabel": "Actions recommandées prioritaires",
+            "title": "Top 3 actions",
+            "subtitle": "Commencez par ces opportunités prioritaires."
+        },
+        "impact": {
+            "monthlyRevenue": "chiffre d’affaires mensuel",
+            "qualifiedVisits": "visites qualifiées",
+            "conversionLift": "gain de conversion",
+            "searchClicks": "clics search",
+            "blindSpots": "angles morts",
+            "estimated_monthly_upside": "potentiel mensuel estimé",
+            "ai_touched_pages": "pages touchées par l’IA",
+            "pageviews_to_route": "pages vues à orienter",
+            "estimated_search_clicks": "clics search estimés",
+            "conversion_signal_coverage": "trafic sans signal de conversion",
+            "tracked_conversion_events": "événements de conversion suivis",
+            "conversion_events_to_measure": "événements de conversion à mesurer",
+            "funnel_steps_to_measure": "étapes de funnel à mesurer"
+        },
+        "routes": {
+            "checkout": "Checkout : {{path}}",
+            "path": "{{path}}",
+            "source": "{{source}}",
+            "search_console": "Search Console",
+            "events": "Événements",
+            "event": "Événement : {{event_name}}",
+            "funnel": "Funnel : {{start_path}}",
+            "tracker": "{{asset}}"
+        },
+        "evidence": {
+            "checkout_starts": "Débuts de checkout",
+            "orders": "Commandes",
+            "checkout_conversion_rate": "Conversion checkout",
+            "ai_requests": "Requêtes de crawlers IA",
+            "ai_paths": "Chemins crawlés uniques",
+            "top_ai_path": "Chemin IA principal",
+            "ai_referrals": "Visites référées par l’IA",
+            "ai_path_pageviews": "Pages vues sur le chemin touché par l’IA",
+            "pageviews": "Pages vues",
+            "sessions": "Sessions",
+            "top_source": "Source principale",
+            "search_impressions": "Impressions search",
+            "search_ctr": "CTR search",
+            "search_position": "Position moyenne",
+            "event_names": "Noms d’événements suivis",
+            "tracked_events": "Événements suivis",
+            "suggested_goal_event": "Événement d’objectif suggéré",
+            "suggested_goal_event_count": "Nombre d’événements observé",
+            "suggested_funnel_start": "Départ de funnel suggéré",
+            "suggested_funnel_start_pageviews": "Pages vues au départ",
+            "suggested_funnel_conversion_event": "Étape de conversion suggérée",
+            "suggested_funnel_event_count": "Événements de conversion observés"
+        },
+        "catalog": {
+            "checkout_conversion": {
+                "title": "Récupérer les abandons de checkout",
+                "summary": "Les débuts de checkout convertissent à {{conversion_rate}} et laissent {{monthly_upside}} sur la table.",
+                "action": "Inspectez la friction du checkout avant d’acheter plus de trafic.",
+                "digest": "La conversion checkout est de {{conversion_rate}}."
+            },
+            "ai_visibility": {
+                "title": "Transformer l’attention des crawlers IA en visites",
+                "summary": "Les assistants IA ont demandé {{requests}} pages ; le chemin le plus fort est {{top_path}}.",
+                "action": "Renforcez la page crawlée avec des réponses d’achat plus claires.",
+                "digest": "Les crawlers IA se sont concentrés sur {{top_path}}."
+            },
+            "traffic_quality": {
+                "title": "Se concentrer sur la source qui apporte déjà de la demande",
+                "summary": "{{source}} génère {{pageviews}} pages vues sur cette période.",
+                "action": "Orientez l’attention des campagnes vers la landing page à plus forte intention.",
+                "digest": "{{source}} est votre source de demande la plus forte."
+            },
+            "search_visibility": {
+                "title": "Améliorer les pages déjà visibles dans la recherche",
+                "summary": "La recherche affiche {{impressions}} impressions à {{ctr}} de CTR, soit environ {{estimated_clicks}} clics en plus.",
+                "action": "Améliorez le snippet, le titre et la réponse sur la page pour les requêtes qui génèrent déjà des impressions.",
+                "digest": "La visibilité search peut ajouter environ {{estimated_clicks}} clics."
+            },
+            "conversion_signal": {
+                "title": "Transformer les événements suivis en signal de conversion",
+                "summary": "{{event_names}} sont suivis sur {{pageviews}} pages vues, mais aucun événement de conversion ne priorise encore les opportunités.",
+                "action": "Choisissez l’événement qui représente le mieux un lead, une inscription ou un achat, puis marquez-le comme signal de conversion.",
+                "digest": "Les événements suivis ont besoin d’un signal de conversion."
+            },
+            "setup_goal_suggestion": {
+                "title": "Créer un objectif pour {{event_name}}",
+                "summary": "{{event_name}} s’est déclenché {{event_count}} fois, mais n’est pas encore enregistré comme objectif.",
+                "action": "Créez un objectif d’événement avec la valeur {{goal_value}} afin que HitKeep puisse prioriser les opportunités de conversion autour de lui.",
+                "digest": "{{event_name}} devrait devenir un objectif."
+            },
+            "setup_funnel_suggestion": {
+                "title": "Créer un funnel de {{start_path}} à {{conversion_event}}",
+                "summary": "{{start_path}} reçoit du trafic et {{conversion_event}} s’est déclenché {{event_count}} fois, mais ces étapes ne sont pas encore enregistrées comme funnel.",
+                "action": "Créez un funnel de {{step_count}} étapes pour {{funnel_steps}} afin que HitKeep puisse suivre les abandons avant la conversion.",
+                "digest": "{{start_path}} vers {{conversion_event}} devrait devenir un funnel."
+            },
+            "tracking_setup": {
+                "title": "Collecter assez de signal pour les recommandations",
+                "summary": "Ajoutez des événements de conversion pour prioriser les opportunités.",
+                "action": "Vérifiez le tracker et ajoutez un événement de conversion.",
+                "digest": "Le tracking a besoin de plus de signal."
+            }
+        },
+        "aiStatus": {
+            "disabled": "IA désactivée",
+            "selfHosted": "IA auto-hébergée : {{provider}} {{model}}",
+            "cloudManaged": "IA gérée par Cloud",
+            "notConfigured": "IA non configurée",
+            "providerUnknown": "fournisseur inconnu",
+            "modelUnknown": "modèle inconnu",
+            "disabledHint": "Les opportunités enregistrées restent disponibles. Les nouvelles explications rédigées par IA sont ignorées jusqu’à ce qu’un propriétaire d’instance active l’IA.",
+            "notConfiguredHint": "Les opportunités enregistrées restent disponibles. Configurez un fournisseur IA pour actualiser les résumés avec le contexte du modèle.",
+            "budgetExhaustedHint": "Les actualisations IA sont en pause, car le budget de requêtes ou de tokens configuré est épuisé pour cette fenêtre."
+        },
+        "card": {
+            "priority": "Priorité"
+        },
+        "detail": {
+            "estimatedImpact": "Impact estimé",
+            "priorityScore": "Score de priorité",
+            "priorityHint": "Pondéré par les preuves",
+            "why": "Pourquoi HitKeep pense que c’est important",
+            "nextBestAction": "Meilleure action suivante",
+            "readOnly": "Vous disposez d’un accès en lecture seule à ce site. Demandez à un admin du site d’enregistrer, d’ignorer ou de marquer les opportunités comme terminées."
+        },
+        "empty": {
+            "title": "Aucune opportunité ne correspond à cette vue",
+            "body": "Essayez un autre filtre de type ou de statut."
+        },
+        "noSiteDescription": "Sélectionnez un site pour afficher les recommandations d’opportunités."
     }
 }

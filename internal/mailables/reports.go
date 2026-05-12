@@ -2,10 +2,13 @@ package mailables
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/mailer"
+	opportunitysvc "hitkeep/internal/opportunities"
 )
 
 // ReportStats holds the aggregated KPIs for one analytics period.
@@ -110,6 +113,131 @@ func (m *AnalyticsDigest) Template() string { return "analytics_digest.mjml" }
 func (m *AnalyticsDigest) Data() any { return m }
 
 func (m *AnalyticsDigest) Locale() string { return m.LocaleCode }
+
+type OpportunityDigestEvidence struct {
+	Label string
+	Value string
+}
+
+type OpportunityDigestItem struct {
+	ID          string
+	Title       string
+	Digest      string
+	Action      string
+	ImpactValue string
+	Confidence  string
+	Score       int
+	URL         string
+	Evidence    []OpportunityDigestEvidence
+}
+
+type OpportunityDigest struct {
+	LocaleCode       string
+	SiteDomain       string
+	PeriodLabel      string
+	FreqLabel        string
+	SubjectFreqLabel string
+	OpportunitiesURL string
+	SettingsURL      string
+	Items            []OpportunityDigestItem
+}
+
+func NewOpportunityDigest(locale, siteDomain, periodLabel, freqLabel, opportunitiesURL, settingsURL string, preview opportunitysvc.DigestPreview) mailer.Mailable {
+	return NewOpportunityDigestWithSubjectLabel(locale, siteDomain, periodLabel, freqLabel, freqLabel, opportunitiesURL, settingsURL, preview)
+}
+
+func NewOpportunityDigestWithSubjectLabel(locale, siteDomain, periodLabel, freqLabel, subjectFreqLabel, opportunitiesURL, settingsURL string, preview opportunitysvc.DigestPreview) mailer.Mailable {
+	digest := &OpportunityDigest{
+		LocaleCode:       locale,
+		SiteDomain:       siteDomain,
+		PeriodLabel:      periodLabel,
+		FreqLabel:        freqLabel,
+		SubjectFreqLabel: subjectFreqLabel,
+		OpportunitiesURL: opportunitiesURL,
+		SettingsURL:      settingsURL,
+		Items:            make([]OpportunityDigestItem, 0, len(preview.Items)),
+	}
+	for _, item := range preview.Items {
+		digest.Items = append(digest.Items, opportunityDigestItem(locale, opportunitiesURL, item))
+	}
+	return digest
+}
+
+func (m *OpportunityDigest) Subject() string {
+	freqLabel := m.SubjectFreqLabel
+	if freqLabel == "" {
+		freqLabel = m.FreqLabel
+	}
+	if len(m.Items) == 1 {
+		return mailer.Translatef(m.LocaleCode, "subject.opportunity_digest_one", freqLabel, m.SiteDomain, m.PeriodLabel)
+	}
+	return mailer.Translatef(m.LocaleCode, "subject.opportunity_digest", len(m.Items), freqLabel, m.SiteDomain, m.PeriodLabel)
+}
+
+func (m *OpportunityDigest) Template() string { return "opportunity_digest.mjml" }
+
+func (m *OpportunityDigest) Data() any { return m }
+
+func (m *OpportunityDigest) Locale() string { return m.LocaleCode }
+
+func opportunityDigestItem(locale, opportunitiesURL string, item opportunitysvc.DigestItem) OpportunityDigestItem {
+	return OpportunityDigestItem{
+		ID:          item.ID,
+		Title:       renderOpportunityMessage(locale, item.TitleKey, item.CopyParams),
+		Digest:      renderOpportunityMessage(locale, item.DigestKey, item.CopyParams),
+		Action:      renderOpportunityMessage(locale, item.ActionKey, item.CopyParams),
+		ImpactValue: item.ImpactValue,
+		Confidence:  item.Confidence,
+		Score:       item.Score,
+		URL:         opportunityDigestItemURL(opportunitiesURL, item.ID),
+		Evidence:    opportunityDigestEvidence(locale, item.Evidence, item.CitedEvidenceIDs),
+	}
+}
+
+func opportunityDigestEvidence(locale string, evidence []api.OpportunityEvidence, citedEvidenceIDs []string) []OpportunityDigestEvidence {
+	cited := make(map[string]bool, len(citedEvidenceIDs))
+	for _, id := range citedEvidenceIDs {
+		if strings.TrimSpace(id) != "" {
+			cited[id] = true
+		}
+	}
+	out := make([]OpportunityDigestEvidence, 0, len(evidence))
+	for _, item := range evidence {
+		if !cited[item.ID] {
+			continue
+		}
+		out = append(out, OpportunityDigestEvidence{
+			Label: mailer.Translate(locale, item.LabelKey),
+			Value: item.Value,
+		})
+	}
+	return out
+}
+
+func renderOpportunityMessage(locale, key string, params map[string]any) string {
+	message := mailer.Translate(locale, key)
+	for _, param := range sortedParamKeys(params) {
+		message = strings.ReplaceAll(message, "{{"+param+"}}", fmt.Sprint(params[param]))
+	}
+	return message
+}
+
+func sortedParamKeys(params map[string]any) []string {
+	keys := make([]string, 0, len(params))
+	for key := range params {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func opportunityDigestItemURL(baseURL, id string) string {
+	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if id == "" || baseURL == "" {
+		return baseURL
+	}
+	return baseURL + "#" + id
+}
 
 // FormatPeriodLabel formats a human-readable period label for the given start/end times.
 func FormatPeriodLabel(start, end time.Time) string {

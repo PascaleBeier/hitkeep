@@ -44,6 +44,10 @@ export const routes: Routes = [
                         loadComponent: () => import('@pages/dashboard/dashboard').then((m) => m.Dashboard)
                     },
                     {
+                        path: 'opportunities',
+                        loadComponent: () => import('@pages/opportunities/opportunities').then((m) => m.OpportunitiesPage)
+                    },
+                    {
                         path: 'events',
                         loadComponent: () => import('@pages/events/events').then((m) => m.Events)
                     },
@@ -77,6 +81,10 @@ export const routes: Routes = [
             {
                 path: 'dashboard',
                 loadComponent: () => import('@pages/dashboard/dashboard').then((m) => m.Dashboard)
+            },
+            {
+                path: 'opportunities',
+                loadComponent: () => import('@pages/opportunities/opportunities').then((m) => m.OpportunitiesPage)
             },
             {
                 path: 'goals',

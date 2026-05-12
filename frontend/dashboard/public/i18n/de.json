@@ -6,6 +6,7 @@
         "analytics": "Analysen",
         "integration": "Integration",
         "dashboardAria": "Zum Dashboard",
+        "opportunitiesAria": "Zu den Opportunities",
         "goalsAria": "Zu den Zielen",
         "funnelsAria": "Zu den Funnels",
         "eventsAria": "Zu den Events",
@@ -20,6 +21,7 @@
         "apiClientsAria": "Zu API-Clients",
         "apiReferenceAria": "Zur API-Referenz",
         "dashboard": "Dashboard",
+        "opportunities": "Opportunities",
         "goals": "Ziele",
         "funnels": "Funnels",
         "utm": "UTM",
@@ -2378,5 +2380,211 @@
             "description": "Erfasse Events wie purchase, begin_checkout, add_to_cart und view_item, um die E-Commerce-Analyse zu füllen."
         },
         "noSiteDescription": "Wähle eine Website aus, um die E-Commerce-Analyse anzuzeigen."
+    },
+    "opportunities": {
+        "header": {
+            "eyebrow": "Umsatzempfehlungen",
+            "title": "Mach mehr Umsatz aus dem Traffic, den du schon hast",
+            "subtitle": "HitKeep priorisiert Conversion-Lecks, Umsatztreiber, AI-Visibility-Lücken, Suchchancen und Setup-Blindspots nach ihrem geschäftlichen Hebel.",
+            "scoreLabel": "Score",
+            "scoreAria": "Opportunity-Score",
+            "scoreHint": "Starkes Signal"
+        },
+        "kpis": {
+            "open": "Offene Chancen",
+            "upside": "Geschätzter Monatshebel",
+            "highConfidence": "Hohe Sicherheit",
+            "aiSearchWins": "AI-/Search-Gewinne"
+        },
+        "filters": {
+            "ariaLabel": "Opportunity-Filter",
+            "typeTitle": "Opportunity-Typ",
+            "statusTitle": "Workflow-Status",
+            "types": {
+                "all": "Alle",
+                "conversion": "Conversion-Lecks",
+                "revenue": "Umsatztreiber",
+                "ai": "AI Visibility",
+                "search": "Suche",
+                "setup": "Setup"
+            },
+            "statuses": {
+                "all": "Alle",
+                "new": "Neu",
+                "saved": "Gespeichert",
+                "done": "Erledigt",
+                "dismissed": "Verworfen"
+            }
+        },
+        "confidence": {
+            "high": "Hohe Sicherheit",
+            "medium": "Mittlere Sicherheit"
+        },
+        "actions": {
+            "previewDigest": "Digest ansehen",
+            "previewOn": "Digest-Vorschau an",
+            "generate": "Empfehlungen aktualisieren",
+            "generating": "Aktualisieren",
+            "save": "Speichern",
+            "inspect": "Prüfen",
+            "markDone": "Als erledigt markieren",
+            "dismiss": "Verwerfen"
+        },
+        "errors": {
+            "load": "Empfehlungen konnten nicht geladen werden.",
+            "generate": "Empfehlungen konnten nicht aktualisiert werden.",
+            "status": "Die Empfehlung konnte nicht aktualisiert werden."
+        },
+        "digest": {
+            "title": "Wöchentliche Digest-Vorschau",
+            "subtitle": "Wichtigste Empfehlungen, die für diese Website gemailt würden.",
+            "statusReady": "Würde senden",
+            "frequency": {
+                "daily": "Täglich",
+                "weekly": "Wöchentlich"
+            },
+            "nextAction": "Nächste Aktion",
+            "evidence": "Evidenz",
+            "confidence": "Sicherheit",
+            "noSend": "Für diese Website würde noch keine Chancen-Mail gesendet.",
+            "error": "Digest-Vorschau konnte nicht geladen werden."
+        },
+        "inbox": {
+            "ariaLabel": "Opportunity-Inbox",
+            "title": "Opportunity-Inbox",
+            "subtitle": "{{count}} priorisierte Vorschläge für diesen Zeitraum",
+            "cloudBadge": "AI-Copy für Cloud bereit"
+        },
+        "topActions": {
+            "ariaLabel": "Wichtigste empfohlene Aktionen",
+            "title": "Top 3 Aktionen",
+            "subtitle": "Beginne mit diesen priorisierten Chancen."
+        },
+        "impact": {
+            "monthlyRevenue": "Monatsumsatz",
+            "qualifiedVisits": "qualifizierte Besuche",
+            "conversionLift": "Conversion-Lift",
+            "searchClicks": "Suchklicks",
+            "blindSpots": "Blindspots",
+            "estimated_monthly_upside": "geschätztes monatliches Potenzial",
+            "ai_touched_pages": "KI-berührte Seiten",
+            "pageviews_to_route": "Seitenaufrufe zum Routen",
+            "estimated_search_clicks": "geschätzte Suchklicks",
+            "conversion_signal_coverage": "Traffic ohne Conversion-Signal",
+            "tracked_conversion_events": "erfasste Conversion-Ereignisse",
+            "conversion_events_to_measure": "Conversion-Ereignisse zum Messen",
+            "funnel_steps_to_measure": "Funnel-Schritte zum Messen"
+        },
+        "routes": {
+            "checkout": "Checkout: {{path}}",
+            "path": "{{path}}",
+            "source": "{{source}}",
+            "search_console": "Search Console",
+            "events": "Events",
+            "event": "Event: {{event_name}}",
+            "funnel": "Funnel: {{start_path}}",
+            "tracker": "{{asset}}"
+        },
+        "evidence": {
+            "checkout_starts": "Checkout-Starts",
+            "orders": "Bestellungen",
+            "checkout_conversion_rate": "Checkout-Conversion",
+            "ai_requests": "KI-Crawler-Anfragen",
+            "ai_paths": "Einzigartige gecrawlte Pfade",
+            "top_ai_path": "Wichtigster KI-Pfad",
+            "ai_referrals": "KI-Referral-Besuche",
+            "ai_path_pageviews": "Seitenaufrufe auf KI-berührtem Pfad",
+            "pageviews": "Seitenaufrufe",
+            "sessions": "Sitzungen",
+            "top_source": "Wichtigste Quelle",
+            "search_impressions": "Suchimpressionen",
+            "search_ctr": "Such-CTR",
+            "search_position": "Durchschnittsposition",
+            "event_names": "Erfasste Event-Namen",
+            "tracked_events": "Erfasste Ereignisse",
+            "suggested_goal_event": "Vorgeschlagenes Ziel-Event",
+            "suggested_goal_event_count": "Beobachtete Event-Anzahl",
+            "suggested_funnel_start": "Vorgeschlagener Funnel-Start",
+            "suggested_funnel_start_pageviews": "Startseitenaufrufe",
+            "suggested_funnel_conversion_event": "Vorgeschlagener Conversion-Schritt",
+            "suggested_funnel_event_count": "Beobachtete Conversion-Events"
+        },
+        "catalog": {
+            "checkout_conversion": {
+                "title": "Checkout-Abbruch zurückholen",
+                "summary": "Checkout-Starts konvertieren mit {{conversion_rate}} und lassen {{monthly_upside}} liegen.",
+                "action": "Prüfe Checkout-Reibung, bevor du mehr Traffic einkaufst.",
+                "digest": "Checkout-Conversion liegt bei {{conversion_rate}}."
+            },
+            "ai_visibility": {
+                "title": "KI-Crawler-Aufmerksamkeit in Besuche verwandeln",
+                "summary": "KI-Assistenten haben {{requests}} Seiten angefragt; der stärkste Pfad ist {{top_path}}.",
+                "action": "Stärke die gecrawlte Seite mit klareren Kaufantworten.",
+                "digest": "KI-Crawler konzentrieren sich auf {{top_path}}."
+            },
+            "traffic_quality": {
+                "title": "Auf die Quelle mit vorhandener Nachfrage fokussieren",
+                "summary": "{{source}} erzeugt in diesem Zeitraum {{pageviews}} Seitenaufrufe.",
+                "action": "Lenke Kampagnenaufmerksamkeit auf die Landingpage mit der höchsten Absicht.",
+                "digest": "{{source}} ist deine stärkste Nachfragequelle."
+            },
+            "search_visibility": {
+                "title": "Seiten ausbauen, die in der Suche schon sichtbar sind",
+                "summary": "Die Suche zeigt {{impressions}} Impressionen bei {{ctr}} CTR, mit etwa {{estimated_clicks}} zusätzlichen Klicks.",
+                "action": "Verbessere Snippet, Titel und die Antwort auf der Seite für Suchanfragen, die schon Impressionen liefern.",
+                "digest": "Die Suchsichtbarkeit kann etwa {{estimated_clicks}} Klicks hinzufügen."
+            },
+            "conversion_signal": {
+                "title": "Erfasste Events in ein Conversion-Signal verwandeln",
+                "summary": "{{event_names}} werden über {{pageviews}} Seitenaufrufe erfasst, aber noch kein Conversion-Event priorisiert Opportunities.",
+                "action": "Wähle das Event, das Lead, Signup oder Kauf am besten beschreibt, und markiere es als Conversion-Signal.",
+                "digest": "Erfasste Events brauchen ein Conversion-Signal."
+            },
+            "setup_goal_suggestion": {
+                "title": "Ziel für {{event_name}} erstellen",
+                "summary": "{{event_name}} wurde {{event_count}} Mal ausgelöst, ist aber noch nicht als Ziel gespeichert.",
+                "action": "Erstelle ein Event-Ziel mit dem Wert {{goal_value}}, damit HitKeep Conversion-Opportunities darum priorisieren kann.",
+                "digest": "{{event_name}} sollte ein Ziel werden."
+            },
+            "setup_funnel_suggestion": {
+                "title": "Funnel von {{start_path}} zu {{conversion_event}} erstellen",
+                "summary": "{{start_path}} hat Traffic und {{conversion_event}} wurde {{event_count}} Mal ausgelöst, aber diese Schritte sind noch nicht als Funnel gespeichert.",
+                "action": "Erstelle einen Funnel mit {{step_count}} Schritten für {{funnel_steps}}, damit HitKeep Drop-offs vor der Conversion überwachen kann.",
+                "digest": "{{start_path}} zu {{conversion_event}} sollte ein Funnel werden."
+            },
+            "tracking_setup": {
+                "title": "Genug Signal für Empfehlungen sammeln",
+                "summary": "Füge Conversion-Ereignisse hinzu, damit Chancen priorisiert werden können.",
+                "action": "Prüfe den Tracker und füge ein Conversion-Ereignis hinzu.",
+                "digest": "Das Tracking braucht mehr Signal."
+            }
+        },
+        "aiStatus": {
+            "disabled": "KI deaktiviert",
+            "selfHosted": "Selbst gehostete KI: {{provider}} {{model}}",
+            "cloudManaged": "Cloud-verwaltete KI",
+            "notConfigured": "KI nicht konfiguriert",
+            "providerUnknown": "Anbieter unbekannt",
+            "modelUnknown": "Modell unbekannt",
+            "disabledHint": "Gespeicherte Chancen bleiben sichtbar. Neue KI-Erklärungen werden übersprungen, bis ein Instanz-Owner KI aktiviert.",
+            "notConfiguredHint": "Gespeicherte Chancen bleiben sichtbar. Konfiguriere einen KI-Anbieter, um Zusammenfassungen mit Modellkontext zu aktualisieren.",
+            "budgetExhaustedHint": "KI-Aktualisierungen pausieren, weil das konfigurierte Anfrage- oder Token-Budget für dieses Fenster erschöpft ist."
+        },
+        "card": {
+            "priority": "Priorität"
+        },
+        "detail": {
+            "estimatedImpact": "Geschätzter Impact",
+            "priorityScore": "Prioritätsscore",
+            "priorityHint": "Nach Evidenz gewichtet",
+            "why": "Warum HitKeep das für wichtig hält",
+            "nextBestAction": "Nächste beste Aktion",
+            "readOnly": "Du hast nur Lesezugriff auf diese Website. Bitte einen Website-Admin, Chancen zu speichern, zu verwerfen oder als erledigt zu markieren."
+        },
+        "empty": {
+            "title": "Keine Opportunities passen zu dieser Ansicht",
+            "body": "Versuche einen anderen Typ- oder Statusfilter."
+        },
+        "noSiteDescription": "Wähle eine Website aus, um Opportunity-Empfehlungen anzuzeigen."
     }
 }

@@ -30,7 +30,7 @@ export class PermissionService {
         const perms = this.permissions();
         if (!perms) return false;
 
-        if (['owner', 'admin'].includes(perms.instance_role)) return true;
+        if (this.hasInstancePermission('site.manage_data')) return true;
 
         const siteRole = perms.permissions[siteId];
         return ['owner', 'admin'].includes(siteRole);
@@ -40,7 +40,7 @@ export class PermissionService {
         const perms = this.permissions();
         if (!perms) return false;
 
-        if (['owner', 'admin'].includes(perms.instance_role)) return true;
+        if (this.hasInstancePermission('site.view')) return true;
 
         return !!perms.permissions[siteId];
     }
@@ -49,8 +49,12 @@ export class PermissionService {
         const perms = this.permissions();
         if (!perms) return false;
 
-        if (perms.instance_role === 'owner') return true;
+        if (this.hasInstancePermission('site.delete')) return true;
 
         return perms.permissions[siteId] === 'owner';
+    }
+
+    private hasInstancePermission(permission: string): boolean {
+        return this.permissions()?.instance_permissions?.includes(permission) ?? false;
     }
 }

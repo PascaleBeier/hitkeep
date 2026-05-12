@@ -11,6 +11,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"hitkeep/internal/api"
+	opportunitysvc "hitkeep/internal/opportunities"
 )
 
 func (s *service) registerTools(server *mcp.Server) {
@@ -308,6 +309,7 @@ func (s *service) getOpportunities(ctx context.Context, _ *mcp.CallToolRequest, 
 	if err != nil {
 		return nil, opportunitiesOutput{}, err
 	}
+	opportunities = opportunitysvc.RankOpportunities(opportunities)
 	return nil, opportunitiesOutput{SiteID: siteID.String(), Opportunities: toMCPOpportunities(opportunities, status, limit)}, nil
 }
 
@@ -366,12 +368,28 @@ func toMCPOpportunity(opportunity api.Opportunity) mcpOpportunity {
 		RouteParams:      opportunity.RouteParams,
 		RouteIcon:        opportunity.RouteIcon,
 		DetectorVersion:  opportunity.DetectorVersion,
-		Evidence:         opportunity.Evidence,
+		Evidence:         citedMCPOpportunityEvidence(opportunity.Evidence, opportunity.CitedEvidenceIDs),
 		CitedEvidenceIDs: opportunity.CitedEvidenceIDs,
 		GeneratedAt:      formatMCPTime(opportunity.GeneratedAt),
 		CreatedAt:        formatMCPTime(opportunity.CreatedAt),
 		UpdatedAt:        formatMCPTime(opportunity.UpdatedAt),
 	}
+}
+
+func citedMCPOpportunityEvidence(evidence []api.OpportunityEvidence, citedEvidenceIDs []string) []api.OpportunityEvidence {
+	cited := make(map[string]bool, len(citedEvidenceIDs))
+	for _, id := range citedEvidenceIDs {
+		if strings.TrimSpace(id) != "" {
+			cited[id] = true
+		}
+	}
+	out := make([]api.OpportunityEvidence, 0, len(evidence))
+	for _, item := range evidence {
+		if cited[item.ID] {
+			out = append(out, item)
+		}
+	}
+	return out
 }
 
 var opportunityStatusFilters = map[string]string{

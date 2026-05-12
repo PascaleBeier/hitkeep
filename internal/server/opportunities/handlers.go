@@ -29,6 +29,10 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		SitePerm:    authcore.PermSiteView,
 		RateLimiter: ctx.ApiLimiter,
 	}, h.handleList()))
+	mux.HandleFunc("GET /api/sites/{id}/opportunities/digest-preview", ctx.Handler(shared.HandlerConfig{
+		SitePerm:    authcore.PermSiteView,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleDigestPreview()))
 	mux.HandleFunc("POST /api/sites/{id}/opportunities/generate", ctx.Handler(shared.HandlerConfig{
 		SitePerm:    authcore.PermSiteManageData,
 		RateLimiter: ctx.ApiLimiter,
@@ -55,7 +59,35 @@ func (h *handler) handleList() http.HandlerFunc {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
+		opps = opportunitysvc.RankOpportunities(opps)
 		writeJSON(w, http.StatusOK, api.OpportunityListResponse{Opportunities: opps})
+	}
+}
+
+func (h *handler) handleDigestPreview() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		siteID, ok := parseUUIDPath(w, r, "id")
+		if !ok {
+			return
+		}
+		if h.ctx.Store == nil {
+			http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
+			return
+		}
+		frequency, ok := parseDigestPreviewFrequency(w, r)
+		if !ok {
+			return
+		}
+		preview, err := opportunitysvc.SelectDigestPreviewForSite(r.Context(), h.ctx.Store, opportunitysvc.DigestPreviewForSiteInput{
+			SiteID:    siteID,
+			Frequency: frequency,
+		})
+		if err != nil {
+			slog.Error("Failed to build opportunity digest preview", "error", err, "site_id", siteID)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, apiOpportunityDigestPreview(preview))
 	}
 }
 
@@ -192,6 +224,52 @@ func (h *handler) handleUpdateStatus() http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusOK, opportunity)
+	}
+}
+
+func parseDigestPreviewFrequency(w http.ResponseWriter, r *http.Request) (api.ReportFrequency, bool) {
+	frequency := api.ReportFrequency(strings.TrimSpace(r.URL.Query().Get("frequency")))
+	if frequency == "" {
+		frequency = api.ReportFrequencyWeekly
+	}
+	if frequency != api.ReportFrequencyDaily && frequency != api.ReportFrequencyWeekly {
+		http.Error(w, "Unsupported opportunity digest frequency", http.StatusBadRequest)
+		return "", false
+	}
+	return frequency, true
+}
+
+func apiOpportunityDigestPreview(preview opportunitysvc.DigestPreview) api.OpportunityDigestPreviewResponse {
+	items := make([]api.OpportunityDigestPreviewItem, 0, len(preview.Items))
+	for _, item := range preview.Items {
+		items = append(items, api.OpportunityDigestPreviewItem{
+			ID:               item.ID,
+			SiteID:           item.SiteID,
+			Kind:             item.Kind,
+			TypeKey:          item.TypeKey,
+			Category:         item.Category,
+			TitleKey:         item.TitleKey,
+			ActionKey:        item.ActionKey,
+			DigestKey:        item.DigestKey,
+			CopyParams:       item.CopyParams,
+			ImpactValue:      item.ImpactValue,
+			ImpactLabelKey:   item.ImpactLabelKey,
+			Confidence:       item.Confidence,
+			Score:            item.Score,
+			ScoreBreakdown:   item.ScoreBreakdown,
+			Status:           item.Status,
+			RouteLabelKey:    item.RouteLabelKey,
+			RouteParams:      item.RouteParams,
+			RouteIcon:        item.RouteIcon,
+			Evidence:         item.Evidence,
+			CitedEvidenceIDs: item.CitedEvidenceIDs,
+		})
+	}
+	return api.OpportunityDigestPreviewResponse{
+		Frequency:  preview.Frequency,
+		ShouldSend: preview.ShouldSend,
+		Reason:     preview.Reason,
+		Items:      items,
 	}
 }
 

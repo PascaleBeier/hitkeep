@@ -16,6 +16,7 @@ import (
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/exportfmt"
+	opportunitysvc "hitkeep/internal/opportunities"
 	"hitkeep/internal/server/shared"
 )
 
@@ -325,6 +326,7 @@ func (h *handler) handleGetShareOpportunities() http.HandlerFunc {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
+		opportunities = opportunitysvc.RankOpportunities(opportunities)
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(api.SharedOpportunityListResponse{Opportunities: sharedOpportunities(opportunities)}); err != nil {

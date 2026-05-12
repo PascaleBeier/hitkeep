@@ -6,6 +6,7 @@
         "analytics": "Analytics",
         "integration": "Integratie",
         "dashboardAria": "Ga naar dashboard",
+        "opportunitiesAria": "Ga naar kansen",
         "goalsAria": "Ga naar doelen",
         "funnelsAria": "Ga naar funnels",
         "eventsAria": "Ga naar events",
@@ -20,6 +21,7 @@
         "apiClientsAria": "Ga naar API-clients",
         "apiReferenceAria": "Ga naar API-referentie",
         "dashboard": "Dashboard",
+        "opportunities": "Kansen",
         "goals": "Doelen",
         "funnels": "Funnels",
         "utm": "UTM",
@@ -2378,5 +2380,211 @@
             "description": "Houd aankoop-, begin_checkout-, add_to_cart- en view_item-gebeurtenissen bij om e-commerceanalyses in te vullen."
         },
         "noSiteDescription": "Selecteer een site om e-commerceanalyses te bekijken."
+    },
+    "opportunities": {
+        "header": {
+            "eyebrow": "Omzetadvies",
+            "title": "Haal meer omzet uit het verkeer dat je al hebt",
+            "subtitle": "HitKeep rangschikt conversielekken, omzetkansen, AI-zichtbaarheidsgaten, zoekkansen en ontbrekende setup-signalen op basis van wat de meeste zakelijke impact lijkt te hebben.",
+            "scoreLabel": "Score",
+            "scoreAria": "Kansenscore",
+            "scoreHint": "Sterk signaal"
+        },
+        "kpis": {
+            "open": "Open kansen",
+            "upside": "Geschat maandelijks potentieel",
+            "highConfidence": "Hoge zekerheid",
+            "aiSearchWins": "AI/zoekkansen"
+        },
+        "filters": {
+            "ariaLabel": "Kansenfilters",
+            "typeTitle": "Type kans",
+            "statusTitle": "Workflowstatus",
+            "types": {
+                "all": "Alle",
+                "conversion": "Conversielekken",
+                "revenue": "Omzetkansen",
+                "ai": "AI-zichtbaarheid",
+                "search": "Zoeken",
+                "setup": "Setup"
+            },
+            "statuses": {
+                "all": "Alle",
+                "new": "Nieuw",
+                "saved": "Opgeslagen",
+                "done": "Gedaan",
+                "dismissed": "Afgewezen"
+            }
+        },
+        "confidence": {
+            "high": "Hoge zekerheid",
+            "medium": "Gemiddelde zekerheid"
+        },
+        "actions": {
+            "previewDigest": "Overzicht bekijken",
+            "previewOn": "Voorbeeld van overzicht aan",
+            "generate": "Kansen vernieuwen",
+            "generating": "Vernieuwen",
+            "save": "Opslaan",
+            "inspect": "Bekijken",
+            "markDone": "Markeer als gedaan",
+            "dismiss": "Afwijzen"
+        },
+        "errors": {
+            "load": "Kansen konden niet worden geladen.",
+            "generate": "Kansen konden niet worden vernieuwd.",
+            "status": "De kans kon niet worden bijgewerkt."
+        },
+        "digest": {
+            "title": "Voorbeeld van wekelijkse samenvatting",
+            "subtitle": "Belangrijkste aanbevelingen die voor deze site per e-mail zouden worden verzonden.",
+            "statusReady": "Zou worden verzonden",
+            "frequency": {
+                "daily": "Dagelijks",
+                "weekly": "Wekelijks"
+            },
+            "nextAction": "Volgende actie",
+            "evidence": "Bewijs",
+            "confidence": "Zekerheid",
+            "noSend": "Voor deze site zou nog geen kansenmail worden verzonden.",
+            "error": "Voorbeeld van samenvatting kon niet worden geladen."
+        },
+        "inbox": {
+            "ariaLabel": "Kanseninbox",
+            "title": "Kanseninbox",
+            "subtitle": "{{count}} geprioriteerde suggesties voor deze periode",
+            "cloudBadge": "Cloudklare AI-copy"
+        },
+        "topActions": {
+            "ariaLabel": "Belangrijkste aanbevolen acties",
+            "title": "Top 3 acties",
+            "subtitle": "Begin met deze geprioriteerde kansen."
+        },
+        "impact": {
+            "monthlyRevenue": "maandelijkse omzet",
+            "qualifiedVisits": "gekwalificeerde bezoeken",
+            "conversionLift": "conversieverbetering",
+            "searchClicks": "zoekklikken",
+            "blindSpots": "blinde vlekken",
+            "estimated_monthly_upside": "geschat maandelijks potentieel",
+            "ai_touched_pages": "door AI geraakte pagina's",
+            "pageviews_to_route": "pageviews om door te sturen",
+            "estimated_search_clicks": "geschatte zoekklikken",
+            "conversion_signal_coverage": "verkeer zonder conversiesignaal",
+            "tracked_conversion_events": "gemeten conversie-events",
+            "conversion_events_to_measure": "conversie-events om te meten",
+            "funnel_steps_to_measure": "funnelstappen om te meten"
+        },
+        "routes": {
+            "checkout": "Checkout: {{path}}",
+            "path": "{{path}}",
+            "source": "{{source}}",
+            "search_console": "Search Console",
+            "events": "Events",
+            "event": "Event: {{event_name}}",
+            "funnel": "Funnel: {{start_path}}",
+            "tracker": "{{asset}}"
+        },
+        "evidence": {
+            "checkout_starts": "Checkout-starts",
+            "orders": "Bestellingen",
+            "checkout_conversion_rate": "Checkoutconversie",
+            "ai_requests": "AI-crawlerverzoeken",
+            "ai_paths": "Unieke gecrawlde paden",
+            "top_ai_path": "Belangrijkste AI-pad",
+            "ai_referrals": "AI-verwijzingsbezoeken",
+            "ai_path_pageviews": "Pageviews op door AI geraakt pad",
+            "pageviews": "Pageviews",
+            "sessions": "Sessies",
+            "top_source": "Belangrijkste bron",
+            "search_impressions": "Zoekimpressies",
+            "search_ctr": "Zoek-CTR",
+            "search_position": "Gemiddelde positie",
+            "event_names": "Gemeten eventnamen",
+            "tracked_events": "Gemeten events",
+            "suggested_goal_event": "Voorgesteld doel-event",
+            "suggested_goal_event_count": "Waargenomen eventaantal",
+            "suggested_funnel_start": "Voorgestelde funnelstart",
+            "suggested_funnel_start_pageviews": "Pageviews op startpagina",
+            "suggested_funnel_conversion_event": "Voorgestelde conversiestap",
+            "suggested_funnel_event_count": "Waargenomen conversie-events"
+        },
+        "catalog": {
+            "checkout_conversion": {
+                "title": "Haal checkout-afhakers terug",
+                "summary": "Checkout-starts converteren met {{conversion_rate}} en laten {{monthly_upside}} liggen.",
+                "action": "Onderzoek checkoutfrictie voordat je meer verkeer toevoegt.",
+                "digest": "Checkoutconversie is {{conversion_rate}}."
+            },
+            "ai_visibility": {
+                "title": "Zet AI-crawleraandacht om in bezoeken",
+                "summary": "AI-assistenten vroegen {{requests}} pagina's op; het sterkste pad is {{top_path}}.",
+                "action": "Versterk de gecrawlde pagina met duidelijkere koopantwoorden.",
+                "digest": "AI-crawlers focusten op {{top_path}}."
+            },
+            "traffic_quality": {
+                "title": "Focus op de bron die al vraag aantrekt",
+                "summary": "{{source}} levert in deze periode {{pageviews}} pageviews op.",
+                "action": "Verplaats campagnedruk naar de landingspagina met de hoogste intentie.",
+                "digest": "{{source}} is je sterkste vraagbron."
+            },
+            "search_visibility": {
+                "title": "Verbeter pagina's die al zichtbaar zijn in zoekresultaten",
+                "summary": "Zoekresultaten tonen {{impressions}} impressies met {{ctr}} CTR, goed voor ongeveer {{estimated_clicks}} extra klikken.",
+                "action": "Verbeter snippet, titel en antwoord op de pagina voor zoekopdrachten die al impressies opleveren.",
+                "digest": "Zoekzichtbaarheid kan ongeveer {{estimated_clicks}} klikken toevoegen."
+            },
+            "conversion_signal": {
+                "title": "Zet gemeten events om in een conversiesignaal",
+                "summary": "{{event_names}} worden gemeten over {{pageviews}} pageviews, maar nog geen conversie-event rangschikt kansen.",
+                "action": "Kies het event dat het beste een lead, registratie of aankoop vertegenwoordigt en markeer het als conversiesignaal.",
+                "digest": "Gemeten events hebben een conversiesignaal nodig."
+            },
+            "setup_goal_suggestion": {
+                "title": "Maak een doel voor {{event_name}}",
+                "summary": "{{event_name}} is {{event_count}} keer geactiveerd, maar is nog niet opgeslagen als doel.",
+                "action": "Maak een eventdoel met waarde {{goal_value}} zodat HitKeep conversiekansen daaromheen kan rangschikken.",
+                "digest": "{{event_name}} zou een doel moeten worden."
+            },
+            "setup_funnel_suggestion": {
+                "title": "Maak een funnel van {{start_path}} naar {{conversion_event}}",
+                "summary": "{{start_path}} heeft verkeer en {{conversion_event}} is {{event_count}} keer geactiveerd, maar die stappen zijn nog niet opgeslagen als funnel.",
+                "action": "Maak een funnel met {{step_count}} stappen voor {{funnel_steps}} zodat HitKeep uitval vóór de conversie kan volgen.",
+                "digest": "{{start_path}} naar {{conversion_event}} zou een funnel moeten worden."
+            },
+            "tracking_setup": {
+                "title": "Verzamel genoeg signaal voor aanbevelingen",
+                "summary": "Voeg conversie-events toe zodat kansen kunnen worden gerangschikt.",
+                "action": "Controleer de tracker en voeg een conversie-event toe.",
+                "digest": "Tracking heeft meer signaal nodig."
+            }
+        },
+        "aiStatus": {
+            "disabled": "AI uitgeschakeld",
+            "selfHosted": "Zelfgehoste AI: {{provider}} {{model}}",
+            "cloudManaged": "Cloudbeheerde AI",
+            "notConfigured": "AI niet geconfigureerd",
+            "providerUnknown": "provider onbekend",
+            "modelUnknown": "model onbekend",
+            "disabledHint": "Opgeslagen kansen blijven beschikbaar. Nieuwe door AI geschreven toelichtingen worden overgeslagen totdat een instance-owner AI inschakelt.",
+            "notConfiguredHint": "Opgeslagen kansen blijven beschikbaar. Configureer een AI-provider om samenvattingen met modelcontext te vernieuwen.",
+            "budgetExhaustedHint": "AI-verversingen zijn gepauzeerd omdat het ingestelde aanvraag- of tokenbudget voor dit venster is opgebruikt."
+        },
+        "card": {
+            "priority": "Prioriteit"
+        },
+        "detail": {
+            "estimatedImpact": "Geschatte impact",
+            "priorityScore": "Prioriteitsscore",
+            "priorityHint": "Gewogen op bewijs",
+            "why": "Waarom HitKeep denkt dat dit belangrijk is",
+            "nextBestAction": "Beste volgende actie",
+            "readOnly": "Je hebt alleen-lezen toegang tot deze site. Vraag een sitebeheerder om kansen op te slaan, af te wijzen of als gedaan te markeren."
+        },
+        "empty": {
+            "title": "Geen kansen voor deze weergave",
+            "body": "Probeer een andere type- of statusfilter."
+        },
+        "noSiteDescription": "Selecteer een site om kansaanbevelingen te bekijken."
     }
 }

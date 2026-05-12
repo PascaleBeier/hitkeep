@@ -209,6 +209,15 @@ func openAPIV1AdminSitePaths() map[string]any {
 			"get": op([]string{"Opportunities"}, "List opportunities", "Lists saved opportunity recommendations for a site. Requires site.view and returns only validated customer-visible outputs with cited evidence.", secAnyAuth(), []any{paramRef("#/components/parameters/siteID")}, nil,
 				map[string]any{"200": jsonRefResp("Opportunity list", "#/components/schemas/OpportunityListResponse")}),
 		},
+		"/api/sites/{id}/opportunities/digest-preview": map[string]any{
+			"get": op([]string{"Opportunities"}, "Preview opportunity digest", "Returns the safe daily or weekly digest payload that would be emailed for saved opportunity recommendations. Requires site.view and returns translation keys, placeholders, scores, and cited aggregate evidence only.", secAnyAuth(), []any{
+				paramRef("#/components/parameters/siteID"),
+				map[string]any{"name": "frequency", "in": "query", "required": false, "schema": map[string]any{"type": "string", "enum": []string{"daily", "weekly"}, "default": "weekly"}},
+			}, nil, map[string]any{
+				"200": jsonRefResp("Opportunity digest preview", "#/components/schemas/OpportunityDigestPreviewResponse"),
+				"400": errResp("Unsupported opportunity digest frequency"),
+			}),
+		},
 		"/api/sites/{id}/opportunities/generate": map[string]any{
 			"post": op([]string{"Opportunities"}, "Generate opportunities", "Runs deterministic opportunity detectors for the selected range and, when AI is configured and budget is available, asks the provider only for structured copy from cited evidence. Requires site.manage_data.", secAnyAuth(), []any{paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/from"), paramRef("#/components/parameters/to")}, nil,
 				map[string]any{"200": jsonRefResp("Generated opportunities", "#/components/schemas/OpportunityGenerateResponse")}),

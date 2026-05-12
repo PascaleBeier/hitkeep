@@ -27,6 +27,33 @@ var opportunityScoreBreakdownOpenAPISchema = map[string]any{
 	"required": []string{"sample", "impact", "urgency", "effort", "actionability", "evidence_fit", "freshness", "total"},
 }
 
+var opportunityDigestPreviewItemOpenAPISchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"id":                 map[string]any{"type": "string", "format": "uuid"},
+		"site_id":            map[string]any{"type": "string", "format": "uuid"},
+		"kind":               map[string]any{"type": "string", "enum": []string{"conversion", "revenue", "ai", "search", "setup"}},
+		"type_key":           map[string]any{"type": "string"},
+		"category":           map[string]any{"type": "string"},
+		"title_key":          map[string]any{"type": "string"},
+		"action_key":         map[string]any{"type": "string"},
+		"digest_key":         map[string]any{"type": "string"},
+		"copy_params":        map[string]any{"type": "object", "additionalProperties": true},
+		"impact_value":       map[string]any{"type": "string"},
+		"impact_label_key":   map[string]any{"type": "string"},
+		"confidence":         map[string]any{"type": "string", "enum": []string{"high", "medium"}},
+		"score":              map[string]any{"type": "integer"},
+		"score_breakdown":    map[string]any{"$ref": "#/components/schemas/OpportunityScoreBreakdown"},
+		"status":             map[string]any{"type": "string", "enum": []string{"new", "saved"}},
+		"route_label_key":    map[string]any{"type": "string"},
+		"route_params":       map[string]any{"type": "object", "additionalProperties": true},
+		"route_icon":         map[string]any{"type": "string"},
+		"evidence":           map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/OpportunityEvidence"}},
+		"cited_evidence_ids": map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+	},
+	"required": []string{"id", "site_id", "kind", "type_key", "category", "title_key", "action_key", "digest_key", "copy_params", "impact_value", "impact_label_key", "confidence", "score", "score_breakdown", "status", "route_label_key", "route_icon", "evidence", "cited_evidence_ids"},
+}
+
 func openAPIV1Schemas() map[string]any {
 	return mergeOpenAPIMapGroups(
 		openAPIV1AnalyticsSchemas(),
@@ -122,6 +149,17 @@ func openAPIV1AnalyticsSchemas() map[string]any {
 				"ai_status":     map[string]any{"type": "string"},
 			},
 			"required": []string{"opportunities", "ai_status"},
+		},
+		"OpportunityDigestPreviewItem": opportunityDigestPreviewItemOpenAPISchema,
+		"OpportunityDigestPreviewResponse": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"frequency":   map[string]any{"type": "string", "enum": []string{"daily", "weekly"}},
+				"should_send": map[string]any{"type": "boolean"},
+				"reason":      map[string]any{"type": "string", "enum": []string{"ready", "no_opportunities", "unsupported_frequency"}},
+				"items":       map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/OpportunityDigestPreviewItem"}},
+			},
+			"required": []string{"frequency", "should_send", "reason", "items"},
 		},
 		"OpportunityStatusUpdateRequest": map[string]any{
 			"type": "object",

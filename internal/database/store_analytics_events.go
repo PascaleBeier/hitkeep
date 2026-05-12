@@ -55,6 +55,43 @@ func (s *Store) GetEventNames(ctx context.Context, params api.EventNamesParams) 
 	return names, nil
 }
 
+func (s *Store) GetEventCounts(ctx context.Context, params api.EventNamesParams) ([]api.MetricStat, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT name, SUM(count) AS count
+		FROM (
+			SELECT name, COUNT(*) AS count
+			FROM events
+			WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?
+			GROUP BY name
+			UNION ALL
+			SELECT event_name AS name, SUM(events) AS count
+			FROM imported_event_daily
+			WHERE site_id = ? AND date >= CAST(? AS DATE) AND date <= CAST(? AS DATE)
+			GROUP BY event_name
+		)
+		WHERE name IS NOT NULL AND name <> ''
+		GROUP BY name
+		ORDER BY count DESC, name
+	`, params.SiteID, params.Start, params.End, params.SiteID, params.Start, params.End)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	results := []api.MetricStat{}
+	for rows.Next() {
+		var item api.MetricStat
+		if err := rows.Scan(&item.Name, &item.Value); err != nil {
+			return nil, err
+		}
+		results = append(results, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read event count rows: %w", err)
+	}
+	return results, nil
+}
+
 // GetEventPropertyKeys returns the distinct JSON property keys for a given event name.
 func (s *Store) GetEventPropertyKeys(ctx context.Context, params api.EventNamesParams, eventName string) ([]string, error) {
 	rows, err := s.db.QueryContext(ctx, `

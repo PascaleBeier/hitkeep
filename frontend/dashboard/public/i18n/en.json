@@ -6,6 +6,7 @@
         "analytics": "Analytics",
         "integration": "Integration",
         "dashboardAria": "Go to dashboard",
+        "opportunitiesAria": "Go to opportunities",
         "goalsAria": "Go to goals",
         "funnelsAria": "Go to funnels",
         "eventsAria": "Go to events",
@@ -20,6 +21,7 @@
         "apiClientsAria": "Go to API clients",
         "apiReferenceAria": "Go to API reference",
         "dashboard": "Dashboard",
+        "opportunities": "Opportunities",
         "goals": "Goals",
         "funnels": "Funnels",
         "utm": "UTM",
@@ -2378,5 +2380,211 @@
             "description": "Track purchase, begin_checkout, add_to_cart, and view_item events to populate ecommerce analytics."
         },
         "noSiteDescription": "Select a site to view ecommerce analytics."
+    },
+    "opportunities": {
+        "header": {
+            "eyebrow": "Revenue guidance",
+            "title": "Make more money from the traffic you already have",
+            "subtitle": "HitKeep ranks conversion leaks, revenue winners, AI visibility gaps, search opportunities, and setup blind spots by what is most likely to move the business.",
+            "scoreLabel": "Score",
+            "scoreAria": "Opportunity score",
+            "scoreHint": "Strong signal"
+        },
+        "kpis": {
+            "open": "Open opportunities",
+            "upside": "Est. monthly upside",
+            "highConfidence": "High confidence",
+            "aiSearchWins": "AI/Search wins"
+        },
+        "filters": {
+            "ariaLabel": "Opportunity filters",
+            "typeTitle": "Opportunity type",
+            "statusTitle": "Workflow status",
+            "types": {
+                "all": "All",
+                "conversion": "Conversion leaks",
+                "revenue": "Revenue winners",
+                "ai": "AI visibility",
+                "search": "Search",
+                "setup": "Setup"
+            },
+            "statuses": {
+                "all": "All",
+                "new": "New",
+                "saved": "Saved",
+                "done": "Done",
+                "dismissed": "Dismissed"
+            }
+        },
+        "confidence": {
+            "high": "High confidence",
+            "medium": "Medium confidence"
+        },
+        "actions": {
+            "previewDigest": "Preview digest",
+            "previewOn": "Digest preview on",
+            "generate": "Refresh opportunities",
+            "generating": "Refreshing",
+            "save": "Save",
+            "inspect": "Inspect",
+            "markDone": "Mark done",
+            "dismiss": "Dismiss"
+        },
+        "errors": {
+            "load": "Could not load opportunities.",
+            "generate": "Could not refresh opportunities.",
+            "status": "Could not update the opportunity."
+        },
+        "digest": {
+            "title": "Weekly digest preview",
+            "subtitle": "Top recommendations that would be emailed for this site.",
+            "statusReady": "Would send",
+            "frequency": {
+                "daily": "Daily",
+                "weekly": "Weekly"
+            },
+            "nextAction": "Next action",
+            "evidence": "Evidence",
+            "confidence": "Confidence",
+            "noSend": "No opportunity email would be sent for this site yet.",
+            "error": "Could not load digest preview."
+        },
+        "inbox": {
+            "ariaLabel": "Opportunity inbox",
+            "title": "Opportunity inbox",
+            "subtitle": "{{count}} ranked suggestions for this range",
+            "cloudBadge": "Cloud-ready AI copy"
+        },
+        "topActions": {
+            "ariaLabel": "Top recommended actions",
+            "title": "Top 3 actions",
+            "subtitle": "Start with these ranked opportunities first."
+        },
+        "impact": {
+            "monthlyRevenue": "monthly revenue",
+            "qualifiedVisits": "qualified visits",
+            "conversionLift": "conversion lift",
+            "searchClicks": "search clicks",
+            "blindSpots": "blind spots",
+            "estimated_monthly_upside": "estimated monthly upside",
+            "ai_touched_pages": "AI-touched pages",
+            "pageviews_to_route": "pageviews to route",
+            "estimated_search_clicks": "estimated search clicks",
+            "conversion_signal_coverage": "traffic needing a conversion signal",
+            "tracked_conversion_events": "tracked conversion events",
+            "conversion_events_to_measure": "conversion events to measure",
+            "funnel_steps_to_measure": "funnel steps to measure"
+        },
+        "routes": {
+            "checkout": "Checkout: {{path}}",
+            "path": "{{path}}",
+            "source": "{{source}}",
+            "search_console": "Search Console",
+            "events": "Events",
+            "event": "Event: {{event_name}}",
+            "funnel": "Funnel: {{start_path}}",
+            "tracker": "{{asset}}"
+        },
+        "evidence": {
+            "checkout_starts": "Checkout starts",
+            "orders": "Orders",
+            "checkout_conversion_rate": "Checkout conversion",
+            "ai_requests": "AI crawler requests",
+            "ai_paths": "Unique crawled paths",
+            "top_ai_path": "Top AI path",
+            "ai_referrals": "AI referral visits",
+            "ai_path_pageviews": "Pageviews on AI-touched path",
+            "pageviews": "Pageviews",
+            "sessions": "Sessions",
+            "top_source": "Top source",
+            "search_impressions": "Search impressions",
+            "search_ctr": "Search CTR",
+            "search_position": "Average position",
+            "event_names": "Tracked event names",
+            "tracked_events": "Tracked events",
+            "suggested_goal_event": "Suggested goal event",
+            "suggested_goal_event_count": "Observed event count",
+            "suggested_funnel_start": "Suggested funnel start",
+            "suggested_funnel_start_pageviews": "Start pageviews",
+            "suggested_funnel_conversion_event": "Suggested conversion step",
+            "suggested_funnel_event_count": "Observed conversion events"
+        },
+        "catalog": {
+            "checkout_conversion": {
+                "title": "Recover checkout drop-off",
+                "summary": "Checkout starts are converting at {{conversion_rate}}, leaving {{monthly_upside}} on the table.",
+                "action": "Inspect checkout friction before adding more traffic.",
+                "digest": "Checkout conversion is {{conversion_rate}}."
+            },
+            "ai_visibility": {
+                "title": "Turn AI crawler attention into visits",
+                "summary": "AI assistants requested {{requests}} pages; the strongest path is {{top_path}}.",
+                "action": "Strengthen the crawled page with clearer buying answers.",
+                "digest": "AI crawlers focused on {{top_path}}."
+            },
+            "traffic_quality": {
+                "title": "Focus on the source already pulling demand",
+                "summary": "{{source}} is producing {{pageviews}} pageviews in this window.",
+                "action": "Move campaign attention toward the highest-intent landing page.",
+                "digest": "{{source}} is your strongest demand source."
+            },
+            "search_visibility": {
+                "title": "Lift pages already visible in search",
+                "summary": "Search shows {{impressions}} impressions at {{ctr}} CTR, worth about {{estimated_clicks}} more clicks.",
+                "action": "Improve the snippet, title, and on-page answer for the queries already earning impressions.",
+                "digest": "Search visibility can add about {{estimated_clicks}} clicks."
+            },
+            "conversion_signal": {
+                "title": "Turn tracked events into a conversion signal",
+                "summary": "{{event_names}} are tracked across {{pageviews}} pageviews, but no conversion event is ranking opportunities yet.",
+                "action": "Pick the event that best represents a lead, signup, or purchase and mark it as a conversion signal.",
+                "digest": "Tracked events need a conversion signal."
+            },
+            "setup_goal_suggestion": {
+                "title": "Create a goal for {{event_name}}",
+                "summary": "{{event_name}} fired {{event_count}} times, but it is not saved as a goal yet.",
+                "action": "Create an event goal with value {{goal_value}} so HitKeep can rank conversion opportunities around it.",
+                "digest": "{{event_name}} should become a goal."
+            },
+            "setup_funnel_suggestion": {
+                "title": "Create a funnel from {{start_path}} to {{conversion_event}}",
+                "summary": "{{start_path}} has traffic and {{conversion_event}} fired {{event_count}} times, but those steps are not saved as a funnel yet.",
+                "action": "Create a {{step_count}}-step funnel for {{funnel_steps}} so HitKeep can monitor drop-off before the conversion.",
+                "digest": "{{start_path}} to {{conversion_event}} should become a funnel."
+            },
+            "tracking_setup": {
+                "title": "Collect enough signal for recommendations",
+                "summary": "Add conversion events so opportunities can be ranked.",
+                "action": "Verify the tracker and add one conversion event.",
+                "digest": "Tracking needs more signal."
+            }
+        },
+        "aiStatus": {
+            "disabled": "AI disabled",
+            "selfHosted": "Self-hosted AI: {{provider}} {{model}}",
+            "cloudManaged": "Cloud-managed AI",
+            "notConfigured": "AI not configured",
+            "providerUnknown": "provider unknown",
+            "modelUnknown": "model unknown",
+            "disabledHint": "Saved opportunities remain available. New AI-written explanations are skipped until an instance owner enables AI.",
+            "notConfiguredHint": "Saved opportunities remain available. Configure an AI provider to refresh summaries with model-written context.",
+            "budgetExhaustedHint": "AI refreshes are paused because the configured request or token budget is exhausted for this window."
+        },
+        "card": {
+            "priority": "Priority"
+        },
+        "detail": {
+            "estimatedImpact": "Estimated impact",
+            "priorityScore": "Priority score",
+            "priorityHint": "Evidence weighted",
+            "why": "Why HitKeep thinks this matters",
+            "nextBestAction": "Next best action",
+            "readOnly": "You have read-only access to this site. Ask a site admin to save, dismiss, or mark opportunities done."
+        },
+        "empty": {
+            "title": "No opportunities match this view",
+            "body": "Try a different type or status filter."
+        },
+        "noSiteDescription": "Select a site to view opportunity recommendations."
     }
 }

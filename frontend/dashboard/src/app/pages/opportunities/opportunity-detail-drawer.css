@@ -1,0 +1,117 @@
+:host {
+    display: contents;
+}
+
+.opportunity-detail {
+    display: flex;
+    min-height: 100%;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.opportunity-detail__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--p-text-muted-color);
+    font-size: 0.75rem;
+}
+
+.opportunity-detail__meta > span:not(.p-tag) {
+    padding: 0.15rem 0.45rem;
+    border: 1px solid var(--p-surface-200);
+    border-radius: 999px;
+}
+
+.opportunity-detail header h2 {
+    margin: 0.5rem 0 0;
+    color: var(--p-text-color);
+    font-size: 1.35rem;
+    font-weight: 750;
+}
+
+.opportunity-detail header p,
+.opportunity-detail__action {
+    margin: 0.5rem 0 0;
+    color: var(--p-text-muted-color);
+    line-height: 1.5;
+}
+
+.opportunity-detail h3 {
+    margin: 0 0 0.75rem;
+    color: var(--p-text-color);
+    font-size: 0.9rem;
+    font-weight: 750;
+}
+
+.opportunity-detail__impact {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.opportunity-detail__impact div,
+.opportunity-detail__evidence div {
+    border: 1px solid var(--p-surface-200);
+    border-radius: 8px;
+    background: var(--p-surface-0);
+}
+
+.opportunity-detail__impact div {
+    padding: 0.875rem;
+}
+
+.opportunity-detail__impact span,
+.opportunity-detail__impact small {
+    display: block;
+    color: var(--p-text-muted-color);
+    font-size: 0.75rem;
+}
+
+.opportunity-detail__impact strong {
+    display: block;
+    margin: 0.25rem 0;
+    color: var(--p-text-color);
+    font-size: 1.5rem;
+}
+
+.opportunity-detail__evidence {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.opportunity-detail__evidence div {
+    display: flex;
+    gap: 0.55rem;
+    padding: 0.75rem;
+    color: var(--p-text-color);
+    font-size: 0.9rem;
+}
+
+.opportunity-detail__evidence i {
+    margin-top: 0.15rem;
+    color: var(--p-green-500);
+}
+
+.opportunity-detail__evidence small {
+    display: block;
+    color: var(--p-text-muted-color);
+    font-size: 0.75rem;
+    line-height: 1.35;
+}
+
+.opportunity-detail footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: auto;
+    padding-top: 1rem;
+    border-top: 1px solid var(--p-surface-200);
+}
+
+@media (max-width: 640px) {
+    .opportunity-detail__impact {
+        grid-template-columns: 1fr;
+    }
+}

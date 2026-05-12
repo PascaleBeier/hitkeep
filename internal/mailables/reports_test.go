@@ -1,9 +1,15 @@
 package mailables
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/google/uuid"
+
+	"hitkeep/internal/api"
 	"hitkeep/internal/mailer"
+	opportunitysvc "hitkeep/internal/opportunities"
 )
 
 func TestLocalizedFrequencyLabelsUseMailContext(t *testing.T) {
@@ -100,6 +106,138 @@ func TestLocalizedFrequencyLabelsUseMailContext(t *testing.T) {
 				t.Fatalf("digest subject = %q, want %q", got, tt.digestSubject)
 			}
 		})
+	}
+}
+
+func TestOpportunityDigestMailableUsesSafeLocalizedOpportunityData(t *testing.T) {
+	preview := opportunitysvc.DigestPreview{
+		Frequency:  api.ReportFrequencyWeekly,
+		ShouldSend: true,
+		Reason:     opportunitysvc.DigestPreviewReasonReady,
+		Items: []opportunitysvc.DigestItem{
+			{
+				ID:          uuid.NewString(),
+				SiteID:      uuid.NewString(),
+				TypeKey:     "opportunities.types.checkout_conversion",
+				TitleKey:    "opportunities.catalog.checkout_conversion.title",
+				ActionKey:   "opportunities.catalog.checkout_conversion.action",
+				DigestKey:   "opportunities.catalog.checkout_conversion.digest",
+				CopyParams:  map[string]any{"conversion_rate": "42%", "monthly_upside": "$1,200"},
+				ImpactValue: "$1,200",
+				Confidence:  "high",
+				Score:       91,
+				Evidence: []api.OpportunityEvidence{
+					{ID: "conversion_rate", LabelKey: "opportunities.evidence.checkout_conversion_rate", Value: "42%"},
+				},
+				CitedEvidenceIDs: []string{"conversion_rate"},
+			},
+		},
+	}
+
+	digest := NewOpportunityDigestWithSubjectLabel(
+		"en",
+		"shop.example",
+		"May 4-10, 2026",
+		"Weekly",
+		"weekly",
+		"https://app.example/sites/site-1/opportunities",
+		"https://app.example/settings/email",
+		preview,
+	)
+
+	if got := digest.Subject(); got != "1 weekly opportunity for shop.example - May 4-10, 2026" {
+		t.Fatalf("unexpected subject %q", got)
+	}
+	if digest.Template() != "opportunity_digest.mjml" {
+		t.Fatalf("unexpected template %q", digest.Template())
+	}
+	data := digest.Data().(*OpportunityDigest)
+	if len(data.Items) != 1 {
+		t.Fatalf("expected one opportunity digest item, got %#v", data.Items)
+	}
+	item := data.Items[0]
+	if item.Title != "Recover checkout drop-off" || item.Digest != "Checkout conversion is 42%." || item.Action == "" {
+		t.Fatalf("expected localized opportunity copy, got %#v", item)
+	}
+	renderedItem := fmt.Sprintf("%#v", item)
+	for _, forbidden := range []string{"TitleKey", "RawPrompt", "ProviderResponse", "opportunities.catalog.checkout_conversion.title"} {
+		if strings.Contains(renderedItem, forbidden) {
+			t.Fatalf("opportunity digest item leaked raw/internal field %q: %s", forbidden, renderedItem)
+		}
+	}
+	if len(item.Evidence) != 1 || item.Evidence[0].Label != "Checkout conversion rate" || item.Evidence[0].Value != "42%" {
+		t.Fatalf("expected localized evidence snippet, got %#v", item.Evidence)
+	}
+}
+
+func TestOpportunityDigestMailableLocalizesNonCheckoutFamilies(t *testing.T) {
+	preview := opportunitysvc.DigestPreview{
+		Frequency:  api.ReportFrequencyWeekly,
+		ShouldSend: true,
+		Reason:     opportunitysvc.DigestPreviewReasonReady,
+		Items: []opportunitysvc.DigestItem{
+			{
+				ID:         uuid.NewString(),
+				SiteID:     uuid.NewString(),
+				TypeKey:    "opportunities.types.traffic_quality",
+				TitleKey:   "opportunities.catalog.traffic_quality.title",
+				ActionKey:  "opportunities.catalog.traffic_quality.action",
+				DigestKey:  "opportunities.catalog.traffic_quality.digest",
+				CopyParams: map[string]any{"source": "Google", "pageviews": "1,200"},
+				Score:      82,
+			},
+		},
+	}
+
+	digest := NewOpportunityDigestWithSubjectLabel("en", "shop.example", "May 4-10, 2026", "Weekly", "weekly", "https://app.example/opportunities", "https://app.example/settings", preview)
+	item := digest.Data().(*OpportunityDigest).Items[0]
+
+	if item.Title != "Focus on the source already pulling demand" || item.Digest != "Google is your strongest demand source." {
+		t.Fatalf("expected localized traffic quality digest copy, got %#v", item)
+	}
+	if strings.Contains(fmt.Sprintf("%#v", item), "opportunities.catalog.traffic_quality") {
+		t.Fatalf("traffic quality digest leaked translation key: %#v", item)
+	}
+}
+
+func TestOpportunityDigestMailableUsesOnlyCitedLocalizedEvidence(t *testing.T) {
+	preview := opportunitysvc.DigestPreview{
+		Frequency:  api.ReportFrequencyWeekly,
+		ShouldSend: true,
+		Reason:     opportunitysvc.DigestPreviewReasonReady,
+		Items: []opportunitysvc.DigestItem{
+			{
+				ID:         uuid.NewString(),
+				SiteID:     uuid.NewString(),
+				TypeKey:    "opportunities.types.traffic_quality",
+				TitleKey:   "opportunities.catalog.traffic_quality.title",
+				ActionKey:  "opportunities.catalog.traffic_quality.action",
+				DigestKey:  "opportunities.catalog.traffic_quality.digest",
+				CopyParams: map[string]any{"source": "Google"},
+				Evidence: []api.OpportunityEvidence{
+					{ID: "pageviews", LabelKey: "opportunities.evidence.pageviews", Value: "1,200"},
+					{ID: "sessions", LabelKey: "opportunities.evidence.sessions", Value: "640"},
+					{ID: "top_source", LabelKey: "opportunities.evidence.top_source", Value: "Google"},
+					{ID: "orders", LabelKey: "opportunities.evidence.orders", Value: "12"},
+				},
+				CitedEvidenceIDs: []string{"pageviews", "sessions", "top_source"},
+			},
+		},
+	}
+
+	digest := NewOpportunityDigestWithSubjectLabel("en", "shop.example", "May 4-10, 2026", "Weekly", "weekly", "https://app.example/opportunities", "https://app.example/settings", preview)
+	evidence := digest.Data().(*OpportunityDigest).Items[0].Evidence
+
+	if len(evidence) != 3 {
+		t.Fatalf("expected only cited evidence snippets, got %#v", evidence)
+	}
+	for _, item := range evidence {
+		if strings.HasPrefix(item.Label, "opportunities.evidence.") {
+			t.Fatalf("expected localized evidence label, got %#v", evidence)
+		}
+		if item.Label == "Orders" || item.Value == "12" {
+			t.Fatalf("uncited evidence leaked into digest: %#v", evidence)
+		}
 	}
 }
 

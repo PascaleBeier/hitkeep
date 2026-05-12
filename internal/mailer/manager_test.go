@@ -145,6 +145,57 @@ func newLocalizedDigestMailable(locale string) *stubMailable {
 	}
 }
 
+func newLocalizedOpportunityDigestMailable(locale string) *stubMailable {
+	type evidence struct {
+		Label string
+		Value string
+	}
+	type item struct {
+		ID          string
+		Title       string
+		Digest      string
+		Action      string
+		ImpactValue string
+		Confidence  string
+		Score       int
+		URL         string
+		Evidence    []evidence
+	}
+
+	return &stubMailable{
+		subject:  Translatef(locale, "subject.opportunity_digest_one", Translate(locale, "freq.digest_subject.weekly"), "shop.example", "4.-10. Mai 2026"),
+		template: "opportunity_digest.mjml",
+		locale:   locale,
+		data: struct {
+			SiteDomain       string
+			PeriodLabel      string
+			FreqLabel        string
+			OpportunitiesURL string
+			SettingsURL      string
+			Items            []item
+		}{
+			SiteDomain:       "shop.example",
+			PeriodLabel:      "4.-10. Mai 2026",
+			FreqLabel:        Translate(locale, "freq.digest.weekly"),
+			OpportunitiesURL: "https://example.com/opportunities",
+			SettingsURL:      "https://example.com/settings",
+			Items: []item{
+				{
+					ID:          "op-1",
+					Title:       Translate(locale, "opportunities.catalog.checkout_conversion.title"),
+					Digest:      strings.ReplaceAll(Translate(locale, "opportunities.catalog.checkout_conversion.digest"), "{{conversion_rate}}", "42%"),
+					Action:      Translate(locale, "opportunities.catalog.checkout_conversion.action"),
+					ImpactValue: "$1,200",
+					Confidence:  "high",
+					Score:       91,
+					URL:         "https://example.com/opportunities#op-1",
+					Evidence:    []evidence{{Label: Translate(locale, "opportunities.evidence.checkout_conversion_rate"), Value: "42%"}},
+				},
+			},
+		},
+	}
+}
+
 func newUserInviteMailable(link, siteName, inviter string) *stubMailable {
 	return &stubMailable{
 		subject:  "You've been invited to join " + siteName,
@@ -465,6 +516,27 @@ func TestSendLocalizedDigestUsesTranslatedTextLabels(t *testing.T) {
 	}
 	if strings.Contains(drv.textBody, "Dashboard:") {
 		t.Fatalf("expected digest text template to avoid hardcoded English label, got:\n%s", drv.textBody)
+	}
+}
+
+func TestSendOpportunityDigestRendersLocalizedSafeRecommendation(t *testing.T) {
+	drv := &mockDriver{}
+	m := &Mailer{driver: drv}
+
+	err := m.Send("user@example.com", newLocalizedOpportunityDigestMailable("de"))
+	if err != nil {
+		t.Fatalf("Send() error = %v", err)
+	}
+
+	for _, want := range []string{"wöchentliche Chance für shop.example", "Checkout-Abbruch reduzieren", "Nächste Aktion", "Checkout-Conversion-Rate", "42%"} {
+		if !strings.Contains(drv.textBody, want) && !strings.Contains(drv.htmlBody, want) {
+			t.Fatalf("expected opportunity digest output to contain %q", want)
+		}
+	}
+	for _, forbidden := range []string{"raw_prompt", "provider_response", "opportunities.catalog.checkout_conversion.title"} {
+		if strings.Contains(drv.textBody, forbidden) || strings.Contains(drv.htmlBody, forbidden) {
+			t.Fatalf("opportunity digest leaked forbidden value %q", forbidden)
+		}
 	}
 }
 

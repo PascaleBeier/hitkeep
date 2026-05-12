@@ -413,9 +413,7 @@ func TestReserveAIRunSerializesBudgetAcrossConcurrentCallers(t *testing.T) {
 	var wg sync.WaitGroup
 	results := make(chan error, callers)
 	for range callers {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, err := store.ReserveAIRun(ctx, AIRunParams{
 				TeamID:          teamID,
 				SiteID:          siteID,
@@ -429,7 +427,7 @@ func TestReserveAIRunSerializesBudgetAcrossConcurrentCallers(t *testing.T) {
 				CreatedAt:       time.Now().UTC(),
 			}, time.Now().UTC().Add(-time.Hour), 1, 0)
 			results <- err
-		}()
+		})
 	}
 	wg.Wait()
 	close(results)

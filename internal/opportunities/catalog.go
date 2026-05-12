@@ -22,13 +22,27 @@ const (
 	DetectorCategorySetupQuality     DetectorCategory = "setup_quality"
 )
 
+type OpportunitySignal string
+
+const (
+	OpportunitySignalSiteStats     OpportunitySignal = "site_stats"
+	OpportunitySignalEcommerce     OpportunitySignal = "ecommerce"
+	OpportunitySignalAIVisibility  OpportunitySignal = "ai_visibility"
+	OpportunitySignalSearchConsole OpportunitySignal = "search_console"
+	OpportunitySignalEvents        OpportunitySignal = "events"
+	OpportunitySignalSetupEvidence OpportunitySignal = "setup_evidence"
+)
+
 type DetectorInput struct {
-	TeamID       uuid.UUID
-	SiteID       uuid.UUID
-	Stats        *api.SiteStats
-	Ecommerce    *api.EcommerceSummary
-	AIVisibility *api.AIFetchOverview
-	GeneratedAt  time.Time
+	TeamID        uuid.UUID
+	SiteID        uuid.UUID
+	Stats         *api.SiteStats
+	Ecommerce     *api.EcommerceSummary
+	AIVisibility  *api.AIFetchOverview
+	SearchConsole *api.SearchConsoleOverview
+	EventNames    []string
+	SetupEvidence *SetupEvidenceSnapshot
+	GeneratedAt   time.Time
 }
 
 type DetectorMessageKeys struct {
@@ -41,10 +55,14 @@ type DetectorMessageKeys struct {
 }
 
 type DetectorContract struct {
-	Category      DetectorCategory
-	TypeKey       string
-	MessageKeys   DetectorMessageKeys
-	AllowedParams []string
+	Category            DetectorCategory
+	TypeKey             string
+	MessageKeys         DetectorMessageKeys
+	AllowedParams       []string
+	ActionTypes         []string
+	IdentityEvidenceIDs []string
+	RequiredSignals     []OpportunitySignal
+	OptionalSignals     []OpportunitySignal
 }
 
 type Detector interface {
@@ -52,21 +70,30 @@ type Detector interface {
 	Detect(DetectorInput) (*database.OpportunityInput, bool)
 }
 
+type definitionBackedDetector interface {
+	Detector
+	Definition() OpportunityDefinition
+}
+
 type DetectorCatalog struct {
 	detectors []Detector
 }
 
 func NewDefaultDetectorCatalog() DetectorCatalog {
-	return NewDetectorCatalog(
-		checkoutDetector{},
-		aiVisibilityDetector{},
-		trafficQualityDetector{},
-		trackingSetupDetector{},
-	)
+	return NewDetectorCatalogFromDefinitions(DefaultOpportunityDefinitions()...)
 }
 
 func NewDetectorCatalog(detectors ...Detector) DetectorCatalog {
 	return DetectorCatalog{detectors: detectors}
+}
+
+func NewDetectorCatalogFromDefinitions(definitions ...OpportunityDefinition) DetectorCatalog {
+	definitions = copyOpportunityDefinitions(definitions)
+	detectors := make([]Detector, 0, len(definitions))
+	for _, definition := range definitions {
+		detectors = append(detectors, definition.Detector())
+	}
+	return NewDetectorCatalog(detectors...)
 }
 
 func SupportedDetectorCategories() []DetectorCategory {
@@ -106,6 +133,43 @@ func (c DetectorCatalog) Contracts() []DetectorContract {
 	return contracts
 }
 
+func (c DetectorCatalog) RequiredSignals() []OpportunitySignal {
+	return c.signals(func(contract DetectorContract) []OpportunitySignal {
+		return contract.RequiredSignals
+	})
+}
+
+func (c DetectorCatalog) DetectionSignals() []OpportunitySignal {
+	seen := map[OpportunitySignal]bool{}
+	signals := []OpportunitySignal{}
+	for _, detector := range c.detectors {
+		contract := detector.Contract()
+		for _, signal := range append(append([]OpportunitySignal(nil), contract.RequiredSignals...), contract.OptionalSignals...) {
+			signals = appendSignalOnce(signals, seen, signal)
+		}
+	}
+	return signals
+}
+
+func (c DetectorCatalog) signals(selectSignals func(DetectorContract) []OpportunitySignal) []OpportunitySignal {
+	seen := map[OpportunitySignal]bool{}
+	signals := []OpportunitySignal{}
+	for _, detector := range c.detectors {
+		for _, signal := range selectSignals(detector.Contract()) {
+			signals = appendSignalOnce(signals, seen, signal)
+		}
+	}
+	return signals
+}
+
+func appendSignalOnce(signals []OpportunitySignal, seen map[OpportunitySignal]bool, signal OpportunitySignal) []OpportunitySignal {
+	if seen[signal] {
+		return signals
+	}
+	seen[signal] = true
+	return append(signals, signal)
+}
+
 func (c DetectorCatalog) ContractFor(typeKey string) (DetectorContract, bool) {
 	for _, detector := range c.detectors {
 		contract := detector.Contract()
@@ -114,6 +178,30 @@ func (c DetectorCatalog) ContractFor(typeKey string) (DetectorContract, bool) {
 		}
 	}
 	return DetectorContract{}, false
+}
+
+func (c DetectorCatalog) DefinitionFor(typeKey string) (OpportunityDefinition, bool) {
+	for _, detector := range c.detectors {
+		contract := detector.Contract()
+		if contract.TypeKey != typeKey {
+			continue
+		}
+		if definitionDetector, ok := detector.(definitionBackedDetector); ok {
+			return definitionDetector.Definition(), true
+		}
+		return OpportunityDefinition{
+			Kind:                "",
+			Category:            contract.Category,
+			TypeKey:             contract.TypeKey,
+			MessageKeys:         contract.MessageKeys,
+			AllowedParams:       append([]string(nil), contract.AllowedParams...),
+			ActionTypes:         append([]string(nil), contract.ActionTypes...),
+			IdentityEvidenceIDs: append([]string(nil), contract.IdentityEvidenceIDs...),
+			RequiredSignals:     append([]OpportunitySignal(nil), contract.RequiredSignals...),
+			OptionalSignals:     append([]OpportunitySignal(nil), contract.OptionalSignals...),
+		}, true
+	}
+	return OpportunityDefinition{}, false
 }
 
 func validateDetectorOutput(contract DetectorContract, opportunity database.OpportunityInput) error {
@@ -202,75 +290,4 @@ func stringSet(values []string) map[string]bool {
 		out[value] = true
 	}
 	return out
-}
-
-type checkoutDetector struct{}
-
-func (checkoutDetector) Contract() DetectorContract {
-	return checkoutOpportunityDefinition.Contract()
-}
-
-func (d checkoutDetector) Detect(input DetectorInput) (*database.OpportunityInput, bool) {
-	if input.Ecommerce == nil || input.Ecommerce.CheckoutStarts <= 0 || input.Ecommerce.CheckoutConversionRate >= 55 {
-		return nil, false
-	}
-	score, ok := scoreCheckoutOpportunity(checkoutScoringInput{
-		CheckoutStarts:         input.Ecommerce.CheckoutStarts,
-		Orders:                 input.Ecommerce.Orders,
-		CheckoutConversionRate: input.Ecommerce.CheckoutConversionRate,
-		AverageOrderValue:      input.Ecommerce.AverageOrderValue,
-	})
-	if !ok {
-		return nil, false
-	}
-	opportunity := checkoutOpportunity(input, input.Ecommerce, score, input.GeneratedAt)
-	return &opportunity, true
-}
-
-type aiVisibilityDetector struct{}
-
-func (aiVisibilityDetector) Contract() DetectorContract {
-	return aiVisibilityOpportunityDefinition.Contract()
-}
-
-func (d aiVisibilityDetector) Detect(input DetectorInput) (*database.OpportunityInput, bool) {
-	if input.AIVisibility == nil || input.AIVisibility.TotalRequests <= 0 {
-		return nil, false
-	}
-	opportunity := aiVisibilityOpportunity(input, input.AIVisibility, input.GeneratedAt)
-	return &opportunity, true
-}
-
-type trafficQualityDetector struct{}
-
-func (trafficQualityDetector) Contract() DetectorContract {
-	return trafficQualityOpportunityDefinition.Contract()
-}
-
-func (d trafficQualityDetector) Detect(input DetectorInput) (*database.OpportunityInput, bool) {
-	if input.Stats == nil || input.Stats.TotalPageviews <= 0 {
-		return nil, false
-	}
-	opportunity := trafficQualityOpportunity(input, input.Stats, input.GeneratedAt)
-	return &opportunity, true
-}
-
-type trackingSetupDetector struct{}
-
-func (trackingSetupDetector) Contract() DetectorContract {
-	return trackingSetupOpportunityDefinition.Contract()
-}
-
-func (d trackingSetupDetector) Detect(input DetectorInput) (*database.OpportunityInput, bool) {
-	if hasOpportunitySignal(input) {
-		return nil, false
-	}
-	opportunity := trackingSetupOpportunity(input, input.GeneratedAt)
-	return &opportunity, true
-}
-
-func hasOpportunitySignal(input DetectorInput) bool {
-	return (input.Ecommerce != nil && input.Ecommerce.CheckoutStarts > 0) ||
-		(input.AIVisibility != nil && input.AIVisibility.TotalRequests > 0) ||
-		(input.Stats != nil && input.Stats.TotalPageviews > 0)
 }

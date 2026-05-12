@@ -58,7 +58,7 @@ type LifecycleEvent struct {
 	LatencyMS     int64     `json:"latency_ms,omitempty"`
 	MessageCount  int       `json:"message_count,omitempty"`
 	ToolCount     int       `json:"tool_count,omitempty"`
-	Timestamp     time.Time `json:"timestamp,omitempty"`
+	Timestamp     time.Time `json:"timestamp"`
 }
 
 type RunRecord struct {
@@ -104,6 +104,15 @@ type OpportunityRequest struct {
 	Tools            []goaisdk.Tool
 }
 
+type OpportunityCatalogRequest struct {
+	TeamID    uuid.UUID
+	SiteID    uuid.UUID
+	ActorID   uuid.UUID
+	ActorType string
+	Catalog   OpportunityCandidateCatalog
+	Tools     []goaisdk.Tool
+}
+
 type OpportunityEvidenceSnapshot struct {
 	SiteDomain string                     `json:"site_domain"`
 	From       time.Time                  `json:"from"`
@@ -113,20 +122,21 @@ type OpportunityEvidenceSnapshot struct {
 }
 
 type OpportunityDetectorInput struct {
-	SiteDomain    string                     `json:"site_domain"`
-	From          time.Time                  `json:"from"`
-	To            time.Time                  `json:"to"`
-	TypeKey       string                     `json:"type_key"`
-	Category      string                     `json:"category"`
-	MessageKeys   OpportunityMessageKeys     `json:"message_keys"`
-	AllowedParams []string                   `json:"allowed_params"`
-	CopyParams    map[string]any             `json:"copy_params,omitempty"`
-	Evidence      []Evidence                 `json:"evidence"`
-	ImpactValue   string                     `json:"impact_value"`
-	Confidence    string                     `json:"confidence"`
-	Kind          string                     `json:"kind"`
-	RouteParams   map[string]any             `json:"route_params,omitempty"`
-	ToolContext   map[string]json.RawMessage `json:"tool_context,omitempty"`
+	SiteDomain         string                     `json:"site_domain"`
+	From               time.Time                  `json:"from"`
+	To                 time.Time                  `json:"to"`
+	TypeKey            string                     `json:"type_key"`
+	Category           string                     `json:"category"`
+	MessageKeys        OpportunityMessageKeys     `json:"message_keys"`
+	AllowedParams      []string                   `json:"allowed_params"`
+	AllowedActionTypes []string                   `json:"allowed_action_types,omitempty"`
+	CopyParams         map[string]any             `json:"copy_params,omitempty"`
+	Evidence           []Evidence                 `json:"evidence"`
+	ImpactValue        string                     `json:"impact_value"`
+	Confidence         string                     `json:"confidence"`
+	Kind               string                     `json:"kind"`
+	RouteParams        map[string]any             `json:"route_params,omitempty"`
+	ToolContext        map[string]json.RawMessage `json:"tool_context,omitempty"`
 }
 
 type OpportunityMessageKeys struct {
@@ -154,6 +164,12 @@ type OpportunityCandidateProposal struct {
 	DigestKey        string         `json:"digest_key" jsonschema:"description=One of the detector's allowed digest message keys."`
 	CopyParams       map[string]any `json:"copy_params" jsonschema:"description=Interpolation params using only detector-allowed param names."`
 	CitedEvidenceIDs []string       `json:"cited_evidence_ids" jsonschema:"description=Evidence ids used by every claim."`
+}
+
+type OpportunityCandidateCatalog struct {
+	Candidates        []OpportunityDetectorInput  `json:"candidates"`
+	EvidenceSnapshot  OpportunityEvidenceSnapshot `json:"evidence_snapshot"`
+	AllowedCategories []string                    `json:"allowed_categories,omitempty"`
 }
 
 type OpportunityProposalResult struct {
@@ -266,6 +282,31 @@ func (s *Service) GenerateOpportunityProposal(ctx context.Context, req Opportuni
 	return OpportunityProposalResult{RunID: runID, Proposal: generation.Output, Usage: generation.Usage}, nil
 }
 
+func (s *Service) GenerateOpportunityCatalogCandidateProposal(ctx context.Context, req OpportunityCatalogRequest) (OpportunityProposalResult, error) {
+	if s == nil || !s.conf.Enabled {
+		return OpportunityProposalResult{}, ErrDisabled
+	}
+	auditReq := catalogOpportunityRequest(req)
+	ledger := newRunLedger(s.conf, s.recorder)
+	if !s.Configured() {
+		if err := ledger.recordNotConfigured(ctx, auditReq); err != nil {
+			return OpportunityProposalResult{}, err
+		}
+		return OpportunityProposalResult{}, ErrNotConfigured
+	}
+	reservedRunID, err := ledger.reserve(ctx, auditReq)
+	if err != nil {
+		return OpportunityProposalResult{}, err
+	}
+
+	generation := s.runOpportunityCatalogGeneration(ctx, req)
+	runID, err := ledger.finalizeGeneration(ctx, reservedRunID, auditReq, generation)
+	if err != nil {
+		return OpportunityProposalResult{}, err
+	}
+	return OpportunityProposalResult{RunID: runID, Proposal: generation.Output, Usage: generation.Usage}, nil
+}
+
 type opportunityGeneration struct {
 	Output          OpportunityCandidateProposal
 	Usage           Usage
@@ -275,9 +316,36 @@ type opportunityGeneration struct {
 }
 
 func (s *Service) runOpportunityGeneration(ctx context.Context, req OpportunityRequest) opportunityGeneration {
-	inputJSON, err := json.Marshal(opportunityGenerationInput(req))
+	return s.runOpportunityProposalGeneration(
+		ctx,
+		opportunityGenerationInput(req),
+		opportunityProposalSchema(req.DetectorInput),
+		req.Tools,
+		strictOpportunityCandidateProposalResult,
+		func(proposal OpportunityCandidateProposal) error {
+			return ValidateOpportunityCandidateProposal(proposal, opportunityProposalValidationInput(req))
+		},
+	)
+}
+
+func (s *Service) runOpportunityCatalogGeneration(ctx context.Context, req OpportunityCatalogRequest) opportunityGeneration {
+	return s.runOpportunityProposalGeneration(
+		ctx,
+		opportunityCatalogGenerationInput(req),
+		opportunityCatalogProposalSchema(req.Catalog),
+		req.Tools,
+		strictOpportunityCatalogCandidateProposalResult,
+		func(proposal OpportunityCandidateProposal) error {
+			_, err := ValidateOpportunityCatalogCandidateProposal(proposal, req.Catalog)
+			return err
+		},
+	)
+}
+
+func (s *Service) runOpportunityProposalGeneration(ctx context.Context, promptInput any, schema json.RawMessage, tools []goaisdk.Tool, decodeResult func(*goaisdk.ObjectResult[OpportunityCandidateProposal]) (OpportunityCandidateProposal, error), validate func(OpportunityCandidateProposal) error) opportunityGeneration {
+	inputJSON, err := json.Marshal(promptInput)
 	if err != nil {
-		return opportunityGeneration{Err: fmt.Errorf("encode opportunity detector input: %w", err)}
+		return opportunityGeneration{Err: fmt.Errorf("encode opportunity prompt input: %w", err)}
 	}
 	timeoutCtx, cancel := context.WithTimeout(ctx, s.conf.Timeout)
 	defer cancel()
@@ -301,8 +369,8 @@ func (s *Service) runOpportunityGeneration(ctx context.Context, req OpportunityR
 	result, err := goaisdk.GenerateObject[OpportunityCandidateProposal](timeoutCtx, s.model,
 		goaisdk.WithSystem(opportunitySystemPrompt()),
 		goaisdk.WithPrompt(opportunityPrompt(string(inputJSON))),
-		goaisdk.WithExplicitSchema(opportunityProposalSchema(req.DetectorInput)),
-		goaisdk.WithTools(req.Tools...),
+		goaisdk.WithExplicitSchema(schema),
+		goaisdk.WithTools(tools...),
 		goaisdk.WithMaxSteps(3),
 		goaisdk.WithMaxOutputTokens(900),
 		goaisdk.WithTemperature(0.2),
@@ -361,13 +429,19 @@ func (s *Service) runOpportunityGeneration(ctx context.Context, req OpportunityR
 		}),
 	)
 	latency := time.Since(started)
-	output, usage, err = finalizeOpportunityGeneration(result, usage, opportunityProposalValidationInput(req), err)
+	output, usage, err = finalizeOpportunityGeneration(result, usage, err, decodeResult, validate)
 	return opportunityGeneration{Output: output, Usage: usage, LifecycleEvents: lifecycleEvents, Latency: latency, Err: err}
 }
 
 type opportunityGenerationPromptInput struct {
 	CandidateContract OpportunityDetectorInput    `json:"candidate_contract"`
 	EvidenceSnapshot  OpportunityEvidenceSnapshot `json:"evidence_snapshot"`
+}
+
+type opportunityCatalogGenerationPromptInput struct {
+	CandidateCatalog  []OpportunityDetectorInput  `json:"candidate_catalog"`
+	EvidenceSnapshot  OpportunityEvidenceSnapshot `json:"evidence_snapshot"`
+	AllowedCategories []string                    `json:"allowed_categories,omitempty"`
 }
 
 func opportunityGenerationInput(req OpportunityRequest) opportunityGenerationPromptInput {
@@ -379,6 +453,30 @@ func opportunityGenerationInput(req OpportunityRequest) opportunityGenerationPro
 	}
 }
 
+func opportunityCatalogGenerationInput(req OpportunityCatalogRequest) opportunityCatalogGenerationPromptInput {
+	activeCandidates := catalogSchemaCandidates(req.Catalog)
+	candidates := make([]OpportunityDetectorInput, 0, len(activeCandidates))
+	for _, candidate := range activeCandidates {
+		candidate.Evidence = nil
+		candidates = append(candidates, candidate)
+	}
+	return opportunityCatalogGenerationPromptInput{
+		CandidateCatalog:  candidates,
+		EvidenceSnapshot:  req.Catalog.EvidenceSnapshot,
+		AllowedCategories: append([]string(nil), req.Catalog.AllowedCategories...),
+	}
+}
+
+func catalogOpportunityRequest(req OpportunityCatalogRequest) OpportunityRequest {
+	return OpportunityRequest{
+		TeamID:           req.TeamID,
+		SiteID:           req.SiteID,
+		ActorID:          req.ActorID,
+		ActorType:        req.ActorType,
+		EvidenceSnapshot: req.Catalog.EvidenceSnapshot,
+	}
+}
+
 func opportunityProposalValidationInput(req OpportunityRequest) OpportunityDetectorInput {
 	input := req.DetectorInput
 	if snapshot := opportunityAuditInput(req); len(snapshot.Evidence) > 0 {
@@ -387,7 +485,7 @@ func opportunityProposalValidationInput(req OpportunityRequest) OpportunityDetec
 	return input
 }
 
-func finalizeOpportunityGeneration(result *goaisdk.ObjectResult[OpportunityCandidateProposal], usage Usage, input OpportunityDetectorInput, err error) (OpportunityCandidateProposal, Usage, error) {
+func finalizeOpportunityGeneration(result *goaisdk.ObjectResult[OpportunityCandidateProposal], usage Usage, err error, decodeResult func(*goaisdk.ObjectResult[OpportunityCandidateProposal]) (OpportunityCandidateProposal, error), validate func(OpportunityCandidateProposal) error) (OpportunityCandidateProposal, Usage, error) {
 	var output OpportunityCandidateProposal
 	if err != nil {
 		return output, usage, err
@@ -395,9 +493,9 @@ func finalizeOpportunityGeneration(result *goaisdk.ObjectResult[OpportunityCandi
 	if result == nil {
 		return output, usage, fmt.Errorf("%w: missing provider result", ErrInvalidOutput)
 	}
-	output, err = strictOpportunityCandidateProposalResult(result)
+	output, err = decodeResult(result)
 	if err == nil {
-		err = ValidateOpportunityCandidateProposal(output, input)
+		err = validate(output)
 	}
 	return output, finalizedUsage(result, usage), err
 }
@@ -415,9 +513,17 @@ func finalizedUsage(result *goaisdk.ObjectResult[OpportunityCandidateProposal], 
 }
 
 func strictOpportunityCandidateProposalResult(result *goaisdk.ObjectResult[OpportunityCandidateProposal]) (OpportunityCandidateProposal, error) {
+	return strictOpportunityProposalResult(result, decodeOpportunityCandidateProposalJSON)
+}
+
+func strictOpportunityCatalogCandidateProposalResult(result *goaisdk.ObjectResult[OpportunityCandidateProposal]) (OpportunityCandidateProposal, error) {
+	return strictOpportunityProposalResult(result, decodeOpportunityCatalogCandidateProposalJSON)
+}
+
+func strictOpportunityProposalResult(result *goaisdk.ObjectResult[OpportunityCandidateProposal], decode func([]byte) (OpportunityCandidateProposal, error)) (OpportunityCandidateProposal, error) {
 	for i := len(result.Steps) - 1; i >= 0; i-- {
 		if text := strings.TrimSpace(result.Steps[i].Text); text != "" {
-			return decodeOpportunityCandidateProposalJSON([]byte(text))
+			return decode([]byte(text))
 		}
 	}
 	return result.Object, nil

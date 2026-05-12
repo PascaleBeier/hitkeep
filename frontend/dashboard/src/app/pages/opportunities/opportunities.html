@@ -1,0 +1,195 @@
+<app-page-frame [breadcrumbItems]="breadcrumbItems()">
+    <app-range-toolbar [timeRanges]="timeRanges()" [selectedRange]="selectedRange()" [customRangeDates]="customRangeDates()" [loading]="false" (selectedRangeChange)="selectedRange.set($event)" (customRangeDatesChange)="customRangeDates.set($event)">
+        @if (canManageActiveSite()) {
+        <p-button
+            toolbar-right
+            size="small"
+            severity="secondary"
+            icon="pi pi-refresh"
+            [outlined]="true"
+            [label]="isGenerating() ? ('opportunities.actions.generating' | transloco) : ('opportunities.actions.generate' | transloco)"
+            [ariaLabel]="'opportunities.actions.generate' | transloco"
+            [loading]="isGenerating()"
+            (onClick)="refreshOpportunities()"
+        />
+        }
+    </app-range-toolbar>
+
+    @if (siteService.isLoading()) {
+    <div class="opportunities-loading">
+        <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
+        <span>{{ "common.loadingSiteData" | transloco }}</span>
+    </div>
+    } @else if (siteService.activeSite()) { @if (errorState() !== 'idle') {
+    <p-message severity="error" [text]="('opportunities.errors.' + errorState()) | transloco" />
+    }
+
+    <div class="opportunities-kpis">
+        @for (card of kpiCards(); track card.label) {
+        <app-kpi-card [label]="card.label" [value]="card.value" [loading]="card.loading" [valueClass]="card.valueClass" />
+        }
+    </div>
+
+    <section class="opportunities-brief" aria-labelledby="opportunities-brief-title">
+        <div class="min-w-0">
+            <p class="opportunities-eyebrow">{{ "opportunities.header.eyebrow" | transloco }}</p>
+            <h1 id="opportunities-brief-title">{{ "opportunities.header.title" | transloco }}</h1>
+            <p>{{ "opportunities.header.subtitle" | transloco }}</p>
+        </div>
+        <div class="opportunities-brief__score" [attr.aria-label]="'opportunities.header.scoreAria' | transloco">
+            <span>{{ "opportunities.header.scoreLabel" | transloco }}</span>
+            <strong>{{ score() }}</strong>
+            <small>{{ "opportunities.header.scoreHint" | transloco }}</small>
+        </div>
+    </section>
+
+    @if (canShowDigestPreview()) {
+    <section class="opportunities-digest" aria-labelledby="opportunities-digest-title">
+        <div class="opportunities-section-header">
+            <div>
+                <h2 id="opportunities-digest-title">{{ "opportunities.digest.title" | transloco }}</h2>
+                <p>{{ "opportunities.digest.subtitle" | transloco }}</p>
+            </div>
+            <div class="opportunities-digest__tags">
+                <p-tag [value]="digestPreviewFrequencyLabel()" severity="info" icon="pi pi-envelope" />
+                @if (digestPreview()?.should_send) {
+                <p-tag [value]="'opportunities.digest.statusReady' | transloco" severity="success" icon="pi pi-check-circle" />
+                }
+            </div>
+        </div>
+
+        @if (digestPreviewError()) {
+        <p-message severity="warn" [text]="'opportunities.digest.error' | transloco" />
+        } @else if (isDigestPreviewLoading()) {
+        <div class="opportunities-digest__loading">
+            <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
+            <span>{{ "common.loadingSiteData" | transloco }}</span>
+        </div>
+        } @else if (digestPreview(); as preview) { @if (preview.should_send && digestPreviewItems().length) {
+        <div class="opportunities-digest__list">
+            @for (item of digestPreviewItems(); track item.id) {
+            <article class="opportunities-digest__item">
+                <div class="opportunities-digest__item-header">
+                    <strong>{{ item.digest }}</strong>
+                    <span>{{ item.score }}</span>
+                </div>
+                <dl class="opportunities-digest__meta">
+                    <div>
+                        <dt>{{ item.impactLabel }}</dt>
+                        <dd>{{ item.impactValue }}</dd>
+                    </div>
+                    <div>
+                        <dt>{{ "opportunities.digest.confidence" | transloco }}</dt>
+                        <dd>{{ item.confidenceLabel }}</dd>
+                    </div>
+                </dl>
+                <p class="opportunities-digest__action">
+                    <span>{{ "opportunities.digest.nextAction" | transloco }}</span>
+                    {{ item.action }}
+                </p>
+                @if (item.evidence.length) {
+                <div class="opportunities-digest__evidence" [attr.aria-label]="'opportunities.digest.evidence' | transloco">
+                    @for (evidence of item.evidence; track evidence.id) {
+                    <span>{{ evidence.label }}: {{ evidence.value }}</span>
+                    }
+                </div>
+                }
+            </article>
+            }
+        </div>
+        } @else {
+        <p-message severity="info" [text]="'opportunities.digest.noSend' | transloco" />
+        } }
+    </section>
+    } @if (topActionOpportunityViews().length) {
+    <section class="opportunities-top-actions" aria-labelledby="opportunities-top-actions-title" [attr.aria-label]="'opportunities.topActions.ariaLabel' | transloco">
+        <div class="opportunities-section-header">
+            <div>
+                <h2 id="opportunities-top-actions-title">{{ "opportunities.topActions.title" | transloco }}</h2>
+                <p>{{ "opportunities.topActions.subtitle" | transloco }}</p>
+            </div>
+        </div>
+        <div class="opportunities-top-actions__list">
+            @for (opportunity of topActionOpportunityViews(); track opportunity.id) {
+            <app-opportunity-card
+                [opportunity]="opportunity"
+                [canManage]="canManageActiveSite()"
+                [pending]="pendingStatusId() === opportunity.id"
+                [priorityLabel]="'opportunities.card.priority' | transloco"
+                [saveLabel]="'opportunities.actions.save' | transloco"
+                [inspectLabel]="'opportunities.actions.inspect' | transloco"
+                (saveClicked)="setStatus($event, 'saved')"
+                (inspectClicked)="openOpportunity($event)"
+            />
+            }
+        </div>
+    </section>
+    }
+
+    <div class="opportunities-shell">
+        <app-opportunity-filter-rail
+            [ariaLabel]="'opportunities.filters.ariaLabel' | transloco"
+            [typeTitle]="'opportunities.filters.typeTitle' | transloco"
+            [statusTitle]="'opportunities.filters.statusTitle' | transloco"
+            [typeItems]="typeFilterItems()"
+            [statusItems]="statusFilterItems()"
+            (typeSelected)="setTypeFilter($event)"
+            (statusSelected)="setStatusFilter($event)"
+        />
+
+        <main class="opportunities-inbox" [attr.aria-label]="'opportunities.inbox.ariaLabel' | transloco">
+            <div class="opportunities-inbox__header">
+                <div>
+                    <h2>{{ "opportunities.inbox.title" | transloco }}</h2>
+                    <p>{{ "opportunities.inbox.subtitle" | transloco: { count: visibleOpportunityViews().length } }}</p>
+                </div>
+                @if (aiStatus()) {
+                <p-tag [value]="aiStatusLabel()" [severity]="aiStatusSeverity()" [icon]="aiStatusIcon()" />
+                }
+            </div>
+            @if (aiStatusMessageKey(); as messageKey) {
+            <p-message styleClass="opportunities-ai-message" [severity]="aiStatusMessageSeverity()" [text]="messageKey | transloco" />
+            } @if (visibleOpportunityViews().length) {
+            <div class="opportunities-list">
+                @for (opportunity of visibleOpportunityViews(); track opportunity.id) {
+                <app-opportunity-card
+                    [opportunity]="opportunity"
+                    [canManage]="canManageActiveSite()"
+                    [pending]="pendingStatusId() === opportunity.id"
+                    [priorityLabel]="'opportunities.card.priority' | transloco"
+                    [saveLabel]="'opportunities.actions.save' | transloco"
+                    [inspectLabel]="'opportunities.actions.inspect' | transloco"
+                    (saveClicked)="setStatus($event, 'saved')"
+                    (inspectClicked)="openOpportunity($event)"
+                />
+                }
+            </div>
+            } @else {
+            <app-empty-state icon="pi-inbox" [title]="'opportunities.empty.title' | transloco" [description]="'opportunities.empty.body' | transloco" />
+            }
+        </main>
+    </div>
+    } @else {
+    <app-empty-state icon="pi-sparkles" [title]="'common.noSiteSelected' | transloco" [description]="'opportunities.noSiteDescription' | transloco" />
+    }
+</app-page-frame>
+
+<app-opportunity-detail-drawer
+    [visible]="isDetailOpen()"
+    [opportunity]="selectedOpportunityView()"
+    [canManage]="canManageActiveSite()"
+    [estimatedImpactLabel]="'opportunities.detail.estimatedImpact' | transloco"
+    [priorityScoreLabel]="'opportunities.detail.priorityScore' | transloco"
+    [priorityHintLabel]="'opportunities.detail.priorityHint' | transloco"
+    [whyLabel]="'opportunities.detail.why' | transloco"
+    [nextBestActionLabel]="'opportunities.detail.nextBestAction' | transloco"
+    [markDoneLabel]="'opportunities.actions.markDone' | transloco"
+    [saveLabel]="'opportunities.actions.save' | transloco"
+    [dismissLabel]="'opportunities.actions.dismiss' | transloco"
+    [readOnlyLabel]="'opportunities.detail.readOnly' | transloco"
+    [pending]="selectedOpportunityView()?.id === pendingStatusId()"
+    (visibleChange)="isDetailOpen.set($event)"
+    (markDoneClicked)="setStatus($event, 'done')"
+    (saveClicked)="setStatus($event, 'saved')"
+    (dismissClicked)="setStatus($event, 'dismissed')"
+/>

@@ -26,7 +26,7 @@ type AILifecycleEvent struct {
 	LatencyMS     int64     `json:"latency_ms,omitempty"`
 	MessageCount  int       `json:"message_count,omitempty"`
 	ToolCount     int       `json:"tool_count,omitempty"`
-	Timestamp     time.Time `json:"timestamp,omitempty"`
+	Timestamp     time.Time `json:"timestamp"`
 }
 
 type AIRunParams struct {

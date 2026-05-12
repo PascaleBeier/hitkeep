@@ -268,7 +268,7 @@ func TestOpenAPISpecV1IncludesOpportunityPaths(t *testing.T) {
 	components := requireMap(t, spec, "components")
 	schemas := requireMap(t, components, "schemas")
 
-	for _, schemaName := range []string{"Opportunity", "OpportunityEvidence", "OpportunityScoreBreakdown", "OpportunityListResponse", "SharedOpportunity", "SharedOpportunityListResponse", "OpportunityGenerateResponse", "OpportunityStatusUpdateRequest"} {
+	for _, schemaName := range []string{"Opportunity", "OpportunityEvidence", "OpportunityScoreBreakdown", "OpportunityListResponse", "SharedOpportunity", "SharedOpportunityListResponse", "OpportunityGenerateResponse", "OpportunityDigestPreviewResponse", "OpportunityDigestPreviewItem", "OpportunityStatusUpdateRequest"} {
 		if _, ok := schemas[schemaName]; !ok {
 			t.Fatalf("expected %s schema to exist", schemaName)
 		}
@@ -303,6 +303,18 @@ func TestOpenAPISpecV1IncludesOpportunityPaths(t *testing.T) {
 	if _, ok := generateResponseProperties["ai_run_id"]; ok {
 		t.Fatalf("OpportunityGenerateResponse schema leaked internal ai_run_id")
 	}
+	digestPreviewItemSchema := requireMap(t, schemas, "OpportunityDigestPreviewItem")
+	digestPreviewItemProperties := requireMap(t, digestPreviewItemSchema, "properties")
+	for _, forbidden := range []string{"title", "summary", "digest", "action", "team_id", "ai_run_id", "raw_prompt", "raw_provider_response"} {
+		if _, ok := digestPreviewItemProperties[forbidden]; ok {
+			t.Fatalf("OpportunityDigestPreviewItem schema leaked forbidden field %q", forbidden)
+		}
+	}
+	for _, required := range []string{"title_key", "action_key", "digest_key", "copy_params", "impact_label_key", "score_breakdown", "evidence", "cited_evidence_ids"} {
+		if _, ok := digestPreviewItemProperties[required]; !ok {
+			t.Fatalf("OpportunityDigestPreviewItem schema missing localization field %q", required)
+		}
+	}
 	sharedOpportunitySchema := requireMap(t, schemas, "SharedOpportunity")
 	sharedOpportunityProperties := requireMap(t, sharedOpportunitySchema, "properties")
 	for _, forbidden := range []string{"team_id", "ai_run_id"} {
@@ -313,6 +325,7 @@ func TestOpenAPISpecV1IncludesOpportunityPaths(t *testing.T) {
 
 	expected := map[string]string{
 		"/api/sites/{id}/opportunities":                 "get",
+		"/api/sites/{id}/opportunities/digest-preview":  "get",
 		"/api/sites/{id}/opportunities/generate":        "post",
 		"/api/sites/{id}/opportunities/{opportunityID}": "patch",
 		"/api/share/{token}/sites/{id}/opportunities":   "get",

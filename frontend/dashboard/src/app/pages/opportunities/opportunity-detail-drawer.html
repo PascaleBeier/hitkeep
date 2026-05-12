@@ -1,0 +1,62 @@
+<p-drawer [visible]="visible()" (visibleChange)="visibleChange.emit($event)" position="right" appendTo="body" [style]="{ width: 'min(44rem, 100vw)' }">
+    @if (opportunity(); as item) {
+    <div class="opportunity-detail">
+        <header>
+            <div class="opportunity-detail__meta">
+                <p-tag [value]="item.typeLabel" [severity]="item.severity" />
+                <span>{{ item.confidenceLabel }}</span>
+                <span>{{ item.statusLabel }}</span>
+            </div>
+            <h2>{{ item.title }}</h2>
+            <p>{{ item.summary }}</p>
+        </header>
+
+        <section class="opportunity-detail__impact">
+            <div>
+                <span>{{ estimatedImpactLabel() }}</span>
+                <strong>{{ item.impactValue }}</strong>
+                <small>{{ item.impactLabel }}</small>
+            </div>
+            <div>
+                <span>{{ priorityScoreLabel() }}</span>
+                <strong>{{ item.score }}</strong>
+                <small>{{ priorityHintLabel() }}</small>
+            </div>
+        </section>
+
+        <section>
+            <h3>{{ whyLabel() }}</h3>
+            <div class="opportunity-detail__evidence">
+                @for (evidence of item.evidence; track evidence.id) {
+                <div>
+                    <i class="pi pi-check-circle" aria-hidden="true"></i>
+                    <span>
+                        {{ evidence.label }}: {{ evidence.value }} @if (evidence.detail; as detail) {
+                        <small>{{ detail }}</small>
+                        }
+                    </span>
+                </div>
+                }
+            </div>
+        </section>
+
+        <section>
+            <h3>{{ nextBestActionLabel() }}</h3>
+            <p class="opportunity-detail__action">{{ item.action }}</p>
+        </section>
+
+        @if (!canManage()) {
+        <p-message severity="info" [text]="readOnlyLabel()" />
+        } @else {
+        <footer>
+            @if (item.status !== 'done') {
+            <p-button [label]="markDoneLabel()" icon="pi pi-check" [loading]="pending()" [disabled]="pending()" (onClick)="markDoneClicked.emit(item)" />
+            } @if (item.status === 'new') {
+            <p-button [label]="saveLabel()" severity="secondary" [outlined]="true" icon="pi pi-bookmark" [loading]="pending()" [disabled]="pending()" (onClick)="saveClicked.emit(item)" />
+            }
+            <p-button [label]="dismissLabel()" severity="secondary" [text]="true" icon="pi pi-times" [disabled]="pending()" (onClick)="dismissClicked.emit(item)" />
+        </footer>
+        }
+    </div>
+    }
+</p-drawer>

@@ -3,25 +3,49 @@ package opportunities
 import (
 	"time"
 
+	"hitkeep/internal/api"
 	"hitkeep/internal/database"
 )
 
 type OpportunityDefinition struct {
-	Key           string
-	Kind          string
-	Category      DetectorCategory
-	TypeKey       string
-	MessageKeys   DetectorMessageKeys
-	AllowedParams []string
-	RouteIcon     string
+	Key                 string
+	Kind                string
+	Category            DetectorCategory
+	TypeKey             string
+	MessageKeys         DetectorMessageKeys
+	AllowedParams       []string
+	ActionTypes         []string
+	IdentityEvidenceIDs []string
+	RequiredSignals     []OpportunitySignal
+	OptionalSignals     []OpportunitySignal
+	RouteIcon           string
+	Detect              OpportunityDetectFunc
+}
+
+type OpportunityDetectFunc func(DetectorInput, OpportunityDefinition) (*database.OpportunityInput, bool)
+
+type OpportunityRecipe struct {
+	CopyParams       map[string]any
+	ImpactValue      string
+	MonthlyUpside    float64
+	Confidence       string
+	Score            int
+	ScoreBreakdown   api.OpportunityScoreBreakdown
+	RouteParams      map[string]any
+	Evidence         []api.OpportunityEvidence
+	CitedEvidenceIDs []string
 }
 
 func (d OpportunityDefinition) Contract() DetectorContract {
 	return DetectorContract{
-		Category:      d.Category,
-		TypeKey:       d.TypeKey,
-		MessageKeys:   d.MessageKeys,
-		AllowedParams: append([]string(nil), d.AllowedParams...),
+		Category:            d.Category,
+		TypeKey:             d.TypeKey,
+		MessageKeys:         d.MessageKeys,
+		AllowedParams:       append([]string(nil), d.AllowedParams...),
+		ActionTypes:         append([]string(nil), d.ActionTypes...),
+		IdentityEvidenceIDs: append([]string(nil), d.IdentityEvidenceIDs...),
+		RequiredSignals:     append([]OpportunitySignal(nil), d.RequiredSignals...),
+		OptionalSignals:     append([]OpportunitySignal(nil), d.OptionalSignals...),
 	}
 }
 
@@ -30,15 +54,27 @@ func DefaultOpportunityDefinitions() []OpportunityDefinition {
 		checkoutOpportunityDefinition,
 		aiVisibilityOpportunityDefinition,
 		trafficQualityOpportunityDefinition,
+		searchVisibilityOpportunityDefinition,
+		setupGoalSuggestionOpportunityDefinition,
+		setupFunnelSuggestionOpportunityDefinition,
+		conversionSignalOpportunityDefinition,
 		trackingSetupOpportunityDefinition,
 	})
+}
+
+func copyOpportunityDefinition(definition OpportunityDefinition) OpportunityDefinition {
+	definition.AllowedParams = append([]string(nil), definition.AllowedParams...)
+	definition.ActionTypes = append([]string(nil), definition.ActionTypes...)
+	definition.IdentityEvidenceIDs = append([]string(nil), definition.IdentityEvidenceIDs...)
+	definition.RequiredSignals = append([]OpportunitySignal(nil), definition.RequiredSignals...)
+	definition.OptionalSignals = append([]OpportunitySignal(nil), definition.OptionalSignals...)
+	return definition
 }
 
 func copyOpportunityDefinitions(definitions []OpportunityDefinition) []OpportunityDefinition {
 	out := make([]OpportunityDefinition, len(definitions))
 	for i, definition := range definitions {
-		out[i] = definition
-		out[i].AllowedParams = append([]string(nil), definition.AllowedParams...)
+		out[i] = copyOpportunityDefinition(definition)
 	}
 	return out
 }
@@ -56,8 +92,12 @@ var checkoutOpportunityDefinition = OpportunityDefinition{
 		ImpactLabel: "opportunities.impact.estimated_monthly_upside",
 		RouteLabel:  "opportunities.routes.checkout",
 	},
-	AllowedParams: []string{"checkout_starts", "orders", "conversion_rate", "monthly_upside", "currency", "path"},
-	RouteIcon:     "pi pi-shopping-cart",
+	AllowedParams:       []string{"checkout_starts", "orders", "conversion_rate", "monthly_upside", "currency", "path"},
+	ActionTypes:         []string{"optimize_checkout"},
+	IdentityEvidenceIDs: []string{"conversion_rate"},
+	RequiredSignals:     []OpportunitySignal{OpportunitySignalEcommerce},
+	RouteIcon:           "pi pi-shopping-cart",
+	Detect:              detectCheckoutOpportunity,
 }
 
 var aiVisibilityOpportunityDefinition = OpportunityDefinition{
@@ -73,8 +113,13 @@ var aiVisibilityOpportunityDefinition = OpportunityDefinition{
 		ImpactLabel: "opportunities.impact.ai_touched_pages",
 		RouteLabel:  "opportunities.routes.path",
 	},
-	AllowedParams: []string{"requests", "unique_paths", "top_path", "path"},
-	RouteIcon:     "pi pi-sparkles",
+	AllowedParams:       []string{"requests", "unique_paths", "top_path", "path", "ai_referrals", "top_path_pageviews"},
+	ActionTypes:         []string{"improve_content"},
+	IdentityEvidenceIDs: []string{"top_ai_path"},
+	RequiredSignals:     []OpportunitySignal{OpportunitySignalAIVisibility},
+	OptionalSignals:     []OpportunitySignal{OpportunitySignalSiteStats},
+	RouteIcon:           "pi pi-sparkles",
+	Detect:              detectAIVisibilityOpportunity,
 }
 
 var trafficQualityOpportunityDefinition = OpportunityDefinition{
@@ -90,8 +135,96 @@ var trafficQualityOpportunityDefinition = OpportunityDefinition{
 		ImpactLabel: "opportunities.impact.pageviews_to_route",
 		RouteLabel:  "opportunities.routes.source",
 	},
-	AllowedParams: []string{"source", "pageviews", "sessions"},
-	RouteIcon:     "pi pi-chart-line",
+	AllowedParams:       []string{"source", "pageviews", "sessions"},
+	ActionTypes:         []string{"route_traffic", "improve_content"},
+	IdentityEvidenceIDs: []string{"top_source"},
+	RequiredSignals:     []OpportunitySignal{OpportunitySignalSiteStats},
+	RouteIcon:           "pi pi-chart-line",
+	Detect:              detectTrafficQualityOpportunity,
+}
+
+var searchVisibilityOpportunityDefinition = OpportunityDefinition{
+	Key:      "search-visibility",
+	Kind:     "search",
+	Category: DetectorCategorySearchVisibility,
+	TypeKey:  "opportunities.types.search_visibility",
+	MessageKeys: DetectorMessageKeys{
+		Title:       "opportunities.catalog.search_visibility.title",
+		Summary:     "opportunities.catalog.search_visibility.summary",
+		Action:      "opportunities.catalog.search_visibility.action",
+		Digest:      "opportunities.catalog.search_visibility.digest",
+		ImpactLabel: "opportunities.impact.estimated_search_clicks",
+		RouteLabel:  "opportunities.routes.search_console",
+	},
+	AllowedParams:       []string{"impressions", "clicks", "ctr", "average_position", "estimated_clicks"},
+	ActionTypes:         []string{"improve_content"},
+	IdentityEvidenceIDs: []string{"search_ctr", "search_position"},
+	RequiredSignals:     []OpportunitySignal{OpportunitySignalSearchConsole},
+	RouteIcon:           "pi pi-search",
+	Detect:              detectSearchVisibilityOpportunity,
+}
+
+var conversionSignalOpportunityDefinition = OpportunityDefinition{
+	Key:      "conversion-signal",
+	Kind:     "setup",
+	Category: DetectorCategorySetupQuality,
+	TypeKey:  "opportunities.types.conversion_signal",
+	MessageKeys: DetectorMessageKeys{
+		Title:       "opportunities.catalog.conversion_signal.title",
+		Summary:     "opportunities.catalog.conversion_signal.summary",
+		Action:      "opportunities.catalog.conversion_signal.action",
+		Digest:      "opportunities.catalog.conversion_signal.digest",
+		ImpactLabel: "opportunities.impact.conversion_signal_coverage",
+		RouteLabel:  "opportunities.routes.events",
+	},
+	AllowedParams:       []string{"pageviews", "sessions", "event_count", "event_names"},
+	ActionTypes:         []string{"define_conversion_signal", "fix_tracking"},
+	IdentityEvidenceIDs: []string{"event_names"},
+	RequiredSignals:     []OpportunitySignal{OpportunitySignalSiteStats, OpportunitySignalEcommerce, OpportunitySignalEvents},
+	RouteIcon:           "pi pi-bullseye",
+	Detect:              detectConversionSignalOpportunity,
+}
+
+var setupGoalSuggestionOpportunityDefinition = OpportunityDefinition{
+	Key:      "setup-goal-suggestion",
+	Kind:     "setup",
+	Category: DetectorCategorySetupQuality,
+	TypeKey:  "opportunities.types.setup_goal_suggestion",
+	MessageKeys: DetectorMessageKeys{
+		Title:       "opportunities.catalog.setup_goal_suggestion.title",
+		Summary:     "opportunities.catalog.setup_goal_suggestion.summary",
+		Action:      "opportunities.catalog.setup_goal_suggestion.action",
+		Digest:      "opportunities.catalog.setup_goal_suggestion.digest",
+		ImpactLabel: "opportunities.impact.conversion_events_to_measure",
+		RouteLabel:  "opportunities.routes.event",
+	},
+	AllowedParams:       []string{"event_name", "event_count", "goal_type", "goal_value"},
+	ActionTypes:         []string{"create_goal"},
+	IdentityEvidenceIDs: []string{"suggested_goal_event"},
+	RequiredSignals:     []OpportunitySignal{OpportunitySignalSetupEvidence},
+	RouteIcon:           "pi pi-bullseye",
+	Detect:              detectSetupGoalSuggestionOpportunity,
+}
+
+var setupFunnelSuggestionOpportunityDefinition = OpportunityDefinition{
+	Key:      "setup-funnel-suggestion",
+	Kind:     "setup",
+	Category: DetectorCategorySetupQuality,
+	TypeKey:  "opportunities.types.setup_funnel_suggestion",
+	MessageKeys: DetectorMessageKeys{
+		Title:       "opportunities.catalog.setup_funnel_suggestion.title",
+		Summary:     "opportunities.catalog.setup_funnel_suggestion.summary",
+		Action:      "opportunities.catalog.setup_funnel_suggestion.action",
+		Digest:      "opportunities.catalog.setup_funnel_suggestion.digest",
+		ImpactLabel: "opportunities.impact.funnel_steps_to_measure",
+		RouteLabel:  "opportunities.routes.funnel",
+	},
+	AllowedParams:       []string{"start_path", "conversion_event", "event_count", "step_count", "funnel_steps"},
+	ActionTypes:         []string{"create_funnel"},
+	IdentityEvidenceIDs: []string{"suggested_funnel_start", "suggested_funnel_conversion_event"},
+	RequiredSignals:     []OpportunitySignal{OpportunitySignalSetupEvidence},
+	RouteIcon:           "pi pi-sitemap",
+	Detect:              detectSetupFunnelSuggestionOpportunity,
 }
 
 var trackingSetupOpportunityDefinition = OpportunityDefinition{
@@ -107,8 +240,12 @@ var trackingSetupOpportunityDefinition = OpportunityDefinition{
 		ImpactLabel: "opportunities.impact.tracked_conversion_events",
 		RouteLabel:  "opportunities.routes.tracker",
 	},
-	AllowedParams: []string{"pageviews", "events", "asset"},
-	RouteIcon:     "pi pi-code",
+	AllowedParams:       []string{"pageviews", "events", "asset"},
+	ActionTypes:         []string{"fix_tracking"},
+	IdentityEvidenceIDs: []string{"pageviews", "events"},
+	RequiredSignals:     []OpportunitySignal{OpportunitySignalSiteStats, OpportunitySignalEcommerce, OpportunitySignalAIVisibility},
+	RouteIcon:           "pi pi-code",
+	Detect:              detectTrackingSetupOpportunity,
 }
 
 func (d OpportunityDefinition) BaseOpportunity(input DetectorInput, generatedAt time.Time) database.OpportunityInput {
@@ -129,4 +266,45 @@ func (d OpportunityDefinition) BaseOpportunity(input DetectorInput, generatedAt 
 		DetectorVersion: detectorVersion,
 		GeneratedAt:     generatedAt,
 	}
+}
+
+func (d OpportunityDefinition) BuildOpportunity(input DetectorInput, recipe OpportunityRecipe) database.OpportunityInput {
+	generatedAt := input.GeneratedAt
+	if generatedAt.IsZero() {
+		generatedAt = time.Now().UTC()
+	}
+	opportunity := d.BaseOpportunity(input, generatedAt)
+	opportunity.CopyParams = copyOpportunityMap(recipe.CopyParams)
+	opportunity.ImpactValue = recipe.ImpactValue
+	opportunity.MonthlyUpside = recipe.MonthlyUpside
+	opportunity.Confidence = recipe.Confidence
+	opportunity.Score = recipe.Score
+	opportunity.ScoreBreakdown = recipe.ScoreBreakdown
+	opportunity.RouteParams = copyOpportunityMap(recipe.RouteParams)
+	opportunity.Evidence = append([]api.OpportunityEvidence(nil), recipe.Evidence...)
+	opportunity.CitedEvidenceIDs = append([]string(nil), recipe.CitedEvidenceIDs...)
+	return opportunity
+}
+
+func (d OpportunityDefinition) Detector() Detector {
+	return definitionDetector{definition: d}
+}
+
+type definitionDetector struct {
+	definition OpportunityDefinition
+}
+
+func (d definitionDetector) Contract() DetectorContract {
+	return d.definition.Contract()
+}
+
+func (d definitionDetector) Definition() OpportunityDefinition {
+	return copyOpportunityDefinition(d.definition)
+}
+
+func (d definitionDetector) Detect(input DetectorInput) (*database.OpportunityInput, bool) {
+	if d.definition.Detect == nil {
+		return nil, false
+	}
+	return d.definition.Detect(input, d.definition)
 }

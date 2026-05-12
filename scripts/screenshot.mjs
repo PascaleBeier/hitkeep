@@ -364,6 +364,18 @@ async function captureSearchConsoleDrilldown(page, record, slug) {
   record(slug, await shoot(page, slug));
 }
 
+async function captureOpportunities(page, record, slug) {
+  await nav(page, "/opportunities", TABLE_SETTLE);
+  const refreshButton = page.getByRole("button", { name: /refresh opportunities/i }).first();
+  if (await refreshButton.count()) {
+    await refreshButton.click();
+    await page.waitForTimeout(TABLE_SETTLE);
+  }
+  await page.getByRole("heading", { name: /opportunity inbox/i }).waitFor({ state: "visible", timeout: 8_000 });
+  await page.locator("app-opportunity-card").first().waitFor({ state: "visible", timeout: 12_000 });
+  record(slug, await shoot(page, slug));
+}
+
 async function captureGoogleSearchConsoleIntegration(page, record, slug) {
   await nav(page, "/integration/google-search-console", FORM_SETTLE);
   await selectSiteByDomain(page);
@@ -518,6 +530,7 @@ async function run() {
     const aiVisibilityClip = await prepareAIVisibilityShot(page);
     record("analytics-ai-visibility-correlation", await shoot(page, "analytics-ai-visibility-correlation", { clip: aiVisibilityClip ?? undefined }));
     await captureRoute(page, record, "analytics-ai-chatbots", "/ai-chatbots", CHART_SETTLE);
+    await captureOpportunities(page, record, "analytics-opportunities");
     await captureRoute(page, record, "analytics-utm", "/utm", CHART_SETTLE);
     await captureRoute(page, record, "dashboard-comparison", "/dashboard", CHART_SETTLE);
     await captureSearchConsoleDrilldown(page, record, "analytics-search-console");

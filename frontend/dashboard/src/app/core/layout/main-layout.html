@@ -29,6 +29,14 @@
                 <i class="pi pi-chart-bar" aria-hidden="true"></i> <span>{{ "nav.dashboard" | transloco }}</span>
             </a>
             <a
+                [routerLink]="navBase() + '/opportunities'"
+                routerLinkActive="bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400"
+                class="flex items-center gap-3 px-3 py-2 rounded-md font-medium transition-colors hover:bg-surface-100 dark:hover:bg-surface-800 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500"
+                [attr.aria-label]="'nav.opportunitiesAria' | transloco"
+            >
+                <i class="pi pi-compass" aria-hidden="true"></i> <span>{{ "nav.opportunities" | transloco }}</span>
+            </a>
+            <a
                 [routerLink]="navBase() + '/goals'"
                 routerLinkActive="bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400"
                 class="flex items-center gap-3 px-3 py-2 rounded-md font-medium transition-colors hover:bg-surface-100 dark:hover:bg-surface-800 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -298,6 +306,15 @@
                     [attr.aria-label]="'nav.dashboardAria' | transloco"
                 >
                     <i class="pi pi-chart-bar" aria-hidden="true"></i> <span>{{ "nav.dashboard" | transloco }}</span>
+                </a>
+                <a
+                    [routerLink]="navBase() + '/opportunities'"
+                    (click)="isMobileDrawerOpen.set(false)"
+                    routerLinkActive="bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400"
+                    class="flex items-center gap-3 px-3 py-2 rounded-md font-medium"
+                    [attr.aria-label]="'nav.opportunitiesAria' | transloco"
+                >
+                    <i class="pi pi-compass" aria-hidden="true"></i> <span>{{ "nav.opportunities" | transloco }}</span>
                 </a>
                 <a
                     [routerLink]="navBase() + '/goals'"

@@ -178,6 +178,83 @@ func TestValidateOpportunityCandidateProposalRejectsInventedEvidence(t *testing.
 	}
 }
 
+func TestValidateOpportunityCatalogCandidateProposalRejectsUnsupportedTypeAndInventedEvidence(t *testing.T) {
+	catalog := structuredOpportunityCandidateCatalog()
+	proposal := validCatalogCandidateProposal()
+	proposal.TypeKey = "opportunities.types.unsupported"
+
+	_, err := ValidateOpportunityCatalogCandidateProposal(proposal, catalog)
+	if !errors.Is(err, ErrInvalidOutput) {
+		t.Fatalf("expected ErrInvalidOutput for unsupported catalog type, got %v", err)
+	}
+
+	proposal = validCatalogCandidateProposal()
+	proposal.CitedEvidenceIDs = []string{"invented"}
+	_, err = ValidateOpportunityCatalogCandidateProposal(proposal, catalog)
+	if !errors.Is(err, ErrInvalidOutput) {
+		t.Fatalf("expected ErrInvalidOutput for invented evidence, got %v", err)
+	}
+}
+
+func TestValidateOpportunityCatalogCandidateProposalAcceptsAllowedCatalogParams(t *testing.T) {
+	catalog := structuredOpportunityCandidateCatalog()
+	proposal := validCatalogCandidateProposal()
+
+	contract, err := ValidateOpportunityCatalogCandidateProposal(proposal, catalog)
+	if err != nil {
+		t.Fatalf("ValidateOpportunityCatalogCandidateProposal: %v", err)
+	}
+	if contract.TypeKey != proposal.TypeKey || contract.Category != proposal.Category {
+		t.Fatalf("expected matching catalog contract, got %#v", contract)
+	}
+}
+
+func TestGenerateOpportunityCatalogCandidateProposalUsesCatalogSchemaAndValidation(t *testing.T) {
+	recorder := &recordingRecorder{}
+	var capturedParams provider.GenerateParams
+	service := &Service{
+		conf: Config{
+			Enabled:  true,
+			Provider: "openai",
+			Model:    "gpt-test",
+			Timeout:  time.Second,
+		},
+		recorder: recorder,
+		model: &fakeLanguageModel{
+			id: "gpt-test",
+			generateFn: func(_ context.Context, params provider.GenerateParams) (*provider.GenerateResult, error) {
+				capturedParams = params
+				return &provider.GenerateResult{
+					Text:         validCatalogCandidateProviderJSON(),
+					FinishReason: provider.FinishStop,
+					Usage:        provider.Usage{InputTokens: 20, OutputTokens: 12},
+				}, nil
+			},
+		},
+	}
+
+	result, err := service.GenerateOpportunityCatalogCandidateProposal(context.Background(), OpportunityCatalogRequest{
+		TeamID:    uuid.New(),
+		SiteID:    uuid.New(),
+		ActorID:   uuid.New(),
+		ActorType: "user",
+		Catalog:   structuredOpportunityCandidateCatalog(),
+	})
+	if err != nil {
+		t.Fatalf("GenerateOpportunityCatalogCandidateProposal: %v", err)
+	}
+	if result.Proposal.TypeKey != "opportunities.types.setup_goal_suggestion" {
+		t.Fatalf("expected catalog-selected type, got %+v", result.Proposal)
+	}
+	if capturedParams.ResponseFormat == nil || !strings.Contains(string(capturedParams.ResponseFormat.Schema), "opportunities.types.setup_goal_suggestion") {
+		t.Fatalf("expected catalog schema in response format, got %+v", capturedParams.ResponseFormat)
+	}
+	run := requireOneRecordedRun(t, recorder)
+	if got := strings.Join(run.EvidenceIDs, ","); got != "suggested_goal_event,suggested_goal_event_count" {
+		t.Fatalf("expected catalog evidence in audit run, got %#v", run.EvidenceIDs)
+	}
+}
+
 func TestDecodeOpportunityCandidateProposalRejectsFreeformProseFields(t *testing.T) {
 	_, err := decodeOpportunityCandidateProposalJSON([]byte(`{
 		"title": "Fix checkout",
@@ -199,8 +276,86 @@ func TestDecodeOpportunityCandidateProposalRejectsTrailingProseAfterJSONObject(t
 	}
 }
 
+func TestDecodeOpportunityCatalogCandidateProposalRejectsFreeformAndTrailingProse(t *testing.T) {
+	_, err := decodeOpportunityCatalogCandidateProposalJSON([]byte(`{"title":"Fix goal setup","cited_evidence_ids":["suggested_goal_event"]}`))
+	if !errors.Is(err, ErrInvalidOutput) {
+		t.Fatalf("expected ErrInvalidOutput for freeform catalog field, got %v", err)
+	}
+
+	_, err = decodeOpportunityCatalogCandidateProposalJSON([]byte(validCatalogCandidateProviderJSON() + "\n\nCreate this goal next."))
+	if !errors.Is(err, ErrInvalidOutput) {
+		t.Fatalf("expected ErrInvalidOutput for trailing catalog prose, got %v", err)
+	}
+}
+
+func TestOpportunityCatalogProposalSchemaUsesAllowedCatalogTypesAndParams(t *testing.T) {
+	schema := string(opportunityCatalogProposalSchema(structuredOpportunityCandidateCatalog()))
+	for _, want := range []string{
+		"opportunities.types.setup_goal_suggestion",
+		"opportunities.catalog.setup_goal_suggestion.title",
+		"event_name",
+		"event_count",
+	} {
+		if !strings.Contains(schema, want) {
+			t.Fatalf("expected schema to include %q, got %s", want, schema)
+		}
+	}
+	for _, forbidden := range []string{"raw_prompt", "provider_response", "freeform"} {
+		if strings.Contains(schema, forbidden) {
+			t.Fatalf("schema leaked forbidden field %q: %s", forbidden, schema)
+		}
+	}
+}
+
+func TestOpportunityCatalogProposalSchemaHonorsAllowedCategories(t *testing.T) {
+	catalog := structuredOpportunityCandidateCatalog()
+	catalog.AllowedCategories = []string{"setup_quality"}
+	catalog.Candidates = append(catalog.Candidates, OpportunityDetectorInput{
+		TypeKey:  "opportunities.types.checkout_conversion",
+		Category: "conversion",
+		MessageKeys: OpportunityMessageKeys{
+			Title:   "opportunities.catalog.checkout_conversion.title",
+			Summary: "opportunities.catalog.checkout_conversion.summary",
+			Action:  "opportunities.catalog.checkout_conversion.action",
+			Digest:  "opportunities.catalog.checkout_conversion.digest",
+		},
+		AllowedParams:      []string{"conversion_rate"},
+		AllowedActionTypes: []string{"optimize_checkout"},
+	})
+
+	schema := string(opportunityCatalogProposalSchema(catalog))
+	if strings.Contains(schema, "opportunities.types.checkout_conversion") || strings.Contains(schema, "conversion_rate") {
+		t.Fatalf("schema advertised candidate outside allowed categories: %s", schema)
+	}
+	if !strings.Contains(schema, "opportunities.types.setup_goal_suggestion") {
+		t.Fatalf("schema dropped allowed setup candidate: %s", schema)
+	}
+}
+
+func TestOpportunityCatalogGenerationInputHonorsAllowedCategories(t *testing.T) {
+	catalog := structuredOpportunityCandidateCatalog()
+	catalog.AllowedCategories = []string{"setup_quality"}
+	catalog.Candidates = append(catalog.Candidates, OpportunityDetectorInput{
+		TypeKey:  "opportunities.types.checkout_conversion",
+		Category: "conversion",
+	})
+
+	input := opportunityCatalogGenerationInput(OpportunityCatalogRequest{Catalog: catalog})
+	if len(input.CandidateCatalog) != 1 || input.CandidateCatalog[0].TypeKey != "opportunities.types.setup_goal_suggestion" {
+		t.Fatalf("expected prompt catalog to include only allowed candidates, got %#v", input.CandidateCatalog)
+	}
+}
+
 func TestFinalizeOpportunityGenerationRejectsNilProviderResult(t *testing.T) {
-	_, _, err := finalizeOpportunityGeneration(nil, Usage{}, structuredDetectorInput(), nil)
+	_, _, err := finalizeOpportunityGeneration(
+		nil,
+		Usage{},
+		nil,
+		strictOpportunityCandidateProposalResult,
+		func(proposal OpportunityCandidateProposal) error {
+			return ValidateOpportunityCandidateProposal(proposal, structuredDetectorInput())
+		},
+	)
 
 	if !errors.Is(err, ErrInvalidOutput) {
 		t.Fatalf("expected ErrInvalidOutput for nil provider result, got %v", err)
@@ -257,6 +412,30 @@ func TestValidateOpportunityCandidateProposalRejectsChangedDetectorParams(t *tes
 
 	if !errors.Is(err, ErrInvalidOutput) {
 		t.Fatalf("expected ErrInvalidOutput for changed detector param, got %v", err)
+	}
+}
+
+func TestValidateOpportunityCandidateProposalRejectsActionTypeOutsideDetectorContract(t *testing.T) {
+	input := structuredDetectorInput()
+	input.TypeKey = "opportunities.types.conversion_signal"
+	input.Category = "setup_quality"
+	input.AllowedActionTypes = []string{"define_conversion_signal"}
+
+	err := ValidateOpportunityCandidateProposal(OpportunityCandidateProposal{
+		TypeKey:          "opportunities.types.conversion_signal",
+		Category:         "setup_quality",
+		ActionType:       "optimize_checkout",
+		Effort:           "medium",
+		TitleKey:         input.MessageKeys.Title,
+		SummaryKey:       input.MessageKeys.Summary,
+		ActionKey:        input.MessageKeys.Action,
+		DigestKey:        input.MessageKeys.Digest,
+		CopyParams:       map[string]any{"conversion_rate": "42%"},
+		CitedEvidenceIDs: []string{"checkout-rate"},
+	}, input)
+
+	if !errors.Is(err, ErrInvalidOutput) {
+		t.Fatalf("expected ErrInvalidOutput for unsupported detector action type, got %v", err)
 	}
 }
 
@@ -811,4 +990,64 @@ func structuredDetectorInput() OpportunityDetectorInput {
 		CopyParams:    map[string]any{"conversion_rate": "42%"},
 		Evidence:      []Evidence{{ID: "checkout-rate", Label: "opportunities.evidence.checkout_conversion_rate", Value: "42%"}},
 	}
+}
+
+func structuredOpportunityCandidateCatalog() OpportunityCandidateCatalog {
+	return OpportunityCandidateCatalog{
+		Candidates: []OpportunityDetectorInput{
+			{
+				TypeKey:  "opportunities.types.setup_goal_suggestion",
+				Category: "setup_quality",
+				MessageKeys: OpportunityMessageKeys{
+					Title:   "opportunities.catalog.setup_goal_suggestion.title",
+					Summary: "opportunities.catalog.setup_goal_suggestion.summary",
+					Action:  "opportunities.catalog.setup_goal_suggestion.action",
+					Digest:  "opportunities.catalog.setup_goal_suggestion.digest",
+				},
+				AllowedParams:      []string{"event_name", "event_count", "goal_type", "goal_value"},
+				AllowedActionTypes: []string{"create_goal"},
+			},
+		},
+		EvidenceSnapshot: OpportunityEvidenceSnapshot{
+			Evidence: []Evidence{
+				{ID: "suggested_goal_event", Label: "opportunities.evidence.suggested_goal_event", Value: "demo_request"},
+				{ID: "suggested_goal_event_count", Label: "opportunities.evidence.suggested_goal_event_count", Value: "18"},
+			},
+		},
+	}
+}
+
+func validCatalogCandidateProposal() OpportunityCandidateProposal {
+	return OpportunityCandidateProposal{
+		TypeKey:    "opportunities.types.setup_goal_suggestion",
+		Category:   "setup_quality",
+		ActionType: "create_goal",
+		Effort:     "low",
+		TitleKey:   "opportunities.catalog.setup_goal_suggestion.title",
+		SummaryKey: "opportunities.catalog.setup_goal_suggestion.summary",
+		ActionKey:  "opportunities.catalog.setup_goal_suggestion.action",
+		DigestKey:  "opportunities.catalog.setup_goal_suggestion.digest",
+		CopyParams: map[string]any{
+			"event_name":  "demo_request",
+			"event_count": 18,
+			"goal_type":   "event",
+			"goal_value":  "demo_request",
+		},
+		CitedEvidenceIDs: []string{"suggested_goal_event", "suggested_goal_event_count"},
+	}
+}
+
+func validCatalogCandidateProviderJSON() string {
+	return `{
+		"type_key": "opportunities.types.setup_goal_suggestion",
+		"category": "setup_quality",
+		"action_type": "create_goal",
+		"effort": "low",
+		"title_key": "opportunities.catalog.setup_goal_suggestion.title",
+		"summary_key": "opportunities.catalog.setup_goal_suggestion.summary",
+		"action_key": "opportunities.catalog.setup_goal_suggestion.action",
+		"digest_key": "opportunities.catalog.setup_goal_suggestion.digest",
+		"copy_params": {"event_name": "demo_request", "event_count": 18, "goal_type": "event", "goal_value": "demo_request"},
+		"cited_evidence_ids": ["suggested_goal_event", "suggested_goal_event_count"]
+	}`
 }

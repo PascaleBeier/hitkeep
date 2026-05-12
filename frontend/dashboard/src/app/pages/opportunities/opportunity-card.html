@@ -1,0 +1,50 @@
+@let item = opportunity();
+
+<article class="opportunity-card">
+    <div class="opportunity-card__header">
+        <span class="opportunity-card__icon"><i [class]="item.icon" aria-hidden="true"></i></span>
+        <div class="min-w-0 flex-1">
+            <div class="opportunity-card__meta">
+                <p-tag [value]="item.typeLabel" [severity]="item.severity" />
+                <span>{{ item.confidenceLabel }}</span>
+                <span>{{ item.statusLabel }}</span>
+            </div>
+            <button type="button" class="opportunity-card__title" (click)="inspectClicked.emit(item)">{{ item.title }}</button>
+        </div>
+        <div class="opportunity-card__impact">
+            <strong>{{ item.impactValue }}</strong>
+            <span>{{ item.impactLabel }}</span>
+        </div>
+    </div>
+
+    <p class="opportunity-card__summary">{{ item.summary }}</p>
+
+    <div class="opportunity-card__evidence">
+        @for (evidence of item.evidence; track evidence.id) {
+        <div class="opportunity-evidence">
+            <span><i class="pi pi-check-circle" aria-hidden="true"></i>{{ evidence.label }}: {{ evidence.value }}</span>
+            @if (evidence.detail; as detail) {
+            <small>{{ detail }}</small>
+            }
+        </div>
+        }
+    </div>
+
+    <div class="opportunity-card__score">
+        <div>
+            <span>{{ priorityLabel() }}</span>
+            <strong>{{ item.score }}</strong>
+        </div>
+        <span class="opportunity-card__bar"><span [style.width]="item.scoreWidth"></span></span>
+    </div>
+
+    <div class="opportunity-card__footer">
+        <span class="opportunity-card__route"><i [class]="item.routeIcon" aria-hidden="true"></i>{{ item.routeLabel }}</span>
+        <div class="opportunity-card__actions">
+            @if (canManage() && item.status === 'new') {
+            <p-button size="small" severity="secondary" [outlined]="true" [label]="saveLabel()" icon="pi pi-bookmark" [loading]="pending()" [disabled]="pending()" (onClick)="saveClicked.emit(item)" />
+            }
+            <p-button size="small" [label]="inspectLabel()" icon="pi pi-arrow-right" iconPos="right" [disabled]="pending()" (onClick)="inspectClicked.emit(item)" />
+        </div>
+    </div>
+</article>

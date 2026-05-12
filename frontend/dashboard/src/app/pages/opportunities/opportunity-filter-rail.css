@@ -1,0 +1,73 @@
+:host {
+    display: block;
+}
+
+.opportunities-sidebar {
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 0.875rem;
+    border: 1px solid var(--p-surface-200);
+    border-radius: 8px;
+    background: var(--p-surface-card);
+}
+
+.opportunities-sidebar h2 {
+    margin: 0 0 0.5rem;
+    color: var(--p-text-muted-color);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.opportunities-filter-list {
+    display: grid;
+    gap: 0.25rem;
+}
+
+.opportunities-filter {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--p-text-color);
+    background: transparent;
+    font: inherit;
+    font-size: 0.875rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.opportunities-filter:hover,
+.opportunities-filter:focus-visible {
+    background: var(--p-surface-100);
+    outline: none;
+}
+
+.opportunities-filter:focus-visible {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--p-primary-color) 28%, transparent);
+}
+
+.opportunities-filter--active {
+    border-color: color-mix(in srgb, var(--p-primary-color) 38%, transparent);
+    color: var(--p-primary-color);
+    background: color-mix(in srgb, var(--p-primary-color) 10%, transparent);
+    font-weight: 700;
+}
+
+.opportunities-filter strong {
+    color: var(--p-text-muted-color);
+    font-size: 0.75rem;
+}
+
+@media (max-width: 900px) {
+    .opportunities-sidebar {
+        position: static;
+    }
+}

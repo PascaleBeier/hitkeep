@@ -975,6 +975,36 @@ type OpportunityGenerateResponse struct {
 	AIStatus      string        `json:"ai_status"`
 }
 
+type OpportunityDigestPreviewResponse struct {
+	Frequency  ReportFrequency                `json:"frequency"`
+	ShouldSend bool                           `json:"should_send"`
+	Reason     string                         `json:"reason"`
+	Items      []OpportunityDigestPreviewItem `json:"items"`
+}
+
+type OpportunityDigestPreviewItem struct {
+	ID               string                    `json:"id"`
+	SiteID           string                    `json:"site_id"`
+	Kind             string                    `json:"kind"`
+	TypeKey          string                    `json:"type_key"`
+	Category         string                    `json:"category"`
+	TitleKey         string                    `json:"title_key"`
+	ActionKey        string                    `json:"action_key"`
+	DigestKey        string                    `json:"digest_key"`
+	CopyParams       map[string]any            `json:"copy_params"`
+	ImpactValue      string                    `json:"impact_value"`
+	ImpactLabelKey   string                    `json:"impact_label_key"`
+	Confidence       string                    `json:"confidence"`
+	Score            int                       `json:"score"`
+	ScoreBreakdown   OpportunityScoreBreakdown `json:"score_breakdown"`
+	Status           string                    `json:"status"`
+	RouteLabelKey    string                    `json:"route_label_key"`
+	RouteParams      map[string]any            `json:"route_params"`
+	RouteIcon        string                    `json:"route_icon"`
+	Evidence         []OpportunityEvidence     `json:"evidence"`
+	CitedEvidenceIDs []string                  `json:"cited_evidence_ids"`
+}
+
 type GoalStats struct {
 	GoalID         uuid.UUID `json:"goal_id"`
 	Name           string    `json:"name"`
