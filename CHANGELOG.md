@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.3](https://github.com/PascaleBeier/hitkeep/compare/v2.4.2...v2.4.3) (2026-05-13)
+
+
+### Bug Fixes
+
+* **mailer:** render RFC-compliant signature delimiter ([#170](https://github.com/PascaleBeier/hitkeep/issues/170)) ([0067658](https://github.com/PascaleBeier/hitkeep/commit/0067658e7b4457e1d9fdf8112b2cb5251f3c6988)), closes [#169](https://github.com/PascaleBeier/hitkeep/issues/169)
+
 ## [2.4.2](https://github.com/PascaleBeier/hitkeep/compare/v2.4.1...v2.4.2) (2026-05-08)
 
 
