@@ -196,6 +196,28 @@ func newLocalizedOpportunityDigestMailable(locale string) *stubMailable {
 	}
 }
 
+func newEmailVerificationMailable(link, teamName string) *stubMailable {
+	return &stubMailable{
+		subject:  "Verify your email for HitKeep Cloud",
+		template: "email_verification.mjml",
+		data: struct {
+			Link     string
+			TeamName string
+		}{Link: link, TeamName: teamName},
+	}
+}
+
+func newMFAMagicLinkMailable(link string, expiresInMinutes int) *stubMailable {
+	return &stubMailable{
+		subject:  "Your HitKeep sign-in link",
+		template: "mfa_magic_link.mjml",
+		data: struct {
+			Link             string
+			ExpiresInMinutes int
+		}{Link: link, ExpiresInMinutes: expiresInMinutes},
+	}
+}
+
 func newUserInviteMailable(link, siteName, inviter string) *stubMailable {
 	return &stubMailable{
 		subject:  "You've been invited to join " + siteName,
@@ -253,6 +275,35 @@ func newTeamInviteExistingUserMailable(link, teamName, inviter, role string) *st
 			HelpText:             "Sign in to access your team workspace.",
 			RequiresAccountSetup: false,
 		},
+	}
+}
+
+func assertRFC3676SignatureSeparator(t *testing.T, textBody string) {
+	t.Helper()
+
+	body := strings.ReplaceAll(textBody, "\r\n", "\n")
+	lines := strings.Split(body, "\n")
+	signatureLine := -1
+	for i, line := range lines {
+		switch {
+		case line == "-- ":
+			if signatureLine >= 0 {
+				t.Fatalf("expected one RFC 3676 signature separator, got another at line %d:\n%s", i+1, textBody)
+			}
+			signatureLine = i
+		case strings.TrimRight(line, " \t") == "--":
+			t.Fatalf("line %d looks like a malformed signature separator %q; expected exactly %q:\n%s", i+1, line, "-- ", textBody)
+		}
+	}
+
+	if signatureLine < 0 {
+		t.Fatalf("expected RFC 3676 signature separator line %q, got:\n%s", "-- ", textBody)
+	}
+	if signatureLine == len(lines)-1 {
+		t.Fatalf("signature separator must be followed by signature content, got:\n%s", textBody)
+	}
+	if lines[signatureLine+1] == "" {
+		t.Fatalf("signature separator must be immediately followed by signature content, got:\n%s", textBody)
 	}
 }
 
@@ -458,6 +509,63 @@ func TestSendPlainTextPasswordReset(t *testing.T) {
 	}
 	if strings.Contains(drv.textBody, "<") {
 		t.Fatalf("plain-text body must not contain HTML tags, got:\n%s", drv.textBody)
+	}
+}
+
+func TestSendPlainTextMailsUseRFC3676SignatureSeparator(t *testing.T) {
+	tests := []struct {
+		name     string
+		mailable *stubMailable
+	}{
+		{
+			name:     "password_reset",
+			mailable: newPasswordResetMailable("https://example.com/reset/abc123"),
+		},
+		{
+			name:     "email_verification",
+			mailable: newEmailVerificationMailable("https://example.com/signup/verify", "Acme Cloud"),
+		},
+		{
+			name:     "mfa_magic_link",
+			mailable: newMFAMagicLinkMailable("https://example.com/api/auth/mfa/email-link/verify?token=abc123", 10),
+		},
+		{
+			name:     "site_report",
+			mailable: newLocalizedSiteReportMailable("en"),
+		},
+		{
+			name:     "analytics_digest",
+			mailable: newLocalizedDigestMailable("en"),
+		},
+		{
+			name:     "opportunity_digest",
+			mailable: newLocalizedOpportunityDigestMailable("en"),
+		},
+		{
+			name:     "user_invite",
+			mailable: newUserInviteMailable("https://example.com/invite/xyz", "My Site", "Alice"),
+		},
+		{
+			name:     "team_invite_new_user",
+			mailable: newTeamInviteNewUserMailable("https://example.com/accept-invite?token=xyz", "DevTeam", "Alice", "editor"),
+		},
+		{
+			name:     "team_invite_existing_user",
+			mailable: newTeamInviteExistingUserMailable("https://example.com/dashboard", "DevTeam", "Alice", "viewer"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			drv := &mockDriver{}
+			m := &Mailer{driver: drv}
+
+			if err := m.Send("user@example.com", tc.mailable); err != nil {
+				t.Fatalf("Send() error = %v", err)
+			}
+
+			assertRFC3676SignatureSeparator(t, drv.textBody)
+		})
 	}
 }
 

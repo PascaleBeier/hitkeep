@@ -1,6 +1,6 @@
 {{ template "content" .Data }}
 
---
+{{ "-- " }}
 {{ t "footer.powered_by" }} HitKeep
 {{ t "footer.tagline" }}
 https://hitkeep.com
