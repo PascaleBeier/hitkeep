@@ -5,21 +5,18 @@ on:
     branches:
       - main
 
-permissions:
-  contents: write
-  pull-requests: write
-  packages: write
-  id-token: write
-  attestations: write
-  artifact-metadata: write
+permissions: {}
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
-      - uses: googleapis/release-please-action@v5
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5
         id: release
         with:
           token: ${{ secrets.GHT }}
@@ -30,6 +27,12 @@ jobs:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     uses: ./.github/workflows/pipeline.yml
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     with:
       version: ${{ needs.release-please.outputs.tag_name }}
       meta_config: |
@@ -103,21 +106,28 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
-      - uses: azure/setup-helm@v5
+      - uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5
 
       - name: Login to GHCR
-        run: echo "${{ secrets.GHT }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+        env:
+          GHCR_ACTOR: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GHT }}
+        run: echo "${GHCR_TOKEN}" | helm registry login ghcr.io -u "${GHCR_ACTOR}" --password-stdin
 
       - name: Package chart
+        env:
+          TAG: ${{ needs.release-please.outputs.tag_name }}
         run: |
-          TAG="${{ needs.release-please.outputs.tag_name }}"
           CHART_VERSION="${TAG#v}"
           helm package charts/hitkeep --version "$CHART_VERSION" --app-version "$TAG"
 
       - name: Push chart
+        env:
+          TAG: ${{ needs.release-please.outputs.tag_name }}
         run: |
-          TAG="${{ needs.release-please.outputs.tag_name }}"
           CHART_VERSION="${TAG#v}"
           helm push "hitkeep-${CHART_VERSION}.tgz" "oci://ghcr.io/pascalebeier/charts"

@@ -20,7 +20,9 @@ jobs:
     name: Lint Golang codebase
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
       - name: Resolve Go build tags
         id: go-build-tags
         shell: bash
@@ -29,13 +31,13 @@ jobs:
           echo "goflags=$(./scripts/go-build-tags.sh goflags)" >> "$GITHUB_OUTPUT"
           echo "golangci_args=$(./scripts/go-build-tags.sh golangci)" >> "$GITHUB_OUTPUT"
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: go.mod
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9
         with:
-          version: v2.11
+          version: v2.12
           args: ${{ steps.go-build-tags.outputs.golangci_args }}
       - name: Vet API
         env:
@@ -51,19 +53,21 @@ jobs:
     name: Audit MCP surface
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
       - name: Resolve Go build tags
         id: go-build-tags
         shell: bash
         run: echo "goflags=$(./scripts/go-build-tags.sh goflags)" >> "$GITHUB_OUTPUT"
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: go.mod
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: 24
+          node-version-file: frontend/dashboard/.nvmrc
       - name: Audit MCP protocol surface
         env:
           GOFLAGS: ${{ steps.go-build-tags.outputs.goflags }}
@@ -75,11 +79,13 @@ jobs:
     name: Lint Dashboard (Angular)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - name: Setup Node
-        uses: actions/setup-node@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          node-version: 24
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: frontend/dashboard/.nvmrc
           cache: npm
           cache-dependency-path: frontend/dashboard/package-lock.json
       - name: Install dependencies
@@ -96,11 +102,13 @@ jobs:
     name: Test Dashboard (Angular)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - name: Setup Node
-        uses: actions/setup-node@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          node-version: 24
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: frontend/dashboard/.nvmrc
           cache: npm
           cache-dependency-path: frontend/dashboard/package-lock.json
       - name: Install dependencies
@@ -117,16 +125,18 @@ jobs:
     name: E2E Dashboard
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: 24
+          node-version-file: frontend/dashboard/.nvmrc
           cache: npm
           cache-dependency-path: frontend/dashboard/package-lock.json
       - name: Install dashboard dependencies
@@ -140,7 +150,7 @@ jobs:
         run: npm run e2e
       - name: Upload Playwright artifacts
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: playwright-report
           path: |

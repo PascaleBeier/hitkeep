@@ -76,13 +76,14 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
+          persist-credentials: false
           ref: ${{ inputs.checkout_ref || github.sha }}
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: 24
+          node-version-file: frontend/dashboard/.nvmrc
           cache: "npm"
           cache-dependency-path: frontend/dashboard/package-lock.json
 
@@ -99,7 +100,7 @@ jobs:
           cp -r frontend/dashboard/dist/dashboard/browser/* public/
           tar -czf public-assets.tar.gz -C public .
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: public-assets-${{ inputs.version }}
           path: public-assets.tar.gz
@@ -136,16 +137,17 @@ jobs:
             glibc_baseline: "2.35"
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
+          persist-credentials: false
           ref: ${{ inputs.checkout_ref || github.sha }}
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: public-assets-${{ inputs.version }}
           path: artifacts/public
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         id: setup-go
         with:
           go-version-file: go.mod
@@ -191,7 +193,7 @@ jobs:
             -o "hitkeep-cloud-linux-${{ matrix.goarch }}" \
             ./cmd/hitkeep/main.go
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: binaries-${{ matrix.id }}
           path: |
@@ -201,7 +203,7 @@ jobs:
           compression-level: 0
 
       - name: Attest Binaries
-        uses: actions/attest@v4
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4
         with:
           subject-path: |
             hitkeep-${{ matrix.artifact_suffix }}
@@ -216,11 +218,12 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
+          persist-credentials: false
           ref: ${{ inputs.checkout_ref || github.sha }}
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: binaries-*
           path: .
@@ -233,7 +236,9 @@ jobs:
           DOCKER_TAGS_SUMMARY: ${{ inputs.docker_tags_summary }}
           DOCKER_SHA_TAG_PREFIX: ${{ inputs.docker_sha_tag_prefix }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          RELEASE_PRERELEASE: ${{ inputs.release_prerelease }}
           RELEASE_TARGET_SHA: ${{ inputs.release_target_sha || github.sha }}
+          RELEASE_TAG_NAME: ${{ inputs.release_tag_name }}
           RELEASE_TITLE: ${{ inputs.release_title }}
         run: |
           set -euo pipefail
@@ -242,7 +247,7 @@ jobs:
           sha256sum "${files[@]}" > SHA256SUMS
           files+=(SHA256SUMS)
 
-          if [[ "${{ inputs.release_prerelease }}" == "true" ]]; then
+          if [[ "${RELEASE_PRERELEASE}" == "true" ]]; then
             short_sha="${RELEASE_TARGET_SHA::7}"
             release_title="${RELEASE_TITLE:-Snapshot ${short_sha}}"
 
@@ -277,15 +282,15 @@ jobs:
               } >> release-notes.md
             fi
 
-            if gh release view "${{ inputs.release_tag_name }}" >/dev/null 2>&1; then
-              gh release edit "${{ inputs.release_tag_name }}" \
+            if gh release view "${RELEASE_TAG_NAME}" >/dev/null 2>&1; then
+              gh release edit "${RELEASE_TAG_NAME}" \
                 --prerelease \
                 --target "${RELEASE_TARGET_SHA}" \
                 --title "${release_title}" \
                 --notes-file release-notes.md
-              gh release upload "${{ inputs.release_tag_name }}" "${files[@]}" --clobber
+              gh release upload "${RELEASE_TAG_NAME}" "${files[@]}" --clobber
             else
-              gh release create "${{ inputs.release_tag_name }}" "${files[@]}" \
+              gh release create "${RELEASE_TAG_NAME}" "${files[@]}" \
                 --target "${RELEASE_TARGET_SHA}" \
                 --prerelease \
                 --latest=false \
@@ -296,7 +301,7 @@ jobs:
             exit 0
           fi
 
-          gh release upload "${{ inputs.release_tag_name }}" "${files[@]}" --clobber
+          gh release upload "${RELEASE_TAG_NAME}" "${files[@]}" --clobber
 
   build-and-push-image:
     name: Build and push Docker image
@@ -312,16 +317,17 @@ jobs:
       artifact-metadata: write
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
+          persist-credentials: false
           ref: ${{ inputs.checkout_ref || github.sha }}
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: public-assets-${{ inputs.version }}
           path: artifacts/public
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: binaries-linux-*
           path: .
@@ -340,25 +346,25 @@ jobs:
 
           find . -maxdepth 1 -type f -name 'hitkeep-cloud-linux-*' -delete
 
-      - uses: docker/setup-qemu-action@v4
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
+      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v4
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.token }}
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v4
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6
         with:
           images: |
             ghcr.io/${{ github.repository }}
@@ -366,7 +372,7 @@ jobs:
           tags: ${{ inputs.meta_config }}
 
       - name: Build and Push Docker Image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7
         id: push
         with:
           context: .
@@ -381,14 +387,14 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: Attest GHCR Image
-        uses: actions/attest@v4
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4
         with:
           subject-name: ghcr.io/${{ github.repository }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
 
       - name: Attest Docker Hub Image
-        uses: actions/attest@v4
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4
         with:
           subject-name: index.docker.io/${{ secrets.DOCKERHUB_USERNAME }}/hitkeep
           subject-digest: ${{ steps.push.outputs.digest }}

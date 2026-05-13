@@ -6,6 +6,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/PascaleBeier/hitkeep?sort=semver)](https://github.com/PascaleBeier/hitkeep/releases)
 [![License](https://img.shields.io/github/license/PascaleBeier/hitkeep)](./LICENSE)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/PascaleBeier/hitkeep?logo=go)](https://github.com/PascaleBeier/hitkeep/blob/main/go.mod)
+[![Node Version](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2FPascaleBeier%2Fhitkeep%2Frefs%2Fheads%2Fmain%2Ffrontend%2Fdashboard%2F.nvmrc&search=%5E(.%2B)%24&replace=%241&label=Node.js&logo=nodedotjs)](https://github.com/PascaleBeier/hitkeep/blob/main/frontend/dashboard/.nvmrc)
 [![Angular Version](https://img.shields.io/github/package-json/dependency-version/PascaleBeier/hitkeep/%40angular%2Fcore?filename=frontend%2Fdashboard%2Fpackage.json&logo=angular&label=Angular)](https://github.com/PascaleBeier/hitkeep/blob/main/frontend/dashboard/package.json)
 [![Docker Pulls](https://img.shields.io/docker/pulls/pascalebeier/hitkeep?logo=docker&label=docker%20pulls)](https://hub.docker.com/r/pascalebeier/hitkeep)
 [![Documentation](https://img.shields.io/website?url=https%3A%2F%2Fhitkeep.com%2Fguides%2Fintroduction%2F&label=docs)](https://hitkeep.com/guides/introduction/)
