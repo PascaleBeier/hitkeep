@@ -64,8 +64,7 @@ func TestHandleListOpportunitiesReturnsLocalizationContract(t *testing.T) {
 		DigestKey:        "opportunities.catalog.checkout_conversion.digest",
 		CopyParams:       map[string]any{"conversion_rate": "42%"},
 		ImpactValue:      "$900",
-		ImpactLabelKey:   "opportunities.impact.estimated_monthly_upside",
-		MonthlyUpside:    900,
+		ImpactLabelKey:   "opportunities.impact.checkout_starts",
 		Confidence:       "medium",
 		Score:            84,
 		ScoreBreakdown:   api.OpportunityScoreBreakdown{Sample: 82, Impact: 70, Urgency: 55, EvidenceFit: 99, Total: 84},
@@ -128,6 +127,28 @@ func TestHandleListOpportunitiesReturnsLocalizationContract(t *testing.T) {
 	}
 	if _, ok := evidenceItem["label_key"]; !ok {
 		t.Fatalf("evidence missing label_key: %#v", evidenceItem)
+	}
+}
+
+func TestHandleListOpportunitiesReturnsEmptyArrayWhenNoRowsExist(t *testing.T) {
+	_, ctx, siteID, _ := setupOpportunityHandlerTestEnv(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/sites/"+siteID.String()+"/opportunities", nil)
+	req.SetPathValue("id", siteID.String())
+	rec := httptest.NewRecorder()
+	h := &handler{ctx: ctx}
+	h.handleList().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	body := requireJSONMap(t, rec.Body.Bytes())
+	opportunities, ok := body["opportunities"].([]any)
+	if !ok {
+		t.Fatalf("expected opportunities to be an array, got %#v in %s", body["opportunities"], rec.Body.String())
+	}
+	if len(opportunities) != 0 {
+		t.Fatalf("expected no opportunities, got %#v", opportunities)
 	}
 }
 
@@ -232,15 +253,14 @@ func TestHandleDigestPreviewDefaultsToWeeklyNoSendState(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
-	var body api.OpportunityDigestPreviewResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode response: %v", err)
+	body := requireJSONMap(t, rec.Body.Bytes())
+	requireDigestPreviewMetadata(t, body, "weekly", false, "no_opportunities")
+	items, ok := body["items"].([]any)
+	if !ok {
+		t.Fatalf("expected digest preview items to be an array, got %#v in %s", body["items"], rec.Body.String())
 	}
-	if body.Frequency != api.ReportFrequencyWeekly || body.ShouldSend || body.Reason != "no_opportunities" {
-		t.Fatalf("expected default weekly no-opportunity preview, got %#v", body)
-	}
-	if len(body.Items) != 0 {
-		t.Fatalf("expected no preview items, got %#v", body.Items)
+	if len(items) != 0 {
+		t.Fatalf("expected no preview items, got %#v", items)
 	}
 }
 
@@ -285,8 +305,7 @@ func listRankingOpportunity(teamID, siteID, id uuid.UUID, status string, score i
 		DigestKey:        "opportunities.catalog.checkout_conversion.digest",
 		CopyParams:       map[string]any{"conversion_rate": "42%"},
 		ImpactValue:      "$900",
-		ImpactLabelKey:   "opportunities.impact.estimated_monthly_upside",
-		MonthlyUpside:    900,
+		ImpactLabelKey:   "opportunities.impact.checkout_starts",
 		Confidence:       "medium",
 		Score:            score,
 		ScoreBreakdown:   breakdown,
@@ -440,6 +459,7 @@ func TestOpportunityRoutesEnforceSitePermissions(t *testing.T) {
 
 func TestGenerateAttributesAPIClientActor(t *testing.T) {
 	store, ctx, siteID, teamID := setupOpportunityHandlerTestEnv(t)
+	seedSetupSuggestionEvidence(t, store, siteID)
 	client, token, err := store.CreateTeamAPIClient(context.Background(), teamID, "team opportunities", "", map[uuid.UUID]authcore.SiteRole{
 		siteID: authcore.SiteAdmin,
 	}, nil)
@@ -485,6 +505,36 @@ func TestGenerateAttributesAPIClientActor(t *testing.T) {
 	}
 }
 
+func seedSetupSuggestionEvidence(t *testing.T, store *database.Store, siteID uuid.UUID) {
+	t.Helper()
+
+	sessionID := uuid.New()
+	timestamp := time.Now().UTC().Add(-2 * time.Hour)
+	isUnique := true
+	for i := range 120 {
+		if err := store.CreateHit(context.Background(), &api.Hit{
+			SiteID:    siteID,
+			SessionID: sessionID,
+			PageID:    uuid.New(),
+			Path:      "/pricing",
+			Timestamp: timestamp.Add(time.Duration(i) * time.Minute),
+			IsUnique:  &isUnique,
+		}); err != nil {
+			t.Fatalf("CreateHit: %v", err)
+		}
+	}
+	for i := range 20 {
+		if err := store.CreateEvent(context.Background(), &api.Event{
+			SiteID:    siteID,
+			SessionID: sessionID,
+			Name:      "demo_request",
+			Timestamp: timestamp.Add(time.Duration(i) * time.Minute),
+		}); err != nil {
+			t.Fatalf("CreateEvent: %v", err)
+		}
+	}
+}
+
 type recordingOpportunityAI struct {
 	last    hitai.OpportunityRequest
 	toolErr error
@@ -499,12 +549,16 @@ func (a *recordingOpportunityAI) GenerateOpportunityProposal(_ context.Context, 
 	for _, evidence := range req.EvidenceSnapshot.Evidence {
 		cited = append(cited, evidence.ID)
 	}
+	actionType := "optimize_checkout"
+	if len(req.DetectorInput.AllowedActionTypes) > 0 {
+		actionType = req.DetectorInput.AllowedActionTypes[0]
+	}
 	return hitai.OpportunityProposalResult{
 		RunID: uuid.New(),
 		Proposal: hitai.OpportunityCandidateProposal{
 			TypeKey:          req.DetectorInput.TypeKey,
 			Category:         req.DetectorInput.Category,
-			ActionType:       "optimize_checkout",
+			ActionType:       actionType,
 			Effort:           "medium",
 			TitleKey:         req.DetectorInput.MessageKeys.Title,
 			SummaryKey:       req.DetectorInput.MessageKeys.Summary,

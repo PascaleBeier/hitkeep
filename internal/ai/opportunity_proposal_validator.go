@@ -123,6 +123,9 @@ func validateCatalogProposalParams(proposal OpportunityCandidateProposal, input 
 		}
 	}
 	for param := range proposal.CopyParams {
+		if forbiddenOpportunityProposalParam(param) {
+			return fmt.Errorf("%w: removed money/upside param %q", ErrInvalidOutput, param)
+		}
 		if !allowedParams[param] {
 			return fmt.Errorf("%w: unsupported param %q", ErrInvalidOutput, param)
 		}
@@ -138,6 +141,9 @@ func validateProposalParams(proposal OpportunityCandidateProposal, input Opportu
 		}
 	}
 	for param := range proposal.CopyParams {
+		if forbiddenOpportunityProposalParam(param) {
+			return fmt.Errorf("%w: removed money/upside param %q", ErrInvalidOutput, param)
+		}
 		if !allowedParams[param] {
 			return fmt.Errorf("%w: unsupported param %q", ErrInvalidOutput, param)
 		}
@@ -161,6 +167,15 @@ func validateProposalEvidence(proposal OpportunityCandidateProposal, input Oppor
 		}
 	}
 	return nil
+}
+
+func forbiddenOpportunityProposalParam(param string) bool {
+	switch strings.TrimSpace(param) {
+	case "monthly_upside", "currency":
+		return true
+	default:
+		return false
+	}
 }
 
 func allowedActionType(value string, allowed []string) bool {

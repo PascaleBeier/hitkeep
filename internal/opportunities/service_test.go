@@ -48,7 +48,6 @@ func TestGeneratePersistsValidatedAIProposal(t *testing.T) {
 			},
 			ImpactValue:     "EUR 900",
 			ImpactLabelKey:  "opportunities.fixture.impact",
-			MonthlyUpside:   900,
 			Confidence:      "medium",
 			Score:           80,
 			Status:          "new",
@@ -219,6 +218,39 @@ func TestGeneratePersistsFunnelSetupSuggestionFromTrackedPageAndConversionEvent(
 	}
 }
 
+func TestGenerateSuppressesNoDataSetupOpportunityBeforeAI(t *testing.T) {
+	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	ai := &countingEchoOpportunityAI{}
+	from := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
+	to := from.AddDate(0, 0, 30)
+
+	opportunities, runID, aiStatus, err := (Service{Shared: shared, AI: ai}).Generate(context.Background(), GenerateInput{
+		Store:           shared,
+		Site:            site,
+		TeamID:          teamID,
+		ActorID:         actorID,
+		EffectiveUserID: actorID,
+		ActorType:       "user",
+		From:            from,
+		To:              to,
+	})
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	if len(opportunities) != 0 {
+		t.Fatalf("expected no opportunities for a zero-signal site, got %#v", opportunities)
+	}
+	if runID != nil {
+		t.Fatalf("expected no AI run for a zero-signal site, got %s", *runID)
+	}
+	if aiStatus != "no_opportunities" {
+		t.Fatalf("expected no_opportunities AI status, got %q", aiStatus)
+	}
+	if ai.calls != 0 {
+		t.Fatalf("expected AI not to run for zero-signal setup, got %d calls", ai.calls)
+	}
+}
+
 func TestGeneratePassesEvidenceSnapshotToAI(t *testing.T) {
 	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	ai := &recordingOpportunityAI{runID: uuid.New(), proposal: fixtureAIProposal("one")}
@@ -259,7 +291,7 @@ func TestGeneratePassesEvidenceSnapshotToAI(t *testing.T) {
 func TestGenerateUsesActiveCatalogContractForDefaultTypeKey(t *testing.T) {
 	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	contract := DetectorContract{
-		Category: DetectorCategoryRevenue,
+		Category: DetectorCategoryTraffic,
 		TypeKey:  "opportunities.types.checkout_conversion",
 		MessageKeys: DetectorMessageKeys{
 			Title:       "opportunities.fixture.custom_checkout.title",
@@ -276,7 +308,7 @@ func TestGenerateUsesActiveCatalogContractForDefaultTypeKey(t *testing.T) {
 		ID:              uuid.New(),
 		TeamID:          teamID,
 		SiteID:          site.ID,
-		Kind:            "revenue",
+		Kind:            "traffic",
 		TypeKey:         contract.TypeKey,
 		TitleKey:        contract.MessageKeys.Title,
 		SummaryKey:      contract.MessageKeys.Summary,
@@ -317,7 +349,7 @@ func TestGenerateUsesActiveCatalogContractForDefaultTypeKey(t *testing.T) {
 	if status != "success" {
 		t.Fatalf("expected active catalog contract to drive AI validation, got status %q", status)
 	}
-	if ai.last.DetectorInput.Category != string(DetectorCategoryRevenue) {
+	if ai.last.DetectorInput.Category != string(DetectorCategoryTraffic) {
 		t.Fatalf("expected active catalog category, got %#v", ai.last.DetectorInput)
 	}
 	if strings.Join(ai.last.DetectorInput.AllowedParams, ",") != "custom_signal" {
@@ -1308,7 +1340,7 @@ func identityOpportunity(teamID, siteID, id uuid.UUID, source string, pageviews 
 		ID:              id,
 		TeamID:          teamID,
 		SiteID:          siteID,
-		Kind:            "revenue",
+		Kind:            "traffic",
 		TypeKey:         contract.TypeKey,
 		TitleKey:        contract.MessageKeys.Title,
 		SummaryKey:      contract.MessageKeys.Summary,
@@ -1317,7 +1349,6 @@ func identityOpportunity(teamID, siteID, id uuid.UUID, source string, pageviews 
 		CopyParams:      map[string]any{"source": source, "pageviews": pageviews},
 		ImpactValue:     fmt.Sprintf("%d", pageviews),
 		ImpactLabelKey:  contract.MessageKeys.ImpactLabel,
-		MonthlyUpside:   float64(pageviews),
 		Confidence:      "high",
 		Score:           80,
 		Status:          "new",
@@ -1349,7 +1380,6 @@ func fixtureOpportunity(teamID, siteID uuid.UUID, name string) database.Opportun
 		CopyParams:      map[string]any{"allowed": "detector " + name},
 		ImpactValue:     "EUR 900",
 		ImpactLabelKey:  contract.MessageKeys.ImpactLabel,
-		MonthlyUpside:   900,
 		Confidence:      "medium",
 		Score:           80,
 		Status:          "new",

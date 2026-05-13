@@ -32,7 +32,7 @@ var opportunityDigestPreviewItemOpenAPISchema = map[string]any{
 	"properties": map[string]any{
 		"id":                 map[string]any{"type": "string", "format": "uuid"},
 		"site_id":            map[string]any{"type": "string", "format": "uuid"},
-		"kind":               map[string]any{"type": "string", "enum": []string{"conversion", "revenue", "ai", "search", "setup"}},
+		"kind":               map[string]any{"type": "string", "enum": []string{"conversion", "traffic", "ai", "search", "setup"}},
 		"type_key":           map[string]any{"type": "string"},
 		"category":           map[string]any{"type": "string"},
 		"title_key":          map[string]any{"type": "string"},
@@ -672,7 +672,7 @@ func opportunityPublicSchema() map[string]any {
 		"properties": map[string]any{
 			"id":                 map[string]any{"type": "string", "format": "uuid"},
 			"site_id":            map[string]any{"type": "string", "format": "uuid"},
-			"kind":               map[string]any{"type": "string", "enum": []string{"conversion", "revenue", "ai", "search", "setup"}},
+			"kind":               map[string]any{"type": "string", "enum": []string{"conversion", "traffic", "ai", "search", "setup"}},
 			"type_key":           map[string]any{"type": "string"},
 			"title_key":          map[string]any{"type": "string"},
 			"summary_key":        map[string]any{"type": "string"},
@@ -681,7 +681,6 @@ func opportunityPublicSchema() map[string]any {
 			"copy_params":        map[string]any{"type": "object", "additionalProperties": true},
 			"impact_value":       map[string]any{"type": "string"},
 			"impact_label_key":   map[string]any{"type": "string"},
-			"monthly_upside":     map[string]any{"type": "number"},
 			"confidence":         map[string]any{"type": "string", "enum": []string{"high", "medium"}},
 			"score":              map[string]any{"type": "integer"},
 			"score_breakdown":    map[string]any{"$ref": "#/components/schemas/OpportunityScoreBreakdown"},
@@ -696,7 +695,7 @@ func opportunityPublicSchema() map[string]any {
 			"created_at":         map[string]any{"type": "string", "format": "date-time"},
 			"updated_at":         map[string]any{"type": "string", "format": "date-time"},
 		},
-		"required": []string{"id", "site_id", "kind", "type_key", "title_key", "summary_key", "action_key", "copy_params", "impact_value", "impact_label_key", "monthly_upside", "confidence", "score", "score_breakdown", "status", "route_label_key", "route_icon", "detector_version", "evidence", "cited_evidence_ids", "generated_at", "created_at", "updated_at"},
+		"required": []string{"id", "site_id", "kind", "type_key", "title_key", "summary_key", "action_key", "digest_key", "copy_params", "impact_value", "impact_label_key", "confidence", "score", "score_breakdown", "status", "route_label_key", "route_icon", "detector_version", "evidence", "cited_evidence_ids", "generated_at", "created_at", "updated_at"},
 	}
 }
 

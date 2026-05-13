@@ -298,6 +298,32 @@ func TestAIStatusReportsMissingRequiredProviderKeyAsNotConfigured(t *testing.T) 
 	}
 }
 
+func TestAIStatusReportsMissingGatewayRouteAsNotConfigured(t *testing.T) {
+	h, _, _, ownerID, _, _ := setupSystemTestEnv(t)
+	h.ctx.Config.AIEnabled = true
+	h.ctx.Config.AIProvider = "openai-compatible"
+	h.ctx.Config.AIModel = "gpt-test"
+	h.ctx.Config.AIAPIKey = "super-secret-ai-key"
+
+	req := withAdminTestUser(httptest.NewRequest(http.MethodGet, "/api/admin/system/ai", nil), ownerID)
+	w := httptest.NewRecorder()
+	h.handleGetAI().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "super-secret-ai-key") {
+		t.Fatalf("AI system status leaked provider secret: %s", w.Body.String())
+	}
+
+	var status api.SystemAIStatus
+	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if status.Configured || status.Status != "not_configured" || status.BaseURLConfigured {
+		t.Fatalf("expected missing gateway route to be not configured, got %#v", status)
+	}
+}
+
 func TestAIStatusAllowsKeylessLocalProviderConfig(t *testing.T) {
 	h, _, _, ownerID, _, _ := setupSystemTestEnv(t)
 	h.ctx.Config.AIEnabled = true

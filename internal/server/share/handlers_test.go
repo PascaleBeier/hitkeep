@@ -146,6 +146,53 @@ func TestShareOpportunitiesListIsScopedToShareTokenSite(t *testing.T) {
 	})
 }
 
+func TestShareOpportunitiesListReturnsEmptyArrayWhenNoRowsExist(t *testing.T) {
+	ctx := context.Background()
+	store := database.NewStore(":memory:")
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	userID, err := store.CreateUser(ctx, "share-opportunities-empty@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	site, err := store.CreateSite(ctx, userID, "share-opportunities-empty.test")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	_, token, err := store.CreateShareLink(ctx, site.ID, userID)
+	if err != nil {
+		t.Fatalf("create share link: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	Register(mux, &shared.Context{Store: store, Config: &config.Config{}})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/share/"+token+"/sites/"+site.ID.String()+"/opportunities", nil)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var body map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	opportunities, ok := body["opportunities"].([]any)
+	if !ok {
+		t.Fatalf("expected opportunities to be an array, got %#v in %s", body["opportunities"], w.Body.String())
+	}
+	if len(opportunities) != 0 {
+		t.Fatalf("expected no opportunities, got %#v", opportunities)
+	}
+}
+
 func seedShareOpportunities(t *testing.T, ctx context.Context, store *database.Store, teamID, siteID, activeID uuid.UUID) {
 	t.Helper()
 	active := shareOpportunityInput(teamID, siteID, activeID, "new", 84, "42%")
@@ -170,8 +217,7 @@ func shareOpportunityInput(teamID, siteID, id uuid.UUID, status string, score in
 		DigestKey:        "opportunities.catalog.checkout_conversion.digest",
 		CopyParams:       map[string]any{"conversion_rate": rate},
 		ImpactValue:      "EUR 900",
-		ImpactLabelKey:   "opportunities.impact.estimated_monthly_upside",
-		MonthlyUpside:    900,
+		ImpactLabelKey:   "opportunities.impact.checkout_starts",
 		Confidence:       "medium",
 		Score:            score,
 		Status:           status,

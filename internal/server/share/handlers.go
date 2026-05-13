@@ -353,7 +353,6 @@ func sharedOpportunities(opportunities []api.Opportunity) []api.SharedOpportunit
 			CopyParams:       opportunity.CopyParams,
 			ImpactValue:      opportunity.ImpactValue,
 			ImpactLabelKey:   opportunity.ImpactLabelKey,
-			MonthlyUpside:    opportunity.MonthlyUpside,
 			Confidence:       opportunity.Confidence,
 			Score:            opportunity.Score,
 			ScoreBreakdown:   opportunity.ScoreBreakdown,

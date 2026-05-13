@@ -5,6 +5,8 @@ import "math"
 const minCheckoutScoringSample = 30
 const minSearchVisibilityImpressions = 1000
 const searchVisibilityTargetCTR = 0.05
+const minTrafficSourceHits = 50
+const minTrafficSourceShare = 0.10
 const minSetupGoalEventCount = 3
 const minSetupFunnelStartPageviews = 30
 
@@ -106,12 +108,12 @@ func scoreSearchVisibilityOpportunity(input searchVisibilityScoringInput) (oppor
 	if input.Impressions < minSearchVisibilityImpressions || input.CTR < 0 || input.CTR >= searchVisibilityTargetCTR {
 		return opportunityScoreBreakdown{}, 0, false
 	}
-	clickUpside := int(math.Round(math.Max(0, searchVisibilityTargetCTR-input.CTR) * float64(input.Impressions)))
-	if clickUpside < 10 {
+	estimatedClicks := int(math.Round(math.Max(0, searchVisibilityTargetCTR-input.CTR) * float64(input.Impressions)))
+	if estimatedClicks < 10 {
 		return opportunityScoreBreakdown{}, 0, false
 	}
 	sample := clampScore(input.Impressions / 50)
-	impact := clampScore(clickUpside / 2)
+	impact := clampScore(estimatedClicks / 2)
 	urgency := clampScore(int(math.Round((searchVisibilityTargetCTR - input.CTR) * 2000)))
 	total := clampScore((sample * 25 / 100) + (impact * 35 / 100) + (urgency * 30 / 100) + 8)
 	return opportunityScoreBreakdown{
@@ -124,7 +126,7 @@ func scoreSearchVisibilityOpportunity(input searchVisibilityScoringInput) (oppor
 		EvidenceFit:   96,
 		Freshness:     70,
 		Total:         total,
-	}, clickUpside, true
+	}, estimatedClicks, true
 }
 
 func scoreSetupGoalSuggestion(eventCount int) opportunityScoreBreakdown {

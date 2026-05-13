@@ -1502,6 +1502,12 @@
                 "cloud_signup": {
                     "label": "Inscription cloud"
                 },
+                "ai": {
+                    "label": "Passerelle IA"
+                },
+                "ai_opportunities": {
+                    "label": "Opportunités IA"
+                },
                 "billing": {
                     "label": "Facturation"
                 }
@@ -1561,6 +1567,43 @@
                     "running": "En cours",
                     "failed": "Échec",
                     "needs_attention": "Attention requise"
+                }
+            },
+            "ai": {
+                "title": "Passerelle IA",
+                "configuration": "Configuration",
+                "enabled": "Activée",
+                "disabled": "Désactivée",
+                "configured": "Configurée",
+                "notConfigured": "Non configurée",
+                "configMode": "Mode de configuration",
+                "provider": "Fournisseur",
+                "model": "Modèle",
+                "budgetWindow": "Fenêtre de budget",
+                "requests": "Requêtes",
+                "tokens": "Jetons",
+                "lastAttempt": "Dernière tentative",
+                "lastSuccess": "Dernier succès",
+                "lastError": "Dernière erreur",
+                "readiness": "État de préparation de la passerelle IA",
+                "summary": {
+                    "ready": "Configurée et dans le budget local.",
+                    "disabled": "Désactivée par la configuration d'exécution.",
+                    "notConfigured": "Activée lorsque le fournisseur et le modèle sont définis.",
+                    "budgetExhausted": "Le budget local de requêtes ou de jetons est épuisé.",
+                    "needsAttention": "Les appels récents au fournisseur nécessitent une vérification.",
+                    "unknown": "Le statut n'est pas encore chargé."
+                },
+                "status": {
+                    "disabled": "Désactivée",
+                    "not_configured": "Non configurée",
+                    "configured": "Configurée",
+                    "budget_exhausted": "Budget épuisé",
+                    "needs_attention": "Attention requise"
+                },
+                "configModes": {
+                    "cloud_managed": "Gérée dans le cloud",
+                    "self_hosted": "Auto-hébergée"
                 }
             },
             "storage": {
@@ -2383,18 +2426,18 @@
     },
     "opportunities": {
         "header": {
-            "eyebrow": "Conseils revenus",
-            "title": "Gagnez plus avec le trafic que vous avez déjà",
-            "subtitle": "HitKeep priorise les fuites de conversion, moteurs de chiffre d’affaires, écarts de visibilité IA, opportunités search et angles morts de configuration selon leur impact probable.",
+            "eyebrow": "Recommandations étayées",
+            "title": "Recommandations priorisées pour le trafic existant",
+            "subtitle": "HitKeep priorise les signaux de conversion, tendances de trafic, écarts de visibilité IA, opportunités search et angles morts de configuration selon la solidité des preuves.",
             "scoreLabel": "Score",
             "scoreAria": "Score des opportunités",
             "scoreHint": "Signal fort"
         },
         "kpis": {
             "open": "Opportunités ouvertes",
-            "upside": "Potentiel mensuel estimé",
             "highConfidence": "Forte confiance",
-            "aiSearchWins": "Gains IA/search"
+            "aiSearchWins": "Gains IA/search",
+            "score": "Score moyen"
         },
         "filters": {
             "ariaLabel": "Filtres des opportunités",
@@ -2403,10 +2446,10 @@
             "types": {
                 "all": "Toutes",
                 "conversion": "Fuites de conversion",
-                "revenue": "Moteurs revenus",
                 "ai": "Visibilité IA",
                 "search": "Search",
-                "setup": "Configuration"
+                "setup": "Configuration",
+                "traffic": "Signaux trafic"
             },
             "statuses": {
                 "all": "Toutes",
@@ -2461,19 +2504,19 @@
             "subtitle": "Commencez par ces opportunités prioritaires."
         },
         "impact": {
-            "monthlyRevenue": "chiffre d’affaires mensuel",
+            "monthlyRevenue": "activité",
             "qualifiedVisits": "visites qualifiées",
             "conversionLift": "gain de conversion",
             "searchClicks": "clics search",
             "blindSpots": "angles morts",
-            "estimated_monthly_upside": "potentiel mensuel estimé",
             "ai_touched_pages": "pages touchées par l’IA",
             "pageviews_to_route": "pages vues à orienter",
             "estimated_search_clicks": "clics search estimés",
             "conversion_signal_coverage": "trafic sans signal de conversion",
             "tracked_conversion_events": "événements de conversion suivis",
             "conversion_events_to_measure": "événements de conversion à mesurer",
-            "funnel_steps_to_measure": "étapes de funnel à mesurer"
+            "funnel_steps_to_measure": "étapes de funnel à mesurer",
+            "checkout_starts": "Débuts de checkout"
         },
         "routes": {
             "checkout": "Checkout : {{path}}",
@@ -2507,35 +2550,37 @@
             "suggested_funnel_start": "Départ de funnel suggéré",
             "suggested_funnel_start_pageviews": "Pages vues au départ",
             "suggested_funnel_conversion_event": "Étape de conversion suggérée",
-            "suggested_funnel_event_count": "Événements de conversion observés"
+            "suggested_funnel_event_count": "Événements de conversion observés",
+            "source_hits": "Visites de la source",
+            "total_pageviews": "Pages vues totales"
         },
         "catalog": {
             "checkout_conversion": {
-                "title": "Récupérer les abandons de checkout",
-                "summary": "Les débuts de checkout convertissent à {{conversion_rate}} et laissent {{monthly_upside}} sur la table.",
-                "action": "Inspectez la friction du checkout avant d’acheter plus de trafic.",
+                "title": "Examiner l’abandon du checkout",
+                "summary": "Les débuts de checkout convertissent à {{conversion_rate}} sur {{checkout_starts}} débuts.",
+                "action": "Inspectez la friction du checkout avant d’ajouter plus de trafic.",
                 "digest": "La conversion checkout est de {{conversion_rate}}."
             },
             "ai_visibility": {
-                "title": "Transformer l’attention des crawlers IA en visites",
+                "title": "Examiner l’attention des crawlers IA",
                 "summary": "Les assistants IA ont demandé {{requests}} pages ; le chemin le plus fort est {{top_path}}.",
-                "action": "Renforcez la page crawlée avec des réponses d’achat plus claires.",
+                "action": "Renforcez la page crawlée avec des réponses plus claires et du contexte de conversion.",
                 "digest": "Les crawlers IA se sont concentrés sur {{top_path}}."
             },
             "traffic_quality": {
-                "title": "Se concentrer sur la source qui apporte déjà de la demande",
-                "summary": "{{source}} génère {{pageviews}} pages vues sur cette période.",
-                "action": "Orientez l’attention des campagnes vers la landing page à plus forte intention.",
-                "digest": "{{source}} est votre source de demande la plus forte."
+                "title": "Examiner le trafic de {{source}}",
+                "summary": "{{source}} a généré {{source_hits}} visites sur {{total_pageviews}} pages vues dans cette période.",
+                "action": "Inspectez les pages d’arrivée et l’intention des visites venant de {{source}}.",
+                "digest": "Examiner le trafic de {{source}}."
             },
             "search_visibility": {
-                "title": "Améliorer les pages déjà visibles dans la recherche",
-                "summary": "La recherche affiche {{impressions}} impressions à {{ctr}} de CTR, soit environ {{estimated_clicks}} clics en plus.",
+                "title": "Examiner les pages déjà visibles en recherche",
+                "summary": "La recherche affiche {{impressions}} impressions à {{ctr}} de CTR ; clics manqués estimés : {{estimated_clicks}}.",
                 "action": "Améliorez le snippet, le titre et la réponse sur la page pour les requêtes qui génèrent déjà des impressions.",
-                "digest": "La visibilité search peut ajouter environ {{estimated_clicks}} clics."
+                "digest": "La recherche indique environ {{estimated_clicks}} clics manqués."
             },
             "conversion_signal": {
-                "title": "Transformer les événements suivis en signal de conversion",
+                "title": "Examiner les événements suivis comme signaux de conversion",
                 "summary": "{{event_names}} sont suivis sur {{pageviews}} pages vues, mais aucun événement de conversion ne priorise encore les opportunités.",
                 "action": "Choisissez l’événement qui représente le mieux un lead, une inscription ou un achat, puis marquez-le comme signal de conversion.",
                 "digest": "Les événements suivis ont besoin d’un signal de conversion."

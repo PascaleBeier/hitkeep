@@ -2,7 +2,6 @@ package opportunities
 
 import (
 	"fmt"
-	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -41,10 +40,11 @@ func detectTrafficQualityOpportunity(input DetectorInput, definition Opportunity
 	if input.Stats == nil || input.Stats.TotalPageviews <= 0 {
 		return nil, false
 	}
-	if _, ok := trafficOpportunitySource(input.Stats); !ok {
+	source, ok := trafficOpportunitySource(input.Stats)
+	if !ok {
 		return nil, false
 	}
-	opportunity := trafficQualityOpportunity(definition, input, input.Stats, input.GeneratedAt)
+	opportunity := trafficQualityOpportunity(definition, input, source, input.GeneratedAt)
 	return &opportunity, true
 }
 
@@ -52,7 +52,7 @@ func detectSearchVisibilityOpportunity(input DetectorInput, definition Opportuni
 	if input.SearchConsole == nil || input.SearchConsole.Impressions <= 0 {
 		return nil, false
 	}
-	score, clickUpside, ok := scoreSearchVisibilityOpportunity(searchVisibilityScoringInput{
+	score, estimatedClicks, ok := scoreSearchVisibilityOpportunity(searchVisibilityScoringInput{
 		Impressions:     input.SearchConsole.Impressions,
 		Clicks:          input.SearchConsole.Clicks,
 		CTR:             input.SearchConsole.CTR,
@@ -61,7 +61,7 @@ func detectSearchVisibilityOpportunity(input DetectorInput, definition Opportuni
 	if !ok {
 		return nil, false
 	}
-	opportunity := searchVisibilityOpportunity(definition, input, input.SearchConsole, score, clickUpside, input.GeneratedAt)
+	opportunity := searchVisibilityOpportunity(definition, input, input.SearchConsole, score, estimatedClicks, input.GeneratedAt)
 	return &opportunity, true
 }
 
@@ -101,34 +101,14 @@ func detectSetupFunnelSuggestionOpportunity(input DetectorInput, definition Oppo
 	return &opportunity, true
 }
 
-func detectTrackingSetupOpportunity(input DetectorInput, definition OpportunityDefinition) (*database.OpportunityInput, bool) {
-	if hasOpportunitySignal(input) {
-		return nil, false
-	}
-	opportunity := trackingSetupOpportunity(definition, input, input.GeneratedAt)
-	return &opportunity, true
-}
-
-func hasOpportunitySignal(input DetectorInput) bool {
-	return (input.Ecommerce != nil && input.Ecommerce.CheckoutStarts > 0) ||
-		(input.AIVisibility != nil && input.AIVisibility.TotalRequests > 0) ||
-		(input.SearchConsole != nil && input.SearchConsole.Impressions > 0) ||
-		(input.Stats != nil && input.Stats.TotalPageviews > 0)
-}
-
 func checkoutOpportunity(definition OpportunityDefinition, input DetectorInput, ecommerce *api.EcommerceSummary, score opportunityScoreBreakdown, generatedAt time.Time) database.OpportunityInput {
-	missedOrders := math.Max(1, float64(ecommerce.CheckoutStarts-ecommerce.Orders)*0.08)
-	upside := missedOrders * math.Max(ecommerce.AverageOrderValue, 80)
 	return definition.BuildOpportunity(withGeneratedAt(input, generatedAt), OpportunityRecipe{
 		CopyParams: map[string]any{
 			"checkout_starts": ecommerce.CheckoutStarts,
 			"orders":          ecommerce.Orders,
 			"conversion_rate": fmt.Sprintf("%.1f%%", ecommerce.CheckoutConversionRate),
-			"monthly_upside":  formatMoney(upside, ecommerce.Currency),
-			"currency":        ecommerce.Currency,
 		},
-		ImpactValue:    formatMoney(upside, ecommerce.Currency),
-		MonthlyUpside:  upside,
+		ImpactValue:    fmt.Sprintf("%d", ecommerce.CheckoutStarts),
 		Confidence:     score.Confidence,
 		Score:          score.Total,
 		ScoreBreakdown: opportunityScoreAPI(score),
@@ -188,7 +168,6 @@ func aiVisibilityOpportunity(definition OpportunityDefinition, input DetectorInp
 	return definition.BuildOpportunity(withGeneratedAt(input, generatedAt), OpportunityRecipe{
 		CopyParams:       copyParams,
 		ImpactValue:      fmt.Sprintf("+%d", maxInt64(1, aiVisibility.UniquePaths)),
-		MonthlyUpside:    float64(aiVisibility.TotalRequests) * 8,
 		Confidence:       score.Confidence,
 		Score:            score.Total,
 		ScoreBreakdown:   opportunityScoreAPI(score),
@@ -223,47 +202,62 @@ func metricValueForName(items []api.MetricStat, name string) int {
 	return 0
 }
 
-func trafficQualityOpportunity(definition OpportunityDefinition, input DetectorInput, stats *api.SiteStats, generatedAt time.Time) database.OpportunityInput {
-	source, _ := trafficOpportunitySource(stats)
+type trafficSourceEvidence struct {
+	Name           string
+	Hits           int
+	TotalPageviews int
+	Sessions       int
+}
+
+func trafficQualityOpportunity(definition OpportunityDefinition, input DetectorInput, source trafficSourceEvidence, generatedAt time.Time) database.OpportunityInput {
 	return definition.BuildOpportunity(withGeneratedAt(input, generatedAt), OpportunityRecipe{
 		CopyParams: map[string]any{
-			"source":    source,
-			"pageviews": stats.TotalPageviews,
-			"sessions":  stats.UniqueSessions,
+			"source":          source.Name,
+			"source_hits":     source.Hits,
+			"total_pageviews": source.TotalPageviews,
+			"sessions":        source.Sessions,
 		},
-		ImpactValue:   fmt.Sprintf("%d", stats.TotalPageviews),
-		MonthlyUpside: float64(stats.TotalPageviews) * 0.7,
-		Confidence:    confidence(stats.TotalPageviews >= 500),
-		Score:         clampScore(55 + stats.TotalPageviews/100),
-		RouteParams:   map[string]any{"source": source},
+		ImpactValue: fmt.Sprintf("%d", source.Hits),
+		Confidence:  confidence(source.Hits >= 200),
+		Score:       clampScore(55 + source.Hits/4),
+		RouteParams: map[string]any{"source": source.Name},
 		Evidence: []api.OpportunityEvidence{
-			{ID: "pageviews", LabelKey: "opportunities.evidence.pageviews", Value: fmt.Sprintf("%d", stats.TotalPageviews)},
-			{ID: "sessions", LabelKey: "opportunities.evidence.sessions", Value: fmt.Sprintf("%d", stats.UniqueSessions)},
-			{ID: "top_source", LabelKey: "opportunities.evidence.top_source", Value: source},
+			{ID: "top_source", LabelKey: "opportunities.evidence.top_source", Value: source.Name},
+			{ID: "source_hits", LabelKey: "opportunities.evidence.source_hits", Value: fmt.Sprintf("%d", source.Hits)},
+			{ID: "total_pageviews", LabelKey: "opportunities.evidence.total_pageviews", Value: fmt.Sprintf("%d", source.TotalPageviews)},
+			{ID: "sessions", LabelKey: "opportunities.evidence.sessions", Value: fmt.Sprintf("%d", source.Sessions)},
 		},
-		CitedEvidenceIDs: []string{"pageviews", "sessions", "top_source"},
+		CitedEvidenceIDs: []string{"top_source", "source_hits", "total_pageviews", "sessions"},
 	})
 }
 
-func trafficOpportunitySource(stats *api.SiteStats) (string, bool) {
-	source := topActionableMetricName(stats.TopUTMSources)
-	if source == "" {
-		source = topActionableMetricName(stats.TopReferrers)
+func trafficOpportunitySource(stats *api.SiteStats) (trafficSourceEvidence, bool) {
+	if stats == nil || stats.TotalPageviews <= 0 {
+		return trafficSourceEvidence{}, false
 	}
-	if source == "" {
-		return "", false
+	source, ok := topActionableTrafficSource(stats.TopUTMSources)
+	if !ok {
+		source, ok = topActionableTrafficSource(stats.TopReferrers)
 	}
+	if !ok || source.Hits < minTrafficSourceHits {
+		return trafficSourceEvidence{}, false
+	}
+	if float64(source.Hits)/float64(stats.TotalPageviews) < minTrafficSourceShare {
+		return trafficSourceEvidence{}, false
+	}
+	source.TotalPageviews = stats.TotalPageviews
+	source.Sessions = stats.UniqueSessions
 	return source, true
 }
 
-func topActionableMetricName(items []api.MetricStat) string {
+func topActionableTrafficSource(items []api.MetricStat) (trafficSourceEvidence, bool) {
 	for _, item := range items {
 		name := strings.TrimSpace(item.Name)
-		if isActionableTrafficSource(name) {
-			return name
+		if isActionableTrafficSource(name) && item.Value > 0 {
+			return trafficSourceEvidence{Name: name, Hits: item.Value}, true
 		}
 	}
-	return ""
+	return trafficSourceEvidence{}, false
 }
 
 func isActionableTrafficSource(name string) bool {
@@ -281,7 +275,7 @@ func searchVisibilityOpportunity(
 	input DetectorInput,
 	overview *api.SearchConsoleOverview,
 	score opportunityScoreBreakdown,
-	clickUpside int,
+	estimatedClicks int,
 	generatedAt time.Time,
 ) database.OpportunityInput {
 	ctr := formatRatePercent(overview.CTR)
@@ -292,10 +286,9 @@ func searchVisibilityOpportunity(
 			"clicks":           overview.Clicks,
 			"ctr":              ctr,
 			"average_position": position,
-			"estimated_clicks": clickUpside,
+			"estimated_clicks": estimatedClicks,
 		},
-		ImpactValue:    fmt.Sprintf("+%d", clickUpside),
-		MonthlyUpside:  float64(clickUpside),
+		ImpactValue:    fmt.Sprintf("+%d", estimatedClicks),
 		Confidence:     score.Confidence,
 		Score:          score.Total,
 		ScoreBreakdown: opportunityScoreAPI(score),
@@ -319,11 +312,10 @@ func conversionSignalOpportunity(definition OpportunityDefinition, input Detecto
 			"event_count": len(eventNames),
 			"event_names": eventNamesValue,
 		},
-		ImpactValue:   fmt.Sprintf("%d", stats.TotalPageviews),
-		MonthlyUpside: float64(stats.TotalPageviews) * 0.4,
-		Confidence:    confidence(stats.UniqueSessions >= 500),
-		Score:         score,
-		RouteParams:   map[string]any{},
+		ImpactValue: fmt.Sprintf("%d", stats.TotalPageviews),
+		Confidence:  confidence(stats.UniqueSessions >= 500),
+		Score:       score,
+		RouteParams: map[string]any{},
 		Evidence: []api.OpportunityEvidence{
 			{ID: "pageviews", LabelKey: "opportunities.evidence.pageviews", Value: fmt.Sprintf("%d", stats.TotalPageviews)},
 			{ID: "sessions", LabelKey: "opportunities.evidence.sessions", Value: fmt.Sprintf("%d", stats.UniqueSessions)},
@@ -463,7 +455,6 @@ func setupGoalSuggestionOpportunity(definition OpportunityDefinition, input Dete
 			"goal_value":  candidate.EventName,
 		},
 		ImpactValue:    eventCount,
-		MonthlyUpside:  0,
 		Confidence:     score.Confidence,
 		Score:          score.Total,
 		ScoreBreakdown: opportunityScoreAPI(score),
@@ -493,7 +484,6 @@ func setupFunnelSuggestionOpportunity(definition OpportunityDefinition, input De
 			"funnel_steps":     funnelSteps,
 		},
 		ImpactValue:    strconv.Itoa(stepCount),
-		MonthlyUpside:  0,
 		Confidence:     score.Confidence,
 		Score:          score.Total,
 		ScoreBreakdown: opportunityScoreAPI(score),
@@ -514,22 +504,6 @@ func setupFunnelSuggestionOpportunity(definition OpportunityDefinition, input De
 	identity := normalizeOpportunityToken(candidate.StartPath) + ":" + normalizeOpportunityToken(candidate.ConversionEvent)
 	opportunity.ID = stableOpportunityID(input.SiteID, definition.Key+":"+identity)
 	return opportunity
-}
-
-func trackingSetupOpportunity(definition OpportunityDefinition, input DetectorInput, generatedAt time.Time) database.OpportunityInput {
-	return definition.BuildOpportunity(withGeneratedAt(input, generatedAt), OpportunityRecipe{
-		CopyParams:    map[string]any{"pageviews": 0, "events": 0},
-		ImpactValue:   "0",
-		MonthlyUpside: 0,
-		Confidence:    "medium",
-		Score:         45,
-		RouteParams:   map[string]any{"asset": "hk.js"},
-		Evidence: []api.OpportunityEvidence{
-			{ID: "pageviews", LabelKey: "opportunities.evidence.pageviews", Value: "0"},
-			{ID: "events", LabelKey: "opportunities.evidence.tracked_events", Value: "0"},
-		},
-		CitedEvidenceIDs: []string{"pageviews", "events"},
-	})
 }
 
 func normalizeOpportunityToken(value string) string {

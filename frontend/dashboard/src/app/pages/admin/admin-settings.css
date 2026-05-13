@@ -19,92 +19,6 @@
     width: 100%;
 }
 
-.admin-status-summary {
-    display: grid;
-    grid-template-columns: minmax(0, 1.15fr) repeat(3, minmax(0, 0.95fr));
-    margin-bottom: 1rem;
-    border: 1px solid var(--admin-border);
-    border-radius: 8px;
-    background: var(--admin-bg);
-    overflow: hidden;
-}
-
-.admin-status-summary__item {
-    display: flex;
-    gap: 0.65rem;
-    align-items: center;
-    justify-content: space-between;
-    min-width: 0;
-    padding: 0.75rem 1rem;
-    border-right: 1px solid var(--admin-divider);
-}
-
-.admin-status-summary__item:last-child {
-    border-right: 0;
-}
-
-.admin-status-summary__label {
-    min-width: 0;
-    color: var(--p-text-muted-color);
-    font-size: 0.78rem;
-    font-weight: 700;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-transform: uppercase;
-    white-space: nowrap;
-}
-
-.admin-status-summary__value {
-    min-width: 0;
-    color: var(--p-text-color);
-    font-size: 1rem;
-    font-weight: 750;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.admin-settings-summary {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    margin-bottom: 1rem;
-    border: 1px solid var(--admin-border);
-    border-radius: 8px;
-    background: var(--admin-bg);
-    overflow: hidden;
-}
-
-.admin-settings-summary__item {
-    display: flex;
-    gap: 0.55rem;
-    align-items: baseline;
-    min-width: 0;
-    padding: 0.75rem 1rem;
-    border-right: 1px solid var(--admin-divider);
-}
-
-.admin-settings-summary__item:last-child {
-    border-right: 0;
-}
-
-.admin-settings-summary__value {
-    color: var(--p-text-color);
-    font-size: 1.15rem;
-    line-height: 1;
-    font-weight: 750;
-}
-
-.admin-settings-summary__label {
-    min-width: 0;
-    color: var(--p-text-muted-color);
-    font-size: 0.8rem;
-    font-weight: 700;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-transform: uppercase;
-    white-space: nowrap;
-}
-
 .admin-metric span,
 .admin-definition-list dt {
     color: var(--p-text-muted-color);
@@ -444,31 +358,6 @@
 }
 
 @media (max-width: 760px) {
-    .admin-status-summary {
-        grid-template-columns: 1fr;
-    }
-
-    .admin-status-summary__item {
-        border-right: 0;
-        border-bottom: 1px solid var(--admin-divider);
-    }
-
-    .admin-status-summary__item:last-child {
-        border-bottom: 0;
-    }
-
-    .admin-settings-summary {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .admin-settings-summary__item:nth-child(2n) {
-        border-right: 0;
-    }
-
-    .admin-settings-summary__item:nth-child(-n + 2) {
-        border-bottom: 1px solid var(--admin-divider);
-    }
-
     .admin-health-grid,
     .admin-metric-grid {
         grid-template-columns: 1fr;

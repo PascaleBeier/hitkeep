@@ -153,7 +153,6 @@ type mcpOpportunity struct {
 	CopyParams       map[string]any                `json:"copy_params"`
 	ImpactValue      string                        `json:"impact_value"`
 	ImpactLabelKey   string                        `json:"impact_label_key"`
-	MonthlyUpside    float64                       `json:"monthly_upside"`
 	Confidence       string                        `json:"confidence"`
 	Score            int                           `json:"score"`
 	ScoreBreakdown   api.OpportunityScoreBreakdown `json:"score_breakdown"`

@@ -461,6 +461,39 @@ func TestMCPOpportunitiesReturnsSafeFinalData(t *testing.T) {
 	requireMCPOpportunityOutput(t, raw, site.ID)
 }
 
+func TestMCPOpportunitiesReturnsEmptyArrayWhenNoRowsExist(t *testing.T) {
+	store, site, token := setupMCPStore(t)
+	conf := testMCPConfig(t, "")
+	handler := NewHandler(conf, store, nil, nil, nil)
+	ts := httptest.NewServer(handler)
+	defer ts.Close()
+
+	session := connectMCPClient(t, ts.URL+conf.MCPPath, token)
+	defer session.Close()
+
+	res, err := session.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "hitkeep_get_opportunities",
+		Arguments: map[string]any{
+			"site_id": site.ID.String(),
+			"status":  "all",
+			"limit":   10,
+		},
+	})
+	requireSuccessfulMCPTool(t, res, err)
+	raw := marshalMCPStructuredContent(t, res)
+	var output map[string]any
+	if err := json.Unmarshal([]byte(raw), &output); err != nil {
+		t.Fatalf("unmarshal opportunities output: %v", err)
+	}
+	opportunities, ok := output["opportunities"].([]any)
+	if !ok {
+		t.Fatalf("expected opportunities to be an array, got %#v in %s", output["opportunities"], raw)
+	}
+	if len(opportunities) != 0 {
+		t.Fatalf("expected no opportunities, got %#v", opportunities)
+	}
+}
+
 func TestMCPOpportunitiesExposeOnlyCitedEvidence(t *testing.T) {
 	store, site, token := setupMCPStore(t)
 	ctx := context.Background()
@@ -626,10 +659,9 @@ func mcpOpportunityInput(teamID, siteID, runID uuid.UUID) database.OpportunityIn
 		SummaryKey:      "opportunities.catalog.checkout_conversion.summary",
 		ActionKey:       "opportunities.catalog.checkout_conversion.action",
 		DigestKey:       "opportunities.catalog.checkout_conversion.digest",
-		CopyParams:      map[string]any{"conversion_rate": 1.8, "currency": "EUR"},
+		CopyParams:      map[string]any{"conversion_rate": 1.8, "checkout_starts": 80},
 		ImpactValue:     "+12%",
-		ImpactLabelKey:  "opportunities.impact.revenue",
-		MonthlyUpside:   4200,
+		ImpactLabelKey:  "opportunities.impact.traffic",
 		Confidence:      "high",
 		Score:           92,
 		ScoreBreakdown:  api.OpportunityScoreBreakdown{Sample: 90, Impact: 88, Urgency: 70, EvidenceFit: 99, Total: 92},

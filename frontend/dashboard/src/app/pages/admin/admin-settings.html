@@ -4,22 +4,22 @@
 <app-admin-page-frame [breadcrumbItems]="breadcrumbItems()">
     <div class="admin-status">
         @if (isSettingsPage()) {
-        <div class="admin-settings-summary">
-            <div class="admin-settings-summary__item">
-                <span class="admin-settings-summary__value">{{ users().length | number }}</span>
-                <span class="admin-settings-summary__label">{{ "admin.tabs.users" | transloco }}</span>
+        <div class="mb-4 grid overflow-hidden rounded-lg border border-surface-100 bg-[var(--p-content-background)] dark:border-surface-800 md:grid-cols-4">
+            <div class="flex min-w-0 items-baseline gap-2 border-b border-surface-100 px-4 py-3 dark:border-surface-800 md:border-r md:border-b-0">
+                <span class="text-lg leading-none font-bold text-[var(--p-text-color)]">{{ users().length | number }}</span>
+                <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.tabs.users" | transloco }}</span>
             </div>
-            <div class="admin-settings-summary__item">
-                <span class="admin-settings-summary__value">{{ instanceAdmins() | number }}</span>
-                <span class="admin-settings-summary__label">{{ "admin.roles.instanceAdmin" | transloco }}</span>
+            <div class="flex min-w-0 items-baseline gap-2 border-b border-surface-100 px-4 py-3 dark:border-surface-800 md:border-r md:border-b-0">
+                <span class="text-lg leading-none font-bold text-[var(--p-text-color)]">{{ instanceAdmins() | number }}</span>
+                <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.roles.instanceAdmin" | transloco }}</span>
             </div>
-            <div class="admin-settings-summary__item">
-                <span class="admin-settings-summary__value">{{ totalSites() | number }}</span>
-                <span class="admin-settings-summary__label">{{ "admin.tabs.sites" | transloco }}</span>
+            <div class="flex min-w-0 items-baseline gap-2 border-b border-surface-100 px-4 py-3 dark:border-surface-800 md:border-r md:border-b-0">
+                <span class="text-lg leading-none font-bold text-[var(--p-text-color)]">{{ totalSites() | number }}</span>
+                <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.tabs.sites" | transloco }}</span>
             </div>
-            <div class="admin-settings-summary__item">
-                <span class="admin-settings-summary__value">{{ activeTeams() | number }}</span>
-                <span class="admin-settings-summary__label">{{ "admin.tabs.teams" | transloco }}</span>
+            <div class="flex min-w-0 items-baseline gap-2 px-4 py-3">
+                <span class="text-lg leading-none font-bold text-[var(--p-text-color)]">{{ activeTeams() | number }}</span>
+                <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.tabs.teams" | transloco }}</span>
             </div>
         </div>
 
@@ -283,22 +283,22 @@
             </p-tabpanels>
         </p-tabs>
         } @else {
-        <div class="admin-status-summary">
-            <div class="admin-status-summary__item">
-                <span class="admin-status-summary__label">{{ "admin.system.health.title" | transloco }}</span>
+        <div class="mb-4 grid overflow-hidden rounded-lg border border-surface-100 bg-[var(--p-content-background)] dark:border-surface-800 lg:grid-cols-[minmax(0,1.15fr)_repeat(3,minmax(0,0.95fr))]">
+            <div class="flex min-w-0 items-center justify-between gap-3 border-b border-surface-100 px-4 py-3 dark:border-surface-800 lg:border-r lg:border-b-0">
+                <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.system.health.title" | transloco }}</span>
                 <p-tag [value]="runtimeStatusKey() | transloco" [severity]="runtimeStatusSeverity()" />
             </div>
-            <div class="admin-status-summary__item">
-                <span class="admin-status-summary__label">{{ "admin.system.overview.version" | transloco }}</span>
-                <span class="admin-status-summary__value">{{ systemInfo()?.version || "-" }}</span>
+            <div class="flex min-w-0 items-center justify-between gap-3 border-b border-surface-100 px-4 py-3 dark:border-surface-800 lg:border-r lg:border-b-0">
+                <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.system.overview.version" | transloco }}</span>
+                <span class="truncate font-bold text-[var(--p-text-color)]">{{ systemInfo()?.version || "-" }}</span>
             </div>
-            <div class="admin-status-summary__item">
-                <span class="admin-status-summary__label">{{ "admin.system.ingest.hits" | transloco }}</span>
-                <span class="admin-status-summary__value">{{ recentHits() | number }}</span>
+            <div class="flex min-w-0 items-center justify-between gap-3 border-b border-surface-100 px-4 py-3 dark:border-surface-800 lg:border-r lg:border-b-0">
+                <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.system.ingest.hits" | transloco }}</span>
+                <span class="truncate font-bold text-[var(--p-text-color)]">{{ recentHits() | number }}</span>
             </div>
-            <div class="admin-status-summary__item">
-                <span class="admin-status-summary__label">{{ "admin.system.storage.diskUsage" | transloco }}</span>
-                <span class="admin-status-summary__value">{{ diskUsedPercent() }}%</span>
+            <div class="flex min-w-0 items-center justify-between gap-3 px-4 py-3">
+                <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.system.storage.diskUsage" | transloco }}</span>
+                <span class="truncate font-bold text-[var(--p-text-color)]">{{ diskUsedPercent() }}%</span>
             </div>
         </div>
 
@@ -418,6 +418,94 @@
                                 </div>
                             </div>
                             } @else if (isLoadingSearchConsole()) {
+                            <div class="admin-loading"><i class="pi pi-spin pi-spinner" aria-hidden="true"></i>{{ "common.loading" | transloco }}</div>
+                            } @else {
+                            <p-message severity="error" [text]="'admin.system.console.loadFailed' | transloco" styleClass="w-full" />
+                            }
+                        </app-system-status-card>
+
+                        <app-system-status-card
+                            titleId="runtime-ai-title"
+                            [title]="'admin.system.ai.title' | transloco"
+                            [loading]="isLoadingAIStatus()"
+                            [refreshLabel]="'admin.system.console.refreshCard' | transloco"
+                            [metricLabel]="'admin.system.ai.tokens' | transloco"
+                            [metricValue]="aiTokenUsageMetric()"
+                            (refreshClicked)="loadSystemAIStatus()"
+                        >
+                            @if (systemAIStatus(); as ai) {
+                            <p-tag system-status-card-status [value]="'admin.system.ai.status.' + ai.status | transloco" [severity]="statusSeverity(ai.status)" />
+                            } @if (systemAIStatus(); as ai) {
+                            <div
+                                class="grid min-w-0 items-center gap-3 rounded-lg border border-surface-100 bg-surface-50 p-3 dark:border-surface-800 dark:bg-surface-800 md:grid-cols-[minmax(0,1fr)_auto]"
+                                [class.border-red-300]="ai.budget_exhausted || ai.status === 'needs_attention'"
+                                [class.dark:border-red-700]="ai.budget_exhausted || ai.status === 'needs_attention'"
+                            >
+                                <div class="grid min-w-0 gap-1">
+                                    <span class="text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.system.ai.configuration" | transloco }}</span>
+                                    <strong class="truncate text-base font-bold text-[var(--p-text-color)]">{{ aiProviderModelLabel() }}</strong>
+                                    <small class="text-sm font-semibold text-[var(--p-text-muted-color)]">{{ "admin.system.ai.summary." + aiSummaryKey() | transloco }}</small>
+                                </div>
+                                <div class="flex flex-wrap justify-start gap-2 md:justify-end" [attr.aria-label]="'admin.system.ai.readiness' | transloco">
+                                    <p-tag [value]="ai.enabled ? ('admin.system.ai.enabled' | transloco) : ('admin.system.ai.disabled' | transloco)" [severity]="ai.enabled ? 'success' : 'secondary'" />
+                                    <p-tag [value]="ai.configured ? ('admin.system.ai.configured' | transloco) : ('admin.system.ai.notConfigured' | transloco)" [severity]="ai.configured ? 'success' : 'warn'" />
+                                </div>
+                            </div>
+
+                            <div class="mt-3 grid gap-3 md:grid-cols-2">
+                                <div class="grid min-w-0 gap-2 rounded-lg border border-surface-100 p-3 dark:border-surface-800">
+                                    <div class="flex min-w-0 items-baseline justify-between gap-3">
+                                        <span class="text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.system.ai.requests" | transloco }}</span>
+                                        <strong class="truncate text-base font-bold text-[var(--p-text-color)]">{{ aiRequestUsageMetric() }}</strong>
+                                    </div>
+                                    <div class="h-2 overflow-hidden rounded-full bg-surface-100 dark:bg-surface-700" aria-hidden="true">
+                                        <span class="block h-full rounded-full bg-primary" [style.width.%]="aiRequestBudgetPercent()"></span>
+                                    </div>
+                                    <small class="truncate text-xs font-semibold text-[var(--p-text-muted-color)]">{{ "admin.system.ai.budgetWindow" | transloco }}: {{ formatMinutes(ai.budget_window_minutes) }}</small>
+                                </div>
+                                <div class="grid min-w-0 gap-2 rounded-lg border border-surface-100 p-3 dark:border-surface-800">
+                                    <div class="flex min-w-0 items-baseline justify-between gap-3">
+                                        <span class="text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.system.ai.tokens" | transloco }}</span>
+                                        <strong class="truncate text-base font-bold text-[var(--p-text-color)]">{{ aiTokenUsageMetric() }}</strong>
+                                    </div>
+                                    <div class="h-2 overflow-hidden rounded-full bg-surface-100 dark:bg-surface-700" aria-hidden="true">
+                                        <span class="block h-full rounded-full bg-primary" [style.width.%]="aiTokenBudgetPercent()"></span>
+                                    </div>
+                                    <small class="truncate text-xs font-semibold text-[var(--p-text-muted-color)]">{{ "admin.system.ai.budgetWindow" | transloco }}: {{ formatMinutes(ai.budget_window_minutes) }}</small>
+                                </div>
+                            </div>
+
+                            <dl class="admin-definition-list admin-definition-list--compact mt-4">
+                                <div>
+                                    <dt>{{ "admin.system.ai.configMode" | transloco }}</dt>
+                                    <dd>{{ "admin.system.ai.configModes." + ai.config_mode | transloco }}</dd>
+                                </div>
+                                <div>
+                                    <dt>{{ "admin.system.ai.provider" | transloco }}</dt>
+                                    <dd>{{ ai.provider || "-" }}</dd>
+                                </div>
+                                <div>
+                                    <dt>{{ "admin.system.ai.model" | transloco }}</dt>
+                                    <dd>{{ ai.model || "-" }}</dd>
+                                </div>
+                                @if (ai.last_attempt_at) {
+                                <div>
+                                    <dt>{{ "admin.system.ai.lastAttempt" | transloco }}</dt>
+                                    <dd><app-relative-date-time [value]="ai.last_attempt_at" /></dd>
+                                </div>
+                                } @if (ai.last_success_at) {
+                                <div>
+                                    <dt>{{ "admin.system.ai.lastSuccess" | transloco }}</dt>
+                                    <dd><app-relative-date-time [value]="ai.last_success_at" /></dd>
+                                </div>
+                                } @if (ai.last_error_category) {
+                                <div>
+                                    <dt>{{ "admin.system.ai.lastError" | transloco }}</dt>
+                                    <dd>{{ ai.last_error_category }}</dd>
+                                </div>
+                                }
+                            </dl>
+                            } @else if (isLoadingAIStatus()) {
                             <div class="admin-loading"><i class="pi pi-spin pi-spinner" aria-hidden="true"></i>{{ "common.loading" | transloco }}</div>
                             } @else {
                             <p-message severity="error" [text]="'admin.system.console.loadFailed' | transloco" styleClass="w-full" />

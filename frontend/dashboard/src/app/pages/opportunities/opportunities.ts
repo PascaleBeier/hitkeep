@@ -13,24 +13,12 @@ import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar } from '@components/ra
 import { KpiCard } from '@features/analytics/components/kpi-card';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { AdminSystemService, SystemAIStatus } from '@services/admin-system.service';
-import { Opportunity, OpportunityDigestPreviewItem, OpportunityDigestPreviewResponse, OpportunityStatus, OpportunitiesService } from '@services/opportunities.service';
+import { Opportunity, OpportunityStatus, OpportunitiesService } from '@services/opportunities.service';
 import { PermissionService } from '@services/permission.service';
-import { ShareService } from '@services/share.service';
 import { OpportunityCard } from './opportunity-card';
 import { OpportunityDetailDrawer } from './opportunity-detail-drawer';
 import { OpportunityFilterRail } from './opportunity-filter-rail';
 import { OpportunityEvidenceView, OpportunityFilter, OpportunityFilterItem, OpportunityView, StatusFilter, TagSeverity } from './opportunity-view';
-
-interface DigestPreviewItemView {
-    id: string;
-    digest: string;
-    action: string;
-    impactValue: string;
-    impactLabel: string;
-    confidenceLabel: string;
-    score: number;
-    evidence: OpportunityEvidenceView[];
-}
 
 @Component({
     selector: 'app-opportunities',
@@ -44,7 +32,6 @@ export class OpportunitiesPage {
     private readonly opportunitiesService = inject(OpportunitiesService);
     private readonly adminSystemService = inject(AdminSystemService);
     private readonly permissionService = inject(PermissionService);
-    private readonly shareService = inject(ShareService);
     private readonly transloco = inject(TranslocoService);
     private readonly destroyRef = inject(DestroyRef);
     private readonly activeLanguage = injectActiveLang();
@@ -67,11 +54,8 @@ export class OpportunitiesPage {
     protected readonly errorState = signal<'idle' | 'load' | 'generate' | 'status'>('idle');
     protected readonly aiStatus = signal<SystemAIStatus | null>(null);
     protected readonly pendingStatusId = signal<string | null>(null);
-    protected readonly digestPreview = signal<OpportunityDigestPreviewResponse | null>(null);
-    protected readonly isDigestPreviewLoading = signal(false);
-    protected readonly digestPreviewError = signal(false);
 
-    protected readonly typeFilters = ['all', 'conversion', 'revenue', 'ai', 'search', 'setup'] as const;
+    protected readonly typeFilters = ['all', 'conversion', 'traffic', 'ai', 'search', 'setup'] as const;
     protected readonly statusFilters = ['all', 'new', 'saved', 'done'] as const;
     protected readonly opportunities = signal<Opportunity[]>([]);
 
@@ -171,26 +155,12 @@ export class OpportunitiesPage {
         return opportunity ? this.toOpportunityView(opportunity) : null;
     });
 
-    protected readonly digestPreviewItems = computed(() => {
-        this.activeLanguage();
-        return this.digestPreview()?.items.map((item) => this.toDigestPreviewItemView(item)) ?? [];
-    });
-
-    protected readonly digestPreviewFrequencyLabel = computed(() => {
-        this.activeLanguage();
-        const frequency = this.digestPreview()?.frequency ?? 'weekly';
-        return this.transloco.translate(`opportunities.digest.frequency.${frequency}`);
-    });
-
-    protected readonly canShowDigestPreview = computed(() => !this.shareService.isShareMode());
-
     protected readonly kpiCards = computed(() => {
         this.activeLanguage();
         const open = this.opportunities().filter((opportunity) => opportunity.status !== 'dismissed' && opportunity.status !== 'done');
         const highConfidence = open.filter((opportunity) => opportunity.confidence === 'high').length;
         const aiWins = open.filter((opportunity) => opportunity.kind === 'ai' || opportunity.kind === 'search').length;
-        const upside = open.reduce((sum, opportunity) => sum + opportunity.monthly_upside, 0);
-        const currency = this.currencyForOpportunities(open);
+        const averageScore = open.length ? Math.round(open.reduce((sum, opportunity) => sum + opportunity.score, 0) / open.length) : 0;
 
         return [
             {
@@ -200,8 +170,8 @@ export class OpportunitiesPage {
                 valueClass: 'text-2xl xl:text-3xl font-bold'
             },
             {
-                label: this.transloco.translate('opportunities.kpis.upside'),
-                value: this.formatCurrency(upside, currency),
+                label: this.transloco.translate('opportunities.kpis.score'),
+                value: averageScore,
                 loading: this.isLoading(),
                 valueClass: 'text-2xl xl:text-3xl font-bold'
             },
@@ -280,13 +250,9 @@ export class OpportunitiesPage {
             const site = this.siteService.activeSite();
             if (!site) {
                 this.opportunities.set([]);
-                this.digestPreview.set(null);
-                this.digestPreviewError.set(false);
-                this.isDigestPreviewLoading.set(false);
                 return;
             }
             this.loadOpportunities(site.id);
-            this.loadDigestPreview(site.id);
         });
 
         effect(() => {
@@ -328,7 +294,6 @@ export class OpportunitiesPage {
                 next: (response) => {
                     this.opportunities.set(response.opportunities);
                     this.selectedOpportunityId.set(response.opportunities[0]?.id ?? null);
-                    this.loadDigestPreview(site.id);
                 },
                 error: () => this.errorState.set('generate')
             });
@@ -379,7 +344,7 @@ export class OpportunitiesPage {
         switch (opportunity.kind) {
             case 'conversion':
                 return 'pi pi-filter';
-            case 'revenue':
+            case 'traffic':
                 return 'pi pi-chart-line';
             case 'ai':
                 return 'pi pi-sparkles';
@@ -421,36 +386,6 @@ export class OpportunitiesPage {
     private evidenceDetailFor(evidence: Opportunity['evidence'][number]): string | null {
         if (!evidence.detail_key) return null;
         return this.transloco.translate(evidence.detail_key, evidence.detail_params ?? {});
-    }
-
-    private digestFor(item: OpportunityDigestPreviewItem): string {
-        return this.transloco.translate(item.digest_key, item.copy_params);
-    }
-
-    private digestActionFor(item: OpportunityDigestPreviewItem): string {
-        return this.transloco.translate(item.action_key, item.copy_params);
-    }
-
-    private digestImpactLabelFor(item: OpportunityDigestPreviewItem): string {
-        return this.transloco.translate(item.impact_label_key, item.copy_params);
-    }
-
-    private formatCurrency(value: number, currency = 'USD'): string {
-        return new Intl.NumberFormat(this.activeLanguage(), {
-            style: 'currency',
-            currency,
-            maximumFractionDigits: 0
-        }).format(value);
-    }
-
-    private currencyForOpportunities(opportunities: Opportunity[]): string {
-        for (const opportunity of opportunities) {
-            const currency = opportunity.copy_params?.['currency'];
-            if (typeof currency === 'string' && /^[A-Za-z]{3}$/.test(currency.trim())) {
-                return currency.trim().toUpperCase();
-            }
-        }
-        return 'USD';
     }
 
     private filterLabel(filter: OpportunityFilter): string {
@@ -504,29 +439,6 @@ export class OpportunitiesPage {
         };
     }
 
-    private toDigestPreviewItemView(item: OpportunityDigestPreviewItem): DigestPreviewItemView {
-        const citedEvidenceIds = new Set(item.cited_evidence_ids);
-        return {
-            id: item.id,
-            digest: this.digestFor(item),
-            action: this.digestActionFor(item),
-            impactValue: item.impact_value,
-            impactLabel: this.digestImpactLabelFor(item),
-            confidenceLabel: this.transloco.translate(`opportunities.confidence.${item.confidence}`),
-            score: item.score,
-            evidence: item.evidence
-                .filter((evidence) => citedEvidenceIds.has(evidence.id))
-                .map(
-                    (evidence): OpportunityEvidenceView => ({
-                        id: evidence.id,
-                        label: this.evidenceLabelFor(evidence),
-                        value: evidence.value,
-                        detail: this.evidenceDetailFor(evidence)
-                    })
-                )
-        };
-    }
-
     private loadOpportunities(siteId: string) {
         this.isLoading.set(true);
         this.errorState.set('idle');
@@ -542,31 +454,6 @@ export class OpportunitiesPage {
                     this.selectedOpportunityId.set(response.opportunities[0]?.id ?? null);
                 },
                 error: () => this.errorState.set('load')
-            });
-    }
-
-    private loadDigestPreview(siteId: string) {
-        if (this.shareService.isShareMode()) {
-            this.digestPreview.set(null);
-            this.digestPreviewError.set(false);
-            this.isDigestPreviewLoading.set(false);
-            return;
-        }
-
-        this.isDigestPreviewLoading.set(true);
-        this.digestPreviewError.set(false);
-        this.opportunitiesService
-            .previewDigest(siteId, 'weekly')
-            .pipe(
-                takeUntilDestroyed(this.destroyRef),
-                finalize(() => this.isDigestPreviewLoading.set(false))
-            )
-            .subscribe({
-                next: (preview) => this.digestPreview.set(preview),
-                error: () => {
-                    this.digestPreview.set(null);
-                    this.digestPreviewError.set(true);
-                }
             });
     }
 

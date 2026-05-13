@@ -15,7 +15,7 @@ func TestSelectDigestPreviewRanksTopActiveOpportunities(t *testing.T) {
 	siteID := uuid.New()
 	opportunities := []api.Opportunity{
 		digestFixtureOpportunity(siteID, "done-high", DetectorCategoryConversion, "opportunities.types.checkout_conversion", "done", 99, time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)),
-		digestFixtureOpportunity(siteID, "dismissed-high", DetectorCategoryRevenue, "opportunities.types.traffic_quality", "dismissed", 98, time.Date(2026, 5, 1, 11, 0, 0, 0, time.UTC)),
+		digestFixtureOpportunity(siteID, "dismissed-high", DetectorCategoryTraffic, "opportunities.types.traffic_quality", "dismissed", 98, time.Date(2026, 5, 1, 11, 0, 0, 0, time.UTC)),
 		digestFixtureOpportunity(siteID, "third", DetectorCategoryTrafficQuality, "opportunities.types.traffic_quality", "saved", 81, time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)),
 		digestFixtureOpportunity(siteID, "first", DetectorCategoryConversion, "opportunities.types.checkout_conversion", "new", 94, time.Date(2026, 5, 1, 13, 0, 0, 0, time.UTC)),
 		digestFixtureOpportunity(siteID, "fourth", DetectorCategoryAIVisibility, "opportunities.types.ai_visibility", "new", 65, time.Date(2026, 5, 1, 14, 0, 0, 0, time.UTC)),
@@ -52,7 +52,7 @@ func TestSelectDigestPreviewIncludesAtMostOneSetupWarningWhenMixed(t *testing.T)
 	opportunities := []api.Opportunity{
 		digestFixtureOpportunity(siteID, "setup-one", DetectorCategorySetupQuality, "opportunities.types.setup_goal_suggestion", "new", 96, time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)),
 		digestFixtureOpportunity(siteID, "setup-two", DetectorCategorySetupQuality, "opportunities.types.setup_funnel_suggestion", "new", 95, time.Date(2026, 5, 1, 11, 0, 0, 0, time.UTC)),
-		digestFixtureOpportunity(siteID, "revenue-one", DetectorCategoryConversion, "opportunities.types.checkout_conversion", "new", 84, time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)),
+		digestFixtureOpportunity(siteID, "traffic-one", DetectorCategoryConversion, "opportunities.types.checkout_conversion", "new", 84, time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)),
 		digestFixtureOpportunity(siteID, "traffic-one", DetectorCategoryTrafficQuality, "opportunities.types.traffic_quality", "new", 82, time.Date(2026, 5, 1, 13, 0, 0, 0, time.UTC)),
 	}
 
@@ -62,7 +62,7 @@ func TestSelectDigestPreviewIncludesAtMostOneSetupWarningWhenMixed(t *testing.T)
 	})
 
 	got := digestItemNames(preview.Items)
-	want := []string{"setup-one", "revenue-one", "traffic-one"}
+	want := []string{"setup-one", "traffic-one", "traffic-one"}
 	if len(got) != len(want) {
 		t.Fatalf("expected mixed digest items %#v, got %#v", want, got)
 	}
@@ -111,7 +111,7 @@ func TestSelectDigestPreviewReturnsNoSendForEmptyLowQualityOrUnsupportedFrequenc
 	lowQuality := SelectDigestPreview(DigestSelectionInput{
 		Frequency: api.ReportFrequencyWeekly,
 		Opportunities: []api.Opportunity{
-			digestFixtureOpportunity(siteID, "too-weak", DetectorCategoryRevenue, "opportunities.types.traffic_quality", "new", 39, time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)),
+			digestFixtureOpportunity(siteID, "too-weak", DetectorCategoryTraffic, "opportunities.types.traffic_quality", "new", 39, time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)),
 		},
 	})
 	if lowQuality.ShouldSend || lowQuality.Reason != DigestPreviewReasonNoOpportunities {
@@ -120,7 +120,7 @@ func TestSelectDigestPreviewReturnsNoSendForEmptyLowQualityOrUnsupportedFrequenc
 
 	unsupported := SelectDigestPreview(DigestSelectionInput{
 		Frequency:     api.ReportFrequencyMonthly,
-		Opportunities: []api.Opportunity{digestFixtureOpportunity(siteID, "strong", DetectorCategoryRevenue, "opportunities.types.traffic_quality", "new", 90, time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC))},
+		Opportunities: []api.Opportunity{digestFixtureOpportunity(siteID, "strong", DetectorCategoryTraffic, "opportunities.types.traffic_quality", "new", 90, time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC))},
 	})
 	if unsupported.ShouldSend || unsupported.Reason != DigestPreviewReasonUnsupportedFrequency {
 		t.Fatalf("expected unsupported monthly preview, got %#v", unsupported)
@@ -131,7 +131,7 @@ func TestSelectDigestPreviewForSiteLoadsSavedOpportunities(t *testing.T) {
 	siteID := uuid.New()
 	lister := &fakeOpportunityLister{
 		opportunities: []api.Opportunity{
-			digestFixtureOpportunity(siteID, "saved", DetectorCategoryRevenue, "opportunities.types.traffic_quality", "new", 90, time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)),
+			digestFixtureOpportunity(siteID, "saved", DetectorCategoryTraffic, "opportunities.types.traffic_quality", "new", 90, time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)),
 		},
 	}
 

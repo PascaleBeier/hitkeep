@@ -38,16 +38,6 @@ func topMetricName(items []api.MetricStat, fallback string) string {
 	return fallback
 }
 
-func formatMoney(value float64, currency string) string {
-	if currency == "" {
-		currency = "USD"
-	}
-	if value >= 1000 {
-		return fmt.Sprintf("%s %.1fk", currency, value/1000)
-	}
-	return fmt.Sprintf("%s %.0f", currency, value)
-}
-
 func formatRatePercent(value float64) string {
 	return fmt.Sprintf("%.1f%%", value*100)
 }

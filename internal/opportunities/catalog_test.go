@@ -14,16 +14,22 @@ import (
 	"hitkeep/internal/database"
 )
 
-func TestDefaultDetectorCatalogGeneratesSetupOpportunityFromNoSignal(t *testing.T) {
+func TestDefaultDetectorCatalogSuppressesTrackingSetupOpportunityWithoutEvidence(t *testing.T) {
 	siteID := uuid.New()
 	teamID := uuid.New()
 	generatedAt := time.Date(2026, 5, 9, 12, 0, 0, 0, time.UTC)
 
-	assertCatalogFixture(t, DetectorInput{
+	opportunities, err := NewDefaultDetectorCatalog().Detect(DetectorInput{
 		TeamID:      teamID,
 		SiteID:      siteID,
 		GeneratedAt: generatedAt,
-	}, "setup", "opportunities.types.tracking_setup", "events", "pageviews", DetectorCategorySetupQuality)
+	})
+	if err != nil {
+		t.Fatalf("detect: %v", err)
+	}
+	if findOpportunityByType(opportunities, "opportunities.types.tracking_setup") != nil {
+		t.Fatalf("expected no-evidence tracking setup suggestion to be suppressed, got %#v", opportunities)
+	}
 }
 
 func TestDefaultDetectorCatalogGeneratesCheckoutOpportunityFromDropoff(t *testing.T) {
@@ -96,7 +102,61 @@ func TestDefaultDetectorCatalogGeneratesTrafficOpportunityFromSource(t *testing.
 			UniqueSessions: 310,
 			TopUTMSources:  []api.MetricStat{{Name: "paid-search", Value: 188}},
 		},
-	}, "revenue", "opportunities.types.traffic_quality", "source", "top_source", DetectorCategoryTrafficQuality)
+	}, "traffic", "opportunities.types.traffic_quality", "source", "top_source", DetectorCategoryTrafficQuality)
+}
+
+func TestDefaultDetectorCatalogUsesSourceSpecificTrafficEvidence(t *testing.T) {
+	opportunities, err := NewDefaultDetectorCatalog().Detect(DetectorInput{
+		TeamID:      uuid.New(),
+		SiteID:      uuid.New(),
+		GeneratedAt: time.Date(2026, 5, 9, 12, 0, 0, 0, time.UTC),
+		Stats: &api.SiteStats{
+			TotalPageviews: 2000,
+			UniqueSessions: 900,
+			TopUTMSources:  []api.MetricStat{{Name: "openalternative", Value: 240}},
+			TopReferrers:   []api.MetricStat{{Name: "example.com", Value: 800}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("detect: %v", err)
+	}
+	opportunity := findOpportunityByType(opportunities, "opportunities.types.traffic_quality")
+	if opportunity == nil {
+		t.Fatalf("expected traffic opportunity, got %#v", opportunities)
+	}
+	if opportunity.CopyParams["source"] != "openalternative" || opportunity.CopyParams["source_hits"] != 240 || opportunity.CopyParams["total_pageviews"] != 2000 {
+		t.Fatalf("expected source-specific traffic params, got %#v", opportunity.CopyParams)
+	}
+	if opportunity.ImpactValue != "240" {
+		t.Fatalf("expected source-specific impact value, got %q", opportunity.ImpactValue)
+	}
+	for _, evidenceID := range []string{"top_source", "source_hits", "total_pageviews", "sessions"} {
+		if !hasEvidenceID(opportunity.Evidence, evidenceID) {
+			t.Fatalf("expected evidence %q in %#v", evidenceID, opportunity.Evidence)
+		}
+		if !slices.Contains(opportunity.CitedEvidenceIDs, evidenceID) {
+			t.Fatalf("expected cited evidence %q in %#v", evidenceID, opportunity.CitedEvidenceIDs)
+		}
+	}
+}
+
+func TestDefaultDetectorCatalogSuppressesTrafficOpportunityForWeakSourceShare(t *testing.T) {
+	opportunities, err := NewDefaultDetectorCatalog().Detect(DetectorInput{
+		TeamID:      uuid.New(),
+		SiteID:      uuid.New(),
+		GeneratedAt: time.Date(2026, 5, 9, 12, 0, 0, 0, time.UTC),
+		Stats: &api.SiteStats{
+			TotalPageviews: 5000,
+			UniqueSessions: 3200,
+			TopUTMSources:  []api.MetricStat{{Name: "openalternative", Value: 120}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("detect: %v", err)
+	}
+	if findOpportunityByType(opportunities, "opportunities.types.traffic_quality") != nil {
+		t.Fatalf("expected weak source share to suppress traffic opportunity, got %#v", opportunities)
+	}
 }
 
 func TestDefaultDetectorCatalogEnrichesAIVisibilityWithSiteTrafficEvidence(t *testing.T) {
@@ -408,8 +468,8 @@ func TestDefaultDetectorCatalogGeneratesSearchVisibilityOpportunityFromSearchCon
 	if search == nil {
 		t.Fatalf("expected search visibility opportunity, got %#v", opportunities)
 	}
-	if search.MonthlyUpside != 156 || search.ImpactValue != "+156" {
-		t.Fatalf("expected deterministic click upside, got value=%q monthly=%v", search.ImpactValue, search.MonthlyUpside)
+	if search.ImpactValue != "+156" {
+		t.Fatalf("expected deterministic click impact, got value=%q", search.ImpactValue)
 	}
 	if search.ScoreBreakdown.Total != 78 || search.ScoreBreakdown.EvidenceFit != 96 {
 		t.Fatalf("expected search visibility score breakdown, got %#v", search.ScoreBreakdown)
@@ -440,7 +500,7 @@ func assertCatalogFixture(
 func TestDetectorCatalogRejectsUndeclaredKeysAndParams(t *testing.T) {
 	catalog := NewDetectorCatalog(fakeDetector{
 		contract: DetectorContract{
-			Category: DetectorCategoryRevenue,
+			Category: DetectorCategoryTraffic,
 			TypeKey:  "opportunities.types.fixture",
 			MessageKeys: DetectorMessageKeys{
 				Title:       "opportunities.fixture.title",
@@ -456,7 +516,7 @@ func TestDetectorCatalogRejectsUndeclaredKeysAndParams(t *testing.T) {
 			ID:               uuid.New(),
 			TeamID:           uuid.New(),
 			SiteID:           uuid.New(),
-			Kind:             "revenue",
+			Kind:             "traffic",
 			TypeKey:          "opportunities.types.fixture",
 			TitleKey:         "opportunities.fixture.title",
 			SummaryKey:       "opportunities.fixture.summary",
@@ -488,7 +548,7 @@ func TestDetectorCatalogRejectsUndeclaredKeysAndParams(t *testing.T) {
 func TestDetectorCatalogRejectsFullTextMessageKeys(t *testing.T) {
 	catalog := NewDetectorCatalog(fakeDetector{
 		contract: DetectorContract{
-			Category: DetectorCategoryRevenue,
+			Category: DetectorCategoryTraffic,
 			TypeKey:  "opportunities.types.fixture",
 			MessageKeys: DetectorMessageKeys{
 				Title:       "Fix checkout",
@@ -504,7 +564,7 @@ func TestDetectorCatalogRejectsFullTextMessageKeys(t *testing.T) {
 			ID:               uuid.New(),
 			TeamID:           uuid.New(),
 			SiteID:           uuid.New(),
-			Kind:             "revenue",
+			Kind:             "traffic",
 			TypeKey:          "opportunities.types.fixture",
 			TitleKey:         "Fix checkout",
 			SummaryKey:       "opportunities.fixture.summary",
@@ -554,7 +614,7 @@ func TestSupportedDetectorCategoriesIncludeReusableOpportunityFamilies(t *testin
 	categories := SupportedDetectorCategories()
 	for _, want := range []DetectorCategory{
 		DetectorCategoryConversion,
-		DetectorCategoryRevenue,
+		DetectorCategoryTraffic,
 		DetectorCategoryTrafficQuality,
 		DetectorCategoryAIVisibility,
 		DetectorCategorySearchVisibility,
@@ -572,8 +632,8 @@ func TestOpportunityDefinitionBuildsContractAndBaseOpportunity(t *testing.T) {
 	generatedAt := time.Date(2026, 5, 9, 12, 0, 0, 0, time.UTC)
 	definition := OpportunityDefinition{
 		Key:      "fixture-growth",
-		Kind:     "revenue",
-		Category: DetectorCategoryRevenue,
+		Kind:     "traffic",
+		Category: DetectorCategoryTraffic,
 		TypeKey:  "opportunities.types.fixture_growth",
 		MessageKeys: DetectorMessageKeys{
 			Title:       "opportunities.catalog.fixture_growth.title",
@@ -622,7 +682,7 @@ func TestOpportunityDefinitionBuildsContractAndBaseOpportunity(t *testing.T) {
 		ID:              stableOpportunityID(siteID, "fixture-growth"),
 		TeamID:          teamID,
 		SiteID:          siteID,
-		Kind:            "revenue",
+		Kind:            "traffic",
 		TypeKey:         definition.TypeKey,
 		TitleKey:        definition.MessageKeys.Title,
 		ImpactLabelKey:  definition.MessageKeys.ImpactLabel,
@@ -643,8 +703,8 @@ func TestOpportunityDefinitionBuildsOpportunityFromRecipe(t *testing.T) {
 	generatedAt := time.Date(2026, 5, 9, 12, 0, 0, 0, time.UTC)
 	definition := OpportunityDefinition{
 		Key:      "fixture-route",
-		Kind:     "revenue",
-		Category: DetectorCategoryRevenue,
+		Kind:     "traffic",
+		Category: DetectorCategoryTraffic,
 		TypeKey:  "opportunities.types.fixture_route",
 		MessageKeys: DetectorMessageKeys{
 			Title:       "opportunities.catalog.fixture_route.title",
@@ -660,7 +720,6 @@ func TestOpportunityDefinitionBuildsOpportunityFromRecipe(t *testing.T) {
 	recipe := OpportunityRecipe{
 		CopyParams:     map[string]any{"source": "newsletter", "sessions": 240},
 		ImpactValue:    "240",
-		MonthlyUpside:  240,
 		Confidence:     "medium",
 		Score:          72,
 		ScoreBreakdown: api.OpportunityScoreBreakdown{Total: 72, EvidenceFit: 95},
@@ -732,8 +791,8 @@ func TestDetectorCatalogGeneratesFromDefinitionDetector(t *testing.T) {
 	generatedAt := time.Date(2026, 5, 9, 12, 0, 0, 0, time.UTC)
 	definition := OpportunityDefinition{
 		Key:      "fixture-expansion",
-		Kind:     "revenue",
-		Category: DetectorCategoryRevenue,
+		Kind:     "traffic",
+		Category: DetectorCategoryTraffic,
 		TypeKey:  "opportunities.types.fixture_expansion",
 		MessageKeys: DetectorMessageKeys{
 			Title:       "opportunities.catalog.fixture_expansion.title",
@@ -752,7 +811,6 @@ func TestDetectorCatalogGeneratesFromDefinitionDetector(t *testing.T) {
 			opportunity := definition.BuildOpportunity(input, OpportunityRecipe{
 				CopyParams:       map[string]any{"source": "newsletter", "sessions": input.Stats.UniqueSessions},
 				ImpactValue:      "240",
-				MonthlyUpside:    240,
 				Confidence:       "medium",
 				Score:            72,
 				RouteParams:      map[string]any{"source": "newsletter"},
@@ -908,7 +966,7 @@ func TestDefaultOpportunityDefinitionsBackDefaultCatalog(t *testing.T) {
 func TestDetectorCatalogRequiredSignalsDeduplicatesActiveContracts(t *testing.T) {
 	catalog := NewDetectorCatalog(
 		fakeDetector{contract: DetectorContract{
-			Category:        DetectorCategoryRevenue,
+			Category:        DetectorCategoryTraffic,
 			TypeKey:         "opportunities.types.one",
 			MessageKeys:     validFixtureContract().MessageKeys,
 			RequiredSignals: []OpportunitySignal{OpportunitySignalSiteStats, OpportunitySignalEcommerce},
@@ -931,7 +989,7 @@ func TestDetectorCatalogRequiredSignalsDeduplicatesActiveContracts(t *testing.T)
 func TestDetectorCatalogDetectionSignalsIncludeOptionalSupportWithoutChangingRequiredSignals(t *testing.T) {
 	catalog := NewDetectorCatalog(
 		fakeDetector{contract: DetectorContract{
-			Category:        DetectorCategoryRevenue,
+			Category:        DetectorCategoryTraffic,
 			TypeKey:         "opportunities.types.one",
 			MessageKeys:     validFixtureContract().MessageKeys,
 			RequiredSignals: []OpportunitySignal{OpportunitySignalAIVisibility},
@@ -1010,7 +1068,7 @@ func (d fakeDetector) Detect(DetectorInput) (*database.OpportunityInput, bool) {
 
 func validFixtureContract() DetectorContract {
 	return DetectorContract{
-		Category: DetectorCategoryRevenue,
+		Category: DetectorCategoryTraffic,
 		TypeKey:  "opportunities.types.fixture",
 		MessageKeys: DetectorMessageKeys{
 			Title:       "opportunities.fixture.title",
@@ -1029,7 +1087,7 @@ func validFixtureOpportunity() database.OpportunityInput {
 		ID:               uuid.New(),
 		TeamID:           uuid.New(),
 		SiteID:           uuid.New(),
-		Kind:             "revenue",
+		Kind:             "traffic",
 		TypeKey:          "opportunities.types.fixture",
 		TitleKey:         "opportunities.fixture.title",
 		SummaryKey:       "opportunities.fixture.summary",

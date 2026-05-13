@@ -1,6 +1,7 @@
 package opportunities
 
 import (
+	"maps"
 	"sort"
 	"time"
 
@@ -23,7 +24,10 @@ type opportunityRank struct {
 }
 
 func RankOpportunities(opportunities []api.Opportunity) []api.Opportunity {
-	out := append([]api.Opportunity(nil), opportunities...)
+	out := make([]api.Opportunity, len(opportunities))
+	for i, opportunity := range opportunities {
+		out[i] = normalizeRankedOpportunity(opportunity)
+	}
 	sort.SliceStable(out, func(i, j int) bool {
 		return ranksBefore(rankOpportunity(out[i]), rankOpportunity(out[j]))
 	})
@@ -31,11 +35,62 @@ func RankOpportunities(opportunities []api.Opportunity) []api.Opportunity {
 }
 
 func rankOpportunityInputs(opportunities []database.OpportunityInput) []database.OpportunityInput {
-	out := append([]database.OpportunityInput(nil), opportunities...)
+	out := make([]database.OpportunityInput, len(opportunities))
+	for i, opportunity := range opportunities {
+		out[i] = normalizeRankedOpportunityInput(opportunity)
+	}
 	sort.SliceStable(out, func(i, j int) bool {
 		return ranksBefore(rankOpportunityInput(out[i]), rankOpportunityInput(out[j]))
 	})
 	return out
+}
+
+func normalizeRankedOpportunity(opportunity api.Opportunity) api.Opportunity {
+	if opportunity.CopyParams == nil {
+		opportunity.CopyParams = map[string]any{}
+	} else {
+		opportunity.CopyParams = maps.Clone(opportunity.CopyParams)
+	}
+	if opportunity.RouteParams == nil {
+		opportunity.RouteParams = map[string]any{}
+	} else {
+		opportunity.RouteParams = maps.Clone(opportunity.RouteParams)
+	}
+	if opportunity.Evidence == nil {
+		opportunity.Evidence = []api.OpportunityEvidence{}
+	} else {
+		opportunity.Evidence = append([]api.OpportunityEvidence(nil), opportunity.Evidence...)
+	}
+	if opportunity.CitedEvidenceIDs == nil {
+		opportunity.CitedEvidenceIDs = []string{}
+	} else {
+		opportunity.CitedEvidenceIDs = append([]string(nil), opportunity.CitedEvidenceIDs...)
+	}
+	return opportunity
+}
+
+func normalizeRankedOpportunityInput(opportunity database.OpportunityInput) database.OpportunityInput {
+	if opportunity.CopyParams == nil {
+		opportunity.CopyParams = map[string]any{}
+	} else {
+		opportunity.CopyParams = maps.Clone(opportunity.CopyParams)
+	}
+	if opportunity.RouteParams == nil {
+		opportunity.RouteParams = map[string]any{}
+	} else {
+		opportunity.RouteParams = maps.Clone(opportunity.RouteParams)
+	}
+	if opportunity.Evidence == nil {
+		opportunity.Evidence = []api.OpportunityEvidence{}
+	} else {
+		opportunity.Evidence = append([]api.OpportunityEvidence(nil), opportunity.Evidence...)
+	}
+	if opportunity.CitedEvidenceIDs == nil {
+		opportunity.CitedEvidenceIDs = []string{}
+	} else {
+		opportunity.CitedEvidenceIDs = append([]string(nil), opportunity.CitedEvidenceIDs...)
+	}
+	return opportunity
 }
 
 func rankOpportunity(opportunity api.Opportunity) opportunityRank {

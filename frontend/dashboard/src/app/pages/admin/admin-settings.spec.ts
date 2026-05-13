@@ -64,6 +64,25 @@ interface AdminSettingsTestAccess {
     importCleanupActionStatusMessage(): string;
     isLoadingSearchConsole(): boolean;
     loadSearchConsoleStatus(): void;
+    isLoadingAIStatus(): boolean;
+    loadSystemAIStatus(): void;
+    systemAIStatus(): {
+        status: string;
+        enabled: boolean;
+        configured: boolean;
+        requests_used: number;
+        request_limit: number;
+        tokens_used: number;
+        token_limit: number;
+        budget_window_minutes: number;
+        budget_exhausted: boolean;
+    } | null;
+    aiTokenUsageMetric(): string;
+    aiRequestUsageMetric(): string;
+    aiTokenBudgetPercent(): number;
+    aiRequestBudgetPercent(): number;
+    aiProviderModelLabel(): string;
+    aiSummaryKey(): string;
     systemSearchConsole(): {
         status: string;
         credentials_status: string;
@@ -407,6 +426,39 @@ describe('AdminSettings', () => {
         expect(component.isLoadingSearchConsole()).toBe(false);
         expect(component.systemSearchConsole()?.status).toBe('needs_attention');
         expect(component.searchConsoleSyncIssueCount()).toBe(3);
+    });
+
+    it('loads AI system status with token usage for the runtime console', () => {
+        component.loadSystemAIStatus();
+
+        expect(component.isLoadingAIStatus()).toBe(true);
+        const request = httpMock.expectOne('/api/admin/system/ai');
+        expect(request.request.method).toBe('GET');
+        request.flush({
+            status: 'configured',
+            enabled: true,
+            configured: true,
+            config_mode: 'cloud_managed',
+            provider: 'bedrock',
+            model: 'amazon.nova-lite-v1:0',
+            base_url_configured: false,
+            requests_used: 7,
+            request_limit: 100,
+            tokens_used: 12345,
+            token_limit: 100000,
+            budget_window_minutes: 1440,
+            budget_exhausted: false
+        });
+
+        expect(component.isLoadingAIStatus()).toBe(false);
+        expect(component.systemAIStatus()?.tokens_used).toBe(12345);
+        expect(component.systemAIStatus()?.token_limit).toBe(100000);
+        expect(component.aiTokenUsageMetric()).toBe('12,345 / 100,000');
+        expect(component.aiRequestUsageMetric()).toBe('7 / 100');
+        expect(component.aiTokenBudgetPercent()).toBe(12);
+        expect(component.aiRequestBudgetPercent()).toBe(7);
+        expect(component.aiProviderModelLabel()).toBe('bedrock / amazon.nova-lite-v1:0');
+        expect(component.aiSummaryKey()).toBe('ready');
     });
 
     it('allows MFA recovery actions when the current user is an instance owner', () => {

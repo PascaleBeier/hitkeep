@@ -1502,6 +1502,12 @@
                 "cloud_signup": {
                     "label": "Cloud-Registrierung"
                 },
+                "ai": {
+                    "label": "KI-Gateway"
+                },
+                "ai_opportunities": {
+                    "label": "KI-Empfehlungen"
+                },
                 "billing": {
                     "label": "Abrechnung"
                 }
@@ -1561,6 +1567,43 @@
                     "running": "Läuft",
                     "failed": "Fehlgeschlagen",
                     "needs_attention": "Aufmerksamkeit nötig"
+                }
+            },
+            "ai": {
+                "title": "KI-Gateway",
+                "configuration": "Konfiguration",
+                "enabled": "Aktiviert",
+                "disabled": "Deaktiviert",
+                "configured": "Konfiguriert",
+                "notConfigured": "Nicht konfiguriert",
+                "configMode": "Konfigurationsmodus",
+                "provider": "Anbieter",
+                "model": "Modell",
+                "budgetWindow": "Budgetfenster",
+                "requests": "Anfragen",
+                "tokens": "Token",
+                "lastAttempt": "Letzter Versuch",
+                "lastSuccess": "Letzter Erfolg",
+                "lastError": "Letzter Fehler",
+                "readiness": "KI-Gateway-Bereitschaft",
+                "summary": {
+                    "ready": "Konfiguriert und innerhalb des lokalen Budgets.",
+                    "disabled": "Per Laufzeitkonfiguration deaktiviert.",
+                    "notConfigured": "Aktiv, sobald Anbieter- und Modelleinstellungen vorhanden sind.",
+                    "budgetExhausted": "Lokales Anfrage- oder Token-Budget ist erschöpft.",
+                    "needsAttention": "Aktuelle Anbieteraufrufe müssen geprüft werden.",
+                    "unknown": "Status wurde noch nicht geladen."
+                },
+                "status": {
+                    "disabled": "Deaktiviert",
+                    "not_configured": "Nicht konfiguriert",
+                    "configured": "Konfiguriert",
+                    "budget_exhausted": "Budget erschöpft",
+                    "needs_attention": "Aufmerksamkeit nötig"
+                },
+                "configModes": {
+                    "cloud_managed": "Cloud-verwaltet",
+                    "self_hosted": "Selbst gehostet"
                 }
             },
             "storage": {
@@ -2383,18 +2426,18 @@
     },
     "opportunities": {
         "header": {
-            "eyebrow": "Umsatzempfehlungen",
-            "title": "Mach mehr Umsatz aus dem Traffic, den du schon hast",
-            "subtitle": "HitKeep priorisiert Conversion-Lecks, Umsatztreiber, AI-Visibility-Lücken, Suchchancen und Setup-Blindspots nach ihrem geschäftlichen Hebel.",
+            "eyebrow": "Evidenzbasierte Empfehlungen",
+            "title": "Priorisierte Empfehlungen für deinen vorhandenen Traffic",
+            "subtitle": "HitKeep priorisiert Conversion-Signale, Traffic-Muster, AI-Visibility-Lücken, Suchchancen und Setup-Blindspots nach Evidenzstärke.",
             "scoreLabel": "Score",
             "scoreAria": "Opportunity-Score",
             "scoreHint": "Starkes Signal"
         },
         "kpis": {
             "open": "Offene Chancen",
-            "upside": "Geschätzter Monatshebel",
             "highConfidence": "Hohe Sicherheit",
-            "aiSearchWins": "AI-/Search-Gewinne"
+            "aiSearchWins": "AI-/Search-Gewinne",
+            "score": "Durchschnittsscore"
         },
         "filters": {
             "ariaLabel": "Opportunity-Filter",
@@ -2403,10 +2446,10 @@
             "types": {
                 "all": "Alle",
                 "conversion": "Conversion-Lecks",
-                "revenue": "Umsatztreiber",
                 "ai": "AI Visibility",
                 "search": "Suche",
-                "setup": "Setup"
+                "setup": "Setup",
+                "traffic": "Traffic-Signale"
             },
             "statuses": {
                 "all": "Alle",
@@ -2461,19 +2504,19 @@
             "subtitle": "Beginne mit diesen priorisierten Chancen."
         },
         "impact": {
-            "monthlyRevenue": "Monatsumsatz",
+            "monthlyRevenue": "Aktivität",
             "qualifiedVisits": "qualifizierte Besuche",
             "conversionLift": "Conversion-Lift",
             "searchClicks": "Suchklicks",
             "blindSpots": "Blindspots",
-            "estimated_monthly_upside": "geschätztes monatliches Potenzial",
             "ai_touched_pages": "KI-berührte Seiten",
             "pageviews_to_route": "Seitenaufrufe zum Routen",
             "estimated_search_clicks": "geschätzte Suchklicks",
             "conversion_signal_coverage": "Traffic ohne Conversion-Signal",
             "tracked_conversion_events": "erfasste Conversion-Ereignisse",
             "conversion_events_to_measure": "Conversion-Ereignisse zum Messen",
-            "funnel_steps_to_measure": "Funnel-Schritte zum Messen"
+            "funnel_steps_to_measure": "Funnel-Schritte zum Messen",
+            "checkout_starts": "Checkout-Starts"
         },
         "routes": {
             "checkout": "Checkout: {{path}}",
@@ -2507,35 +2550,37 @@
             "suggested_funnel_start": "Vorgeschlagener Funnel-Start",
             "suggested_funnel_start_pageviews": "Startseitenaufrufe",
             "suggested_funnel_conversion_event": "Vorgeschlagener Conversion-Schritt",
-            "suggested_funnel_event_count": "Beobachtete Conversion-Events"
+            "suggested_funnel_event_count": "Beobachtete Conversion-Events",
+            "source_hits": "Quellenbesuche",
+            "total_pageviews": "Gesamte Seitenaufrufe"
         },
         "catalog": {
             "checkout_conversion": {
-                "title": "Checkout-Abbruch zurückholen",
-                "summary": "Checkout-Starts konvertieren mit {{conversion_rate}} und lassen {{monthly_upside}} liegen.",
-                "action": "Prüfe Checkout-Reibung, bevor du mehr Traffic einkaufst.",
+                "title": "Checkout-Abbruch prüfen",
+                "summary": "Checkout-Starts konvertieren mit {{conversion_rate}} bei {{checkout_starts}} Starts.",
+                "action": "Prüfe Checkout-Reibung, bevor du mehr Traffic hinzufügst.",
                 "digest": "Checkout-Conversion liegt bei {{conversion_rate}}."
             },
             "ai_visibility": {
-                "title": "KI-Crawler-Aufmerksamkeit in Besuche verwandeln",
+                "title": "KI-Crawler-Aufmerksamkeit prüfen",
                 "summary": "KI-Assistenten haben {{requests}} Seiten angefragt; der stärkste Pfad ist {{top_path}}.",
-                "action": "Stärke die gecrawlte Seite mit klareren Kaufantworten.",
+                "action": "Stärke die gecrawlte Seite mit klareren Antworten und Conversion-Kontext.",
                 "digest": "KI-Crawler konzentrieren sich auf {{top_path}}."
             },
             "traffic_quality": {
-                "title": "Auf die Quelle mit vorhandener Nachfrage fokussieren",
-                "summary": "{{source}} erzeugt in diesem Zeitraum {{pageviews}} Seitenaufrufe.",
-                "action": "Lenke Kampagnenaufmerksamkeit auf die Landingpage mit der höchsten Absicht.",
-                "digest": "{{source}} ist deine stärkste Nachfragequelle."
+                "title": "Traffic von {{source}} prüfen",
+                "summary": "{{source}} erzeugte {{source_hits}} Besuche bei {{total_pageviews}} Seitenaufrufen in diesem Zeitraum.",
+                "action": "Prüfe Landingpages und Besucherintention für Traffic von {{source}}.",
+                "digest": "Traffic von {{source}} prüfen."
             },
             "search_visibility": {
-                "title": "Seiten ausbauen, die in der Suche schon sichtbar sind",
-                "summary": "Die Suche zeigt {{impressions}} Impressionen bei {{ctr}} CTR, mit etwa {{estimated_clicks}} zusätzlichen Klicks.",
+                "title": "Bereits sichtbare Suchseiten prüfen",
+                "summary": "Die Suche zeigt {{impressions}} Impressionen bei {{ctr}} CTR; geschätzte verpasste Klicks: {{estimated_clicks}}.",
                 "action": "Verbessere Snippet, Titel und die Antwort auf der Seite für Suchanfragen, die schon Impressionen liefern.",
-                "digest": "Die Suchsichtbarkeit kann etwa {{estimated_clicks}} Klicks hinzufügen."
+                "digest": "Die Suche zeigt etwa {{estimated_clicks}} verpasste Klicks."
             },
             "conversion_signal": {
-                "title": "Erfasste Events in ein Conversion-Signal verwandeln",
+                "title": "Erfasste Ereignisse als Conversion-Signale prüfen",
                 "summary": "{{event_names}} werden über {{pageviews}} Seitenaufrufe erfasst, aber noch kein Conversion-Event priorisiert Opportunities.",
                 "action": "Wähle das Event, das Lead, Signup oder Kauf am besten beschreibt, und markiere es als Conversion-Signal.",
                 "digest": "Erfasste Events brauchen ein Conversion-Signal."

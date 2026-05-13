@@ -200,7 +200,7 @@ func (s *Store) ReserveAIRun(ctx context.Context, params AIRunParams, since time
 	var id uuid.UUID
 	exhausted := false
 	err := s.Transact(ctx, func(tx *sql.Tx) error {
-		usage, err := queryAIUsageSinceForBudget(ctx, tx, since, params.TeamID)
+		usage, err := queryAIUsageSinceForBudget(ctx, tx, since)
 		if err != nil {
 			return err
 		}
@@ -243,22 +243,8 @@ func queryAIUsageSince(ctx context.Context, db aiUsageQuerier, since time.Time) 
 	return usage, nil
 }
 
-func queryAIUsageSinceForBudget(ctx context.Context, db aiUsageQuerier, since time.Time, teamID uuid.UUID) (AIUsageSummary, error) {
-	if teamID == uuid.Nil {
-		return queryAIUsageSince(ctx, db, since)
-	}
-	var usage AIUsageSummary
-	err := db.QueryRowContext(ctx, `
-		SELECT COUNT(*), COALESCE(SUM(total_tokens), 0)
-		FROM ai_runs
-		WHERE created_at >= ?
-			AND team_id = ?
-			AND error_category NOT IN ('budget_exhausted', 'disabled', 'not_configured')
-	`, since, teamID).Scan(&usage.Requests, &usage.Tokens)
-	if err != nil {
-		return AIUsageSummary{}, fmt.Errorf("query scoped ai usage: %w", err)
-	}
-	return usage, nil
+func queryAIUsageSinceForBudget(ctx context.Context, db aiUsageQuerier, since time.Time) (AIUsageSummary, error) {
+	return queryAIUsageSince(ctx, db, since)
 }
 
 func aiBudgetExhausted(usage AIUsageSummary, requestLimit, tokenLimit int) bool {

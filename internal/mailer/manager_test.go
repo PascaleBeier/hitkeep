@@ -528,7 +528,7 @@ func TestSendOpportunityDigestRendersLocalizedSafeRecommendation(t *testing.T) {
 		t.Fatalf("Send() error = %v", err)
 	}
 
-	for _, want := range []string{"wöchentliche Chance für shop.example", "Checkout-Abbruch reduzieren", "Nächste Aktion", "Checkout-Conversion-Rate", "42%"} {
+	for _, want := range []string{"wöchentliche Chance für shop.example", "Checkout-Abbruch prüfen", "Nächste Aktion", "Checkout-Conversion-Rate", "42%"} {
 		if !strings.Contains(drv.textBody, want) && !strings.Contains(drv.htmlBody, want) {
 			t.Fatalf("expected opportunity digest output to contain %q", want)
 		}

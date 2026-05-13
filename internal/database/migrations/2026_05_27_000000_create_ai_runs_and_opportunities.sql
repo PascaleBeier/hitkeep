@@ -40,7 +40,6 @@ CREATE TABLE IF NOT EXISTS opportunities (
     copy_params_json JSON NOT NULL DEFAULT '{}',
     impact_value VARCHAR NOT NULL,
     impact_label_key VARCHAR NOT NULL,
-    monthly_upside DOUBLE NOT NULL DEFAULT 0,
     confidence VARCHAR NOT NULL,
     score BIGINT NOT NULL DEFAULT 0,
     score_breakdown_json JSON NOT NULL DEFAULT '{}',

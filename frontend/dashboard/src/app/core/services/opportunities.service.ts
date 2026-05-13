@@ -1,9 +1,9 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { ShareService } from './share.service';
 
-export type OpportunityType = 'conversion' | 'revenue' | 'ai' | 'search' | 'setup';
+export type OpportunityType = 'conversion' | 'traffic' | 'ai' | 'search' | 'setup';
 export type OpportunityStatus = 'new' | 'saved' | 'done' | 'dismissed';
 export type OpportunityConfidence = 'high' | 'medium';
 export type OpportunityDigestFrequency = 'daily' | 'weekly';
@@ -39,7 +39,6 @@ export interface Opportunity {
     copy_params: Record<string, unknown>;
     impact_value: string;
     impact_label_key: string;
-    monthly_upside: number;
     confidence: OpportunityConfidence;
     score: number;
     score_breakdown: OpportunityScoreBreakdown;
@@ -94,6 +93,34 @@ export interface OpportunityDigestPreviewResponse {
     items: OpportunityDigestPreviewItem[];
 }
 
+type OpportunityPayload = Omit<Opportunity, 'copy_params' | 'score_breakdown' | 'route_params' | 'evidence' | 'cited_evidence_ids'> & {
+    copy_params?: Record<string, unknown> | null;
+    score_breakdown?: OpportunityScoreBreakdown | null;
+    route_params?: Record<string, unknown> | null;
+    evidence?: OpportunityEvidence[] | null;
+    cited_evidence_ids?: string[] | null;
+};
+
+type OpportunityDigestPreviewItemPayload = Omit<OpportunityDigestPreviewItem, 'copy_params' | 'score_breakdown' | 'route_params' | 'evidence' | 'cited_evidence_ids'> & {
+    copy_params?: Record<string, unknown> | null;
+    score_breakdown?: OpportunityScoreBreakdown | null;
+    route_params?: Record<string, unknown> | null;
+    evidence?: OpportunityEvidence[] | null;
+    cited_evidence_ids?: string[] | null;
+};
+
+type OpportunityListPayload = Omit<OpportunityListResponse, 'opportunities'> & {
+    opportunities?: (OpportunityPayload | null)[] | null;
+};
+
+type OpportunityGeneratePayload = Omit<OpportunityGenerateResponse, 'opportunities'> & {
+    opportunities?: (OpportunityPayload | null)[] | null;
+};
+
+type OpportunityDigestPreviewPayload = Omit<OpportunityDigestPreviewResponse, 'items'> & {
+    items?: (OpportunityDigestPreviewItemPayload | null)[] | null;
+};
+
 @Injectable({ providedIn: 'root' })
 export class OpportunitiesService {
     private readonly http = inject(HttpClient);
@@ -102,22 +129,99 @@ export class OpportunitiesService {
     list(siteId: string): Observable<OpportunityListResponse> {
         const shareToken = this.shareService.token();
         if (shareToken) {
-            return this.http.get<OpportunityListResponse>(`/api/share/${shareToken}/sites/${siteId}/opportunities`);
+            return this.http.get<OpportunityListPayload>(`/api/share/${shareToken}/sites/${siteId}/opportunities`).pipe(map((response) => this.normalizeOpportunityList(response)));
         }
-        return this.http.get<OpportunityListResponse>(`/api/sites/${siteId}/opportunities`);
+        return this.http.get<OpportunityListPayload>(`/api/sites/${siteId}/opportunities`).pipe(map((response) => this.normalizeOpportunityList(response)));
     }
 
     generate(siteId: string, from: string, to: string): Observable<OpportunityGenerateResponse> {
         const params = new HttpParams().set('from', from).set('to', to);
-        return this.http.post<OpportunityGenerateResponse>(`/api/sites/${siteId}/opportunities/generate`, {}, { params });
+        return this.http.post<OpportunityGeneratePayload>(`/api/sites/${siteId}/opportunities/generate`, {}, { params }).pipe(map((response) => this.normalizeOpportunityGenerate(response)));
     }
 
     previewDigest(siteId: string, frequency: OpportunityDigestFrequency): Observable<OpportunityDigestPreviewResponse> {
         const params = new HttpParams().set('frequency', frequency);
-        return this.http.get<OpportunityDigestPreviewResponse>(`/api/sites/${siteId}/opportunities/digest-preview`, { params });
+        return this.http.get<OpportunityDigestPreviewPayload>(`/api/sites/${siteId}/opportunities/digest-preview`, { params }).pipe(map((response) => this.normalizeDigestPreview(response)));
     }
 
     updateStatus(siteId: string, opportunityId: string, status: OpportunityStatus): Observable<Opportunity> {
-        return this.http.patch<Opportunity>(`/api/sites/${siteId}/opportunities/${opportunityId}`, { status });
+        return this.http.patch<OpportunityPayload>(`/api/sites/${siteId}/opportunities/${opportunityId}`, { status }).pipe(map((response) => this.normalizeOpportunity(response)));
     }
+
+    private normalizeOpportunityList(response: OpportunityListPayload): OpportunityListResponse {
+        return {
+            ...response,
+            opportunities: this.normalizeOpportunities(response.opportunities)
+        };
+    }
+
+    private normalizeOpportunityGenerate(response: OpportunityGeneratePayload): OpportunityGenerateResponse {
+        return {
+            ...response,
+            opportunities: this.normalizeOpportunities(response.opportunities)
+        };
+    }
+
+    private normalizeDigestPreview(response: OpportunityDigestPreviewPayload): OpportunityDigestPreviewResponse {
+        return {
+            ...response,
+            items: this.normalizeDigestPreviewItems(response.items)
+        };
+    }
+
+    private normalizeOpportunities(opportunities: (OpportunityPayload | null)[] | null | undefined): Opportunity[] {
+        if (!Array.isArray(opportunities)) {
+            return [];
+        }
+        return opportunities.filter(isPayloadObject).map((opportunity) => this.normalizeOpportunity(opportunity));
+    }
+
+    private normalizeOpportunity(opportunity: OpportunityPayload): Opportunity {
+        return {
+            ...opportunity,
+            copy_params: normalizeRecord(opportunity.copy_params),
+            score_breakdown: opportunity.score_breakdown ?? emptyScoreBreakdown(),
+            route_params: normalizeRecord(opportunity.route_params),
+            evidence: Array.isArray(opportunity.evidence) ? opportunity.evidence : [],
+            cited_evidence_ids: Array.isArray(opportunity.cited_evidence_ids) ? opportunity.cited_evidence_ids : []
+        };
+    }
+
+    private normalizeDigestPreviewItems(items: (OpportunityDigestPreviewItemPayload | null)[] | null | undefined): OpportunityDigestPreviewItem[] {
+        if (!Array.isArray(items)) {
+            return [];
+        }
+        return items.filter(isPayloadObject).map((item) => ({
+            ...item,
+            copy_params: normalizeRecord(item.copy_params),
+            score_breakdown: item.score_breakdown ?? emptyScoreBreakdown(),
+            route_params: normalizeRecord(item.route_params),
+            evidence: Array.isArray(item.evidence) ? item.evidence : [],
+            cited_evidence_ids: Array.isArray(item.cited_evidence_ids) ? item.cited_evidence_ids : []
+        }));
+    }
+}
+
+function isPayloadObject<T extends object>(value: T | null | undefined): value is T {
+    return typeof value === 'object' && value !== null;
+}
+
+function normalizeRecord(value: Record<string, unknown> | null | undefined): Record<string, unknown> {
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        return value;
+    }
+    return {};
+}
+
+function emptyScoreBreakdown(): OpportunityScoreBreakdown {
+    return {
+        sample: 0,
+        impact: 0,
+        urgency: 0,
+        effort: 0,
+        actionability: 0,
+        evidence_fit: 0,
+        freshness: 0,
+        total: 0
+    };
 }

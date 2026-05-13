@@ -85,6 +85,7 @@ func aiConfigError(cfg *config.Config) error {
 	return hitai.ValidateConfig(hitai.Config{
 		Provider: strings.TrimSpace(cfg.AIProvider),
 		Model:    strings.TrimSpace(cfg.AIModel),
+		BaseURL:  strings.TrimSpace(cfg.AIBaseURL),
 		APIKey:   strings.TrimSpace(cfg.AIAPIKey),
 	})
 }

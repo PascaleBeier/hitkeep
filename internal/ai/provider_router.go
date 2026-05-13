@@ -49,20 +49,33 @@ var modelBuilders = map[string]modelBuilder{
 }
 
 var providerRequiresAPIKey = map[string]bool{
-	"openai":     true,
-	"anthropic":  true,
-	"google":     true,
-	"gemini":     true,
-	"mistral":    true,
-	"openrouter": true,
-	"deepseek":   true,
-	"groq":       true,
-	"xai":        true,
-	"cerebras":   true,
-	"cohere":     true,
-	"perplexity": true,
-	"together":   true,
-	"fireworks":  true,
+	"openai":            true,
+	"openai-compatible": true,
+	"compat":            true,
+	"gateway":           true,
+	"bifrost":           true,
+	"litellm":           true,
+	"anthropic":         true,
+	"google":            true,
+	"gemini":            true,
+	"mistral":           true,
+	"openrouter":        true,
+	"deepseek":          true,
+	"groq":              true,
+	"xai":               true,
+	"cerebras":          true,
+	"cohere":            true,
+	"perplexity":        true,
+	"together":          true,
+	"fireworks":         true,
+}
+
+var providerRequiresBaseURL = map[string]bool{
+	"openai-compatible": true,
+	"compat":            true,
+	"gateway":           true,
+	"bifrost":           true,
+	"litellm":           true,
 }
 
 func buildModel(conf Config) (provider.LanguageModel, error) {

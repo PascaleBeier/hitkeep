@@ -32,7 +32,6 @@ type OpportunityInput struct {
 	CopyParams       map[string]any
 	ImpactValue      string
 	ImpactLabelKey   string
-	MonthlyUpside    float64
 	Confidence       string
 	Score            int
 	ScoreBreakdown   api.OpportunityScoreBreakdown
@@ -157,10 +156,10 @@ func (s *Store) upsertOpportunityExec(ctx context.Context, exec sqlQueryExecCont
 	_, err = exec.ExecContext(ctx, `
 			INSERT INTO opportunities (
 			id, team_id, site_id, kind, type_key, title_key, summary_key, action_key, digest_key,
-			copy_params_json, impact_value, impact_label_key, monthly_upside, confidence, score,
+			copy_params_json, impact_value, impact_label_key, confidence, score,
 			score_breakdown_json, status, route_label_key, route_params_json, route_icon, detector_version,
 			evidence_json, cited_evidence_ids_json, ai_run_id, generated_at, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			kind = excluded.kind,
 			type_key = excluded.type_key,
@@ -171,7 +170,6 @@ func (s *Store) upsertOpportunityExec(ctx context.Context, exec sqlQueryExecCont
 			copy_params_json = excluded.copy_params_json,
 			impact_value = excluded.impact_value,
 			impact_label_key = excluded.impact_label_key,
-			monthly_upside = excluded.monthly_upside,
 			confidence = excluded.confidence,
 			score = excluded.score,
 			score_breakdown_json = excluded.score_breakdown_json,
@@ -186,7 +184,7 @@ func (s *Store) upsertOpportunityExec(ctx context.Context, exec sqlQueryExecCont
 			generated_at = excluded.generated_at,
 			updated_at = ?
 	`, id, input.TeamID, input.SiteID, input.Kind, input.TypeKey, input.TitleKey, input.SummaryKey, input.ActionKey, input.DigestKey,
-		encoded.CopyParams, input.ImpactValue, input.ImpactLabelKey, input.MonthlyUpside, input.Confidence, input.Score,
+		encoded.CopyParams, input.ImpactValue, input.ImpactLabelKey, input.Confidence, input.Score,
 		encoded.ScoreBreakdown, status, input.RouteLabelKey, encoded.RouteParams, input.RouteIcon, input.DetectorVersion,
 		encoded.Evidence, encoded.CitedEvidenceIDs, nullableUUID(input.AIRunID), generatedAt, now, now, now)
 	if err != nil {
@@ -284,11 +282,11 @@ func encodeOpportunityJSON(input OpportunityInput) (encodedOpportunityJSON, erro
 		value any
 		dest  *string
 	}{
-		{label: "evidence", value: input.Evidence, dest: &out.Evidence},
+		{label: "evidence", value: nonNilSlice(input.Evidence), dest: &out.Evidence},
 		{label: "copy params", value: nonNilMap(input.CopyParams), dest: &out.CopyParams},
 		{label: "route params", value: nonNilMap(input.RouteParams), dest: &out.RouteParams},
 		{label: "score breakdown", value: input.ScoreBreakdown, dest: &out.ScoreBreakdown},
-		{label: "cited evidence ids", value: input.CitedEvidenceIDs, dest: &out.CitedEvidenceIDs},
+		{label: "cited evidence ids", value: nonNilSlice(input.CitedEvidenceIDs), dest: &out.CitedEvidenceIDs},
 	}
 	for _, field := range fields {
 		raw, err := json.Marshal(field.value)
@@ -323,7 +321,13 @@ func ensureOpportunityIDScope(ctx context.Context, db sqlQueryExecContext, id, t
 }
 
 func validateOpportunityInput(input OpportunityInput) error {
+	if strings.TrimSpace(input.Kind) == "revenue" {
+		return fmt.Errorf("invalid opportunity kind: revenue opportunities are no longer supported")
+	}
 	if err := validateOpportunityCustomerParams(input); err != nil {
+		return err
+	}
+	if err := validateOpportunityPublicValues(input); err != nil {
 		return err
 	}
 	if err := validateOpportunityTranslationKeys(input); err != nil {
@@ -399,9 +403,29 @@ func validateOpportunityCustomerParams(input OpportunityInput) error {
 	return rejectRawOpportunityParamFields("route_params", input.RouteParams)
 }
 
+func validateOpportunityPublicValues(input OpportunityInput) error {
+	if err := rejectRawPayloadStringValues(input.ImpactValue); err != nil {
+		return fmt.Errorf("invalid opportunity impact_value: %w", err)
+	}
+	for _, item := range input.Evidence {
+		if err := rejectRawPayloadStringValues(item.Value); err != nil {
+			return fmt.Errorf("invalid opportunity evidence.value: %w", err)
+		}
+	}
+	return nil
+}
+
 func rejectRawOpportunityParamFields(field string, value any) error {
 	if err := rejectRawPayloadFields(value); err != nil {
 		return fmt.Errorf("invalid opportunity %s: %w", field, err)
+	}
+	if params, ok := value.(map[string]any); ok {
+		for key := range params {
+			switch strings.TrimSpace(key) {
+			case "monthly_upside", "currency":
+				return fmt.Errorf("invalid opportunity %s: money/upside param %q is not supported", field, key)
+			}
+		}
 	}
 	return nil
 }
@@ -414,7 +438,7 @@ func isOpportunityTranslationKey(value string) bool {
 func (s *Store) ListOpportunities(ctx context.Context, siteID uuid.UUID) ([]api.Opportunity, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, team_id, site_id, kind, type_key, title_key, summary_key, action_key, digest_key,
-			copy_params_json, impact_value, impact_label_key, monthly_upside, confidence, score,
+			copy_params_json, impact_value, impact_label_key, confidence, score,
 			score_breakdown_json, status, route_label_key, route_params_json, route_icon, detector_version, evidence_json,
 			cited_evidence_ids_json, CAST(ai_run_id AS VARCHAR), generated_at, created_at, updated_at
 		FROM opportunities
@@ -443,7 +467,7 @@ func (s *Store) ListOpportunities(ctx context.Context, siteID uuid.UUID) ([]api.
 func (s *Store) GetOpportunity(ctx context.Context, siteID, opportunityID uuid.UUID) (*api.Opportunity, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT id, team_id, site_id, kind, type_key, title_key, summary_key, action_key, digest_key,
-			copy_params_json, impact_value, impact_label_key, monthly_upside, confidence, score,
+			copy_params_json, impact_value, impact_label_key, confidence, score,
 			score_breakdown_json, status, route_label_key, route_params_json, route_icon, detector_version, evidence_json,
 			cited_evidence_ids_json, CAST(ai_run_id AS VARCHAR), generated_at, created_at, updated_at
 		FROM opportunities
@@ -543,7 +567,6 @@ func scanOpportunityRow(row opportunityScanner, opportunity *api.Opportunity, ra
 		&raw.CopyParams,
 		&opportunity.ImpactValue,
 		&opportunity.ImpactLabelKey,
-		&opportunity.MonthlyUpside,
 		&opportunity.Confidence,
 		&opportunity.Score,
 		&raw.ScoreBreakdown,
@@ -619,6 +642,13 @@ func assignOpportunityAIRunID(opportunity *api.Opportunity, raw sql.NullString) 
 func nonNilMap(value map[string]any) map[string]any {
 	if value == nil {
 		return map[string]any{}
+	}
+	return value
+}
+
+func nonNilSlice[T any](value []T) []T {
+	if value == nil {
+		return []T{}
 	}
 	return value
 }

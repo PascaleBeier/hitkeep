@@ -1502,6 +1502,12 @@
                 "cloud_signup": {
                     "label": "Cloud-aanmelding"
                 },
+                "ai": {
+                    "label": "AI-gateway"
+                },
+                "ai_opportunities": {
+                    "label": "AI-aanbevelingen"
+                },
                 "billing": {
                     "label": "Facturering"
                 }
@@ -1561,6 +1567,43 @@
                     "running": "Rennen",
                     "failed": "Mislukt",
                     "needs_attention": "Heeft aandacht nodig"
+                }
+            },
+            "ai": {
+                "title": "AI-gateway",
+                "configuration": "Configuratie",
+                "enabled": "Ingeschakeld",
+                "disabled": "Uitgeschakeld",
+                "configured": "Geconfigureerd",
+                "notConfigured": "Niet geconfigureerd",
+                "configMode": "Configuratiemodus",
+                "provider": "Provider",
+                "model": "Model",
+                "budgetWindow": "Budgetvenster",
+                "requests": "Aanvragen",
+                "tokens": "Tokens",
+                "lastAttempt": "Laatste poging",
+                "lastSuccess": "Laatste succes",
+                "lastError": "Laatste fout",
+                "readiness": "Gereedheid van AI-gateway",
+                "summary": {
+                    "ready": "Geconfigureerd en binnen het lokale budget.",
+                    "disabled": "Uitgeschakeld via runtimeconfiguratie.",
+                    "notConfigured": "Ingeschakeld zodra provider- en modelinstellingen aanwezig zijn.",
+                    "budgetExhausted": "Het lokale aanvraag- of tokenbudget is uitgeput.",
+                    "needsAttention": "Recente provider-aanroepen moeten worden gecontroleerd.",
+                    "unknown": "Status is nog niet geladen."
+                },
+                "status": {
+                    "disabled": "Uitgeschakeld",
+                    "not_configured": "Niet geconfigureerd",
+                    "configured": "Geconfigureerd",
+                    "budget_exhausted": "Budget uitgeput",
+                    "needs_attention": "Heeft aandacht nodig"
+                },
+                "configModes": {
+                    "cloud_managed": "Cloudbeheerd",
+                    "self_hosted": "Zelf gehost"
                 }
             },
             "storage": {
@@ -2383,18 +2426,18 @@
     },
     "opportunities": {
         "header": {
-            "eyebrow": "Omzetadvies",
-            "title": "Haal meer omzet uit het verkeer dat je al hebt",
-            "subtitle": "HitKeep rangschikt conversielekken, omzetkansen, AI-zichtbaarheidsgaten, zoekkansen en ontbrekende setup-signalen op basis van wat de meeste zakelijke impact lijkt te hebben.",
+            "eyebrow": "Aanbevelingen met bewijs",
+            "title": "Geprioriteerde aanbevelingen voor je bestaande verkeer",
+            "subtitle": "HitKeep rangschikt conversiesignalen, verkeerspatronen, AI-zichtbaarheidsgaten, zoekkansen en ontbrekende setup-signalen op bewijskracht.",
             "scoreLabel": "Score",
             "scoreAria": "Kansenscore",
             "scoreHint": "Sterk signaal"
         },
         "kpis": {
             "open": "Open kansen",
-            "upside": "Geschat maandelijks potentieel",
             "highConfidence": "Hoge zekerheid",
-            "aiSearchWins": "AI/zoekkansen"
+            "aiSearchWins": "AI/zoekkansen",
+            "score": "Gemiddelde score"
         },
         "filters": {
             "ariaLabel": "Kansenfilters",
@@ -2403,10 +2446,10 @@
             "types": {
                 "all": "Alle",
                 "conversion": "Conversielekken",
-                "revenue": "Omzetkansen",
                 "ai": "AI-zichtbaarheid",
                 "search": "Zoeken",
-                "setup": "Setup"
+                "setup": "Setup",
+                "traffic": "Verkeerssignalen"
             },
             "statuses": {
                 "all": "Alle",
@@ -2461,19 +2504,19 @@
             "subtitle": "Begin met deze geprioriteerde kansen."
         },
         "impact": {
-            "monthlyRevenue": "maandelijkse omzet",
+            "monthlyRevenue": "activiteit",
             "qualifiedVisits": "gekwalificeerde bezoeken",
             "conversionLift": "conversieverbetering",
             "searchClicks": "zoekklikken",
             "blindSpots": "blinde vlekken",
-            "estimated_monthly_upside": "geschat maandelijks potentieel",
             "ai_touched_pages": "door AI geraakte pagina's",
             "pageviews_to_route": "pageviews om door te sturen",
             "estimated_search_clicks": "geschatte zoekklikken",
             "conversion_signal_coverage": "verkeer zonder conversiesignaal",
             "tracked_conversion_events": "gemeten conversie-events",
             "conversion_events_to_measure": "conversie-events om te meten",
-            "funnel_steps_to_measure": "funnelstappen om te meten"
+            "funnel_steps_to_measure": "funnelstappen om te meten",
+            "checkout_starts": "Checkout-starts"
         },
         "routes": {
             "checkout": "Checkout: {{path}}",
@@ -2507,35 +2550,37 @@
             "suggested_funnel_start": "Voorgestelde funnelstart",
             "suggested_funnel_start_pageviews": "Pageviews op startpagina",
             "suggested_funnel_conversion_event": "Voorgestelde conversiestap",
-            "suggested_funnel_event_count": "Waargenomen conversie-events"
+            "suggested_funnel_event_count": "Waargenomen conversie-events",
+            "source_hits": "Bronbezoeken",
+            "total_pageviews": "Totale paginaweergaven"
         },
         "catalog": {
             "checkout_conversion": {
-                "title": "Haal checkout-afhakers terug",
-                "summary": "Checkout-starts converteren met {{conversion_rate}} en laten {{monthly_upside}} liggen.",
+                "title": "Bekijk checkout-uitval",
+                "summary": "Checkout-starts converteren met {{conversion_rate}} over {{checkout_starts}} starts.",
                 "action": "Onderzoek checkoutfrictie voordat je meer verkeer toevoegt.",
                 "digest": "Checkoutconversie is {{conversion_rate}}."
             },
             "ai_visibility": {
-                "title": "Zet AI-crawleraandacht om in bezoeken",
+                "title": "Bekijk aandacht van AI-crawlers",
                 "summary": "AI-assistenten vroegen {{requests}} pagina's op; het sterkste pad is {{top_path}}.",
-                "action": "Versterk de gecrawlde pagina met duidelijkere koopantwoorden.",
+                "action": "Versterk de gecrawlde pagina met duidelijkere antwoorden en conversiecontext.",
                 "digest": "AI-crawlers focusten op {{top_path}}."
             },
             "traffic_quality": {
-                "title": "Focus op de bron die al vraag aantrekt",
-                "summary": "{{source}} levert in deze periode {{pageviews}} pageviews op.",
-                "action": "Verplaats campagnedruk naar de landingspagina met de hoogste intentie.",
-                "digest": "{{source}} is je sterkste vraagbron."
+                "title": "Bekijk verkeer van {{source}}",
+                "summary": "{{source}} leverde {{source_hits}} bezoeken op van {{total_pageviews}} paginaweergaven in deze periode.",
+                "action": "Controleer landingspagina’s en intentie voor bezoekers vanuit {{source}}.",
+                "digest": "Bekijk verkeer van {{source}}."
             },
             "search_visibility": {
-                "title": "Verbeter pagina's die al zichtbaar zijn in zoekresultaten",
-                "summary": "Zoekresultaten tonen {{impressions}} impressies met {{ctr}} CTR, goed voor ongeveer {{estimated_clicks}} extra klikken.",
+                "title": "Bekijk pagina’s die al zichtbaar zijn in zoekresultaten",
+                "summary": "Search toont {{impressions}} vertoningen bij {{ctr}} CTR; geschatte gemiste klikken: {{estimated_clicks}}.",
                 "action": "Verbeter snippet, titel en antwoord op de pagina voor zoekopdrachten die al impressies opleveren.",
-                "digest": "Zoekzichtbaarheid kan ongeveer {{estimated_clicks}} klikken toevoegen."
+                "digest": "Search toont ongeveer {{estimated_clicks}} gemiste klikken."
             },
             "conversion_signal": {
-                "title": "Zet gemeten events om in een conversiesignaal",
+                "title": "Bekijk getrackte events als conversiesignalen",
                 "summary": "{{event_names}} worden gemeten over {{pageviews}} pageviews, maar nog geen conversie-event rangschikt kansen.",
                 "action": "Kies het event dat het beste een lead, registratie of aankoop vertegenwoordigt en markeer het als conversiesignaal.",
                 "digest": "Gemeten events hebben een conversiesignaal nodig."

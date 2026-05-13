@@ -15,7 +15,7 @@ type DetectorCategory string
 
 const (
 	DetectorCategoryConversion       DetectorCategory = "conversion"
-	DetectorCategoryRevenue          DetectorCategory = "revenue"
+	DetectorCategoryTraffic          DetectorCategory = "traffic"
 	DetectorCategoryTrafficQuality   DetectorCategory = "traffic_quality"
 	DetectorCategoryAIVisibility     DetectorCategory = "ai_visibility"
 	DetectorCategorySearchVisibility DetectorCategory = "search_visibility"
@@ -99,7 +99,7 @@ func NewDetectorCatalogFromDefinitions(definitions ...OpportunityDefinition) Det
 func SupportedDetectorCategories() []DetectorCategory {
 	return []DetectorCategory{
 		DetectorCategoryConversion,
-		DetectorCategoryRevenue,
+		DetectorCategoryTraffic,
 		DetectorCategoryTrafficQuality,
 		DetectorCategoryAIVisibility,
 		DetectorCategorySearchVisibility,

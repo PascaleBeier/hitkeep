@@ -1502,6 +1502,12 @@
                 "cloud_signup": {
                     "label": "Cloud signup"
                 },
+                "ai": {
+                    "label": "AI gateway"
+                },
+                "ai_opportunities": {
+                    "label": "AI opportunities"
+                },
                 "billing": {
                     "label": "Billing"
                 }
@@ -1561,6 +1567,43 @@
                     "running": "Running",
                     "failed": "Failed",
                     "needs_attention": "Needs attention"
+                }
+            },
+            "ai": {
+                "title": "AI Gateway",
+                "configuration": "Configuration",
+                "enabled": "Enabled",
+                "disabled": "Disabled",
+                "configured": "Configured",
+                "notConfigured": "Not configured",
+                "configMode": "Config mode",
+                "provider": "Provider",
+                "model": "Model",
+                "budgetWindow": "Budget window",
+                "requests": "Requests",
+                "tokens": "Tokens",
+                "lastAttempt": "Last attempt",
+                "lastSuccess": "Last success",
+                "lastError": "Last error",
+                "readiness": "AI gateway readiness",
+                "summary": {
+                    "ready": "Configured and within local budget.",
+                    "disabled": "Disabled by runtime configuration.",
+                    "notConfigured": "Enabled after provider and model settings are present.",
+                    "budgetExhausted": "Local request or token budget is exhausted.",
+                    "needsAttention": "Recent provider calls need operator review.",
+                    "unknown": "Status has not loaded yet."
+                },
+                "status": {
+                    "disabled": "Disabled",
+                    "not_configured": "Not configured",
+                    "configured": "Configured",
+                    "budget_exhausted": "Budget exhausted",
+                    "needs_attention": "Needs attention"
+                },
+                "configModes": {
+                    "cloud_managed": "Cloud managed",
+                    "self_hosted": "Self-hosted"
                 }
             },
             "storage": {
@@ -2383,18 +2426,18 @@
     },
     "opportunities": {
         "header": {
-            "eyebrow": "Revenue guidance",
-            "title": "Make more money from the traffic you already have",
-            "subtitle": "HitKeep ranks conversion leaks, revenue winners, AI visibility gaps, search opportunities, and setup blind spots by what is most likely to move the business.",
+            "eyebrow": "Evidence-backed recommendations",
+            "title": "Prioritized recommendations for the traffic you already have",
+            "subtitle": "HitKeep ranks conversion signals, traffic patterns, AI visibility gaps, search opportunities, and setup blind spots by evidence strength.",
             "scoreLabel": "Score",
             "scoreAria": "Opportunity score",
             "scoreHint": "Strong signal"
         },
         "kpis": {
             "open": "Open opportunities",
-            "upside": "Est. monthly upside",
             "highConfidence": "High confidence",
-            "aiSearchWins": "AI/Search wins"
+            "aiSearchWins": "AI/Search wins",
+            "score": "Average score"
         },
         "filters": {
             "ariaLabel": "Opportunity filters",
@@ -2403,10 +2446,10 @@
             "types": {
                 "all": "All",
                 "conversion": "Conversion leaks",
-                "revenue": "Revenue winners",
                 "ai": "AI visibility",
                 "search": "Search",
-                "setup": "Setup"
+                "setup": "Setup",
+                "traffic": "Traffic signals"
             },
             "statuses": {
                 "all": "All",
@@ -2461,19 +2504,19 @@
             "subtitle": "Start with these ranked opportunities first."
         },
         "impact": {
-            "monthlyRevenue": "monthly revenue",
+            "monthlyRevenue": "activity",
             "qualifiedVisits": "qualified visits",
             "conversionLift": "conversion lift",
             "searchClicks": "search clicks",
             "blindSpots": "blind spots",
-            "estimated_monthly_upside": "estimated monthly upside",
             "ai_touched_pages": "AI-touched pages",
             "pageviews_to_route": "pageviews to route",
             "estimated_search_clicks": "estimated search clicks",
             "conversion_signal_coverage": "traffic needing a conversion signal",
             "tracked_conversion_events": "tracked conversion events",
             "conversion_events_to_measure": "conversion events to measure",
-            "funnel_steps_to_measure": "funnel steps to measure"
+            "funnel_steps_to_measure": "funnel steps to measure",
+            "checkout_starts": "Checkout starts"
         },
         "routes": {
             "checkout": "Checkout: {{path}}",
@@ -2507,35 +2550,37 @@
             "suggested_funnel_start": "Suggested funnel start",
             "suggested_funnel_start_pageviews": "Start pageviews",
             "suggested_funnel_conversion_event": "Suggested conversion step",
-            "suggested_funnel_event_count": "Observed conversion events"
+            "suggested_funnel_event_count": "Observed conversion events",
+            "source_hits": "Source visits",
+            "total_pageviews": "Total pageviews"
         },
         "catalog": {
             "checkout_conversion": {
-                "title": "Recover checkout drop-off",
-                "summary": "Checkout starts are converting at {{conversion_rate}}, leaving {{monthly_upside}} on the table.",
+                "title": "Review checkout drop-off",
+                "summary": "Checkout starts are converting at {{conversion_rate}} across {{checkout_starts}} starts.",
                 "action": "Inspect checkout friction before adding more traffic.",
                 "digest": "Checkout conversion is {{conversion_rate}}."
             },
             "ai_visibility": {
-                "title": "Turn AI crawler attention into visits",
+                "title": "Review AI crawler attention",
                 "summary": "AI assistants requested {{requests}} pages; the strongest path is {{top_path}}.",
-                "action": "Strengthen the crawled page with clearer buying answers.",
+                "action": "Strengthen the crawled page with clearer answers and conversion context.",
                 "digest": "AI crawlers focused on {{top_path}}."
             },
             "traffic_quality": {
-                "title": "Focus on the source already pulling demand",
-                "summary": "{{source}} is producing {{pageviews}} pageviews in this window.",
-                "action": "Move campaign attention toward the highest-intent landing page.",
-                "digest": "{{source}} is your strongest demand source."
+                "title": "Review traffic from {{source}}",
+                "summary": "{{source}} produced {{source_hits}} visits out of {{total_pageviews}} pageviews in this window.",
+                "action": "Inspect the landing pages and intent for visitors from {{source}}.",
+                "digest": "Review traffic from {{source}}."
             },
             "search_visibility": {
-                "title": "Lift pages already visible in search",
-                "summary": "Search shows {{impressions}} impressions at {{ctr}} CTR, worth about {{estimated_clicks}} more clicks.",
+                "title": "Review pages already visible in search",
+                "summary": "Search shows {{impressions}} impressions at {{ctr}} CTR; estimated missed clicks: {{estimated_clicks}}.",
                 "action": "Improve the snippet, title, and on-page answer for the queries already earning impressions.",
-                "digest": "Search visibility can add about {{estimated_clicks}} clicks."
+                "digest": "Search visibility shows about {{estimated_clicks}} missed clicks."
             },
             "conversion_signal": {
-                "title": "Turn tracked events into a conversion signal",
+                "title": "Review tracked events as conversion signals",
                 "summary": "{{event_names}} are tracked across {{pageviews}} pageviews, but no conversion event is ranking opportunities yet.",
                 "action": "Pick the event that best represents a lead, signup, or purchase and mark it as a conversion signal.",
                 "digest": "Tracked events need a conversion signal."

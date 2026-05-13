@@ -115,6 +115,7 @@ func recoverDisable2FA(args []string) {
 	if user == nil {
 		fmt.Fprintf(os.Stderr, "Error: no user found with email %q\n", *email)
 		os.Exit(1)
+		return
 	}
 
 	name := strings.TrimSpace(user.GivenName + " " + user.LastName)

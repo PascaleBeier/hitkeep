@@ -27,7 +27,6 @@ type OpportunityDetectFunc func(DetectorInput, OpportunityDefinition) (*database
 type OpportunityRecipe struct {
 	CopyParams       map[string]any
 	ImpactValue      string
-	MonthlyUpside    float64
 	Confidence       string
 	Score            int
 	ScoreBreakdown   api.OpportunityScoreBreakdown
@@ -58,7 +57,6 @@ func DefaultOpportunityDefinitions() []OpportunityDefinition {
 		setupGoalSuggestionOpportunityDefinition,
 		setupFunnelSuggestionOpportunityDefinition,
 		conversionSignalOpportunityDefinition,
-		trackingSetupOpportunityDefinition,
 	})
 }
 
@@ -89,10 +87,10 @@ var checkoutOpportunityDefinition = OpportunityDefinition{
 		Summary:     "opportunities.catalog.checkout_conversion.summary",
 		Action:      "opportunities.catalog.checkout_conversion.action",
 		Digest:      "opportunities.catalog.checkout_conversion.digest",
-		ImpactLabel: "opportunities.impact.estimated_monthly_upside",
+		ImpactLabel: "opportunities.impact.checkout_starts",
 		RouteLabel:  "opportunities.routes.checkout",
 	},
-	AllowedParams:       []string{"checkout_starts", "orders", "conversion_rate", "monthly_upside", "currency", "path"},
+	AllowedParams:       []string{"checkout_starts", "orders", "conversion_rate", "path"},
 	ActionTypes:         []string{"optimize_checkout"},
 	IdentityEvidenceIDs: []string{"conversion_rate"},
 	RequiredSignals:     []OpportunitySignal{OpportunitySignalEcommerce},
@@ -124,7 +122,7 @@ var aiVisibilityOpportunityDefinition = OpportunityDefinition{
 
 var trafficQualityOpportunityDefinition = OpportunityDefinition{
 	Key:      "traffic-quality",
-	Kind:     "revenue",
+	Kind:     "traffic",
 	Category: DetectorCategoryTrafficQuality,
 	TypeKey:  "opportunities.types.traffic_quality",
 	MessageKeys: DetectorMessageKeys{
@@ -135,7 +133,7 @@ var trafficQualityOpportunityDefinition = OpportunityDefinition{
 		ImpactLabel: "opportunities.impact.pageviews_to_route",
 		RouteLabel:  "opportunities.routes.source",
 	},
-	AllowedParams:       []string{"source", "pageviews", "sessions"},
+	AllowedParams:       []string{"source", "source_hits", "total_pageviews", "sessions"},
 	ActionTypes:         []string{"route_traffic", "improve_content"},
 	IdentityEvidenceIDs: []string{"top_source"},
 	RequiredSignals:     []OpportunitySignal{OpportunitySignalSiteStats},
@@ -227,27 +225,6 @@ var setupFunnelSuggestionOpportunityDefinition = OpportunityDefinition{
 	Detect:              detectSetupFunnelSuggestionOpportunity,
 }
 
-var trackingSetupOpportunityDefinition = OpportunityDefinition{
-	Key:      "tracking-setup",
-	Kind:     "setup",
-	Category: DetectorCategorySetupQuality,
-	TypeKey:  "opportunities.types.tracking_setup",
-	MessageKeys: DetectorMessageKeys{
-		Title:       "opportunities.catalog.tracking_setup.title",
-		Summary:     "opportunities.catalog.tracking_setup.summary",
-		Action:      "opportunities.catalog.tracking_setup.action",
-		Digest:      "opportunities.catalog.tracking_setup.digest",
-		ImpactLabel: "opportunities.impact.tracked_conversion_events",
-		RouteLabel:  "opportunities.routes.tracker",
-	},
-	AllowedParams:       []string{"pageviews", "events", "asset"},
-	ActionTypes:         []string{"fix_tracking"},
-	IdentityEvidenceIDs: []string{"pageviews", "events"},
-	RequiredSignals:     []OpportunitySignal{OpportunitySignalSiteStats, OpportunitySignalEcommerce, OpportunitySignalAIVisibility},
-	RouteIcon:           "pi pi-code",
-	Detect:              detectTrackingSetupOpportunity,
-}
-
 func (d OpportunityDefinition) BaseOpportunity(input DetectorInput, generatedAt time.Time) database.OpportunityInput {
 	return database.OpportunityInput{
 		ID:              stableOpportunityID(input.SiteID, d.Key),
@@ -276,7 +253,6 @@ func (d OpportunityDefinition) BuildOpportunity(input DetectorInput, recipe Oppo
 	opportunity := d.BaseOpportunity(input, generatedAt)
 	opportunity.CopyParams = copyOpportunityMap(recipe.CopyParams)
 	opportunity.ImpactValue = recipe.ImpactValue
-	opportunity.MonthlyUpside = recipe.MonthlyUpside
 	opportunity.Confidence = recipe.Confidence
 	opportunity.Score = recipe.Score
 	opportunity.ScoreBreakdown = recipe.ScoreBreakdown

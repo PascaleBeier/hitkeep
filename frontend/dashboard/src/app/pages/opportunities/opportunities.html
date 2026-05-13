@@ -43,65 +43,7 @@
         </div>
     </section>
 
-    @if (canShowDigestPreview()) {
-    <section class="opportunities-digest" aria-labelledby="opportunities-digest-title">
-        <div class="opportunities-section-header">
-            <div>
-                <h2 id="opportunities-digest-title">{{ "opportunities.digest.title" | transloco }}</h2>
-                <p>{{ "opportunities.digest.subtitle" | transloco }}</p>
-            </div>
-            <div class="opportunities-digest__tags">
-                <p-tag [value]="digestPreviewFrequencyLabel()" severity="info" icon="pi pi-envelope" />
-                @if (digestPreview()?.should_send) {
-                <p-tag [value]="'opportunities.digest.statusReady' | transloco" severity="success" icon="pi pi-check-circle" />
-                }
-            </div>
-        </div>
-
-        @if (digestPreviewError()) {
-        <p-message severity="warn" [text]="'opportunities.digest.error' | transloco" />
-        } @else if (isDigestPreviewLoading()) {
-        <div class="opportunities-digest__loading">
-            <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
-            <span>{{ "common.loadingSiteData" | transloco }}</span>
-        </div>
-        } @else if (digestPreview(); as preview) { @if (preview.should_send && digestPreviewItems().length) {
-        <div class="opportunities-digest__list">
-            @for (item of digestPreviewItems(); track item.id) {
-            <article class="opportunities-digest__item">
-                <div class="opportunities-digest__item-header">
-                    <strong>{{ item.digest }}</strong>
-                    <span>{{ item.score }}</span>
-                </div>
-                <dl class="opportunities-digest__meta">
-                    <div>
-                        <dt>{{ item.impactLabel }}</dt>
-                        <dd>{{ item.impactValue }}</dd>
-                    </div>
-                    <div>
-                        <dt>{{ "opportunities.digest.confidence" | transloco }}</dt>
-                        <dd>{{ item.confidenceLabel }}</dd>
-                    </div>
-                </dl>
-                <p class="opportunities-digest__action">
-                    <span>{{ "opportunities.digest.nextAction" | transloco }}</span>
-                    {{ item.action }}
-                </p>
-                @if (item.evidence.length) {
-                <div class="opportunities-digest__evidence" [attr.aria-label]="'opportunities.digest.evidence' | transloco">
-                    @for (evidence of item.evidence; track evidence.id) {
-                    <span>{{ evidence.label }}: {{ evidence.value }}</span>
-                    }
-                </div>
-                }
-            </article>
-            }
-        </div>
-        } @else {
-        <p-message severity="info" [text]="'opportunities.digest.noSend' | transloco" />
-        } }
-    </section>
-    } @if (topActionOpportunityViews().length) {
+    @if (topActionOpportunityViews().length) {
     <section class="opportunities-top-actions" aria-labelledby="opportunities-top-actions-title" [attr.aria-label]="'opportunities.topActions.ariaLabel' | transloco">
         <div class="opportunities-section-header">
             <div>

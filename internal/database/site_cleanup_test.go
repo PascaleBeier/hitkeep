@@ -34,7 +34,7 @@ func TestSiteDeleteStepsCoverAllSiteTables(t *testing.T) {
 
 	var missing []string
 	for table := range siteTables {
-		if table == "sites" {
+		if table == "sites" || isMigrationScratchTable(table) {
 			continue
 		}
 		if _, ok := knownSiteDeleteTables[table]; !ok {
@@ -46,6 +46,10 @@ func TestSiteDeleteStepsCoverAllSiteTables(t *testing.T) {
 		sort.Strings(missing)
 		t.Fatalf("site delete steps missing tables: %s", strings.Join(missing, ", "))
 	}
+}
+
+func isMigrationScratchTable(table string) bool {
+	return strings.HasSuffix(table, "_without_money_contract")
 }
 
 func TestGoalAndFunnelRollupTablesCovered(t *testing.T) {

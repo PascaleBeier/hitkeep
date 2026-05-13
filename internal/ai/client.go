@@ -230,6 +230,9 @@ func ValidateConfig(conf Config) error {
 	if modelBuilders[providerKey] == nil {
 		return fmt.Errorf("%w: unsupported provider %q", ErrNotConfigured, conf.Provider)
 	}
+	if providerRequiresBaseURL[providerKey] && strings.TrimSpace(conf.BaseURL) == "" {
+		return fmt.Errorf("%w: base url is required for provider %q", ErrNotConfigured, conf.Provider)
+	}
 	if providerRequiresAPIKey[providerKey] && strings.TrimSpace(conf.APIKey) == "" {
 		return fmt.Errorf("%w: api key is required for provider %q", ErrNotConfigured, conf.Provider)
 	}
@@ -530,11 +533,11 @@ func strictOpportunityProposalResult(result *goaisdk.ObjectResult[OpportunityCan
 }
 
 func opportunitySystemPrompt() string {
-	return "You propose analytics opportunities by returning structured candidate metadata, message keys, interpolation params, and cited evidence ids only. Do not write customer-facing prose. Use only allowed keys and params from the candidate contract. Every claim must be supported by cited_evidence_ids. Return the requested JSON object only."
+	return "You propose analytics opportunities by returning structured candidate metadata, message keys, interpolation params, and cited evidence ids only. Do not write customer-facing prose. Do not make money claims, revenue-upside claims, or financial promises. Do not make causal claims. Do not infer source-specific traffic from total pageviews; source claims require source-specific evidence. Use only allowed keys and params from the candidate contract. Every claim must be supported by cited_evidence_ids. Return the requested JSON object only."
 }
 
 func opportunityPrompt(input string) string {
-	return "Propose an evidence-backed opportunity candidate from this contract and evidence snapshot. You may call the available read-only tools to verify aggregate context, but the final object must contain only allowed metadata, message keys, interpolation params, and cited evidence ids. Preserve the opportunity intent and do not add unsupported claims:\n\n" + input
+	return "Propose an evidence-backed opportunity candidate from this contract and evidence snapshot. You may call the available read-only tools to verify aggregate context, but the final object must contain only allowed metadata, message keys, interpolation params, and cited evidence ids. Do not make money claims. Do not make causal claims. Do not infer source-specific traffic from total pageviews. Preserve the opportunity intent and do not add unsupported claims:\n\n" + input
 }
 
 func mustRawJSON(value any) json.RawMessage {

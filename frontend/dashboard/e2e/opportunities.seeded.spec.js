@@ -13,11 +13,10 @@ const baseOpportunity = {
     digest_key: "opportunities.catalog.checkout_conversion.digest",
     copy_params: {
         conversion_rate: "42%",
-        monthly_upside: "$8,500"
+        checkout_starts: 120
     },
-    impact_value: "$8,500",
-    impact_label_key: "opportunities.impact.estimated_monthly_upside",
-    monthly_upside: 8500,
+    impact_value: "120",
+    impact_label_key: "opportunities.impact.checkout_starts",
     confidence: "high",
     score: 92,
     status: "new",
@@ -42,7 +41,7 @@ const baseOpportunity = {
 const generatedOpportunity = {
     ...baseOpportunity,
     id: "e2e-op-2",
-    kind: "revenue",
+    kind: "traffic",
     type_key: "opportunities.types.traffic_quality",
     title_key: "opportunities.catalog.traffic_quality.title",
     summary_key: "opportunities.catalog.traffic_quality.summary",
@@ -50,21 +49,24 @@ const generatedOpportunity = {
     digest_key: "opportunities.catalog.traffic_quality.digest",
     copy_params: {
         source: "google / cpc",
-        pageviews: 2400
+        source_hits: 240,
+        total_pageviews: 2400,
+        sessions: 1100
     },
-    impact_value: "+2,400",
+    impact_value: "240",
     impact_label_key: "opportunities.impact.pageviews_to_route",
-    monthly_upside: 1200,
     score: 88,
     route_label_key: "opportunities.routes.source",
     route_params: {
         source: "google / cpc"
     },
     evidence: [
-        { id: "pageviews", label_key: "opportunities.evidence.pageviews", value: "2400" },
-        { id: "top_source", label_key: "opportunities.evidence.top_source", value: "google / cpc" }
+        { id: "top_source", label_key: "opportunities.evidence.top_source", value: "google / cpc" },
+        { id: "source_hits", label_key: "opportunities.evidence.source_hits", value: "240" },
+        { id: "total_pageviews", label_key: "opportunities.evidence.total_pageviews", value: "2400" },
+        { id: "sessions", label_key: "opportunities.evidence.sessions", value: "1100" }
     ],
-    cited_evidence_ids: ["pageviews", "top_source"]
+    cited_evidence_ids: ["top_source", "source_hits", "total_pageviews", "sessions"]
 };
 
 test("opportunities inbox supports localized read and manage workflow", async ({ page }) => {
@@ -72,20 +74,21 @@ test("opportunities inbox supports localized read and manage workflow", async ({
     await login(page, "/opportunities");
 
     await expect(page.getByRole("heading", { name: "Opportunity inbox" })).toBeVisible();
-    await expect(page.getByText("Recover checkout drop-off")).toBeVisible();
-    await expect(page.getByText("Checkout starts are converting at 42%")).toBeVisible();
+    const inbox = page.getByLabel("Opportunity inbox");
+    await expect(inbox.getByRole("button", { name: "Review checkout drop-off" })).toBeVisible();
+    await expect(inbox.getByText("Checkout starts are converting at 42%")).toBeVisible();
     await expect(page.getByText("API should not render me")).toHaveCount(0);
     await expect(page.getByText("Self-hosted AI: openai gpt-test")).toBeVisible();
 
     await page.getByRole("button", { name: /refresh opportunities/i }).click();
-    await expect(page.getByText("Focus on the source already pulling demand")).toBeVisible();
+    await expect(inbox.getByRole("button", { name: "Review traffic from google / cpc" })).toBeVisible();
 
-    const generatedCard = page.locator(".opportunity-card").filter({ hasText: "Focus on the source already pulling demand" }).first();
+    const generatedCard = page.locator(".opportunity-card").filter({ hasText: "Review traffic from google / cpc" }).first();
     await generatedCard.getByRole("button", { name: /save/i }).click();
     await expect(page.getByText("Saved").first()).toBeVisible();
 
     await generatedCard.getByRole("button", { name: /inspect/i }).click();
-    await expect(page.getByText("Move campaign attention toward the highest-intent landing page.")).toBeVisible();
+    await expect(page.getByText("Inspect the landing pages and intent for visitors from google / cpc.")).toBeVisible();
 
     await page.getByRole("button", { name: /mark done/i }).click();
     await expect(page.getByText("Done").first()).toBeVisible();
@@ -103,8 +106,8 @@ test("opportunities inbox renders the same keyed recommendation in German", asyn
         await setLocale(page, "de");
         await page.goto("/opportunities", { waitUntil: "domcontentloaded" });
 
-        await expect(page.getByText("Checkout-Abbruch zurückholen")).toBeVisible();
-        await expect(page.getByText("Checkout-Starts konvertieren mit 42%")).toBeVisible();
+        await expect(page.getByLabel("Opportunity-Inbox").getByRole("button", { name: "Checkout-Abbruch prüfen" })).toBeVisible();
+        await expect(page.getByLabel("Opportunity-Inbox").getByText("Checkout-Starts konvertieren mit 42%")).toBeVisible();
         await expect(page.getByText("API should not render me")).toHaveCount(0);
     } finally {
         await setLocale(page, originalLocale);

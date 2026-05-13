@@ -38,6 +38,7 @@ import {
     SystemInfo,
     SystemHealth,
     SystemSearchConsoleStatus,
+    SystemAIStatus,
     SystemStorage,
     SystemIngestStats,
     SystemBackupStatus,
@@ -159,6 +160,7 @@ export class AdminSettings implements OnInit {
     protected systemInfo = signal<SystemInfo | null>(null);
     protected systemHealth = signal<SystemHealth | null>(null);
     protected systemSearchConsole = signal<SystemSearchConsoleStatus | null>(null);
+    protected systemAIStatus = signal<SystemAIStatus | null>(null);
     protected systemStorage = signal<SystemStorage | null>(null);
     protected systemIngest = signal<SystemIngestStats | null>(null);
     protected systemBackups = signal<SystemBackupStatus | null>(null);
@@ -171,6 +173,7 @@ export class AdminSettings implements OnInit {
     protected isLoadingSystem = signal(false);
     protected isLoadingHealth = signal(false);
     protected isLoadingSearchConsole = signal(false);
+    protected isLoadingAIStatus = signal(false);
     protected isLoadingStorage = signal(false);
     protected isLoadingIngest = signal(false);
     protected isLoadingBackups = signal(false);
@@ -296,6 +299,43 @@ export class AdminSettings implements OnInit {
         return status.failed_syncs + status.needs_attention_syncs;
     });
     protected readonly searchConsoleSyncIssueMetric = computed(() => `${this.searchConsoleSyncIssueCount()}`);
+    protected readonly aiTokenUsageMetric = computed(() => {
+        const status = this.systemAIStatus();
+        if (!status) return '-';
+        return this.formatBudgetUsage(status.tokens_used, status.token_limit);
+    });
+    protected readonly aiRequestUsageMetric = computed(() => {
+        const status = this.systemAIStatus();
+        if (!status) return '-';
+        return this.formatBudgetUsage(status.requests_used, status.request_limit);
+    });
+    protected readonly aiTokenBudgetPercent = computed(() => {
+        const status = this.systemAIStatus();
+        if (!status) return 0;
+        return this.budgetPercent(status.tokens_used, status.token_limit);
+    });
+    protected readonly aiRequestBudgetPercent = computed(() => {
+        const status = this.systemAIStatus();
+        if (!status) return 0;
+        return this.budgetPercent(status.requests_used, status.request_limit);
+    });
+    protected readonly aiProviderModelLabel = computed(() => {
+        const status = this.systemAIStatus();
+        if (!status) return '-';
+        const provider = status.provider?.trim();
+        const model = status.model?.trim();
+        if (provider && model) return `${provider} / ${model}`;
+        return provider || model || '-';
+    });
+    protected readonly aiSummaryKey = computed(() => {
+        const status = this.systemAIStatus();
+        if (!status) return 'unknown';
+        if (status.budget_exhausted || status.status === 'budget_exhausted') return 'budgetExhausted';
+        if (!status.enabled) return 'disabled';
+        if (!status.configured) return 'notConfigured';
+        if (status.status === 'needs_attention') return 'needsAttention';
+        return 'ready';
+    });
     protected readonly pageTitleKey = computed(() => (this.routeData()['adminPage'] === 'settings' ? 'nav.systemSettings' : 'nav.systemStatus'));
     protected readonly isSettingsPage = computed(() => this.routeData()['adminPage'] === 'settings');
 
@@ -480,6 +520,16 @@ export class AdminSettings implements OnInit {
             });
     }
 
+    protected loadSystemAIStatus() {
+        this.isLoadingAIStatus.set(true);
+        this.system
+            .getAI()
+            .pipe(finalize(() => this.isLoadingAIStatus.set(false)))
+            .subscribe({
+                next: (status) => this.systemAIStatus.set(status)
+            });
+    }
+
     protected loadSystemStorage() {
         this.isLoadingStorage.set(true);
         this.system.getStorage().subscribe({
@@ -629,6 +679,7 @@ export class AdminSettings implements OnInit {
         this.loadSystemInfo();
         this.loadSystemHealth();
         this.loadSearchConsoleStatus();
+        this.loadSystemAIStatus();
         this.loadSystemStorage();
         this.loadSystemIngest();
     }
@@ -780,6 +831,22 @@ export class AdminSettings implements OnInit {
         return formatDurationInterval(minutes * 60, this.localeTag(), 'short');
     }
 
+    protected formatBudgetUsage(used: number | null | undefined, limit: number | null | undefined): string {
+        const formatter = new Intl.NumberFormat(this.localeTag());
+        const usedValue = formatter.format(Math.max(used ?? 0, 0));
+        if (!limit || limit <= 0) {
+            return usedValue;
+        }
+        return `${usedValue} / ${formatter.format(limit)}`;
+    }
+
+    protected budgetPercent(used: number | null | undefined, limit: number | null | undefined): number {
+        if (!limit || limit <= 0) {
+            return 0;
+        }
+        return Math.min(100, Math.round((Math.max(used ?? 0, 0) / limit) * 100));
+    }
+
     protected statusSeverity(status: string | null | undefined): 'success' | 'danger' | 'warn' | 'secondary' | 'info' | 'contrast' {
         switch ((status ?? '').toLowerCase()) {
             case 'healthy':
@@ -794,6 +861,7 @@ export class AdminSettings implements OnInit {
             case 'error':
             case 'unhealthy':
             case 'needs_attention':
+            case 'budget_exhausted':
                 return 'danger';
             case 'warn':
             case 'warning':

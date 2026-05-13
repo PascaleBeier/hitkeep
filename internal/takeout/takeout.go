@@ -328,7 +328,6 @@ func opportunityTakeoutSelect(whereClause string) string {
 			copy_params_json,
 			impact_value,
 			impact_label_key,
-			monthly_upside,
 			confidence,
 			score,
 			score_breakdown_json,

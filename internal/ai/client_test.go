@@ -269,7 +269,7 @@ func TestDecodeOpportunityCandidateProposalRejectsFreeformProseFields(t *testing
 }
 
 func TestDecodeOpportunityCandidateProposalRejectsTrailingProseAfterJSONObject(t *testing.T) {
-	_, err := decodeOpportunityCandidateProposalJSON([]byte(validOpportunityProviderJSON() + "\n\nThis means checkout is leaking money."))
+	_, err := decodeOpportunityCandidateProposalJSON([]byte(validOpportunityProviderJSON() + "\n\nThis is unsupported trailing prose."))
 
 	if !errors.Is(err, ErrInvalidOutput) {
 		t.Fatalf("expected ErrInvalidOutput for trailing prose, got %v", err)
@@ -393,6 +393,45 @@ func TestValidateOpportunityCandidateProposalRejectsUnsupportedKeysAndParams(t *
 	}, structuredDetectorInput())
 	if !errors.Is(err, ErrInvalidOutput) {
 		t.Fatalf("expected ErrInvalidOutput for unsupported key, got %v", err)
+	}
+}
+
+func TestValidateOpportunityCandidateProposalRejectsRemovedMoneyParamsEvenIfAllowed(t *testing.T) {
+	input := structuredDetectorInput()
+	input.AllowedParams = append(input.AllowedParams, "monthly_upside", "currency")
+	input.CopyParams = map[string]any{
+		"conversion_rate": "42%",
+		"monthly_upside":  "8500",
+		"currency":        "EUR",
+	}
+
+	err := ValidateOpportunityCandidateProposal(OpportunityCandidateProposal{
+		TypeKey:          "opportunities.types.checkout_conversion",
+		Category:         "conversion",
+		ActionType:       "optimize_checkout",
+		Effort:           "medium",
+		TitleKey:         "opportunities.catalog.checkout_conversion.title",
+		SummaryKey:       "opportunities.catalog.checkout_conversion.summary",
+		ActionKey:        "opportunities.catalog.checkout_conversion.action",
+		DigestKey:        "opportunities.catalog.checkout_conversion.digest",
+		CopyParams:       map[string]any{"conversion_rate": "42%", "monthly_upside": "8500", "currency": "EUR"},
+		CitedEvidenceIDs: []string{"checkout-rate"},
+	}, input)
+	if !errors.Is(err, ErrInvalidOutput) {
+		t.Fatalf("expected ErrInvalidOutput for removed money params, got %v", err)
+	}
+}
+
+func TestOpportunityPromptsForbidMoneyCausalAndSourceTotalClaims(t *testing.T) {
+	prompt := opportunitySystemPrompt() + "\n" + opportunityPrompt("{}")
+	for _, want := range []string{
+		"Do not make money claims",
+		"Do not make causal claims",
+		"Do not infer source-specific traffic from total pageviews",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("expected prompt guardrail %q in %s", want, prompt)
+		}
 	}
 }
 
@@ -722,8 +761,32 @@ func TestValidateConfigRequiresAPIKeyForHostedKeyProviders(t *testing.T) {
 	if !errors.Is(err, ErrNotConfigured) {
 		t.Fatalf("expected ErrNotConfigured for missing OpenAI API key, got %v", err)
 	}
+	err = ValidateConfig(Config{Provider: "openai-compatible", Model: "gpt-test", BaseURL: "https://gateway.example/v1"})
+	if !errors.Is(err, ErrNotConfigured) {
+		t.Fatalf("expected ErrNotConfigured for missing gateway API key, got %v", err)
+	}
 	if err := ValidateConfig(Config{Provider: "ollama", Model: "llama3"}); err != nil {
 		t.Fatalf("expected local keyless provider config to be valid, got %v", err)
+	}
+}
+
+func TestValidateConfigRequiresExplicitBaseURLForGatewayProviders(t *testing.T) {
+	for _, provider := range []string{"openai-compatible", "compat", "gateway", "bifrost", "litellm"} {
+		t.Run(provider, func(t *testing.T) {
+			err := ValidateConfig(Config{Provider: provider, Model: "gpt-test", APIKey: "provider-secret"})
+			if !errors.Is(err, ErrNotConfigured) {
+				t.Fatalf("expected ErrNotConfigured for missing gateway base URL, got %v", err)
+			}
+		})
+	}
+
+	if err := ValidateConfig(Config{
+		Provider: "openai-compatible",
+		Model:    "gpt-test",
+		BaseURL:  "https://gateway.example/v1",
+		APIKey:   "provider-secret",
+	}); err != nil {
+		t.Fatalf("expected explicit gateway config to be valid, got %v", err)
 	}
 }
 

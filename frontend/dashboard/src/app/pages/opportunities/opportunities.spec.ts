@@ -44,8 +44,8 @@ describe('OpportunitiesPage', () => {
                             },
                             opportunities: {
                                 header: {
-                                    eyebrow: 'Revenue guidance',
-                                    title: 'Make more money from the traffic you already have',
+                                    eyebrow: 'Traffic guidance',
+                                    title: 'Evidence-backed recommendations for this site',
                                     subtitle: 'Ranked suggestions built from goals, funnels, ecommerce, search, and AI visibility.',
                                     scoreLabel: 'Score',
                                     scoreAria: 'Opportunity score',
@@ -53,7 +53,7 @@ describe('OpportunitiesPage', () => {
                                 },
                                 kpis: {
                                     open: 'Open',
-                                    upside: 'Upside',
+                                    score: 'Average score',
                                     highConfidence: 'High confidence',
                                     aiSearchWins: 'AI/Search wins'
                                 },
@@ -64,7 +64,7 @@ describe('OpportunitiesPage', () => {
                                     types: {
                                         all: 'All',
                                         conversion: 'Conversion',
-                                        revenue: 'Revenue',
+                                        traffic: 'Traffic',
                                         ai: 'AI visibility',
                                         search: 'Search',
                                         setup: 'Setup'
@@ -79,8 +79,6 @@ describe('OpportunitiesPage', () => {
                                 },
                                 confidence: { high: 'High confidence', medium: 'Medium confidence' },
                                 actions: {
-                                    previewDigest: 'Preview digest',
-                                    previewOn: 'Digest preview',
                                     generate: 'Refresh opportunities',
                                     generating: 'Refreshing',
                                     save: 'Save',
@@ -92,20 +90,6 @@ describe('OpportunitiesPage', () => {
                                     load: 'Could not load opportunities.',
                                     generate: 'Could not refresh opportunities.',
                                     status: 'Could not update opportunity.'
-                                },
-                                digest: {
-                                    title: 'Weekly digest preview',
-                                    subtitle: 'Top recommendations that would be emailed for this site.',
-                                    statusReady: 'Would send',
-                                    frequency: {
-                                        daily: 'Daily',
-                                        weekly: 'Weekly'
-                                    },
-                                    nextAction: 'Next action',
-                                    evidence: 'Evidence',
-                                    confidence: 'Confidence',
-                                    noSend: 'No opportunity email would be sent for this site yet.',
-                                    error: 'Could not load digest preview.'
                                 },
                                 inbox: {
                                     ariaLabel: 'Opportunity inbox',
@@ -119,7 +103,6 @@ describe('OpportunitiesPage', () => {
                                     subtitle: 'Start with these ranked opportunities first.'
                                 },
                                 impact: {
-                                    estimated_monthly_upside: 'estimated monthly upside',
                                     qualifiedVisits: 'qualified visits',
                                     conversionLift: 'conversion lift',
                                     searchClicks: 'search clicks',
@@ -151,6 +134,8 @@ describe('OpportunitiesPage', () => {
                                     pageviews: 'Pageviews',
                                     sessions: 'Sessions',
                                     top_source: 'Top source',
+                                    source_hits: 'Source visits',
+                                    total_pageviews: 'Total pageviews',
                                     tracked_events: 'Tracked events',
                                     suggested_goal_event: 'Suggested goal event',
                                     suggested_goal_event_count: 'Observed event count',
@@ -161,22 +146,22 @@ describe('OpportunitiesPage', () => {
                                 },
                                 catalog: {
                                     checkout_conversion: {
-                                        title: 'Recover checkout drop-off',
-                                        summary: 'Checkout starts are converting at {{conversion_rate}}, leaving {{monthly_upside}} on the table.',
+                                        title: 'Review checkout drop-off',
+                                        summary: 'Checkout starts are converting at {{conversion_rate}} across {{checkout_starts}} starts.',
                                         action: 'Inspect checkout friction before adding more traffic.',
                                         digest: 'Checkout conversion is {{conversion_rate}}.'
                                     },
                                     ai_visibility: {
-                                        title: 'Turn AI crawler attention into visits',
+                                        title: 'Review AI crawler attention',
                                         summary: 'AI assistants requested {{requests}} pages; the strongest path is {{top_path}}.',
-                                        action: 'Strengthen the crawled page with clearer buying answers.',
+                                        action: 'Strengthen the crawled page with clearer answers and conversion context.',
                                         digest: 'AI crawlers focused on {{top_path}}.'
                                     },
                                     traffic_quality: {
-                                        title: 'Focus on the source already pulling demand',
-                                        summary: '{{source}} is producing {{pageviews}} pageviews in this window.',
-                                        action: 'Move campaign attention toward the highest-intent landing page.',
-                                        digest: '{{source}} is your strongest demand source.'
+                                        title: 'Review traffic from {{source}}',
+                                        summary: '{{source}} produced {{source_hits}} visits out of {{total_pageviews}} pageviews in this window.',
+                                        action: 'Review the landing paths and conversion setup for this source.',
+                                        digest: 'Review traffic signals from {{source}}.'
                                     },
                                     setup_goal_suggestion: {
                                         title: 'Create a goal for {{event_name}}',
@@ -231,18 +216,18 @@ describe('OpportunitiesPage', () => {
                                         plan: ['Replay the path', 'Shorten the form', 'Make payment errors visible']
                                     },
                                     aiPricing: {
-                                        title: 'Turn AI attention on pricing into visits',
+                                        title: 'Review AI attention on pricing',
                                         summary: 'AI crawlers keep hitting pricing, but referral visits lag.',
                                         action: 'Add comparison copy above the pricing CTA.',
                                         evidence: ['Pricing has AI fetches', 'AI referrals convert well', 'No comparison section exists'],
                                         plan: ['Add AI-friendly answer copy', 'Add comparison schema', 'Link docs to pricing']
                                     },
                                     sourceAmplifier: {
-                                        title: 'Put more budget behind the source that buys',
-                                        summary: 'Google CPC converts much better than average.',
-                                        action: 'Shift spend toward the campaign with purchase intent.',
-                                        evidence: ['High conversion rate', 'Low traffic share', 'Good order value'],
-                                        plan: ['Duplicate the winning ad', 'Build a focused landing page', 'Pause low-intent terms']
+                                        title: 'Review the source with clear engagement',
+                                        summary: 'Google CPC has enough traffic to inspect landing paths.',
+                                        action: 'Compare its landing paths against configured goals.',
+                                        evidence: ['High traffic share', 'Tracked sessions exist', 'Goal setup is available'],
+                                        plan: ['Review landing paths', 'Check goal coverage', 'Tag follow-up campaigns']
                                     },
                                     searchCtr: {
                                         title: 'Recover clicks from a high-impression comparison page',
@@ -280,8 +265,8 @@ describe('OpportunitiesPage', () => {
                             },
                             opportunities: {
                                 header: {
-                                    eyebrow: 'Umsatzhinweise',
-                                    title: 'Mehr Umsatz aus dem vorhandenen Traffic',
+                                    eyebrow: 'Traffichinweise',
+                                    title: 'Evidenzbasierte Empfehlungen für diese Website',
                                     subtitle: 'Priorisierte Hinweise aus Zielen, Funnels, E-Commerce, Suche und KI-Sichtbarkeit.',
                                     scoreLabel: 'Score',
                                     scoreAria: 'Opportunity-Score',
@@ -289,7 +274,7 @@ describe('OpportunitiesPage', () => {
                                 },
                                 kpis: {
                                     open: 'Offen',
-                                    upside: 'Potenzial',
+                                    score: 'Durchschnittsscore',
                                     highConfidence: 'Hohe Sicherheit',
                                     aiSearchWins: 'KI-/Suchchancen'
                                 },
@@ -300,7 +285,7 @@ describe('OpportunitiesPage', () => {
                                     types: {
                                         all: 'Alle',
                                         conversion: 'Conversion',
-                                        revenue: 'Umsatz',
+                                        traffic: 'Traffic',
                                         ai: 'KI-Sichtbarkeit',
                                         search: 'Suche',
                                         setup: 'Setup'
@@ -327,20 +312,6 @@ describe('OpportunitiesPage', () => {
                                     generate: 'Chancen konnten nicht aktualisiert werden.',
                                     status: 'Chance konnte nicht aktualisiert werden.'
                                 },
-                                digest: {
-                                    title: 'Wöchentliche Digest-Vorschau',
-                                    subtitle: 'Wichtigste Empfehlungen, die für diese Website gemailt würden.',
-                                    statusReady: 'Würde senden',
-                                    frequency: {
-                                        daily: 'Täglich',
-                                        weekly: 'Wöchentlich'
-                                    },
-                                    nextAction: 'Nächste Aktion',
-                                    evidence: 'Evidenz',
-                                    confidence: 'Sicherheit',
-                                    noSend: 'Für diese Website würde noch keine Chancen-Mail gesendet.',
-                                    error: 'Digest-Vorschau konnte nicht geladen werden.'
-                                },
                                 inbox: {
                                     ariaLabel: 'Chancen-Posteingang',
                                     title: 'Chancen-Posteingang',
@@ -352,7 +323,6 @@ describe('OpportunitiesPage', () => {
                                     subtitle: 'Beginne mit diesen priorisierten Chancen.'
                                 },
                                 impact: {
-                                    estimated_monthly_upside: 'geschätztes monatliches Potenzial',
                                     ai_touched_pages: 'KI-berührte Seiten',
                                     pageviews_to_route: 'Seitenaufrufe zum Routen',
                                     tracked_conversion_events: 'erfasste Conversion-Ereignisse'
@@ -376,26 +346,28 @@ describe('OpportunitiesPage', () => {
                                     pageviews: 'Seitenaufrufe',
                                     sessions: 'Sitzungen',
                                     top_source: 'Wichtigste Quelle',
+                                    source_hits: 'Quellenbesuche',
+                                    total_pageviews: 'Gesamte Seitenaufrufe',
                                     tracked_events: 'Erfasste Ereignisse'
                                 },
                                 catalog: {
                                     checkout_conversion: {
-                                        title: 'Checkout-Abbruch zurückholen',
-                                        summary: 'Checkout-Starts konvertieren mit {{conversion_rate}} und lassen {{monthly_upside}} liegen.',
+                                        title: 'Checkout-Abbruch prüfen',
+                                        summary: 'Checkout-Starts konvertieren mit {{conversion_rate}} bei {{checkout_starts}} Starts.',
                                         action: 'Prüfe Checkout-Reibung, bevor du mehr Traffic einkaufst.',
                                         digest: 'Checkout-Conversion liegt bei {{conversion_rate}}.'
                                     },
                                     ai_visibility: {
-                                        title: 'KI-Crawler-Aufmerksamkeit in Besuche verwandeln',
+                                        title: 'KI-Crawler-Aufmerksamkeit prüfen',
                                         summary: 'KI-Assistenten haben {{requests}} Seiten angefragt; der stärkste Pfad ist {{top_path}}.',
-                                        action: 'Stärke die gecrawlte Seite mit klareren Kaufantworten.',
+                                        action: 'Stärke die gecrawlte Seite mit klareren Antworten und Conversion-Kontext.',
                                         digest: 'KI-Crawler konzentrieren sich auf {{top_path}}.'
                                     },
                                     traffic_quality: {
-                                        title: 'Auf die Quelle mit vorhandener Nachfrage fokussieren',
-                                        summary: '{{source}} erzeugt in diesem Zeitraum {{pageviews}} Seitenaufrufe.',
-                                        action: 'Lenke Kampagnenaufmerksamkeit auf die Landingpage mit der höchsten Absicht.',
-                                        digest: '{{source}} ist deine stärkste Nachfragequelle.'
+                                        title: 'Traffic von {{source}} prüfen',
+                                        summary: '{{source}} erzeugte {{source_hits}} Besuche bei {{total_pageviews}} Seitenaufrufen in diesem Zeitraum.',
+                                        action: 'Prüfe Landingpages und Conversion-Setup für diese Quelle.',
+                                        digest: 'Prüfe Traffic-Signale von {{source}}.'
                                     },
                                     tracking_setup: {
                                         title: 'Genug Signal für Empfehlungen sammeln',
@@ -470,14 +442,15 @@ describe('OpportunitiesPage', () => {
         httpMock.verify();
     });
 
-    it('renders the money-shot opportunity inbox', () => {
+    it('renders the evidence-backed opportunity inbox without money positioning', () => {
         renderDashboard();
 
-        expect(fixture.nativeElement.textContent).toContain('Make more money from the traffic you already have');
-        expect(fixture.nativeElement.textContent).toContain('Recover checkout drop-off');
+        expect(fixture.nativeElement.textContent).toContain('Evidence-backed recommendations for this site');
+        expect(fixture.nativeElement.textContent).toContain('Review checkout drop-off');
         expect(fixture.nativeElement.textContent).toContain('Checkout starts are converting at 42%');
         expect(fixture.nativeElement.textContent).not.toContain('API should not render me');
-        expect(fixture.nativeElement.textContent).toContain('$8,500');
+        expect(fixture.nativeElement.textContent).not.toContain('$8,500');
+        expect(fixture.nativeElement.textContent).not.toContain('Upside');
     });
 
     it('renders the top three actionable opportunities before the full inbox', () => {
@@ -511,18 +484,19 @@ describe('OpportunitiesPage', () => {
                 buildOpportunity({
                     id: 'top-checkout',
                     score: 88,
-                    copy_params: { conversion_rate: '42%', monthly_upside: '$8,500' },
-                    impact_value: '$8,500'
+                    copy_params: { conversion_rate: '42%', checkout_starts: 500 },
+                    impact_value: '500'
                 }),
                 buildOpportunity({
                     id: 'top-source',
-                    kind: 'revenue',
+                    kind: 'traffic',
                     score: 74,
                     type_key: 'opportunities.types.traffic_quality',
                     title_key: 'opportunities.catalog.traffic_quality.title',
                     summary_key: 'opportunities.catalog.traffic_quality.summary',
                     action_key: 'opportunities.catalog.traffic_quality.action',
-                    digest_key: 'opportunities.catalog.traffic_quality.digest'
+                    digest_key: 'opportunities.catalog.traffic_quality.digest',
+                    copy_params: { source: 'Open Alternative', source_hits: 240, total_pageviews: 1200 }
                 }),
                 buildOpportunity({
                     id: 'dismissed-setup',
@@ -540,68 +514,20 @@ describe('OpportunitiesPage', () => {
         const topActions = fixture.nativeElement.querySelector('.opportunities-top-actions') as HTMLElement | null;
         expect(topActions?.textContent).toContain('Top 3 actions');
         expect(topActions?.querySelectorAll('app-opportunity-card').length).toBe(3);
-        expect(topActions?.textContent).toContain('Turn AI crawler attention into visits');
-        expect(topActions?.textContent).toContain('Recover checkout drop-off');
-        expect(topActions?.textContent).toContain('Focus on the source already pulling demand');
+        expect(topActions?.textContent).toContain('Review AI crawler attention');
+        expect(topActions?.textContent).toContain('Review checkout drop-off');
+        expect(topActions?.textContent).toContain('Review traffic from Open Alternative');
         expect(topActions?.textContent).not.toContain('Collect enough signal for recommendations');
     });
 
-    it('renders the weekly digest preview from safe keys and cited evidence', () => {
-        renderDashboard({
-            digestPreview: {
-                frequency: 'weekly',
-                should_send: true,
-                reason: 'ready',
-                items: [
-                    buildDigestPreviewItem({
-                        digest_key: 'opportunities.catalog.checkout_conversion.digest',
-                        action_key: 'opportunities.catalog.checkout_conversion.action',
-                        copy_params: { conversion_rate: '42%', monthly_upside: '$8,500' },
-                        evidence: [
-                            { id: 'checkout_starts', label_key: 'opportunities.evidence.checkout_starts', value: '120' },
-                            { id: 'conversion_rate', label_key: 'opportunities.evidence.checkout_conversion_rate', value: '42%' },
-                            { id: 'uncited', label_key: 'opportunities.evidence.pageviews', value: '999' }
-                        ],
-                        cited_evidence_ids: ['checkout_starts', 'conversion_rate'],
-                        title: 'API should not render digest title',
-                        digest: 'API should not render digest copy',
-                        action: 'API should not render digest action'
-                    })
-                ]
-            }
-        });
+    it('does not render the email digest preview on the decision page', () => {
+        renderDashboard();
 
-        const digest = fixture.nativeElement.querySelector('.opportunities-digest') as HTMLElement | null;
-        expect(digest?.textContent).toContain('Weekly digest preview');
-        expect(digest?.textContent).toContain('Weekly');
-        expect(digest?.textContent).toContain('Would send');
-        expect(digest?.textContent).toContain('Checkout conversion is 42%.');
-        expect(digest?.textContent).toContain('Inspect checkout friction before adding more traffic.');
-        expect(digest?.textContent).toContain('Confidence');
-        expect(digest?.textContent).toContain('Checkout starts: 120');
-        expect(digest?.textContent).toContain('Checkout conversion: 42%');
-        expect(digest?.textContent).not.toContain('ScoreMedium confidence');
-        expect(digest?.textContent).not.toContain('Pageviews: 999');
-        expect(digest?.textContent).not.toContain('API should not render digest');
+        expect(fixture.nativeElement.querySelector('.opportunities-digest')).toBeNull();
+        httpMock.expectNone('/api/sites/site-1/opportunities/digest-preview?frequency=weekly');
     });
 
-    it('renders a no-send digest preview state when there are no email-worthy opportunities', () => {
-        renderDashboard({
-            digestPreview: {
-                frequency: 'weekly',
-                should_send: false,
-                reason: 'no_opportunities',
-                items: []
-            }
-        });
-
-        const digest = fixture.nativeElement.querySelector('.opportunities-digest') as HTMLElement | null;
-        expect(digest?.textContent).toContain('Weekly digest preview');
-        expect(digest?.textContent).toContain('No opportunity email would be sent for this site yet.');
-        expect(digest?.querySelectorAll('.opportunities-digest__item').length).toBe(0);
-    });
-
-    it('does not call or render the authenticated digest preview in share mode', () => {
+    it('does not render the digest preview in share mode', () => {
         renderDashboard({
             shareToken: 'share-token',
             permissions: {
@@ -613,38 +539,30 @@ describe('OpportunitiesPage', () => {
         });
 
         expect(fixture.nativeElement.querySelector('.opportunities-digest')).toBeNull();
-        expect(fixture.nativeElement.textContent).toContain('Recover checkout drop-off');
+        expect(fixture.nativeElement.textContent).toContain('Review checkout drop-off');
     });
 
-    it('formats aggregate upside with the opportunity currency', () => {
+    it('renders average score instead of aggregate currency value', () => {
         renderDashboard({
             opportunities: [
                 buildOpportunity({
-                    copy_params: {
-                        conversion_rate: '42%',
-                        monthly_upside: '€8,500',
-                        currency: 'EUR'
-                    },
-                    impact_value: '€8,500',
-                    monthly_upside: 8500
+                    id: 'score-a',
+                    score: 90,
+                    copy_params: { conversion_rate: '42%', checkout_starts: 500 },
+                    impact_value: '500'
+                }),
+                buildOpportunity({
+                    id: 'score-b',
+                    score: 70,
+                    copy_params: { conversion_rate: '35%', checkout_starts: 300 },
+                    impact_value: '300'
                 })
-            ],
-            digestPreview: defaultDigestPreview({
-                items: [
-                    buildDigestPreviewItem({
-                        copy_params: {
-                            conversion_rate: '42%',
-                            monthly_upside: '€8,500',
-                            currency: 'EUR'
-                        },
-                        impact_value: '€8,500'
-                    })
-                ]
-            })
+            ]
         });
 
-        expect(fixture.nativeElement.textContent).toContain('€8,500');
-        expect(fixture.nativeElement.textContent).not.toContain('$8,500');
+        expect(fixture.nativeElement.textContent).toContain('Average score');
+        expect(fixture.nativeElement.textContent).toContain('80');
+        expect(fixture.nativeElement.textContent).not.toContain('Estimated monthly');
     });
 
     it('filters opportunities by AI visibility', () => {
@@ -654,8 +572,8 @@ describe('OpportunitiesPage', () => {
         buttons.find((button) => button.textContent?.includes('AI visibility'))?.click();
         fixture.detectChanges();
 
-        expect(fixture.nativeElement.textContent).toContain('Turn AI crawler attention into visits');
-        expect(fixture.nativeElement.textContent).not.toContain('Recover checkout drop-off');
+        expect(fixture.nativeElement.textContent).toContain('Review AI crawler attention');
+        expect(fixture.nativeElement.textContent).not.toContain('Review checkout drop-off');
     });
 
     it('regenerates opportunities for the selected range', () => {
@@ -668,14 +586,63 @@ describe('OpportunitiesPage', () => {
         expect(req.request.params.has('from')).toBe(true);
         expect(req.request.params.has('to')).toBe(true);
         req.flush({
-            opportunities: [buildOpportunity({ id: 'op-3', kind: 'revenue', type_key: 'opportunities.types.traffic_quality', title_key: 'opportunities.catalog.traffic_quality.title', impact_value: '$1,200' })],
+            opportunities: [
+                buildOpportunity({
+                    id: 'op-3',
+                    kind: 'traffic',
+                    type_key: 'opportunities.types.traffic_quality',
+                    title_key: 'opportunities.catalog.traffic_quality.title',
+                    summary_key: 'opportunities.catalog.traffic_quality.summary',
+                    action_key: 'opportunities.catalog.traffic_quality.action',
+                    digest_key: 'opportunities.catalog.traffic_quality.digest',
+                    copy_params: { source: 'Google', source_hits: '1,200', total_pageviews: '4,000' },
+                    impact_value: '1,200'
+                })
+            ],
             ai_status: 'success'
         });
-        flushDigestPreview(defaultDigestPreview());
         fixture.detectChanges();
 
-        expect(fixture.nativeElement.textContent).toContain('Focus on the source already pulling demand');
-        expect(fixture.nativeElement.textContent).toContain('$1,200');
+        expect(fixture.nativeElement.textContent).toContain('Review traffic from Google');
+        expect(fixture.nativeElement.textContent).toContain('1,200');
+    });
+
+    it('keeps the inbox stable when generation returns nullable opportunities', () => {
+        renderDashboard();
+
+        const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+        buttons.find((button) => button.textContent?.includes('Refresh opportunities'))?.click();
+
+        const req = httpMock.expectOne((request) => request.method === 'POST' && request.url === '/api/sites/site-1/opportunities/generate');
+        req.flush({
+            opportunities: null,
+            ai_status: 'success'
+        });
+        expect(() => fixture.detectChanges()).not.toThrow();
+        expect(fixture.nativeElement.textContent).toContain('No opportunities match this view');
+    });
+
+    it('keeps the inbox stable when generation returns nullable nested opportunity fields', () => {
+        renderDashboard();
+
+        const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+        buttons.find((button) => button.textContent?.includes('Refresh opportunities'))?.click();
+
+        const req = httpMock.expectOne((request) => request.method === 'POST' && request.url === '/api/sites/site-1/opportunities/generate');
+        req.flush({
+            opportunities: [
+                buildOpportunity({
+                    id: 'op-null-nested',
+                    copy_params: null,
+                    route_params: null,
+                    evidence: null,
+                    cited_evidence_ids: null
+                })
+            ],
+            ai_status: 'success'
+        });
+        expect(() => fixture.detectChanges()).not.toThrow();
+        expect(fixture.nativeElement.textContent).toContain('Review checkout drop-off');
     });
 
     it('lets site viewers read localized opportunities without mutation actions', () => {
@@ -688,7 +655,7 @@ describe('OpportunitiesPage', () => {
             }
         });
 
-        expect(fixture.nativeElement.textContent).toContain('Recover checkout drop-off');
+        expect(fixture.nativeElement.textContent).toContain('Review checkout drop-off');
         expect(fixture.nativeElement.textContent).not.toContain('Refresh opportunities');
         expect(fixture.nativeElement.textContent).not.toContain('AI disabled');
 
@@ -738,9 +705,9 @@ describe('OpportunitiesPage', () => {
         transloco.setActiveLang('de');
         fixture.detectChanges();
 
-        expect(fixture.nativeElement.textContent).toContain('Checkout-Abbruch zurückholen');
+        expect(fixture.nativeElement.textContent).toContain('Checkout-Abbruch prüfen');
         expect(fixture.nativeElement.textContent).toContain('Checkout-Starts konvertieren mit 42%');
-        expect(fixture.nativeElement.textContent).not.toContain('Recover checkout drop-off');
+        expect(fixture.nativeElement.textContent).not.toContain('Review checkout drop-off');
         expect(fixture.nativeElement.textContent).not.toContain('API should not render me');
     });
 
@@ -882,7 +849,7 @@ describe('OpportunitiesPage', () => {
         expect(fixture.nativeElement.textContent).not.toContain('API should not render me');
     });
 
-    function renderDashboard(options: { permissions?: UserPermissions; aiStatus?: Partial<Record<string, unknown>>; opportunities?: unknown[]; digestPreview?: Record<string, unknown>; shareToken?: string } = {}) {
+    function renderDashboard(options: { permissions?: UserPermissions; aiStatus?: Partial<Record<string, unknown>>; opportunities?: unknown[]; shareToken?: string } = {}) {
         shareService.setToken(options.shareToken ?? null);
         permissions.applyPermissions(
             options.permissions ?? {
@@ -899,9 +866,6 @@ describe('OpportunitiesPage', () => {
             flushAIStatus(options.aiStatus);
         }
         flushList(options.opportunities, options.shareToken);
-        if (!options.shareToken) {
-            flushDigestPreview(options.digestPreview ?? defaultDigestPreview());
-        }
         fixture.detectChanges();
     }
 });
@@ -941,10 +905,10 @@ function flushList(opportunities?: unknown[], shareToken?: string) {
                 digest_key: 'opportunities.catalog.checkout_conversion.digest',
                 copy_params: {
                     conversion_rate: '42%',
-                    monthly_upside: '$8,500'
+                    checkout_starts: 500
                 },
-                impact_value: '$8,500',
-                impact_label_key: 'opportunities.impact.estimated_monthly_upside',
+                impact_value: '500',
+                impact_label_key: 'opportunities.impact.checkout_starts',
                 evidence: [
                     { id: 'checkout_starts', label_key: 'opportunities.evidence.checkout_starts', value: '120' },
                     { id: 'conversion_rate', label_key: 'opportunities.evidence.checkout_conversion_rate', value: '42%' }
@@ -974,35 +938,6 @@ function flushList(opportunities?: unknown[], shareToken?: string) {
     });
 }
 
-function flushDigestPreview(preview: Record<string, unknown>) {
-    const httpMock = TestBed.inject(HttpTestingController);
-    httpMock.expectOne('/api/sites/site-1/opportunities/digest-preview?frequency=weekly').flush(preview);
-}
-
-function defaultDigestPreview(overrides: Partial<Record<string, unknown>> = {}) {
-    return {
-        frequency: 'weekly',
-        should_send: true,
-        reason: 'ready',
-        items: [
-            buildDigestPreviewItem({
-                id: 'digest-op-1',
-                copy_params: {
-                    conversion_rate: '42%',
-                    monthly_upside: '$8,500'
-                },
-                impact_value: '$8,500',
-                evidence: [
-                    { id: 'checkout_starts', label_key: 'opportunities.evidence.checkout_starts', value: '120' },
-                    { id: 'conversion_rate', label_key: 'opportunities.evidence.checkout_conversion_rate', value: '42%' }
-                ],
-                cited_evidence_ids: ['checkout_starts', 'conversion_rate']
-            })
-        ],
-        ...overrides
-    };
-}
-
 function buildOpportunity(overrides: Partial<Record<string, unknown>> = {}) {
     return {
         id: 'op-default',
@@ -1013,10 +948,9 @@ function buildOpportunity(overrides: Partial<Record<string, unknown>> = {}) {
         summary_key: 'opportunities.catalog.checkout_conversion.summary',
         action_key: 'opportunities.catalog.checkout_conversion.action',
         digest_key: 'opportunities.catalog.checkout_conversion.digest',
-        copy_params: { conversion_rate: '42%', monthly_upside: '$100', source: 'google', pageviews: 100 },
-        impact_value: '$100',
-        impact_label_key: 'opportunities.impact.estimated_monthly_upside',
-        monthly_upside: 100,
+        copy_params: { conversion_rate: '42%', checkout_starts: 100 },
+        impact_value: '100',
+        impact_label_key: 'opportunities.impact.checkout_starts',
         confidence: 'medium',
         score: 82,
         score_breakdown: {
@@ -1039,41 +973,6 @@ function buildOpportunity(overrides: Partial<Record<string, unknown>> = {}) {
         generated_at: '2026-05-09T10:00:00Z',
         created_at: '2026-05-09T10:00:00Z',
         updated_at: '2026-05-09T10:00:00Z',
-        ...overrides
-    };
-}
-
-function buildDigestPreviewItem(overrides: Partial<Record<string, unknown>> = {}) {
-    return {
-        id: 'digest-op-default',
-        site_id: 'site-1',
-        kind: 'conversion',
-        type_key: 'opportunities.types.checkout_conversion',
-        category: 'conversion',
-        title_key: 'opportunities.catalog.checkout_conversion.title',
-        action_key: 'opportunities.catalog.checkout_conversion.action',
-        digest_key: 'opportunities.catalog.checkout_conversion.digest',
-        copy_params: { conversion_rate: '42%', monthly_upside: '$100' },
-        impact_value: '$100',
-        impact_label_key: 'opportunities.impact.estimated_monthly_upside',
-        confidence: 'medium',
-        score: 82,
-        score_breakdown: {
-            sample: 82,
-            impact: 70,
-            urgency: 55,
-            effort: 70,
-            actionability: 85,
-            evidence_fit: 99,
-            freshness: 50,
-            total: 82
-        },
-        status: 'new',
-        route_label_key: 'opportunities.routes.checkout',
-        route_params: { path: '/checkout' },
-        route_icon: 'pi pi-arrow-right',
-        evidence: [{ id: 'conversion_rate', label_key: 'opportunities.evidence.checkout_conversion_rate', value: '42%' }],
-        cited_evidence_ids: ['conversion_rate'],
         ...overrides
     };
 }

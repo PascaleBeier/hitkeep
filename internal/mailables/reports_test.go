@@ -122,7 +122,7 @@ func TestOpportunityDigestMailableUsesSafeLocalizedOpportunityData(t *testing.T)
 				TitleKey:    "opportunities.catalog.checkout_conversion.title",
 				ActionKey:   "opportunities.catalog.checkout_conversion.action",
 				DigestKey:   "opportunities.catalog.checkout_conversion.digest",
-				CopyParams:  map[string]any{"conversion_rate": "42%", "monthly_upside": "$1,200"},
+				CopyParams:  map[string]any{"conversion_rate": "42%"},
 				ImpactValue: "$1,200",
 				Confidence:  "high",
 				Score:       91,
@@ -156,7 +156,7 @@ func TestOpportunityDigestMailableUsesSafeLocalizedOpportunityData(t *testing.T)
 		t.Fatalf("expected one opportunity digest item, got %#v", data.Items)
 	}
 	item := data.Items[0]
-	if item.Title != "Recover checkout drop-off" || item.Digest != "Checkout conversion is 42%." || item.Action == "" {
+	if item.Title != "Review checkout drop-off" || item.Digest != "Checkout conversion is 42%." || item.Action == "" {
 		t.Fatalf("expected localized opportunity copy, got %#v", item)
 	}
 	renderedItem := fmt.Sprintf("%#v", item)
@@ -183,7 +183,7 @@ func TestOpportunityDigestMailableLocalizesNonCheckoutFamilies(t *testing.T) {
 				TitleKey:   "opportunities.catalog.traffic_quality.title",
 				ActionKey:  "opportunities.catalog.traffic_quality.action",
 				DigestKey:  "opportunities.catalog.traffic_quality.digest",
-				CopyParams: map[string]any{"source": "Google", "pageviews": "1,200"},
+				CopyParams: map[string]any{"source": "Google", "source_hits": "1,200"},
 				Score:      82,
 			},
 		},
@@ -192,7 +192,7 @@ func TestOpportunityDigestMailableLocalizesNonCheckoutFamilies(t *testing.T) {
 	digest := NewOpportunityDigestWithSubjectLabel("en", "shop.example", "May 4-10, 2026", "Weekly", "weekly", "https://app.example/opportunities", "https://app.example/settings", preview)
 	item := digest.Data().(*OpportunityDigest).Items[0]
 
-	if item.Title != "Focus on the source already pulling demand" || item.Digest != "Google is your strongest demand source." {
+	if item.Title != "Review traffic from Google" || item.Digest != "Review traffic from Google." {
 		t.Fatalf("expected localized traffic quality digest copy, got %#v", item)
 	}
 	if strings.Contains(fmt.Sprintf("%#v", item), "opportunities.catalog.traffic_quality") {

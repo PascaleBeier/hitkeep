@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/database/migrations"
 )
 
 func setupAIStore(t *testing.T) (*Store, uuid.UUID, uuid.UUID, uuid.UUID) {
@@ -37,6 +38,112 @@ func setupAIStore(t *testing.T) (*Store, uuid.UUID, uuid.UUID, uuid.UUID) {
 		t.Fatalf("get site tenant: %v", err)
 	}
 	return store, userID, site.ID, teamID
+}
+
+func TestOpportunitySchemaRemovesMoneyContract(t *testing.T) {
+	store, _, _, _ := setupAIStore(t)
+	assertNoOpportunityColumn(t, store, "monthly_upside")
+}
+
+func assertNoOpportunityColumn(t *testing.T, store *Store, column string) {
+	t.Helper()
+	rows, err := store.DB().QueryContext(context.Background(), "PRAGMA table_info('opportunities')")
+	if err != nil {
+		t.Fatalf("table info: %v", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid int
+		var name string
+		var typ string
+		var notNull bool
+		var defaultValue any
+		var pk bool
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &defaultValue, &pk); err != nil {
+			t.Fatalf("scan table info: %v", err)
+		}
+		if name == column {
+			t.Fatalf("opportunities table must not expose %s", column)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("read table info: %v", err)
+	}
+}
+
+func TestRemoveOpportunityMoneyContractMigrationHandlesIndexedLegacyTable(t *testing.T) {
+	store := NewStore(":memory:")
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	ctx := context.Background()
+
+	if _, err := store.DB().ExecContext(ctx, `
+		CREATE TABLE opportunities (
+			id UUID PRIMARY KEY,
+			team_id UUID NOT NULL,
+			site_id UUID NOT NULL,
+			kind VARCHAR NOT NULL,
+			type_key VARCHAR NOT NULL,
+			title_key VARCHAR NOT NULL,
+			summary_key VARCHAR NOT NULL,
+			action_key VARCHAR NOT NULL,
+			digest_key VARCHAR NOT NULL DEFAULT '',
+			copy_params_json JSON NOT NULL DEFAULT '{}',
+			impact_value VARCHAR NOT NULL,
+			impact_label_key VARCHAR NOT NULL,
+			monthly_upside DOUBLE NOT NULL DEFAULT 0,
+			confidence VARCHAR NOT NULL,
+			score BIGINT NOT NULL DEFAULT 0,
+			score_breakdown_json JSON NOT NULL DEFAULT '{}',
+			status VARCHAR NOT NULL,
+			route_label_key VARCHAR NOT NULL DEFAULT '',
+			route_params_json JSON NOT NULL DEFAULT '{}',
+			route_icon VARCHAR NOT NULL DEFAULT '',
+			detector_version VARCHAR NOT NULL DEFAULT '',
+			evidence_json JSON NOT NULL DEFAULT '[]',
+			cited_evidence_ids_json JSON NOT NULL DEFAULT '[]',
+			ai_run_id UUID,
+			generated_at TIMESTAMP NOT NULL,
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		);
+		CREATE INDEX idx_opportunities_site_status_score ON opportunities (site_id, status, score DESC);
+		CREATE INDEX idx_opportunities_team_site_updated ON opportunities (team_id, site_id, updated_at DESC);
+		INSERT INTO opportunities (
+			id, team_id, site_id, kind, type_key, title_key, summary_key, action_key, copy_params_json,
+			impact_value, impact_label_key, monthly_upside, confidence, status, generated_at
+		) VALUES (
+			?, ?, ?, 'revenue', 'opportunities.types.traffic_quality', 'opportunities.catalog.traffic_quality.title',
+			'opportunities.catalog.traffic_quality.summary', 'opportunities.catalog.traffic_quality.action',
+			'{"monthly_upside":"8500","currency":"EUR","source":"google"}', '$8500',
+			'opportunities.impact.estimated_monthly_upside', 8500, 'high', 'new', CURRENT_TIMESTAMP
+		);
+	`, uuid.New(), uuid.New(), uuid.New()); err != nil {
+		t.Fatalf("create legacy opportunity table: %v", err)
+	}
+
+	migrationSQL, err := migrations.Fs.ReadFile("2026_05_28_000000_remove_opportunity_money_contract.sql")
+	if err != nil {
+		t.Fatalf("read migration: %v", err)
+	}
+	if _, err := store.DB().ExecContext(ctx, string(migrationSQL)); err != nil {
+		t.Fatalf("apply migration: %v", err)
+	}
+
+	assertNoOpportunityColumn(t, store, "monthly_upside")
+	var kind, label, params string
+	if err := store.DB().QueryRowContext(ctx, `SELECT kind, impact_label_key, CAST(copy_params_json AS VARCHAR) FROM opportunities`).Scan(&kind, &label, &params); err != nil {
+		t.Fatalf("read migrated row: %v", err)
+	}
+	if kind != "traffic" || label != "opportunities.impact.checkout_starts" {
+		t.Fatalf("legacy money row was not normalized: kind=%q label=%q", kind, label)
+	}
+	if strings.Contains(params, "monthly_upside") || strings.Contains(params, "currency") {
+		t.Fatalf("legacy money params survived migration: %s", params)
+	}
 }
 
 func TestAIRunSummaryAndUsage(t *testing.T) {
@@ -393,7 +500,7 @@ func TestAppendOpportunityAIRunRejectsCustomerProseOutputFields(t *testing.T) {
 		Provider:        "openai",
 		Model:           "gpt-test",
 		TemplateVersion: "opportunities-v1",
-		OutputJSON:      `{"summary":"Checkout conversion is leaking revenue","summary_key":"opportunities.fixture.summary"}`,
+		OutputJSON:      `{"summary":"Checkout conversion is leaking traffic","summary_key":"opportunities.fixture.summary"}`,
 		Status:          "success",
 		CreatedAt:       time.Now().UTC(),
 	})
@@ -495,7 +602,7 @@ func TestReserveAIRunBudgetExhaustedAuditDoesNotConsumeBudget(t *testing.T) {
 	}
 }
 
-func TestReserveAIRunBudgetIsScopedToTeam(t *testing.T) {
+func TestReserveAIRunBudgetIsGlobalAcrossTeams(t *testing.T) {
 	store, userID, firstSiteID, firstTeamID := setupAIStore(t)
 	ctx := context.Background()
 	now := time.Now().UTC()
@@ -529,21 +636,6 @@ func TestReserveAIRunBudgetIsScopedToTeam(t *testing.T) {
 		t.Fatalf("append first team run: %v", err)
 	}
 
-	if _, err := store.ReserveAIRun(ctx, AIRunParams{
-		TeamID:          secondTeam.ID,
-		SiteID:          secondSite.ID,
-		ActorID:         userID,
-		ActorType:       "user",
-		Feature:         "opportunities",
-		Provider:        "openai",
-		Model:           "gpt-test",
-		TemplateVersion: "opportunities-v1",
-		OutputJSON:      `{}`,
-		CreatedAt:       now,
-	}, since, 1, 0); err != nil {
-		t.Fatalf("expected second team to reserve despite first team usage, got %v", err)
-	}
-
 	_, err = store.ReserveAIRun(ctx, AIRunParams{
 		TeamID:          secondTeam.ID,
 		SiteID:          secondSite.ID,
@@ -557,7 +649,7 @@ func TestReserveAIRunBudgetIsScopedToTeam(t *testing.T) {
 		CreatedAt:       now,
 	}, since, 1, 0)
 	if !errors.Is(err, ErrAIBudgetExhausted) {
-		t.Fatalf("expected second team budget to be exhausted after its own reservation, got %v", err)
+		t.Fatalf("expected global budget to be exhausted by first team usage, got %v", err)
 	}
 }
 
@@ -578,11 +670,9 @@ func TestOpportunityPersistenceAndStatus(t *testing.T) {
 		DigestKey:  "opportunities.catalog.checkout_conversion.digest",
 		CopyParams: map[string]any{
 			"conversion_rate": "42%",
-			"monthly_upside":  "$900",
 		},
 		ImpactValue:    "$900",
-		ImpactLabelKey: "opportunities.impact.estimated_monthly_upside",
-		MonthlyUpside:  900,
+		ImpactLabelKey: "opportunities.impact.checkout_starts",
 		Confidence:     "medium",
 		Score:          84,
 		ScoreBreakdown: api.OpportunityScoreBreakdown{
@@ -623,6 +713,22 @@ func TestOpportunityPersistenceAndStatus(t *testing.T) {
 	}
 	if updated == nil || updated.Status != "done" {
 		t.Fatalf("expected updated done opportunity, got %#v", updated)
+	}
+}
+
+func TestEncodeOpportunityJSONUsesEmptyCollections(t *testing.T) {
+	input := OpportunityInput{}
+	input.CopyParams = nil
+	input.RouteParams = nil
+	input.Evidence = nil
+	input.CitedEvidenceIDs = nil
+
+	encoded, err := encodeOpportunityJSON(input)
+	if err != nil {
+		t.Fatalf("encode opportunity JSON: %v", err)
+	}
+	if encoded.CopyParams != "{}" || encoded.RouteParams != "{}" || encoded.Evidence != "[]" || encoded.CitedEvidenceIDs != "[]" {
+		t.Fatalf("expected encoded empty JSON collections, got copy=%s route=%s evidence=%s cited=%s", encoded.CopyParams, encoded.RouteParams, encoded.Evidence, encoded.CitedEvidenceIDs)
 	}
 }
 
@@ -671,7 +777,7 @@ func TestUpsertOpportunitiesResurfacesDismissedStatusWhenEvidenceChanges(t *test
 
 	changed := input
 	changed.Status = "new"
-	changed.CopyParams = map[string]any{"conversion_rate": "58%", "monthly_upside": "$1200"}
+	changed.CopyParams = map[string]any{"conversion_rate": "58%"}
 	changed.Evidence = []api.OpportunityEvidence{{ID: "checkout-rate", LabelKey: "opportunities.evidence.checkout_conversion_rate", Value: "58%"}}
 	opportunities, err := store.UpsertOpportunities(ctx, []OpportunityInput{changed})
 	if err != nil {
@@ -904,6 +1010,22 @@ func TestOpportunityPersistenceRejectsRawPayloadFieldsInCustomerParams(t *testin
 			},
 			wantErr: "raw",
 		},
+		{
+			name: "impact value credential",
+			input: func(input OpportunityInput) OpportunityInput {
+				input.ImpactValue = "Bearer sk-secret"
+				return input
+			},
+			wantErr: "raw",
+		},
+		{
+			name: "evidence value raw provider payload",
+			input: func(input OpportunityInput) OpportunityInput {
+				input.Evidence[0].Value = "raw_provider_response user_agent curl/8.0"
+				return input
+			},
+			wantErr: "raw",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			input := tc.input(validOpportunityInput(siteID, teamID))
@@ -972,11 +1094,9 @@ func validOpportunityInputWithID(siteID, teamID, id uuid.UUID) OpportunityInput 
 		DigestKey:  "opportunities.catalog.checkout_conversion.digest",
 		CopyParams: map[string]any{
 			"conversion_rate": "42%",
-			"monthly_upside":  "$900",
 		},
 		ImpactValue:      "$900",
-		ImpactLabelKey:   "opportunities.impact.estimated_monthly_upside",
-		MonthlyUpside:    900,
+		ImpactLabelKey:   "opportunities.impact.checkout_starts",
 		Confidence:       "medium",
 		Score:            84,
 		Status:           "new",
