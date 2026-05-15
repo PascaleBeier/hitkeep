@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.5.0](https://github.com/PascaleBeier/hitkeep/compare/v2.4.2...v2.5.0) (2026-05-15)
+
+
+### Features
+
+* **analytics:** add web vitals ingest and reporting APIs ([0cecad9](https://github.com/PascaleBeier/hitkeep/commit/0cecad96dcfc40b71bd187bca82e5c850c50e29f))
+* **frontend:** add web vitals dashboard ([65a8f65](https://github.com/PascaleBeier/hitkeep/commit/65a8f65f2a33be6ef8877b659694f94a55e1a247))
+* **mcp:** expose web vitals aggregates ([a590fc4](https://github.com/PascaleBeier/hitkeep/commit/a590fc4f4eac0a8464adb8b4353f1d47428f5d55))
+* **opportunities:** surface web vitals evidence ([a00c029](https://github.com/PascaleBeier/hitkeep/commit/a00c02979f68c9150e5bc677ae52d70989319bb0))
+* **seed:** add web vitals demo data ([e26f68c](https://github.com/PascaleBeier/hitkeep/commit/e26f68c69c8a8f7290d5069b97986afff10af9e9))
+* **tracker:** add opt-in web vitals bundle ([d86a063](https://github.com/PascaleBeier/hitkeep/commit/d86a0639fe7fca573abb410a74819a9c8976d36f))
+
+
+### Bug Fixes
+
+* **ai:** defer provider credentials to goAI ([b5d83b4](https://github.com/PascaleBeier/hitkeep/commit/b5d83b4c14d8bea9d19b4108706b7b9c6e54c801))
+* **ci:** build snapshots from pull request merge commits ([aff346c](https://github.com/PascaleBeier/hitkeep/commit/aff346c2e6a645e750a28b375bd4991e92919ea0))
+* **deployment:** support subdirectory installs ([c43107d](https://github.com/PascaleBeier/hitkeep/commit/c43107de2262c29d8ba2aeeea88b8e2ea82e968f))
+* **frontend:** stabilize funnel and goal management UX ([4b8df8b](https://github.com/PascaleBeier/hitkeep/commit/4b8df8ba22a7c6dedb13f94ae97e068d2000c822))
+* **mailer:** render RFC-compliant signature delimiter ([#170](https://github.com/PascaleBeier/hitkeep/issues/170)) ([0067658](https://github.com/PascaleBeier/hitkeep/commit/0067658e7b4457e1d9fdf8112b2cb5251f3c6988)), closes [#169](https://github.com/PascaleBeier/hitkeep/issues/169)
+
 ## [2.4.2](https://github.com/PascaleBeier/hitkeep/compare/v2.4.1...v2.4.2) (2026-05-08)
 
 
