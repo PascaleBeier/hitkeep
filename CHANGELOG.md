@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.1](https://github.com/PascaleBeier/hitkeep/compare/v2.5.0...v2.5.1) (2026-05-15)
+
+
+### Bug Fixes
+
+* **cloud:** age out stale AI provider warnings ([bffa3bd](https://github.com/PascaleBeier/hitkeep/commit/bffa3bd39c960bd7648d2c90b4916855ab2aa5c5))
+
 ## [2.5.0](https://github.com/PascaleBeier/hitkeep/compare/v2.4.2...v2.5.0) (2026-05-15)
 
 
