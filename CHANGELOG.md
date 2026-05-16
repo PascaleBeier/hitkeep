@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.5.1](https://github.com/PascaleBeier/hitkeep/compare/v2.5.0...v2.5.1) (2026-05-16)
+
+
+### Bug Fixes
+
+* **cloud:** age out stale AI provider warnings ([bffa3bd](https://github.com/PascaleBeier/hitkeep/commit/bffa3bd39c960bd7648d2c90b4916855ab2aa5c5))
+* **cloud:** harden hosted team membership flows ([ab96a05](https://github.com/PascaleBeier/hitkeep/commit/ab96a0526e0558b730054d968953a1b0eeb74a11))
+* **share:** show Web Vitals in shared dashboards ([ea2c783](https://github.com/PascaleBeier/hitkeep/commit/ea2c783de2f67f208ef0fb9a7144c35cba7a2d7c))
+
 ## [2.5.0](https://github.com/PascaleBeier/hitkeep/compare/v2.4.2...v2.5.0) (2026-05-15)
 
 
