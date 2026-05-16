@@ -51,3 +51,17 @@ func TestGetRealIPUsesAllForwardedHeaderOccurrences(t *testing.T) {
 		t.Fatalf("expected client ip from all X-Forwarded-For values, got %q", ip)
 	}
 }
+
+func TestGetRealIPUsesOriginalForwardedIPWhenTrustingAllProxies(t *testing.T) {
+	req := httptest.NewRequest("GET", "http://localhost", nil)
+	req.RemoteAddr = "18.68.33.36:44321"
+	req.Header.Set("X-Forwarded-For", "203.0.113.10, 18.68.33.36")
+
+	ip := GetRealIP(req, []netip.Prefix{
+		netip.MustParsePrefix("0.0.0.0/0"),
+		netip.MustParsePrefix("::/0"),
+	})
+	if ip != "203.0.113.10" {
+		t.Fatalf("expected original client ip from X-Forwarded-For, got %q", ip)
+	}
+}

@@ -87,6 +87,11 @@ func GetRealIP(r *http.Request, trustedProxies []netip.Prefix) string {
 
 	if len(trustedProxies) > 0 {
 		parts := allHeaderTokens(r.Header.Values("X-Forwarded-For"))
+		if trustsAllProxiesForAddr(parsedDirectIP, trustedProxies) {
+			if ip, ok := firstValidIP(parts); ok {
+				return ip.String()
+			}
+		}
 		for i := len(parts) - 1; i >= 0; i-- {
 			parsedIP, ok := ParseAddr(parts[i])
 			if !ok {
@@ -158,6 +163,15 @@ func firstValidHeaderIP(header http.Header, name string) (netip.Addr, bool) {
 	return netip.Addr{}, false
 }
 
+func firstValidIP(tokens []string) (netip.Addr, bool) {
+	for _, token := range tokens {
+		if parsed, ok := ParseAddr(token); ok {
+			return parsed, true
+		}
+	}
+	return netip.Addr{}, false
+}
+
 func allHeaderTokens(values []string) []string {
 	tokens := make([]string, 0, len(values))
 	for _, value := range values {
@@ -176,6 +190,22 @@ func reverseTokens(tokens []string) []string {
 		tokens[left], tokens[right] = tokens[right], tokens[left]
 	}
 	return tokens
+}
+
+func trustsAllProxiesForAddr(ip netip.Addr, networks []netip.Prefix) bool {
+	for _, network := range networks {
+		if network.Bits() != 0 {
+			continue
+		}
+		addr := network.Addr().Unmap()
+		if ip.Is4() && addr.Is4() {
+			return true
+		}
+		if ip.Is6() && addr.Is6() {
+			return true
+		}
+	}
+	return false
 }
 
 // isAddrInNetworks checks if an IP belongs to any of the provided networks.
