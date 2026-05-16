@@ -100,14 +100,31 @@ func (h *handler) handleAdminDeleteTeam() http.HandlerFunc {
 				purgeable, purgeableErr := h.ctx.Store.GetPurgeableTenant(r.Context(), teamID)
 				if purgeableErr != nil {
 					if errors.Is(purgeableErr, database.ErrTeamPurgeNotArchived) {
-						http.Error(w, "Managed cloud teams cannot be force deleted", http.StatusForbidden)
+						actorID := shared.GetUserIDFromContext(r)
+						archived, archiveErr := h.archiveEmptyHostedCloudTeamForForceDelete(r.Context(), teamID, actorID)
+						if archiveErr != nil {
+							if errors.Is(archiveErr, database.ErrTeamArchiveDefaultTenant) {
+								http.Error(w, "The default team cannot be deleted", http.StatusBadRequest)
+								return
+							}
+							slog.Error("Failed to archive empty hosted cloud team during force delete", "error", archiveErr, "team_id", teamID)
+							http.Error(w, "Failed to delete team", http.StatusInternalServerError)
+							return
+						}
+						if !archived {
+							http.Error(w, "Managed cloud teams cannot be force deleted", http.StatusForbidden)
+							return
+						}
+					} else if errors.Is(purgeableErr, database.ErrTeamPurgeDefaultTenant) {
+						http.Error(w, "The default team cannot be deleted", http.StatusBadRequest)
+						return
+					} else {
+						slog.Error("Failed to check archived team before cloud force delete", "error", purgeableErr, "team_id", teamID)
+						http.Error(w, "Failed to delete team", http.StatusInternalServerError)
 						return
 					}
-					slog.Error("Failed to check archived team before cloud force delete", "error", purgeableErr, "team_id", teamID)
-					http.Error(w, "Failed to delete team", http.StatusInternalServerError)
-					return
 				}
-				if purgeable == nil {
+				if purgeableErr == nil && purgeable == nil {
 					http.Error(w, "Managed cloud teams cannot be force deleted", http.StatusForbidden)
 					return
 				}
@@ -175,6 +192,29 @@ func (h *handler) handleAdminDeleteTeam() http.HandlerFunc {
 			slog.Error("Failed to encode delete team response", "error", err, "team_id", teamID)
 		}
 	}
+}
+
+func (h *handler) archiveEmptyHostedCloudTeamForForceDelete(ctx context.Context, teamID, actorID uuid.UUID) (bool, error) {
+	memberCount, err := h.ctx.Store.CountTeamMembers(ctx, teamID)
+	if err != nil {
+		return false, err
+	}
+	if memberCount > 0 {
+		return false, nil
+	}
+
+	siteCount, err := h.ctx.Store.CountTeamSites(ctx, teamID)
+	if err != nil {
+		return false, err
+	}
+	if siteCount > 0 {
+		return false, nil
+	}
+
+	if err := h.ctx.Store.AdminArchiveTenant(ctx, teamID, actorID); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (h *handler) handleAdminListSites() http.HandlerFunc {

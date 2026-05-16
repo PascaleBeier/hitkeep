@@ -446,6 +446,37 @@ func TestHandleAdminForceDeleteTeamRejectsHostedCloudWithoutDefaultFallback(t *t
 	}
 }
 
+func TestHandleAdminForceDeletePurgesEmptyActiveHostedCloudTeam(t *testing.T) {
+	h, store, _, _, actorUserID, _ := setupAdminTestEnv(t)
+	h.ctx.Config.CloudHosted = true
+	ctx := context.Background()
+
+	teamID := uuid.New()
+	if _, err := store.DB().ExecContext(ctx,
+		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
+		teamID, "Empty Cloud Team", time.Now().UTC(),
+	); err != nil {
+		t.Fatalf("create empty team: %v", err)
+	}
+
+	req := withAdminTestUser(httptest.NewRequest(http.MethodDelete, "/api/admin/teams/"+teamID.String()+"?force=true", nil), actorUserID)
+	req.SetPathValue("id", teamID.String())
+	w := httptest.NewRecorder()
+
+	h.handleAdminDeleteTeam().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
+	}
+
+	deleted, err := store.GetTenant(ctx, teamID)
+	if err != nil {
+		t.Fatalf("get deleted team: %v", err)
+	}
+	if deleted != nil {
+		t.Fatalf("expected empty hosted cloud team to be purged, got %+v", deleted)
+	}
+}
+
 func TestHandleAdminForceDeletePurgesAlreadyArchivedHostedCloudTeam(t *testing.T) {
 	h, store, _, _, actorUserID, _ := setupAdminTestEnv(t)
 	h.ctx.Config.CloudHosted = true
