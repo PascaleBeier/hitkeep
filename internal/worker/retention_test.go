@@ -15,6 +15,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	"hitkeep/internal/importables"
 )
 
 // newTestStore creates a file-backed DuckDB store for testing.
@@ -91,6 +92,11 @@ func TestRetentionArchivesAndPrunesUTMHits(t *testing.T) {
 
 	old := time.Now().UTC().Add(-48 * time.Hour)
 	isUnique := true
+	region := "California"
+	city := "Mountain View"
+	provider := "Google LLC"
+	asn := 15169
+	asnOrg := "Google LLC"
 	if err := store.CreateHit(ctx, &api.Hit{
 		SiteID:      siteID,
 		SessionID:   uuid.New(),
@@ -103,6 +109,11 @@ func TestRetentionArchivesAndPrunesUTMHits(t *testing.T) {
 		UTMTerm:     new("audit"),
 		UTMContent:  new("copy-a"),
 		IsUnique:    &isUnique,
+		Region:      &region,
+		City:        &city,
+		Provider:    &provider,
+		ASN:         &asn,
+		ASNOrg:      &asnOrg,
 	}); err != nil {
 		t.Fatalf("create hit: %v", err)
 	}
@@ -144,6 +155,25 @@ func TestRetentionArchivesAndPrunesUTMHits(t *testing.T) {
 	}
 	if !utmCampaign.Valid || utmCampaign.String != "retention-check" {
 		t.Fatalf("expected utm_campaign=retention-check, got %q (valid=%v)", utmCampaign.String, utmCampaign.Valid)
+	}
+	var archivedCity, archivedProvider, archivedASNOrg sql.NullString
+	var archivedASN sql.NullInt32
+	if err := store.DB().QueryRowContext(ctx,
+		fmt.Sprintf("SELECT city, provider, asn, asn_org FROM read_parquet('%s') WHERE city IS NOT NULL LIMIT 1", safePath),
+	).Scan(&archivedCity, &archivedProvider, &archivedASN, &archivedASNOrg); err != nil {
+		t.Fatalf("query archived geo/network fields: %v", err)
+	}
+	if !archivedCity.Valid || archivedCity.String != "Mountain View" {
+		t.Fatalf("expected archived city Mountain View, got %q (valid=%v)", archivedCity.String, archivedCity.Valid)
+	}
+	if !archivedProvider.Valid || archivedProvider.String != "Google LLC" {
+		t.Fatalf("expected archived provider Google LLC, got %q (valid=%v)", archivedProvider.String, archivedProvider.Valid)
+	}
+	if !archivedASN.Valid || archivedASN.Int32 != 15169 {
+		t.Fatalf("expected archived asn 15169, got %d (valid=%v)", archivedASN.Int32, archivedASN.Valid)
+	}
+	if !archivedASNOrg.Valid || archivedASNOrg.String != "Google LLC" {
+		t.Fatalf("expected archived asn_org Google LLC, got %q (valid=%v)", archivedASNOrg.String, archivedASNOrg.Valid)
 	}
 	var source string
 	if err := store.DB().QueryRowContext(ctx,
@@ -400,6 +430,63 @@ func TestRetentionArchivesAndPrunesWebVitals(t *testing.T) {
 	assertArchivedWebVital(t, ctx, store, files[0], api.WebVitalLCP, "/stale-vitals", api.WebVitalRatingNeedsImprovement)
 	assertHotWebVitalCount(t, ctx, store, siteID, "/recent-vitals", 1)
 	assertHotWebVitalCount(t, ctx, store, siteID, "/stale-vitals", 0)
+}
+
+func TestRetentionArchivesAndPrunesImportedEventDimensions(t *testing.T) {
+	ctx := context.Background()
+	store := newTestStore(t)
+	archiveDir := filepath.Join(t.TempDir(), "archive")
+	siteID := seedSite(t, ctx, store, 7)
+
+	old := time.Now().UTC().Add(-14 * 24 * time.Hour)
+	sink, err := database.NewImportedDataSink(ctx, store, siteID, uuid.New())
+	if err != nil {
+		t.Fatalf("new imported sink: %v", err)
+	}
+	for _, row := range []importables.EventDimensionRow{
+		{Date: old, EventName: "signup", Dimension: "city", Name: "Dortmund", Visitors: 7, Events: 9, SourceFile: "imported_event_dimensions.csv"},
+		{Date: old, EventName: "signup", Dimension: "provider", Name: "Deutsche Telekom AG", Visitors: 6, Events: 8, SourceFile: "imported_event_dimensions.csv"},
+		{Date: old, EventName: "signup", Dimension: "asn", Name: "AS3320 Deutsche Telekom AG", Visitors: 5, Events: 7, SourceFile: "imported_event_dimensions.csv"},
+	} {
+		if err := sink.PutEventDimension(ctx, row); err != nil {
+			t.Fatalf("put imported event dimension %s: %v", row.Dimension, err)
+		}
+	}
+	if err := sink.Flush(ctx); err != nil {
+		t.Fatalf("flush imported event dimensions: %v", err)
+	}
+
+	w := NewRetentionWorker(newTestTenantMgr(t, store), archiveDir, 365, nil)
+	if err := w.Run(ctx); err != nil {
+		t.Fatalf("run retention: %v", err)
+	}
+
+	files, err := findParquetFiles(archiveDir)
+	if err != nil {
+		t.Fatalf("read archive dir: %v", err)
+	}
+	if len(files) == 0 {
+		t.Fatal("expected archive file for stale imported event dimensions")
+	}
+	safePath := strings.ReplaceAll(files[0], "'", "''")
+
+	var archivedCity string
+	if err := store.DB().QueryRowContext(ctx,
+		fmt.Sprintf("SELECT name FROM read_parquet('%s') WHERE _source = 'imported_event_dimensions_daily' AND dimension = 'city'", safePath),
+	).Scan(&archivedCity); err != nil {
+		t.Fatalf("query archived imported city dimension: %v", err)
+	}
+	if archivedCity != "Dortmund" {
+		t.Fatalf("expected archived imported city Dortmund, got %q", archivedCity)
+	}
+
+	var remaining int
+	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM imported_event_dimensions_daily WHERE site_id = ?", siteID).Scan(&remaining); err != nil {
+		t.Fatalf("count hot imported event dimensions: %v", err)
+	}
+	if remaining != 0 {
+		t.Fatalf("expected imported event dimensions to be pruned from hot storage, got %d", remaining)
+	}
 }
 
 func seedRetentionWebVital(t *testing.T, ctx context.Context, store *database.Store, siteID uuid.UUID, metric api.WebVitalMetric, value float64, path string, ts time.Time) {

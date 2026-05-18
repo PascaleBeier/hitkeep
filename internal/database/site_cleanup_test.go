@@ -82,6 +82,15 @@ func TestGoalAndFunnelRollupTablesCovered(t *testing.T) {
 	assertTablesCovered(t, "funnel_rollups", expectedFunnels, extractTablesFromDeletes(funnelRollupQueries))
 }
 
+func TestSiteTransferTablesCoverAnalyticsCleanupTables(t *testing.T) {
+	expected := map[string]struct{}{}
+	for _, step := range siteAnalyticsDeleteSteps {
+		expected[step.table] = struct{}{}
+	}
+
+	assertTablesCovered(t, "site analytics transfer", expected, siteAnalyticsTransferTables)
+}
+
 func extractSiteIDTables(sql string) map[string]struct{} {
 	createTableRe := regexp.MustCompile(`(?i)^\s*create\s+table\s+(if\s+not\s+exists\s+)?([a-zA-Z0-9_]+)`)
 	endTableRe := regexp.MustCompile(`\);`)

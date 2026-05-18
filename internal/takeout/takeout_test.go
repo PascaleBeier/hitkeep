@@ -21,6 +21,7 @@ import (
 	"hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/exportfmt"
+	"hitkeep/internal/importables"
 )
 
 type takeoutSentinel struct {
@@ -131,6 +132,173 @@ func TestExportSiteDataCSVIncludesUTMFields(t *testing.T) {
 	if got := row[index["utm_content"]]; got != "button-a" {
 		t.Fatalf("expected utm_content=button-a, got %q", got)
 	}
+}
+
+func TestExportSiteDataCSVIncludesGeoNetworkFields(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "takeout.db")
+	exportDir := filepath.Join(t.TempDir(), "exports")
+
+	store := database.NewStore(dbPath)
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	userID, err := store.CreateUser(ctx, "geo-takeout@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	site, err := store.CreateSite(ctx, userID, "geo-takeout.test")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+
+	region := "California"
+	city := "Mountain View"
+	provider := "Google LLC"
+	asn := 15169
+	asnOrg := "Google LLC"
+	if err := store.CreateHit(ctx, &api.Hit{
+		SiteID:    site.ID,
+		SessionID: uuid.New(),
+		PageID:    uuid.New(),
+		Timestamp: time.Now().UTC(),
+		Path:      "/geo",
+		Region:    &region,
+		City:      &city,
+		Provider:  &provider,
+		ASN:       &asn,
+		ASNOrg:    &asnOrg,
+	}); err != nil {
+		t.Fatalf("create hit: %v", err)
+	}
+
+	service := NewTakeoutService(store, exportDir)
+	filename, err := service.ExportSiteData(ctx, site.ID, "csv")
+	if err != nil {
+		t.Fatalf("export site data: %v", err)
+	}
+
+	f, err := os.Open(filename)
+	if err != nil {
+		t.Fatalf("open export file: %v", err)
+	}
+	defer f.Close()
+
+	rows, err := csv.NewReader(f).ReadAll()
+	if err != nil {
+		t.Fatalf("read csv: %v", err)
+	}
+	if len(rows) < 2 {
+		t.Fatalf("expected at least header and one row, got %d rows", len(rows))
+	}
+
+	index := takeoutHeaderIndex(t, rows[0], "record_type", "region", "city", "provider", "asn", "asn_org")
+	for _, row := range rows[1:] {
+		if row[index["record_type"]] != "hit" {
+			continue
+		}
+		if got := row[index["region"]]; got != "California" {
+			t.Fatalf("expected region California, got %q", got)
+		}
+		if got := row[index["city"]]; got != "Mountain View" {
+			t.Fatalf("expected city Mountain View, got %q", got)
+		}
+		if got := row[index["provider"]]; got != "Google LLC" {
+			t.Fatalf("expected provider Google LLC, got %q", got)
+		}
+		if got := row[index["asn"]]; got != "15169" {
+			t.Fatalf("expected asn 15169, got %q", got)
+		}
+		if got := row[index["asn_org"]]; got != "Google LLC" {
+			t.Fatalf("expected asn_org Google LLC, got %q", got)
+		}
+		return
+	}
+
+	t.Fatalf("expected at least one hit row in takeout export")
+}
+
+func TestExportUserDataCSVIncludesGeoNetworkFields(t *testing.T) {
+	ctx, store, service, userID, siteID := setupTakeoutFixture(t)
+	t.Cleanup(func() { _ = store.Close() })
+
+	region := "California"
+	city := "Mountain View"
+	provider := "Google LLC"
+	asn := 15169
+	asnOrg := "Google LLC"
+	if err := store.CreateHit(ctx, &api.Hit{
+		SiteID:    siteID,
+		SessionID: uuid.New(),
+		PageID:    uuid.New(),
+		Timestamp: time.Now().UTC(),
+		Path:      "/geo-user",
+		Region:    &region,
+		City:      &city,
+		Provider:  &provider,
+		ASN:       &asn,
+		ASNOrg:    &asnOrg,
+	}); err != nil {
+		t.Fatalf("create geo hit: %v", err)
+	}
+
+	filename, err := service.ExportUserData(ctx, userID, "csv")
+	if err != nil {
+		t.Fatalf("export user data: %v", err)
+	}
+
+	requireCSVTakeoutRow(t, readCSVTakeout(t, filename),
+		map[string]string{
+			"record_type": "hit",
+			"path":        "/geo-user",
+		},
+		map[string]string{
+			"region":   "California",
+			"city":     "Mountain View",
+			"provider": "Google LLC",
+			"asn":      "15169",
+			"asn_org":  "Google LLC",
+		},
+	)
+}
+
+func TestExportSiteDataCSVIncludesImportedEventDimensions(t *testing.T) {
+	ctx, store, service, _, siteID := setupTakeoutFixture(t)
+	t.Cleanup(func() { _ = store.Close() })
+
+	day := time.Date(2026, 4, 8, 0, 0, 0, 0, time.UTC)
+	sink, err := database.NewImportedDataSink(ctx, store, siteID, uuid.New())
+	if err != nil {
+		t.Fatalf("new imported sink: %v", err)
+	}
+	for _, row := range []importables.EventDimensionRow{
+		{Date: day, EventName: "signup", Dimension: "city", Name: "Dortmund", Visitors: 7, Events: 9, SourceFile: "imported_event_dimensions.csv"},
+		{Date: day, EventName: "signup", Dimension: "provider", Name: "Deutsche Telekom AG", Visitors: 6, Events: 8, SourceFile: "imported_event_dimensions.csv"},
+		{Date: day, EventName: "signup", Dimension: "asn", Name: "AS3320 Deutsche Telekom AG", Visitors: 5, Events: 7, SourceFile: "imported_event_dimensions.csv"},
+	} {
+		if err := sink.PutEventDimension(ctx, row); err != nil {
+			t.Fatalf("put imported event dimension %s: %v", row.Dimension, err)
+		}
+	}
+	if err := sink.Flush(ctx); err != nil {
+		t.Fatalf("flush imported event dimensions: %v", err)
+	}
+
+	filename, err := service.ExportSiteData(ctx, siteID, "csv")
+	if err != nil {
+		t.Fatalf("export site data: %v", err)
+	}
+
+	requireCSVTakeoutRow(t, readCSVTakeout(t, filename),
+		map[string]string{"record_type": "imported_event_dimension", "dimension": "city"},
+		map[string]string{"event_name": "signup", "name": "Dortmund", "visitors": "7", "events": "9"},
+	)
 }
 
 func TestExportSiteDataCSVIncludesAIFetchesAndAIChatbotEvents(t *testing.T) {
@@ -1395,6 +1563,66 @@ func takeoutHeaderIndex(t *testing.T, header []string, columns ...string) map[st
 		}
 	}
 	return index
+}
+
+func readCSVTakeout(t *testing.T, filename string) [][]string {
+	t.Helper()
+
+	f, err := os.Open(filename)
+	if err != nil {
+		t.Fatalf("open export file: %v", err)
+	}
+	defer f.Close()
+
+	rows, err := csv.NewReader(f).ReadAll()
+	if err != nil {
+		t.Fatalf("read csv: %v", err)
+	}
+	if len(rows) < 2 {
+		t.Fatalf("expected at least header and one row, got %d rows", len(rows))
+	}
+	return rows
+}
+
+func requireCSVTakeoutRow(t *testing.T, rows [][]string, match map[string]string, want map[string]string) {
+	t.Helper()
+
+	columns := make([]string, 0, len(match)+len(want))
+	for column := range match {
+		columns = append(columns, column)
+	}
+	for column := range want {
+		columns = append(columns, column)
+	}
+
+	index := takeoutHeaderIndex(t, rows[0], columns...)
+	for _, row := range rows[1:] {
+		if !csvRowMatches(row, index, match) {
+			continue
+		}
+		assertCSVRowValues(t, row, index, want)
+		return
+	}
+	t.Fatalf("expected takeout row matching %#v, got %#v", match, rows)
+}
+
+func csvRowMatches(row []string, index map[string]int, match map[string]string) bool {
+	for column, want := range match {
+		if row[index[column]] != want {
+			return false
+		}
+	}
+	return true
+}
+
+func assertCSVRowValues(t *testing.T, row []string, index map[string]int, want map[string]string) {
+	t.Helper()
+
+	for column, want := range want {
+		if got := row[index[column]]; got != want {
+			t.Fatalf("expected %s %q, got %q", column, want, got)
+		}
+	}
 }
 
 func takeoutString(value any) string {

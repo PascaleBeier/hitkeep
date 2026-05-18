@@ -474,15 +474,32 @@ func TestTransferSiteMovesAnalyticsToDestinationTenant(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("create goal in shared store: %v", err)
 	}
+	sessionID := uuid.New()
+	pageID := uuid.New()
 	if err := store.CreateHit(ctx, &api.Hit{
 		ID:        uuid.New(),
 		SiteID:    site.ID,
-		SessionID: uuid.New(),
-		PageID:    uuid.New(),
+		SessionID: sessionID,
+		PageID:    pageID,
 		Timestamp: time.Now().UTC(),
 		Path:      "/pricing",
 	}); err != nil {
 		t.Fatalf("create hit in shared store: %v", err)
+	}
+	if err := store.CreateWebVital(ctx, &api.WebVital{
+		ID:             uuid.New(),
+		SiteID:         site.ID,
+		SessionID:      sessionID,
+		PageID:         pageID,
+		Metric:         api.WebVitalLCP,
+		Value:          2400,
+		Rating:         api.WebVitalRatingGood,
+		Path:           "/pricing",
+		Timestamp:      time.Now().UTC(),
+		TrackerSource:  "browser",
+		TrackerVersion: "test",
+	}); err != nil {
+		t.Fatalf("create web vital in shared store: %v", err)
 	}
 	if err := store.CreateEvent(ctx, &api.Event{
 		ID:        uuid.New(),
@@ -570,6 +587,14 @@ func TestTransferSiteMovesAnalyticsToDestinationTenant(t *testing.T) {
 		t.Fatalf("expected 1 transferred hit in destination tenant store, got %d", hitCount)
 	}
 
+	var webVitalCount int
+	if err := tenantStore.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM web_vitals WHERE site_id = ?", site.ID).Scan(&webVitalCount); err != nil {
+		t.Fatalf("count transferred web vitals in destination store: %v", err)
+	}
+	if webVitalCount != 1 {
+		t.Fatalf("expected 1 transferred web vital in destination tenant store, got %d", webVitalCount)
+	}
+
 	var eventCount int
 	var eventProperties string
 	if err := tenantStore.DB().QueryRowContext(ctx, "SELECT COUNT(*), CAST(MAX(properties) AS VARCHAR) FROM events WHERE site_id = ?", site.ID).Scan(&eventCount, &eventProperties); err != nil {
@@ -607,6 +632,14 @@ func TestTransferSiteMovesAnalyticsToDestinationTenant(t *testing.T) {
 	}
 	if sharedHitCount != 0 {
 		t.Fatalf("expected shared analytics to be cleared after transfer, got %d hit rows", sharedHitCount)
+	}
+
+	var sharedWebVitalCount int
+	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM web_vitals WHERE site_id = ?", site.ID).Scan(&sharedWebVitalCount); err != nil {
+		t.Fatalf("count shared web vitals after transfer: %v", err)
+	}
+	if sharedWebVitalCount != 0 {
+		t.Fatalf("expected shared Web Vitals to be cleared after transfer, got %d rows", sharedWebVitalCount)
 	}
 
 	requireNoGoogleSearchConsoleSiteMapping(t, store, site.ID)
