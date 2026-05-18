@@ -48,6 +48,7 @@ func seedTraffic(ctx context.Context, store *database.Store, siteID uuid.UUID, g
 
 			uaEntry := pickWeighted(rng, userAgents)
 			country := pickWeighted(rng, countries)
+			region, city, provider, asn, asnOrg := seedGeoNetworkMetadata(country, rng)
 			lang := pickWeighted(rng, languages)
 			utmEntry := pickWeighted(rng, utmCampaigns)
 			ref := pickWeighted(rng, referrers)
@@ -76,6 +77,11 @@ func seedTraffic(ctx context.Context, store *database.Store, siteID uuid.UUID, g
 					Path:           page,
 					UserAgent:      new(uaEntry.ua),
 					CountryCode:    country,
+					Region:         region,
+					City:           city,
+					Provider:       provider,
+					ASN:            asn,
+					ASNOrg:         asnOrg,
 					Language:       lang,
 					ViewportWidth:  new(vw),
 					ViewportHeight: new(vh),
