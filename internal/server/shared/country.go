@@ -1,19 +1,18 @@
 package shared
 
 import (
-	"net"
 	"net/http"
 	"net/netip"
 	"slices"
 	"strings"
 
-	"github.com/phuslu/iploc"
+	"hitkeep/internal/ipmeta"
 )
 
 type CountryCodeResolver func(netip.Addr) string
 
 func DefaultCountryCodeResolver(ip netip.Addr) string {
-	return iploc.Country(net.IP(ip.AsSlice()))
+	return ipmeta.Lookup(ip).CountryCode
 }
 
 func CountryCodeFromRequest(r *http.Request, trustedProxies []netip.Prefix) string {
