@@ -4,7 +4,9 @@ import { HttpClient } from '@angular/common/http';
 import { CurrentIP, IPExclusion } from '@models/analytics.types';
 
 interface CreateExclusionPayload {
-    cidr: string;
+    type?: 'cidr' | 'country';
+    cidr?: string;
+    country_code?: string;
     description?: string;
 }
 

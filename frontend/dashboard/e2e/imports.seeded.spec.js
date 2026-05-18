@@ -283,7 +283,8 @@ async function openImportedEventReport(page, domain) {
     const eventActivity = page.locator("p-card").filter({ hasText: "Event activity" }).first();
     await expect(eventActivity).toContainText("Total events");
     await expect(eventActivity).not.toContainText("No event data");
-    await expect(page.getByText("Select a property to view the breakdown.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Content" })).toBeVisible();
+    await expect(page.getByText("Top pages", { exact: true })).toBeVisible();
 }
 
 async function deleteSite(page, siteId) {

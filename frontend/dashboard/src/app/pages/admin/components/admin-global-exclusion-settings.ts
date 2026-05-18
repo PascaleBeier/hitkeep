@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { NgOptimizedImage } from '@angular/common';
 
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { finalize } from 'rxjs';
@@ -12,8 +13,11 @@ import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
 import { InputTextModule } from 'primeng/inputtext';
 import { MessageModule } from 'primeng/message';
+import { SelectModule } from 'primeng/select';
 import { TableModule } from 'primeng/table';
 
+import { CountryOption, countryDisplayName, countryOptions } from '@core/i18n/country-options';
+import { countryFlagUrl } from '@core/i18n/flag-utils';
 import { IPExclusion } from '@models/analytics.types';
 import { ExclusionsService } from '@services/exclusions.service';
 import { CopyControl } from '@components/copy-control/copy-control';
@@ -30,10 +34,34 @@ interface ActionStatus {
     params?: Record<string, string | number>;
 }
 
+type ExclusionRuleType = 'cidr' | 'country';
+type ExclusionRow = IPExclusion & {
+    type_label: string;
+    value_label: string;
+    country_name: string;
+    search_value: string;
+};
+
 @Component({
     selector: 'app-admin-global-exclusion-settings',
     standalone: true,
-    imports: [ReactiveFormsModule, ButtonModule, ConfirmDialogModule, IconFieldModule, InputIconModule, InputTextModule, MessageModule, TableModule, CopyControl, CrudDialog, RelativeDateTime, TableRowActions, TranslocoPipe],
+    imports: [
+        ReactiveFormsModule,
+        NgOptimizedImage,
+        ButtonModule,
+        ConfirmDialogModule,
+        IconFieldModule,
+        InputIconModule,
+        InputTextModule,
+        MessageModule,
+        SelectModule,
+        TableModule,
+        CopyControl,
+        CrudDialog,
+        RelativeDateTime,
+        TableRowActions,
+        TranslocoPipe
+    ],
     templateUrl: './admin-global-exclusion-settings.html',
     styleUrl: './admin-global-exclusion-settings.css',
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -55,6 +83,28 @@ export class AdminGlobalExclusionSettings {
     protected readonly deletingRuleID = signal<string | null>(null);
     protected readonly isCurrentIPLoading = signal(false);
     protected readonly currentIPCIDR = signal('');
+    protected readonly ruleTypeOptions = computed(() => {
+        this.activeLanguage();
+        return [
+            { label: this.transloco.translate('admin.exclusions.ruleTypes.cidr'), value: 'cidr' },
+            { label: this.transloco.translate('admin.exclusions.ruleTypes.country'), value: 'country' }
+        ];
+    });
+    protected readonly countryOptions = computed<CountryOption[]>(() => countryOptions(this.activeLanguage()));
+    protected readonly exclusionRows = computed<ExclusionRow[]>(() =>
+        this.exclusions().map((rule) => {
+            const countryName = rule.country_code ? countryDisplayName(rule.country_code, this.activeLanguage()) : '';
+            const valueLabel = rule.type === 'country' ? `${countryName} (${rule.country_code ?? ''})` : (rule.cidr ?? '');
+            const typeLabel = this.ruleTypeLabel(rule.type);
+            return {
+                ...rule,
+                type_label: typeLabel,
+                value_label: valueLabel,
+                country_name: countryName,
+                search_value: `${typeLabel} ${valueLabel} ${rule.description ?? ''} ${rule.created_at}`
+            };
+        })
+    );
     protected readonly actionStatusMessage = computed(() => {
         this.activeLanguage();
         const status = this.actionStatus();
@@ -66,7 +116,9 @@ export class AdminGlobalExclusionSettings {
     });
 
     protected readonly form = new FormGroup({
-        cidr: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.pattern(ipOrCIDRPattern)] }),
+        type: new FormControl<ExclusionRuleType>('cidr', { nonNullable: true }),
+        cidr: new FormControl('', { nonNullable: true, validators: [Validators.pattern(ipOrCIDRPattern)] }),
+        countryCode: new FormControl('', { nonNullable: true }),
         description: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(255)] })
     });
 
@@ -79,7 +131,7 @@ export class AdminGlobalExclusionSettings {
         if (this.isSaving()) {
             return;
         }
-        if (this.form.invalid) {
+        if (!this.validateRuleForm()) {
             this.form.markAllAsTouched();
             return;
         }
@@ -90,7 +142,9 @@ export class AdminGlobalExclusionSettings {
 
         this.exclusionsService
             .createInstanceExclusion({
-                cidr: this.form.controls.cidr.value.trim(),
+                type: this.form.controls.type.value,
+                cidr: this.form.controls.type.value === 'cidr' ? this.form.controls.cidr.value.trim() : undefined,
+                country_code: this.form.controls.type.value === 'country' ? this.form.controls.countryCode.value.trim() : undefined,
                 description: this.form.controls.description.value.trim()
             })
             .pipe(finalize(() => this.isSaving.set(false)))
@@ -100,7 +154,7 @@ export class AdminGlobalExclusionSettings {
                     this.actionStatus.set({
                         severity: 'success',
                         key: 'admin.exclusions.status.createSuccess',
-                        params: { cidr: rule.cidr }
+                        params: { value: this.ruleValue(rule) }
                     });
                     this.closeAddDialog();
                 },
@@ -112,9 +166,14 @@ export class AdminGlobalExclusionSettings {
     }
 
     protected openAddDialog(): void {
-        this.form.reset({ cidr: '', description: '' });
+        this.form.reset({ type: 'cidr', cidr: '', countryCode: '', description: '' });
         this.createError.set(null);
         this.isAddDialogVisible.set(true);
+    }
+
+    protected onRuleTypeChange(): void {
+        this.form.controls.cidr.setErrors(null);
+        this.form.controls.countryCode.setErrors(null);
     }
 
     protected onAddDialogVisibleChange(visible: boolean): void {
@@ -142,7 +201,7 @@ export class AdminGlobalExclusionSettings {
 
     protected confirmDeleteRule(rule: IPExclusion): void {
         this.confirmationService.confirm({
-            message: this.transloco.translate('admin.exclusions.confirmDelete', { cidr: rule.cidr }),
+            message: this.transloco.translate('admin.exclusions.confirmDelete', { value: this.ruleValue(rule) }),
             icon: 'pi pi-exclamation-triangle',
             rejectButtonProps: dialogCancelButton(this.transloco.translate('common.actions.cancel')),
             acceptButtonProps: dialogDangerButton(this.transloco.translate('share.dialog.deleteAction')),
@@ -163,7 +222,7 @@ export class AdminGlobalExclusionSettings {
                     this.actionStatus.set({
                         severity: 'success',
                         key: 'admin.exclusions.status.deleteSuccess',
-                        params: { cidr: rule.cidr }
+                        params: { value: this.ruleValue(rule) }
                     });
                 },
                 error: () => {
@@ -214,7 +273,43 @@ export class AdminGlobalExclusionSettings {
 
     private closeAddDialog(): void {
         this.isAddDialogVisible.set(false);
-        this.form.reset({ cidr: '', description: '' });
+        this.form.reset({ type: 'cidr', cidr: '', countryCode: '', description: '' });
         this.createError.set(null);
+    }
+
+    protected ruleTypeLabel(type: IPExclusion['type']): string {
+        this.activeLanguage();
+        return this.transloco.translate(type === 'country' ? 'admin.exclusions.ruleTypes.country' : 'admin.exclusions.ruleTypes.cidr');
+    }
+
+    protected ruleValue(rule: IPExclusion): string {
+        if (rule.type === 'country' && rule.country_code) {
+            return `${countryDisplayName(rule.country_code, this.activeLanguage())} (${rule.country_code})`;
+        }
+        return rule.cidr ?? '';
+    }
+
+    protected countryFlagUrl(code: string): string {
+        return countryFlagUrl(code);
+    }
+
+    private validateRuleForm(): boolean {
+        this.form.controls.cidr.setErrors(null);
+        this.form.controls.countryCode.setErrors(null);
+        if (this.form.controls.description.invalid) {
+            return false;
+        }
+        if (this.form.controls.type.value === 'country') {
+            if (!this.form.controls.countryCode.value.trim()) {
+                this.form.controls.countryCode.setErrors({ required: true });
+                return false;
+            }
+            return true;
+        }
+        if (!this.form.controls.cidr.value.trim() || !ipOrCIDRPattern.test(this.form.controls.cidr.value.trim())) {
+            this.form.controls.cidr.setErrors({ invalidCidr: true });
+            return false;
+        }
+        return true;
     }
 }

@@ -1141,34 +1141,43 @@
             "savePolicy": "Save policy"
         },
         "exclusions": {
-            "description": "Exclude internal, monitoring, or bot traffic by IP or CIDR so it never reaches analytics storage.",
+            "description": "Exclude internal, monitoring, bot, or country traffic so it never reaches analytics storage.",
+            "typeLabel": "Rule type",
             "cidrLabel": "IP or CIDR",
             "cidrPlaceholder": "203.0.113.5 or 192.168.0.0/24",
+            "countryLabel": "Country",
+            "countryPlaceholder": "Select a country",
             "descriptionLabel": "Description",
             "descriptionPlaceholder": "Office VPN, synthetic monitor, etc.",
             "addAction": "Add exclusion",
             "loading": "Loading exclusions...",
             "empty": "No exclusions configured for this site.",
-            "confirmDelete": "Delete exclusion {{cidr}}?",
+            "confirmDelete": "Delete exclusion {{value}}?",
             "suggestionsTitle": "Your current IP",
             "suggestionsHint": "Copy this CIDR and paste it into the IP or CIDR field.",
             "currentIpLoading": "Resolving your IP...",
             "currentIpUnavailable": "Unable to resolve your current IP.",
+            "ruleTypes": {
+                "cidr": "IP/CIDR",
+                "country": "Country"
+            },
             "columns": {
-                "cidr": "CIDR",
+                "type": "Type",
+                "value": "Value",
                 "description": "Description",
                 "created": "Created"
             },
             "errors": {
                 "invalidCidr": "Enter a valid IP or CIDR value.",
+                "invalidCountry": "Select a country.",
                 "descriptionTooLong": "Description must be 255 characters or fewer.",
                 "loadFailed": "Failed to load exclusions.",
                 "createFailed": "Failed to create exclusion.",
                 "deleteFailed": "Failed to delete exclusion."
             },
             "status": {
-                "createSuccess": "Created exclusion {{cidr}}.",
-                "deleteSuccess": "Deleted exclusion {{cidr}}."
+                "createSuccess": "Created exclusion {{value}}.",
+                "deleteSuccess": "Deleted exclusion {{value}}."
             }
         },
         "selector": {
@@ -1305,35 +1314,44 @@
             "ownerUnknown": "Unknown owner"
         },
         "exclusions": {
-            "title": "Global IP/CIDR filters",
-            "description": "Drop traffic from selected networks for every site in this HitKeep instance.",
+            "title": "Global traffic filters",
+            "description": "Drop traffic from selected networks or countries for every site in this HitKeep instance.",
+            "typeLabel": "Rule type",
             "cidrLabel": "IP or CIDR",
             "cidrPlaceholder": "203.0.113.5 or 192.168.0.0/24",
+            "countryLabel": "Country",
+            "countryPlaceholder": "Select a country",
             "descriptionLabel": "Description",
             "descriptionPlaceholder": "Uptime monitor, office range, etc.",
             "addAction": "Add global filter",
             "loading": "Loading global filters...",
             "empty": "No global filters configured.",
-            "confirmDelete": "Delete global filter {{cidr}}?",
+            "confirmDelete": "Delete global filter {{value}}?",
             "suggestionsTitle": "Your current IP",
             "suggestionsHint": "Copy this CIDR and paste it into the IP or CIDR field.",
             "currentIpLoading": "Resolving your IP...",
             "currentIpUnavailable": "Unable to resolve your current IP.",
+            "ruleTypes": {
+                "cidr": "IP/CIDR",
+                "country": "Country"
+            },
             "columns": {
-                "cidr": "CIDR",
+                "type": "Type",
+                "value": "Value",
                 "description": "Description",
                 "created": "Created"
             },
             "errors": {
                 "invalidCidr": "Enter a valid IP or CIDR value.",
+                "invalidCountry": "Select a country.",
                 "descriptionTooLong": "Description must be 255 characters or fewer.",
                 "loadFailed": "Failed to load global filters.",
                 "createFailed": "Failed to create global filter.",
                 "deleteFailed": "Failed to delete global filter."
             },
             "status": {
-                "createSuccess": "Created global filter {{cidr}}.",
-                "deleteSuccess": "Deleted global filter {{cidr}}."
+                "createSuccess": "Created global filter {{value}}.",
+                "deleteSuccess": "Deleted global filter {{value}}."
             }
         },
         "roles": {

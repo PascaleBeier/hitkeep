@@ -11,12 +11,56 @@
     <form [formGroup]="form" class="site-exclusions__form" (ngSubmit)="addRule()">
         <div class="site-settings-field-grid site-exclusions__field-grid">
             <div class="site-settings-field">
+                <label for="site-exclusion-type">{{ "sites.exclusions.typeLabel" | transloco }}</label>
+                <p-select inputId="site-exclusion-type" [options]="ruleTypeOptions()" formControlName="type" optionLabel="label" optionValue="value" appendTo="body" class="w-full" (onChange)="onRuleTypeChange()" />
+            </div>
+
+            @if (form.controls.type.value === "country") {
+            <div class="site-settings-field">
+                <label for="site-exclusion-country">{{ "sites.exclusions.countryLabel" | transloco }}</label>
+                <p-select
+                    inputId="site-exclusion-country"
+                    [options]="countryOptions()"
+                    formControlName="countryCode"
+                    optionLabel="label"
+                    optionValue="code"
+                    appendTo="body"
+                    [filter]="true"
+                    filterBy="searchText"
+                    [placeholder]="'sites.exclusions.countryPlaceholder' | transloco"
+                    class="w-full"
+                >
+                    <ng-template #selectedItem let-selectedOption>
+                        @if (selectedOption) {
+                        <div class="flex items-center gap-2">
+                            <img [ngSrc]="selectedOption.flagUrl" class="size-4 shrink-0 rounded-full" width="16" height="16" alt="" />
+                            <span>{{ selectedOption.label }} ({{ selectedOption.code }})</span>
+                        </div>
+                        }
+                    </ng-template>
+                    <ng-template #item let-option>
+                        <div class="flex items-center gap-3">
+                            <img [ngSrc]="option.flagUrl" class="size-4 shrink-0 rounded-full" width="16" height="16" alt="" />
+                            <div class="flex flex-col">
+                                <span>{{ option.label }}</span>
+                                <span class="text-xs text-[var(--p-text-muted-color)]">{{ option.code }}</span>
+                            </div>
+                        </div>
+                    </ng-template>
+                </p-select>
+                @if (form.controls.countryCode.touched && form.controls.countryCode.invalid) {
+                <small class="site-exclusions__error-text">{{ "sites.exclusions.errors.invalidCountry" | transloco }}</small>
+                }
+            </div>
+            } @else {
+            <div class="site-settings-field">
                 <label for="site-exclusion-cidr">{{ "sites.exclusions.cidrLabel" | transloco }}</label>
                 <input id="site-exclusion-cidr" pInputText formControlName="cidr" [placeholder]="'sites.exclusions.cidrPlaceholder' | transloco" />
                 @if (form.controls.cidr.touched && form.controls.cidr.invalid) {
                 <small class="site-exclusions__error-text">{{ "sites.exclusions.errors.invalidCidr" | transloco }}</small>
                 }
             </div>
+            }
 
             <div class="site-settings-field">
                 <label for="site-exclusion-description">{{ "sites.exclusions.descriptionLabel" | transloco }}</label>
@@ -93,8 +137,8 @@
                 <div class="hk-crud-table-wrap">
                     <p-table
                         #siteExclusionsTable
-                        [value]="exclusions()"
-                        [globalFilterFields]="['cidr', 'description', 'created_at']"
+                        [value]="exclusionRows()"
+                        [globalFilterFields]="['type_label', 'value_label', 'country_name', 'search_value', 'description', 'created_at']"
                         [sortField]="'created_at'"
                         [sortOrder]="-1"
                         [paginator]="true"
@@ -107,9 +151,13 @@
                     >
                         <ng-template pTemplate="header">
                             <tr>
-                                <th pSortableColumn="cidr">
-                                    {{ "sites.exclusions.columns.cidr" | transloco }}
-                                    <p-sortIcon field="cidr" />
+                                <th pSortableColumn="type_label">
+                                    {{ "sites.exclusions.columns.type" | transloco }}
+                                    <p-sortIcon field="type_label" />
+                                </th>
+                                <th pSortableColumn="value_label">
+                                    {{ "sites.exclusions.columns.value" | transloco }}
+                                    <p-sortIcon field="value_label" />
                                 </th>
                                 <th pSortableColumn="description">
                                     {{ "sites.exclusions.columns.description" | transloco }}
@@ -124,8 +172,16 @@
                         </ng-template>
                         <ng-template pTemplate="body" let-rule>
                             <tr>
+                                <td>{{ rule.type_label }}</td>
                                 <td>
+                                    @if (rule.type === "country" && rule.country_code) {
+                                    <span class="inline-flex items-center gap-2">
+                                        <img [ngSrc]="countryFlagUrl(rule.country_code)" class="size-4 shrink-0 rounded-full" width="16" height="16" alt="" />
+                                        <span>{{ rule.value_label }}</span>
+                                    </span>
+                                    } @else {
                                     <code>{{ rule.cidr }}</code>
+                                    }
                                 </td>
                                 <td>{{ rule.description || "-" }}</td>
                                 <td><app-relative-date-time [value]="rule.created_at" /></td>
@@ -136,7 +192,7 @@
                         </ng-template>
                         <ng-template pTemplate="emptymessage">
                             <tr>
-                                <td colspan="4" class="text-center text-muted-color py-4">{{ "sites.exclusions.empty" | transloco }}</td>
+                                <td colspan="5" class="text-center text-muted-color py-4">{{ "sites.exclusions.empty" | transloco }}</td>
                             </tr>
                         </ng-template>
                     </p-table>

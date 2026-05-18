@@ -109,7 +109,9 @@ export interface TeamAuditListResponse {
 export interface IPExclusion {
     id: string;
     site_id?: string;
-    cidr: string;
+    type: 'cidr' | 'country';
+    cidr?: string;
+    country_code?: string;
     description?: string;
     created_at: string;
     created_by?: string;

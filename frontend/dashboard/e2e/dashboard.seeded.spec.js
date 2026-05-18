@@ -350,7 +350,7 @@ test("ai visibility page shows correlation insights", async ({ page }) => {
 
     await expect(page.getByRole("heading", { name: "Fetch volume over time" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Fetch-to-visit correlation" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Citation yield" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Citation yield" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Opportunity pages" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Failure hotspots" })).toBeVisible();
     await expect(page.getByText("GPTBot").first()).toBeVisible();
@@ -363,9 +363,9 @@ test("ai chatbot page surfaces seeded audience geography and network data", asyn
 
     await expect(page.getByRole("heading", { name: "Conversation activity" })).toBeVisible();
     await expect(page.getByText("Conversations", { exact: true }).first()).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Cities", exact: true })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Providers", exact: true })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "ASNs", exact: true })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Cities", exact: true })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Providers", exact: true })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "ASNs", exact: true })).toBeVisible();
     await expectSeededGeoNetworkMetrics(page);
 });
 

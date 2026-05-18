@@ -6,6 +6,7 @@ import { vi } from 'vitest';
 
 import { AdminGlobalExclusionSettings } from './admin-global-exclusion-settings';
 import { ExclusionsService } from '@services/exclusions.service';
+import { IPExclusion } from '@models/analytics.types';
 
 describe('AdminGlobalExclusionSettings', () => {
     let fixture: ComponentFixture<AdminGlobalExclusionSettings>;
@@ -14,8 +15,9 @@ describe('AdminGlobalExclusionSettings', () => {
         getCurrentIP: vi.fn(() => of({ ip: '203.0.113.10', cidr: '203.0.113.10/32' })),
         listInstanceExclusions: vi.fn(() => of([])),
         createInstanceExclusion: vi.fn(() =>
-            of({
+            of<IPExclusion>({
                 id: 'rule-1',
+                type: 'cidr' as const,
                 cidr: '203.0.113.10/32',
                 description: 'Office',
                 created_at: '2026-05-01T00:00:00Z'
@@ -52,24 +54,30 @@ describe('AdminGlobalExclusionSettings', () => {
                                     currentIpLoading: 'Loading current IP',
                                     currentIpUnavailable: 'Current IP unavailable',
                                     addAction: 'Add filter',
+                                    typeLabel: 'Rule type',
                                     cidrLabel: 'CIDR',
                                     cidrPlaceholder: '203.0.113.10/32',
+                                    countryLabel: 'Country',
+                                    countryPlaceholder: 'Select a country',
                                     descriptionLabel: 'Description',
                                     descriptionPlaceholder: 'Office',
                                     loading: 'Loading',
                                     empty: 'No filters',
-                                    confirmDelete: 'Delete {{cidr}}?',
+                                    confirmDelete: 'Delete {{value}}?',
+                                    ruleTypes: { cidr: 'IP/CIDR', country: 'Country' },
                                     columns: {
-                                        cidr: 'CIDR',
+                                        type: 'Type',
+                                        value: 'Value',
                                         description: 'Description',
                                         created: 'Created'
                                     },
                                     status: {
-                                        createSuccess: 'Created {{cidr}}',
-                                        deleteSuccess: 'Deleted {{cidr}}'
+                                        createSuccess: 'Created {{value}}',
+                                        deleteSuccess: 'Deleted {{value}}'
                                     },
                                     errors: {
                                         invalidCidr: 'Invalid CIDR',
+                                        invalidCountry: 'Select a country',
                                         descriptionTooLong: 'Too long',
                                         loadFailed: 'Load failed',
                                         createFailed: 'Create failed',
@@ -141,7 +149,9 @@ describe('AdminGlobalExclusionSettings', () => {
 
         const createCalls = (exclusionsService.createInstanceExclusion as unknown as { mock: { calls: unknown[][] } }).mock.calls;
         expect(createCalls[0]?.[0]).toEqual({
+            type: 'cidr',
             cidr: '203.0.113.10/32',
+            country_code: undefined,
             description: 'Office'
         });
         expect(fixture.componentInstance['isAddDialogVisible']()).toBe(false);
@@ -155,6 +165,7 @@ describe('AdminGlobalExclusionSettings', () => {
         fixture.componentInstance['exclusions'].set([
             {
                 id: 'rule-1',
+                type: 'cidr',
                 cidr: '203.0.113.10/32',
                 description: 'Office',
                 created_at: '2026-05-01T00:00:00Z'
@@ -164,6 +175,7 @@ describe('AdminGlobalExclusionSettings', () => {
 
         fixture.componentInstance['deleteRule']({
             id: 'rule-1',
+            type: 'cidr',
             cidr: '203.0.113.10/32',
             description: 'Office',
             created_at: '2026-05-01T00:00:00Z'
@@ -181,7 +193,7 @@ describe('AdminGlobalExclusionSettings', () => {
     });
 
     it('ignores duplicate create submits while the request is in flight', async () => {
-        const pending = new Subject<{ id: string; cidr: string; description: string; created_at: string }>();
+        const pending = new Subject<{ id: string; type: 'cidr'; cidr: string; description: string; created_at: string }>();
         exclusionsService.createInstanceExclusion.mockReturnValueOnce(pending.asObservable());
         clickButton('Add filter');
         fixture.detectChanges();
@@ -195,6 +207,37 @@ describe('AdminGlobalExclusionSettings', () => {
 
         expect(exclusionsService.createInstanceExclusion).toHaveBeenCalledTimes(1);
         pending.complete();
+    });
+
+    it('creates a country exclusion from the dialog', async () => {
+        exclusionsService.createInstanceExclusion.mockReturnValueOnce(
+            of<IPExclusion>({
+                id: 'rule-country',
+                type: 'country' as const,
+                country_code: 'DE',
+                description: 'Germany',
+                created_at: '2026-05-01T00:00:00Z'
+            })
+        );
+        clickButton('Add filter');
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        fixture.componentInstance['form'].controls.type.setValue('country');
+        fixture.componentInstance['form'].controls.countryCode.setValue('DE');
+        fixture.componentInstance['form'].controls.description.setValue('Germany');
+
+        fixture.componentInstance['addRule']();
+        fixture.detectChanges();
+
+        const createCalls = (exclusionsService.createInstanceExclusion as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+        expect(createCalls.at(-1)?.[0]).toEqual({
+            type: 'country',
+            cidr: undefined,
+            country_code: 'DE',
+            description: 'Germany'
+        });
+        expect(fixture.nativeElement.textContent).toContain('Germany (DE)');
     });
 
     it('keeps create errors inside the add dialog', async () => {

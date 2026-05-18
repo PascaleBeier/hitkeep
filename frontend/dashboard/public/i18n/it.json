@@ -1141,34 +1141,43 @@
             "savePolicy": "Salva policy"
         },
         "exclusions": {
-            "description": "Escludi traffico interno, di monitoraggio o bot tramite IP/CIDR in modo che non entri mai nello storage analitico.",
+            "description": "Escludi traffico interno, di monitoraggio, bot o paesi in modo che non entri mai nello storage analitico.",
+            "typeLabel": "Tipo di regola",
             "cidrLabel": "IP o CIDR",
             "cidrPlaceholder": "203.0.113.5 o 192.168.0.0/24",
+            "countryLabel": "Paese",
+            "countryPlaceholder": "Seleziona un paese",
             "descriptionLabel": "Descrizione",
             "descriptionPlaceholder": "VPN ufficio, monitor sintetico, ecc.",
             "addAction": "Aggiungi esclusione",
             "loading": "Caricamento esclusioni...",
             "empty": "Nessuna esclusione configurata per questo sito.",
-            "confirmDelete": "Eliminare l'esclusione {{cidr}}?",
+            "confirmDelete": "Eliminare l'esclusione {{value}}?",
             "suggestionsTitle": "Il tuo IP attuale",
             "suggestionsHint": "Copia questo CIDR e incollalo nel campo IP o CIDR.",
             "currentIpLoading": "Risoluzione del tuo IP...",
             "currentIpUnavailable": "Impossibile risolvere il tuo IP attuale.",
+            "ruleTypes": {
+                "cidr": "IP/CIDR",
+                "country": "Paese"
+            },
             "columns": {
-                "cidr": "CIDR",
+                "type": "Tipo",
+                "value": "Valore",
                 "description": "Descrizione",
                 "created": "Creato"
             },
             "errors": {
                 "invalidCidr": "Inserisci un valore IP o CIDR valido.",
+                "invalidCountry": "Seleziona un paese.",
                 "descriptionTooLong": "La descrizione deve essere di massimo 255 caratteri.",
                 "loadFailed": "Impossibile caricare le esclusioni.",
                 "createFailed": "Impossibile creare l'esclusione.",
                 "deleteFailed": "Impossibile eliminare l'esclusione."
             },
             "status": {
-                "createSuccess": "Esclusione {{cidr}} creata.",
-                "deleteSuccess": "Esclusione {{cidr}} eliminata."
+                "createSuccess": "Esclusione {{value}} creata.",
+                "deleteSuccess": "Esclusione {{value}} eliminata."
             }
         },
         "selector": {
@@ -1305,35 +1314,44 @@
             "ownerUnknown": "Proprietario sconosciuto"
         },
         "exclusions": {
-            "title": "Filtri globali IP/CIDR",
-            "description": "Scarta traffico da reti selezionate per tutti i siti di questa istanza HitKeep.",
+            "title": "Filtri globali del traffico",
+            "description": "Scarta traffico da reti o paesi selezionati per tutti i siti di questa istanza HitKeep.",
+            "typeLabel": "Tipo di regola",
             "cidrLabel": "IP o CIDR",
             "cidrPlaceholder": "203.0.113.5 o 192.168.0.0/24",
+            "countryLabel": "Paese",
+            "countryPlaceholder": "Seleziona un paese",
             "descriptionLabel": "Descrizione",
             "descriptionPlaceholder": "Monitor uptime, range ufficio, ecc.",
             "addAction": "Aggiungi filtro globale",
             "loading": "Caricamento filtri globali...",
             "empty": "Nessun filtro globale configurato.",
-            "confirmDelete": "Eliminare il filtro globale {{cidr}}?",
+            "confirmDelete": "Eliminare il filtro globale {{value}}?",
             "suggestionsTitle": "Il tuo IP attuale",
             "suggestionsHint": "Copia questo CIDR e incollalo nel campo IP o CIDR.",
             "currentIpLoading": "Risoluzione del tuo IP...",
             "currentIpUnavailable": "Impossibile risolvere il tuo IP attuale.",
+            "ruleTypes": {
+                "cidr": "IP/CIDR",
+                "country": "Paese"
+            },
             "columns": {
-                "cidr": "CIDR",
+                "type": "Tipo",
+                "value": "Valore",
                 "description": "Descrizione",
                 "created": "Creato"
             },
             "errors": {
                 "invalidCidr": "Inserisci un valore IP o CIDR valido.",
+                "invalidCountry": "Seleziona un paese.",
                 "descriptionTooLong": "La descrizione deve essere di massimo 255 caratteri.",
                 "loadFailed": "Impossibile caricare i filtri globali.",
                 "createFailed": "Impossibile creare il filtro globale.",
                 "deleteFailed": "Impossibile eliminare il filtro globale."
             },
             "status": {
-                "createSuccess": "Filtro globale {{cidr}} creato.",
-                "deleteSuccess": "Filtro globale {{cidr}} eliminato."
+                "createSuccess": "Filtro globale {{value}} creato.",
+                "deleteSuccess": "Filtro globale {{value}} eliminato."
             }
         },
         "roles": {
