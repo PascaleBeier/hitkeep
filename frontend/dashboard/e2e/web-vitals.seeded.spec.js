@@ -3,6 +3,9 @@ const { E2E_SHARE_TOKEN, login } = require("./support/auth");
 
 const TABLE_SETTLE_MS = 1000;
 const PRIMARY_SEEDED_SITE_DOMAIN = "acme-analytics.io";
+const SEEDED_CITY_RE = /Mountain View|New York|Seattle|Berlin|Munich|London|Paris|Amsterdam/;
+const SEEDED_PROVIDER_RE = /Google LLC|Verizon Business|Comcast Cable|Deutsche Telekom AG|Vodafone GmbH|BT|Orange|KPN/;
+const SEEDED_ASN_RE = /AS15169|AS701|AS7922|AS3320|AS3209|AS2856|AS3215|AS1136/;
 
 async function selectSeededSite(page, domain = PRIMARY_SEEDED_SITE_DOMAIN) {
     const combobox = page.locator('[role="combobox"]:visible').first();
@@ -21,6 +24,13 @@ async function selectSeededSite(page, domain = PRIMARY_SEEDED_SITE_DOMAIN) {
 
     await expect(combobox).toContainText(domain);
     await page.waitForTimeout(TABLE_SETTLE_MS);
+}
+
+async function expectBreakdownRow(page, tabName, valuePattern) {
+    await page.getByRole("tab", { name: tabName }).click();
+    const panel = page.getByRole("tabpanel", { name: tabName });
+    await expect(panel).toBeVisible();
+    await expect(panel.locator(".web-vitals-table tbody tr").filter({ hasText: valuePattern }).first()).toBeVisible();
 }
 
 test("web vitals dashboard renders seeded data and filters", async ({ page }) => {
@@ -58,6 +68,10 @@ test("web vitals dashboard renders seeded data and filters", async ({ page }) =>
     await page.getByRole("button", { name: "Clear all" }).click();
     await expect(page.getByText("Path: /")).toBeVisible();
     await expect(page.getByText("Rating: Good")).toHaveCount(0);
+
+    await expectBreakdownRow(page, "Cities", SEEDED_CITY_RE);
+    await expectBreakdownRow(page, "Providers", SEEDED_PROVIDER_RE);
+    await expectBreakdownRow(page, "ASNs", SEEDED_ASN_RE);
 });
 
 test("shared dashboard exposes seeded Web Vitals", async ({ page }) => {
@@ -68,5 +82,8 @@ test("shared dashboard exposes seeded Web Vitals", async ({ page }) => {
     await expect(page.getByRole("button", { name: "Inspect LCP over time" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "LCP p75 trend" })).toBeVisible();
     await expect(page.locator(".web-vitals-table tbody tr").filter({ hasText: "/" }).first()).toBeVisible();
+    await expectBreakdownRow(page, "Cities", SEEDED_CITY_RE);
+    await expectBreakdownRow(page, "Providers", SEEDED_PROVIDER_RE);
+    await expectBreakdownRow(page, "ASNs", SEEDED_ASN_RE);
     await expect(page.getByRole("button", { name: /share dashboard/i })).toHaveCount(0);
 });

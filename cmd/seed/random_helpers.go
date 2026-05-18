@@ -105,6 +105,7 @@ func seedAIReferredVisits(batch *seedWriteBatch, siteID uuid.UUID, fetch *api.AI
 		sessionID := uuid.New()
 		uaEntry := pickWeighted(rng, userAgents)
 		country := pickWeighted(rng, countries)
+		region, city, provider, asn, asnOrg := seedGeoNetworkMetadata(country, rng)
 		lang := pickWeighted(rng, languages)
 		vw, vh, sw, sh := pickViewport(rng, uaEntry.kind)
 		sessionStart := randomAIFollowupTime(fetch.Timestamp, rng)
@@ -127,6 +128,11 @@ func seedAIReferredVisits(batch *seedWriteBatch, siteID uuid.UUID, fetch *api.AI
 				Referrer:       nil,
 				UserAgent:      new(uaEntry.ua),
 				CountryCode:    country,
+				Region:         region,
+				City:           city,
+				Provider:       provider,
+				ASN:            asn,
+				ASNOrg:         asnOrg,
 				Language:       lang,
 				ViewportWidth:  new(vw),
 				ViewportHeight: new(vh),
@@ -146,6 +152,41 @@ func seedAIReferredVisits(batch *seedWriteBatch, siteID uuid.UUID, fetch *api.AI
 	}
 
 	return sessions, hits
+}
+
+func seedGeoNetworkMetadata(country *string, rng *mrand.Rand) (*string, *string, *string, *int, *string) {
+	if country == nil {
+		return nil, nil, nil, nil, nil
+	}
+	choices, ok := seedGeoNetworkChoices[*country]
+	if !ok {
+		return nil, nil, nil, nil, nil
+	}
+	meta := pickWeighted(rng, choices)
+	return new(meta.region), new(meta.city), new(meta.provider), new(meta.asn), new(meta.asnOrg)
+}
+
+type seedGeoNetwork struct {
+	region   string
+	city     string
+	provider string
+	asn      int
+	asnOrg   string
+}
+
+var seedGeoNetworkChoices = map[string][]weightedEntry[seedGeoNetwork]{
+	"US": {
+		{seedGeoNetwork{region: "California", city: "Mountain View", provider: "Google LLC", asn: 15169, asnOrg: "Google LLC"}, 4},
+		{seedGeoNetwork{region: "New York", city: "New York", provider: "Verizon Business", asn: 701, asnOrg: "Verizon Business"}, 3},
+		{seedGeoNetwork{region: "Washington", city: "Seattle", provider: "Comcast Cable", asn: 7922, asnOrg: "Comcast Cable Communications LLC"}, 2},
+	},
+	"DE": {
+		{seedGeoNetwork{region: "Berlin", city: "Berlin", provider: "Deutsche Telekom AG", asn: 3320, asnOrg: "Deutsche Telekom AG"}, 5},
+		{seedGeoNetwork{region: "Bavaria", city: "Munich", provider: "Vodafone GmbH", asn: 3209, asnOrg: "Vodafone GmbH"}, 3},
+	},
+	"GB": {{seedGeoNetwork{region: "England", city: "London", provider: "BT", asn: 2856, asnOrg: "British Telecommunications PLC"}, 1}},
+	"FR": {{seedGeoNetwork{region: "Ile-de-France", city: "Paris", provider: "Orange", asn: 3215, asnOrg: "Orange S.A."}, 1}},
+	"NL": {{seedGeoNetwork{region: "North Holland", city: "Amsterdam", provider: "KPN", asn: 1136, asnOrg: "KPN B.V."}, 1}},
 }
 
 func randomAIFollowupTime(fetchTime time.Time, rng *mrand.Rand) time.Time {
