@@ -72,3 +72,35 @@ func TestIPFilterIsBlocked(t *testing.T) {
 		t.Fatalf("expected empty ip to be allowed")
 	}
 }
+
+func TestIPFilterBlocksCountries(t *testing.T) {
+	store, userID, siteID, otherSiteID := setupFilterStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+
+	if _, err := store.CreateInstanceCountryExclusion(ctx, "DE", "global country", userID); err != nil {
+		t.Fatalf("create instance country exclusion: %v", err)
+	}
+	if _, err := store.CreateSiteCountryExclusion(ctx, siteID, "US", "site country", userID); err != nil {
+		t.Fatalf("create site country exclusion: %v", err)
+	}
+
+	filter := NewIPFilter(store)
+	if err := filter.Refresh(ctx); err != nil {
+		t.Fatalf("refresh filter: %v", err)
+	}
+
+	if decision := filter.Evaluate(siteID, "198.51.100.1", "de"); !decision.Blocked || decision.Reason != BlockReasonInstanceCountry {
+		t.Fatalf("expected instance country block, got %#v", decision)
+	}
+	if decision := filter.Evaluate(siteID, "198.51.100.1", "us"); !decision.Blocked || decision.Reason != BlockReasonSiteCountry {
+		t.Fatalf("expected site country block, got %#v", decision)
+	}
+	if decision := filter.Evaluate(otherSiteID, "198.51.100.1", "us"); decision.Blocked {
+		t.Fatalf("expected site country rule to allow other site, got %#v", decision)
+	}
+	if decision := filter.Evaluate(siteID, "198.51.100.1", ""); decision.Blocked {
+		t.Fatalf("expected empty country to be allowed, got %#v", decision)
+	}
+}

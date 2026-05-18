@@ -250,6 +250,52 @@ func TestHandleCreateAIFetchDropsBlockedSiteExclusion(t *testing.T) {
 	}
 }
 
+func TestHandleCreateAIFetchDropsCountryExclusion(t *testing.T) {
+	store, ctx, userID, siteID, token := setupAIFetchTestEnv(t)
+
+	if _, err := store.CreateInstanceCountryExclusion(context.Background(), "US", "United States", userID); err != nil {
+		t.Fatalf("CreateInstanceCountryExclusion: %v", err)
+	}
+	ipFilter := blocking.NewIPFilter(store)
+	if err := ipFilter.Refresh(context.Background()); err != nil {
+		t.Fatalf("Refresh ip filter: %v", err)
+	}
+	ctx.IPFilter = ipFilter
+
+	mux := http.NewServeMux()
+	Register(mux, ctx)
+
+	body := map[string]any{
+		"path":        "/docs",
+		"status_code": 200,
+		"user_agent":  "Mozilla/5.0 (compatible; GPTBot/1.0; +https://openai.com/gptbot)",
+	}
+	payload, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/sites/"+siteID.String()+"/ingest/ai-fetch", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", token)
+	req.RemoteAddr = "8.8.8.8:1234"
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected %d, got %d body=%s", http.StatusAccepted, rec.Code, rec.Body.String())
+	}
+
+	overview, err := store.GetAIFetchOverview(context.Background(), api.AIFetchQueryParams{
+		SiteID: siteID,
+		Start:  time.Now().UTC().Add(-time.Hour),
+		End:    time.Now().UTC().Add(time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("GetAIFetchOverview: %v", err)
+	}
+	if overview.TotalRequests != 0 {
+		t.Fatalf("expected 0 stored fetches, got %d", overview.TotalRequests)
+	}
+}
+
 func TestHandleCreateAIFetchDropsSpamNetwork(t *testing.T) {
 	store, ctx, _, siteID, token := setupAIFetchTestEnv(t)
 

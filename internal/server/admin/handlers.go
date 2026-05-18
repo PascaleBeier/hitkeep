@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -12,7 +13,6 @@ import (
 
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
-	"hitkeep/internal/blocking"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
 )
@@ -195,11 +195,6 @@ func (h *handler) handleListInstanceExclusions() http.HandlerFunc {
 }
 
 func (h *handler) handleCreateInstanceExclusion() http.HandlerFunc {
-	type request struct {
-		CIDR        string `json:"cidr"`
-		Description string `json:"description"`
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
 		if h.ctx.Store == nil {
 			http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
@@ -212,36 +207,52 @@ func (h *handler) handleCreateInstanceExclusion() http.HandlerFunc {
 			return
 		}
 
-		var req request
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
+		input, message, status, ok := shared.DecodeTrafficExclusionRequest(r)
+		if !ok {
+			http.Error(w, message, status)
 			return
 		}
-
-		normalizedCIDR, _, err := blocking.NormalizeCIDR(req.CIDR)
+		var createdRule any
+		var ruleID string
+		var err error
+		switch input.Type {
+		case shared.ExclusionRuleTypeCIDR:
+			rule, createErr := h.ctx.Store.CreateInstanceExclusion(r.Context(), input.CIDR, input.Description, userID)
+			if createErr != nil {
+				err = createErr
+				break
+			}
+			createdRule = rule
+			ruleID = rule.ID.String()
+		case shared.ExclusionRuleTypeCountry:
+			rule, createErr := h.ctx.Store.CreateInstanceCountryExclusion(r.Context(), input.CountryCode, input.Description, userID)
+			if createErr != nil {
+				err = createErr
+				break
+			}
+			createdRule = rule
+			ruleID = rule.ID.String()
+		}
 		if err != nil {
-			http.Error(w, "Invalid IP or CIDR", http.StatusBadRequest)
-			return
-		}
-
-		description := strings.TrimSpace(req.Description)
-		if len(description) > 255 {
-			http.Error(w, "Description must be 255 characters or fewer", http.StatusBadRequest)
-			return
-		}
-
-		rule, err := h.ctx.Store.CreateInstanceExclusion(r.Context(), normalizedCIDR, description, userID)
-		if err != nil {
-			slog.Error("Failed to create instance exclusion", "error", err, "cidr", normalizedCIDR)
+			slog.Error("Failed to create instance exclusion", "error", err, "type", input.Type, "label", input.Label)
 			http.Error(w, "Internal error", http.StatusInternalServerError)
 			return
 		}
 
 		h.refreshIPFilter(r.Context())
+		h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
+			ActorID:     userID,
+			Action:      "site.exclusion_created",
+			TargetType:  "site_exclusion",
+			TargetID:    ruleID,
+			TargetLabel: input.Label,
+			Outcome:     "success",
+			Details:     fmt.Sprintf("Global exclusion %s created", input.Label),
+		})
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(rule); err != nil {
+		if err := json.NewEncoder(w).Encode(createdRule); err != nil {
 			slog.Error("Failed to encode instance exclusion response", "error", err)
 		}
 	}
@@ -272,6 +283,15 @@ func (h *handler) handleDeleteInstanceExclusion() http.HandlerFunc {
 		}
 
 		h.refreshIPFilter(r.Context())
+		h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
+			ActorID:     shared.GetUserIDFromContext(r),
+			Action:      "site.exclusion_deleted",
+			TargetType:  "site_exclusion",
+			TargetID:    ruleID.String(),
+			TargetLabel: ruleID.String(),
+			Outcome:     "success",
+			Details:     fmt.Sprintf("Global exclusion %s deleted", ruleID),
+		})
 
 		w.WriteHeader(http.StatusNoContent)
 	}

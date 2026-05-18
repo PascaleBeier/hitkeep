@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/internal/blocking"
 	"hitkeep/internal/server/shared"
 )
 
@@ -42,11 +41,6 @@ func (h *handler) handleListSiteExclusions() http.HandlerFunc {
 }
 
 func (h *handler) handleCreateSiteExclusion() http.HandlerFunc {
-	type request struct {
-		CIDR        string `json:"cidr"`
-		Description string `json:"description"`
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
 		if h.ctx.Store == nil {
 			http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
@@ -65,27 +59,14 @@ func (h *handler) handleCreateSiteExclusion() http.HandlerFunc {
 			return
 		}
 
-		var req request
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
+		input, message, status, ok := shared.DecodeTrafficExclusionRequest(r)
+		if !ok {
+			http.Error(w, message, status)
 			return
 		}
-
-		normalizedCIDR, _, err := blocking.NormalizeCIDR(req.CIDR)
-		if err != nil {
-			http.Error(w, "Invalid IP or CIDR", http.StatusBadRequest)
-			return
-		}
-
-		description := strings.TrimSpace(req.Description)
-		if len(description) > 255 {
-			http.Error(w, "Description must be 255 characters or fewer", http.StatusBadRequest)
-			return
-		}
-
-		rule, err := h.ctx.Store.CreateSiteExclusion(r.Context(), siteID, normalizedCIDR, description, userID)
-		if err != nil {
-			slog.Error("Failed to create site exclusion", "error", err, "site_id", siteID, "cidr", normalizedCIDR)
+		ruleID, createdRule, createErr := h.createSiteTrafficExclusion(r.Context(), siteID, userID, input)
+		if createErr != nil {
+			slog.Error("Failed to create site exclusion", "error", createErr, "site_id", siteID, "type", input.Type, "label", input.Label)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -97,18 +78,37 @@ func (h *handler) handleCreateSiteExclusion() http.HandlerFunc {
 				TeamID:      teamID,
 				Action:      "site.exclusion_created",
 				TargetType:  "site_exclusion",
-				TargetID:    rule.ID.String(),
-				TargetLabel: normalizedCIDR,
+				TargetID:    ruleID,
+				TargetLabel: input.Label,
 				Outcome:     "success",
-				Details:     fmt.Sprintf("Site exclusion %s created", normalizedCIDR),
+				Details:     fmt.Sprintf("Site exclusion %s created", input.Label),
 			})
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(rule); err != nil {
+		if err := json.NewEncoder(w).Encode(createdRule); err != nil {
 			slog.Error("Failed to encode site exclusion response", "error", err, "site_id", siteID)
 		}
+	}
+}
+
+func (h *handler) createSiteTrafficExclusion(ctx context.Context, siteID uuid.UUID, userID uuid.UUID, input shared.TrafficExclusionInput) (string, any, error) {
+	switch input.Type {
+	case shared.ExclusionRuleTypeCIDR:
+		rule, err := h.ctx.Store.CreateSiteExclusion(ctx, siteID, input.CIDR, input.Description, userID)
+		if err != nil {
+			return "", nil, err
+		}
+		return rule.ID.String(), rule, nil
+	case shared.ExclusionRuleTypeCountry:
+		rule, err := h.ctx.Store.CreateSiteCountryExclusion(ctx, siteID, input.CountryCode, input.Description, userID)
+		if err != nil {
+			return "", nil, err
+		}
+		return rule.ID.String(), rule, nil
+	default:
+		return "", nil, fmt.Errorf("unsupported exclusion type %q", input.Type)
 	}
 }
 

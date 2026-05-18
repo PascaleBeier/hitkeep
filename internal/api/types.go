@@ -1318,7 +1318,9 @@ type AdminDisableUserMFAResponse struct {
 type IPExclusion struct {
 	ID          uuid.UUID  `json:"id"`
 	SiteID      *uuid.UUID `json:"site_id,omitempty"`
-	CIDR        string     `json:"cidr"`
+	Type        string     `json:"type"`
+	CIDR        string     `json:"cidr,omitempty"`
+	CountryCode string     `json:"country_code,omitempty"`
 	Description string     `json:"description,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
 	CreatedBy   *uuid.UUID `json:"created_by,omitempty"`

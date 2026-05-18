@@ -3,8 +3,9 @@ package shared
 import (
 	"net/http"
 	"net/netip"
-	"slices"
 	"strings"
+
+	"golang.org/x/text/language"
 
 	"hitkeep/internal/ipmeta"
 )
@@ -93,14 +94,22 @@ func isPrivateCountryIP(ip netip.Addr) bool {
 }
 
 func validAuditCountryCode(code string) string {
+	return NormalizeCountryCode(code)
+}
+
+func NormalizeCountryCode(code string) string {
 	code = strings.ToUpper(strings.TrimSpace(code))
 	if len(code) != 2 {
 		return ""
 	}
-
-	invalid := []string{"XX", "T1", "A1", "A2", "O1"}
-	if slices.Contains(invalid, code) {
+	for _, r := range code {
+		if r < 'A' || r > 'Z' {
+			return ""
+		}
+	}
+	region, err := language.ParseRegion(code)
+	if err != nil || !region.IsCountry() {
 		return ""
 	}
-	return code
+	return region.String()
 }

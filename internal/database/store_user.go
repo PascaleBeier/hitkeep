@@ -205,11 +205,13 @@ type userFKReference struct {
 var userFKReferences = []userFKReference{
 	{table: "api_clients", column: "user_id", query: "UPDATE api_clients SET user_id = ? WHERE user_id = ?"},
 	{table: "instance_exclusions", column: "created_by", query: "UPDATE instance_exclusions SET created_by = ? WHERE created_by = ?"},
+	{table: "instance_country_exclusions", column: "created_by", query: "UPDATE instance_country_exclusions SET created_by = ? WHERE created_by = ?"},
 	{table: "instance_roles", column: "granted_by", query: "UPDATE instance_roles SET granted_by = ? WHERE granted_by = ?"},
 	{table: "instance_roles", column: "user_id", query: "UPDATE instance_roles SET user_id = ? WHERE user_id = ?"},
 	{table: "remember_me_tokens", column: "user_id", query: "UPDATE remember_me_tokens SET user_id = ? WHERE user_id = ?"},
 	{table: "share_links", column: "created_by", query: "UPDATE share_links SET created_by = ? WHERE created_by = ?"},
 	{table: "site_exclusions", column: "created_by", query: "UPDATE site_exclusions SET created_by = ? WHERE created_by = ?"},
+	{table: "site_country_exclusions", column: "created_by", query: "UPDATE site_country_exclusions SET created_by = ? WHERE created_by = ?"},
 	{table: "site_members", column: "added_by", query: "UPDATE site_members SET added_by = ? WHERE added_by = ?"},
 	{table: "site_members", column: "user_id", query: "UPDATE site_members SET user_id = ? WHERE user_id = ?"},
 	{table: "sites", column: "user_id", query: "UPDATE sites SET user_id = ? WHERE user_id = ?"},

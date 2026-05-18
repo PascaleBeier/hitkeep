@@ -149,8 +149,10 @@ func (h *handler) handleCreateAIFetch() http.HandlerFunc {
 			return
 		}
 
-		userIP := shared.GetRealIP(r, h.ctx.Config.GetTrustedProxyNetworks())
-		if h.ctx.IPFilter != nil && h.ctx.IPFilter.IsBlocked(site.ID, userIP) {
+		trustedProxyNets := h.ctx.Config.GetTrustedProxyNetworks()
+		userIP := shared.GetRealIP(r, trustedProxyNets)
+		countryCode := shared.CountryCodeFromRequest(r, trustedProxyNets)
+		if h.ctx.IPFilter != nil && h.ctx.IPFilter.Evaluate(site.ID, userIP, countryCode).Blocked {
 			h.recordRejection()
 			w.WriteHeader(http.StatusAccepted)
 			return

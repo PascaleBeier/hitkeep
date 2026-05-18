@@ -484,9 +484,14 @@ func openAPIV1AccountSchemas() map[string]any {
 		"IPExclusion": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"id":          map[string]any{"type": "string", "format": "uuid"},
-				"site_id":     map[string]any{"type": "string", "format": "uuid"},
-				"cidr":        map[string]any{"type": "string"},
+				"id":      map[string]any{"type": "string", "format": "uuid"},
+				"site_id": map[string]any{"type": "string", "format": "uuid"},
+				"type":    map[string]any{"type": "string", "enum": []string{"cidr", "country"}},
+				"cidr":    map[string]any{"type": "string", "description": "IP or CIDR value for cidr rules."},
+				"country_code": map[string]any{
+					"type":        "string",
+					"description": "Uppercase ISO 3166-1 alpha-2 country code for country rules.",
+				},
 				"description": map[string]any{"type": "string"},
 				"created_at":  map[string]any{"type": "string", "format": "date-time"},
 				"created_by":  map[string]any{"type": "string", "format": "uuid"},
@@ -495,10 +500,14 @@ func openAPIV1AccountSchemas() map[string]any {
 		"IPExclusionCreateRequest": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"cidr":        map[string]any{"type": "string", "description": "IP or CIDR value. Plain IP values are normalized to /32 (IPv4) or /128 (IPv6)."},
+				"type": map[string]any{"type": "string", "enum": []string{"cidr", "country"}, "description": "Rule type. Omitted cidr requests remain accepted for backward compatibility."},
+				"cidr": map[string]any{"type": "string", "description": "IP or CIDR value for cidr rules. Plain IP values are normalized to /32 (IPv4) or /128 (IPv6)."},
+				"country_code": map[string]any{
+					"type":        "string",
+					"description": "ISO 3166-1 alpha-2 country code for country rules. Values are normalized to uppercase.",
+				},
 				"description": map[string]any{"type": "string", "maxLength": 255},
 			},
-			"required": []string{"cidr"},
 		},
 		"UserProfile": map[string]any{
 			"type": "object",

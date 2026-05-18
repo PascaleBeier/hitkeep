@@ -61,3 +61,20 @@ func TestCountryCodeFromRequestSkipsPrivateClientIP(t *testing.T) {
 		t.Fatalf("expected private IP to have no country, got %q", got)
 	}
 }
+
+func TestNormalizeCountryCodeRequiresKnownCountry(t *testing.T) {
+	tests := map[string]string{
+		"de":  "DE",
+		"US":  "US",
+		"zz":  "",
+		"eu":  "",
+		"deu": "",
+		"1A":  "",
+	}
+
+	for input, want := range tests {
+		if got := NormalizeCountryCode(input); got != want {
+			t.Fatalf("NormalizeCountryCode(%q) = %q, want %q", input, got, want)
+		}
+	}
+}

@@ -143,7 +143,8 @@ func (h *handler) handleServerPageviewIngestLeader() http.HandlerFunc {
 			return
 		}
 
-		if h.ctx.IPFilter != nil && h.ctx.IPFilter.IsBlocked(ingestCtx.site.ID, ingestCtx.visitorIP) {
+		countryCodePtr, metadata := geoNetworkFromVisitorIP(ingestCtx.visitorIP, h.ctx.Config.GetTrustedProxyNetworks())
+		if h.ctx.IPFilter != nil && h.ctx.IPFilter.Evaluate(ingestCtx.site.ID, ingestCtx.visitorIP, stringValue(countryCodePtr)).Blocked {
 			h.recordRejection()
 			w.WriteHeader(http.StatusAccepted)
 			return
@@ -166,8 +167,6 @@ func (h *handler) handleServerPageviewIngestLeader() http.HandlerFunc {
 		if pageID == uuid.Nil {
 			pageID = uuid.New()
 		}
-
-		countryCodePtr, metadata := geoNetworkFromVisitorIP(ingestCtx.visitorIP, h.ctx.Config.GetTrustedProxyNetworks())
 
 		userAgent := ingestCtx.userAgent
 		hit := api.Hit{
@@ -244,7 +243,8 @@ func (h *handler) handleServerEventIngestLeader() http.HandlerFunc {
 			return
 		}
 
-		if h.ctx.IPFilter != nil && h.ctx.IPFilter.IsBlocked(ingestCtx.site.ID, ingestCtx.visitorIP) {
+		countryCode := countryCodeFromVisitorIP(ingestCtx.visitorIP, h.ctx.Config.GetTrustedProxyNetworks())
+		if h.ctx.IPFilter != nil && h.ctx.IPFilter.Evaluate(ingestCtx.site.ID, ingestCtx.visitorIP, countryCode).Blocked {
 			h.recordRejection()
 			w.WriteHeader(http.StatusAccepted)
 			return
@@ -427,6 +427,14 @@ func countryCodeFromVisitorIP(visitorIP string, trustedProxyNets []netip.Prefix)
 	return shared.CountryCodeFromRequest(req, trustedProxyNets)
 }
 
+func countryCodeFromRequest(r *http.Request, visitorIP string, trustedProxyNets []netip.Prefix) string {
+	countryCode := shared.CountryCodeFromRequest(r, trustedProxyNets)
+	if countryCode != "" {
+		return countryCode
+	}
+	return metadataFromVisitorIP(visitorIP).CountryCode
+}
+
 func geoNetworkFromVisitorIP(visitorIP string, trustedProxyNets []netip.Prefix) (*string, ipmeta.Metadata) {
 	metadata := metadataFromVisitorIP(visitorIP)
 	countryCode := countryCodeFromVisitorIP(visitorIP, trustedProxyNets)
@@ -450,6 +458,13 @@ func stringPtrIfNotEmpty(value string) *string {
 		return nil
 	}
 	return &value
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func intPtrIfPositive(value int) *int {
@@ -488,8 +503,10 @@ func (h *handler) handleIngestLeader(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userIP := shared.GetRealIP(r, h.ctx.Config.GetTrustedProxyNetworks())
-	if h.ctx.IPFilter != nil && h.ctx.IPFilter.IsBlocked(site.ID, userIP) {
+	trustedProxyNets := h.ctx.Config.GetTrustedProxyNetworks()
+	userIP := shared.GetRealIP(r, trustedProxyNets)
+	countryCode := countryCodeFromRequest(r, userIP, trustedProxyNets)
+	if h.ctx.IPFilter != nil && h.ctx.IPFilter.Evaluate(site.ID, userIP, countryCode).Blocked {
 		h.recordRejection()
 		w.WriteHeader(http.StatusAccepted)
 		return
@@ -512,8 +529,6 @@ func (h *handler) handleIngestLeader(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	extractor := NewCountryCodeExtractor(h.ctx.Config.GetTrustedProxyNetworks())
-	countryCode := extractor.ExtractFromRequest(r, payload.Language)
 	metadata := metadataFromVisitorIP(userIP)
 	if countryCode == "" {
 		countryCode = metadata.CountryCode
@@ -636,8 +651,10 @@ func (h *handler) handleIngestWebVitalsLeader(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	userIP := shared.GetRealIP(r, h.ctx.Config.GetTrustedProxyNetworks())
-	if h.ctx.IPFilter != nil && h.ctx.IPFilter.IsBlocked(site.ID, userIP) {
+	trustedProxyNets := h.ctx.Config.GetTrustedProxyNetworks()
+	userIP := shared.GetRealIP(r, trustedProxyNets)
+	countryCode := countryCodeFromRequest(r, userIP, trustedProxyNets)
+	if h.ctx.IPFilter != nil && h.ctx.IPFilter.Evaluate(site.ID, userIP, countryCode).Blocked {
 		h.recordRejection()
 		w.WriteHeader(http.StatusAccepted)
 		return
@@ -775,8 +792,10 @@ func (h *handler) handleIngestEventLeader(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	userIP := shared.GetRealIP(r, h.ctx.Config.GetTrustedProxyNetworks())
-	if h.ctx.IPFilter != nil && h.ctx.IPFilter.IsBlocked(site.ID, userIP) {
+	trustedProxyNets := h.ctx.Config.GetTrustedProxyNetworks()
+	userIP := shared.GetRealIP(r, trustedProxyNets)
+	countryCode := countryCodeFromRequest(r, userIP, trustedProxyNets)
+	if h.ctx.IPFilter != nil && h.ctx.IPFilter.Evaluate(site.ID, userIP, countryCode).Blocked {
 		h.recordRejection()
 		w.WriteHeader(http.StatusAccepted)
 		return

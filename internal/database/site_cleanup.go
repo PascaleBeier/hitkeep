@@ -21,6 +21,7 @@ var siteDeleteSteps = []siteDeleteStep{
 	{table: "site_activity_hourly_counts", query: "DELETE FROM site_activity_hourly_counts WHERE site_id = ?"},
 	{table: "site_activity_summary", query: "DELETE FROM site_activity_summary WHERE site_id = ?"},
 	{table: "site_exclusions", query: "DELETE FROM site_exclusions WHERE site_id = ?"},
+	{table: "site_country_exclusions", query: "DELETE FROM site_country_exclusions WHERE site_id = ?"},
 	{table: "api_client_site_roles", query: "DELETE FROM api_client_site_roles WHERE site_id = ?"},
 	{table: "google_search_console_sync_state", query: "DELETE FROM google_search_console_sync_state WHERE site_id = ?"},
 	{table: "google_search_console_site_mappings", query: "DELETE FROM google_search_console_site_mappings WHERE site_id = ?"},

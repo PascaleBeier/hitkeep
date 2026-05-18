@@ -366,6 +366,59 @@ func TestSiteExclusionsAllowInstanceAdmin(t *testing.T) {
 	}
 }
 
+func TestSiteExclusionCountryRules(t *testing.T) {
+	h, store, ownerID := setupTestEnv(t)
+	defer store.Close()
+
+	site, err := store.CreateSite(context.Background(), ownerID, "country-exclusions.test")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+
+	body := bytes.NewReader([]byte(`{"type":"country","country_code":"de","description":"Germany"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/sites/"+site.ID.String()+"/exclusions", body)
+	req.SetPathValue("id", site.ID.String())
+	req = req.WithContext(context.WithValue(req.Context(), shared.UserIDKey, ownerID))
+	w := httptest.NewRecorder()
+
+	h.ctx.RequireSiteOrInstancePermission(auth.PermSiteManageData, auth.PermInstanceManageSiteExclusions)(h.handleCreateSiteExclusion()).ServeHTTP(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected country create status %d, got %d: %s", http.StatusCreated, w.Code, w.Body.String())
+	}
+	var created api.IPExclusion
+	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
+		t.Fatalf("decode created country exclusion: %v", err)
+	}
+	if created.Type != "country" || created.CountryCode != "DE" || created.CIDR != "" {
+		t.Fatalf("unexpected created country exclusion: %+v", created)
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/sites/"+site.ID.String()+"/exclusions", nil)
+	listReq.SetPathValue("id", site.ID.String())
+	listReq = listReq.WithContext(context.WithValue(listReq.Context(), shared.UserIDKey, ownerID))
+	listW := httptest.NewRecorder()
+	h.ctx.RequireSiteOrInstancePermission(auth.PermSiteManageData, auth.PermInstanceManageSiteExclusions)(h.handleListSiteExclusions()).ServeHTTP(listW, listReq)
+	if listW.Code != http.StatusOK {
+		t.Fatalf("expected list status %d, got %d: %s", http.StatusOK, listW.Code, listW.Body.String())
+	}
+	var rules []api.IPExclusion
+	if err := json.NewDecoder(listW.Body).Decode(&rules); err != nil {
+		t.Fatalf("decode list: %v", err)
+	}
+	if len(rules) != 1 || rules[0].Type != "country" || rules[0].CountryCode != "DE" {
+		t.Fatalf("unexpected listed rules: %+v", rules)
+	}
+
+	badReq := httptest.NewRequest(http.MethodPost, "/api/sites/"+site.ID.String()+"/exclusions", bytes.NewReader([]byte(`{"type":"country","country_code":"deu"}`)))
+	badReq.SetPathValue("id", site.ID.String())
+	badReq = badReq.WithContext(context.WithValue(badReq.Context(), shared.UserIDKey, ownerID))
+	badW := httptest.NewRecorder()
+	h.ctx.RequireSiteOrInstancePermission(auth.PermSiteManageData, auth.PermInstanceManageSiteExclusions)(h.handleCreateSiteExclusion()).ServeHTTP(badW, badReq)
+	if badW.Code != http.StatusBadRequest {
+		t.Fatalf("expected invalid country status %d, got %d: %s", http.StatusBadRequest, badW.Code, badW.Body.String())
+	}
+}
+
 func TestSiteExclusionsAllowTeamAdminAndRejectUnscopedMember(t *testing.T) {
 	h, store, ownerID := setupTestEnv(t)
 	defer store.Close()

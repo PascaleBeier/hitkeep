@@ -24,14 +24,32 @@ type IPFilter struct {
 	siteRules map[uuid.UUID][]netip.Prefix
 	// Global blocked networks.
 	globalRules []netip.Prefix
+	// Map site ID to blocked country codes.
+	siteCountries map[uuid.UUID]map[string]struct{}
+	// Global blocked country codes.
+	globalCountries map[string]struct{}
 
 	mu sync.RWMutex
 }
 
+const (
+	BlockReasonInstanceCIDR    = "instance_cidr"
+	BlockReasonSiteCIDR        = "site_cidr"
+	BlockReasonInstanceCountry = "instance_country"
+	BlockReasonSiteCountry     = "site_country"
+)
+
+type BlockDecision struct {
+	Blocked bool
+	Reason  string
+}
+
 func NewIPFilter(store *database.Store) *IPFilter {
 	return &IPFilter{
-		store:     store,
-		siteRules: make(map[uuid.UUID][]netip.Prefix),
+		store:           store,
+		siteRules:       make(map[uuid.UUID][]netip.Prefix),
+		siteCountries:   make(map[uuid.UUID]map[string]struct{}),
+		globalCountries: make(map[string]struct{}),
 	}
 }
 
@@ -72,6 +90,14 @@ func (f *IPFilter) Refresh(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	instanceCountries, err := f.store.ListInstanceExclusionCountries(ctx)
+	if err != nil {
+		return err
+	}
+	siteCountries, err := f.store.ListSiteExclusionCountries(ctx)
+	if err != nil {
+		return err
+	}
 
 	newGlobals := make([]netip.Prefix, 0, len(instanceCIDRs))
 	for _, cidr := range instanceCIDRs {
@@ -93,38 +119,74 @@ func (f *IPFilter) Refresh(ctx context.Context) error {
 		newSites[rule.SiteID] = append(newSites[rule.SiteID], ipNet)
 	}
 
+	newGlobalCountries := make(map[string]struct{}, len(instanceCountries))
+	for _, countryCode := range instanceCountries {
+		if countryCode = normalizeCountryCode(countryCode); countryCode != "" {
+			newGlobalCountries[countryCode] = struct{}{}
+		}
+	}
+
+	newSiteCountries := make(map[uuid.UUID]map[string]struct{})
+	for _, rule := range siteCountries {
+		countryCode := normalizeCountryCode(rule.CountryCode)
+		if countryCode == "" {
+			continue
+		}
+		if _, ok := newSiteCountries[rule.SiteID]; !ok {
+			newSiteCountries[rule.SiteID] = make(map[string]struct{})
+		}
+		newSiteCountries[rule.SiteID][countryCode] = struct{}{}
+	}
+
 	f.mu.Lock()
 	f.globalRules = newGlobals
 	f.siteRules = newSites
+	f.globalCountries = newGlobalCountries
+	f.siteCountries = newSiteCountries
 	f.mu.Unlock()
 
 	return nil
 }
 
 func (f *IPFilter) IsBlocked(siteID uuid.UUID, ipStr string) bool {
+	return f.Evaluate(siteID, ipStr, "").Blocked
+}
+
+func (f *IPFilter) Evaluate(siteID uuid.UUID, ipStr string, countryCode string) BlockDecision {
 	ip := parseIP(ipStr)
-	if !ip.IsValid() {
-		return false
-	}
 
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
-	for _, blockedNetwork := range f.globalRules {
-		if blockedNetwork.Contains(ip) {
-			return true
-		}
-	}
-
-	if siteNetworks, ok := f.siteRules[siteID]; ok {
-		for _, blockedNetwork := range siteNetworks {
+	if ip.IsValid() {
+		for _, blockedNetwork := range f.globalRules {
 			if blockedNetwork.Contains(ip) {
-				return true
+				return BlockDecision{Blocked: true, Reason: BlockReasonInstanceCIDR}
+			}
+		}
+
+		if siteNetworks, ok := f.siteRules[siteID]; ok {
+			for _, blockedNetwork := range siteNetworks {
+				if blockedNetwork.Contains(ip) {
+					return BlockDecision{Blocked: true, Reason: BlockReasonSiteCIDR}
+				}
 			}
 		}
 	}
 
-	return false
+	countryCode = normalizeCountryCode(countryCode)
+	if countryCode != "" {
+		if _, ok := f.globalCountries[countryCode]; ok {
+			return BlockDecision{Blocked: true, Reason: BlockReasonInstanceCountry}
+		}
+		if siteCountryRules, ok := f.siteCountries[siteID]; ok {
+			if _, ok := siteCountryRules[countryCode]; ok {
+				return BlockDecision{Blocked: true, Reason: BlockReasonSiteCountry}
+			}
+		}
+	}
+
+	return BlockDecision{}
 }
 
 func parseIP(value string) netip.Addr {
@@ -142,4 +204,12 @@ func parseIP(value string) netip.Addr {
 		return netip.Addr{}
 	}
 	return addr.Unmap()
+}
+
+func normalizeCountryCode(value string) string {
+	code := strings.ToUpper(strings.TrimSpace(value))
+	if len(code) != 2 {
+		return ""
+	}
+	return code
 }

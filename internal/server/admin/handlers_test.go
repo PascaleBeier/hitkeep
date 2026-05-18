@@ -79,6 +79,61 @@ func withAdminTestUser(req *http.Request, userID uuid.UUID) *http.Request {
 	return req.WithContext(context.WithValue(req.Context(), shared.UserIDKey, userID))
 }
 
+func TestHandleCreateInstanceCountryExclusion(t *testing.T) {
+	h, store, _, _, actorUserID, _ := setupAdminTestEnv(t)
+
+	req := withAdminTestUser(httptest.NewRequest(http.MethodPost, "/api/admin/exclusions", strings.NewReader(`{"type":"country","country_code":"us","description":"United States"}`)), actorUserID)
+	req.RemoteAddr = "203.0.113.10:1234"
+	req.Header.Set("User-Agent", "global-exclusion-test")
+	req.Header.Set("X-Request-Id", "req-global-exclusion-create")
+	w := httptest.NewRecorder()
+
+	h.handleCreateInstanceExclusion().ServeHTTP(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, w.Code, w.Body.String())
+	}
+
+	var created api.IPExclusion
+	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
+		t.Fatalf("decode created exclusion: %v", err)
+	}
+	if created.Type != "country" || created.CountryCode != "US" || created.CIDR != "" {
+		t.Fatalf("unexpected created exclusion: %+v", created)
+	}
+	assertGlobalExclusionAuditEntry(t, store, "site.exclusion_created", created.ID.String(), "US", "203.0.113.10", "global-exclusion-test", "req-global-exclusion-create")
+
+	listReq := withAdminTestUser(httptest.NewRequest(http.MethodGet, "/api/admin/exclusions", nil), actorUserID)
+	listW := httptest.NewRecorder()
+	h.handleListInstanceExclusions().ServeHTTP(listW, listReq)
+	if listW.Code != http.StatusOK {
+		t.Fatalf("expected list status %d, got %d: %s", http.StatusOK, listW.Code, listW.Body.String())
+	}
+	var rules []api.IPExclusion
+	if err := json.NewDecoder(listW.Body).Decode(&rules); err != nil {
+		t.Fatalf("decode list: %v", err)
+	}
+	if len(rules) != 1 || rules[0].Type != "country" || rules[0].CountryCode != "US" {
+		t.Fatalf("unexpected listed rules: %+v", rules)
+	}
+
+	badReq := withAdminTestUser(httptest.NewRequest(http.MethodPost, "/api/admin/exclusions", strings.NewReader(`{"type":"country","country_code":"usa"}`)), actorUserID)
+	badW := httptest.NewRecorder()
+	h.handleCreateInstanceExclusion().ServeHTTP(badW, badReq)
+	if badW.Code != http.StatusBadRequest {
+		t.Fatalf("expected invalid country status %d, got %d: %s", http.StatusBadRequest, badW.Code, badW.Body.String())
+	}
+
+	deleteReq := withAdminTestUser(httptest.NewRequest(http.MethodDelete, "/api/admin/exclusions/"+created.ID.String(), nil), actorUserID)
+	deleteReq.SetPathValue("ruleID", created.ID.String())
+	deleteW := httptest.NewRecorder()
+
+	h.handleDeleteInstanceExclusion().ServeHTTP(deleteW, deleteReq)
+	if deleteW.Code != http.StatusNoContent {
+		t.Fatalf("expected delete status %d, got %d: %s", http.StatusNoContent, deleteW.Code, deleteW.Body.String())
+	}
+	assertGlobalExclusionAuditEntry(t, store, "site.exclusion_deleted", created.ID.String(), created.ID.String(), "", "", "")
+}
+
 func TestHandleDeleteUserReturnsConflictForSoleOwner(t *testing.T) {
 	h, store, _, _, actorUserID, targetUserID := setupAdminTestEnv(t)
 
@@ -623,6 +678,35 @@ func assertPermissionAuditEntry(t *testing.T, store *database.Store, action stri
 	}
 	if entry.TargetType != "permission" || entry.TargetID != siteID.String() || entry.TargetLabel != "audit-permissions.example" {
 		t.Fatalf("expected permission target fields, got type=%q id=%q label=%q", entry.TargetType, entry.TargetID, entry.TargetLabel)
+	}
+	if expectedIP != "" && entry.IPAddress != expectedIP {
+		t.Fatalf("expected IP %q, got %q", expectedIP, entry.IPAddress)
+	}
+	if expectedUserAgent != "" && entry.UserAgent != expectedUserAgent {
+		t.Fatalf("expected user agent %q, got %q", expectedUserAgent, entry.UserAgent)
+	}
+	if expectedRequestID != "" && entry.RequestID != expectedRequestID {
+		t.Fatalf("expected request ID %q, got %q", expectedRequestID, entry.RequestID)
+	}
+}
+
+func assertGlobalExclusionAuditEntry(t *testing.T, store *database.Store, action string, targetID string, targetLabel string, expectedIP string, expectedUserAgent string, expectedRequestID string) {
+	t.Helper()
+
+	entries, total, err := store.ListInstanceAuditEntries(context.Background(), database.InstanceAuditFilter{
+		Action: action,
+		Limit:  10,
+	})
+	if err != nil {
+		t.Fatalf("list audit entries for %s: %v", action, err)
+	}
+	if total != 1 || len(entries) != 1 {
+		t.Fatalf("expected one %s audit entry, total=%d len=%d", action, total, len(entries))
+	}
+
+	entry := entries[0]
+	if entry.TargetType != "site_exclusion" || entry.TargetID != targetID || entry.TargetLabel != targetLabel {
+		t.Fatalf("expected exclusion target fields, got type=%q id=%q label=%q", entry.TargetType, entry.TargetID, entry.TargetLabel)
 	}
 	if expectedIP != "" && entry.IPAddress != expectedIP {
 		t.Fatalf("expected IP %q, got %q", expectedIP, entry.IPAddress)

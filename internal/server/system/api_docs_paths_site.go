@@ -162,14 +162,14 @@ func openAPIV1AdminSitePaths() map[string]any {
 			}),
 		},
 		"/api/admin/exclusions": map[string]any{
-			"get": op([]string{"Admin"}, "List global exclusions", "Lists instance-level IP/CIDR exclusions used by ingest filtering. Requires instance.manage_site_exclusions.", secCookie(), nil, nil,
+			"get": op([]string{"Admin"}, "List global exclusions", "Lists instance-level IP/CIDR and country exclusions used by ingest-time filtering. Country exclusions affect new traffic only. Requires instance.manage_site_exclusions.", secCookie(), nil, nil,
 				map[string]any{"200": jsonSchemaResp("Global exclusions", map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/IPExclusion"}})}),
-			"post": op([]string{"Admin"}, "Create global exclusion", "Creates instance-level IP/CIDR exclusion for all sites. Requires instance.manage_site_exclusions.", secCookie(), nil,
+			"post": op([]string{"Admin"}, "Create global exclusion", "Creates an instance-level IP/CIDR or country exclusion for all sites. Country exclusions use ISO 3166-1 alpha-2 country codes and affect new traffic only. Requires instance.manage_site_exclusions.", secCookie(), nil,
 				jsonBody(map[string]any{"$ref": "#/components/schemas/IPExclusionCreateRequest"}),
-				map[string]any{"201": jsonRefResp("Created exclusion", "#/components/schemas/IPExclusion"), "400": errResp("Invalid IP/CIDR")}),
+				map[string]any{"201": jsonRefResp("Created exclusion", "#/components/schemas/IPExclusion"), "400": errResp("Invalid exclusion rule")}),
 		},
 		"/api/admin/exclusions/{ruleID}": map[string]any{
-			"delete": op([]string{"Admin"}, "Delete global exclusion", "Deletes instance-level IP/CIDR exclusion rule. Requires instance.manage_site_exclusions.", secCookie(), []any{paramRef("#/components/parameters/ruleID")}, nil,
+			"delete": op([]string{"Admin"}, "Delete global exclusion", "Deletes an instance-level IP/CIDR or country exclusion rule. Requires instance.manage_site_exclusions.", secCookie(), []any{paramRef("#/components/parameters/ruleID")}, nil,
 				map[string]any{"204": desc("Deleted"), "404": errResp("Not found")}),
 		},
 		"/api/sites/{id}/members": map[string]any{
@@ -431,14 +431,14 @@ func openAPIV1AdminSitePaths() map[string]any {
 				}),
 		},
 		"/api/sites/{id}/exclusions": map[string]any{
-			"get": op([]string{"Sites"}, "List site exclusions", "Lists per-site IP/CIDR exclusions used by ingest filtering. Requires site data-control permission or the narrow instance site-exclusion permission.", secCookie(), []any{paramRef("#/components/parameters/siteID")}, nil,
+			"get": op([]string{"Sites"}, "List site exclusions", "Lists per-site IP/CIDR and country exclusions used by ingest-time filtering. Country exclusions affect new traffic only. Requires site data-control permission or the narrow instance site-exclusion permission.", secCookie(), []any{paramRef("#/components/parameters/siteID")}, nil,
 				map[string]any{"200": jsonSchemaResp("Site exclusions", map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/IPExclusion"}})}),
-			"post": op([]string{"Sites"}, "Create site exclusion", "Creates per-site IP/CIDR exclusion rule. Requires site data-control permission or the narrow instance site-exclusion permission.", secCookie(), []any{paramRef("#/components/parameters/siteID")},
+			"post": op([]string{"Sites"}, "Create site exclusion", "Creates a per-site IP/CIDR or country exclusion rule. Country exclusions use ISO 3166-1 alpha-2 country codes and affect new traffic only. Requires site data-control permission or the narrow instance site-exclusion permission.", secCookie(), []any{paramRef("#/components/parameters/siteID")},
 				jsonBody(map[string]any{"$ref": "#/components/schemas/IPExclusionCreateRequest"}),
-				map[string]any{"201": jsonRefResp("Created exclusion", "#/components/schemas/IPExclusion"), "400": errResp("Invalid IP/CIDR")}),
+				map[string]any{"201": jsonRefResp("Created exclusion", "#/components/schemas/IPExclusion"), "400": errResp("Invalid exclusion rule")}),
 		},
 		"/api/sites/{id}/exclusions/{ruleID}": map[string]any{
-			"delete": op([]string{"Sites"}, "Delete site exclusion", "Deletes a per-site IP/CIDR exclusion rule. Requires site data-control permission or the narrow instance site-exclusion permission.", secCookie(), []any{paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/ruleID")}, nil,
+			"delete": op([]string{"Sites"}, "Delete site exclusion", "Deletes a per-site IP/CIDR or country exclusion rule. Requires site data-control permission or the narrow instance site-exclusion permission.", secCookie(), []any{paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/ruleID")}, nil,
 				map[string]any{"204": desc("Deleted"), "404": errResp("Not found")}),
 		},
 

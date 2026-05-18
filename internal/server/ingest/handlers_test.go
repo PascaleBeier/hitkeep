@@ -127,6 +127,41 @@ func TestHandleIngestLeaderDropsBlockedNetworkBeforePublish(t *testing.T) {
 	}
 }
 
+func TestHandleIngestLeaderDropsCountryExclusionBeforePublish(t *testing.T) {
+	producer := &capturingProducer{}
+	h, cleanup := setupIngestHandler(t, func(ctx *shared.Context) {
+		ctx.Producer = producer
+		if _, err := ctx.Store.CreateInstanceCountryExclusion(context.Background(), "US", "United States", uuid.Nil); err != nil {
+			t.Fatalf("CreateInstanceCountryExclusion: %v", err)
+		}
+		filter := blocking.NewIPFilter(ctx.Store)
+		if err := filter.Refresh(context.Background()); err != nil {
+			t.Fatalf("Refresh IP filter: %v", err)
+		}
+		ctx.IPFilter = filter
+	})
+	defer cleanup()
+
+	req := newIngestRequest(t, "https://example.com", "8.8.8.8:1234", map[string]any{
+		"path":       "/blocked-country",
+		"session_id": uuid.New(),
+		"page_id":    uuid.New(),
+	})
+
+	rec := httptest.NewRecorder()
+	h.handleIngestLeader(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status %d, got %d", http.StatusAccepted, rec.Code)
+	}
+	if got := producer.messageCount("hits"); got != 0 {
+		t.Fatalf("expected country exclusion to publish no hits, got %d", got)
+	}
+	if got := h.ctx.SystemCounters.Rejections.Load(); got != 1 {
+		t.Fatalf("expected rejection counter 1, got %d", got)
+	}
+}
+
 func TestHandleIngestLeaderCountsUnknownSiteRejection(t *testing.T) {
 	h, cleanup := setupIngestHandler(t, nil)
 	defer cleanup()
@@ -410,6 +445,40 @@ func TestHandleIngestWebVitalsLeaderDropsBlockedNetworkBeforePublish(t *testing.
 	}
 	if got := producer.messageCount("web_vitals"); got != 0 {
 		t.Fatalf("expected no web vitals to publish, got %d", got)
+	}
+}
+
+func TestHandleIngestWebVitalsLeaderDropsCountryExclusionBeforePublish(t *testing.T) {
+	producer := &capturingProducer{}
+	h, cleanup := setupIngestHandler(t, func(ctx *shared.Context) {
+		ctx.Producer = producer
+		if _, err := ctx.Store.CreateInstanceCountryExclusion(context.Background(), "US", "United States", uuid.Nil); err != nil {
+			t.Fatalf("CreateInstanceCountryExclusion: %v", err)
+		}
+		filter := blocking.NewIPFilter(ctx.Store)
+		if err := filter.Refresh(context.Background()); err != nil {
+			t.Fatalf("Refresh IP filter: %v", err)
+		}
+		ctx.IPFilter = filter
+	})
+	defer cleanup()
+
+	req := newIngestWebVitalsRequest(t, "https://example.com", "8.8.8.8:1234", map[string]any{
+		"n":   "LCP",
+		"v":   1800,
+		"p":   "/docs",
+		"sid": uuid.New(),
+		"pid": uuid.New(),
+	})
+
+	rec := httptest.NewRecorder()
+	h.handleIngestWebVitalsLeader(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status %d, got %d", http.StatusAccepted, rec.Code)
+	}
+	if got := producer.messageCount("web_vitals"); got != 0 {
+		t.Fatalf("expected country exclusion to publish no web vitals, got %d", got)
 	}
 }
 
@@ -821,6 +890,45 @@ func TestHandleServerPageviewIngestUsesVisitorIPForExclusionsBeforePublish(t *te
 	}
 	if got := ctx.SystemCounters.Rejections.Load(); got != 1 {
 		t.Fatalf("expected rejection counter 1, got %d", got)
+	}
+}
+
+func TestHandleServerPageviewIngestUsesVisitorCountryForExclusionsBeforePublish(t *testing.T) {
+	producer := &capturingProducer{}
+	store, ctx, userID, _, token := setupServerIngestTestEnv(t, auth.SiteOwner, func(ctx *shared.Context) {
+		ctx.Producer = producer
+	})
+	if _, err := store.CreateInstanceCountryExclusion(context.Background(), "US", "United States", userID); err != nil {
+		t.Fatalf("CreateInstanceCountryExclusion: %v", err)
+	}
+	filter := blocking.NewIPFilter(store)
+	if err := filter.Refresh(context.Background()); err != nil {
+		t.Fatalf("Refresh IP filter: %v", err)
+	}
+	ctx.IPFilter = filter
+
+	mux := http.NewServeMux()
+	Register(mux, ctx)
+
+	body := map[string]any{
+		"url":        "https://example.com/blocked-country",
+		"timestamp":  "2026-04-03T12:30:45Z",
+		"visitor_ip": "8.8.8.8",
+		"user_agent": "Mozilla/5.0",
+	}
+	payload, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/ingest/server/pageview", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", token)
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected %d, got %d body=%s", http.StatusAccepted, rec.Code, rec.Body.String())
+	}
+	if got := producer.messageCount("hits"); got != 0 {
+		t.Fatalf("expected blocked visitor country to publish no hits, got %d", got)
 	}
 }
 
