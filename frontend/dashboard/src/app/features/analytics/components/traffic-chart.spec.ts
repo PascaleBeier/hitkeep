@@ -54,4 +54,11 @@ describe('TrafficChart', () => {
         const loader = fixture.debugElement.query(By.css('[aria-live="polite"]'));
         expect(loader).toBeTruthy();
     });
+
+    it('should cap y-axis ticks without forcing one tick per pageview', () => {
+        const options = (component as unknown as { chartOptions: () => { scales: { y: { ticks: { maxTicksLimit: number; stepSize?: number } } } } }).chartOptions();
+
+        expect(options.scales.y.ticks.maxTicksLimit).toBe(6);
+        expect(options.scales.y.ticks.stepSize).toBeUndefined();
+    });
 });

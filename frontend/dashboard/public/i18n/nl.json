@@ -491,6 +491,9 @@
         },
         "filters": {
             "country": "Land:{{value}}",
+            "city": "Stad:{{value}}",
+            "provider": "Provider:{{value}}",
+            "asn": "ASN:{{value}}",
             "device": "Apparaat:{{value}}",
             "language": "Taal:{{value}}",
             "page": "Pagina:{{value}}",
@@ -501,10 +504,20 @@
             "conversionRate": "Conversiepercentage"
         },
         "loadingSiteData": "Sitegegevens laden...",
+        "metricGroups": {
+            "content": "Content",
+            "acquisition": "Acquisitie",
+            "audience": "Audience",
+            "location": "Locatie",
+            "network": "Netwerk"
+        },
         "metrics": {
             "audience": "Audience",
             "browsers": "Browsers",
             "countries": "Landen",
+            "cities": "Steden",
+            "providers": "Providers",
+            "asns": "ASN's",
             "devices": "Apparaten",
             "languages": "Talen",
             "pages": "Pagina's",
@@ -1586,6 +1599,7 @@
                 "database": "Database",
                 "workers": "Werknemers",
                 "isLeader": "Is Leider",
+                "ip2locationAttribution": "HitKeep gebruikt de IP2Location LITE-database voor IP-geolocatie.",
                 "actions": {
                     "check": "Controle uitvoeren"
                 }
@@ -2228,6 +2242,15 @@
                 "correlatedPaths": "Gecorreleerde paden",
                 "aiVisits": "AI-verwezen bezoeken",
                 "uncorrelatedFetches": "Niet-gecorreleerde ophaalacties"
+            },
+            "helpAria": "Correlatiehulp tonen",
+            "help": {
+                "correlatedPaths": "Opgehaalde paden die later AI-verwezen menselijke bezoeken ontvingen binnen het geselecteerde venster.",
+                "aiVisits": "Menselijke bezoeken via AI-verwijzers op paden die ook door AI-crawlers zijn opgehaald.",
+                "uncorrelatedFetches": "Ophaalacties op paden die in dit venster geen bijpassend AI-verwezen bezoek opleverden.",
+                "citationYieldCard": "Gebruik dit om pagina's te vinden waar AI-crawlervraag leidt tot downstream bezoeken.",
+                "opportunityCard": "Gebruik dit om veel opgehaalde pagina's te vinden die betere content, links of beschikbaarheid nodig hebben.",
+                "failureHotspotCard": "Gebruik dit om assistent- en padvoorvoegselparen te vinden waar crawlertoegang fouten veroorzaakt."
             }
         },
         "tables": {
@@ -2239,6 +2262,7 @@
             "opportunityPages": {
                 "title": "Mogelijkheidspagina's",
                 "description": "Pagina's met een hoge ophaalsnelheid, weinig downstream-bezoeken of een verhoogde foutdruk.",
+                "cardSubtitle": "Vraagt aandacht",
                 "empty": "Er zijn geen opportunitypagina's die overeenkomen met de huidige filters."
             },
             "failureHotspots": {
@@ -2447,6 +2471,10 @@
             "devices": "Topapparaten",
             "countries": "Toplanden"
         },
+        "breakdowns": {
+            "title": "Omzetverdeling",
+            "description": "Vergelijk productprestaties en omzettoewijzing op één plek."
+        },
         "products": {
             "title": "Topproducten",
             "description": "Bekijk welke producten de meeste omzet en voltooide bestellingen genereren.",
@@ -2468,7 +2496,9 @@
         },
         "actions": {
             "filterProduct": "Filter",
-            "clearProductFilter": "Duidelijk"
+            "clearProductFilter": "Duidelijk",
+            "filterSource": "Filter",
+            "clearSourceFilter": "Duidelijk"
         },
         "empty": {
             "title": "Nog geen e-commercegegevens",
@@ -2576,6 +2606,9 @@
             "pageviews": "Pageviews",
             "sessions": "Sessies",
             "top_source": "Belangrijkste bron",
+            "top_city": "Belangrijkste stad totaal",
+            "top_provider": "Belangrijkste provider totaal",
+            "top_asn": "Belangrijkste ASN totaal",
             "search_impressions": "Zoekimpressies",
             "search_ctr": "Zoek-CTR",
             "search_position": "Gemiddelde positie",
@@ -2737,7 +2770,10 @@
                 "countries": "Landen",
                 "languages": "Talen",
                 "browsers": "Browsers",
-                "devices": "Apparaten"
+                "devices": "Apparaten",
+                "cities": "Steden",
+                "providers": "Providers",
+                "asns": "ASN's"
             }
         },
         "columns": {

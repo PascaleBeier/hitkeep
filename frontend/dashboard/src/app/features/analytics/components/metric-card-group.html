@@ -1,0 +1,73 @@
+@if (visibleGroups().length) {
+<section class="metric-card-group">
+    <div class="metric-card-group__grid">
+        @for (group of visibleGroups(); track group.id) {
+        <p-card class="metric-card-group__card surface-card h-full border border-surface-200 shadow-sm dark:border-surface-700">
+            <div class="metric-card-group__card-header">
+                <div class="metric-card-group__title-wrap">
+                    <h3 class="metric-card-group__title">{{ cardHeading(group) }}</h3>
+                </div>
+            </div>
+
+            @if (group.cards.length > 1) {
+            <p-tabs [value]="activeCardValue(group)" (valueChange)="setActiveCard(group.id, $event)" [scrollable]="true" [lazy]="true" styleClass="metric-card-group__tabs">
+                <p-tablist>
+                    @for (card of group.cards; track card.id) {
+                    <p-tab [value]="card.id">
+                        <span>{{ card.title }}</span>
+                    </p-tab>
+                    }
+                </p-tablist>
+                <p-tabpanels>
+                    @for (card of group.cards; track card.id) {
+                    <p-tabpanel [value]="card.id">
+                        <app-metric-list
+                            [framed]="false"
+                            [showHeader]="false"
+                            [title]="card.title"
+                            [icon]="card.icon ?? 'pi-list'"
+                            [data]="card.data"
+                            [isLoading]="card.isLoading ?? false"
+                            [linkMode]="card.linkMode ?? 'none'"
+                            [siteDomain]="card.siteDomain ?? null"
+                            [isRowClickable]="card.isRowClickable ?? false"
+                            [activeValue]="card.activeValue ?? null"
+                            [showBrowserIcons]="card.showBrowserIcons ?? false"
+                            [showCountryFlags]="card.showCountryFlags ?? false"
+                            [showCountryNames]="card.showCountryNames ?? false"
+                            [showLanguageFlags]="card.showLanguageFlags ?? false"
+                            [showLanguageNames]="card.showLanguageNames ?? false"
+                            (rowClicked)="handleRowClick(group, card, $event)"
+                        />
+                    </p-tabpanel>
+                    }
+                </p-tabpanels>
+            </p-tabs>
+            } @else if (activeCard(group); as card) {
+            <div class="metric-card-group__single-label">
+                <span>{{ card.title }}</span>
+            </div>
+            <app-metric-list
+                [framed]="false"
+                [showHeader]="false"
+                [title]="card.title"
+                [icon]="card.icon ?? 'pi-list'"
+                [data]="card.data"
+                [isLoading]="card.isLoading ?? false"
+                [linkMode]="card.linkMode ?? 'none'"
+                [siteDomain]="card.siteDomain ?? null"
+                [isRowClickable]="card.isRowClickable ?? false"
+                [activeValue]="card.activeValue ?? null"
+                [showBrowserIcons]="card.showBrowserIcons ?? false"
+                [showCountryFlags]="card.showCountryFlags ?? false"
+                [showCountryNames]="card.showCountryNames ?? false"
+                [showLanguageFlags]="card.showLanguageFlags ?? false"
+                [showLanguageNames]="card.showLanguageNames ?? false"
+                (rowClicked)="handleRowClick(group, card, $event)"
+            />
+            }
+        </p-card>
+        }
+    </div>
+</section>
+}

@@ -486,6 +486,9 @@
         },
         "filters": {
             "country": "Pays: {{value}}",
+            "city": "Ville: {{value}}",
+            "provider": "Fournisseur: {{value}}",
+            "asn": "ASN: {{value}}",
             "device": "Appareil: {{value}}",
             "language": "Langue: {{value}}",
             "page": "Page: {{value}}",
@@ -496,10 +499,20 @@
             "conversionRate": "Taux de conversion"
         },
         "loadingSiteData": "Chargement des données du site...",
+        "metricGroups": {
+            "content": "Contenu",
+            "acquisition": "Acquisition",
+            "audience": "Audience",
+            "location": "Localisation",
+            "network": "Réseau"
+        },
         "metrics": {
             "audience": "Audience",
             "browsers": "Navigateurs",
             "countries": "Pays",
+            "cities": "Villes",
+            "providers": "Fournisseurs",
+            "asns": "ASN",
             "devices": "Appareils",
             "languages": "Langues",
             "pages": "Pages",
@@ -1586,6 +1599,7 @@
                 "database": "Base de données",
                 "workers": "Workers",
                 "isLeader": "Est leader",
+                "ip2locationAttribution": "HitKeep utilise la base de données IP2Location LITE pour la géolocalisation IP.",
                 "actions": {
                     "check": "Contrôler"
                 }
@@ -2228,6 +2242,15 @@
                 "correlatedPaths": "Chemins corrélés",
                 "aiVisits": "Visites référées par l’IA",
                 "uncorrelatedFetches": "Fetchs non corrélés"
+            },
+            "helpAria": "Afficher l’aide de corrélation",
+            "help": {
+                "correlatedPaths": "Chemins récupérés ayant ensuite reçu des visites humaines référées par l’IA dans la fenêtre sélectionnée.",
+                "aiVisits": "Visites humaines attribuées à des référents IA sur des chemins également fetchés par des crawlers IA.",
+                "uncorrelatedFetches": "Fetchs sur des chemins n’ayant produit aucune visite référée par l’IA correspondante dans cette fenêtre.",
+                "citationYieldCard": "Sert à repérer les pages où la demande des crawlers IA se transforme en visites aval.",
+                "opportunityCard": "Sert à trouver les pages très fetchées qui nécessitent encore de meilleurs contenus, liens ou une meilleure disponibilité.",
+                "failureHotspotCard": "Sert à trouver les paires assistant/préfixe de chemin où l’accès des crawlers rencontre des erreurs."
             }
         },
         "tables": {
@@ -2239,6 +2262,7 @@
             "opportunityPages": {
                 "title": "Pages d’opportunité",
                 "description": "Pages très fetchées avec peu de visites aval ou une forte pression d’erreurs.",
+                "cardSubtitle": "À surveiller",
                 "empty": "Aucune page d’opportunité ne correspond aux filtres actuels."
             },
             "failureHotspots": {
@@ -2447,6 +2471,10 @@
             "devices": "Principaux appareils",
             "countries": "Principaux pays"
         },
+        "breakdowns": {
+            "title": "Répartition du chiffre d'affaires",
+            "description": "Comparez les performances produit et l'attribution du chiffre d'affaires au même endroit."
+        },
         "products": {
             "title": "Produits principaux",
             "description": "Voyez quels produits génèrent le plus de chiffre d’affaires et de commandes finalisées.",
@@ -2468,7 +2496,9 @@
         },
         "actions": {
             "filterProduct": "Filtrer",
-            "clearProductFilter": "Effacer"
+            "clearProductFilter": "Effacer",
+            "filterSource": "Filtrer",
+            "clearSourceFilter": "Effacer"
         },
         "empty": {
             "title": "Aucune donnée e-commerce pour le moment",
@@ -2576,6 +2606,9 @@
             "pageviews": "Pages vues",
             "sessions": "Sessions",
             "top_source": "Source principale",
+            "top_city": "Ville principale globale",
+            "top_provider": "Fournisseur principal global",
+            "top_asn": "ASN principale globale",
             "search_impressions": "Impressions search",
             "search_ctr": "CTR search",
             "search_position": "Position moyenne",
@@ -2737,7 +2770,10 @@
                 "countries": "Pays",
                 "languages": "Langues",
                 "browsers": "Navigateurs",
-                "devices": "Appareils"
+                "devices": "Appareils",
+                "cities": "Villes",
+                "providers": "Fournisseurs",
+                "asns": "ASN"
             }
         },
         "columns": {

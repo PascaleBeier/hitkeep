@@ -11,7 +11,7 @@ import { TagModule } from 'primeng/tag';
 import { MetricStat } from '@models/analytics.types';
 import { GoogleSearchConsoleService, GoogleSearchConsoleSiteMapping, SearchConsoleDimensionRow, SearchConsoleMetricPoint, SearchConsoleOverview, SearchConsoleReportFilters } from '@services/google-search-console.service';
 import { KpiCard } from './kpi-card';
-import { MetricList } from './metric-list';
+import { MetricCardGroup, MetricCardGroupTab } from './metric-card-group';
 import { SeriesChart, SeriesChartPoint, SeriesDefinition } from './series-chart';
 
 interface KpiCardData {
@@ -278,7 +278,7 @@ const SEARCH_CONSOLE_ALPHA3_TO_ALPHA2 = new Map(
 
 @Component({
     selector: 'app-search-console-drilldown',
-    imports: [RouterLink, ButtonModule, CardModule, MessageModule, TagModule, TranslocoPipe, KpiCard, MetricList, SeriesChart],
+    imports: [RouterLink, ButtonModule, CardModule, MessageModule, TagModule, TranslocoPipe, KpiCard, MetricCardGroup, SeriesChart],
     templateUrl: './search-console-drilldown.html',
     styleUrl: './search-console-drilldown.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -371,6 +371,32 @@ export class SearchConsoleDrilldown {
     protected readonly pageMetrics = computed<MetricStat[]>(() => this.rowsToMetricStats(this.pages(), (value) => this.displayPagePath(value)));
     protected readonly countryMetrics = computed<MetricStat[]>(() => this.rowsToMetricStats(this.countries(), (value) => this.normalizeCountry(value)));
     protected readonly deviceMetrics = computed<MetricStat[]>(() => this.rowsToMetricStats(this.devices(), (value) => this.formatDevice(value)));
+    protected readonly metricCardTabs = computed<MetricCardGroupTab[]>(() => {
+        this.activeLanguage();
+        return [
+            {
+                id: 'content',
+                label: this.transloco.translate('common.metricGroups.content'),
+                icon: 'pi-file',
+                cards: [
+                    { id: 'queries', title: this.transloco.translate('searchConsole.sections.topQueries'), icon: 'pi-search', data: this.queryMetrics(), isLoading: this.loading() },
+                    { id: 'pages', title: this.transloco.translate('searchConsole.sections.topPages'), icon: 'pi-file', data: this.pageMetrics(), isLoading: this.loading(), linkMode: 'path', siteDomain: this.siteDomain() }
+                ]
+            },
+            {
+                id: 'audience',
+                label: this.transloco.translate('common.metricGroups.audience'),
+                icon: 'pi-users',
+                cards: [{ id: 'devices', title: this.transloco.translate('searchConsole.sections.devices'), icon: 'pi-mobile', data: this.deviceMetrics(), isLoading: this.loading() }]
+            },
+            {
+                id: 'location',
+                label: this.transloco.translate('common.metricGroups.location'),
+                icon: 'pi-map',
+                cards: [{ id: 'countries', title: this.transloco.translate('searchConsole.sections.countries'), icon: 'pi-globe', data: this.countryMetrics(), isLoading: this.loading(), showCountryFlags: true, showCountryNames: true }]
+            }
+        ];
+    });
     protected readonly contextTags = computed(() => {
         this.activeLanguage();
         const tags: string[] = [];

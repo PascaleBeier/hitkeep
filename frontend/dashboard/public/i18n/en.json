@@ -491,6 +491,9 @@
         },
         "filters": {
             "country": "Country: {{value}}",
+            "city": "City: {{value}}",
+            "provider": "Provider: {{value}}",
+            "asn": "ASN: {{value}}",
             "device": "Device: {{value}}",
             "language": "Language: {{value}}",
             "page": "Page: {{value}}",
@@ -501,10 +504,20 @@
             "conversionRate": "Conversion rate"
         },
         "loadingSiteData": "Loading site data...",
+        "metricGroups": {
+            "content": "Content",
+            "acquisition": "Acquisition",
+            "audience": "Audience",
+            "location": "Location",
+            "network": "Network"
+        },
         "metrics": {
             "audience": "Audience",
             "browsers": "Browsers",
             "countries": "Countries",
+            "cities": "Cities",
+            "providers": "Providers",
+            "asns": "ASNs",
             "devices": "Devices",
             "languages": "Languages",
             "pages": "Pages",
@@ -1586,6 +1599,7 @@
                 "database": "Database",
                 "workers": "Workers",
                 "isLeader": "Is Leader",
+                "ip2locationAttribution": "HitKeep uses the IP2Location LITE database for IP geolocation.",
                 "actions": {
                     "check": "Run check"
                 }
@@ -2228,6 +2242,15 @@
                 "correlatedPaths": "Correlated paths",
                 "aiVisits": "AI-referred visits",
                 "uncorrelatedFetches": "Uncorrelated fetches"
+            },
+            "helpAria": "Show correlation help",
+            "help": {
+                "correlatedPaths": "Fetched paths that later received AI-referred human visits in the selected window.",
+                "aiVisits": "Human visits attributed to AI referrers on paths that were also fetched by AI crawlers.",
+                "uncorrelatedFetches": "Fetches on paths that did not produce a matching AI-referred visit in this window.",
+                "citationYieldCard": "Use this to spot pages where AI crawler demand is translating into downstream visits.",
+                "opportunityCard": "Use this to find heavily fetched pages that still need better content, links, or availability.",
+                "failureHotspotCard": "Use this to find assistant and path-prefix pairs where crawler access is running into errors."
             }
         },
         "tables": {
@@ -2239,6 +2262,7 @@
             "opportunityPages": {
                 "title": "Opportunity pages",
                 "description": "High-fetch pages with low downstream visits or elevated error pressure.",
+                "cardSubtitle": "Needs attention",
                 "empty": "No opportunity pages matched the current filters."
             },
             "failureHotspots": {
@@ -2447,6 +2471,10 @@
             "devices": "Top devices",
             "countries": "Top countries"
         },
+        "breakdowns": {
+            "title": "Revenue breakdown",
+            "description": "Compare product performance and revenue attribution in one place."
+        },
         "products": {
             "title": "Top products",
             "description": "See which products drive the most revenue and completed orders.",
@@ -2468,7 +2496,9 @@
         },
         "actions": {
             "filterProduct": "Filter",
-            "clearProductFilter": "Clear"
+            "clearProductFilter": "Clear",
+            "filterSource": "Filter",
+            "clearSourceFilter": "Clear"
         },
         "empty": {
             "title": "No ecommerce data yet",
@@ -2576,6 +2606,9 @@
             "pageviews": "Pageviews",
             "sessions": "Sessions",
             "top_source": "Top source",
+            "top_city": "Overall top city",
+            "top_provider": "Overall top provider",
+            "top_asn": "Overall top ASN",
             "search_impressions": "Search impressions",
             "search_ctr": "Search CTR",
             "search_position": "Average position",
@@ -2737,7 +2770,10 @@
                 "countries": "Countries",
                 "languages": "Languages",
                 "browsers": "Browsers",
-                "devices": "Devices"
+                "devices": "Devices",
+                "cities": "Cities",
+                "providers": "Providers",
+                "asns": "ASNs"
             }
         },
         "columns": {

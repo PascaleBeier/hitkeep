@@ -25,7 +25,7 @@ import { SiteService } from '@features/sites/services/site.service';
 import { StatsService } from '@features/analytics/services/stats.service';
 import { HitService } from '@features/hits/services/hit.service';
 import { TrafficChart } from '@features/analytics/components/traffic-chart';
-import { MetricList, MetricListViewOption } from '@features/analytics/components/metric-list';
+import { MetricCardGroup, MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
 import { GoalList } from '@features/analytics/components/goal-list';
 import { FunnelList } from '@features/analytics/components/funnel-list';
 import { SearchConsoleDrilldown } from '@features/analytics/components/search-console-drilldown';
@@ -48,8 +48,7 @@ import { TeamService } from '@services/team.service';
 import { OnboardingService, OnboardingStep } from '@services/onboarding.service';
 import { browserAppUrl } from '@core/interceptors/base-path.interceptor';
 
-type MetricFilterType = 'path' | 'referrer' | 'device' | 'country' | 'browser' | 'language';
-type PageMetricMode = 'top_pages' | 'top_landing_pages' | 'top_exit_pages';
+type MetricFilterType = 'path' | 'referrer' | 'device' | 'country' | 'city' | 'provider' | 'asn' | 'browser' | 'language';
 interface MetricFilter {
     type: MetricFilterType;
     value: string;
@@ -86,7 +85,7 @@ interface KpiCardData {
         RelativeDateTime,
         KpiCard,
         TrafficChart,
-        MetricList,
+        MetricCardGroup,
         GoalList,
         FunnelList,
         SearchConsoleDrilldown,
@@ -144,7 +143,6 @@ export class Dashboard {
         const domain = this.siteDomain();
         return domain ? browserAppUrl(this.document, `/api/favicon/${encodeURIComponent(domain)}`) : '';
     });
-    protected readonly pageMetricMode = signal<PageMetricMode>('top_pages');
     protected activeFilters = signal<MetricFilter[]>([]);
     protected hasFilters = computed(() => this.activeFilters().length > 0);
     protected isExportingFiltered = signal(false);
@@ -159,24 +157,161 @@ export class Dashboard {
             label: this.filterLabel(filter)
         }))
     );
-    protected readonly pageMetricOptions = computed<MetricListViewOption[]>(() => {
+    protected readonly metricCardTabs = computed<MetricCardGroupTab<MetricFilterType>[]>(() => {
         this.activeLanguage();
-        return [
-            { label: this.transloco.translate('common.metrics.topPages'), value: 'top_pages' },
-            { label: this.transloco.translate('common.metrics.landingPages'), value: 'top_landing_pages' },
-            { label: this.transloco.translate('common.metrics.exitPages'), value: 'top_exit_pages' }
-        ];
-    });
-    protected readonly pageMetricData = computed<MetricStat[]>(() => {
         const stats = this.statsService.stats();
-        switch (this.pageMetricMode()) {
-            case 'top_landing_pages':
-                return stats?.top_landing_pages ?? [];
-            case 'top_exit_pages':
-                return stats?.top_exit_pages ?? [];
-            default:
-                return stats?.top_pages ?? [];
-        }
+        const loading = this.statsService.isLoading();
+        const siteDomain = this.siteDomain();
+        return [
+            {
+                id: 'content',
+                label: this.transloco.translate('common.metricGroups.content'),
+                icon: 'pi-file',
+                cards: [
+                    {
+                        id: 'top-pages',
+                        title: this.transloco.translate('common.metrics.topPages'),
+                        icon: 'pi-file',
+                        data: stats?.top_pages ?? [],
+                        linkMode: 'path',
+                        siteDomain,
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('path'),
+                        filterType: 'path'
+                    },
+                    {
+                        id: 'landing-pages',
+                        title: this.transloco.translate('common.metrics.landingPages'),
+                        icon: 'pi-sign-in',
+                        data: stats?.top_landing_pages ?? [],
+                        linkMode: 'path',
+                        siteDomain,
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('path'),
+                        filterType: 'path'
+                    },
+                    {
+                        id: 'exit-pages',
+                        title: this.transloco.translate('common.metrics.exitPages'),
+                        icon: 'pi-sign-out',
+                        data: stats?.top_exit_pages ?? [],
+                        linkMode: 'path',
+                        siteDomain,
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('path'),
+                        filterType: 'path'
+                    }
+                ]
+            },
+            {
+                id: 'acquisition',
+                label: this.transloco.translate('common.metricGroups.acquisition'),
+                icon: 'pi-link',
+                cards: [
+                    {
+                        id: 'sources',
+                        title: this.transloco.translate('common.metrics.topSources'),
+                        icon: 'pi-link',
+                        data: stats?.top_referrers ?? [],
+                        linkMode: 'url',
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('referrer'),
+                        filterType: 'referrer'
+                    }
+                ]
+            },
+            {
+                id: 'audience',
+                label: this.transloco.translate('common.metricGroups.audience'),
+                icon: 'pi-users',
+                cards: [
+                    {
+                        id: 'devices',
+                        title: this.transloco.translate('common.metrics.devices'),
+                        icon: 'pi-mobile',
+                        data: stats?.top_devices ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('device'),
+                        filterType: 'device'
+                    },
+                    {
+                        id: 'browsers',
+                        title: this.transloco.translate('common.metrics.browsers'),
+                        icon: 'pi-globe',
+                        data: stats?.top_browsers ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('browser'),
+                        showBrowserIcons: true,
+                        filterType: 'browser'
+                    },
+                    {
+                        id: 'languages',
+                        title: this.transloco.translate('common.metrics.languages'),
+                        icon: 'pi-language',
+                        data: stats?.top_languages ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('language'),
+                        showLanguageFlags: true,
+                        showLanguageNames: true,
+                        filterType: 'language'
+                    }
+                ]
+            },
+            {
+                id: 'location',
+                label: this.transloco.translate('common.metricGroups.location'),
+                icon: 'pi-map',
+                cards: [
+                    {
+                        id: 'countries',
+                        title: this.transloco.translate('common.metrics.countries'),
+                        icon: 'pi-map',
+                        data: stats?.top_countries ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('country'),
+                        showCountryFlags: true,
+                        showCountryNames: true,
+                        filterType: 'country'
+                    },
+                    {
+                        id: 'cities',
+                        title: this.transloco.translate('common.metrics.cities'),
+                        icon: 'pi-map-marker',
+                        data: stats?.top_cities ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('city'),
+                        filterType: 'city'
+                    }
+                ]
+            },
+            {
+                id: 'network',
+                label: this.transloco.translate('common.metricGroups.network'),
+                icon: 'pi-server',
+                cards: [
+                    {
+                        id: 'providers',
+                        title: this.transloco.translate('common.metrics.providers'),
+                        icon: 'pi-server',
+                        data: stats?.top_providers ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('provider'),
+                        filterType: 'provider'
+                    },
+                    { id: 'asns', title: this.transloco.translate('common.metrics.asns'), icon: 'pi-sitemap', data: stats?.top_asns ?? [], isLoading: loading, isRowClickable: true, activeValue: this.activeFilterValue('asn'), filterType: 'asn' }
+                ]
+            }
+        ];
     });
     protected readonly showOnboarding = computed(() => {
         const onboarding = this.onboarding.onboarding();
@@ -425,10 +560,8 @@ export class Dashboard {
         this.searchSubject.next((event.target as HTMLInputElement).value);
     }
 
-    protected onPageMetricModeChange(mode: string): void {
-        if (mode === 'top_pages' || mode === 'top_landing_pages' || mode === 'top_exit_pages') {
-            this.pageMetricMode.set(mode);
-        }
+    protected onMetricCardClick(event: MetricCardGroupRowClick): void {
+        this.applyMetricFilter(event.filterType as MetricFilterType, event.metric);
     }
 
     loadHits(event: TableLazyLoadEvent) {
@@ -584,6 +717,12 @@ export class Dashboard {
                 return this.transloco.translate('common.filters.device', { value: filter.value });
             case 'country':
                 return this.transloco.translate('common.filters.country', { value: filter.value });
+            case 'city':
+                return this.transloco.translate('common.filters.city', { value: filter.value });
+            case 'provider':
+                return this.transloco.translate('common.filters.provider', { value: filter.value });
+            case 'asn':
+                return this.transloco.translate('common.filters.asn', { value: filter.value });
             case 'browser':
                 return this.transloco.translate('common.filters.browser', { value: filter.value });
             case 'language':

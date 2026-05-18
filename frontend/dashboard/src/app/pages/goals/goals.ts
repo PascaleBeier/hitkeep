@@ -11,7 +11,7 @@ import { SiteService } from '@features/sites/services/site.service';
 import { StatsService } from '@features/analytics/services/stats.service';
 import { AnalyticsService } from '@services/analytics.service';
 import { GoalList } from '@features/analytics/components/goal-list';
-import { MetricList } from '@features/analytics/components/metric-list';
+import { MetricCardGroup, MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
 import { GoalManager } from '@features/goals/components/goal-manager';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
@@ -22,7 +22,7 @@ import { KpiCard } from '@features/analytics/components/kpi-card';
 import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar } from '@components/range-toolbar/range-toolbar';
 import { finalize } from 'rxjs';
 
-type MetricFilterType = 'path' | 'referrer' | 'device' | 'country';
+type MetricFilterType = 'path' | 'referrer' | 'device' | 'country' | 'city' | 'provider' | 'asn';
 interface MetricFilter {
     type: MetricFilterType;
     value: string;
@@ -31,7 +31,7 @@ interface MetricFilter {
 @Component({
     selector: 'app-goals',
     standalone: true,
-    imports: [ReactiveFormsModule, ButtonModule, CardModule, SelectModule, PageHeader, PageHeaderLeft, PageBreadcrumb, PageState, RangeToolbar, SeriesChart, KpiCard, MetricList, GoalList, GoalManager, TranslocoPipe],
+    imports: [ReactiveFormsModule, ButtonModule, CardModule, SelectModule, PageHeader, PageHeaderLeft, PageBreadcrumb, PageState, RangeToolbar, SeriesChart, KpiCard, MetricCardGroup, GoalList, GoalManager, TranslocoPipe],
     templateUrl: './goals.html',
     styleUrl: './goals.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -168,6 +168,115 @@ export class Goals {
             }
         ];
     });
+    protected readonly metricCardTabs = computed<MetricCardGroupTab<MetricFilterType>[]>(() => {
+        this.activeLanguage();
+        const stats = this.statsService.stats();
+        const loading = this.statsService.isLoading();
+        const siteDomain = this.siteService.activeSite()?.domain ?? null;
+        return [
+            {
+                id: 'content',
+                label: this.transloco.translate('common.metricGroups.content'),
+                icon: 'pi-file',
+                cards: [
+                    {
+                        id: 'top-pages',
+                        title: this.transloco.translate('common.metrics.topPages'),
+                        icon: 'pi-file',
+                        data: stats?.top_pages ?? [],
+                        linkMode: 'path',
+                        siteDomain,
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('path'),
+                        filterType: 'path'
+                    }
+                ]
+            },
+            {
+                id: 'acquisition',
+                label: this.transloco.translate('common.metricGroups.acquisition'),
+                icon: 'pi-link',
+                cards: [
+                    {
+                        id: 'sources',
+                        title: this.transloco.translate('common.metrics.topSources'),
+                        icon: 'pi-link',
+                        data: stats?.top_referrers ?? [],
+                        linkMode: 'url',
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('referrer'),
+                        filterType: 'referrer'
+                    }
+                ]
+            },
+            {
+                id: 'audience',
+                label: this.transloco.translate('common.metricGroups.audience'),
+                icon: 'pi-users',
+                cards: [
+                    {
+                        id: 'devices',
+                        title: this.transloco.translate('common.metrics.devices'),
+                        icon: 'pi-mobile',
+                        data: stats?.top_devices ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('device'),
+                        filterType: 'device'
+                    }
+                ]
+            },
+            {
+                id: 'location',
+                label: this.transloco.translate('common.metricGroups.location'),
+                icon: 'pi-map',
+                cards: [
+                    {
+                        id: 'countries',
+                        title: this.transloco.translate('common.metrics.countries'),
+                        icon: 'pi-globe',
+                        data: stats?.top_countries ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('country'),
+                        showCountryFlags: true,
+                        showCountryNames: true,
+                        filterType: 'country'
+                    },
+                    {
+                        id: 'cities',
+                        title: this.transloco.translate('common.metrics.cities'),
+                        icon: 'pi-map-marker',
+                        data: stats?.top_cities ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('city'),
+                        filterType: 'city'
+                    }
+                ]
+            },
+            {
+                id: 'network',
+                label: this.transloco.translate('common.metricGroups.network'),
+                icon: 'pi-server',
+                cards: [
+                    {
+                        id: 'providers',
+                        title: this.transloco.translate('common.metrics.providers'),
+                        icon: 'pi-server',
+                        data: stats?.top_providers ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('provider'),
+                        filterType: 'provider'
+                    },
+                    { id: 'asns', title: this.transloco.translate('common.metrics.asns'), icon: 'pi-sitemap', data: stats?.top_asns ?? [], isLoading: loading, isRowClickable: true, activeValue: this.activeFilterValue('asn'), filterType: 'asn' }
+                ]
+            }
+        ];
+    });
     protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
         this.activeLanguage();
         const site = this.siteService.activeSite();
@@ -300,6 +409,10 @@ export class Goals {
         });
     }
 
+    protected onMetricCardClick(event: MetricCardGroupRowClick): void {
+        this.applyMetricFilter(event.filterType as MetricFilterType, event.metric);
+    }
+
     protected clearFilter() {
         this.activeFilters.set([]);
     }
@@ -322,6 +435,12 @@ export class Goals {
                 return this.transloco.translate('common.filters.device', { value: filter.value });
             case 'country':
                 return this.transloco.translate('common.filters.country', { value: filter.value });
+            case 'city':
+                return this.transloco.translate('common.filters.city', { value: filter.value });
+            case 'provider':
+                return this.transloco.translate('common.filters.provider', { value: filter.value });
+            case 'asn':
+                return this.transloco.translate('common.filters.asn', { value: filter.value });
             default:
                 return `${filter.type}: ${filter.value}`;
         }

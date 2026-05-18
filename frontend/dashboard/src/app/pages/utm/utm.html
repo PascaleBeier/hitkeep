@@ -69,57 +69,7 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
-        <app-metric-list
-            [title]="'utm.metrics.topCampaigns' | transloco"
-            icon="pi-tag"
-            [data]="statsService.stats()?.top_utm_campaigns || []"
-            [isLoading]="statsService.isLoading()"
-            [isRowClickable]="true"
-            [activeValue]="activeFilterValue('utm_campaign')"
-            (rowClicked)="applyMetricFilter('utm_campaign', $event)"
-        />
-
-        <app-metric-list
-            [title]="'utm.metrics.topContents' | transloco"
-            icon="pi-file"
-            [data]="statsService.stats()?.top_utm_contents || []"
-            [isLoading]="statsService.isLoading()"
-            [isRowClickable]="true"
-            [activeValue]="activeFilterValue('utm_content')"
-            (rowClicked)="applyMetricFilter('utm_content', $event)"
-        />
-
-        <app-metric-list
-            [title]="'utm.metrics.topMediums' | transloco"
-            icon="pi-send"
-            [data]="statsService.stats()?.top_utm_mediums || []"
-            [isLoading]="statsService.isLoading()"
-            [isRowClickable]="true"
-            [activeValue]="activeFilterValue('utm_medium')"
-            (rowClicked)="applyMetricFilter('utm_medium', $event)"
-        />
-
-        <app-metric-list
-            [title]="'utm.metrics.topSources' | transloco"
-            icon="pi-link"
-            [data]="statsService.stats()?.top_utm_sources || []"
-            [isLoading]="statsService.isLoading()"
-            [isRowClickable]="true"
-            [activeValue]="activeFilterValue('utm_source')"
-            (rowClicked)="applyMetricFilter('utm_source', $event)"
-        />
-
-        <app-metric-list
-            [title]="'utm.metrics.topTerms' | transloco"
-            icon="pi-search"
-            [data]="statsService.stats()?.top_utm_terms || []"
-            [isLoading]="statsService.isLoading()"
-            [isRowClickable]="true"
-            [activeValue]="activeFilterValue('utm_term')"
-            (rowClicked)="applyMetricFilter('utm_term', $event)"
-        />
-    </div>
+    <app-metric-card-group class="mb-6" [tabs]="metricCardTabs()" (rowClicked)="onMetricCardClick($event)" />
     } @else {
     <app-page-state titleKey="common.noSiteSelected" messageKey="utm.noSiteDescription" icon="pi pi-globe" />
     }

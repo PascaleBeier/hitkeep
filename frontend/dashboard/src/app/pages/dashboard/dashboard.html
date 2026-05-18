@@ -119,83 +119,7 @@
     <div class="mb-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ "dashboard.exportStatus.error" | transloco }}</div>
     }
 
-    <!-- Row 1: Pages, Sources, Devices -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-        <app-metric-list
-            [title]="'common.metrics.pages' | transloco"
-            icon="pi-file"
-            [data]="pageMetricData()"
-            [linkMode]="'path'"
-            [siteDomain]="siteService.activeSite()?.domain || null"
-            [isLoading]="statsService.isLoading()"
-            [viewOptions]="pageMetricOptions()"
-            [selectedView]="pageMetricMode()"
-            [viewSelectAriaLabel]="'common.metrics.pageModeAria' | transloco"
-            [isRowClickable]="true"
-            [activeValue]="activeFilterValue('path')"
-            (viewChanged)="onPageMetricModeChange($event)"
-            (rowClicked)="applyMetricFilter('path', $event)"
-        />
-
-        <app-metric-list
-            [title]="'common.metrics.topSources' | transloco"
-            icon="pi-link"
-            [data]="statsService.stats()?.top_referrers || []"
-            [linkMode]="'url'"
-            [isLoading]="statsService.isLoading()"
-            [isRowClickable]="true"
-            [activeValue]="activeFilterValue('referrer')"
-            (rowClicked)="applyMetricFilter('referrer', $event)"
-        />
-
-        <app-metric-list
-            [title]="'common.metrics.devices' | transloco"
-            icon="pi-mobile"
-            [data]="statsService.stats()?.top_devices || []"
-            [isLoading]="statsService.isLoading()"
-            [isRowClickable]="true"
-            [activeValue]="activeFilterValue('device')"
-            (rowClicked)="applyMetricFilter('device', $event)"
-        />
-    </div>
-
-    <!-- Row 2: Browsers, Countries, Languages -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-        <app-metric-list
-            [title]="'common.metrics.browsers' | transloco"
-            icon="pi-globe"
-            [data]="statsService.stats()?.top_browsers || []"
-            [isLoading]="statsService.isLoading()"
-            [isRowClickable]="true"
-            [showBrowserIcons]="true"
-            [activeValue]="activeFilterValue('browser')"
-            (rowClicked)="applyMetricFilter('browser', $event)"
-        />
-
-        <app-metric-list
-            [title]="'common.metrics.countries' | transloco"
-            icon="pi-map"
-            [data]="statsService.stats()?.top_countries || []"
-            [isLoading]="statsService.isLoading()"
-            [isRowClickable]="true"
-            [showCountryFlags]="true"
-            [showCountryNames]="true"
-            [activeValue]="activeFilterValue('country')"
-            (rowClicked)="applyMetricFilter('country', $event)"
-        />
-
-        <app-metric-list
-            [title]="'common.metrics.languages' | transloco"
-            icon="pi-language"
-            [data]="statsService.stats()?.top_languages || []"
-            [isLoading]="statsService.isLoading()"
-            [isRowClickable]="true"
-            [showLanguageFlags]="true"
-            [showLanguageNames]="true"
-            [activeValue]="activeFilterValue('language')"
-            (rowClicked)="applyMetricFilter('language', $event)"
-        />
-    </div>
+    <app-metric-card-group class="mb-6" [tabs]="metricCardTabs()" (rowClicked)="onMetricCardClick($event)" />
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         <app-goal-list [data]="statsService.stats()?.goals || []" [siteId]="siteService.activeSite()?.id || null" [readOnly]="isShareMode()" [isLoading]="statsService.isLoading()" (refresh)="refreshAll()" />
@@ -242,9 +166,13 @@
             [loading]="hitService.isLoading()"
             [rows]="10"
             [paginator]="true"
+            [rowsPerPageOptions]="[10, 25, 50]"
+            [rowHover]="true"
+            responsiveLayout="scroll"
             class="p-datatable-sm"
             sortField="timestamp"
             [sortOrder]="-1"
+            [tableStyle]="{ 'min-width': '760px' }"
         >
             <ng-template pTemplate="header">
                 <tr>

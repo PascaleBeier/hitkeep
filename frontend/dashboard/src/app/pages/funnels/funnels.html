@@ -94,52 +94,7 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
-        <app-metric-list
-            [title]="'common.metrics.topPages' | transloco"
-            icon="pi-file"
-            [data]="statsService.stats()?.top_pages || []"
-            [linkMode]="'path'"
-            [siteDomain]="siteService.activeSite()?.domain || null"
-            [isLoading]="statsService.isLoading()"
-            [isRowClickable]="true"
-            [activeValue]="activeFilterValue('path')"
-            (rowClicked)="applyMetricFilter('path', $event)"
-        />
-
-        <app-metric-list
-            [title]="'common.metrics.topSources' | transloco"
-            icon="pi-link"
-            [data]="statsService.stats()?.top_referrers || []"
-            [linkMode]="'url'"
-            [isLoading]="statsService.isLoading()"
-            [isRowClickable]="true"
-            [activeValue]="activeFilterValue('referrer')"
-            (rowClicked)="applyMetricFilter('referrer', $event)"
-        />
-
-        <app-metric-list
-            [title]="'common.metrics.devices' | transloco"
-            icon="pi-mobile"
-            [data]="statsService.stats()?.top_devices || []"
-            [isLoading]="statsService.isLoading()"
-            [isRowClickable]="true"
-            [activeValue]="activeFilterValue('device')"
-            (rowClicked)="applyMetricFilter('device', $event)"
-        />
-
-        <app-metric-list
-            [title]="'common.metrics.countries' | transloco"
-            icon="pi-globe"
-            [data]="statsService.stats()?.top_countries || []"
-            [isLoading]="statsService.isLoading()"
-            [isRowClickable]="true"
-            [showCountryFlags]="true"
-            [showCountryNames]="true"
-            [activeValue]="activeFilterValue('country')"
-            (rowClicked)="applyMetricFilter('country', $event)"
-        />
-    </div>
+    <app-metric-card-group class="mb-6" [tabs]="metricCardTabs()" (rowClicked)="onMetricCardClick($event)" />
 
     <div class="grid grid-cols-1 gap-4">
         <app-funnel-list [funnels]="funnels()" [isLoading]="loading()" (manageClicked)="openFunnelManager()" (funnelClicked)="viewFunnel($event)" />

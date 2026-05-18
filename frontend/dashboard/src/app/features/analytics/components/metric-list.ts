@@ -1,33 +1,25 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, output } from '@angular/core';
-import { DOCUMENT, NgOptimizedImage } from '@angular/common';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, output, signal, viewChild } from '@angular/core';
+import { DOCUMENT, NgOptimizedImage, NgTemplateOutlet } from '@angular/common';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { TranslocoDecimalPipe } from '@jsverse/transloco-locale';
 import { CardModule } from 'primeng/card';
 import { SkeletonModule } from 'primeng/skeleton';
-import { SelectModule } from 'primeng/select';
 import { browserIconUrl } from '@core/i18n/browser-utils';
 import { countryFlagUrl, languageFlagUrl } from '@core/i18n/flag-utils';
 import { browserAppUrl } from '@core/interceptors/base-path.interceptor';
 import { MetricStat } from '@models/analytics.types';
 
-export interface MetricListViewOption {
-    label: string;
-    value: string;
-}
-
 @Component({
     selector: 'app-metric-list',
-    imports: [CardModule, SkeletonModule, TranslocoPipe, TranslocoDecimalPipe, NgOptimizedImage, ReactiveFormsModule, SelectModule],
+    imports: [CardModule, SkeletonModule, TranslocoPipe, TranslocoDecimalPipe, NgOptimizedImage, NgTemplateOutlet],
     templateUrl: './metric-list.html',
     styleUrl: './metric-list.css',
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MetricList {
     private readonly transloco = inject(TranslocoService);
-    private readonly destroyRef = inject(DestroyRef);
     private readonly document = inject(DOCUMENT);
+    private readonly scrollFrame = viewChild<ElementRef<HTMLElement>>('scrollFrame');
 
     title = input.required<string>();
     icon = input<string>('pi-list');
@@ -42,36 +34,35 @@ export class MetricList {
     showCountryNames = input<boolean>(false);
     showLanguageFlags = input<boolean>(false);
     showLanguageNames = input<boolean>(false);
-    viewOptions = input<MetricListViewOption[]>([]);
-    selectedView = input<string | null>(null);
-    viewSelectAriaLabel = input<string | null>(null);
+    framed = input<boolean>(true);
+    showHeader = input<boolean>(true);
     rowClicked = output<MetricStat>();
-    viewChanged = output<string>();
 
-    protected readonly viewControl = new FormControl<string | null>(null);
-
+    protected readonly isScrollFrameScrollable = signal(false);
+    protected readonly isScrollFrameAtBottom = signal(true);
+    protected readonly scrollThumbTop = signal(0);
+    protected readonly scrollThumbHeight = signal(100);
     protected readonly totalValue = computed(() => this.data().reduce((sum, item) => sum + item.value, 0));
-    protected readonly hasViewSelector = computed(() => this.viewOptions().length > 1);
-
-    constructor() {
-        effect(() => {
-            const options = this.viewOptions();
-            const selected = this.selectedView() ?? options[0]?.value ?? null;
-            this.viewControl.setValue(selected, { emitEvent: false });
-        });
-
-        this.viewControl.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((value) => {
-            if (value) {
-                this.viewChanged.emit(value);
-            }
-        });
-    }
-
     protected readonly maxValue = computed(() => {
         const list = this.data();
         if (list.length === 0) return 0;
         return Math.max(...list.map((item) => item.value), 0);
     });
+
+    constructor() {
+        effect((onCleanup) => {
+            this.data();
+            this.isLoading();
+            const frame = this.scrollFrame()?.nativeElement;
+            if (!frame) return;
+
+            const resizeObserver = new ResizeObserver(() => this.updateScrollFrameState());
+            resizeObserver.observe(frame);
+            queueMicrotask(() => this.updateScrollFrameState());
+
+            onCleanup(() => resizeObserver.disconnect());
+        });
+    }
 
     protected linkInfo(item: MetricStat): { href: string; faviconUrl: string | null } | null {
         const mode = this.linkMode();
@@ -158,15 +149,51 @@ export class MetricList {
         this.rowClicked.emit(item);
     }
 
+    protected onScrollFrame(): void {
+        this.updateScrollFrameState();
+    }
+
+    protected scrollShellClass(): string {
+        const scrollable = this.isScrollFrameScrollable() ? ' metric-list__scroll-shell--scrollable' : '';
+        const atBottom = this.isScrollFrameAtBottom() ? ' metric-list__scroll-shell--at-bottom' : '';
+        return `metric-list__scroll-shell${scrollable}${atBottom}`;
+    }
+
     protected rowClass(item: MetricStat): string {
         const base = 'metric-list__row group relative flex items-center justify-between overflow-hidden rounded-md text-sm transition-colors';
         const clickable = this.isRowClickable() ? ' cursor-pointer hover:bg-surface-50 dark:hover:bg-surface-800' : '';
-        const active = this.isActive(item) ? ' ring-1 ring-[var(--p-primary-color)] bg-[var(--p-primary-50)] dark:bg-[var(--p-primary-900)]/30' : '';
+        const active = this.isActive(item) ? ' metric-list__row--active' : '';
         return base + clickable + active;
     }
 
     private buildFaviconUrl(domain: string): string {
         return browserAppUrl(this.document, `/api/favicon/${encodeURIComponent(domain)}`);
+    }
+
+    private updateScrollFrameState(): void {
+        const frame = this.scrollFrame()?.nativeElement;
+        if (!frame) {
+            this.isScrollFrameScrollable.set(false);
+            this.isScrollFrameAtBottom.set(true);
+            return;
+        }
+
+        const scrollable = frame.scrollHeight > frame.clientHeight + 1;
+        const atBottom = !scrollable || frame.scrollTop + frame.clientHeight >= frame.scrollHeight - 1;
+        this.isScrollFrameScrollable.set(scrollable);
+        this.isScrollFrameAtBottom.set(atBottom);
+        if (!scrollable) {
+            this.scrollThumbTop.set(0);
+            this.scrollThumbHeight.set(100);
+            return;
+        }
+
+        const thumbHeight = Math.max(18, (frame.clientHeight / frame.scrollHeight) * 100);
+        const maxTop = 100 - thumbHeight;
+        const scrollRange = frame.scrollHeight - frame.clientHeight;
+        const thumbTop = scrollRange > 0 ? (frame.scrollTop / scrollRange) * maxTop : 0;
+        this.scrollThumbHeight.set(thumbHeight);
+        this.scrollThumbTop.set(thumbTop);
     }
 
     private normalizeUrl(raw: string): URL | null {

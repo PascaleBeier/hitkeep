@@ -39,14 +39,8 @@
         <p class="text-muted-color">{{ "aiVisibility.noSiteDescription" | transloco }}</p>
     </div>
     } @else {
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+    <div data-testid="ai-visibility-headline-kpis" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         @for (card of primaryKpiCards(); track card.label) {
-        <app-kpi-card [label]="card.label" [value]="card.value" [loading]="card.loading" />
-        }
-    </div>
-
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        @for (card of secondaryKpiCards(); track card.label) {
         <app-kpi-card [label]="card.label" [value]="card.value" [loading]="card.loading" />
         }
     </div>
@@ -99,7 +93,7 @@
     </p-card>
 
     <p-card class="shadow-sm border border-surface-200 dark:border-surface-700 surface-card mb-6">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-4">
             <div>
                 <div class="flex items-center gap-2">
                     <h3 class="text-lg font-semibold">{{ "aiVisibility.chart.title" | transloco }}</h3>
@@ -109,6 +103,18 @@
                 </div>
                 <p class="text-sm text-[var(--p-text-muted-color)] mt-1">{{ "aiVisibility.chart.description" | transloco }}</p>
             </div>
+            <dl data-testid="ai-visibility-health-strip" class="ai-visibility__stat-strip">
+                @for (stat of healthStats(); track stat.label) {
+                <div class="ai-visibility__stat">
+                    <dt>{{ stat.label }}</dt>
+                    <dd>
+                        @if (stat.loading) {
+                        <span class="ai-visibility__stat-skeleton" aria-hidden="true"></span>
+                        } @else { {{ stat.value }} }
+                    </dd>
+                </div>
+                }
+            </dl>
         </div>
         <app-series-chart
             [data]="series()"
@@ -152,213 +158,19 @@
     <div class="mb-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ "aiVisibility.exportStatus.error" | transloco }}</div>
     }
 
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <app-metric-list [title]="'aiVisibility.breakdowns.assistants' | transloco" icon="pi-android" [data]="overview()?.top_assistants ?? []" [isLoading]="isLoadingOverview()" />
-        <app-metric-list [title]="'aiVisibility.breakdowns.paths' | transloco" icon="pi-file" [data]="overview()?.top_paths ?? []" [isLoading]="isLoadingOverview()" [linkMode]="'path'" [siteDomain]="activeSite()?.domain ?? null" />
-        <app-metric-list
-            [title]="'aiVisibility.breakdowns.errorPaths' | transloco"
-            icon="pi-exclamation-triangle"
-            [data]="overview()?.top_error_paths ?? []"
-            [isLoading]="isLoadingOverview()"
-            [linkMode]="'path'"
-            [siteDomain]="activeSite()?.domain ?? null"
-        />
-        <app-metric-list [title]="'aiVisibility.breakdowns.resourceTypes' | transloco" icon="pi-database" [data]="overview()?.resource_type_split ?? []" [isLoading]="isLoadingOverview()" />
-    </div>
+    <dl data-testid="ai-visibility-correlation-summary" class="ai-visibility__stat-strip ai-visibility__stat-strip--wide mb-4">
+        @for (stat of correlationSummaryStats(); track stat.label) {
+        <div class="ai-visibility__stat">
+            <dt>{{ stat.label }}</dt>
+            <dd>
+                @if (stat.loading) {
+                <span class="ai-visibility__stat-skeleton" aria-hidden="true"></span>
+                } @else { {{ stat.value }} }
+            </dd>
+        </div>
+        }
+    </dl>
 
-    <!-- Correlation section -->
-    <section data-testid="ai-visibility-correlation-shot">
-        <p-card class="ai-visibility__correlation-card shadow-sm border border-surface-200 dark:border-surface-700 surface-card mb-6">
-            <div class="ai-visibility__correlation-shell flex flex-col gap-5">
-                <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                        <h3 class="text-lg font-semibold text-[var(--p-text-color)]">{{ "aiVisibility.correlation.title" | transloco }}</h3>
-                        <p class="mt-1 max-w-3xl text-sm text-[var(--p-text-muted-color)]">{{ "aiVisibility.correlation.description" | transloco }}</p>
-                    </div>
-                </div>
-
-                <div class="ai-visibility__correlation-kpis-band rounded-2xl p-4 md:p-5">
-                    <div data-testid="ai-visibility-correlation-kpis" class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                        @for (card of correlationKpis(); track card.label) {
-                        <app-kpi-card [label]="card.label" [value]="card.value" [loading]="card.loading" />
-                        }
-                    </div>
-                </div>
-
-                <p data-testid="ai-visibility-correlation-note" class="ai-visibility__note text-sm">{{ "aiVisibility.correlation.note" | transloco }}</p>
-
-                <div data-testid="ai-visibility-correlation-tables" class="ai-visibility__correlation-tabs-shell rounded-2xl shadow-sm">
-                    <p-tabs [(value)]="activeCorrelationTab" styleClass="ai-visibility__correlation-tabs">
-                        <p-tablist>
-                            @for (tab of correlationTabs(); track tab.value) {
-                            <p-tab [value]="tab.value">
-                                <div class="flex min-w-0 items-center gap-3">
-                                    <span class="ai-visibility__tab-icon" aria-hidden="true">
-                                        <i [class]="tab.icon"></i>
-                                    </span>
-                                    <span class="flex min-w-0 flex-col items-start">
-                                        <span class="truncate text-sm font-semibold">{{ tab.label }}</span>
-                                        <span class="text-xs text-[var(--p-text-muted-color)]">{{ tab.count | translocoDecimal }}</span>
-                                    </span>
-                                </div>
-                            </p-tab>
-                            }
-                        </p-tablist>
-                        <p-tabpanels>
-                            <p-tabpanel value="citationYield">
-                                <div class="flex flex-col gap-4 px-1 pt-4 md:px-2">
-                                    <div>
-                                        <h4 class="text-base font-semibold text-[var(--p-text-color)]">{{ "aiVisibility.tables.citationYield.title" | transloco }}</h4>
-                                        <p class="mt-1 text-sm text-[var(--p-text-muted-color)]">{{ "aiVisibility.tables.citationYield.description" | transloco }}</p>
-                                    </div>
-
-                                    <div class="ai-visibility__correlation-table-wrap overflow-x-auto rounded-2xl">
-                                        <p-table [value]="citationYieldRows()" [loading]="isLoadingCorrelation()" [rowHover]="true" styleClass="p-datatable-sm ai-visibility__correlation-table" [tableStyle]="{ 'min-width': '58rem' }">
-                                            <ng-template pTemplate="header">
-                                                <tr>
-                                                    <th>{{ "aiVisibility.columns.path" | transloco }}</th>
-                                                    <th>{{ "aiVisibility.columns.assistant" | transloco }}</th>
-                                                    <th class="text-right">{{ "aiVisibility.columns.fetches" | transloco }}</th>
-                                                    <th class="text-right">{{ "aiVisibility.columns.aiVisits" | transloco }}</th>
-                                                    <th class="text-right">{{ "aiVisibility.columns.yield" | transloco }}</th>
-                                                </tr>
-                                            </ng-template>
-                                            <ng-template pTemplate="body" let-row>
-                                                <tr>
-                                                    <td>
-                                                        <span class="ai-visibility__path-label" [pTooltip]="tooltipText(row.path)" tooltipPosition="top">{{ row.path }}</span>
-                                                    </td>
-                                                    <td>
-                                                        <span class="ai-visibility__assistant-pill">{{ row.assistant_name }}</span>
-                                                    </td>
-                                                    <td class="text-right">
-                                                        <div class="ai-visibility__bar-cell">
-                                                            <div class="ai-visibility__bar-fill" [style.width.%]="metricBarWidth(row.fetch_count, citationYieldMaxFetches())"></div>
-                                                            <span class="ai-visibility__bar-value">{{ row.fetch_count | translocoDecimal }}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td class="text-right">
-                                                        <span class="font-semibold tabular-nums text-[var(--p-text-color)]">{{ row.ai_referred_visits | translocoDecimal }}</span>
-                                                    </td>
-                                                    <td class="text-right">
-                                                        <span class="font-semibold tabular-nums text-[var(--p-text-color)]">{{ formatPercent(row.citation_yield_pct) }}</span>
-                                                    </td>
-                                                </tr>
-                                            </ng-template>
-                                            <ng-template pTemplate="emptymessage">
-                                                <tr>
-                                                    <td colspan="5" class="py-8 text-center text-sm text-[var(--p-text-muted-color)]">{{ "aiVisibility.tables.citationYield.empty" | transloco }}</td>
-                                                </tr>
-                                            </ng-template>
-                                        </p-table>
-                                    </div>
-                                </div>
-                            </p-tabpanel>
-
-                            <p-tabpanel value="opportunityPages">
-                                <div class="flex flex-col gap-4 px-1 pt-4 md:px-2">
-                                    <div>
-                                        <h4 class="text-base font-semibold text-[var(--p-text-color)]">{{ "aiVisibility.tables.opportunityPages.title" | transloco }}</h4>
-                                        <p class="mt-1 text-sm text-[var(--p-text-muted-color)]">{{ "aiVisibility.tables.opportunityPages.description" | transloco }}</p>
-                                    </div>
-
-                                    <div class="ai-visibility__correlation-table-wrap overflow-x-auto rounded-2xl">
-                                        <p-table [value]="opportunityRows()" [loading]="isLoadingCorrelation()" [rowHover]="true" styleClass="p-datatable-sm ai-visibility__correlation-table" [tableStyle]="{ 'min-width': '56rem' }">
-                                            <ng-template pTemplate="header">
-                                                <tr>
-                                                    <th>{{ "aiVisibility.columns.path" | transloco }}</th>
-                                                    <th class="text-right">{{ "aiVisibility.columns.fetches" | transloco }}</th>
-                                                    <th class="text-right">{{ "aiVisibility.columns.aiVisits" | transloco }}</th>
-                                                    <th class="text-right">{{ "aiVisibility.columns.errors" | transloco }}</th>
-                                                    <th class="text-right">{{ "aiVisibility.columns.errorRate" | transloco }}</th>
-                                                </tr>
-                                            </ng-template>
-                                            <ng-template pTemplate="body" let-row>
-                                                <tr>
-                                                    <td>
-                                                        <span class="ai-visibility__path-label" [pTooltip]="tooltipText(row.path)" tooltipPosition="top">{{ row.path }}</span>
-                                                    </td>
-                                                    <td class="text-right">
-                                                        <div class="ai-visibility__bar-cell">
-                                                            <div class="ai-visibility__bar-fill" [style.width.%]="metricBarWidth(row.fetch_count, opportunityPageMaxFetches())"></div>
-                                                            <span class="ai-visibility__bar-value">{{ row.fetch_count | translocoDecimal }}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td class="text-right">
-                                                        <span class="font-semibold tabular-nums text-[var(--p-text-color)]">{{ row.ai_referred_visits | translocoDecimal }}</span>
-                                                    </td>
-                                                    <td class="text-right">
-                                                        <span class="tabular-nums text-[var(--p-text-color)]">{{ row.error_requests | translocoDecimal }}</span>
-                                                    </td>
-                                                    <td class="text-right">
-                                                        <p-tag [value]="formatPercent(row.error_rate_pct)" [severity]="errorRateSeverity(row.error_rate_pct)" [rounded]="true" />
-                                                    </td>
-                                                </tr>
-                                            </ng-template>
-                                            <ng-template pTemplate="emptymessage">
-                                                <tr>
-                                                    <td colspan="5" class="py-8 text-center text-sm text-[var(--p-text-muted-color)]">{{ "aiVisibility.tables.opportunityPages.empty" | transloco }}</td>
-                                                </tr>
-                                            </ng-template>
-                                        </p-table>
-                                    </div>
-                                </div>
-                            </p-tabpanel>
-
-                            <p-tabpanel value="failureHotspots">
-                                <div class="flex flex-col gap-4 px-1 pt-4 md:px-2">
-                                    <div>
-                                        <h4 class="text-base font-semibold text-[var(--p-text-color)]">{{ "aiVisibility.tables.failureHotspots.title" | transloco }}</h4>
-                                        <p class="mt-1 text-sm text-[var(--p-text-muted-color)]">{{ "aiVisibility.tables.failureHotspots.description" | transloco }}</p>
-                                    </div>
-
-                                    <div class="ai-visibility__correlation-table-wrap overflow-x-auto rounded-2xl">
-                                        <p-table [value]="failureHotspotRows()" [loading]="isLoadingCorrelation()" [rowHover]="true" styleClass="p-datatable-sm ai-visibility__correlation-table" [tableStyle]="{ 'min-width': '56rem' }">
-                                            <ng-template pTemplate="header">
-                                                <tr>
-                                                    <th>{{ "aiVisibility.columns.assistant" | transloco }}</th>
-                                                    <th>{{ "aiVisibility.columns.pathPrefix" | transloco }}</th>
-                                                    <th class="text-right">{{ "aiVisibility.columns.requests" | transloco }}</th>
-                                                    <th class="text-right">{{ "aiVisibility.columns.errors" | transloco }}</th>
-                                                    <th class="text-right">{{ "aiVisibility.columns.errorRate" | transloco }}</th>
-                                                </tr>
-                                            </ng-template>
-                                            <ng-template pTemplate="body" let-row>
-                                                <tr>
-                                                    <td>
-                                                        <span class="ai-visibility__assistant-pill">{{ row.assistant_name }}</span>
-                                                    </td>
-                                                    <td>
-                                                        <span class="ai-visibility__path-label" [pTooltip]="tooltipText(row.path_prefix)" tooltipPosition="top">{{ row.path_prefix }}</span>
-                                                    </td>
-                                                    <td class="text-right">
-                                                        <div class="ai-visibility__bar-cell">
-                                                            <div class="ai-visibility__bar-fill" [style.width.%]="metricBarWidth(row.total_requests, failureHotspotMaxRequests())"></div>
-                                                            <span class="ai-visibility__bar-value">{{ row.total_requests | translocoDecimal }}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td class="text-right">
-                                                        <span class="tabular-nums text-[var(--p-text-color)]">{{ row.error_requests | translocoDecimal }}</span>
-                                                    </td>
-                                                    <td class="text-right">
-                                                        <p-tag [value]="formatPercent(row.error_rate_pct)" [severity]="errorRateSeverity(row.error_rate_pct)" [rounded]="true" />
-                                                    </td>
-                                                </tr>
-                                            </ng-template>
-                                            <ng-template pTemplate="emptymessage">
-                                                <tr>
-                                                    <td colspan="5" class="py-8 text-center text-sm text-[var(--p-text-muted-color)]">{{ "aiVisibility.tables.failureHotspots.empty" | transloco }}</td>
-                                                </tr>
-                                            </ng-template>
-                                        </p-table>
-                                    </div>
-                                </div>
-                            </p-tabpanel>
-                        </p-tabpanels>
-                    </p-tabs>
-                </div>
-            </div>
-        </p-card>
-    </section>
+    <app-metric-card-group class="mb-6" [tabs]="metricCardTabs()" (rowClicked)="onMetricCardClick($event)" />
     }
 </div>

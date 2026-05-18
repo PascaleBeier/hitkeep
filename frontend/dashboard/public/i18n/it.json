@@ -486,6 +486,9 @@
         },
         "filters": {
             "country": "Paese: {{value}}",
+            "city": "Città: {{value}}",
+            "provider": "Provider: {{value}}",
+            "asn": "ASN: {{value}}",
             "device": "Dispositivo: {{value}}",
             "language": "Lingua: {{value}}",
             "page": "Pagina: {{value}}",
@@ -496,10 +499,20 @@
             "conversionRate": "Tasso di conversione"
         },
         "loadingSiteData": "Caricamento dati sito...",
+        "metricGroups": {
+            "content": "Contenuto",
+            "acquisition": "Acquisizione",
+            "audience": "Pubblico",
+            "location": "Posizione",
+            "network": "Rete"
+        },
         "metrics": {
             "audience": "Pubblico",
             "browsers": "Browser",
             "countries": "Paesi",
+            "cities": "Città",
+            "providers": "Provider",
+            "asns": "ASN",
             "devices": "Dispositivi",
             "languages": "Lingue",
             "pages": "Pagine",
@@ -1586,6 +1599,7 @@
                 "database": "Database",
                 "workers": "Worker",
                 "isLeader": "È leader",
+                "ip2locationAttribution": "HitKeep usa il database IP2Location LITE per la geolocalizzazione IP.",
                 "actions": {
                     "check": "Controlla"
                 }
@@ -2228,6 +2242,15 @@
                 "correlatedPaths": "Percorsi correlati",
                 "aiVisits": "Visite riferite dall’AI",
                 "uncorrelatedFetches": "Fetch non correlati"
+            },
+            "helpAria": "Mostra guida sulla correlazione",
+            "help": {
+                "correlatedPaths": "Percorsi recuperati che in seguito hanno ricevuto visite umane riferite dall’AI nella finestra selezionata.",
+                "aiVisits": "Visite umane attribuite a referrer AI su percorsi recuperati anche da crawler AI.",
+                "uncorrelatedFetches": "Fetch su percorsi che non hanno prodotto una visita riferita dall’AI corrispondente in questa finestra.",
+                "citationYieldCard": "Usalo per individuare le pagine in cui la domanda dei crawler AI si traduce in visite successive.",
+                "opportunityCard": "Usalo per trovare pagine molto richieste che richiedono contenuti, link o disponibilità migliori.",
+                "failureHotspotCard": "Usalo per trovare coppie assistente/prefisso di percorso in cui l’accesso dei crawler genera errori."
             }
         },
         "tables": {
@@ -2239,6 +2262,7 @@
             "opportunityPages": {
                 "title": "Pagine opportunità",
                 "description": "Pagine con molti fetch, poche visite successive o pressione elevata di errori.",
+                "cardSubtitle": "Richiede attenzione",
                 "empty": "Nessuna pagina opportunità corrisponde ai filtri attuali."
             },
             "failureHotspots": {
@@ -2447,6 +2471,10 @@
             "devices": "Principali dispositivi",
             "countries": "Principali paesi"
         },
+        "breakdowns": {
+            "title": "Dettaglio ricavi",
+            "description": "Confronta performance dei prodotti e attribuzione dei ricavi in un unico punto."
+        },
         "products": {
             "title": "Prodotti principali",
             "description": "Scopri quali prodotti generano più ricavi e ordini completati.",
@@ -2468,7 +2496,9 @@
         },
         "actions": {
             "filterProduct": "Filtra",
-            "clearProductFilter": "Cancella"
+            "clearProductFilter": "Cancella",
+            "filterSource": "Filtra",
+            "clearSourceFilter": "Cancella"
         },
         "empty": {
             "title": "Nessun dato e-commerce disponibile",
@@ -2576,6 +2606,9 @@
             "pageviews": "Visualizzazioni",
             "sessions": "Sessioni",
             "top_source": "Fonte principale",
+            "top_city": "Città principale complessiva",
+            "top_provider": "Provider principale complessivo",
+            "top_asn": "ASN principale complessiva",
             "search_impressions": "Impressioni search",
             "search_ctr": "CTR search",
             "search_position": "Posizione media",
@@ -2737,7 +2770,10 @@
                 "countries": "Paesi",
                 "languages": "Lingue",
                 "browsers": "Browser",
-                "devices": "Dispositivi"
+                "devices": "Dispositivi",
+                "cities": "Città",
+                "providers": "Provider",
+                "asns": "ASN"
             }
         },
         "columns": {

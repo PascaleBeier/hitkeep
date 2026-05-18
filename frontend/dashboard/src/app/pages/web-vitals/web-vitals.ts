@@ -6,6 +6,9 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { TranslocoLocaleService } from '@jsverse/transloco-locale';
 import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
+import { IconFieldModule } from 'primeng/iconfield';
+import { InputIconModule } from 'primeng/inputicon';
+import { InputTextModule } from 'primeng/inputtext';
 import { SelectModule } from 'primeng/select';
 import { TabsModule } from 'primeng/tabs';
 import { TableModule } from 'primeng/table';
@@ -64,7 +67,25 @@ const WEB_VITAL_THRESHOLDS: Record<WebVitalMetric, { good: number; poor: number 
 };
 @Component({
     selector: 'app-web-vitals',
-    imports: [NgOptimizedImage, FormsModule, TranslocoPipe, ButtonModule, CardModule, SelectModule, TabsModule, TableModule, TagModule, PageHeader, PageHeaderLeft, PageBreadcrumb, RangeToolbar, SeriesChart],
+    imports: [
+        NgOptimizedImage,
+        FormsModule,
+        TranslocoPipe,
+        ButtonModule,
+        CardModule,
+        IconFieldModule,
+        InputIconModule,
+        InputTextModule,
+        SelectModule,
+        TabsModule,
+        TableModule,
+        TagModule,
+        PageHeader,
+        PageHeaderLeft,
+        PageBreadcrumb,
+        RangeToolbar,
+        SeriesChart
+    ],
     templateUrl: './web-vitals.html',
     styleUrl: './web-vitals.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -146,10 +167,13 @@ export class WebVitalsPage {
         this.activeLanguage();
         return [
             { label: this.transloco.translate('webVitals.breakdown.tabs.pages'), value: 'pages' },
-            { label: this.transloco.translate('webVitals.breakdown.tabs.countries'), value: 'country' },
-            { label: this.transloco.translate('webVitals.breakdown.tabs.languages'), value: 'language' },
+            { label: this.transloco.translate('webVitals.breakdown.tabs.devices'), value: 'device' },
             { label: this.transloco.translate('webVitals.breakdown.tabs.browsers'), value: 'browser' },
-            { label: this.transloco.translate('webVitals.breakdown.tabs.devices'), value: 'device' }
+            { label: this.transloco.translate('webVitals.breakdown.tabs.languages'), value: 'language' },
+            { label: this.transloco.translate('webVitals.breakdown.tabs.countries'), value: 'country' },
+            { label: this.transloco.translate('webVitals.breakdown.tabs.cities'), value: 'city' },
+            { label: this.transloco.translate('webVitals.breakdown.tabs.providers'), value: 'provider' },
+            { label: this.transloco.translate('webVitals.breakdown.tabs.asns'), value: 'asn' }
         ];
     });
     protected readonly metricCards = computed(() => {
@@ -339,7 +363,7 @@ export class WebVitalsPage {
     }
 
     protected setBreakdownTab(value: string | number | undefined) {
-        if (value === 'pages' || value === 'browser' || value === 'country' || value === 'language' || value === 'device') {
+        if (value === 'pages' || value === 'browser' || value === 'country' || value === 'language' || value === 'device' || value === 'city' || value === 'provider' || value === 'asn') {
             this.activeBreakdownTab.set(value);
         }
     }

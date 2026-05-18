@@ -99,7 +99,7 @@
             @if (filterChips().length > 0) { @for (chip of filterChips(); track chip.key) {
             <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--p-primary-color)] text-sm">
                 <span class="font-medium text-[var(--p-text-color)]">{{ chip.label }}</span>
-                <button type="button" class="text-muted-color hover:text-[var(--p-text-color)]" (click)="clearFilters()" [attr.aria-label]="'common.removeFilterAria' | transloco">
+                <button type="button" class="text-muted-color hover:text-[var(--p-text-color)]" (click)="chip.remove()" [attr.aria-label]="'common.removeFilterAria' | transloco">
                     <i class="pi pi-times" aria-hidden="true"></i>
                 </button>
             </span>
@@ -126,17 +126,6 @@
     <div class="mb-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ "aiChatbots.exportStatus.error" | transloco }}</div>
     }
 
-    <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-6">
-        <app-metric-list [title]="'aiChatbots.breakdowns.intents' | transloco" icon="pi-send" [data]="topIntents()" [isLoading]="isLoadingBreakdowns()" />
-        <app-metric-list [title]="'aiChatbots.breakdowns.providers' | transloco" icon="pi-globe" [data]="topProviders()" [isLoading]="isLoadingBreakdowns()" />
-        <app-metric-list [title]="'aiChatbots.breakdowns.surfaces' | transloco" icon="pi-window-maximize" [data]="topSurfaces()" [isLoading]="isLoadingBreakdowns()" />
-    </div>
-
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        <app-metric-list [title]="'common.metrics.topPages' | transloco" icon="pi-file" [data]="audience()?.top_pages ?? []" [isLoading]="isLoadingAudience()" [linkMode]="'path'" [siteDomain]="activeSite()?.domain ?? null" />
-        <app-metric-list [title]="'common.metrics.topSources' | transloco" icon="pi-link" [data]="audience()?.top_referrers ?? []" [isLoading]="isLoadingAudience()" [linkMode]="'url'" />
-        <app-metric-list [title]="'common.metrics.devices' | transloco" icon="pi-mobile" [data]="audience()?.top_devices ?? []" [isLoading]="isLoadingAudience()" />
-        <app-metric-list [title]="'common.metrics.countries' | transloco" icon="pi-globe" [data]="audience()?.top_countries ?? []" [isLoading]="isLoadingAudience()" [showCountryFlags]="true" [showCountryNames]="true" />
-    </div>
+    <app-metric-card-group [tabs]="metricCardTabs()" (rowClicked)="onMetricCardClick($event)" />
     }
 </div>

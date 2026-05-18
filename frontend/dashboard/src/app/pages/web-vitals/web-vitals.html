@@ -200,7 +200,7 @@
     </div>
 
     <p-card class="shadow-sm border border-surface-200 dark:border-surface-700 surface-card">
-        <p-tabs [value]="activeBreakdownTab()" (valueChange)="setBreakdownTab($event)" styleClass="web-vitals-breakdown-tabs">
+        <p-tabs [value]="activeBreakdownTab()" (valueChange)="setBreakdownTab($event)" [scrollable]="true" styleClass="web-vitals-breakdown-tabs">
             <p-tablist>
                 @for (tab of breakdownTabs(); track tab.value) {
                 <p-tab [value]="tab.value">{{ tab.label }}</p-tab>
@@ -208,16 +208,22 @@
             </p-tablist>
             <p-tabpanels>
                 <p-tabpanel value="pages">
-                    <div class="flex flex-col gap-1 mb-4">
+                    <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <h3 class="text-lg font-semibold">{{ pageBreakdownTitle() }}</h3>
                             <p class="text-sm text-[var(--p-text-muted-color)]">{{ pageBreakdownDescription() }}</p>
                         </div>
+                        <p-iconfield class="w-full sm:w-64">
+                            <p-inputicon class="pi pi-search" />
+                            <input pInputText #pageSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="pagesTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
+                        </p-iconfield>
                     </div>
                     <p-table
+                        #pagesTable
                         [value]="pageRows()"
                         [loading]="isLoading()"
                         [rowHover]="true"
+                        [globalFilterFields]="['path', 'samples', 'ratingSamples']"
                         [paginator]="true"
                         [rows]="10"
                         [rowsPerPageOptions]="[10, 25, 50]"
@@ -295,16 +301,22 @@
                 </p-tabpanel>
                 @for (tab of breakdownTabs().slice(1); track tab.value) {
                 <p-tabpanel [value]="tab.value">
-                    <div class="flex flex-col gap-1 mb-4">
+                    <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <h3 class="text-lg font-semibold">{{ "webVitals.breakdown.title" | transloco: { dimension: tab.label } }}</h3>
                             <p class="text-sm text-[var(--p-text-muted-color)]">{{ "webVitals.breakdown.description" | transloco: { metric: selectedMetric() } }}</p>
                         </div>
+                        <p-iconfield class="w-full sm:w-64">
+                            <p-inputicon class="pi pi-search" />
+                            <input pInputText #dimensionSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="dimensionTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
+                        </p-iconfield>
                     </div>
                     <p-table
+                        #dimensionTable
                         [value]="dimensionRows()"
                         [loading]="isLoading()"
                         [rowHover]="true"
+                        [globalFilterFields]="['name', 'p75', 'samples', 'rating']"
                         [paginator]="true"
                         [rows]="10"
                         [rowsPerPageOptions]="[10, 25, 50]"

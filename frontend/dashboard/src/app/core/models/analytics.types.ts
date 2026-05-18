@@ -132,6 +132,12 @@ export interface Hit {
     viewport_width?: number;
     viewport_height?: number;
     language?: string;
+    country_code?: string;
+    region?: string;
+    city?: string;
+    provider?: string;
+    asn?: number;
+    asn_org?: string;
     utm_source?: string;
     utm_medium?: string;
     utm_campaign?: string;
@@ -209,7 +215,7 @@ export interface WebVitalMetricBreakdown {
     rating: WebVitalRating;
 }
 
-export type WebVitalDimension = 'browser' | 'country' | 'language' | 'device';
+export type WebVitalDimension = 'browser' | 'country' | 'language' | 'device' | 'city' | 'provider' | 'asn';
 
 export interface WebVitalDimensionRow {
     name: string;
@@ -301,6 +307,9 @@ export interface EventAudience {
     top_referrers: MetricStat[];
     top_devices: MetricStat[];
     top_countries: MetricStat[];
+    top_cities?: MetricStat[];
+    top_providers?: MetricStat[];
+    top_asns?: MetricStat[];
     imported_excluded?: ImportExclusionReason[];
 }
 
@@ -311,6 +320,9 @@ export interface EcommerceSummary {
     checkout_starts: number;
     checkout_conversion_rate: number;
     currency: string;
+    top_cities?: MetricStat[];
+    top_providers?: MetricStat[];
+    top_asns?: MetricStat[];
 }
 
 export interface EcommerceSeriesPoint {
@@ -376,6 +388,9 @@ export interface SiteStats {
     top_referrers: MetricStat[];
     top_devices: MetricStat[];
     top_countries: MetricStat[];
+    top_cities?: MetricStat[];
+    top_providers?: MetricStat[];
+    top_asns?: MetricStat[];
     top_browsers: MetricStat[];
     top_ai_bots: MetricStat[];
     top_ai_sources: MetricStat[];

@@ -5,6 +5,9 @@ import { firstValueFrom } from 'rxjs';
 import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
 import { FileUpload, FileUploadHandlerEvent, FileUploadModule, FileRemoveEvent, FileSelectEvent } from 'primeng/fileupload';
+import { IconFieldModule } from 'primeng/iconfield';
+import { InputIconModule } from 'primeng/inputicon';
+import { InputTextModule } from 'primeng/inputtext';
 import { MessageModule } from 'primeng/message';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { TagModule } from 'primeng/tag';
@@ -79,7 +82,7 @@ function safeList<T>(value: readonly T[] | null | undefined): T[] {
 
 @Component({
     selector: 'app-imports',
-    imports: [DatePipe, DecimalPipe, TranslocoPipe, ButtonModule, CardModule, FileUploadModule, MessageModule, ProgressBarModule, TagModule, TableModule, PageState],
+    imports: [DatePipe, DecimalPipe, TranslocoPipe, ButtonModule, CardModule, FileUploadModule, IconFieldModule, InputIconModule, InputTextModule, MessageModule, ProgressBarModule, TagModule, TableModule, PageState],
     templateUrl: './imports.html',
     styleUrl: './imports.css',
     changeDetection: ChangeDetectionStrategy.OnPush

@@ -18,6 +18,13 @@ describe('Dashboard', () => {
     let component: Dashboard;
     let fixture: ComponentFixture<Dashboard>;
 
+    const clickTab = (label: string): void => {
+        const tab = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('p-tab')).find((element) => element.textContent?.includes(label));
+        expect(tab).toBeTruthy();
+        tab?.click();
+        fixture.detectChanges();
+    };
+
     beforeEach(async () => {
         await TestBed.configureTestingModule({
             imports: [
@@ -110,7 +117,7 @@ describe('Dashboard', () => {
         expect(rail.querySelector('[aria-current="step"]')?.textContent).toContain('dashboard.onboarding.steps.verify_tracking');
     });
 
-    it('should switch the pages card data between top, landing, and exit pages', () => {
+    it('should group top, landing, and exit pages under the content metric tab', () => {
         const siteService = TestBed.inject(SiteService);
         const statsService = TestBed.inject(StatsService);
         const hitService = TestBed.inject(HitService);
@@ -143,6 +150,9 @@ describe('Dashboard', () => {
             top_ai_bots: [],
             top_ai_sources: [],
             top_languages: [{ name: 'de', value: 4 }],
+            top_cities: [],
+            top_providers: [],
+            top_asns: [],
             top_utm_campaigns: [],
             top_utm_contents: [],
             top_utm_mediums: [],
@@ -159,13 +169,71 @@ describe('Dashboard', () => {
             funnels: []
         });
 
-        expect((component as unknown as { pageMetricData: () => { name: string; value: number }[] }).pageMetricData()).toEqual([{ name: '/pricing', value: 4 }]);
+        const tabs = (component as unknown as { metricCardTabs: () => { id: string; cards: { id: string; data: { name: string; value: number }[] }[] }[] }).metricCardTabs();
+        const content = tabs.find((tab) => tab.id === 'content');
 
-        (component as unknown as { onPageMetricModeChange: (mode: string) => void }).onPageMetricModeChange('top_landing_pages');
-        expect((component as unknown as { pageMetricData: () => { name: string; value: number }[] }).pageMetricData()).toEqual([{ name: '/blog', value: 3 }]);
+        expect(content?.cards.map((card) => card.id)).toEqual(['top-pages', 'landing-pages', 'exit-pages']);
+        expect(content?.cards.find((card) => card.id === 'top-pages')?.data).toEqual([{ name: '/pricing', value: 4 }]);
+        expect(content?.cards.find((card) => card.id === 'landing-pages')?.data).toEqual([{ name: '/blog', value: 3 }]);
+        expect(content?.cards.find((card) => card.id === 'exit-pages')?.data).toEqual([{ name: '/signup', value: 2 }]);
+    });
 
-        (component as unknown as { onPageMetricModeChange: (mode: string) => void }).onPageMetricModeChange('top_exit_pages');
-        expect((component as unknown as { pageMetricData: () => { name: string; value: number }[] }).pageMetricData()).toEqual([{ name: '/signup', value: 2 }]);
+    it('should group countries and cities under location and providers and ASNs under network', () => {
+        const siteService = TestBed.inject(SiteService);
+        const statsService = TestBed.inject(StatsService);
+        const hitService = TestBed.inject(HitService);
+
+        vi.spyOn(statsService, 'loadStats').mockImplementation(() => undefined);
+        vi.spyOn(hitService, 'loadHits').mockImplementation(() => undefined);
+
+        siteService.activeSite.set({
+            id: 'site-1',
+            user_id: 'user-1',
+            domain: 'example.com',
+            created_at: '2026-01-01T00:00:00Z'
+        });
+
+        statsService.stats.set({
+            live_visitors: 0,
+            total_pageviews: 10,
+            unique_sessions: 5,
+            bounce_rate: 40,
+            avg_session_duration: 12,
+            pages_per_session: 2,
+            chart_data: [],
+            top_pages: [],
+            top_landing_pages: [],
+            top_exit_pages: [],
+            top_referrers: [],
+            top_devices: [],
+            top_countries: [{ name: 'DE', value: 4 }],
+            top_browsers: [],
+            top_ai_bots: [],
+            top_ai_sources: [],
+            top_languages: [],
+            top_cities: [{ name: 'Berlin', value: 3 }],
+            top_providers: [{ name: 'Hetzner Online GmbH', value: 2 }],
+            top_asns: [{ name: 'AS24940 Hetzner Online GmbH', value: 2 }],
+            top_utm_campaigns: [],
+            top_utm_contents: [],
+            top_utm_mediums: [],
+            top_utm_sources: [],
+            top_utm_terms: [],
+            ai_bot_hits: 0,
+            ai_source_visits: 0,
+            utm_campaign_hits: 0,
+            utm_content_hits: 0,
+            utm_medium_hits: 0,
+            utm_source_hits: 0,
+            utm_term_hits: 0,
+            goals: [],
+            funnels: []
+        });
+
+        const tabs = (component as unknown as { metricCardTabs: () => { id: string; cards: { id: string }[] }[] }).metricCardTabs();
+
+        expect(tabs.find((tab) => tab.id === 'location')?.cards.map((card) => card.id)).toEqual(['countries', 'cities']);
+        expect(tabs.find((tab) => tab.id === 'network')?.cards.map((card) => card.id)).toEqual(['providers', 'asns']);
     });
 
     it('should expose countries and languages from stats as separate data sources', () => {
@@ -201,6 +269,9 @@ describe('Dashboard', () => {
             top_ai_bots: [],
             top_ai_sources: [],
             top_languages: [{ name: 'de', value: 3 }],
+            top_cities: [],
+            top_providers: [],
+            top_asns: [],
             top_utm_campaigns: [],
             top_utm_contents: [],
             top_utm_mediums: [],
@@ -219,6 +290,76 @@ describe('Dashboard', () => {
 
         expect(statsService.stats()?.top_countries).toEqual([{ name: 'DE', value: 4 }]);
         expect(statsService.stats()?.top_languages).toEqual([{ name: 'de', value: 3 }]);
+    });
+
+    it('should render configured funnels from dashboard stats', () => {
+        const siteService = TestBed.inject(SiteService);
+        const statsService = TestBed.inject(StatsService);
+        const hitService = TestBed.inject(HitService);
+
+        vi.spyOn(statsService, 'loadStats').mockImplementation(() => undefined);
+        vi.spyOn(hitService, 'loadHits').mockImplementation(() => undefined);
+
+        siteService.activeSite.set({
+            id: 'site-1',
+            user_id: 'user-1',
+            domain: 'example.com',
+            created_at: '2026-01-01T00:00:00Z'
+        });
+
+        statsService.stats.set({
+            live_visitors: 0,
+            total_pageviews: 10,
+            unique_sessions: 5,
+            bounce_rate: 40,
+            avg_session_duration: 12,
+            pages_per_session: 2,
+            chart_data: [],
+            top_pages: [],
+            top_landing_pages: [],
+            top_exit_pages: [],
+            top_referrers: [],
+            top_devices: [],
+            top_browsers: [],
+            top_countries: [],
+            top_ai_bots: [],
+            top_ai_sources: [],
+            top_languages: [],
+            top_cities: [],
+            top_providers: [],
+            top_asns: [],
+            top_utm_campaigns: [],
+            top_utm_contents: [],
+            top_utm_mediums: [],
+            top_utm_sources: [],
+            top_utm_terms: [],
+            ai_bot_hits: 0,
+            ai_source_visits: 0,
+            utm_campaign_hits: 0,
+            utm_content_hits: 0,
+            utm_medium_hits: 0,
+            utm_source_hits: 0,
+            utm_term_hits: 0,
+            goals: [],
+            funnels: [
+                {
+                    id: 'funnel-1',
+                    site_id: 'site-1',
+                    name: 'Checkout funnel',
+                    steps: [
+                        { type: 'path', value: '/pricing' },
+                        { type: 'event', value: 'signup_completed' }
+                    ],
+                    created_at: '2026-01-01T00:00:00Z'
+                }
+            ]
+        });
+
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.textContent).toContain('Checkout funnel');
+        expect(fixture.nativeElement.textContent).toContain('funnels.list.stepsCount');
+        expect(fixture.nativeElement.textContent).not.toContain('funnels.list.emptyTitle');
     });
 
     it('should refresh Search Console drilldown data from the shared dashboard refresh action', async () => {
@@ -356,6 +497,7 @@ describe('Dashboard', () => {
         fixture.detectChanges();
 
         expect(fixture.nativeElement.textContent).toContain('privacy analytics');
+        clickTab('searchConsole.sections.topPages');
         expect(fixture.nativeElement.textContent).toContain('/pricing');
         expect(searchConsoleService.getOverview).toHaveBeenCalled();
         expect(hitService.hits()).toEqual([]);

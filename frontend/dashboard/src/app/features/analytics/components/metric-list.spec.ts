@@ -50,6 +50,19 @@ describe('MetricList', () => {
         expect(fixture.nativeElement.textContent).toContain('30%');
     });
 
+    it('should render duplicate row labels without collapsing rows', () => {
+        fixture.componentRef.setInput('data', [
+            { name: '/docs', value: 70 },
+            { name: '/docs', value: 30 }
+        ]);
+        fixture.detectChanges();
+
+        const rows = fixture.debugElement.queryAll(By.css('.metric-list__row:not(.metric-list__row--empty)'));
+        expect(rows.length).toBe(2);
+        expect(fixture.nativeElement.textContent).toContain('70%');
+        expect(fixture.nativeElement.textContent).toContain('30%');
+    });
+
     it('should show an empty state instead of a zero-value row when there is no data', () => {
         fixture.componentRef.setInput('data', []);
         fixture.detectChanges();
@@ -57,6 +70,15 @@ describe('MetricList', () => {
         expect(fixture.debugElement.query(By.css('.metric-list__row--empty'))).not.toBeNull();
         expect(fixture.nativeElement.textContent).toContain('common.empty.noDataTitle');
         expect(fixture.nativeElement.textContent).not.toContain('0');
+    });
+
+    it('should mark the active row with the inset active style class', () => {
+        fixture.componentRef.setInput('activeValue', 'Desktop');
+        fixture.detectChanges();
+
+        const active = fixture.debugElement.query(By.css('.metric-list__row--active'));
+        expect(active).not.toBeNull();
+        expect(active.nativeElement.textContent).toContain('Desktop');
     });
 
     it('should render distinct device icons', () => {
@@ -83,20 +105,6 @@ describe('MetricList', () => {
         fixture.detectChanges();
 
         expect(fixture.debugElement.query(By.css('.metric-list__item-icon'))).toBeNull();
-    });
-
-    it('should render a header view selector when multiple view options are provided', () => {
-        fixture.componentRef.setInput('title', 'Pages');
-        fixture.componentRef.setInput('icon', 'pi-file');
-        fixture.componentRef.setInput('viewOptions', [
-            { label: 'Top pages', value: 'top' },
-            { label: 'Landing pages', value: 'landing' },
-            { label: 'Exit pages', value: 'exit' }
-        ]);
-        fixture.componentRef.setInput('selectedView', 'landing');
-        fixture.detectChanges();
-
-        expect(fixture.debugElement.query(By.css('.metric-list__view-select'))).not.toBeNull();
     });
 
     it('should render human-readable language names when enabled', () => {

@@ -55,4 +55,21 @@ describe('AnalyticsService Web Vitals', () => {
         expect(breakdownReq.request.params.get('limit')).toBe('10');
         breakdownReq.flush([]);
     });
+
+    it('requests AI fetch reports with path filters', () => {
+        const filters = { assistantName: 'GPTBot', assistantFamily: 'OpenAI', resourceType: 'html', path: '/docs' };
+
+        service.getAIFetchOverview('site-1', 'from', 'to', filters).subscribe();
+        const overviewReq = httpMock.expectOne((request) => request.url === '/api/sites/site-1/ai-fetch/overview');
+        expect(overviewReq.request.params.get('assistant_name')).toBe('GPTBot');
+        expect(overviewReq.request.params.get('assistant_family')).toBe('OpenAI');
+        expect(overviewReq.request.params.get('resource_type')).toBe('html');
+        expect(overviewReq.request.params.get('path')).toBe('/docs');
+        overviewReq.flush({});
+
+        service.getAIFetchCorrelation('site-1', 'from', 'to', filters).subscribe();
+        const correlationReq = httpMock.expectOne((request) => request.url === '/api/sites/site-1/ai-fetch/correlation');
+        expect(correlationReq.request.params.get('path')).toBe('/docs');
+        correlationReq.flush({ summary: {}, citation_yield: [], opportunity_pages: [], failure_hotspots: [] });
+    });
 });

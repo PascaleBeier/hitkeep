@@ -82,13 +82,26 @@ describe('Events', () => {
                                     topPages: 'Top Pages',
                                     topSources: 'Top Sources',
                                     devices: 'Devices',
-                                    countries: 'Countries'
+                                    countries: 'Countries',
+                                    cities: 'Cities',
+                                    providers: 'Providers',
+                                    asns: 'ASNs'
+                                },
+                                metricGroups: {
+                                    content: 'Content',
+                                    acquisition: 'Acquisition',
+                                    audience: 'Audience',
+                                    location: 'Location',
+                                    network: 'Network'
                                 },
                                 filters: {
                                     page: 'Page: {{value}}',
                                     source: 'Source: {{value}}',
                                     device: 'Device: {{value}}',
-                                    country: 'Country: {{value}}'
+                                    country: 'Country: {{value}}',
+                                    city: 'City: {{value}}',
+                                    provider: 'Provider: {{value}}',
+                                    asn: 'ASN: {{value}}'
                                 }
                             }
                         }
@@ -151,9 +164,9 @@ describe('Events', () => {
 
     it('keeps multiple audience dimension filters active together', () => {
         const events = component as unknown as {
-            toggleAudienceDimFilter: (type: 'path' | 'referrer' | 'device' | 'country', item: { name: string; value: number }) => void;
+            toggleAudienceDimFilter: (type: 'path' | 'referrer' | 'device' | 'country' | 'city' | 'provider' | 'asn', item: { name: string; value: number }) => void;
             audienceDimFilters: () => { type: string; value: string }[];
-            activeDimensionFilterValue: (type: 'path' | 'referrer' | 'device' | 'country') => string | null;
+            activeDimensionFilterValue: (type: 'path' | 'referrer' | 'device' | 'country' | 'city' | 'provider' | 'asn') => string | null;
         };
 
         events.toggleAudienceDimFilter('path', { name: '/pricing', value: 8 });
@@ -169,7 +182,7 @@ describe('Events', () => {
 
     it('replaces a filter value for the same audience dimension', () => {
         const events = component as unknown as {
-            toggleAudienceDimFilter: (type: 'path' | 'referrer' | 'device' | 'country', item: { name: string; value: number }) => void;
+            toggleAudienceDimFilter: (type: 'path' | 'referrer' | 'device' | 'country' | 'city' | 'provider' | 'asn', item: { name: string; value: number }) => void;
             audienceDimFilters: () => { type: string; value: string }[];
         };
 
@@ -177,5 +190,59 @@ describe('Events', () => {
         events.toggleAudienceDimFilter('path', { name: '/docs', value: 4 });
 
         expect(events.audienceDimFilters()).toEqual([{ type: 'path', value: '/docs' }]);
+    });
+
+    it('groups event property and audience cards into the shared metric card surface', () => {
+        const events = component as unknown as {
+            audience: { set: (value: unknown) => void };
+            selectedEvent: { set: (value: string) => void };
+            selectedPropertyKey: { set: (value: string) => void };
+            breakdown: { set: (value: { name: string; value: number }[]) => void };
+            metricCardTabs: () => { id: string; cards: { id: string; activeValue?: string | null; filterType?: string; data: { name: string; value: number }[] }[] }[];
+            onMetricCardClick: (event: { tabId: string; cardId: string; filterType: string; metric: { name: string; value: number } }) => void;
+            audienceDimFilters: () => { type: string; value: string }[];
+            selectedPropertyValue: () => string | null;
+            activeDimensionFilterValue: (type: 'provider') => string | null;
+        };
+
+        events.selectedEvent.set('outbound_click');
+        events.selectedPropertyKey.set('target_host');
+        events.breakdown.set([{ name: 'external.example.com', value: 12 }]);
+        events.audience.set({
+            top_pages: [{ name: '/pricing', value: 8 }],
+            top_referrers: [{ name: 'https://google.com', value: 5 }],
+            top_devices: [{ name: 'Desktop', value: 7 }],
+            top_countries: [{ name: 'US', value: 4 }],
+            top_cities: [{ name: 'Berlin', value: 3 }],
+            top_providers: [{ name: 'Hetzner Online GmbH', value: 2 }],
+            top_asns: [{ name: 'AS24940 Hetzner Online GmbH', value: 2 }]
+        });
+
+        const tabs = events.metricCardTabs();
+
+        expect(tabs.map((tab) => tab.id)).toEqual(['content', 'acquisition', 'audience', 'location', 'network']);
+        expect(tabs.find((tab) => tab.id === 'content')?.cards.map((card) => card.id)).toEqual(['property-breakdown', 'top-pages']);
+        expect(tabs.find((tab) => tab.id === 'content')?.cards[0]?.filterType).toBe('propertyValue');
+        expect(tabs.find((tab) => tab.id === 'location')?.cards.map((card) => card.id)).toEqual(['countries', 'cities']);
+        expect(tabs.find((tab) => tab.id === 'network')?.cards.map((card) => card.id)).toEqual(['providers', 'asns']);
+
+        events.onMetricCardClick({
+            tabId: 'content',
+            cardId: 'property-breakdown',
+            filterType: 'propertyValue',
+            metric: { name: 'external.example.com', value: 12 }
+        });
+
+        expect(events.selectedPropertyValue()).toBe('external.example.com');
+
+        events.onMetricCardClick({
+            tabId: 'network',
+            cardId: 'providers',
+            filterType: 'provider',
+            metric: { name: 'Hetzner Online GmbH', value: 2 }
+        });
+
+        expect(events.audienceDimFilters()).toEqual([{ type: 'provider', value: 'Hetzner Online GmbH' }]);
+        expect(events.activeDimensionFilterValue('provider')).toBe('Hetzner Online GmbH');
     });
 });

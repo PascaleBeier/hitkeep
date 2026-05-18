@@ -3,15 +3,11 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { finalize, forkJoin } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { TranslocoDecimalPipe, TranslocoLocaleService } from '@jsverse/transloco-locale';
+import { TranslocoLocaleService } from '@jsverse/transloco-locale';
 import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
 import { SelectModule } from 'primeng/select';
 import { SplitButtonModule } from 'primeng/splitbutton';
-import { TabsModule } from 'primeng/tabs';
-import { TagModule } from 'primeng/tag';
-import { TableModule } from 'primeng/table';
-import { TooltipModule } from 'primeng/tooltip';
 import { MenuItem } from 'primeng/api';
 import { SiteService } from '@features/sites/services/site.service';
 import { AIFetchFilters, AnalyticsService } from '@core/services/analytics.service';
@@ -20,46 +16,24 @@ import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header'
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { SeriesChart, SeriesChartPoint, SeriesDefinition } from '@features/analytics/components/series-chart';
 import { KpiCard } from '@features/analytics/components/kpi-card';
-import { MetricList } from '@features/analytics/components/metric-list';
+import { MetricCardGroup, MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
 import { AIFetchCorrelationReport, AIFetchOverview, MetricStat } from '@models/analytics.types';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { buildTakeoutExportMenuItems, DEFAULT_HITS_EXPORT_FORMAT, TakeoutExportFormat } from '@core/export/export-formats';
 import { TakeoutDownloadService } from '@services/takeout-download.service';
 import { AIFilterChip, formatBytes, formatResponseMs, mapAIFetchSeries } from '@pages/ai-visibility/ai-visibility.utils';
 
-type FilterKey = 'assistantName' | 'assistantFamily' | 'resourceType';
-type CorrelationTabValue = 'citationYield' | 'opportunityPages' | 'failureHotspots';
+type FilterKey = 'assistantName' | 'assistantFamily' | 'resourceType' | 'path';
 
-interface CorrelationTableTab {
-    value: CorrelationTabValue;
+interface CorrelationSummaryCard {
     label: string;
-    description: string;
-    count: number;
-    icon: string;
+    value: string | number;
+    loading: boolean;
 }
 
 @Component({
     selector: 'app-ai-visibility',
-    imports: [
-        FormsModule,
-        TranslocoPipe,
-        TranslocoDecimalPipe,
-        ButtonModule,
-        CardModule,
-        SelectModule,
-        SplitButtonModule,
-        TabsModule,
-        TagModule,
-        TableModule,
-        TooltipModule,
-        RangeToolbar,
-        PageHeader,
-        PageHeaderLeft,
-        PageBreadcrumb,
-        SeriesChart,
-        KpiCard,
-        MetricList
-    ],
+    imports: [FormsModule, TranslocoPipe, ButtonModule, CardModule, SelectModule, SplitButtonModule, RangeToolbar, PageHeader, PageHeaderLeft, PageBreadcrumb, SeriesChart, KpiCard, MetricCardGroup],
     templateUrl: './ai-visibility.html',
     styleUrl: './ai-visibility.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -85,7 +59,6 @@ export class AIVisibility {
     protected readonly customRangeDates = signal<Date[] | null>(null);
 
     protected readonly filters = signal<AIFetchFilters>({});
-    protected readonly activeCorrelationTab = signal<CorrelationTabValue>('citationYield');
 
     protected readonly overview = signal<AIFetchOverview | null>(null);
     protected readonly correlation = signal<AIFetchCorrelationReport | null>(null);
@@ -140,6 +113,9 @@ export class AIVisibility {
         if (filters.resourceType) {
             chips.push({ key: 'resourceType', label: `${this.transloco.translate('aiVisibility.filters.resourceType')}: ${filters.resourceType}` });
         }
+        if (filters.path) {
+            chips.push({ key: 'path', label: `${this.transloco.translate('aiVisibility.columns.path')}: ${filters.path}` });
+        }
         return chips;
     });
 
@@ -159,66 +135,146 @@ export class AIVisibility {
     protected readonly primaryKpiCards = computed(() => {
         this.activeLanguage();
         const overview = this.overview();
+        const summary = this.correlation()?.summary;
         const loading = this.isLoadingOverview();
         return [
             { label: this.transloco.translate('aiVisibility.kpis.totalFetches'), value: overview?.total_requests ?? 0, loading },
-            { label: this.transloco.translate('aiVisibility.kpis.uniquePaths'), value: overview?.unique_paths ?? 0, loading },
+            { label: this.transloco.translate('aiVisibility.correlation.kpis.aiVisits'), value: summary?.ai_referred_visits ?? 0, loading: this.isLoadingCorrelation() },
             { label: this.transloco.translate('aiVisibility.kpis.uniqueAssistants'), value: overview?.unique_assistants ?? 0, loading },
-            { label: this.transloco.translate('aiVisibility.kpis.errorRate4xx'), value: `${(overview?.error_rate_4xx ?? 0).toFixed(1)}%`, loading }
+            { label: this.transloco.translate('aiVisibility.columns.errorRate'), value: `${((overview?.error_rate_4xx ?? 0) + (overview?.error_rate_5xx ?? 0)).toFixed(1)}%`, loading }
         ];
     });
 
-    protected readonly secondaryKpiCards = computed(() => {
+    protected readonly healthStats = computed<CorrelationSummaryCard[]>(() => {
         this.activeLanguage();
         const overview = this.overview();
         const loading = this.isLoadingOverview();
         return [
+            { label: this.transloco.translate('aiVisibility.kpis.uniquePaths'), value: overview?.unique_paths ?? 0, loading },
+            { label: this.transloco.translate('aiVisibility.kpis.errorRate4xx'), value: `${(overview?.error_rate_4xx ?? 0).toFixed(1)}%`, loading },
             { label: this.transloco.translate('aiVisibility.kpis.errorRate5xx'), value: `${(overview?.error_rate_5xx ?? 0).toFixed(1)}%`, loading },
             { label: this.transloco.translate('aiVisibility.kpis.medianResponse'), value: this.formatResponse(overview?.median_response_ms ?? 0), loading },
             { label: this.transloco.translate('aiVisibility.kpis.bytesServed'), value: this.formatBytes(overview?.total_bytes ?? 0), loading }
         ];
     });
 
-    protected readonly correlationKpis = computed(() => {
+    protected readonly correlationSummaryStats = computed<CorrelationSummaryCard[]>(() => {
         this.activeLanguage();
         const summary = this.correlation()?.summary;
         const loading = this.isLoadingCorrelation();
         return [
             { label: this.transloco.translate('aiVisibility.correlation.kpis.correlatedPaths'), value: summary?.correlated_paths ?? 0, loading },
-            { label: this.transloco.translate('aiVisibility.correlation.kpis.aiVisits'), value: summary?.ai_referred_visits ?? 0, loading },
             { label: this.transloco.translate('aiVisibility.correlation.kpis.uncorrelatedFetches'), value: summary?.uncorrelated_fetches ?? 0, loading }
         ];
     });
-
-    protected readonly citationYieldRows = computed(() => this.correlation()?.citation_yield ?? []);
-    protected readonly opportunityRows = computed(() => this.correlation()?.opportunity_pages ?? []);
-    protected readonly failureHotspotRows = computed(() => this.correlation()?.failure_hotspots ?? []);
-    protected readonly citationYieldMaxFetches = computed(() => this.maxMetricValue(this.citationYieldRows().map((row) => row.fetch_count)));
-    protected readonly opportunityPageMaxFetches = computed(() => this.maxMetricValue(this.opportunityRows().map((row) => row.fetch_count)));
-    protected readonly failureHotspotMaxRequests = computed(() => this.maxMetricValue(this.failureHotspotRows().map((row) => row.total_requests)));
-    protected readonly correlationTabs = computed<CorrelationTableTab[]>(() => {
+    protected readonly metricCardTabs = computed<MetricCardGroupTab<FilterKey>[]>(() => {
         this.activeLanguage();
+        const overview = this.overview();
+        const correlation = this.correlation();
+        const overviewLoading = this.isLoadingOverview();
+        const correlationLoading = this.isLoadingCorrelation();
         return [
             {
-                value: 'citationYield',
-                label: this.transloco.translate('aiVisibility.tables.citationYield.title'),
-                description: this.transloco.translate('aiVisibility.tables.citationYield.description'),
-                count: this.citationYieldRows().length,
-                icon: 'pi pi-chart-line'
+                id: 'content',
+                label: this.transloco.translate('common.metricGroups.content'),
+                icon: 'pi-file',
+                cards: [
+                    {
+                        id: 'assistants',
+                        title: this.transloco.translate('aiVisibility.breakdowns.assistants'),
+                        icon: 'pi-android',
+                        data: overview?.top_assistants ?? [],
+                        isLoading: overviewLoading,
+                        isRowClickable: true,
+                        activeValue: this.filterValue('assistantName'),
+                        filterType: 'assistantName'
+                    },
+                    {
+                        id: 'families',
+                        title: this.transloco.translate('aiVisibility.breakdowns.families'),
+                        icon: 'pi-sitemap',
+                        data: overview?.top_families ?? [],
+                        isLoading: overviewLoading,
+                        isRowClickable: true,
+                        activeValue: this.filterValue('assistantFamily'),
+                        filterType: 'assistantFamily'
+                    },
+                    {
+                        id: 'paths',
+                        title: this.transloco.translate('aiVisibility.breakdowns.paths'),
+                        icon: 'pi-file',
+                        data: overview?.top_paths ?? [],
+                        isLoading: overviewLoading,
+                        linkMode: 'path',
+                        siteDomain: this.activeSite()?.domain ?? null,
+                        isRowClickable: true,
+                        activeValue: this.filterValue('path'),
+                        filterType: 'path'
+                    },
+                    {
+                        id: 'error-paths',
+                        title: this.transloco.translate('aiVisibility.breakdowns.errorPaths'),
+                        icon: 'pi-exclamation-triangle',
+                        data: overview?.top_error_paths ?? [],
+                        isLoading: overviewLoading,
+                        linkMode: 'path',
+                        siteDomain: this.activeSite()?.domain ?? null,
+                        isRowClickable: true,
+                        activeValue: this.filterValue('path'),
+                        filterType: 'path'
+                    },
+                    {
+                        id: 'resource-types',
+                        title: this.transloco.translate('aiVisibility.breakdowns.resourceTypes'),
+                        icon: 'pi-database',
+                        data: overview?.resource_type_split ?? [],
+                        isLoading: overviewLoading,
+                        isRowClickable: true,
+                        activeValue: this.filterValue('resourceType'),
+                        filterType: 'resourceType'
+                    }
+                ]
             },
             {
-                value: 'opportunityPages',
-                label: this.transloco.translate('aiVisibility.tables.opportunityPages.title'),
-                description: this.transloco.translate('aiVisibility.tables.opportunityPages.description'),
-                count: this.opportunityRows().length,
-                icon: 'pi pi-compass'
-            },
-            {
-                value: 'failureHotspots',
-                label: this.transloco.translate('aiVisibility.tables.failureHotspots.title'),
-                description: this.transloco.translate('aiVisibility.tables.failureHotspots.description'),
-                count: this.failureHotspotRows().length,
-                icon: 'pi pi-exclamation-circle'
+                id: 'correlation',
+                label: this.transloco.translate('aiVisibility.correlation.title'),
+                icon: 'pi-sparkles',
+                cards: [
+                    {
+                        id: 'citation-yield',
+                        title: this.transloco.translate('aiVisibility.tables.citationYield.title'),
+                        icon: 'pi-link',
+                        data: (correlation?.citation_yield ?? []).map((row) => ({ name: row.path, value: row.ai_referred_visits })),
+                        isLoading: correlationLoading,
+                        linkMode: 'path',
+                        siteDomain: this.activeSite()?.domain ?? null,
+                        isRowClickable: true,
+                        activeValue: this.filterValue('path'),
+                        filterType: 'path'
+                    },
+                    {
+                        id: 'opportunity-pages',
+                        title: this.transloco.translate('aiVisibility.tables.opportunityPages.title'),
+                        icon: 'pi-bolt',
+                        data: (correlation?.opportunity_pages ?? []).map((row) => ({ name: row.path, value: row.fetch_count })),
+                        isLoading: correlationLoading,
+                        linkMode: 'path',
+                        siteDomain: this.activeSite()?.domain ?? null,
+                        isRowClickable: true,
+                        activeValue: this.filterValue('path'),
+                        filterType: 'path'
+                    },
+                    {
+                        id: 'failure-hotspots',
+                        title: this.transloco.translate('aiVisibility.tables.failureHotspots.title'),
+                        icon: 'pi-exclamation-triangle',
+                        data: (correlation?.failure_hotspots ?? []).map((row) => ({ name: row.assistant_name, value: row.error_requests })),
+                        isLoading: correlationLoading,
+                        isRowClickable: true,
+                        activeValue: this.filterValue('assistantName'),
+                        filterType: 'assistantName'
+                    }
+                ]
             }
         ];
     });
@@ -233,6 +289,7 @@ export class AIVisibility {
         if (filters.assistantName) params.set('assistant_name', filters.assistantName);
         if (filters.assistantFamily) params.set('assistant_family', filters.assistantFamily);
         if (filters.resourceType) params.set('resource_type', filters.resourceType);
+        if (filters.path) params.set('path', filters.path);
         return `/api/sites/${site.id}/ai-fetch/export?${params.toString()}`;
     });
 
@@ -289,23 +346,9 @@ export class AIVisibility {
         }));
     }
 
-    protected formatPercent(value: number): string {
-        return `${value.toFixed(1)}%`;
-    }
-
-    protected metricBarWidth(value: number, max: number): number {
-        if (value <= 0 || max <= 0) return 0;
-        return Math.min(100, Math.max(12, (value / max) * 100));
-    }
-
-    protected errorRateSeverity(value: number): 'secondary' | 'warn' | 'danger' {
-        if (value <= 0) return 'secondary';
-        if (value < 5) return 'warn';
-        return 'danger';
-    }
-
-    protected tooltipText(value: string): string | undefined {
-        return value.length > 36 ? value : undefined;
+    protected onMetricCardClick(event: MetricCardGroupRowClick): void {
+        if (!this.isFilterKey(event.filterType)) return;
+        this.setFilter(event.filterType, this.filterValue(event.filterType) === event.metric.name ? null : event.metric.name);
     }
 
     protected formatBytes(value: number): string {
@@ -420,17 +463,16 @@ export class AIVisibility {
         return items.map((item) => ({ label: item.name, value: item.name }));
     }
 
-    private maxMetricValue(values: number[]): number {
-        if (values.length === 0) return 0;
-        return Math.max(...values, 0);
-    }
-
     private localeTag(): string {
         const locale = this.localeService.getLocale();
         if (typeof locale === 'string' && locale.trim()) {
             return locale;
         }
         return this.activeLanguage();
+    }
+
+    private isFilterKey(value: string): value is FilterKey {
+        return value === 'assistantName' || value === 'assistantFamily' || value === 'resourceType' || value === 'path';
     }
 
     private buildExportUrl(format: TakeoutExportFormat): string {

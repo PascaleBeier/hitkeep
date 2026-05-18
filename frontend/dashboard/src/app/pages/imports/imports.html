@@ -150,15 +150,46 @@
                     </div>
 
                     <div class="space-y-3">
-                        <h4 class="m-0 text-sm font-semibold">{{ "imports.datasets.title" | transloco }}</h4>
-                        <p-table [value]="manifestDatasets()" styleClass="p-datatable-sm imports-table" responsiveLayout="scroll">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <h4 class="m-0 text-sm font-semibold">{{ "imports.datasets.title" | transloco }}</h4>
+                            <p-iconfield class="w-full sm:w-64">
+                                <p-inputicon class="pi pi-search" />
+                                <input pInputText #importDatasetsSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="importDatasetsTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
+                            </p-iconfield>
+                        </div>
+                        <p-table
+                            #importDatasetsTable
+                            [value]="manifestDatasets()"
+                            [globalFilterFields]="['name', 'rows_accepted', 'pageviews', 'events']"
+                            [paginator]="true"
+                            [rows]="10"
+                            [rowsPerPageOptions]="[10, 25, 50]"
+                            [rowHover]="true"
+                            responsiveLayout="scroll"
+                            sortField="rows_accepted"
+                            [sortOrder]="-1"
+                            styleClass="p-datatable-sm imports-table"
+                            [tableStyle]="{ 'min-width': showDatasetEventsColumn() ? '680px' : '560px' }"
+                        >
                             <ng-template pTemplate="header">
                                 <tr>
-                                    <th>{{ "imports.datasets.dataset" | transloco }}</th>
-                                    <th>{{ "imports.datasets.rows" | transloco }}</th>
-                                    <th>{{ "imports.datasets.pageviews" | transloco }}</th>
+                                    <th pSortableColumn="name">
+                                        {{ "imports.datasets.dataset" | transloco }}
+                                        <p-sortIcon field="name" />
+                                    </th>
+                                    <th pSortableColumn="rows_accepted">
+                                        {{ "imports.datasets.rows" | transloco }}
+                                        <p-sortIcon field="rows_accepted" />
+                                    </th>
+                                    <th pSortableColumn="pageviews">
+                                        {{ "imports.datasets.pageviews" | transloco }}
+                                        <p-sortIcon field="pageviews" />
+                                    </th>
                                     @if (showDatasetEventsColumn()) {
-                                    <th>{{ "imports.datasets.events" | transloco }}</th>
+                                    <th pSortableColumn="events">
+                                        {{ "imports.datasets.events" | transloco }}
+                                        <p-sortIcon field="events" />
+                                    </th>
                                     }
                                 </tr>
                             </ng-template>
@@ -273,12 +304,40 @@
                 @if (history().length === 0) {
                 <p-message severity="secondary" styleClass="w-full">{{ "imports.history.empty" | transloco }}</p-message>
                 } @else {
-                <p-table [value]="history()" styleClass="p-datatable-sm imports-history-table" responsiveLayout="scroll">
+                <div class="flex justify-end">
+                    <p-iconfield class="w-full sm:w-64">
+                        <p-inputicon class="pi pi-search" />
+                        <input pInputText #importHistorySearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="importHistoryTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
+                    </p-iconfield>
+                </div>
+                <p-table
+                    #importHistoryTable
+                    [value]="history()"
+                    [globalFilterFields]="['provider', 'status', 'rows_imported', 'rows_scanned']"
+                    [paginator]="true"
+                    [rows]="10"
+                    [rowsPerPageOptions]="[10, 25, 50]"
+                    [rowHover]="true"
+                    responsiveLayout="scroll"
+                    sortField="created_at"
+                    [sortOrder]="-1"
+                    styleClass="p-datatable-sm imports-history-table"
+                    [tableStyle]="{ 'min-width': '620px' }"
+                >
                     <ng-template pTemplate="header">
                         <tr>
-                            <th>{{ "imports.history.importer" | transloco }}</th>
-                            <th>{{ "imports.history.status" | transloco }}</th>
-                            <th>{{ "imports.history.rows" | transloco }}</th>
+                            <th pSortableColumn="provider">
+                                {{ "imports.history.importer" | transloco }}
+                                <p-sortIcon field="provider" />
+                            </th>
+                            <th pSortableColumn="status">
+                                {{ "imports.history.status" | transloco }}
+                                <p-sortIcon field="status" />
+                            </th>
+                            <th pSortableColumn="rows_imported">
+                                {{ "imports.history.rows" | transloco }}
+                                <p-sortIcon field="rows_imported" />
+                            </th>
                             <th></th>
                         </tr>
                     </ng-template>

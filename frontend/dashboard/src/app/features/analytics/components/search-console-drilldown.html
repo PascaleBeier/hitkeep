@@ -52,12 +52,7 @@
     <p-message severity="info" styleClass="w-full" [text]="'searchConsole.states.empty' | transloco" />
     }
 
-    <div class="search-console-drilldown__content">
-        <app-metric-list [title]="'searchConsole.sections.topQueries' | transloco" icon="pi-search" [data]="queryMetrics()" [isLoading]="loading()" />
-        <app-metric-list [title]="'searchConsole.sections.topPages' | transloco" icon="pi-file" [data]="pageMetrics()" [isLoading]="loading()" linkMode="path" [siteDomain]="siteDomain()" />
-        <app-metric-list [title]="'searchConsole.sections.countries' | transloco" icon="pi-globe" [data]="countryMetrics()" [isLoading]="loading()" [showCountryFlags]="true" [showCountryNames]="true" />
-        <app-metric-list [title]="'searchConsole.sections.devices' | transloco" icon="pi-mobile" [data]="deviceMetrics()" [isLoading]="loading()" />
-    </div>
+    <app-metric-card-group class="search-console-drilldown__content" [tabs]="metricCardTabs()" />
     }
 </p-card>
 }
