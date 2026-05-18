@@ -12,6 +12,8 @@
         "build:prod": "ng build --configuration production && npm run transloco:optimize && npm run build:tracker && npm run sync:public",
         "watch": "ng build --watch --configuration development",
         "test": "ng test",
+        "test:ci": "ng test --watch=false --no-progress",
+        "i18n:check": "node scripts/check-i18n-locales.mjs",
         "e2e": "ng e2e",
         "test:e2e": "playwright test",
         "test:e2e:smoke": "playwright test e2e/deployment.smoke.spec.js --workers=1",
