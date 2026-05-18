@@ -601,11 +601,28 @@ func TestGeneratePersistsWebVitalsOpportunityFromStoredSamples(t *testing.T) {
 
 func seedOpportunityWebVitals(t *testing.T, ctx context.Context, store *database.Store, siteID uuid.UUID, from time.Time, samples int) {
 	t.Helper()
+	city := "Berlin"
+	provider := "Hetzner Online GmbH"
+	asnOrg := "Hetzner Online GmbH"
+	asn := 24940
 	for i := range samples {
+		sessionID := uuid.New()
+		pageID := uuid.New()
+		requireNoError(t, store.CreateHit(ctx, &api.Hit{
+			SiteID:    siteID,
+			SessionID: sessionID,
+			PageID:    pageID,
+			Timestamp: from.Add(time.Duration(i)*time.Hour + 30*time.Minute),
+			Path:      "/pricing",
+			City:      &city,
+			Provider:  &provider,
+			ASN:       &asn,
+			ASNOrg:    &asnOrg,
+		}), "create web vital hit context")
 		requireNoError(t, store.CreateWebVital(ctx, &api.WebVital{
 			SiteID:    siteID,
-			SessionID: uuid.New(),
-			PageID:    uuid.New(),
+			SessionID: sessionID,
+			PageID:    pageID,
 			Metric:    api.WebVitalLCP,
 			Value:     4200 + float64(i),
 			Path:      "/pricing",
@@ -630,6 +647,16 @@ func assertPoorLCPWebVitalsSignal(t *testing.T, snapshot *WebVitalsEvidenceSnaps
 	if pages[0].Path != "/pricing" {
 		t.Fatalf("expected pricing page breakdown, got %#v", pages[0])
 	}
+	dimensions := snapshot.Dimensions[api.WebVitalLCP]
+	if len(dimensions.TopCities) != 1 || dimensions.TopCities[0].Name != "Berlin" {
+		t.Fatalf("expected Berlin web vitals city evidence, got %#v", dimensions.TopCities)
+	}
+	if len(dimensions.TopProviders) != 1 || dimensions.TopProviders[0].Name != "Hetzner Online GmbH" {
+		t.Fatalf("expected Hetzner web vitals provider evidence, got %#v", dimensions.TopProviders)
+	}
+	if len(dimensions.TopASNs) != 1 || dimensions.TopASNs[0].Name != "AS24940 Hetzner Online GmbH" {
+		t.Fatalf("expected Hetzner web vitals ASN evidence, got %#v", dimensions.TopASNs)
+	}
 }
 
 func requireWebVitalsSummaryCount(t *testing.T, snapshot *WebVitalsEvidenceSnapshot, expected int) {
@@ -649,6 +676,14 @@ func assertPersistedWebVitalsOpportunity(t *testing.T, opportunity api.Opportuni
 	}
 	if opportunity.CopyParams["path"] != "/pricing" {
 		t.Fatalf("expected pricing copy param, got %#v", opportunity.CopyParams)
+	}
+	if opportunity.CopyParams["top_city"] != "Berlin" || opportunity.CopyParams["top_provider"] != "Hetzner Online GmbH" || opportunity.CopyParams["top_asn"] != "AS24940 Hetzner Online GmbH" {
+		t.Fatalf("expected web vitals geo/network copy params, got %#v", opportunity.CopyParams)
+	}
+	for _, evidenceID := range []string{"top_city", "top_provider", "top_asn"} {
+		if !containsString(opportunity.CitedEvidenceIDs, evidenceID) {
+			t.Fatalf("expected cited evidence %q, got %#v", evidenceID, opportunity.CitedEvidenceIDs)
+		}
 	}
 	if opportunity.ScoreBreakdown.EvidenceFit < 95 {
 		t.Fatalf("expected strong evidence fit, got %#v", opportunity.ScoreBreakdown)

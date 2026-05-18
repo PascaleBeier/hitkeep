@@ -121,23 +121,39 @@ func detectSetupFunnelSuggestionOpportunity(input DetectorInput, definition Oppo
 }
 
 func checkoutOpportunity(definition OpportunityDefinition, input DetectorInput, ecommerce *api.EcommerceSummary, score opportunityScoreBreakdown, generatedAt time.Time) database.OpportunityInput {
+	copyParams := map[string]any{
+		"checkout_starts": ecommerce.CheckoutStarts,
+		"orders":          ecommerce.Orders,
+		"conversion_rate": fmt.Sprintf("%.1f%%", ecommerce.CheckoutConversionRate),
+	}
+	evidence := []api.OpportunityEvidence{
+		{ID: "checkout_starts", LabelKey: "opportunities.evidence.checkout_starts", Value: fmt.Sprintf("%d", ecommerce.CheckoutStarts)},
+		{ID: "orders", LabelKey: "opportunities.evidence.orders", Value: fmt.Sprintf("%d", ecommerce.Orders)},
+		{ID: "conversion_rate", LabelKey: "opportunities.evidence.checkout_conversion_rate", Value: fmt.Sprintf("%.1f%%", ecommerce.CheckoutConversionRate)},
+	}
+	citedEvidenceIDs := []string{"checkout_starts", "orders", "conversion_rate"}
+	appendGeoEvidence := func(id, labelKey, value string) {
+		value = strings.TrimSpace(value)
+		if value == "" || value == "(Unknown)" {
+			return
+		}
+		copyParams[id] = value
+		evidence = append(evidence, api.OpportunityEvidence{ID: id, LabelKey: labelKey, Value: value})
+		citedEvidenceIDs = append(citedEvidenceIDs, id)
+	}
+	appendGeoEvidence("top_city", "opportunities.evidence.top_city", topMetricName(ecommerce.TopCities, ""))
+	appendGeoEvidence("top_provider", "opportunities.evidence.top_provider", topMetricName(ecommerce.TopProviders, ""))
+	appendGeoEvidence("top_asn", "opportunities.evidence.top_asn", topMetricName(ecommerce.TopASNs, ""))
+
 	return definition.BuildOpportunity(withGeneratedAt(input, generatedAt), OpportunityRecipe{
-		CopyParams: map[string]any{
-			"checkout_starts": ecommerce.CheckoutStarts,
-			"orders":          ecommerce.Orders,
-			"conversion_rate": fmt.Sprintf("%.1f%%", ecommerce.CheckoutConversionRate),
-		},
-		ImpactValue:    fmt.Sprintf("%d", ecommerce.CheckoutStarts),
-		Confidence:     score.Confidence,
-		Score:          score.Total,
-		ScoreBreakdown: opportunityScoreAPI(score),
-		RouteParams:    map[string]any{"path": "/checkout"},
-		Evidence: []api.OpportunityEvidence{
-			{ID: "checkout_starts", LabelKey: "opportunities.evidence.checkout_starts", Value: fmt.Sprintf("%d", ecommerce.CheckoutStarts)},
-			{ID: "orders", LabelKey: "opportunities.evidence.orders", Value: fmt.Sprintf("%d", ecommerce.Orders)},
-			{ID: "conversion_rate", LabelKey: "opportunities.evidence.checkout_conversion_rate", Value: fmt.Sprintf("%.1f%%", ecommerce.CheckoutConversionRate)},
-		},
-		CitedEvidenceIDs: []string{"checkout_starts", "orders", "conversion_rate"},
+		CopyParams:       copyParams,
+		ImpactValue:      fmt.Sprintf("%d", ecommerce.CheckoutStarts),
+		Confidence:       score.Confidence,
+		Score:            score.Total,
+		ScoreBreakdown:   opportunityScoreAPI(score),
+		RouteParams:      map[string]any{"path": "/checkout"},
+		Evidence:         evidence,
+		CitedEvidenceIDs: citedEvidenceIDs,
 	})
 }
 
@@ -184,6 +200,18 @@ func aiVisibilityOpportunity(definition OpportunityDefinition, input DetectorInp
 		evidence = append(evidence, api.OpportunityEvidence{ID: "ai_path_pageviews", LabelKey: "opportunities.evidence.ai_path_pageviews", Value: fmt.Sprintf("%d", support.TopPathPageviews)})
 		citedEvidenceIDs = append(citedEvidenceIDs, "ai_path_pageviews")
 	}
+	appendGeoEvidence := func(id, labelKey, value string) {
+		value = strings.TrimSpace(value)
+		if value == "" || value == "(Unknown)" {
+			return
+		}
+		copyParams[id] = value
+		evidence = append(evidence, api.OpportunityEvidence{ID: id, LabelKey: labelKey, Value: value})
+		citedEvidenceIDs = append(citedEvidenceIDs, id)
+	}
+	appendGeoEvidence("top_city", "opportunities.evidence.top_city", support.TopCity)
+	appendGeoEvidence("top_provider", "opportunities.evidence.top_provider", support.TopProvider)
+	appendGeoEvidence("top_asn", "opportunities.evidence.top_asn", support.TopASN)
 	return definition.BuildOpportunity(withGeneratedAt(input, generatedAt), OpportunityRecipe{
 		CopyParams:       copyParams,
 		ImpactValue:      fmt.Sprintf("+%d", maxInt64(1, aiVisibility.UniquePaths)),
@@ -199,6 +227,9 @@ func aiVisibilityOpportunity(definition OpportunityDefinition, input DetectorInp
 type aiVisibilityTrafficSupportEvidence struct {
 	AIReferrals      int
 	TopPathPageviews int
+	TopCity          string
+	TopProvider      string
+	TopASN           string
 }
 
 func aiVisibilityTrafficSupport(stats *api.SiteStats, path string) aiVisibilityTrafficSupportEvidence {
@@ -208,6 +239,9 @@ func aiVisibilityTrafficSupport(stats *api.SiteStats, path string) aiVisibilityT
 	return aiVisibilityTrafficSupportEvidence{
 		AIReferrals:      stats.AISourceVisits,
 		TopPathPageviews: metricValueForName(stats.TopPages, path),
+		TopCity:          topMetricName(stats.TopCities, ""),
+		TopProvider:      topMetricName(stats.TopProviders, ""),
+		TopASN:           topMetricName(stats.TopASNs, ""),
 	}
 }
 
@@ -226,6 +260,9 @@ type trafficSourceEvidence struct {
 	Hits           int
 	TotalPageviews int
 	Sessions       int
+	TopCity        string
+	TopProvider    string
+	TopASN         string
 }
 
 type webVitalsOpportunityEvidence struct {
@@ -239,6 +276,9 @@ type webVitalsOpportunityEvidence struct {
 	PageP75                 float64
 	PageRating              api.WebVitalRating
 	PageSamples             int64
+	TopCity                 string
+	TopProvider             string
+	TopASN                  string
 }
 
 func webVitalsOpportunityCandidate(snapshot *WebVitalsEvidenceSnapshot) (webVitalsOpportunityEvidence, bool) {
@@ -275,6 +315,7 @@ func topWebVitalsOpportunityCandidate(snapshot *WebVitalsEvidenceSnapshot) (webV
 		if !ok {
 			continue
 		}
+		candidate = withWebVitalsDimensionEvidence(candidate, snapshot.Dimensions[metric.Metric])
 		score := webVitalsMetricOpportunityScore(candidate)
 		if score <= bestScore {
 			continue
@@ -317,6 +358,24 @@ func withWebVitalsPageEvidence(candidate webVitalsOpportunityEvidence, pages []a
 	return candidate
 }
 
+func withWebVitalsDimensionEvidence(candidate webVitalsOpportunityEvidence, dimensions WebVitalsDimensionEvidence) webVitalsOpportunityEvidence {
+	candidate.TopCity = topWebVitalDimensionName(dimensions.TopCities)
+	candidate.TopProvider = topWebVitalDimensionName(dimensions.TopProviders)
+	candidate.TopASN = topWebVitalDimensionName(dimensions.TopASNs)
+	return candidate
+}
+
+func topWebVitalDimensionName(rows []api.WebVitalDimensionRow) string {
+	for _, row := range rows {
+		name := strings.TrimSpace(row.Name)
+		if name == "" || name == "(Unknown)" {
+			continue
+		}
+		return name
+	}
+	return ""
+}
+
 func webVitalsMetricOpportunityScore(candidate webVitalsOpportunityEvidence) int {
 	return webVitalRatingPriority(candidate.Rating)*1000 +
 		int(minInt64(candidate.Samples, 100)) +
@@ -341,33 +400,48 @@ func webVitalsOpportunity(definition OpportunityDefinition, input DetectorInput,
 	p75 := formatWebVitalValue(candidate.Metric, candidate.P75)
 	pageP75 := formatWebVitalValue(candidate.Metric, candidate.PageP75)
 	rating := formatWebVitalRating(candidate.Rating)
+	copyParams := map[string]any{
+		"metric":                    string(candidate.Metric),
+		"p75":                       p75,
+		"rating":                    rating,
+		"samples":                   candidate.Samples,
+		"poor_samples":              candidate.PoorSamples,
+		"needs_improvement_samples": candidate.NeedsImprovementSamples,
+		"path":                      candidate.Path,
+		"page_p75":                  pageP75,
+		"page_samples":              candidate.PageSamples,
+	}
+	evidence := []api.OpportunityEvidence{
+		{ID: "web_vital_metric", LabelKey: "opportunities.evidence.web_vital_metric", Value: string(candidate.Metric)},
+		{ID: "web_vital_p75", LabelKey: "opportunities.evidence.web_vital_p75", Value: p75},
+		{ID: "web_vital_rating", LabelKey: "opportunities.evidence.web_vital_rating", Value: rating},
+		{ID: "web_vital_samples", LabelKey: "opportunities.evidence.web_vital_samples", Value: fmt.Sprintf("%d", candidate.Samples)},
+		{ID: "web_vital_poor_samples", LabelKey: "opportunities.evidence.web_vital_poor_samples", Value: fmt.Sprintf("%d", candidate.PoorSamples)},
+		{ID: "web_vital_top_page", LabelKey: "opportunities.evidence.web_vital_top_page", Value: candidate.Path},
+		{ID: "web_vital_top_page_p75", LabelKey: "opportunities.evidence.web_vital_top_page_p75", Value: pageP75},
+	}
+	citedEvidenceIDs := []string{"web_vital_metric", "web_vital_p75", "web_vital_rating", "web_vital_samples", "web_vital_top_page", "web_vital_top_page_p75"}
+	appendGeoEvidence := func(id, labelKey, value string) {
+		value = strings.TrimSpace(value)
+		if value == "" || value == "(Unknown)" {
+			return
+		}
+		copyParams[id] = value
+		evidence = append(evidence, api.OpportunityEvidence{ID: id, LabelKey: labelKey, Value: value})
+		citedEvidenceIDs = append(citedEvidenceIDs, id)
+	}
+	appendGeoEvidence("top_city", "opportunities.evidence.top_city", candidate.TopCity)
+	appendGeoEvidence("top_provider", "opportunities.evidence.top_provider", candidate.TopProvider)
+	appendGeoEvidence("top_asn", "opportunities.evidence.top_asn", candidate.TopASN)
 	opportunity := definition.BuildOpportunity(withGeneratedAt(input, generatedAt), OpportunityRecipe{
-		CopyParams: map[string]any{
-			"metric":                    string(candidate.Metric),
-			"p75":                       p75,
-			"rating":                    rating,
-			"samples":                   candidate.Samples,
-			"poor_samples":              candidate.PoorSamples,
-			"needs_improvement_samples": candidate.NeedsImprovementSamples,
-			"path":                      candidate.Path,
-			"page_p75":                  pageP75,
-			"page_samples":              candidate.PageSamples,
-		},
-		ImpactValue:    fmt.Sprintf("%d", candidate.Samples),
-		Confidence:     score.Confidence,
-		Score:          score.Total,
-		ScoreBreakdown: opportunityScoreAPI(score),
-		RouteParams:    map[string]any{"metric": string(candidate.Metric), "path": candidate.Path},
-		Evidence: []api.OpportunityEvidence{
-			{ID: "web_vital_metric", LabelKey: "opportunities.evidence.web_vital_metric", Value: string(candidate.Metric)},
-			{ID: "web_vital_p75", LabelKey: "opportunities.evidence.web_vital_p75", Value: p75},
-			{ID: "web_vital_rating", LabelKey: "opportunities.evidence.web_vital_rating", Value: rating},
-			{ID: "web_vital_samples", LabelKey: "opportunities.evidence.web_vital_samples", Value: fmt.Sprintf("%d", candidate.Samples)},
-			{ID: "web_vital_poor_samples", LabelKey: "opportunities.evidence.web_vital_poor_samples", Value: fmt.Sprintf("%d", candidate.PoorSamples)},
-			{ID: "web_vital_top_page", LabelKey: "opportunities.evidence.web_vital_top_page", Value: candidate.Path},
-			{ID: "web_vital_top_page_p75", LabelKey: "opportunities.evidence.web_vital_top_page_p75", Value: pageP75},
-		},
-		CitedEvidenceIDs: []string{"web_vital_metric", "web_vital_p75", "web_vital_rating", "web_vital_samples", "web_vital_top_page", "web_vital_top_page_p75"},
+		CopyParams:       copyParams,
+		ImpactValue:      fmt.Sprintf("%d", candidate.Samples),
+		Confidence:       score.Confidence,
+		Score:            score.Total,
+		ScoreBreakdown:   opportunityScoreAPI(score),
+		RouteParams:      map[string]any{"metric": string(candidate.Metric), "path": candidate.Path},
+		Evidence:         evidence,
+		CitedEvidenceIDs: citedEvidenceIDs,
 	})
 	opportunity.ID = stableOpportunityID(input.SiteID, definition.Key+":"+strings.ToLower(string(candidate.Metric)))
 	return opportunity
@@ -394,24 +468,39 @@ func formatWebVitalRating(rating api.WebVitalRating) string {
 }
 
 func trafficQualityOpportunity(definition OpportunityDefinition, input DetectorInput, source trafficSourceEvidence, generatedAt time.Time) database.OpportunityInput {
+	copyParams := map[string]any{
+		"source":          source.Name,
+		"source_hits":     source.Hits,
+		"total_pageviews": source.TotalPageviews,
+		"sessions":        source.Sessions,
+	}
+	evidence := []api.OpportunityEvidence{
+		{ID: "top_source", LabelKey: "opportunities.evidence.top_source", Value: source.Name},
+		{ID: "source_hits", LabelKey: "opportunities.evidence.source_hits", Value: fmt.Sprintf("%d", source.Hits)},
+		{ID: "total_pageviews", LabelKey: "opportunities.evidence.total_pageviews", Value: fmt.Sprintf("%d", source.TotalPageviews)},
+		{ID: "sessions", LabelKey: "opportunities.evidence.sessions", Value: fmt.Sprintf("%d", source.Sessions)},
+	}
+	citedEvidenceIDs := []string{"top_source", "source_hits", "total_pageviews", "sessions"}
+	appendGeoEvidence := func(id, labelKey, value string) {
+		value = strings.TrimSpace(value)
+		if value == "" || value == "(Unknown)" {
+			return
+		}
+		copyParams[id] = value
+		evidence = append(evidence, api.OpportunityEvidence{ID: id, LabelKey: labelKey, Value: value})
+		citedEvidenceIDs = append(citedEvidenceIDs, id)
+	}
+	appendGeoEvidence("top_city", "opportunities.evidence.top_city", source.TopCity)
+	appendGeoEvidence("top_provider", "opportunities.evidence.top_provider", source.TopProvider)
+	appendGeoEvidence("top_asn", "opportunities.evidence.top_asn", source.TopASN)
 	return definition.BuildOpportunity(withGeneratedAt(input, generatedAt), OpportunityRecipe{
-		CopyParams: map[string]any{
-			"source":          source.Name,
-			"source_hits":     source.Hits,
-			"total_pageviews": source.TotalPageviews,
-			"sessions":        source.Sessions,
-		},
-		ImpactValue: fmt.Sprintf("%d", source.Hits),
-		Confidence:  confidence(source.Hits >= 200),
-		Score:       clampScore(55 + source.Hits/4),
-		RouteParams: map[string]any{"source": source.Name},
-		Evidence: []api.OpportunityEvidence{
-			{ID: "top_source", LabelKey: "opportunities.evidence.top_source", Value: source.Name},
-			{ID: "source_hits", LabelKey: "opportunities.evidence.source_hits", Value: fmt.Sprintf("%d", source.Hits)},
-			{ID: "total_pageviews", LabelKey: "opportunities.evidence.total_pageviews", Value: fmt.Sprintf("%d", source.TotalPageviews)},
-			{ID: "sessions", LabelKey: "opportunities.evidence.sessions", Value: fmt.Sprintf("%d", source.Sessions)},
-		},
-		CitedEvidenceIDs: []string{"top_source", "source_hits", "total_pageviews", "sessions"},
+		CopyParams:       copyParams,
+		ImpactValue:      fmt.Sprintf("%d", source.Hits),
+		Confidence:       confidence(source.Hits >= 200),
+		Score:            clampScore(55 + source.Hits/4),
+		RouteParams:      map[string]any{"source": source.Name},
+		Evidence:         evidence,
+		CitedEvidenceIDs: citedEvidenceIDs,
 	})
 }
 
@@ -431,6 +520,12 @@ func trafficOpportunitySource(stats *api.SiteStats) (trafficSourceEvidence, bool
 	}
 	source.TotalPageviews = stats.TotalPageviews
 	source.Sessions = stats.UniqueSessions
+	// These audience dimensions come from the site-wide stats snapshot, not
+	// from a source-filtered query. The evidence labels call this out as
+	// overall audience context.
+	source.TopCity = topMetricName(stats.TopCities, "")
+	source.TopProvider = topMetricName(stats.TopProviders, "")
+	source.TopASN = topMetricName(stats.TopASNs, "")
 	return source, true
 }
 
