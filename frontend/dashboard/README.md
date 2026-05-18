@@ -51,8 +51,10 @@ The Scalar API Reference runtime (`vendor/scalar/standalone.js`) is copied into 
 To execute unit tests, use:
 
 ```bash
-ng test
+npm run test:ci
 ```
+
+This runs Angular's Vitest-backed unit tests in non-watch headless mode. For a focused spec, use `npm run test -- --watch=false --no-progress --include <spec>`. Avoid bare `ng test` unless you intentionally want watch-mode debugging.
 
 ## Running end-to-end tests
 
