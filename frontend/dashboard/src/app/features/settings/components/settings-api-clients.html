@@ -171,8 +171,13 @@
                     [globalFilterFields]="['name', 'description', 'instance_role', 'created_at', 'last_used_at', 'expires_at']"
                     [sortField]="'created_at'"
                     [sortOrder]="-1"
+                    [paginator]="true"
+                    [rows]="10"
+                    [rowsPerPageOptions]="[10, 25, 50]"
                     [rowHover]="true"
+                    responsiveLayout="scroll"
                     styleClass="hk-crud-table p-datatable-sm"
+                    [tableStyle]="{ 'min-width': '1040px' }"
                 >
                     <ng-template pTemplate="caption">
                         <div class="api-client-table-caption">
