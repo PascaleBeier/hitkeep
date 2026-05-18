@@ -33,6 +33,11 @@ var hitAppenderColumns = []string{
 	"language",
 	"is_unique",
 	"country_code",
+	"region",
+	"city",
+	"provider",
+	"asn",
+	"asn_org",
 	"utm_source",
 	"utm_medium",
 	"utm_campaign",
@@ -116,6 +121,11 @@ func (s *Store) createHitsBulk(ctx context.Context, hits []*api.Hit, skipDirtyBu
 				nullableStringPtr(hit.Language),
 				nullableBoolPtr(hit.IsUnique),
 				nullableStringPtr(hit.CountryCode),
+				nullableStringPtr(hit.Region),
+				nullableStringPtr(hit.City),
+				nullableStringPtr(hit.Provider),
+				nullableIntPtr(hit.ASN),
+				nullableStringPtr(hit.ASNOrg),
 				nullableStringPtr(hit.UTMSource),
 				nullableStringPtr(hit.UTMMedium),
 				nullableStringPtr(hit.UTMCampaign),
@@ -198,6 +208,7 @@ func (s *Store) GetHits(ctx context.Context, params api.HitQueryParams) (*api.Pa
 		SELECT
             h.id, h.site_id, h.session_id, h.page_id, h.timestamp, h.path, h.hostname, h.referrer, h.user_agent,
             h.viewport_width, h.viewport_height, h.screen_width, h.screen_height, h.language, h.country_code,
+            h.region, h.city, h.provider, h.asn, h.asn_org,
             h.utm_source, h.utm_medium, h.utm_campaign, h.utm_term, h.utm_content, h.is_unique
 	` + baseQuery // whitelisted
 
@@ -213,7 +224,7 @@ func (s *Store) GetHits(ctx context.Context, params api.HitQueryParams) (*api.Pa
 		if err := rows.Scan(
 			&hit.ID, &hit.SiteID, &hit.SessionID, &hit.PageID, &hit.Timestamp, &hit.Path, &hit.Hostname, &hit.Referrer,
 			&hit.UserAgent, &hit.ViewportWidth, &hit.ViewportHeight, &hit.ScreenWidth,
-			&hit.ScreenHeight, &hit.Language, &hit.CountryCode, &hit.UTMSource, &hit.UTMMedium, &hit.UTMCampaign, &hit.UTMTerm, &hit.UTMContent, &hit.IsUnique,
+			&hit.ScreenHeight, &hit.Language, &hit.CountryCode, &hit.Region, &hit.City, &hit.Provider, &hit.ASN, &hit.ASNOrg, &hit.UTMSource, &hit.UTMMedium, &hit.UTMCampaign, &hit.UTMTerm, &hit.UTMContent, &hit.IsUnique,
 		); err != nil {
 			return nil, err
 		}
@@ -255,6 +266,11 @@ func (s *Store) ExportHitsCSV(ctx context.Context, params api.HitQueryParams, w 
 		"screen_height",
 		"language",
 		"country_code",
+		"region",
+		"city",
+		"provider",
+		"asn",
+		"asn_org",
 		"utm_source",
 		"utm_medium",
 		"utm_campaign",
@@ -271,10 +287,12 @@ func (s *Store) ExportHitsCSV(ctx context.Context, params api.HitQueryParams, w 
 			timestamp                                            time.Time
 			path                                                 string
 			hostname, referrer, userAgent, language, countryCode sql.NullString
+			region, city, provider, asnOrg                       sql.NullString
 			utmSource, utmMedium, utmCampaign                    sql.NullString
 			utmTerm, utmContent                                  sql.NullString
 			viewportWidth, viewportHeight                        sql.NullInt32
 			screenWidth, screenHeight                            sql.NullInt32
+			asn                                                  sql.NullInt32
 			isUnique                                             sql.NullBool
 		)
 		if err := rows.Scan(
@@ -293,6 +311,11 @@ func (s *Store) ExportHitsCSV(ctx context.Context, params api.HitQueryParams, w 
 			&screenHeight,
 			&language,
 			&countryCode,
+			&region,
+			&city,
+			&provider,
+			&asn,
+			&asnOrg,
 			&utmSource,
 			&utmMedium,
 			&utmCampaign,
@@ -319,6 +342,11 @@ func (s *Store) ExportHitsCSV(ctx context.Context, params api.HitQueryParams, w 
 			nullInt32(screenHeight),
 			nullString(language),
 			nullString(countryCode),
+			nullString(region),
+			nullString(city),
+			nullString(provider),
+			nullInt32(asn),
+			nullString(asnOrg),
 			nullString(utmSource),
 			nullString(utmMedium),
 			nullString(utmCampaign),
@@ -413,6 +441,7 @@ func buildHitExportQuery(params api.HitQueryParams) (string, []any) {
 		SELECT
             h.id, h.site_id, h.session_id, h.page_id, h.timestamp, h.path, h.hostname, h.referrer, h.user_agent,
             h.viewport_width, h.viewport_height, h.screen_width, h.screen_height, h.language, h.country_code,
+            h.region, h.city, h.provider, h.asn, h.asn_org,
             h.utm_source, h.utm_medium, h.utm_campaign, h.utm_term, h.utm_content, h.is_unique
 	` + baseQuery
 

@@ -680,6 +680,52 @@ func TestHandleServerPageviewIngestDNTDropsWithoutStoring(t *testing.T) {
 	}
 }
 
+func TestHandleServerPageviewIngestPublishesGeoNetworkMetadata(t *testing.T) {
+	producer := &capturingProducer{}
+	_, ctx, _, _, token := setupServerIngestTestEnv(t, auth.SiteOwner, func(ctx *shared.Context) {
+		ctx.Producer = producer
+	})
+
+	mux := http.NewServeMux()
+	Register(mux, ctx)
+
+	body := map[string]any{
+		"url":        "https://www.example.com/geo",
+		"timestamp":  "2026-04-03T12:30:45Z",
+		"visitor_ip": "8.8.8.8",
+		"user_agent": "Mozilla/5.0 server-side replay",
+	}
+	payload, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/ingest/server/pageview", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", token)
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected %d, got %d body=%s", http.StatusAccepted, rec.Code, rec.Body.String())
+	}
+
+	msg := producer.onlyMessage(t, "hits")
+	var got api.Hit
+	if err := json.Unmarshal(msg, &got); err != nil {
+		t.Fatalf("unmarshal published hit: %v", err)
+	}
+	if got.City == nil || *got.City != "Mountain View" {
+		t.Fatalf("expected city Mountain View, got %+v", got.City)
+	}
+	if got.Provider == nil || *got.Provider != "Google LLC" {
+		t.Fatalf("expected provider Google LLC, got %+v", got.Provider)
+	}
+	if got.ASN == nil || *got.ASN != 15169 {
+		t.Fatalf("expected ASN 15169, got %+v", got.ASN)
+	}
+	if got.ASNOrg == nil || *got.ASNOrg != "Google LLC" {
+		t.Fatalf("expected ASN org Google LLC, got %+v", got.ASNOrg)
+	}
+}
+
 func TestHandleServerPageviewIngestGeneratesIDsAndDoesNotExposeIsUnique(t *testing.T) {
 	producer := &capturingProducer{}
 	_, ctx, _, _, token := setupServerIngestTestEnv(t, auth.SiteOwner, func(ctx *shared.Context) {

@@ -19,6 +19,7 @@ import (
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
+	"hitkeep/internal/ipmeta"
 	"hitkeep/internal/server/shared"
 )
 
@@ -166,11 +167,7 @@ func (h *handler) handleServerPageviewIngestLeader() http.HandlerFunc {
 			pageID = uuid.New()
 		}
 
-		countryCode := countryCodeFromVisitorIP(ingestCtx.visitorIP, h.ctx.Config.GetTrustedProxyNetworks())
-		var countryCodePtr *string
-		if countryCode != "" {
-			countryCodePtr = &countryCode
-		}
+		countryCodePtr, metadata := geoNetworkFromVisitorIP(ingestCtx.visitorIP, h.ctx.Config.GetTrustedProxyNetworks())
 
 		userAgent := ingestCtx.userAgent
 		hit := api.Hit{
@@ -188,6 +185,11 @@ func (h *handler) handleServerPageviewIngestLeader() http.HandlerFunc {
 			ScreenHeight:   payload.SCHeight,
 			Language:       payload.Language,
 			CountryCode:    countryCodePtr,
+			Region:         stringPtrIfNotEmpty(metadata.Region),
+			City:           stringPtrIfNotEmpty(metadata.City),
+			Provider:       stringPtrIfNotEmpty(metadata.Provider),
+			ASN:            intPtrIfPositive(metadata.ASN),
+			ASNOrg:         stringPtrIfNotEmpty(metadata.ASNOrg),
 			UTMSource:      queryValuePtr(ingestCtx.utm, "utm_source"),
 			UTMMedium:      queryValuePtr(ingestCtx.utm, "utm_medium"),
 			UTMCampaign:    queryValuePtr(ingestCtx.utm, "utm_campaign"),
@@ -425,6 +427,38 @@ func countryCodeFromVisitorIP(visitorIP string, trustedProxyNets []netip.Prefix)
 	return shared.CountryCodeFromRequest(req, trustedProxyNets)
 }
 
+func geoNetworkFromVisitorIP(visitorIP string, trustedProxyNets []netip.Prefix) (*string, ipmeta.Metadata) {
+	metadata := metadataFromVisitorIP(visitorIP)
+	countryCode := countryCodeFromVisitorIP(visitorIP, trustedProxyNets)
+	if countryCode == "" {
+		countryCode = metadata.CountryCode
+	}
+	return stringPtrIfNotEmpty(countryCode), metadata
+}
+
+func metadataFromVisitorIP(visitorIP string) ipmeta.Metadata {
+	addr, ok := shared.ParseAddr(visitorIP)
+	if !ok {
+		return ipmeta.Metadata{}
+	}
+	return ipmeta.Lookup(addr)
+}
+
+func stringPtrIfNotEmpty(value string) *string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
+func intPtrIfPositive(value int) *int {
+	if value <= 0 {
+		return nil
+	}
+	return &value
+}
+
 func (h *handler) handleIngestLeader(w http.ResponseWriter, r *http.Request) {
 	origin := r.Header.Get("Origin")
 	if origin == "" {
@@ -480,11 +514,11 @@ func (h *handler) handleIngestLeader(w http.ResponseWriter, r *http.Request) {
 
 	extractor := NewCountryCodeExtractor(h.ctx.Config.GetTrustedProxyNetworks())
 	countryCode := extractor.ExtractFromRequest(r, payload.Language)
-
-	var countryCodePtr *string
-	if countryCode != "" {
-		countryCodePtr = &countryCode
+	metadata := metadataFromVisitorIP(userIP)
+	if countryCode == "" {
+		countryCode = metadata.CountryCode
 	}
+	countryCodePtr := stringPtrIfNotEmpty(countryCode)
 
 	hit := api.Hit{
 		SiteID:         site.ID,
@@ -501,6 +535,11 @@ func (h *handler) handleIngestLeader(w http.ResponseWriter, r *http.Request) {
 		ScreenHeight:   payload.SCHeight,
 		Language:       payload.Language,
 		CountryCode:    countryCodePtr,
+		Region:         stringPtrIfNotEmpty(metadata.Region),
+		City:           stringPtrIfNotEmpty(metadata.City),
+		Provider:       stringPtrIfNotEmpty(metadata.Provider),
+		ASN:            intPtrIfPositive(metadata.ASN),
+		ASNOrg:         stringPtrIfNotEmpty(metadata.ASNOrg),
 		UTMSource:      payload.UTMSource,
 		UTMMedium:      payload.UTMMedium,
 		UTMCampaign:    payload.UTMCamp,

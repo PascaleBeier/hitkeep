@@ -62,6 +62,11 @@ type Hit struct {
 	ScreenHeight   *int      `json:"screen_height"`
 	Language       *string   `json:"language"`
 	CountryCode    *string   `json:"country_code"`
+	Region         *string   `json:"region"`
+	City           *string   `json:"city"`
+	Provider       *string   `json:"provider"`
+	ASN            *int      `json:"asn"`
+	ASNOrg         *string   `json:"asn_org"`
 	UTMSource      *string   `json:"utm_source"`
 	UTMMedium      *string   `json:"utm_medium"`
 	UTMCampaign    *string   `json:"utm_campaign"`
@@ -269,6 +274,9 @@ const (
 	WebVitalDimensionLanguage WebVitalDimension = "language"
 	WebVitalDimensionBrowser  WebVitalDimension = "browser"
 	WebVitalDimensionDevice   WebVitalDimension = "device"
+	WebVitalDimensionCity     WebVitalDimension = "city"
+	WebVitalDimensionProvider WebVitalDimension = "provider"
+	WebVitalDimensionASN      WebVitalDimension = "asn"
 )
 
 type WebVitalSummaryMetric struct {
@@ -577,6 +585,9 @@ type SiteStats struct {
 	TopReferrers       []MetricStat            `json:"top_referrers"`
 	TopDevices         []MetricStat            `json:"top_devices"`
 	TopCountries       []MetricStat            `json:"top_countries"`
+	TopCities          []MetricStat            `json:"top_cities"`
+	TopProviders       []MetricStat            `json:"top_providers"`
+	TopASNs            []MetricStat            `json:"top_asns"`
 	TopBrowsers        []MetricStat            `json:"top_browsers"`
 	TopAIBots          []MetricStat            `json:"top_ai_bots"`
 	TopAISources       []MetricStat            `json:"top_ai_sources"`
@@ -594,6 +605,7 @@ type SiteStats struct {
 	UTMSourceHits      int                     `json:"utm_source_hits"`
 	UTMTermHits        int                     `json:"utm_term_hits"`
 	Goals              []GoalStats             `json:"goals"`
+	Funnels            []Funnel                `json:"funnels"`
 	Comparison         *ComparisonStats        `json:"comparison,omitempty"`
 	ImportedExcluded   []ImportExclusionReason `json:"imported_excluded,omitempty"`
 }
@@ -642,6 +654,7 @@ type ChatbotExportParams struct {
 	End        time.Time
 	ScopeKey   string // optional: "provider" | "bot_id" | "surface" | "model"
 	ScopeValue string // optional — requires ScopeKey
+	Filters    []Filter
 }
 
 type EventAudience struct {
@@ -649,6 +662,9 @@ type EventAudience struct {
 	TopReferrers     []MetricStat            `json:"top_referrers"`
 	TopDevices       []MetricStat            `json:"top_devices"`
 	TopCountries     []MetricStat            `json:"top_countries"`
+	TopCities        []MetricStat            `json:"top_cities"`
+	TopProviders     []MetricStat            `json:"top_providers"`
+	TopASNs          []MetricStat            `json:"top_asns"`
 	ImportedExcluded []ImportExclusionReason `json:"imported_excluded,omitempty"`
 }
 
@@ -873,6 +889,7 @@ type AIFetchQueryParams struct {
 	AssistantName   string
 	AssistantFamily string
 	ResourceType    string
+	Path            string
 }
 
 type AIFetchCorrelationParams struct {
@@ -882,6 +899,7 @@ type AIFetchCorrelationParams struct {
 	AssistantName   string
 	AssistantFamily string
 	ResourceType    string
+	Path            string
 	WindowDays      int
 }
 
@@ -955,12 +973,15 @@ type EcommerceParams struct {
 }
 
 type EcommerceSummary struct {
-	Revenue                float64 `json:"revenue"`
-	Orders                 int     `json:"orders"`
-	AverageOrderValue      float64 `json:"average_order_value"`
-	CheckoutStarts         int     `json:"checkout_starts"`
-	CheckoutConversionRate float64 `json:"checkout_conversion_rate"`
-	Currency               string  `json:"currency"`
+	Revenue                float64      `json:"revenue"`
+	Orders                 int          `json:"orders"`
+	AverageOrderValue      float64      `json:"average_order_value"`
+	CheckoutStarts         int          `json:"checkout_starts"`
+	CheckoutConversionRate float64      `json:"checkout_conversion_rate"`
+	Currency               string       `json:"currency"`
+	TopCities              []MetricStat `json:"top_cities"`
+	TopProviders           []MetricStat `json:"top_providers"`
+	TopASNs                []MetricStat `json:"top_asns"`
 }
 
 type EcommerceSeriesPoint struct {
