@@ -74,6 +74,29 @@ func TestHandleExportShareHitsSupportsAllFormats(t *testing.T) {
 	}
 }
 
+func TestHandleGetShareSiteStatsIncludesGeoNetworkAggregates(t *testing.T) {
+	h, store, token, siteID := setupShareExportTestEnv(t)
+	t.Cleanup(func() { _ = store.Close() })
+
+	req := httptest.NewRequest(http.MethodGet, "/api/share/"+token+"/sites/"+siteID.String()+"/stats", nil)
+	req.SetPathValue("token", token)
+	req.SetPathValue("id", siteID.String())
+
+	w := httptest.NewRecorder()
+	h.handleGetShareSiteStats().ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var stats api.SiteStats
+	if err := json.NewDecoder(w.Body).Decode(&stats); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	assertMetricStat(t, "shared stats city", stats.TopCities, "Mountain View", 1)
+	assertMetricStat(t, "shared stats provider", stats.TopProviders, "Google LLC", 1)
+	assertMetricStat(t, "shared stats ASN", stats.TopASNs, "AS15169 Google LLC", 1)
+}
+
 func TestShareOpportunitiesListIsScopedToShareTokenSite(t *testing.T) {
 	ctx := context.Background()
 	store := database.NewStore(":memory:")
@@ -606,6 +629,10 @@ func setupShareEcommerceTestEnv(t *testing.T) (*handler, *database.Store, string
 	sessionID := uuid.New()
 	now := time.Now().UTC()
 	isUnique := true
+	city := "Mountain View"
+	provider := "Google LLC"
+	asn := 15169
+	asnOrg := "Google LLC"
 
 	if err := store.CreateHit(ctx, &api.Hit{
 		SiteID:      site.ID,
@@ -614,6 +641,10 @@ func setupShareEcommerceTestEnv(t *testing.T) (*handler, *database.Store, string
 		Timestamp:   now,
 		Path:        "/checkout",
 		CountryCode: new("US"),
+		City:        &city,
+		Provider:    &provider,
+		ASN:         &asn,
+		ASNOrg:      &asnOrg,
 		UTMSource:   new("google"),
 		UTMMedium:   new("cpc"),
 		IsUnique:    &isUnique,
@@ -705,7 +736,22 @@ func TestHandleGetShareEcommerceSummary(t *testing.T) {
 			if summary.Revenue != 79 {
 				t.Fatalf("expected revenue 79, got %f", summary.Revenue)
 			}
+			assertSharedEcommerceAudienceMetadata(t, summary)
 		})
+	}
+}
+
+func assertSharedEcommerceAudienceMetadata(t *testing.T, summary api.EcommerceSummary) {
+	t.Helper()
+	assertMetricStat(t, "shared ecommerce city", summary.TopCities, "Mountain View", 1)
+	assertMetricStat(t, "shared ecommerce provider", summary.TopProviders, "Google LLC", 1)
+	assertMetricStat(t, "shared ecommerce ASN", summary.TopASNs, "AS15169 Google LLC", 1)
+}
+
+func assertMetricStat(t *testing.T, label string, stats []api.MetricStat, name string, value int) {
+	t.Helper()
+	if len(stats) != 1 || stats[0].Name != name || stats[0].Value != value {
+		t.Fatalf("expected %s aggregate %q=%d, got %+v", label, name, value, stats)
 	}
 }
 
@@ -953,12 +999,20 @@ func setupShareExportTestEnv(t *testing.T) (*handler, *database.Store, string, u
 
 	now := time.Now().UTC()
 	isUnique := true
+	city := "Mountain View"
+	provider := "Google LLC"
+	asn := 15169
+	asnOrg := "Google LLC"
 	if err := store.CreateHit(ctx, &api.Hit{
 		SiteID:      site.ID,
 		SessionID:   uuid.New(),
 		PageID:      uuid.New(),
 		Timestamp:   now,
 		Path:        "/share-export",
+		City:        &city,
+		Provider:    &provider,
+		ASN:         &asn,
+		ASNOrg:      &asnOrg,
 		UTMSource:   new("newsletter"),
 		UTMMedium:   new("email"),
 		UTMCampaign: new("launch"),

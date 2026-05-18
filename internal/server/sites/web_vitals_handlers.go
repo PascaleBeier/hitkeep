@@ -116,7 +116,7 @@ func (h *handler) handleGetSiteWebVitalsBreakdown() http.HandlerFunc {
 		}
 		dimension := api.WebVitalDimension(strings.TrimSpace(r.URL.Query().Get("dimension")))
 		switch dimension {
-		case api.WebVitalDimensionCountry, api.WebVitalDimensionLanguage, api.WebVitalDimensionBrowser, api.WebVitalDimensionDevice:
+		case api.WebVitalDimensionCountry, api.WebVitalDimensionLanguage, api.WebVitalDimensionBrowser, api.WebVitalDimensionDevice, api.WebVitalDimensionCity, api.WebVitalDimensionProvider, api.WebVitalDimensionASN:
 		default:
 			http.Error(w, "Invalid dimension", http.StatusBadRequest)
 			return

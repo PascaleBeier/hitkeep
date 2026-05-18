@@ -10,13 +10,16 @@ import (
 	"hitkeep/internal/api"
 )
 
-var importedEventAudienceDimensions = []string{"path", "referrer", "device", "country"}
+var importedEventAudienceDimensions = []string{"path", "referrer", "device", "country", "city", "provider", "asn"}
 
 var importedEventAudienceDimensionLabels = map[string]string{
 	"path":     "page",
 	"referrer": "referrer",
 	"device":   "device",
 	"country":  "country",
+	"city":     "city",
+	"provider": "provider",
+	"asn":      "ASN",
 }
 
 func (s *Store) GetEventNames(ctx context.Context, params api.EventNamesParams) ([]string, error) {
@@ -219,6 +222,9 @@ func (s *Store) GetEventAudience(ctx context.Context, params api.EventAudiencePa
 		TopReferrers: []api.MetricStat{},
 		TopDevices:   []api.MetricStat{},
 		TopCountries: []api.MetricStat{},
+		TopCities:    []api.MetricStat{},
+		TopProviders: []api.MetricStat{},
+		TopASNs:      []api.MetricStat{},
 	}
 
 	eventArgs := []any{params.SiteID, params.Start, params.End, params.EventName}
@@ -244,6 +250,9 @@ func (s *Store) GetEventAudience(ctx context.Context, params api.EventAudiencePa
 				hk_referrer(h.referrer)     AS referrer,
 				hk_device(h.viewport_width) AS device,
 				hk_country(h.country_code)  AS country,
+				COALESCE(NULLIF(TRIM(h.city), ''), '(Unknown)') AS city,
+				COALESCE(NULLIF(TRIM(h.provider), ''), '(Unknown)') AS provider,
+				hk_asn(h.asn, h.asn_org) AS asn,
 				h.session_id                AS session_id
 			FROM hits h
 			INNER JOIN event_sessions es ON h.session_id = es.session_id
@@ -256,11 +265,14 @@ func (s *Store) GetEventAudience(ctx context.Context, params api.EventAudiencePa
 					WHEN GROUPING(referrer) = 0 THEN 'referrer'
 					WHEN GROUPING(device)   = 0 THEN 'device'
 					WHEN GROUPING(country)  = 0 THEN 'country'
+					WHEN GROUPING(city)     = 0 THEN 'city'
+					WHEN GROUPING(provider) = 0 THEN 'provider'
+					WHEN GROUPING(asn)      = 0 THEN 'asn'
 				END AS dim,
-				COALESCE(path, referrer, device, country) AS name,
+				COALESCE(path, referrer, device, country, city, provider, asn) AS name,
 				COUNT(DISTINCT session_id) AS val
 			FROM base
-			GROUP BY GROUPING SETS ((path),(referrer),(device),(country))
+			GROUP BY GROUPING SETS ((path),(referrer),(device),(country),(city),(provider),(asn))
 		),
 		ranked AS (
 			SELECT dim, name, val,
@@ -284,38 +296,67 @@ func (s *Store) GetEventAudience(ctx context.Context, params api.EventAudiencePa
 		if err := rows.Scan(&dim, &m.Name, &m.Value); err != nil {
 			return nil, err
 		}
-		switch dim {
-		case "path":
-			result.TopPages = append(result.TopPages, m)
-		case "referrer":
-			result.TopReferrers = append(result.TopReferrers, m)
-		case "device":
-			result.TopDevices = append(result.TopDevices, m)
-		case "country":
-			result.TopCountries = append(result.TopCountries, m)
-		}
+		appendEventAudienceMetric(result, dim, m)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
-	if len(params.Filters) == 0 && params.DimensionKey == "" && params.DimensionValue == "" && params.PropertyKey == "" && params.PropertyValue == "" {
-		importedDimensions, err := s.getImportedEventAudienceDimensions(ctx, params)
-		if err != nil {
-			return nil, err
-		}
-		result.TopPages = mergeMetricList(result.TopPages, importedDimensions["path"], 10)
-		result.TopReferrers = mergeMetricList(result.TopReferrers, importedDimensions["referrer"], 10)
-		result.TopDevices = mergeMetricList(result.TopDevices, importedDimensions["device"], 10)
-		result.TopCountries = mergeMetricList(result.TopCountries, importedDimensions["country"], 10)
-		if err := s.addImportedEventDimensionLimitation(ctx, params, result); err != nil {
-			return nil, err
-		}
-	} else if err := s.addImportedEventAudienceExclusion(ctx, params, result); err != nil {
+	if err := s.mergeImportedEventAudience(ctx, params, result); err != nil {
 		return nil, err
 	}
 
 	return result, nil
+}
+
+func appendEventAudienceMetric(result *api.EventAudience, dim string, metric api.MetricStat) {
+	appendMetric, ok := eventAudienceMetricAppenders[dim]
+	if ok {
+		appendMetric(result, metric)
+	}
+}
+
+var eventAudienceMetricAppenders = map[string]func(*api.EventAudience, api.MetricStat){
+	"path": func(result *api.EventAudience, metric api.MetricStat) {
+		result.TopPages = append(result.TopPages, metric)
+	},
+	"referrer": func(result *api.EventAudience, metric api.MetricStat) {
+		result.TopReferrers = append(result.TopReferrers, metric)
+	},
+	"device": func(result *api.EventAudience, metric api.MetricStat) {
+		result.TopDevices = append(result.TopDevices, metric)
+	},
+	"country": func(result *api.EventAudience, metric api.MetricStat) {
+		result.TopCountries = append(result.TopCountries, metric)
+	},
+	"city": func(result *api.EventAudience, metric api.MetricStat) {
+		result.TopCities = append(result.TopCities, metric)
+	},
+	"provider": func(result *api.EventAudience, metric api.MetricStat) {
+		result.TopProviders = append(result.TopProviders, metric)
+	},
+	"asn": func(result *api.EventAudience, metric api.MetricStat) {
+		result.TopASNs = append(result.TopASNs, metric)
+	},
+}
+
+func (s *Store) mergeImportedEventAudience(ctx context.Context, params api.EventAudienceParams, result *api.EventAudience) error {
+	if len(params.Filters) > 0 || params.DimensionKey != "" || params.DimensionValue != "" || params.PropertyKey != "" || params.PropertyValue != "" {
+		return s.addImportedEventAudienceExclusion(ctx, params, result)
+	}
+
+	importedDimensions, err := s.getImportedEventAudienceDimensions(ctx, params)
+	if err != nil {
+		return err
+	}
+	result.TopPages = mergeMetricList(result.TopPages, importedDimensions["path"], 10)
+	result.TopReferrers = mergeMetricList(result.TopReferrers, importedDimensions["referrer"], 10)
+	result.TopDevices = mergeMetricList(result.TopDevices, importedDimensions["device"], 10)
+	result.TopCountries = mergeMetricList(result.TopCountries, importedDimensions["country"], 10)
+	result.TopCities = mergeMetricList(result.TopCities, importedDimensions["city"], 10)
+	result.TopProviders = mergeMetricList(result.TopProviders, importedDimensions["provider"], 10)
+	result.TopASNs = mergeMetricList(result.TopASNs, importedDimensions["asn"], 10)
+	return s.addImportedEventDimensionLimitation(ctx, params, result)
 }
 
 func (s *Store) addImportedEventAudienceExclusion(ctx context.Context, params api.EventAudienceParams, result *api.EventAudience) error {
@@ -382,7 +423,7 @@ func (s *Store) getImportedEventAudienceDimensions(ctx context.Context, params a
 			SELECT dimension, name, SUM(visitors) AS val
 			FROM imported_event_dimensions_daily
 			WHERE site_id = ? AND date >= CAST(? AS DATE) AND date <= CAST(? AS DATE)
-				AND event_name = ? AND dimension IN ('path', 'referrer', 'device', 'country')
+				AND event_name = ? AND dimension IN ('path', 'referrer', 'device', 'country', 'city', 'provider', 'asn')
 			GROUP BY dimension, name
 			UNION ALL
 			SELECT 'path' AS dimension, path AS name, SUM(visitors) AS val
@@ -442,7 +483,7 @@ func (s *Store) importedEventAudienceAvailableDimensions(ctx context.Context, pa
 		SELECT DISTINCT dimension
 		FROM imported_event_dimensions_daily
 		WHERE site_id = ? AND date >= CAST(? AS DATE) AND date <= CAST(? AS DATE)
-			AND event_name = ? AND dimension IN ('path', 'referrer', 'device', 'country')
+			AND event_name = ? AND dimension IN ('path', 'referrer', 'device', 'country', 'city', 'provider', 'asn')
 		UNION
 		SELECT DISTINCT 'path' AS dimension
 		FROM imported_event_daily

@@ -24,7 +24,7 @@ func openAPIV1Parameters() map[string]any {
 		"query":           map[string]any{"name": "q", "in": "query", "schema": map[string]any{"type": "string"}},
 		"sort":            map[string]any{"name": "sort", "in": "query", "schema": map[string]any{"type": "string"}},
 		"order":           map[string]any{"name": "order", "in": "query", "schema": map[string]any{"type": "string", "enum": []string{"asc", "desc"}}},
-		"filter":          map[string]any{"name": "filter", "in": "query", "description": "Filter in form type:value (repeatable). Supported types: path, hostname, referrer, referrer_host, device, country, browser, language, utm_campaign, utm_content, utm_medium, utm_source, utm_term.", "schema": map[string]any{"type": "string"}},
+		"filter":          map[string]any{"name": "filter", "in": "query", "description": "Filter in form type:value (repeatable). Supported types: path, hostname, referrer, referrer_host, device, country, city, provider, asn, browser, language, utm_campaign, utm_content, utm_medium, utm_source, utm_term.", "schema": map[string]any{"type": "string"}},
 		"filterType":      map[string]any{"name": "filter_type", "in": "query", "schema": map[string]any{"type": "string"}},
 		"filterValue":     map[string]any{"name": "filter_value", "in": "query", "schema": map[string]any{"type": "string"}},
 		"eventName":       map[string]any{"name": "event_name", "in": "query", "required": true, "schema": map[string]any{"type": "string"}},
@@ -42,7 +42,7 @@ func openAPIV1Parameters() map[string]any {
 			"in":          "query",
 			"deprecated":  true,
 			"description": "Deprecated single event dimension filter. Prefer repeatable filter=type:value.",
-			"schema":      map[string]any{"type": "string", "enum": []string{"path", "hostname", "referrer", "referrer_host", "device", "country", "browser", "language", "utm_campaign", "utm_content", "utm_medium", "utm_source", "utm_term"}},
+			"schema":      map[string]any{"type": "string", "enum": []string{"path", "hostname", "referrer", "referrer_host", "device", "country", "city", "provider", "asn", "browser", "language", "utm_campaign", "utm_content", "utm_medium", "utm_source", "utm_term"}},
 		},
 		"eventDimensionValue": map[string]any{
 			"name":        "dimension_value",

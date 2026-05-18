@@ -405,6 +405,10 @@ func (s *Store) GetWebVitalsBreakdown(ctx context.Context, params api.WebVitalsP
 				arg_min(user_agent, timestamp) AS user_agent,
 				arg_min(viewport_width, timestamp) AS viewport_width,
 				arg_min(country_code, timestamp) AS country_code,
+				arg_min(city, timestamp) AS city,
+				arg_min(provider, timestamp) AS provider,
+				arg_min(asn, timestamp) AS asn,
+				arg_min(asn_org, timestamp) AS asn_org,
 				arg_min(language, timestamp) AS language
 			FROM hits
 			GROUP BY site_id, page_id
@@ -453,6 +457,12 @@ func webVitalsDimensionExpr(dimension api.WebVitalDimension) (string, error) {
 	switch dimension {
 	case api.WebVitalDimensionCountry:
 		return "hk_country(ctx.country_code)", nil
+	case api.WebVitalDimensionCity:
+		return "COALESCE(NULLIF(TRIM(ctx.city), ''), '(Unknown)')", nil
+	case api.WebVitalDimensionProvider:
+		return "COALESCE(NULLIF(TRIM(ctx.provider), ''), '(Unknown)')", nil
+	case api.WebVitalDimensionASN:
+		return "hk_asn(ctx.asn, ctx.asn_org)", nil
 	case api.WebVitalDimensionLanguage:
 		return "CASE WHEN NULLIF(TRIM(ctx.language), '') IS NULL THEN '(Unspecified)' ELSE lower(split_part(TRIM(ctx.language), '-', 1)) END", nil
 	case api.WebVitalDimensionBrowser:

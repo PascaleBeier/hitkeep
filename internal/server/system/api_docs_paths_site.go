@@ -319,11 +319,11 @@ func openAPIV1AdminSitePaths() map[string]any {
 				map[string]any{"200": jsonSchemaResp("Event timeseries", map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/EventSeriesPoint"}})}),
 		},
 		"/api/sites/{id}/events/audience": map[string]any{
-			"get": op([]string{"Sites"}, "Get event audience", "Returns top pages, referrers, devices, and countries for sessions containing the selected event. Optional property filters and repeatable filter=type:value hit-dimension filters restrict the sessions included.", secAnyAuth(), eventFilteredParams(paramRef("#/components/parameters/siteID")), nil,
+			"get": op([]string{"Sites"}, "Get event audience", "Returns top pages, referrers, devices, countries, cities, providers, and ASNs for sessions containing the selected event. Optional property filters and repeatable filter=type:value hit-dimension filters restrict the sessions included.", secAnyAuth(), eventFilteredParams(paramRef("#/components/parameters/siteID")), nil,
 				map[string]any{"200": jsonRefResp("Event audience", "#/components/schemas/EventAudience")}),
 		},
 		"/api/sites/{id}/ecommerce": map[string]any{
-			"get": op([]string{"Sites"}, "Get ecommerce summary", "Returns revenue, orders, average order value, checkout starts, and checkout conversion for a site.", secAnyAuth(), []any{
+			"get": op([]string{"Sites"}, "Get ecommerce summary", "Returns revenue, orders, average order value, checkout starts, checkout conversion, and aggregate city, provider, and ASN breakdowns for a site.", secAnyAuth(), []any{
 				paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/from"), paramRef("#/components/parameters/to"),
 				paramRef("#/components/parameters/filter"), paramRef("#/components/parameters/filterType"), paramRef("#/components/parameters/filterValue"),
 				paramRef("#/components/parameters/itemID"), paramRef("#/components/parameters/itemName"),
@@ -363,6 +363,7 @@ func openAPIV1AdminSitePaths() map[string]any {
 				map[string]any{"name": "assistant_name", "in": "query", "description": "Optional AI assistant bot name filter.", "schema": map[string]any{"type": "string"}},
 				map[string]any{"name": "assistant_family", "in": "query", "description": "Optional AI assistant family filter.", "schema": map[string]any{"type": "string"}},
 				map[string]any{"name": "resource_type", "in": "query", "description": "Optional AI fetch resource type filter.", "schema": map[string]any{"type": "string", "enum": []string{"html", "document", "image", "other"}}},
+				map[string]any{"name": "path", "in": "query", "description": "Optional exact fetched path filter.", "schema": map[string]any{"type": "string"}},
 			}, nil, map[string]any{"200": jsonRefResp("AI fetch overview", "#/components/schemas/AIFetchOverview")}),
 		},
 		"/api/sites/{id}/ai-fetch/timeseries": map[string]any{
@@ -371,6 +372,7 @@ func openAPIV1AdminSitePaths() map[string]any {
 				map[string]any{"name": "assistant_name", "in": "query", "description": "Optional AI assistant bot name filter.", "schema": map[string]any{"type": "string"}},
 				map[string]any{"name": "assistant_family", "in": "query", "description": "Optional AI assistant family filter.", "schema": map[string]any{"type": "string"}},
 				map[string]any{"name": "resource_type", "in": "query", "description": "Optional AI fetch resource type filter.", "schema": map[string]any{"type": "string", "enum": []string{"html", "document", "image", "other"}}},
+				map[string]any{"name": "path", "in": "query", "description": "Optional exact fetched path filter.", "schema": map[string]any{"type": "string"}},
 			}, nil, map[string]any{"200": jsonSchemaResp("AI fetch timeseries", map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/AIFetchSeriesPoint"}})}),
 		},
 		"/api/sites/{id}/ai-fetch/correlation": map[string]any{
@@ -379,6 +381,7 @@ func openAPIV1AdminSitePaths() map[string]any {
 				map[string]any{"name": "assistant_name", "in": "query", "description": "Optional AI assistant bot name filter.", "schema": map[string]any{"type": "string"}},
 				map[string]any{"name": "assistant_family", "in": "query", "description": "Optional AI assistant family filter.", "schema": map[string]any{"type": "string"}},
 				map[string]any{"name": "resource_type", "in": "query", "description": "Optional AI fetch resource type filter.", "schema": map[string]any{"type": "string", "enum": []string{"html", "document", "image", "other"}}},
+				map[string]any{"name": "path", "in": "query", "description": "Optional exact fetched path filter.", "schema": map[string]any{"type": "string"}},
 				map[string]any{"name": "window_days", "in": "query", "description": "Directional correlation window in days. Must be between 1 and 90. Defaults to 30.", "schema": map[string]any{"type": "integer", "minimum": 1, "maximum": 90, "default": 30}},
 			}, nil, map[string]any{"200": jsonRefResp("AI fetch correlation report", "#/components/schemas/AIFetchCorrelationReport")}),
 		},
@@ -391,14 +394,16 @@ func openAPIV1AdminSitePaths() map[string]any {
 				map[string]any{"name": "assistant_name", "in": "query", "description": "Optional AI assistant bot name filter.", "schema": map[string]any{"type": "string"}},
 				map[string]any{"name": "assistant_family", "in": "query", "description": "Optional AI assistant family filter.", "schema": map[string]any{"type": "string"}},
 				map[string]any{"name": "resource_type", "in": "query", "description": "Optional AI fetch resource type filter.", "schema": map[string]any{"type": "string", "enum": []string{"html", "document", "image", "other"}}},
+				map[string]any{"name": "path", "in": "query", "description": "Optional exact fetched path filter.", "schema": map[string]any{"type": "string"}},
 			}, nil, map[string]any{"200": desc("Export file stream")}),
 		},
 		"/api/sites/{id}/ai-chatbots/export": map[string]any{
-			"get": op([]string{"Sites"}, "Export AI chatbot events", "Exports AI chatbot instrumentation events for the selected site and date range in csv/xlsx/parquet/json/ndjson. Optional scope filters restrict the export to a single provider, bot, surface, or model.", secAnyAuth(), []any{
+			"get": op([]string{"Sites"}, "Export AI chatbot events", "Exports AI chatbot instrumentation events for the selected site and date range in csv/xlsx/parquet/json/ndjson. Optional scope filters restrict the export to a single provider, bot, surface, or model. Repeatable hit-dimension filters restrict the export to matching audience sessions.", secAnyAuth(), []any{
 				paramRef("#/components/parameters/siteID"),
 				paramRef("#/components/parameters/from"),
 				paramRef("#/components/parameters/to"),
 				paramRef("#/components/parameters/format"),
+				paramRef("#/components/parameters/filter"),
 				map[string]any{"name": "scope_key", "in": "query", "description": "Optional chatbot scope filter key.", "schema": map[string]any{"type": "string", "enum": []string{"provider", "bot_id", "surface", "model"}}},
 				map[string]any{"name": "scope_value", "in": "query", "description": "Optional chatbot scope filter value. Requires scope_key.", "schema": map[string]any{"type": "string"}},
 			}, nil, map[string]any{"200": desc("Export file stream")}),
@@ -532,7 +537,7 @@ func openAPIV1AdminSitePaths() map[string]any {
 				map[string]any{"200": jsonSchemaResp("Event timeseries", map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/EventSeriesPoint"}})}),
 		},
 		"/api/share/{token}/sites/{id}/events/audience": map[string]any{
-			"get": op([]string{"Share"}, "Shared event audience", "Returns event audience through share token. Optional property filters and repeatable filter=type:value hit-dimension filters restrict the sessions included.", nil, eventFilteredParams(paramRef("#/components/parameters/token"), paramRef("#/components/parameters/siteID")), nil,
+			"get": op([]string{"Share"}, "Shared event audience", "Returns event audience through share token, including aggregate pages, referrers, devices, countries, cities, providers, and ASNs. Optional property filters and repeatable filter=type:value hit-dimension filters restrict the sessions included.", nil, eventFilteredParams(paramRef("#/components/parameters/token"), paramRef("#/components/parameters/siteID")), nil,
 				map[string]any{"200": jsonRefResp("Event audience", "#/components/schemas/EventAudience")}),
 		},
 		"/api/share/{token}/sites/{id}/goals": map[string]any{

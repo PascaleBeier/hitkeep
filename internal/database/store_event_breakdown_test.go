@@ -443,6 +443,11 @@ func TestGetEventAudience(t *testing.T) {
 	now := time.Now().UTC()
 	sessionWithEvent := uuid.New()
 	sessionWithoutEvent := uuid.New()
+	region := "California"
+	city := "Mountain View"
+	provider := "Google LLC"
+	asn := 15169
+	asnOrg := "Google LLC"
 
 	// A hit that shares sessionWithEvent — should appear in the audience
 	if err := store.CreateHit(ctx, &api.Hit{
@@ -451,6 +456,11 @@ func TestGetEventAudience(t *testing.T) {
 		PageID:    uuid.New(),
 		Timestamp: now.AddDate(0, 0, -1),
 		Path:      "/signup",
+		Region:    &region,
+		City:      &city,
+		Provider:  &provider,
+		ASN:       &asn,
+		ASNOrg:    &asnOrg,
 	}); err != nil {
 		t.Fatalf("create hit: %v", err)
 	}
@@ -499,6 +509,15 @@ func TestGetEventAudience(t *testing.T) {
 		if p.Name == "/other-page" {
 			t.Errorf("non-event page /other-page should not appear in audience")
 		}
+	}
+	if len(audience.TopCities) != 1 || audience.TopCities[0].Name != "Mountain View" {
+		t.Fatalf("expected Mountain View event audience city, got %+v", audience.TopCities)
+	}
+	if len(audience.TopProviders) != 1 || audience.TopProviders[0].Name != "Google LLC" {
+		t.Fatalf("expected Google LLC event audience provider, got %+v", audience.TopProviders)
+	}
+	if len(audience.TopASNs) != 1 || audience.TopASNs[0].Name != "AS15169 Google LLC" {
+		t.Fatalf("expected AS15169 Google LLC event audience ASN, got %+v", audience.TopASNs)
 	}
 }
 

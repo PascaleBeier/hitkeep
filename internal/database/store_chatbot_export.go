@@ -135,6 +135,14 @@ func buildChatbotExportQuery(params api.ChatbotExportParams) (string, []any) {
 		args = append(args, "$."+params.ScopeKey, params.ScopeValue)
 	}
 
+	filterSQL, filterArgs := buildHitFilters(params.Filters, "")
+	if filterSQL != "" {
+		//nolint:gosec // filterSQL is built from fixed allowlisted hit filter fragments with parameterized values.
+		baseQuery += fmt.Sprintf(" AND session_id IN (SELECT DISTINCT session_id FROM hits WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?%s)", filterSQL)
+		args = append(args, params.SiteID, params.Start, params.End)
+		args = append(args, filterArgs...)
+	}
+
 	baseQuery += " ORDER BY timestamp DESC"
 
 	//nolint:gosec // baseQuery is composed from a fixed event list and parameterized filter placeholders.

@@ -92,6 +92,7 @@ func parseSiteAndRange(w http.ResponseWriter, r *http.Request) (api.AIFetchQuery
 	params.AssistantName = strings.TrimSpace(query.Get("assistant_name"))
 	params.AssistantFamily = strings.TrimSpace(query.Get("assistant_family"))
 	params.ResourceType = strings.TrimSpace(query.Get("resource_type"))
+	params.Path = strings.TrimSpace(query.Get("path"))
 	return params, true
 }
 
@@ -108,6 +109,7 @@ func parseCorrelationParams(w http.ResponseWriter, r *http.Request) (api.AIFetch
 		AssistantName:   base.AssistantName,
 		AssistantFamily: base.AssistantFamily,
 		ResourceType:    base.ResourceType,
+		Path:            base.Path,
 		WindowDays:      30,
 	}
 
