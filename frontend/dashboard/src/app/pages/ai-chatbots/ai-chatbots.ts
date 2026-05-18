@@ -10,13 +10,13 @@ import { CardModule } from 'primeng/card';
 import { SplitButtonModule } from 'primeng/splitbutton';
 import { MenuItem } from 'primeng/api';
 import { SiteService } from '@features/sites/services/site.service';
-import { AnalyticsService } from '@core/services/analytics.service';
+import { AnalyticsService, EventDimensionFilter } from '@core/services/analytics.service';
 import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar } from '@components/range-toolbar/range-toolbar';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { SeriesChart, SeriesChartPoint, SeriesDefinition } from '@features/analytics/components/series-chart';
 import { KpiCard } from '@features/analytics/components/kpi-card';
-import { MetricList } from '@features/analytics/components/metric-list';
+import { MetricCardGroup, MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
 import { EventAudience, EventSeriesPoint, MetricStat } from '@models/analytics.types';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { buildTakeoutExportMenuItems, DEFAULT_HITS_EXPORT_FORMAT, TakeoutExportFormat } from '@core/export/export-formats';
@@ -30,9 +30,12 @@ interface ScopeFilter {
 }
 
 interface FilterChip {
-    key: 'scope';
+    key: string;
     label: string;
+    remove: () => void;
 }
+
+type AudienceDimensionFilterType = 'path' | 'referrer' | 'device' | 'country' | 'city' | 'provider' | 'asn';
 
 const CHATBOT_EVENTS: Record<ChatbotMetricKey, string> = {
     started: 'assistant.chat_started',
@@ -45,7 +48,7 @@ const CHATBOT_EVENTS: Record<ChatbotMetricKey, string> = {
 
 @Component({
     selector: 'app-ai-chatbots',
-    imports: [FormsModule, TranslocoPipe, SelectModule, ButtonModule, CardModule, SplitButtonModule, RangeToolbar, PageHeader, PageHeaderLeft, PageBreadcrumb, SeriesChart, KpiCard, MetricList],
+    imports: [FormsModule, TranslocoPipe, SelectModule, ButtonModule, CardModule, SplitButtonModule, RangeToolbar, PageHeader, PageHeaderLeft, PageBreadcrumb, SeriesChart, KpiCard, MetricCardGroup],
     templateUrl: './ai-chatbots.html',
     styleUrl: './ai-chatbots.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -83,6 +86,7 @@ export class AIChatbots {
     protected readonly topProviders = signal<MetricStat[]>([]);
     protected readonly topSurfaces = signal<MetricStat[]>([]);
     protected readonly audience = signal<EventAudience | null>(null);
+    protected readonly audienceDimFilters = signal<EventDimensionFilter[]>([]);
 
     protected readonly series = signal<ChatbotSeriesState>(createEmptySeries());
     protected readonly comparisonSeries = signal<ChatbotSeriesState>(createEmptySeries());
@@ -183,11 +187,26 @@ export class AIChatbots {
     });
 
     protected readonly filterChips = computed<FilterChip[]>(() => {
-        const value = this.selectedScopeValue();
-        if (!value) return [];
         this.activeLanguage();
-        const keyLabel = this.scopeKeyOptions().find((item) => item.value === this.selectedScopeKey())?.label ?? this.selectedScopeKey();
-        return [{ key: 'scope', label: `${keyLabel}: ${value}` }];
+        const chips: FilterChip[] = [];
+        const value = this.selectedScopeValue();
+        if (value) {
+            const scopeKey = this.selectedScopeKey();
+            const keyLabel = this.scopeKeyOptions().find((item) => item.value === scopeKey)?.label ?? scopeKey;
+            chips.push({
+                key: `scope:${scopeKey}:${value}`,
+                label: `${keyLabel}: ${value}`,
+                remove: () => this.selectedScopeValue.set(null)
+            });
+        }
+        for (const dim of this.audienceDimFilters()) {
+            chips.push({
+                key: `dimension:${dim.type}:${dim.value}`,
+                label: this.dimFilterLabel(dim.type, dim.value),
+                remove: () => this.removeDimensionFilter(dim.type, dim.value)
+            });
+        }
+        return chips;
     });
 
     protected readonly exportUrl = computed(() => {
@@ -200,6 +219,9 @@ export class AIChatbots {
         if (scopeFilter) {
             params.set('scope_key', scopeFilter.key);
             params.set('scope_value', scopeFilter.value);
+        }
+        for (const filter of this.audienceDimFilters()) {
+            params.append('filter', `${filter.type}:${filter.value}`);
         }
 
         return `/api/sites/${site.id}/ai-chatbots/export?${params.toString()}`;
@@ -240,6 +262,127 @@ export class AIChatbots {
             this.kpi(this.transloco.translate('aiChatbots.kpis.citationCtr'), `${this.citationCtr().toFixed(1)}%`, this.calcDelta(this.citationCtr(), this.comparisonCitationCtr()))
         ];
     });
+    protected readonly metricCardTabs = computed<MetricCardGroupTab<AudienceDimensionFilterType>[]>(() => {
+        this.activeLanguage();
+        const audience = this.audience();
+        const loadingBreakdowns = this.isLoadingBreakdowns();
+        const loadingAudience = this.isLoadingAudience();
+        return [
+            {
+                id: 'content',
+                label: this.transloco.translate('common.metricGroups.content'),
+                icon: 'pi-window-maximize',
+                cards: [
+                    { id: 'intents', title: this.transloco.translate('aiChatbots.breakdowns.intents'), icon: 'pi-send', data: this.topIntents(), isLoading: loadingBreakdowns },
+                    { id: 'chatbot-providers', title: this.transloco.translate('aiChatbots.breakdowns.providers'), icon: 'pi-globe', data: this.topProviders(), isLoading: loadingBreakdowns },
+                    { id: 'surfaces', title: this.transloco.translate('aiChatbots.breakdowns.surfaces'), icon: 'pi-window-maximize', data: this.topSurfaces(), isLoading: loadingBreakdowns },
+                    {
+                        id: 'top-pages',
+                        title: this.transloco.translate('common.metrics.topPages'),
+                        icon: 'pi-file',
+                        data: audience?.top_pages ?? [],
+                        linkMode: 'path',
+                        siteDomain: this.activeSite()?.domain ?? null,
+                        isLoading: loadingAudience,
+                        isRowClickable: true,
+                        activeValue: this.activeDimensionFilterValue('path'),
+                        filterType: 'path'
+                    }
+                ]
+            },
+            {
+                id: 'acquisition',
+                label: this.transloco.translate('common.metricGroups.acquisition'),
+                icon: 'pi-link',
+                cards: [
+                    {
+                        id: 'sources',
+                        title: this.transloco.translate('common.metrics.topSources'),
+                        icon: 'pi-link',
+                        data: audience?.top_referrers ?? [],
+                        linkMode: 'url',
+                        isLoading: loadingAudience,
+                        isRowClickable: true,
+                        activeValue: this.activeDimensionFilterValue('referrer'),
+                        filterType: 'referrer'
+                    }
+                ]
+            },
+            {
+                id: 'audience',
+                label: this.transloco.translate('common.metricGroups.audience'),
+                icon: 'pi-users',
+                cards: [
+                    {
+                        id: 'devices',
+                        title: this.transloco.translate('common.metrics.devices'),
+                        icon: 'pi-mobile',
+                        data: audience?.top_devices ?? [],
+                        isLoading: loadingAudience,
+                        isRowClickable: true,
+                        activeValue: this.activeDimensionFilterValue('device'),
+                        filterType: 'device'
+                    }
+                ]
+            },
+            {
+                id: 'location',
+                label: this.transloco.translate('common.metricGroups.location'),
+                icon: 'pi-map',
+                cards: [
+                    {
+                        id: 'countries',
+                        title: this.transloco.translate('common.metrics.countries'),
+                        icon: 'pi-globe',
+                        data: audience?.top_countries ?? [],
+                        isLoading: loadingAudience,
+                        showCountryFlags: true,
+                        showCountryNames: true,
+                        isRowClickable: true,
+                        activeValue: this.activeDimensionFilterValue('country'),
+                        filterType: 'country'
+                    },
+                    {
+                        id: 'cities',
+                        title: this.transloco.translate('common.metrics.cities'),
+                        icon: 'pi-map-marker',
+                        data: audience?.top_cities ?? [],
+                        isLoading: loadingAudience,
+                        isRowClickable: true,
+                        activeValue: this.activeDimensionFilterValue('city'),
+                        filterType: 'city'
+                    }
+                ]
+            },
+            {
+                id: 'network',
+                label: this.transloco.translate('common.metricGroups.network'),
+                icon: 'pi-server',
+                cards: [
+                    {
+                        id: 'network-providers',
+                        title: this.transloco.translate('common.metrics.providers'),
+                        icon: 'pi-server',
+                        data: audience?.top_providers ?? [],
+                        isLoading: loadingAudience,
+                        isRowClickable: true,
+                        activeValue: this.activeDimensionFilterValue('provider'),
+                        filterType: 'provider'
+                    },
+                    {
+                        id: 'asns',
+                        title: this.transloco.translate('common.metrics.asns'),
+                        icon: 'pi-sitemap',
+                        data: audience?.top_asns ?? [],
+                        isLoading: loadingAudience,
+                        isRowClickable: true,
+                        activeValue: this.activeDimensionFilterValue('asn'),
+                        filterType: 'asn'
+                    }
+                ]
+            }
+        ];
+    });
 
     constructor() {
         effect(() => {
@@ -268,6 +411,7 @@ export class AIChatbots {
             const site = this.activeSite();
             this.selectedRange();
             const scopeFilter = this.activeScopeFilter();
+            const dimFilters = this.audienceDimFilters();
             if (!site) {
                 this.series.set(createEmptySeries());
                 this.comparisonSeries.set(createEmptySeries());
@@ -284,13 +428,39 @@ export class AIChatbots {
             const comparison = computeComparisonPeriod(dates.from, dates.to);
             this.comparisonRange.set(comparison);
 
-            this.loadPrimaryData(site.id, dates.from, dates.to, scopeFilter, () => this.loadComparisonData(site.id, comparison.from, comparison.to, scopeFilter));
-            this.loadAudience(site.id, dates.from, dates.to, scopeFilter);
+            this.loadPrimaryData(site.id, dates.from, dates.to, scopeFilter, dimFilters, () => this.loadComparisonData(site.id, comparison.from, comparison.to, scopeFilter, dimFilters));
+            this.loadAudience(site.id, dates.from, dates.to, scopeFilter, dimFilters);
         });
     }
 
     protected clearFilters() {
         this.selectedScopeValue.set(null);
+        this.audienceDimFilters.set([]);
+    }
+
+    protected toggleAudienceDimFilter(type: AudienceDimensionFilterType, item: MetricStat) {
+        if (!item.name) return;
+        this.audienceDimFilters.update((filters) => {
+            const existingIndex = filters.findIndex((filter) => filter.type === type);
+            if (existingIndex >= 0) {
+                const existing = filters[existingIndex];
+                if (existing.value === item.name) {
+                    return filters.filter((_, idx) => idx !== existingIndex);
+                }
+                const next = [...filters];
+                next[existingIndex] = { type, value: item.name };
+                return next;
+            }
+            return [...filters, { type, value: item.name }];
+        });
+    }
+
+    protected onMetricCardClick(event: MetricCardGroupRowClick): void {
+        this.toggleAudienceDimFilter(event.filterType as AudienceDimensionFilterType, event.metric);
+    }
+
+    protected activeDimensionFilterValue(type: AudienceDimensionFilterType): string | null {
+        return this.audienceDimFilters().find((filter) => filter.type === type)?.value ?? null;
     }
 
     protected exportFiltered(format: TakeoutExportFormat = DEFAULT_HITS_EXPORT_FORMAT) {
@@ -312,19 +482,19 @@ export class AIChatbots {
             });
     }
 
-    private loadPrimaryData(siteId: string, from: string, to: string, scopeFilter: ScopeFilter | null, onSettled?: () => void) {
+    private loadPrimaryData(siteId: string, from: string, to: string, scopeFilter: ScopeFilter | null, filters: EventDimensionFilter[] = [], onSettled?: () => void) {
         this.isLoadingSeries.set(true);
         this.isLoadingBreakdowns.set(true);
         const propertyKey = scopeFilter?.key;
         const propertyValue = scopeFilter?.value;
 
         forkJoin({
-            started: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.started, propertyKey, propertyValue),
-            sent: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.sent, propertyKey, propertyValue),
-            rendered: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.rendered, propertyKey, propertyValue),
-            clicked: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.clicked, propertyKey, propertyValue),
-            handoff: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.handoff, propertyKey, propertyValue),
-            assisted: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.assisted, propertyKey, propertyValue),
+            started: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.started, propertyKey, propertyValue, filters),
+            sent: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.sent, propertyKey, propertyValue, filters),
+            rendered: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.rendered, propertyKey, propertyValue, filters),
+            clicked: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.clicked, propertyKey, propertyValue, filters),
+            handoff: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.handoff, propertyKey, propertyValue, filters),
+            assisted: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.assisted, propertyKey, propertyValue, filters),
             intents: this.analyticsService.getEventPropertyBreakdown(siteId, from, to, CHATBOT_EVENTS.sent, 'intent'),
             providers: this.analyticsService.getEventPropertyBreakdown(siteId, from, to, CHATBOT_EVENTS.started, 'provider'),
             surfaces: this.analyticsService.getEventPropertyBreakdown(siteId, from, to, CHATBOT_EVENTS.started, 'surface')
@@ -359,18 +529,18 @@ export class AIChatbots {
             });
     }
 
-    private loadComparisonData(siteId: string, from: string, to: string, scopeFilter: ScopeFilter | null) {
+    private loadComparisonData(siteId: string, from: string, to: string, scopeFilter: ScopeFilter | null, filters: EventDimensionFilter[] = []) {
         this.isLoadingComparison.set(true);
         const propertyKey = scopeFilter?.key;
         const propertyValue = scopeFilter?.value;
 
         forkJoin({
-            started: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.started, propertyKey, propertyValue),
-            sent: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.sent, propertyKey, propertyValue),
-            rendered: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.rendered, propertyKey, propertyValue),
-            clicked: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.clicked, propertyKey, propertyValue),
-            handoff: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.handoff, propertyKey, propertyValue),
-            assisted: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.assisted, propertyKey, propertyValue)
+            started: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.started, propertyKey, propertyValue, filters),
+            sent: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.sent, propertyKey, propertyValue, filters),
+            rendered: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.rendered, propertyKey, propertyValue, filters),
+            clicked: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.clicked, propertyKey, propertyValue, filters),
+            handoff: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.handoff, propertyKey, propertyValue, filters),
+            assisted: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.assisted, propertyKey, propertyValue, filters)
         })
             .pipe(finalize(() => this.isLoadingComparison.set(false)))
             .subscribe({
@@ -399,18 +569,43 @@ export class AIChatbots {
             });
     }
 
-    private loadAudience(siteId: string, from: string, to: string, scopeFilter: ScopeFilter | null) {
+    private loadAudience(siteId: string, from: string, to: string, scopeFilter: ScopeFilter | null, filters: EventDimensionFilter[] = []) {
         this.isLoadingAudience.set(true);
         const propertyKey = scopeFilter?.key;
         const propertyValue = scopeFilter?.value;
 
         this.analyticsService
-            .getEventAudience(siteId, from, to, CHATBOT_EVENTS.started, propertyKey, propertyValue)
+            .getEventAudience(siteId, from, to, CHATBOT_EVENTS.started, propertyKey, propertyValue, filters)
             .pipe(finalize(() => this.isLoadingAudience.set(false)))
             .subscribe({
                 next: (data) => this.audience.set(data),
                 error: () => this.audience.set(null)
             });
+    }
+
+    private removeDimensionFilter(type: string, value: string) {
+        this.audienceDimFilters.update((filters) => filters.filter((filter) => !(filter.type === type && filter.value === value)));
+    }
+
+    private dimFilterLabel(dim: string, value: string): string {
+        switch (dim) {
+            case 'path':
+                return this.transloco.translate('common.filters.page', { value });
+            case 'referrer':
+                return this.transloco.translate('common.filters.source', { value });
+            case 'device':
+                return this.transloco.translate('common.filters.device', { value });
+            case 'country':
+                return this.transloco.translate('common.filters.country', { value });
+            case 'city':
+                return this.transloco.translate('common.filters.city', { value });
+            case 'provider':
+                return this.transloco.translate('common.filters.provider', { value });
+            case 'asn':
+                return this.transloco.translate('common.filters.asn', { value });
+            default:
+                return `${dim}: ${value}`;
+        }
     }
 
     protected getCurrentDateRange(): { from: string; to: string } | null {

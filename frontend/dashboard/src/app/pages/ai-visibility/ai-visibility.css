@@ -1,201 +1,80 @@
 :host {
     display: block;
-    --ai-correlation-shell-bg:
-        radial-gradient(circle at top right, color-mix(in srgb, var(--p-primary-color) 9%, transparent) 0%, transparent 34%), linear-gradient(180deg, color-mix(in srgb, var(--p-primary-color) 4%, transparent) 0%, transparent 10rem);
-    --ai-correlation-kpis-bg: color-mix(in srgb, var(--p-surface-0) 88%, var(--p-surface-50) 12%);
-    --ai-correlation-kpis-border: color-mix(in srgb, var(--p-surface-300) 72%, transparent);
-    --ai-correlation-note-bg: color-mix(in srgb, var(--p-primary-color) 7%, var(--p-surface-0));
-    --ai-correlation-tabs-bg: color-mix(in srgb, var(--p-surface-0) 94%, var(--p-surface-100) 6%);
-    --ai-correlation-tabs-border: color-mix(in srgb, var(--p-surface-300) 70%, transparent);
-    --ai-correlation-table-wrap-bg: var(--p-surface-0);
-    --ai-correlation-table-wrap-border: color-mix(in srgb, var(--p-surface-300) 70%, transparent);
-    --ai-correlation-table-head-bg: color-mix(in srgb, var(--p-surface-0) 90%, var(--p-surface-100) 10%);
-    --ai-correlation-table-row-hover: color-mix(in srgb, var(--p-surface-0) 72%, var(--p-surface-100) 28%);
-    --ai-correlation-pill-bg: color-mix(in srgb, var(--p-primary-color) 10%, var(--p-surface-0));
-    --ai-correlation-pill-border: color-mix(in srgb, var(--p-primary-color) 16%, transparent);
-    --ai-correlation-bar-bg: color-mix(in srgb, var(--p-primary-color) 6%, var(--p-surface-0));
-    --ai-correlation-bar-border: color-mix(in srgb, var(--p-primary-color) 12%, transparent);
-    --ai-correlation-bar-fill-start: color-mix(in srgb, var(--p-primary-color) 16%, transparent);
-    --ai-correlation-bar-fill-end: color-mix(in srgb, var(--p-primary-color) 26%, transparent);
 }
 
-:host-context(.p-dark) {
-    --ai-correlation-shell-bg:
-        radial-gradient(circle at top right, color-mix(in srgb, var(--p-primary-color) 18%, transparent) 0%, transparent 38%), linear-gradient(180deg, color-mix(in srgb, var(--p-primary-color) 8%, transparent) 0%, transparent 10rem);
-    --ai-correlation-kpis-bg: color-mix(in srgb, var(--p-surface-900) 90%, var(--p-surface-800) 10%);
-    --ai-correlation-kpis-border: color-mix(in srgb, var(--p-surface-700) 82%, transparent);
-    --ai-correlation-note-bg: color-mix(in srgb, var(--p-primary-color) 12%, var(--p-surface-900));
-    --ai-correlation-tabs-bg: color-mix(in srgb, var(--p-surface-900) 94%, #000 6%);
-    --ai-correlation-tabs-border: color-mix(in srgb, var(--p-surface-700) 85%, transparent);
-    --ai-correlation-table-wrap-bg: color-mix(in srgb, var(--p-surface-900) 96%, #000 4%);
-    --ai-correlation-table-wrap-border: color-mix(in srgb, var(--p-surface-700) 88%, transparent);
-    --ai-correlation-table-head-bg: color-mix(in srgb, var(--p-surface-800) 86%, var(--p-surface-900) 14%);
-    --ai-correlation-table-row-hover: color-mix(in srgb, var(--p-surface-800) 86%, var(--p-surface-700) 14%);
-    --ai-correlation-pill-bg: color-mix(in srgb, var(--p-primary-color) 16%, var(--p-surface-900));
-    --ai-correlation-pill-border: color-mix(in srgb, var(--p-primary-color) 28%, transparent);
-    --ai-correlation-bar-bg: color-mix(in srgb, var(--p-primary-color) 10%, var(--p-surface-900));
-    --ai-correlation-bar-border: color-mix(in srgb, var(--p-primary-color) 18%, transparent);
-    --ai-correlation-bar-fill-start: color-mix(in srgb, var(--p-primary-color) 26%, transparent);
-    --ai-correlation-bar-fill-end: color-mix(in srgb, var(--p-primary-color) 38%, transparent);
+.ai-visibility__stat-strip {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    width: 100%;
 }
 
-.ai-visibility__correlation-shell {
-    border-radius: 1.25rem;
-    background: var(--ai-correlation-shell-bg);
+.ai-visibility__stat-strip--wide {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.ai-visibility__correlation-kpis-band {
-    background: var(--ai-correlation-kpis-bg);
-    border: 1px solid var(--ai-correlation-kpis-border);
+.ai-visibility__stat {
+    min-width: 0;
+    border: 1px solid var(--p-surface-border);
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, var(--p-surface-0) 72%, transparent);
+    padding: 0.625rem 0.75rem;
 }
 
-.ai-visibility__correlation-tabs-shell {
-    background: var(--ai-correlation-tabs-bg);
-    border: 1px solid var(--ai-correlation-tabs-border);
-}
-
-.ai-visibility__correlation-table-wrap {
-    background: var(--ai-correlation-table-wrap-bg);
-    border: 1px solid var(--ai-correlation-table-wrap-border);
-}
-
-.ai-visibility__note {
-    background: var(--ai-correlation-note-bg);
-    border-left: 3px solid var(--p-primary-color);
-    border-radius: 0.9rem;
-    line-height: 1.5;
-    padding: 0.95rem 1rem 0.95rem 0.875rem;
-    padding-left: 0.875rem;
-    color: var(--p-text-muted-color);
-}
-
-.ai-visibility__tab-icon {
-    align-items: center;
-    background: var(--ai-correlation-pill-bg);
-    border: 1px solid var(--ai-correlation-pill-border);
-    border-radius: 0.85rem;
-    color: var(--p-primary-color);
-    display: inline-flex;
-    flex-shrink: 0;
-    height: 2rem;
-    justify-content: center;
-    width: 2rem;
-}
-
-.ai-visibility__path-label {
-    color: var(--p-text-color);
-    display: block;
-    font-weight: 600;
-    max-width: min(30rem, 52vw);
+.ai-visibility__stat dt {
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.ai-visibility__assistant-pill {
-    align-items: center;
-    background: var(--ai-correlation-pill-bg);
-    border: 1px solid var(--ai-correlation-pill-border);
-    border-radius: 9999px;
-    color: color-mix(in srgb, var(--p-primary-color) 72%, var(--p-text-color));
-    display: inline-flex;
+    color: var(--p-text-muted-color);
     font-size: 0.75rem;
-    font-weight: 700;
-    line-height: 1;
-    max-width: 12rem;
-    overflow: hidden;
-    padding: 0.4rem 0.7rem;
+    font-weight: 600;
+    line-height: 1rem;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.ai-visibility__bar-cell {
-    background: var(--ai-correlation-bar-bg);
-    border: 1px solid var(--ai-correlation-bar-border);
-    border-radius: 9999px;
-    display: inline-flex;
-    justify-content: flex-end;
-    min-width: 5.5rem;
-    overflow: hidden;
-    padding: 0.35rem 0.7rem;
-    position: relative;
-}
-
-.ai-visibility__bar-fill {
-    background: linear-gradient(90deg, var(--ai-correlation-bar-fill-start), var(--ai-correlation-bar-fill-end));
-    border-radius: inherit;
-    inset: 0 auto 0 0;
-    position: absolute;
-    transition: width 180ms ease;
-}
-
-.ai-visibility__bar-value {
+.ai-visibility__stat dd {
+    margin: 0.125rem 0 0;
     color: var(--p-text-color);
-    font-variant-numeric: tabular-nums;
+    font-size: 0.95rem;
     font-weight: 700;
-    position: relative;
-    z-index: 1;
+    line-height: 1.25rem;
+    overflow-wrap: anywhere;
 }
 
-:host ::ng-deep .ai-visibility__correlation-card .p-card-body {
-    padding: 1.25rem;
+.ai-visibility__stat-skeleton {
+    display: block;
+    width: 4rem;
+    height: 1rem;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--p-surface-100), var(--p-surface-200), var(--p-surface-100));
+    background-size: 200% 100%;
+    animation: ai-visibility-stat-pulse 1.2s ease-in-out infinite;
 }
 
-:host ::ng-deep .ai-visibility__correlation-tabs .p-tablist {
-    background: transparent;
-    padding: 1rem 1rem 0;
-}
-
-:host ::ng-deep .ai-visibility__correlation-tabs .p-tab {
-    color: var(--p-text-color);
-}
-
-:host ::ng-deep .ai-visibility__correlation-tabs .p-tabpanels {
-    background: transparent;
-    padding: 0 1rem 1rem;
-}
-
-:host ::ng-deep .ai-visibility__correlation-table .p-datatable-thead > tr > th {
-    background: var(--ai-correlation-table-head-bg);
-    border-bottom: 1px solid var(--p-surface-200);
-    color: var(--p-text-muted-color);
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    padding: 0.85rem 0.95rem;
-    text-transform: uppercase;
-    white-space: nowrap;
-}
-
-:host ::ng-deep .ai-visibility__correlation-table .p-datatable-tbody > tr > td {
-    background: transparent;
-    border-bottom: 1px solid var(--ai-correlation-table-wrap-border);
-    padding: 0.9rem 0.95rem;
-    vertical-align: middle;
-}
-
-:host ::ng-deep .ai-visibility__correlation-table .p-datatable-tbody > tr:last-child > td {
-    border-bottom: 0;
-}
-
-:host ::ng-deep .ai-visibility__correlation-table .p-datatable-tbody > tr:hover > td {
-    background: var(--ai-correlation-table-row-hover);
-}
-
-@media (max-width: 767px) {
-    .ai-visibility__path-label {
-        max-width: min(22rem, 68vw);
+@keyframes ai-visibility-stat-pulse {
+    from {
+        background-position: 100% 0;
     }
 
-    :host ::ng-deep .ai-visibility__correlation-card .p-card-body {
-        padding: 1rem;
+    to {
+        background-position: -100% 0;
+    }
+}
+
+@media (min-width: 1024px) {
+    .ai-visibility__stat-strip {
+        grid-template-columns: repeat(5, minmax(6rem, 1fr));
+        max-width: 42rem;
     }
 
-    :host ::ng-deep .ai-visibility__correlation-tabs .p-tablist {
-        padding: 0.75rem 0.75rem 0;
+    .ai-visibility__stat-strip--wide {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        max-width: none;
     }
+}
 
-    :host ::ng-deep .ai-visibility__correlation-tabs .p-tabpanels {
-        padding: 0 0.75rem 0.75rem;
+@media (max-width: 340px) {
+    .ai-visibility__stat-strip,
+    .ai-visibility__stat-strip--wide {
+        grid-template-columns: 1fr;
     }
 }

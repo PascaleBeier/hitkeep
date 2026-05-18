@@ -9,7 +9,7 @@ import { ButtonModule } from 'primeng/button';
 import { MessageModule } from 'primeng/message';
 import { SiteService } from '@features/sites/services/site.service';
 import { AnalyticsService, EventDimensionFilter } from '@core/services/analytics.service';
-import { MetricList } from '@features/analytics/components/metric-list';
+import { MetricCardConfig, MetricCardGroup, MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
 import { DEFAULT_RANGE_OPTIONS, RangeToolbar, RangeOption } from '@components/range-toolbar/range-toolbar';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
@@ -24,7 +24,8 @@ interface EventFilterChip {
     remove: () => void;
 }
 
-type EventDimensionFilterType = 'path' | 'referrer' | 'device' | 'country';
+type EventDimensionFilterType = 'path' | 'referrer' | 'device' | 'country' | 'city' | 'provider' | 'asn';
+type EventMetricFilterType = 'propertyValue' | EventDimensionFilterType;
 
 interface EventOption {
     label: string;
@@ -42,7 +43,7 @@ const AUTOMATIC_EVENT_NAMES = Object.keys(AUTOMATIC_EVENT_META);
 
 @Component({
     selector: 'app-events',
-    imports: [FormsModule, ReactiveFormsModule, TranslocoPipe, SelectModule, CardModule, SkeletonModule, ButtonModule, MessageModule, MetricList, RangeToolbar, PageHeader, PageHeaderLeft, PageBreadcrumb, SeriesChart],
+    imports: [FormsModule, ReactiveFormsModule, TranslocoPipe, SelectModule, CardModule, SkeletonModule, ButtonModule, MessageModule, MetricCardGroup, RangeToolbar, PageHeader, PageHeaderLeft, PageBreadcrumb, SeriesChart],
     templateUrl: './events.html',
     styleUrl: './events.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -183,6 +184,137 @@ export class Events {
         const d = this.totalEventDelta();
         if (d === null) return '';
         return `${d >= 0 ? '+' : ''}${d.toFixed(1)}%`;
+    });
+    protected readonly metricCardTabs = computed<MetricCardGroupTab<EventMetricFilterType>[]>(() => {
+        this.activeLanguage();
+        const audience = this.audience();
+        const loading = this.isLoadingAudience();
+        const contentCards: MetricCardConfig<EventMetricFilterType>[] = [];
+        if (this.selectedEvent() && this.selectedPropertyKey()) {
+            contentCards.push({
+                id: 'property-breakdown',
+                title: this.transloco.translate('events.breakdown.title'),
+                icon: 'pi-list',
+                data: this.breakdown(),
+                isLoading: this.isLoadingBreakdown(),
+                isRowClickable: true,
+                activeValue: this.selectedPropertyValue(),
+                filterType: 'propertyValue'
+            });
+        }
+        if (this.selectedEvent()) {
+            contentCards.push({
+                id: 'top-pages',
+                title: this.transloco.translate('common.metrics.topPages'),
+                icon: 'pi-file',
+                data: audience?.top_pages ?? [],
+                linkMode: 'path',
+                siteDomain: this.activeSite()?.domain ?? null,
+                isLoading: loading,
+                isRowClickable: true,
+                activeValue: this.activeDimensionFilterValue('path'),
+                filterType: 'path'
+            });
+        }
+        return [
+            {
+                id: 'content',
+                label: this.transloco.translate('common.metricGroups.content'),
+                icon: 'pi-file',
+                cards: contentCards
+            },
+            {
+                id: 'acquisition',
+                label: this.transloco.translate('common.metricGroups.acquisition'),
+                icon: 'pi-link',
+                cards: [
+                    {
+                        id: 'sources',
+                        title: this.transloco.translate('common.metrics.topSources'),
+                        icon: 'pi-link',
+                        data: audience?.top_referrers ?? [],
+                        linkMode: 'url',
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeDimensionFilterValue('referrer'),
+                        filterType: 'referrer'
+                    }
+                ]
+            },
+            {
+                id: 'audience',
+                label: this.transloco.translate('common.metricGroups.audience'),
+                icon: 'pi-users',
+                cards: [
+                    {
+                        id: 'devices',
+                        title: this.transloco.translate('common.metrics.devices'),
+                        icon: 'pi-mobile',
+                        data: audience?.top_devices ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeDimensionFilterValue('device'),
+                        filterType: 'device'
+                    }
+                ]
+            },
+            {
+                id: 'location',
+                label: this.transloco.translate('common.metricGroups.location'),
+                icon: 'pi-map',
+                cards: [
+                    {
+                        id: 'countries',
+                        title: this.transloco.translate('common.metrics.countries'),
+                        icon: 'pi-globe',
+                        data: audience?.top_countries ?? [],
+                        isLoading: loading,
+                        showCountryFlags: true,
+                        showCountryNames: true,
+                        isRowClickable: true,
+                        activeValue: this.activeDimensionFilterValue('country'),
+                        filterType: 'country'
+                    },
+                    {
+                        id: 'cities',
+                        title: this.transloco.translate('common.metrics.cities'),
+                        icon: 'pi-map-marker',
+                        data: audience?.top_cities ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeDimensionFilterValue('city'),
+                        filterType: 'city'
+                    }
+                ]
+            },
+            {
+                id: 'network',
+                label: this.transloco.translate('common.metricGroups.network'),
+                icon: 'pi-server',
+                cards: [
+                    {
+                        id: 'providers',
+                        title: this.transloco.translate('common.metrics.providers'),
+                        icon: 'pi-server',
+                        data: audience?.top_providers ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeDimensionFilterValue('provider'),
+                        filterType: 'provider'
+                    },
+                    {
+                        id: 'asns',
+                        title: this.transloco.translate('common.metrics.asns'),
+                        icon: 'pi-sitemap',
+                        data: audience?.top_asns ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeDimensionFilterValue('asn'),
+                        filterType: 'asn'
+                    }
+                ]
+            }
+        ];
     });
 
     constructor() {
@@ -333,6 +465,15 @@ export class Events {
         });
     }
 
+    protected onMetricCardClick(event: MetricCardGroupRowClick): void {
+        if (event.filterType === 'propertyValue') {
+            this.togglePropertyValueFilter(event.metric.name);
+            return;
+        }
+        if (!this.isEventDimensionFilterType(event.filterType)) return;
+        this.toggleAudienceDimFilter(event.filterType, event.metric);
+    }
+
     protected activeDimensionFilterValue(type: EventDimensionFilterType): string | null {
         return this.audienceDimFilters().find((filter) => filter.type === type)?.value ?? null;
     }
@@ -351,9 +492,19 @@ export class Events {
                 return this.transloco.translate('common.filters.device', { value });
             case 'country':
                 return this.transloco.translate('common.filters.country', { value });
+            case 'city':
+                return this.transloco.translate('common.filters.city', { value });
+            case 'provider':
+                return this.transloco.translate('common.filters.provider', { value });
+            case 'asn':
+                return this.transloco.translate('common.filters.asn', { value });
             default:
                 return `${dim}: ${value}`;
         }
+    }
+
+    private isEventDimensionFilterType(value: string): value is EventDimensionFilterType {
+        return value === 'path' || value === 'referrer' || value === 'device' || value === 'country' || value === 'city' || value === 'provider' || value === 'asn';
     }
 
     protected getCurrentDateRange(): { from: string; to: string } | null {

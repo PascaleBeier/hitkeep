@@ -154,25 +154,12 @@
         }
     </div>
 
-    <!-- Breakdown table — clicking a row filters the chart -->
-    @if (selectedEvent() && selectedPropertyKey()) {
-    <app-metric-list
-        [title]="'events.breakdown.title' | transloco"
-        icon="pi-list"
-        [data]="breakdown()"
-        [isLoading]="isLoadingBreakdown()"
-        [isRowClickable]="true"
-        [activeValue]="selectedPropertyValue()"
-        (rowClicked)="togglePropertyValueFilter($event.name)"
-    />
-    } @else {
+    <!-- Metric cards — property breakdown and audience panels share one card system -->
+    @if (!selectedEvent()) {
     <div class="flex flex-col items-center justify-center h-32 gap-2">
-        <p class="text-sm text-[var(--p-text-muted-color)]">@if (!selectedEvent()) { {{ 'events.breakdown.selectEventFirst' | transloco }} } @else { {{ 'events.breakdown.selectPropertyFirst' | transloco }} }</p>
+        <p class="text-sm text-[var(--p-text-muted-color)]">{{ 'events.breakdown.selectEventFirst' | transloco }}</p>
     </div>
-    }
-
-    <!-- Audience panels — only shown when an event is selected -->
-    @if (selectedEvent()) { @if ((audience()?.imported_excluded?.length ?? 0) > 0) {
+    } @else { @if ((audience()?.imported_excluded?.length ?? 0) > 0) {
     <p-message severity="info" styleClass="w-full mt-6">
         <strong>{{ "events.importedLimitations.title" | transloco }}</strong>
         @for (reason of audience()?.imported_excluded ?? []; track reason.reason + reason.detail) {
@@ -180,48 +167,6 @@
         }
     </p-message>
     }
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mt-6">
-        <app-metric-list
-            [title]="'common.metrics.topPages' | transloco"
-            icon="pi-file"
-            [data]="audience()?.top_pages ?? []"
-            [isLoading]="isLoadingAudience()"
-            [linkMode]="'path'"
-            [siteDomain]="activeSite()?.domain ?? null"
-            [isRowClickable]="true"
-            [activeValue]="activeDimensionFilterValue('path')"
-            (rowClicked)="toggleAudienceDimFilter('path', $event)"
-        />
-        <app-metric-list
-            [title]="'common.metrics.topSources' | transloco"
-            icon="pi-link"
-            [data]="audience()?.top_referrers ?? []"
-            [isLoading]="isLoadingAudience()"
-            [linkMode]="'url'"
-            [isRowClickable]="true"
-            [activeValue]="activeDimensionFilterValue('referrer')"
-            (rowClicked)="toggleAudienceDimFilter('referrer', $event)"
-        />
-        <app-metric-list
-            [title]="'common.metrics.devices' | transloco"
-            icon="pi-mobile"
-            [data]="audience()?.top_devices ?? []"
-            [isLoading]="isLoadingAudience()"
-            [isRowClickable]="true"
-            [activeValue]="activeDimensionFilterValue('device')"
-            (rowClicked)="toggleAudienceDimFilter('device', $event)"
-        />
-        <app-metric-list
-            [title]="'common.metrics.countries' | transloco"
-            icon="pi-globe"
-            [data]="audience()?.top_countries ?? []"
-            [isLoading]="isLoadingAudience()"
-            [showCountryFlags]="true"
-            [showCountryNames]="true"
-            [isRowClickable]="true"
-            [activeValue]="activeDimensionFilterValue('country')"
-            (rowClicked)="toggleAudienceDimFilter('country', $event)"
-        />
-    </div>
+    <app-metric-card-group class="mt-6 block" [tabs]="metricCardTabs()" (rowClicked)="onMetricCardClick($event)" />
     } }
 </div>

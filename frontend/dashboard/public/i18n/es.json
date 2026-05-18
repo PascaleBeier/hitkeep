@@ -486,6 +486,9 @@
         },
         "filters": {
             "country": "País: {{value}}",
+            "city": "Ciudad: {{value}}",
+            "provider": "Proveedor: {{value}}",
+            "asn": "ASN: {{value}}",
             "device": "Dispositivo: {{value}}",
             "language": "Idioma: {{value}}",
             "page": "Página: {{value}}",
@@ -496,10 +499,20 @@
             "conversionRate": "Tasa de conversión"
         },
         "loadingSiteData": "Cargando datos del sitio...",
+        "metricGroups": {
+            "content": "Contenido",
+            "acquisition": "Adquisición",
+            "audience": "Audiencia",
+            "location": "Ubicación",
+            "network": "Red"
+        },
         "metrics": {
             "audience": "Audiencia",
             "browsers": "Navegadores",
             "countries": "Países",
+            "cities": "Ciudades",
+            "providers": "Proveedores",
+            "asns": "ASN",
             "devices": "Dispositivos",
             "languages": "Idiomas",
             "pages": "Páginas",
@@ -1586,6 +1599,7 @@
                 "database": "Base de datos",
                 "workers": "Workers",
                 "isLeader": "Es líder",
+                "ip2locationAttribution": "HitKeep usa la base de datos IP2Location LITE para geolocalización IP.",
                 "actions": {
                     "check": "Comprobar"
                 }
@@ -2228,6 +2242,15 @@
                 "correlatedPaths": "Rutas correlacionadas",
                 "aiVisits": "Visitas referidas por IA",
                 "uncorrelatedFetches": "Fetches no correlacionados"
+            },
+            "helpAria": "Mostrar ayuda de correlación",
+            "help": {
+                "correlatedPaths": "Rutas obtenidas que luego recibieron visitas humanas referidas por IA en la ventana seleccionada.",
+                "aiVisits": "Visitas humanas atribuidas a referentes de IA en rutas que también rastrearon crawlers de IA.",
+                "uncorrelatedFetches": "Fetches en rutas que no produjeron una visita referida por IA coincidente en esta ventana.",
+                "citationYieldCard": "Úsalo para detectar páginas donde la demanda de crawlers de IA se convierte en visitas posteriores.",
+                "opportunityCard": "Úsalo para encontrar páginas muy rastreadas que aún necesitan mejor contenido, enlaces o disponibilidad.",
+                "failureHotspotCard": "Úsalo para encontrar pares de asistente y prefijo de ruta donde el acceso del crawler genera errores."
             }
         },
         "tables": {
@@ -2239,6 +2262,7 @@
             "opportunityPages": {
                 "title": "Páginas de oportunidad",
                 "description": "Páginas con mucho fetch y pocas visitas posteriores o con presión elevada de errores.",
+                "cardSubtitle": "Requiere atención",
                 "empty": "Ninguna página de oportunidad coincide con los filtros actuales."
             },
             "failureHotspots": {
@@ -2447,6 +2471,10 @@
             "devices": "Principales dispositivos",
             "countries": "Principales países"
         },
+        "breakdowns": {
+            "title": "Desglose de ingresos",
+            "description": "Compara el rendimiento de productos y la atribución de ingresos en un solo lugar."
+        },
         "products": {
             "title": "Productos principales",
             "description": "Consulta qué productos generan más ingresos y pedidos completados.",
@@ -2468,7 +2496,9 @@
         },
         "actions": {
             "filterProduct": "Filtrar",
-            "clearProductFilter": "Limpiar"
+            "clearProductFilter": "Limpiar",
+            "filterSource": "Filtrar",
+            "clearSourceFilter": "Limpiar"
         },
         "empty": {
             "title": "Todavía no hay datos de comercio electrónico",
@@ -2576,6 +2606,9 @@
             "pageviews": "Páginas vistas",
             "sessions": "Sesiones",
             "top_source": "Fuente principal",
+            "top_city": "Ciudad principal total",
+            "top_provider": "Proveedor principal total",
+            "top_asn": "ASN principal total",
             "search_impressions": "Impresiones de búsqueda",
             "search_ctr": "CTR de búsqueda",
             "search_position": "Posición media",
@@ -2737,7 +2770,10 @@
                 "countries": "Países",
                 "languages": "Idiomas",
                 "browsers": "Navegadores",
-                "devices": "Dispositivos"
+                "devices": "Dispositivos",
+                "cities": "Ciudades",
+                "providers": "Proveedores",
+                "asns": "ASN"
             }
         },
         "columns": {

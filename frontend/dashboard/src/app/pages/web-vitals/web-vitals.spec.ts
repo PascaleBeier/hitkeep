@@ -3,6 +3,7 @@ import { signal } from '@angular/core';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { TRANSLOCO_LOCALE_CONFIG, TRANSLOCO_LOCALE_LANG_MAPPING, TranslocoLocaleService } from '@jsverse/transloco-locale';
@@ -61,6 +62,7 @@ describe('WebVitalsPage', () => {
                                 loadingSiteData: 'Loading site data...',
                                 noSiteSelected: 'No site selected',
                                 selectDateRange: 'Select date range',
+                                searchPlaceholder: 'Search...',
                                 columns: { actions: 'Actions' },
                                 actions: { apply: 'Apply', cancel: 'Cancel', clearAll: 'Clear all' },
                                 removeFilterAria: 'Remove filter',
@@ -162,6 +164,17 @@ describe('WebVitalsPage', () => {
         expect(timeseriesCall[4]).toBe('/');
         expect(timeseriesCall[5]).toBeNull();
         expect(fixture.nativeElement.textContent).toContain('Path: /');
+    });
+
+    it('keeps breakdown tables searchable, sortable, and paginated', () => {
+        const searches = Array.from<HTMLInputElement>(fixture.nativeElement.querySelectorAll('input[placeholder="Search..."]'));
+        const tables = fixture.debugElement.queryAll(By.css('p-table'));
+        const sortIcons = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('p-sorticon'));
+
+        expect(searches.length).toBeGreaterThanOrEqual(2);
+        expect(tables.length).toBeGreaterThanOrEqual(2);
+        expect(tables.every((table) => table.componentInstance.paginator === true)).toBe(true);
+        expect(sortIcons.length).toBeGreaterThanOrEqual(11);
     });
 
     it('keeps metric cards site-wide while passing rating and path filters to drilldowns', () => {

@@ -20,6 +20,13 @@ describe('SearchConsoleDrilldown', () => {
         getBreakdown: ReturnType<typeof vi.fn>;
     };
 
+    const clickTab = (label: string): void => {
+        const tab = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('p-tab')).find((element) => element.textContent?.includes(label));
+        expect(tab).toBeTruthy();
+        tab?.click();
+        fixture.detectChanges();
+    };
+
     beforeEach(async () => {
         service = {
             getSiteMapping: vi.fn(() =>
@@ -57,6 +64,11 @@ describe('SearchConsoleDrilldown', () => {
                                 },
                                 openInNewTabAria: 'Open in new tab',
                                 seriesChartAria: 'Series chart with {{count}} points',
+                                metricGroups: {
+                                    content: 'Content',
+                                    audience: 'Audience',
+                                    location: 'Location'
+                                },
                                 filters: {
                                     country: 'Country: {{value}}',
                                     device: 'Device: {{value}}',
@@ -132,12 +144,13 @@ describe('SearchConsoleDrilldown', () => {
         expect(fixture.nativeElement.textContent).toContain('Search Console');
         expect(fixture.nativeElement.textContent).toContain('42');
         expect(fixture.nativeElement.textContent).toContain('hitkeep analytics');
+        clickTab('Top pages');
         expect(fixture.nativeElement.textContent).toContain('/docs');
+        const pageLink = fixture.nativeElement.querySelector('a[href="https://example.com/docs"]') as HTMLAnchorElement | null;
+        expect(pageLink).not.toBeNull();
         expect(fixture.nativeElement.textContent).toContain('United States');
         expect(fixture.nativeElement.textContent).toContain('Range:');
         expect(fixture.nativeElement.textContent).not.toContain('2026-05-01');
-        const pageLink = fixture.nativeElement.querySelector('a[href="https://example.com/docs"]') as HTMLAnchorElement | null;
-        expect(pageLink).not.toBeNull();
         expect(service.getOverview).toHaveBeenCalledWith('site-1', {
             from: '2026-05-01T00:00:00Z',
             to: '2026-05-05T00:00:00Z',
@@ -145,6 +158,27 @@ describe('SearchConsoleDrilldown', () => {
             country: null,
             device: null
         });
+    });
+
+    it('uses the shared metric card pattern without unsupported Search Console groups', async () => {
+        fixture = TestBed.createComponent(SearchConsoleDrilldown);
+        fixture.componentRef.setInput('siteId', 'site-1');
+        fixture.componentRef.setInput('siteDomain', 'example.com');
+        fixture.componentRef.setInput('from', '2026-05-01T00:00:00Z');
+        fixture.componentRef.setInput('to', '2026-05-05T00:00:00Z');
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+
+        const component = fixture.componentInstance as unknown as {
+            metricCardTabs: () => { id: string; cards: { id: string }[] }[];
+        };
+        const tabs = component.metricCardTabs();
+
+        expect(tabs.map((tab) => tab.id)).toEqual(['content', 'audience', 'location']);
+        expect(tabs.find((tab) => tab.id === 'content')?.cards.map((card) => card.id)).toEqual(['queries', 'pages']);
+        expect(tabs.find((tab) => tab.id === 'audience')?.cards.map((card) => card.id)).toEqual(['devices']);
+        expect(tabs.find((tab) => tab.id === 'location')?.cards.map((card) => card.id)).toEqual(['countries']);
     });
 
     it('shows the dashboard date range and Search Console-supported filters', async () => {

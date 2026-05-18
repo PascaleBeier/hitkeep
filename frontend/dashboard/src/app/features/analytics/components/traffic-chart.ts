@@ -186,7 +186,7 @@ export class TrafficChart {
                     border: { display: false }
                 },
                 y: {
-                    ticks: { color: textColor, stepSize: 1 },
+                    ticks: { color: textColor, maxTicksLimit: 6, precision: 0 },
                     grid: { color: gridColor, drawBorder: false, tickLength: 0 },
                     border: { display: false },
                     beginAtZero: true

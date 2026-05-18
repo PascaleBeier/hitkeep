@@ -1,0 +1,174 @@
+:host {
+    display: block;
+    --metric-card-group-card-height: 30rem;
+}
+
+.metric-card-group {
+    width: 100%;
+}
+
+.metric-card-group__grid {
+    display: grid;
+    align-items: stretch;
+    grid-auto-rows: var(--metric-card-group-card-height);
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.metric-card-group__card-header {
+    align-items: center;
+    display: flex;
+    gap: 0.75rem;
+    justify-content: space-between;
+    margin-bottom: 0.85rem;
+    min-height: 1.75rem;
+}
+
+.metric-card-group__title-wrap {
+    align-items: center;
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.metric-card-group__title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.metric-card-group__card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+}
+
+:host ::ng-deep .metric-card-group__card .p-card-body,
+:host ::ng-deep .metric-card-group__card .p-card-content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+}
+
+:host ::ng-deep .metric-card-group__card .p-card-body {
+    overflow: hidden;
+}
+
+.metric-card-group__card p-tabs {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.metric-card-group__card p-tablist,
+:host ::ng-deep .metric-card-group__card .p-tablist {
+    flex: 0 0 auto;
+    border-bottom: 1px solid var(--p-surface-border);
+    margin-bottom: 0.85rem;
+}
+
+:host ::ng-deep .metric-card-group__card .p-tablist-tab-list {
+    gap: 0.15rem;
+}
+
+:host ::ng-deep .metric-card-group__card .p-tab {
+    gap: 0.35rem;
+    min-height: 2.2rem;
+    padding: 0.52rem 0.6rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.metric-card-group__card p-tabpanels,
+:host ::ng-deep .metric-card-group__card .p-tabpanels {
+    background: transparent;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    padding: 0;
+}
+
+.metric-card-group__card p-tabpanel,
+:host ::ng-deep .metric-card-group__card .p-tabpanel {
+    height: 100%;
+    min-height: 0;
+    padding: 0;
+}
+
+.metric-card-group__card p-tabpanel.p-tabpanel-active,
+:host ::ng-deep .metric-card-group__card .p-tabpanel-active {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.metric-card-group__card app-metric-list {
+    display: block;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.metric-card-group__single-label {
+    align-items: center;
+    border-bottom: 1px solid var(--p-surface-border);
+    color: var(--p-text-muted-color);
+    display: inline-flex;
+    flex: 0 0 auto;
+    font-size: 0.78rem;
+    font-weight: 700;
+    margin-bottom: 0.85rem;
+    min-height: 2.2rem;
+    padding: 0.52rem 0;
+}
+
+@media (min-width: 768px) {
+    .metric-card-group__grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1280px) {
+    .metric-card-group__grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 1024px) {
+    :host {
+        --metric-card-group-card-height: 28rem;
+    }
+}
+
+@media (max-width: 640px) {
+    :host {
+        --metric-card-group-card-height: 26rem;
+    }
+
+    .metric-card-group__card-header {
+        margin-bottom: 0.7rem;
+    }
+
+    .metric-card-group__card p-tablist,
+    :host ::ng-deep .metric-card-group__card .p-tablist {
+        margin-bottom: 0.7rem;
+    }
+
+    :host ::ng-deep .metric-card-group__card .p-tab {
+        min-height: 2.1rem;
+        padding: 0.48rem 0.55rem;
+    }
+
+    .metric-card-group__single-label {
+        margin-bottom: 0.7rem;
+        min-height: 2.1rem;
+        padding: 0.48rem 0;
+    }
+}

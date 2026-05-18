@@ -43,6 +43,12 @@ export interface Hit {
     viewport_width?: number;
     viewport_height?: number;
     language?: string;
+    country_code?: string;
+    region?: string;
+    city?: string;
+    provider?: string;
+    asn?: number;
+    asn_org?: string;
     utm_source?: string;
     utm_medium?: string;
     utm_campaign?: string;
@@ -81,6 +87,9 @@ export interface SiteStats {
     top_referrers: MetricStat[];
     top_devices: MetricStat[];
     top_countries: MetricStat[];
+    top_cities?: MetricStat[];
+    top_providers?: MetricStat[];
+    top_asns?: MetricStat[];
     top_languages: MetricStat[];
     utm_campaign_hits: number;
     utm_content_hits: number;
@@ -146,6 +155,7 @@ export interface AIFetchFilters {
     assistantName?: string | null;
     assistantFamily?: string | null;
     resourceType?: string | null;
+    path?: string | null;
 }
 
 export interface EventDimensionFilter {
@@ -349,6 +359,9 @@ export class AnalyticsService {
         }
         if (filters.resourceType) {
             params = params.set('resource_type', filters.resourceType);
+        }
+        if (filters.path) {
+            params = params.set('path', filters.path);
         }
         return params;
     }

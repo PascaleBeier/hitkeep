@@ -13,7 +13,7 @@ import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/
 import { PageState } from '@components/page-state/page-state';
 import { KpiCard } from '@features/analytics/components/kpi-card';
 import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar } from '@components/range-toolbar/range-toolbar';
-import { MetricList } from '@features/analytics/components/metric-list';
+import { MetricCardGroup, MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
 import { SeriesChart, SeriesChartPoint, SeriesDefinition } from '@features/analytics/components/series-chart';
 
 type MetricFilterType = 'utm_campaign' | 'utm_content' | 'utm_medium' | 'utm_source' | 'utm_term';
@@ -25,7 +25,7 @@ interface MetricFilter {
 @Component({
     selector: 'app-utm-dashboard',
     standalone: true,
-    imports: [ReactiveFormsModule, RouterLink, TranslocoPipe, ButtonModule, CardModule, PageHeader, PageHeaderLeft, PageBreadcrumb, PageState, RangeToolbar, KpiCard, MetricList, SeriesChart],
+    imports: [ReactiveFormsModule, RouterLink, TranslocoPipe, ButtonModule, CardModule, PageHeader, PageHeaderLeft, PageBreadcrumb, PageState, RangeToolbar, KpiCard, MetricCardGroup, SeriesChart],
     templateUrl: './utm.html',
     styleUrl: './utm.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -168,6 +168,70 @@ export class UtmDashboard {
             }
         ];
     });
+    protected readonly metricCardTabs = computed<MetricCardGroupTab<MetricFilterType>[]>(() => {
+        this.activeLanguage();
+        const stats = this.statsService.stats();
+        const loading = this.statsService.isLoading();
+        return [
+            {
+                id: 'acquisition',
+                label: this.transloco.translate('common.metricGroups.acquisition'),
+                icon: 'pi-link',
+                cards: [
+                    {
+                        id: 'campaigns',
+                        title: this.transloco.translate('utm.metrics.topCampaigns'),
+                        icon: 'pi-tag',
+                        data: stats?.top_utm_campaigns ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('utm_campaign'),
+                        filterType: 'utm_campaign'
+                    },
+                    {
+                        id: 'sources',
+                        title: this.transloco.translate('utm.metrics.topSources'),
+                        icon: 'pi-link',
+                        data: stats?.top_utm_sources ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('utm_source'),
+                        filterType: 'utm_source'
+                    },
+                    {
+                        id: 'mediums',
+                        title: this.transloco.translate('utm.metrics.topMediums'),
+                        icon: 'pi-send',
+                        data: stats?.top_utm_mediums ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('utm_medium'),
+                        filterType: 'utm_medium'
+                    },
+                    {
+                        id: 'contents',
+                        title: this.transloco.translate('utm.metrics.topContents'),
+                        icon: 'pi-file',
+                        data: stats?.top_utm_contents ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('utm_content'),
+                        filterType: 'utm_content'
+                    },
+                    {
+                        id: 'terms',
+                        title: this.transloco.translate('utm.metrics.topTerms'),
+                        icon: 'pi-search',
+                        data: stats?.top_utm_terms ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('utm_term'),
+                        filterType: 'utm_term'
+                    }
+                ]
+            }
+        ];
+    });
 
     constructor() {
         effect(() => {
@@ -210,6 +274,10 @@ export class UtmDashboard {
             }
             return [...filters, { type, value: metric.name }];
         });
+    }
+
+    protected onMetricCardClick(event: MetricCardGroupRowClick): void {
+        this.applyMetricFilter(event.filterType as MetricFilterType, event.metric);
     }
 
     protected clearFilter() {

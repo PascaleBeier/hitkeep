@@ -486,6 +486,9 @@
         },
         "filters": {
             "country": "Land: {{value}}",
+            "city": "Stadt: {{value}}",
+            "provider": "Provider: {{value}}",
+            "asn": "ASN: {{value}}",
             "device": "Gerät: {{value}}",
             "language": "Sprache: {{value}}",
             "page": "Seite: {{value}}",
@@ -496,10 +499,20 @@
             "conversionRate": "Conversion-Rate"
         },
         "loadingSiteData": "Seitendaten werden geladen...",
+        "metricGroups": {
+            "content": "Inhalte",
+            "acquisition": "Akquise",
+            "audience": "Zielgruppe",
+            "location": "Standort",
+            "network": "Netzwerk"
+        },
         "metrics": {
             "audience": "Zielgruppe",
             "browsers": "Browser",
             "countries": "Länder",
+            "cities": "Städte",
+            "providers": "Provider",
+            "asns": "ASNs",
             "devices": "Geräte",
             "languages": "Sprachen",
             "pages": "Seiten",
@@ -1586,6 +1599,7 @@
                 "database": "Datenbank",
                 "workers": "Worker",
                 "isLeader": "Ist Leader",
+                "ip2locationAttribution": "HitKeep verwendet die IP2Location LITE-Datenbank für IP-Geolocation.",
                 "actions": {
                     "check": "Prüfen"
                 }
@@ -2228,6 +2242,15 @@
                 "correlatedPaths": "Korrelierte Pfade",
                 "aiVisits": "AI-vermittelte Besuche",
                 "uncorrelatedFetches": "Nicht korrelierte Fetches"
+            },
+            "helpAria": "Korrelationshilfe anzeigen",
+            "help": {
+                "correlatedPaths": "Abgerufene Pfade, die im ausgewählten Zeitraum später AI-vermittelte Besuche erhalten haben.",
+                "aiVisits": "Menschliche Besuche über AI-Referrer auf Pfaden, die auch von AI-Crawlern abgerufen wurden.",
+                "uncorrelatedFetches": "Fetches auf Pfaden, die in diesem Zeitraum keinen passenden AI-vermittelten Besuch erzeugt haben.",
+                "citationYieldCard": "Nutze dies, um Seiten zu erkennen, bei denen AI-Crawler-Nachfrage zu nachgelagerten Besuchen führt.",
+                "opportunityCard": "Nutze dies, um stark abgerufene Seiten zu finden, die bessere Inhalte, Links oder Verfügbarkeit brauchen.",
+                "failureHotspotCard": "Nutze dies, um Assistenten- und Pfadpräfix-Paare zu finden, bei denen Crawler-Zugriffe Fehler auslösen."
             }
         },
         "tables": {
@@ -2239,6 +2262,7 @@
             "opportunityPages": {
                 "title": "Chancen-Seiten",
                 "description": "Stark abgerufene Seiten mit wenig Downstream-Besuchen oder erhöhtem Fehlerdruck.",
+                "cardSubtitle": "Benötigt Aufmerksamkeit",
                 "empty": "Keine Chancen-Seiten entsprechen den aktuellen Filtern."
             },
             "failureHotspots": {
@@ -2447,6 +2471,10 @@
             "devices": "Top-Geräte",
             "countries": "Top-Länder"
         },
+        "breakdowns": {
+            "title": "Umsatzaufschlüsselung",
+            "description": "Vergleiche Produktleistung und Umsatzzuordnung an einer Stelle."
+        },
         "products": {
             "title": "Top-Produkte",
             "description": "Sieh, welche Produkte den meisten Umsatz und die meisten Bestellungen erzielen.",
@@ -2468,7 +2496,9 @@
         },
         "actions": {
             "filterProduct": "Filtern",
-            "clearProductFilter": "Zurücksetzen"
+            "clearProductFilter": "Zurücksetzen",
+            "filterSource": "Filtern",
+            "clearSourceFilter": "Zurücksetzen"
         },
         "empty": {
             "title": "Noch keine E-Commerce-Daten",
@@ -2576,6 +2606,9 @@
             "pageviews": "Seitenaufrufe",
             "sessions": "Sitzungen",
             "top_source": "Wichtigste Quelle",
+            "top_city": "Wichtigste Stadt insgesamt",
+            "top_provider": "Wichtigster Provider insgesamt",
+            "top_asn": "Wichtigste ASN insgesamt",
             "search_impressions": "Suchimpressionen",
             "search_ctr": "Such-CTR",
             "search_position": "Durchschnittsposition",
@@ -2737,7 +2770,10 @@
                 "countries": "Länder",
                 "languages": "Sprachen",
                 "browsers": "Browser",
-                "devices": "Geräte"
+                "devices": "Geräte",
+                "cities": "Städte",
+                "providers": "Provider",
+                "asns": "ASNs"
             }
         },
         "columns": {

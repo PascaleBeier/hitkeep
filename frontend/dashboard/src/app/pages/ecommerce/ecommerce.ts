@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, linkedSignal, signal } from '@angular/core';
+import { DOCUMENT, NgOptimizedImage } from '@angular/common';
 import { ReactiveFormsModule } from '@angular/forms';
 import { finalize, forkJoin } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
@@ -6,19 +7,23 @@ import { injectActiveLang } from '@core/i18n/active-lang';
 import { TranslocoLocaleService } from '@jsverse/transloco-locale';
 import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
+import { IconFieldModule } from 'primeng/iconfield';
+import { InputIconModule } from 'primeng/inputicon';
+import { InputTextModule } from 'primeng/inputtext';
 import { TableModule } from 'primeng/table';
+import { TabsModule } from 'primeng/tabs';
 import { SiteService } from '@features/sites/services/site.service';
 import { AnalyticsService } from '@core/services/analytics.service';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
-import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
 import { KpiCard } from '@features/analytics/components/kpi-card';
 import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar } from '@components/range-toolbar/range-toolbar';
-import { MetricList } from '@features/analytics/components/metric-list';
+import { MetricCardGroup, MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
 import { SeriesChart, SeriesChartPoint, SeriesDefinition } from '@features/analytics/components/series-chart';
 import { EcommerceProductStat, EcommerceSeriesPoint, EcommerceSourceStat, EcommerceSummary, MetricStat, SiteStats } from '@models/analytics.types';
+import { browserAppUrl } from '@core/interceptors/base-path.interceptor';
 
-type MetricFilterType = 'referrer' | 'device' | 'country' | 'utm_source';
+type MetricFilterType = 'referrer' | 'device' | 'country' | 'city' | 'provider' | 'asn' | 'utm_source';
 
 interface MetricFilter {
     type: MetricFilterType;
@@ -32,7 +37,25 @@ interface ProductFilter {
 
 @Component({
     selector: 'app-ecommerce',
-    imports: [ReactiveFormsModule, TranslocoPipe, ButtonModule, CardModule, TableModule, PageHeader, PageHeaderLeft, PageBreadcrumb, TableRowActions, RangeToolbar, KpiCard, MetricList, SeriesChart],
+    imports: [
+        NgOptimizedImage,
+        ReactiveFormsModule,
+        TranslocoPipe,
+        ButtonModule,
+        CardModule,
+        IconFieldModule,
+        InputIconModule,
+        InputTextModule,
+        TableModule,
+        TabsModule,
+        PageHeader,
+        PageHeaderLeft,
+        PageBreadcrumb,
+        RangeToolbar,
+        KpiCard,
+        MetricCardGroup,
+        SeriesChart
+    ],
     templateUrl: './ecommerce.html',
     styleUrl: './ecommerce.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -43,6 +66,7 @@ export class EcommercePage {
     private analyticsService = inject(AnalyticsService);
     private localeService = inject(TranslocoLocaleService);
     private transloco = inject(TranslocoService);
+    private document = inject(DOCUMENT);
     private readonly activeLanguage = injectActiveLang();
 
     protected readonly summary = signal<EcommerceSummary | null>(null);
@@ -161,6 +185,106 @@ export class EcommercePage {
         }
         return chips;
     });
+    protected readonly metricCardTabs = computed<MetricCardGroupTab<MetricFilterType>[]>(() => {
+        this.activeLanguage();
+        const stats = this.filterStats();
+        const summary = this.summary();
+        const loading = this.isLoading();
+        return [
+            {
+                id: 'acquisition',
+                label: this.transloco.translate('common.metricGroups.acquisition'),
+                icon: 'pi-link',
+                cards: [
+                    {
+                        id: 'utm-sources',
+                        title: this.transloco.translate('ecommerce.filtersPanels.sources'),
+                        icon: 'pi-link',
+                        data: stats?.top_utm_sources ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('utm_source'),
+                        filterType: 'utm_source'
+                    },
+                    {
+                        id: 'referrers',
+                        title: this.transloco.translate('ecommerce.filtersPanels.referrers'),
+                        icon: 'pi-share-alt',
+                        data: stats?.top_referrers ?? [],
+                        linkMode: 'url',
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('referrer'),
+                        filterType: 'referrer'
+                    }
+                ]
+            },
+            {
+                id: 'audience',
+                label: this.transloco.translate('common.metricGroups.audience'),
+                icon: 'pi-users',
+                cards: [
+                    {
+                        id: 'devices',
+                        title: this.transloco.translate('ecommerce.filtersPanels.devices'),
+                        icon: 'pi-mobile',
+                        data: stats?.top_devices ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('device'),
+                        filterType: 'device'
+                    }
+                ]
+            },
+            {
+                id: 'location',
+                label: this.transloco.translate('common.metricGroups.location'),
+                icon: 'pi-map',
+                cards: [
+                    {
+                        id: 'countries',
+                        title: this.transloco.translate('ecommerce.filtersPanels.countries'),
+                        icon: 'pi-globe',
+                        data: stats?.top_countries ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('country'),
+                        showCountryFlags: true,
+                        showCountryNames: true,
+                        filterType: 'country'
+                    },
+                    {
+                        id: 'cities',
+                        title: this.transloco.translate('common.metrics.cities'),
+                        icon: 'pi-map-marker',
+                        data: summary?.top_cities ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('city'),
+                        filterType: 'city'
+                    }
+                ]
+            },
+            {
+                id: 'network',
+                label: this.transloco.translate('common.metricGroups.network'),
+                icon: 'pi-server',
+                cards: [
+                    {
+                        id: 'providers',
+                        title: this.transloco.translate('common.metrics.providers'),
+                        icon: 'pi-server',
+                        data: summary?.top_providers ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('provider'),
+                        filterType: 'provider'
+                    },
+                    { id: 'asns', title: this.transloco.translate('common.metrics.asns'), icon: 'pi-sitemap', data: summary?.top_asns ?? [], isLoading: loading, isRowClickable: true, activeValue: this.activeFilterValue('asn'), filterType: 'asn' }
+                ]
+            }
+        ];
+    });
 
     constructor() {
         effect(() => {
@@ -208,6 +332,10 @@ export class EcommercePage {
         });
     }
 
+    protected onMetricCardClick(event: MetricCardGroupRowClick): void {
+        this.applyMetricFilter(event.filterType as MetricFilterType, event.metric);
+    }
+
     protected activeFilterValue(type: MetricFilterType): string | null {
         return this.activeFilters().find((filter) => filter.type === type)?.value ?? null;
     }
@@ -238,16 +366,36 @@ export class EcommercePage {
         return current?.itemId === product.item_id && current?.itemName === product.item_name;
     }
 
-    protected productActions(product: EcommerceProductStat): TableRowActionItem[] {
-        this.activeLanguage();
-        const active = this.isProductFilterActive(product);
-        return [
-            {
-                label: this.transloco.translate(active ? 'ecommerce.actions.clearProductFilter' : 'ecommerce.actions.filterProduct'),
-                icon: active ? 'pi pi-filter-slash' : 'pi pi-filter',
-                command: () => this.toggleProductFilter(product)
-            }
-        ];
+    protected toggleSourceFilter(source: EcommerceSourceStat): void {
+        const sourceValue = source.utm_source?.trim();
+        if (!sourceValue) {
+            return;
+        }
+        this.applyMetricFilter('utm_source', { name: sourceValue, value: source.orders });
+    }
+
+    protected isSourceFilterActive(source: EcommerceSourceStat): boolean {
+        const sourceValue = source.utm_source?.trim();
+        return !!sourceValue && this.activeFilterValue('utm_source') === sourceValue;
+    }
+
+    protected sourceLinkUrl(value: string | null | undefined): string | null {
+        const url = this.normalizeUrl(value);
+        return url ? url.href : null;
+    }
+
+    protected sourceDomain(value: string | null | undefined): string | null {
+        const url = this.normalizeUrl(value);
+        return url ? url.hostname : null;
+    }
+
+    protected sourceDisplayUrl(value: string | null | undefined): string {
+        if (!value) return '';
+        return value.replace(/^https?:\/\//, '').replace(/^www\./, '');
+    }
+
+    protected faviconUrlForDomain(domain: string | null | undefined): string | null {
+        return domain ? browserAppUrl(this.document, `/api/favicon/${encodeURIComponent(domain)}`) : null;
     }
 
     protected formatCurrency(value: number, currency: string): string {
@@ -318,6 +466,12 @@ export class EcommercePage {
                 return this.transloco.translate('common.filters.device', { value: filter.value });
             case 'country':
                 return this.transloco.translate('common.filters.country', { value: filter.value });
+            case 'city':
+                return this.transloco.translate('common.filters.city', { value: filter.value });
+            case 'provider':
+                return this.transloco.translate('common.filters.provider', { value: filter.value });
+            case 'asn':
+                return this.transloco.translate('common.filters.asn', { value: filter.value });
             case 'utm_source':
                 return this.transloco.translate('ecommerce.filters.utmSource', { value: filter.value });
             default:
@@ -354,5 +508,17 @@ export class EcommercePage {
         }
 
         return { from: start.toISOString(), to: end.toISOString() };
+    }
+
+    private normalizeUrl(raw: string | null | undefined): URL | null {
+        if (!raw) return null;
+        const trimmed = raw.trim();
+        if (!trimmed || trimmed.toLowerCase() === 'direct' || trimmed.startsWith('(')) return null;
+        const normalized = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+        try {
+            return new URL(normalized);
+        } catch {
+            return null;
+        }
     }
 }

@@ -2,7 +2,7 @@ import { SeriesChartPoint } from '@features/analytics/components/series-chart';
 import { AIFetchSeriesPoint } from '@models/analytics.types';
 
 export interface AIFilterChip {
-    key: 'assistantName' | 'assistantFamily' | 'resourceType';
+    key: 'assistantName' | 'assistantFamily' | 'resourceType' | 'path';
     label: string;
 }
 
