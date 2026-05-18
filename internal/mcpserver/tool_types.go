@@ -19,7 +19,7 @@ type siteRangeInput struct {
 }
 
 type filterInput struct {
-	Type  string `json:"type" jsonschema:"Filter type: path, hostname, referrer, referrer_host, device, country, browser, language, utm_campaign, utm_content, utm_medium, utm_source, or utm_term."`
+	Type  string `json:"type" jsonschema:"Filter type: path, hostname, referrer, referrer_host, device, country, city, provider, asn, browser, language, utm_campaign, utm_content, utm_medium, utm_source, or utm_term."`
 	Value string `json:"value" jsonschema:"Filter value."`
 }
 
@@ -50,12 +50,13 @@ type ecommerceInput struct {
 }
 
 type webVitalsInput struct {
-	SiteID       string `json:"site_id" jsonschema:"HitKeep site UUID."`
-	Metric       string `json:"metric,omitempty" jsonschema:"Optional Web Vital metric filter: LCP, INP, CLS, FCP, or TTFB. Defaults to all metrics for summary and LCP for page breakdowns."`
-	Path         string `json:"path,omitempty" jsonschema:"Optional normalized page path filter."`
-	Rating       string `json:"rating,omitempty" jsonschema:"Optional rating filter: good, needs_improvement, or poor."`
-	IncludePages bool   `json:"include_pages,omitempty" jsonschema:"Whether to include aggregate page breakdown rows."`
-	Limit        int    `json:"limit,omitempty" jsonschema:"Maximum page rows to return. Defaults to 10 and is capped at 50."`
+	SiteID             string `json:"site_id" jsonschema:"HitKeep site UUID."`
+	Metric             string `json:"metric,omitempty" jsonschema:"Optional Web Vital metric filter: LCP, INP, CLS, FCP, or TTFB. Defaults to all metrics for summary and LCP for page or dimension breakdowns."`
+	Path               string `json:"path,omitempty" jsonschema:"Optional normalized page path filter."`
+	Rating             string `json:"rating,omitempty" jsonschema:"Optional rating filter: good, needs_improvement, or poor."`
+	IncludePages       bool   `json:"include_pages,omitempty" jsonschema:"Whether to include aggregate page breakdown rows."`
+	BreakdownDimension string `json:"breakdown_dimension,omitempty" jsonschema:"Optional aggregate visitor context breakdown: browser, country, language, device, city, provider, or asn."`
+	Limit              int    `json:"limit,omitempty" jsonschema:"Maximum page or breakdown rows to return. Defaults to 10 and is capped at 50."`
 	rangeInput
 }
 
@@ -138,12 +139,14 @@ type ecommerceOutput struct {
 }
 
 type webVitalsOutput struct {
-	SiteID  string                      `json:"site_id"`
-	From    string                      `json:"from"`
-	To      string                      `json:"to"`
-	Metric  api.WebVitalMetric          `json:"metric,omitempty"`
-	Summary []api.WebVitalSummaryMetric `json:"summary"`
-	Pages   []api.WebVitalPageRow       `json:"pages,omitempty"`
+	SiteID             string                      `json:"site_id"`
+	From               string                      `json:"from"`
+	To                 string                      `json:"to"`
+	Metric             api.WebVitalMetric          `json:"metric,omitempty"`
+	Summary            []api.WebVitalSummaryMetric `json:"summary"`
+	Pages              []api.WebVitalPageRow       `json:"pages,omitempty"`
+	BreakdownDimension api.WebVitalDimension       `json:"breakdown_dimension,omitempty"`
+	Breakdown          []api.WebVitalDimensionRow  `json:"breakdown,omitempty"`
 }
 
 type aiVisibilityOutput struct {
@@ -274,6 +277,9 @@ type mcpSiteStats struct {
 	TopReferrers       []api.MetricStat    `json:"top_referrers"`
 	TopDevices         []api.MetricStat    `json:"top_devices"`
 	TopCountries       []api.MetricStat    `json:"top_countries"`
+	TopCities          []api.MetricStat    `json:"top_cities"`
+	TopProviders       []api.MetricStat    `json:"top_providers"`
+	TopASNs            []api.MetricStat    `json:"top_asns"`
 	TopBrowsers        []api.MetricStat    `json:"top_browsers"`
 	TopAIBots          []api.MetricStat    `json:"top_ai_bots"`
 	TopAISources       []api.MetricStat    `json:"top_ai_sources"`

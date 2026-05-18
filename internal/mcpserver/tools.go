@@ -45,13 +45,13 @@ func (s *service) registerTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "hitkeep_get_ecommerce",
 		Title:       "Get HitKeep Ecommerce Analytics",
-		Description: "Read ecommerce summary, top products, and source stats for one site.",
+		Description: "Read ecommerce summary, top products, source stats, and aggregate city, provider, and ASN breakdowns for one site.",
 		Annotations: readOnly,
 	}, s.getEcommerce)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "hitkeep_get_web_vitals",
 		Title:       "Get HitKeep Web Vitals",
-		Description: "Read aggregate Web Vitals p75, sample counts, rating counts, and optional page breakdowns for one site.",
+		Description: "Read aggregate Web Vitals p75, sample counts, rating counts, and optional page or visitor-context breakdowns for one site.",
 		Annotations: readOnly,
 	}, s.getWebVitals)
 	mcp.AddTool(server, &mcp.Tool{
@@ -268,31 +268,9 @@ func (s *service) getWebVitals(ctx context.Context, _ *mcp.CallToolRequest, inpu
 		return nil, webVitalsOutput{}, err
 	}
 
-	metric := api.WebVitalMetric(strings.TrimSpace(input.Metric))
-	if metric != "" {
-		if _, err := database.WebVitalRatingForValue(metric, 0); err != nil {
-			return nil, webVitalsOutput{}, err
-		}
-	} else if input.IncludePages {
-		metric = api.WebVitalLCP
-	}
-	rating := api.WebVitalRating(strings.TrimSpace(input.Rating))
-	if rating != "" {
-		switch rating {
-		case api.WebVitalRatingGood, api.WebVitalRatingNeedsImprovement, api.WebVitalRatingPoor:
-		default:
-			return nil, webVitalsOutput{}, fmt.Errorf("invalid web vital rating %q", input.Rating)
-		}
-	}
-
-	params := api.WebVitalsParams{
-		SiteID: siteID,
-		Start:  start,
-		End:    end,
-		Metric: metric,
-		Path:   strings.TrimSpace(input.Path),
-		Rating: rating,
-		Limit:  normalizeLimit(input.Limit),
+	params, breakdownDimension, err := parseMCPWebVitalsParams(siteID, start, end, input)
+	if err != nil {
+		return nil, webVitalsOutput{}, err
 	}
 	analyticsStore, err := s.analyticsStore(ctx, siteID)
 	if err != nil {
@@ -308,15 +286,97 @@ func (s *service) getWebVitals(ctx context.Context, _ *mcp.CallToolRequest, inpu
 		To:      formatMCPTime(end),
 		Summary: summary,
 	}
-	if input.IncludePages {
-		pages, err := analyticsStore.GetWebVitalsPages(ctx, params)
-		if err != nil {
-			return nil, webVitalsOutput{}, err
-		}
-		output.Metric = metric
-		output.Pages = pages
+	if err := loadMCPWebVitalsDetails(ctx, analyticsStore, params, input, breakdownDimension, &output); err != nil {
+		return nil, webVitalsOutput{}, err
 	}
 	return nil, output, nil
+}
+
+func parseMCPWebVitalsParams(siteID uuid.UUID, start, end time.Time, input webVitalsInput) (api.WebVitalsParams, api.WebVitalDimension, error) {
+	metric, err := parseMCPWebVitalMetric(input)
+	if err != nil {
+		return api.WebVitalsParams{}, "", err
+	}
+	rating, err := parseMCPWebVitalRating(input.Rating)
+	if err != nil {
+		return api.WebVitalsParams{}, "", err
+	}
+	breakdownDimension := api.WebVitalDimension(strings.TrimSpace(input.BreakdownDimension))
+	if breakdownDimension != "" && !isAllowedWebVitalBreakdownDimension(breakdownDimension) {
+		return api.WebVitalsParams{}, "", fmt.Errorf("invalid web vital breakdown dimension %q", input.BreakdownDimension)
+	}
+
+	return api.WebVitalsParams{
+		SiteID: siteID,
+		Start:  start,
+		End:    end,
+		Metric: metric,
+		Path:   strings.TrimSpace(input.Path),
+		Rating: rating,
+		Limit:  normalizeLimit(input.Limit),
+	}, breakdownDimension, nil
+}
+
+func parseMCPWebVitalMetric(input webVitalsInput) (api.WebVitalMetric, error) {
+	metric := api.WebVitalMetric(strings.TrimSpace(input.Metric))
+	if metric != "" {
+		if _, err := database.WebVitalRatingForValue(metric, 0); err != nil {
+			return "", err
+		}
+	}
+	if metric == "" && (input.IncludePages || strings.TrimSpace(input.BreakdownDimension) != "") {
+		return api.WebVitalLCP, nil
+	}
+	return metric, nil
+}
+
+func parseMCPWebVitalRating(rawRating string) (api.WebVitalRating, error) {
+	rating := api.WebVitalRating(strings.TrimSpace(rawRating))
+	if rating == "" {
+		return "", nil
+	}
+	switch rating {
+	case api.WebVitalRatingGood, api.WebVitalRatingNeedsImprovement, api.WebVitalRatingPoor:
+		return rating, nil
+	default:
+		return "", fmt.Errorf("invalid web vital rating %q", rawRating)
+	}
+}
+
+func loadMCPWebVitalsDetails(ctx context.Context, store *database.Store, params api.WebVitalsParams, input webVitalsInput, breakdownDimension api.WebVitalDimension, output *webVitalsOutput) error {
+	if input.IncludePages {
+		pages, err := store.GetWebVitalsPages(ctx, params)
+		if err != nil {
+			return err
+		}
+		output.Metric = params.Metric
+		output.Pages = pages
+	}
+	if breakdownDimension != "" {
+		breakdown, err := store.GetWebVitalsBreakdown(ctx, params, breakdownDimension)
+		if err != nil {
+			return err
+		}
+		output.Metric = params.Metric
+		output.BreakdownDimension = breakdownDimension
+		output.Breakdown = breakdown
+	}
+	return nil
+}
+
+func isAllowedWebVitalBreakdownDimension(dimension api.WebVitalDimension) bool {
+	switch dimension {
+	case api.WebVitalDimensionBrowser,
+		api.WebVitalDimensionCountry,
+		api.WebVitalDimensionLanguage,
+		api.WebVitalDimensionDevice,
+		api.WebVitalDimensionCity,
+		api.WebVitalDimensionProvider,
+		api.WebVitalDimensionASN:
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *service) getAIVisibility(ctx context.Context, _ *mcp.CallToolRequest, input aiVisibilityInput) (*mcp.CallToolResult, aiVisibilityOutput, error) {
