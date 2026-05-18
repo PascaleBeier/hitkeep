@@ -64,8 +64,13 @@
                                 [globalFilterFields]="['email', 'instance_role', 'created_at']"
                                 [sortField]="'created_at'"
                                 [sortOrder]="-1"
+                                [paginator]="true"
+                                [rows]="10"
+                                [rowsPerPageOptions]="[10, 25, 50]"
                                 [rowHover]="true"
+                                responsiveLayout="scroll"
                                 styleClass="p-datatable-sm admin-data-table"
+                                [tableStyle]="{ 'min-width': '760px' }"
                             >
                                 <ng-template pTemplate="header">
                                     <tr>
@@ -124,8 +129,13 @@
                                 [globalFilterFields]="['domain', 'owner_email', 'created_at']"
                                 [sortField]="'created_at'"
                                 [sortOrder]="-1"
+                                [paginator]="true"
+                                [rows]="10"
+                                [rowsPerPageOptions]="[10, 25, 50]"
                                 [rowHover]="true"
+                                responsiveLayout="scroll"
                                 styleClass="p-datatable-sm admin-data-table"
+                                [tableStyle]="{ 'min-width': '760px' }"
                             >
                                 <ng-template pTemplate="header">
                                     <tr>
@@ -175,8 +185,13 @@
                                 [globalFilterFields]="['name', 'created_at']"
                                 [sortField]="'created_at'"
                                 [sortOrder]="-1"
+                                [paginator]="true"
+                                [rows]="10"
+                                [rowsPerPageOptions]="[10, 25, 50]"
                                 [rowHover]="true"
+                                responsiveLayout="scroll"
                                 styleClass="p-datatable-sm admin-data-table"
+                                [tableStyle]="{ 'min-width': '820px' }"
                             >
                                 <ng-template pTemplate="header">
                                     <tr>
@@ -298,6 +313,10 @@
                             } @else {
                             <p-message severity="error" [text]="'admin.system.console.loadFailed' | transloco" styleClass="w-full" />
                             }
+                            <p system-status-card-footer class="m-0 border-t border-surface-100 px-4 py-3 text-xs text-muted-color dark:border-surface-800">
+                                {{ "admin.system.health.ip2locationAttribution" | transloco }}
+                                <a class="admin-link" href="https://www.ip2location.com" target="_blank" rel="noopener">IP2Location</a>
+                            </p>
                         </app-system-status-card>
 
                         <app-system-status-card
@@ -498,17 +517,17 @@
                             <div class="admin-feature-list">
                                 @for (feature of enabledFeatureRows(); track feature.label) {
                                 <div class="admin-feature">
-                                    <span class="feature-copy">
-                                        <span class="feature-label">{{ feature.label }}</span>
+                                    <span class="min-w-0 font-semibold">
+                                        <span class="text-sm text-[var(--p-text-color)] [overflow-wrap:anywhere]">{{ feature.label }}</span>
                                         @if (feature.detail) {
                                         <br />
-                                        <small class="feature-detail">{{ feature.detail }}</small>
+                                        <small class="text-sm text-[var(--p-text-muted-color)] [overflow-wrap:anywhere]">{{ feature.detail }}</small>
                                         }
                                     </span>
                                     <p-tag [value]="feature.value" [severity]="feature.enabled ? 'success' : 'secondary'" />
                                 </div>
                                 } @empty {
-                                <div class="admin-empty">{{ "admin.system.console.noFeatures" | transloco }}</div>
+                                <div class="text-sm text-[var(--p-text-muted-color)]">{{ "admin.system.console.noFeatures" | transloco }}</div>
                                 }
                             </div>
                         </app-system-status-card>
@@ -524,7 +543,7 @@
                             (refreshClicked)="loadSystemStorage()"
                         >
                             @if (systemStorage(); as storage) {
-                            <div class="admin-storage-layout">
+                            <div class="grid gap-4 min-[1181px]:grid-cols-[minmax(18rem,0.8fr)_minmax(0,1.2fr)]">
                                 <dl class="admin-definition-list admin-definition-list--compact">
                                     <div>
                                         <dt>{{ "admin.system.storage.sharedDb" | transloco }}</dt>

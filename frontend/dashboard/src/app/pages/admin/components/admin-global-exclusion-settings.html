@@ -71,7 +71,20 @@
         </p-iconfield>
     </div>
     <div class="hk-crud-table-wrap">
-        <p-table #exclusionsTable [value]="exclusions()" [globalFilterFields]="['cidr', 'description', 'created_at']" [sortField]="'created_at'" [sortOrder]="-1" [rowHover]="true" styleClass="hk-crud-table p-datatable-sm">
+        <p-table
+            #exclusionsTable
+            [value]="exclusions()"
+            [globalFilterFields]="['cidr', 'description', 'created_at']"
+            [sortField]="'created_at'"
+            [sortOrder]="-1"
+            [paginator]="true"
+            [rows]="10"
+            [rowsPerPageOptions]="[10, 25, 50]"
+            [rowHover]="true"
+            responsiveLayout="scroll"
+            styleClass="hk-crud-table p-datatable-sm"
+            [tableStyle]="{ 'min-width': '680px' }"
+        >
             <ng-template pTemplate="header">
                 <tr>
                     <th pSortableColumn="cidr">

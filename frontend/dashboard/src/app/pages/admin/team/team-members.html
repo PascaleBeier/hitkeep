@@ -72,7 +72,21 @@
 </div>
 
 <div class="hk-crud-table-wrap">
-    <p-table #membersTable [value]="members()" [loading]="isLoading()" [globalFilterFields]="['email', 'role', 'added_at']" [sortField]="'added_at'" [sortOrder]="-1" [rowHover]="true" styleClass="hk-crud-table p-datatable-sm">
+    <p-table
+        #membersTable
+        [value]="members()"
+        [loading]="isLoading()"
+        [globalFilterFields]="['email', 'role', 'added_at']"
+        [sortField]="'added_at'"
+        [sortOrder]="-1"
+        [paginator]="true"
+        [rows]="10"
+        [rowsPerPageOptions]="[10, 25, 50]"
+        [rowHover]="true"
+        responsiveLayout="scroll"
+        styleClass="hk-crud-table p-datatable-sm"
+        [tableStyle]="{ 'min-width': '720px' }"
+    >
         <ng-template pTemplate="header">
             <tr>
                 <th pSortableColumn="email">
@@ -134,16 +148,46 @@
             <div class="team-members__pending-title">{{ "teams.management.pendingTitle" | transloco }}</div>
             <div class="team-members__meta-subtitle">{{ "teams.management.pendingSubtitle" | transloco }}</div>
         </div>
+        <p-iconfield class="hk-crud-search">
+            <p-inputicon class="pi pi-search" />
+            <input pInputText #pendingInvitesSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="pendingInvitesTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
+        </p-iconfield>
     </div>
 
     <div class="hk-crud-table-wrap">
-        <p-table [value]="pendingInvites()" [loading]="isLoading()" [sortField]="'created_at'" [sortOrder]="-1" [rowHover]="true" styleClass="hk-crud-table p-datatable-sm">
+        <p-table
+            #pendingInvitesTable
+            [value]="pendingInvites()"
+            [loading]="isLoading()"
+            [globalFilterFields]="['email', 'role', 'created_at', 'expires_at']"
+            [sortField]="'created_at'"
+            [sortOrder]="-1"
+            [paginator]="true"
+            [rows]="10"
+            [rowsPerPageOptions]="[10, 25, 50]"
+            [rowHover]="true"
+            responsiveLayout="scroll"
+            styleClass="hk-crud-table p-datatable-sm"
+            [tableStyle]="{ 'min-width': '760px' }"
+        >
             <ng-template pTemplate="header">
                 <tr>
-                    <th>{{ "common.columns.email" | transloco }}</th>
-                    <th>{{ "common.columns.role" | transloco }}</th>
-                    <th>{{ "common.columns.created" | transloco }}</th>
-                    <th>{{ "teams.management.expiresLabel" | transloco }}</th>
+                    <th pSortableColumn="email">
+                        {{ "common.columns.email" | transloco }}
+                        <p-sortIcon field="email" />
+                    </th>
+                    <th pSortableColumn="role">
+                        {{ "common.columns.role" | transloco }}
+                        <p-sortIcon field="role" />
+                    </th>
+                    <th pSortableColumn="created_at">
+                        {{ "common.columns.created" | transloco }}
+                        <p-sortIcon field="created_at" />
+                    </th>
+                    <th pSortableColumn="expires_at">
+                        {{ "teams.management.expiresLabel" | transloco }}
+                        <p-sortIcon field="expires_at" />
+                    </th>
                     <th>{{ "common.columns.actions" | transloco }}</th>
                 </tr>
             </ng-template>

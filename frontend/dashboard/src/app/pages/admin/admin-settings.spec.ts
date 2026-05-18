@@ -506,3 +506,143 @@ describe('AdminSettings', () => {
         expect(component.canViewActivation()).toBe(true);
     });
 });
+
+describe('AdminSettings rendered system status', () => {
+    let httpMock: HttpTestingController;
+    const renderedPermissionServiceMock = {
+        isInstanceOwner: signal(false),
+        isInstanceAdmin: signal(false),
+        permissions: signal(null)
+    };
+
+    beforeEach(() => {
+        TestBed.configureTestingModule({
+            imports: [
+                AdminSettings,
+                TranslocoTestingModule.forRoot({
+                    langs: {
+                        en: {
+                            admin: {
+                                system: {
+                                    health: {
+                                        ip2locationAttribution: 'HitKeep uses the IP2Location LITE database for IP geolocation.'
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    translocoConfig: {
+                        availableLangs: ['en'],
+                        defaultLang: 'en'
+                    },
+                    preloadLangs: true
+                })
+            ],
+            providers: [
+                provideRouter([]),
+                provideHttpClient(),
+                provideHttpClientTesting(),
+                {
+                    provide: UserProfileService,
+                    useValue: {
+                        profile: signal({ id: 'admin-user', email: 'admin@example.com' }),
+                        loadProfile: vi.fn()
+                    }
+                },
+                {
+                    provide: PermissionService,
+                    useValue: renderedPermissionServiceMock
+                },
+                {
+                    provide: AccessService,
+                    useValue: {
+                        hasInstance: vi.fn(() => true)
+                    }
+                }
+            ]
+        });
+
+        renderedPermissionServiceMock.isInstanceOwner.set(false);
+        renderedPermissionServiceMock.isInstanceAdmin.set(false);
+        renderedPermissionServiceMock.permissions.set(null);
+        httpMock = TestBed.inject(HttpTestingController);
+    });
+
+    afterEach(() => {
+        httpMock.verify();
+    });
+
+    function flushRuntimeStatusRequests() {
+        httpMock.expectOne('/api/admin/system').flush({
+            version: 'test',
+            runtime_mode: 'local',
+            uptime: '1m',
+            public_url: 'https://example.com',
+            enabled_features: [],
+            config_flags: {}
+        });
+        httpMock.expectOne('/api/admin/system/health').flush({
+            status: 'healthy',
+            database: 'ok',
+            workers: 'ok',
+            is_leader: true
+        });
+        httpMock.expectOne('/api/admin/system/search-console').flush({
+            status: 'disabled',
+            credentials_status: 'missing',
+            worker_status: 'disabled',
+            sync_status: 'idle',
+            connected_teams: 0,
+            mapped_sites: 0,
+            pending_syncs: 0,
+            running_syncs: 0,
+            failed_syncs: 0,
+            needs_attention_syncs: 0
+        });
+        httpMock.expectOne('/api/admin/system/ai').flush({
+            status: 'disabled',
+            enabled: false,
+            configured: false,
+            config_mode: 'self_hosted',
+            base_url_configured: false,
+            requests_used: 0,
+            request_limit: 0,
+            tokens_used: 0,
+            token_limit: 0,
+            budget_window_minutes: 1440,
+            budget_exhausted: false
+        });
+        httpMock.expectOne('/api/admin/system/storage').flush({
+            shared_db_path: '/tmp/hitkeep.db',
+            shared_db_bytes: 1024,
+            data_path: '/tmp',
+            tenant_db_count: 0,
+            tenant_dbs: [],
+            spam_cache_path: '/tmp/spam-filter.json',
+            backup_path: '/tmp/backups',
+            disk_available_bytes: 1024,
+            disk_total_bytes: 2048
+        });
+        httpMock.expectOne('/api/admin/system/ingest').flush({
+            recent_hits: 0,
+            recent_events: 0,
+            recent_rejections: 0,
+            recent_spam: 0,
+            hits_per_second: 0
+        });
+    }
+
+    it('shows public IP2Location attribution on the runtime status card', () => {
+        const fixture = TestBed.createComponent(AdminSettings);
+
+        fixture.detectChanges();
+        flushRuntimeStatusRequests();
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.textContent).toContain('HitKeep uses the IP2Location LITE database for IP geolocation.');
+        const link = fixture.nativeElement.querySelector('a[href="https://www.ip2location.com"]');
+        expect(link?.textContent?.trim()).toBe('IP2Location');
+        expect(link?.getAttribute('target')).toBe('_blank');
+        expect(link?.getAttribute('rel')).toContain('noopener');
+    });
+});
