@@ -27,7 +27,7 @@ require (
 	github.com/rs/cors v1.11.1
 	github.com/stripe/stripe-go/v84 v84.4.1
 	github.com/wneessen/go-mail v0.7.3
-	github.com/zendev-sh/goai v0.7.6
+	github.com/zendev-sh/goai v0.7.7
 	golang.org/x/crypto v0.51.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.20.0
