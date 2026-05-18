@@ -12,7 +12,7 @@ func TestCountryCodeFromRequestTrustsCDNCountryForTrustedPeer(t *testing.T) {
 	req.Header.Set("Cf-Ipcountry", "de")
 
 	got := CountryCodeFromRequestWithResolver(req, []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}, func(netip.Addr) string {
-		t.Fatal("geo resolver should not be called when trusted CDN country is present")
+		t.Fatal("IP metadata resolver should not be called when trusted CDN country is present")
 		return ""
 	})
 	if got != "DE" {
@@ -33,7 +33,7 @@ func TestCountryCodeFromRequestIgnoresCountryHeaderFromUntrustedPeer(t *testing.
 	}
 }
 
-func TestCountryCodeFromRequestFallsBackToGeoIPForResolvedClient(t *testing.T) {
+func TestCountryCodeFromRequestFallsBackToIPMetadataForResolvedClient(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 	req.RemoteAddr = "10.0.0.10:443"
 	req.Header.Set("X-Forwarded-For", "8.8.8.8")
@@ -45,7 +45,7 @@ func TestCountryCodeFromRequestFallsBackToGeoIPForResolvedClient(t *testing.T) {
 		return "us"
 	})
 	if got != "US" {
-		t.Fatalf("expected GeoIP country US, got %q", got)
+		t.Fatalf("expected IP metadata country US, got %q", got)
 	}
 }
 
@@ -54,7 +54,7 @@ func TestCountryCodeFromRequestSkipsPrivateClientIP(t *testing.T) {
 	req.RemoteAddr = "10.0.0.5:443"
 
 	got := CountryCodeFromRequestWithResolver(req, nil, func(netip.Addr) string {
-		t.Fatal("geo resolver should not be called for private client IPs")
+		t.Fatal("IP metadata resolver should not be called for private client IPs")
 		return "US"
 	})
 	if got != "" {
