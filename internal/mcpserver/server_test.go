@@ -187,6 +187,23 @@ func TestMCPRequestHostDisablesLoopbackAllowanceForProxyWithoutForwardedHost(t *
 	}
 }
 
+func TestMCPParseFiltersAllowsGeoNetworkDimensions(t *testing.T) {
+	filters, err := parseFilters([]filterInput{
+		{Type: "city", Value: "Mountain View"},
+		{Type: "provider", Value: "Google LLC"},
+		{Type: "asn", Value: "AS15169 Google LLC"},
+	})
+	if err != nil {
+		t.Fatalf("parse filters: %v", err)
+	}
+	if len(filters) != 3 {
+		t.Fatalf("expected 3 filters, got %d", len(filters))
+	}
+	if filters[0].Type != "city" || filters[1].Type != "provider" || filters[2].Type != "asn" {
+		t.Fatalf("unexpected filters: %+v", filters)
+	}
+}
+
 func TestMCPHostValidationNormalizesPublicURLAndLoopbackHosts(t *testing.T) {
 	tests := []struct {
 		name              string
@@ -401,6 +418,94 @@ func TestMCPToolsListAndSiteOverview(t *testing.T) {
 	if len(output.Stats.Goals) != 1 || output.Stats.Goals[0].GoalID == "" {
 		t.Fatalf("expected string goal id in overview output, got %+v", output.Stats.Goals)
 	}
+	if len(output.Stats.TopCities) != 1 || output.Stats.TopCities[0].Name != "Mountain View" {
+		t.Fatalf("expected city aggregate in overview output, got %+v", output.Stats.TopCities)
+	}
+	if len(output.Stats.TopProviders) != 1 || output.Stats.TopProviders[0].Name != "Google LLC" {
+		t.Fatalf("expected provider aggregate in overview output, got %+v", output.Stats.TopProviders)
+	}
+	if len(output.Stats.TopASNs) != 1 || output.Stats.TopASNs[0].Name != "AS15169 Google LLC" {
+		t.Fatalf("expected ASN aggregate in overview output, got %+v", output.Stats.TopASNs)
+	}
+}
+
+func TestMCPEcommerceReturnsGeoNetworkAggregatesOnly(t *testing.T) {
+	store, site, token := setupMCPStore(t)
+	ctx := context.Background()
+	eventTime := time.Now().UTC().Add(-30 * time.Minute)
+	sessionID := uuid.New()
+	city := "Berlin"
+	provider := "Hetzner Online GmbH"
+	asn := 24940
+	asnOrg := "Hetzner Online GmbH"
+	userAgent := "RawBot/1.0"
+	if err := store.CreateHit(ctx, &api.Hit{
+		SiteID:    site.ID,
+		SessionID: sessionID,
+		PageID:    uuid.New(),
+		Timestamp: eventTime,
+		Path:      "/checkout",
+		UserAgent: &userAgent,
+		City:      &city,
+		Provider:  &provider,
+		ASN:       &asn,
+		ASNOrg:    &asnOrg,
+	}); err != nil {
+		t.Fatalf("CreateHit: %v", err)
+	}
+	if err := store.CreateEvent(ctx, &api.Event{
+		SiteID:    site.ID,
+		SessionID: sessionID,
+		Name:      "begin_checkout",
+		Timestamp: eventTime.Add(5 * time.Minute),
+		Properties: map[string]any{
+			"items": []map[string]any{
+				{"item_id": "pro-plan", "item_name": "Pro Plan", "quantity": 1, "price": 120.0},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("CreateEvent: %v", err)
+	}
+
+	conf := testMCPConfig(t, "")
+	handler := NewHandler(conf, store, nil, nil, nil)
+	ts := httptest.NewServer(handler)
+	defer ts.Close()
+
+	session := connectMCPClient(t, ts.URL+conf.MCPPath, token)
+	defer session.Close()
+
+	tools, err := session.ListTools(ctx, nil)
+	if err != nil {
+		t.Fatalf("ListTools: %v", err)
+	}
+	ecommerceTool := findTool(tools.Tools, "hitkeep_get_ecommerce")
+	if ecommerceTool == nil {
+		t.Fatalf("expected hitkeep_get_ecommerce in tool list")
+	}
+	requireMCPEcommerceToolDescribesGeoNetworkAggregates(t, ecommerceTool)
+
+	res, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "hitkeep_get_ecommerce",
+		Arguments: map[string]any{
+			"site_id": site.ID.String(),
+			"from":    eventTime.Add(-time.Hour).Format(time.RFC3339),
+			"to":      eventTime.Add(time.Hour).Format(time.RFC3339),
+		},
+	})
+	requireSuccessfulMCPTool(t, res, err)
+	raw := marshalMCPStructuredContent(t, res)
+	var output ecommerceOutput
+	if err := json.Unmarshal([]byte(raw), &output); err != nil {
+		t.Fatalf("unmarshal ecommerce output: %v", err)
+	}
+	if output.Summary == nil {
+		t.Fatalf("expected ecommerce summary, got %+v", output)
+	}
+	requireMCPEcommerceGeoNetworkSummary(t, output.Summary)
+	if strings.Contains(raw, "RawBot/1.0") || strings.Contains(raw, "session_id") || strings.Contains(raw, "page_id") {
+		t.Fatalf("expected MCP ecommerce output to omit raw visitor fields, got %s", raw)
+	}
 }
 
 func TestMCPWebVitalsReturnsAggregateOnly(t *testing.T) {
@@ -438,6 +543,37 @@ func TestMCPWebVitalsReturnsAggregateOnly(t *testing.T) {
 	}
 	if len(output.Pages) != 1 || output.Pages[0].Path != "/pricing" {
 		t.Fatalf("expected aggregate page breakdown only, got %+v", output.Pages)
+	}
+	if strings.Contains(raw, "session_id") || strings.Contains(raw, "page_id") || strings.Contains(raw, "tracker_version") {
+		t.Fatalf("expected MCP output to omit raw Web Vitals sample fields, got %s", raw)
+	}
+}
+
+func TestMCPWebVitalsReturnsGeoNetworkBreakdown(t *testing.T) {
+	store, site, token := setupMCPStore(t)
+	conf := testMCPConfig(t, "")
+	handler := NewHandler(conf, store, nil, nil, nil)
+	ts := httptest.NewServer(handler)
+	defer ts.Close()
+
+	session := connectMCPClient(t, ts.URL+conf.MCPPath, token)
+	defer session.Close()
+
+	res, err := session.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "hitkeep_get_web_vitals",
+		Arguments: map[string]any{
+			"site_id":             site.ID.String(),
+			"from":                time.Now().UTC().Add(-2 * time.Hour).Format(time.RFC3339),
+			"to":                  time.Now().UTC().Add(2 * time.Hour).Format(time.RFC3339),
+			"metric":              "LCP",
+			"breakdown_dimension": "city",
+		},
+	})
+	requireSuccessfulMCPTool(t, res, err)
+
+	raw := marshalMCPStructuredContent(t, res)
+	if !strings.Contains(raw, `"breakdown"`) || !strings.Contains(raw, "Mountain View") {
+		t.Fatalf("expected aggregate city breakdown in Web Vitals MCP output, got %s", raw)
 	}
 	if strings.Contains(raw, "session_id") || strings.Contains(raw, "page_id") || strings.Contains(raw, "tracker_version") {
 		t.Fatalf("expected MCP output to omit raw Web Vitals sample fields, got %s", raw)
@@ -1220,6 +1356,9 @@ func TestMCPResourcesListAndReadHelp(t *testing.T) {
 	if !strings.Contains(help.Contents[0].Text, "Opportunities") || !strings.Contains(help.Contents[0].Text, "localization keys") {
 		t.Fatalf("expected Opportunities safe-data guidance, got %q", help.Contents[0].Text)
 	}
+	if !strings.Contains(help.Contents[0].Text, "city, provider, and ASN") {
+		t.Fatalf("expected geo/network aggregate guidance, got %q", help.Contents[0].Text)
+	}
 }
 
 func TestMCPDocsToolsFetchMarkdown(t *testing.T) {
@@ -1393,12 +1532,21 @@ func setupMCPStore(t *testing.T) (*database.Store, *api.Site, string) {
 		t.Fatalf("CreateSite: %v", err)
 	}
 	sessionID := uuid.New()
+	pageID := uuid.New()
+	city := "Mountain View"
+	provider := "Google LLC"
+	asn := 15169
+	asnOrg := "Google LLC"
 	if err := store.CreateHit(ctx, &api.Hit{
 		SiteID:    site.ID,
 		SessionID: sessionID,
-		PageID:    uuid.New(),
+		PageID:    pageID,
 		Timestamp: time.Now().UTC(),
 		Path:      "/",
+		City:      &city,
+		Provider:  &provider,
+		ASN:       &asn,
+		ASNOrg:    &asnOrg,
 	}); err != nil {
 		t.Fatalf("CreateHit: %v", err)
 	}
@@ -1406,7 +1554,7 @@ func setupMCPStore(t *testing.T) (*database.Store, *api.Site, string) {
 		{
 			SiteID:    site.ID,
 			SessionID: uuid.New(),
-			PageID:    uuid.New(),
+			PageID:    pageID,
 			Metric:    api.WebVitalLCP,
 			Value:     1800,
 			Path:      "/pricing",
@@ -1415,7 +1563,7 @@ func setupMCPStore(t *testing.T) (*database.Store, *api.Site, string) {
 		{
 			SiteID:    site.ID,
 			SessionID: uuid.New(),
-			PageID:    uuid.New(),
+			PageID:    pageID,
 			Metric:    api.WebVitalLCP,
 			Value:     3200,
 			Path:      "/pricing",
@@ -1516,6 +1664,30 @@ func requireSuccessfulMCPTool(t *testing.T, res *mcp.CallToolResult, err error) 
 	}
 	if res.IsError {
 		t.Fatalf("expected Search Console tool success, got %+v", res.Content)
+	}
+}
+
+func requireMCPEcommerceToolDescribesGeoNetworkAggregates(t *testing.T, tool *mcp.Tool) {
+	t.Helper()
+	description := tool.Description
+	for _, want := range []string{"city", "provider", "ASN"} {
+		if !strings.Contains(description, want) {
+			t.Fatalf("expected ecommerce tool description to mention %q, got %q", want, description)
+		}
+	}
+}
+
+func requireMCPEcommerceGeoNetworkSummary(t *testing.T, summary *api.EcommerceSummary) {
+	t.Helper()
+	requireMetricStat(t, summary.TopCities, "Berlin", "ecommerce city aggregate")
+	requireMetricStat(t, summary.TopProviders, "Hetzner Online GmbH", "ecommerce provider aggregate")
+	requireMetricStat(t, summary.TopASNs, "AS24940 Hetzner Online GmbH", "ecommerce ASN aggregate")
+}
+
+func requireMetricStat(t *testing.T, stats []api.MetricStat, name, label string) {
+	t.Helper()
+	if len(stats) != 1 || stats[0].Name != name {
+		t.Fatalf("expected %s %q, got %+v", label, name, stats)
 	}
 }
 
@@ -1753,12 +1925,16 @@ func (t authRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func hasTool(tools []*mcp.Tool, name string) bool {
+	return findTool(tools, name) != nil
+}
+
+func findTool(tools []*mcp.Tool, name string) *mcp.Tool {
 	for _, tool := range tools {
 		if tool.Name == name {
-			return true
+			return tool
 		}
 	}
-	return false
+	return nil
 }
 
 func hasResource(resources []*mcp.Resource, uri string) bool {

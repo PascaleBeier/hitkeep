@@ -47,6 +47,9 @@ func toMCPSiteStats(stats *api.SiteStats) *mcpSiteStats {
 		TopReferrers:       stats.TopReferrers,
 		TopDevices:         stats.TopDevices,
 		TopCountries:       stats.TopCountries,
+		TopCities:          stats.TopCities,
+		TopProviders:       stats.TopProviders,
+		TopASNs:            stats.TopASNs,
 		TopBrowsers:        stats.TopBrowsers,
 		TopAIBots:          stats.TopAIBots,
 		TopAISources:       stats.TopAISources,
@@ -144,7 +147,7 @@ func toMCPSearchConsoleSeries(series api.SearchConsoleSeriesResponse) *mcpSearch
 
 func isAllowedFilter(filterType string) bool {
 	switch filterType {
-	case "path", "hostname", "referrer", "referrer_host", "device", "country", "browser", "language", "utm_campaign", "utm_content", "utm_medium", "utm_source", "utm_term":
+	case "path", "hostname", "referrer", "referrer_host", "device", "country", "city", "provider", "asn", "browser", "language", "utm_campaign", "utm_content", "utm_medium", "utm_source", "utm_term":
 		return true
 	default:
 		return false
@@ -185,9 +188,9 @@ Team API clients are recommended for shared assistants and automations.
 
 ## Analytics Scope
 
-Analytics tools require a ` + "`site_id`" + ` that the API client can view. The server returns aggregate KPIs, event summaries, ecommerce summaries, Web Vitals summaries, AI visibility reports, and saved Opportunities recommendations. It does not expose raw hit exports, raw Web Vitals samples, or write/admin actions.
+Analytics tools require a ` + "`site_id`" + ` that the API client can view. The server returns aggregate KPIs, event summaries, ecommerce summaries, Web Vitals summaries and visitor-context breakdowns, AI visibility reports, and saved Opportunities recommendations. It does not expose raw hit exports, raw Web Vitals samples, or write/admin actions.
 
-Date inputs use RFC3339 timestamps. If omitted, tools default to the last 30 days. Filters support path, hostname, referrer, referrer_host, device, country, browser, language, and UTM fields.
+Date inputs use RFC3339 timestamps. If omitted, tools default to the last 30 days. Filters and visitor-context breakdowns support aggregate geo/network dimensions such as city, provider, and ASN where the selected tool supports them.
 
 Opportunities are returned as final customer-visible records with localization keys, interpolation params, cited evidence, detector metadata, and status. MCP does not expose raw prompts, raw provider payloads, unrestricted tool calls, or visitor-level rows.
 
