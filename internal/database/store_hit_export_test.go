@@ -110,6 +110,94 @@ func TestExportHitsCSVIncludesUTMFields(t *testing.T) {
 	}
 }
 
+func TestExportHitsCSVIncludesGeoNetworkFields(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "hits-geo-export.db")
+
+	store := NewStore(dbPath)
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	userID, err := store.CreateUser(ctx, "geo-export@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	site, err := store.CreateSite(ctx, userID, "geo-export.test")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+
+	now := time.Now().UTC()
+	region := "California"
+	city := "Mountain View"
+	provider := "Google LLC"
+	asn := 15169
+	asnOrg := "Google LLC"
+	if err := store.CreateHit(ctx, &api.Hit{
+		SiteID:    site.ID,
+		SessionID: uuid.New(),
+		PageID:    uuid.New(),
+		Timestamp: now,
+		Path:      "/geo",
+		Region:    &region,
+		City:      &city,
+		Provider:  &provider,
+		ASN:       &asn,
+		ASNOrg:    &asnOrg,
+	}); err != nil {
+		t.Fatalf("create hit: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if err := store.ExportHitsCSV(ctx, api.HitQueryParams{
+		SiteID: site.ID,
+		UserID: userID,
+		Start:  now.Add(-time.Hour),
+		End:    now.Add(time.Hour),
+		Limit:  10,
+	}, &buf); err != nil {
+		t.Fatalf("export csv: %v", err)
+	}
+
+	rows, err := csv.NewReader(&buf).ReadAll()
+	if err != nil {
+		t.Fatalf("read csv: %v", err)
+	}
+	if len(rows) < 2 {
+		t.Fatalf("expected at least header and one row, got %d rows", len(rows))
+	}
+
+	index := make(map[string]int, len(rows[0]))
+	for i, name := range rows[0] {
+		index[name] = i
+	}
+	for _, col := range []string{"region", "city", "provider", "asn", "asn_org"} {
+		if _, ok := index[col]; !ok {
+			t.Fatalf("expected header column %q to exist", col)
+		}
+	}
+
+	row := rows[1]
+	if got := row[index["city"]]; got != "Mountain View" {
+		t.Fatalf("expected city Mountain View, got %q", got)
+	}
+	if got := row[index["provider"]]; got != "Google LLC" {
+		t.Fatalf("expected provider Google LLC, got %q", got)
+	}
+	if got := row[index["asn"]]; got != "15169" {
+		t.Fatalf("expected asn 15169, got %q", got)
+	}
+	if got := row[index["asn_org"]]; got != "Google LLC" {
+		t.Fatalf("expected asn_org Google LLC, got %q", got)
+	}
+}
+
 func TestExportHitsFileSupportsAllFormats(t *testing.T) {
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "hits-export-file.db")

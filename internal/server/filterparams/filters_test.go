@@ -39,6 +39,36 @@ func TestParseHitFiltersCombinesRepeatableAndLegacyFilters(t *testing.T) {
 	}
 }
 
+func TestParseHitFiltersAllowsGeoNetworkFilters(t *testing.T) {
+	values := url.Values{
+		"filter": {"city:Mountain View", "provider:Google LLC", "asn:AS15169 Google LLC"},
+	}
+
+	filters, err := ParseHitFilters(values, LegacyPair{
+		TypeParam:          "filter_type",
+		ValueParam:         "filter_value",
+		MissingMessage:     "filter_type and filter_value are required together",
+		InvalidTypeMessage: "invalid filter_type",
+	})
+	if err != nil {
+		t.Fatalf("ParseHitFilters: %v", err)
+	}
+
+	want := []api.Filter{
+		{Type: "city", Value: "Mountain View"},
+		{Type: "provider", Value: "Google LLC"},
+		{Type: "asn", Value: "AS15169 Google LLC"},
+	}
+	if len(filters) != len(want) {
+		t.Fatalf("expected %d filters, got %d: %+v", len(want), len(filters), filters)
+	}
+	for i := range want {
+		if filters[i] != want[i] {
+			t.Fatalf("filter %d mismatch: got %+v want %+v", i, filters[i], want[i])
+		}
+	}
+}
+
 func TestParseHitFiltersRejectsInvalidInput(t *testing.T) {
 	tests := []struct {
 		name    string

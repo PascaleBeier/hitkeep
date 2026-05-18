@@ -110,6 +110,64 @@ func TestCreateHitsBulk(t *testing.T) {
 	}
 }
 
+func TestCreateHitPersistsGeoNetworkMetadata(t *testing.T) {
+	store, _, site := setupAppenderStore(t)
+	ctx := context.Background()
+
+	region := "California"
+	city := "Mountain View"
+	provider := "Google LLC"
+	asnOrg := "Google LLC"
+	asn := 15169
+
+	hit := &api.Hit{
+		SiteID:    site.ID,
+		SessionID: uuid.New(),
+		PageID:    uuid.New(),
+		Timestamp: time.Now().UTC(),
+		Path:      "/geo",
+		Region:    &region,
+		City:      &city,
+		Provider:  &provider,
+		ASN:       &asn,
+		ASNOrg:    &asnOrg,
+	}
+
+	if err := store.CreateHit(ctx, hit); err != nil {
+		t.Fatalf("CreateHit: %v", err)
+	}
+
+	result, err := store.GetHits(ctx, api.HitQueryParams{
+		SiteID: site.ID,
+		Start:  hit.Timestamp.Add(-time.Minute),
+		End:    hit.Timestamp.Add(time.Minute),
+		Limit:  10,
+	})
+	if err != nil {
+		t.Fatalf("GetHits: %v", err)
+	}
+	if result.Total != 1 {
+		t.Fatalf("expected 1 hit, got %d", result.Total)
+	}
+
+	got := result.Data[0]
+	if got.Region == nil || *got.Region != region {
+		t.Fatalf("expected region %q, got %+v", region, got.Region)
+	}
+	if got.City == nil || *got.City != city {
+		t.Fatalf("expected city %q, got %+v", city, got.City)
+	}
+	if got.Provider == nil || *got.Provider != provider {
+		t.Fatalf("expected provider %q, got %+v", provider, got.Provider)
+	}
+	if got.ASN == nil || *got.ASN != asn {
+		t.Fatalf("expected ASN %d, got %+v", asn, got.ASN)
+	}
+	if got.ASNOrg == nil || *got.ASNOrg != asnOrg {
+		t.Fatalf("expected ASN org %q, got %+v", asnOrg, got.ASNOrg)
+	}
+}
+
 func TestCreateHitsBulkWithLegacyHostnameColumnOrder(t *testing.T) {
 	ctx := context.Background()
 
@@ -136,6 +194,11 @@ func TestCreateHitsBulkWithLegacyHostnameColumnOrder(t *testing.T) {
 			language        VARCHAR,
 			is_unique       BOOLEAN,
 			country_code    VARCHAR,
+			region          VARCHAR,
+			city            VARCHAR,
+			provider        VARCHAR,
+			asn             INTEGER,
+			asn_org         VARCHAR,
 			utm_source      VARCHAR,
 			utm_medium      VARCHAR,
 			utm_campaign    VARCHAR,
@@ -358,6 +421,10 @@ func TestCreateWebVitalsBulkAndAggregates(t *testing.T) {
 	userAgent := "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 	language := "de-DE"
 	country := "DE"
+	city := "Berlin"
+	provider := "Deutsche Telekom AG"
+	asn := 3320
+	asnOrg := "Deutsche Telekom AG"
 	viewportWidth := 1440
 	if err := store.CreateHit(ctx, &api.Hit{
 		SiteID:        site.ID,
@@ -368,6 +435,10 @@ func TestCreateWebVitalsBulkAndAggregates(t *testing.T) {
 		UserAgent:     &userAgent,
 		Language:      &language,
 		CountryCode:   &country,
+		City:          &city,
+		Provider:      &provider,
+		ASN:           &asn,
+		ASNOrg:        &asnOrg,
 		ViewportWidth: &viewportWidth,
 	}); err != nil {
 		t.Fatalf("CreateHit: %v", err)
@@ -444,6 +515,20 @@ func TestCreateWebVitalsBulkAndAggregates(t *testing.T) {
 	}
 	if len(breakdown) != 1 || breakdown[0].Name != "Chrome" || breakdown[0].Samples != 1 {
 		t.Fatalf("expected Chrome browser breakdown, got %+v", breakdown)
+	}
+
+	providerBreakdown, err := store.GetWebVitalsBreakdown(ctx, api.WebVitalsParams{
+		SiteID: site.ID,
+		Start:  now.Add(-24 * time.Hour),
+		End:    now.Add(24 * time.Hour),
+		Metric: api.WebVitalLCP,
+		Path:   "/pricing?plan=pro#cta",
+	}, api.WebVitalDimensionProvider)
+	if err != nil {
+		t.Fatalf("GetWebVitalsBreakdown provider: %v", err)
+	}
+	if len(providerBreakdown) != 1 || providerBreakdown[0].Name != "Deutsche Telekom AG" || providerBreakdown[0].Samples != 1 {
+		t.Fatalf("expected provider breakdown, got %+v", providerBreakdown)
 	}
 }
 
