@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.6.0](https://github.com/PascaleBeier/hitkeep/compare/v2.5.1...v2.6.0) (2026-05-18)
+
+
+### Features
+
+* **analytics:** add geo network evidence to opportunities ([3c8e3fb](https://github.com/PascaleBeier/hitkeep/commit/3c8e3fb826d097e92f9452a44ffee95910ebfa95))
+* **analytics:** embed IP2Location city and network metadata ([8c9f458](https://github.com/PascaleBeier/hitkeep/commit/8c9f458770fb425b4007728643da6c2ec38c01e2))
+* **analytics:** expose geo network dashboard aggregates ([0e24914](https://github.com/PascaleBeier/hitkeep/commit/0e24914236689467ddf39d859cf5ddbbbec8edbb))
+* **analytics:** persist geo network metadata for hits ([87b1b5e](https://github.com/PascaleBeier/hitkeep/commit/87b1b5eddd36dd8b23abe787536f1d5991cb79f5))
+* **api:** add country traffic exclusions ([633a74b](https://github.com/PascaleBeier/hitkeep/commit/633a74b9082fbba8414d00d270549e444aec8045))
+* **frontend:** add country exclusion controls ([3798a45](https://github.com/PascaleBeier/hitkeep/commit/3798a45d65f2fdeda88dea08eddb711ea1aad14c))
+* **frontend:** standardize tabbed analytics breakdown cards ([06fd470](https://github.com/PascaleBeier/hitkeep/commit/06fd470e655681305ca751d497fa7adfe7d9905e))
+* **mcp:** expose geo network analytics filters ([5c5d5b9](https://github.com/PascaleBeier/hitkeep/commit/5c5d5b94dd8e1c71b1c1505d27e30d322574e7bc))
+
+
+### Bug Fixes
+
+* **analytics:** preserve geo network metadata in lifecycle workflows ([cf1cd4d](https://github.com/PascaleBeier/hitkeep/commit/cf1cd4dcfbd03e98eb87e49e8659825136115e03))
+* **frontend:** standardize admin and settings tables ([aa8b999](https://github.com/PascaleBeier/hitkeep/commit/aa8b9994952d5c7e59147d8084625e38aaf99cad))
+* **teams:** delete empty hosted cloud teams ([f650b9b](https://github.com/PascaleBeier/hitkeep/commit/f650b9b39b7f139a9251d80ac92b53293d7b3a5b))
+
 ## [2.5.1](https://github.com/PascaleBeier/hitkeep/compare/v2.5.0...v2.5.1) (2026-05-16)
 
 
