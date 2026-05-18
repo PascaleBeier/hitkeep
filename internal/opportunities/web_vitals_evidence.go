@@ -12,11 +12,18 @@ import (
 )
 
 type WebVitalsEvidenceSnapshot struct {
-	SiteID  uuid.UUID
-	From    time.Time
-	To      time.Time
-	Summary []api.WebVitalSummaryMetric
-	Pages   map[api.WebVitalMetric][]api.WebVitalPageRow
+	SiteID     uuid.UUID
+	From       time.Time
+	To         time.Time
+	Summary    []api.WebVitalSummaryMetric
+	Pages      map[api.WebVitalMetric][]api.WebVitalPageRow
+	Dimensions map[api.WebVitalMetric]WebVitalsDimensionEvidence
+}
+
+type WebVitalsDimensionEvidence struct {
+	TopCities    []api.WebVitalDimensionRow
+	TopProviders []api.WebVitalDimensionRow
+	TopASNs      []api.WebVitalDimensionRow
 }
 
 func buildWebVitalsEvidenceSnapshot(ctx context.Context, store *database.Store, siteID uuid.UUID, from, to time.Time) (*WebVitalsEvidenceSnapshot, error) {
@@ -36,13 +43,18 @@ func buildWebVitalsEvidenceSnapshot(ctx context.Context, store *database.Store, 
 	if err != nil {
 		return nil, err
 	}
+	dimensions, err := loadWebVitalsEvidenceDimensions(ctx, store, siteID, from, to, summary)
+	if err != nil {
+		return nil, err
+	}
 
 	return &WebVitalsEvidenceSnapshot{
-		SiteID:  siteID,
-		From:    from,
-		To:      to,
-		Summary: append([]api.WebVitalSummaryMetric(nil), summary...),
-		Pages:   pages,
+		SiteID:     siteID,
+		From:       from,
+		To:         to,
+		Summary:    append([]api.WebVitalSummaryMetric(nil), summary...),
+		Pages:      pages,
+		Dimensions: dimensions,
 	}, nil
 }
 
@@ -72,4 +84,35 @@ func loadWebVitalsEvidencePages(ctx context.Context, store *database.Store, site
 		pages[metric.Metric] = rows
 	}
 	return pages, nil
+}
+
+func loadWebVitalsEvidenceDimensions(ctx context.Context, store *database.Store, siteID uuid.UUID, from, to time.Time, summary []api.WebVitalSummaryMetric) (map[api.WebVitalMetric]WebVitalsDimensionEvidence, error) {
+	dimensions := make(map[api.WebVitalMetric]WebVitalsDimensionEvidence, len(summary))
+	for _, metric := range summary {
+		params := api.WebVitalsParams{
+			SiteID: siteID,
+			Start:  from,
+			End:    to,
+			Metric: metric.Metric,
+			Limit:  3,
+		}
+		cities, err := store.GetWebVitalsBreakdown(ctx, params, api.WebVitalDimensionCity)
+		if err != nil {
+			return nil, fmt.Errorf("load web vitals cities for %s: %w", metric.Metric, err)
+		}
+		providers, err := store.GetWebVitalsBreakdown(ctx, params, api.WebVitalDimensionProvider)
+		if err != nil {
+			return nil, fmt.Errorf("load web vitals providers for %s: %w", metric.Metric, err)
+		}
+		asns, err := store.GetWebVitalsBreakdown(ctx, params, api.WebVitalDimensionASN)
+		if err != nil {
+			return nil, fmt.Errorf("load web vitals ASNs for %s: %w", metric.Metric, err)
+		}
+		dimensions[metric.Metric] = WebVitalsDimensionEvidence{
+			TopCities:    cities,
+			TopProviders: providers,
+			TopASNs:      asns,
+		}
+	}
+	return dimensions, nil
 }

@@ -47,6 +47,9 @@ func TestDefaultDetectorCatalogGeneratesCheckoutOpportunityFromDropoff(t *testin
 			AverageOrderValue:      95,
 			CheckoutConversionRate: 23.3,
 			Currency:               "EUR",
+			TopCities:              []api.MetricStat{{Name: "Berlin", Value: 64}},
+			TopProviders:           []api.MetricStat{{Name: "Hetzner Online GmbH", Value: 58}},
+			TopASNs:                []api.MetricStat{{Name: "AS24940 Hetzner Online GmbH", Value: 55}},
 		},
 	}
 	assertCatalogFixture(t, input, "conversion", "opportunities.types.checkout_conversion", "conversion_rate", "conversion_rate", DetectorCategoryConversion)
@@ -61,6 +64,17 @@ func TestDefaultDetectorCatalogGeneratesCheckoutOpportunityFromDropoff(t *testin
 	}
 	if checkout.ScoreBreakdown.Total != checkout.Score || checkout.ScoreBreakdown.EvidenceFit == 0 {
 		t.Fatalf("expected persisted checkout score breakdown, got %#v", checkout.ScoreBreakdown)
+	}
+	for _, evidenceID := range []string{"top_city", "top_provider", "top_asn"} {
+		if !hasEvidenceID(checkout.Evidence, evidenceID) {
+			t.Fatalf("expected checkout evidence %q in %#v", evidenceID, checkout.Evidence)
+		}
+		if !slices.Contains(checkout.CitedEvidenceIDs, evidenceID) {
+			t.Fatalf("expected checkout cited evidence %q in %#v", evidenceID, checkout.CitedEvidenceIDs)
+		}
+		if checkout.CopyParams[evidenceID] == nil {
+			t.Fatalf("expected checkout copy param %q in %#v", evidenceID, checkout.CopyParams)
+		}
 	}
 }
 
@@ -115,6 +129,9 @@ func TestDefaultDetectorCatalogUsesSourceSpecificTrafficEvidence(t *testing.T) {
 			UniqueSessions: 900,
 			TopUTMSources:  []api.MetricStat{{Name: "openalternative", Value: 240}},
 			TopReferrers:   []api.MetricStat{{Name: "example.com", Value: 800}},
+			TopCities:      []api.MetricStat{{Name: "Mountain View", Value: 180}},
+			TopProviders:   []api.MetricStat{{Name: "Google LLC", Value: 170}},
+			TopASNs:        []api.MetricStat{{Name: "AS15169 Google LLC", Value: 165}},
 		},
 	})
 	if err != nil {
@@ -130,7 +147,7 @@ func TestDefaultDetectorCatalogUsesSourceSpecificTrafficEvidence(t *testing.T) {
 	if opportunity.ImpactValue != "240" {
 		t.Fatalf("expected source-specific impact value, got %q", opportunity.ImpactValue)
 	}
-	for _, evidenceID := range []string{"top_source", "source_hits", "total_pageviews", "sessions"} {
+	for _, evidenceID := range []string{"top_source", "source_hits", "total_pageviews", "sessions", "top_city", "top_provider", "top_asn"} {
 		if !hasEvidenceID(opportunity.Evidence, evidenceID) {
 			t.Fatalf("expected evidence %q in %#v", evidenceID, opportunity.Evidence)
 		}
@@ -159,6 +176,13 @@ func TestDefaultDetectorCatalogGeneratesWebVitalsOpportunityFromPoorP75(t *testi
 					{Path: "/pricing", P75: 4700, Samples: 31, Good: 3, NeedsImprove: 10, Poor: 18, Rating: api.WebVitalRatingPoor},
 				},
 			},
+			Dimensions: map[api.WebVitalMetric]WebVitalsDimensionEvidence{
+				api.WebVitalLCP: {
+					TopCities:    []api.WebVitalDimensionRow{{Name: "Berlin", Samples: 44}},
+					TopProviders: []api.WebVitalDimensionRow{{Name: "Hetzner Online GmbH", Samples: 39}},
+					TopASNs:      []api.WebVitalDimensionRow{{Name: "AS24940 Hetzner Online GmbH", Samples: 35}},
+				},
+			},
 		},
 	}
 	assertCatalogFixture(t, input, "performance", "opportunities.types.web_vitals_performance", "p75", "web_vital_top_page", DetectorCategoryPerformance)
@@ -172,7 +196,7 @@ func TestDefaultDetectorCatalogGeneratesWebVitalsOpportunityFromPoorP75(t *testi
 		t.Fatalf("expected web vitals opportunity, got %#v", opportunities)
 	}
 	assertWebVitalsOpportunityParams(t, *opportunity)
-	assertOpportunityEvidenceCited(t, *opportunity, "web_vital_metric", "web_vital_p75", "web_vital_rating", "web_vital_samples", "web_vital_top_page", "web_vital_top_page_p75")
+	assertOpportunityEvidenceCited(t, *opportunity, "web_vital_metric", "web_vital_p75", "web_vital_rating", "web_vital_samples", "web_vital_top_page", "web_vital_top_page_p75", "top_city", "top_provider", "top_asn")
 }
 
 func TestDefaultDetectorCatalogSuppressesWebVitalsOpportunityForGoodP75(t *testing.T) {
@@ -232,6 +256,9 @@ func TestDefaultDetectorCatalogEnrichesAIVisibilityWithSiteTrafficEvidence(t *te
 			UniqueSessions: 640,
 			AISourceVisits: 32,
 			TopPages:       []api.MetricStat{{Name: "/pricing", Value: 420}},
+			TopCities:      []api.MetricStat{{Name: "Berlin", Value: 180}},
+			TopProviders:   []api.MetricStat{{Name: "Hetzner Online GmbH", Value: 172}},
+			TopASNs:        []api.MetricStat{{Name: "AS24940 Hetzner Online GmbH", Value: 168}},
 		},
 	})
 	if err != nil {
@@ -249,6 +276,17 @@ func TestDefaultDetectorCatalogEnrichesAIVisibilityWithSiteTrafficEvidence(t *te
 	}
 	if !slices.Contains(opportunity.CitedEvidenceIDs, "ai_referrals") || !slices.Contains(opportunity.CitedEvidenceIDs, "ai_path_pageviews") {
 		t.Fatalf("expected cross-source citations, got %#v", opportunity.CitedEvidenceIDs)
+	}
+	for _, evidenceID := range []string{"top_city", "top_provider", "top_asn"} {
+		if !hasEvidenceID(opportunity.Evidence, evidenceID) {
+			t.Fatalf("expected AI visibility evidence %q in %#v", evidenceID, opportunity.Evidence)
+		}
+		if !slices.Contains(opportunity.CitedEvidenceIDs, evidenceID) {
+			t.Fatalf("expected AI visibility cited evidence %q in %#v", evidenceID, opportunity.CitedEvidenceIDs)
+		}
+		if opportunity.CopyParams[evidenceID] == nil {
+			t.Fatalf("expected AI visibility copy param %q in %#v", evidenceID, opportunity.CopyParams)
+		}
 	}
 	if opportunity.ScoreBreakdown.EvidenceFit < 98 || opportunity.Score <= 92 {
 		t.Fatalf("expected corroborated AI visibility scoring, got score=%d breakdown=%#v", opportunity.Score, opportunity.ScoreBreakdown)
@@ -1230,6 +1268,9 @@ func assertWebVitalsOpportunityParams(t *testing.T, opportunity database.Opportu
 	}
 	if opportunity.RouteParams["path"] != "/pricing" {
 		t.Fatalf("expected pricing route param, got %#v", opportunity.RouteParams)
+	}
+	if opportunity.CopyParams["top_city"] != "Berlin" || opportunity.CopyParams["top_provider"] != "Hetzner Online GmbH" || opportunity.CopyParams["top_asn"] != "AS24940 Hetzner Online GmbH" {
+		t.Fatalf("expected web vital geo/network copy params, got %#v", opportunity.CopyParams)
 	}
 }
 
