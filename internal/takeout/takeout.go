@@ -273,7 +273,7 @@ func buildTakeoutQuery(sources []takeoutQuerySource, filename, format string) st
 		sources = []takeoutQuerySource{{WhereClause: "FALSE"}}
 	}
 
-	selects := make([]string, 0, len(sources)*7)
+	selects := make([]string, 0, len(sources)*12)
 	for _, source := range sources {
 		whereClause := source.WhereClause
 		if whereClause == "" {
@@ -293,6 +293,11 @@ func buildTakeoutQuery(sources []takeoutQuerySource, filename, format string) st
 				fmt.Sprintf("SELECT 'ai_fetch' as record_type, * FROM ai_fetches WHERE %s", whereClause),
 				fmt.Sprintf("SELECT 'goal' as record_type, * FROM goals WHERE %s", whereClause),
 				fmt.Sprintf("SELECT 'funnel' as record_type, * FROM funnels WHERE %s", whereClause),
+				fmt.Sprintf("SELECT 'imported_traffic' as record_type, * FROM imported_traffic_daily WHERE %s", whereClause),
+				fmt.Sprintf("SELECT 'imported_dimension' as record_type, * FROM imported_dimension_daily WHERE %s", whereClause),
+				fmt.Sprintf("SELECT 'imported_event' as record_type, * FROM imported_event_daily WHERE %s", whereClause),
+				fmt.Sprintf("SELECT 'imported_event_dimension' as record_type, * FROM imported_event_dimensions_daily WHERE %s", whereClause),
+				fmt.Sprintf("SELECT 'imported_event_property' as record_type, * FROM imported_event_properties_daily WHERE %s", whereClause),
 			)
 		}
 		if includeControl {

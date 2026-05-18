@@ -38,6 +38,7 @@ type retentionCounts struct {
 	ImportedTraffic         int64
 	ImportedDimensions      int64
 	ImportedEvents          int64
+	ImportedEventDimensions int64
 	ImportedEventProperties int64
 }
 
@@ -206,6 +207,7 @@ func countRetainedRows(ctx context.Context, db *sql.DB, siteID uuid.UUID, cutoff
 		{name: "imported traffic", query: "SELECT COUNT(*) FROM imported_traffic_daily WHERE site_id = ? AND date < ?", assign: func(v int64) { counts.ImportedTraffic = v }},
 		{name: "imported dimensions", query: "SELECT COUNT(*) FROM imported_dimension_daily WHERE site_id = ? AND date < ?", assign: func(v int64) { counts.ImportedDimensions = v }},
 		{name: "imported events", query: "SELECT COUNT(*) FROM imported_event_daily WHERE site_id = ? AND date < ?", assign: func(v int64) { counts.ImportedEvents = v }},
+		{name: "imported event dimensions", query: "SELECT COUNT(*) FROM imported_event_dimensions_daily WHERE site_id = ? AND date < ?", assign: func(v int64) { counts.ImportedEventDimensions = v }},
 		{name: "imported event properties", query: "SELECT COUNT(*) FROM imported_event_properties_daily WHERE site_id = ? AND date < ?", assign: func(v int64) { counts.ImportedEventProperties = v }},
 	}
 	for _, q := range queries {
@@ -226,6 +228,7 @@ func (c retentionCounts) hasColdData() bool {
 		c.ImportedTraffic > 0 ||
 		c.ImportedDimensions > 0 ||
 		c.ImportedEvents > 0 ||
+		c.ImportedEventDimensions > 0 ||
 		c.ImportedEventProperties > 0
 }
 
@@ -239,6 +242,7 @@ func (c retentionCounts) logAttrs(siteID uuid.UUID, cutoff time.Time) []any {
 		"imported_traffic", c.ImportedTraffic,
 		"imported_dimensions", c.ImportedDimensions,
 		"imported_events", c.ImportedEvents,
+		"imported_event_dimensions", c.ImportedEventDimensions,
 		"imported_event_properties", c.ImportedEventProperties,
 		"cutoff", cutoff.Format(time.DateOnly),
 	}
@@ -283,9 +287,11 @@ func buildRetentionExportQuery(siteID uuid.UUID, cutoff time.Time, filename stri
 					UNION BY NAME
 					SELECT 'imported_event_daily' AS _source, * FROM imported_event_daily WHERE site_id = '%s' AND date < '%s'
 					UNION BY NAME
+					SELECT 'imported_event_dimensions_daily' AS _source, * FROM imported_event_dimensions_daily WHERE site_id = '%s' AND date < '%s'
+					UNION BY NAME
 					SELECT 'imported_event_properties_daily' AS _source, * FROM imported_event_properties_daily WHERE site_id = '%s' AND date < '%s'
 				) TO '%s' (FORMAT PARQUET, COMPRESSION 'SNAPPY');
-			`, siteID, timestampCutoff, siteID, timestampCutoff, siteID, timestampCutoff, siteID, timestampCutoff, siteID, dateCutoff, siteID, dateCutoff, siteID, dateCutoff, siteID, dateCutoff, safeFilename)
+			`, siteID, timestampCutoff, siteID, timestampCutoff, siteID, timestampCutoff, siteID, timestampCutoff, siteID, dateCutoff, siteID, dateCutoff, siteID, dateCutoff, siteID, dateCutoff, siteID, dateCutoff, safeFilename)
 }
 
 func pruneRetainedRows(ctx context.Context, db *sql.DB, siteID uuid.UUID, cutoff time.Time, counts retentionCounts) error {
@@ -324,6 +330,7 @@ func retentionDeleteQueries(counts retentionCounts) []retentionDeleteQuery {
 		{count: counts.ImportedTraffic, label: "imported traffic", query: "DELETE FROM imported_traffic_daily WHERE site_id = ? AND date < ?"},
 		{count: counts.ImportedDimensions, label: "imported dimensions", query: "DELETE FROM imported_dimension_daily WHERE site_id = ? AND date < ?"},
 		{count: counts.ImportedEvents, label: "imported events", query: "DELETE FROM imported_event_daily WHERE site_id = ? AND date < ?"},
+		{count: counts.ImportedEventDimensions, label: "imported event dimensions", query: "DELETE FROM imported_event_dimensions_daily WHERE site_id = ? AND date < ?"},
 		{count: counts.ImportedEventProperties, label: "imported event properties", query: "DELETE FROM imported_event_properties_daily WHERE site_id = ? AND date < ?"},
 		{count: 1, label: "hourly rollups", query: "DELETE FROM hit_rollups_hourly WHERE site_id = ? AND bucket < ?"},
 		{count: 1, label: "daily rollups", query: "DELETE FROM hit_rollups_daily WHERE site_id = ? AND bucket < ?"},

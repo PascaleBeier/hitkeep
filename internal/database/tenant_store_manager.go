@@ -37,6 +37,7 @@ var siteAnalyticsTransferTables = []string{
 	"imported_event_daily",
 	"imported_dimension_daily",
 	"imported_traffic_daily",
+	"search_console_facts",
 	"goal_rollups_hourly",
 	"goal_rollups_daily",
 	"goal_rollups_monthly",
@@ -46,6 +47,7 @@ var siteAnalyticsTransferTables = []string{
 	"session_rollups_hourly",
 	"session_rollups_daily",
 	"session_rollups_monthly",
+	"rollup_dirty_buckets",
 	"hit_rollups_hourly",
 	"hit_rollups_daily",
 	"hit_rollups_monthly",
@@ -53,6 +55,8 @@ var siteAnalyticsTransferTables = []string{
 	"funnels",
 	"events",
 	"hits",
+	"web_vitals",
+	"ai_fetches",
 }
 
 // NewTenantStoreManager creates a TenantStoreManager that wraps the shared store.

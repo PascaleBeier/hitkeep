@@ -7,8 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
+
+	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	"hitkeep/internal/worker"
 )
 
 func TestMoveExistingDatabaseAsideRenamesDatabaseAndWal(t *testing.T) {
@@ -101,6 +106,144 @@ func TestRestoreDatabaseDoesNotLeaveWal(t *testing.T) {
 	}
 	if id != 1 || name != "acme" {
 		t.Fatalf("unexpected restored row: id=%d name=%q", id, name)
+	}
+}
+
+func TestBackupRestorePreservesHitGeoNetworkMetadata(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	sourceDBPath := filepath.Join(tmpDir, "hitkeep.db")
+	backupDir := filepath.Join(tmpDir, "backups")
+	dataPath := filepath.Join(tmpDir, "data")
+	expected := geoNetworkBackupFixture{
+		region:   "California",
+		city:     "Mountain View",
+		provider: "Google LLC",
+		asn:      15169,
+		asnOrg:   "Google LLC",
+	}
+
+	sourceStore := newMigratedRecoverTestStore(t, ctx, sourceDBPath)
+	siteID := seedGeoNetworkHitForBackup(t, ctx, sourceStore, expected)
+	runRecoverTestBackup(t, ctx, sourceStore, dataPath, backupDir)
+	targetPath := filepath.Join(tmpDir, "restored.db")
+	restoreLatestSharedSnapshot(t, ctx, backupDir, targetPath)
+	assertRestoredGeoNetworkHit(t, ctx, targetPath, siteID, expected)
+}
+
+type geoNetworkBackupFixture struct {
+	region   string
+	city     string
+	provider string
+	asn      int
+	asnOrg   string
+}
+
+func newMigratedRecoverTestStore(t *testing.T, ctx context.Context, dbPath string) *database.Store {
+	t.Helper()
+	store := database.NewStore(dbPath)
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect source: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("migrate source: %v", err)
+	}
+	return store
+}
+
+func seedGeoNetworkHitForBackup(t *testing.T, ctx context.Context, store *database.Store, fixture geoNetworkBackupFixture) uuid.UUID {
+	t.Helper()
+	userID, err := store.CreateUser(ctx, "backup-geo@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	site, err := store.CreateSite(ctx, userID, "backup-geo.test")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	if err := store.CreateHit(ctx, &api.Hit{
+		SiteID:    site.ID,
+		SessionID: uuid.New(),
+		PageID:    uuid.New(),
+		Timestamp: time.Now().UTC(),
+		Path:      "/geo-backup",
+		Region:    &fixture.region,
+		City:      &fixture.city,
+		Provider:  &fixture.provider,
+		ASN:       &fixture.asn,
+		ASNOrg:    &fixture.asnOrg,
+	}); err != nil {
+		t.Fatalf("create geo hit: %v", err)
+	}
+	return site.ID
+}
+
+func runRecoverTestBackup(t *testing.T, ctx context.Context, sourceStore *database.Store, dataPath string, backupDir string) {
+	t.Helper()
+	tenantMgr := database.NewTenantStoreManager(sourceStore, dataPath)
+	t.Cleanup(func() { _ = tenantMgr.Close() })
+	backupWorker := worker.NewBackupWorker(tenantMgr, dataPath, backupDir, 60, 24, nil, nil)
+	if err := backupWorker.Run(ctx); err != nil {
+		t.Fatalf("backup run: %v", err)
+	}
+}
+
+func restoreLatestSharedSnapshot(t *testing.T, ctx context.Context, backupDir string, targetPath string) {
+	t.Helper()
+	entries, err := os.ReadDir(filepath.Join(backupDir, "shared"))
+	if err != nil {
+		t.Fatalf("read shared backup dir: %v", err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("expected shared backup snapshot")
+	}
+	snapshotPath := filepath.Join(backupDir, "shared", entries[0].Name())
+	if err := restoreDatabase(ctx, targetPath, snapshotPath, false, nil); err != nil {
+		t.Fatalf("restoreDatabase: %v", err)
+	}
+}
+
+func assertRestoredGeoNetworkHit(t *testing.T, ctx context.Context, targetPath string, siteID uuid.UUID, expected geoNetworkBackupFixture) {
+	t.Helper()
+	restoredStore := database.NewStore(targetPath)
+	if err := restoredStore.Connect(); err != nil {
+		t.Fatalf("connect restored: %v", err)
+	}
+	defer restoredStore.Close()
+
+	var (
+		gotRegion   sql.NullString
+		gotCity     sql.NullString
+		gotProvider sql.NullString
+		gotASN      sql.NullInt64
+		gotASNOrg   sql.NullString
+	)
+	if err := restoredStore.DB().QueryRowContext(ctx, `
+		SELECT region, city, provider, asn, asn_org
+		FROM hits
+		WHERE site_id = ? AND path = ?
+	`, siteID, "/geo-backup").Scan(&gotRegion, &gotCity, &gotProvider, &gotASN, &gotASNOrg); err != nil {
+		t.Fatalf("query restored geo hit: %v", err)
+	}
+	assertRestoredString(t, "region", expected.region, gotRegion)
+	assertRestoredString(t, "city", expected.city, gotCity)
+	assertRestoredString(t, "provider", expected.provider, gotProvider)
+	assertRestoredInt64(t, "ASN", int64(expected.asn), gotASN)
+	assertRestoredString(t, "ASN org", expected.asnOrg, gotASNOrg)
+}
+
+func assertRestoredString(t *testing.T, label string, want string, got sql.NullString) {
+	t.Helper()
+	if !got.Valid || got.String != want {
+		t.Fatalf("expected restored %s %q, got %q valid=%v", label, want, got.String, got.Valid)
+	}
+}
+
+func assertRestoredInt64(t *testing.T, label string, want int64, got sql.NullInt64) {
+	t.Helper()
+	if !got.Valid || got.Int64 != want {
+		t.Fatalf("expected restored %s %d, got %d valid=%v", label, want, got.Int64, got.Valid)
 	}
 }
 
