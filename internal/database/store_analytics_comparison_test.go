@@ -320,6 +320,48 @@ func TestGetSiteStatsIncludesLandingAndExitPages(t *testing.T) {
 	}
 }
 
+func TestGetSiteStatsIncludesConfiguredFunnels(t *testing.T) {
+	store, userID := setupComparisonStore(t)
+	ctx := context.Background()
+
+	site, err := store.CreateSite(ctx, userID, "funnels.example.com")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+
+	if err := store.CreateFunnel(ctx, &api.Funnel{
+		SiteID: site.ID,
+		Name:   "Signup funnel",
+		Steps: []api.FunnelStep{
+			{Type: "path", Value: "/pricing"},
+			{Type: "event", Value: "signup_completed"},
+		},
+	}); err != nil {
+		t.Fatalf("create funnel: %v", err)
+	}
+
+	base := time.Date(2026, 3, 14, 12, 0, 0, 0, time.UTC)
+	stats, err := store.GetSiteStats(ctx, api.AnalyticsParams{
+		SiteID: site.ID,
+		UserID: userID,
+		Start:  base.Add(-24 * time.Hour),
+		End:    base.Add(24 * time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("GetSiteStats: %v", err)
+	}
+
+	if len(stats.Funnels) != 1 {
+		t.Fatalf("expected configured funnel in site stats, got %+v", stats.Funnels)
+	}
+	if stats.Funnels[0].Name != "Signup funnel" {
+		t.Fatalf("expected Signup funnel in site stats, got %+v", stats.Funnels[0])
+	}
+	if len(stats.Funnels[0].Steps) != 2 {
+		t.Fatalf("expected funnel steps in site stats, got %+v", stats.Funnels[0].Steps)
+	}
+}
+
 func TestGetSiteStatsLandingAndExitUseFullSessionBoundaries(t *testing.T) {
 	store, userID := setupComparisonStore(t)
 	ctx := context.Background()
@@ -508,6 +550,71 @@ func TestGetSiteStatsIncludesAIDimensions(t *testing.T) {
 	}
 	if !containsMetric(result.TopAISources, "Perplexity", 1) {
 		t.Fatalf("expected Perplexity with 1 session, got %+v", result.TopAISources)
+	}
+}
+
+func TestGetSiteStatsIncludesGeoNetworkDimensions(t *testing.T) {
+	store, userID := setupComparisonStore(t)
+	ctx := context.Background()
+
+	site, err := store.CreateSite(ctx, userID, "geo-network.example.com")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+
+	base := time.Date(2026, 3, 18, 12, 0, 0, 0, time.UTC)
+	region := "California"
+	city := "Mountain View"
+	provider := "Google LLC"
+	asnOrg := "Google LLC"
+	asn := 15169
+	otherCity := "Berlin"
+	otherProvider := "Deutsche Telekom AG"
+	otherASNOrg := "Deutsche Telekom AG"
+	otherASN := 3320
+
+	for _, hit := range []api.Hit{
+		{SiteID: site.ID, SessionID: uuid.New(), PageID: uuid.New(), Timestamp: base.Add(-2 * time.Hour), Path: "/a", Region: &region, City: &city, Provider: &provider, ASN: &asn, ASNOrg: &asnOrg},
+		{SiteID: site.ID, SessionID: uuid.New(), PageID: uuid.New(), Timestamp: base.Add(-time.Hour), Path: "/b", Region: &region, City: &city, Provider: &provider, ASN: &asn, ASNOrg: &asnOrg},
+		{SiteID: site.ID, SessionID: uuid.New(), PageID: uuid.New(), Timestamp: base.Add(-30 * time.Minute), Path: "/c", City: &otherCity, Provider: &otherProvider, ASN: &otherASN, ASNOrg: &otherASNOrg},
+	} {
+		if err := store.CreateHit(ctx, &hit); err != nil {
+			t.Fatalf("create hit %s: %v", hit.Path, err)
+		}
+	}
+
+	result, err := store.GetSiteStats(ctx, api.AnalyticsParams{
+		SiteID: site.ID,
+		UserID: userID,
+		Start:  base.Add(-24 * time.Hour),
+		End:    base,
+	})
+	if err != nil {
+		t.Fatalf("GetSiteStats: %v", err)
+	}
+
+	if !containsMetric(result.TopCities, "Mountain View", 2) {
+		t.Fatalf("expected Mountain View with 2 hits, got %+v", result.TopCities)
+	}
+	if !containsMetric(result.TopProviders, "Google LLC", 2) {
+		t.Fatalf("expected Google LLC with 2 hits, got %+v", result.TopProviders)
+	}
+	if !containsMetric(result.TopASNs, "AS15169 Google LLC", 2) {
+		t.Fatalf("expected AS15169 Google LLC with 2 hits, got %+v", result.TopASNs)
+	}
+
+	filtered, err := store.GetSiteStats(ctx, api.AnalyticsParams{
+		SiteID:  site.ID,
+		UserID:  userID,
+		Start:   base.Add(-24 * time.Hour),
+		End:     base,
+		Filters: []api.Filter{{Type: "provider", Value: "Google LLC"}},
+	})
+	if err != nil {
+		t.Fatalf("GetSiteStats with provider filter: %v", err)
+	}
+	if filtered.TotalPageviews != 2 {
+		t.Fatalf("expected provider filter to return 2 pageviews, got %d", filtered.TotalPageviews)
 	}
 }
 

@@ -32,6 +32,7 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 		TopUTMSources:   []api.MetricStat{},
 		TopUTMTerms:     []api.MetricStat{},
 		Goals:           []api.GoalStats{},
+		Funnels:         []api.Funnel{},
 	}
 
 	filterSQL, filterArgs := buildHitFilters(params.Filters, "h")
@@ -155,6 +156,9 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 				hk_referrer(h.referrer) AS referrer,
 				hk_device(h.viewport_width) AS device,
 				hk_country(h.country_code) AS country,
+				COALESCE(NULLIF(TRIM(h.city), ''), '(Unknown)') AS city,
+				COALESCE(NULLIF(TRIM(h.provider), ''), '(Unknown)') AS provider,
+				hk_asn(h.asn, h.asn_org) AS asn,
 				hk_browser(h.user_agent) AS browser,
 				hk_ai_bot(h.user_agent) AS ai_bot,
 				hk_ai_source(h.referrer) AS ai_source,
@@ -178,6 +182,9 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 					WHEN GROUPING(referrer) = 0 THEN 'referrer'
 					WHEN GROUPING(device) = 0 THEN 'device'
 					WHEN GROUPING(country) = 0 THEN 'country'
+					WHEN GROUPING(city) = 0 THEN 'city'
+					WHEN GROUPING(provider) = 0 THEN 'provider'
+					WHEN GROUPING(asn) = 0 THEN 'asn'
 					WHEN GROUPING(browser) = 0 THEN 'browser'
 					WHEN GROUPING(ai_bot) = 0 THEN 'ai_bot'
 					WHEN GROUPING(language) = 0 THEN 'language'
@@ -188,7 +195,7 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 					WHEN GROUPING(utm_term) = 0 THEN 'utm_term'
 					ELSE '__summary__'
 				END AS dim,
-				COALESCE(path, referrer, device, country, browser, ai_bot, language, utm_campaign, utm_content, utm_medium, utm_source, utm_term) AS name,
+				COALESCE(path, referrer, device, country, city, provider, asn, browser, ai_bot, language, utm_campaign, utm_content, utm_medium, utm_source, utm_term) AS name,
 				COUNT(*) AS val,
 				COUNT(*) FILTER (WHERE ai_bot IS NOT NULL) AS ai_bot_hits,
 				COUNT(DISTINCT session_id) FILTER (WHERE ai_source IS NOT NULL) AS ai_source_visits
@@ -198,6 +205,9 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 				(referrer),
 				(device),
 				(country),
+				(city),
+				(provider),
+				(asn),
 				(browser),
 				(ai_bot),
 				(language),
@@ -281,6 +291,12 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 			stats.TopDevices = append(stats.TopDevices, m)
 		case "country":
 			stats.TopCountries = append(stats.TopCountries, m)
+		case "city":
+			stats.TopCities = append(stats.TopCities, m)
+		case "provider":
+			stats.TopProviders = append(stats.TopProviders, m)
+		case "asn":
+			stats.TopASNs = append(stats.TopASNs, m)
 		case "browser":
 			stats.TopBrowsers = append(stats.TopBrowsers, m)
 		case "ai_bot":
@@ -437,6 +453,12 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 			ConversionRate: rate,
 		})
 	}
+
+	funnels, err := s.GetFunnels(ctx, params.SiteID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch funnels: %w", err)
+	}
+	stats.Funnels = funnels
 
 	if !params.CompareStart.IsZero() {
 		comparison, err := s.GetComparisonStats(ctx, params)

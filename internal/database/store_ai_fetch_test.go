@@ -131,6 +131,19 @@ func TestAIFetchOverviewAndTimeseries(t *testing.T) {
 	if filtered.TotalRequests != 2 {
 		t.Fatalf("expected 2 filtered requests, got %d", filtered.TotalRequests)
 	}
+
+	pathFiltered, err := store.GetAIFetchOverview(ctx, api.AIFetchQueryParams{
+		SiteID: site.ID,
+		Start:  params.Start,
+		End:    params.End,
+		Path:   "/docs",
+	})
+	if err != nil {
+		t.Fatalf("GetAIFetchOverview path filtered: %v", err)
+	}
+	if pathFiltered.TotalRequests != 1 || pathFiltered.UniquePaths != 1 {
+		t.Fatalf("expected /docs path filter to return 1 request and 1 path, got requests=%d paths=%d", pathFiltered.TotalRequests, pathFiltered.UniquePaths)
+	}
 }
 
 func TestAIFetchCorrelation(t *testing.T) {
@@ -202,6 +215,23 @@ func TestAIFetchCorrelation(t *testing.T) {
 	}
 	if !containsHotspot(report.FailureHotspots, "ClaudeBot", "/pricing", 1, 1) {
 		t.Fatalf("expected ClaudeBot /pricing hotspot, got %+v", report.FailureHotspots)
+	}
+
+	pathReport, err := store.GetAIFetchCorrelation(ctx, api.AIFetchCorrelationParams{
+		SiteID:     site.ID,
+		Start:      base.Add(-72 * time.Hour),
+		End:        base,
+		Path:       "/docs",
+		WindowDays: 30,
+	})
+	if err != nil {
+		t.Fatalf("GetAIFetchCorrelation path filtered: %v", err)
+	}
+	if pathReport.Summary.TotalFetches != 2 || pathReport.Summary.CorrelatedPaths != 1 {
+		t.Fatalf("expected /docs path filter to scope correlation, got summary %+v", pathReport.Summary)
+	}
+	if len(pathReport.OpportunityPages) != 1 || pathReport.OpportunityPages[0].Path != "/docs" {
+		t.Fatalf("expected only /docs opportunity rows after path filter, got %+v", pathReport.OpportunityPages)
 	}
 }
 

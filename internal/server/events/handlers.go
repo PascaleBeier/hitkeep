@@ -254,12 +254,22 @@ func parseChatbotExportParams(w http.ResponseWriter, r *http.Request) (api.Chatb
 		}
 	}
 
+	filters, err := filterparams.ParseHitFilters(r.URL.Query(), filterparams.LegacyPair{
+		MissingMessage:     "filter type and value are required together",
+		InvalidTypeMessage: "invalid filter type",
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return api.ChatbotExportParams{}, false
+	}
+
 	return api.ChatbotExportParams{
 		SiteID:     siteID,
 		Start:      start,
 		End:        end,
 		ScopeKey:   scopeKey,
 		ScopeValue: scopeValue,
+		Filters:    filters,
 	}, true
 }
 

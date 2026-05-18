@@ -119,6 +119,106 @@ func TestHandleExportAIChatbotsCSV(t *testing.T) {
 	}
 }
 
+func TestHandleExportAIChatbotsCSVAcceptsAudienceFilters(t *testing.T) {
+	store, ctx, userID, siteID, _ := setupEventHandlerTestEnv(t)
+
+	base := time.Now().UTC()
+	berlinSessionID := uuid.New()
+	munichSessionID := uuid.New()
+	asn := 3320
+	berlin := "Berlin"
+	munich := "Munich"
+	deutscheTelekom := "Deutsche Telekom AG"
+	vodafone := "Vodafone GmbH"
+	for _, hit := range []*api.Hit{
+		{
+			SiteID:    siteID,
+			SessionID: berlinSessionID,
+			PageID:    uuid.New(),
+			Timestamp: base.Add(-2 * time.Hour),
+			Path:      "/pricing",
+			City:      &berlin,
+			Provider:  &deutscheTelekom,
+			ASN:       &asn,
+			ASNOrg:    &deutscheTelekom,
+		},
+		{
+			SiteID:    siteID,
+			SessionID: munichSessionID,
+			PageID:    uuid.New(),
+			Timestamp: base.Add(-2 * time.Hour),
+			Path:      "/pricing",
+			City:      &munich,
+			Provider:  &vodafone,
+			ASN:       &asn,
+			ASNOrg:    &deutscheTelekom,
+		},
+	} {
+		if err := store.CreateHit(context.Background(), hit); err != nil {
+			t.Fatalf("CreateHit: %v", err)
+		}
+	}
+
+	for _, event := range []*api.Event{
+		{
+			SiteID:    siteID,
+			SessionID: berlinSessionID,
+			Name:      "assistant.chat_started",
+			Properties: map[string]any{
+				"provider": "OpenAI",
+				"bot_id":   "support-bot",
+			},
+			Timestamp: base.Add(-90 * time.Minute),
+		},
+		{
+			SiteID:    siteID,
+			SessionID: munichSessionID,
+			Name:      "assistant.chat_started",
+			Properties: map[string]any{
+				"provider": "OpenAI",
+				"bot_id":   "sales-bot",
+			},
+			Timestamp: base.Add(-80 * time.Minute),
+		},
+	} {
+		if err := store.CreateEvent(context.Background(), event); err != nil {
+			t.Fatalf("CreateEvent: %v", err)
+		}
+	}
+
+	h := &handler{ctx: ctx}
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/sites/"+siteID.String()+"/ai-chatbots/export?from="+base.Add(-24*time.Hour).Format(time.RFC3339)+"&to="+base.Format(time.RFC3339)+"&filter=city:Berlin&filter=provider:Deutsche+Telekom+AG&filter=asn:AS3320+Deutsche+Telekom+AG&format=csv",
+		nil,
+	)
+	req = req.WithContext(context.WithValue(req.Context(), shared.UserIDKey, userID))
+	req.SetPathValue("id", siteID.String())
+	rec := httptest.NewRecorder()
+	h.handleExportAIChatbots().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected %d, got %d body=%s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	rows, err := csv.NewReader(bytes.NewReader(rec.Body.Bytes())).ReadAll()
+	if err != nil {
+		t.Fatalf("read csv: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("expected header plus one matching row, got %d: %v", len(rows), rows)
+	}
+
+	header := rows[0]
+	index := make(map[string]int, len(header))
+	for i, name := range header {
+		index[name] = i
+	}
+	if got := rows[1][index["session_id"]]; got != berlinSessionID.String() {
+		t.Fatalf("expected filtered Berlin session %s, got %s", berlinSessionID, got)
+	}
+}
+
 func TestHandleExportAIChatbotsRejectsInvalidScopeKey(t *testing.T) {
 	_, ctx, userID, siteID, _ := setupEventHandlerTestEnv(t)
 

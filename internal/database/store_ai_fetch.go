@@ -292,7 +292,7 @@ func (s *Store) GetAIFetchCorrelation(ctx context.Context, params api.AIFetchCor
 		FailureHotspots:  []api.AIFetchFailureHotspot{},
 	}
 
-	filterSQL, filterArgs := buildAIFetchFiltersWithAlias(params.AssistantName, params.AssistantFamily, params.ResourceType, "f.")
+	filterSQL, filterArgs := buildAIFetchFiltersWithAlias(params.AssistantName, params.AssistantFamily, params.ResourceType, params.Path, "f.")
 	windowDays := params.WindowDays
 	if windowDays <= 0 {
 		windowDays = 30
@@ -496,10 +496,10 @@ func (s *Store) GetAIFetchCorrelation(ctx context.Context, params api.AIFetchCor
 }
 
 func buildAIFetchFilters(params api.AIFetchQueryParams) (string, []any) {
-	return buildAIFetchFiltersWithAlias(params.AssistantName, params.AssistantFamily, params.ResourceType, "")
+	return buildAIFetchFiltersWithAlias(params.AssistantName, params.AssistantFamily, params.ResourceType, params.Path, "")
 }
 
-func buildAIFetchFiltersWithAlias(assistantName, assistantFamily, resourceType, prefix string) (string, []any) {
+func buildAIFetchFiltersWithAlias(assistantName, assistantFamily, resourceType, path, prefix string) (string, []any) {
 	sqlFilter := ""
 	args := []any{}
 
@@ -514,6 +514,10 @@ func buildAIFetchFiltersWithAlias(assistantName, assistantFamily, resourceType, 
 	if resourceType != "" {
 		sqlFilter += " AND " + prefix + "resource_type = ?"
 		args = append(args, resourceType)
+	}
+	if path != "" {
+		sqlFilter += " AND " + prefix + "path = ?"
+		args = append(args, path)
 	}
 
 	return sqlFilter, args

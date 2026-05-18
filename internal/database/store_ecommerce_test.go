@@ -35,6 +35,10 @@ func TestGetEcommerceSummaryAndBreakdowns(t *testing.T) {
 	firstDay := time.Date(2026, 3, 5, 10, 0, 0, 0, time.UTC)
 	secondDay := firstDay.Add(24 * time.Hour)
 	isUnique := true
+	city := "Berlin"
+	provider := "Hetzner Online GmbH"
+	asn := 24940
+	asnOrg := "Hetzner Online GmbH"
 
 	if err := store.CreateHit(ctx, &api.Hit{
 		SiteID:        site.ID,
@@ -45,6 +49,10 @@ func TestGetEcommerceSummaryAndBreakdowns(t *testing.T) {
 		Referrer:      new("https://www.google.com"),
 		ViewportWidth: new(1440),
 		CountryCode:   new("US"),
+		City:          &city,
+		Provider:      &provider,
+		ASN:           &asn,
+		ASNOrg:        &asnOrg,
 		UTMSource:     new("google"),
 		UTMMedium:     new("cpc"),
 		UTMCampaign:   new("spring-launch"),
@@ -61,6 +69,10 @@ func TestGetEcommerceSummaryAndBreakdowns(t *testing.T) {
 		Timestamp:     secondDay,
 		ViewportWidth: new(390),
 		CountryCode:   new("DE"),
+		City:          &city,
+		Provider:      &provider,
+		ASN:           &asn,
+		ASNOrg:        &asnOrg,
 		UTMSource:     new("newsletter"),
 		UTMMedium:     new("email"),
 		UTMCampaign:   new("march-digest"),
@@ -154,6 +166,15 @@ func TestGetEcommerceSummaryAndBreakdowns(t *testing.T) {
 	}
 	if summary.Currency != "USD" {
 		t.Fatalf("expected USD currency, got %q", summary.Currency)
+	}
+	if len(summary.TopCities) != 1 || summary.TopCities[0].Name != "Berlin" || summary.TopCities[0].Value != 2 {
+		t.Fatalf("expected Berlin checkout city aggregate, got %+v", summary.TopCities)
+	}
+	if len(summary.TopProviders) != 1 || summary.TopProviders[0].Name != "Hetzner Online GmbH" || summary.TopProviders[0].Value != 2 {
+		t.Fatalf("expected Hetzner checkout provider aggregate, got %+v", summary.TopProviders)
+	}
+	if len(summary.TopASNs) != 1 || summary.TopASNs[0].Name != "AS24940 Hetzner Online GmbH" || summary.TopASNs[0].Value != 2 {
+		t.Fatalf("expected Hetzner checkout ASN aggregate, got %+v", summary.TopASNs)
 	}
 
 	googleSummary, err := store.GetEcommerceSummary(ctx, api.EcommerceParams{

@@ -85,6 +85,58 @@ func TestOpenAPISpecV1TakeoutAndExportPathsListAllFormats(t *testing.T) {
 	}
 }
 
+func TestOpenAPISpecV1EcommerceSummaryDocumentsGeoNetworkAggregates(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	pathItem := requireMap(t, paths, "/api/sites/{id}/ecommerce")
+	getOp := requireMap(t, pathItem, "get")
+	description, ok := getOp["description"].(string)
+	if !ok {
+		t.Fatalf("expected ecommerce description to be string, got %T", getOp["description"])
+	}
+	for _, want := range []string{"city", "provider", "ASN"} {
+		if !strings.Contains(description, want) {
+			t.Fatalf("expected ecommerce description to mention %q, got %q", want, description)
+		}
+	}
+
+	summarySchema := requireMap(t, schemas, "EcommerceSummary")
+	properties := requireMap(t, summarySchema, "properties")
+	for _, prop := range []string{"top_cities", "top_providers", "top_asns"} {
+		if _, ok := properties[prop]; !ok {
+			t.Fatalf("expected EcommerceSummary to include %s", prop)
+		}
+	}
+}
+
+func TestOpenAPISpecV1BrowserIngestDocumentsGeoNetworkBoundary(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+
+	pathItem := requireMap(t, paths, "/ingest")
+	postOp := requireMap(t, pathItem, "post")
+	description, ok := postOp["description"].(string)
+	if !ok {
+		t.Fatalf("expected browser ingest description to be string, got %T", postOp["description"])
+	}
+	for _, want := range []string{
+		"resolved request IP",
+		"exclusions, spam filtering, and country, region, city, provider, and ASN lookup",
+		"derived country, region, city, provider, and ASN",
+		"does not store the raw visitor IP",
+	} {
+		if !strings.Contains(description, want) {
+			t.Fatalf("expected browser ingest description to mention %q, got %q", want, description)
+		}
+	}
+	if strings.Contains(description, "geolocation") {
+		t.Fatalf("expected browser ingest description to avoid generic geolocation wording, got %q", description)
+	}
+}
+
 func TestOpenAPISpecV1TeamSchemasExposeUsageAndEntitlements(t *testing.T) {
 	spec := openAPISpecV1("http://localhost:8080")
 	components := requireMap(t, spec, "components")
@@ -465,6 +517,9 @@ func TestOpenAPISpecV1IncludesAIChatbotExportPath(t *testing.T) {
 	if !hasFormatParamRef(params) {
 		t.Fatalf("expected AI chatbot export path to include shared format parameter")
 	}
+	if !hasParamRef(params, "#/components/parameters/filter") {
+		t.Fatalf("expected AI chatbot export path to document repeatable filter parameter")
+	}
 }
 
 func TestOpenAPISpecV1IncludesAIFetchExportPath(t *testing.T) {
@@ -524,6 +579,25 @@ func TestOpenAPISpecV1IncludesEventAnalyticsPaths(t *testing.T) {
 	}
 	if !hasParamRef(timeseriesParams, "#/components/parameters/eventDimensionKey") {
 		t.Fatalf("expected event timeseries to document deprecated dimension_key parameter")
+	}
+}
+
+func TestOpenAPISpecV1EventAudienceDocumentsGeoNetworkAggregates(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+
+	for _, path := range []string{
+		"/api/sites/{id}/events/audience",
+		"/api/share/{token}/sites/{id}/events/audience",
+	} {
+		pathItem := requireMap(t, paths, path)
+		getOp := requireMap(t, pathItem, "get")
+		description, _ := getOp["description"].(string)
+		for _, want := range []string{"cities", "providers", "ASNs"} {
+			if !strings.Contains(description, want) {
+				t.Fatalf("expected %s description to mention %q, got %q", path, want, description)
+			}
+		}
 	}
 }
 
@@ -624,6 +698,15 @@ func assertServerSideIngestDescription(t *testing.T, path string, postOp map[str
 	if path == "/api/ingest/server/pageview" && (!strings.Contains(description, "UTM values are read from the query string in url") || !strings.Contains(description, "not from top-level JSON fields")) {
 		t.Fatalf("expected server-side pageview description to document URL-based UTM extraction, got %q", description)
 	}
+	if !strings.Contains(description, "derived country, region, city, provider, and ASN") || !strings.Contains(description, "does not store the raw visitor IP") {
+		t.Fatalf("expected server-side ingest description to document derived geo/network metadata and raw IP boundary, got %q", description)
+	}
+	if !strings.Contains(description, "exclusions, spam filtering, and country, region, city, provider, and ASN lookup") {
+		t.Fatalf("expected server-side ingest description to document explicit visitor_ip metadata lookup, got %q", description)
+	}
+	if strings.Contains(description, "geolocation") {
+		t.Fatalf("expected server-side ingest description to avoid generic geolocation wording, got %q", description)
+	}
 }
 
 func assertAPIClientOnlyOperation(t *testing.T, path string, postOp map[string]any) {
@@ -661,6 +744,11 @@ func assertServerSideIngestProperties(t *testing.T, path string, properties map[
 	t.Helper()
 	if _, ok := properties["dnt"]; !ok {
 		t.Fatalf("expected %s request schema to include optional dnt", path)
+	}
+	visitorIP := requireMap(t, properties, "visitor_ip")
+	visitorIPDescription, ok := visitorIP["description"].(string)
+	if !ok || !strings.Contains(visitorIPDescription, "country, region, city, provider, and ASN") || !strings.Contains(visitorIPDescription, "does not store the raw visitor IP") {
+		t.Fatalf("expected %s visitor_ip schema to document derived geo/network metadata and raw IP boundary, got %q", path, visitorIPDescription)
 	}
 	for _, field := range []string{"is_unique", "tracker_source", "tracker_version"} {
 		if _, ok := properties[field]; ok {

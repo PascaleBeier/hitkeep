@@ -15,8 +15,8 @@ func openAPIV1WebVitalPaths() map[string]any {
 				map[string]any{"200": jsonSchemaResp("Web Vitals pages", map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/WebVitalPageRow"}})}),
 		},
 		"/api/sites/{id}/web-vitals/breakdown": map[string]any{
-			"get": op([]string{"Sites"}, "Get Web Vitals visitor context breakdown", "Returns Web Vitals p75 and rating counts for one metric grouped by browser, country, language, or device using the matching pageview context.", secAnyAuth(), append(webVitalsParams(true),
-				map[string]any{"name": "dimension", "in": "query", "required": true, "description": "Visitor context dimension.", "schema": map[string]any{"type": "string", "enum": []string{"browser", "country", "language", "device"}}},
+			"get": op([]string{"Sites"}, "Get Web Vitals visitor context breakdown", "Returns Web Vitals p75 and rating counts for one metric grouped by browser, country, language, device, city, provider, or ASN using the matching pageview context.", secAnyAuth(), append(webVitalsParams(true),
+				map[string]any{"name": "dimension", "in": "query", "required": true, "description": "Visitor context dimension.", "schema": map[string]any{"type": "string", "enum": []string{"browser", "country", "language", "device", "city", "provider", "asn"}}},
 				paramRef("#/components/parameters/limit"),
 			), nil,
 				map[string]any{"200": jsonSchemaResp("Web Vitals breakdown", map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/WebVitalDimensionRow"}})}),
@@ -40,7 +40,7 @@ func openAPIV1SharedWebVitalPaths() map[string]any {
 		},
 		"/api/share/{token}/sites/{id}/web-vitals/breakdown": map[string]any{
 			"get": op([]string{"Share"}, "Shared Web Vitals visitor context breakdown", "Returns Web Vitals visitor context breakdown through a read-only share token.", nil, append(sharedWebVitalsParams(true),
-				map[string]any{"name": "dimension", "in": "query", "required": true, "description": "Visitor context dimension.", "schema": map[string]any{"type": "string", "enum": []string{"browser", "country", "language", "device"}}},
+				map[string]any{"name": "dimension", "in": "query", "required": true, "description": "Visitor context dimension.", "schema": map[string]any{"type": "string", "enum": []string{"browser", "country", "language", "device", "city", "provider", "asn"}}},
 				paramRef("#/components/parameters/limit"),
 			), nil,
 				map[string]any{"200": jsonSchemaResp("Web Vitals breakdown", map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/WebVitalDimensionRow"}})}),

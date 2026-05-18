@@ -22,6 +22,9 @@ type ecommerceEventRecord struct {
 	referrer    string
 	device      string
 	country     string
+	city        string
+	provider    string
+	asn         string
 }
 
 type ecommerceItem struct {
@@ -47,6 +50,9 @@ type ecommercePurchase struct {
 type ecommerceCheckout struct {
 	timestamp time.Time
 	items     []ecommerceItem
+	city      string
+	provider  string
+	asn       string
 }
 
 type ecommerceDataset struct {
@@ -95,6 +101,9 @@ func (s *Store) GetEcommerceSummary(ctx context.Context, params api.EcommercePar
 	}
 
 	currencyCounts := map[string]int{}
+	cityCounts := map[string]int{}
+	providerCounts := map[string]int{}
+	asnCounts := map[string]int{}
 	for _, purchase := range dataset.purchases {
 		summary.Orders++
 		summary.Revenue += purchase.value
@@ -105,6 +114,9 @@ func (s *Store) GetEcommerceSummary(ctx context.Context, params api.EcommercePar
 	for _, checkout := range dataset.checkouts {
 		if matchesEcommerceItemFilter(checkout.items, params.ItemID, params.ItemName) {
 			summary.CheckoutStarts++
+			incrementMetricCount(cityCounts, checkout.city)
+			incrementMetricCount(providerCounts, checkout.provider)
+			incrementMetricCount(asnCounts, checkout.asn)
 		}
 	}
 
@@ -121,6 +133,9 @@ func (s *Store) GetEcommerceSummary(ctx context.Context, params api.EcommercePar
 			summary.Currency = currency
 		}
 	}
+	summary.TopCities = ecommerceMetricStats(cityCounts, params.Limit)
+	summary.TopProviders = ecommerceMetricStats(providerCounts, params.Limit)
+	summary.TopASNs = ecommerceMetricStats(asnCounts, params.Limit)
 
 	return summary, nil
 }
@@ -305,6 +320,9 @@ func (s *Store) loadEcommerceDataset(ctx context.Context, params api.EcommercePa
 			checkout := ecommerceCheckout{
 				timestamp: record.timestamp,
 				items:     normalizeEcommerceItems(props),
+				city:      record.city,
+				provider:  record.provider,
+				asn:       record.asn,
 			}
 			dataset.checkouts = append(dataset.checkouts, checkout)
 		}
@@ -340,7 +358,10 @@ func (s *Store) listEcommerceEvents(ctx context.Context, params api.EcommercePar
 				arg_min(COALESCE(NULLIF(TRIM(h.utm_campaign), ''), '(Unspecified)'), h.timestamp) AS utm_campaign,
 				arg_min(hk_referrer(h.referrer), h.timestamp) AS referrer,
 				arg_min(hk_device(h.viewport_width), h.timestamp) AS device,
-				arg_min(hk_country(h.country_code), h.timestamp) AS country
+				arg_min(hk_country(h.country_code), h.timestamp) AS country,
+				arg_min(COALESCE(NULLIF(TRIM(h.city), ''), '(Unknown)'), h.timestamp) AS city,
+				arg_min(COALESCE(NULLIF(TRIM(h.provider), ''), '(Unknown)'), h.timestamp) AS provider,
+				arg_min(hk_asn(h.asn, h.asn_org), h.timestamp) AS asn
 			FROM hits h
 			WHERE h.site_id = ? AND h.timestamp >= ? AND h.timestamp <= ?
 			GROUP BY h.session_id
@@ -366,7 +387,10 @@ func (s *Store) listEcommerceEvents(ctx context.Context, params api.EcommercePar
 			sa.utm_campaign,
 			sa.referrer,
 			sa.device,
-			sa.country
+			sa.country,
+			sa.city,
+			sa.provider,
+			sa.asn
 		FROM events e
 		%s
 		LEFT JOIN session_attrs sa ON sa.session_id = e.session_id
@@ -389,6 +413,7 @@ func (s *Store) listEcommerceEvents(ctx context.Context, params api.EcommercePar
 			utmSource, utmMedium  sql.NullString
 			utmCampaign, referrer sql.NullString
 			device, country       sql.NullString
+			city, provider, asn   sql.NullString
 		)
 		if err := rows.Scan(
 			&record.name,
@@ -400,6 +425,9 @@ func (s *Store) listEcommerceEvents(ctx context.Context, params api.EcommercePar
 			&referrer,
 			&device,
 			&country,
+			&city,
+			&provider,
+			&asn,
 		); err != nil {
 			return nil, err
 		}
@@ -414,6 +442,9 @@ func (s *Store) listEcommerceEvents(ctx context.Context, params api.EcommercePar
 		record.referrer = nullStringOrDefault(referrer, "(Direct)")
 		record.device = nullStringOrDefault(device, "(Unknown)")
 		record.country = nullStringOrDefault(country, "(Unknown)")
+		record.city = nullStringOrDefault(city, "(Unknown)")
+		record.provider = nullStringOrDefault(provider, "(Unknown)")
+		record.asn = nullStringOrDefault(asn, "(Unknown)")
 		records = append(records, record)
 	}
 
@@ -548,6 +579,35 @@ func normalizeEcommerceLimit(limit int) int {
 	default:
 		return limit
 	}
+}
+
+func incrementMetricCount(counts map[string]int, name string) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = "(Unknown)"
+	}
+	counts[name]++
+}
+
+func ecommerceMetricStats(counts map[string]int, limit int) []api.MetricStat {
+	stats := make([]api.MetricStat, 0, len(counts))
+	for name, value := range counts {
+		stats = append(stats, api.MetricStat{Name: name, Value: value})
+	}
+	sort.Slice(stats, func(i, j int) bool {
+		if stats[i].Value == stats[j].Value {
+			return stats[i].Name < stats[j].Name
+		}
+		return stats[i].Value > stats[j].Value
+	})
+	limit = normalizeEcommerceLimit(limit)
+	if len(stats) > limit {
+		stats = stats[:limit]
+	}
+	if stats == nil {
+		return []api.MetricStat{}
+	}
+	return stats
 }
 
 func ecommerceProductKey(itemID, itemName string) string {

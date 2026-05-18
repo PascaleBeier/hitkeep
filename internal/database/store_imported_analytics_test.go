@@ -158,6 +158,50 @@ func TestImportedAggregatesIncludedWithComparisonRequest(t *testing.T) {
 	assertImportedComparisonStats(t, stats)
 }
 
+func TestImportedSiteStatsIncludeGeoNetworkDimensions(t *testing.T) {
+	store, userID := setupEventBreakdownStore(t)
+	ctx := context.Background()
+	site, err := store.CreateSite(ctx, userID, "imported-geo-network.example.com")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+
+	day := time.Date(2026, 4, 8, 0, 0, 0, 0, time.UTC)
+	sink, err := NewImportedDataSink(ctx, store, site.ID, uuid.New())
+	if err != nil {
+		t.Fatalf("new sink: %v", err)
+	}
+	if err := sink.PutTraffic(ctx, importables.TrafficRow{Date: day, Visitors: 12, Visits: 12, Pageviews: 24, SourceFile: "datapoints.csv"}); err != nil {
+		t.Fatalf("put traffic: %v", err)
+	}
+	for _, row := range []importables.DimensionRow{
+		{Date: day, Dimension: "city", Name: "Dortmund", Visitors: 7, Visits: 7, Pageviews: 14, SourceFile: "datapoints.csv"},
+		{Date: day, Dimension: "provider", Name: "Deutsche Telekom AG", Visitors: 6, Visits: 6, Pageviews: 12, SourceFile: "datapoints.csv"},
+		{Date: day, Dimension: "asn", Name: "AS3320 Deutsche Telekom AG", Visitors: 5, Visits: 5, Pageviews: 10, SourceFile: "datapoints.csv"},
+	} {
+		if err := sink.PutDimension(ctx, row); err != nil {
+			t.Fatalf("put dimension %s: %v", row.Dimension, err)
+		}
+	}
+	if err := sink.Flush(ctx); err != nil {
+		t.Fatalf("flush: %v", err)
+	}
+
+	stats, err := store.GetSiteStats(ctx, api.AnalyticsParams{SiteID: site.ID, Start: day, End: day.AddDate(0, 0, 7)})
+	if err != nil {
+		t.Fatalf("get stats: %v", err)
+	}
+	if !containsMetric(stats.TopCities, "Dortmund", 14) {
+		t.Fatalf("expected imported city aggregate, got %+v", stats.TopCities)
+	}
+	if !containsMetric(stats.TopProviders, "Deutsche Telekom AG", 12) {
+		t.Fatalf("expected imported provider aggregate, got %+v", stats.TopProviders)
+	}
+	if !containsMetric(stats.TopASNs, "AS3320 Deutsche Telekom AG", 10) {
+		t.Fatalf("expected imported ASN aggregate, got %+v", stats.TopASNs)
+	}
+}
+
 func putImportedComparisonRows(t *testing.T, ctx context.Context, store *Store, siteID uuid.UUID, day time.Time) {
 	t.Helper()
 	sink, err := NewImportedDataSink(ctx, store, siteID, uuid.New())
@@ -273,6 +317,9 @@ func TestEventAudienceIncludesImportedEventDimensions(t *testing.T) {
 		{Date: day, EventName: "signup", Dimension: "referrer", Name: "Google", Visitors: 2, Events: 5, SourceFile: "imported_event_dimensions.csv"},
 		{Date: day, EventName: "signup", Dimension: "device", Name: "Desktop", Visitors: 2, Events: 5, SourceFile: "imported_event_dimensions.csv"},
 		{Date: day, EventName: "signup", Dimension: "country", Name: "Germany", Visitors: 1, Events: 3, SourceFile: "imported_event_dimensions.csv"},
+		{Date: day, EventName: "signup", Dimension: "city", Name: "Berlin", Visitors: 1, Events: 3, SourceFile: "imported_event_dimensions.csv"},
+		{Date: day, EventName: "signup", Dimension: "provider", Name: "Hetzner Online GmbH", Visitors: 1, Events: 3, SourceFile: "imported_event_dimensions.csv"},
+		{Date: day, EventName: "signup", Dimension: "asn", Name: "AS24940 Hetzner Online GmbH", Visitors: 1, Events: 3, SourceFile: "imported_event_dimensions.csv"},
 	} {
 		if err := sink.PutEventDimension(ctx, row); err != nil {
 			t.Fatalf("put event dimension %s: %v", row.Dimension, err)
@@ -297,6 +344,15 @@ func TestEventAudienceIncludesImportedEventDimensions(t *testing.T) {
 	}
 	if len(audience.TopCountries) != 1 || audience.TopCountries[0].Name != "Germany" || audience.TopCountries[0].Value != 1 {
 		t.Fatalf("expected imported country audience, got %+v", audience.TopCountries)
+	}
+	if len(audience.TopCities) != 1 || audience.TopCities[0].Name != "Berlin" || audience.TopCities[0].Value != 1 {
+		t.Fatalf("expected imported city audience, got %+v", audience.TopCities)
+	}
+	if len(audience.TopProviders) != 1 || audience.TopProviders[0].Name != "Hetzner Online GmbH" || audience.TopProviders[0].Value != 1 {
+		t.Fatalf("expected imported provider audience, got %+v", audience.TopProviders)
+	}
+	if len(audience.TopASNs) != 1 || audience.TopASNs[0].Name != "AS24940 Hetzner Online GmbH" || audience.TopASNs[0].Value != 1 {
+		t.Fatalf("expected imported ASN audience, got %+v", audience.TopASNs)
 	}
 	if len(audience.ImportedExcluded) != 0 {
 		t.Fatalf("expected no missing-dimension limitation when aggregate dimensions exist, got %+v", audience.ImportedExcluded)

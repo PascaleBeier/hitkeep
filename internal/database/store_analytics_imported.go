@@ -201,7 +201,7 @@ func (s *Store) mergeImportedTopLists(ctx context.Context, params api.AnalyticsP
 		WHERE site_id = ? AND date >= CAST(? AS DATE) AND date <= CAST(? AS DATE)
 			AND dimension IN (
 				'page', 'entry_page', 'exit_page', 'source', 'device', 'country', 'browser', 'operating_system',
-				'language', 'utm_campaign', 'utm_content', 'utm_medium', 'utm_source', 'utm_term'
+				'city', 'provider', 'asn', 'language', 'utm_campaign', 'utm_content', 'utm_medium', 'utm_source', 'utm_term'
 			)
 		GROUP BY dimension, name
 		ORDER BY dimension, val DESC, name ASC
@@ -230,6 +230,9 @@ func (s *Store) mergeImportedTopLists(ctx context.Context, params api.AnalyticsP
 	stats.TopReferrers = mergeMetricList(stats.TopReferrers, imported["source"], 10)
 	stats.TopDevices = mergeMetricList(stats.TopDevices, imported["device"], 10)
 	stats.TopCountries = mergeMetricList(stats.TopCountries, imported["country"], 10)
+	stats.TopCities = mergeMetricList(stats.TopCities, imported["city"], 10)
+	stats.TopProviders = mergeMetricList(stats.TopProviders, imported["provider"], 10)
+	stats.TopASNs = mergeMetricList(stats.TopASNs, imported["asn"], 10)
 	stats.TopBrowsers = mergeMetricList(stats.TopBrowsers, imported["browser"], 10)
 	stats.TopLanguages = mergeMetricList(stats.TopLanguages, imported["language"], 10)
 	stats.TopUTMCampaigns = mergeMetricList(stats.TopUTMCampaigns, imported["utm_campaign"], 10)
