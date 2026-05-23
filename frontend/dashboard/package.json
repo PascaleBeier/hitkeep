@@ -50,7 +50,7 @@
     "devDependencies": {
         "@angular/build": "^21.2.10",
         "@angular/cli": "^21.2.10",
-        "@angular/compiler-cli": "^21.2.12",
+        "@angular/compiler-cli": "^21.2.13",
         "@eslint/js": "^10.0.1",
         "@hitkeep/ng-e2e-builder": "file:tools/ng-e2e-builder",
         "@jsverse/transloco": "^8.3.0",
