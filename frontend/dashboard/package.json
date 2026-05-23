@@ -63,7 +63,7 @@
         "eslint": "^10.3.0",
         "jasmine-core": "~6.2.0",
         "jsdom": "^29.1.1",
-        "oxfmt": "^0.49.0",
+        "oxfmt": "^0.50.0",
         "postcss": "^8.5.14",
         "typescript": "~5.9.3",
         "typescript-eslint": "8.59.3",
