@@ -14,7 +14,7 @@ exclude (
 require (
 	github.com/Boostport/mjml-go v0.16.0
 	github.com/duckdb/duckdb-go/v2 v2.10502.0
-	github.com/go-webauthn/webauthn v0.17.3
+	github.com/go-webauthn/webauthn v0.17.4
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
@@ -28,10 +28,10 @@ require (
 	github.com/stripe/stripe-go/v84 v84.4.1
 	github.com/wneessen/go-mail v0.7.3
 	github.com/zendev-sh/goai v0.7.7
-	golang.org/x/crypto v0.51.0
+	golang.org/x/crypto v0.52.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.20.0
-	golang.org/x/sys v0.44.0
+	golang.org/x/sys v0.45.0
 	golang.org/x/text v0.37.0
 	golang.org/x/time v0.15.0
 	google.golang.org/api v0.279.0
@@ -59,7 +59,7 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
-	github.com/go-webauthn/x v0.2.5 // indirect
+	github.com/go-webauthn/x v0.2.6 // indirect
 	github.com/goccy/go-json v0.10.6 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/btree v1.1.3 // indirect
