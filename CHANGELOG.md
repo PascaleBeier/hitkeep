@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.6.1](https://github.com/PascaleBeier/hitkeep/compare/v2.6.0...v2.6.1) (2026-06-01)
+
+
+### Bug Fixes
+
+* **analytics:** store web vitals metric ids for dedup ([af24874](https://github.com/PascaleBeier/hitkeep/commit/af248743b7597b530eda50b8b4628490257345f4))
+* **db:** pin duckdb-go race-safe release ([45f3a6e](https://github.com/PascaleBeier/hitkeep/commit/45f3a6e5505e5eeb3967f450767bfa3a2d4b6f18))
+* **deps:** update frontend dependencies ([df6b7b5](https://github.com/PascaleBeier/hitkeep/commit/df6b7b57e44855c415ccfe7f78831877800e4280))
+* **deps:** update Go module dependencies ([bf28c30](https://github.com/PascaleBeier/hitkeep/commit/bf28c30fbc8a4c0d62357c2b059061447499493d))
+* **frontend:** introduce reusable site selects for API clients and settings ([f0b01e2](https://github.com/PascaleBeier/hitkeep/commit/f0b01e24806cb2a66c9c960c0f3d15530a8c0c2c))
+* **ipmeta:** isolate token download test ([34b604e](https://github.com/PascaleBeier/hitkeep/commit/34b604e3ff76af1164bd3f69cc93867f50933744))
+
 ## [2.6.0](https://github.com/PascaleBeier/hitkeep/compare/v2.5.1...v2.6.0) (2026-05-18)
 
 
