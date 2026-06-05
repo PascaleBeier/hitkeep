@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.7.0](https://github.com/PascaleBeier/hitkeep/compare/v2.6.1...v2.7.0) (2026-06-05)
+
+
+### Features
+
+* **dashboard:** refresh analytics in realtime ([f05d58d](https://github.com/PascaleBeier/hitkeep/commit/f05d58d3ece5836f616d6b377d3c2e8b86b63f52))
+
+
+### Bug Fixes
+
+* **api:** allow AI fetch ingest without browser metadata ([59df19d](https://github.com/PascaleBeier/hitkeep/commit/59df19dd646d396598b707f2f445666b057b424d)), closes [#197](https://github.com/PascaleBeier/hitkeep/issues/197)
+* **cloud:** let operators manage unlimited own resources ([4b84ee9](https://github.com/PascaleBeier/hitkeep/commit/4b84ee96a3cf162c4599d4eb98f8f02cbaf1eb3a))
+* **deps:** update Go toolchain to 1.26.4 ([34271b4](https://github.com/PascaleBeier/hitkeep/commit/34271b4f5de80aa9fa8eb5303eeda6733fbf3598))
+
 ## [2.6.1](https://github.com/PascaleBeier/hitkeep/compare/v2.6.0...v2.6.1) (2026-06-01)
 
 
