@@ -100,8 +100,8 @@ github.com/duckdb/duckdb-go-bindings/lib/linux-arm64 v0.10503.0 h1:zYkiCNaQAmneI
 github.com/duckdb/duckdb-go-bindings/lib/linux-arm64 v0.10503.0/go.mod h1:81SGOYoEUs8qaAfSk1wRfM5oobrIJ5KI7AzYhK6/bvQ=
 github.com/duckdb/duckdb-go-bindings/lib/windows-amd64 v0.10503.0 h1:InTPj+kxhdsFmG8iip6FAqJoH8Oerx0tW4dzfxqkAEk=
 github.com/duckdb/duckdb-go-bindings/lib/windows-amd64 v0.10503.0/go.mod h1:K25pJL26ARblGDeuAkrdblFvUen92+CwksLtPEHRqqQ=
-github.com/duckdb/duckdb-go/v2 v2.10503.0 h1:cl8hbxl8Wn2rBuBWVyyDyJe/ZfCji7wrMPZ/EdFzN1Y=
-github.com/duckdb/duckdb-go/v2 v2.10503.0/go.mod h1:3trgI3LZo7TTgJYAP9+xCDJYdAF+E+TKE41JWKeWE5I=
+github.com/duckdb/duckdb-go/v2 v2.10503.1 h1:mExuoVmoLQYVdTiGvsKTAlRPtGBVRutx12B8lctU+NI=
+github.com/duckdb/duckdb-go/v2 v2.10503.1/go.mod h1:3trgI3LZo7TTgJYAP9+xCDJYdAF+E+TKE41JWKeWE5I=
 github.com/evanw/esbuild v0.25.9 h1:aU7GVC4lxJGC1AyaPwySWjSIaNLAdVEEuq3chD0Khxs=
 github.com/evanw/esbuild v0.25.9/go.mod h1:D2vIQZqV/vIf/VRHtViaUtViZmG7o+kKmlBfVQuRi48=
 github.com/fatih/color v1.18.0 h1:S8gINlzdQ840/4pfAwic/ZE0djQEH3wM94VfqLTZcOM=

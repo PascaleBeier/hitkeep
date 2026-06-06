@@ -13,7 +13,7 @@ exclude (
 
 require (
 	github.com/Boostport/mjml-go v0.16.0
-	github.com/duckdb/duckdb-go/v2 v2.10503.0 // v2.10503.1 trips Go checkptr under -race when scanning DuckDB strings
+	github.com/duckdb/duckdb-go/v2 v2.10503.1 // v2.10503.1 trips Go checkptr under -race when scanning DuckDB strings
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
