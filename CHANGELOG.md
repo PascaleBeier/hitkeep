@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.7.1](https://github.com/PascaleBeier/hitkeep/compare/v2.7.0...v2.7.1) (2026-06-18)
+
+
+### Bug Fixes
+
+* **deps:** Bump duckdb to v2.10504.0 to fix ptr race cond ([00f674f](https://github.com/PascaleBeier/hitkeep/commit/00f674ff856ccb7f093fdf0030a0cbc9318cfe4d))
+
 ## [2.7.0](https://github.com/PascaleBeier/hitkeep/compare/v2.6.1...v2.7.0) (2026-06-05)
 
 
