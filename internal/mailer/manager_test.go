@@ -661,7 +661,7 @@ func TestMonthNameUsesUTF8LocaleData(t *testing.T) {
 }
 
 func TestSupportedLocalesAreStable(t *testing.T) {
-	want := []string{"de", "en", "es", "fr", "it", "nl"}
+	want := []string{"de", "en", "es", "fr", "it", "nl", "pt"}
 	got := SupportedLocales()
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("expected supported locales %v, got %v", want, got)

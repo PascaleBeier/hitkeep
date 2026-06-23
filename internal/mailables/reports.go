@@ -273,7 +273,7 @@ func FormatPeriodLabelForLocale(locale string, start, end time.Time) string {
 		switch locale {
 		case "de":
 			return fmt.Sprintf("%d.-%d. %s %d", start.Day(), end.Day(), mailer.MonthName(locale, start.Month(), false), start.Year())
-		case "fr", "it":
+		case "fr", "it", "pt":
 			return fmt.Sprintf("%d-%d %s %d", start.Day(), end.Day(), mailer.MonthName(locale, start.Month(), true), start.Year())
 		case "es":
 			return fmt.Sprintf("%d-%d %s %d", start.Day(), end.Day(), mailer.MonthName(locale, start.Month(), true), start.Year())
@@ -285,7 +285,7 @@ func FormatPeriodLabelForLocale(locale string, start, end time.Time) string {
 	switch locale {
 	case "de":
 		return fmt.Sprintf("%d. %s - %d. %s %d", start.Day(), mailer.MonthName(locale, start.Month(), false), end.Day(), mailer.MonthName(locale, end.Month(), false), end.Year())
-	case "fr", "it":
+	case "fr", "it", "pt":
 		return fmt.Sprintf("%d %s - %d %s %d", start.Day(), mailer.MonthName(locale, start.Month(), true), end.Day(), mailer.MonthName(locale, end.Month(), true), end.Year())
 	case "es":
 		return fmt.Sprintf("%d %s - %d %s %d", start.Day(), mailer.MonthName(locale, start.Month(), true), end.Day(), mailer.MonthName(locale, end.Month(), true), end.Year())
@@ -303,7 +303,7 @@ func FormatSingleDayLabel(locale string, day time.Time) string {
 	switch locale {
 	case "de":
 		return fmt.Sprintf("%d. %s %d", day.Day(), mailer.MonthName(locale, day.Month(), false), day.Year())
-	case "fr", "it":
+	case "fr", "it", "pt":
 		return fmt.Sprintf("%d %s %d", day.Day(), mailer.MonthName(locale, day.Month(), false), day.Year())
 	case "es":
 		return fmt.Sprintf("%d %s %d", day.Day(), mailer.MonthName(locale, day.Month(), true), day.Year())
