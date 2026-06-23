@@ -219,7 +219,9 @@ func (h *handler) handleCreateInitialUser() http.HandlerFunc {
 			return
 		}
 
-		userID, err := h.ctx.Store.CreateUserWithNames(r.Context(), req.Email, hashedPassword, req.GivenName, req.LastName)
+		locale := fallbackMailLocale(r.Header.Get("Accept-Language"))
+		ctx := context.WithValue(r.Context(), database.LocaleContextKey, locale)
+		userID, err := h.ctx.Store.CreateUserWithNames(ctx, req.Email, hashedPassword, req.GivenName, req.LastName)
 		if err != nil {
 			slog.Error("Failed to create initial user", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)

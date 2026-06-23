@@ -12,12 +12,69 @@ import (
 	"hitkeep/internal/api"
 )
 
-func defaultTenantNameForSetup(givenName string) string {
-	givenName = strings.TrimSpace(givenName)
-	if givenName == "" {
-		return defaultTenantName
+type contextKey string
+
+const LocaleContextKey contextKey = "locale"
+
+type tenantTranslations struct {
+	defaultTenantName string
+	teamFormat        string
+}
+
+var tenantTranslationsByLocale = map[string]tenantTranslations{
+	"en": {
+		defaultTenantName: "Default Tenant",
+		teamFormat:        "%s's Team",
+	},
+	"pt": {
+		defaultTenantName: "Equipe Padrão",
+		teamFormat:        "Equipe de %s",
+	},
+	"de": {
+		defaultTenantName: "Standard-Team",
+		teamFormat:        "Team von %s",
+	},
+	"es": {
+		defaultTenantName: "Equipo predeterminado",
+		teamFormat:        "Equipo de %s",
+	},
+	"fr": {
+		defaultTenantName: "Équipe par défaut",
+		teamFormat:        "Équipe de %s",
+	},
+	"it": {
+		defaultTenantName: "Team predefinito",
+		teamFormat:        "Team di %s",
+	},
+	"nl": {
+		defaultTenantName: "Standaardteam",
+		teamFormat:        "Team van %s",
+	},
+}
+
+func getLocaleFromContext(ctx context.Context) string {
+	if val, ok := ctx.Value(LocaleContextKey).(string); ok {
+		val = strings.TrimSpace(strings.ToLower(val))
+		if val != "" {
+			parts := strings.Split(val, "-")
+			base := strings.TrimSpace(parts[0])
+			if _, exists := tenantTranslationsByLocale[base]; exists {
+				return base
+			}
+		}
 	}
-	return fmt.Sprintf("%s's Team", givenName)
+	return "en"
+}
+
+func defaultTenantNameForSetup(ctx context.Context, givenName string) string {
+	givenName = strings.TrimSpace(givenName)
+	locale := getLocaleFromContext(ctx)
+	trans := tenantTranslationsByLocale[locale]
+
+	if givenName == "" {
+		return trans.defaultTenantName
+	}
+	return fmt.Sprintf(trans.teamFormat, givenName)
 }
 
 func ensureDefaultTenantTx(ctx context.Context, tx *sql.Tx, tenantName string, renameExisting bool) error {

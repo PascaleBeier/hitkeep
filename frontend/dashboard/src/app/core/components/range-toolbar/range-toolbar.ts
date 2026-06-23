@@ -188,14 +188,22 @@ export class RangeToolbar {
 
     private shortLabel(value: string): string {
         switch (value) {
-            case '24h':
-                return '24h';
-            case '7d':
-                return '7d';
-            case '30d':
-                return '30d';
-            case '1y':
-                return '1y';
+            case '24h': {
+                const translation = this.transloco.translate('common.timeRanges.last24HoursShort');
+                return translation === 'common.timeRanges.last24HoursShort' ? '24h' : translation;
+            }
+            case '7d': {
+                const translation = this.transloco.translate('common.timeRanges.last7DaysShort');
+                return translation === 'common.timeRanges.last7DaysShort' ? '7d' : translation;
+            }
+            case '30d': {
+                const translation = this.transloco.translate('common.timeRanges.last30DaysShort');
+                return translation === 'common.timeRanges.last30DaysShort' ? '30d' : translation;
+            }
+            case '1y': {
+                const translation = this.transloco.translate('common.timeRanges.lastYearShort');
+                return translation === 'common.timeRanges.lastYearShort' ? '1y' : translation;
+            }
             case 'custom':
                 return this.transloco.translate('common.timeRanges.customShort');
             default:

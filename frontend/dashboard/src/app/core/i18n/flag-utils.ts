@@ -29,7 +29,7 @@ const REPRESENTATIVE_COUNTRY_FLAG_BY_LANGUAGE: Record<string, string> = {
     nb: 'no',
     nn: 'no',
     pl: 'pl',
-    pt: 'pt',
+    pt: 'br',
     ru: 'ru',
     sv: 'se',
     th: 'th',

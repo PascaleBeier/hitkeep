@@ -540,9 +540,13 @@
         "timeRangeSelectorAria": "Sélecteur de plage temporelle",
         "timeRanges": {
             "last24Hours": "Dernières 24 heures",
+            "last24HoursShort": "24h",
             "last7Days": "Derniers 7 jours",
+            "last7DaysShort": "7j",
             "last30Days": "Derniers 30 jours",
+            "last30DaysShort": "30j",
             "lastYear": "Dernière année",
+            "lastYearShort": "1a",
             "customRange": "Plage personnalisée",
             "customShort": "Personnalisé",
             "customRangeSummary": "{{start}} - {{end}}",

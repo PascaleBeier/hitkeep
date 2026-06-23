@@ -545,9 +545,13 @@
         "timeRangeSelectorAria": "Seletor de período",
         "timeRanges": {
             "last24Hours": "Últimas 24 horas",
+            "last24HoursShort": "24h",
             "last7Days": "Últimos 7 dias",
+            "last7DaysShort": "7d",
             "last30Days": "Últimos 30 dias",
+            "last30DaysShort": "30d",
             "lastYear": "Último ano",
+            "lastYearShort": "1a",
             "customRange": "Período personalizado",
             "customShort": "Personalizado",
             "customRangeSummary": "{{start}} - {{end}}",

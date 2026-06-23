@@ -154,7 +154,7 @@ func (s *Store) CreateUserWithNames(ctx context.Context, email string, hashedPas
 		return uuid.Nil, fmt.Errorf("could not count users: %w", err)
 	}
 
-	if err := ensureDefaultTenantTx(ctx, tx, defaultTenantNameForSetup(givenName), count == 1); err != nil {
+	if err := ensureDefaultTenantTx(ctx, tx, defaultTenantNameForSetup(ctx, givenName), count == 1); err != nil {
 		return uuid.Nil, err
 	}
 

@@ -545,9 +545,13 @@
         "timeRangeSelectorAria": "Keuzeschakelaar voor tijdsbereik",
         "timeRanges": {
             "last24Hours": "Afgelopen 24 uur",
+            "last24HoursShort": "24u",
             "last7Days": "Laatste 7 dagen",
+            "last7DaysShort": "7d",
             "last30Days": "Laatste 30 dagen",
+            "last30DaysShort": "30d",
             "lastYear": "Vorig jaar",
+            "lastYearShort": "1j",
             "customRange": "Aangepast bereik",
             "customShort": "Aangepast",
             "customRangeSummary": "{{start}}-{{end}}",
