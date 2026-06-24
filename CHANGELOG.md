@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.8.0](https://github.com/PascaleBeier/hitkeep/compare/v2.7.0...v2.8.0) (2026-06-24)
+
+
+### Features
+
+* **admin:** surface MCP runtime readiness ([41680e6](https://github.com/PascaleBeier/hitkeep/commit/41680e6130aa68bcd144b464bda458484fd2d752))
+* **ai:** Add HitKeep Skills ([d391e94](https://github.com/PascaleBeier/hitkeep/commit/d391e94b81d57865f3b1a94e8dd0af60605144fa))
+* **frontend:** add QR campaign dashboard ([f176ae0](https://github.com/PascaleBeier/hitkeep/commit/f176ae0913b919f04b293c83191f6041eb67e546))
+* **i18n:** add Brazilian Portuguese localization ([c003387](https://github.com/PascaleBeier/hitkeep/commit/c003387344e0cb795162a611bbf32b2352eea198))
+* **qr:** add dynamic campaign tracking APIs ([8d54d4a](https://github.com/PascaleBeier/hitkeep/commit/8d54d4ab054c876606961dc9e78788166a52ea07))
+* **seed:** add QR campaign demo data ([cc7b533](https://github.com/PascaleBeier/hitkeep/commit/cc7b5332c6957da88bdfc26cf56ef53cd57ede6c))
+
+
+### Bug Fixes
+
+* **ci:** refresh github action pins ([bc86772](https://github.com/PascaleBeier/hitkeep/commit/bc86772762c9f0aa7eeb1b4b385f85a502716b5f))
+* **deps:** Bump duckdb to v2.10504.0 to fix ptr race cond ([00f674f](https://github.com/PascaleBeier/hitkeep/commit/00f674ff856ccb7f093fdf0030a0cbc9318cfe4d))
+* **frontend:** clarify admin user role display ([e8790f9](https://github.com/PascaleBeier/hitkeep/commit/e8790f9accb4843469b4398d25ad3bfd96038c77))
+* **i18n:** localize default team setup explicitly ([96ea994](https://github.com/PascaleBeier/hitkeep/commit/96ea99467741ae1c7f74351df80cd5a18f53abb8))
+* **release:** sync version metadata with release-please ([50690e1](https://github.com/PascaleBeier/hitkeep/commit/50690e1233e669b46dc5fdd3dc5ed42faf841dae))
+
 ## [2.7.0](https://github.com/PascaleBeier/hitkeep/compare/v2.6.1...v2.7.0) (2026-06-05)
 
 
