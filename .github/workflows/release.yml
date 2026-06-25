@@ -145,3 +145,34 @@ jobs:
         run: |
           CHART_VERSION="${TAG#v}"
           helm push "hitkeep-${CHART_VERSION}.tgz" "oci://ghcr.io/pascalebeier/charts"
+
+  deploy-cloud:
+    name: Trigger cloud deploy
+    needs:
+      - release-please
+      - build-release
+      - link-release-blog
+      - publish-helm
+    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' && needs.publish-helm.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Dispatch hitkeep-infra release deploy
+        env:
+          GH_TOKEN: ${{ secrets.GHT }}
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+
+          artifact_url="https://github.com/PascaleBeier/hitkeep/releases/download/${TAG}/hitkeep-cloud-linux-arm64"
+
+          gh workflow run release-deploy.yml \
+            --repo PascaleBeier/hitkeep-infra \
+            --ref main \
+            -f stack=both \
+            -f artifact_url="${artifact_url}" \
+            -f release_version="${TAG}" \
+            -f mode=deploy
+
+          echo "Triggered hitkeep-infra release deploy for ${TAG}: ${artifact_url}"
