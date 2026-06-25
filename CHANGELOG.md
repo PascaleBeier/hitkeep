@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.8.1](https://github.com/PascaleBeier/hitkeep/compare/v2.8.0...v2.8.1) (2026-06-25)
+
+
+### Bug Fixes
+
+* **frontend:** resolve password settings validation, breadcrumbs scrollbar, and GSC timezone tests ([c09f293](https://github.com/PascaleBeier/hitkeep/commit/c09f2934d3eec75ef68984ea49e92243693ff958))
+* **i18n:** update Portuguese translations and add missing QR code labels ([c9af959](https://github.com/PascaleBeier/hitkeep/commit/c9af95946f86163cb8c1caca7cefbfbf8aa1a0a4))
+
 ## [2.8.0](https://github.com/PascaleBeier/hitkeep/compare/v2.7.0...v2.8.0) (2026-06-24)
 
 
