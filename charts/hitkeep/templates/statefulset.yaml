@@ -27,15 +27,16 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       {{- if .Values.serviceAccount.create }}
-      serviceAccountName: {{ include "hitkeep.fullname" . }}
+      serviceAccountName: {{ include "hitkeep.serviceAccountName" . }}
       {{- else if .Values.serviceAccount.name }}
-      serviceAccountName: {{ .Values.serviceAccount.name }}
+      serviceAccountName: {{ include "hitkeep.serviceAccountName" . }}
       {{- end }}
       securityContext:
         fsGroup: 65532
       containers:
         - name: hitkeep
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          {{- $imageTag := .Values.image.tag | default (trimPrefix "v" .Chart.AppVersion) }}
+          image: "{{ .Values.image.repository }}:{{ $imageTag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
@@ -52,11 +53,12 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            {{- $env := .Values.env | default dict -}}
             {{- $flags := dict "hasJoin" false "hasBind" false -}}
-            {{- if hasKey .Values.env "HITKEEP_JOIN_ADDR" }}
+            {{- if hasKey $env "HITKEEP_JOIN_ADDR" }}
             {{- $_ := set $flags "hasJoin" true }}
             {{- end }}
-            {{- if hasKey .Values.env "HITKEEP_BIND_ADDR" }}
+            {{- if hasKey $env "HITKEEP_BIND_ADDR" }}
             {{- $_ := set $flags "hasBind" true }}
             {{- end }}
             {{- range .Values.extraEnv }}
@@ -81,12 +83,28 @@ spec:
               value: "{{ include "hitkeep.fullname" . }}-headless.{{ .Release.Namespace }}.svc.cluster.local:7946"
             {{- end }}
             {{- end }}
-            {{- range $key, $value := .Values.env }}
+            {{- if not (hasKey $env "HITKEEP_DB_PATH") }}
+            - name: HITKEEP_DB_PATH
+              value: {{ printf "%s/hitkeep.db" .Values.persistence.mountPath | quote }}
+            {{- end }}
+            {{- if not (hasKey $env "HITKEEP_DATA_PATH") }}
+            - name: HITKEEP_DATA_PATH
+              value: {{ .Values.persistence.mountPath | quote }}
+            {{- end }}
+            {{- if not (hasKey $env "HITKEEP_ARCHIVE_PATH") }}
+            - name: HITKEEP_ARCHIVE_PATH
+              value: {{ printf "%s/archive" .Values.persistence.mountPath | quote }}
+            {{- end }}
+            {{- if not (hasKey $env "HITKEEP_SPAM_FILTER_PATH") }}
+            - name: HITKEEP_SPAM_FILTER_PATH
+              value: {{ printf "%s/spam-filter.json" .Values.persistence.mountPath | quote }}
+            {{- end }}
+            {{- range $key, $value := $env }}
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
-            {{- range .Values.extraEnv }}
-            - {{- toYaml . | nindent 14 }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
             {{- end }}
           {{- if .Values.extraArgs }}
           args:

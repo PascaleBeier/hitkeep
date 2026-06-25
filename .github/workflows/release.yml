@@ -137,7 +137,7 @@ jobs:
           TAG: ${{ needs.release-please.outputs.tag_name }}
         run: |
           CHART_VERSION="${TAG#v}"
-          helm package charts/hitkeep --version "$CHART_VERSION" --app-version "$TAG"
+          helm package charts/hitkeep --version "$CHART_VERSION" --app-version "$CHART_VERSION"
 
       - name: Push chart
         env:

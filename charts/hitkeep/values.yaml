@@ -7,6 +7,7 @@ fullnameOverride: ""
 image:
   repository: ghcr.io/pascalebeier/hitkeep
   pullPolicy: IfNotPresent
+  # Defaults to the chart appVersion, normalized without a leading "v".
   tag: ""
 
 imagePullSecrets: []

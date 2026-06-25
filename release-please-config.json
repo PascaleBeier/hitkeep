@@ -23,6 +23,16 @@
           "type": "json",
           "path": "frontend/dashboard/package-lock.json",
           "jsonpath": "$['packages']['']['version']"
+        },
+        {
+          "type": "yaml",
+          "path": "charts/hitkeep/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "charts/hitkeep/Chart.yaml",
+          "jsonpath": "$.appVersion"
         }
       ],
       "bump-minor-pre-major": false,
