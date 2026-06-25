@@ -1,6 +1,8 @@
 apiVersion: v2
 name: hitkeep
-description: Privacy-first analytics for humans and AI agents, self-hosted or in EU/US cloud.
+description: >-
+  Privacy-first analytics for humans and AI agents, self-hosted or in EU/US
+  cloud.
 type: application
-version: 2.8.1
-appVersion: "2.8.1"
+version: 2.8.2
+appVersion: 2.8.2

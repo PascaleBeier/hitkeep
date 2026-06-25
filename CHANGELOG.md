@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.8.2](https://github.com/PascaleBeier/hitkeep/compare/v2.8.1...v2.8.2) (2026-06-25)
+
+
+### Bug Fixes
+
+* **helm:** align chart with 2.8.1 ([84f1896](https://github.com/PascaleBeier/hitkeep/commit/84f1896da74e77d5a573edf40e2cf625c18c99f6))
+
 ## [2.8.1](https://github.com/PascaleBeier/hitkeep/compare/v2.8.0...v2.8.1) (2026-06-25)
 
 
