@@ -33,6 +33,10 @@
           "type": "yaml",
           "path": "charts/hitkeep/Chart.yaml",
           "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "generic",
+          "path": "charts/hitkeep/README.md"
         }
       ],
       "bump-minor-pre-major": false,
