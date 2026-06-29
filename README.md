@@ -117,7 +117,7 @@ Tracker options, ecommerce events, custom events, and advanced tracking examples
 - [Custom events](https://hitkeep.com/guides/tracking/custom-events/)
 - [Ecommerce analytics](https://hitkeep.com/guides/analytics/ecommerce/)
 - [Google Search Console integration](https://hitkeep.com/guides/integrations/google-search-console/)
-- [MCP analytics access](https://hitkeep.com/guides/integrations/mcp/)
+- [Read-only MCP server for web analytics](https://hitkeep.com/use-cases/read-only-mcp-server-web-analytics/)
 - [WordPress integration](https://hitkeep.com/guides/integrations/wordpress/)
 - [AI visibility analytics](https://hitkeep.com/guides/analytics/ai-visibility/)
 - [CloudFront AI crawler tracking](https://hitkeep.com/guides/tracking/cloudfront-ai-crawler-tracking/)

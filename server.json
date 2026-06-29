@@ -3,7 +3,7 @@
   "name": "io.github.PascaleBeier/hitkeep",
   "title": "HitKeep",
   "description": "Read-only MCP server for aggregate HitKeep analytics and official documentation.",
-  "websiteUrl": "https://hitkeep.com/guides/integrations/mcp/",
+  "websiteUrl": "https://hitkeep.com/use-cases/read-only-mcp-server-web-analytics/",
   "repository": {
     "url": "https://github.com/pascalebeier/hitkeep",
     "source": "github"
