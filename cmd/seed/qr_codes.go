@@ -44,7 +44,7 @@ func seedQRCampaigns(ctx context.Context, sharedStore, analyticsStore *database.
 	now := time.Now().UTC()
 	daysBack := min(max(numDays, 7), 30)
 
-	for _, fixture := range fixtures {
+	for fixtureIndex, fixture := range fixtures {
 		qr, _, err := sharedStore.CreateQRCode(ctx, siteID, userID, api.QRCodeCreateRequest{
 			Name:           fixture.name,
 			DestinationURL: seedURLForPath(domain, fixture.path),
@@ -72,6 +72,20 @@ func seedQRCampaigns(ctx context.Context, sharedStore, analyticsStore *database.
 			}
 		}
 
+		defaultRangeTS := defaultRangeQRCodeTimestamp(now, fixtureIndex, len(fixtures))
+		open, err := seedQRCodeOpen(siteID, qr.ID, fixture, defaultRangeTS, rng)
+		if err != nil {
+			return stats, err
+		}
+		if err := analyticsStore.CreateQRCodeOpen(ctx, open); err != nil {
+			return stats, fmt.Errorf("create default-range QR open for %q: %w", fixture.name, err)
+		}
+		stats.qrOpens++
+		hits, events := seedQRCodeSession(&batch, siteID, qr.ID, domain, fixture, defaultRangeTS.Add(15*time.Second), 1, rng)
+		stats.hits += hits
+		stats.events += events
+		stats.sessions++
+
 		for i := 0; i < fixture.openCount; i++ {
 			ts := randomQRCodeTimestamp(rng, now, daysBack)
 			open, err := seedQRCodeOpen(siteID, qr.ID, fixture, ts, rng)
@@ -98,6 +112,22 @@ func seedQRCampaigns(ctx context.Context, sharedStore, analyticsStore *database.
 
 	slog.Info("QR campaigns seeded", "codes", stats.qrCodes, "opens", stats.qrOpens, "attributed_hits", stats.hits, "attributed_sessions", stats.sessions)
 	return stats, nil
+}
+
+func defaultRangeQRCodeTimestamp(now time.Time, index, total int) time.Time {
+	now = now.UTC()
+	dayStart := now.Truncate(24 * time.Hour)
+	if ts := now.Add(-time.Duration(index+1) * time.Minute); ts.After(dayStart) {
+		return ts
+	}
+
+	elapsed := now.Sub(dayStart)
+	if elapsed <= 0 {
+		return dayStart
+	}
+	denominator := max(total+1, 2)
+	offset := time.Duration(index+1) * elapsed / time.Duration(denominator)
+	return dayStart.Add(offset)
 }
 
 func qrCampaignSeedFixtures(domain string) []qrCampaignSeedFixture {

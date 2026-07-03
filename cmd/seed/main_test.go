@@ -257,6 +257,87 @@ func TestSeedQRCampaignsCreatesDefinitionsAndAttribution(t *testing.T) {
 	requireSeedQRCodeAttribution(t, ctx, analyticsStore, site.ID, qrs)
 }
 
+func TestSeedQRCampaignsCreateDefaultRangeAnalytics(t *testing.T) {
+	ctx, store, tenantMgr, site, userID, analyticsStore := newSeedQRCampaignTestContext(t)
+	defer store.Close()
+	defer tenantMgr.Close()
+
+	stats, err := seedQRCampaigns(ctx, store, analyticsStore, site.ID, userID, site.Domain, 30, t.TempDir(), mrand.New(mrand.NewSource(2112))) // #nosec G404 -- deterministic fixture test.
+	if err != nil {
+		t.Fatalf("seedQRCampaigns: %v", err)
+	}
+	requireSeedQRCampaignStats(t, stats)
+	qrs := requireSeedQRCampaignDefinitions(t, ctx, store, site.ID, stats.qrCodes)
+
+	defaultRangeStart := time.Now().UTC().Truncate(24 * time.Hour)
+	defaultRangeEnd := time.Now().UTC().Add(5 * time.Minute)
+	for _, qr := range qrs {
+		opens, err := analyticsStore.CountQRCodeOpens(ctx, site.ID, qr.ID, defaultRangeStart, defaultRangeEnd)
+		if err != nil {
+			t.Fatalf("CountQRCodeOpens(%s): %v", qr.Name, err)
+		}
+		if opens == 0 {
+			t.Fatalf("expected default today range to show QR opens for %s", qr.Name)
+		}
+
+		report, err := analyticsStore.GetSiteStats(ctx, api.AnalyticsParams{
+			SiteID: site.ID,
+			Start:  defaultRangeStart,
+			End:    defaultRangeEnd,
+			Filters: []api.Filter{{
+				Type:  "qr_code_id",
+				Value: qr.ID.String(),
+			}},
+		})
+		if err != nil {
+			t.Fatalf("GetSiteStats(%s): %v", qr.Name, err)
+		}
+		if report.TotalPageviews == 0 || report.UniqueSessions == 0 {
+			t.Fatalf("expected default today range to show QR-attributed analytics for %s, got %+v", qr.Name, report)
+		}
+	}
+}
+
+func TestSeedTrafficCreatesDefaultRangeUTMData(t *testing.T) {
+	ctx, store, tenantMgr, site, _, analyticsStore := newSeedQRCampaignTestContext(t)
+	defer store.Close()
+	defer tenantMgr.Close()
+
+	stats, err := seedTraffic(ctx, analyticsStore, site.ID, goalIDs{}, 30, mrand.New(mrand.NewSource(4242))) // #nosec G404 -- deterministic demo fixture test.
+	if err != nil {
+		t.Fatalf("seedTraffic: %v", err)
+	}
+	if stats.hits == 0 || stats.sessions == 0 {
+		t.Fatalf("expected seeded traffic, got %+v", stats)
+	}
+
+	defaultRangeStart := time.Now().UTC().Truncate(24 * time.Hour)
+	defaultRangeEnd := time.Now().UTC().Add(5 * time.Minute)
+	report, err := analyticsStore.GetSiteStats(ctx, api.AnalyticsParams{
+		SiteID: site.ID,
+		Start:  defaultRangeStart,
+		End:    defaultRangeEnd,
+	})
+	if err != nil {
+		t.Fatalf("GetSiteStats: %v", err)
+	}
+	if report.UTMCampaignHits == 0 || report.UTMMediumHits == 0 || report.UTMSourceHits == 0 {
+		t.Fatalf("expected default today range to show seeded UTM KPIs, got campaign=%d medium=%d source=%d", report.UTMCampaignHits, report.UTMMediumHits, report.UTMSourceHits)
+	}
+	if !hasSpecifiedSeedMetric(report.TopUTMCampaigns) || !hasSpecifiedSeedMetric(report.TopUTMMediums) || !hasSpecifiedSeedMetric(report.TopUTMSources) {
+		t.Fatalf("expected default today range to show seeded UTM top lists, got campaigns=%+v mediums=%+v sources=%+v", report.TopUTMCampaigns, report.TopUTMMediums, report.TopUTMSources)
+	}
+}
+
+func hasSpecifiedSeedMetric(rows []api.MetricStat) bool {
+	for _, row := range rows {
+		if row.Name != "" && row.Name != "(Unspecified)" {
+			return true
+		}
+	}
+	return false
+}
+
 func newSeedQRCampaignTestContext(t *testing.T) (context.Context, *database.Store, *database.TenantStoreManager, *api.Site, uuid.UUID, *database.Store) {
 	t.Helper()
 	ctx := context.Background()

@@ -15,7 +15,10 @@ import (
 
 func seedTraffic(ctx context.Context, store *database.Store, siteID uuid.UUID, goals goalIDs, numDays int, rng *mrand.Rand) (seedStats, error) {
 	now := time.Now().UTC()
-	start := now.AddDate(0, 0, -numDays).Truncate(24 * time.Hour)
+	if numDays <= 0 {
+		return seedStats{}, nil
+	}
+	start := now.AddDate(0, 0, -(numDays - 1)).Truncate(24 * time.Hour)
 
 	var stats seedStats
 	var batch seedWriteBatch
@@ -57,7 +60,7 @@ func seedTraffic(ctx context.Context, store *database.Store, siteID uuid.UUID, g
 
 			entryPage := pickWeighted(rng, pages)
 
-			sessionStart := randomTimeInDay(rng, day)
+			sessionStart := randomTimeInElapsedDay(rng, day, now)
 
 			for i := range sessionLen {
 				var page string

@@ -58,6 +58,20 @@ func randomTimeInDay(rng *mrand.Rand, day time.Time) time.Time {
 	return day.Add(time.Duration(hour)*time.Hour + time.Duration(minute)*time.Minute + time.Duration(second)*time.Second)
 }
 
+func randomTimeInElapsedDay(rng *mrand.Rand, day, now time.Time) time.Time {
+	dayStart := day.UTC().Truncate(24 * time.Hour)
+	now = now.UTC()
+	if !dayStart.Equal(now.Truncate(24 * time.Hour)) {
+		return randomTimeInDay(rng, day)
+	}
+
+	elapsedSeconds := int(now.Sub(dayStart) / time.Second)
+	if elapsedSeconds <= 0 {
+		return dayStart
+	}
+	return dayStart.Add(time.Duration(rng.Intn(elapsedSeconds+1)) * time.Second)
+}
+
 func max64(a, b int64) int64 {
 	if a > b {
 		return a
