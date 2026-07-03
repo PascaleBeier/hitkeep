@@ -32,6 +32,7 @@
 #   DB, PORT, HITKEEP_EMAIL, HITKEEP_PASSWORD, SEED_DAYS,
 #   OUTPUT_DIR, SCALE, DATA_PATH, MAILPIT_HOST, MAILPIT_PORT, MAILPIT_UI,
 #   SKIP_SEED, SKIP_BUILD, SKIP_EMAILS
+#   SCREENSHOT_TARGET=ask-ai limits screenshot.mjs to the Ask AI docs states
 #
 # Prerequisites:
 #   npm install playwright && npx playwright install chromium
@@ -213,9 +214,13 @@ SCALE="$SCALE"               \
 # ─── Step 5: Sync README assets ───────────────────────────────────────────────
 echo ""
 echo "  [5/6] Syncing README screenshot assets…"
-mkdir -p "$REPO_DIR/.github/assets"
-find "$OUTPUT_DIR" -maxdepth 1 -type f -name '*.png' -exec cp {} "$REPO_DIR/.github/assets/" \;
-echo "  ✓ Synced app screenshots to $REPO_DIR/.github/assets"
+if [[ -n "${SCREENSHOT_TARGET:-}" ]]; then
+  echo "  Skipped for targeted screenshot run (${SCREENSHOT_TARGET})"
+else
+  mkdir -p "$REPO_DIR/.github/assets"
+  find "$OUTPUT_DIR" -maxdepth 1 -type f -name '*.png' -exec cp {} "$REPO_DIR/.github/assets/" \;
+  echo "  ✓ Synced app screenshots to $REPO_DIR/.github/assets"
+fi
 
 # ─── Step 6: Preview emails ───────────────────────────────────────────────────
 echo ""

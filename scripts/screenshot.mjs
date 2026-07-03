@@ -22,17 +22,18 @@
  *   SCALE            Device pixel ratio (default: 2)
  */
 
-import { chromium } from "playwright";
-import { mkdirSync } from "fs";
+import { existsSync, mkdirSync } from "fs";
 import { join, resolve, dirname } from "path";
-import { fileURLToPath } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
+const { chromium } = await loadPlaywright();
 
 const BASE_URL = (process.env.HITKEEP_URL ?? "http://localhost:8080").replace(/\/$/, "");
 const EMAIL = process.env.HITKEEP_EMAIL;
 const PASSWORD = process.env.HITKEEP_PASSWORD;
 const SCALE = parseFloat(process.env.SCALE ?? "2");
+const SCREENSHOT_TARGET = (process.env.SCREENSHOT_TARGET ?? "").trim().toLowerCase();
 const OUTPUT_DIR = resolve(
   process.env.OUTPUT_DIR ?? join(__dir, "../../hitkeep-docs/src/assets/screenshots"),
 );
@@ -46,6 +47,18 @@ const CHART_SETTLE = 2500;
 const TABLE_SETTLE = 1000;
 const FORM_SETTLE = 600;
 const DEMO_SITE_DOMAIN = process.env.HITKEEP_SCREENSHOT_SITE ?? "acme-analytics.io";
+
+async function loadPlaywright() {
+  try {
+    return await import("playwright");
+  } catch (err) {
+    const workspacePlaywright = join(__dir, "../frontend/dashboard/node_modules/playwright/index.mjs");
+    if (existsSync(workspacePlaywright)) {
+      return await import(pathToFileURL(workspacePlaywright).href);
+    }
+    throw err;
+  }
+}
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -96,6 +109,93 @@ async function shoot(page, slug, { fullPage = false, clip } = {}) {
   } catch (err) {
     return { ok: false, file, error: err.message };
   }
+}
+
+async function installAskAIDemoRoutes(page) {
+  await page.route("**/api/user/bootstrap", async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    body.status = body.status || {};
+    body.status.ask_ai = {
+      enabled: true,
+      available: true,
+      status: "available",
+      provider: "openai-compatible",
+      model: "gpt-4.1-mini",
+      budget_exhausted: false,
+    };
+    await route.fulfill({ response, json: body });
+  });
+
+  await page.route("**/api/sites/*/ask-ai/events", async (route) => {
+    const events = [
+      { type: "progress", status: "accepted", message_key: "askAi.progress.accepted" },
+      { type: "progress", status: "generating", message_key: "askAi.progress.generating" },
+      {
+        type: "progress",
+        status: "tool_call_start",
+        message_key: "askAi.progress.readingAnalytics",
+        tool_call_id: "tool-site-overview",
+        tool_name: "hitkeep_get_site_overview",
+      },
+      {
+        type: "progress",
+        status: "tool_call_finish",
+        message_key: "askAi.progress.composing",
+        tool_call_id: "tool-site-overview",
+        tool_name: "hitkeep_get_site_overview",
+      },
+      {
+        type: "progress",
+        status: "tool_call_start",
+        message_key: "askAi.progress.readingAnalytics",
+        tool_call_id: "tool-ai-visibility",
+        tool_name: "hitkeep_get_ai_visibility",
+      },
+      {
+        type: "progress",
+        status: "tool_call_finish",
+        message_key: "askAi.progress.composing",
+        tool_call_id: "tool-ai-visibility",
+        tool_name: "hitkeep_get_ai_visibility",
+      },
+      {
+        type: "final",
+        status: "success",
+        message_key: "askAi.progress.complete",
+        response: {
+          run_id: "ask-ai-screenshot-demo",
+          answer_markdown:
+            "In this demo site, ChatGPT sent **128 visits** in the last 14 days.\n\n- 94 came from ChatGPT referrals.\n- 34 landed after OpenAI crawler fetches.\n- The docs and pricing pages were the strongest paths.",
+          citations: [
+            { label: "Site overview", tool_call_id: "tool-site-overview" },
+            { label: "AI visibility", tool_call_id: "tool-ai-visibility" },
+          ],
+          charts: [
+            {
+              type: "table",
+              title: "Top demo ChatGPT paths",
+              rows: [
+                { path: "/docs", visits: 54 },
+                { path: "/pricing", visits: 38 },
+                { path: "/guides/analytics/ai-visibility", visits: 21 },
+              ],
+            },
+          ],
+          actions: [{ type: "navigate", label: "Open AI visibility", target: "/ai-visibility" }],
+        },
+      },
+    ];
+    const body = events.map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n`).join("\n");
+    await route.fulfill({
+      status: 200,
+      headers: {
+        "Cache-Control": "no-cache",
+        "Content-Type": "text/event-stream; charset=utf-8",
+      },
+      body: `${body}\n`,
+    });
+  });
 }
 
 async function maybeSelectFirstOption(page, comboLabel) {
@@ -403,6 +503,44 @@ async function captureGoogleSearchConsoleIntegration(page, record, slug) {
   record(slug, await shoot(page, slug));
 }
 
+async function openAskAIDrawer(page) {
+  await nav(page, "/dashboard", CHART_SETTLE);
+  await selectSiteByDomain(page);
+  if (!(await page.locator(".ask-ai-trigger:visible").first().count())) {
+    const mobileMenu = page.getByRole("button", { name: /main sidebar/i }).first();
+    if (await mobileMenu.count()) {
+      await mobileMenu.click();
+      await page.waitForTimeout(FORM_SETTLE);
+    }
+  }
+  const trigger = page.locator(".ask-ai-trigger:visible").first();
+  await trigger.waitFor({ state: "visible", timeout: 10_000 });
+  await trigger.click();
+  await page.locator(".ask-ai-drawer").waitFor({ state: "visible", timeout: 8_000 });
+  await page.waitForTimeout(FORM_SETTLE);
+}
+
+async function captureAskAI(page, record) {
+  await openAskAIDrawer(page);
+  await page.locator(".ai-suggestion-row").waitFor({ state: "visible", timeout: 8_000 });
+  record("feature-ask-ai-empty", await shoot(page, "feature-ask-ai-empty"));
+
+  const prompt = "How many hits did I get from ChatGPT in the last 14 days?";
+  await page.locator('input[name="ask-ai-panel-query"]').fill(prompt);
+  await page.getByRole("button", { name: /send ask ai question/i }).click();
+  await page.getByText(/In this demo site, ChatGPT sent 128 visits/i).waitFor({ state: "visible", timeout: 8_000 });
+  await page.getByText(/Top demo ChatGPT paths/i).waitFor({ state: "visible", timeout: 8_000 });
+  await page.waitForTimeout(FORM_SETTLE);
+  record("feature-ask-ai-answer", await shoot(page, "feature-ask-ai-answer"));
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openAskAIDrawer(page);
+  await page.locator(".ai-suggestion-row").waitFor({ state: "visible", timeout: 8_000 });
+  await page.waitForTimeout(FORM_SETTLE);
+  record("feature-ask-ai-mobile", await shoot(page, "feature-ask-ai-mobile"));
+  await page.setViewportSize({ width: 1440, height: 1024 });
+}
+
 async function openTeamSwitcher(page) {
   const trigger = page.locator('[data-testid="team-switcher-trigger"]:visible').first();
   if (!(await trigger.count())) return false;
@@ -449,6 +587,7 @@ async function run() {
   const page = await context.newPage();
   page.on("console", () => {});
   page.on("pageerror", () => {});
+  await installAskAIDemoRoutes(page);
 
   const results = [];
   const record = (slug, result) => {
@@ -457,19 +596,25 @@ async function run() {
   };
 
   try {
-    console.log("  Pre-auth:");
-    await page.goto(`${BASE_URL}/login`, { waitUntil: "domcontentloaded" });
-    await page.waitForSelector('input[type="password"]', { state: "visible", timeout: 10_000 });
-    await page.waitForTimeout(FORM_SETTLE);
-    record("page-login", await shoot(page, "page-login"));
+    if (SCREENSHOT_TARGET !== "ask-ai") {
+      console.log("  Pre-auth:");
+      await page.goto(`${BASE_URL}/login`, { waitUntil: "domcontentloaded" });
+      await page.waitForSelector('input[type="password"]', { state: "visible", timeout: 10_000 });
+      await page.waitForTimeout(FORM_SETTLE);
+      record("page-login", await shoot(page, "page-login"));
+    }
 
     console.log("\n  Authenticating...");
     await login(page);
     console.log("  ✓ Logged in\n");
 
-    console.log("  Dashboard:");
-    await captureRoute(page, record, "dashboard-overview", "/dashboard", CHART_SETTLE);
-    record("feature-onboarding-checklist", await shoot(page, "feature-onboarding-checklist"));
+    if (SCREENSHOT_TARGET === "ask-ai") {
+      console.log("  Ask AI:");
+      await captureAskAI(page, record);
+    } else {
+      console.log("  Dashboard:");
+      await captureRoute(page, record, "dashboard-overview", "/dashboard", CHART_SETTLE);
+      record("feature-onboarding-checklist", await shoot(page, "feature-onboarding-checklist"));
 
     if (await openTeamSwitcher(page)) {
       record("feature-team-switcher", await shoot(page, "feature-team-switcher"));
@@ -553,6 +698,7 @@ async function run() {
     await captureRoute(page, record, "analytics-utm", "/utm", CHART_SETTLE);
     await captureRoute(page, record, "dashboard-comparison", "/dashboard", CHART_SETTLE);
     await captureSearchConsoleDrilldown(page, record, "analytics-search-console");
+    await captureAskAI(page, record);
 
     console.log("\n  Settings:");
     await captureRoute(page, record, "settings-profile", "/settings", FORM_SETTLE);
@@ -621,8 +767,9 @@ async function run() {
       record("admin-team-audit", await shoot(page, "admin-team-audit"));
     }
 
-    console.log("\n  Tools:");
-    await captureRoute(page, record, "tools-utm-builder", "/utm/builder", FORM_SETTLE);
+      console.log("\n  Tools:");
+      await captureRoute(page, record, "tools-utm-builder", "/utm/builder", FORM_SETTLE);
+    }
   } finally {
     await browser.close();
   }
