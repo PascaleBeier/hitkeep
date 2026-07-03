@@ -137,6 +137,7 @@ describe('UserSettings', () => {
         expect(select.filterPlaceholder).toBe('Search by language or ISO code');
         expect(select.ariaFilterLabel).toBe('Search by language or ISO code');
         expect(select.resetFilterOnHide).toBe(true);
+        expect(select.appendTo()).toBe('body');
         expect(german?.label).toBe('German');
         expect(german?.nativeLabel).toBe('Deutsch');
         expect(german?.value).toBe('de');
