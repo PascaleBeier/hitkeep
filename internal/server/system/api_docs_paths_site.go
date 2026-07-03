@@ -198,6 +198,46 @@ func openAPIV1AdminSitePaths() map[string]any {
 					"404": errResp("Site not found"),
 				}),
 		},
+		"/api/sites/{id}/ask-ai": map[string]any{
+			"post": op([]string{"Sites"}, "Ask AI", "Runs the session-only, site-scoped dashboard assistant over read-only aggregate analytics tools. Requires a human dashboard session with site.view; API client bearer tokens and shared dashboard routes are rejected.", secCookie(), []any{paramRef("#/components/parameters/siteID")},
+				jsonBody(map[string]any{"$ref": "#/components/schemas/AskAIRequest"}),
+				map[string]any{
+					"200": jsonRefResp("Ask AI response", "#/components/schemas/AskAIResponse"),
+					"400": errResp("Invalid Ask AI request"),
+					"403": errResp("Dashboard session required or forbidden"),
+					"409": jsonRefResp("Ask AI unavailable", "#/components/schemas/AskAIStatus"),
+					"429": jsonRefResp("Ask AI budget exhausted", "#/components/schemas/AskAIStatus"),
+					"502": errResp("Ask AI provider or validation failure"),
+				}),
+		},
+		"/api/sites/{id}/ask-ai/events": map[string]any{
+			"post": op([]string{"Sites"}, "Stream Ask AI", "Runs the same audited, session-only Ask AI workflow and streams safe Server-Sent Events for progress, answer deltas, and the final validated response. Requires a human dashboard session with site.view; API client bearer tokens and shared dashboard routes are rejected.", secCookie(), []any{paramRef("#/components/parameters/siteID")},
+				jsonBody(map[string]any{"$ref": "#/components/schemas/AskAIRequest"}),
+				map[string]any{
+					"200": map[string]any{
+						"description": "Ask AI Server-Sent Events stream",
+						"content": map[string]any{
+							"text/event-stream": map[string]any{"schema": map[string]any{"$ref": "#/components/schemas/AskAIStreamEvent"}},
+						},
+					},
+					"400": errResp("Invalid Ask AI request"),
+					"403": errResp("Dashboard session required or forbidden"),
+					"409": jsonRefResp("Ask AI unavailable", "#/components/schemas/AskAIStatus"),
+					"429": jsonRefResp("Ask AI budget exhausted", "#/components/schemas/AskAIStatus"),
+				}),
+		},
+		"/api/sites/{id}/ask-ai/history": map[string]any{
+			"get": op([]string{"Sites"}, "List Ask AI history", "Returns audit-safe Ask AI run summaries for the selected site. The response includes run metadata, hashes, usage, and validated summary counts only; raw prompts, full answers, provider payloads, headers, and credentials are not returned. Requires a human dashboard session with site.view; API client bearer tokens and shared dashboard routes are rejected.", secCookie(), []any{
+				paramRef("#/components/parameters/siteID"),
+				map[string]any{"name": "limit", "in": "query", "description": "Maximum runs to return.", "schema": map[string]any{"type": "integer", "minimum": 1, "maximum": 100, "default": 20}},
+				map[string]any{"name": "offset", "in": "query", "description": "Number of runs to skip.", "schema": map[string]any{"type": "integer", "minimum": 0, "default": 0}},
+			}, nil, map[string]any{
+				"200": jsonRefResp("Ask AI history", "#/components/schemas/AskAIHistoryResponse"),
+				"400": errResp("Invalid Ask AI history request"),
+				"403": errResp("Dashboard session required or forbidden"),
+				"409": jsonRefResp("Ask AI unavailable", "#/components/schemas/AskAIStatus"),
+			}),
+		},
 		"/api/sites/{id}/stats": map[string]any{
 			"get": op([]string{"Sites"}, "Get site stats", "Aggregated site metrics and charts.", secAnyAuth(), []any{
 				paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/from"), paramRef("#/components/parameters/to"),

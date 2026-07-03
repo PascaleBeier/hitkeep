@@ -3,7 +3,7 @@
         <app-brand size="small" />
     </div>
 
-    <div class="flex min-w-0 items-center gap-2">
+    <div class="flex min-w-0 flex-col gap-3">
         <app-site-selector
             class="min-w-0 flex-1"
             [sites]="siteService.sites()"
@@ -14,6 +14,7 @@
             (settingsClicked)="openSiteSettings('0')"
             (trackingClicked)="openSiteSettings('1')"
         />
+        <app-ask-ai-control (opened)="closeMobileDrawer()" />
     </div>
 
     <nav class="flex-1" [attr.aria-label]="'nav.primaryNavigationAria' | transloco">
@@ -46,6 +47,7 @@
             (settingsClicked)="openSiteSettings('0'); closeMobileDrawer()"
             (trackingClicked)="openSiteSettings('1'); closeMobileDrawer()"
         />
+        <app-ask-ai-control (opened)="closeMobileDrawer()" />
 
         <nav class="flex-1" [attr.aria-label]="'nav.primaryNavigationAria' | transloco">
             <ng-container *ngTemplateOutlet="sidebarMenu; context: { items: mobileMenuItems() }" />

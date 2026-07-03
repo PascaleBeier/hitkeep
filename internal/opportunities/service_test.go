@@ -1281,6 +1281,10 @@ func (f fakeOpportunityAI) GenerateOpportunityProposal(context.Context, hitai.Op
 	return hitai.OpportunityProposalResult{RunID: f.runID, Proposal: f.proposal}, nil
 }
 
+func (fakeOpportunityAI) GenerateAskAI(context.Context, hitai.AskAIRequest) (hitai.AskAIResult, error) {
+	return hitai.AskAIResult{}, errors.New("unexpected Ask AI call")
+}
+
 func (fakeOpportunityAI) Configured() bool { return true }
 func (fakeOpportunityAI) Enabled() bool    { return true }
 func (fakeOpportunityAI) Provider() string { return "test" }
@@ -1295,6 +1299,10 @@ type recordingOpportunityAI struct {
 func (f *recordingOpportunityAI) GenerateOpportunityProposal(_ context.Context, req hitai.OpportunityRequest) (hitai.OpportunityProposalResult, error) {
 	f.last = req
 	return hitai.OpportunityProposalResult{RunID: f.runID, Proposal: f.proposal}, nil
+}
+
+func (*recordingOpportunityAI) GenerateAskAI(context.Context, hitai.AskAIRequest) (hitai.AskAIResult, error) {
+	return hitai.AskAIResult{}, errors.New("unexpected Ask AI call")
 }
 
 func (*recordingOpportunityAI) Configured() bool { return true }
@@ -1333,6 +1341,10 @@ func (f *echoOpportunityAI) GenerateOpportunityProposal(_ context.Context, req h
 	}, nil
 }
 
+func (*echoOpportunityAI) GenerateAskAI(context.Context, hitai.AskAIRequest) (hitai.AskAIResult, error) {
+	return hitai.AskAIResult{}, errors.New("unexpected Ask AI call")
+}
+
 func (*echoOpportunityAI) Configured() bool { return true }
 func (*echoOpportunityAI) Enabled() bool    { return true }
 func (*echoOpportunityAI) Provider() string { return "test" }
@@ -1364,6 +1376,10 @@ func (f *sequenceOpportunityAI) GenerateOpportunityProposal(_ context.Context, r
 			CitedEvidenceIDs: []string{"secondary"},
 		},
 	}, nil
+}
+
+func (*sequenceOpportunityAI) GenerateAskAI(context.Context, hitai.AskAIRequest) (hitai.AskAIResult, error) {
+	return hitai.AskAIResult{}, errors.New("unexpected Ask AI call")
 }
 
 func (*sequenceOpportunityAI) Configured() bool { return true }
@@ -1399,6 +1415,10 @@ func (f *countingEchoOpportunityAI) GenerateOpportunityProposal(_ context.Contex
 			CitedEvidenceIDs: citations,
 		},
 	}, nil
+}
+
+func (*countingEchoOpportunityAI) GenerateAskAI(context.Context, hitai.AskAIRequest) (hitai.AskAIResult, error) {
+	return hitai.AskAIResult{}, errors.New("unexpected Ask AI call")
 }
 
 func (*countingEchoOpportunityAI) Configured() bool { return true }

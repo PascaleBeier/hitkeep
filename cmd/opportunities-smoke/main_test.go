@@ -32,3 +32,26 @@ func TestPrepareWorkingDBCopiesSourceWithoutMutatingIt(t *testing.T) {
 		t.Fatalf("source db was mutated: %q", sourceContents)
 	}
 }
+
+func TestResolveSmokeAIBaseURLDefaultsMantleForOpenAICompatible(t *testing.T) {
+	got := resolveSmokeAIBaseURL("openai-compatible", "eu-west-1", "")
+	if got != "https://bedrock-mantle.eu-west-1.api.aws/v1" {
+		t.Fatalf("expected regional Mantle base URL, got %q", got)
+	}
+}
+
+func TestResolveSmokeAIBaseURLUsesDefaultRegionForOpenAICompatible(t *testing.T) {
+	got := resolveSmokeAIBaseURL(" openai-compatible ", " ", "")
+	if got != "https://bedrock-mantle.eu-central-1.api.aws/v1" {
+		t.Fatalf("expected default-region Mantle base URL, got %q", got)
+	}
+}
+
+func TestResolveSmokeAIBaseURLPreservesExplicitURLAndOtherProviders(t *testing.T) {
+	if got := resolveSmokeAIBaseURL("openai-compatible", "eu-west-1", " https://gateway.example/v1 "); got != "https://gateway.example/v1" {
+		t.Fatalf("expected explicit base URL to win, got %q", got)
+	}
+	if got := resolveSmokeAIBaseURL("bedrock", "eu-west-1", ""); got != "" {
+		t.Fatalf("expected direct Bedrock to have no OpenAI-compatible base URL, got %q", got)
+	}
+}

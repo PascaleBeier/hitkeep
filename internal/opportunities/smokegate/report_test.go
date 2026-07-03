@@ -10,12 +10,12 @@ import (
 	"hitkeep/internal/api"
 )
 
-func TestEvaluateBlocksReleaseUntilBedrockNovaCompletes(t *testing.T) {
+func TestEvaluateBlocksReleaseUntilDefaultAIRunCompletes(t *testing.T) {
 	report := Report{
 		GeneratedAt: time.Date(2026, 5, 12, 18, 0, 0, 0, time.UTC),
 		Source:      "restored EU backup",
-		Provider:    "bedrock",
-		Model:       "eu.amazon.nova-2-lite-v1:0",
+		Provider:    "openai-compatible",
+		Model:       "openai.gpt-oss-120b",
 		Targets: []TargetResult{{
 			Domain: "hitkeep.com",
 			From:   time.Date(2026, 4, 12, 0, 0, 0, 0, time.UTC),
@@ -51,10 +51,10 @@ func TestEvaluateBlocksReleaseUntilBedrockNovaCompletes(t *testing.T) {
 
 	verdict := Evaluate(report)
 	if verdict.ReleaseReady {
-		t.Fatal("expected release readiness to stay blocked without a completed Bedrock Nova run")
+		t.Fatal("expected release readiness to stay blocked without a completed default AI run")
 	}
-	if verdict.BedrockNovaComplete {
-		t.Fatal("expected Bedrock Nova completion to be false")
+	if verdict.DefaultAIRunComplete {
+		t.Fatal("expected default AI run completion to be false")
 	}
 	if verdict.MoneyCopyClean != true || verdict.SourceAttributionClean != true || verdict.CausalClaimsClean != true {
 		t.Fatalf("expected deterministic outputs to be clean, got %#v", verdict)
@@ -62,7 +62,7 @@ func TestEvaluateBlocksReleaseUntilBedrockNovaCompletes(t *testing.T) {
 }
 
 func TestEvaluateRequiresHitkeepComAndAdditionalTarget(t *testing.T) {
-	report := cleanBedrockNovaReport()
+	report := cleanDefaultAIReport()
 
 	verdict := Evaluate(report)
 	if verdict.ReleaseReady {
@@ -86,7 +86,7 @@ func TestEvaluateRequiresHitkeepComAndAdditionalTarget(t *testing.T) {
 }
 
 func TestEvaluateDoesNotCountErroredTargetsTowardCoverage(t *testing.T) {
-	report := cleanBedrockNovaReport()
+	report := cleanDefaultAIReport()
 	report.Targets = append(report.Targets, TargetResult{Domain: "cloud.hitkeep.eu", Error: "site not found"})
 
 	verdict := Evaluate(report)
@@ -103,7 +103,7 @@ func TestEvaluateDoesNotCountErroredTargetsTowardCoverage(t *testing.T) {
 }
 
 func TestEvaluateRejectsOpportunitiesWithMissingCitedEvidence(t *testing.T) {
-	report := cleanBedrockNovaReport()
+	report := cleanDefaultAIReport()
 	report.Targets = append(report.Targets, TargetResult{Domain: "cloud.hitkeep.eu", From: report.Targets[0].From, To: report.Targets[0].To})
 
 	verdict := Evaluate(report)
@@ -122,7 +122,7 @@ func TestEvaluateRejectsOpportunitiesWithMissingCitedEvidence(t *testing.T) {
 }
 
 func TestEvaluateRejectsCitedEvidenceWithoutVisibleAggregateValues(t *testing.T) {
-	report := cleanBedrockNovaReport()
+	report := cleanDefaultAIReport()
 	report.Targets = append(report.Targets, TargetResult{Domain: "cloud.hitkeep.eu", From: report.Targets[0].From, To: report.Targets[0].To})
 
 	report.Targets[0].Opportunities[0].Evidence = []api.OpportunityEvidence{
@@ -140,7 +140,7 @@ func TestEvaluateRejectsCitedEvidenceWithoutVisibleAggregateValues(t *testing.T)
 }
 
 func TestEvaluateRejectsAndRedactsPrivacyLeakMarkers(t *testing.T) {
-	report := cleanBedrockNovaReport()
+	report := cleanDefaultAIReport()
 	report.Targets = append(report.Targets, TargetResult{Domain: "cloud.hitkeep.eu", From: report.Targets[0].From, To: report.Targets[0].To})
 	report.Targets[1].Error = "provider returned user_agent curl/8.0 for ip_address 203.0.113.7"
 	report.AIRuns[0].OutputJSON = `{"raw_prompt":"full prompt","provider_response":{"ip_address":"203.0.113.7","user_agent":"curl/8.0"}}`
@@ -166,9 +166,9 @@ func TestEvaluateRejectsAndRedactsPrivacyLeakMarkers(t *testing.T) {
 
 func TestEvaluateRejectsMoneyCopyAndSourceTotalAttribution(t *testing.T) {
 	report := Report{
-		Provider: "bedrock",
-		Model:    "eu.amazon.nova-2-lite-v1:0",
-		AIRuns:   []AIRun{{Provider: "bedrock", Model: "eu.amazon.nova-2-lite-v1:0", Status: "success"}},
+		Provider: "openai-compatible",
+		Model:    "openai.gpt-oss-120b",
+		AIRuns:   []AIRun{{Provider: "openai-compatible", Model: "openai.gpt-oss-120b", Status: "success"}},
 		Targets: []TargetResult{{
 			Domain: "hitkeep.com",
 			Opportunities: []api.Opportunity{{
@@ -208,7 +208,7 @@ func TestEvaluateRejectsWeakOrImpossibleTrafficSourceEvidence(t *testing.T) {
 	}
 	for name, params := range tests {
 		t.Run(name, func(t *testing.T) {
-			report := cleanBedrockNovaReport()
+			report := cleanDefaultAIReport()
 			report.Targets = append(report.Targets, TargetResult{Domain: "cloud.hitkeep.eu", From: report.Targets[0].From, To: report.Targets[0].To})
 			report.Targets[0].Opportunities[0].CopyParams = params
 
@@ -221,7 +221,7 @@ func TestEvaluateRejectsWeakOrImpossibleTrafficSourceEvidence(t *testing.T) {
 }
 
 func TestEvaluateRejectsTrafficSourceOpportunitiesWithoutCitedSourceCounts(t *testing.T) {
-	report := cleanBedrockNovaReport()
+	report := cleanDefaultAIReport()
 	report.Targets = append(report.Targets, TargetResult{Domain: "cloud.hitkeep.eu", From: report.Targets[0].From, To: report.Targets[0].To})
 	report.Targets[0].Opportunities[0].CitedEvidenceIDs = []string{"total_pageviews"}
 
@@ -235,7 +235,7 @@ func TestEvaluateRejectsTrafficSourceOpportunitiesWithoutCitedSourceCounts(t *te
 }
 
 func TestEvaluateRejectsTrafficSourceOpportunitiesWithMismatchedSourceCountEvidence(t *testing.T) {
-	report := cleanBedrockNovaReport()
+	report := cleanDefaultAIReport()
 	report.Targets = append(report.Targets, TargetResult{Domain: "cloud.hitkeep.eu", From: report.Targets[0].From, To: report.Targets[0].To})
 	report.Targets[0].Opportunities[0].Evidence = []api.OpportunityEvidence{
 		{ID: "source_hits", LabelKey: "opportunities.evidence.source_hits", Value: "1"},
@@ -249,7 +249,7 @@ func TestEvaluateRejectsTrafficSourceOpportunitiesWithMismatchedSourceCountEvide
 }
 
 func TestEvaluateAcceptsStringifiedTrafficSourceCounts(t *testing.T) {
-	report := cleanBedrockNovaReport()
+	report := cleanDefaultAIReport()
 	report.Targets = append(report.Targets, TargetResult{Domain: "cloud.hitkeep.eu", From: report.Targets[0].From, To: report.Targets[0].To})
 	report.Targets[0].Opportunities[0].CopyParams = map[string]any{
 		"source":          "Open Alternative",
@@ -267,9 +267,9 @@ func TestRenderMarkdownIncludesSanitizedVerdictAndEvidence(t *testing.T) {
 	report := Report{
 		GeneratedAt: time.Date(2026, 5, 12, 18, 0, 0, 0, time.UTC),
 		Source:      "restored EU backup",
-		Provider:    "bedrock",
-		Model:       "eu.amazon.nova-2-lite-v1:0",
-		AIRuns:      []AIRun{{Provider: "bedrock", Model: "eu.amazon.nova-2-lite-v1:0", Status: "invalid_output", ErrorCategory: "invalid_output", OutputJSON: `{"type_key":"opportunities.types.traffic_quality"}`}},
+		Provider:    "openai-compatible",
+		Model:       "openai.gpt-oss-120b",
+		AIRuns:      []AIRun{{Provider: "openai-compatible", Model: "openai.gpt-oss-120b", Status: "invalid_output", ErrorCategory: "invalid_output", OutputJSON: `{"type_key":"opportunities.types.traffic_quality"}`}},
 		Targets: []TargetResult{{
 			Domain: "hitkeep.com",
 			From:   time.Date(2026, 4, 12, 0, 0, 0, 0, time.UTC),
@@ -292,7 +292,7 @@ func TestRenderMarkdownIncludesSanitizedVerdictAndEvidence(t *testing.T) {
 	}
 
 	markdown := RenderMarkdown(report)
-	for _, want := range []string{"# Opportunities Release-Hardening Smoke Report", "Bedrock Nova complete", "Target coverage complete", "Cited evidence complete", "Privacy clean", "Open Alternative", "source_hits", "invalid_output"} {
+	for _, want := range []string{"# Opportunities Release-Hardening Smoke Report", "Default AI run complete", "Target coverage complete", "Cited evidence complete", "Privacy clean", "Open Alternative", "source_hits", "invalid_output"} {
 		if !strings.Contains(markdown, want) {
 			t.Fatalf("expected report to contain %q:\n%s", want, markdown)
 		}
@@ -304,13 +304,13 @@ func TestRenderMarkdownIncludesSanitizedVerdictAndEvidence(t *testing.T) {
 	}
 }
 
-func cleanBedrockNovaReport() Report {
+func cleanDefaultAIReport() Report {
 	return Report{
 		GeneratedAt: time.Date(2026, 5, 12, 18, 0, 0, 0, time.UTC),
 		Source:      "restored EU backup",
-		Provider:    "bedrock",
-		Model:       "eu.amazon.nova-2-lite-v1:0",
-		AIRuns:      []AIRun{{Provider: "bedrock", Model: "eu.amazon.nova-2-lite-v1:0", Status: "success"}},
+		Provider:    "openai-compatible",
+		Model:       "openai.gpt-oss-120b",
+		AIRuns:      []AIRun{{Provider: "openai-compatible", Model: "openai.gpt-oss-120b", Status: "success"}},
 		Targets: []TargetResult{{
 			Domain: "hitkeep.com",
 			From:   time.Date(2026, 4, 12, 0, 0, 0, 0, time.UTC),

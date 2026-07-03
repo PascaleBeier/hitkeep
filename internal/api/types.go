@@ -548,6 +548,16 @@ type SystemStatus struct {
 	NeedsSetup bool         `json:"needs_setup"`
 	Version    string       `json:"version"`
 	Cloud      *CloudStatus `json:"cloud,omitempty"`
+	AskAI      *AskAIStatus `json:"ask_ai,omitempty"`
+}
+
+type AskAIStatus struct {
+	Enabled         bool   `json:"enabled"`
+	Available       bool   `json:"available"`
+	Status          string `json:"status"`
+	Provider        string `json:"provider,omitempty"`
+	Model           string `json:"model,omitempty"`
+	BudgetExhausted bool   `json:"budget_exhausted"`
 }
 
 type UserBootstrap struct {
@@ -1506,6 +1516,8 @@ type SystemAIStatus struct {
 	Status              string     `json:"status"`
 	Enabled             bool       `json:"enabled"`
 	Configured          bool       `json:"configured"`
+	AskAIEnabled        bool       `json:"ask_ai_enabled"`
+	AskAIAvailable      bool       `json:"ask_ai_available"`
 	ConfigMode          string     `json:"config_mode"`
 	Provider            string     `json:"provider,omitempty"`
 	Model               string     `json:"model,omitempty"`
@@ -1520,6 +1532,101 @@ type SystemAIStatus struct {
 	TokenLimit          int        `json:"token_limit"`
 	BudgetWindowMinutes int        `json:"budget_window_minutes"`
 	BudgetExhausted     bool       `json:"budget_exhausted"`
+}
+
+type AskAIRequest struct {
+	Query   string         `json:"query"`
+	From    string         `json:"from,omitempty"`
+	To      string         `json:"to,omitempty"`
+	Route   string         `json:"route,omitempty"`
+	Filters []AskAIFilter  `json:"filters,omitempty"`
+	History []AskAIMessage `json:"history,omitempty"`
+}
+
+type AskAIFilter struct {
+	Type  string `json:"type"`
+	Value string `json:"value"`
+}
+
+type AskAIMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type AskAIResponse struct {
+	RunID          string          `json:"run_id"`
+	AnswerMarkdown string          `json:"answer_markdown"`
+	Citations      []AskAICitation `json:"citations"`
+	Charts         []AskAIChart    `json:"charts"`
+	Actions        []AskAIAction   `json:"actions"`
+}
+
+type AskAIStreamEvent struct {
+	Type          string         `json:"type"`
+	Status        string         `json:"status,omitempty"`
+	MessageKey    string         `json:"message_key,omitempty"`
+	ToolCallID    string         `json:"tool_call_id,omitempty"`
+	ToolName      string         `json:"tool_name,omitempty"`
+	DeltaMarkdown string         `json:"delta_markdown,omitempty"`
+	Response      *AskAIResponse `json:"response,omitempty"`
+	Error         string         `json:"error,omitempty"`
+}
+
+type AskAIHistoryResponse struct {
+	Entries []AskAIHistoryEntry `json:"entries"`
+	Total   int                 `json:"total"`
+	Limit   int                 `json:"limit"`
+	Offset  int                 `json:"offset"`
+	HasMore bool                `json:"has_more"`
+}
+
+type AskAIHistoryEntry struct {
+	RunID               string    `json:"run_id"`
+	CreatedAt           time.Time `json:"created_at"`
+	Status              string    `json:"status"`
+	ErrorCategory       string    `json:"error_category,omitempty"`
+	Provider            string    `json:"provider,omitempty"`
+	Model               string    `json:"model,omitempty"`
+	TemplateVersion     string    `json:"template_version,omitempty"`
+	InputHash           string    `json:"input_hash,omitempty"`
+	OutputHash          string    `json:"output_hash,omitempty"`
+	AnswerChars         int       `json:"answer_chars"`
+	CitationCount       int       `json:"citation_count"`
+	ChartCount          int       `json:"chart_count"`
+	ActionCount         int       `json:"action_count"`
+	ChartTypes          []string  `json:"chart_types"`
+	ActionTypes         []string  `json:"action_types"`
+	InputTokens         int       `json:"input_tokens"`
+	OutputTokens        int       `json:"output_tokens"`
+	TotalTokens         int       `json:"total_tokens"`
+	ToolCallCount       int       `json:"tool_call_count"`
+	LifecycleEventCount int       `json:"lifecycle_event_count"`
+	ToolNames           []string  `json:"tool_names"`
+}
+
+type AskAICitation struct {
+	Label      string `json:"label"`
+	ToolCallID string `json:"tool_call_id"`
+}
+
+type AskAIChart struct {
+	Type   string             `json:"type"`
+	Title  string             `json:"title"`
+	XKey   string             `json:"x_key,omitempty"`
+	Series []AskAIChartSeries `json:"series,omitempty"`
+	Rows   []map[string]any   `json:"rows"`
+}
+
+type AskAIChartSeries struct {
+	Key   string `json:"key"`
+	Label string `json:"label"`
+}
+
+type AskAIAction struct {
+	Type   string `json:"type"`
+	Label  string `json:"label"`
+	Target string `json:"target"`
+	Format string `json:"format,omitempty"`
 }
 
 type SystemHealth struct {

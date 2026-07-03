@@ -62,7 +62,10 @@ const SHARED_ACTIONS = [
     'google_search_console.sync_started',
     'google_search_console.sync_import_prepared',
     'google_search_console.sync_imported',
-    'google_search_console.sync_failed'
+    'google_search_console.sync_failed',
+    'ask_ai.requested',
+    'ask_ai.responded',
+    'ask_ai.history_viewed'
 ];
 
 const ACTION_KEYS: Record<string, string> = {
@@ -128,7 +131,10 @@ const ACTION_KEYS: Record<string, string> = {
     'google_search_console.sync_started': 'auditTable.actions.googleSearchConsoleSyncStarted',
     'google_search_console.sync_import_prepared': 'auditTable.actions.googleSearchConsoleSyncImportPrepared',
     'google_search_console.sync_imported': 'auditTable.actions.googleSearchConsoleSyncImported',
-    'google_search_console.sync_failed': 'auditTable.actions.googleSearchConsoleSyncFailed'
+    'google_search_console.sync_failed': 'auditTable.actions.googleSearchConsoleSyncFailed',
+    'ask_ai.requested': 'auditTable.actions.askAIRequested',
+    'ask_ai.responded': 'auditTable.actions.askAIResponded',
+    'ask_ai.history_viewed': 'auditTable.actions.askAIHistoryViewed'
 };
 
 const TARGET_TYPE_KEYS: Record<string, string> = {
@@ -234,7 +240,7 @@ export class AuditPresentationService {
         ) {
             return 'danger';
         }
-        if (value.includes('role') || value.includes('ownership') || value.startsWith('auth.') || value.startsWith('permission.')) {
+        if (value.includes('role') || value.includes('ownership') || value.startsWith('auth.') || value.startsWith('permission.') || value.startsWith('ask_ai.')) {
             return 'info';
         }
         if (value.includes('created') || value.includes('added') || value.includes('accepted') || value.includes('completed') || value.includes('written') || value.includes('granted')) {

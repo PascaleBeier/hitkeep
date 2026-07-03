@@ -45,7 +45,7 @@ type TargetResult struct {
 
 type Verdict struct {
 	ReleaseReady           bool
-	BedrockNovaComplete    bool
+	DefaultAIRunComplete   bool
 	TargetCoverageComplete bool
 	CitedEvidenceComplete  bool
 	PrivacyClean           bool
@@ -68,7 +68,7 @@ var privacyLeakMarkers = []string{
 
 func Evaluate(report Report) Verdict {
 	verdict := Verdict{
-		BedrockNovaComplete:    hasSuccessfulBedrockNovaRun(report),
+		DefaultAIRunComplete:   hasSuccessfulDefaultAIRun(report),
 		TargetCoverageComplete: hasRequiredTargetCoverage(report),
 		CitedEvidenceComplete:  hasCompleteCitedEvidence(report),
 		PrivacyClean:           hasNoPrivacyLeakMarkers(report),
@@ -76,8 +76,8 @@ func Evaluate(report Report) Verdict {
 		SourceAttributionClean: hasNoSourceTotalAttribution(report),
 		CausalClaimsClean:      hasNoCausalClaims(report),
 	}
-	if !verdict.BedrockNovaComplete {
-		verdict.Failures = append(verdict.Failures, "Bedrock Nova 2 Lite smoke did not complete successfully")
+	if !verdict.DefaultAIRunComplete {
+		verdict.Failures = append(verdict.Failures, "default GPT OSS 120b Mantle smoke did not complete successfully")
 	}
 	if !verdict.TargetCoverageComplete {
 		verdict.Failures = append(verdict.Failures, "smoke report must cover hitkeep.com and at least one additional target")
@@ -113,7 +113,7 @@ func RenderMarkdown(report Report) string {
 
 	fmt.Fprintf(&b, "## Verdict\n\n")
 	fmt.Fprintf(&b, "- Release ready: `%t`\n", verdict.ReleaseReady)
-	fmt.Fprintf(&b, "- Bedrock Nova complete: `%t`\n", verdict.BedrockNovaComplete)
+	fmt.Fprintf(&b, "- Default AI run complete: `%t`\n", verdict.DefaultAIRunComplete)
 	fmt.Fprintf(&b, "- Target coverage complete: `%t`\n", verdict.TargetCoverageComplete)
 	fmt.Fprintf(&b, "- Cited evidence complete: `%t`\n", verdict.CitedEvidenceComplete)
 	fmt.Fprintf(&b, "- Privacy clean: `%t`\n", verdict.PrivacyClean)
@@ -170,10 +170,10 @@ func renderOpportunity(b *strings.Builder, opportunity api.Opportunity) {
 	fmt.Fprintf(b, "- Cited evidence IDs: `%s`\n\n", strings.Join(opportunity.CitedEvidenceIDs, "`, `"))
 }
 
-func hasSuccessfulBedrockNovaRun(report Report) bool {
+func hasSuccessfulDefaultAIRun(report Report) bool {
 	for _, run := range report.AIRuns {
-		if strings.EqualFold(run.Provider, "bedrock") &&
-			strings.Contains(strings.ToLower(run.Model), "nova-2-lite") &&
+		if strings.EqualFold(run.Provider, "openai-compatible") &&
+			strings.Contains(strings.ToLower(run.Model), "gpt-oss-120b") &&
 			strings.EqualFold(run.Status, "success") {
 			return true
 		}

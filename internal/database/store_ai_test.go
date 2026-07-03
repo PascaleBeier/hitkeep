@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -353,6 +354,252 @@ func TestAppendAIRunRejectsRawPromptAndProviderPayloadFields(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "credential") {
 		t.Fatalf("expected credential validation error, got %v", err)
+	}
+
+	_, err = store.AppendAIRun(ctx, AIRunParams{
+		TeamID:          teamID,
+		SiteID:          siteID,
+		ActorID:         userID,
+		ActorType:       "user",
+		Feature:         "opportunities",
+		Provider:        "openai",
+		Model:           "gpt-test",
+		TemplateVersion: "opportunities-v1",
+		OutputJSON:      `{"title_key":"opportunities.fixture.title","model_note":"sk-placeholder-secret"}`,
+		Status:          "failure",
+		CreatedAt:       time.Now().UTC(),
+	})
+	if err == nil {
+		t.Fatal("expected sk-shaped output json value to be rejected")
+	}
+	if !strings.Contains(err.Error(), "raw payload") {
+		t.Fatalf("expected raw payload value validation error, got %v", err)
+	}
+}
+
+func TestAppendAskAIAIRunRequiresSafeOutputSummary(t *testing.T) {
+	store, userID, siteID, teamID := setupAIStore(t)
+	ctx := context.Background()
+
+	for name, outputJSON := range map[string]string{
+		"raw answer":                `{"answer_markdown":"Traffic increased over the selected range.","citations":[],"charts":[],"actions":[]}`,
+		"raw chart rows":            `{"version":"ask-ai-output-summary-v1","answer_sha256":"hash","answer_chars":12,"charts":[{"type":"line","rows":[{"date":"2026-06-01","visits":10}]}],"actions":[],"citations":[]}`,
+		"unsupported chart type":    `{"version":"ask-ai-output-summary-v1","answer_sha256":"hash","answer_chars":12,"charts":[{"type":"pie","title_sha256":"title-hash","title_chars":6,"row_count":7,"series_count":1,"series":[]}],"actions":[],"citations":[]}`,
+		"mismatched series count":   `{"version":"ask-ai-output-summary-v1","answer_sha256":"hash","answer_chars":12,"charts":[{"type":"line","title_sha256":"title-hash","title_chars":6,"row_count":7,"series_count":2,"series":[]}],"actions":[],"citations":[]}`,
+		"raw action link":           `{"version":"ask-ai-output-summary-v1","answer_sha256":"hash","answer_chars":12,"charts":[],"actions":[{"type":"navigate","target":"/dashboard","label":"Open dashboard"}],"citations":[]}`,
+		"unsupported action type":   `{"version":"ask-ai-output-summary-v1","answer_sha256":"hash","answer_chars":12,"charts":[],"actions":[{"type":"delete_site","format":"","label_sha256":"label-hash","label_chars":4,"target_sha256":"target-hash","target_chars":10}],"citations":[]}`,
+		"unsupported export format": `{"version":"ask-ai-output-summary-v1","answer_sha256":"hash","answer_chars":12,"charts":[],"actions":[{"type":"download_export","format":"html","label_sha256":"label-hash","label_chars":4,"target_sha256":"target-hash","target_chars":10}],"citations":[]}`,
+		"malformed action summary":  `{"version":"ask-ai-output-summary-v1","answer_sha256":"hash","answer_chars":12,"charts":[],"actions":[{"type":"navigate","format":"","label_sha256":"label-hash","label_chars":"four","target_sha256":"target-hash","target_chars":10}],"citations":[]}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := store.AppendAIRun(ctx, AIRunParams{
+				TeamID:          teamID,
+				SiteID:          siteID,
+				ActorID:         userID,
+				ActorType:       "user",
+				Feature:         "ask_ai",
+				Provider:        "bedrock",
+				Model:           "openai.gpt-oss-120b",
+				TemplateVersion: "ask-ai-v1",
+				OutputJSON:      outputJSON,
+				Status:          "success",
+				CreatedAt:       time.Now().UTC(),
+			})
+			if err == nil {
+				t.Fatal("expected raw Ask AI output json to be rejected")
+			}
+			if !strings.Contains(err.Error(), "ask ai") {
+				t.Fatalf("expected Ask AI validation error, got %v", err)
+			}
+		})
+	}
+
+	_, err := store.AppendAIRun(ctx, AIRunParams{
+		TeamID:          teamID,
+		SiteID:          siteID,
+		ActorID:         userID,
+		ActorType:       "user",
+		Feature:         "ask_ai",
+		Provider:        "bedrock",
+		Model:           "openai.gpt-oss-120b",
+		TemplateVersion: "ask-ai-v1",
+		EvidenceIDs:     []string{"hitkeep_get_site_overview"},
+		OutputHash:      "output-hash",
+		OutputJSON: `{
+			"version":"ask-ai-output-summary-v1",
+			"answer_sha256":"answer-hash",
+			"answer_chars":42,
+			"citations":[
+				{"tool_call_id":"input_context","label_sha256":"context-label-hash","label_chars":13},
+				{"tool_call_id":"hitkeep_get_site_overview","label_sha256":"label-hash","label_chars":8}
+			],
+			"charts":[{"type":"line","title_sha256":"title-hash","title_chars":6,"row_count":7,"series_count":1,"series":[{"key_sha256":"key-hash","key_chars":6,"label_sha256":"label-hash","label_chars":6}]}],
+			"actions":[
+				{"type":"navigate","format":"","label_sha256":"action-label-hash","label_chars":14,"target_sha256":"target-hash","target_chars":10},
+				{"type":"download_export","format":"csv","label_sha256":"export-label-hash","label_chars":15,"target_sha256":"export-target-hash","target_chars":56}
+			]
+		}`,
+		Status:    "success",
+		CreatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("expected safe Ask AI output summary to be accepted: %v", err)
+	}
+}
+
+func TestListAskAIHistoryReturnsSafeSiteScopedSummaries(t *testing.T) {
+	store, userID, siteID, teamID := setupAIStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	otherSite, err := store.CreateSite(ctx, userID, "ask-ai-other.example")
+	if err != nil {
+		t.Fatalf("create other site: %v", err)
+	}
+	otherTeamID, err := store.GetSiteTenantID(ctx, otherSite.ID)
+	if err != nil {
+		t.Fatalf("get other site team: %v", err)
+	}
+	olderRunID := uuid.New()
+	newerRunID := uuid.New()
+
+	if _, err := store.AppendAIRun(ctx, AIRunParams{
+		ID:              olderRunID,
+		TeamID:          teamID,
+		SiteID:          siteID,
+		ActorID:         userID,
+		ActorType:       "user",
+		Feature:         "ask_ai",
+		Provider:        "bedrock",
+		Model:           "openai.gpt-oss-120b-1:0",
+		TemplateVersion: "ask-ai-v1",
+		EvidenceIDs:     []string{"hitkeep_get_site_overview"},
+		InputHash:       "older-input-hash",
+		OutputHash:      "older-output-hash",
+		OutputJSON: `{
+			"version":"ask-ai-output-summary-v1",
+			"answer_sha256":"older-answer-hash",
+			"answer_chars":12,
+			"citations":[{"tool_call_id":"hitkeep_get_site_overview","label_sha256":"label-hash","label_chars":8}],
+			"charts":[],
+			"actions":[]
+		}`,
+		TotalTokens: 33,
+		Status:      "success",
+		CreatedAt:   now.Add(-time.Hour),
+	}); err != nil {
+		t.Fatalf("append older ask ai run: %v", err)
+	}
+	if _, err := store.AppendAIRun(ctx, AIRunParams{
+		TeamID:          teamID,
+		SiteID:          siteID,
+		ActorID:         userID,
+		ActorType:       "user",
+		Feature:         "opportunities",
+		Provider:        "bedrock",
+		Model:           "openai.gpt-oss-120b-1:0",
+		TemplateVersion: "opportunities-v1",
+		OutputJSON:      `{"title_key":"opportunities.fixture.title"}`,
+		Status:          "success",
+		CreatedAt:       now.Add(-30 * time.Minute),
+	}); err != nil {
+		t.Fatalf("append opportunity run: %v", err)
+	}
+	if _, err := store.AppendAIRun(ctx, AIRunParams{
+		TeamID:          otherTeamID,
+		SiteID:          otherSite.ID,
+		ActorID:         userID,
+		ActorType:       "user",
+		Feature:         "ask_ai",
+		Provider:        "bedrock",
+		Model:           "openai.gpt-oss-120b-1:0",
+		TemplateVersion: "ask-ai-v1",
+		OutputJSON: `{
+			"version":"ask-ai-output-summary-v1",
+			"answer_sha256":"other-answer-hash",
+			"answer_chars":99,
+			"citations":[],
+			"charts":[],
+			"actions":[]
+		}`,
+		Status:    "success",
+		CreatedAt: now.Add(-10 * time.Minute),
+	}); err != nil {
+		t.Fatalf("append other site run: %v", err)
+	}
+	if _, err := store.AppendAIRun(ctx, AIRunParams{
+		ID:              newerRunID,
+		TeamID:          teamID,
+		SiteID:          siteID,
+		ActorID:         userID,
+		ActorType:       "user",
+		Feature:         "ask_ai",
+		Provider:        "bedrock",
+		Model:           "openai.gpt-oss-120b-1:0",
+		TemplateVersion: "ask-ai-v1",
+		EvidenceIDs:     []string{"input_context", "hitkeep_get_site_overview"},
+		InputHash:       "newer-input-hash",
+		OutputHash:      "newer-output-hash",
+		OutputJSON: `{
+			"version":"ask-ai-output-summary-v1",
+			"answer_sha256":"newer-answer-hash",
+			"answer_chars":42,
+			"citations":[
+				{"tool_call_id":"input_context","label_sha256":"context-label-hash","label_chars":13},
+				{"tool_call_id":"hitkeep_get_site_overview","label_sha256":"label-hash","label_chars":8}
+			],
+			"charts":[{"type":"line","title_sha256":"title-hash","title_chars":7,"row_count":7,"series_count":1,"series":[{"key_sha256":"key-hash","key_chars":6,"label_sha256":"series-label-hash","label_chars":6}]}],
+			"actions":[
+				{"type":"navigate","format":"","label_sha256":"action-label-hash","label_chars":11,"target_sha256":"target-hash","target_chars":7},
+				{"type":"download_export","format":"csv","label_sha256":"export-label-hash","label_chars":14,"target_sha256":"export-target-hash","target_chars":54}
+			]
+		}`,
+		InputTokens:     10,
+		OutputTokens:    20,
+		TotalTokens:     30,
+		ToolCallCount:   2,
+		LifecycleEvents: []AILifecycleEvent{{Type: "tool_call_start", ToolName: "hitkeep_get_site_overview", Status: "started", Timestamp: now}},
+		Status:          "success",
+		CreatedAt:       now,
+	}); err != nil {
+		t.Fatalf("append newer ask ai run: %v", err)
+	}
+
+	entries, total, err := store.ListAskAIHistory(ctx, siteID, 10, 0)
+	if err != nil {
+		t.Fatalf("list ask ai history: %v", err)
+	}
+	if total != 2 || len(entries) != 2 {
+		t.Fatalf("expected two site-scoped Ask AI runs, got total=%d entries=%d", total, len(entries))
+	}
+	if entries[0].RunID != newerRunID || entries[1].RunID != olderRunID {
+		t.Fatalf("expected newest-first Ask AI history, got %#v", entries)
+	}
+	newer := entries[0]
+	if newer.AnswerChars != 42 || newer.CitationCount != 2 || newer.ChartCount != 1 || newer.ActionCount != 2 {
+		t.Fatalf("unexpected Ask AI summary counts: %#v", newer)
+	}
+	if strings.Join(newer.ChartTypes, ",") != "line" {
+		t.Fatalf("expected chart types to be summarized, got %#v", newer.ChartTypes)
+	}
+	if strings.Join(newer.ActionTypes, ",") != "download_export,navigate" {
+		t.Fatalf("expected sorted action types, got %#v", newer.ActionTypes)
+	}
+	if strings.Join(newer.ToolNames, ",") != "hitkeep_get_site_overview" {
+		t.Fatalf("expected lifecycle tool names, got %#v", newer.ToolNames)
+	}
+	if newer.InputHash != "newer-input-hash" || newer.OutputHash != "newer-output-hash" {
+		t.Fatalf("expected audit hashes in history, got %#v", newer)
+	}
+	if strings.Contains(fmt.Sprintf("%#v", entries), "Traffic increased") || strings.Contains(fmt.Sprintf("%#v", entries), "Open events") {
+		t.Fatalf("Ask AI history leaked raw prompt/response content: %#v", entries)
+	}
+
+	page, pageTotal, err := store.ListAskAIHistory(ctx, siteID, 1, 1)
+	if err != nil {
+		t.Fatalf("list paginated ask ai history: %v", err)
+	}
+	if pageTotal != 2 || len(page) != 1 || page[0].RunID != olderRunID {
+		t.Fatalf("unexpected paginated history: total=%d page=%#v", pageTotal, page)
 	}
 }
 

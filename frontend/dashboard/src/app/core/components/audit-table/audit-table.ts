@@ -212,6 +212,7 @@ export class AuditTableComponent {
 
     protected evidenceFields(row: AuditTableRow): AuditEvidenceField[] {
         return [
+            ...this.askAIEvidenceFields(row),
             { key: 'actor_id', labelKey: 'auditTable.evidence.actorId', value: row.actor_id || row.actor_user_id || '', mono: true },
             { key: 'actor_role', labelKey: 'auditTable.evidence.actorRole', value: row.actor_role_snapshot ? this.roleLabel(row.actor_role_snapshot) : '', mono: false },
             { key: 'team_id', labelKey: 'auditTable.evidence.teamId', value: row.team_id || '', mono: true },
@@ -223,8 +224,12 @@ export class AuditTableComponent {
         ].filter((field) => field.value);
     }
 
+    protected showFullDetails(row: AuditTableRow): boolean {
+        return Boolean(row.details) && (!this.isAskAIAction(row) || this.askAIEvidenceFields(row).length === 0);
+    }
+
     protected hasEvidence(row: AuditTableRow): boolean {
-        return this.evidenceFields(row).length > 0 || Boolean(row.details);
+        return this.evidenceFields(row).length > 0 || this.showFullDetails(row);
     }
 
     protected pageSummaryParams() {
@@ -272,5 +277,77 @@ export class AuditTableComponent {
             return [];
         }
         return [from, to];
+    }
+
+    private askAIEvidenceFields(row: AuditTableRow): AuditEvidenceField[] {
+        if (!this.isAskAIAction(row) || !row.details) {
+            return [];
+        }
+
+        const values = this.parseAuditDetails(row.details);
+        const fields: AuditEvidenceField[] = [];
+        const add = (key: string, labelKey: string, mono = false, format: (value: string) => string = (value) => value) => {
+            const value = values.get(key);
+            if (value) {
+                fields.push({ key: `ask_ai_${key}`, labelKey, value: format(value), mono });
+            }
+        };
+
+        add('status', 'auditTable.evidence.askAIStatus');
+        add('http_status', 'auditTable.evidence.askAIHTTPStatus');
+        add('run_id', 'auditTable.evidence.askAIRunId', true);
+        add('request_sha256', 'auditTable.evidence.askAIRequestHash', true);
+        add('query_sha256', 'auditTable.evidence.askAIQueryHash', true);
+        add('query_chars', 'auditTable.evidence.askAIQueryChars');
+        add('route_sha256', 'auditTable.evidence.askAIRouteHash', true);
+        add('route_chars', 'auditTable.evidence.askAIRouteChars');
+        add('history', 'auditTable.evidence.askAIHistory');
+        add('from', 'auditTable.evidence.askAIFrom');
+        add('to', 'auditTable.evidence.askAITo');
+        add('filters', 'auditTable.evidence.askAIFilters');
+        add('filter_types', 'auditTable.evidence.askAIFilterTypes', false, this.formatAuditListValue);
+        add('output_sha256', 'auditTable.evidence.askAIOutputHash', true);
+        add('answer_sha256', 'auditTable.evidence.askAIAnswerHash', true);
+        add('answer_chars', 'auditTable.evidence.askAIAnswerChars');
+        add('citations', 'auditTable.evidence.askAICitations');
+        add('charts', 'auditTable.evidence.askAICharts');
+        add('actions', 'auditTable.evidence.askAIActions');
+        add('action_types', 'auditTable.evidence.askAIActionTypes', false, this.formatAuditListValue);
+        add('chart_types', 'auditTable.evidence.askAIChartTypes', false, this.formatAuditListValue);
+        add('error_category', 'auditTable.evidence.askAIErrorCategory');
+        add('limit', 'auditTable.evidence.askAIHistoryLimit');
+        add('offset', 'auditTable.evidence.askAIHistoryOffset');
+        add('total', 'auditTable.evidence.askAIHistoryTotal');
+
+        return fields;
+    }
+
+    private isAskAIAction(row: AuditTableRow): boolean {
+        return row.action === 'ask_ai.requested' || row.action === 'ask_ai.responded' || row.action === 'ask_ai.history_viewed';
+    }
+
+    private parseAuditDetails(details: string): Map<string, string> {
+        const values = new Map<string, string>();
+        for (const part of details.split(/\s+/)) {
+            const separator = part.indexOf('=');
+            if (separator <= 0) {
+                continue;
+            }
+
+            const key = part.slice(0, separator).trim();
+            const value = part.slice(separator + 1).trim();
+            if (key && value) {
+                values.set(key, value);
+            }
+        }
+        return values;
+    }
+
+    private formatAuditListValue(value: string): string {
+        return value
+            .split(',')
+            .map((part) => part.trim())
+            .filter(Boolean)
+            .join(', ');
     }
 }

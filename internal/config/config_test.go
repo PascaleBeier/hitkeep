@@ -157,6 +157,9 @@ func TestLoadAIConfigDefaultsDisabled(t *testing.T) {
 	if conf.AIEnabled {
 		t.Fatal("expected AI to be disabled by default")
 	}
+	if conf.AskAIEnabled {
+		t.Fatal("expected Ask AI to be disabled by default")
+	}
 	if conf.AIProvider != "" {
 		t.Fatalf("expected empty AIProvider by default, got %q", conf.AIProvider)
 	}
@@ -180,6 +183,7 @@ func TestLoadAIConfigDefaultsDisabled(t *testing.T) {
 func TestLoadAIConfigFromEnv(t *testing.T) {
 	env := map[string]string{
 		"HITKEEP_AI_ENABLED":         "true",
+		"HITKEEP_ASK_AI_ENABLED":     "true",
 		"HITKEEP_AI_PROVIDER":        "openai-compatible",
 		"HITKEEP_AI_MODEL":           "gpt-4.1-mini",
 		"HITKEEP_AI_BASE_URL":        "https://ai-gateway.example/v1",
@@ -199,6 +203,9 @@ func TestLoadAIConfigFromEnv(t *testing.T) {
 
 	if !conf.AIEnabled {
 		t.Fatal("expected AIEnabled true")
+	}
+	if !conf.AskAIEnabled {
+		t.Fatal("expected AskAIEnabled true")
 	}
 	if conf.AIProvider != "openai-compatible" || conf.AIModel != "gpt-4.1-mini" {
 		t.Fatalf("unexpected AI provider/model: %q/%q", conf.AIProvider, conf.AIModel)

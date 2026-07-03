@@ -47,6 +47,41 @@ func (l runLedger) recordNotConfigured(ctx context.Context, req OpportunityReque
 	return err
 }
 
+func (l runLedger) reserveAskAI(ctx context.Context, req AskAIRequest) (uuid.UUID, error) {
+	if l.recorder == nil {
+		return uuid.Nil, l.checkBudget(ctx)
+	}
+	window := l.budgetWindow()
+	return l.recorder.ReserveAIRun(ctx, l.askAIRunRecord(uuid.Nil, req, nil, nil, "reserved", "", 0, Usage{}, nil), time.Now().UTC().Add(-window), l.conf.RequestLimit, l.conf.TokenLimit)
+}
+
+func (l runLedger) recordAskAINotConfigured(ctx context.Context, req AskAIRequest) error {
+	_, err := l.recordAskAIID(ctx, uuid.Nil, req, nil, nil, "failure", "not_configured", 0, Usage{}, nil)
+	return err
+}
+
+func (l runLedger) recordAskAIID(ctx context.Context, runID uuid.UUID, req AskAIRequest, output *AskAIOutput, evidenceIDs []string, status, category string, latency time.Duration, usage Usage, lifecycleEvents []LifecycleEvent) (uuid.UUID, error) {
+	if l.recorder == nil {
+		return uuid.Nil, nil
+	}
+	return l.recorder.RecordAIRun(ctx, l.askAIRunRecord(runID, req, output, evidenceIDs, status, category, latency, usage, lifecycleEvents))
+}
+
+func (l runLedger) finalizeAskAI(ctx context.Context, runID uuid.UUID, req AskAIRequest, generation askAIGeneration) (uuid.UUID, error) {
+	status, category, outputForAudit := askAIGenerationAuditFields(generation)
+	finalRunID, recordErr := l.recordAskAIID(ctx, runID, req, outputForAudit, generation.EvidenceIDs, status, category, generation.Latency, generation.Usage, generation.LifecycleEvents)
+	if generation.Err != nil {
+		if recordErr != nil {
+			return uuid.Nil, errors.Join(generation.Err, recordErr)
+		}
+		return finalRunID, generation.Err
+	}
+	if recordErr != nil {
+		return uuid.Nil, recordErr
+	}
+	return finalRunID, nil
+}
+
 func (l runLedger) recordID(ctx context.Context, runID uuid.UUID, req OpportunityRequest, output *OpportunityCandidateProposal, status, category string, latency time.Duration, usage Usage, lifecycleEvents []LifecycleEvent) (uuid.UUID, error) {
 	if l.recorder == nil {
 		return uuid.Nil, nil
@@ -94,6 +129,35 @@ func (l runLedger) runRecord(runID uuid.UUID, req OpportunityRequest, output *Op
 		Model:           l.conf.Model,
 		TemplateVersion: OpportunityTemplateVersion,
 		EvidenceIDs:     evidenceIDs(auditInput.Evidence),
+		InputHash:       HashAny(auditInput),
+		OutputHash:      HashAny(output),
+		OutputJSON:      outputJSON,
+		Usage:           usage,
+		LifecycleEvents: lifecycleEvents,
+		Status:          status,
+		ErrorCategory:   category,
+		Latency:         latency,
+		CreatedAt:       time.Now().UTC(),
+	}
+}
+
+func (l runLedger) askAIRunRecord(runID uuid.UUID, req AskAIRequest, output *AskAIOutput, evidenceIDs []string, status, category string, latency time.Duration, usage Usage, lifecycleEvents []LifecycleEvent) RunRecord {
+	outputJSON := "{}"
+	if output != nil {
+		outputJSON = mustJSON(askAIOutputSummary(output))
+	}
+	auditInput := askAIAuditInput(req)
+	return RunRecord{
+		ID:              runID,
+		TeamID:          req.TeamID,
+		SiteID:          req.SiteID,
+		ActorID:         req.ActorID,
+		ActorType:       req.ActorType,
+		Feature:         "ask_ai",
+		Provider:        l.conf.Provider,
+		Model:           l.conf.Model,
+		TemplateVersion: AskAITemplateVersion,
+		EvidenceIDs:     askAIRunEvidenceIDs(evidenceIDs, output),
 		InputHash:       HashAny(auditInput),
 		OutputHash:      HashAny(output),
 		OutputJSON:      outputJSON,

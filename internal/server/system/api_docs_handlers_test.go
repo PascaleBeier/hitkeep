@@ -233,6 +233,11 @@ func TestOpenAPISpecV1IncludesAdminSystemPaths(t *testing.T) {
 	}
 	aiStatusSchema := requireMap(t, schemas, "SystemAIStatus")
 	aiStatusProps := requireMap(t, aiStatusSchema, "properties")
+	for _, prop := range []string{"ask_ai_enabled", "ask_ai_available"} {
+		if _, ok := aiStatusProps[prop]; !ok {
+			t.Fatalf("expected SystemAIStatus.%s property to exist", prop)
+		}
+	}
 	configModeSchema := requireMap(t, aiStatusProps, "config_mode")
 	configModeEnum := asStringSlice(t, configModeSchema["enum"])
 	for _, want := range []string{"cloud_managed", "self_hosted"} {
@@ -311,6 +316,149 @@ func TestOpenAPISpecV1IncludesAdminSystemPaths(t *testing.T) {
 	}
 	if _, ok := exportResponses["403"]; !ok {
 		t.Fatalf("expected audit export to document owner-only response")
+	}
+}
+
+func TestOpenAPISpecV1IncludesAskAIPathAndSchemas(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	for _, schemaName := range []string{
+		"AskAIStatus",
+		"AskAIFilter",
+		"AskAIMessage",
+		"AskAIRequest",
+		"AskAICitation",
+		"AskAIChartSeries",
+		"AskAIChart",
+		"AskAIAction",
+		"AskAIResponse",
+		"AskAIStreamEvent",
+		"AskAIHistoryEntry",
+		"AskAIHistoryResponse",
+	} {
+		if _, ok := schemas[schemaName]; !ok {
+			t.Fatalf("expected %s schema to exist", schemaName)
+		}
+	}
+
+	systemStatusSchema := requireMap(t, schemas, "SystemStatus")
+	systemStatusProps := requireMap(t, systemStatusSchema, "properties")
+	if ref, _ := requireMap(t, systemStatusProps, "ask_ai")["$ref"].(string); ref != "#/components/schemas/AskAIStatus" {
+		t.Fatalf("expected SystemStatus.ask_ai to reference AskAIStatus, got %q", ref)
+	}
+
+	requestSchema := requireMap(t, schemas, "AskAIRequest")
+	requestProps := requireMap(t, requestSchema, "properties")
+	if _, ok := requestProps["query"]; !ok {
+		t.Fatalf("expected AskAIRequest.query property")
+	}
+	for _, forbidden := range []string{"raw_prompt", "raw_provider_response", "provider_headers", "credentials"} {
+		if _, ok := requestProps[forbidden]; ok {
+			t.Fatalf("AskAIRequest schema leaked forbidden field %q", forbidden)
+		}
+	}
+
+	actionSchema := requireMap(t, schemas, "AskAIAction")
+	actionProps := requireMap(t, actionSchema, "properties")
+	actionTypeEnum := asStringSlice(t, requireMap(t, actionProps, "type")["enum"])
+	for _, want := range []string{"navigate", "download_export"} {
+		if !slices.Contains(actionTypeEnum, want) {
+			t.Fatalf("expected AskAIAction.type enum to include %q, got %v", want, actionTypeEnum)
+		}
+	}
+
+	chartSchema := requireMap(t, schemas, "AskAIChart")
+	chartProps := requireMap(t, chartSchema, "properties")
+	chartTypeEnum := asStringSlice(t, requireMap(t, chartProps, "type")["enum"])
+	for _, want := range []string{"line", "bar", "table"} {
+		if !slices.Contains(chartTypeEnum, want) {
+			t.Fatalf("expected AskAIChart.type enum to include %q, got %v", want, chartTypeEnum)
+		}
+	}
+
+	streamEventSchema := requireMap(t, schemas, "AskAIStreamEvent")
+	streamEventProps := requireMap(t, streamEventSchema, "properties")
+	streamEventTypeEnum := asStringSlice(t, requireMap(t, streamEventProps, "type")["enum"])
+	for _, want := range []string{"progress", "delta", "final", "error"} {
+		if !slices.Contains(streamEventTypeEnum, want) {
+			t.Fatalf("expected AskAIStreamEvent.type enum to include %q, got %v", want, streamEventTypeEnum)
+		}
+	}
+	if _, ok := streamEventProps["delta_markdown"]; !ok {
+		t.Fatalf("expected AskAIStreamEvent.delta_markdown property")
+	}
+	if _, ok := streamEventProps["tool_name"]; !ok {
+		t.Fatalf("expected AskAIStreamEvent.tool_name property")
+	}
+	historyEntrySchema := requireMap(t, schemas, "AskAIHistoryEntry")
+	historyEntryProps := requireMap(t, historyEntrySchema, "properties")
+	for _, forbidden := range []string{"query", "answer_markdown", "raw_prompt", "raw_provider_response", "provider_headers", "credentials"} {
+		if _, ok := historyEntryProps[forbidden]; ok {
+			t.Fatalf("AskAIHistoryEntry schema leaked forbidden field %q", forbidden)
+		}
+	}
+
+	pathItem := requireMap(t, paths, "/api/sites/{id}/ask-ai")
+	postOp := requireMap(t, pathItem, "post")
+	if !strings.Contains(postOp["description"].(string), "human dashboard session") {
+		t.Fatalf("expected Ask AI path to document dashboard-session boundary, got %q", postOp["description"])
+	}
+	security, ok := postOp["security"].([]any)
+	if !ok || len(security) != 1 {
+		t.Fatalf("expected Ask AI path to use one cookie security requirement, got %#v", postOp["security"])
+	}
+	firstSecurity, ok := security[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected Ask AI security requirement map, got %#v", security[0])
+	}
+	if _, ok := firstSecurity["cookieAuth"]; !ok {
+		t.Fatalf("expected Ask AI path to use cookieAuth security, got %#v", firstSecurity)
+	}
+	body := requireMap(t, postOp, "requestBody")
+	content := requireMap(t, body, "content")
+	jsonContent := requireMap(t, content, "application/json")
+	bodySchema := requireMap(t, jsonContent, "schema")
+	if ref, _ := bodySchema["$ref"].(string); ref != "#/components/schemas/AskAIRequest" {
+		t.Fatalf("expected Ask AI request schema ref, got %q", ref)
+	}
+	responses := requireMap(t, postOp, "responses")
+	okResp := requireMap(t, responses, "200")
+	okContent := requireMap(t, okResp, "content")
+	okJSON := requireMap(t, okContent, "application/json")
+	okSchema := requireMap(t, okJSON, "schema")
+	if ref, _ := okSchema["$ref"].(string); ref != "#/components/schemas/AskAIResponse" {
+		t.Fatalf("expected Ask AI response schema ref, got %q", ref)
+	}
+
+	streamPathItem := requireMap(t, paths, "/api/sites/{id}/ask-ai/events")
+	streamPostOp := requireMap(t, streamPathItem, "post")
+	if !strings.Contains(streamPostOp["description"].(string), "Server-Sent Events") {
+		t.Fatalf("expected Ask AI stream path to document SSE behavior, got %q", streamPostOp["description"])
+	}
+	streamResponses := requireMap(t, streamPostOp, "responses")
+	streamOK := requireMap(t, streamResponses, "200")
+	streamContent := requireMap(t, streamOK, "content")
+	streamEventContent := requireMap(t, streamContent, "text/event-stream")
+	streamSchema := requireMap(t, streamEventContent, "schema")
+	if ref, _ := streamSchema["$ref"].(string); ref != "#/components/schemas/AskAIStreamEvent" {
+		t.Fatalf("expected Ask AI stream event schema ref, got %q", ref)
+	}
+
+	historyPathItem := requireMap(t, paths, "/api/sites/{id}/ask-ai/history")
+	historyGetOp := requireMap(t, historyPathItem, "get")
+	if !strings.Contains(historyGetOp["description"].(string), "audit-safe") {
+		t.Fatalf("expected Ask AI history path to document audit-safe behavior, got %q", historyGetOp["description"])
+	}
+	historyResponses := requireMap(t, historyGetOp, "responses")
+	historyOK := requireMap(t, historyResponses, "200")
+	historyContent := requireMap(t, historyOK, "content")
+	historyJSON := requireMap(t, historyContent, "application/json")
+	historySchema := requireMap(t, historyJSON, "schema")
+	if ref, _ := historySchema["$ref"].(string); ref != "#/components/schemas/AskAIHistoryResponse" {
+		t.Fatalf("expected Ask AI history response schema ref, got %q", ref)
 	}
 }
 

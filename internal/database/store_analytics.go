@@ -6,8 +6,27 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+
 	"hitkeep/internal/api"
 )
+
+// GetSiteAnalyticsBounds returns the observed timestamp span for a site's hits.
+// Zero values mean the site has no stored hits yet.
+func (s *Store) GetSiteAnalyticsBounds(ctx context.Context, siteID uuid.UUID) (time.Time, time.Time, error) {
+	var from, to sql.NullTime
+	if err := s.db.QueryRowContext(ctx, `
+		SELECT MIN(timestamp), MAX(timestamp)
+		FROM hits
+		WHERE site_id = ?
+	`, siteID).Scan(&from, &to); err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("query site analytics bounds: %w", err)
+	}
+	if !from.Valid || !to.Valid {
+		return time.Time{}, time.Time{}, nil
+	}
+	return from.Time.UTC(), to.Time.UTC(), nil
+}
 
 // GetSiteStats returns aggregated KPIs and time-series data using the AnalyticsParams struct.
 func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*api.SiteStats, error) {

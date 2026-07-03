@@ -49,6 +49,7 @@ func main() {
 	var provider string
 	var model string
 	var region string
+	var baseURL string
 	var dataPath string
 	var aiEnabled bool
 	var windowDays int
@@ -56,9 +57,10 @@ func main() {
 	flag.StringVar(&dbPath, "db", "", "restored shared HitKeep database path")
 	flag.StringVar(&outPath, "out", "tmp/prod-eu-opportunities-smoke/release-hardening-smoke.md", "markdown report output path")
 	flag.StringVar(&domains, "domains", "hitkeep.com,cloud.hitkeep.eu", "comma-separated site domains to smoke")
-	flag.StringVar(&provider, "provider", envOrDefault("HITKEEP_AI_PROVIDER", "bedrock"), "AI provider")
-	flag.StringVar(&model, "model", envOrDefault("HITKEEP_AI_MODEL", "eu.amazon.nova-2-lite-v1:0"), "AI model")
+	flag.StringVar(&provider, "provider", envOrDefault("HITKEEP_AI_PROVIDER", "openai-compatible"), "AI provider")
+	flag.StringVar(&model, "model", envOrDefault("HITKEEP_AI_MODEL", "openai.gpt-oss-120b"), "AI model")
 	flag.StringVar(&region, "region", envOrDefault("HITKEEP_AI_REGION", "eu-central-1"), "AI provider region")
+	flag.StringVar(&baseURL, "base-url", strings.TrimSpace(os.Getenv("HITKEEP_AI_BASE_URL")), "AI provider base URL")
 	flag.StringVar(&dataPath, "data-path", envOrDefault("HITKEEP_DATA_PATH", "data"), "restored HitKeep data directory containing tenant databases")
 	flag.BoolVar(&aiEnabled, "ai", true, "enable AI provider calls")
 	flag.IntVar(&windowDays, "window-days", 30, "analysis window in days")
@@ -72,6 +74,7 @@ func main() {
 	if err != nil {
 		fatalf("parse -to: %v", err)
 	}
+	baseURL = resolveSmokeAIBaseURL(provider, region, baseURL)
 
 	report, err := runSmoke(context.Background(), smokeConfig{
 		DBPath:     dbPath,
@@ -80,6 +83,7 @@ func main() {
 		Provider:   provider,
 		Model:      model,
 		Region:     region,
+		BaseURL:    baseURL,
 		DataPath:   dataPath,
 		AIEnabled:  aiEnabled,
 		WindowDays: windowDays,
@@ -107,6 +111,7 @@ type smokeConfig struct {
 	Provider   string
 	Model      string
 	Region     string
+	BaseURL    string
 	DataPath   string
 	AIEnabled  bool
 	WindowDays int
@@ -146,6 +151,7 @@ func runSmoke(ctx context.Context, conf smokeConfig) (smokegate.Report, error) {
 			Enabled:             true,
 			Provider:            conf.Provider,
 			Model:               conf.Model,
+			BaseURL:             conf.BaseURL,
 			Region:              conf.Region,
 			APIKey:              strings.TrimSpace(os.Getenv("HITKEEP_AI_API_KEY")),
 			Timeout:             45 * time.Second,
@@ -281,6 +287,18 @@ func envOrDefault(name, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func resolveSmokeAIBaseURL(provider, region, baseURL string) string {
+	baseURL = strings.TrimSpace(baseURL)
+	if baseURL != "" || !strings.EqualFold(strings.TrimSpace(provider), "openai-compatible") {
+		return baseURL
+	}
+	region = strings.TrimSpace(region)
+	if region == "" {
+		region = "eu-central-1"
+	}
+	return "https://bedrock-mantle." + region + ".api.aws/v1"
 }
 
 func prepareWorkingDB(source string) (string, func(), error) {

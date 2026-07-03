@@ -27,6 +27,7 @@ func openAPIV1CorePaths() map[string]any {
 						"needs_setup": map[string]any{"type": "boolean"},
 						"version":     map[string]any{"type": "string"},
 						"cloud":       map[string]any{"$ref": "#/components/schemas/CloudStatus"},
+						"ask_ai":      map[string]any{"$ref": "#/components/schemas/AskAIStatus"},
 					},
 				}),
 			}),

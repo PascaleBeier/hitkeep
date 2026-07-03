@@ -79,6 +79,8 @@ func compatModel(conf Config) provider.LanguageModel {
 	opts := []compat.Option{compat.WithProviderID(normalizeProvider(conf.Provider))}
 	if conf.APIKey != "" {
 		opts = append(opts, compat.WithAPIKey(conf.APIKey))
+	} else if isBedrockMantleBaseURL(conf.BaseURL) {
+		opts = append(opts, compat.WithHTTPClient(newBedrockMantleSigV4HTTPClient(conf.Region)))
 	}
 	if conf.BaseURL != "" {
 		opts = append(opts, compat.WithBaseURL(conf.BaseURL))

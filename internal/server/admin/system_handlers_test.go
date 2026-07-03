@@ -195,6 +195,9 @@ func TestHandleGetAIStatusIsNonSecret(t *testing.T) {
 	if !status.Enabled || !status.Configured {
 		t.Fatalf("expected enabled configured AI status: %#v", status)
 	}
+	if status.AskAIEnabled || status.AskAIAvailable {
+		t.Fatalf("expected Ask AI to remain disabled without HITKEEP_ASK_AI_ENABLED, got %#v", status)
+	}
 	if status.Provider != "openai-compatible" || status.Model != "gpt-test" {
 		t.Fatalf("unexpected provider/model: %#v", status)
 	}
@@ -273,6 +276,30 @@ func TestHandleGetAIStatusReportsCloudManagedMode(t *testing.T) {
 	}
 	if status.ConfigMode != "cloud_managed" {
 		t.Fatalf("expected cloud_managed config mode, got %#v", status)
+	}
+}
+
+func TestHandleGetAIStatusReportsAskAIAvailability(t *testing.T) {
+	h, _, _, ownerID, _, _ := setupSystemTestEnv(t)
+	h.ctx.Config.AIEnabled = true
+	h.ctx.Config.AskAIEnabled = true
+	h.ctx.Config.AIProvider = "bedrock"
+	h.ctx.Config.AIModel = "amazon.nova-lite-v1:0"
+	h.ctx.Config.AIBudgetWindowMinutes = 60
+
+	req := withAdminTestUser(httptest.NewRequest(http.MethodGet, "/api/admin/system/ai", nil), ownerID)
+	w := httptest.NewRecorder()
+	h.handleGetAI().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var status api.SystemAIStatus
+	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if !status.AskAIEnabled || !status.AskAIAvailable {
+		t.Fatalf("expected Ask AI to be enabled and available, got %#v", status)
 	}
 }
 
@@ -364,6 +391,30 @@ func TestAIStatusReportsMissingGatewayRouteAsNotConfigured(t *testing.T) {
 	}
 	if status.Configured || status.Status != "not_configured" || status.BaseURLConfigured {
 		t.Fatalf("expected missing gateway route to be not configured, got %#v", status)
+	}
+}
+
+func TestAIStatusReportsBedrockMantleInstanceRoleMissingRegionAsNotConfigured(t *testing.T) {
+	h, _, _, ownerID, _, _ := setupSystemTestEnv(t)
+	h.ctx.Config.AIEnabled = true
+	h.ctx.Config.AskAIEnabled = true
+	h.ctx.Config.AIProvider = "openai-compatible"
+	h.ctx.Config.AIModel = "openai.gpt-oss-120b"
+	h.ctx.Config.AIBaseURL = "https://bedrock-mantle.eu-central-1.api.aws/v1"
+
+	req := withAdminTestUser(httptest.NewRequest(http.MethodGet, "/api/admin/system/ai", nil), ownerID)
+	w := httptest.NewRecorder()
+	h.handleGetAI().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var status api.SystemAIStatus
+	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if status.Configured || status.AskAIAvailable || status.Status != "not_configured" {
+		t.Fatalf("expected Mantle instance-role config without region to be not configured, got %#v", status)
 	}
 }
 

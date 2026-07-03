@@ -570,6 +570,10 @@ func (a *recordingOpportunityAI) GenerateOpportunityProposal(_ context.Context, 
 	}, nil
 }
 
+func (a *recordingOpportunityAI) GenerateAskAI(context.Context, hitai.AskAIRequest) (hitai.AskAIResult, error) {
+	return hitai.AskAIResult{}, hitai.ErrDisabled
+}
+
 func (a *recordingOpportunityAI) Configured() bool { return true }
 func (a *recordingOpportunityAI) Enabled() bool    { return true }
 func (a *recordingOpportunityAI) Provider() string { return "test" }

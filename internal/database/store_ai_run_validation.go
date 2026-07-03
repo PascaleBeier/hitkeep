@@ -3,6 +3,7 @@ package database
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 )
 
@@ -175,6 +176,9 @@ func validateAIRunOutputJSON(feature, outputJSON string, evidenceIDs []string) e
 	if strings.EqualFold(strings.TrimSpace(feature), "opportunities") {
 		return validateOpportunityAIRunOutput(object, evidenceIDs)
 	}
+	if strings.EqualFold(strings.TrimSpace(feature), "ask_ai") {
+		return validateAskAIAIRunOutput(object, evidenceIDs)
+	}
 	return nil
 }
 
@@ -201,6 +205,270 @@ func validateOpportunityAIRunOutputCitations(output map[string]any, evidenceIDs 
 	for _, id := range cited {
 		if !allowed[id] {
 			return fmt.Errorf("opportunity ai run output cited evidence %q missing from run evidence ids", id)
+		}
+	}
+	return nil
+}
+
+var askAIAIRunTopLevelFields = map[string]bool{
+	"actions":       true,
+	"answer_chars":  true,
+	"answer_sha256": true,
+	"charts":        true,
+	"citations":     true,
+	"version":       true,
+}
+
+var askAIAIRunCitationFields = map[string]bool{
+	"label_chars":  true,
+	"label_sha256": true,
+	"tool_call_id": true,
+}
+
+var askAIAIRunChartFields = map[string]bool{
+	"row_count":    true,
+	"series":       true,
+	"series_count": true,
+	"title_chars":  true,
+	"title_sha256": true,
+	"type":         true,
+}
+
+var askAIAIRunChartSeriesFields = map[string]bool{
+	"key_chars":    true,
+	"key_sha256":   true,
+	"label_chars":  true,
+	"label_sha256": true,
+}
+
+var askAIAIRunActionFields = map[string]bool{
+	"format":        true,
+	"label_chars":   true,
+	"label_sha256":  true,
+	"target_chars":  true,
+	"target_sha256": true,
+	"type":          true,
+}
+
+func validateAskAIAIRunOutput(output map[string]any, evidenceIDs []string) error {
+	if len(output) == 0 {
+		return nil
+	}
+	if err := validateObjectFields(output, askAIAIRunTopLevelFields, "ask ai run output json"); err != nil {
+		return err
+	}
+	version, ok := output["version"].(string)
+	if !ok || version != "ask-ai-output-summary-v1" {
+		return fmt.Errorf("ask ai run output json must use the safe output summary version")
+	}
+	if err := summaryStringField(output, "answer_sha256", "ask ai run output json"); err != nil {
+		return err
+	}
+	if err := summaryCountField(output, "answer_chars", "ask ai run output json"); err != nil {
+		return err
+	}
+	if err := validateAskAIAIRunCitations(output, evidenceIDs); err != nil {
+		return err
+	}
+	if err := validateAskAIAIRunCharts(output); err != nil {
+		return err
+	}
+	return validateAskAIAIRunActions(output)
+}
+
+func validateAskAIAIRunCitations(output map[string]any, evidenceIDs []string) error {
+	citations, err := arrayField(output, "citations", "ask ai run output json citations")
+	if err != nil {
+		return err
+	}
+	allowed := map[string]bool{"input_context": true}
+	for _, id := range evidenceIDs {
+		if id = strings.TrimSpace(id); id != "" {
+			allowed[id] = true
+		}
+	}
+	for _, citation := range citations {
+		object, ok := citation.(map[string]any)
+		if !ok {
+			return fmt.Errorf("ask ai run output json citations must contain objects")
+		}
+		if err := validateObjectFields(object, askAIAIRunCitationFields, "ask ai run output json citation"); err != nil {
+			return err
+		}
+		if err := summaryStringField(object, "label_sha256", "ask ai run output json citation"); err != nil {
+			return err
+		}
+		if err := summaryCountField(object, "label_chars", "ask ai run output json citation"); err != nil {
+			return err
+		}
+		toolCallID, ok := object["tool_call_id"].(string)
+		if !ok || strings.TrimSpace(toolCallID) == "" {
+			return fmt.Errorf("ask ai run output json citation tool_call_id must be a string")
+		}
+		if !allowed[toolCallID] {
+			return fmt.Errorf("ask ai run output citation %q missing from run evidence ids", toolCallID)
+		}
+	}
+	return nil
+}
+
+func validateAskAIAIRunCharts(output map[string]any) error {
+	charts, err := arrayField(output, "charts", "ask ai run output json charts")
+	if err != nil {
+		return err
+	}
+	for _, chart := range charts {
+		object, ok := chart.(map[string]any)
+		if !ok {
+			return fmt.Errorf("ask ai run output json charts must contain objects")
+		}
+		if err := validateObjectFields(object, askAIAIRunChartFields, "ask ai run output json chart"); err != nil {
+			return err
+		}
+		if err := summaryStringField(object, "title_sha256", "ask ai run output json chart"); err != nil {
+			return err
+		}
+		if err := summaryCountField(object, "title_chars", "ask ai run output json chart"); err != nil {
+			return err
+		}
+		if err := summaryCountField(object, "row_count", "ask ai run output json chart"); err != nil {
+			return err
+		}
+		seriesCount, err := summaryCountValue(object, "series_count", "ask ai run output json chart")
+		if err != nil {
+			return err
+		}
+		chartType, ok := object["type"].(string)
+		if !ok {
+			return fmt.Errorf("ask ai run output json chart type must be a string")
+		}
+		switch strings.TrimSpace(chartType) {
+		case "line", "bar", "table":
+		default:
+			return fmt.Errorf("ask ai run output json chart type must be a stable chart code")
+		}
+		series, err := arrayField(object, "series", "ask ai run output json chart series")
+		if err != nil {
+			return err
+		}
+		if seriesCount != len(series) {
+			return fmt.Errorf("ask ai run output json chart series_count must match series length")
+		}
+		for _, item := range series {
+			seriesObject, ok := item.(map[string]any)
+			if !ok {
+				return fmt.Errorf("ask ai run output json chart series must contain objects")
+			}
+			if err := validateObjectFields(seriesObject, askAIAIRunChartSeriesFields, "ask ai run output json chart series"); err != nil {
+				return err
+			}
+			if err := summaryStringField(seriesObject, "key_sha256", "ask ai run output json chart series"); err != nil {
+				return err
+			}
+			if err := summaryCountField(seriesObject, "key_chars", "ask ai run output json chart series"); err != nil {
+				return err
+			}
+			if err := summaryStringField(seriesObject, "label_sha256", "ask ai run output json chart series"); err != nil {
+				return err
+			}
+			if err := summaryCountField(seriesObject, "label_chars", "ask ai run output json chart series"); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func validateAskAIAIRunActions(output map[string]any) error {
+	actions, err := arrayField(output, "actions", "ask ai run output json actions")
+	if err != nil {
+		return err
+	}
+	for _, action := range actions {
+		object, ok := action.(map[string]any)
+		if !ok {
+			return fmt.Errorf("ask ai run output json actions must contain objects")
+		}
+		if err := validateObjectFields(object, askAIAIRunActionFields, "ask ai run output json action"); err != nil {
+			return err
+		}
+		if err := summaryStringField(object, "label_sha256", "ask ai run output json action"); err != nil {
+			return err
+		}
+		if err := summaryCountField(object, "label_chars", "ask ai run output json action"); err != nil {
+			return err
+		}
+		if err := summaryStringField(object, "target_sha256", "ask ai run output json action"); err != nil {
+			return err
+		}
+		if err := summaryCountField(object, "target_chars", "ask ai run output json action"); err != nil {
+			return err
+		}
+		actionType, ok := object["type"].(string)
+		if !ok {
+			return fmt.Errorf("ask ai run output json action type must be a string")
+		}
+		actionType = strings.TrimSpace(actionType)
+		format, ok := object["format"].(string)
+		if !ok {
+			return fmt.Errorf("ask ai run output json action format must be a string")
+		}
+		format = strings.TrimSpace(format)
+		switch actionType {
+		case "navigate":
+			if format != "" {
+				return fmt.Errorf("ask ai run output json navigate action format must be empty")
+			}
+		case "download_export":
+			switch format {
+			case "xlsx", "json", "csv", "ndjson":
+			default:
+				return fmt.Errorf("ask ai run output json export action format must be stable")
+			}
+		default:
+			return fmt.Errorf("ask ai run output json action type must be a stable action code")
+		}
+	}
+	return nil
+}
+
+func summaryStringField(object map[string]any, key, label string) error {
+	value, ok := object[key].(string)
+	if !ok || strings.TrimSpace(value) == "" {
+		return fmt.Errorf("%s %s must be a non-empty string", label, key)
+	}
+	return nil
+}
+
+func summaryCountField(object map[string]any, key, label string) error {
+	_, err := summaryCountValue(object, key, label)
+	return err
+}
+
+func summaryCountValue(object map[string]any, key, label string) (int, error) {
+	value, ok := object[key].(float64)
+	if !ok || value < 0 || value != math.Trunc(value) {
+		return 0, fmt.Errorf("%s %s must be a non-negative whole number", label, key)
+	}
+	return int(value), nil
+}
+
+func arrayField(object map[string]any, key, label string) ([]any, error) {
+	value, ok := object[key]
+	if !ok {
+		return nil, fmt.Errorf("%s must be an array", label)
+	}
+	items, ok := value.([]any)
+	if !ok {
+		return nil, fmt.Errorf("%s must be an array", label)
+	}
+	return items, nil
+}
+
+func validateObjectFields(object map[string]any, allowed map[string]bool, label string) error {
+	for key := range object {
+		if !allowed[key] {
+			return fmt.Errorf("%s contains unsupported field %q", label, key)
 		}
 	}
 	return nil
@@ -265,7 +533,7 @@ func rejectRawPayloadStringValues(value any) error {
 
 func containsRawPayloadMarker(value string) bool {
 	lower := strings.ToLower(value)
-	if strings.Contains(lower, "sk-") ||
+	if containsSecretKeyMarker(lower) ||
 		strings.Contains(lower, "bearer ") ||
 		strings.Contains(lower, "authorization:") ||
 		containsAnyCredentialAssignment(lower, []string{"api_key", "api-key", "x-api-key"}) ||
@@ -276,6 +544,24 @@ func containsRawPayloadMarker(value string) bool {
 	}
 	normalized := normalizeAIRunOutputField(value)
 	return containsAnyRawPayloadMarker(normalized) || stringContainsAny(normalized, rawPayloadCredentialValueMarkers)
+}
+
+func containsSecretKeyMarker(value string) bool {
+	for offset := 0; ; {
+		index := strings.Index(value[offset:], "sk-")
+		if index < 0 {
+			return false
+		}
+		index += offset
+		if index == 0 || !isASCIIAlphaNumeric(value[index-1]) {
+			return true
+		}
+		offset = index + len("sk-")
+	}
+}
+
+func isASCIIAlphaNumeric(value byte) bool {
+	return (value >= 'a' && value <= 'z') || (value >= 'A' && value <= 'Z') || (value >= '0' && value <= '9')
 }
 
 func containsAnyCredentialAssignment(value string, names []string) bool {

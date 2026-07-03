@@ -150,7 +150,7 @@
                 <tr class="audit-table__evidence-row">
                     <td colspan="10">
                         <div class="audit-table__evidence">
-                            @if (row.details) {
+                            @if (showFullDetails(row)) {
                             <div class="audit-table__evidence-full">
                                 <span class="audit-table__evidence-label">{{ "auditTable.evidence.details" | transloco }}</span>
                                 <span>{{ row.details }}</span>

@@ -22,6 +22,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	"hitkeep/internal/server/shared"
 	"hitkeep/internal/worker"
 )
 
@@ -64,6 +65,7 @@ func systemFeatureStatuses(cfg *config.Config, mailerConfigured bool) []api.Syst
 		{Key: "mcp_docs", Enabled: cfg.MCPEnabled && cfg.MCPDocsEnabled, Detail: enabledDetail(cfg.MCPEnabled && cfg.MCPDocsEnabled, cfg.MCPDocsURL)},
 		{Key: "ai", Enabled: cfg.AIEnabled && aiConfigured, Detail: aiFeatureDetail(cfg, aiConfigured)},
 		{Key: "ai_opportunities", Enabled: cfg.AIEnabled && aiConfigured, Detail: aiFeatureDetail(cfg, aiConfigured)},
+		{Key: "ask_ai", Enabled: cfg.AIEnabled && cfg.AskAIEnabled && aiConfigured, Detail: aiFeatureDetail(cfg, aiConfigured)},
 		{Key: "automatic_backups", Enabled: cfg.BackupPath != "", Detail: backupFeatureDetail(cfg)},
 		{Key: "spam_auto_update", Enabled: cfg.SpamFilterAutoUpdate, Detail: enabledDetail(cfg.SpamFilterAutoUpdate, formatFeatureInterval(cfg.SpamFilterUpdateIntervalMin))},
 		{Key: "mail_delivery", Enabled: mailerConfigured, Detail: mailFeatureDetail(cfg, mailerConfigured)},
@@ -86,6 +88,7 @@ func aiConfigError(cfg *config.Config) error {
 		Provider: strings.TrimSpace(cfg.AIProvider),
 		Model:    strings.TrimSpace(cfg.AIModel),
 		BaseURL:  strings.TrimSpace(cfg.AIBaseURL),
+		Region:   strings.TrimSpace(cfg.AIRegion),
 		APIKey:   strings.TrimSpace(cfg.AIAPIKey),
 	})
 }
@@ -226,6 +229,7 @@ func aiSystemStatus(cfg *config.Config, store *database.Store) api.SystemAIStatu
 	if cfg != nil {
 		status.Enabled = cfg.AIEnabled
 		status.Configured = aiConfigured(cfg)
+		status.AskAIEnabled = cfg.AIEnabled && cfg.AskAIEnabled
 		status.RequestLimit = cfg.AIRequestLimit
 		status.TokenLimit = cfg.AITokenLimit
 		status.BudgetWindowMinutes = cfg.AIBudgetWindowMinutes
@@ -246,6 +250,7 @@ func aiSystemStatus(cfg *config.Config, store *database.Store) api.SystemAIStatu
 		status.Status = "configured"
 	}
 	if store == nil {
+		status.AskAIAvailable = status.AskAIEnabled && status.Configured
 		return status
 	}
 	window := time.Duration(status.BudgetWindowMinutes) * time.Minute
@@ -269,6 +274,8 @@ func aiSystemStatus(cfg *config.Config, store *database.Store) api.SystemAIStatu
 			status.Status = "needs_attention"
 		}
 	}
+	askAI := shared.AskAIStatus(context.Background(), cfg, store)
+	status.AskAIAvailable = askAI.Available
 	return status
 }
 

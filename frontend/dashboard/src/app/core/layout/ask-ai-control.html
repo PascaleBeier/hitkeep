@@ -1,0 +1,246 @@
+@if (shouldRender()) {
+<button type="button" class="ask-ai-trigger" [class.ask-ai-trigger--unavailable]="!status()?.available" [attr.aria-label]="'askAi.triggerAria' | transloco" (click)="openDrawer()">
+    <span class="ai-mark ai-mark--sm" aria-hidden="true">
+        <i class="pi pi-sparkles"></i>
+    </span>
+    <span class="ai-trigger-label">{{ placeholderKey() | transloco }}</span>
+    <i [class]="status()?.available ? 'pi pi-arrow-up-right' : 'pi pi-info-circle'" aria-hidden="true"></i>
+</button>
+}
+
+<p-drawer [visible]="drawerVisible()" (visibleChange)="onDrawerVisibleChange($event)" position="right" appendTo="body" styleClass="ask-ai-drawer" [style]="{ width: '48rem', maxWidth: '100vw' }">
+    <div class="ai-panel" [attr.aria-busy]="isLoading()">
+        <header class="ai-head">
+            <div class="ai-title">
+                <span class="ai-mark" aria-hidden="true">
+                    <i class="pi pi-sparkles"></i>
+                </span>
+                <div>
+                    <h2>{{ "askAi.title" | transloco }}</h2>
+                    @if (activeSite(); as site) {
+                    <p>{{ site.domain }}</p>
+                    }
+                </div>
+            </div>
+            <div class="ai-head-actions">
+                @if (isLoading()) {
+                <span data-testid="ask-ai-stop">
+                    <p-button icon="pi pi-stop-circle" [label]="'askAi.stop' | transloco" severity="secondary" [outlined]="true" size="small" styleClass="ai-stop" [ariaLabel]="'askAi.stopAria' | transloco" (onClick)="stopGenerating()" />
+                </span>
+                } @else if (hasSession()) {
+                <p-button
+                    icon="pi pi-plus"
+                    [label]="'askAi.newChat' | transloco"
+                    severity="secondary"
+                    [outlined]="true"
+                    size="small"
+                    styleClass="ai-new-chat"
+                    data-testid="ask-ai-new-chat"
+                    [ariaLabel]="'askAi.newChatAria' | transloco"
+                    (onClick)="startNewChat()"
+                />
+                }
+            </div>
+        </header>
+
+        <div class="ai-chat-panel">
+            <div class="ai-scroll">
+                @if (!status()?.available) {
+                <p-message severity="warn" styleClass="w-full" [text]="statusLabelKey() | transloco" />
+                } @if (hasTranscript()) {
+                <section class="ai-thread" [attr.aria-label]="'askAi.conversation' | transloco">
+                    @for (turn of previousTurns(); track turnTrack(turn)) {
+                    <article class="ai-message ai-message--user" [attr.aria-label]="'askAi.questionLabel' | transloco">
+                        <div class="ai-bubble ai-bubble--user">
+                            <p>{{ turn.user }}</p>
+                        </div>
+                        <div class="ai-avatar ai-avatar--user" aria-hidden="true">
+                            @if (profile.avatarUrl()) {
+                            <p-avatar [image]="profile.avatarUrl()" shape="circle" styleClass="ai-avatar-control" />
+                            } @else {
+                            <p-avatar icon="pi pi-user" shape="circle" styleClass="ai-avatar-control" />
+                            }
+                        </div>
+                    </article>
+                    <article class="ai-message ai-message--assistant" [attr.aria-label]="'askAi.answerLabel' | transloco">
+                        <div class="ai-avatar ai-avatar--assistant" aria-hidden="true">
+                            <img [src]="hitkeepIconUrl()" alt="" />
+                        </div>
+                        <div class="ai-bubble ai-bubble--assistant">
+                            <p>{{ turn.assistant }}</p>
+                        </div>
+                    </article>
+                    } @if (currentQuestion(); as question) {
+                    <article class="ai-message ai-message--user" [attr.aria-label]="'askAi.questionLabel' | transloco">
+                        <div class="ai-bubble ai-bubble--user">
+                            <p>{{ question }}</p>
+                        </div>
+                        <div class="ai-avatar ai-avatar--user" aria-hidden="true">
+                            @if (profile.avatarUrl()) {
+                            <p-avatar [image]="profile.avatarUrl()" shape="circle" styleClass="ai-avatar-control" />
+                            } @else {
+                            <p-avatar icon="pi pi-user" shape="circle" styleClass="ai-avatar-control" />
+                            }
+                        </div>
+                    </article>
+                    } @if (toolProgress().length) {
+                    <div class="ai-chip-row ai-tool-stack" aria-live="polite">
+                        @for (progress of toolProgress(); track toolProgressTrack(progress)) {
+                        <div class="ai-molecule ai-tool-row" [class.ai-molecule--done]="progress.state === 'done'" [class.ai-molecule--failed]="progress.state === 'failed'">
+                            <i [class]="toolProgressIcon(progress)" aria-hidden="true"></i>
+                            <span>{{ progress.labelKey | transloco }}</span>
+                        </div>
+                        }
+                    </div>
+                    } @else if (isLoading() && !answerBlocks().length) {
+                    <div class="ai-chip-row ai-tool-stack" aria-live="polite">
+                        <div class="ai-molecule ai-tool-row">
+                            <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
+                            <span>{{ progressMessageKey() | transloco }}</span>
+                        </div>
+                    </div>
+                    } @if (answerBlocks().length) {
+                    <article class="ai-message ai-message--assistant" [attr.aria-label]="'askAi.answerLabel' | transloco" aria-live="polite">
+                        <div class="ai-avatar ai-avatar--assistant" aria-hidden="true">
+                            <img [src]="hitkeepIconUrl()" alt="" />
+                        </div>
+                        <div class="ai-bubble ai-bubble--assistant">
+                            <div class="ai-answer-body">
+                                @for (block of answerBlocks(); track blockTrack(block)) { @if (block.type === 'heading') {
+                                <h4>{{ block.text }}</h4>
+                                } @else if (block.type === 'list' && block.ordered) {
+                                <ol>
+                                    @for (item of block.items; track item) {
+                                    <li>{{ item }}</li>
+                                    }
+                                </ol>
+                                } @else if (block.type === 'list') {
+                                <ul>
+                                    @for (item of block.items; track item) {
+                                    <li>{{ item }}</li>
+                                    }
+                                </ul>
+                                } @else {
+                                <p>{{ block.text }}</p>
+                                } } @if (isLoading()) {
+                                <span class="ai-caret" aria-hidden="true"></span>
+                                }
+                            </div>
+                        </div>
+                    </article>
+                    }
+                </section>
+                } @if (errorKey(); as key) {
+                <p-message severity="error" styleClass="w-full" [text]="key | transloco" />
+                } @if (feedbackStatus(); as status) {
+                <p-message [severity]="status.severity" styleClass="w-full" [text]="status.key | transloco" />
+                } @if (response(); as answer) { @if (answer.citations.length) {
+                <section class="ai-sec">
+                    <div class="ai-sec-head">
+                        <h3>{{ "askAi.citations" | transloco }}</h3>
+                    </div>
+                    <div class="ai-cites">
+                        @for (citation of answer.citations; track citation.tool_call_id + citation.label) {
+                        <span [title]="citation.tool_call_id">{{ citation.label }}</span>
+                        }
+                    </div>
+                </section>
+                } @if (answer.charts.length) {
+                <section class="ai-sec">
+                    <div class="ai-sec-head">
+                        <h3>{{ "askAi.charts" | transloco }}</h3>
+                    </div>
+                    <div class="ai-chart-list">
+                        @for (chart of answer.charts; track chart.title) {
+                        <div class="ai-chart">
+                            <h4>{{ chart.title }}</h4>
+                            @if (isTable(chart)) {
+                            <div class="ai-table">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            @for (column of tableColumns(chart); track column) {
+                                            <th scope="col">{{ formatColumnHeader(column) }}</th>
+                                            }
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @for (row of chart.rows; track $index) {
+                                        <tr>
+                                            @for (column of tableColumns(chart); track column) {
+                                            <td>{{ formatCell(row[column]) }}</td>
+                                            }
+                                        </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            } @else {
+                            <div class="ai-canvas">
+                                <p-chart [type]="chartKind(chart)" [data]="chartPayload(chart)" [options]="chartOptions()" height="100%" />
+                            </div>
+                            }
+                        </div>
+                        }
+                    </div>
+                </section>
+                } @if (answer.actions.length) {
+                <section class="ai-sec">
+                    <div class="ai-sec-head">
+                        <h3>{{ "askAi.actions" | transloco }}</h3>
+                    </div>
+                    <div class="ai-actions">
+                        @for (action of answer.actions; track action.type + action.target) {
+                        <p-button [icon]="actionIcon(action)" [label]="action.label" severity="secondary" [outlined]="true" size="small" [loading]="isActionRunning(action)" [disabled]="!!runningActionKey()" (onClick)="runAction(action)" />
+                        }
+                    </div>
+                </section>
+                } }
+            </div>
+
+            @if (status()?.available && !hasTranscript()) {
+            <section class="ai-chip-row ai-suggestion-row" [attr.aria-label]="'askAi.suggestionsLabel' | transloco">
+                @for (suggestion of promptSuggestions; track suggestion.key) {
+                <button type="button" class="ai-molecule ai-molecule--action" (click)="useSuggestion(suggestion)">
+                    <i [class]="suggestion.icon" aria-hidden="true"></i>
+                    <span>{{ suggestion.labelKey | transloco }}</span>
+                </button>
+                }
+            </section>
+            }
+
+            <form class="ai-prompt" (submit)="submit($event)">
+                <div class="ai-input">
+                    @if (supportsDictation()) {
+                    <button
+                        type="button"
+                        class="ai-dictate"
+                        [class.ai-dictate--active]="isDictating()"
+                        [disabled]="!canUseDictation() && !isDictating()"
+                        [attr.aria-label]="dictationAriaKey() | transloco"
+                        [attr.title]="dictationAriaKey() | transloco"
+                        data-testid="ask-ai-dictate"
+                        (click)="toggleDictation()"
+                    >
+                        <i [class]="isDictating() ? 'pi pi-stop-circle' : 'pi pi-microphone'" aria-hidden="true"></i>
+                    </button>
+                    }
+                    <input
+                        #promptInput
+                        pInputText
+                        type="search"
+                        [attr.aria-label]="'askAi.promptAria' | transloco"
+                        [placeholder]="promptPlaceholderKey() | transloco"
+                        [disabled]="isLoading() || !status()?.available"
+                        [attr.disabled]="isLoading() || !status()?.available ? '' : null"
+                        [value]="query()"
+                        (input)="updateQueryFromInput($event)"
+                        name="ask-ai-panel-query"
+                        autocomplete="off"
+                    />
+                </div>
+                <p-button type="submit" icon="pi pi-arrow-up" styleClass="ai-send" [rounded]="true" [loading]="isLoading()" [disabled]="!canSubmit()" [ariaLabel]="'askAi.submitAria' | transloco" />
+            </form>
+        </div>
+    </div>
+</p-drawer>

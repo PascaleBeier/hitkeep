@@ -16,6 +16,7 @@ import (
 )
 
 const OpportunityTemplateVersion = "opportunities-v1"
+const AskAITemplateVersion = "ask-ai-v1"
 
 var (
 	ErrDisabled        = errors.New("ai disabled")
@@ -180,6 +181,7 @@ type OpportunityProposalResult struct {
 
 type Client interface {
 	GenerateOpportunityProposal(context.Context, OpportunityRequest) (OpportunityProposalResult, error)
+	GenerateAskAI(context.Context, AskAIRequest) (AskAIResult, error)
 	Configured() bool
 	Enabled() bool
 	Provider() string
@@ -232,6 +234,9 @@ func ValidateConfig(conf Config) error {
 	}
 	if providerRequiresBaseURL[providerKey] && strings.TrimSpace(conf.BaseURL) == "" {
 		return fmt.Errorf("%w: base url is required for provider %q", ErrNotConfigured, conf.Provider)
+	}
+	if isOpenAICompatibleProvider(providerKey) && isBedrockMantleBaseURL(conf.BaseURL) && strings.TrimSpace(conf.APIKey) == "" && strings.TrimSpace(conf.Region) == "" {
+		return fmt.Errorf("%w: region is required for Bedrock Mantle instance-role auth", ErrNotConfigured)
 	}
 	return nil
 }
@@ -366,14 +371,16 @@ func (s *Service) runOpportunityProposalGeneration(ctx context.Context, promptIn
 	}
 	started := time.Now()
 	var output OpportunityCandidateProposal
-	result, err := goaisdk.GenerateObject[OpportunityCandidateProposal](timeoutCtx, s.model,
+	temperatureOpts := temperatureOptions(s.model, 0.2)
+	structuredOutputOpts := mantleStructuredOutputOptions(s.conf)
+	options := make([]goaisdk.Option, 0, 10+len(temperatureOpts)+len(structuredOutputOpts))
+	options = append(options,
 		goaisdk.WithSystem(opportunitySystemPrompt()),
 		goaisdk.WithPrompt(opportunityPrompt(string(inputJSON))),
 		goaisdk.WithExplicitSchema(schema),
 		goaisdk.WithTools(tools...),
 		goaisdk.WithMaxSteps(3),
 		goaisdk.WithMaxOutputTokens(900),
-		goaisdk.WithTemperature(0.2),
 		goaisdk.WithOnRequest(func(info goaisdk.RequestInfo) {
 			appendLifecycle(LifecycleEvent{
 				Type:         "request_start",
@@ -428,6 +435,9 @@ func (s *Service) runOpportunityProposalGeneration(ctx context.Context, promptIn
 			})
 		}),
 	)
+	options = append(options, temperatureOpts...)
+	options = append(options, structuredOutputOpts...)
+	result, err := goaisdk.GenerateObject[OpportunityCandidateProposal](timeoutCtx, s.model, options...)
 	latency := time.Since(started)
 	output, usage, err = finalizeOpportunityGeneration(result, usage, err, decodeResult, validate)
 	return opportunityGeneration{Output: output, Usage: usage, LifecycleEvents: lifecycleEvents, Latency: latency, Err: err}
@@ -465,6 +475,13 @@ func opportunityCatalogGenerationInput(req OpportunityCatalogRequest) opportunit
 		EvidenceSnapshot:  req.Catalog.EvidenceSnapshot,
 		AllowedCategories: append([]string(nil), req.Catalog.AllowedCategories...),
 	}
+}
+
+func temperatureOptions(model provider.LanguageModel, temperature float64) []goaisdk.Option {
+	if _, ok := model.(provider.CapableModel); ok && !provider.ModelCapabilitiesOf(model).Temperature {
+		return nil
+	}
+	return []goaisdk.Option{goaisdk.WithTemperature(temperature)}
 }
 
 func catalogOpportunityRequest(req OpportunityCatalogRequest) OpportunityRequest {

@@ -26,6 +26,7 @@ import (
 	"hitkeep/internal/searchconsole"
 	"hitkeep/internal/server/admin"
 	"hitkeep/internal/server/aifetch"
+	askaihandlers "hitkeep/internal/server/askai"
 	serverauth "hitkeep/internal/server/auth"
 	cloudhandlers "hitkeep/internal/server/cloud"
 	"hitkeep/internal/server/events"
@@ -353,6 +354,7 @@ func (s *Server) setupRoutes(mux *http.ServeMux, publicFS fs.FS) {
 	goals.Register(mux, ctx)
 	importhandlers.Register(mux, ctx)
 	events.Register(mux, ctx)
+	askaihandlers.Register(mux, ctx)
 	opportunityhandlers.Register(mux, ctx)
 	aifetch.Register(mux, ctx)
 	searchconsolereports.Register(mux, ctx)

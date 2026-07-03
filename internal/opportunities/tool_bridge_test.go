@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/internal/analyticscatalog"
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
 	"hitkeep/internal/database"
@@ -123,6 +124,71 @@ func TestToolBridgeAllowsViewerAggregateToolsWithoutRawRows(t *testing.T) {
 		if len(body) == 0 {
 			t.Fatalf("%s returned empty aggregate body", toolName)
 		}
+	}
+}
+
+func TestToolBridgeExposesSharedAggregateCatalogTools(t *testing.T) {
+	store, siteID, teamID, viewerID, _ := setupToolBridgeStore(t)
+	bridge := NewToolBridge(ToolBridgeConfig{
+		Shared:            store,
+		Analytics:         store,
+		TeamID:            teamID,
+		SiteID:            siteID,
+		ActorID:           viewerID,
+		ActorType:         "user",
+		EffectiveUserID:   viewerID,
+		EffectiveSiteRole: auth.SiteViewer,
+		From:              time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC),
+		To:                time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC),
+	})
+
+	got := make([]string, 0, len(bridge.Tools()))
+	for _, tool := range bridge.Tools() {
+		got = append(got, tool.Name)
+	}
+	want := make([]string, 0, len(analyticscatalog.ReadOnlyAggregateTools))
+	for _, definition := range analyticscatalog.ReadOnlyAggregateTools {
+		want = append(want, definition.Name)
+	}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("expected shared aggregate tool catalog %v, got %v", want, got)
+	}
+}
+
+func TestToolBridgeExecutesSharedEventNamesTool(t *testing.T) {
+	store, siteID, teamID, viewerID, _ := setupToolBridgeStore(t)
+	bridge := NewToolBridge(ToolBridgeConfig{
+		Shared:            store,
+		Analytics:         store,
+		TeamID:            teamID,
+		SiteID:            siteID,
+		ActorID:           viewerID,
+		ActorType:         "user",
+		EffectiveUserID:   viewerID,
+		EffectiveSiteRole: auth.SiteViewer,
+		From:              time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC),
+		To:                time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC),
+	})
+
+	raw := executeBridgeTool(t, bridge, analyticscatalog.ToolEventNames)
+	if containsRawRowField(raw) {
+		t.Fatalf("event names returned raw row field: %s", raw)
+	}
+	var body struct {
+		EvidenceID string `json:"evidence_id"`
+		SiteID     string `json:"site_id"`
+		Data       struct {
+			Names []string `json:"names"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(raw), &body); err != nil {
+		t.Fatalf("event names returned invalid JSON: %v", err)
+	}
+	if body.EvidenceID != analyticscatalog.ToolEventNames || body.SiteID != siteID.String() {
+		t.Fatalf("expected scoped event names envelope, got %+v", body)
+	}
+	if strings.Join(body.Data.Names, ",") != "begin_checkout" {
+		t.Fatalf("expected seeded event name, got %#v", body.Data.Names)
 	}
 }
 

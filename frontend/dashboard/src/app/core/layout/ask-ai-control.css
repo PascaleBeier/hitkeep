@@ -1,0 +1,511 @@
+:host {
+    display: block;
+    width: 100%;
+    --b: var(--p-content-border-color);
+    --m: var(--p-text-muted-color);
+    --s: var(--p-content-hover-background);
+    --bg: var(--p-content-background);
+}
+
+::ng-deep .ask-ai-drawer {
+    background: var(--p-content-background);
+    width: min(48rem, 100vw) !important;
+}
+
+::ng-deep .ask-ai-drawer .p-drawer-content {
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0;
+}
+
+.ask-ai-trigger,
+.ai-prompt,
+.ai-bubble,
+.ai-molecule,
+.ai-chart,
+.ai-table,
+.ai-cites span {
+    border: 1px solid var(--b);
+    border-radius: 8px;
+}
+
+.ask-ai-trigger {
+    align-items: center;
+    background: var(--bg);
+    color: var(--p-text-color);
+    cursor: pointer;
+    display: grid;
+    font: inherit;
+    font-weight: 600;
+    gap: 0.65rem;
+    grid-template-columns: 1.75rem minmax(0, 1fr) 1.5rem;
+    min-height: 2.625rem;
+    padding: 0.375rem 0.5rem;
+    text-align: left;
+    width: 100%;
+}
+
+.ask-ai-trigger:hover {
+    background: var(--s);
+}
+
+.ask-ai-trigger:focus-visible {
+    border-color: var(--p-primary-color);
+    outline: 2px solid var(--p-primary-color);
+    outline-offset: -2px;
+}
+
+.ask-ai-trigger--unavailable {
+    color: var(--m);
+}
+
+.ask-ai-trigger > .pi {
+    color: var(--m);
+    font-size: 0.85rem;
+    justify-self: center;
+}
+
+.ai-trigger-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ai-mark {
+    align-items: center;
+    background: var(--p-primary-50);
+    border-radius: 8px;
+    color: var(--p-primary-700);
+    display: inline-flex;
+    flex: 0 0 auto;
+    height: 2.25rem;
+    justify-content: center;
+    width: 2.25rem;
+}
+
+.ai-mark--sm {
+    height: 1.75rem;
+    width: 1.75rem;
+}
+
+.ai-head p,
+.ai-sec-head h3 {
+    color: var(--m);
+}
+
+.ai-panel {
+    color: var(--p-text-color);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    height: 100%;
+    min-height: 100%;
+    min-width: 0;
+    padding: 1rem;
+    width: 100%;
+}
+
+.ai-head,
+.ai-head-actions,
+.ai-title,
+.ai-sec-head {
+    align-items: center;
+    display: flex;
+}
+
+.ai-head {
+    align-items: flex-start;
+    border-bottom: 1px solid var(--b);
+    gap: 1rem;
+    justify-content: space-between;
+    padding-bottom: 1rem;
+}
+
+.ai-title {
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.ai-head-actions {
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.ai-head h2,
+.ai-sec-head h3,
+.ai-chart h4,
+.ai-answer-body h4,
+.ai-answer-body p,
+.ai-answer-body ul,
+.ai-bubble p {
+    margin: 0;
+}
+
+.ai-head h2 {
+    font-size: 1.25rem;
+}
+
+.ai-head p {
+    font-size: 0.85rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ai-chat-panel {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 0.55rem;
+    min-height: 0;
+    min-width: 0;
+    padding-top: 1rem;
+}
+
+.ai-scroll {
+    align-content: start;
+    display: grid;
+    flex: 1 1 auto;
+    gap: 0.75rem;
+    min-height: 0;
+    overflow: auto;
+    padding-right: 0.25rem;
+}
+
+.ai-prompt {
+    background: var(--p-form-field-background, var(--s));
+    border-color: var(--p-form-field-border-color, var(--b));
+    display: grid;
+    flex: 0 0 auto;
+    gap: 0.75rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 6rem;
+    padding: 0.85rem;
+}
+
+.ai-input {
+    align-items: flex-start;
+    background: transparent;
+    display: flex;
+    gap: 0.45rem;
+    min-height: 4.25rem;
+    min-width: 0;
+    padding: 0.2rem 0.15rem;
+}
+
+.ai-dictate {
+    align-items: center;
+    background: var(--p-content-hover-background);
+    border: 1px solid transparent;
+    border-radius: 999px;
+    color: var(--m);
+    cursor: pointer;
+    display: inline-flex;
+    flex: 0 0 auto;
+    height: 2rem;
+    justify-content: center;
+    width: 2rem;
+}
+
+.ai-dictate:hover {
+    background: color-mix(in srgb, var(--s) 82%, var(--p-primary-color) 10%);
+    color: var(--p-primary-color);
+}
+
+.ai-dictate:focus-visible {
+    border-color: var(--p-primary-color);
+    outline: 2px solid var(--p-primary-color);
+    outline-offset: 2px;
+}
+
+.ai-dictate:disabled {
+    cursor: not-allowed;
+    opacity: 0.48;
+}
+
+.ai-dictate--active {
+    background: color-mix(in srgb, var(--p-primary-color) 14%, var(--s));
+    color: var(--p-primary-color);
+}
+
+.ai-input input {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    font-size: 0.98rem;
+    min-width: 0;
+    padding: 0.2rem 0;
+    width: 100%;
+}
+
+:host ::ng-deep .ai-send.p-button {
+    align-self: end;
+    height: 2.6rem;
+    width: 2.6rem;
+}
+
+.ai-skel,
+.ai-sec,
+.ai-chart-list,
+.ai-chart,
+.ai-thread {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.ai-sec-head h3 {
+    font-size: 0.75rem;
+    font-weight: 750;
+    text-transform: uppercase;
+}
+
+.ai-skel {
+    padding-top: 0.15rem;
+}
+
+.ai-sec {
+    border-top: 1px solid var(--b);
+    padding-top: 1rem;
+}
+
+.ai-sec-head {
+    justify-content: space-between;
+}
+
+.ai-message {
+    align-items: flex-start;
+    display: flex;
+    gap: 0.65rem;
+    min-width: 0;
+}
+
+.ai-message--user {
+    justify-content: flex-end;
+}
+
+.ai-chip-row {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
+.ai-suggestion-row {
+    flex: 0 0 auto;
+    padding: 0 0.1rem;
+}
+
+.ai-tool-stack {
+    justify-content: flex-start;
+}
+
+.ai-molecule {
+    align-items: center;
+    background: color-mix(in srgb, var(--bg) 92%, #000 8%);
+    border-color: color-mix(in srgb, var(--b) 82%, #000 18%);
+    color: var(--p-text-color);
+    display: inline-flex;
+    font-size: 0.82rem;
+    font-weight: 400;
+    gap: 0.42rem;
+    line-height: 1.2;
+    max-width: 100%;
+    min-height: 1.9rem;
+    padding: 0.34rem 0.55rem;
+    width: fit-content;
+}
+
+.ai-molecule span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ai-molecule i {
+    color: var(--p-primary-color);
+    flex: 0 0 auto;
+    font-size: 0.82rem;
+}
+
+button.ai-molecule {
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+}
+
+button.ai-molecule:hover {
+    background: color-mix(in srgb, var(--bg) 88%, #000 12%);
+    border-color: color-mix(in srgb, var(--b) 60%, var(--p-primary-color) 40%);
+}
+
+button.ai-molecule:focus-visible {
+    border-color: var(--p-primary-color);
+    outline: 2px solid var(--p-primary-color);
+    outline-offset: 2px;
+}
+
+.ai-molecule--done i {
+    color: var(--p-green-500);
+}
+
+.ai-molecule--failed i {
+    color: var(--p-red-500);
+}
+
+.ai-avatar {
+    align-items: center;
+    border: 1px solid var(--b);
+    border-radius: 999px;
+    display: inline-flex;
+    flex: 0 0 auto;
+    height: 2rem;
+    justify-content: center;
+    overflow: hidden;
+    width: 2rem;
+}
+
+.ai-avatar--user {
+    background: var(--p-content-hover-background);
+}
+
+.ai-avatar--assistant {
+    background: var(--p-content-background);
+    padding: 0.2rem;
+}
+
+.ai-avatar--assistant img {
+    display: block;
+    height: 100%;
+    object-fit: contain;
+    width: 100%;
+}
+
+:host ::ng-deep .ai-avatar-control {
+    height: 2rem;
+    width: 2rem;
+}
+
+.ai-bubble {
+    display: grid;
+    gap: 0.55rem;
+    max-width: min(34rem, calc(100% - 2.75rem));
+    min-width: 0;
+    padding: 0.75rem 0.85rem;
+}
+
+.ai-bubble--user {
+    background: var(--p-primary-color);
+    border-color: transparent;
+    border-bottom-right-radius: 3px;
+    color: var(--p-primary-contrast-color);
+}
+
+.ai-bubble--assistant {
+    background: var(--s);
+    border-bottom-left-radius: 3px;
+}
+
+.ai-message-head {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: space-between;
+}
+
+.ai-message-head small {
+    align-items: center;
+    color: var(--m);
+    display: inline-flex;
+    font-size: 0.78rem;
+    gap: 0.35rem;
+}
+
+.ai-answer-body {
+    display: grid;
+    gap: 0.55rem;
+}
+
+.ai-answer-body p,
+.ai-answer-body ul,
+.ai-bubble p {
+    font-size: 0.95rem;
+    line-height: 1.55;
+}
+
+.ai-answer-body p,
+.ai-bubble p {
+    white-space: pre-line;
+}
+
+.ai-answer-body ul,
+.ai-answer-body ol {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+.ai-cites,
+.ai-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.ai-chart {
+    background: var(--bg);
+    min-width: 0;
+    padding: 0.875rem;
+}
+
+.ai-canvas {
+    height: 240px;
+}
+
+.ai-table {
+    overflow: auto;
+}
+
+.ai-table table {
+    border-collapse: collapse;
+    min-width: 100%;
+}
+
+.ai-table th,
+.ai-table td {
+    border-bottom: 1px solid var(--b);
+    font-size: 0.82rem;
+    padding: 0.55rem 0.65rem;
+    text-align: left;
+    white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+    .ai-head {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .ai-head-actions {
+        justify-content: flex-start;
+    }
+
+    .ai-prompt {
+        grid-template-columns: minmax(0, 1fr) auto;
+        min-height: 5.5rem;
+    }
+
+    .ai-bubble {
+        max-width: calc(100% - 2.5rem);
+    }
+
+    .ai-canvas {
+        height: 220px;
+    }
+
+    :host ::ng-deep .ai-send.p-button {
+        width: 2.6rem;
+    }
+}

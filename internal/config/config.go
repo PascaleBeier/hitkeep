@@ -87,6 +87,7 @@ type Config struct {
 	MCPDocsCacheMinutes int    `env:"HITKEEP_MCP_DOCS_CACHE_MINUTES" default:"60"     desc:"Minutes to cache fetched docs for MCP tools"`
 
 	AIEnabled             bool   `env:"HITKEEP_AI_ENABLED"             default:"false" desc:"Enable optional AI-powered product features"`
+	AskAIEnabled          bool   `env:"HITKEEP_ASK_AI_ENABLED"         default:"false" desc:"Enable the optional dashboard Ask AI assistant; requires HITKEEP_AI_ENABLED and a configured AI model"`
 	AIProvider            string `env:"HITKEEP_AI_PROVIDER"            default:""      desc:"AI provider key supported by GoAI (openai, openai-compatible, bedrock, anthropic, google, mistral, ollama, openrouter)"`
 	AIModel               string `env:"HITKEEP_AI_MODEL"               default:""      desc:"AI model identifier for the configured provider"`
 	AIBaseURL             string `env:"HITKEEP_AI_BASE_URL"            default:""      desc:"Optional explicit AI provider or gateway base URL"`

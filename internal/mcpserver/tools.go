@@ -10,6 +10,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"hitkeep/internal/analyticscatalog"
+	"hitkeep/internal/analyticstools"
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
 	opportunitysvc "hitkeep/internal/opportunities"
@@ -24,40 +26,46 @@ func (s *service) registerTools(server *mcp.Server) {
 		Description: "List HitKeep sites visible to the bearer API client.",
 		Annotations: readOnly,
 	}, s.listSites)
+	siteOverview := analyticscatalog.MustDefinition(analyticscatalog.ToolSiteOverview)
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "hitkeep_get_site_overview",
-		Title:       "Get HitKeep Site Overview",
-		Description: "Read aggregate traffic KPIs, top dimensions, goals, chart data, and optional comparison for one site.",
+		Name:        siteOverview.Name,
+		Title:       siteOverview.Title,
+		Description: siteOverview.MCPDescription,
 		Annotations: readOnly,
 	}, s.getSiteOverview)
+	eventNames := analyticscatalog.MustDefinition(analyticscatalog.ToolEventNames)
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "hitkeep_get_event_names",
-		Title:       "Get HitKeep Event Names",
-		Description: "List event names tracked for one site in a date range.",
+		Name:        eventNames.Name,
+		Title:       eventNames.Title,
+		Description: eventNames.MCPDescription,
 		Annotations: readOnly,
 	}, s.getEventNames)
+	eventBreakdown := analyticscatalog.MustDefinition(analyticscatalog.ToolEventBreakdown)
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "hitkeep_get_event_breakdown",
-		Title:       "Get HitKeep Event Breakdown",
-		Description: "Read a count breakdown for one event property.",
+		Name:        eventBreakdown.Name,
+		Title:       eventBreakdown.Title,
+		Description: eventBreakdown.MCPDescription,
 		Annotations: readOnly,
 	}, s.getEventBreakdown)
+	ecommerce := analyticscatalog.MustDefinition(analyticscatalog.ToolEcommerce)
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "hitkeep_get_ecommerce",
-		Title:       "Get HitKeep Ecommerce Analytics",
-		Description: "Read ecommerce summary, top products, source stats, and aggregate city, provider, and ASN breakdowns for one site.",
+		Name:        ecommerce.Name,
+		Title:       ecommerce.Title,
+		Description: ecommerce.MCPDescription,
 		Annotations: readOnly,
 	}, s.getEcommerce)
+	webVitals := analyticscatalog.MustDefinition(analyticscatalog.ToolWebVitals)
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "hitkeep_get_web_vitals",
-		Title:       "Get HitKeep Web Vitals",
-		Description: "Read aggregate Web Vitals p75, sample counts, rating counts, and optional page or visitor-context breakdowns for one site.",
+		Name:        webVitals.Name,
+		Title:       webVitals.Title,
+		Description: webVitals.MCPDescription,
 		Annotations: readOnly,
 	}, s.getWebVitals)
+	aiVisibility := analyticscatalog.MustDefinition(analyticscatalog.ToolAIVisibility)
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "hitkeep_get_ai_visibility",
-		Title:       "Get HitKeep AI Visibility",
-		Description: "Read AI crawler fetch overview, timeseries, and optional fetch-to-visit correlation for one site.",
+		Name:        aiVisibility.Name,
+		Title:       aiVisibility.Title,
+		Description: aiVisibility.MCPDescription,
 		Annotations: readOnly,
 	}, s.getAIVisibility)
 	mcp.AddTool(server, &mcp.Tool{
@@ -149,27 +157,23 @@ func (s *service) getSiteOverview(ctx context.Context, _ *mcp.CallToolRequest, i
 		return nil, siteOverviewOutput{}, err
 	}
 
-	params := api.AnalyticsParams{
-		SiteID:  siteID,
-		UserID:  authz.UserID,
-		Start:   start,
-		End:     end,
-		Filters: filters,
-	}
+	var overviewInput analyticstools.SiteOverviewInput
 	if input.CompareFrom != "" || input.CompareTo != "" {
 		compareStart, compareEnd, err := parseExplicitRange(input.CompareFrom, input.CompareTo, s.conf.MCPMaxRangeDays)
 		if err != nil {
 			return nil, siteOverviewOutput{}, err
 		}
-		params.CompareStart = compareStart
-		params.CompareEnd = compareEnd
+		overviewInput.CompareStart = compareStart
+		overviewInput.CompareEnd = compareEnd
 	}
 
 	analyticsStore, err := s.analyticsStore(ctx, siteID)
 	if err != nil {
 		return nil, siteOverviewOutput{}, err
 	}
-	stats, err := analyticsStore.GetSiteStats(ctx, params)
+	stats, err := analyticstools.NewBridge(analyticstools.Config{
+		Analytics: analyticsStore, SiteID: siteID, UserID: authz.UserID, From: start, To: end, Filters: filters,
+	}).SiteOverviewData(ctx, overviewInput)
 	if err != nil {
 		return nil, siteOverviewOutput{}, err
 	}
@@ -188,7 +192,9 @@ func (s *service) getEventNames(ctx context.Context, _ *mcp.CallToolRequest, inp
 	if err != nil {
 		return nil, eventNamesOutput{}, err
 	}
-	names, err := analyticsStore.GetEventNames(ctx, api.EventNamesParams{SiteID: siteID, Start: start, End: end})
+	names, err := analyticstools.NewBridge(analyticstools.Config{
+		Analytics: analyticsStore, SiteID: siteID, From: start, To: end,
+	}).EventNamesData(ctx)
 	if err != nil {
 		return nil, eventNamesOutput{}, err
 	}
@@ -213,13 +219,14 @@ func (s *service) getEventBreakdown(ctx context.Context, _ *mcp.CallToolRequest,
 	if err != nil {
 		return nil, eventBreakdownOutput{}, err
 	}
-	breakdown, err := analyticsStore.GetEventPropertyBreakdown(ctx, api.EventBreakdownParams{
-		SiteID: siteID, Start: start, End: end, EventName: eventName, PropertyKey: propertyKey,
+	breakdown, _, _, err := analyticstools.NewBridge(analyticstools.Config{
+		Analytics: analyticsStore, SiteID: siteID, From: start, To: end,
+	}).EventBreakdownData(ctx, analyticstools.EventBreakdownInput{
+		EventName: eventName, PropertyKey: propertyKey, Limit: normalizeLimit(input.Limit),
 	})
 	if err != nil {
 		return nil, eventBreakdownOutput{}, err
 	}
-	breakdown = limitSlice(breakdown, normalizeLimit(input.Limit))
 	return nil, eventBreakdownOutput{SiteID: siteID.String(), From: formatMCPTime(start), To: formatMCPTime(end), Breakdown: breakdown}, nil
 }
 
@@ -235,28 +242,19 @@ func (s *service) getEcommerce(ctx context.Context, _ *mcp.CallToolRequest, inpu
 	if err != nil {
 		return nil, ecommerceOutput{}, err
 	}
-	params := api.EcommerceParams{
-		SiteID: siteID, Start: start, End: end, Filters: filters,
-		ItemID: strings.TrimSpace(input.ItemID), ItemName: strings.TrimSpace(input.ItemName),
-		Limit: normalizeLimit(input.Limit),
-	}
 	analyticsStore, err := s.analyticsStore(ctx, siteID)
 	if err != nil {
 		return nil, ecommerceOutput{}, err
 	}
-	summary, err := analyticsStore.GetEcommerceSummary(ctx, params)
+	payload, err := analyticstools.NewBridge(analyticstools.Config{
+		Analytics: analyticsStore, SiteID: siteID, From: start, To: end, Filters: filters,
+	}).EcommerceData(ctx, analyticstools.EcommerceInput{
+		ItemID: input.ItemID, ItemName: input.ItemName, Limit: normalizeLimit(input.Limit),
+	})
 	if err != nil {
 		return nil, ecommerceOutput{}, err
 	}
-	products, err := analyticsStore.GetEcommerceTopProducts(ctx, params)
-	if err != nil {
-		return nil, ecommerceOutput{}, err
-	}
-	sources, err := analyticsStore.GetEcommerceSources(ctx, params)
-	if err != nil {
-		return nil, ecommerceOutput{}, err
-	}
-	return nil, ecommerceOutput{SiteID: siteID.String(), From: formatMCPTime(start), To: formatMCPTime(end), Summary: summary, Products: products, Sources: sources}, nil
+	return nil, ecommerceOutput{SiteID: siteID.String(), From: formatMCPTime(start), To: formatMCPTime(end), Summary: payload.Summary, Products: payload.Products, Sources: payload.Sources}, nil
 }
 
 func (s *service) getWebVitals(ctx context.Context, _ *mcp.CallToolRequest, input webVitalsInput) (*mcp.CallToolResult, webVitalsOutput, error) {
@@ -276,7 +274,12 @@ func (s *service) getWebVitals(ctx context.Context, _ *mcp.CallToolRequest, inpu
 	if err != nil {
 		return nil, webVitalsOutput{}, err
 	}
-	summary, err := analyticsStore.GetWebVitalsSummary(ctx, params)
+	payload, err := analyticstools.NewBridge(analyticstools.Config{
+		Analytics: analyticsStore, SiteID: siteID, From: start, To: end,
+	}).WebVitalsData(ctx, analyticstools.WebVitalsInput{
+		Metric: params.Metric, Path: params.Path, Rating: params.Rating, IncludePages: input.IncludePages,
+		BreakdownDimension: breakdownDimension, Limit: params.Limit,
+	})
 	if err != nil {
 		return nil, webVitalsOutput{}, err
 	}
@@ -284,10 +287,16 @@ func (s *service) getWebVitals(ctx context.Context, _ *mcp.CallToolRequest, inpu
 		SiteID:  siteID.String(),
 		From:    formatMCPTime(start),
 		To:      formatMCPTime(end),
-		Summary: summary,
+		Summary: payload.Summary,
 	}
-	if err := loadMCPWebVitalsDetails(ctx, analyticsStore, params, input, breakdownDimension, &output); err != nil {
-		return nil, webVitalsOutput{}, err
+	if len(payload.Pages) > 0 {
+		output.Metric = payload.Metric
+		output.Pages = payload.Pages
+	}
+	if payload.BreakdownDimension != "" {
+		output.Metric = payload.Metric
+		output.BreakdownDimension = payload.BreakdownDimension
+		output.Breakdown = payload.Breakdown
 	}
 	return nil, output, nil
 }
@@ -343,27 +352,6 @@ func parseMCPWebVitalRating(rawRating string) (api.WebVitalRating, error) {
 	}
 }
 
-func loadMCPWebVitalsDetails(ctx context.Context, store *database.Store, params api.WebVitalsParams, input webVitalsInput, breakdownDimension api.WebVitalDimension, output *webVitalsOutput) error {
-	if input.IncludePages {
-		pages, err := store.GetWebVitalsPages(ctx, params)
-		if err != nil {
-			return err
-		}
-		output.Metric = params.Metric
-		output.Pages = pages
-	}
-	if breakdownDimension != "" {
-		breakdown, err := store.GetWebVitalsBreakdown(ctx, params, breakdownDimension)
-		if err != nil {
-			return err
-		}
-		output.Metric = params.Metric
-		output.BreakdownDimension = breakdownDimension
-		output.Breakdown = breakdown
-	}
-	return nil
-}
-
 func isAllowedWebVitalBreakdownDimension(dimension api.WebVitalDimension) bool {
 	switch dimension {
 	case api.WebVitalDimensionBrowser,
@@ -387,43 +375,20 @@ func (s *service) getAIVisibility(ctx context.Context, _ *mcp.CallToolRequest, i
 	if _, err := s.requireSiteView(ctx, siteID); err != nil {
 		return nil, aiVisibilityOutput{}, err
 	}
-	params := api.AIFetchQueryParams{
-		SiteID: siteID, Start: start, End: end,
-		AssistantName:   strings.TrimSpace(input.AssistantName),
-		AssistantFamily: strings.TrimSpace(input.AssistantFamily),
-		ResourceType:    strings.TrimSpace(input.ResourceType),
-	}
 	analyticsStore, err := s.analyticsStore(ctx, siteID)
 	if err != nil {
 		return nil, aiVisibilityOutput{}, err
 	}
-	overview, err := analyticsStore.GetAIFetchOverview(ctx, params)
+	payload, err := analyticstools.NewBridge(analyticstools.Config{
+		Analytics: analyticsStore, SiteID: siteID, From: start, To: end,
+	}).AIVisibilityData(ctx, analyticstools.AIVisibilityInput{
+		AssistantName: input.AssistantName, AssistantFamily: input.AssistantFamily, ResourceType: input.ResourceType,
+		IncludeTimeseries: true, IncludeCorrelation: input.IncludeCorrelation, WindowDays: input.WindowDays,
+	})
 	if err != nil {
 		return nil, aiVisibilityOutput{}, err
 	}
-	timeseries, err := analyticsStore.GetAIFetchTimeseries(ctx, params)
-	if err != nil {
-		return nil, aiVisibilityOutput{}, err
-	}
-	output := aiVisibilityOutput{SiteID: siteID.String(), From: formatMCPTime(start), To: formatMCPTime(end), Overview: overview, Timeseries: toMCPAIFetchSeries(timeseries)}
-	if input.IncludeCorrelation {
-		windowDays := input.WindowDays
-		if windowDays <= 0 {
-			windowDays = 30
-		}
-		if windowDays > 90 {
-			windowDays = 90
-		}
-		correlation, err := analyticsStore.GetAIFetchCorrelation(ctx, api.AIFetchCorrelationParams{
-			SiteID: siteID, Start: start, End: end,
-			AssistantName: params.AssistantName, AssistantFamily: params.AssistantFamily, ResourceType: params.ResourceType,
-			WindowDays: windowDays,
-		})
-		if err != nil {
-			return nil, aiVisibilityOutput{}, err
-		}
-		output.Correlation = correlation
-	}
+	output := aiVisibilityOutput{SiteID: siteID.String(), From: formatMCPTime(start), To: formatMCPTime(end), Overview: payload.Overview, Timeseries: toMCPAIFetchSeries(payload.Timeseries), Correlation: payload.Correlation}
 	return nil, output, nil
 }
 

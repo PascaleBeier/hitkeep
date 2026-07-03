@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -63,6 +64,30 @@ type AIRunSummary struct {
 	LastSuccessAt     *time.Time
 	LastAttemptAt     *time.Time
 	LastErrorCategory string
+}
+
+type AskAIHistoryEntry struct {
+	RunID               uuid.UUID
+	CreatedAt           time.Time
+	Status              string
+	ErrorCategory       string
+	Provider            string
+	Model               string
+	TemplateVersion     string
+	InputHash           string
+	OutputHash          string
+	AnswerChars         int
+	CitationCount       int
+	ChartCount          int
+	ActionCount         int
+	ChartTypes          []string
+	ActionTypes         []string
+	InputTokens         int
+	OutputTokens        int
+	TotalTokens         int
+	ToolCallCount       int
+	LifecycleEventCount int
+	ToolNames           []string
 }
 
 type preparedAIRun struct {
@@ -225,6 +250,52 @@ func (s *Store) GetAIUsageSince(ctx context.Context, since time.Time) (AIUsageSu
 	return queryAIUsageSince(ctx, s.db, since)
 }
 
+func (s *Store) ListAskAIHistory(ctx context.Context, siteID uuid.UUID, limit, offset int) ([]AskAIHistoryEntry, int, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	var total int
+	if err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM ai_runs
+		WHERE feature = 'ask_ai' AND site_id = ?
+	`, siteID).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count ask ai history: %w", err)
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, created_at, status, error_category, provider, model, template_version,
+			input_hash, output_hash, output_json, input_tokens, output_tokens, total_tokens,
+			tool_call_count, lifecycle_events_json
+		FROM ai_runs
+		WHERE feature = 'ask_ai' AND site_id = ?
+		ORDER BY created_at DESC, id DESC
+		LIMIT ? OFFSET ?
+	`, siteID, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list ask ai history: %w", err)
+	}
+	defer rows.Close()
+
+	entries := []AskAIHistoryEntry{}
+	for rows.Next() {
+		entry, err := scanAskAIHistoryEntry(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		entries = append(entries, entry)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("read ask ai history: %w", err)
+	}
+	return entries, total, nil
+}
+
 type aiUsageQuerier interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
 }
@@ -245,6 +316,123 @@ func queryAIUsageSince(ctx context.Context, db aiUsageQuerier, since time.Time) 
 
 func queryAIUsageSinceForBudget(ctx context.Context, db aiUsageQuerier, since time.Time) (AIUsageSummary, error) {
 	return queryAIUsageSince(ctx, db, since)
+}
+
+type askAIHistoryScanner interface {
+	Scan(dest ...any) error
+}
+
+type askAIHistoryOutputSummary struct {
+	Version   string `json:"version"`
+	Answer    int    `json:"answer_chars"`
+	Citations []struct {
+		ToolCallID string `json:"tool_call_id"`
+	} `json:"citations"`
+	Charts []struct {
+		Type string `json:"type"`
+	} `json:"charts"`
+	Actions []struct {
+		Type string `json:"type"`
+	} `json:"actions"`
+}
+
+func scanAskAIHistoryEntry(row askAIHistoryScanner) (AskAIHistoryEntry, error) {
+	var entry AskAIHistoryEntry
+	var outputJSON any
+	var lifecycleEventsJSON any
+	if err := row.Scan(
+		&entry.RunID,
+		&entry.CreatedAt,
+		&entry.Status,
+		&entry.ErrorCategory,
+		&entry.Provider,
+		&entry.Model,
+		&entry.TemplateVersion,
+		&entry.InputHash,
+		&entry.OutputHash,
+		&outputJSON,
+		&entry.InputTokens,
+		&entry.OutputTokens,
+		&entry.TotalTokens,
+		&entry.ToolCallCount,
+		&lifecycleEventsJSON,
+	); err != nil {
+		return AskAIHistoryEntry{}, err
+	}
+	if err := applyAskAIHistoryOutputSummary(&entry, outputJSON); err != nil {
+		return AskAIHistoryEntry{}, err
+	}
+	if err := applyAskAIHistoryLifecycleSummary(&entry, lifecycleEventsJSON); err != nil {
+		return AskAIHistoryEntry{}, err
+	}
+	return entry, nil
+}
+
+func applyAskAIHistoryOutputSummary(entry *AskAIHistoryEntry, raw any) error {
+	value := jsonScanString(raw)
+	if value == "" || value == "{}" {
+		entry.ChartTypes = []string{}
+		entry.ActionTypes = []string{}
+		return nil
+	}
+	var summary askAIHistoryOutputSummary
+	if err := json.Unmarshal([]byte(value), &summary); err != nil {
+		return fmt.Errorf("decode ask ai history output summary: %w", err)
+	}
+	if summary.Version == "" {
+		entry.ChartTypes = []string{}
+		entry.ActionTypes = []string{}
+		return nil
+	}
+	entry.AnswerChars = summary.Answer
+	entry.CitationCount = len(summary.Citations)
+	entry.ChartCount = len(summary.Charts)
+	entry.ActionCount = len(summary.Actions)
+	chartTypes := make([]string, 0, len(summary.Charts))
+	for _, chart := range summary.Charts {
+		chartTypes = append(chartTypes, chart.Type)
+	}
+	actionTypes := make([]string, 0, len(summary.Actions))
+	for _, action := range summary.Actions {
+		actionTypes = append(actionTypes, action.Type)
+	}
+	entry.ChartTypes = sortedUniqueTrimmedStrings(chartTypes)
+	entry.ActionTypes = sortedUniqueTrimmedStrings(actionTypes)
+	return nil
+}
+
+func applyAskAIHistoryLifecycleSummary(entry *AskAIHistoryEntry, raw any) error {
+	value := jsonScanString(raw)
+	if value == "" || value == "[]" {
+		entry.ToolNames = []string{}
+		return nil
+	}
+	var events []AILifecycleEvent
+	if err := json.Unmarshal([]byte(value), &events); err != nil {
+		return fmt.Errorf("decode ask ai history lifecycle events: %w", err)
+	}
+	entry.LifecycleEventCount = len(events)
+	toolNames := make([]string, 0, len(events))
+	for _, event := range events {
+		toolNames = append(toolNames, event.ToolName)
+	}
+	entry.ToolNames = sortedUniqueTrimmedStrings(toolNames)
+	return nil
+}
+
+func sortedUniqueTrimmedStrings(values []string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func aiBudgetExhausted(usage AIUsageSummary, requestLimit, tokenLimit int) bool {

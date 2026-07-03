@@ -546,6 +546,79 @@ export interface SystemStatus {
     needs_setup: boolean;
     version: string;
     cloud?: CloudStatus;
+    ask_ai?: AskAIStatus;
+}
+
+export interface AskAIStatus {
+    enabled: boolean;
+    available: boolean;
+    status: 'disabled' | 'not_configured' | 'available' | 'budget_exhausted';
+    provider?: string;
+    model?: string;
+    budget_exhausted: boolean;
+}
+
+export interface AskAIRequest {
+    query: string;
+    from?: string;
+    to?: string;
+    route?: string;
+    filters?: AskAIFilter[];
+    history?: AskAIMessage[];
+}
+
+export interface AskAIFilter {
+    type: string;
+    value: string;
+}
+
+export interface AskAIMessage {
+    role: 'user' | 'assistant';
+    content: string;
+}
+
+export interface AskAIResponse {
+    run_id: string;
+    answer_markdown: string;
+    citations: AskAICitation[];
+    charts: AskAIChart[];
+    actions: AskAIAction[];
+}
+
+export interface AskAIStreamEvent {
+    type: 'progress' | 'delta' | 'final' | 'error';
+    status?: 'accepted' | 'generating' | 'streaming' | 'success' | 'audit_failed' | string;
+    message_key?: string;
+    tool_call_id?: string;
+    tool_name?: string;
+    delta_markdown?: string;
+    response?: AskAIResponse;
+    error?: string;
+}
+
+export interface AskAICitation {
+    label: string;
+    tool_call_id: string;
+}
+
+export interface AskAIChart {
+    type: 'line' | 'bar' | 'table';
+    title: string;
+    x_key?: string;
+    series?: AskAIChartSeries[];
+    rows: Record<string, string | number | boolean | null>[];
+}
+
+export interface AskAIChartSeries {
+    key: string;
+    label: string;
+}
+
+export interface AskAIAction {
+    type: 'navigate' | 'download_export';
+    label: string;
+    target: string;
+    format?: 'xlsx' | 'json' | 'csv' | 'ndjson';
 }
 
 export interface CloudStatus {
