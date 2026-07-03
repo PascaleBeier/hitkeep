@@ -10,7 +10,7 @@ import { MessageModule } from 'primeng/message';
 import { SiteService } from '@features/sites/services/site.service';
 import { AnalyticsService, EventDimensionFilter } from '@core/services/analytics.service';
 import { MetricCardConfig, MetricCardGroup, MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
-import { DEFAULT_RANGE_OPTIONS, RangeToolbar, RangeOption } from '@components/range-toolbar/range-toolbar';
+import { DEFAULT_RANGE_OPTIONS, isShortRange as isShortDateRange, RangeOption, RangeToolbar, resolveDateRange, selectDefaultRange } from '@components/range-toolbar/range-toolbar';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { SeriesChart, SeriesDefinition, SeriesChartPoint } from '@features/analytics/components/series-chart';
@@ -63,20 +63,10 @@ export class Events {
     protected timeRanges = signal<RangeOption[]>(DEFAULT_RANGE_OPTIONS);
     protected selectedRange = linkedSignal<RangeOption[], RangeOption>({
         source: this.timeRanges,
-        computation: (ranges, previous) => {
-            const value = previous?.value.value ?? '30d';
-            return ranges.find((r) => r.value === value) ?? ranges[2]!;
-        }
+        computation: (ranges, previous) => selectDefaultRange(ranges, previous?.value)
     });
     protected readonly customRangeDates = signal<Date[] | null>(null);
-    protected isShortRange = computed(() => {
-        if (this.selectedRange().value === '24h') return true;
-        const d = this.customRangeDates();
-        if (this.selectedRange().value === 'custom' && d && d.length === 2 && d[0] && d[1]) {
-            return d[1].getTime() - d[0].getTime() < 48 * 60 * 60 * 1000;
-        }
-        return false;
-    });
+    protected isShortRange = computed(() => isShortDateRange(this.selectedRange(), this.customRangeDates()));
 
     protected eventNames = signal<string[]>([]);
     private realtimeRefreshKey = signal(0);
@@ -525,32 +515,7 @@ export class Events {
     }
 
     protected getCurrentDateRange(): { from: string; to: string } | null {
-        const range = this.selectedRange();
-        const end = new Date();
-        const start = new Date();
-
-        if (range.value === 'custom') {
-            const d = this.customRangeDates();
-            if (d && d.length === 2 && d[0] && d[1]) {
-                return { from: d[0].toISOString(), to: d[1].toISOString() };
-            }
-            return null;
-        }
-
-        switch (range.value) {
-            case '24h':
-                start.setHours(end.getHours() - 24);
-                break;
-            case '7d':
-                start.setDate(end.getDate() - 7);
-                break;
-            case '1y':
-                start.setFullYear(end.getFullYear() - 1);
-                break;
-            default:
-                start.setDate(end.getDate() - 30);
-        }
-        return { from: start.toISOString(), to: end.toISOString() };
+        return resolveDateRange(this.selectedRange(), this.customRangeDates());
     }
 
     private loadEventNames(siteId: string, from: string, to: string) {

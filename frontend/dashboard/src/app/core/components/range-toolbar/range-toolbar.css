@@ -3,7 +3,7 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
+    gap: 0.875rem;
     margin-bottom: 1.5rem;
 }
 
@@ -12,6 +12,78 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 0.75rem;
+}
+
+.range-toolbar__range-group {
+    --p-selectbutton-border-radius: 0.8rem;
+    --p-togglebutton-background: transparent;
+    --p-togglebutton-border-color: transparent;
+    --p-togglebutton-checked-background: transparent;
+    --p-togglebutton-checked-border-color: transparent;
+    --p-togglebutton-sm-padding: 0.125rem;
+    --p-togglebutton-font-weight: 650;
+    --p-togglebutton-content-sm-padding: 0.34rem 0.78rem;
+    --p-togglebutton-content-checked-background: var(--p-content-background);
+    --p-togglebutton-content-checked-shadow: 0 4px 12px -6px color-mix(in srgb, var(--p-surface-950) 28%, transparent);
+    --p-button-border-radius: calc(var(--p-selectbutton-border-radius) - 0.25rem);
+    --p-button-sm-padding-x: 0.78rem;
+    --p-button-sm-padding-y: 0.34rem;
+    --p-button-label-font-weight: 650;
+    --p-button-secondary-background: var(--p-content-background);
+    --p-button-secondary-border-color: transparent;
+    --p-button-secondary-color: var(--p-text-color);
+    --p-button-secondary-hover-background: var(--p-content-background);
+    --p-button-outlined-secondary-border-color: transparent;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.125rem;
+    max-width: 100%;
+    border: 1px solid var(--p-content-border-color);
+    border-radius: var(--p-selectbutton-border-radius);
+    background: var(--p-content-hover-background);
+    padding: 0.2rem;
+}
+
+:host-context(.p-dark) .range-toolbar__range-group {
+    --p-togglebutton-content-checked-background: var(--p-surface-950);
+    --p-togglebutton-content-checked-shadow: none;
+    --p-button-secondary-background: var(--p-surface-950);
+    --p-button-secondary-color: var(--p-surface-0);
+    --p-button-secondary-hover-background: var(--p-surface-950);
+    border-color: var(--p-surface-700);
+    background: var(--p-surface-800);
+}
+
+:host ::ng-deep .range-toolbar__preset-select.p-selectbutton {
+    flex-wrap: wrap;
+    gap: 0.125rem;
+}
+
+:host ::ng-deep .range-toolbar__preset-select.p-selectbutton .p-togglebutton {
+    min-height: 2.1rem;
+    border-width: 1px;
+    border-radius: calc(var(--p-selectbutton-border-radius) - 0.25rem);
+}
+
+:host ::ng-deep .range-toolbar__more-button,
+:host ::ng-deep .range-toolbar__custom-button {
+    min-height: 2.1rem;
+}
+
+:host ::ng-deep .range-toolbar__more-button {
+    min-width: 2.1rem;
+    padding-inline: 0;
+}
+
+:host ::ng-deep .range-toolbar__custom-button .p-button-label {
+    white-space: nowrap;
+}
+
+:host ::ng-deep .range-toolbar__refresh-button {
+    width: 2.35rem;
+    min-width: 2.35rem;
+    min-height: 2.35rem;
+    padding-inline: 0;
 }
 
 .range-toolbar__summary {
@@ -85,6 +157,10 @@
     .range-toolbar__controls {
         width: 100%;
         gap: 0.5rem;
+    }
+
+    .range-toolbar__range-group {
+        width: 100%;
     }
 
     .range-toolbar__fields {

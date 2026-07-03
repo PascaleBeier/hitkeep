@@ -2,6 +2,7 @@ import { inject, provideAppInitializer } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 import { getBaseLanguage, getLocaleDirection, normalizeLocaleTag } from '@core/i18n/locale-utils';
+import { DEFAULT_DASHBOARD_LANGUAGE } from '@core/i18n/supported-locales';
 
 type AvailableLang = string | { id: string; label: string };
 
@@ -51,7 +52,7 @@ export function preloadUserLang() {
 
     return (async () => {
         const available = availableLangIds(transloco);
-        const defaultLang = resolveTranslationLang(transloco.getDefaultLang(), available, 'en');
+        const defaultLang = resolveTranslationLang(transloco.getDefaultLang(), available, DEFAULT_DASHBOARD_LANGUAGE);
 
         const browserLocale = browserLocaleCandidates()[0] ?? defaultLang;
         const browserLang = resolveTranslationLang(browserLocale, available, defaultLang);

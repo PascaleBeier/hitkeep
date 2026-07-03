@@ -28,7 +28,7 @@ import { DialogShell } from '@components/dialog-shell/dialog-shell';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageState } from '@components/page-state/page-state';
-import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar } from '@components/range-toolbar/range-toolbar';
+import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar, resolveDateRange, selectDefaultRange } from '@components/range-toolbar/range-toolbar';
 import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
 import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
 import { KpiCard } from '@features/analytics/components/kpi-card';
@@ -146,10 +146,7 @@ export class QRCodesPage {
     protected readonly timeRanges = signal<RangeOption[]>(DEFAULT_RANGE_OPTIONS);
     protected readonly selectedRange = linkedSignal<RangeOption[], RangeOption>({
         source: this.timeRanges,
-        computation: (ranges, previous) => {
-            const value = previous?.value.value ?? '30d';
-            return ranges.find((range) => range.value === value) ?? ranges[2]!;
-        }
+        computation: (ranges, previous) => selectDefaultRange(ranges, previous?.value)
     });
     protected readonly customRangeDates = signal<Date[] | null>(null);
     protected readonly isShareMode = computed(() => this.share.isShareMode());
@@ -870,33 +867,7 @@ export class QRCodesPage {
     }
 
     private currentDateRange(): { from: string; to: string } | null {
-        const range = this.selectedRange();
-        const end = new Date();
-        const start = new Date();
-
-        if (range.value === 'custom') {
-            const dates = this.customRangeDates();
-            if (dates?.[0] && dates?.[1]) {
-                return { from: dates[0].toISOString(), to: dates[1].toISOString() };
-            }
-            return null;
-        }
-
-        switch (range.value) {
-            case '24h':
-                start.setHours(end.getHours() - 24);
-                break;
-            case '7d':
-                start.setDate(end.getDate() - 7);
-                break;
-            case '30d':
-                start.setDate(end.getDate() - 30);
-                break;
-            case '1y':
-                start.setFullYear(end.getFullYear() - 1);
-                break;
-        }
-        return { from: start.toISOString(), to: end.toISOString() };
+        return resolveDateRange(this.selectedRange(), this.customRangeDates());
     }
 
     private urlValidator(control: AbstractControl<string>): ValidationErrors | null {

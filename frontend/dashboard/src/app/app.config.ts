@@ -13,6 +13,7 @@ import { provideTranslocoLocale } from '@jsverse/transloco-locale';
 import { TranslocoHttpLoader } from './transloco-loader';
 import { providePreloadUserLang } from '@core/i18n/preload-user-lang';
 import { PrimeLocaleSyncService } from '@core/i18n/prime-locale-sync.service';
+import { DASHBOARD_LANGUAGE_CODES, DASHBOARD_LOCALE_MAPPING, DEFAULT_DASHBOARD_LANGUAGE, SOURCE_LOCALE } from '@core/i18n/supported-locales';
 
 export const appConfig: ApplicationConfig = {
     providers: [
@@ -28,9 +29,9 @@ export const appConfig: ApplicationConfig = {
         }),
         provideTransloco({
             config: {
-                availableLangs: ['en', 'de', 'es', 'fr', 'it', 'nl', 'pt'],
-                defaultLang: 'en',
-                fallbackLang: 'en',
+                availableLangs: DASHBOARD_LANGUAGE_CODES,
+                defaultLang: DEFAULT_DASHBOARD_LANGUAGE,
+                fallbackLang: DEFAULT_DASHBOARD_LANGUAGE,
                 reRenderOnLangChange: true,
                 flatten: {
                     aot: !isDevMode()
@@ -40,23 +41,8 @@ export const appConfig: ApplicationConfig = {
             loader: TranslocoHttpLoader
         }),
         provideTranslocoLocale({
-            defaultLocale: 'en-US',
-            langToLocaleMapping: {
-                en: 'en-US',
-                de: 'de-DE',
-                es: 'es-ES',
-                fr: 'fr-FR',
-                it: 'it-IT',
-                nl: 'nl-NL',
-                pt: 'pt-BR',
-                'en-US': 'en-US',
-                'de-DE': 'de-DE',
-                'es-ES': 'es-ES',
-                'fr-FR': 'fr-FR',
-                'it-IT': 'it-IT',
-                'nl-NL': 'nl-NL',
-                'pt-BR': 'pt-BR'
-            }
+            defaultLocale: SOURCE_LOCALE,
+            langToLocaleMapping: DASHBOARD_LOCALE_MAPPING
         }),
         provideEnvironmentInitializer(() => inject(PrimeLocaleSyncService)),
         providePreloadUserLang()

@@ -67,11 +67,22 @@ describe('WebVitalsPage', () => {
                                 actions: { apply: 'Apply', cancel: 'Cancel', clearAll: 'Clear all' },
                                 removeFilterAria: 'Remove filter',
                                 timeRanges: {
-                                    last24Hours: 'Last 24 hours',
-                                    last7Days: 'Last 7 days',
-                                    last30Days: 'Last 30 days',
+                                    today: 'Today',
+                                    todayShort: 'Today',
+                                    yesterday: 'Yesterday',
+                                    yesterdayShort: 'Yesterday',
+                                    lastMinute: 'Last minute',
+                                    lastMinutes: 'Last {{count}} minutes',
+                                    lastHour: 'Last hour',
+                                    lastHours: 'Last {{count}} hours',
+                                    lastDay: 'Last day',
+                                    lastDays: 'Last {{count}} days',
                                     lastYear: 'Last year',
-                                    customRange: 'Custom range'
+                                    lastYearShort: '1y',
+                                    moreRanges: 'More ranges',
+                                    customRange: 'Custom range',
+                                    customShort: 'Custom',
+                                    customRangeSummary: '{{start}} - {{end}}'
                                 },
                                 empty: { noDataTitle: 'No data yet', noDataDescription: 'No data.' },
                                 seriesChartAria: 'Series chart with {{count}} points'

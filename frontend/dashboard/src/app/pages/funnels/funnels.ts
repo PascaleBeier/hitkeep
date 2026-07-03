@@ -20,7 +20,7 @@ import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/
 import { SeriesChart, SeriesDefinition, SeriesChartPoint } from '@features/analytics/components/series-chart';
 import { FunnelSeriesPoint } from '@models/analytics.types';
 import { KpiCard } from '@features/analytics/components/kpi-card';
-import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar } from '@components/range-toolbar/range-toolbar';
+import { DEFAULT_RANGE_OPTIONS, isShortRange as isShortDateRange, RangeOption, RangeToolbar, resolveDateRange, selectDefaultRange } from '@components/range-toolbar/range-toolbar';
 import { finalize } from 'rxjs';
 import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
 import { REALTIME_FUNNEL_KINDS } from '@services/realtime.service';
@@ -52,28 +52,14 @@ export class Funnels {
     protected timeRanges = signal<RangeOption[]>(DEFAULT_RANGE_OPTIONS);
     protected selectedRange = linkedSignal<RangeOption[], RangeOption>({
         source: this.timeRanges,
-        computation: (ranges, previous) => {
-            const value = previous?.value.value ?? '30d';
-            return ranges.find((r) => r.value === value) ?? ranges[2]!;
-        }
+        computation: (ranges, previous) => selectDefaultRange(ranges, previous?.value)
     });
     private readonly funnelFilterFormModel = signal({
         funnelFilter: new FormControl<{ id: string; name: string } | null>(null),
         customRangeDates: new FormControl<Date[] | null>(null)
     });
     protected readonly funnelFilterForm = compatForm(this.funnelFilterFormModel);
-    protected isShortRange = computed(() => {
-        if (this.selectedRange().value === '24h') return true;
-        const customRangeDates = this.funnelFilterForm.customRangeDates().value();
-        if (this.selectedRange().value === 'custom' && customRangeDates) {
-            const d = customRangeDates;
-            if (d.length === 2 && d[0] && d[1]) {
-                const diff = d[1].getTime() - d[0].getTime();
-                return diff < 48 * 60 * 60 * 1000;
-            }
-        }
-        return false;
-    });
+    protected isShortRange = computed(() => isShortDateRange(this.selectedRange(), this.funnelFilterForm.customRangeDates().value()));
     protected isFunnelManagerVisible = signal(false);
     protected isFunnelViewerVisible = signal(false);
     protected selectedFunnel = signal<Funnel | null>(null);
@@ -507,33 +493,7 @@ export class Funnels {
     }
 
     protected getCurrentDateRange() {
-        const range = this.selectedRange();
-        const end = new Date();
-        const start = new Date();
-
-        if (range.value === 'custom') {
-            const d = this.funnelFilterForm.customRangeDates().value();
-            if (d && d.length === 2 && d[0] && d[1]) {
-                return { from: d[0].toISOString(), to: d[1].toISOString() };
-            }
-            return null;
-        }
-
-        switch (range.value) {
-            case '24h':
-                start.setHours(end.getHours() - 24);
-                break;
-            case '7d':
-                start.setDate(end.getDate() - 7);
-                break;
-            case '30d':
-                start.setDate(end.getDate() - 30);
-                break;
-            case '1y':
-                start.setFullYear(end.getFullYear() - 1);
-                break;
-        }
-        return { from: start.toISOString(), to: end.toISOString() };
+        return resolveDateRange(this.selectedRange(), this.funnelFilterForm.customRangeDates().value());
     }
 
     openFunnelManager() {
@@ -564,9 +524,6 @@ export class Funnels {
     getDateRange() {
         const range = this.getCurrentDateRange();
         if (range) return range;
-        const end = new Date();
-        const start = new Date();
-        start.setDate(end.getDate() - 30);
-        return { from: start.toISOString(), to: end.toISOString() };
+        return resolveDateRange(selectDefaultRange(this.timeRanges()), null)!;
     }
 }

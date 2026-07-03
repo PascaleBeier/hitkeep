@@ -119,6 +119,12 @@ describe('Dashboard', () => {
         expect(component).toBeTruthy();
     });
 
+    it('defaults the report range to today', () => {
+        const dashboard = component as unknown as { selectedRange: () => { value: string } };
+
+        expect(dashboard.selectedRange().value).toBe('today');
+    });
+
     it('should show team onboarding copy when the active team has no sites', () => {
         const siteService = TestBed.inject(SiteService);
         const teamService = TestBed.inject(TeamService);

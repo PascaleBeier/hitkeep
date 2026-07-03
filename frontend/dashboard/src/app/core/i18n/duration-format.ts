@@ -1,3 +1,5 @@
+import { DASHBOARD_LANG_LOCALES, SOURCE_LOCALE } from '@core/i18n/supported-locales';
+
 type DurationUnit = 'year' | 'month' | 'week' | 'day' | 'hour' | 'minute' | 'second';
 
 const DURATION_UNITS: readonly { unit: DurationUnit; seconds: number }[] = [
@@ -10,17 +12,10 @@ const DURATION_UNITS: readonly { unit: DurationUnit; seconds: number }[] = [
     { unit: 'second', seconds: 1 }
 ];
 
-const LANGUAGE_LOCALES: Record<string, string> = {
-    en: 'en-US',
-    de: 'de-DE',
-    es: 'es-ES',
-    fr: 'fr-FR',
-    it: 'it-IT',
-    nl: 'nl-NL'
-};
+const LANGUAGE_LOCALES: Record<string, string> = DASHBOARD_LANG_LOCALES;
 
 export function localeForLanguage(language: string): string {
-    return LANGUAGE_LOCALES[language] ?? (language || 'en-US');
+    return LANGUAGE_LOCALES[language] ?? (language || SOURCE_LOCALE);
 }
 
 export function formatDurationInterval(totalSeconds: number, languageOrLocale: string, unitDisplay: Intl.NumberFormatOptions['unitDisplay'] = 'long'): string {

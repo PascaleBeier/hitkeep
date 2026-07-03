@@ -8,7 +8,7 @@ import { TagModule } from 'primeng/tag';
 import { MenuItem } from 'primeng/api';
 import { buildTakeoutExportMenuItems, TakeoutExportFormat } from '@core/export/export-formats';
 import { CopyControl } from '@components/copy-control/copy-control';
-import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar } from '@components/range-toolbar/range-toolbar';
+import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar, resolveDateRange, selectDefaultRange } from '@components/range-toolbar/range-toolbar';
 import { KpiCard } from '@features/analytics/components/kpi-card';
 import { MetricCardGroup, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
 import { SeriesChart, SeriesChartPoint, SeriesDefinition } from '@features/analytics/components/series-chart';
@@ -41,10 +41,7 @@ export class QRSharePage {
     protected readonly timeRanges = signal<RangeOption[]>(DEFAULT_RANGE_OPTIONS);
     protected readonly selectedRange = linkedSignal<RangeOption[], RangeOption>({
         source: this.timeRanges,
-        computation: (ranges, previous) => {
-            const value = previous?.value.value ?? '30d';
-            return ranges.find((range) => range.value === value) ?? ranges[2]!;
-        }
+        computation: (ranges, previous) => selectDefaultRange(ranges, previous?.value)
     });
     protected readonly customRangeDates = signal<Date[] | null>(null);
     protected readonly assetURL = computed(() => (this.qr()?.has_asset ? this.service.qrShareAssetURL(this.token) : null));
@@ -163,18 +160,6 @@ export class QRSharePage {
     }
 
     private currentDateRange(): { from: string; to: string } | null {
-        const range = this.selectedRange();
-        const end = new Date();
-        const start = new Date();
-        if (range.value === 'custom') {
-            const dates = this.customRangeDates();
-            if (dates?.[0] && dates?.[1]) return { from: dates[0].toISOString(), to: dates[1].toISOString() };
-            return null;
-        }
-        if (range.value === '24h') start.setHours(end.getHours() - 24);
-        if (range.value === '7d') start.setDate(end.getDate() - 7);
-        if (range.value === '30d') start.setDate(end.getDate() - 30);
-        if (range.value === '1y') start.setFullYear(end.getFullYear() - 1);
-        return { from: start.toISOString(), to: end.toISOString() };
+        return resolveDateRange(this.selectedRange(), this.customRangeDates());
     }
 }

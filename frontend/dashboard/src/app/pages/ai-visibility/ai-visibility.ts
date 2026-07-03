@@ -11,7 +11,7 @@ import { SplitButtonModule } from 'primeng/splitbutton';
 import { MenuItem } from 'primeng/api';
 import { SiteService } from '@features/sites/services/site.service';
 import { AIFetchFilters, AnalyticsService } from '@core/services/analytics.service';
-import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar } from '@components/range-toolbar/range-toolbar';
+import { DEFAULT_RANGE_OPTIONS, isShortRange as isShortDateRange, RangeOption, RangeToolbar, resolveDateRange, selectDefaultRange } from '@components/range-toolbar/range-toolbar';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { SeriesChart, SeriesChartPoint, SeriesDefinition } from '@features/analytics/components/series-chart';
@@ -54,10 +54,7 @@ export class AIVisibility {
     protected readonly timeRanges = signal<RangeOption[]>(DEFAULT_RANGE_OPTIONS);
     protected readonly selectedRange = linkedSignal<RangeOption[], RangeOption>({
         source: this.timeRanges,
-        computation: (ranges, previous) => {
-            const value = previous?.value.value ?? '30d';
-            return ranges.find((range) => range.value === value) ?? ranges[2]!;
-        }
+        computation: (ranges, previous) => selectDefaultRange(ranges, previous?.value)
     });
     protected readonly customRangeDates = signal<Date[] | null>(null);
 
@@ -88,14 +85,7 @@ export class AIVisibility {
         ];
     });
 
-    protected readonly isShortRange = computed(() => {
-        if (this.selectedRange().value === '24h') return true;
-        const dates = this.customRangeDates();
-        if (this.selectedRange().value === 'custom' && dates && dates.length === 2 && dates[0] && dates[1]) {
-            return dates[1].getTime() - dates[0].getTime() < 48 * 60 * 60 * 1000;
-        }
-        return false;
-    });
+    protected readonly isShortRange = computed(() => isShortDateRange(this.selectedRange(), this.customRangeDates()));
 
     protected readonly assistantOptions = computed(() => this.toOptions(this.overview()?.top_assistants ?? []));
     protected readonly familyOptions = computed(() => this.toOptions(this.overview()?.top_families ?? []));
@@ -438,37 +428,7 @@ export class AIVisibility {
     }
 
     private getCurrentDateRange(): { from: string; to: string } | null {
-        const range = this.selectedRange().value;
-        const now = new Date();
-
-        if (range === 'custom') {
-            const dates = this.customRangeDates();
-            if (!dates || dates.length !== 2 || !dates[0] || !dates[1]) return null;
-            return {
-                from: dates[0].toISOString(),
-                to: dates[1].toISOString()
-            };
-        }
-
-        const from = new Date(now);
-        switch (range) {
-            case '24h':
-                from.setHours(now.getHours() - 24);
-                break;
-            case '7d':
-                from.setDate(now.getDate() - 7);
-                break;
-            case '30d':
-                from.setDate(now.getDate() - 30);
-                break;
-            case '90d':
-                from.setDate(now.getDate() - 90);
-                break;
-            default:
-                from.setDate(now.getDate() - 30);
-        }
-
-        return { from: from.toISOString(), to: now.toISOString() };
+        return resolveDateRange(this.selectedRange(), this.customRangeDates());
     }
 
     private toOptions(items: MetricStat[]) {

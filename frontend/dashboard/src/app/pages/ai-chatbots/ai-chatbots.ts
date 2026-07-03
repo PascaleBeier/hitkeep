@@ -11,7 +11,7 @@ import { SplitButtonModule } from 'primeng/splitbutton';
 import { MenuItem } from 'primeng/api';
 import { SiteService } from '@features/sites/services/site.service';
 import { AnalyticsService, EventDimensionFilter } from '@core/services/analytics.service';
-import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar } from '@components/range-toolbar/range-toolbar';
+import { DEFAULT_RANGE_OPTIONS, isShortRange as isShortDateRange, RangeOption, RangeToolbar, resolveDateRange, selectDefaultRange } from '@components/range-toolbar/range-toolbar';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { SeriesChart, SeriesChartPoint, SeriesDefinition } from '@features/analytics/components/series-chart';
@@ -69,10 +69,7 @@ export class AIChatbots {
     protected readonly timeRanges = signal<RangeOption[]>(DEFAULT_RANGE_OPTIONS);
     protected readonly selectedRange = linkedSignal<RangeOption[], RangeOption>({
         source: this.timeRanges,
-        computation: (ranges, previous) => {
-            const value = previous?.value.value ?? '30d';
-            return ranges.find((r) => r.value === value) ?? ranges[2]!;
-        }
+        computation: (ranges, previous) => selectDefaultRange(ranges, previous?.value)
     });
     protected readonly customRangeDates = signal<Date[] | null>(null);
     protected readonly comparisonRange = signal<{ from: string; to: string } | null>(null);
@@ -127,14 +124,7 @@ export class AIChatbots {
         ];
     });
 
-    protected readonly isShortRange = computed(() => {
-        if (this.selectedRange().value === '24h') return true;
-        const dates = this.customRangeDates();
-        if (this.selectedRange().value === 'custom' && dates && dates.length === 2 && dates[0] && dates[1]) {
-            return dates[1].getTime() - dates[0].getTime() < 48 * 60 * 60 * 1000;
-        }
-        return false;
-    });
+    protected readonly isShortRange = computed(() => isShortDateRange(this.selectedRange(), this.customRangeDates()));
 
     protected readonly chartSeries = computed<SeriesChartPoint[]>(() => {
         const state = this.series();
@@ -622,32 +612,7 @@ export class AIChatbots {
     }
 
     protected getCurrentDateRange(): { from: string; to: string } | null {
-        const range = this.selectedRange();
-        const end = new Date();
-        const start = new Date();
-
-        if (range.value === 'custom') {
-            const dates = this.customRangeDates();
-            if (dates && dates.length === 2 && dates[0] && dates[1]) {
-                return { from: dates[0].toISOString(), to: dates[1].toISOString() };
-            }
-            return null;
-        }
-
-        switch (range.value) {
-            case '24h':
-                start.setHours(end.getHours() - 24);
-                break;
-            case '7d':
-                start.setDate(end.getDate() - 7);
-                break;
-            case '1y':
-                start.setFullYear(end.getFullYear() - 1);
-                break;
-            default:
-                start.setDate(end.getDate() - 30);
-        }
-        return { from: start.toISOString(), to: end.toISOString() };
+        return resolveDateRange(this.selectedRange(), this.customRangeDates());
     }
 
     private totalFor(key: ChatbotMetricKey, state: ChatbotSeriesState): number {

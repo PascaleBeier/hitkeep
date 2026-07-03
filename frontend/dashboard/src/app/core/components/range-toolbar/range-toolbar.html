@@ -1,33 +1,48 @@
 <div class="range-toolbar">
     <div class="range-toolbar__controls">
-        <div class="inline-flex items-center gap-1 rounded-lg border border-surface-200 bg-surface-100 p-1 dark:border-surface-700 dark:bg-surface-800" [attr.aria-label]="'common.timeRangeSelectorAria' | transloco" role="group">
-            @for (option of presetRanges(); track option.value) {
-            <button
+        <div class="range-toolbar__range-group">
+            <span id="range-toolbar-presets-label" class="sr-only">{{ "common.timeRangeSelectorAria" | transloco }}</span>
+            <p-selectbutton
+                class="range-toolbar__preset-select"
+                [options]="visiblePresetRanges()"
+                [ngModel]="selectedPresetValue()"
+                optionLabel="shortLabel"
+                optionValue="value"
+                size="small"
+                [allowEmpty]="false"
+                ariaLabelledBy="range-toolbar-presets-label"
+                (onChange)="selectPresetValue($event.value)"
+            />
+
+            @if (overflowPresetRanges().length) {
+            <p-menu #overflowMenu [model]="overflowMenuItems()" [popup]="true" appendTo="body" styleClass="range-toolbar__overflow-menu" />
+            <p-button
                 type="button"
-                class="active:scale-95 cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium transition-all duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                [class]="isPresetActive(option.value) ? 'bg-surface-0 dark:bg-surface-900 shadow-sm text-[var(--p-text-color)]' : 'text-muted-color hover:bg-surface-200/50 hover:text-[var(--p-text-color)] dark:hover:bg-surface-700/50'"
-                [attr.aria-pressed]="isPresetActive(option.value)"
-                [attr.aria-label]="option.label"
-                [pTooltip]="option.label"
+                icon="pi pi-ellipsis-h"
+                [outlined]="!isOverflowActive()"
+                severity="secondary"
+                [ariaLabel]="moreRangesLabel()"
+                size="small"
+                styleClass="range-toolbar__more-button cursor-pointer"
+                [pTooltip]="moreRangesLabel()"
                 tooltipPosition="bottom"
-                (click)="selectPreset(option)"
-            >
-                {{ option.shortLabel }}
-            </button>
+                (onClick)="toggleOverflowRanges($event, overflowMenu)"
+            />
             }
-            <button
+
+            <p-button
                 type="button"
-                class="active:scale-95 flex cursor-pointer items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-all duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                [class]="isCustomActive() ? 'bg-surface-0 dark:bg-surface-900 shadow-sm text-[var(--p-text-color)]' : 'text-muted-color hover:bg-surface-200/50 hover:text-[var(--p-text-color)] dark:hover:bg-surface-700/50'"
-                [attr.aria-pressed]="isCustomActive()"
-                [attr.aria-label]="'common.timeRanges.openCustomRangeAria' | transloco"
+                icon="pi pi-calendar"
+                [label]="customButtonLabel()"
+                [outlined]="!isCustomActive()"
+                severity="secondary"
+                [ariaLabel]="'common.timeRanges.openCustomRangeAria' | transloco"
+                size="small"
+                styleClass="range-toolbar__custom-button cursor-pointer"
                 [pTooltip]="customRangeSummary() ?? undefined"
                 tooltipPosition="bottom"
-                (click)="toggleCustomRange($event, customPopover)"
-            >
-                <i class="pi pi-calendar text-xs" aria-hidden="true"></i>
-                {{ customButtonLabel() }}
-            </button>
+                (onClick)="toggleCustomRange($event, customPopover)"
+            />
         </div>
 
         @if (customRangeSummary(); as summary) {
@@ -89,7 +104,7 @@
             tooltipPosition="bottom"
             [outlined]="true"
             severity="secondary"
-            styleClass="flex h-9 w-9 cursor-pointer items-center justify-center p-0"
+            styleClass="range-toolbar__refresh-button cursor-pointer"
         />
     </div>
 

@@ -18,7 +18,7 @@ import { AnalyticsService } from '@core/services/analytics.service';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
-import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar } from '@components/range-toolbar/range-toolbar';
+import { DEFAULT_RANGE_OPTIONS, isShortRange as isShortDateRange, RangeOption, RangeToolbar, resolveDateRange, selectDefaultRange } from '@components/range-toolbar/range-toolbar';
 import { SeriesChart, SeriesChartPoint, SeriesDefinition } from '@features/analytics/components/series-chart';
 import { browserAppUrl } from '@core/interceptors/base-path.interceptor';
 import { WebVitalDimension, WebVitalDimensionRow, WebVitalMetric, WebVitalMetricBreakdown, WebVitalPageRow, WebVitalRating, WebVitalSeriesPoint, WebVitalSummaryMetric } from '@models/analytics.types';
@@ -123,17 +123,10 @@ export class WebVitalsPage {
     protected readonly timeRanges = signal<RangeOption[]>(DEFAULT_RANGE_OPTIONS);
     protected readonly selectedRange = linkedSignal<RangeOption[], RangeOption>({
         source: this.timeRanges,
-        computation: (ranges, previous) => {
-            const value = previous?.value.value ?? '30d';
-            return ranges.find((range) => range.value === value) ?? ranges[2]!;
-        }
+        computation: (ranges, previous) => selectDefaultRange(ranges, previous?.value)
     });
     protected readonly customRangeDates = signal<Date[] | null>(null);
-    protected readonly isShortRange = computed(() => {
-        if (this.selectedRange().value === '24h') return true;
-        const dates = this.customRangeDates();
-        return this.selectedRange().value === 'custom' && dates?.length === 2 && !!dates[0] && !!dates[1] && dates[1].getTime() - dates[0].getTime() < 48 * 60 * 60 * 1000;
-    });
+    protected readonly isShortRange = computed(() => isShortDateRange(this.selectedRange(), this.customRangeDates()));
 
     protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
         this.activeLanguage();
@@ -506,30 +499,6 @@ export class WebVitalsPage {
     }
 
     private getCurrentDateRange() {
-        const range = this.selectedRange();
-        const end = new Date();
-        const start = new Date();
-        if (range.value === 'custom') {
-            const dates = this.customRangeDates();
-            if (dates && dates.length === 2 && dates[0] && dates[1]) {
-                return { from: dates[0].toISOString(), to: dates[1].toISOString() };
-            }
-            return null;
-        }
-        switch (range.value) {
-            case '24h':
-                start.setHours(end.getHours() - 24);
-                break;
-            case '7d':
-                start.setDate(end.getDate() - 7);
-                break;
-            case '30d':
-                start.setDate(end.getDate() - 30);
-                break;
-            case '1y':
-                start.setFullYear(end.getFullYear() - 1);
-                break;
-        }
-        return { from: start.toISOString(), to: end.toISOString() };
+        return resolveDateRange(this.selectedRange(), this.customRangeDates());
     }
 }

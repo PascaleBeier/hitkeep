@@ -9,7 +9,7 @@ import { SiteService } from '@features/sites/services/site.service';
 import { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { EmptyState } from '@components/molecules/empty-state';
 import { PageFrame } from '@components/page-frame/page-frame';
-import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar } from '@components/range-toolbar/range-toolbar';
+import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar, resolveDateRange, selectDefaultRange } from '@components/range-toolbar/range-toolbar';
 import { INSTANCE_CAPABILITIES, SITE_CAPABILITIES } from '@core/access/capabilities';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { AdminSystemService, SystemAIStatus } from '@services/admin-system.service';
@@ -42,10 +42,7 @@ export class OpportunitiesPage {
     protected readonly timeRanges = signal<RangeOption[]>(DEFAULT_RANGE_OPTIONS);
     protected readonly selectedRange = linkedSignal<RangeOption[], RangeOption>({
         source: this.timeRanges,
-        computation: (ranges, previous) => {
-            const value = previous?.value.value ?? '30d';
-            return ranges.find((range) => range.value === value) ?? ranges[2]!;
-        }
+        computation: (ranges, previous) => selectDefaultRange(ranges, previous?.value)
     });
     protected readonly customRangeDates = signal<Date[] | null>(null);
     protected readonly typeFilter = signal<OpportunityFilter>('all');
@@ -427,32 +424,6 @@ export class OpportunitiesPage {
     }
 
     private getCurrentDateRange() {
-        const range = this.selectedRange();
-        const end = new Date();
-        const start = new Date();
-
-        if (range.value === 'custom') {
-            const dates = this.customRangeDates();
-            if (dates && dates.length === 2 && dates[0] && dates[1]) {
-                return { from: dates[0].toISOString(), to: dates[1].toISOString() };
-            }
-            return null;
-        }
-
-        switch (range.value) {
-            case '24h':
-                start.setHours(end.getHours() - 24);
-                break;
-            case '7d':
-                start.setDate(end.getDate() - 7);
-                break;
-            case '30d':
-                start.setDate(end.getDate() - 30);
-                break;
-            case '1y':
-                start.setFullYear(end.getFullYear() - 1);
-                break;
-        }
-        return { from: start.toISOString(), to: end.toISOString() };
+        return resolveDateRange(this.selectedRange(), this.customRangeDates());
     }
 }

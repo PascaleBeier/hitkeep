@@ -20,7 +20,7 @@ import { PageState } from '@components/page-state/page-state';
 import { SeriesChart, SeriesDefinition, SeriesChartPoint } from '@features/analytics/components/series-chart';
 import { Goal, GoalSeriesPoint, SiteStats } from '@models/analytics.types';
 import { KpiCard } from '@features/analytics/components/kpi-card';
-import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar } from '@components/range-toolbar/range-toolbar';
+import { DEFAULT_RANGE_OPTIONS, isShortRange as isShortDateRange, RangeOption, RangeToolbar, resolveDateRange, selectDefaultRange } from '@components/range-toolbar/range-toolbar';
 import { finalize } from 'rxjs';
 import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
 import { REALTIME_GOAL_KINDS } from '@services/realtime.service';
@@ -53,28 +53,14 @@ export class Goals {
     protected timeRanges = signal<RangeOption[]>(DEFAULT_RANGE_OPTIONS);
     protected selectedRange = linkedSignal<RangeOption[], RangeOption>({
         source: this.timeRanges,
-        computation: (ranges, previous) => {
-            const value = previous?.value.value ?? '30d';
-            return ranges.find((r) => r.value === value) ?? ranges[2]!;
-        }
+        computation: (ranges, previous) => selectDefaultRange(ranges, previous?.value)
     });
     private readonly goalFilterFormModel = signal({
         goalFilter: new FormControl<{ id: string; name: string } | null>(null),
         customRangeDates: new FormControl<Date[] | null>(null)
     });
     protected readonly goalFilterForm = compatForm(this.goalFilterFormModel);
-    protected isShortRange = computed(() => {
-        if (this.selectedRange().value === '24h') return true;
-        const customRangeDates = this.goalFilterForm.customRangeDates().value();
-        if (this.selectedRange().value === 'custom' && customRangeDates) {
-            const d = customRangeDates;
-            if (d.length === 2 && d[0] && d[1]) {
-                const diff = d[1].getTime() - d[0].getTime();
-                return diff < 48 * 60 * 60 * 1000;
-            }
-        }
-        return false;
-    });
+    protected isShortRange = computed(() => isShortDateRange(this.selectedRange(), this.goalFilterForm.customRangeDates().value()));
     protected isGoalManagerVisible = signal(false);
     protected goals = signal<Goal[]>([]);
     protected goalsLoading = signal(false);
@@ -494,32 +480,6 @@ export class Goals {
     }
 
     protected getCurrentDateRange() {
-        const range = this.selectedRange();
-        const end = new Date();
-        const start = new Date();
-
-        if (range.value === 'custom') {
-            const d = this.goalFilterForm.customRangeDates().value();
-            if (d && d.length === 2 && d[0] && d[1]) {
-                return { from: d[0].toISOString(), to: d[1].toISOString() };
-            }
-            return null;
-        }
-
-        switch (range.value) {
-            case '24h':
-                start.setHours(end.getHours() - 24);
-                break;
-            case '7d':
-                start.setDate(end.getDate() - 7);
-                break;
-            case '30d':
-                start.setDate(end.getDate() - 30);
-                break;
-            case '1y':
-                start.setFullYear(end.getFullYear() - 1);
-                break;
-        }
-        return { from: start.toISOString(), to: end.toISOString() };
+        return resolveDateRange(this.selectedRange(), this.goalFilterForm.customRangeDates().value());
     }
 }

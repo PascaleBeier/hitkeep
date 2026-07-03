@@ -212,6 +212,20 @@ describe('TeamOverviewPage', () => {
         expect(text).toContain('2 pending invites');
     });
 
+    it('renders a singular pending invite label', () => {
+        activeTeam.set({
+            ...createActiveTeam(),
+            usage: {
+                current_sites: 3,
+                current_members: 5,
+                current_pending_invites: 1
+            }
+        });
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.textContent).toContain('1 pending invite');
+    });
+
     it('renders the active team ID with a copy control', () => {
         const text = fixture.nativeElement.textContent;
         const copyButton = fixture.nativeElement.querySelector('app-copy-control button') as HTMLButtonElement | null;
