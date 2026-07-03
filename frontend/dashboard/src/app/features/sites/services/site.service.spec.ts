@@ -63,6 +63,27 @@ describe('SiteService', () => {
         expect(service.sites().map((entry) => entry.domain)).toEqual(['alpha.example.com', 'middle.example.com', 'zeta.example.com']);
         expect(service.activeSite()?.id).toBe('site-middle');
     });
+
+    it('posts reset confirmation to the site stats reset endpoint', () => {
+        service.resetSiteStats('site-1', 'example.com').subscribe((response) => {
+            expect(response).toEqual({
+                status: 'reset',
+                rows_cleared: 12,
+                imports_marked_deleted: 1,
+                families_cleared: ['native']
+            });
+        });
+
+        const req = httpMock.expectOne('/api/sites/site-1/stats/reset');
+        expect(req.request.method).toBe('POST');
+        expect(req.request.body).toEqual({ confirm_domain: 'example.com' });
+        req.flush({
+            status: 'reset',
+            rows_cleared: 12,
+            imports_marked_deleted: 1,
+            families_cleared: ['native']
+        });
+    });
 });
 
 function site(id: string, domain: string): Site {

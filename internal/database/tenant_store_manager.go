@@ -222,6 +222,28 @@ func (m *TenantStoreManager) DeleteSite(ctx context.Context, siteID uuid.UUID) e
 	return nil
 }
 
+func (m *TenantStoreManager) ResetSiteStats(ctx context.Context, siteID uuid.UUID) (api.SiteStatsResetResponse, error) {
+	analyticsStore, _, err := m.ResolveSiteStore(ctx, siteID)
+	if err != nil {
+		return api.SiteStatsResetResponse{Status: "reset"}, err
+	}
+
+	if analyticsStore == m.shared {
+		return m.shared.ResetSiteStats(ctx, siteID)
+	}
+
+	result, err := analyticsStore.resetSiteAnalyticsMeasurements(ctx, siteID)
+	if err != nil {
+		return result, fmt.Errorf("reset tenant analytics stats for site %s: %w", siteID, err)
+	}
+	sharedResult, err := m.shared.resetSiteSharedMeasurements(ctx, siteID)
+	if err != nil {
+		return result, fmt.Errorf("reset shared stats for site %s: %w", siteID, err)
+	}
+	mergeSiteStatsResetResult(&result, sharedResult)
+	return result, nil
+}
+
 // PurgeArchivedTenant removes the per-tenant analytics database directory and
 // deletes archived control-plane records for a non-default tenant.
 func (m *TenantStoreManager) PurgeArchivedTenant(ctx context.Context, tenantID uuid.UUID) (*api.Team, error) {

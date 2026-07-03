@@ -25,6 +25,13 @@ export interface SiteTrackingStatus {
     updated_at?: string;
 }
 
+export interface SiteStatsResetResponse {
+    status: 'reset';
+    rows_cleared: number;
+    imports_marked_deleted: number;
+    families_cleared: string[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class SiteService {
     private http = inject(HttpClient);
@@ -89,6 +96,10 @@ export class SiteService {
                 }
             })
         );
+    }
+
+    resetSiteStats(siteId: string, confirmDomain: string) {
+        return this.http.post<SiteStatsResetResponse>(`/api/sites/${siteId}/stats/reset`, { confirm_domain: confirmDomain });
     }
 
     getTrackingStatus(siteId: string) {

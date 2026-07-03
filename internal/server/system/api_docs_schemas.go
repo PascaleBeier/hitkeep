@@ -97,6 +97,23 @@ func openAPIV1AnalyticsSchemas() map[string]any {
 				"destination_team_id": map[string]any{"type": "string", "format": "uuid"},
 			},
 		},
+		"SiteStatsResetRequest": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"confirm_domain": map[string]any{"type": "string"},
+			},
+			"required": []string{"confirm_domain"},
+		},
+		"SiteStatsResetResponse": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"status":                 map[string]any{"type": "string", "enum": []string{"reset"}},
+				"rows_cleared":           map[string]any{"type": "integer", "format": "int64"},
+				"imports_marked_deleted": map[string]any{"type": "integer", "format": "int64"},
+				"families_cleared":       map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+			},
+			"required": []string{"status", "rows_cleared", "imports_marked_deleted", "families_cleared"},
+		},
 		"Site": map[string]any{
 			"type": "object",
 			"properties": map[string]any{

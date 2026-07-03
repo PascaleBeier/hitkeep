@@ -719,6 +719,17 @@ type SiteStats struct {
 	ImportedExcluded   []ImportExclusionReason `json:"imported_excluded,omitempty"`
 }
 
+type SiteStatsResetRequest struct {
+	ConfirmDomain string `json:"confirm_domain"`
+}
+
+type SiteStatsResetResponse struct {
+	Status               string   `json:"status"`
+	RowsCleared          int64    `json:"rows_cleared"`
+	ImportsMarkedDeleted int64    `json:"imports_marked_deleted"`
+	FamiliesCleared      []string `json:"families_cleared"`
+}
+
 type EventNamesParams struct {
 	SiteID uuid.UUID
 	Start  time.Time

@@ -46,6 +46,10 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		SitePerm:    authcore.PermSiteView,
 		RateLimiter: ctx.ApiLimiter,
 	}, h.handleGetSiteStats()))
+	mux.HandleFunc("POST /api/sites/{id}/stats/reset", ctx.Handler(shared.HandlerConfig{
+		SitePerm:    authcore.PermSiteDelete,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleResetSiteStats()))
 	mux.HandleFunc("GET /api/sites/{id}/tracking/status", ctx.Handler(shared.HandlerConfig{
 		SitePerm:    authcore.PermSiteView,
 		RateLimiter: ctx.ApiLimiter,
@@ -330,6 +334,92 @@ func (h *handler) handleDeleteSite() http.HandlerFunc {
 
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+			slog.Error("Failed to encode response", "error", err)
+		}
+	}
+}
+
+func (h *handler) handleResetSiteStats() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if h.ctx.Store == nil {
+			http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
+			return
+		}
+		if apiClientAuth, _ := r.Context().Value(shared.APIClientAuthKey).(*database.APIClientAuth); apiClientAuth != nil {
+			http.Error(w, "Dashboard session required", http.StatusForbidden)
+			return
+		}
+
+		siteID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
+		if err != nil {
+			http.Error(w, "Invalid site_id", http.StatusBadRequest)
+			return
+		}
+
+		site, err := h.ctx.Store.GetSiteByID(r.Context(), siteID)
+		if err != nil {
+			slog.Error("Failed to get site for stats reset", "error", err, "site_id", siteID)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		if site == nil {
+			http.Error(w, "Site not found", http.StatusNotFound)
+			return
+		}
+
+		var req api.SiteStatsResetRequest
+		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
+		if err := decoder.Decode(&req); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		if !strings.EqualFold(strings.TrimSpace(req.ConfirmDomain), strings.TrimSpace(site.Domain)) {
+			http.Error(w, "Confirmation does not match site domain", http.StatusBadRequest)
+			return
+		}
+
+		var result api.SiteStatsResetResponse
+		if h.ctx.TenantStores != nil {
+			result, err = h.ctx.TenantStores.ResetSiteStats(r.Context(), siteID)
+		} else {
+			result, err = h.ctx.Store.ResetSiteStats(r.Context(), siteID)
+		}
+		if err != nil {
+			slog.Error("Failed to reset site stats", "error", err, "site_id", siteID)
+			http.Error(w, "Failed to reset site stats", http.StatusInternalServerError)
+			return
+		}
+
+		teamID, err := h.ctx.Store.GetSiteTenantID(r.Context(), siteID)
+		if err != nil {
+			slog.Error("Failed to resolve site team for stats reset audit", "error", err, "site_id", siteID)
+			http.Error(w, "Failed to audit site stats reset", http.StatusInternalServerError)
+			return
+		}
+		userID := shared.GetUserIDFromContext(r)
+		if err := h.ctx.AppendAuditEventChecked(r.Context(), r, shared.AuditEvent{
+			ActorID:     userID,
+			TeamID:      teamID,
+			Action:      "site.stats_reset",
+			TargetType:  "site",
+			TargetID:    siteID.String(),
+			TargetLabel: site.Domain,
+			Outcome:     "success",
+			Details: fmt.Sprintf(
+				"Reset stats for %s; rows_cleared=%d imports_marked_deleted=%d families=%s",
+				site.Domain,
+				result.RowsCleared,
+				result.ImportsMarkedDeleted,
+				strings.Join(result.FamiliesCleared, ","),
+			),
+		}); err != nil {
+			slog.Error("Failed to append site stats reset audit", "error", err, "site_id", siteID)
+			http.Error(w, "Failed to audit site stats reset", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(result); err != nil {
 			slog.Error("Failed to encode response", "error", err)
 		}
 	}

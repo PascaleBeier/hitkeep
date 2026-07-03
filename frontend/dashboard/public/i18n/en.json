@@ -184,6 +184,7 @@
       "ownershipTransferred": "Ownership transferred",
       "siteCreated": "Site created",
       "siteDeleted": "Site deleted",
+      "siteStatsReset": "Stats reset",
       "siteRetentionUpdated": "Retention updated",
       "siteTransferredIn": "Site moved in",
       "siteTransferredOut": "Site moved out",
@@ -1251,6 +1252,13 @@
       }
     },
     "danger": {
+      "resetTitle": "Reset stats",
+      "resetDescription": "Permanently clears this site's measured stats while keeping settings, access, goals, funnels, and tracking setup.",
+      "resetConfirmLabel": "Type \"{{domain}}\" to confirm the stats reset",
+      "resetConfirmHint": "Tracking stays active. New data collected after the reset will appear normally.",
+      "resetAction": "Reset stats",
+      "resetSuccess": "Stats reset. Cleared {{rows}} row(s) and marked {{imports}} completed import(s) deleted.",
+      "resetFailed": "Failed to reset site stats.",
       "deleteTitle": "Delete site",
       "deleteDescription": "Permanently deletes this site and all associated analytics data.",
       "confirmLabel": "Type \"{{domain}}\" to confirm",

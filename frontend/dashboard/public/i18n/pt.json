@@ -184,6 +184,7 @@
       "ownershipTransferred": "Propriedade transferida",
       "siteCreated": "Site criado",
       "siteDeleted": "Site excluído",
+      "siteStatsReset": "Estatísticas redefinidas",
       "siteRetentionUpdated": "Retenção atualizada",
       "siteTransferredIn": "Site transferido para cá",
       "siteTransferredOut": "Site transferido para fora",
@@ -1244,6 +1245,13 @@
       }
     },
     "danger": {
+      "resetTitle": "Redefinir estatísticas",
+      "resetDescription": "Apaga permanentemente as estatísticas medidas deste site, mantendo configurações, acessos, metas, funis e configuração de rastreamento.",
+      "resetConfirmLabel": "Digite \"{{domain}}\" para confirmar a redefinição das estatísticas",
+      "resetConfirmHint": "O rastreamento continua ativo. Novos dados coletados após a redefinição aparecerão normalmente.",
+      "resetAction": "Redefinir estatísticas",
+      "resetSuccess": "Estatísticas redefinidas. {{rows}} linha(s) apagada(s) e {{imports}} importação(ões) concluída(s) marcada(s) como excluída(s).",
+      "resetFailed": "Não foi possível redefinir as estatísticas do site.",
       "deleteTitle": "Excluir site",
       "deleteDescription": "Exclui permanentemente este site e todos os dados analíticos associados.",
       "confirmLabel": "Digite \"{{domain}}\" para confirmar",

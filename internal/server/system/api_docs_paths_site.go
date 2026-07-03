@@ -245,6 +245,17 @@ func openAPIV1AdminSitePaths() map[string]any {
 				paramRef("#/components/parameters/goalIDQuery"), paramRef("#/components/parameters/funnelIDQuery"),
 			}, nil, map[string]any{"200": jsonRefResp("Site stats", "#/components/schemas/SiteStats")}),
 		},
+		"/api/sites/{id}/stats/reset": map[string]any{
+			"post": op([]string{"Sites"}, "Reset site stats", "Irreversibly clears currently stored measured stats for a site while preserving the site configuration. Requires a human dashboard session with site.delete; API client bearer tokens are rejected.", secCookie(), []any{paramRef("#/components/parameters/siteID")},
+				jsonBody(map[string]any{"$ref": "#/components/schemas/SiteStatsResetRequest"}),
+				map[string]any{
+					"200": jsonRefResp("Reset summary", "#/components/schemas/SiteStatsResetResponse"),
+					"400": errResp("Invalid request or confirmation mismatch"),
+					"403": errResp("Dashboard session required or forbidden"),
+					"404": errResp("Site not found"),
+					"500": errResp("Reset failed"),
+				}),
+		},
 		"/api/sites/{id}/realtime": map[string]any{
 			"get": internalOp(op([]string{"Sites"}, "Stream site realtime changes", "Streams privacy-safe site-scoped analytics invalidation events using server-sent events. Requires site.view.", secCookie(), []any{paramRef("#/components/parameters/siteID")}, nil,
 				map[string]any{"200": desc("Server-sent event stream with analytics.changed and analytics.resync events")})),

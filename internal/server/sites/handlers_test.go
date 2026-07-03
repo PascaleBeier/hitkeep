@@ -545,6 +545,219 @@ func TestHandleTransferSiteTeam(t *testing.T) {
 	}
 }
 
+func TestHandleResetSiteStatsValidatesRequest(t *testing.T) {
+	ctx := context.Background()
+	h, store, userID := setupTestEnv(t)
+	defer store.Close()
+
+	site, err := store.CreateSite(ctx, userID, "reset-validation.test")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+
+	tests := []struct {
+		name           string
+		siteID         string
+		body           string
+		apiClientAuth  *database.APIClientAuth
+		expectedStatus int
+	}{
+		{
+			name:           "invalid site id",
+			siteID:         "not-a-uuid",
+			body:           `{"confirm_domain":"reset-validation.test"}`,
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "missing site",
+			siteID:         uuid.New().String(),
+			body:           `{"confirm_domain":"reset-validation.test"}`,
+			expectedStatus: http.StatusNotFound,
+		},
+		{
+			name:           "missing body",
+			siteID:         site.ID.String(),
+			body:           ``,
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "domain mismatch",
+			siteID:         site.ID.String(),
+			body:           `{"confirm_domain":"other.test"}`,
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name:   "api client rejected",
+			siteID: site.ID.String(),
+			body:   `{"confirm_domain":"reset-validation.test"}`,
+			apiClientAuth: &database.APIClientAuth{
+				ClientID:     uuid.New(),
+				InstanceRole: auth.InstanceUser,
+				SiteRoles:    map[uuid.UUID]auth.SiteRole{site.ID: auth.SiteOwner},
+			},
+			expectedStatus: http.StatusForbidden,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/api/sites/"+tt.siteID+"/stats/reset", strings.NewReader(tt.body))
+			req.SetPathValue("id", tt.siteID)
+			req = req.WithContext(context.WithValue(req.Context(), shared.UserIDKey, userID))
+			if tt.apiClientAuth != nil {
+				req = req.WithContext(context.WithValue(req.Context(), shared.APIClientAuthKey, tt.apiClientAuth))
+			}
+			w := httptest.NewRecorder()
+
+			h.handleResetSiteStats().ServeHTTP(w, req)
+
+			if w.Code != tt.expectedStatus {
+				t.Fatalf("expected status %d, got %d: %s", tt.expectedStatus, w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestResetSiteStatsRequiresSiteDeletePermission(t *testing.T) {
+	ctx := context.Background()
+	h, store, ownerID := setupTestEnv(t)
+	defer store.Close()
+
+	adminID, err := store.CreateUser(ctx, "site-admin-reset@example.com", "hashed_secret")
+	if err != nil {
+		t.Fatalf("create site admin: %v", err)
+	}
+	defaultTeamID, err := store.GetDefaultTenantID(ctx)
+	if err != nil {
+		t.Fatalf("get default team: %v", err)
+	}
+	if err := store.AddTeamMember(ctx, defaultTeamID, adminID, database.TenantRoleMember, ownerID); err != nil {
+		t.Fatalf("add team member: %v", err)
+	}
+	site, err := store.CreateSite(ctx, ownerID, "reset-permission.test")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	if err := store.AddSiteMember(ctx, site.ID, adminID, auth.SiteAdmin, ownerID); err != nil {
+		t.Fatalf("add site admin: %v", err)
+	}
+
+	handler := h.ctx.RequirePermission(auth.PermSiteDelete)(h.handleResetSiteStats())
+
+	unauthReq := newResetSiteStatsRequest(site.ID, site.Domain)
+	unauthW := httptest.NewRecorder()
+	handler.ServeHTTP(unauthW, unauthReq)
+	if unauthW.Code != http.StatusUnauthorized {
+		t.Fatalf("expected unauthenticated status %d, got %d: %s", http.StatusUnauthorized, unauthW.Code, unauthW.Body.String())
+	}
+
+	adminReq := newResetSiteStatsRequest(site.ID, site.Domain)
+	adminReq = adminReq.WithContext(context.WithValue(adminReq.Context(), shared.UserIDKey, adminID))
+	adminW := httptest.NewRecorder()
+	handler.ServeHTTP(adminW, adminReq)
+	if adminW.Code != http.StatusForbidden {
+		t.Fatalf("expected site admin status %d, got %d: %s", http.StatusForbidden, adminW.Code, adminW.Body.String())
+	}
+
+	apiClientReq := newResetSiteStatsRequest(site.ID, site.Domain)
+	apiClientReq = apiClientReq.WithContext(context.WithValue(apiClientReq.Context(), shared.APIClientAuthKey, &database.APIClientAuth{
+		ClientID:     uuid.New(),
+		InstanceRole: auth.InstanceUser,
+		SiteRoles:    map[uuid.UUID]auth.SiteRole{site.ID: auth.SiteOwner},
+	}))
+	apiClientW := httptest.NewRecorder()
+	handler.ServeHTTP(apiClientW, apiClientReq)
+	if apiClientW.Code != http.StatusForbidden {
+		t.Fatalf("expected api client status %d, got %d: %s", http.StatusForbidden, apiClientW.Code, apiClientW.Body.String())
+	}
+}
+
+func TestHandleResetSiteStatsSuccessClearsRowsAndAudits(t *testing.T) {
+	ctx := context.Background()
+	h, store, userID := setupTestEnv(t)
+	defer store.Close()
+
+	site, err := store.CreateSite(ctx, userID, "reset-success.test")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	now := time.Now().UTC()
+	if err := store.CreateHit(ctx, &api.Hit{
+		ID:        uuid.New(),
+		SiteID:    site.ID,
+		SessionID: uuid.New(),
+		PageID:    uuid.New(),
+		Timestamp: now,
+		Path:      "/",
+	}); err != nil {
+		t.Fatalf("create hit: %v", err)
+	}
+	importID := uuid.New()
+	if _, err := store.DB().ExecContext(ctx,
+		"INSERT INTO site_imports (id, site_id, provider, status, source_hash, bytes_total, bytes_received, rows_scanned, rows_imported, created_by, created_at, updated_at, finished_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		importID, site.ID, "plausible", database.ImportStatusCompleted, "reset-success", 10, 10, 10, 10, userID, now, now, now,
+	); err != nil {
+		t.Fatalf("insert import: %v", err)
+	}
+
+	req := newResetSiteStatsRequest(site.ID, "RESET-SUCCESS.TEST")
+	req = req.WithContext(context.WithValue(req.Context(), shared.UserIDKey, userID))
+	w := httptest.NewRecorder()
+
+	h.handleResetSiteStats().ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
+	}
+	var response api.SiteStatsResetResponse
+	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.Status != "reset" || response.RowsCleared == 0 || response.ImportsMarkedDeleted != 1 {
+		t.Fatalf("unexpected reset response: %+v", response)
+	}
+
+	var hits int
+	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM hits WHERE site_id = ?", site.ID).Scan(&hits); err != nil {
+		t.Fatalf("count hits: %v", err)
+	}
+	if hits != 0 {
+		t.Fatalf("expected hits cleared, got %d", hits)
+	}
+	var deletedImports int
+	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM site_imports WHERE site_id = ? AND status = ?", site.ID, database.ImportStatusDeleted).Scan(&deletedImports); err != nil {
+		t.Fatalf("count deleted imports: %v", err)
+	}
+	if deletedImports != 1 {
+		t.Fatalf("expected completed import marked deleted, got %d", deletedImports)
+	}
+
+	teamID, err := store.GetSiteTenantID(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("get site team: %v", err)
+	}
+	entries, total, err := store.ListTeamAuditEntries(ctx, teamID, "site.stats_reset", 5, 0)
+	if err != nil {
+		t.Fatalf("list audit entries: %v", err)
+	}
+	if total != 1 || len(entries) != 1 {
+		t.Fatalf("expected one stats reset audit entry, got total=%d entries=%+v", total, entries)
+	}
+	entry := entries[0]
+	if entry.TargetType != "site" || entry.TargetID != site.ID.String() || entry.TargetLabel != site.Domain || entry.Outcome != "success" {
+		t.Fatalf("unexpected audit entry: %+v", entry)
+	}
+	if !strings.Contains(entry.Details, "rows_cleared=") || !strings.Contains(entry.Details, "imports_marked_deleted=1") {
+		t.Fatalf("expected reset summary in audit details, got %q", entry.Details)
+	}
+}
+
+func newResetSiteStatsRequest(siteID uuid.UUID, confirmDomain string) *http.Request {
+	req := httptest.NewRequest(http.MethodPost, "/api/sites/"+siteID.String()+"/stats/reset", strings.NewReader(fmt.Sprintf(`{"confirm_domain":%q}`, confirmDomain)))
+	req.SetPathValue("id", siteID.String())
+	return req
+}
+
 func TestHandleGetSiteStats(t *testing.T) {
 	h, store, userID := setupTestEnv(t)
 	defer store.Close()

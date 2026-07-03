@@ -184,6 +184,7 @@
       "ownershipTransferred": "Eigendom overgedragen",
       "siteCreated": "Site gemaakt",
       "siteDeleted": "Site verwijderd",
+      "siteStatsReset": "Statistieken gereset",
       "siteRetentionUpdated": "Retentie bijgewerkt",
       "siteTransferredIn": "Site is verhuisd",
       "siteTransferredOut": "Site is verhuisd",
@@ -1251,6 +1252,13 @@
       }
     },
     "danger": {
+      "resetTitle": "Statistieken resetten",
+      "resetDescription": "Wist de gemeten statistieken van deze site permanent, maar behoudt instellingen, toegang, doelen, funnels en trackingconfiguratie.",
+      "resetConfirmLabel": "Typ \"{{domain}}\" om de reset van statistieken te bevestigen",
+      "resetConfirmHint": "Tracking blijft actief. Nieuwe data die na de reset wordt verzameld, verschijnt normaal.",
+      "resetAction": "Statistieken resetten",
+      "resetSuccess": "Statistieken gereset. {{rows}} rij(en) gewist en {{imports}} voltooide import(s) als verwijderd gemarkeerd.",
+      "resetFailed": "Kan de sitestatistieken niet resetten.",
       "deleteTitle": "Site verwijderen",
       "deleteDescription": "Verwijdert deze site en alle bijbehorende analytics-gegevens definitief.",
       "confirmLabel": "Typ \"{{domain}}\" om te bevestigen",

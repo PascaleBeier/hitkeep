@@ -388,6 +388,141 @@ func TestDeleteSiteRemovesTenantAndSharedData(t *testing.T) {
 	}
 }
 
+func TestResetSiteStatsClearsTenantAnalyticsAndSharedMeasuredData(t *testing.T) {
+	ctx := context.Background()
+	store := newSharedTestStore(t)
+	basePath := t.TempDir()
+	mgr := NewTenantStoreManager(store, basePath)
+	t.Cleanup(func() { _ = mgr.Close() })
+
+	userID, err := store.CreateUser(ctx, "reset-tenant-site@test.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	team, err := store.CreateTenant(ctx, userID, "Reset Team", "")
+	if err != nil {
+		t.Fatalf("create team: %v", err)
+	}
+	if err := store.SetActiveTenantID(ctx, userID, team.ID); err != nil {
+		t.Fatalf("set active tenant: %v", err)
+	}
+	site, err := store.CreateSite(ctx, userID, "reset-team.test")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	tenantStore, _, err := mgr.ResolveSiteStore(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("ResolveSiteStore: %v", err)
+	}
+
+	now := time.Now().UTC()
+	sessionID := uuid.New()
+	pageID := uuid.New()
+	if err := tenantStore.CreateHit(ctx, &api.Hit{
+		ID:        uuid.New(),
+		SiteID:    site.ID,
+		SessionID: sessionID,
+		PageID:    pageID,
+		Timestamp: now,
+		Path:      "/",
+	}); err != nil {
+		t.Fatalf("create tenant hit: %v", err)
+	}
+	if err := tenantStore.CreateEvent(ctx, &api.Event{
+		ID:         uuid.New(),
+		SiteID:     site.ID,
+		SessionID:  sessionID,
+		Name:       "signup",
+		Properties: map[string]any{"plan": "pro"},
+		Timestamp:  now,
+	}); err != nil {
+		t.Fatalf("create tenant event: %v", err)
+	}
+	if err := tenantStore.CreateWebVital(ctx, &api.WebVital{
+		ID:             uuid.New(),
+		SiteID:         site.ID,
+		SessionID:      sessionID,
+		PageID:         pageID,
+		Metric:         api.WebVitalLCP,
+		Value:          2600,
+		Rating:         api.WebVitalRatingNeedsImprovement,
+		Path:           "/pricing",
+		Timestamp:      now,
+		TrackerSource:  "browser",
+		TrackerVersion: "test",
+	}); err != nil {
+		t.Fatalf("create tenant web vital: %v", err)
+	}
+	importID := uuid.New()
+	if _, err := tenantStore.DB().ExecContext(ctx,
+		"INSERT INTO imported_traffic_daily (site_id, import_id, date, visitors, visits, pageviews, bounces, visit_duration, source_file) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		site.ID, importID, now.Format("2006-01-02"), 1, 1, 1, 0, 10, "visits.csv",
+	); err != nil {
+		t.Fatalf("insert tenant imported traffic: %v", err)
+	}
+	if _, err := tenantStore.DB().ExecContext(ctx,
+		"INSERT INTO ai_fetches (id, site_id, timestamp, assistant_name, assistant_family, path, status_code, resource_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		uuid.New(), site.ID, now, "GPTBot", "openai", "/", 200, "page",
+	); err != nil {
+		t.Fatalf("insert tenant ai fetch: %v", err)
+	}
+
+	if _, err := store.DB().ExecContext(ctx,
+		"INSERT INTO site_imports (id, site_id, provider, status, source_hash, bytes_total, bytes_received, rows_scanned, rows_imported, created_by, created_at, updated_at, finished_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		importID, site.ID, "plausible", ImportStatusCompleted, "hash", 10, 10, 10, 10, userID, now, now, now,
+	); err != nil {
+		t.Fatalf("insert shared import: %v", err)
+	}
+	if _, err := store.DB().ExecContext(ctx,
+		"INSERT INTO site_activity_summary (site_id, tenant_id, first_hit_at, last_hit_at, last_event_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+		site.ID, team.ID, now, now, now, now,
+	); err != nil {
+		t.Fatalf("insert shared activity summary: %v", err)
+	}
+	if _, err := store.DB().ExecContext(ctx,
+		"INSERT INTO site_activity_hourly_counts (site_id, tenant_id, bucket, hits, events, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+		site.ID, team.ID, now.Truncate(time.Hour), 1, 1, now,
+	); err != nil {
+		t.Fatalf("insert shared activity hourly: %v", err)
+	}
+	aiRunID := uuid.New()
+	if _, err := store.DB().ExecContext(ctx,
+		"INSERT INTO ai_runs (id, team_id, site_id, actor_id, actor_type, feature, provider, model, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		aiRunID, team.ID, site.ID, userID, "user", "opportunities", "test", "test-model", "completed", now,
+	); err != nil {
+		t.Fatalf("insert shared ai run: %v", err)
+	}
+	if _, err := store.DB().ExecContext(ctx,
+		"INSERT INTO opportunities (id, team_id, site_id, kind, type_key, title_key, summary_key, action_key, impact_value, impact_label_key, confidence, status, ai_run_id, generated_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		uuid.New(), team.ID, site.ID, "analytics", "type", "title", "summary", "action", "10", "impact", "high", "open", aiRunID, now, now, now,
+	); err != nil {
+		t.Fatalf("insert shared opportunity: %v", err)
+	}
+
+	result, err := mgr.ResetSiteStats(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("ResetSiteStats: %v", err)
+	}
+	if result.RowsCleared == 0 {
+		t.Fatalf("expected tenant/shared rows to be cleared")
+	}
+	if result.ImportsMarkedDeleted != 1 {
+		t.Fatalf("expected completed shared import to be marked deleted, got %d", result.ImportsMarkedDeleted)
+	}
+	assertResetFamilies(t, result.FamiliesCleared, "native", "web_vitals", "imports", "activity", "ai")
+
+	for _, table := range []string{"hits", "events", "web_vitals", "imported_traffic_daily", "ai_fetches"} {
+		assertTableCount(t, ctx, tenantStore, table, "site_id", site.ID, 0)
+	}
+	for _, table := range []string{"site_activity_summary", "site_activity_hourly_counts", "ai_runs", "opportunities"} {
+		assertTableCount(t, ctx, store, table, "site_id", site.ID, 0)
+	}
+	assertTableCount(t, ctx, store, "sites", "id", site.ID, 1)
+	assertTableCount(t, ctx, store, "site_tenants", "site_id", site.ID, 1)
+	assertTableCount(t, ctx, tenantStore, "sites", "id", site.ID, 1)
+	assertSiteImportStatuses(t, ctx, store, site.ID, map[string]int{ImportStatusDeleted: 1})
+}
+
 func TestDeleteSiteWithImportedUnattributedPropertiesDoesNotInvalidateTenantDB(t *testing.T) {
 	ctx := context.Background()
 	store := newSharedTestStore(t)

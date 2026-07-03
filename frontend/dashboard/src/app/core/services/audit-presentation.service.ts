@@ -30,6 +30,7 @@ const SHARED_ACTIONS = [
     'ownership.transferred',
     'site.created',
     'site.deleted',
+    'site.stats_reset',
     'site.retention_updated',
     'site.transferred_in',
     'site.transferred_out',
@@ -99,6 +100,7 @@ const ACTION_KEYS: Record<string, string> = {
     'ownership.transferred': 'auditTable.actions.ownershipTransferred',
     'site.created': 'auditTable.actions.siteCreated',
     'site.deleted': 'auditTable.actions.siteDeleted',
+    'site.stats_reset': 'auditTable.actions.siteStatsReset',
     'site.retention_updated': 'auditTable.actions.siteRetentionUpdated',
     'site.transferred_in': 'auditTable.actions.siteTransferredIn',
     'site.transferred_out': 'auditTable.actions.siteTransferredOut',
@@ -230,6 +232,7 @@ export class AuditPresentationService {
         const value = action ?? '';
         if (
             value === 'access.denied' ||
+            value === 'site.stats_reset' ||
             value.endsWith('.failed') ||
             value.endsWith('.revoked') ||
             value.endsWith('.removed') ||

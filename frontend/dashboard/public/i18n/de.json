@@ -184,6 +184,7 @@
       "ownershipTransferred": "Eigentümerschaft übertragen",
       "siteCreated": "Site erstellt",
       "siteDeleted": "Site gelöscht",
+      "siteStatsReset": "Statistiken zurückgesetzt",
       "siteRetentionUpdated": "Aufbewahrung geändert",
       "siteTransferredIn": "Site eingehend übertragen",
       "siteTransferredOut": "Site ausgehend übertragen",
@@ -1251,6 +1252,13 @@
       }
     },
     "danger": {
+      "resetTitle": "Statistiken zurücksetzen",
+      "resetDescription": "Löscht die gemessenen Statistiken dieser Site dauerhaft, behält aber Einstellungen, Zugriffe, Ziele, Funnels und Tracking-Einrichtung bei.",
+      "resetConfirmLabel": "Gib \"{{domain}}\" ein, um das Zurücksetzen der Statistiken zu bestätigen",
+      "resetConfirmHint": "Das Tracking bleibt aktiv. Neue Daten nach dem Zurücksetzen werden normal angezeigt.",
+      "resetAction": "Statistiken zurücksetzen",
+      "resetSuccess": "Statistiken zurückgesetzt. {{rows}} Zeile(n) gelöscht und {{imports}} abgeschlossene Import(e) als gelöscht markiert.",
+      "resetFailed": "Statistiken der Site konnten nicht zurückgesetzt werden.",
       "deleteTitle": "Seite löschen",
       "deleteDescription": "Löscht diese Seite und alle zugehörigen Analytics-Daten dauerhaft.",
       "confirmLabel": "Gib \"{{domain}}\" zur Bestätigung ein",

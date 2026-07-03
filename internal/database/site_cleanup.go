@@ -5,13 +5,22 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/google/uuid"
+
+	"hitkeep/internal/api"
 )
 
 type siteDeleteStep struct {
 	table string
 	query string
+}
+
+type siteStatsResetStep struct {
+	table  string
+	family string
+	query  string
 }
 
 var siteDeleteSteps = []siteDeleteStep{
@@ -96,6 +105,40 @@ var siteAnalyticsDeleteSteps = []siteDeleteStep{
 	{table: "web_vitals", query: "DELETE FROM web_vitals WHERE site_id = ?"},
 	{table: "ai_fetches", query: "DELETE FROM ai_fetches WHERE site_id = ?"},
 	{table: "qr_code_opens", query: "DELETE FROM qr_code_opens WHERE site_id = ?"},
+}
+
+var siteStatsResetAnalyticsSteps = []siteStatsResetStep{
+	{table: "imported_event_properties_daily", family: "imports", query: "DELETE FROM imported_event_properties_daily WHERE site_id = ?"},
+	{table: "imported_event_dimensions_daily", family: "imports", query: "DELETE FROM imported_event_dimensions_daily WHERE site_id = ?"},
+	{table: "imported_event_daily", family: "imports", query: "DELETE FROM imported_event_daily WHERE site_id = ?"},
+	{table: "imported_dimension_daily", family: "imports", query: "DELETE FROM imported_dimension_daily WHERE site_id = ?"},
+	{table: "imported_traffic_daily", family: "imports", query: "DELETE FROM imported_traffic_daily WHERE site_id = ?"},
+	{table: "search_console_facts", family: "search_console", query: "DELETE FROM search_console_facts WHERE site_id = ?"},
+	{table: "goal_rollups_hourly", family: "rollups", query: "DELETE FROM goal_rollups_hourly WHERE site_id = ?"},
+	{table: "goal_rollups_daily", family: "rollups", query: "DELETE FROM goal_rollups_daily WHERE site_id = ?"},
+	{table: "goal_rollups_monthly", family: "rollups", query: "DELETE FROM goal_rollups_monthly WHERE site_id = ?"},
+	{table: "funnel_rollups_hourly", family: "rollups", query: "DELETE FROM funnel_rollups_hourly WHERE site_id = ?"},
+	{table: "funnel_rollups_daily", family: "rollups", query: "DELETE FROM funnel_rollups_daily WHERE site_id = ?"},
+	{table: "funnel_rollups_monthly", family: "rollups", query: "DELETE FROM funnel_rollups_monthly WHERE site_id = ?"},
+	{table: "session_rollups_hourly", family: "rollups", query: "DELETE FROM session_rollups_hourly WHERE site_id = ?"},
+	{table: "session_rollups_daily", family: "rollups", query: "DELETE FROM session_rollups_daily WHERE site_id = ?"},
+	{table: "session_rollups_monthly", family: "rollups", query: "DELETE FROM session_rollups_monthly WHERE site_id = ?"},
+	{table: "rollup_dirty_buckets", family: "rollups", query: "DELETE FROM rollup_dirty_buckets WHERE site_id = ?"},
+	{table: "hit_rollups_hourly", family: "rollups", query: "DELETE FROM hit_rollups_hourly WHERE site_id = ?"},
+	{table: "hit_rollups_daily", family: "rollups", query: "DELETE FROM hit_rollups_daily WHERE site_id = ?"},
+	{table: "hit_rollups_monthly", family: "rollups", query: "DELETE FROM hit_rollups_monthly WHERE site_id = ?"},
+	{table: "events", family: "native", query: "DELETE FROM events WHERE site_id = ?"},
+	{table: "hits", family: "native", query: "DELETE FROM hits WHERE site_id = ?"},
+	{table: "web_vitals", family: "web_vitals", query: "DELETE FROM web_vitals WHERE site_id = ?"},
+	{table: "ai_fetches", family: "ai", query: "DELETE FROM ai_fetches WHERE site_id = ?"},
+	{table: "qr_code_opens", family: "qr", query: "DELETE FROM qr_code_opens WHERE site_id = ?"},
+}
+
+var siteStatsResetSharedSteps = []siteStatsResetStep{
+	{table: "opportunities", family: "ai", query: "DELETE FROM opportunities WHERE site_id = ?"},
+	{table: "ai_runs", family: "ai", query: "DELETE FROM ai_runs WHERE site_id = ?"},
+	{table: "site_activity_hourly_counts", family: "activity", query: "DELETE FROM site_activity_hourly_counts WHERE site_id = ?"},
+	{table: "site_activity_summary", family: "activity", query: "DELETE FROM site_activity_summary WHERE site_id = ?"},
 }
 
 type queryer interface {
@@ -183,6 +226,114 @@ func deleteSiteAnalyticsOnly(ctx context.Context, store *Store, siteID uuid.UUID
 		return fmt.Errorf("could not commit analytics cleanup transaction: %w", err)
 	}
 	return nil
+}
+
+func (s *Store) ResetSiteStats(ctx context.Context, siteID uuid.UUID) (api.SiteStatsResetResponse, error) {
+	result, err := s.resetSiteAnalyticsMeasurements(ctx, siteID)
+	if err != nil {
+		return result, err
+	}
+	sharedResult, err := s.resetSiteSharedMeasurements(ctx, siteID)
+	if err != nil {
+		return result, err
+	}
+	mergeSiteStatsResetResult(&result, sharedResult)
+	return result, nil
+}
+
+func (s *Store) resetSiteAnalyticsMeasurements(ctx context.Context, siteID uuid.UUID) (api.SiteStatsResetResponse, error) {
+	return s.resetSiteStatsWithSteps(ctx, siteID, siteStatsResetAnalyticsSteps, false)
+}
+
+func (s *Store) resetSiteSharedMeasurements(ctx context.Context, siteID uuid.UUID) (api.SiteStatsResetResponse, error) {
+	return s.resetSiteStatsWithSteps(ctx, siteID, siteStatsResetSharedSteps, true)
+}
+
+func (s *Store) resetSiteStatsWithSteps(ctx context.Context, siteID uuid.UUID, steps []siteStatsResetStep, markCompletedImports bool) (api.SiteStatsResetResponse, error) {
+	result := api.SiteStatsResetResponse{Status: "reset"}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return result, fmt.Errorf("could not begin site stats reset transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	existingTables, err := listTables(ctx, tx)
+	if err != nil {
+		return result, err
+	}
+
+	for _, step := range steps {
+		if _, ok := existingTables[step.table]; !ok {
+			continue
+		}
+		if !isSafeIdentifier(step.table) {
+			return result, fmt.Errorf("unsafe table name %q", step.table)
+		}
+		sqlResult, err := tx.ExecContext(ctx, step.query, siteID)
+		if err != nil {
+			return result, fmt.Errorf("could not reset site stats from %s: %w", step.table, err)
+		}
+		affected, ok := rowsAffected(sqlResult)
+		if !ok || affected <= 0 {
+			continue
+		}
+		result.RowsCleared += affected
+		addSiteStatsResetFamily(&result, step.family)
+	}
+
+	if markCompletedImports {
+		importsDeleted, err := markCompletedImportsDeletedForSite(ctx, tx, siteID)
+		if err != nil {
+			return result, err
+		}
+		result.ImportsMarkedDeleted = importsDeleted
+		if importsDeleted > 0 {
+			addSiteStatsResetFamily(&result, "imports")
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return result, fmt.Errorf("could not commit site stats reset transaction: %w", err)
+	}
+	return result, nil
+}
+
+func rowsAffected(result sql.Result) (int64, bool) {
+	if result == nil {
+		return 0, false
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, false
+	}
+	return affected, true
+}
+
+func mergeSiteStatsResetResult(dst *api.SiteStatsResetResponse, src api.SiteStatsResetResponse) {
+	if dst == nil {
+		return
+	}
+	if strings.TrimSpace(dst.Status) == "" {
+		dst.Status = "reset"
+	}
+	dst.RowsCleared += src.RowsCleared
+	dst.ImportsMarkedDeleted += src.ImportsMarkedDeleted
+	for _, family := range src.FamiliesCleared {
+		addSiteStatsResetFamily(dst, family)
+	}
+}
+
+func addSiteStatsResetFamily(result *api.SiteStatsResetResponse, family string) {
+	family = strings.TrimSpace(family)
+	if result == nil || family == "" {
+		return
+	}
+	for _, existing := range result.FamiliesCleared {
+		if existing == family {
+			return
+		}
+	}
+	result.FamiliesCleared = append(result.FamiliesCleared, family)
 }
 
 func listTables(ctx context.Context, q queryer) (map[string]struct{}, error) {

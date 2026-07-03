@@ -584,6 +584,26 @@ func (s *Store) MarkImportDeleted(ctx context.Context, siteID, importID uuid.UUI
 	return s.updateImportStatus(ctx, siteID, importID, ImportStatusDeleted, "", nil)
 }
 
+func (s *Store) MarkCompletedImportsDeletedForSite(ctx context.Context, siteID uuid.UUID) (int64, error) {
+	return markCompletedImportsDeletedForSite(ctx, s.db, siteID)
+}
+
+func markCompletedImportsDeletedForSite(ctx context.Context, exec sqlExecContext, siteID uuid.UUID) (int64, error) {
+	now := time.Now().UTC()
+	result, err := exec.ExecContext(ctx, `
+		UPDATE site_imports
+		SET status = ?, error = NULL, updated_at = ?
+		WHERE site_id = ? AND status = ?
+	`, ImportStatusDeleted, now, siteID, ImportStatusCompleted)
+	if err != nil {
+		return 0, fmt.Errorf("mark completed imports deleted for site: %w", err)
+	}
+	if affected, err := result.RowsAffected(); err == nil {
+		return affected, nil
+	}
+	return 0, nil
+}
+
 func (s *Store) updateImportStatus(ctx context.Context, siteID, importID uuid.UUID, status string, errMsg string, manifest *api.ImportManifest) error {
 	now := time.Now().UTC()
 	if manifest != nil {
