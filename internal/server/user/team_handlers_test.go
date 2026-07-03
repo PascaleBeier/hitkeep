@@ -16,6 +16,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
 	"hitkeep/internal/mailer"
+	serverauth "hitkeep/internal/server/auth"
 )
 
 type teamTestMailDriver struct {
@@ -44,7 +45,7 @@ func TestHandleGetTeams(t *testing.T) {
 	if _, err := store.CreateSite(context.Background(), userID, "usage-api.test"); err != nil {
 		t.Fatalf("create site: %v", err)
 	}
-	if _, err := store.CreateTeamInvite(context.Background(), activeTeamID, "pending-team-usage@test.dev", database.TenantRoleMember, nil, userID); err != nil {
+	if _, err := store.CreateTeamInvite(context.Background(), activeTeamID, "pending-team-usage@test.dev", database.TenantRoleMember, nil, userID, false); err != nil {
 		t.Fatalf("create invite: %v", err)
 	}
 
@@ -300,7 +301,7 @@ func TestSendTeamInviteEmailFallsBackToInviterLocaleForNewRecipient(t *testing.T
 		t.Fatalf("get active team: %v", err)
 	}
 
-	invite, err := store.CreateTeamInvite(ctx, teamID, "neu@example.com", database.TenantRoleMember, nil, ownerID)
+	invite, err := store.CreateTeamInvite(ctx, teamID, "neu@example.com", database.TenantRoleMember, nil, ownerID, true)
 	if err != nil {
 		t.Fatalf("create team invite: %v", err)
 	}
@@ -322,6 +323,44 @@ func TestSendTeamInviteEmailFallsBackToInviterLocaleForNewRecipient(t *testing.T
 	}
 	if !strings.Contains(drv.textBody, "https://www.example.net/hitkeep/accept-invite?token=") {
 		t.Fatalf("expected invite link to use prefixed public URL, got:\n%s", drv.textBody)
+	}
+}
+
+func TestSendTeamInviteEmailRoutesExistingUsersThroughLogin(t *testing.T) {
+	h, store, ownerID := setupUserSecurityTestEnv(t)
+	defer store.Close()
+	h.ctx.Config.PublicURL = "https://www.example.net/hitkeep/"
+
+	ctx := context.Background()
+	teamID, err := store.GetActiveTenantID(ctx, ownerID)
+	if err != nil {
+		t.Fatalf("get active team: %v", err)
+	}
+
+	existingHash, err := serverauth.HashPassword("password123")
+	if err != nil {
+		t.Fatalf("hash existing user password: %v", err)
+	}
+	existingID, err := store.CreateUserWithoutDefaultTenant(ctx, "bestehend@example.com", existingHash)
+	if err != nil {
+		t.Fatalf("create existing user: %v", err)
+	}
+	invite, err := store.CreateTeamInvite(ctx, teamID, "bestehend@example.com", database.TenantRoleMember, &existingID, ownerID, false)
+	if err != nil {
+		t.Fatalf("create team invite: %v", err)
+	}
+
+	drv := &teamTestMailDriver{}
+	h.ctx.Mailer = mailer.NewWithDriver(drv, h.ctx.Config)
+
+	req := withTestUser(httptest.NewRequest(http.MethodPost, "/api/user/teams/"+teamID.String()+"/members", nil), ownerID)
+	h.sendTeamInviteEmail(req, teamID, ownerID, invite)
+
+	if !strings.Contains(drv.textBody, "https://www.example.net/hitkeep/login?returnUrl=%2Faccept-invite%3Ftoken%3D") {
+		t.Fatalf("expected existing user invite link to route through login, got:\n%s", drv.textBody)
+	}
+	if strings.Contains(drv.textBody, "Passwort festlegen") {
+		t.Fatalf("expected existing user invite copy not to ask for password setup, got:\n%s", drv.textBody)
 	}
 }
 
@@ -477,7 +516,7 @@ func TestHandleGetAndRevokeTeamInvites(t *testing.T) {
 		t.Fatalf("add owner to custom tenant: %v", err)
 	}
 
-	invite, err := store.CreateTeamInvite(context.Background(), customTenantID, "revoke-invite@team.test", database.TenantRoleMember, nil, ownerID)
+	invite, err := store.CreateTeamInvite(context.Background(), customTenantID, "revoke-invite@team.test", database.TenantRoleMember, nil, ownerID, false)
 	if err != nil {
 		t.Fatalf("create team invite: %v", err)
 	}

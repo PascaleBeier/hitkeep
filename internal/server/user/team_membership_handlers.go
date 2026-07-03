@@ -64,6 +64,7 @@ func (h *handler) handleAddTeamMember() http.HandlerFunc {
 		var targetUserID uuid.UUID
 		wasMember := false
 		previousRole := ""
+		requiresPasswordSetup := false
 		if user != nil {
 			targetUserID = user.ID
 
@@ -86,6 +87,7 @@ func (h *handler) handleAddTeamMember() http.HandlerFunc {
 				}
 			}
 		} else {
+			requiresPasswordSetup = true
 			if h.ctx.Config.CloudHosted && !operatorOwnedTeam {
 				if err := h.requireTeamMemberCapacity(r.Context(), teamID); err != nil {
 					h.writeCloudTeamMemberPreflightError(w, err, email, teamID, actorID)
@@ -114,7 +116,7 @@ func (h *handler) handleAddTeamMember() http.HandlerFunc {
 			return
 		}
 
-		h.createPendingTeamInvite(w, r, teamID, actorID, targetUserID, email, role)
+		h.createPendingTeamInvite(w, r, teamID, actorID, targetUserID, email, role, requiresPasswordSetup)
 	}
 }
 
@@ -137,8 +139,8 @@ func (h *handler) updateExistingTeamMember(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-func (h *handler) createPendingTeamInvite(w http.ResponseWriter, r *http.Request, teamID, actorID, targetUserID uuid.UUID, email, role string) {
-	invite, err := h.ctx.Store.CreateTeamInvite(r.Context(), teamID, email, role, &targetUserID, actorID)
+func (h *handler) createPendingTeamInvite(w http.ResponseWriter, r *http.Request, teamID, actorID, targetUserID uuid.UUID, email, role string, requiresPasswordSetup bool) {
+	invite, err := h.ctx.Store.CreateTeamInvite(r.Context(), teamID, email, role, &targetUserID, actorID, requiresPasswordSetup)
 	if err != nil {
 		if errors.Is(err, database.ErrTeamInviteAlreadyPending) {
 			http.Error(w, "Invite already pending", http.StatusConflict)

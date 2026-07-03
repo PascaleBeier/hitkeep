@@ -109,6 +109,16 @@ export class AuthService {
         return this.http.post<void>('/api/auth/reset-password', { token, password });
     }
 
+    acceptInvite(token: string, password?: string): Observable<LoginResponse> {
+        return this.http.post<LoginResponse>('/api/auth/accept-invite', password ? { token, password } : { token }).pipe(
+            tap((resp) => {
+                if (resp.status === 'ok') {
+                    this.status.set('authenticated');
+                }
+            })
+        );
+    }
+
     changePassword(current: string, newPass: string): Observable<void> {
         return this.http.post<void>('/api/user/password', {
             current_password: current,

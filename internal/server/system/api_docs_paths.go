@@ -133,9 +133,9 @@ func openAPIV1CorePaths() map[string]any {
 				map[string]any{"200": jsonRefResp("Status", "#/components/schemas/Status"), "400": errResp("Invalid or expired link")}),
 		},
 		"/api/auth/accept-invite": map[string]any{
-			"post": op([]string{"Auth"}, "Accept invite", "Sets password for invited user using invite token.", nil, nil,
-				jsonBody(map[string]any{"type": "object", "properties": map[string]any{"token": map[string]any{"type": "string"}, "password": map[string]any{"type": "string", "minLength": 8}}, "required": []string{"token", "password"}}),
-				map[string]any{"200": jsonRefResp("Status", "#/components/schemas/Status")}),
+			"post": op([]string{"Auth"}, "Accept invite", "Accepts a team invite. New invite-created users provide a password and receive a session cookie; existing users must sign in first and can accept with the token only.", nil, nil,
+				jsonBody(map[string]any{"type": "object", "properties": map[string]any{"token": map[string]any{"type": "string"}, "password": map[string]any{"type": "string", "minLength": 8}}, "required": []string{"token"}}),
+				map[string]any{"200": jsonRefResp("Login response", "#/components/schemas/LoginResponse"), "400": errResp("Invalid or expired link"), "401": errResp("Sign in to accept this invitation"), "403": errResp("Invite cannot be accepted")}),
 		},
 		"/api/auth/passkey/login/start": map[string]any{
 			"post": op([]string{"Auth"}, "Start passkey login", "Creates passkey login challenge.", nil, nil, nil,

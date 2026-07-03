@@ -1403,7 +1403,7 @@ func TestHandleAcceptInviteActivatesPendingTeamInvite(t *testing.T) {
 	if err := store.AddTeamMember(context.Background(), teamID, ownerID, database.TenantRoleOwner, ownerID); err != nil {
 		t.Fatalf("failed to add owner to team: %v", err)
 	}
-	if _, err := store.CreateTeamInvite(context.Background(), teamID, "accept-invite@example.com", database.TenantRoleAdmin, &inviteeID, ownerID); err != nil {
+	if _, err := store.CreateTeamInvite(context.Background(), teamID, "accept-invite@example.com", database.TenantRoleAdmin, &inviteeID, ownerID, true); err != nil {
 		t.Fatalf("failed to create team invite: %v", err)
 	}
 
@@ -1421,6 +1421,18 @@ func TestHandleAcceptInviteActivatesPendingTeamInvite(t *testing.T) {
 	h.handleAcceptInvite().ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
+	}
+	if !slices.ContainsFunc(w.Header().Values("Set-Cookie"), func(cookie string) bool {
+		return strings.Contains(cookie, auth.CookieName+"=")
+	}) {
+		t.Fatalf("expected auth cookie to be set after accepting invite")
+	}
+	var resp loginResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode invite acceptance response: %v", err)
+	}
+	if resp.Status != "ok" {
+		t.Fatalf("expected invite acceptance status ok, got %+v", resp)
 	}
 
 	isMember, err := store.IsTenantMember(context.Background(), teamID, inviteeID)
@@ -1465,6 +1477,243 @@ func TestHandleAcceptInviteActivatesPendingTeamInvite(t *testing.T) {
 		if entry.TargetUserID == nil || *entry.TargetUserID != inviteeID {
 			t.Fatalf("expected %s target_user_id %s, got %v", action, inviteeID, entry.TargetUserID)
 		}
+	}
+}
+
+func TestHandleAcceptInviteLetsExistingAuthenticatedUserAcceptWithoutPassword(t *testing.T) {
+	h, store := setupAuthTestEnv(t)
+	defer store.Close()
+
+	ownerHash, err := HashPassword("password123")
+	if err != nil {
+		t.Fatalf("failed to hash owner password: %v", err)
+	}
+	ownerID, err := store.CreateUser(context.Background(), "owner-existing-invite@example.com", ownerHash)
+	if err != nil {
+		t.Fatalf("failed to create owner user: %v", err)
+	}
+
+	existingHash, err := HashPassword("password123")
+	if err != nil {
+		t.Fatalf("failed to hash existing user password: %v", err)
+	}
+	existingID, err := store.CreateUser(context.Background(), "existing-invite@example.com", existingHash)
+	if err != nil {
+		t.Fatalf("failed to create existing user: %v", err)
+	}
+
+	teamID := uuid.New()
+	if _, err := store.DB().ExecContext(context.Background(),
+		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
+		teamID, "Existing Invite", time.Now().UTC(),
+	); err != nil {
+		t.Fatalf("failed to insert team: %v", err)
+	}
+	if err := store.AddTeamMember(context.Background(), teamID, ownerID, database.TenantRoleOwner, ownerID); err != nil {
+		t.Fatalf("failed to add owner to team: %v", err)
+	}
+	if _, err := store.CreateTeamInvite(context.Background(), teamID, "existing-invite@example.com", database.TenantRoleAdmin, &existingID, ownerID, false); err != nil {
+		t.Fatalf("failed to create team invite: %v", err)
+	}
+
+	token, err := store.CreatePasswordResetToken(context.Background(), "existing-invite@example.com")
+	if err != nil {
+		t.Fatalf("failed to create invite token: %v", err)
+	}
+	authToken, err := auth.GenerateToken(h.ctx.Config.JWTSecret, h.ctx.Config.PublicURL, existingID)
+	if err != nil {
+		t.Fatalf("failed to create auth token: %v", err)
+	}
+
+	body, _ := json.Marshal(map[string]string{"token": token})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/accept-invite", bytes.NewReader(body))
+	req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: authToken})
+	w := httptest.NewRecorder()
+	h.handleAcceptInvite().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
+	}
+	if got := w.Header().Get("Content-Type"); !strings.HasPrefix(got, "application/json") {
+		t.Fatalf("expected JSON content type, got %q", got)
+	}
+
+	var resp loginResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode invite acceptance response: %v", err)
+	}
+	if resp.Status != "ok" {
+		t.Fatalf("expected invite acceptance status ok, got %+v", resp)
+	}
+
+	user, err := store.GetUserByID(context.Background(), existingID)
+	if err != nil {
+		t.Fatalf("load existing user: %v", err)
+	}
+	passwordStillWorks, err := verifyPassword("password123", user.Password)
+	if err != nil {
+		t.Fatalf("verify existing password: %v", err)
+	}
+	if !passwordStillWorks {
+		t.Fatalf("expected existing invite acceptance to leave password unchanged")
+	}
+
+	isMember, err := store.IsTenantMember(context.Background(), teamID, existingID)
+	if err != nil {
+		t.Fatalf("check existing user membership: %v", err)
+	}
+	if !isMember {
+		t.Fatalf("expected existing user to become a team member")
+	}
+}
+
+func TestHandleAcceptInviteRequiresLoginForExistingUserInvite(t *testing.T) {
+	h, store := setupAuthTestEnv(t)
+	defer store.Close()
+
+	ownerHash, err := HashPassword("password123")
+	if err != nil {
+		t.Fatalf("failed to hash owner password: %v", err)
+	}
+	ownerID, err := store.CreateUser(context.Background(), "owner-login-invite@example.com", ownerHash)
+	if err != nil {
+		t.Fatalf("failed to create owner user: %v", err)
+	}
+
+	existingHash, err := HashPassword("password123")
+	if err != nil {
+		t.Fatalf("failed to hash existing user password: %v", err)
+	}
+	existingID, err := store.CreateUser(context.Background(), "login-required-invite@example.com", existingHash)
+	if err != nil {
+		t.Fatalf("failed to create existing user: %v", err)
+	}
+
+	teamID := uuid.New()
+	if _, err := store.DB().ExecContext(context.Background(),
+		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
+		teamID, "Login Required Invite", time.Now().UTC(),
+	); err != nil {
+		t.Fatalf("failed to insert team: %v", err)
+	}
+	if err := store.AddTeamMember(context.Background(), teamID, ownerID, database.TenantRoleOwner, ownerID); err != nil {
+		t.Fatalf("failed to add owner to team: %v", err)
+	}
+	if _, err := store.CreateTeamInvite(context.Background(), teamID, "login-required-invite@example.com", database.TenantRoleAdmin, &existingID, ownerID, false); err != nil {
+		t.Fatalf("failed to create team invite: %v", err)
+	}
+
+	token, err := store.CreatePasswordResetToken(context.Background(), "login-required-invite@example.com")
+	if err != nil {
+		t.Fatalf("failed to create invite token: %v", err)
+	}
+
+	body, _ := json.Marshal(map[string]string{
+		"token":    token,
+		"password": "new-password-123",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/accept-invite", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	h.handleAcceptInvite().ServeHTTP(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusUnauthorized, w.Code, w.Body.String())
+	}
+
+	user, err := store.GetUserByID(context.Background(), existingID)
+	if err != nil {
+		t.Fatalf("load existing user: %v", err)
+	}
+	passwordStillWorks, err := verifyPassword("password123", user.Password)
+	if err != nil {
+		t.Fatalf("verify existing password: %v", err)
+	}
+	if !passwordStillWorks {
+		t.Fatalf("expected unauthenticated existing invite acceptance to leave password unchanged")
+	}
+
+	authToken, err := auth.GenerateToken(h.ctx.Config.JWTSecret, h.ctx.Config.PublicURL, existingID)
+	if err != nil {
+		t.Fatalf("failed to create auth token: %v", err)
+	}
+	body, _ = json.Marshal(map[string]string{"token": token})
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/accept-invite", bytes.NewReader(body))
+	req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: authToken})
+	w = httptest.NewRecorder()
+	h.handleAcceptInvite().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected token to remain usable after login-required response, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandleAcceptInviteRejectsAuthenticatedEmailMismatch(t *testing.T) {
+	h, store := setupAuthTestEnv(t)
+	defer store.Close()
+
+	ownerHash, err := HashPassword("password123")
+	if err != nil {
+		t.Fatalf("failed to hash owner password: %v", err)
+	}
+	ownerID, err := store.CreateUser(context.Background(), "owner-mismatch-invite@example.com", ownerHash)
+	if err != nil {
+		t.Fatalf("failed to create owner user: %v", err)
+	}
+	inviteeHash, err := HashPassword("password123")
+	if err != nil {
+		t.Fatalf("failed to hash invitee password: %v", err)
+	}
+	inviteeID, err := store.CreateUser(context.Background(), "mismatch-invite@example.com", inviteeHash)
+	if err != nil {
+		t.Fatalf("failed to create invitee user: %v", err)
+	}
+	otherHash, err := HashPassword("password123")
+	if err != nil {
+		t.Fatalf("failed to hash other user password: %v", err)
+	}
+	otherID, err := store.CreateUser(context.Background(), "other-mismatch-invite@example.com", otherHash)
+	if err != nil {
+		t.Fatalf("failed to create other user: %v", err)
+	}
+
+	teamID := uuid.New()
+	if _, err := store.DB().ExecContext(context.Background(),
+		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
+		teamID, "Mismatch Invite", time.Now().UTC(),
+	); err != nil {
+		t.Fatalf("failed to insert team: %v", err)
+	}
+	if err := store.AddTeamMember(context.Background(), teamID, ownerID, database.TenantRoleOwner, ownerID); err != nil {
+		t.Fatalf("failed to add owner to team: %v", err)
+	}
+	if _, err := store.CreateTeamInvite(context.Background(), teamID, "mismatch-invite@example.com", database.TenantRoleAdmin, &inviteeID, ownerID, false); err != nil {
+		t.Fatalf("failed to create team invite: %v", err)
+	}
+	token, err := store.CreatePasswordResetToken(context.Background(), "mismatch-invite@example.com")
+	if err != nil {
+		t.Fatalf("failed to create invite token: %v", err)
+	}
+	otherToken, err := auth.GenerateToken(h.ctx.Config.JWTSecret, h.ctx.Config.PublicURL, otherID)
+	if err != nil {
+		t.Fatalf("failed to create auth token: %v", err)
+	}
+
+	body, _ := json.Marshal(map[string]string{"token": token})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/accept-invite", bytes.NewReader(body))
+	req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: otherToken})
+	w := httptest.NewRecorder()
+	h.handleAcceptInvite().ServeHTTP(w, req)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusForbidden, w.Code, w.Body.String())
+	}
+
+	correctToken, err := auth.GenerateToken(h.ctx.Config.JWTSecret, h.ctx.Config.PublicURL, inviteeID)
+	if err != nil {
+		t.Fatalf("failed to create correct auth token: %v", err)
+	}
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/accept-invite", bytes.NewReader(body))
+	req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: correctToken})
+	w = httptest.NewRecorder()
+	h.handleAcceptInvite().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected token to remain usable after mismatch response, got %d: %s", w.Code, w.Body.String())
 	}
 }
 

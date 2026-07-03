@@ -1185,6 +1185,24 @@
       }
     }
   },
+  "invite": {
+    "accept": {
+      "title": "Aceitar convite",
+      "description": "Defina uma senha ou entre com o endereço de e-mail que recebeu este convite.",
+      "passwordLabel": "Senha",
+      "minimumLength": "Deve ter pelo menos 8 caracteres.",
+      "submit": "Aceitar convite",
+      "checkingSession": "Verificando convite...",
+      "loginRequired": "Entre com o endereço de e-mail que recebeu este convite para aceitá-lo.",
+      "signIn": "Entrar",
+      "errors": {
+        "tokenMissing": "Link de convite inválido. O token está ausente.",
+        "expiredOrInvalid": "Este link de convite expirou ou é inválido.",
+        "teamLimit": "Este convite não pode ser aceito porque a conta já está vinculada a outra equipe.",
+        "acceptFailed": "Não foi possível aceitar este convite. Tente novamente."
+      }
+    }
+  },
   "share": {
     "dialog": {
       "title": "Compartilhar painel",

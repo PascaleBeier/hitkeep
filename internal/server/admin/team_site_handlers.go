@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/mail"
+	"net/url"
 	"strings"
 
 	"github.com/google/uuid"
@@ -20,12 +22,13 @@ import (
 	"hitkeep/internal/server/shared"
 )
 
-var errHostedCloudSiteMemberRequiresTeam = errors.New("hosted cloud site member must join a team first")
+var errHostedCloudSiteInviteTeamMemberLimitReached = errors.New("cloud team member limit reached")
 
 type resolvedSiteMemberUser struct {
-	userID      uuid.UUID
-	isNewUser   bool
-	inviteToken string
+	userID                uuid.UUID
+	isTeamMember          bool
+	inviteToken           string
+	requiresPasswordSetup bool
 }
 
 func (h *handler) handleAdminListTeams() http.HandlerFunc {
@@ -303,22 +306,31 @@ func (h *handler) handleAddSiteMember() http.HandlerFunc {
 			return
 		}
 
-		resolvedUser, err := h.resolveSiteMemberUser(r.Context(), req.Email)
-		if errors.Is(err, errHostedCloudSiteMemberRequiresTeam) {
-			http.Error(w, "Managed cloud users must join a team before site access can be granted", http.StatusConflict)
+		email, ok := normalizeSiteMemberEmail(w, req.Email)
+		if !ok {
 			return
 		}
+
+		actorID := shared.GetUserIDFromContext(r)
+		teamID, teamErr := h.ctx.Store.GetSiteTenantID(r.Context(), siteID)
+		if teamErr != nil {
+			slog.Error("Failed to resolve site team", "error", teamErr, "site_id", siteID, "actor_id", actorID)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		resolvedUser, err := h.resolveSiteMemberUser(r.Context(), teamID, actorID, email)
 		if err != nil {
+			if h.writeSiteInvitePreflightError(w, err, email, teamID, actorID) {
+				return
+			}
 			slog.Error("Failed to resolve site member user", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		userID := resolvedUser.userID
-		isNewUser := resolvedUser.isNewUser
 		inviteToken := resolvedUser.inviteToken
 
-		actorID := shared.GetUserIDFromContext(r)
-		teamID, teamErr := h.ctx.Store.GetSiteTenantID(r.Context(), siteID)
 		siteLabel := siteID.String()
 		if site, siteErr := h.ctx.Store.GetSiteByID(r.Context(), siteID); siteErr == nil && site != nil && strings.TrimSpace(site.Domain) != "" {
 			siteLabel = site.Domain
@@ -333,34 +345,36 @@ func (h *handler) handleAddSiteMember() http.HandlerFunc {
 			}
 		}
 
-		err = h.ctx.Store.AddSiteMember(r.Context(), siteID, userID, authcore.SiteRole(req.Role), actorID)
+		if resolvedUser.isTeamMember {
+			err = h.ctx.Store.AddSiteMember(r.Context(), siteID, userID, authcore.SiteRole(req.Role), actorID)
+		} else {
+			err = h.ctx.Store.AddPendingSiteMemberInviteAccess(r.Context(), siteID, userID, authcore.SiteRole(req.Role), actorID)
+		}
 		if err != nil {
 			slog.Error("Failed to add member", "error", err)
 			http.Error(w, "Failed to add member", http.StatusInternalServerError)
 			return
 		}
-		if teamErr == nil {
-			action := "permission.site_member_granted"
-			details := fmt.Sprintf("Site member %s granted %s on %s", req.Email, strings.TrimSpace(req.Role), siteLabel)
-			if previousRole != "" {
-				action = "permission.site_member_role_updated"
-				details = fmt.Sprintf("Site member %s role changed from %s to %s on %s", req.Email, previousRole, strings.TrimSpace(req.Role), siteLabel)
-			}
-			h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
-				ActorID:      actorID,
-				TeamID:       teamID,
-				TargetUserID: userID,
-				Action:       action,
-				TargetType:   "permission",
-				TargetID:     siteID.String(),
-				TargetLabel:  siteLabel,
-				Outcome:      "success",
-				Details:      details,
-			})
+		action := "permission.site_member_granted"
+		details := fmt.Sprintf("Site member %s granted %s on %s", email, strings.TrimSpace(req.Role), siteLabel)
+		if previousRole != "" {
+			action = "permission.site_member_role_updated"
+			details = fmt.Sprintf("Site member %s role changed from %s to %s on %s", email, previousRole, strings.TrimSpace(req.Role), siteLabel)
 		}
+		h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
+			ActorID:      actorID,
+			TeamID:       teamID,
+			TargetUserID: userID,
+			Action:       action,
+			TargetType:   "permission",
+			TargetID:     siteID.String(),
+			TargetLabel:  siteLabel,
+			Outcome:      "success",
+			Details:      details,
+		})
 
-		if isNewUser && inviteToken != "" {
-			site, err := h.ctx.Store.GetSite(r.Context(), siteID, actorID)
+		if inviteToken != "" && h.ctx.Mailer != nil {
+			site, err := h.ctx.Store.GetSiteByID(r.Context(), siteID)
 			siteName := "Unknown Site"
 			if err == nil && site != nil {
 				siteName = site.Domain
@@ -379,10 +393,10 @@ func (h *handler) handleAddSiteMember() http.HandlerFunc {
 				}
 			}
 
-			inviteLink := appurl.Path(h.ctx.Config.PublicURL, "/accept-invite?token="+inviteToken)
-			err = h.ctx.Mailer.Send(req.Email, mailables.NewUserInvite(inviteLink, siteName, inviterName, locale))
+			inviteLink := siteInviteLink(h.ctx.Config.PublicURL, inviteToken, resolvedUser.requiresPasswordSetup)
+			err = h.ctx.Mailer.Send(email, mailables.NewUserInvite(inviteLink, siteName, inviterName, locale))
 			if err != nil {
-				slog.Warn("Failed to send invite email", "error", err, "email", req.Email)
+				slog.Warn("Failed to send invite email", "error", err, "email", email)
 			}
 		}
 
@@ -393,35 +407,175 @@ func (h *handler) handleAddSiteMember() http.HandlerFunc {
 	}
 }
 
-func (h *handler) resolveSiteMemberUser(ctx context.Context, email string) (resolvedSiteMemberUser, error) {
+func normalizeSiteMemberEmail(w http.ResponseWriter, value string) (string, bool) {
+	email := strings.ToLower(strings.TrimSpace(value))
+	parsedEmail, err := mail.ParseAddress(email)
+	if err != nil || parsedEmail.Address != email {
+		http.Error(w, "Invalid email", http.StatusBadRequest)
+		return "", false
+	}
+	return email, true
+}
+
+func (h *handler) resolveSiteMemberUser(ctx context.Context, teamID, actorID uuid.UUID, email string) (resolvedSiteMemberUser, error) {
 	user, err := h.ctx.Store.GetUserByEmail(ctx, email)
 	if err != nil {
 		return resolvedSiteMemberUser{}, fmt.Errorf("check user: %w", err)
 	}
+
+	result := resolvedSiteMemberUser{}
 	if user != nil {
-		return resolvedSiteMemberUser{userID: user.ID}, nil
-	}
-	if h.ctx.Config.CloudHosted {
-		return resolvedSiteMemberUser{}, errHostedCloudSiteMemberRequiresTeam
+		result.userID = user.ID
+	} else {
+		tempPassword := uuid.New().String()
+		hashedPassword, err := serverauth.HashPassword(tempPassword)
+		if err != nil {
+			return resolvedSiteMemberUser{}, fmt.Errorf("hash temporary password: %w", err)
+		}
+
+		if h.ctx.Config.CloudHosted {
+			result.userID, err = h.ctx.Store.CreateUserWithoutDefaultTenant(ctx, email, hashedPassword)
+		} else {
+			result.userID, err = h.ctx.Store.CreateUser(ctx, email, hashedPassword)
+		}
+		if err != nil {
+			return resolvedSiteMemberUser{}, fmt.Errorf("create user: %w", err)
+		}
+		result.requiresPasswordSetup = true
 	}
 
-	tempPassword := uuid.New().String()
-	hashedPassword, err := serverauth.HashPassword(tempPassword)
+	isTeamMember, err := h.ctx.Store.IsTenantMember(ctx, teamID, result.userID)
 	if err != nil {
-		return resolvedSiteMemberUser{}, fmt.Errorf("hash temporary password: %w", err)
+		return resolvedSiteMemberUser{}, fmt.Errorf("check tenant membership: %w", err)
+	}
+	result.isTeamMember = isTeamMember
+
+	if !isTeamMember || result.requiresPasswordSetup {
+		invite, err := h.findPendingTeamInviteForSite(ctx, teamID, email)
+		if err != nil {
+			return resolvedSiteMemberUser{}, err
+		}
+		if !isTeamMember && h.ctx.Config.CloudHosted {
+			if err := h.validateHostedCloudSiteInvitee(ctx, teamID, result.userID, email, invite == nil); err != nil {
+				return resolvedSiteMemberUser{}, err
+			}
+		}
+		if invite == nil {
+			invite, err = h.createSiteTeamInvite(ctx, teamID, actorID, result.userID, email, result.requiresPasswordSetup)
+			if err != nil {
+				return resolvedSiteMemberUser{}, err
+			}
+		}
+		result.requiresPasswordSetup = invite.RequiresPasswordSetup
+		result.inviteToken, err = h.ctx.Store.CreatePasswordResetToken(ctx, email)
+		if err != nil {
+			return resolvedSiteMemberUser{}, fmt.Errorf("create invite token: %w", err)
+		}
 	}
 
-	userID, err := h.ctx.Store.CreateUser(ctx, email, hashedPassword)
+	return result, nil
+}
+
+func (h *handler) createSiteTeamInvite(ctx context.Context, teamID, actorID, userID uuid.UUID, email string, requiresPasswordSetup bool) (*api.TeamInvite, error) {
+	invite, err := h.ctx.Store.CreateTeamInvite(ctx, teamID, email, database.TenantRoleMember, &userID, actorID, requiresPasswordSetup)
+	if err == nil {
+		return invite, nil
+	}
+	if !errors.Is(err, database.ErrTeamInviteAlreadyPending) {
+		return nil, err
+	}
+	invite, err = h.findPendingTeamInviteForSite(ctx, teamID, email)
 	if err != nil {
-		return resolvedSiteMemberUser{}, fmt.Errorf("create user: %w", err)
+		return nil, err
 	}
+	if invite == nil {
+		return nil, database.ErrTeamInviteAlreadyPending
+	}
+	return invite, nil
+}
 
-	inviteToken, err := h.ctx.Store.CreatePasswordResetToken(ctx, email)
+func (h *handler) findPendingTeamInviteForSite(ctx context.Context, teamID uuid.UUID, email string) (*api.TeamInvite, error) {
+	pendingInvites, err := h.ctx.Store.ListPendingTeamInvitesByEmail(ctx, email)
 	if err != nil {
-		slog.Error("Failed to create invite token", "error", err)
+		return nil, err
+	}
+	for idx := range pendingInvites {
+		if pendingInvites[idx].TeamID == teamID {
+			return &pendingInvites[idx], nil
+		}
+	}
+	return nil, nil
+}
+
+func (h *handler) validateHostedCloudSiteInvitee(ctx context.Context, teamID, userID uuid.UUID, email string, requireCapacity bool) error {
+	if requireCapacity {
+		if err := h.requireHostedCloudSiteInviteCapacity(ctx, teamID); err != nil {
+			return err
+		}
+	}
+	teamCount, err := h.ctx.Store.CountUserNonDefaultTeams(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("count cloud invitee teams: %w", err)
+	}
+	if teamCount > 0 {
+		return database.ErrManagedCloudSingleTeamLimit
 	}
 
-	return resolvedSiteMemberUser{userID: userID, isNewUser: true, inviteToken: inviteToken}, nil
+	pendingInvites, err := h.ctx.Store.ListPendingTeamInvitesByEmail(ctx, email)
+	if err != nil {
+		return fmt.Errorf("load pending cloud invites: %w", err)
+	}
+	for _, pendingInvite := range pendingInvites {
+		if pendingInvite.TeamID != teamID {
+			return database.ErrManagedCloudSingleTeamLimit
+		}
+	}
+	return nil
+}
+
+func (h *handler) requireHostedCloudSiteInviteCapacity(ctx context.Context, teamID uuid.UUID) error {
+	if h.ctx.Entitlements == nil {
+		return nil
+	}
+	ent, err := h.ctx.Entitlements.ForTenant(ctx, teamID)
+	if err != nil || ent == nil || ent.MaxTeamMembers <= 0 {
+		return nil
+	}
+
+	memberCount, err := h.ctx.Store.CountTeamMembers(ctx, teamID)
+	if err != nil {
+		return err
+	}
+	pendingInviteCount, err := h.ctx.Store.CountPendingTeamInvites(ctx, teamID)
+	if err != nil {
+		return err
+	}
+	if memberCount+pendingInviteCount >= ent.MaxTeamMembers {
+		return errHostedCloudSiteInviteTeamMemberLimitReached
+	}
+	return nil
+}
+
+func (h *handler) writeSiteInvitePreflightError(w http.ResponseWriter, err error, email string, teamID, actorID uuid.UUID) bool {
+	switch {
+	case errors.Is(err, errHostedCloudSiteInviteTeamMemberLimitReached):
+		slog.Warn("Cloud team member limit reached for site invite", "error", err, "email", email, "team_id", teamID, "actor_id", actorID)
+		http.Error(w, "Team member limit reached", http.StatusForbidden)
+		return true
+	case errors.Is(err, database.ErrManagedCloudSingleTeamLimit):
+		http.Error(w, "Managed cloud accounts are limited to one team", http.StatusConflict)
+		return true
+	default:
+		return false
+	}
+}
+
+func siteInviteLink(publicURL, inviteToken string, requiresPasswordSetup bool) string {
+	acceptPath := "/accept-invite?token=" + inviteToken
+	if requiresPasswordSetup {
+		return appurl.Path(publicURL, acceptPath)
+	}
+	return appurl.Path(publicURL, "/login?returnUrl="+url.QueryEscape(acceptPath))
 }
 
 func (h *handler) handleRemoveSiteMember() http.HandlerFunc {

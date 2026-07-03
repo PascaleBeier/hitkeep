@@ -31,6 +31,10 @@ export const routes: Routes = [
         loadComponent: () => import('@pages/password/reset-password').then((m) => m.ResetPassword)
     },
     {
+        path: 'accept-invite',
+        loadComponent: () => import('@pages/invite/accept-invite').then((m) => m.AcceptInvite)
+    },
+    {
         path: 'qr-share/:token',
         loadComponent: () => import('@pages/qr-share/qr-share').then((m) => m.QRSharePage),
         canActivate: [setupGuard]

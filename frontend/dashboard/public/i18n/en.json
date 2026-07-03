@@ -1192,6 +1192,24 @@
       }
     }
   },
+  "invite": {
+    "accept": {
+      "title": "Accept invitation",
+      "description": "Set a password or sign in with the email address that received this invite.",
+      "passwordLabel": "Password",
+      "minimumLength": "Must be at least 8 characters.",
+      "submit": "Accept invitation",
+      "checkingSession": "Checking invitation...",
+      "loginRequired": "Sign in with the email address that received this invite to accept it.",
+      "signIn": "Sign in",
+      "errors": {
+        "tokenMissing": "Invalid invitation link. The token is missing.",
+        "expiredOrInvalid": "This invitation link has expired or is invalid.",
+        "teamLimit": "This invitation cannot be accepted because the account is already linked to another team.",
+        "acceptFailed": "We could not accept this invitation. Please try again."
+      }
+    }
+  },
   "share": {
     "dialog": {
       "title": "Share dashboard",

@@ -1350,17 +1350,18 @@ type TeamMember struct {
 }
 
 type TeamInvite struct {
-	ID            uuid.UUID  `json:"id"`
-	TeamID        uuid.UUID  `json:"team_id"`
-	Email         string     `json:"email"`
-	Role          string     `json:"role"`
-	InvitedUserID *uuid.UUID `json:"invited_user_id,omitempty"`
-	Status        string     `json:"status"`
-	CreatedBy     *uuid.UUID `json:"created_by,omitempty"`
-	CreatedAt     time.Time  `json:"created_at"`
-	ExpiresAt     time.Time  `json:"expires_at"`
-	AcceptedAt    *time.Time `json:"accepted_at,omitempty"`
-	RevokedAt     *time.Time `json:"revoked_at,omitempty"`
+	ID                    uuid.UUID  `json:"id"`
+	TeamID                uuid.UUID  `json:"team_id"`
+	Email                 string     `json:"email"`
+	Role                  string     `json:"role"`
+	InvitedUserID         *uuid.UUID `json:"invited_user_id,omitempty"`
+	Status                string     `json:"status"`
+	RequiresPasswordSetup bool       `json:"requires_password_setup"`
+	CreatedBy             *uuid.UUID `json:"created_by,omitempty"`
+	CreatedAt             time.Time  `json:"created_at"`
+	ExpiresAt             time.Time  `json:"expires_at"`
+	AcceptedAt            *time.Time `json:"accepted_at,omitempty"`
+	RevokedAt             *time.Time `json:"revoked_at,omitempty"`
 }
 
 type TeamAuditEntry struct {

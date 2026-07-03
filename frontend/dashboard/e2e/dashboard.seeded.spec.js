@@ -393,8 +393,9 @@ test("team admin page shows seeded members and settings", async ({ page }) => {
     await expect(page.getByRole("heading", { name: "Acme Analytics" })).toBeVisible();
 
     await page.getByRole("tab", { name: /^Members$/i }).click();
-    await expect(page.getByText("bob@devtools.co")).toBeVisible();
-    await expect(page.getByText("diana@saaslaunch.com")).toBeVisible();
+    const membersPanel = page.getByLabel("Members");
+    await expect(membersPanel.getByText("bob@devtools.co")).toBeVisible();
+    await expect(membersPanel.getByText("diana@saaslaunch.com")).toBeVisible();
 
     await page.getByRole("tab", { name: /^Settings$/i }).click();
     await expect(page.getByText("Team name")).toBeVisible();

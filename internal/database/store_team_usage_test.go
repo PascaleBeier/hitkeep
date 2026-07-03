@@ -40,7 +40,7 @@ func TestBuildTeamUsageSummary(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create site: %v", err)
 	}
-	if _, err := store.CreateTeamInvite(ctx, team.ID, "pending-usage@test.dev", TenantRoleMember, nil, ownerID); err != nil {
+	if _, err := store.CreateTeamInvite(ctx, team.ID, "pending-usage@test.dev", TenantRoleMember, nil, ownerID, false); err != nil {
 		t.Fatalf("create invite: %v", err)
 	}
 

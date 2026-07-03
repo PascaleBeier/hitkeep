@@ -283,6 +283,7 @@ func scanTeamInvite(scanner interface {
 		&invite.Role,
 		&invitedUserRaw,
 		&invite.Status,
+		&invite.RequiresPasswordSetup,
 		&createdByRaw,
 		&invite.CreatedAt,
 		&invite.ExpiresAt,

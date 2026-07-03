@@ -241,8 +241,12 @@ func (h *handler) sendTeamInviteEmail(r *http.Request, teamID, actorID uuid.UUID
 		}
 	}
 
-	inviteLink := appurl.Path(h.ctx.Config.PublicURL, "/accept-invite?token="+inviteToken)
-	if err := h.ctx.Mailer.Send(invite.Email, mailables.NewTeamInvite(inviteLink, teamName, inviterName, invite.Role, true, locale)); err != nil {
+	acceptPath := "/accept-invite?token=" + inviteToken
+	inviteLink := appurl.Path(h.ctx.Config.PublicURL, acceptPath)
+	if !invite.RequiresPasswordSetup {
+		inviteLink = appurl.Path(h.ctx.Config.PublicURL, "/login?returnUrl="+url.QueryEscape(acceptPath))
+	}
+	if err := h.ctx.Mailer.Send(invite.Email, mailables.NewTeamInvite(inviteLink, teamName, inviterName, invite.Role, invite.RequiresPasswordSetup, locale)); err != nil {
 		slog.Warn("Failed to send team invite email", "error", err, "email", invite.Email, "team_id", teamID)
 	}
 }

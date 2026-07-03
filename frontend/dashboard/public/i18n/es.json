@@ -1192,6 +1192,24 @@
       }
     }
   },
+  "invite": {
+    "accept": {
+      "title": "Aceptar invitación",
+      "description": "Define una contraseña o inicia sesión con la dirección de correo que recibió esta invitación.",
+      "passwordLabel": "Contraseña",
+      "minimumLength": "Debe tener al menos 8 caracteres.",
+      "submit": "Aceptar invitación",
+      "checkingSession": "Comprobando invitación...",
+      "loginRequired": "Inicia sesión con la dirección de correo que recibió esta invitación para aceptarla.",
+      "signIn": "Iniciar sesión",
+      "errors": {
+        "tokenMissing": "Enlace de invitación inválido. Falta el token.",
+        "expiredOrInvalid": "Este enlace de invitación ha expirado o no es válido.",
+        "teamLimit": "No se puede aceptar esta invitación porque la cuenta ya está vinculada a otro equipo.",
+        "acceptFailed": "No se pudo aceptar esta invitación. Inténtalo de nuevo."
+      }
+    }
+  },
   "share": {
     "dialog": {
       "title": "Compartir panel",

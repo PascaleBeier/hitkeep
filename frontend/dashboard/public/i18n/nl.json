@@ -1192,6 +1192,24 @@
       }
     }
   },
+  "invite": {
+    "accept": {
+      "title": "Uitnodiging accepteren",
+      "description": "Stel een wachtwoord in of log in met het e-mailadres dat deze uitnodiging heeft ontvangen.",
+      "passwordLabel": "Wachtwoord",
+      "minimumLength": "Moet minimaal 8 tekens lang zijn.",
+      "submit": "Uitnodiging accepteren",
+      "checkingSession": "Uitnodiging controleren...",
+      "loginRequired": "Log in met het e-mailadres dat deze uitnodiging heeft ontvangen om deze te accepteren.",
+      "signIn": "Inloggen",
+      "errors": {
+        "tokenMissing": "Ongeldige uitnodigingslink. Het token ontbreekt.",
+        "expiredOrInvalid": "Deze uitnodigingslink is verlopen of ongeldig.",
+        "teamLimit": "Deze uitnodiging kan niet worden geaccepteerd omdat het account al aan een ander team is gekoppeld.",
+        "acceptFailed": "We konden deze uitnodiging niet accepteren. Probeer het opnieuw."
+      }
+    }
+  },
   "share": {
     "dialog": {
       "title": "Dashboard delen",

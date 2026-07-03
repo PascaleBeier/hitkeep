@@ -68,6 +68,7 @@ export interface TeamInvite {
     role: TeamRole;
     invited_user_id?: string;
     status: 'pending' | 'accepted' | 'revoked';
+    requires_password_setup: boolean;
     created_by?: string;
     created_at: string;
     expires_at: string;

@@ -935,7 +935,7 @@ func TestCreateAndListTeamInvites(t *testing.T) {
 		t.Fatalf("get default tenant: %v", err)
 	}
 
-	invite, err := store.CreateTeamInvite(ctx, teamID, "invitee@tenant.test", TenantRoleAdmin, nil, ownerID)
+	invite, err := store.CreateTeamInvite(ctx, teamID, "invitee@tenant.test", TenantRoleAdmin, nil, ownerID, false)
 	if err != nil {
 		t.Fatalf("create team invite: %v", err)
 	}
@@ -968,10 +968,10 @@ func TestCreateTeamInviteRejectsDuplicatePendingInvite(t *testing.T) {
 		t.Fatalf("get default tenant: %v", err)
 	}
 
-	if _, err := store.CreateTeamInvite(ctx, teamID, "dup@tenant.test", TenantRoleMember, nil, ownerID); err != nil {
+	if _, err := store.CreateTeamInvite(ctx, teamID, "dup@tenant.test", TenantRoleMember, nil, ownerID, false); err != nil {
 		t.Fatalf("create first team invite: %v", err)
 	}
-	if _, err := store.CreateTeamInvite(ctx, teamID, "dup@tenant.test", TenantRoleMember, nil, ownerID); !errors.Is(err, ErrTeamInviteAlreadyPending) {
+	if _, err := store.CreateTeamInvite(ctx, teamID, "dup@tenant.test", TenantRoleMember, nil, ownerID, false); !errors.Is(err, ErrTeamInviteAlreadyPending) {
 		t.Fatalf("expected ErrTeamInviteAlreadyPending, got %v", err)
 	}
 }
@@ -989,7 +989,7 @@ func TestRevokeTeamInviteRemovesPendingInvite(t *testing.T) {
 		t.Fatalf("get default tenant: %v", err)
 	}
 
-	invite, err := store.CreateTeamInvite(ctx, teamID, "revoke@tenant.test", TenantRoleMember, nil, ownerID)
+	invite, err := store.CreateTeamInvite(ctx, teamID, "revoke@tenant.test", TenantRoleMember, nil, ownerID, false)
 	if err != nil {
 		t.Fatalf("create team invite: %v", err)
 	}
@@ -1027,7 +1027,7 @@ func TestAcceptTeamInvitesByEmailCreatesMembership(t *testing.T) {
 		t.Fatalf("insert tenant: %v", err)
 	}
 
-	if _, err := store.CreateTeamInvite(ctx, teamID, "accept@tenant.test", TenantRoleAdmin, &inviteeID, ownerID); err != nil {
+	if _, err := store.CreateTeamInvite(ctx, teamID, "accept@tenant.test", TenantRoleAdmin, &inviteeID, ownerID, false); err != nil {
 		t.Fatalf("create team invite: %v", err)
 	}
 

@@ -1192,6 +1192,24 @@
       }
     }
   },
+  "invite": {
+    "accept": {
+      "title": "Accepter l'invitation",
+      "description": "Définissez un mot de passe ou connectez-vous avec l'adresse e-mail qui a reçu cette invitation.",
+      "passwordLabel": "Mot de passe",
+      "minimumLength": "Doit contenir au moins 8 caractères.",
+      "submit": "Accepter l'invitation",
+      "checkingSession": "Vérification de l'invitation...",
+      "loginRequired": "Connectez-vous avec l'adresse e-mail qui a reçu cette invitation pour l'accepter.",
+      "signIn": "Se connecter",
+      "errors": {
+        "tokenMissing": "Lien d'invitation invalide. Le jeton est manquant.",
+        "expiredOrInvalid": "Ce lien d'invitation a expiré ou est invalide.",
+        "teamLimit": "Cette invitation ne peut pas être acceptée, car le compte est déjà lié à une autre équipe.",
+        "acceptFailed": "Impossible d'accepter cette invitation. Veuillez réessayer."
+      }
+    }
+  },
   "share": {
     "dialog": {
       "title": "Partager le tableau de bord",

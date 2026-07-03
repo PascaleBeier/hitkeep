@@ -604,35 +604,253 @@ func TestHandleAddSiteMemberUsesInviterLocaleForNewUserInvite(t *testing.T) {
 	}
 }
 
-func TestHandleAddSiteMemberInHostedCloudRejectsNewUserInsteadOfJoiningDefaultTeam(t *testing.T) {
+func TestHandleAddSiteMemberCreatesTeamInviteForNewUserOutsideSiteTeam(t *testing.T) {
 	h, store, _, _, actorUserID, _ := setupAdminTestEnv(t)
-	h.ctx.Config.CloudHosted = true
 	ctx := context.Background()
 
-	site, err := store.CreateSite(ctx, actorUserID, "cloud-admin-invite.example")
-	if err != nil {
-		t.Fatalf("create site: %v", err)
-	}
+	team, site := createAdminTestTeamSite(t, store, actorUserID, "Site Invite Team", "site-invite-new.example")
 
 	drv := &adminTestMailDriver{}
 	h.ctx.Mailer = mailer.NewWithDriver(drv, h.ctx.Config)
 
-	body := strings.NewReader(`{"email":"cloud-site-member@example.com","role":"viewer"}`)
+	body := strings.NewReader(`{"email":"new-site-invite@example.com","role":"viewer"}`)
 	req := withAdminTestUser(httptest.NewRequest(http.MethodPost, "/api/admin/sites/"+site.ID.String()+"/members", body), actorUserID)
 	req.SetPathValue("id", site.ID.String())
 	w := httptest.NewRecorder()
 
 	h.handleAddSiteMember().ServeHTTP(w, req)
-	if w.Code != http.StatusConflict {
-		t.Fatalf("expected status %d, got %d: %s", http.StatusConflict, w.Code, w.Body.String())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
 	}
 
-	user, err := store.GetUserByEmail(ctx, "cloud-site-member@example.com")
+	user, err := store.GetUserByEmail(ctx, "new-site-invite@example.com")
 	if err != nil {
-		t.Fatalf("get rejected user: %v", err)
+		t.Fatalf("get invited user: %v", err)
 	}
-	if user != nil {
-		t.Fatalf("expected hosted-cloud site member path not to create a user, got %+v", user)
+	if user == nil {
+		t.Fatal("expected site invite to create placeholder user")
+	}
+
+	invites, err := store.ListPendingTeamInvitesByEmail(ctx, "new-site-invite@example.com")
+	if err != nil {
+		t.Fatalf("list pending team invites: %v", err)
+	}
+	if len(invites) != 1 {
+		t.Fatalf("expected one pending team invite, got %d", len(invites))
+	}
+	invite := invites[0]
+	if invite.TeamID != team.ID {
+		t.Fatalf("expected invite for site team %s, got %s", team.ID, invite.TeamID)
+	}
+	if invite.Role != database.TenantRoleMember {
+		t.Fatalf("expected team invite role %q, got %q", database.TenantRoleMember, invite.Role)
+	}
+	if !invite.RequiresPasswordSetup {
+		t.Fatal("expected new user site invite to require password setup")
+	}
+	if invite.InvitedUserID == nil || *invite.InvitedUserID != user.ID {
+		t.Fatalf("expected invite user %s, got %+v", user.ID, invite.InvitedUserID)
+	}
+	if role := siteMemberRole(t, store, site.ID, user.ID); role != string(auth.SiteViewer) {
+		t.Fatalf("expected pending site role %q, got %q", auth.SiteViewer, role)
+	}
+	if !strings.Contains(drv.textBody, "/accept-invite?token=") {
+		t.Fatalf("expected direct accept invite link, got:\n%s", drv.textBody)
+	}
+	if strings.Contains(drv.textBody, "/login?returnUrl=") {
+		t.Fatalf("expected new user link not to route through login, got:\n%s", drv.textBody)
+	}
+}
+
+func TestHandleAddSiteMemberReusesPendingTeamInviteForSiteAccess(t *testing.T) {
+	h, store, _, _, actorUserID, _ := setupAdminTestEnv(t)
+	ctx := context.Background()
+
+	team, site := createAdminTestTeamSite(t, store, actorUserID, "Pending Team Invite Site", "site-invite-pending-team.example")
+	targetUserID, err := store.CreateUser(ctx, "pending-team-site-invite@example.com", "temporary-hash")
+	if err != nil {
+		t.Fatalf("create pending invite user: %v", err)
+	}
+	pendingInvite, err := store.CreateTeamInvite(ctx, team.ID, "pending-team-site-invite@example.com", database.TenantRoleMember, &targetUserID, actorUserID, true)
+	if err != nil {
+		t.Fatalf("create pending team invite: %v", err)
+	}
+
+	drv := &adminTestMailDriver{}
+	h.ctx.Mailer = mailer.NewWithDriver(drv, h.ctx.Config)
+
+	body := strings.NewReader(`{"email":"pending-team-site-invite@example.com","role":"viewer"}`)
+	req := withAdminTestUser(httptest.NewRequest(http.MethodPost, "/api/admin/sites/"+site.ID.String()+"/members", body), actorUserID)
+	req.SetPathValue("id", site.ID.String())
+	w := httptest.NewRecorder()
+
+	h.handleAddSiteMember().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
+	}
+
+	invites, err := store.ListPendingTeamInvitesByEmail(ctx, "pending-team-site-invite@example.com")
+	if err != nil {
+		t.Fatalf("list pending team invites: %v", err)
+	}
+	if len(invites) != 1 {
+		t.Fatalf("expected one reused pending team invite, got %d", len(invites))
+	}
+	if invites[0].ID != pendingInvite.ID {
+		t.Fatalf("expected pending invite %s to be reused, got %s", pendingInvite.ID, invites[0].ID)
+	}
+	if role := siteMemberRole(t, store, site.ID, targetUserID); role != string(auth.SiteViewer) {
+		t.Fatalf("expected pending site role %q, got %q", auth.SiteViewer, role)
+	}
+	if !strings.Contains(drv.textBody, "/accept-invite?token=") {
+		t.Fatalf("expected direct accept invite link for password setup invite, got:\n%s", drv.textBody)
+	}
+	if strings.Contains(drv.textBody, "/login?returnUrl=") {
+		t.Fatalf("expected password setup invite not to route through login, got:\n%s", drv.textBody)
+	}
+}
+
+func TestHandleAddSiteMemberRoutesExistingUserOutsideSiteTeamThroughLogin(t *testing.T) {
+	h, store, _, _, actorUserID, _ := setupAdminTestEnv(t)
+	ctx := context.Background()
+
+	team, site := createAdminTestTeamSite(t, store, actorUserID, "Existing Site Invite Team", "site-invite-existing.example")
+	targetUserID, err := store.CreateUser(ctx, "existing-site-invite@example.com", "old-hash")
+	if err != nil {
+		t.Fatalf("create existing user: %v", err)
+	}
+
+	drv := &adminTestMailDriver{}
+	h.ctx.Mailer = mailer.NewWithDriver(drv, h.ctx.Config)
+
+	body := strings.NewReader(`{"email":"existing-site-invite@example.com","role":"admin"}`)
+	req := withAdminTestUser(httptest.NewRequest(http.MethodPost, "/api/admin/sites/"+site.ID.String()+"/members", body), actorUserID)
+	req.SetPathValue("id", site.ID.String())
+	w := httptest.NewRecorder()
+
+	h.handleAddSiteMember().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
+	}
+
+	invites, err := store.ListPendingTeamInvitesByEmail(ctx, "existing-site-invite@example.com")
+	if err != nil {
+		t.Fatalf("list pending team invites: %v", err)
+	}
+	if len(invites) != 1 {
+		t.Fatalf("expected one pending team invite, got %d", len(invites))
+	}
+	invite := invites[0]
+	if invite.TeamID != team.ID {
+		t.Fatalf("expected invite for site team %s, got %s", team.ID, invite.TeamID)
+	}
+	if invite.RequiresPasswordSetup {
+		t.Fatal("expected existing user site invite not to require password setup")
+	}
+	if invite.InvitedUserID == nil || *invite.InvitedUserID != targetUserID {
+		t.Fatalf("expected invite user %s, got %+v", targetUserID, invite.InvitedUserID)
+	}
+	if role := siteMemberRole(t, store, site.ID, targetUserID); role != string(auth.SiteAdmin) {
+		t.Fatalf("expected pending site role %q, got %q", auth.SiteAdmin, role)
+	}
+	if !strings.Contains(drv.textBody, "/login?returnUrl=") {
+		t.Fatalf("expected existing user invite to route through login, got:\n%s", drv.textBody)
+	}
+	if !strings.Contains(drv.textBody, "%2Faccept-invite%3Ftoken%3D") {
+		t.Fatalf("expected encoded accept invite return URL, got:\n%s", drv.textBody)
+	}
+}
+
+func TestHandleAddSiteMemberForExistingTeamMemberDoesNotCreateInvite(t *testing.T) {
+	h, store, _, _, actorUserID, _ := setupAdminTestEnv(t)
+	ctx := context.Background()
+
+	_, site := createAdminTestTeamSite(t, store, actorUserID, "Existing Team Member Site", "site-member-existing-team.example")
+	teamID, err := store.GetSiteTenantID(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("get site team: %v", err)
+	}
+	targetUserID, err := store.CreateUser(ctx, "team-member-site-invite@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create target user: %v", err)
+	}
+	if err := store.AddTeamMember(ctx, teamID, targetUserID, database.TenantRoleMember, actorUserID); err != nil {
+		t.Fatalf("add target to site team: %v", err)
+	}
+
+	drv := &adminTestMailDriver{}
+	h.ctx.Mailer = mailer.NewWithDriver(drv, h.ctx.Config)
+
+	body := strings.NewReader(`{"email":"team-member-site-invite@example.com","role":"viewer"}`)
+	req := withAdminTestUser(httptest.NewRequest(http.MethodPost, "/api/admin/sites/"+site.ID.String()+"/members", body), actorUserID)
+	req.SetPathValue("id", site.ID.String())
+	w := httptest.NewRecorder()
+
+	h.handleAddSiteMember().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
+	}
+
+	invites, err := store.ListPendingTeamInvitesByEmail(ctx, "team-member-site-invite@example.com")
+	if err != nil {
+		t.Fatalf("list pending team invites: %v", err)
+	}
+	if len(invites) != 0 {
+		t.Fatalf("expected no pending team invite, got %d", len(invites))
+	}
+	if role := siteMemberRole(t, store, site.ID, targetUserID); role != string(auth.SiteViewer) {
+		t.Fatalf("expected site role %q, got %q", auth.SiteViewer, role)
+	}
+	if drv.subject != "" || drv.textBody != "" {
+		t.Fatalf("expected no invite email for existing team member, got subject %q body:\n%s", drv.subject, drv.textBody)
+	}
+}
+
+func TestHandleAddSiteMemberUpdatesExistingSiteAccessWithoutInvite(t *testing.T) {
+	h, store, _, _, actorUserID, _ := setupAdminTestEnv(t)
+	ctx := context.Background()
+
+	_, site := createAdminTestTeamSite(t, store, actorUserID, "Existing Site Access", "site-member-existing-access.example")
+	teamID, err := store.GetSiteTenantID(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("get site team: %v", err)
+	}
+	targetUserID, err := store.CreateUser(ctx, "site-access-existing@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create target user: %v", err)
+	}
+	if err := store.AddTeamMember(ctx, teamID, targetUserID, database.TenantRoleMember, actorUserID); err != nil {
+		t.Fatalf("add target to site team: %v", err)
+	}
+	if err := store.AddSiteMember(ctx, site.ID, targetUserID, auth.SiteViewer, actorUserID); err != nil {
+		t.Fatalf("add existing site member: %v", err)
+	}
+
+	drv := &adminTestMailDriver{}
+	h.ctx.Mailer = mailer.NewWithDriver(drv, h.ctx.Config)
+
+	body := strings.NewReader(`{"email":"site-access-existing@example.com","role":"admin"}`)
+	req := withAdminTestUser(httptest.NewRequest(http.MethodPost, "/api/admin/sites/"+site.ID.String()+"/members", body), actorUserID)
+	req.SetPathValue("id", site.ID.String())
+	w := httptest.NewRecorder()
+
+	h.handleAddSiteMember().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
+	}
+
+	invites, err := store.ListPendingTeamInvitesByEmail(ctx, "site-access-existing@example.com")
+	if err != nil {
+		t.Fatalf("list pending team invites: %v", err)
+	}
+	if len(invites) != 0 {
+		t.Fatalf("expected no pending team invite, got %d", len(invites))
+	}
+	if role := siteMemberRole(t, store, site.ID, targetUserID); role != string(auth.SiteAdmin) {
+		t.Fatalf("expected updated site role %q, got %q", auth.SiteAdmin, role)
+	}
+	if drv.subject != "" || drv.textBody != "" {
+		t.Fatalf("expected no invite email for existing site member, got subject %q body:\n%s", drv.subject, drv.textBody)
 	}
 }
 
@@ -684,6 +902,40 @@ func TestHandleSiteMemberPermissionMutationsAppendCentralAudit(t *testing.T) {
 		t.Fatalf("expected remove status %d, got %d: %s", http.StatusOK, removeW.Code, removeW.Body.String())
 	}
 	assertPermissionAuditEntry(t, store, "permission.site_member_revoked", teamID, targetUserID, site.ID, "", "", "")
+}
+
+func createAdminTestTeamSite(t *testing.T, store *database.Store, actorUserID uuid.UUID, teamName string, domain string) (*api.Team, *api.Site) {
+	t.Helper()
+
+	ctx := context.Background()
+	team, err := store.CreateTenant(ctx, actorUserID, teamName, "")
+	if err != nil {
+		t.Fatalf("create team: %v", err)
+	}
+	if err := store.SetActiveTenantID(ctx, actorUserID, team.ID); err != nil {
+		t.Fatalf("set active team: %v", err)
+	}
+	site, err := store.CreateSite(ctx, actorUserID, domain)
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	return team, site
+}
+
+func siteMemberRole(t *testing.T, store *database.Store, siteID, userID uuid.UUID) string {
+	t.Helper()
+
+	members, err := store.GetSiteMembers(context.Background(), siteID)
+	if err != nil {
+		t.Fatalf("get site members: %v", err)
+	}
+	for _, member := range members {
+		if member.UserID == userID {
+			return member.Role
+		}
+	}
+	t.Fatalf("site member %s not found", userID)
+	return ""
 }
 
 func assertPermissionAuditEntry(t *testing.T, store *database.Store, action string, teamID, targetUserID, siteID uuid.UUID, expectedIP, expectedUserAgent, expectedRequestID string) {

@@ -1192,6 +1192,24 @@
       }
     }
   },
+  "invite": {
+    "accept": {
+      "title": "Accetta invito",
+      "description": "Imposta una password oppure accedi con l'indirizzo e-mail che ha ricevuto questo invito.",
+      "passwordLabel": "Password",
+      "minimumLength": "Deve contenere almeno 8 caratteri.",
+      "submit": "Accetta invito",
+      "checkingSession": "Verifica dell'invito...",
+      "loginRequired": "Accedi con l'indirizzo e-mail che ha ricevuto questo invito per accettarlo.",
+      "signIn": "Accedi",
+      "errors": {
+        "tokenMissing": "Link di invito non valido. Token mancante.",
+        "expiredOrInvalid": "Questo link di invito è scaduto o non valido.",
+        "teamLimit": "Questo invito non può essere accettato perché l'account è già collegato a un altro team.",
+        "acceptFailed": "Non è stato possibile accettare questo invito. Riprova."
+      }
+    }
+  },
   "share": {
     "dialog": {
       "title": "Condividi dashboard",

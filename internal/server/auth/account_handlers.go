@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/internal/api"
 	"hitkeep/internal/appurl"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
@@ -133,8 +135,8 @@ func (h *handler) handleAcceptInvite() http.HandlerFunc {
 			return
 		}
 
-		if req.Token == "" || len(req.Password) < 8 {
-			http.Error(w, "Invalid token or password too short", http.StatusBadRequest)
+		if strings.TrimSpace(req.Token) == "" {
+			http.Error(w, "Invalid token", http.StatusBadRequest)
 			return
 		}
 
@@ -149,28 +151,9 @@ func (h *handler) handleAcceptInvite() http.HandlerFunc {
 			return
 		}
 
-		hashedPassword, err := HashPassword(req.Password)
-		if err != nil {
-			slog.Error("Failed to hash password", "error", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		err = h.ctx.Store.CompletePasswordReset(r.Context(), req.Token, hashedPassword)
-		if err != nil {
-			if errors.Is(err, database.ErrPasswordResetInvalid) || errors.Is(err, database.ErrPasswordResetExpired) {
-				http.Error(w, "Invalid or expired link", http.StatusBadRequest)
-				return
-			}
-
-			slog.Error("Failed to complete invite acceptance", "error", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-
 		user, err := h.ctx.Store.GetUserByEmail(r.Context(), email)
 		if err != nil {
-			slog.Error("Failed to load invited user after password reset", "error", err, "email", email)
+			slog.Error("Failed to load invited user", "error", err, "email", email)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -179,77 +162,174 @@ func (h *handler) handleAcceptInvite() http.HandlerFunc {
 			return
 		}
 
-		if h.ctx.Config.CloudHosted {
-			pendingInvites, err := h.ctx.Store.ListPendingTeamInvitesByEmail(r.Context(), email)
-			if err != nil {
-				slog.Error("Failed to list pending cloud invites", "error", err, "email", email, "user_id", user.ID)
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-				return
-			}
-
-			targetTeams := make(map[uuid.UUID]struct{})
-			for _, invite := range pendingInvites {
-				isMember, err := h.ctx.Store.IsTenantMember(r.Context(), invite.TeamID, user.ID)
-				if err != nil {
-					slog.Error("Failed to check cloud invite membership", "error", err, "email", email, "user_id", user.ID, "team_id", invite.TeamID)
-					http.Error(w, "Internal server error", http.StatusInternalServerError)
-					return
-				}
-				if !isMember {
-					targetTeams[invite.TeamID] = struct{}{}
-				}
-			}
-
-			teamCount, err := h.ctx.Store.CountUserNonDefaultTeams(r.Context(), user.ID)
-			if err != nil {
-				slog.Error("Failed to count cloud invite teams", "error", err, "email", email, "user_id", user.ID)
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-				return
-			}
-			if len(targetTeams) > 1 || (teamCount > 0 && len(targetTeams) > 0) {
-				http.Error(w, "Managed cloud accounts are limited to one team", http.StatusForbidden)
-				return
-			}
-		}
-
-		acceptedInvites, err := h.ctx.Store.AcceptTeamInvitesByEmail(r.Context(), email, user.ID)
+		pendingInvites, err := h.ctx.Store.ListPendingTeamInvitesByEmail(r.Context(), email)
 		if err != nil {
-			slog.Error("Failed to accept team invites", "error", err, "email", email, "user_id", user.ID)
+			slog.Error("Failed to list pending invites", "error", err, "email", email, "user_id", user.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		for _, invite := range acceptedInvites {
-			h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
-				ActorID:      user.ID,
-				TeamID:       invite.TeamID,
-				TargetUserID: user.ID,
-				Action:       "member.invite_accepted",
-				TargetType:   "user",
-				TargetID:     user.ID.String(),
-				TargetLabel:  email,
-				Outcome:      "success",
-				Details:      fmt.Sprintf("Invitation accepted by %s", email),
-			})
-			h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
-				ActorID:      user.ID,
-				TeamID:       invite.TeamID,
-				TargetUserID: user.ID,
-				Action:       "member.added",
-				TargetType:   "user",
-				TargetID:     user.ID.String(),
-				TargetLabel:  email,
-				Outcome:      "success",
-				Details:      fmt.Sprintf("Member %s added after accepting an invitation", email),
-			})
+		if len(pendingInvites) == 0 {
+			http.Error(w, "Invalid or expired link", http.StatusBadRequest)
+			return
 		}
+
+		authenticatedUserID := h.userIDFromLogoutRequest(r)
+		if authenticatedUserID != uuid.Nil {
+			authenticatedUser, err := h.ctx.Store.GetUserByID(r.Context(), authenticatedUserID)
+			if err != nil {
+				slog.Error("Failed to load authenticated invite user", "error", err, "user_id", authenticatedUserID)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			if authenticatedUser == nil {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+			if !strings.EqualFold(authenticatedUser.Email, email) {
+				http.Error(w, "Invite does not match signed-in user", http.StatusForbidden)
+				return
+			}
+
+			if err := h.validateCloudInviteAcceptance(r.Context(), email, authenticatedUser.ID, pendingInvites); err != nil {
+				h.writeInviteAcceptanceError(w, err, email, authenticatedUser.ID)
+				return
+			}
+
+			acceptedEmail, acceptedInvites, err := h.ctx.Store.AcceptInviteForAuthenticatedUser(r.Context(), req.Token, authenticatedUser.ID)
+			if err != nil {
+				h.writeInviteAcceptanceError(w, err, email, authenticatedUser.ID)
+				return
+			}
+			h.appendInviteAcceptedAuditEvents(r, authenticatedUser.ID, acceptedEmail, acceptedInvites)
+
+			slog.Info("Invite accepted by existing user", "token_mask", req.Token[:4]+"...", "user_id", authenticatedUser.ID)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			if err := json.NewEncoder(w).Encode(loginResponse{Status: "ok"}); err != nil {
+				slog.Error("Failed to encode response", "error", err)
+			}
+			return
+		}
+
+		requiresPasswordSetup := false
+		for _, invite := range pendingInvites {
+			if invite.RequiresPasswordSetup {
+				requiresPasswordSetup = true
+				break
+			}
+		}
+		if !requiresPasswordSetup {
+			http.Error(w, "Sign in to accept this invitation", http.StatusUnauthorized)
+			return
+		}
+
+		if len(req.Password) < 8 {
+			http.Error(w, "Invalid token or password too short", http.StatusBadRequest)
+			return
+		}
+
+		if err := h.validateCloudInviteAcceptance(r.Context(), email, user.ID, pendingInvites); err != nil {
+			h.writeInviteAcceptanceError(w, err, email, user.ID)
+			return
+		}
+
+		hashedPassword, err := HashPassword(req.Password)
+		if err != nil {
+			slog.Error("Failed to hash password", "error", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		acceptedEmail, userID, acceptedInvites, err := h.ctx.Store.AcceptInviteWithPassword(r.Context(), req.Token, hashedPassword)
+		if err != nil {
+			h.writeInviteAcceptanceError(w, err, email, user.ID)
+			return
+		}
+		h.appendInviteAcceptedAuditEvents(r, userID, acceptedEmail, acceptedInvites)
+
+		if err := h.issueLoginSession(r.Context(), w, userID, false); err != nil {
+			slog.Error("Failed to issue invite acceptance session", "error", err, "email", acceptedEmail, "user_id", userID)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		h.appendAuthAuditForUserTeams(r, userID, "auth.login_succeeded", "success", "Login succeeded after accepting an invitation", true)
 
 		slog.Info("Invite accepted", "token_mask", req.Token[:4]+"...")
 
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		err = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "Account set up successfully. Please log in."})
-		if err != nil {
+		if err := json.NewEncoder(w).Encode(loginResponse{Status: "ok"}); err != nil {
 			slog.Error("Failed to encode response", "error", err)
 		}
+	}
+}
+
+func (h *handler) validateCloudInviteAcceptance(ctx context.Context, email string, userID uuid.UUID, pendingInvites []api.TeamInvite) error {
+	if !h.ctx.Config.CloudHosted {
+		return nil
+	}
+
+	targetTeams := make(map[uuid.UUID]struct{})
+	for _, invite := range pendingInvites {
+		isMember, err := h.ctx.Store.IsTenantMember(ctx, invite.TeamID, userID)
+		if err != nil {
+			return fmt.Errorf("check cloud invite membership for team %s: %w", invite.TeamID, err)
+		}
+		if !isMember {
+			targetTeams[invite.TeamID] = struct{}{}
+		}
+	}
+
+	teamCount, err := h.ctx.Store.CountUserNonDefaultTeams(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("count cloud invite teams: %w", err)
+	}
+	if len(targetTeams) > 1 || (teamCount > 0 && len(targetTeams) > 0) {
+		return database.ErrManagedCloudSingleTeamLimit
+	}
+	return nil
+}
+
+func (h *handler) writeInviteAcceptanceError(w http.ResponseWriter, err error, email string, userID uuid.UUID) {
+	switch {
+	case errors.Is(err, database.ErrPasswordResetInvalid), errors.Is(err, database.ErrPasswordResetExpired), errors.Is(err, database.ErrTeamInviteNotFound):
+		http.Error(w, "Invalid or expired link", http.StatusBadRequest)
+	case errors.Is(err, database.ErrTeamInviteLoginRequired):
+		http.Error(w, "Sign in to accept this invitation", http.StatusUnauthorized)
+	case errors.Is(err, database.ErrTeamInviteEmailMismatch):
+		http.Error(w, "Invite does not match signed-in user", http.StatusForbidden)
+	case errors.Is(err, database.ErrManagedCloudSingleTeamLimit):
+		http.Error(w, "Managed cloud accounts are limited to one team", http.StatusForbidden)
+	default:
+		slog.Error("Failed to accept invite", "error", err, "email", email, "user_id", userID)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+func (h *handler) appendInviteAcceptedAuditEvents(r *http.Request, userID uuid.UUID, email string, acceptedInvites []api.TeamInvite) {
+	for _, invite := range acceptedInvites {
+		h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
+			ActorID:      userID,
+			TeamID:       invite.TeamID,
+			TargetUserID: userID,
+			Action:       "member.invite_accepted",
+			TargetType:   "user",
+			TargetID:     userID.String(),
+			TargetLabel:  email,
+			Outcome:      "success",
+			Details:      fmt.Sprintf("Invitation accepted by %s", email),
+		})
+		h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
+			ActorID:      userID,
+			TeamID:       invite.TeamID,
+			TargetUserID: userID,
+			Action:       "member.added",
+			TargetType:   "user",
+			TargetID:     userID.String(),
+			TargetLabel:  email,
+			Outcome:      "success",
+			Details:      fmt.Sprintf("Member %s added after accepting an invitation", email),
+		})
 	}
 }
 

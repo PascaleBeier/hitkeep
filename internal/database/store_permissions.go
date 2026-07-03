@@ -170,7 +170,7 @@ func (s *Store) GetSiteRole(ctx context.Context, userID uuid.UUID, siteID uuid.U
 	return effectiveRole, nil
 }
 
-// AddSiteMember grants a user access to a site
+// AddSiteMember grants a user access to a site.
 func (s *Store) AddSiteMember(ctx context.Context, siteID uuid.UUID, userID uuid.UUID, role auth.SiteRole, addedBy uuid.UUID) error {
 	siteTenantID, err := s.GetSiteTenantID(ctx, siteID)
 	if err != nil {
@@ -185,7 +185,21 @@ func (s *Store) AddSiteMember(ctx context.Context, siteID uuid.UUID, userID uuid
 		return fmt.Errorf("failed to add site member: user is not part of tenant")
 	}
 
-	_, err = s.db.ExecContext(ctx,
+	return s.addSiteMemberAccess(ctx, siteID, userID, role, addedBy)
+}
+
+// AddPendingSiteMemberInviteAccess records a site role for a user who is not a
+// tenant member yet. Access checks still require tenant membership before this
+// role is effective, so callers must pair this with a pending team invite.
+func (s *Store) AddPendingSiteMemberInviteAccess(ctx context.Context, siteID uuid.UUID, userID uuid.UUID, role auth.SiteRole, addedBy uuid.UUID) error {
+	if _, err := s.GetSiteTenantID(ctx, siteID); err != nil {
+		return fmt.Errorf("failed to resolve site tenant: %w", err)
+	}
+	return s.addSiteMemberAccess(ctx, siteID, userID, role, addedBy)
+}
+
+func (s *Store) addSiteMemberAccess(ctx context.Context, siteID uuid.UUID, userID uuid.UUID, role auth.SiteRole, addedBy uuid.UUID) error {
+	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO site_members (site_id, user_id, role, added_by)
 		 VALUES (?, ?, ?, ?)
 		 ON CONFLICT (site_id, user_id) DO UPDATE SET role = excluded.role`,

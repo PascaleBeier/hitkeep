@@ -39,6 +39,13 @@ describe('routes', () => {
         expect(settingsRoute?.data?.['instanceCapability']).toBe(INSTANCE_CAPABILITIES.manageUsers);
     });
 
+    it('exposes accept-invite as a public auth page route', () => {
+        const route = routes.find((route) => route.path === 'accept-invite');
+
+        expect(route).toBeTruthy();
+        expect(route?.canActivate).toBeUndefined();
+    });
+
     it('should navigate /import-export to Import for active-site managers', async () => {
         await configureImportExportRouter();
         seedSiteRole('admin');

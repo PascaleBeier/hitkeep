@@ -1192,6 +1192,24 @@
       }
     }
   },
+  "invite": {
+    "accept": {
+      "title": "Einladung annehmen",
+      "description": "Lege ein Passwort fest oder melde dich mit der E-Mail-Adresse an, die diese Einladung erhalten hat.",
+      "passwordLabel": "Passwort",
+      "minimumLength": "Mindestens 8 Zeichen erforderlich.",
+      "submit": "Einladung annehmen",
+      "checkingSession": "Einladung wird geprüft...",
+      "loginRequired": "Melde dich mit der E-Mail-Adresse an, die diese Einladung erhalten hat, um sie anzunehmen.",
+      "signIn": "Anmelden",
+      "errors": {
+        "tokenMissing": "Ungültiger Einladungslink. Das Token fehlt.",
+        "expiredOrInvalid": "Dieser Einladungslink ist abgelaufen oder ungültig.",
+        "teamLimit": "Diese Einladung kann nicht angenommen werden, weil das Konto bereits mit einem anderen Team verknüpft ist.",
+        "acceptFailed": "Einladung konnte nicht angenommen werden. Bitte versuche es erneut."
+      }
+    }
+  },
   "share": {
     "dialog": {
       "title": "Dashboard teilen",

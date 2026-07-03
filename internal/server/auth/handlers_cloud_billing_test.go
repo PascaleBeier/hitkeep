@@ -61,7 +61,7 @@ func TestHandleAcceptInviteRejectsSecondHostedCloudTeam(t *testing.T) {
 	if err := store.AddTeamMember(context.Background(), targetTeamID, ownerID, database.TenantRoleOwner, ownerID); err != nil {
 		t.Fatalf("add owner to target team: %v", err)
 	}
-	if _, err := store.CreateTeamInvite(context.Background(), targetTeamID, "invite-cloud@example.com", database.TenantRoleAdmin, &inviteeID, ownerID); err != nil {
+	if _, err := store.CreateTeamInvite(context.Background(), targetTeamID, "invite-cloud@example.com", database.TenantRoleAdmin, &inviteeID, ownerID, true); err != nil {
 		t.Fatalf("create team invite: %v", err)
 	}
 
@@ -92,5 +92,25 @@ func TestHandleAcceptInviteRejectsSecondHostedCloudTeam(t *testing.T) {
 	}
 	if isMember {
 		t.Fatalf("expected invitee not to join second hosted cloud team")
+	}
+
+	user, err := store.GetUserByID(context.Background(), inviteeID)
+	if err != nil {
+		t.Fatalf("load invitee after rejected invite: %v", err)
+	}
+	passwordStillWorks, err := verifyPassword("password123", user.Password)
+	if err != nil {
+		t.Fatalf("verify invitee password after rejected invite: %v", err)
+	}
+	if !passwordStillWorks {
+		t.Fatalf("expected rejected invite to leave invitee password unchanged")
+	}
+
+	email, err := store.ResolvePasswordResetEmail(context.Background(), token)
+	if err != nil {
+		t.Fatalf("expected rejected invite to preserve token: %v", err)
+	}
+	if email != "invite-cloud@example.com" {
+		t.Fatalf("expected preserved token email invite-cloud@example.com, got %q", email)
 	}
 }
