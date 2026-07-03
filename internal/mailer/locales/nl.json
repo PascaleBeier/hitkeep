@@ -2,6 +2,13 @@
   "messages": {
     "footer.powered_by": "Gemaakt met",
     "footer.tagline": "Het privacyvriendelijke single-binary analyticsplatform.",
+    "footer.imprint": "Colofon",
+    "footer.privacy_policy": "Privacybeleid",
+    "footer.social.profiles": "HitKeep op sociale media",
+    "footer.social.github": "GitHub",
+    "footer.social.linkedin": "LinkedIn",
+    "footer.social.x": "X",
+    "footer.social.bluesky": "Bluesky",
     "common.copy_link": "Of kopieer deze link:",
     "common.hello": "Hallo,",
     "freq.daily": "Dagelijks",

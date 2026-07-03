@@ -2,6 +2,13 @@
   "messages": {
     "footer.powered_by": "Powered by",
     "footer.tagline": "The privacy-first, single-binary analytics platform.",
+    "footer.imprint": "Imprint",
+    "footer.privacy_policy": "Privacy Policy",
+    "footer.social.profiles": "HitKeep on Social Media",
+    "footer.social.github": "GitHub",
+    "footer.social.linkedin": "LinkedIn",
+    "footer.social.x": "X",
+    "footer.social.bluesky": "Bluesky",
     "common.copy_link": "Or copy this link:",
     "common.hello": "Hello,",
     "freq.daily": "Daily",

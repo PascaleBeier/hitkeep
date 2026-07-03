@@ -2,6 +2,13 @@
   "messages": {
     "footer.powered_by": "Bereitgestellt von",
     "footer.tagline": "Die datenschutzfreundliche Analytics-Plattform als Single Binary.",
+    "footer.imprint": "Impressum",
+    "footer.privacy_policy": "Datenschutzerklärung",
+    "footer.social.profiles": "HitKeep auf Social Media",
+    "footer.social.github": "GitHub",
+    "footer.social.linkedin": "LinkedIn",
+    "footer.social.x": "X",
+    "footer.social.bluesky": "Bluesky",
     "common.copy_link": "Oder kopiere diesen Link:",
     "common.hello": "Hallo,",
     "freq.daily": "Täglich",

@@ -2,6 +2,13 @@
   "messages": {
     "footer.powered_by": "Offerto da",
     "footer.tagline": "La piattaforma di analitica privacy-first in un unico binario.",
+    "footer.imprint": "Note legali",
+    "footer.privacy_policy": "Informativa sulla privacy",
+    "footer.social.profiles": "HitKeep sui social media",
+    "footer.social.github": "GitHub",
+    "footer.social.linkedin": "LinkedIn",
+    "footer.social.x": "X",
+    "footer.social.bluesky": "Bluesky",
     "common.copy_link": "Oppure copia questo link:",
     "common.hello": "Ciao,",
     "freq.daily": "Giornaliero",

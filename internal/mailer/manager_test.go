@@ -569,6 +569,67 @@ func TestSendPlainTextMailsUseRFC3676SignatureSeparator(t *testing.T) {
 	}
 }
 
+func TestSendFooterIncludesLegalAndSocialLinks(t *testing.T) {
+	drv := &mockDriver{}
+	m := &Mailer{driver: drv}
+
+	if err := m.Send("user@example.com", newPasswordResetMailable("https://example.com/reset/footer")); err != nil {
+		t.Fatalf("Send() error = %v", err)
+	}
+
+	for _, want := range []string{
+		"https://hitkeep.com/legal/imprint/",
+		"https://hitkeep.com/legal/privacy-policy/",
+		"https://github.com/pascalebeier/hitkeep",
+		"https://www.linkedin.com/company/hitkeep",
+		"https://x.com/gethitkeep",
+		"https://bsky.app/profile/hitkeep.com",
+	} {
+		if !strings.Contains(drv.htmlBody, want) {
+			t.Fatalf("HTML footer missing %q", want)
+		}
+		if !strings.Contains(drv.textBody, want) {
+			t.Fatalf("plain-text footer missing %q", want)
+		}
+	}
+
+	for _, want := range []string{"Imprint", "Privacy Policy", "HitKeep on Social Media", "GitHub", "LinkedIn", "Bluesky"} {
+		if !strings.Contains(drv.htmlBody, want) {
+			t.Fatalf("HTML footer missing label %q", want)
+		}
+		if !strings.Contains(drv.textBody, want) {
+			t.Fatalf("plain-text footer missing label %q", want)
+		}
+	}
+
+	for _, forbidden := range []string{
+		"mailjet.com/images/theme/v1/icons",
+		"cdn.simpleicons.org",
+	} {
+		if strings.Contains(drv.htmlBody, forbidden) {
+			t.Fatalf("footer should not depend on remote social icon asset %q", forbidden)
+		}
+	}
+}
+
+func TestSendLocalizedFooterUsesRecipientLocale(t *testing.T) {
+	drv := &mockDriver{}
+	m := &Mailer{driver: drv}
+
+	if err := m.Send("user@example.com", newLocalizedPasswordResetMailable("https://example.com/reset/de-footer", "de")); err != nil {
+		t.Fatalf("Send() error = %v", err)
+	}
+
+	for _, want := range []string{"Impressum", "Datenschutzerklärung", "HitKeep auf Social Media"} {
+		if !strings.Contains(drv.htmlBody, want) {
+			t.Fatalf("localized HTML footer missing %q", want)
+		}
+		if !strings.Contains(drv.textBody, want) {
+			t.Fatalf("localized plain-text footer missing %q", want)
+		}
+	}
+}
+
 func TestSendLocalizedPasswordResetUsesRecipientLocale(t *testing.T) {
 	drv := &mockDriver{}
 	m := &Mailer{driver: drv}

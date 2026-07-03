@@ -2,6 +2,13 @@
   "messages": {
     "footer.powered_by": "Impulsado por",
     "footer.tagline": "La plataforma de analítica centrada en la privacidad y en un solo binario.",
+    "footer.imprint": "Aviso legal",
+    "footer.privacy_policy": "Política de privacidad",
+    "footer.social.profiles": "HitKeep en redes sociales",
+    "footer.social.github": "GitHub",
+    "footer.social.linkedin": "LinkedIn",
+    "footer.social.x": "X",
+    "footer.social.bluesky": "Bluesky",
     "common.copy_link": "O copia este enlace:",
     "common.hello": "Hola,",
     "freq.daily": "Diario",

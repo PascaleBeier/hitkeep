@@ -4,3 +4,12 @@
 {{ t "footer.powered_by" }} HitKeep
 {{ t "footer.tagline" }}
 https://hitkeep.com
+
+{{ t "footer.imprint" }}: https://hitkeep.com/legal/imprint/
+{{ t "footer.privacy_policy" }}: https://hitkeep.com/legal/privacy-policy/
+
+{{ t "footer.social.profiles" }}:
+{{ t "footer.social.github" }}: https://github.com/pascalebeier/hitkeep
+{{ t "footer.social.linkedin" }}: https://www.linkedin.com/company/hitkeep
+{{ t "footer.social.x" }}: https://x.com/gethitkeep
+{{ t "footer.social.bluesky" }}: https://bsky.app/profile/hitkeep.com
