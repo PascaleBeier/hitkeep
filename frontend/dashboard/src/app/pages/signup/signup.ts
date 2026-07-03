@@ -1,3 +1,4 @@
+import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -28,6 +29,13 @@ type Jurisdiction = 'EU' | 'US';
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Signup {
+    private static readonly REGION_BASE_URLS: Record<Jurisdiction, string> = {
+        EU: 'https://cloud.hitkeep.eu',
+        US: 'https://cloud.hitkeep.com'
+    };
+    private static readonly PRESERVED_QUERY_PARAMS = new Set(['ref', 'source', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'utm_id', 'utm_source_platform', 'utm_creative_format', 'utm_marketing_tactic']);
+
+    private readonly document = inject(DOCUMENT);
     private readonly destroyRef = inject(DestroyRef);
     private readonly router = inject(Router);
     private readonly route = inject(ActivatedRoute);
@@ -42,8 +50,8 @@ export class Signup {
     protected readonly submittedEmail = signal('');
     private readonly activeLanguage = injectActiveLang();
     protected readonly currentYear = new Date().getFullYear();
+    protected readonly jurisdictionOptions: readonly Jurisdiction[] = ['EU', 'US'];
     protected readonly currentJurisdiction = computed<Jurisdiction>(() => this.normalizeJurisdiction(this.cloudStatus()?.jurisdiction) ?? this.inferJurisdictionFromHost());
-    protected readonly alternateJurisdiction = computed<Jurisdiction>(() => (this.currentJurisdiction() === 'EU' ? 'US' : 'EU'));
     private trackedSignupPageView = false;
     private trackedInitialSignupError = false;
 
@@ -57,6 +65,7 @@ export class Signup {
 
     constructor() {
         this.hydrateFromQuery();
+        this.redirectToRequestedJurisdiction();
         this.analytics
             .getSystemStatus()
             .pipe(takeUntilDestroyed(this.destroyRef))
@@ -73,6 +82,15 @@ export class Signup {
                     console.error('Failed to load cloud status for signup', err);
                 }
             });
+    }
+
+    protected selectJurisdiction(jurisdiction: Jurisdiction): void {
+        if (jurisdiction === this.currentJurisdiction()) {
+            return;
+        }
+
+        this.trackRegionSwitchClick(jurisdiction);
+        this.redirectToJurisdiction(jurisdiction);
     }
 
     protected onSubmit(event?: Event): void {
@@ -125,10 +143,10 @@ export class Signup {
             });
     }
 
-    protected jurisdictionHref(jurisdiction: Jurisdiction): string {
-        const baseURL = jurisdiction === 'US' ? 'https://cloud.hitkeep.com' : 'https://cloud.hitkeep.eu';
-        const url = new URL('/signup', baseURL);
+    private signupUrlForJurisdiction(jurisdiction: Jurisdiction): string {
+        const url = new URL('/signup', Signup.REGION_BASE_URLS[jurisdiction]);
 
+        this.appendPreservedQueryParams(url);
         const email = this.signupForm.email().value().trim().toLowerCase();
         const teamName = this.signupForm.teamName().value().trim();
         if (email !== '') {
@@ -166,6 +184,39 @@ export class Signup {
         }
     }
 
+    private redirectToRequestedJurisdiction(): void {
+        const requested = this.normalizeJurisdiction(this.route.snapshot.queryParamMap.get('region'));
+        if (!requested || requested === this.inferJurisdictionFromHost()) {
+            return;
+        }
+
+        this.redirectToJurisdiction(requested);
+    }
+
+    private redirectToJurisdiction(jurisdiction: Jurisdiction): void {
+        this.document.defaultView?.location.assign(this.signupUrlForJurisdiction(jurisdiction));
+    }
+
+    private appendPreservedQueryParams(url: URL): void {
+        const params = this.route.snapshot.queryParamMap;
+        for (const key of params.keys) {
+            if (!this.shouldPreserveQueryParam(key)) {
+                continue;
+            }
+
+            for (const value of params.getAll(key)) {
+                if (value.trim() !== '') {
+                    url.searchParams.append(key, value);
+                }
+            }
+        }
+    }
+
+    private shouldPreserveQueryParam(key: string): boolean {
+        const normalized = key.trim().toLowerCase();
+        return normalized.startsWith('utm_') || Signup.PRESERVED_QUERY_PARAMS.has(normalized);
+    }
+
     private trackSignupPageView(): void {
         if (this.trackedSignupPageView) {
             return;
@@ -192,7 +243,7 @@ export class Signup {
     }
 
     private inferJurisdictionFromHost(hostname?: string): Jurisdiction {
-        const value = (hostname ?? (typeof window !== 'undefined' ? window.location.hostname : '')).trim().toLowerCase();
+        const value = (hostname ?? this.document.defaultView?.location.hostname ?? '').trim().toLowerCase();
         if (value === 'cloud.hitkeep.com' || value.endsWith('.hitkeep.com')) {
             return 'US';
         }

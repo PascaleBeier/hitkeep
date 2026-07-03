@@ -1,3 +1,4 @@
+import { DOCUMENT } from '@angular/common';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { Router } from '@angular/router';
@@ -14,6 +15,8 @@ describe('Signup', () => {
     let component: Signup;
     let fixture: ComponentFixture<Signup>;
     let queryParams: Record<string, string>;
+    let locationAssignMock: ReturnType<typeof vi.fn>;
+    let documentMock: Document;
 
     const cloudServiceMock: { signup: ReturnType<typeof vi.fn> } = {
         signup: vi.fn(() => NEVER)
@@ -46,6 +49,29 @@ describe('Signup', () => {
         routerMock.navigateByUrl.mockClear();
         signupTrackingMock.install.mockClear();
         signupTrackingMock.trackEvent.mockClear();
+        locationAssignMock = vi.fn();
+        const locationMock = {
+            hostname: 'cloud.hitkeep.eu',
+            assign: locationAssignMock
+        } as unknown as Location;
+        const defaultViewMock = new Proxy(window, {
+            get(target, prop) {
+                if (prop === 'location') {
+                    return locationMock;
+                }
+                const value = Reflect.get(target, prop, target);
+                return typeof value === 'function' ? value.bind(target) : value;
+            }
+        }) as Window;
+        documentMock = new Proxy(document, {
+            get(target, prop) {
+                if (prop === 'defaultView') {
+                    return defaultViewMock;
+                }
+                const value = Reflect.get(target, prop, target);
+                return typeof value === 'function' ? value.bind(target) : value;
+            }
+        }) as Document;
         queryParams = {};
 
         await TestBed.configureTestingModule({
@@ -65,6 +91,7 @@ describe('Signup', () => {
                 { provide: CloudService, useValue: cloudServiceMock },
                 { provide: AnalyticsService, useValue: analyticsServiceMock },
                 { provide: CloudSignupTrackingService, useValue: signupTrackingMock },
+                { provide: DOCUMENT, useValue: documentMock },
                 {
                     provide: ActivatedRoute,
                     useValue: {
@@ -150,18 +177,45 @@ describe('Signup', () => {
         expect(component['signupForm'].email().value()).toBe('ada@example.com');
     });
 
-    it('provides a jurisdiction href for the alternate region', () => {
+    it('builds a jurisdiction URL for the alternate region with safe funnel context', () => {
+        queryParams = {
+            region: 'EU',
+            utm_source: 'hitkeep_docs',
+            utm_campaign: 'agency_pilot',
+            error: 'exists'
+        };
+        fixture = TestBed.createComponent(Signup);
+        component = fixture.componentInstance;
+        fixture.detectChanges();
+
         component['signupForm'].teamName().control().setValue('Cloud Team');
         component['signupForm'].email().control().setValue('user@example.com');
+        component['signupForm'].password().control().setValue('password123');
+        component['signupForm'].acceptedTos().control().setValue(true);
 
-        const href = component['jurisdictionHref']('US');
+        const href = component['signupUrlForJurisdiction']('US');
         expect(href).toContain('https://cloud.hitkeep.com/signup');
         expect(href).toContain('team_name=Cloud+Team');
         expect(href).toContain('email=user%40example.com');
+        expect(href).toContain('utm_source=hitkeep_docs');
+        expect(href).toContain('utm_campaign=agency_pilot');
+        expect(href).not.toContain('region=');
+        expect(href).not.toContain('error=');
+        expect(href).not.toContain('password123');
     });
 
-    it('tracks alternate region clicks without form values', () => {
-        component['trackRegionSwitchClick']('US');
+    it('does nothing when the selected jurisdiction is already active', () => {
+        const redirectSpy = vi.spyOn(component as unknown as { redirectToJurisdiction: (jurisdiction: 'EU' | 'US') => void }, 'redirectToJurisdiction');
+
+        component['selectJurisdiction']('EU');
+
+        expect(redirectSpy).not.toHaveBeenCalled();
+    });
+
+    it('tracks and redirects when selecting the alternate region', () => {
+        const redirectSpy = vi.spyOn(component as unknown as { redirectToJurisdiction: (jurisdiction: 'EU' | 'US') => void }, 'redirectToJurisdiction').mockImplementation(() => undefined);
+
+        component['selectJurisdiction']('US');
 
         expect(signupTrackingMock.trackEvent).toHaveBeenCalledWith('cloud_region_switch_click', {
             jurisdiction: 'EU',
@@ -169,5 +223,42 @@ describe('Signup', () => {
             source_path: '/signup',
             target_jurisdiction: 'US'
         });
+        expect(redirectSpy).toHaveBeenCalledWith('US');
+    });
+
+    it('redirects a region query parameter to the matching regional signup host', () => {
+        queryParams = {
+            region: 'US',
+            utm_source: 'hitkeep_docs',
+            email: 'ada@example.com',
+            team_name: 'Analytical Engine'
+        };
+        locationAssignMock.mockClear();
+
+        fixture = TestBed.createComponent(Signup);
+        component = fixture.componentInstance;
+        fixture.detectChanges();
+
+        expect(locationAssignMock).toHaveBeenCalledTimes(1);
+        const target = locationAssignMock.mock.calls[0]?.[0] as string;
+        expect(target).toContain('https://cloud.hitkeep.com/signup');
+        expect(target).toContain('utm_source=hitkeep_docs');
+        expect(target).toContain('email=ada%40example.com');
+        expect(target).toContain('team_name=Analytical+Engine');
+        expect(target).not.toContain('region=');
+    });
+
+    it('ignores invalid region query parameters', () => {
+        queryParams = {
+            region: 'APAC',
+            utm_source: 'hitkeep_docs'
+        };
+        locationAssignMock.mockClear();
+
+        fixture = TestBed.createComponent(Signup);
+        component = fixture.componentInstance;
+        fixture.detectChanges();
+
+        expect(locationAssignMock).not.toHaveBeenCalled();
     });
 });

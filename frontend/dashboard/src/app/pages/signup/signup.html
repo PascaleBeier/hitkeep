@@ -24,6 +24,27 @@
                 </div>
                 }
 
+                <section class="hk-auth-region" [attr.aria-label]="'signup.jurisdictionLabel' | transloco">
+                    <div class="hk-auth-region-copy">
+                        <span class="hk-auth-field-label">{{ "signup.jurisdictionLabel" | transloco }}</span>
+                        <p>{{ "signup.jurisdictionDescription" | transloco }}</p>
+                    </div>
+                    <div class="hk-auth-region-toggle" role="group" [attr.aria-label]="'signup.jurisdictionLabel' | transloco">
+                        @for (jurisdiction of jurisdictionOptions; track jurisdiction) {
+                        <button
+                            type="button"
+                            class="hk-auth-region-option"
+                            [class.hk-auth-region-option-active]="currentJurisdiction() === jurisdiction"
+                            [attr.aria-pressed]="currentJurisdiction() === jurisdiction"
+                            (click)="selectJurisdiction(jurisdiction)"
+                        >
+                            {{ ("signup.jurisdictions." + jurisdiction.toLowerCase()) | transloco }}
+                        </button>
+                        }
+                    </div>
+                    <p class="hk-auth-region-hint">{{ "signup.jurisdictionRedirectHint" | transloco }}</p>
+                </section>
+
                 <div class="hk-auth-field">
                     <label for="email" class="hk-auth-field-label">
                         {{ "common.emailAddress" | transloco }}
@@ -113,12 +134,6 @@
             <p class="hk-auth-footer-text">
                 <span>{{ "signup.haveAccount" | transloco }}</span>
                 <a routerLink="/login" class="hk-auth-link">{{ "signup.signInAction" | transloco }}</a>
-            </p>
-            <p class="hk-auth-footer-text">
-                <span>{{ "signup.otherJurisdictionPrompt" | transloco }}</span>
-                <a [href]="jurisdictionHref(alternateJurisdiction())" class="hk-auth-link" (click)="trackRegionSwitchClick(alternateJurisdiction())">
-                    {{ "signup.otherJurisdictionAction" | transloco : { jurisdiction: ("signup.jurisdictions." + alternateJurisdiction().toLowerCase()) | transloco } }}
-                </a>
             </p>
             <p class="hk-auth-footer-text">
                 <a href="https://hitkeep.com/guides/installation/binary/" class="hk-auth-link" target="_blank" rel="noopener">{{ "signup.selfHostLink" | transloco }}</a>
