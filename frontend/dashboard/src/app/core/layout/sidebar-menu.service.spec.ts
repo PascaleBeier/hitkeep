@@ -161,15 +161,18 @@ describe('SidebarMenuService', () => {
         const items = service.mobileItems(() => {
             closed = true;
         });
+        const analytics = findByLabel(items, 'Analytics');
+        const analyticsItems = analytics?.items ?? [];
         const dashboard = findByLabel(items, 'Dashboard');
-        const utm = findByLabel(items, 'UTM');
+        const utm = analyticsItems.find((item) => item.label === 'UTM');
         const webVitals = findByLabel(items, 'Web Vitals');
         const utmBuilder = findByLabel(items, 'UTM Builder');
-        const qrCodes = findByLabel(items, 'QR codes');
+        const qrCodes = analyticsItems.find((item) => item.label === 'QR codes');
 
         expect(dashboard?.routerLink).toBe('/share/share-token/dashboard');
         expect(webVitals?.routerLink).toBe('/share/share-token/web-vitals');
         expect(utm?.routerLink).toBe('/share/share-token/utm');
+        expect(utm?.items).toBeUndefined();
         expect(utmBuilder).toBeUndefined();
         expect(qrCodes?.routerLink).toBe('/share/share-token/utm/qr-codes');
 

@@ -124,12 +124,31 @@ export class SidebarMenuService {
     }
 
     private sections(): SidebarSection[] {
-        const notShare = () => !this.share.isShareMode();
+        const shareMode = this.share.isShareMode();
+        const notShare = () => !shareMode;
         const canViewSystem = () => this.access.hasInstance(INSTANCE_CAPABILITIES.viewSystem);
         const canManageUsers = () => this.access.hasInstance(INSTANCE_CAPABILITIES.manageUsers);
         const canManageTeamSettings = () => this.access.canActiveTeam(TEAM_CAPABILITIES.manageSettings);
         const canManageIntegrations = () => this.access.canActiveTeam(TEAM_CAPABILITIES.manageIntegrations);
         const supportURL = this.supportUrl();
+        const utmItems: SidebarItem[] = shareMode
+            ? [
+                  { labelKey: 'nav.utm', icon: 'pi pi-tags', routerLink: '/utm', shareRouterLink: '/utm', exact: true },
+                  { labelKey: 'nav.qrCodes', icon: 'pi pi-qrcode', routerLink: '/utm/qr-codes', shareRouterLink: '/utm/qr-codes' }
+              ]
+            : [
+                  {
+                      labelKey: 'nav.utm',
+                      icon: 'pi pi-tags',
+                      routerLink: '/utm',
+                      shareRouterLink: '/utm',
+                      exact: true,
+                      items: [
+                          { labelKey: 'nav.utmBuilder', icon: 'pi pi-link', routerLink: '/utm/builder', visible: notShare },
+                          { labelKey: 'nav.qrCodes', icon: 'pi pi-qrcode', routerLink: '/utm/qr-codes', shareRouterLink: '/utm/qr-codes' }
+                      ]
+                  }
+              ];
 
         return [
             {
@@ -144,17 +163,7 @@ export class SidebarMenuService {
                     { labelKey: 'nav.aiVisibility', icon: 'pi pi-sparkles', routerLink: '/ai-visibility', shareRouterLink: '/ai-visibility' },
                     { labelKey: 'nav.aiChatbots', icon: 'pi pi-comments', routerLink: '/ai-chatbots', shareRouterLink: '/ai-chatbots' },
                     { labelKey: 'nav.ecommerce', icon: 'pi pi-shopping-bag', routerLink: '/ecommerce', shareRouterLink: '/ecommerce' },
-                    {
-                        labelKey: 'nav.utm',
-                        icon: 'pi pi-tags',
-                        routerLink: '/utm',
-                        shareRouterLink: '/utm',
-                        exact: true,
-                        items: [
-                            { labelKey: 'nav.utmBuilder', icon: 'pi pi-link', routerLink: '/utm/builder', visible: notShare },
-                            { labelKey: 'nav.qrCodes', icon: 'pi pi-qrcode', routerLink: '/utm/qr-codes', shareRouterLink: '/utm/qr-codes' }
-                        ]
-                    },
+                    ...utmItems,
                     { labelKey: 'nav.importExport', icon: 'pi pi-sync', routerLink: '/import-export', visible: notShare }
                 ]
             },

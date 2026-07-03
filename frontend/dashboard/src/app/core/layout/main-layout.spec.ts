@@ -296,6 +296,17 @@ describe('MainLayout', () => {
         expect(importExportLink).toBeFalsy();
     });
 
+    it('should show UTM and QR Codes navigation in share mode', () => {
+        TestBed.inject(ShareService).setToken('share-token');
+        fixture.detectChanges();
+
+        const navLinks = Array.from(fixture.nativeElement.querySelectorAll('nav a')) as HTMLAnchorElement[];
+        const visibleHrefs = navLinks.map((link) => link.getAttribute('href'));
+
+        expect(visibleHrefs).toContain('/share/share-token/utm');
+        expect(visibleHrefs).toContain('/share/share-token/utm/qr-codes');
+    });
+
     it('should hide Ask AI by default', () => {
         seedActiveSite();
         fixture.detectChanges();
