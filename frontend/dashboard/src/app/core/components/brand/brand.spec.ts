@@ -36,4 +36,11 @@ describe('Brand', () => {
 
         expect(component.iconUrl()).toBe('/hitkeep/icon.png');
     });
+
+    it('links the brand to the configured app root', () => {
+        const link = fixture.nativeElement.querySelector('a');
+
+        expect(link?.getAttribute('href')).toBe('/hitkeep/');
+        expect(link?.textContent).toContain('HitKeep');
+    });
 });
