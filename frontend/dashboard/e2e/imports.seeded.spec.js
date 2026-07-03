@@ -273,9 +273,7 @@ async function eventPropertyBreakdownForImportRange(page, siteId, eventName, pro
 async function openImportedEventReport(page, domain) {
     await page.goto("/events", { waitUntil: "domcontentloaded" });
     await selectSeededSite(page, domain);
-    const yearRangeButton = page.getByRole("button", { name: "Last year" });
-    await yearRangeButton.click();
-    await expect(yearRangeButton).toHaveAttribute("aria-pressed", "true");
+    await selectOverflowRange(page, "Last year");
 
     await selectVisibleOptionMatching(page, "#event-name-select", /outbound_click/);
     await expect(page.locator("#event-name-select")).toContainText("outbound_click");
@@ -285,6 +283,15 @@ async function openImportedEventReport(page, domain) {
     await expect(eventActivity).not.toContainText("No event data");
     await expect(page.getByRole("heading", { name: "Content" })).toBeVisible();
     await expect(page.getByText("Top pages", { exact: true })).toBeVisible();
+}
+
+async function selectOverflowRange(page, label) {
+    const toolbar = page.locator("app-range-toolbar").first();
+    const moreSelect = toolbar.locator(".range-toolbar__more-select").first();
+    await expect(moreSelect).toBeVisible({ timeout: 15_000 });
+    await moreSelect.click();
+    await page.getByRole("option", { name: label }).click();
+    await expect(moreSelect).toContainText(label);
 }
 
 async function deleteSite(page, siteId) {

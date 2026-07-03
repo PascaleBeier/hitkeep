@@ -667,6 +667,7 @@
       "lastYear": "Último año",
       "lastYearShort": "1a",
       "moreRanges": "Más rangos",
+      "searchRanges": "Buscar rangos",
       "customRange": "Rango personalizado",
       "customShort": "Personalizado",
       "customRangeSummary": "{{start}} - {{end}}",
@@ -2296,6 +2297,7 @@
       "description": "El idioma de tu navegador se usa por defecto hasta que personalices esta configuración.",
       "defaultLabel": "Idioma predeterminado",
       "defaultPlaceholder": "Selecciona un idioma predeterminado",
+      "searchPlaceholder": "Buscar por idioma o código ISO",
       "defaultHint": "Este es el idioma principal de la interfaz del panel.",
       "rtlBadge": "RTL"
     }

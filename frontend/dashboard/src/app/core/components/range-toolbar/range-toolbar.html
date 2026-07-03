@@ -1,6 +1,6 @@
-<div class="range-toolbar">
-    <div class="range-toolbar__controls">
-        <div class="range-toolbar__range-group">
+<div class="range-toolbar mb-6 flex flex-wrap items-center justify-between gap-3.5 max-md:items-stretch">
+    <div class="range-toolbar__controls flex flex-wrap items-center gap-3 max-md:w-full max-md:gap-2">
+        <div class="range-toolbar__range-group max-md:w-full">
             <span id="range-toolbar-presets-label" class="sr-only">{{ "common.timeRangeSelectorAria" | transloco }}</span>
             <p-selectbutton
                 class="range-toolbar__preset-select"
@@ -15,18 +15,27 @@
             />
 
             @if (overflowPresetRanges().length) {
-            <p-menu #overflowMenu [model]="overflowMenuItems()" [popup]="true" appendTo="body" styleClass="range-toolbar__overflow-menu" />
-            <p-button
-                type="button"
-                icon="pi pi-ellipsis-h"
-                [outlined]="!isOverflowActive()"
-                severity="secondary"
-                [ariaLabel]="moreRangesLabel()"
+            <p-select
+                class="range-toolbar__more-select"
+                styleClass="range-toolbar__more-select-control"
+                panelStyleClass="range-toolbar__more-select-panel"
+                [options]="overflowPresetRanges()"
+                [ngModel]="overflowSelectValue()"
+                (ngModelChange)="selectOverflowPresetValue($event)"
+                optionLabel="label"
+                optionValue="value"
                 size="small"
-                styleClass="range-toolbar__more-button cursor-pointer"
+                [filter]="true"
+                filterBy="label,shortLabel,value"
+                [filterPlaceholder]="searchRangesLabel()"
+                [ariaFilterLabel]="searchRangesLabel()"
+                [ariaLabel]="moreRangesLabel()"
+                [placeholder]="moreRangesLabel()"
+                [resetFilterOnHide]="true"
+                [checkmark]="true"
+                appendTo="body"
                 [pTooltip]="moreRangesLabel()"
                 tooltipPosition="bottom"
-                (onClick)="toggleOverflowRanges($event, overflowMenu)"
             />
             }
 
@@ -46,19 +55,24 @@
         </div>
 
         @if (customRangeSummary(); as summary) {
-        <div class="range-toolbar__summary" [attr.aria-label]="'common.timeRanges.customRange' | transloco">{{ summary }}</div>
+        <div
+            class="range-toolbar__summary inline-flex min-h-[2.35rem] items-center whitespace-nowrap px-1.5 text-sm font-semibold tabular-nums text-[var(--p-text-muted-color)] max-md:w-full max-md:px-0"
+            [attr.aria-label]="'common.timeRanges.customRange' | transloco"
+        >
+            {{ summary }}
+        </div>
         }
 
         <p-popover #customPopover>
-            <div class="range-toolbar__popover">
-                <div class="range-toolbar__popover-header">
-                    <h3 class="range-toolbar__popover-title">{{ "common.selectDateRange" | transloco }}</h3>
-                    <p class="range-toolbar__popover-copy">{{ "common.timeRanges.customRangeHint" | transloco }}</p>
+            <div class="range-toolbar__popover flex w-[min(34rem,calc(100vw-3rem))] flex-col gap-4">
+                <div class="flex flex-col gap-1">
+                    <h3 class="m-0 text-base font-bold text-[var(--p-text-color)]">{{ "common.selectDateRange" | transloco }}</h3>
+                    <p class="m-0 text-sm text-[var(--p-text-muted-color)]">{{ "common.timeRanges.customRangeHint" | transloco }}</p>
                 </div>
 
-                <div class="range-toolbar__fields">
-                    <div class="range-toolbar__field">
-                        <label for="range-custom-start" class="range-toolbar__field-label">{{ "common.timeRanges.customStart" | transloco }}</label>
+                <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div class="flex flex-col gap-2">
+                        <label for="range-custom-start" class="text-sm font-semibold text-[var(--p-text-color)]">{{ "common.timeRanges.customStart" | transloco }}</label>
                         <p-datepicker
                             inputId="range-custom-start"
                             [formControl]="rangeForm.customStart().control()"
@@ -72,8 +86,8 @@
                         />
                     </div>
 
-                    <div class="range-toolbar__field">
-                        <label for="range-custom-end" class="range-toolbar__field-label">{{ "common.timeRanges.customEnd" | transloco }}</label>
+                    <div class="flex flex-col gap-2">
+                        <label for="range-custom-end" class="text-sm font-semibold text-[var(--p-text-color)]">{{ "common.timeRanges.customEnd" | transloco }}</label>
                         <p-datepicker
                             inputId="range-custom-end"
                             [formControl]="rangeForm.customEnd().control()"
@@ -88,7 +102,7 @@
                     </div>
                 </div>
 
-                <div class="range-toolbar__actions">
+                <div class="flex justify-end gap-2">
                     <p-button [label]="'common.actions.cancel' | transloco" severity="secondary" styleClass="cursor-pointer p-button-text" size="small" (onClick)="cancelCustomRange(customPopover)" />
                     <p-button [label]="'common.actions.apply' | transloco" styleClass="cursor-pointer" size="small" [disabled]="!canApplyCustomRange()" (onClick)="applyCustomRange(customPopover)" />
                 </div>

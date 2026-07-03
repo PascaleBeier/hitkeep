@@ -667,6 +667,7 @@
       "lastYear": "Ultimo anno",
       "lastYearShort": "1a",
       "moreRanges": "Altri intervalli",
+      "searchRanges": "Cerca intervalli",
       "customRange": "Intervallo personalizzato",
       "customShort": "Personalizzato",
       "customRangeSummary": "{{start}} - {{end}}",
@@ -2296,6 +2297,7 @@
       "description": "La lingua del browser viene usata come predefinita finché non personalizzi queste impostazioni.",
       "defaultLabel": "Lingua predefinita",
       "defaultPlaceholder": "Seleziona una lingua predefinita",
+      "searchPlaceholder": "Cerca per lingua o codice ISO",
       "defaultHint": "Questa è la lingua principale dell'interfaccia della dashboard.",
       "rtlBadge": "RTL"
     }

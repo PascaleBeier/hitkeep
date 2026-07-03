@@ -672,6 +672,7 @@
       "lastYear": "Vorig jaar",
       "lastYearShort": "1j",
       "moreRanges": "Meer perioden",
+      "searchRanges": "Perioden zoeken",
       "customRange": "Aangepast bereik",
       "customShort": "Aangepast",
       "customRangeSummary": "{{start}}-{{end}}",
@@ -2278,6 +2279,7 @@
       "description": "Standaard gebruiken we je browsertaal totdat je deze instelling aanpast.",
       "defaultLabel": "Standaardtaal",
       "defaultPlaceholder": "Selecteer een standaardtaal",
+      "searchPlaceholder": "Zoek op taal of ISO-code",
       "defaultHint": "Dit is de hoofdtaal voor de dashboard-UI.",
       "rtlBadge": "RTL"
     }

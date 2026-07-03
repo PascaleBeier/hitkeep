@@ -1,7 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
+import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
+import { Select } from 'primeng/select';
 import { vi } from 'vitest';
 
 import { UserPreferencesService } from '@services/user-preferences.service';
@@ -26,6 +28,7 @@ describe('UserSettings', () => {
                                     description: 'Choose dashboard language.',
                                     defaultLabel: 'Default language',
                                     defaultPlaceholder: 'Select language',
+                                    searchPlaceholder: 'Search by language or ISO code',
                                     defaultHint: 'Used across the dashboard.',
                                     rtlBadge: 'RTL'
                                 },
@@ -68,10 +71,12 @@ describe('UserSettings', () => {
                                     }
                                 }
                             }
-                        }
+                        },
+                        de: {},
+                        pt: {}
                     },
                     translocoConfig: {
-                        availableLangs: ['en'],
+                        availableLangs: ['en', 'de', 'pt'],
                         defaultLang: 'en'
                     },
                     preloadLangs: true
@@ -120,5 +125,25 @@ describe('UserSettings', () => {
         expect(links.some((link) => link.getAttribute('href') === '/import-export/export')).toBe(true);
         expect(fixture.nativeElement.querySelector('[role="tab"][value="export"]')).toBeNull();
         expect(fixture.nativeElement.querySelector('p-splitbutton')).toBeNull();
+    });
+
+    it('makes the profile language selector searchable by language names and ISO code', () => {
+        const select = fixture.debugElement.query(By.directive(Select)).componentInstance as Select;
+        const options = select.options as { label: string; nativeLabel: string; value: string; isoCode: string; searchText: string }[];
+        const german = options.find((option) => option.value === 'de');
+
+        expect(select.filter).toBe(true);
+        expect(select.filterBy).toBe('label,nativeLabel,value,isoCode,searchText');
+        expect(select.filterPlaceholder).toBe('Search by language or ISO code');
+        expect(select.ariaFilterLabel).toBe('Search by language or ISO code');
+        expect(select.resetFilterOnHide).toBe(true);
+        expect(german?.label).toBe('German');
+        expect(german?.nativeLabel).toBe('Deutsch');
+        expect(german?.value).toBe('de');
+        expect(german?.isoCode).toBe('DE');
+        expect(german?.searchText).toContain('German');
+        expect(german?.searchText).toContain('Deutsch');
+        expect(german?.searchText).toContain('de');
+        expect(german?.searchText).toContain('DE');
     });
 });

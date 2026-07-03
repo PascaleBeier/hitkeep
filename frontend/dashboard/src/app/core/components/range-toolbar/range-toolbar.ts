@@ -3,11 +3,10 @@ import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { compatForm } from '@angular/forms/signals/compat';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { TranslocoLocaleService } from '@jsverse/transloco-locale';
-import { MenuItem } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { DatePickerModule } from 'primeng/datepicker';
-import { Menu, MenuModule } from 'primeng/menu';
 import { Popover, PopoverModule } from 'primeng/popover';
+import { SelectModule } from 'primeng/select';
 import { SelectButtonModule } from 'primeng/selectbutton';
 import { TooltipModule } from 'primeng/tooltip';
 import { injectActiveLang } from '@core/i18n/active-lang';
@@ -32,7 +31,7 @@ const VISIBLE_PRESET_VALUES = new Set<RangeValue>(['today', 'yesterday', '24h', 
 
 @Component({
     selector: 'app-range-toolbar',
-    imports: [FormsModule, ReactiveFormsModule, DatePickerModule, MenuModule, PopoverModule, ButtonModule, SelectButtonModule, TooltipModule, TranslocoPipe],
+    imports: [FormsModule, ReactiveFormsModule, DatePickerModule, PopoverModule, ButtonModule, SelectButtonModule, SelectModule, TooltipModule, TranslocoPipe],
     templateUrl: './range-toolbar.html',
     styleUrl: './range-toolbar.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -72,17 +71,10 @@ export class RangeToolbar {
         const value = this.selectedRange().value;
         return this.visiblePresetRanges().some((option) => option.value === value) ? value : null;
     });
-    protected readonly isOverflowActive = computed(() => {
+    protected readonly overflowSelectValue = computed(() => {
         const value = this.selectedRange().value;
-        return this.overflowPresetRanges().some((option) => option.value === value);
+        return this.overflowPresetRanges().some((option) => option.value === value) ? value : null;
     });
-    protected readonly overflowMenuItems = computed<MenuItem[]>(() =>
-        this.overflowPresetRanges().map((option) => ({
-            label: option.label,
-            icon: this.isPresetActive(option.value) ? 'pi pi-check' : undefined,
-            command: () => this.selectPreset(option)
-        }))
-    );
     protected readonly customRangeSummary = computed(() => {
         this.activeLanguage();
         if (!this.isCustomActive()) {
@@ -116,6 +108,10 @@ export class RangeToolbar {
     protected readonly moreRangesLabel = computed(() => {
         this.activeLanguage();
         return this.transloco.translate('common.timeRanges.moreRanges');
+    });
+    protected readonly searchRangesLabel = computed(() => {
+        this.activeLanguage();
+        return this.transloco.translate('common.timeRanges.searchRanges');
     });
     protected readonly datePickerDateFormat = computed(() => {
         this.activeLanguage();
@@ -165,8 +161,15 @@ export class RangeToolbar {
         }
     }
 
-    protected toggleOverflowRanges(event: Event, menu: Menu) {
-        menu.toggle(event);
+    protected selectOverflowPresetValue(value: RangeValue | null) {
+        if (!value) {
+            return;
+        }
+
+        const option = this.overflowPresetRanges().find((range) => range.value === value);
+        if (option) {
+            this.selectPreset(option);
+        }
     }
 
     protected toggleCustomRange(event: Event, popover: Popover) {

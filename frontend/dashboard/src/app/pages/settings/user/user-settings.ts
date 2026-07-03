@@ -23,7 +23,10 @@ import { TabsModule } from 'primeng/tabs';
 
 interface LanguageOption {
     label: string;
+    nativeLabel: string;
     value: string;
+    isoCode: string;
+    searchText: string;
     flagUrl: string;
     direction: TextDirection;
 }
@@ -98,9 +101,14 @@ export class UserSettings {
             seen.add(base);
 
             const label = this.optionLabel(base);
+            const nativeLabel = this.languageName(base, base);
+            const isoCode = base.toUpperCase();
             options.push({
                 value: base,
+                isoCode,
                 label,
+                nativeLabel,
+                searchText: `${label} ${nativeLabel} ${base} ${isoCode}`,
                 flagUrl: localeFlagUrl(base),
                 direction: getLocaleDirection(base)
             });
@@ -241,10 +249,14 @@ export class UserSettings {
     }
 
     protected optionLabel(locale: string): string {
+        const uiLanguage = getBaseLanguage(this.activeLanguage()) || 'en';
+        return this.languageName(locale, uiLanguage);
+    }
+
+    private languageName(locale: string, displayLocale: string): string {
         const normalized = normalizeLocaleTag(locale);
         if (!normalized) return locale;
-        const uiLanguage = getBaseLanguage(this.activeLanguage()) || 'en';
-        const languageNames = this.displayNames('language', uiLanguage);
+        const languageNames = this.displayNames('language', displayLocale);
         const language = normalized.split('-')[0];
         const languageName = languageNames?.of(language) ?? language;
         return languageName;

@@ -667,6 +667,7 @@
       "lastYear": "Letztes Jahr",
       "lastYearShort": "1J",
       "moreRanges": "Weitere Zeiträume",
+      "searchRanges": "Zeiträume suchen",
       "customRange": "Benutzerdefiniert",
       "customShort": "Benutzerdef.",
       "customRangeSummary": "{{start}} - {{end}}",
@@ -2296,6 +2297,7 @@
       "description": "Die Sprache deines Browsers wird standardmäßig verwendet, bis du diese Einstellungen anpasst.",
       "defaultLabel": "Standardsprache",
       "defaultPlaceholder": "Standardsprache auswählen",
+      "searchPlaceholder": "Nach Sprache oder ISO-Code suchen",
       "defaultHint": "Dies ist die primäre Sprache für die Dashboard-Oberfläche.",
       "rtlBadge": "RTL"
     }

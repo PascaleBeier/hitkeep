@@ -667,6 +667,7 @@
       "lastYear": "Dernière année",
       "lastYearShort": "1a",
       "moreRanges": "Plus de plages",
+      "searchRanges": "Rechercher des plages",
       "customRange": "Plage personnalisée",
       "customShort": "Personnalisé",
       "customRangeSummary": "{{start}} - {{end}}",
@@ -2296,6 +2297,7 @@
       "description": "La langue de votre navigateur est utilisée par défaut jusqu'à personnalisation.",
       "defaultLabel": "Langue par défaut",
       "defaultPlaceholder": "Sélectionnez une langue par défaut",
+      "searchPlaceholder": "Rechercher par langue ou code ISO",
       "defaultHint": "C'est la langue principale de l'interface du tableau de bord.",
       "rtlBadge": "RTL"
     }

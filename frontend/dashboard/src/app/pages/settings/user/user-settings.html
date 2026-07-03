@@ -116,6 +116,11 @@
                                     [formControl]="preferencesForm.defaultLocale().control()"
                                     (onChange)="onLocaleChange()"
                                     optionLabel="label"
+                                    [filter]="true"
+                                    filterBy="label,nativeLabel,value,isoCode,searchText"
+                                    [filterPlaceholder]="'preferences.language.searchPlaceholder' | transloco"
+                                    [ariaFilterLabel]="'preferences.language.searchPlaceholder' | transloco"
+                                    [resetFilterOnHide]="true"
                                     [placeholder]="'preferences.language.defaultPlaceholder' | transloco"
                                     class="w-full"
                                 >

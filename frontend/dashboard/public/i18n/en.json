@@ -672,6 +672,7 @@
       "lastYear": "Last year",
       "lastYearShort": "1y",
       "moreRanges": "More ranges",
+      "searchRanges": "Search ranges",
       "customRange": "Custom range",
       "customShort": "Custom",
       "customRangeSummary": "{{start}} - {{end}}",
@@ -2296,6 +2297,7 @@
       "description": "Your browser language is used by default until you customize these settings.",
       "defaultLabel": "Default language",
       "defaultPlaceholder": "Select a default language",
+      "searchPlaceholder": "Search by language or ISO code",
       "defaultHint": "This is the primary language for the dashboard UI.",
       "rtlBadge": "RTL"
     }

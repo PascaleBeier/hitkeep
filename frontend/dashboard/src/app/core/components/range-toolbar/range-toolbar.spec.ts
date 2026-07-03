@@ -1,8 +1,10 @@
 import { Signal } from '@angular/core';
+import { By } from '@angular/platform-browser';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { provideTranslocoLocale } from '@jsverse/transloco-locale';
 import { PrimeNG } from 'primeng/config';
+import { Select } from 'primeng/select';
 
 import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar } from './range-toolbar';
 import { PrimeLocaleSyncService } from '@core/i18n/prime-locale-sync.service';
@@ -59,7 +61,8 @@ describe('RangeToolbar', () => {
                                     lastYearShort: '1y',
                                     customRange: 'Custom range',
                                     customShort: 'Custom',
-                                    moreRanges: 'More ranges'
+                                    moreRanges: 'More ranges',
+                                    searchRanges: 'Search ranges'
                                 },
                                 actions: {
                                     refresh: 'Refresh'
@@ -95,7 +98,8 @@ describe('RangeToolbar', () => {
                                     lastYearShort: '1J',
                                     customRange: 'Benutzerdefiniert',
                                     customShort: 'Benutzerdef.',
-                                    moreRanges: 'Weitere Zeiträume'
+                                    moreRanges: 'Weitere Zeiträume',
+                                    searchRanges: 'Zeiträume suchen'
                                 },
                                 actions: {
                                     refresh: 'Aktualisieren'
@@ -131,7 +135,8 @@ describe('RangeToolbar', () => {
                                     lastYearShort: '1a',
                                     customRange: 'Intervalo personalizado',
                                     customShort: 'Personalizado',
-                                    moreRanges: 'Mais períodos'
+                                    moreRanges: 'Mais períodos',
+                                    searchRanges: 'Pesquisar períodos'
                                 },
                                 actions: {
                                     refresh: 'Atualizar'
@@ -288,15 +293,34 @@ describe('RangeToolbar', () => {
         component.selectedRangeChange.subscribe((event) => selectedRangeEvents.push(event));
         component.rangeChange.subscribe((event) => rangeEvents.push(event));
 
-        const { overflowMenuItems } = component as unknown as {
-            overflowMenuItems: Signal<{ label?: string; command?: () => void }[]>;
-        };
-        overflowMenuItems()
-            .find((item) => item.label === 'Last 14 days')
-            ?.command?.();
+        const overflowSelect = fixture.debugElement.query(By.css('p-select.range-toolbar__more-select'));
+        overflowSelect.triggerEventHandler('ngModelChange', '14d');
+        fixture.detectChanges();
 
         expect(selectedRangeEvents[0]?.value).toBe('14d');
         expect(rangeEvents[0]?.value.value).toBe('14d');
+    });
+
+    it('makes overflow presets searchable', () => {
+        const overflowSelect = fixture.debugElement.query(By.css('p-select.range-toolbar__more-select')).componentInstance as Select;
+
+        expect(overflowSelect.filter).toBe(true);
+        expect(overflowSelect.filterBy).toBe('label,shortLabel,value');
+        expect(overflowSelect.filterPlaceholder).toBe('Search ranges');
+        expect(overflowSelect.ariaFilterLabel).toBe('Search ranges');
+        expect(overflowSelect.resetFilterOnHide).toBe(true);
+        expect((overflowSelect.options ?? []).map((option: RangeOption) => option.value)).toContain('180d');
+    });
+
+    it('shows the active overflow preset as the searchable selector value', () => {
+        fixture.componentRef.setInput('selectedRange', DEFAULT_RANGE_OPTIONS.find((range) => range.value === '90d') as RangeOption);
+        fixture.detectChanges();
+
+        const { overflowSelectValue } = component as unknown as {
+            overflowSelectValue: Signal<string | null>;
+        };
+
+        expect(overflowSelectValue()).toBe('90d');
     });
 
     it('keeps the segmented toolbar on dark content surfaces in dark mode', () => {
@@ -316,7 +340,7 @@ describe('RangeToolbar', () => {
 
         const group = fixture.nativeElement.querySelector('.range-toolbar__range-group') as HTMLElement;
         const segment = fixture.nativeElement.querySelector('p-togglebutton') as HTMLElement;
-        const overflowButton = fixture.nativeElement.querySelector('.range-toolbar__more-button') as HTMLElement;
+        const overflowSelect = fixture.nativeElement.querySelector('.range-toolbar__more-select-control') as HTMLElement;
         const groupStyle = getComputedStyle(group);
 
         expect(groupStyle.backgroundColor).toBe('rgb(39, 39, 42)');
@@ -324,7 +348,7 @@ describe('RangeToolbar', () => {
         expect(groupStyle.getPropertyValue('--p-togglebutton-content-checked-background').trim()).toBe('rgb(9, 9, 11)');
         expect(groupStyle.getPropertyValue('--p-button-secondary-background').trim()).toBe('rgb(9, 9, 11)');
         expect(getComputedStyle(segment).backgroundColor).not.toBe('rgb(255, 255, 255)');
-        expect(getComputedStyle(overflowButton).backgroundColor).not.toBe('rgb(255, 255, 255)');
+        expect(getComputedStyle(overflowSelect).backgroundColor).not.toBe('rgb(255, 255, 255)');
     });
 
     it('uses the active locale for the custom date picker format', async () => {

@@ -665,6 +665,7 @@
       "lastYear": "Último ano",
       "lastYearShort": "1a",
       "moreRanges": "Mais períodos",
+      "searchRanges": "Pesquisar períodos",
       "customRange": "Período personalizado",
       "customShort": "Personalizado",
       "customRangeSummary": "{{start}} - {{end}}",
@@ -2272,6 +2273,7 @@
       "description": "O idioma do seu navegador é usado por padrão até que você personalize estas configurações.",
       "defaultLabel": "Idioma padrão",
       "defaultPlaceholder": "Selecione um idioma padrão",
+      "searchPlaceholder": "Pesquisar por idioma ou código ISO",
       "defaultHint": "Este é o idioma principal da interface do painel.",
       "rtlBadge": "RTL"
     }
