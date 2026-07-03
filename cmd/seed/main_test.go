@@ -329,9 +329,49 @@ func TestSeedTrafficCreatesDefaultRangeUTMData(t *testing.T) {
 	}
 }
 
+func TestSeedAIFetchesCreatesDefaultRangeGPTBotData(t *testing.T) {
+	ctx, store, tenantMgr, site, _, analyticsStore := newSeedQRCampaignTestContext(t)
+	defer store.Close()
+	defer tenantMgr.Close()
+
+	stats, err := seedAIFetches(ctx, analyticsStore, site.ID, 30, mrand.New(mrand.NewSource(4242))) // #nosec G404 -- deterministic demo fixture test.
+	if err != nil {
+		t.Fatalf("seedAIFetches: %v", err)
+	}
+	if stats.fetches == 0 {
+		t.Fatalf("expected seeded AI fetches, got %+v", stats)
+	}
+
+	defaultRangeStart := time.Now().UTC().Truncate(24 * time.Hour)
+	defaultRangeEnd := time.Now().UTC().Add(5 * time.Minute)
+	overview, err := analyticsStore.GetAIFetchOverview(ctx, api.AIFetchQueryParams{
+		SiteID: site.ID,
+		Start:  defaultRangeStart,
+		End:    defaultRangeEnd,
+	})
+	if err != nil {
+		t.Fatalf("GetAIFetchOverview: %v", err)
+	}
+	if overview.TotalRequests == 0 {
+		t.Fatalf("expected default today range to show seeded AI fetch requests, got %+v", overview)
+	}
+	if !hasSeedMetricNamed(overview.TopAssistants, "GPTBot") {
+		t.Fatalf("expected default today range to show GPTBot, got %+v", overview.TopAssistants)
+	}
+}
+
 func hasSpecifiedSeedMetric(rows []api.MetricStat) bool {
 	for _, row := range rows {
 		if row.Name != "" && row.Name != "(Unspecified)" {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSeedMetricNamed(rows []api.MetricStat, name string) bool {
+	for _, row := range rows {
+		if row.Name == name {
 			return true
 		}
 	}

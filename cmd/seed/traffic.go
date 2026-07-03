@@ -127,7 +127,10 @@ func seedTraffic(ctx context.Context, store *database.Store, siteID uuid.UUID, g
 
 func seedAIFetches(ctx context.Context, store *database.Store, siteID uuid.UUID, numDays int, rng *mrand.Rand) (aiFetchSeedStats, error) {
 	now := time.Now().UTC()
-	start := now.AddDate(0, 0, -numDays).Truncate(24 * time.Hour)
+	if numDays <= 0 {
+		return aiFetchSeedStats{}, nil
+	}
+	start := now.AddDate(0, 0, -(numDays - 1)).Truncate(24 * time.Hour)
 	stats := aiFetchSeedStats{}
 	var batch seedWriteBatch
 
@@ -152,7 +155,7 @@ func seedAIFetches(ctx context.Context, store *database.Store, siteID uuid.UUID,
 
 			fetch := &api.AIFetch{
 				SiteID:          siteID,
-				Timestamp:       randomTimeInDay(rng, day),
+				Timestamp:       randomTimeInElapsedDay(rng, day, now),
 				AssistantName:   bot.name,
 				AssistantFamily: bot.family,
 				Path:            target.path,
@@ -172,6 +175,12 @@ func seedAIFetches(ctx context.Context, store *database.Store, siteID uuid.UUID,
 			stats.hits += hitCount
 		}
 
+		if day.UTC().Truncate(24 * time.Hour).Equal(now.Truncate(24 * time.Hour)) {
+			fetch := seedDefaultRangeAIFetch(siteID, day, now)
+			batch.addAIFetch(fetch)
+			stats.fetches++
+		}
+
 		if err := batch.flush(ctx, store); err != nil {
 			return stats, fmt.Errorf("flush ai visibility batch for %s: %w", day.Format("2006-01-02"), err)
 		}
@@ -179,4 +188,31 @@ func seedAIFetches(ctx context.Context, store *database.Store, siteID uuid.UUID,
 
 	slog.Info("AI visibility seeded", "fetches", stats.fetches, "ai_referred_sessions", stats.sessions, "ai_referred_hits", stats.hits)
 	return stats, nil
+}
+
+func seedDefaultRangeAIFetch(siteID uuid.UUID, day, now time.Time) *api.AIFetch {
+	hostname := "acme-analytics.io"
+	contentType := "text/html; charset=utf-8"
+	responseMs := 144
+	bytesServed := int64(28_640)
+	userAgent := "Mozilla/5.0 (compatible; GPTBot/1.2; +https://openai.com/gptbot)"
+	timestamp := day.UTC().Truncate(24 * time.Hour).Add(15 * time.Minute)
+	if timestamp.After(now) {
+		timestamp = now
+	}
+
+	return &api.AIFetch{
+		SiteID:          siteID,
+		Timestamp:       timestamp,
+		AssistantName:   "GPTBot",
+		AssistantFamily: "OpenAI",
+		Path:            "/docs/getting-started",
+		Hostname:        &hostname,
+		StatusCode:      200,
+		ContentType:     &contentType,
+		ResourceType:    "html",
+		ResponseMs:      &responseMs,
+		BytesServed:     &bytesServed,
+		UserAgent:       &userAgent,
+	}
 }
