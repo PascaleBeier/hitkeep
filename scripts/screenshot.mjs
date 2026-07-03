@@ -101,6 +101,20 @@ async function clickTab(page, label, settle = TABLE_SETTLE) {
   return true;
 }
 
+async function selectRangePreset(page, label, settle = CHART_SETTLE) {
+  const toolbar = page.locator("app-range-toolbar").first();
+  const option = toolbar
+    .getByRole("button", { name: new RegExp(`^${escapeRegExp(label)}$`) })
+    .first();
+  if (!(await option.count())) {
+    console.warn(`    ! Range preset not found: ${label}`);
+    return false;
+  }
+  await option.click();
+  await page.waitForTimeout(settle);
+  return true;
+}
+
 async function shoot(page, slug, { fullPage = false, clip } = {}) {
   const file = join(OUTPUT_DIR, `${slug}.png`);
   try {
@@ -450,6 +464,7 @@ async function selectSiteByDomain(page, domain = DEMO_SITE_DOMAIN) {
 async function captureSearchConsoleDrilldown(page, record, slug) {
   await nav(page, "/dashboard", CHART_SETTLE);
   await selectSiteByDomain(page);
+  await selectRangePreset(page, "7d", CHART_SETTLE);
   const drilldown = page.locator('[data-testid="search-console-drilldown"]').first();
   if (!(await drilldown.count())) {
     console.warn("    ! Search Console drilldown not found, skipping screenshot");
@@ -466,9 +481,12 @@ async function captureSearchConsoleDrilldown(page, record, slug) {
 
 async function captureOpportunities(page, record, slug) {
   await nav(page, "/opportunities", TABLE_SETTLE);
-  await page.getByRole("heading", { name: /opportunity inbox/i }).waitFor({ state: "visible", timeout: 8_000 });
+  await selectSiteByDomain(page);
+  await page.locator(".opportunities-inbox").first().waitFor({ state: "visible", timeout: 15_000 }).catch(() => {
+    console.warn("    ! Opportunity inbox was not visible before capture");
+  });
   const firstCard = page.locator("app-opportunity-card").first();
-  await firstCard.waitFor({ state: "visible", timeout: 12_000 }).catch(() => {
+  await firstCard.waitFor({ state: "visible", timeout: 15_000 }).catch(() => {
     console.warn("    ! Opportunity cards were not visible before capture");
   });
   record(slug, await shoot(page, slug));
