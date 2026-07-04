@@ -658,6 +658,27 @@ type ChartDataPoint struct {
 	Visitors  int       `json:"visitors"`
 }
 
+type SiteOverviewStatsStatus string
+
+const (
+	SiteOverviewStatsReady SiteOverviewStatsStatus = "ready"
+	SiteOverviewStatsError SiteOverviewStatsStatus = "error"
+)
+
+type SiteOverviewStats struct {
+	SiteID         uuid.UUID               `json:"site_id"`
+	Status         SiteOverviewStatsStatus `json:"status"`
+	TotalPageviews int                     `json:"total_pageviews"`
+	UniqueSessions int                     `json:"unique_sessions"`
+	BounceRate     float64                 `json:"bounce_rate"`
+	ChartData      []ChartDataPoint        `json:"chart_data"`
+	Error          string                  `json:"error,omitempty"`
+}
+
+type SitesOverviewStatsResponse struct {
+	Sites []SiteOverviewStats `json:"sites"`
+}
+
 type GoalSeriesPoint struct {
 	Time        time.Time `json:"time"`
 	Conversions int       `json:"conversions"`

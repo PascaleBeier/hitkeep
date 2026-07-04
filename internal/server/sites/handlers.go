@@ -34,6 +34,11 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		AllowAPIKey: true,
 		RateLimiter: ctx.ApiLimiter,
 	}, h.handleGetSites()))
+	mux.HandleFunc("GET /api/sites/overview", ctx.Handler(shared.HandlerConfig{
+		RequireAuth: true,
+		AllowAPIKey: true,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleGetSitesOverviewStats()))
 	mux.HandleFunc("POST /api/sites", ctx.Handler(shared.HandlerConfig{
 		RequireAuth: true,
 		RateLimiter: ctx.ApiLimiter,

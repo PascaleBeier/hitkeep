@@ -318,6 +318,103 @@ func TestHandleGetSites(t *testing.T) {
 	}
 }
 
+func TestHandleGetSitesOverviewStats(t *testing.T) {
+	h, store, userID := setupTestEnv(t)
+	defer store.Close()
+	ctx := context.Background()
+
+	siteAlpha, err := store.CreateSite(ctx, userID, "alpha-overview.test")
+	if err != nil {
+		t.Fatalf("create alpha site: %v", err)
+	}
+	siteBeta, err := store.CreateSite(ctx, userID, "beta-overview.test")
+	if err != nil {
+		t.Fatalf("create beta site: %v", err)
+	}
+
+	base := time.Date(2026, time.July, 1, 12, 0, 0, 0, time.UTC)
+	sessionID := uuid.New()
+	for _, path := range []string{"/", "/pricing"} {
+		if err := store.CreateHit(ctx, &api.Hit{
+			SiteID:    siteAlpha.ID,
+			SessionID: sessionID,
+			PageID:    uuid.New(),
+			Timestamp: base.Add(-1 * time.Hour),
+			Path:      path,
+		}); err != nil {
+			t.Fatalf("create alpha hit: %v", err)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/sites/overview", nil)
+	w := httptest.NewRecorder()
+	h.handleGetSitesOverviewStats().ServeHTTP(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected unauthorized status %d, got %d", http.StatusUnauthorized, w.Code)
+	}
+
+	statsURL := fmt.Sprintf(
+		"/api/sites/overview?from=%s&to=%s",
+		url.QueryEscape(base.Add(-24*time.Hour).Format(time.RFC3339)),
+		url.QueryEscape(base.Format(time.RFC3339)),
+	)
+	req = httptest.NewRequest(http.MethodGet, statsURL, nil)
+	req = req.WithContext(context.WithValue(req.Context(), shared.UserIDKey, userID))
+	w = httptest.NewRecorder()
+	h.handleGetSitesOverviewStats().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
+	}
+
+	var response api.SitesOverviewStatsResponse
+	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+		t.Fatalf("decode overview response: %v", err)
+	}
+	if len(response.Sites) != 2 {
+		t.Fatalf("expected two accessible site rows, got %+v", response.Sites)
+	}
+	alphaStats := findOverviewStats(response.Sites, siteAlpha.ID)
+	if alphaStats == nil {
+		t.Fatalf("expected alpha stats in response: %+v", response.Sites)
+	}
+	if alphaStats.Status != api.SiteOverviewStatsReady || alphaStats.TotalPageviews != 2 || alphaStats.UniqueSessions != 1 {
+		t.Fatalf("unexpected alpha overview stats: %+v", alphaStats)
+	}
+	if findOverviewStats(response.Sites, siteBeta.ID) == nil {
+		t.Fatalf("expected beta row with no traffic in response: %+v", response.Sites)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, statsURL, nil)
+	apiClientAuth := &database.APIClientAuth{
+		UserID:    userID,
+		SiteRoles: map[uuid.UUID]auth.SiteRole{siteBeta.ID: auth.SiteViewer},
+	}
+	req = req.WithContext(context.WithValue(req.Context(), shared.UserIDKey, userID))
+	req = req.WithContext(context.WithValue(req.Context(), shared.APIClientAuthKey, apiClientAuth))
+	w = httptest.NewRecorder()
+	h.handleGetSitesOverviewStats().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected API client status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
+	}
+
+	response = api.SitesOverviewStatsResponse{}
+	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+		t.Fatalf("decode API client overview response: %v", err)
+	}
+	if len(response.Sites) != 1 || response.Sites[0].SiteID != siteBeta.ID {
+		t.Fatalf("expected API client response to be scoped to beta, got %+v", response.Sites)
+	}
+}
+
+func findOverviewStats(rows []api.SiteOverviewStats, siteID uuid.UUID) *api.SiteOverviewStats {
+	for idx := range rows {
+		if rows[idx].SiteID == siteID {
+			return &rows[idx]
+		}
+	}
+	return nil
+}
+
 func TestSiteExclusionsAllowInstanceAdmin(t *testing.T) {
 	h, store, ownerID := setupTestEnv(t)
 	defer store.Close()

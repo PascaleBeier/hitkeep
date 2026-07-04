@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
@@ -117,7 +117,22 @@ describe('Login', () => {
 
     it('falls back for unsafe returnUrl', () => {
         returnUrl = 'https://evil.example/phish';
-        expect(component['resolveReturnUrl']()).toBe('/dashboard');
+        expect(component['resolveReturnUrl']()).toBe('/');
+    });
+
+    it('routes successful logins without returnUrl through the authenticated start page', () => {
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+        component['loginForm'].email().control().setValue('user@example.com');
+        component['loginForm'].password().control().setValue('password123');
+
+        component.onSubmit();
+
+        expect(authMock.login).toHaveBeenCalledWith({
+            email: 'user@example.com',
+            password: 'password123',
+            remember_me: false
+        });
+        expect(navigate).toHaveBeenCalledWith('/');
     });
 
     it('stores recovery-code MFA state from the login response', () => {

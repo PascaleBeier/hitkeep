@@ -540,6 +540,26 @@ func openAPIV1AnalyticsSchemas() map[string]any {
 				"visitors":  map[string]any{"type": "integer"},
 			},
 		},
+		"SiteOverviewStats": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"site_id":         map[string]any{"type": "string", "format": "uuid"},
+				"status":          map[string]any{"type": "string", "enum": []string{"ready", "error"}},
+				"total_pageviews": map[string]any{"type": "integer"},
+				"unique_sessions": map[string]any{"type": "integer"},
+				"bounce_rate":     map[string]any{"type": "number"},
+				"chart_data":      map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/ChartDataPoint"}},
+				"error":           map[string]any{"type": "string"},
+			},
+			"required": []string{"site_id", "status", "total_pageviews", "unique_sessions", "bounce_rate", "chart_data"},
+		},
+		"SitesOverviewStatsResponse": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"sites": map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/SiteOverviewStats"}},
+			},
+			"required": []string{"sites"},
+		},
 		"GoalStats": map[string]any{
 			"type": "object",
 			"properties": map[string]any{

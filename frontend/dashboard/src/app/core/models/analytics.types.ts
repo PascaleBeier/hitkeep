@@ -161,6 +161,22 @@ export interface ChartDataPoint {
     visitors: number;
 }
 
+export type SiteOverviewStatsStatus = 'ready' | 'error';
+
+export interface SiteOverviewStats {
+    site_id: string;
+    status: SiteOverviewStatsStatus;
+    total_pageviews: number;
+    unique_sessions: number;
+    bounce_rate: number;
+    chart_data: ChartDataPoint[];
+    error?: string;
+}
+
+export interface SitesOverviewStatsResponse {
+    sites: SiteOverviewStats[];
+}
+
 export interface GoalSeriesPoint {
     time: string;
     conversions: number;

@@ -4,8 +4,10 @@
     "primaryNavigationAria": "Navigation principale",
     "contentAreaAria": "Zone de contenu",
     "analytics": "Analytiques",
+    "overview": "Vue d’ensemble",
     "integration": "Intégrations",
     "dashboardAria": "Aller au tableau de bord",
+    "overviewAria": "Aller à la vue d’ensemble des sites",
     "opportunitiesAria": "Aller aux opportunités",
     "goalsAria": "Aller aux objectifs",
     "funnelsAria": "Aller aux entonnoirs",
@@ -64,6 +66,40 @@
     "webVitals": "Web Vitals",
     "webVitalsAria": "Ouvrir les analyses Web Vitals",
     "qrCodes": "QR codes"
+  },
+  "overview": {
+    "title": "Vue d’ensemble",
+    "toolbarAria": "Commandes de la vue d’ensemble des sites",
+    "gridAria": "Vue d’ensemble des sites",
+    "chartAria": "Tendance du trafic pour {{site}}",
+    "searchPlaceholder": "Filtrer les sites",
+    "searchLabel": "Filtrer les sites",
+    "sortLabel": "Trier les sites",
+    "sort": {
+      "domain": "Nom",
+      "pageviews": "Pages vues",
+      "visitors": "Visiteurs"
+    },
+    "metrics": {
+      "pageviews": "Pages vues",
+      "visitors": "Visiteurs",
+      "bounceRate": "Rebond"
+    },
+    "actions": {
+      "addSite": "Ajouter un site",
+      "openDashboard": "Ouvrir le tableau",
+      "openDashboardFor": "Ouvrir le tableau de bord pour {{site}}"
+    },
+    "empty": {
+      "noSitesTitle": "Aucun site pour l’instant",
+      "noSitesDescription": "Ajoutez un site pour commencer à collecter des données.",
+      "noMatchesTitle": "Aucun site correspondant",
+      "noMatchesDescription": "Ajustez le filtre pour afficher plus de sites.",
+      "noTraffic": "Aucun trafic"
+    },
+    "errors": {
+      "siteStatsFailed": "Statistiques indisponibles"
+    }
   },
   "askAi": {
     "triggerPlaceholder": "Ask AI",

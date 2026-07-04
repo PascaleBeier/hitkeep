@@ -8,6 +8,7 @@ import { INSTANCE_CAPABILITIES } from '@core/access/capabilities';
 import { PermissionService } from '@services/permission.service';
 import { SiteService } from '@features/sites/services/site.service';
 import { routes } from './app.routes';
+import { overviewDefaultGuard } from '@pages/overview/overview-default.guard';
 
 describe('routes', () => {
     it('should be accepted by Angular Router', () => {
@@ -44,6 +45,16 @@ describe('routes', () => {
 
         expect(route).toBeTruthy();
         expect(route?.canActivate).toBeUndefined();
+    });
+
+    it('exposes the multi-site overview page and delegates the authenticated start page to its default guard', () => {
+        const children = routes.find((route) => route.path === '')?.children ?? [];
+        const overviewRoute = children.find((route) => route.path === 'overview');
+        const defaultRoute = children.find((route) => route.path === '' && route.pathMatch === 'full');
+
+        expect(overviewRoute).toBeTruthy();
+        expect(defaultRoute?.redirectTo).toBeUndefined();
+        expect(defaultRoute?.canActivate).toContain(overviewDefaultGuard);
     });
 
     it('should navigate /import-export to Import for active-site managers', async () => {

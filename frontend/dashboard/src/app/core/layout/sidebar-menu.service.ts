@@ -154,6 +154,7 @@ export class SidebarMenuService {
             {
                 labelKey: 'nav.analytics',
                 items: [
+                    { labelKey: 'nav.overview', icon: 'pi pi-globe', routerLink: '/overview', visible: notShare, exact: true },
                     { labelKey: 'nav.dashboard', icon: 'pi pi-chart-bar', routerLink: '/dashboard', shareRouterLink: '/dashboard' },
                     { labelKey: 'nav.opportunities', icon: 'pi pi-compass', routerLink: '/opportunities', shareRouterLink: '/opportunities' },
                     { labelKey: 'nav.goals', icon: 'pi pi-flag', routerLink: '/goals', shareRouterLink: '/goals' },

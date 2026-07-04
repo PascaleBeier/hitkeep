@@ -188,6 +188,11 @@ func openAPIV1AdminSitePaths() map[string]any {
 				jsonBody(map[string]any{"type": "object", "properties": map[string]any{"domain": map[string]any{"type": "string"}}, "required": []string{"domain"}}),
 				map[string]any{"200": jsonRefResp("Site", "#/components/schemas/Site"), "409": errResp("Domain exists")}),
 		},
+		"/api/sites/overview": map[string]any{
+			"get": op([]string{"Sites"}, "Get sites overview stats", "Returns lightweight overview metrics and chart data for all sites visible to the caller.", secAnyAuth(), []any{
+				paramRef("#/components/parameters/from"), paramRef("#/components/parameters/to"),
+			}, nil, map[string]any{"200": jsonRefResp("Sites overview stats", "#/components/schemas/SitesOverviewStatsResponse")}),
+		},
 		"/api/sites/{id}": map[string]any{
 			"delete": op([]string{"Sites"}, "Delete site", "Deletes a site and associated analytics data.", secCookie(), []any{paramRef("#/components/parameters/siteID")}, nil, map[string]any{"200": jsonRefResp("Status", "#/components/schemas/Status")}),
 		},

@@ -18,6 +18,122 @@ import (
 	"hitkeep/internal/server/shared"
 )
 
+func (h *handler) handleGetSitesOverviewStats() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := shared.GetUserIDFromContext(r)
+		apiClientAuth, _ := r.Context().Value(shared.APIClientAuthKey).(*database.APIClientAuth)
+		if userID == uuid.Nil && apiClientAuth == nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if userID == uuid.Nil && apiClientAuth != nil && apiClientAuth.TenantID == uuid.Nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		if h.ctx.Store == nil {
+			http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
+			return
+		}
+
+		sites, err := h.listAccessibleSites(r.Context(), userID, apiClientAuth)
+		if err != nil {
+			slog.Error("Failed to get overview sites", "error", err, "user_id", userID, "tenant_id", apiClientAuthTenantID(apiClientAuth))
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		start, end := parseOverviewStatsRange(r.URL.Query())
+		response := api.SitesOverviewStatsResponse{
+			Sites: make([]api.SiteOverviewStats, 0, len(sites)),
+		}
+
+		for _, site := range sites {
+			analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), site.ID)
+			if err != nil {
+				slog.Error("Failed to resolve overview analytics store", "error", err, "site_id", site.ID)
+				response.Sites = append(response.Sites, overviewStatsError(site.ID))
+				continue
+			}
+
+			stats, err := analyticsStore.GetSiteOverviewStats(r.Context(), api.AnalyticsParams{
+				SiteID: site.ID,
+				UserID: userID,
+				Start:  start,
+				End:    end,
+			})
+			if err != nil {
+				slog.Error("Failed to get overview site stats", "error", err, "site_id", site.ID)
+				response.Sites = append(response.Sites, overviewStatsError(site.ID))
+				continue
+			}
+			response.Sites = append(response.Sites, *stats)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			slog.Error("Failed to encode response", "error", err)
+		}
+	}
+}
+
+func (h *handler) listAccessibleSites(ctx context.Context, userID uuid.UUID, apiClientAuth *database.APIClientAuth) ([]api.Site, error) {
+	var (
+		sites []api.Site
+		err   error
+	)
+	switch {
+	case userID != uuid.Nil:
+		sites, err = h.ctx.Store.GetSites(ctx, userID)
+	case apiClientAuth != nil && apiClientAuth.TenantID != uuid.Nil:
+		sites, err = h.ctx.Store.ListSitesForTenant(ctx, apiClientAuth.TenantID)
+	default:
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if apiClientAuth != nil {
+		filtered := make([]api.Site, 0, len(sites))
+		for _, site := range sites {
+			if _, allowed := apiClientAuth.SiteRoles[site.ID]; allowed {
+				filtered = append(filtered, site)
+			}
+		}
+		sites = filtered
+	}
+
+	return sites, nil
+}
+
+func parseOverviewStatsRange(q url.Values) (time.Time, time.Time) {
+	now := time.Now().UTC()
+	end := now.AddDate(0, 0, 1)
+	start := end.AddDate(0, 0, -30)
+
+	if fromStr := q.Get("from"); fromStr != "" {
+		if parsed, err := time.Parse(time.RFC3339, fromStr); err == nil {
+			start = parsed
+		}
+	}
+	if toStr := q.Get("to"); toStr != "" {
+		if parsed, err := time.Parse(time.RFC3339, toStr); err == nil {
+			end = parsed
+		}
+	}
+	return start, end
+}
+
+func overviewStatsError(siteID uuid.UUID) api.SiteOverviewStats {
+	return api.SiteOverviewStats{
+		SiteID:    siteID,
+		Status:    api.SiteOverviewStatsError,
+		ChartData: []api.ChartDataPoint{},
+		Error:     "stats_unavailable",
+	}
+}
+
 func (h *handler) handleGetSiteStats() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID := shared.GetUserIDFromContext(r)

@@ -366,7 +366,7 @@ describe('SettingsAPIClients', () => {
 
         const dialog = document.body.querySelector('.p-dialog') as HTMLElement | null;
 
-        expect(dialog?.querySelector('app-site-select-option img[alt="alpha.example.com"]')).not.toBeNull();
+        expect(dialog?.querySelector('app-site-select-option img[alt=""][aria-hidden="true"]')).not.toBeNull();
         expect(dialog?.textContent).toContain('alpha.example.com');
     });
 

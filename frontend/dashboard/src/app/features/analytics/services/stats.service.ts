@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { finalize, Observable } from 'rxjs';
-import { SiteStats } from '@models/analytics.types';
+import { SiteStats, SitesOverviewStatsResponse } from '@models/analytics.types';
 
 @Injectable({ providedIn: 'root' })
 export class StatsService {
@@ -37,6 +37,11 @@ export class StatsService {
         }
 
         return this.http.get<SiteStats>(`/api/sites/${siteId}/stats`, { params });
+    }
+
+    fetchSitesOverviewStats(from: string, to: string): Observable<SitesOverviewStatsResponse> {
+        const params = new HttpParams().set('from', from).set('to', to);
+        return this.http.get<SitesOverviewStatsResponse>('/api/sites/overview', { params });
     }
 
     comparisonRange(from: string, to: string): { from: string; to: string } {

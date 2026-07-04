@@ -101,3 +101,24 @@
     min-height: 2.35rem;
     padding-inline: 0;
 }
+
+@media (max-width: 640px) {
+    .range-toolbar__range-group {
+        flex-wrap: wrap;
+    }
+
+    :host ::ng-deep .range-toolbar__preset-select.p-selectbutton {
+        display: grid;
+        width: 100%;
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    :host ::ng-deep .range-toolbar__preset-select.p-selectbutton .p-togglebutton {
+        width: 100%;
+    }
+
+    :host ::ng-deep .range-toolbar__more-select.p-select,
+    :host ::ng-deep .range-toolbar__custom-button {
+        flex: 1 1 10rem;
+    }
+}

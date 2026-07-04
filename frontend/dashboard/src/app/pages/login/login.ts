@@ -239,9 +239,9 @@ export class Login {
 
     private resolveReturnUrl(): string {
         const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl')?.trim();
-        if (!returnUrl) return '/dashboard';
-        if (!returnUrl.startsWith('/') || returnUrl.startsWith('//')) return '/dashboard';
-        if (returnUrl.startsWith('/login') || returnUrl.startsWith('/setup')) return '/dashboard';
+        if (!returnUrl) return '/';
+        if (!returnUrl.startsWith('/') || returnUrl.startsWith('//')) return '/';
+        if (returnUrl.startsWith('/login') || returnUrl.startsWith('/setup')) return '/';
         return returnUrl;
     }
 

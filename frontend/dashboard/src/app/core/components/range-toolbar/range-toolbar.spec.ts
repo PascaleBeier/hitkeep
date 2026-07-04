@@ -312,6 +312,13 @@ describe('RangeToolbar', () => {
         expect((overflowSelect.options ?? []).map((option: RangeOption) => option.value)).toContain('180d');
     });
 
+    it('labels the refresh button for assistive technology', () => {
+        const refreshButton = fixture.nativeElement.querySelector('.range-toolbar__refresh-button') as HTMLButtonElement;
+
+        expect(refreshButton.type).toBe('button');
+        expect(refreshButton.getAttribute('aria-label')).toBe('Refresh');
+    });
+
     it('shows the active overflow preset as the searchable selector value', () => {
         fixture.componentRef.setInput('selectedRange', DEFAULT_RANGE_OPTIONS.find((range) => range.value === '90d') as RangeOption);
         fixture.detectChanges();

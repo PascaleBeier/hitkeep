@@ -1,0 +1,118 @@
+<div class="hk-overview-page">
+    <app-page-header>
+        <ng-template appPageHeaderLeft>
+            <app-page-breadcrumb [items]="breadcrumbItems()" />
+        </ng-template>
+    </app-page-header>
+
+    <app-range-toolbar
+        [timeRanges]="timeRanges()"
+        [selectedRange]="selectedRange()"
+        [customRangeDates]="customRangeDates()"
+        [loading]="isStatsLoading()"
+        (selectedRangeChange)="selectedRange.set($event)"
+        (customRangeDatesChange)="customRangeDates.set($event)"
+        (refresh)="refreshOverview()"
+    />
+
+    <section class="hk-overview-toolbar" [attr.aria-label]="'overview.toolbarAria' | transloco">
+        <label class="sr-only" for="overview-site-search">{{ "overview.searchLabel" | transloco }}</label>
+        <p-iconfield class="hk-overview-search">
+            <p-inputicon class="pi pi-search" />
+            <input id="overview-site-search" pInputText type="search" [value]="searchTerm()" [placeholder]="'overview.searchPlaceholder' | transloco" (input)="onSearch($event)" />
+        </p-iconfield>
+        <div class="hk-overview-sort">
+            <label class="sr-only" for="overview-sort">{{ "overview.sortLabel" | transloco }}</label>
+            <p-select inputId="overview-sort" [options]="sortOptions()" [ngModel]="sortValue()" (ngModelChange)="setSort($event)" optionLabel="label" optionValue="value" size="small" appendTo="body" />
+        </div>
+    </section>
+
+    @if (siteService.sites().length === 0) {
+    <section class="hk-overview-empty" aria-labelledby="overview-no-sites-title" aria-live="polite">
+        <i class="pi pi-globe" aria-hidden="true"></i>
+        <h2 id="overview-no-sites-title">{{ "overview.empty.noSitesTitle" | transloco }}</h2>
+        <p>{{ "overview.empty.noSitesDescription" | transloco }}</p>
+        <p-button [label]="'overview.actions.addSite' | transloco" icon="pi pi-plus" (onClick)="openAddSite()" />
+    </section>
+    } @else if (siteRows().length === 0) {
+    <section class="hk-overview-empty" aria-labelledby="overview-no-matches-title" aria-live="polite">
+        <i class="pi pi-search" aria-hidden="true"></i>
+        <h2 id="overview-no-matches-title">{{ "overview.empty.noMatchesTitle" | transloco }}</h2>
+        <p>{{ "overview.empty.noMatchesDescription" | transloco }}</p>
+    </section>
+    } @else {
+    <section class="hk-overview-grid" [attr.aria-label]="'overview.gridAria' | transloco">
+        @for (row of siteRows(); track row.site.id) {
+        <p-card class="hk-overview-card" styleClass="hk-overview-card__surface h-full border border-surface-200 shadow-sm dark:border-surface-700 surface-card">
+            <article class="hk-overview-card__content">
+                <header class="hk-overview-card__header">
+                    <div class="hk-overview-card__site">
+                        <app-site-favicon [site]="row.site" />
+                        <div class="hk-overview-card__identity">
+                            <h2 [title]="row.site.domain">{{ row.site.domain }}</h2>
+                        </div>
+                    </div>
+                </header>
+
+                <div class="hk-overview-card__chart" [attr.role]="row.hasSparkline ? 'img' : null" [attr.aria-label]="row.hasSparkline ? row.sparklineAria : null">
+                    @if (row.status === "loading") {
+                    <p-skeleton width="100%" height="5rem" />
+                    } @else if (row.status === "error") {
+                    <p-message severity="error" [text]="'overview.errors.siteStatsFailed' | transloco" />
+                    } @else if (row.hasSparkline) {
+                    <svg viewBox="0 0 160 56" preserveAspectRatio="none" focusable="false" aria-hidden="true">
+                        <polygon [attr.points]="row.sparklineAreaPoints" />
+                        <polyline [attr.points]="row.sparklinePoints" />
+                    </svg>
+                    } @else {
+                    <div class="hk-overview-card__no-traffic">
+                        <i class="pi pi-chart-line" aria-hidden="true"></i>
+                        <span>{{ "overview.empty.noTraffic" | transloco }}</span>
+                    </div>
+                    }
+                </div>
+
+                <dl class="hk-overview-card__metrics">
+                    <div>
+                        <dt>{{ "overview.metrics.pageviews" | transloco }}</dt>
+                        <dd>
+                            @if (row.status === "loading") {
+                            <p-skeleton width="4rem" height="1.5rem" />
+                            } @else { {{ row.pageviewsLabel }} }
+                        </dd>
+                    </div>
+                    <div>
+                        <dt>{{ "overview.metrics.visitors" | transloco }}</dt>
+                        <dd>
+                            @if (row.status === "loading") {
+                            <p-skeleton width="4rem" height="1.5rem" />
+                            } @else { {{ row.visitorsLabel }} }
+                        </dd>
+                    </div>
+                    <div>
+                        <dt>{{ "overview.metrics.bounceRate" | transloco }}</dt>
+                        <dd>
+                            @if (row.status === "loading") {
+                            <p-skeleton width="4rem" height="1.5rem" />
+                            } @else { {{ row.bounceRateLabel }} }
+                        </dd>
+                    </div>
+                </dl>
+
+                <footer class="hk-overview-card__footer">
+                    <p-button
+                        [label]="'overview.actions.openDashboard' | transloco"
+                        [ariaLabel]="'overview.actions.openDashboardFor' | transloco: { site: row.site.domain }"
+                        icon="pi pi-arrow-right"
+                        iconPos="right"
+                        size="small"
+                        [outlined]="true"
+                        (onClick)="openDashboard(row.site)"
+                    />
+                </footer>
+            </article>
+        </p-card>
+        }
+    </section>
+    }
+</div>

@@ -4,6 +4,7 @@ import { authGuard } from '@guards/auth-guard';
 import { capabilityGuard } from '@guards/capability-guard';
 import { cloudSignupGuard } from '@guards/cloud-signup-guard';
 import { importExportDefaultGuard } from '@pages/import-export/import-export-default.guard';
+import { overviewDefaultGuard } from '@pages/overview/overview-default.guard';
 import { INSTANCE_CAPABILITIES, TEAM_CAPABILITIES } from '@core/access/capabilities';
 
 export const routes: Routes = [
@@ -102,6 +103,10 @@ export const routes: Routes = [
             {
                 path: 'dashboard',
                 loadComponent: () => import('@pages/dashboard/dashboard').then((m) => m.Dashboard)
+            },
+            {
+                path: 'overview',
+                loadComponent: () => import('@pages/overview/overview').then((m) => m.OverviewPage)
             },
             {
                 path: 'opportunities',
@@ -216,7 +221,12 @@ export const routes: Routes = [
                     { path: '', redirectTo: 'team', pathMatch: 'full' }
                 ]
             },
-            { path: '', redirectTo: 'dashboard', pathMatch: 'full' }
+            {
+                path: '',
+                pathMatch: 'full',
+                canActivate: [overviewDefaultGuard],
+                children: []
+            }
         ]
     },
     { path: '**', redirectTo: '/dashboard' }

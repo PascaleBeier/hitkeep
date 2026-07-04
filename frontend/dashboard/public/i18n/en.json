@@ -4,8 +4,10 @@
     "primaryNavigationAria": "Primary navigation",
     "contentAreaAria": "Content area",
     "analytics": "Analytics",
+    "overview": "Overview",
     "integration": "Integration",
     "dashboardAria": "Go to dashboard",
+    "overviewAria": "Go to site overview",
     "opportunitiesAria": "Go to opportunities",
     "goalsAria": "Go to goals",
     "funnelsAria": "Go to funnels",
@@ -64,6 +66,40 @@
     "webVitals": "Web Vitals",
     "webVitalsAria": "Open Web Vitals analytics",
     "qrCodes": "QR codes"
+  },
+  "overview": {
+    "title": "Overview",
+    "toolbarAria": "Site overview controls",
+    "gridAria": "Sites overview",
+    "chartAria": "Traffic trend for {{site}}",
+    "searchPlaceholder": "Filter sites",
+    "searchLabel": "Filter sites",
+    "sortLabel": "Sort sites",
+    "sort": {
+      "domain": "Name",
+      "pageviews": "Pageviews",
+      "visitors": "Visitors"
+    },
+    "metrics": {
+      "pageviews": "Pageviews",
+      "visitors": "Visitors",
+      "bounceRate": "Bounce"
+    },
+    "actions": {
+      "addSite": "Add site",
+      "openDashboard": "Open dashboard",
+      "openDashboardFor": "Open dashboard for {{site}}"
+    },
+    "empty": {
+      "noSitesTitle": "No sites yet",
+      "noSitesDescription": "Add a site to start collecting analytics.",
+      "noMatchesTitle": "No matching sites",
+      "noMatchesDescription": "Adjust the filter to show more sites.",
+      "noTraffic": "No traffic"
+    },
+    "errors": {
+      "siteStatsFailed": "Stats unavailable"
+    }
   },
   "askAi": {
     "triggerPlaceholder": "Ask AI",

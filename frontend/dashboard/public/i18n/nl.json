@@ -4,8 +4,10 @@
     "primaryNavigationAria": "Primaire navigatie",
     "contentAreaAria": "Inhoudsgebied",
     "analytics": "Analytics",
+    "overview": "Overzicht",
     "integration": "Integratie",
     "dashboardAria": "Ga naar dashboard",
+    "overviewAria": "Ga naar siteoverzicht",
     "opportunitiesAria": "Ga naar kansen",
     "goalsAria": "Ga naar doelen",
     "funnelsAria": "Ga naar funnels",
@@ -64,6 +66,40 @@
     "webVitals": "Web Vitals",
     "webVitalsAria": "Web Vitals-analyse openen",
     "qrCodes": "QR codes"
+  },
+  "overview": {
+    "title": "Overzicht",
+    "toolbarAria": "Bediening voor siteoverzicht",
+    "gridAria": "Siteoverzicht",
+    "chartAria": "Verkeerstrend voor {{site}}",
+    "searchPlaceholder": "Sites filteren",
+    "searchLabel": "Sites filteren",
+    "sortLabel": "Sites sorteren",
+    "sort": {
+      "domain": "Naam",
+      "pageviews": "Paginaweergaven",
+      "visitors": "Bezoekers"
+    },
+    "metrics": {
+      "pageviews": "Paginaweergaven",
+      "visitors": "Bezoekers",
+      "bounceRate": "Bounce"
+    },
+    "actions": {
+      "addSite": "Site toevoegen",
+      "openDashboard": "Dashboard openen",
+      "openDashboardFor": "Dashboard voor {{site}} openen"
+    },
+    "empty": {
+      "noSitesTitle": "Nog geen sites",
+      "noSitesDescription": "Voeg een site toe om analytics te verzamelen.",
+      "noMatchesTitle": "Geen overeenkomende sites",
+      "noMatchesDescription": "Pas het filter aan om meer sites te tonen.",
+      "noTraffic": "Geen verkeer"
+    },
+    "errors": {
+      "siteStatsFailed": "Statistieken niet beschikbaar"
+    }
   },
   "askAi": {
     "triggerPlaceholder": "Ask AI",

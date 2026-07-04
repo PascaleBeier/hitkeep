@@ -67,6 +67,49 @@ func (s *Store) augmentImportedSiteStats(ctx context.Context, params api.Analyti
 	return nil
 }
 
+func (s *Store) augmentImportedSiteOverviewStats(ctx context.Context, params api.AnalyticsParams, truncUnit string, stats *api.SiteOverviewStats) error {
+	if stats == nil || !canIncludeImportedSiteAggregates(params, truncUnit) {
+		return nil
+	}
+
+	var (
+		pageviews sql.NullInt64
+		visits    sql.NullInt64
+		bounces   sql.NullInt64
+	)
+	err := s.db.QueryRowContext(ctx, `
+		SELECT
+			SUM(pageviews),
+			SUM(visits),
+			SUM(bounces)
+		FROM imported_traffic_daily
+		WHERE site_id = ? AND date >= CAST(? AS DATE) AND date <= CAST(? AS DATE)
+	`, params.SiteID, params.Start, params.End).Scan(&pageviews, &visits, &bounces)
+	if err != nil {
+		return fmt.Errorf("query imported overview traffic totals: %w", err)
+	}
+
+	importedPageviews := int(sqlNullInt64Value(pageviews))
+	importedVisits := int(sqlNullInt64Value(visits))
+	importedBounces := int(sqlNullInt64Value(bounces))
+	nativeSessions := stats.UniqueSessions
+	nativeBounces := int((stats.BounceRate / 100) * float64(nativeSessions))
+
+	stats.TotalPageviews += importedPageviews
+	stats.UniqueSessions += importedVisits
+	totalSessions := nativeSessions + importedVisits
+	if totalSessions > 0 {
+		stats.BounceRate = (float64(nativeBounces+importedBounces) / float64(totalSessions)) * 100
+	}
+
+	siteStats := &api.SiteStats{ChartData: stats.ChartData}
+	if err := s.mergeImportedChartData(ctx, params, truncUnit, siteStats); err != nil {
+		return err
+	}
+	stats.ChartData = siteStats.ChartData
+	return nil
+}
+
 func canIncludeImportedSiteAggregates(params api.AnalyticsParams, truncUnit string) bool {
 	return canIncludeImportedTruncUnit(truncUnit) && len(params.Filters) == 0
 }

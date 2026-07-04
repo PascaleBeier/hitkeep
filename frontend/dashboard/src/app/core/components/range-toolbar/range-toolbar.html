@@ -110,10 +110,12 @@
         </p-popover>
 
         <p-button
+            type="button"
             icon="pi pi-refresh"
             (onClick)="refresh.emit()"
             [loading]="loading()"
             class="ml-1"
+            [ariaLabel]="'common.actions.refresh' | transloco"
             [pTooltip]="'common.actions.refresh' | transloco"
             tooltipPosition="bottom"
             [outlined]="true"

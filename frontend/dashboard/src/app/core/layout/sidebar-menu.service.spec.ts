@@ -22,6 +22,7 @@ describe('SidebarMenuService', () => {
                         en: {
                             nav: {
                                 analytics: 'Analytics',
+                                overview: 'Overview',
                                 dashboard: 'Dashboard',
                                 opportunities: 'Opportunities',
                                 goals: 'Goals',
@@ -102,6 +103,7 @@ describe('SidebarMenuService', () => {
 
         expect(analytics?.expanded).toBe(true);
         expect(integration?.expanded).toBe(true);
+        expect(findByLabel(items, 'Overview')?.routerLink).toBe('/overview');
         expect(utm?.routerLink).toBe('/utm');
         expect(utm?.expanded).toBe(false);
         expect(utmBuilder?.routerLink).toBe('/utm/builder');
