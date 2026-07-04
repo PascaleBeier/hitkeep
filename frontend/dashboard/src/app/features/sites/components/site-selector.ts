@@ -16,6 +16,7 @@ import { ShareService } from '@services/share.service';
     standalone: true,
     imports: [ReactiveFormsModule, SelectModule, SkeletonModule, SiteSelectOption, ShareDashboardLink, TranslocoPipe],
     changeDetection: ChangeDetectionStrategy.OnPush,
+    styleUrl: './site-selector.css',
     template: `
         <div class="flex flex-col gap-2 w-full" role="region" [attr.aria-label]="'sites.selector.regionAria' | transloco">
             <div class="flex items-center justify-between">
@@ -47,7 +48,7 @@ import { ShareService } from '@services/share.service';
                             (onChange)="onSiteChange($event.value)"
                             optionLabel="domain"
                             [placeholder]="'sites.selector.selectPlaceholder' | transloco"
-                            class="w-full text-sm"
+                            class="site-selector__select w-full text-sm"
                             [attr.aria-label]="'sites.selector.selectSiteAria' | transloco"
                         >
                             <ng-template pTemplate="selectedItem" let-selected>

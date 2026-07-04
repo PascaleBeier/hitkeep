@@ -103,22 +103,64 @@
 }
 
 @media (max-width: 640px) {
+    .range-toolbar__controls {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) max-content;
+        align-items: start;
+        gap: 0.5rem;
+    }
+
     .range-toolbar__range-group {
-        flex-wrap: wrap;
+        --p-togglebutton-content-sm-padding: 0.34rem 0.42rem;
+        --p-button-sm-padding-x: 0.62rem;
+        --p-select-sm-padding-x: 0.62rem;
+        grid-column: 1;
+        grid-row: 1;
+        min-width: 0;
+        width: 100%;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .range-toolbar__range-group::-webkit-scrollbar {
+        display: none;
     }
 
     :host ::ng-deep .range-toolbar__preset-select.p-selectbutton {
-        display: grid;
-        width: 100%;
-        grid-template-columns: repeat(3, 1fr);
+        display: inline-flex;
+        width: auto;
+        flex: 0 0 auto;
+        flex-wrap: nowrap;
     }
 
     :host ::ng-deep .range-toolbar__preset-select.p-selectbutton .p-togglebutton {
-        width: 100%;
+        width: auto;
+        flex: 0 0 auto;
     }
 
-    :host ::ng-deep .range-toolbar__more-select.p-select,
+    .range-toolbar__more-select,
+    :host ::ng-deep .range-toolbar__more-select-control.p-select,
     :host ::ng-deep .range-toolbar__custom-button {
-        flex: 1 1 10rem;
+        flex: 0 0 auto;
+    }
+
+    .range-toolbar__more-select {
+        margin-left: 1.5rem;
+    }
+
+    .range-toolbar__summary {
+        grid-column: 1 / -1;
+    }
+
+    .range-toolbar__refresh {
+        grid-column: 2;
+        grid-row: 1;
+        display: inline-flex;
+        width: max-content;
+        margin-left: 0;
+        justify-self: end;
     }
 }

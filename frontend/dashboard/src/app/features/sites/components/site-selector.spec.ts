@@ -65,6 +65,47 @@ describe('SiteSelector', () => {
         expect(select.attributes['inputId']).toBe('site-dropdown');
     });
 
+    it('keeps long selected domains and options constrained to the sidebar width', async () => {
+        const longDomain = 'a-very-long-customer-subdomain-with-campaign-context-and-region.example-analytics.test';
+        const host = fixture.nativeElement as HTMLElement;
+        host.style.width = '16rem';
+        host.style.maxWidth = '16rem';
+        host.style.minWidth = '0';
+
+        fixture.componentRef.setInput('sites', [{ id: '1', user_id: 'user-1', domain: longDomain, created_at: '2026-01-01T00:00:00Z' }]);
+        fixture.componentRef.setInput('current', { id: '1', user_id: 'user-1', domain: longDomain, created_at: '2026-01-01T00:00:00Z' });
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        const select = fixture.debugElement.query(By.css('p-select.site-selector__select'));
+        const selectBox = select?.nativeElement as HTMLElement | undefined;
+
+        expect(select).toBeTruthy();
+        expect(selectBox?.classList.contains('w-full')).toBe(true);
+        expect(selectBox).toBeTruthy();
+        expect(selectBox!.getBoundingClientRect().width).toBeLessThanOrEqual(host.getBoundingClientRect().width);
+
+        selectBox!.click();
+        fixture.detectChanges();
+        await fixture.whenStable();
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+
+        const panel = selectBox!.querySelector('.p-select-overlay') as HTMLElement | null;
+        const selectedOption = selectBox!.querySelector('.p-select-label app-site-select-option') as HTMLElement | null;
+        const selectedDomain = selectBox!.querySelector('.p-select-label .site-select-option__domain') as HTMLElement | null;
+        const optionDomain = panel?.querySelector('.site-select-option__domain') as HTMLElement | null;
+
+        expect(panel).toBeTruthy();
+        expect(selectedOption).toBeTruthy();
+        expect(selectedDomain).toBeTruthy();
+        expect(optionDomain).toBeTruthy();
+        expect(getComputedStyle(panel!).maxWidth).toBe('100%');
+        expect(getComputedStyle(selectedOption!).display).toBe('block');
+        expect(panel!.getBoundingClientRect().width).toBeLessThanOrEqual(selectBox!.getBoundingClientRect().width);
+        expect(selectedDomain!.getBoundingClientRect().right).toBeLessThanOrEqual(selectBox!.getBoundingClientRect().right);
+        expect(optionDomain!.getBoundingClientRect().right).toBeLessThanOrEqual(panel!.getBoundingClientRect().right);
+    });
+
     it('A11Y: Add Site button should have aria-label', () => {
         const btn = fixture.debugElement.query(By.css('button[aria-label]'));
         expect(btn).toBeTruthy();

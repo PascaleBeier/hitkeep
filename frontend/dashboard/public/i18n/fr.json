@@ -2272,8 +2272,7 @@
     "title": "Commencez gratuitement",
     "subtitle": "Créez votre espace de travail et commencez le suivi en moins d'une minute. Aucune carte bancaire requise.",
     "jurisdictionLabel": "Juridiction",
-    "jurisdictionDescription": "Cet espace restera rattaché à la frontière légale et à la région AWS sélectionnées.",
-    "jurisdictionRedirectHint": "Choisir l’autre région ouvre l’inscription régionale correspondante.",
+    "jurisdictionDescription": "Cet espace restera rattaché à la frontière légale sélectionnée.",
     "jurisdictions": {
       "eu": "EU",
       "us": "US"

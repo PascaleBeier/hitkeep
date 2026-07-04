@@ -2272,8 +2272,7 @@
     "title": "Get started for free",
     "subtitle": "Create your workspace and start tracking in under a minute. No credit card required.",
     "jurisdictionLabel": "Jurisdiction",
-    "jurisdictionDescription": "This workspace will stay pinned to the selected legal and AWS region boundary.",
-    "jurisdictionRedirectHint": "Choosing the other region opens the matching regional signup page.",
+    "jurisdictionDescription": "This workspace will stay pinned to the selected legal boundary.",
     "jurisdictions": {
       "eu": "EU",
       "us": "US"

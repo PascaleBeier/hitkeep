@@ -2254,8 +2254,7 @@
     "title": "Ga gratis aan de slag",
     "subtitle": "Creëer je werkruimte en begin binnen een minuut met volgen. Geen creditcard vereist.",
     "jurisdictionLabel": "Jurisdictie",
-    "jurisdictionDescription": "Deze werkruimte blijft vastgemaakt aan de geselecteerde juridische enAWS-regiogrens.",
-    "jurisdictionRedirectHint": "Als je de andere regio kiest, openen we de bijbehorende regionale aanmelding.",
+    "jurisdictionDescription": "Deze werkruimte blijft gekoppeld aan de geselecteerde juridische grens.",
     "jurisdictions": {
       "eu": "EU",
       "us": "US"

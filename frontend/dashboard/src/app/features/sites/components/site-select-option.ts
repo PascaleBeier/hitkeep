@@ -14,14 +14,24 @@ import { SiteFavicon, SiteFaviconSource } from '@features/sites/components/site-
     `,
     styles: [
         `
+            :host {
+                display: block;
+                width: 100%;
+                min-width: 0;
+                max-width: 100%;
+            }
+
             .site-select-option {
                 display: flex;
+                width: 100%;
                 min-width: 0;
+                max-width: 100%;
                 align-items: center;
                 gap: 0.5rem;
             }
 
             .site-select-option__domain {
+                flex: 1 1 auto;
                 min-width: 0;
                 overflow: hidden;
                 text-overflow: ellipsis;

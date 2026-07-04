@@ -20,8 +20,7 @@
     gap: 0.25rem;
 }
 
-.hk-auth-region-copy p,
-.hk-auth-region-hint {
+.hk-auth-region-copy p {
     margin: 0;
     color: var(--p-text-muted-color, #64748b);
     font-size: 0.82rem;

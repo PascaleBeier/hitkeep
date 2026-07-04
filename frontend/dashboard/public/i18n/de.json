@@ -2272,8 +2272,7 @@
     "title": "Kostenlos starten",
     "subtitle": "Erstelle deinen Workspace und tracke in unter einer Minute. Keine Kreditkarte erforderlich.",
     "jurisdictionLabel": "Jurisdiktion",
-    "jurisdictionDescription": "Dieser Workspace bleibt an die ausgewählte rechtliche Grenze und AWS-Region gebunden.",
-    "jurisdictionRedirectHint": "Wenn du die andere Region wählst, öffnen wir die passende regionale Registrierung.",
+    "jurisdictionDescription": "Dieser Workspace bleibt an die ausgewählte rechtliche Grenze gebunden.",
     "jurisdictions": {
       "eu": "EU",
       "us": "US"

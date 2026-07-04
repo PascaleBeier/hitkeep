@@ -2248,8 +2248,7 @@
     "title": "Comece gratuitamente",
     "subtitle": "Crie seu espaço de trabalho e comece a rastrear em menos de um minuto. Não é necessário cartão de crédito.",
     "jurisdictionLabel": "Jurisdição",
-    "jurisdictionDescription": "Este espaço de trabalho ficará fixado na jurisdição legal e região da AWS selecionadas.",
-    "jurisdictionRedirectHint": "Ao escolher a outra região, abrimos o cadastro regional correspondente.",
+    "jurisdictionDescription": "Este espaço de trabalho ficará vinculado à fronteira legal selecionada.",
     "jurisdictions": {
       "eu": "UE",
       "us": "EUA"

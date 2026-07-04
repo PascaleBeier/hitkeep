@@ -2272,8 +2272,7 @@
     "title": "Inizia gratis",
     "subtitle": "Crea il tuo workspace e inizia il tracciamento in meno di un minuto. Nessuna carta di credito richiesta.",
     "jurisdictionLabel": "Giurisdizione",
-    "jurisdictionDescription": "Questo workspace resterà vincolato al confine legale e alla regione AWS selezionati.",
-    "jurisdictionRedirectHint": "Se scegli l’altra regione, si apre la registrazione regionale corrispondente.",
+    "jurisdictionDescription": "Questo workspace resterà vincolato al confine legale selezionato.",
     "jurisdictions": {
       "eu": "EU",
       "us": "US"

@@ -4,11 +4,22 @@
 }
 
 :host ::ng-deep .site-selector__select,
+:host ::ng-deep .site-selector__select.p-select,
 :host ::ng-deep .site-selector__select .p-select,
 :host ::ng-deep .site-selector__select .p-select-label {
     min-width: 0;
 }
 
+:host ::ng-deep .site-selector__select {
+    width: 100%;
+    max-width: 100%;
+}
+
+:host ::ng-deep .site-selector__select:not(.p-select) {
+    display: block;
+}
+
+:host ::ng-deep .site-selector__select.p-select,
 :host ::ng-deep .site-selector__select .p-select {
     width: 100%;
     max-width: 100%;
@@ -26,4 +37,24 @@
 
 :host ::ng-deep .site-selector__select .p-select-dropdown {
     flex-shrink: 0;
+}
+
+:host ::ng-deep .site-selector__select .p-overlay,
+:host ::ng-deep .site-selector__select .p-motion,
+:host ::ng-deep .site-selector__select .p-overlay-content,
+:host ::ng-deep .site-selector__select .p-select-overlay,
+:host ::ng-deep .site-selector__select .p-select-list-container,
+:host ::ng-deep .site-selector__select .p-select-list,
+:host ::ng-deep .site-selector__select .p-select-option {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}
+
+:host ::ng-deep .site-selector__select .p-select-option {
+    overflow: hidden;
+}
+
+:host ::ng-deep .site-selector__select .p-select-option > * {
+    min-width: 0;
 }
