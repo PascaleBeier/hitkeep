@@ -57,11 +57,6 @@
         .footer-social a {
           color: #33d399 !important;
         }
-        .footer-social-badge {
-          border-color: #334155 !important;
-          color: #e2e8f0 !important;
-        }
-
         /* ── Card text (mj-text elements) ── */
         .dark-text div {
           color: #f1f5f9 !important;
@@ -184,45 +179,25 @@
           <a
             href="https://github.com/pascalebeier/hitkeep"
             style="color: #334155; text-decoration: none; font-weight: 600"
-            ><span
-              class="footer-social-badge"
-              style="display: inline-block; min-width: 18px; padding: 1px 5px; border: 1px solid #cbd5e1; border-radius: 999px; color: #0f172a; font-size: 10px; line-height: 16px; text-align: center"
-              >GH</span
-            >
-            {{ t "footer.social.github" }}</a
+            >{{ t "footer.social.github" }}</a
           >
           <span style="color: #94a3b8">&nbsp;&nbsp;</span>
           <a
             href="https://www.linkedin.com/company/hitkeep"
             style="color: #334155; text-decoration: none; font-weight: 600"
-            ><span
-              class="footer-social-badge"
-              style="display: inline-block; min-width: 18px; padding: 1px 5px; border: 1px solid #cbd5e1; border-radius: 999px; color: #0f172a; font-size: 10px; line-height: 16px; text-align: center"
-              >in</span
-            >
-            {{ t "footer.social.linkedin" }}</a
+            >{{ t "footer.social.linkedin" }}</a
           >
           <span style="color: #94a3b8">&nbsp;&nbsp;</span>
           <a
             href="https://x.com/gethitkeep"
             style="color: #334155; text-decoration: none; font-weight: 600"
-            ><span
-              class="footer-social-badge"
-              style="display: inline-block; min-width: 18px; padding: 1px 5px; border: 1px solid #cbd5e1; border-radius: 999px; color: #0f172a; font-size: 10px; line-height: 16px; text-align: center"
-              >X</span
-            >
-            {{ t "footer.social.x" }}</a
+            >{{ t "footer.social.x" }}</a
           >
           <span style="color: #94a3b8">&nbsp;&nbsp;</span>
           <a
             href="https://bsky.app/profile/hitkeep.com"
             style="color: #334155; text-decoration: none; font-weight: 600"
-            ><span
-              class="footer-social-badge"
-              style="display: inline-block; min-width: 18px; padding: 1px 5px; border: 1px solid #cbd5e1; border-radius: 999px; color: #0f172a; font-size: 10px; line-height: 16px; text-align: center"
-              >B</span
-            >
-            {{ t "footer.social.bluesky" }}</a
+            >{{ t "footer.social.bluesky" }}</a
           >
         </mj-text>
       </mj-column>
