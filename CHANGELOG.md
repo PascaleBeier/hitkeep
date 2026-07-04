@@ -1,5 +1,32 @@
 # Changelog
 
+## [2.9.0](https://github.com/PascaleBeier/hitkeep/compare/v2.8.1...v2.9.0) (2026-07-04)
+
+
+### Features
+
+* **ai:** add ask ai dashboard assistant ([d45b426](https://github.com/PascaleBeier/hitkeep/commit/d45b426202dc3209cecc87275e3fe6c6b540b9be))
+* **analytics:** add sites overview API and UI with lightweight metrics and chart visualizations. ([02f9d0e](https://github.com/PascaleBeier/hitkeep/commit/02f9d0e3c41203ae67309d9072783e53515e5e4b)), closes [#215](https://github.com/PascaleBeier/hitkeep/issues/215)
+* **analytics:** add today report range presets ([0e4a300](https://github.com/PascaleBeier/hitkeep/commit/0e4a300adf4592f2dadf7d795131737fb6763641))
+* **cloud:** expose hosted integration discovery ([4e22779](https://github.com/PascaleBeier/hitkeep/commit/4e227797a016fcb013790030e0e2270c542947e9))
+* **cloud:** move region choice into signup ([c4b4a54](https://github.com/PascaleBeier/hitkeep/commit/c4b4a54e0044e7a3b2f2291bfb141f7d4149e8ad))
+* **frontend:** link brand to app root ([c5e26c5](https://github.com/PascaleBeier/hitkeep/commit/c5e26c534a9c662f2f8507f507a0a919b625542e)), closes [#214](https://github.com/PascaleBeier/hitkeep/issues/214)
+* **frontend:** make range and language selectors searchable ([20bfb38](https://github.com/PascaleBeier/hitkeep/commit/20bfb387b932860895df949af6ffd99f267b7d49))
+* **mail:** add legal and social footer links ([b084815](https://github.com/PascaleBeier/hitkeep/commit/b084815d57a27475abbd0a1926d123237a87dfc4))
+* **sites:** add owner-only stats reset ([39fabc7](https://github.com/PascaleBeier/hitkeep/commit/39fabc7de3d9efe22ae99e6034d780fa67bfea0e)), closes [#216](https://github.com/PascaleBeier/hitkeep/issues/216)
+
+
+### Bug Fixes
+
+* **auth:** accept invite links through login flow ([a26f121](https://github.com/PascaleBeier/hitkeep/commit/a26f1219c75a52a765d6ca84f6b5b68274b81a0f)), closes [#221](https://github.com/PascaleBeier/hitkeep/issues/221)
+* **frontend:** expose QR navigation in share mode ([25a3d82](https://github.com/PascaleBeier/hitkeep/commit/25a3d82c7ac3bc75fcead3ee7cad6e2e94ff91d2))
+* **frontend:** replace favicon and primary logo with optimized svg ([81ce3e9](https://github.com/PascaleBeier/hitkeep/commit/81ce3e9bb90c144a9c098dc4c528fbb412cc4112))
+* **frontend:** Sidebar overflow for large sites names (again) ([19feab8](https://github.com/PascaleBeier/hitkeep/commit/19feab8f767b5c3365d994cbe5f5836b15f6274f))
+* **helm:** align chart with 2.8.1 ([84f1896](https://github.com/PascaleBeier/hitkeep/commit/84f1896da74e77d5a573edf40e2cf625c18c99f6))
+* **seed:** show AI visibility data for today ([3c03270](https://github.com/PascaleBeier/hitkeep/commit/3c032709434aac1db7f2cfa320ed6b304cc79326))
+* **seed:** show UTM and QR demo data today ([97e470c](https://github.com/PascaleBeier/hitkeep/commit/97e470cfe8506520395d1725944351f4b1633fdb))
+* **ui:** keep language selector overlay above settings card ([3f9a4ff](https://github.com/PascaleBeier/hitkeep/commit/3f9a4ff8788fdbcebcd0fbaa2a922d78f8c73004))
+
 ## [2.8.1](https://github.com/PascaleBeier/hitkeep/compare/v2.8.0...v2.8.1) (2026-06-25)
 
 
