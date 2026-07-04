@@ -1,43 +1,31 @@
 const { test, expect } = require("playwright/test");
 const { E2E_SHARE_TOKEN, login } = require("./support/auth");
 
-const CHART_SETTLE_MS = 2500;
-const TABLE_SETTLE_MS = 1000;
 const PRIMARY_SEEDED_SITE_DOMAIN = "acme-analytics.io";
+const SEEDED_EVENT_NAME = "newsletter_signup";
+const SEEDED_EVENT_RANGE = "30d";
 const SEEDED_CITY_RE = /Mountain View|New York|Seattle|Berlin|Munich|London|Paris|Amsterdam/;
 const SEEDED_PROVIDER_RE = /Google LLC|Verizon Business|Comcast Cable|Deutsche Telekom AG|Vodafone GmbH|BT|Orange|KPN/;
 const SEEDED_ASN_RE = /AS15169|AS701|AS7922|AS3320|AS3209|AS2856|AS3215|AS1136/;
 
-async function selectFirstVisibleOption(page, selector) {
-    const select = page.locator(`${selector}:visible`).first();
-    await expect(select).toBeVisible();
-    await expect(select).toBeEnabled();
-
-    await select.click();
-
-    const option = page.locator('[role="option"]:visible').first();
-    await expect(option).toBeVisible();
-
-    const optionText = ((await option.textContent()) || "").trim();
-    await option.click();
-    await page.waitForTimeout(TABLE_SETTLE_MS);
-    return optionText;
-}
-
-async function selectFirstVisibleComboboxOption(page, name) {
+async function selectComboboxOption(page, name, optionName) {
     const select = page.getByRole("combobox", { name }).first();
     await expect(select).toBeVisible();
     await expect(select).toBeEnabled();
 
+    const currentText = ((await select.textContent()) || "").trim();
+    if (currentText.includes(optionName)) {
+        return optionName;
+    }
+
     await select.click();
 
-    const option = page.locator('[role="option"]:visible').first();
+    const option = page.getByRole("option", { name: optionName, exact: true }).first();
     await expect(option).toBeVisible();
 
-    const optionText = ((await option.textContent()) || "").trim();
     await option.click();
-    await page.waitForTimeout(TABLE_SETTLE_MS);
-    return optionText;
+    await expect(page.getByText(optionName, { exact: true }).first()).toBeVisible();
+    return optionName;
 }
 
 async function selectSeededSite(page, domain = PRIMARY_SEEDED_SITE_DOMAIN) {
@@ -66,47 +54,82 @@ async function selectSeededSite(page, domain = PRIMARY_SEEDED_SITE_DOMAIN) {
     await option.click();
 
     await expect(combobox).toContainText(domain);
-    await page.waitForTimeout(TABLE_SETTLE_MS);
 }
 
-async function expectSeededGeoNetworkMetrics(page) {
-    await revealMetricCard(page, "Cities");
-    await expect(page.locator("app-metric-list:visible").filter({ hasText: SEEDED_CITY_RE }).first()).toBeVisible();
+async function selectSeededEvent(page) {
+    await selectRange(page, SEEDED_EVENT_RANGE);
+    return selectComboboxOption(page, "Event", SEEDED_EVENT_NAME);
+}
 
-    await revealMetricCard(page, "Providers");
-    await expect(page.locator("app-metric-list:visible").filter({ hasText: SEEDED_PROVIDER_RE }).first()).toBeVisible();
+async function selectRange(page, label) {
+    const rangeButton = page.getByRole("button", { name: label, exact: true }).first();
+    await expect(rangeButton).toBeVisible();
 
-    await revealMetricCard(page, "ASNs");
-    await expect(page.locator("app-metric-list:visible").filter({ hasText: SEEDED_ASN_RE }).first()).toBeVisible();
+    if ((await rangeButton.getAttribute("aria-pressed")) === "true") {
+        return;
+    }
+
+    await rangeButton.click();
+    await expect(rangeButton).toHaveAttribute("aria-pressed", "true");
 }
 
 async function revealMetricCard(page, title) {
     const tab = page.getByRole("tab", { name: title, exact: true }).first();
     if (await tab.isVisible().catch(() => false)) {
         await tab.click();
-        await page.waitForTimeout(250);
-        return;
+        const panel = page.getByRole("tabpanel", { name: title, exact: true }).first();
+        await expect(panel).toBeVisible();
+        return panel;
     }
 
     await expect(page.getByText(title, { exact: true }).first()).toBeVisible();
+    const card = page.locator(".metric-card-group__card").filter({ hasText: title }).first();
+    await expect(card).toBeVisible();
+    return card;
+}
+
+async function expectSeededMetricValue(page, title, valuePattern) {
+    const panel = await revealMetricCard(page, title);
+    await expect(panel.getByText(valuePattern).first()).toBeVisible();
+    return panel;
+}
+
+async function expectSeededGeoNetworkMetrics(page) {
+    await expectSeededMetricValue(page, "Cities", SEEDED_CITY_RE);
+    await expectSeededMetricValue(page, "Providers", SEEDED_PROVIDER_RE);
+    await expectSeededMetricValue(page, "ASNs", SEEDED_ASN_RE);
 }
 
 async function clickSeededMetricRow(page, title, valuePattern) {
-    await revealMetricCard(page, title);
+    const panel = await expectSeededMetricValue(page, title, valuePattern);
 
-    const metricList = page.locator("app-metric-list:visible").filter({ hasText: valuePattern }).first();
-    await expect(metricList).toBeVisible();
-
-    const row = metricList.getByRole("button").filter({ hasText: valuePattern }).first();
+    const row = panel.getByRole("button").filter({ hasText: valuePattern }).first();
     await expect(row).toBeVisible();
     await row.click();
-    await page.waitForTimeout(TABLE_SETTLE_MS);
 }
 
 async function expectMetricCardGroupPolish(page, expectedCardCount = 5) {
     await expect(page.locator(".metric-card-group")).toBeVisible();
 
-    const result = await page.evaluate(() => {
+    await expect
+        .poll(async () => {
+            const result = await collectMetricCardGroupState(page);
+            return metricCardGroupHasPolish(result, expectedCardCount);
+        })
+        .toBe(true);
+
+    const result = await collectMetricCardGroupState(page);
+
+    expect(result.overflowX).toBeLessThanOrEqual(1);
+    expect(result.cardCount).toBe(expectedCardCount);
+    expect(new Set(result.cards.map((card) => card.height)).size).toBe(1);
+    expect(Math.min(...result.cards.map((card) => card.width))).toBeGreaterThan(280);
+    expect(result.cards.some((card) => card.tabCount > 0)).toBeTruthy();
+    expect(result.cards.some((card) => card.scrollableCount > 0 && card.visibleScrollbarCount > 0 && card.visibleFadeCount > 0)).toBeTruthy();
+}
+
+async function collectMetricCardGroupState(page) {
+    return page.evaluate(() => {
         const cards = [...document.querySelectorAll(".metric-card-group__card")].map((card) => {
             const rect = card.getBoundingClientRect();
             const scrollShells = [...card.querySelectorAll(".metric-list__scroll-shell")];
@@ -119,11 +142,11 @@ async function expectMetricCardGroupPolish(page, expectedCardCount = 5) {
                 scrollableCount: scrollableShells.length,
                 visibleScrollbarCount: scrollableShells.filter((shell) => {
                     const scrollbar = shell.querySelector(".metric-list__scrollbar");
-                    return scrollbar && getComputedStyle(scrollbar).opacity === "1";
+                    return scrollbar && Number(getComputedStyle(scrollbar).opacity) > 0.9;
                 }).length,
                 visibleFadeCount: scrollableShells.filter((shell) => {
                     const fade = shell.querySelector(".metric-list__scroll-fade");
-                    return fade && getComputedStyle(fade).opacity === "1";
+                    return fade && Number(getComputedStyle(fade).opacity) > 0.9;
                 }).length
             };
         });
@@ -134,13 +157,17 @@ async function expectMetricCardGroupPolish(page, expectedCardCount = 5) {
             overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth
         };
     });
+}
 
-    expect(result.overflowX).toBeLessThanOrEqual(1);
-    expect(result.cardCount).toBe(expectedCardCount);
-    expect(new Set(result.cards.map((card) => card.height)).size).toBe(1);
-    expect(Math.min(...result.cards.map((card) => card.width))).toBeGreaterThan(280);
-    expect(result.cards.some((card) => card.tabCount > 0)).toBeTruthy();
-    expect(result.cards.some((card) => card.scrollableCount > 0 && card.visibleScrollbarCount > 0 && card.visibleFadeCount > 0)).toBeTruthy();
+function metricCardGroupHasPolish(result, expectedCardCount) {
+    return (
+        result.overflowX <= 1 &&
+        result.cardCount === expectedCardCount &&
+        new Set(result.cards.map((card) => card.height)).size === 1 &&
+        Math.min(...result.cards.map((card) => card.width)) > 280 &&
+        result.cards.some((card) => card.tabCount > 0) &&
+        result.cards.some((card) => card.scrollableCount > 0 && card.visibleScrollbarCount > 0 && card.visibleFadeCount > 0)
+    );
 }
 
 test("dashboard renders seeded data and product controls", async ({ page }) => {
@@ -177,7 +204,6 @@ test("dashboard renders seeded data and product controls", async ({ page }) => {
 test("dashboard filters by seeded geography and network metrics", async ({ page }) => {
     await login(page, "/dashboard");
     await selectSeededSite(page);
-    await page.waitForTimeout(TABLE_SETTLE_MS);
 
     await clickSeededMetricRow(page, "Cities", SEEDED_CITY_RE);
     await expect(page.getByText(/City: (Mountain View|New York|Seattle|Berlin|Munich|London|Paris|Amsterdam)/)).toBeVisible();
@@ -196,7 +222,6 @@ test("dashboard filters by seeded geography and network metrics", async ({ page 
 test("ecommerce page surfaces seeded orders and products", async ({ page }) => {
     await login(page, "/ecommerce");
     await selectSeededSite(page);
-    await page.waitForTimeout(CHART_SETTLE_MS);
 
     await expect(page.getByText("Revenue over time")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Revenue breakdown" })).toBeVisible();
@@ -212,7 +237,6 @@ test("ecommerce page surfaces seeded orders and products", async ({ page }) => {
 test("ecommerce page filters by seeded geography and network metrics", async ({ page }) => {
     await login(page, "/ecommerce");
     await selectSeededSite(page);
-    await page.waitForTimeout(CHART_SETTLE_MS);
 
     await clickSeededMetricRow(page, "Cities", SEEDED_CITY_RE);
     await expect(page.getByText(/City: (Mountain View|New York|Seattle|Berlin|Munich|London|Paris|Amsterdam)/)).toBeVisible();
@@ -231,10 +255,9 @@ test("ecommerce page filters by seeded geography and network metrics", async ({ 
 test("events page surfaces seeded audience geography and network data", async ({ page }) => {
     await login(page, "/events");
     await selectSeededSite(page);
-    await page.waitForTimeout(TABLE_SETTLE_MS);
 
-    const selectedEvent = await selectFirstVisibleComboboxOption(page, "Event");
-    expect(selectedEvent).not.toBe("");
+    const selectedEvent = await selectSeededEvent(page);
+    expect(selectedEvent).toBe(SEEDED_EVENT_NAME);
     await expect(page.getByRole("heading", { name: "Event activity" })).toBeVisible();
     await expect(page.getByText("Total events")).toBeVisible();
     await expect(page.getByText("Cities")).toBeVisible();
@@ -246,10 +269,9 @@ test("events page surfaces seeded audience geography and network data", async ({
 test("events page filters by seeded audience geography and network metrics", async ({ page }) => {
     await login(page, "/events");
     await selectSeededSite(page);
-    await page.waitForTimeout(TABLE_SETTLE_MS);
 
-    const selectedEvent = await selectFirstVisibleComboboxOption(page, "Event");
-    expect(selectedEvent).not.toBe("");
+    const selectedEvent = await selectSeededEvent(page);
+    expect(selectedEvent).toBe(SEEDED_EVENT_NAME);
 
     await clickSeededMetricRow(page, "Cities", SEEDED_CITY_RE);
     await expect(page.getByText(/City: (Mountain View|New York|Seattle|Berlin|Munich|London|Paris|Amsterdam)/)).toBeVisible();
@@ -269,21 +291,19 @@ test("secondary analytics metric cards keep equal-height tabbed surfaces and scr
     await page.setViewportSize({ width: 1440, height: 1000 });
     await login(page, "/events");
     await selectSeededSite(page);
-    await page.waitForTimeout(TABLE_SETTLE_MS);
-    const selectedEvent = await selectFirstVisibleComboboxOption(page, "Event");
-    expect(selectedEvent).not.toBe("");
+    const selectedEvent = await selectSeededEvent(page);
+    expect(selectedEvent).toBe(SEEDED_EVENT_NAME);
     await expectMetricCardGroupPolish(page);
 
     await page.setViewportSize({ width: 390, height: 900 });
     await login(page, "/ai-chatbots");
-    await page.waitForTimeout(CHART_SETTLE_MS);
+    await selectRange(page, SEEDED_EVENT_RANGE);
     await expectMetricCardGroupPolish(page);
 });
 
 test("goals page surfaces seeded geography and network data", async ({ page }) => {
     await login(page, "/goals");
     await selectSeededSite(page);
-    await page.waitForTimeout(TABLE_SETTLE_MS);
 
     await expect(page.getByRole("heading", { name: "Goals" }).first()).toBeVisible();
     await expect(page.getByText("Conversions", { exact: true }).first()).toBeVisible();
@@ -296,7 +316,6 @@ test("goals page surfaces seeded geography and network data", async ({ page }) =
 test("goals page filters by seeded geography and network metrics", async ({ page }) => {
     await login(page, "/goals");
     await selectSeededSite(page);
-    await page.waitForTimeout(TABLE_SETTLE_MS);
 
     await clickSeededMetricRow(page, "Cities", SEEDED_CITY_RE);
     await expect(page.getByText(/City: (Mountain View|New York|Seattle|Berlin|Munich|London|Paris|Amsterdam)/)).toBeVisible();
@@ -315,7 +334,6 @@ test("goals page filters by seeded geography and network metrics", async ({ page
 test("funnels page surfaces seeded geography and network data", async ({ page }) => {
     await login(page, "/funnels");
     await selectSeededSite(page);
-    await page.waitForTimeout(TABLE_SETTLE_MS);
 
     await expect(page.getByText("Entries", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("Cities")).toBeVisible();
@@ -327,7 +345,6 @@ test("funnels page surfaces seeded geography and network data", async ({ page })
 test("funnels page filters by seeded geography and network metrics", async ({ page }) => {
     await login(page, "/funnels");
     await selectSeededSite(page);
-    await page.waitForTimeout(TABLE_SETTLE_MS);
 
     await clickSeededMetricRow(page, "Cities", SEEDED_CITY_RE);
     await expect(page.getByText(/City: (Mountain View|New York|Seattle|Berlin|Munich|London|Paris|Amsterdam)/)).toBeVisible();
@@ -346,7 +363,6 @@ test("funnels page filters by seeded geography and network metrics", async ({ pa
 test("ai visibility page shows correlation insights", async ({ page }) => {
     await login(page, "/ai-visibility");
     await selectSeededSite(page);
-    await page.waitForTimeout(CHART_SETTLE_MS);
 
     await expect(page.getByRole("heading", { name: "Fetch volume over time" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Fetch-to-visit correlation" })).toBeVisible();
@@ -359,7 +375,6 @@ test("ai visibility page shows correlation insights", async ({ page }) => {
 test("ai chatbot page surfaces seeded audience geography and network data", async ({ page }) => {
     await login(page, "/ai-chatbots");
     await selectSeededSite(page);
-    await page.waitForTimeout(CHART_SETTLE_MS);
 
     await expect(page.getByRole("heading", { name: "Conversation activity" })).toBeVisible();
     await expect(page.getByText("Conversations", { exact: true }).first()).toBeVisible();
@@ -372,7 +387,6 @@ test("ai chatbot page surfaces seeded audience geography and network data", asyn
 test("ai chatbot page filters by seeded audience geography and network metrics", async ({ page }) => {
     await login(page, "/ai-chatbots");
     await selectSeededSite(page);
-    await page.waitForTimeout(CHART_SETTLE_MS);
 
     await clickSeededMetricRow(page, "Cities", SEEDED_CITY_RE);
     await expect(page.getByText(/City: (Mountain View|New York|Seattle|Berlin|Munich|London|Paris|Amsterdam)/)).toBeVisible();
@@ -407,7 +421,6 @@ test("team admin page shows seeded members and settings", async ({ page }) => {
 
 test("public share links render seeded analytics without login", async ({ page }) => {
     await page.goto(`/share/${E2E_SHARE_TOKEN}/dashboard`, { waitUntil: "domcontentloaded" });
-    await page.waitForTimeout(CHART_SETTLE_MS);
 
     await expect(page).toHaveURL(new RegExp(`/share/${E2E_SHARE_TOKEN}/dashboard`));
     await expect(page.getByText("Latest Hits")).toBeVisible();
