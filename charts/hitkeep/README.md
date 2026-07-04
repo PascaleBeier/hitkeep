@@ -124,7 +124,7 @@ persistence:
 
 ### Optional MCP and AI configuration
 
-HitKeep 2.9.0 can expose the read-only MCP endpoint and optional AI-backed product features when you configure them explicitly. <!-- x-release-please-version -->
+HitKeep 2.9.0 can expose the read-only MCP endpoint, optional AI-backed Opportunity features, and the optional Ask AI dashboard assistant when you configure them explicitly. <!-- x-release-please-version -->
 
 ```
 env:
@@ -132,6 +132,7 @@ env:
   HITKEEP_MCP_PATH: "/mcp"
   HITKEEP_MCP_MAX_RANGE_DAYS: "366"
   HITKEEP_AI_ENABLED: "true"
+  HITKEEP_ASK_AI_ENABLED: "true"
   HITKEEP_AI_PROVIDER: "openai-compatible"
   HITKEEP_AI_MODEL: "gpt-4.1-mini"
 

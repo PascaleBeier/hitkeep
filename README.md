@@ -1,6 +1,6 @@
 # HitKeep
 
-> Privacy-first analytics for humans and AI agents, self-hosted or in EU/US cloud.
+> Privacy-first web analytics with conversion reporting, AI visibility, and optional Ask AI, self-hosted or in EU/US cloud.
 
 [![Continuous Integration](https://github.com/PascaleBeier/hitkeep/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/PascaleBeier/hitkeep/actions/workflows/ci.yml)
 [![Latest Release](https://img.shields.io/github/v/release/PascaleBeier/hitkeep?sort=semver)](https://github.com/PascaleBeier/hitkeep/releases)
@@ -12,17 +12,19 @@
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/11990/badge)](https://www.bestpractices.dev/projects/11990)
 [![HitKeep MCP server](https://glama.ai/mcp/servers/PascaleBeier/hitkeep/badges/score.svg)](https://glama.ai/mcp/servers/PascaleBeier/hitkeep)
 
-HitKeep is open source web analytics for teams that want useful product reporting without running PostgreSQL, Redis, ClickHouse, or a separate queue.
+HitKeep is open source web analytics for teams that want useful product reporting, conversion analytics, and AI-era search visibility without running PostgreSQL, Redis, ClickHouse, or a separate queue.
 
 - Single Go binary with embedded DuckDB and NSQ
 - Cookie-less tracker by default, with Do Not Track support
-- Traffic, events, goals, funnels, ecommerce, UTM, and email reports
+- Multi-site Overview, ECharts-based charts, expanded report ranges, and email reports
+- Traffic, events, goals, funnels, ecommerce, UTM, QR campaigns, and Web Vitals
 - Google Search Console aggregate import for query, page, country, and device reporting
-- AI visibility analytics for crawler fetches and AI-referred visits
-- Scoped API clients and a read-only MCP analytics server for approved agents
+- AI visibility analytics for crawler fetches, AI-referred visits, and on-site AI chatbot outcomes
+- Optional Ask AI dashboard assistant for site-scoped aggregate questions, citations, small charts, and safe actions
+- Scoped API clients and a read-only MCP analytics server for approved assistants
 - Self-hosted or managed cloud with EU/US region choice
 
-[AI Performance](https://hitkeep.com/ai-performance/) · [Website](https://hitkeep.com) · [Cloud](https://hitkeep.com/cloud) · [Live Demo](https://demo.hitkeep.com/share/7a55968bb42df256512fbe7ff73ab88f29dd45c236eddc818bd66420b4ffbaad) · [Docs](https://hitkeep.com/guides/introduction/) · [API](https://hitkeep.com/api/) · [Releases](https://github.com/PascaleBeier/hitkeep/releases)
+[AI Performance](https://hitkeep.com/ai-performance/) · [Website](https://hitkeep.com) · [Cloud](https://hitkeep.com/cloud) · [Live Demo](https://demo.hitkeep.com/share/7a55968bb42df256512fbe7ff73ab88f29dd45c236eddc818bd66420b4ffbaad) · [Docs](https://hitkeep.com/guides/introduction/) · [Ask AI](https://hitkeep.com/guides/analytics/ask-ai/) · [API](https://hitkeep.com/api/) · [Releases](https://github.com/PascaleBeier/hitkeep/releases)
 
 ![HitKeep analytics dashboard with traffic overview, geographic breakdown, goals, funnels, and UTM attribution](./.github/assets/dashboard-overview.png)
 
@@ -31,9 +33,10 @@ HitKeep is open source web analytics for teams that want useful product reportin
 HitKeep is for teams that need clear web analytics, conversion reporting, and AI-era search visibility in one small operational footprint.
 
 - **Low-ops self-hosting:** one binary, one data directory, embedded DuckDB and NSQ
-- **Useful reports:** top pages, landing and exit pages, events, goals, funnels, ecommerce, UTM attribution, and Search Console aggregates
+- **Useful reports:** multi-site Overview, top pages, landing and exit pages, events, goals, funnels, ecommerce, UTM attribution, QR campaigns, Web Vitals, and Search Console aggregates
 - **Privacy defaults:** focused data collection, cookie-less tracking, and DNT handling
-- **AI visibility:** server-side crawler fetch analytics, AI-referred visits, and correlation reports
+- **AI visibility:** server-side crawler fetch analytics, AI-referred visits, chatbot outcomes, and correlation reports
+- **Ask AI:** optional dashboard-session assistant for aggregate analytics answers with citations and safe dashboard actions
 - **Team controls:** passkeys, TOTP, site/team permissions, share links, audit logs, API clients, and read-only MCP access
 - **Deployment choice:** run it yourself or use managed cloud in the EU or US
 
@@ -116,6 +119,7 @@ Tracker options, ecommerce events, custom events, and advanced tracking examples
 - [Tracking docs](https://hitkeep.com/guides/tracking/)
 - [Custom events](https://hitkeep.com/guides/tracking/custom-events/)
 - [Ecommerce analytics](https://hitkeep.com/guides/analytics/ecommerce/)
+- [Ask AI analytics assistant](https://hitkeep.com/guides/analytics/ask-ai/)
 - [Google Search Console integration](https://hitkeep.com/guides/integrations/google-search-console/)
 - [Read-only MCP server for web analytics](https://hitkeep.com/use-cases/read-only-mcp-server-web-analytics/)
 - [WordPress integration](https://hitkeep.com/guides/integrations/wordpress/)
@@ -128,7 +132,7 @@ Tracker options, ecommerce events, custom events, and advanced tracking examples
 ## Product Tour
 
 <details>
-<summary>See five product screenshots</summary>
+<summary>See six product screenshots</summary>
 
 ### Dashboard
 ![HitKeep analytics dashboard with traffic overview, geographic breakdown, goals, funnels, and UTM attribution](./.github/assets/dashboard-overview.png)
@@ -141,6 +145,9 @@ Tracker options, ecommerce events, custom events, and advanced tracking examples
 
 ### AI Visibility
 ![HitKeep AI visibility analytics with fetch KPIs, assistant filters, and fetch volume chart](./.github/assets/analytics-ai-visibility.png)
+
+### Ask AI
+![HitKeep Ask AI answer with completed analytics tool chips, citations, a table, and a safe dashboard action](./.github/assets/feature-ask-ai-answer.png)
 
 ### MCP Access
 ![HitKeep MCP integration overview for read-only analytics access](./.github/assets/mcp.png)
