@@ -2,7 +2,7 @@ import { DOCUMENT } from '@angular/common';
 import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 
-const APP_OWNED_ROOT_PATHS = ['/api/', '/i18n/', '/scalar/', '/hk.js', '/hk-vitals.js', '/icon.png', '/favicon-96x96.png', '/favicon.svg', '/favicon.ico', '/apple-touch-icon.png'];
+const APP_OWNED_ROOT_PATHS = ['/api/', '/i18n/', '/scalar/', '/hk.js', '/hk-vitals.js', '/brand-icon.svg', '/icon.png', '/favicon.svg', '/favicon.ico', '/apple-touch-icon.png'];
 
 export function browserBasePath(document: Document): string {
     const href = document.querySelector('base')?.getAttribute('href')?.trim() || '/';

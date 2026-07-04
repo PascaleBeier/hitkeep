@@ -31,10 +31,27 @@ describe('Brand', () => {
         }
     });
 
-    it('loads the logo from the configured browser base path', () => {
+    it('loads the small logo SVG from the configured browser base path', () => {
         const component = fixture.componentInstance as unknown as { iconUrl: () => string };
 
-        expect(component.iconUrl()).toBe('/hitkeep/icon.png');
+        expect(component.iconUrl()).toBe('/hitkeep/brand-icon.svg');
+    });
+
+    it('loads the large logo SVG from the configured browser base path', () => {
+        const largeFixture = TestBed.createComponent(Brand);
+
+        largeFixture.componentRef.setInput('size', 'large');
+        largeFixture.detectChanges();
+
+        const component = largeFixture.componentInstance as unknown as { iconUrl: () => string };
+
+        expect(component.iconUrl()).toBe('/hitkeep/brand-icon.svg');
+    });
+
+    it('marks the logo image for dark-mode color treatment', () => {
+        const image = fixture.nativeElement.querySelector('img');
+
+        expect(image?.classList.contains('hk-brand-icon')).toBe(true);
     });
 
     it('links the brand to the configured app root', () => {

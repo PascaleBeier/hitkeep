@@ -20,6 +20,7 @@ describe('prefixBrowserBasePath', () => {
         expect(prefixBrowserBasePath('/i18n/en.json', '/hitkeep/')).toBe('/hitkeep/i18n/en.json');
         expect(prefixBrowserBasePath('/scalar/index.html', '/hitkeep/')).toBe('/hitkeep/scalar/index.html');
         expect(prefixBrowserBasePath('/hk.js', '/hitkeep/')).toBe('/hitkeep/hk.js');
+        expect(prefixBrowserBasePath('/brand-icon.svg', '/hitkeep/')).toBe('/hitkeep/brand-icon.svg');
         expect(prefixBrowserBasePath('/icon.png', '/hitkeep/')).toBe('/hitkeep/icon.png');
     });
 
