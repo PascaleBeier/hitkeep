@@ -108,6 +108,8 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		webhooks: stripeWebhookSDK{},
 	}
 
+	h.registerDiscoveryRoutes(mux)
+
 	mux.HandleFunc("POST /api/cloud/signup", ctx.Handler(shared.HandlerConfig{
 		RateLimiter: ctx.AuthLimiter,
 	}, h.handleSignup()))
