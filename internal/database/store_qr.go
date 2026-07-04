@@ -316,54 +316,39 @@ func (s *Store) CountQRCodeOpens(ctx context.Context, siteID, qrID uuid.UUID, st
 }
 
 func (s *Store) GetQRCodeOpenSeries(ctx context.Context, siteID, qrID uuid.UUID, start, end time.Time) ([]api.QRCodeOpenSeriesPoint, error) {
-	duration := end.Sub(start)
-	truncUnit := "day"
-	interval := "1 day"
-	if duration < 48*time.Hour {
-		truncUnit = "hour"
-		interval = "1 hour"
-	} else if duration >= 180*24*time.Hour {
-		truncUnit = "month"
-		interval = "1 month"
-	}
+	truncUnit := truncUnitForRange(start, end)
+	bucketExpr := bucketSQL("timestamp", truncUnit)
 
+	//nolint:gosec // bucketExpr is selected from a fixed allowlist.
 	query := fmt.Sprintf(`
-			WITH bounds AS (
-				SELECT
-					date_trunc('%s', ?::TIMESTAMP)::TIMESTAMP AS start_bucket,
-					date_trunc('%s', ?::TIMESTAMP)::TIMESTAMP AS end_bucket
-			),
-			time_range AS (
-				SELECT unnest(generate_series(start_bucket, end_bucket, INTERVAL '%s')) as bucket
-				FROM bounds
-			),
-			opens AS (
-				SELECT date_trunc('%s', timestamp)::TIMESTAMP as bucket, COUNT(*) as opens
+			SELECT %s::TIMESTAMP as bucket, COUNT(*) as opens
 			FROM qr_code_opens
 			WHERE site_id = ? AND qr_code_id = ? AND timestamp >= ? AND timestamp <= ?
 			GROUP BY bucket
-		)
-		SELECT tr.bucket, COALESCE(o.opens, 0)
-		FROM time_range tr
-		LEFT JOIN opens o ON tr.bucket = o.bucket
-		ORDER BY tr.bucket
-		`, truncUnit, truncUnit, interval, truncUnit)
-	rows, err := s.db.QueryContext(ctx, query, start, end, siteID, qrID, start, end)
+		ORDER BY bucket
+		`, bucketExpr)
+	rows, err := s.db.QueryContext(ctx, query, siteID, qrID, start, end)
 	if err != nil {
 		return nil, fmt.Errorf("query qr open series: %w", err)
 	}
 	defer rows.Close()
 
-	points := []api.QRCodeOpenSeriesPoint{}
+	counts := map[time.Time]int{}
 	for rows.Next() {
-		var point api.QRCodeOpenSeriesPoint
-		if err := rows.Scan(&point.Time, &point.Opens); err != nil {
+		var bucket time.Time
+		var opens int
+		if err := rows.Scan(&bucket, &opens); err != nil {
 			return nil, fmt.Errorf("scan qr open series: %w", err)
 		}
-		points = append(points, point)
+		counts[truncToUnit(bucket, truncUnit)] = opens
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("read qr open series: %w", err)
+	}
+	buckets := buildSeriesBuckets(start, end, truncUnit)
+	points := make([]api.QRCodeOpenSeriesPoint, 0, len(buckets))
+	for _, bucket := range buckets {
+		points = append(points, api.QRCodeOpenSeriesPoint{Time: bucket, Opens: counts[bucket]})
 	}
 	return points, nil
 }

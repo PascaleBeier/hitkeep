@@ -559,15 +559,7 @@ func matchesEcommerceItemFilter(items []ecommerceItem, itemID, itemName string) 
 }
 
 func ecommerceTruncUnit(start, end time.Time) string {
-	duration := end.Sub(start)
-	switch {
-	case duration < 48*time.Hour:
-		return "hour"
-	case duration >= 180*24*time.Hour:
-		return "month"
-	default:
-		return "day"
-	}
+	return truncUnitForRange(start, end)
 }
 
 func normalizeEcommerceLimit(limit int) int {

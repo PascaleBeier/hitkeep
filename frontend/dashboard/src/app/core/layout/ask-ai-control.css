@@ -464,6 +464,12 @@ button.ai-molecule:focus-visible {
     height: 240px;
 }
 
+.ai-echarts {
+    height: 100%;
+    min-height: 0;
+    width: 100%;
+}
+
 .ai-table {
     overflow: auto;
 }

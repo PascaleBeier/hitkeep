@@ -427,39 +427,9 @@ func (s *Store) GetComparisonStats(ctx context.Context, params api.AnalyticsPara
 		ChartData: []api.ChartDataPoint{},
 	}
 
-	duration := cmp.End.Sub(cmp.Start)
-	interval := "1 DAY"
-	truncUnit := "day"
-
-	var gridStart, gridEnd time.Time
-
-	if duration < 48*time.Hour {
-		interval = "1 HOUR"
-		truncUnit = "hour"
-		gridStart = cmp.Start.Truncate(time.Hour)
-		gridEnd = cmp.End.Truncate(time.Hour)
-		if !gridEnd.After(cmp.End) {
-			gridEnd = gridEnd.Add(time.Hour)
-		}
-	} else {
-		y, m, d := cmp.Start.Date()
-		gridStart = time.Date(y, m, d, 0, 0, 0, 0, cmp.Start.Location())
-
-		y, m, d = cmp.End.Date()
-		gridEnd = time.Date(y, m, d, 0, 0, 0, 0, cmp.End.Location())
-		if !gridEnd.After(cmp.End) {
-			gridEnd = gridEnd.AddDate(0, 0, 1)
-		}
-		if duration >= 180*24*time.Hour {
-			interval = "1 MONTH"
-			truncUnit = "month"
-			gridStart = time.Date(gridStart.Year(), gridStart.Month(), 1, 0, 0, 0, 0, gridStart.Location())
-			gridEnd = time.Date(gridEnd.Year(), gridEnd.Month(), 1, 0, 0, 0, 0, gridEnd.Location())
-			if !gridEnd.After(cmp.End) {
-				gridEnd = gridEnd.AddDate(0, 1, 0)
-			}
-		}
-	}
+	truncUnit := truncUnitForRange(cmp.Start, cmp.End)
+	gridStart := truncToUnit(cmp.Start, truncUnit)
+	gridEnd := truncToUnit(cmp.End, truncUnit)
 
 	if err := s.queryKpis(ctx, cmp, "", nil, false, rollupHourly,
 		&stats.TotalPageviews, &stats.UniqueSessions, &stats.BounceRate, &stats.AvgSessionDuration, &stats.PagesPerSession,
@@ -473,7 +443,7 @@ func (s *Store) GetComparisonStats(ctx context.Context, params api.AnalyticsPara
 		return nil, fmt.Errorf("comparison UTM KPI query failed: %w", err)
 	}
 
-	rows, err := s.queryChartData(ctx, cmp, gridStart, gridEnd, interval, truncUnit, "", nil, false, rollupHourly)
+	rows, err := s.queryChartData(ctx, cmp, gridStart, gridEnd, truncUnit, "", nil, false, rollupHourly)
 	if err != nil {
 		return nil, fmt.Errorf("comparison chart query failed: %w", err)
 	}

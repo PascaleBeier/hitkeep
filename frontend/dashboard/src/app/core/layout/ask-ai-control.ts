@@ -2,18 +2,23 @@ import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, output, signal, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import type { EChartsCoreOption, EChartsInitOpts } from 'echarts/core';
+import { NgxEchartsDirective } from 'ngx-echarts';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Subscription, finalize } from 'rxjs';
 import { AvatarModule } from 'primeng/avatar';
 import { ButtonModule } from 'primeng/button';
-import { ChartModule } from 'primeng/chart';
 import { DrawerModule } from 'primeng/drawer';
 import { InputTextModule } from 'primeng/inputtext';
 import { MessageModule } from 'primeng/message';
+import { injectActiveLang } from '@core/i18n/active-lang';
 import { browserAppUrl } from '@core/interceptors/base-path.interceptor';
+import { buildHitkeepChartMergeOptions, buildHitkeepChartOptions, hitkeepChartTheme, withChartAlpha, type HitkeepChartDesign, type HitkeepChartSeries } from '@core/charts/hitkeep-chart-options';
+import { provideHitkeepEcharts } from '@core/charts/hitkeep-echarts.provider';
 import { AskAIAction, AskAIChart, AskAIMessage, AskAIRequest, AskAIResponse, AskAIStreamEvent } from '@models/analytics.types';
 import { AskAIService, AskAIStreamStatusError } from '@services/ask-ai.service';
 import { DashboardBootstrapService } from '@services/dashboard-bootstrap.service';
+import { PreferencesService } from '@services/preferences.service';
 import { ShareService } from '@services/share.service';
 import { TakeoutDownloadService } from '@services/takeout-download.service';
 import { UserProfileService } from '@services/user-profile.service';
@@ -82,7 +87,8 @@ interface SpeechRecognitionWindow extends Window {
 @Component({
     selector: 'app-ask-ai-control',
     standalone: true,
-    imports: [AvatarModule, ButtonModule, ChartModule, DrawerModule, InputTextModule, MessageModule, TranslocoPipe],
+    imports: [AvatarModule, ButtonModule, DrawerModule, InputTextModule, MessageModule, NgxEchartsDirective, TranslocoPipe],
+    providers: [provideHitkeepEcharts()],
     templateUrl: './ask-ai-control.html',
     styleUrl: './ask-ai-control.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -119,6 +125,8 @@ export class AskAIControl {
     private readonly takeout = inject(TakeoutDownloadService);
     private readonly document = inject(DOCUMENT);
     private readonly transloco = inject(TranslocoService);
+    private readonly activeLanguage = injectActiveLang();
+    private readonly prefs = inject(PreferencesService);
     protected readonly profile = inject(UserProfileService);
     private readonly destroyRef = inject(DestroyRef);
     private readonly promptInput = viewChild<ElementRef<HTMLInputElement>>('promptInput');
@@ -131,6 +139,7 @@ export class AskAIControl {
     private focusTimer: ReturnType<typeof setTimeout> | null = null;
 
     readonly opened = output<void>();
+    protected readonly chartInitOptions: EChartsInitOpts = { renderer: 'canvas' };
 
     protected readonly query = signal('');
     protected readonly drawerVisible = signal(false);
@@ -453,10 +462,6 @@ export class AskAIControl {
         }
     }
 
-    protected chartKind(chart: AskAIChart): 'line' | 'bar' {
-        return chart.type === 'bar' ? 'bar' : 'line';
-    }
-
     protected isTable(chart: AskAIChart): boolean {
         return chart.type === 'table';
     }
@@ -483,54 +488,36 @@ export class AskAIControl {
             .replace(/\b\w/g, (letter) => letter.toUpperCase());
     }
 
-    protected chartPayload(chart: AskAIChart): object {
+    protected chartOptions(chart: AskAIChart): EChartsCoreOption {
+        this.activeLanguage();
         const xKey = chart.x_key ?? '';
-        return {
-            labels: (chart.rows ?? []).map((row) => this.formatCell(row[xKey] ?? '')),
-            datasets: (chart.series ?? []).map((series, index) => {
-                const color = AskAIControl.palette[index % AskAIControl.palette.length];
-                return {
-                    label: series.label,
-                    data: (chart.rows ?? []).map((row) => Number(row[series.key] ?? 0)),
-                    backgroundColor: chart.type === 'bar' ? color : this.withAlpha(color, 0.14),
-                    borderColor: color,
-                    pointBackgroundColor: color,
-                    fill: chart.type === 'line',
-                    tension: 0.35,
-                    borderWidth: 2,
-                    pointRadius: 2
-                };
-            })
-        };
+        const rows = chart.rows ?? [];
+        const design = this.chartDesign(chart);
+        return buildHitkeepChartOptions({
+            ariaLabel: chart.title,
+            design,
+            labels: rows.map((row) => this.formatCell(row[xKey] ?? '')),
+            locale: this.transloco.getActiveLang(),
+            series: this.askAIChartSeries(chart, rows, design),
+            theme: hitkeepChartTheme(this.prefs.isDarkMode()),
+            yAxisTicks: 5
+        });
     }
 
-    protected chartOptions(): object {
-        const textColor = this.cssVar('--p-text-muted-color', '#64748b');
-        const gridColor = this.cssVar('--p-content-border-color', 'rgba(100, 116, 139, 0.16)');
-        return {
-            maintainAspectRatio: false,
-            responsive: true,
-            plugins: {
-                legend: {
-                    labels: { color: textColor, usePointStyle: true, boxWidth: 8 },
-                    position: 'bottom'
-                },
-                tooltip: { mode: 'index', intersect: false }
-            },
-            scales: {
-                x: {
-                    ticks: { color: textColor, maxTicksLimit: 8 },
-                    grid: { color: gridColor },
-                    border: { display: false }
-                },
-                y: {
-                    ticks: { color: textColor },
-                    grid: { color: gridColor },
-                    border: { display: false },
-                    beginAtZero: true
-                }
-            }
-        };
+    protected chartMergeOptions(chart: AskAIChart): EChartsCoreOption {
+        this.activeLanguage();
+        const xKey = chart.x_key ?? '';
+        const rows = chart.rows ?? [];
+        const design = this.chartDesign(chart);
+        return buildHitkeepChartMergeOptions({
+            ariaLabel: chart.title,
+            design,
+            labels: rows.map((row) => this.formatCell(row[xKey] ?? '')),
+            locale: this.transloco.getActiveLang(),
+            series: this.askAIChartSeries(chart, rows, design),
+            theme: hitkeepChartTheme(this.prefs.isDarkMode()),
+            yAxisTicks: 5
+        });
     }
 
     protected formatCell(value: string | number | boolean | null | undefined): string {
@@ -550,6 +537,30 @@ export class AskAIControl {
             }
         }
         return String(value);
+    }
+
+    private chartDesign(chart: AskAIChart): HitkeepChartDesign {
+        return chart.type === 'bar' ? 'bar' : 'area';
+    }
+
+    private askAIChartSeries(chart: AskAIChart, rows: AskAIChart['rows'], design: HitkeepChartDesign): HitkeepChartSeries[] {
+        return (chart.series ?? []).map((item, index) => {
+            const color = AskAIControl.palette[index % AskAIControl.palette.length];
+            return {
+                id: item.key,
+                label: item.label,
+                data: rows.map((row) => this.numericCell(row[item.key])),
+                color,
+                gradientFrom: withChartAlpha(color, 0.14),
+                gradientTo: withChartAlpha(color, 0),
+                design
+            };
+        });
+    }
+
+    private numericCell(value: string | number | boolean | null | undefined): number {
+        const numberValue = Number(value ?? 0);
+        return Number.isFinite(numberValue) ? numberValue : 0;
     }
 
     protected turnTrack(turn: ConversationTurn): string {
@@ -883,24 +894,5 @@ export class AskAIControl {
             .replace(/(^-|-$)/g, '');
         const format = action.format || 'xlsx';
         return `${safeDomain || 'site'}-ask-ai-${new Date().toISOString().slice(0, 10)}.${format}`;
-    }
-
-    private withAlpha(hex: string, alpha: number): string {
-        const match = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        if (!match) {
-            return hex;
-        }
-        const r = parseInt(match[1]!, 16);
-        const g = parseInt(match[2]!, 16);
-        const b = parseInt(match[3]!, 16);
-        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    }
-
-    private cssVar(name: string, fallback: string): string {
-        if (typeof getComputedStyle !== 'function') {
-            return fallback;
-        }
-        const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-        return value || fallback;
     }
 }

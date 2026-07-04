@@ -112,6 +112,10 @@ func (s *Store) queryHitRollupCounts(ctx context.Context, kind rollupKind, siteI
 }
 
 func (s *Store) queryHitSeriesCounts(ctx context.Context, params api.AnalyticsParams, truncUnit string) (map[time.Time]api.ChartDataPoint, error) {
+	if !canUseRollupsForTruncUnit(truncUnit) {
+		return s.queryRawHitSeriesCounts(ctx, params, truncUnit)
+	}
+
 	stmts, err := s.ensureAnalyticsStatements(ctx)
 	if err != nil {
 		return nil, err
@@ -140,6 +144,44 @@ func (s *Store) queryHitSeriesCounts(ctx context.Context, params api.AnalyticsPa
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("failed to read hit series count rows: %w", err)
+	}
+
+	return result, nil
+}
+
+func (s *Store) queryRawHitSeriesCounts(ctx context.Context, params api.AnalyticsParams, truncUnit string) (map[time.Time]api.ChartDataPoint, error) {
+	bucketExpr := bucketSQL("timestamp", truncUnit)
+	//nolint:gosec // bucketExpr is derived from a fixed allowlist.
+	query := fmt.Sprintf(`
+		SELECT %s AS bucket, COUNT(*) AS pageviews, COUNT(DISTINCT session_id) AS visitors
+		FROM hits
+		WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?
+		GROUP BY bucket
+		ORDER BY bucket
+	`, bucketExpr)
+	rows, err := s.db.QueryContext(ctx, query, params.SiteID, params.Start, params.End)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[time.Time]api.ChartDataPoint)
+	for rows.Next() {
+		var bucket time.Time
+		var pageviews int
+		var visitors int
+		if err := rows.Scan(&bucket, &pageviews, &visitors); err != nil {
+			return nil, err
+		}
+		normalized := truncToUnit(bucket, truncUnit)
+		result[normalized] = api.ChartDataPoint{
+			Time:      normalized,
+			Pageviews: pageviews,
+			Visitors:  visitors,
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read raw hit series count rows: %w", err)
 	}
 
 	return result, nil

@@ -156,7 +156,6 @@ func (s *Store) queryChartData(
 	params api.AnalyticsParams,
 	gridStart time.Time,
 	gridEnd time.Time,
-	interval string,
 	truncUnit string,
 	filterSQL string,
 	filterArgs []any,
@@ -164,17 +163,20 @@ func (s *Store) queryChartData(
 	rollupKind rollupKind,
 ) (*sql.Rows, error) {
 	if useRollups {
-		return s.queryRollupChart(ctx, params.SiteID, gridStart, gridEnd, interval, truncUnit, rollupKind)
+		return s.queryRollupChart(ctx, params.SiteID, gridStart, gridEnd, truncUnit, rollupKind)
 	}
 
-	//nolint:gosec // interval/truncUnit/filterSQL are derived from fixed allowlists
+	bucketExpr := bucketSQL("timestamp", truncUnit)
+	interval := bucketIntervalSQL(truncUnit)
+
+	//nolint:gosec // interval/bucketExpr/filterSQL are derived from fixed allowlists
 	chartQuery := fmt.Sprintf(`
 	WITH time_range AS (
-		SELECT unnest(generate_series(?::TIMESTAMP, ?::TIMESTAMP, INTERVAL %s)) as bucket
+		SELECT unnest(generate_series(?::TIMESTAMP, ?::TIMESTAMP, %s)) as bucket
 	),
 	daily_hits AS (
 		SELECT 
-			date_trunc('%s', timestamp)::TIMESTAMP as bucket,
+			%s::TIMESTAMP as bucket,
 			COUNT(*) as pageviews,
 			COUNT(DISTINCT session_id) as visitors
 		FROM hits h
@@ -188,7 +190,7 @@ func (s *Store) queryChartData(
 	FROM time_range tr
 	LEFT JOIN daily_hits dh ON tr.bucket = dh.bucket
 	ORDER BY tr.bucket ASC;
-	`, interval, truncUnit, filterSQL)
+	`, interval, bucketExpr, filterSQL)
 
 	return s.db.QueryContext(ctx, chartQuery, append([]any{gridStart, gridEnd, params.SiteID, params.Start, params.End}, filterArgs...)...)
 }
@@ -357,14 +359,16 @@ func (s *Store) querySeriesCounts(ctx context.Context, table string, valueField 
 		args = append(args, v)
 	}
 
-	//nolint:gosec // table/valueField/truncUnit are from fixed allowlists
+	bucketExpr := bucketSQL("timestamp", truncUnit)
+
+	//nolint:gosec // table/valueField/bucketExpr are from fixed allowlists
 	query := fmt.Sprintf(`
-		SELECT date_trunc('%s', timestamp) AS bucket, COUNT(DISTINCT session_id) AS conversions
+		SELECT %s AS bucket, COUNT(DISTINCT session_id) AS conversions
 		FROM %s
 		WHERE site_id = ? AND timestamp >= ? AND timestamp <= ? AND %s IN (%s)
 		GROUP BY bucket
 		ORDER BY bucket
-	`, truncUnit, table, valueField, placeholders)
+	`, bucketExpr, table, valueField, placeholders)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {

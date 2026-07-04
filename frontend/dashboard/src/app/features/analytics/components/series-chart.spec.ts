@@ -1,17 +1,17 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { TrafficChart } from '@features/analytics/components/traffic-chart';
 import { By } from '@angular/platform-browser';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { provideTranslocoLocale } from '@jsverse/transloco-locale';
+import { SeriesChart } from '@features/analytics/components/series-chart';
 
-describe('TrafficChart', () => {
-    let component: TrafficChart;
-    let fixture: ComponentFixture<TrafficChart>;
+describe('SeriesChart', () => {
+    let component: SeriesChart;
+    let fixture: ComponentFixture<SeriesChart>;
 
     beforeEach(async () => {
         await TestBed.configureTestingModule({
             imports: [
-                TrafficChart,
+                SeriesChart,
                 TranslocoTestingModule.forRoot({
                     langs: { en: {} },
                     translocoConfig: {
@@ -32,40 +32,32 @@ describe('TrafficChart', () => {
             ]
         }).compileComponents();
 
-        fixture = TestBed.createComponent(TrafficChart);
+        fixture = TestBed.createComponent(SeriesChart);
         component = fixture.componentInstance;
         fixture.componentRef.setInput('data', []);
+        fixture.componentRef.setInput('series', []);
         fixture.detectChanges();
     });
 
-    it('should create', () => {
-        expect(component).toBeTruthy();
-    });
-
-    it('A11Y: container should have img role and accessible label', () => {
+    it('keeps an image role and accessible label', () => {
         const container = fixture.debugElement.query(By.css('div[role="img"]'));
         expect(container).toBeTruthy();
         expect(container.nativeElement.getAttribute('aria-label')).toBeTruthy();
     });
 
-    it('A11Y: loading state should be polite aria-live', () => {
-        fixture.componentRef.setInput('isLoading', true);
-        fixture.detectChanges();
-        const loader = fixture.debugElement.query(By.css('[aria-live="polite"]'));
-        expect(loader).toBeTruthy();
-    });
-
-    it('should cap y-axis ticks without forcing one tick per pageview', () => {
-        const options = (component as unknown as { chartOptions: () => { yAxis: { splitNumber: number; interval?: number } } }).chartOptions();
-
-        expect(options.yAxis.splitNumber).toBe(6);
-        expect(options.yAxis.interval).toBeUndefined();
-    });
-
-    it('renders the ECharts directive instead of the PrimeNG chart element when traffic exists', () => {
+    it('renders the ECharts directive instead of the PrimeNG chart element when data exists', () => {
         fixture.componentRef.setInput('data', [
-            { time: '2026-07-01T00:00:00Z', pageviews: 12, visitors: 7 },
-            { time: '2026-07-02T00:00:00Z', pageviews: 18, visitors: 10 }
+            { time: '2026-07-01T00:00:00Z', count: 5 },
+            { time: '2026-07-02T00:00:00Z', count: 9 }
+        ]);
+        fixture.componentRef.setInput('series', [
+            {
+                key: 'count',
+                label: 'Events',
+                color: '#2563eb',
+                gradientFrom: 'rgba(37, 99, 235, 0.3)',
+                gradientTo: 'rgba(37, 99, 235, 0)'
+            }
         ]);
         fixture.detectChanges();
 
@@ -74,26 +66,39 @@ describe('TrafficChart', () => {
         expect(fixture.debugElement.query(By.css('p-' + 'chart'))).toBeNull();
     });
 
-    it('can render primary traffic series with the bar design variant and merge data updates', () => {
+    it('applies comparison series, chart design variants, and merge updates', () => {
         fixture.componentRef.setInput('data', [
-            { time: '2026-07-01T00:00:00Z', pageviews: 12, visitors: 7 },
-            { time: '2026-07-02T00:00:00Z', pageviews: 18, visitors: 10 }
+            { time: '2026-07-01T00:00:00Z', count: 5 },
+            { time: '2026-07-02T00:00:00Z', count: 9 }
+        ]);
+        fixture.componentRef.setInput('comparisonData', [
+            { time: '2026-06-29T00:00:00Z', count: 3 },
+            { time: '2026-06-30T00:00:00Z', count: 4 }
+        ]);
+        fixture.componentRef.setInput('series', [
+            {
+                key: 'count',
+                label: 'Events',
+                color: '#2563eb',
+                gradientFrom: 'rgba(37, 99, 235, 0.3)',
+                gradientTo: 'rgba(37, 99, 235, 0)'
+            }
         ]);
         fixture.componentRef.setInput('design', 'bar');
         fixture.detectChanges();
 
         const inspectable = component as unknown as {
             chartFrameOptions: () => { series: { data: number[] }[] };
-            chartMergeOptions: () => { xAxis: { data: string[] }; series: { name: string; type: string; data: number[] }[] };
-            chartOptions: () => { series: { name: string; type: string }[] };
+            chartMergeOptions: () => { xAxis: { data: string[] }; series: { name: string; type: string; data: number[]; lineStyle?: { type?: string } }[] };
+            chartOptions: () => { series: { name: string; type: string; lineStyle?: { type?: string } }[] };
         };
         const options = inspectable.chartOptions();
         const frame = inspectable.chartFrameOptions();
         const merge = inspectable.chartMergeOptions();
-        expect(options.series.find((series) => series.name === 'dashboard.kpis.pageviews')?.type).toBe('bar');
-        expect(options.series.find((series) => series.name === 'dashboard.traffic.trendLine')?.type).toBe('line');
+        expect(options.series.find((series) => series.name === 'Events')?.type).toBe('bar');
+        expect(options.series.find((series) => series.name === 'Events (prev.)')?.lineStyle?.type).toBe('dashed');
         expect(frame.series.find((series) => series.data.length > 0)).toBeUndefined();
         expect(merge.xAxis.data.length).toBe(2);
-        expect(merge.series.find((series) => series.name === 'dashboard.kpis.pageviews')?.data).toEqual([12, 18]);
+        expect(merge.series.find((series) => series.name === 'Events')?.data).toEqual([5, 9]);
     });
 });

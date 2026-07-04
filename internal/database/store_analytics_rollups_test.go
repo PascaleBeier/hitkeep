@@ -252,6 +252,59 @@ func TestGetSiteStatsLast24HoursAcrossMonthBoundary(t *testing.T) {
 	}
 }
 
+func TestGetSiteStatsLastHourUsesFiveMinuteBuckets(t *testing.T) {
+	store, userID := setupComparisonStore(t)
+	ctx := context.Background()
+
+	site, err := store.CreateSite(ctx, userID, "minute-buckets.example.com")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+
+	queryEnd := time.Date(2026, time.March, 31, 8, 30, 0, 0, time.UTC)
+	queryStart := queryEnd.Add(-time.Hour)
+	hitTimes := []time.Time{
+		time.Date(2026, time.March, 31, 7, 35, 0, 0, time.UTC),
+		time.Date(2026, time.March, 31, 7, 40, 0, 0, time.UTC),
+		time.Date(2026, time.March, 31, 8, 5, 0, 0, time.UTC),
+	}
+	for i, ts := range hitTimes {
+		if err := store.CreateHit(ctx, &api.Hit{
+			SiteID:    site.ID,
+			SessionID: uuid.New(),
+			PageID:    uuid.New(),
+			Timestamp: ts,
+			Path:      "/minute-bucket",
+		}); err != nil {
+			t.Fatalf("create hit %d: %v", i, err)
+		}
+	}
+
+	stats, err := store.GetSiteStats(ctx, api.AnalyticsParams{
+		SiteID: site.ID,
+		UserID: userID,
+		Start:  queryStart,
+		End:    queryEnd,
+	})
+	if err != nil {
+		t.Fatalf("GetSiteStats: %v", err)
+	}
+
+	if len(stats.ChartData) != 13 {
+		t.Fatalf("expected 13 five-minute buckets, got %d: %+v", len(stats.ChartData), stats.ChartData)
+	}
+	wantCounts := map[time.Time]int{
+		time.Date(2026, time.March, 31, 7, 35, 0, 0, time.UTC): 1,
+		time.Date(2026, time.March, 31, 7, 40, 0, 0, time.UTC): 1,
+		time.Date(2026, time.March, 31, 8, 5, 0, 0, time.UTC):  1,
+	}
+	for _, point := range stats.ChartData {
+		if want, ok := wantCounts[point.Time]; ok && point.Pageviews != want {
+			t.Fatalf("bucket %s pageviews = %d, want %d", point.Time.Format(time.RFC3339), point.Pageviews, want)
+		}
+	}
+}
+
 func TestGetSiteStatsRefreshesStaleHourlyRollups(t *testing.T) {
 	store, userID := setupComparisonStore(t)
 	ctx := context.Background()

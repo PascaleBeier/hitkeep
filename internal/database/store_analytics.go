@@ -67,11 +67,6 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 	filterSQL += sessionSQL
 	filterArgs = append(filterArgs, funnelPathArgs...)
 	filterArgs = append(filterArgs, sessionArgs...)
-	useRollups := len(params.Filters) == 0
-	if sessionSQL != "" || funnelPathSQL != "" {
-		useRollups = false
-	}
-
 	liveThreshold := time.Now().Add(-5 * time.Minute)
 	liveQuery := "SELECT COUNT(DISTINCT h.session_id) FROM hits h WHERE h.site_id = ? AND h.timestamp >= ?" + filterSQL
 	err = s.db.QueryRowContext(ctx, liveQuery, append([]any{params.SiteID, liveThreshold}, filterArgs...)...).Scan(&stats.LiveVisitors)
@@ -79,42 +74,13 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 		return nil, fmt.Errorf("failed to calc live visitors: %w", err)
 	}
 
-	duration := params.End.Sub(params.Start)
-	interval := "1 DAY"
-	truncUnit := "day"
-	rollupKind := rollupHourly
-
-	var gridStart, gridEnd time.Time
-
-	if duration < 48*time.Hour {
-		interval = "1 HOUR"
-		truncUnit = "hour"
-		gridStart = params.Start.Truncate(time.Hour)
-		gridEnd = params.End.Truncate(time.Hour)
-		if !gridEnd.After(params.End) {
-			gridEnd = gridEnd.Add(time.Hour)
-		}
-	} else {
-		y, m, d := params.Start.Date()
-		gridStart = time.Date(y, m, d, 0, 0, 0, 0, params.Start.Location())
-
-		y, m, d = params.End.Date()
-		gridEnd = time.Date(y, m, d, 0, 0, 0, 0, params.End.Location())
-		if !gridEnd.After(params.End) {
-			gridEnd = gridEnd.AddDate(0, 0, 1)
-		}
-		if duration >= 180*24*time.Hour {
-			interval = "1 MONTH"
-			truncUnit = "month"
-			rollupKind = rollupMonthly
-			gridStart = time.Date(gridStart.Year(), gridStart.Month(), 1, 0, 0, 0, 0, gridStart.Location())
-			gridEnd = time.Date(gridEnd.Year(), gridEnd.Month(), 1, 0, 0, 0, 0, gridEnd.Location())
-			if !gridEnd.After(params.End) {
-				gridEnd = gridEnd.AddDate(0, 1, 0)
-			}
-		} else {
-			rollupKind = rollupDaily
-		}
+	truncUnit := truncUnitForRange(params.Start, params.End)
+	rollupKind := rollupKindFromTruncUnit(truncUnit)
+	gridStart := truncToUnit(params.Start, truncUnit)
+	gridEnd := truncToUnit(params.End, truncUnit)
+	useRollups := len(params.Filters) == 0 && canUseRollupsForTruncUnit(truncUnit)
+	if sessionSQL != "" || funnelPathSQL != "" {
+		useRollups = false
 	}
 
 	if useRollups {
@@ -148,7 +114,7 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 			return nil, fmt.Errorf("failed to query hybrid chart data: %w", err)
 		}
 	} else {
-		rows, err := s.queryChartData(ctx, params, gridStart, gridEnd, interval, truncUnit, filterSQL, filterArgs, useRollups, rollupKind)
+		rows, err := s.queryChartData(ctx, params, gridStart, gridEnd, truncUnit, filterSQL, filterArgs, useRollups, rollupKind)
 		if err != nil {
 			return nil, fmt.Errorf("failed to query chart data: %w", err)
 		}

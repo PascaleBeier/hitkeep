@@ -245,18 +245,13 @@ func (s *Store) GetAIFetchOverview(ctx context.Context, params api.AIFetchQueryP
 }
 
 func (s *Store) GetAIFetchTimeseries(ctx context.Context, params api.AIFetchQueryParams) ([]api.AIFetchSeriesPoint, error) {
-	duration := params.End.Sub(params.Start)
-	truncUnit := "day"
-	if duration < 48*time.Hour {
-		truncUnit = "hour"
-	} else if duration >= 180*24*time.Hour {
-		truncUnit = "month"
-	}
+	truncUnit := truncUnitForRange(params.Start, params.End)
 
 	filterSQL, args := buildAIFetchFilters(params)
-	//nolint:gosec // truncUnit is selected from a fixed allowlist and filterSQL is parameterized.
+	bucketExpr := bucketSQL("timestamp", truncUnit)
+	//nolint:gosec // bucketExpr is selected from a fixed allowlist and filterSQL is parameterized.
 	query := `
-		SELECT date_trunc('` + truncUnit + `', timestamp) AS bucket, COUNT(*) AS cnt
+		SELECT ` + bucketExpr + ` AS bucket, COUNT(*) AS cnt
 		FROM ai_fetches
 		WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?` + filterSQL + `
 		GROUP BY bucket
@@ -271,18 +266,25 @@ func (s *Store) GetAIFetchTimeseries(ctx context.Context, params api.AIFetchQuer
 	}
 	defer rows.Close()
 
-	var points []api.AIFetchSeriesPoint
+	counts := map[time.Time]int{}
 	for rows.Next() {
-		var point api.AIFetchSeriesPoint
-		if err := rows.Scan(&point.Time, &point.Count); err != nil {
+		var bucket time.Time
+		var count int
+		if err := rows.Scan(&bucket, &count); err != nil {
 			return nil, err
 		}
-		points = append(points, point)
+		counts[truncToUnit(bucket, truncUnit)] = count
 	}
-	if points == nil {
-		points = []api.AIFetchSeriesPoint{}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
-	return points, rows.Err()
+
+	buckets := buildSeriesBuckets(params.Start, params.End, truncUnit)
+	points := make([]api.AIFetchSeriesPoint, 0, len(buckets))
+	for _, bucket := range buckets {
+		points = append(points, api.AIFetchSeriesPoint{Time: bucket, Count: counts[bucket]})
+	}
+	return points, nil
 }
 
 func (s *Store) GetAIFetchCorrelation(ctx context.Context, params api.AIFetchCorrelationParams) (*api.AIFetchCorrelationReport, error) {

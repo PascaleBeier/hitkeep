@@ -645,6 +645,12 @@
     "searchPlaceholder": "Zoekopdracht...",
     "selectDateRange": "Selecteer een datumbereik",
     "seriesChartAria": "Tijdreeksgrafiek met gegevens voor de laatste {{count}}-intervallen",
+    "chartDesign": {
+      "label": "Grafiekstijl",
+      "area": "Vlak",
+      "line": "Lijn",
+      "bar": "Balken"
+    },
     "switchToDarkModeAria": "Schakel over naar de donkere modus",
     "switchToLightModeAria": "Schakel over naar de lichtmodus",
     "timeRangeSelectorAria": "Keuzeschakelaar voor tijdsbereik",

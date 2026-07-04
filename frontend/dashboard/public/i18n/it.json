@@ -640,6 +640,12 @@
     "searchPlaceholder": "Cerca...",
     "selectDateRange": "Seleziona intervallo date",
     "seriesChartAria": "Grafico serie temporale con dati per gli ultimi {{count}} intervalli",
+    "chartDesign": {
+      "label": "Stile del grafico",
+      "area": "Area",
+      "line": "Linea",
+      "bar": "Barre"
+    },
     "switchToDarkModeAria": "Passa alla modalità scura",
     "switchToLightModeAria": "Passa alla modalità chiara",
     "timeRangeSelectorAria": "Selettore intervallo temporale",

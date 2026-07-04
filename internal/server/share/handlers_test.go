@@ -914,7 +914,13 @@ func TestHandleGetShareWebVitals(t *testing.T) {
 		requireShareStatus(t, w, http.StatusOK)
 		var rows []api.WebVitalSeriesPoint
 		decodeShareResponse(t, w, &rows)
-		if len(rows) != 1 || rows[0].Samples == 0 {
+		var populated []api.WebVitalSeriesPoint
+		for _, row := range rows {
+			if row.Samples > 0 {
+				populated = append(populated, row)
+			}
+		}
+		if len(populated) != 1 || populated[0].P75 != 2800 {
 			t.Fatalf("expected one populated timeseries row, got %+v", rows)
 		}
 	})

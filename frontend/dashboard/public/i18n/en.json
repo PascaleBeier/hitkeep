@@ -645,6 +645,12 @@
     "searchPlaceholder": "Search...",
     "selectDateRange": "Select date range",
     "seriesChartAria": "Time series chart with data for the last {{count}} intervals",
+    "chartDesign": {
+      "label": "Chart style",
+      "area": "Area",
+      "line": "Line",
+      "bar": "Bars"
+    },
     "switchToDarkModeAria": "Switch to dark mode",
     "switchToLightModeAria": "Switch to light mode",
     "timeRangeSelectorAria": "Time range selector",

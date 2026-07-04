@@ -14,8 +14,8 @@ func (s *Store) augmentImportedSiteStats(ctx context.Context, params api.Analyti
 	if stats == nil {
 		return nil
 	}
-	if truncUnit == "hour" {
-		return s.addImportedSiteStatsExclusion(ctx, params, stats, "daily_grain", "Imported aggregate data is stored at daily grain and is excluded from hourly/realtime views.")
+	if !canIncludeImportedTruncUnit(truncUnit) {
+		return s.addImportedSiteStatsExclusion(ctx, params, stats, "daily_grain", "Imported aggregate data is stored at daily grain and is excluded from sub-day views.")
 	}
 	if len(params.Filters) > 0 {
 		return s.addImportedSiteStatsExclusion(ctx, params, stats, "aggregate_filter", "The active filters require relationships aggregate imports cannot prove.")
@@ -68,7 +68,11 @@ func (s *Store) augmentImportedSiteStats(ctx context.Context, params api.Analyti
 }
 
 func canIncludeImportedSiteAggregates(params api.AnalyticsParams, truncUnit string) bool {
-	return truncUnit != "hour" && len(params.Filters) == 0
+	return canIncludeImportedTruncUnit(truncUnit) && len(params.Filters) == 0
+}
+
+func canIncludeImportedTruncUnit(truncUnit string) bool {
+	return truncUnit == "day" || truncUnit == "month"
 }
 
 func (s *Store) queryImportedEventGoalConversions(ctx context.Context, params api.AnalyticsParams, eventName string) (int, error) {

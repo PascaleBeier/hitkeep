@@ -1,23 +1,30 @@
-import { Component, input, output, computed, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, input, output, computed, inject, ChangeDetectionStrategy, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
 
-import { ChartModule } from 'primeng/chart';
 import { ButtonModule } from 'primeng/button';
+import { SelectModule } from 'primeng/select';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { TranslocoLocaleService } from '@jsverse/transloco-locale';
+import { NgxEchartsDirective } from 'ngx-echarts';
+import type { EChartsCoreOption, EChartsInitOpts } from 'echarts/core';
+import { buildHitkeepChartMergeOptions, buildHitkeepChartOptions, hitkeepChartTheme, withChartAlpha, type HitkeepChartDesign, type HitkeepChartSeries } from '@core/charts/hitkeep-chart-options';
+import { provideHitkeepEcharts } from '@core/charts/hitkeep-echarts.provider';
 import { ChartDataPoint } from '@models/analytics.types';
 import { PreferencesService } from '@services/preferences.service';
 
-interface ChartContext {
-    chart: {
-        ctx: CanvasRenderingContext2D;
-    };
+interface ChartDesignOption {
+    label: string;
+    value: HitkeepChartDesign;
 }
+
+let trafficChartId = 0;
 
 @Component({
     selector: 'app-traffic-chart',
     standalone: true,
-    imports: [ChartModule, ButtonModule, TranslocoPipe],
+    imports: [ButtonModule, FormsModule, NgxEchartsDirective, SelectModule, TranslocoPipe],
+    providers: [provideHitkeepEcharts()],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <div class="h-80 w-full relative" role="img" [attr.aria-label]="accessibilityLabel()">
@@ -26,7 +33,23 @@ interface ChartContext {
                     <i class="pi pi-spin pi-spinner text-4xl text-[var(--p-primary-color)]" aria-hidden="true"></i>
                 </div>
             } @else if (hasTraffic()) {
-                <p-chart type="line" [data]="chartPayload()" [options]="chartOptions()" height="100%" />
+                @if (showDesignSelector()) {
+                    <div class="absolute right-2 top-2 z-10">
+                        <label class="sr-only" [for]="chartDesignSelectId">{{ 'common.chartDesign.label' | transloco }}</label>
+                        <p-select
+                            [inputId]="chartDesignSelectId"
+                            [options]="chartDesignOptions()"
+                            [ngModel]="effectiveDesign()"
+                            (ngModelChange)="setSelectedDesign($event)"
+                            optionLabel="label"
+                            optionValue="value"
+                            size="small"
+                            appendTo="body"
+                            styleClass="chart-design-select"
+                        />
+                    </div>
+                }
+                <div echarts class="h-full w-full" [options]="chartFrameOptions()" [merge]="chartMergeOptions()" [initOpts]="chartInitOptions" [autoResize]="true"></div>
             } @else {
                 <div class="absolute inset-0 flex flex-col items-center justify-center text-[var(--p-text-muted-color)] bg-[var(--p-surface-ground)]/50 rounded-lg border-2 border-dashed border-[var(--p-surface-border)] p-6 text-center">
                     <h3 class="font-semibold text-[var(--p-text-color)] text-lg mb-1">{{ 'dashboard.empty.noTrafficTitle' | transloco }}</h3>
@@ -46,13 +69,28 @@ export class TrafficChart {
     isLoading = input<boolean>(false);
     isShortRange = input<boolean>(false);
     comparisonLabel = input<string>('');
+    design = input<HitkeepChartDesign>('area');
+    showDesignSelector = input<boolean>(true);
 
     snippetClicked = output<void>();
+    protected readonly chartInitOptions: EChartsInitOpts = { renderer: 'canvas' };
+    protected readonly chartDesignSelectId = `traffic-chart-design-${++trafficChartId}`;
 
     private prefs = inject(PreferencesService);
     private localeService = inject(TranslocoLocaleService);
     private transloco = inject(TranslocoService);
     private activeLanguage = toSignal(this.transloco.langChanges$, { initialValue: this.transloco.getActiveLang() });
+    protected readonly selectedDesign = signal<HitkeepChartDesign | null>(null);
+    protected readonly effectiveDesign = computed(() => this.selectedDesign() ?? this.design());
+
+    protected readonly chartDesignOptions = computed<ChartDesignOption[]>(() => {
+        this.activeLanguage();
+        return [
+            { label: this.transloco.translate('common.chartDesign.area'), value: 'area' },
+            { label: this.transloco.translate('common.chartDesign.line'), value: 'line' },
+            { label: this.transloco.translate('common.chartDesign.bar'), value: 'bar' }
+        ];
+    });
 
     protected hasTraffic = computed(() => {
         const d = this.data();
@@ -66,142 +104,113 @@ export class TrafficChart {
         return this.transloco.translate('dashboard.trafficChartAria', { count });
     });
 
-    protected chartPayload = computed(() => {
+    protected chartOptions = computed(() => {
         this.activeLanguage();
         const raw = this.data() || [];
         const cmp = this.comparisonData() || [];
-        const pageviews = raw.map((d) => d.pageviews);
-        const visitors = raw.map((d) => d.visitors);
-        const trend = this.linearTrendLine(visitors);
 
-        const labels = raw.map((d) => {
-            const date = new Date(d.time);
-            if (this.isShortRange()) return this.localeService.localizeDate(date, undefined, { hour: 'numeric', minute: '2-digit' });
-            return this.localeService.localizeDate(date, undefined, { month: 'short', day: 'numeric' });
+        return buildHitkeepChartOptions({
+            ariaLabel: this.accessibilityLabel(),
+            design: this.effectiveDesign(),
+            labels: raw.map((d) => this.formatBucketLabel(d.time)),
+            locale: this.transloco.getActiveLang(),
+            series: this.chartSeries(raw, cmp),
+            theme: hitkeepChartTheme(this.prefs.isDarkMode()),
+            yAxisTicks: 6
         });
+    });
 
-        const datasets: object[] = [
+    protected chartFrameOptions = computed((): EChartsCoreOption => {
+        this.activeLanguage();
+        return buildHitkeepChartOptions({
+            ariaLabel: this.transloco.translate('dashboard.trafficChartAria', { count: 0 }),
+            design: this.effectiveDesign(),
+            labels: [],
+            locale: this.transloco.getActiveLang(),
+            series: this.chartSeries([], [], this.comparisonLabel().trim().length > 0),
+            theme: hitkeepChartTheme(this.prefs.isDarkMode()),
+            yAxisTicks: 6
+        });
+    });
+
+    protected chartMergeOptions = computed((): EChartsCoreOption => {
+        this.activeLanguage();
+        const raw = this.data() || [];
+        const cmp = this.comparisonData() || [];
+        return buildHitkeepChartMergeOptions({
+            ariaLabel: this.accessibilityLabel(),
+            design: this.effectiveDesign(),
+            labels: raw.map((d) => this.formatBucketLabel(d.time)),
+            locale: this.transloco.getActiveLang(),
+            series: this.chartSeries(raw, cmp),
+            theme: hitkeepChartTheme(this.prefs.isDarkMode()),
+            yAxisTicks: 6
+        });
+    });
+
+    protected setSelectedDesign(value: HitkeepChartDesign | null): void {
+        if (value) {
+            this.selectedDesign.set(value);
+        }
+    }
+
+    private chartSeries(raw: ChartDataPoint[], cmp: ChartDataPoint[], includeComparison = cmp.length > 0): HitkeepChartSeries[] {
+        const visitors = raw.map((d) => d.visitors);
+        const series: HitkeepChartSeries[] = [
             {
+                id: 'pageviews',
                 label: this.transloco.translate('dashboard.kpis.pageviews'),
-                data: pageviews,
-                fill: true,
-                backgroundColor: (ctx: ChartContext) => this.getGradient(ctx, 'rgba(99, 102, 241, 0.5)', 'rgba(99, 102, 241, 0.0)'),
-                borderColor: '#6366f1',
-                pointBackgroundColor: '#6366f1',
-                tension: 0.4,
-                borderWidth: 2,
-                pointRadius: 0,
-                pointHoverRadius: 4
+                data: raw.map((d) => d.pageviews),
+                color: '#6366f1',
+                gradientFrom: 'rgba(99, 102, 241, 0.5)',
+                gradientTo: 'rgba(99, 102, 241, 0)'
             },
             {
+                id: 'visitors',
                 label: this.transloco.translate('dashboard.traffic.visitors'),
                 data: visitors,
-                fill: true,
-                backgroundColor: (ctx: ChartContext) => this.getGradient(ctx, 'rgba(20, 184, 166, 0.5)', 'rgba(20, 184, 166, 0.0)'),
-                borderColor: '#14b8a6',
-                pointBackgroundColor: '#14b8a6',
-                tension: 0.4,
-                borderWidth: 2,
-                pointRadius: 0,
-                pointHoverRadius: 4
+                color: '#14b8a6',
+                gradientFrom: 'rgba(20, 184, 166, 0.5)',
+                gradientTo: 'rgba(20, 184, 166, 0)'
             },
             {
+                id: 'visitors-trend',
                 label: this.transloco.translate('dashboard.traffic.trendLine'),
-                data: trend,
-                fill: false,
-                borderColor: '#0ea5b7',
-                pointBackgroundColor: '#0ea5b7',
-                tension: 0,
-                borderWidth: 2,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-                borderDash: [6, 4]
+                data: this.linearTrendLine(visitors),
+                color: '#0ea5b7',
+                dashed: true,
+                smooth: false
             }
         ];
 
-        if (cmp.length > 0) {
-            datasets.push(
+        if (includeComparison) {
+            series.push(
                 {
+                    id: 'pageviews-comparison',
                     label: this.transloco.translate('comparison.pageviewsLabel'),
                     data: cmp.map((d) => d.pageviews),
-                    fill: false,
-                    borderColor: 'rgba(99, 102, 241, 0.4)',
-                    pointBackgroundColor: 'rgba(99, 102, 241, 0.4)',
-                    tension: 0.4,
-                    borderWidth: 1.5,
-                    pointRadius: 0,
-                    pointHoverRadius: 3,
-                    borderDash: [5, 5]
+                    color: withChartAlpha('#6366f1', 0.4),
+                    muted: true,
+                    dashed: true
                 },
                 {
+                    id: 'visitors-comparison',
                     label: this.transloco.translate('comparison.visitorsLabel'),
                     data: cmp.map((d) => d.visitors),
-                    fill: false,
-                    borderColor: 'rgba(20, 184, 166, 0.4)',
-                    pointBackgroundColor: 'rgba(20, 184, 166, 0.4)',
-                    tension: 0.4,
-                    borderWidth: 1.5,
-                    pointRadius: 0,
-                    pointHoverRadius: 3,
-                    borderDash: [5, 5]
+                    color: withChartAlpha('#14b8a6', 0.4),
+                    muted: true,
+                    dashed: true
                 }
             );
         }
 
-        return { labels, datasets };
-    });
+        return series;
+    }
 
-    protected chartOptions = computed(() => {
-        const isDark = this.prefs.isDarkMode();
-        const textColor = isDark ? '#94a3b8' : '#64748b';
-        const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
-        const tooltipBg = isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)';
-        const tooltipText = isDark ? '#f8fafc' : '#0f172a';
-        const tooltipBorder = isDark ? '#334155' : '#e2e8f0';
-
-        return {
-            maintainAspectRatio: false,
-            aspectRatio: 0.5,
-            responsive: true,
-            interaction: { mode: 'index', intersect: false },
-            plugins: {
-                legend: { labels: { color: textColor, usePointStyle: true, boxWidth: 8 }, position: 'bottom' },
-                tooltip: {
-                    mode: 'index',
-                    intersect: false,
-                    backgroundColor: tooltipBg,
-                    titleColor: tooltipText,
-                    bodyColor: tooltipText,
-                    borderColor: tooltipBorder,
-                    borderWidth: 1,
-                    padding: 10,
-                    cornerRadius: 8,
-                    displayColors: true
-                }
-            },
-            scales: {
-                x: {
-                    ticks: { color: textColor, maxTicksLimit: 8 },
-                    grid: { color: gridColor, drawBorder: false, tickLength: 0 },
-                    border: { display: false }
-                },
-                y: {
-                    ticks: { color: textColor, maxTicksLimit: 6, precision: 0 },
-                    grid: { color: gridColor, drawBorder: false, tickLength: 0 },
-                    border: { display: false },
-                    beginAtZero: true
-                }
-            }
-        };
-    });
-
-    private getGradient(context: ChartContext, c1: string, c2: string) {
-        const ctx = context.chart.ctx;
-        if (!ctx) return c1;
-        const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-        gradient.addColorStop(0, c1);
-        gradient.addColorStop(1, c2);
-        return gradient;
+    private formatBucketLabel(time: string): string {
+        const date = new Date(time);
+        if (this.isShortRange()) return this.localeService.localizeDate(date, undefined, { hour: 'numeric', minute: '2-digit' });
+        return this.localeService.localizeDate(date, undefined, { month: 'short', day: 'numeric' });
     }
 
     private linearTrendLine(values: number[]): number[] {

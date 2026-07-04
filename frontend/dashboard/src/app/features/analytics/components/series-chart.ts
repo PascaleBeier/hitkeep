@@ -1,8 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, input, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { ChartModule } from 'primeng/chart';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { TranslocoLocaleService } from '@jsverse/transloco-locale';
+import { NgxEchartsDirective } from 'ngx-echarts';
+import { SelectModule } from 'primeng/select';
+import type { EChartsCoreOption, EChartsInitOpts } from 'echarts/core';
+import { buildHitkeepChartMergeOptions, buildHitkeepChartOptions, hitkeepChartTheme, withChartAlpha, type HitkeepChartDesign, type HitkeepChartSeries } from '@core/charts/hitkeep-chart-options';
+import { provideHitkeepEcharts } from '@core/charts/hitkeep-echarts.provider';
 import { PreferencesService } from '@services/preferences.service';
 
 export type SeriesChartPoint = Record<string, number | string> & { time: string };
@@ -13,18 +18,21 @@ export interface SeriesDefinition {
     color: string;
     gradientFrom: string;
     gradientTo: string;
+    design?: HitkeepChartDesign;
 }
 
-interface ChartContext {
-    chart: {
-        ctx: CanvasRenderingContext2D;
-    };
+interface ChartDesignOption {
+    label: string;
+    value: HitkeepChartDesign;
 }
+
+let seriesChartId = 0;
 
 @Component({
     selector: 'app-series-chart',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ChartModule, TranslocoPipe],
+    imports: [FormsModule, NgxEchartsDirective, SelectModule, TranslocoPipe],
+    providers: [provideHitkeepEcharts()],
     template: `
         <div class="h-80 w-full relative" role="img" [attr.aria-label]="accessibilityLabel()">
             @if (isLoading()) {
@@ -32,7 +40,23 @@ interface ChartContext {
                     <i class="pi pi-spin pi-spinner text-4xl text-[var(--p-primary-color)]" aria-hidden="true"></i>
                 </div>
             } @else if (hasData()) {
-                <p-chart type="line" [data]="chartPayload()" [options]="chartOptions()" height="100%" />
+                @if (showDesignSelector()) {
+                    <div class="absolute right-2 top-2 z-10">
+                        <label class="sr-only" [for]="chartDesignSelectId">{{ 'common.chartDesign.label' | transloco }}</label>
+                        <p-select
+                            [inputId]="chartDesignSelectId"
+                            [options]="chartDesignOptions()"
+                            [ngModel]="effectiveDesign()"
+                            (ngModelChange)="setSelectedDesign($event)"
+                            optionLabel="label"
+                            optionValue="value"
+                            size="small"
+                            appendTo="body"
+                            styleClass="chart-design-select"
+                        />
+                    </div>
+                }
+                <div echarts class="h-full w-full" [options]="chartFrameOptions()" [merge]="chartMergeOptions()" [initOpts]="chartInitOptions" [autoResize]="true"></div>
             } @else {
                 <div class="absolute inset-0 flex flex-col items-center justify-center text-[var(--p-text-muted-color)] bg-[var(--p-surface-ground)]/50 rounded-lg border-2 border-dashed border-[var(--p-surface-border)] p-6 text-center">
                     <h3 class="font-semibold text-[var(--p-text-color)] text-lg mb-1">{{ emptyTitle() || ('common.empty.noDataTitle' | transloco) }}</h3>
@@ -54,11 +78,27 @@ export class SeriesChart {
     emptyTitle = input<string>('');
     emptyDescription = input<string>('');
     comparisonLabel = input<string>('');
+    design = input<HitkeepChartDesign>('area');
+    showDesignSelector = input<boolean>(true);
 
+    protected readonly chartInitOptions: EChartsInitOpts = { renderer: 'canvas' };
+    protected readonly chartDesignSelectId = `series-chart-design-${++seriesChartId}`;
     private prefs = inject(PreferencesService);
     private localeService = inject(TranslocoLocaleService);
     private transloco = inject(TranslocoService);
     private activeLanguage = toSignal(this.transloco.langChanges$, { initialValue: this.transloco.getActiveLang() });
+    protected readonly selectedDesign = signal<HitkeepChartDesign | null>(null);
+
+    protected readonly effectiveDesign = computed(() => this.selectedDesign() ?? this.design());
+
+    protected readonly chartDesignOptions = computed<ChartDesignOption[]>(() => {
+        this.activeLanguage();
+        return [
+            { label: this.transloco.translate('common.chartDesign.area'), value: 'area' },
+            { label: this.transloco.translate('common.chartDesign.line'), value: 'line' },
+            { label: this.transloco.translate('common.chartDesign.bar'), value: 'bar' }
+        ];
+    });
 
     protected hasData = computed(() => {
         const data = this.data() || [];
@@ -73,110 +113,84 @@ export class SeriesChart {
         return this.transloco.translate('common.seriesChartAria', { count });
     });
 
-    protected chartPayload = computed(() => {
+    protected chartOptions = computed(() => {
         this.activeLanguage();
         const raw = this.data() || [];
         const cmp = this.comparisonData() || [];
-        const series = this.series() || [];
 
-        const labels = raw.map((d) => {
-            const date = new Date(d.time);
-            if (this.isShortRange()) return this.localeService.localizeDate(date, undefined, { hour: 'numeric', minute: '2-digit' });
-            return this.localeService.localizeDate(date, undefined, { month: 'short', day: 'numeric' });
+        return buildHitkeepChartOptions({
+            ariaLabel: this.accessibilityLabel(),
+            design: this.effectiveDesign(),
+            labels: raw.map((point) => this.formatBucketLabel(point.time)),
+            locale: this.transloco.getActiveLang(),
+            series: this.chartSeries(raw, cmp),
+            theme: hitkeepChartTheme(this.prefs.isDarkMode())
         });
+    });
 
-        const datasets: object[] = series.map((s) => ({
+    protected chartFrameOptions = computed((): EChartsCoreOption => {
+        this.activeLanguage();
+        return buildHitkeepChartOptions({
+            ariaLabel: this.transloco.translate('common.seriesChartAria', { count: 0 }),
+            design: this.effectiveDesign(),
+            labels: [],
+            locale: this.transloco.getActiveLang(),
+            series: this.chartSeries([], [], this.comparisonLabel().trim().length > 0),
+            theme: hitkeepChartTheme(this.prefs.isDarkMode())
+        });
+    });
+
+    protected chartMergeOptions = computed((): EChartsCoreOption => {
+        this.activeLanguage();
+        const raw = this.data() || [];
+        const cmp = this.comparisonData() || [];
+        return buildHitkeepChartMergeOptions({
+            ariaLabel: this.accessibilityLabel(),
+            design: this.effectiveDesign(),
+            labels: raw.map((point) => this.formatBucketLabel(point.time)),
+            locale: this.transloco.getActiveLang(),
+            series: this.chartSeries(raw, cmp),
+            theme: hitkeepChartTheme(this.prefs.isDarkMode())
+        });
+    });
+
+    protected setSelectedDesign(value: HitkeepChartDesign | null): void {
+        if (value) {
+            this.selectedDesign.set(value);
+        }
+    }
+
+    private chartSeries(raw: SeriesChartPoint[], cmp: SeriesChartPoint[], includeComparison = cmp.length > 0): HitkeepChartSeries[] {
+        const series = this.series() || [];
+        const chartSeries: HitkeepChartSeries[] = series.map((s) => ({
+            id: s.key,
             label: s.label,
             data: raw.map((d) => Number(d[s.key] ?? 0)),
-            fill: true,
-            backgroundColor: (ctx: ChartContext) => this.getGradient(ctx, s.gradientFrom, s.gradientTo),
-            borderColor: s.color,
-            pointBackgroundColor: s.color,
-            tension: 0.4,
-            borderWidth: 2,
-            pointRadius: 0,
-            pointHoverRadius: 4
+            color: s.color,
+            gradientFrom: s.gradientFrom,
+            gradientTo: s.gradientTo,
+            design: s.design
         }));
 
-        if (cmp.length > 0) {
+        if (includeComparison) {
             for (const s of series) {
-                datasets.push({
+                chartSeries.push({
+                    id: `${s.key}-comparison`,
                     label: `${s.label} (prev.)`,
                     data: cmp.map((d) => Number(d[s.key] ?? 0)),
-                    fill: false,
-                    borderColor: this.hexToRgba(s.color, 0.4),
-                    pointBackgroundColor: this.hexToRgba(s.color, 0.4),
-                    tension: 0.4,
-                    borderWidth: 1.5,
-                    pointRadius: 0,
-                    pointHoverRadius: 3,
-                    borderDash: [5, 5]
+                    color: withChartAlpha(s.color, 0.4),
+                    muted: true,
+                    dashed: true
                 });
             }
         }
 
-        return { labels, datasets };
-    });
-
-    protected chartOptions = computed(() => {
-        const isDark = this.prefs.isDarkMode();
-        const textColor = isDark ? '#94a3b8' : '#64748b';
-        const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
-        const tooltipBg = isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)';
-        const tooltipText = isDark ? '#f8fafc' : '#0f172a';
-        const tooltipBorder = isDark ? '#334155' : '#e2e8f0';
-
-        return {
-            maintainAspectRatio: false,
-            aspectRatio: 0.5,
-            responsive: true,
-            interaction: { mode: 'index', intersect: false },
-            plugins: {
-                legend: { labels: { color: textColor, usePointStyle: true, boxWidth: 8 }, position: 'bottom' },
-                tooltip: {
-                    mode: 'index',
-                    intersect: false,
-                    backgroundColor: tooltipBg,
-                    titleColor: tooltipText,
-                    bodyColor: tooltipText,
-                    borderColor: tooltipBorder,
-                    borderWidth: 1,
-                    padding: 10,
-                    cornerRadius: 8,
-                    displayColors: true
-                }
-            },
-            scales: {
-                x: {
-                    ticks: { color: textColor, maxTicksLimit: 8 },
-                    grid: { color: gridColor, drawBorder: false, tickLength: 0 },
-                    border: { display: false }
-                },
-                y: {
-                    ticks: { color: textColor },
-                    grid: { color: gridColor, drawBorder: false, tickLength: 0 },
-                    border: { display: false },
-                    beginAtZero: true
-                }
-            }
-        };
-    });
-
-    private getGradient(context: ChartContext, c1: string, c2: string) {
-        const ctx = context.chart.ctx;
-        if (!ctx) return c1;
-        const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-        gradient.addColorStop(0, c1);
-        gradient.addColorStop(1, c2);
-        return gradient;
+        return chartSeries;
     }
 
-    private hexToRgba(hex: string, alpha: number): string {
-        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        if (!result) return hex;
-        const r = parseInt(result[1]!, 16);
-        const g = parseInt(result[2]!, 16);
-        const b = parseInt(result[3]!, 16);
-        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    private formatBucketLabel(time: string): string {
+        const date = new Date(time);
+        if (this.isShortRange()) return this.localeService.localizeDate(date, undefined, { hour: 'numeric', minute: '2-digit' });
+        return this.localeService.localizeDate(date, undefined, { month: 'short', day: 'numeric' });
     }
 }

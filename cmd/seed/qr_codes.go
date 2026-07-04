@@ -245,14 +245,14 @@ func seedQRCodeOpen(siteID, qrID uuid.UUID, fixture qrCampaignSeedFixture, ts ti
 	region, city, provider, asn, asnOrg := seedGeoNetworkMetadata(country, rng)
 	var referrer *string
 	if len(fixture.referrers) > 0 && rng.Float64() < 0.72 {
-		referrer = seedPtr(fixture.referrers[rng.Intn(len(fixture.referrers))])
+		referrer = new(fixture.referrers[rng.Intn(len(fixture.referrers))])
 	}
 	return &api.QRCodeOpen{
 		SiteID:      siteID,
 		QRCodeID:    qrID,
 		Timestamp:   ts,
 		Referrer:    referrer,
-		UserAgent:   seedPtr(uaEntry.ua),
+		UserAgent:   new(uaEntry.ua),
 		CountryCode: country,
 		Region:      region,
 		City:        city,
@@ -273,7 +273,7 @@ func seedQRCodeSession(batch *seedWriteBatch, siteID, qrID uuid.UUID, domain str
 	referrer := seedQRCodeHitReferrer(fixture, rng)
 	sessionLen := 2 + rng.Intn(3)
 
-	for i := 0; i < sessionLen; i++ {
+	for i := range sessionLen {
 		path := fixture.followupPaths[min(i, len(fixture.followupPaths)-1)]
 		ts := sessionStart.Add(time.Duration(i*80+rng.Intn(80)) * time.Second)
 		isUnique := i == 0
@@ -283,8 +283,8 @@ func seedQRCodeSession(batch *seedWriteBatch, siteID, qrID uuid.UUID, domain str
 			PageID:         uuid.New(),
 			Timestamp:      ts,
 			Path:           path,
-			Hostname:       seedPtr(hostname),
-			UserAgent:      seedPtr(uaEntry.ua),
+			Hostname:       new(hostname),
+			UserAgent:      new(uaEntry.ua),
 			CountryCode:    country,
 			Region:         region,
 			City:           city,
@@ -292,21 +292,21 @@ func seedQRCodeSession(batch *seedWriteBatch, siteID, qrID uuid.UUID, domain str
 			ASN:            asn,
 			ASNOrg:         asnOrg,
 			Language:       lang,
-			ViewportWidth:  seedPtr(vw),
-			ViewportHeight: seedPtr(vh),
-			ScreenWidth:    seedPtr(sw),
-			ScreenHeight:   seedPtr(sh),
-			UTMSource:      seedPtr(fixture.utmSource),
-			UTMMedium:      seedPtr(fixture.utmMedium),
-			UTMCampaign:    seedPtr(fixture.utmCampaign),
-			QRCodeID:       seedPtr(qrID),
-			IsUnique:       seedPtr(isUnique),
+			ViewportWidth:  new(vw),
+			ViewportHeight: new(vh),
+			ScreenWidth:    new(sw),
+			ScreenHeight:   new(sh),
+			UTMSource:      new(fixture.utmSource),
+			UTMMedium:      new(fixture.utmMedium),
+			UTMCampaign:    new(fixture.utmCampaign),
+			QRCodeID:       new(qrID),
+			IsUnique:       new(isUnique),
 		}
 		if fixture.utmTerm != "" {
-			hit.UTMTerm = seedPtr(fixture.utmTerm)
+			hit.UTMTerm = new(fixture.utmTerm)
 		}
 		if fixture.utmContent != "" {
-			hit.UTMContent = seedPtr(fixture.utmContent)
+			hit.UTMContent = new(fixture.utmContent)
 		}
 		if i == 0 {
 			hit.Referrer = referrer
@@ -386,7 +386,7 @@ func seedQRCodeHitReferrer(fixture qrCampaignSeedFixture, rng *mrand.Rand) *stri
 	if len(fixture.referrers) == 0 || rng.Float64() < 0.35 {
 		return nil
 	}
-	return seedPtr(fixture.referrers[rng.Intn(len(fixture.referrers))])
+	return new(fixture.referrers[rng.Intn(len(fixture.referrers))])
 }
 
 func randomQRCodeTimestamp(rng *mrand.Rand, now time.Time, daysBack int) time.Time {
@@ -418,10 +418,6 @@ func seedHostname(domain string) string {
 		return "acme-analytics.io"
 	}
 	return host
-}
-
-func seedPtr[T any](value T) *T {
-	return &value
 }
 
 const seedQRLogoPNGBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC"

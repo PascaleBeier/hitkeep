@@ -513,13 +513,7 @@ func (s *Store) importedEventAudienceAvailableDimensions(ctx context.Context, pa
 // If both PropertyKey and PropertyValue are set, only events where that JSON property equals
 // the given value are counted.
 func (s *Store) GetEventTimeseries(ctx context.Context, params api.EventTimeseriesParams) ([]api.EventSeriesPoint, error) {
-	duration := params.End.Sub(params.Start)
-	truncUnit := "day"
-	if duration < 48*time.Hour {
-		truncUnit = "hour"
-	} else if duration >= 180*24*time.Hour {
-		truncUnit = "month"
-	}
+	truncUnit := truncUnitForRange(params.Start, params.End)
 
 	args := []any{params.SiteID, params.Start, params.End, params.EventName}
 	propClause := ""
@@ -538,14 +532,16 @@ func (s *Store) GetEventTimeseries(ctx context.Context, params api.EventTimeseri
 		args = append(args, filterArgs...)
 	}
 
-	//nolint:gosec // truncUnit is from a fixed allowlist; propClause/dimClause are literal SQL fragments with no user content
+	bucketExpr := bucketSQL("timestamp", truncUnit)
+
+	//nolint:gosec // bucketExpr is from a fixed allowlist; propClause/dimClause are literal SQL fragments with no user content
 	query := fmt.Sprintf(`
-		SELECT date_trunc('%s', timestamp) AS bucket, COUNT(*) AS count
+		SELECT %s AS bucket, COUNT(*) AS count
 		FROM events
 		WHERE site_id = ? AND timestamp >= ? AND timestamp <= ? AND name = ?%s%s
 		GROUP BY bucket
 		ORDER BY bucket
-	`, truncUnit, propClause, dimClause)
+	`, bucketExpr, propClause, dimClause)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -566,7 +562,7 @@ func (s *Store) GetEventTimeseries(ctx context.Context, params api.EventTimeseri
 		return nil, err
 	}
 
-	if truncUnit != "hour" && len(params.Filters) == 0 && params.DimensionKey == "" && params.DimensionValue == "" {
+	if canIncludeImportedTruncUnit(truncUnit) && len(params.Filters) == 0 && params.DimensionKey == "" && params.DimensionValue == "" {
 		if err := s.mergeImportedEventTimeseries(ctx, params, truncUnit, counts); err != nil {
 			return nil, err
 		}

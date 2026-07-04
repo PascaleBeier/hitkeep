@@ -49,3 +49,40 @@ func TestBuildSeriesBucketsIncludesBoundaryBuckets(t *testing.T) {
 		}
 	}
 }
+
+func TestTruncUnitForRangeUsesDenseShortBuckets(t *testing.T) {
+	end := time.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
+
+	cases := []struct {
+		name string
+		from time.Time
+		want string
+	}{
+		{name: "last hour", from: end.Add(-time.Hour), want: "5minute"},
+		{name: "six hours", from: end.Add(-6 * time.Hour), want: "15minute"},
+		{name: "three days", from: end.Add(-72 * time.Hour), want: "day"},
+		{name: "thirty days", from: end.Add(-30 * 24 * time.Hour), want: "day"},
+		{name: "one year", from: end.Add(-365 * 24 * time.Hour), want: "month"},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := truncUnitForRange(tt.from, end); got != tt.want {
+				t.Fatalf("truncUnitForRange() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBuildSeriesBucketsSupportsFiveMinuteBuckets(t *testing.T) {
+	start := time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC)
+	end := time.Date(2026, 4, 20, 11, 0, 0, 0, time.UTC)
+
+	got := buildSeriesBuckets(start, end, "5minute")
+	if len(got) != 13 {
+		t.Fatalf("got %d buckets, want 13", len(got))
+	}
+	if !got[0].Equal(start) || !got[len(got)-1].Equal(end) {
+		t.Fatalf("unexpected bucket boundaries: first=%s last=%s", got[0], got[len(got)-1])
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -328,10 +329,8 @@ func addSiteStatsResetFamily(result *api.SiteStatsResetResponse, family string) 
 	if result == nil || family == "" {
 		return
 	}
-	for _, existing := range result.FamiliesCleared {
-		if existing == family {
-			return
-		}
+	if slices.Contains(result.FamiliesCleared, family) {
+		return
 	}
 	result.FamiliesCleared = append(result.FamiliesCleared, family)
 }

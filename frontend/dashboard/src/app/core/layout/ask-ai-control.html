@@ -176,8 +176,8 @@
                                 </table>
                             </div>
                             } @else {
-                            <div class="ai-canvas">
-                                <p-chart [type]="chartKind(chart)" [data]="chartPayload(chart)" [options]="chartOptions()" height="100%" />
+                            <div class="ai-canvas" role="img" [attr.aria-label]="chart.title">
+                                <div echarts class="ai-echarts" [options]="chartOptions(chart)" [merge]="chartMergeOptions(chart)" [initOpts]="chartInitOptions" [autoResize]="true"></div>
                             </div>
                             }
                         </div>

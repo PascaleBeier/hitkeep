@@ -401,7 +401,6 @@ func (s *Store) queryRollupChart(
 	siteID uuid.UUID,
 	gridStart time.Time,
 	gridEnd time.Time,
-	interval string,
 	truncUnit string,
 	kind rollupKind,
 ) (*sql.Rows, error) {
@@ -417,10 +416,12 @@ func (s *Store) queryRollupChart(
 		table = "hit_rollups_hourly"
 	}
 
+	interval := bucketIntervalSQL(truncUnit)
+
 	//nolint:gosec // interval/truncUnit are derived from fixed allowlists
 	chartQuery := fmt.Sprintf(`
 	WITH time_range AS (
-		SELECT unnest(generate_series(?::TIMESTAMP, ?::TIMESTAMP, INTERVAL %s)) as bucket
+		SELECT unnest(generate_series(?::TIMESTAMP, ?::TIMESTAMP, %s)) as bucket
 	),
 	rollup_hits AS (
 		SELECT 

@@ -159,10 +159,12 @@ func (s *Store) GetWebVitalsTimeseries(ctx context.Context, params api.WebVitals
 		return nil, err
 	}
 	unit := webVitalsBucketUnit(params.Start, params.End)
+	bucketExpr := bucketSQL("timestamp", unit)
 
+	//nolint:gosec // bucketExpr is selected from a fixed allowlist.
 	rows, err := s.db.QueryContext(ctx, fmt.Sprintf(`
 		SELECT
-			date_trunc('%s', timestamp)::TIMESTAMPTZ AS bucket,
+			%s::TIMESTAMPTZ AS bucket,
 			COALESCE(quantile_cont(value, 0.75), 0) AS p75,
 			COUNT(*) AS samples,
 			COUNT(*) FILTER (WHERE rating = 'good') AS good,
@@ -172,22 +174,30 @@ func (s *Store) GetWebVitalsTimeseries(ctx context.Context, params api.WebVitals
 		%s
 		GROUP BY bucket
 		ORDER BY bucket
-	`, unit, where), args...)
+	`, bucketExpr, where), args...)
 	if err != nil {
 		return nil, fmt.Errorf("query web vitals timeseries: %w", err)
 	}
 	defer rows.Close()
 
-	results := []api.WebVitalSeriesPoint{}
+	byBucket := map[time.Time]api.WebVitalSeriesPoint{}
 	for rows.Next() {
 		var item api.WebVitalSeriesPoint
 		if err := rows.Scan(&item.Time, &item.P75, &item.Samples, &item.Good, &item.NeedsImprove, &item.Poor); err != nil {
 			return nil, fmt.Errorf("scan web vitals timeseries: %w", err)
 		}
-		results = append(results, item)
+		byBucket[truncToUnit(item.Time, unit)] = item
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("read web vitals timeseries: %w", err)
+	}
+
+	buckets := buildSeriesBuckets(params.Start, params.End, unit)
+	results := make([]api.WebVitalSeriesPoint, 0, len(buckets))
+	for _, bucket := range buckets {
+		item := byBucket[bucket]
+		item.Time = bucket
+		results = append(results, item)
 	}
 	return results, nil
 }
@@ -477,10 +487,7 @@ func webVitalsDimensionExpr(dimension api.WebVitalDimension) (string, error) {
 }
 
 func webVitalsBucketUnit(start, end time.Time) string {
-	if end.Sub(start) <= 48*time.Hour {
-		return "hour"
-	}
-	return "day"
+	return truncUnitForRange(start, end)
 }
 
 func nullableNonEmptyString(value string) any {

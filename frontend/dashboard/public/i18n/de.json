@@ -640,6 +640,12 @@
     "searchPlaceholder": "Suchen...",
     "selectDateRange": "Datumsbereich auswählen",
     "seriesChartAria": "Zeitreihendiagramm mit Daten für die letzten {{count}} Intervalle",
+    "chartDesign": {
+      "label": "Diagrammtyp",
+      "area": "Fläche",
+      "line": "Linie",
+      "bar": "Balken"
+    },
     "switchToDarkModeAria": "In den dunklen Modus wechseln",
     "switchToLightModeAria": "In den hellen Modus wechseln",
     "timeRangeSelectorAria": "Zeitraumauswahl",
