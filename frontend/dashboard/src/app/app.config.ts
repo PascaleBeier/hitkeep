@@ -14,6 +14,7 @@ import { TranslocoHttpLoader } from './transloco-loader';
 import { providePreloadUserLang } from '@core/i18n/preload-user-lang';
 import { PrimeLocaleSyncService } from '@core/i18n/prime-locale-sync.service';
 import { DASHBOARD_LANGUAGE_CODES, DASHBOARD_LOCALE_MAPPING, DEFAULT_DASHBOARD_LANGUAGE, SOURCE_LOCALE } from '@core/i18n/supported-locales';
+import { DashboardTitleService } from '@services/dashboard-title.service';
 
 export const appConfig: ApplicationConfig = {
     providers: [
@@ -45,6 +46,7 @@ export const appConfig: ApplicationConfig = {
             langToLocaleMapping: DASHBOARD_LOCALE_MAPPING
         }),
         provideEnvironmentInitializer(() => inject(PrimeLocaleSyncService)),
+        provideEnvironmentInitializer(() => inject(DashboardTitleService)),
         providePreloadUserLang()
     ]
 };
