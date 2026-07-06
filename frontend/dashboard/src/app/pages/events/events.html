@@ -7,14 +7,7 @@
         </ng-template>
     </app-page-header>
 
-    <app-range-toolbar
-        [timeRanges]="timeRanges()"
-        [selectedRange]="selectedRange()"
-        [customRangeDates]="customRangeDates()"
-        [loading]="isLoading()"
-        (selectedRangeChange)="selectedRange.set($event)"
-        (customRangeDatesChange)="customRangeDates.set($event)"
-    >
+    <app-report-range-toolbar [loading]="isLoading()">
         <a
             toolbar-right
             pButton
@@ -28,7 +21,7 @@
             [attr.aria-label]="'events.docsAction' | transloco"
             class="p-button-rounded p-button-secondary"
         ></a>
-    </app-range-toolbar>
+    </app-report-range-toolbar>
 
     @if (noSite()) {
     <div class="flex flex-col items-center justify-center h-[50vh] gap-4">

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, linkedSignal, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { finalize, forkJoin } from 'rxjs';
@@ -11,7 +11,7 @@ import { SplitButtonModule } from 'primeng/splitbutton';
 import { MenuItem } from 'primeng/api';
 import { SiteService } from '@features/sites/services/site.service';
 import { AnalyticsService, EventDimensionFilter } from '@core/services/analytics.service';
-import { DEFAULT_RANGE_OPTIONS, isShortRange as isShortDateRange, RangeOption, RangeToolbar, resolveDateRange, selectDefaultRange } from '@components/range-toolbar/range-toolbar';
+import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { SeriesChart, SeriesChartPoint, SeriesDefinition } from '@features/analytics/components/series-chart';
@@ -24,6 +24,7 @@ import { TakeoutDownloadService } from '@services/takeout-download.service';
 import { calcDelta, ChatbotMetricKey, ChatbotSeriesState, computeComparisonPeriod, createEmptySeries, safeRate, totalFor } from '@pages/ai-chatbots/ai-chatbots.utils';
 import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
 import { REALTIME_KINDS } from '@services/realtime.service';
+import { injectReportRange } from '@services/report-range-preferences.service';
 
 type ScopeKey = 'provider' | 'bot_id' | 'surface' | 'model';
 interface ScopeFilter {
@@ -50,7 +51,7 @@ const CHATBOT_EVENTS: Record<ChatbotMetricKey, string> = {
 
 @Component({
     selector: 'app-ai-chatbots',
-    imports: [FormsModule, TranslocoPipe, SelectModule, ButtonModule, CardModule, SplitButtonModule, RangeToolbar, PageHeader, PageHeaderLeft, PageBreadcrumb, SeriesChart, KpiCard, MetricCardGroup],
+    imports: [FormsModule, TranslocoPipe, SelectModule, ButtonModule, CardModule, SplitButtonModule, ReportRangeToolbar, PageHeader, PageHeaderLeft, PageBreadcrumb, SeriesChart, KpiCard, MetricCardGroup],
     templateUrl: './ai-chatbots.html',
     styleUrl: './ai-chatbots.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -64,14 +65,9 @@ export class AIChatbots {
     private readonly takeoutDownloadService = inject(TakeoutDownloadService);
     private readonly destroyRef = inject(DestroyRef);
     private readonly realtimeRefresh = inject(RealtimeRefreshCoordinator);
+    private readonly reportRange = injectReportRange();
     private readonly activeLanguage = injectActiveLang();
 
-    protected readonly timeRanges = signal<RangeOption[]>(DEFAULT_RANGE_OPTIONS);
-    protected readonly selectedRange = linkedSignal<RangeOption[], RangeOption>({
-        source: this.timeRanges,
-        computation: (ranges, previous) => selectDefaultRange(ranges, previous?.value)
-    });
-    protected readonly customRangeDates = signal<Date[] | null>(null);
     protected readonly comparisonRange = signal<{ from: string; to: string } | null>(null);
     private readonly realtimeRefreshKey = signal(0);
 
@@ -124,7 +120,7 @@ export class AIChatbots {
         ];
     });
 
-    protected readonly isShortRange = computed(() => isShortDateRange(this.selectedRange(), this.customRangeDates()));
+    protected readonly isShortRange = this.reportRange.isShortRange;
 
     protected readonly chartSeries = computed<SeriesChartPoint[]>(() => {
         const state = this.series();
@@ -390,7 +386,7 @@ export class AIChatbots {
 
         effect(() => {
             const site = this.activeSite();
-            this.selectedRange();
+            this.reportRange.selectedRange();
             this.selectedScopeKey();
             this.realtimeRefreshKey();
             if (!site) {
@@ -404,7 +400,7 @@ export class AIChatbots {
 
         effect(() => {
             const site = this.activeSite();
-            this.selectedRange();
+            this.reportRange.selectedRange();
             const scopeFilter = this.activeScopeFilter();
             const dimFilters = this.audienceDimFilters();
             this.realtimeRefreshKey();
@@ -612,7 +608,7 @@ export class AIChatbots {
     }
 
     protected getCurrentDateRange(): { from: string; to: string } | null {
-        return resolveDateRange(this.selectedRange(), this.customRangeDates());
+        return this.reportRange.currentDateRange();
     }
 
     private totalFor(key: ChatbotMetricKey, state: ChatbotSeriesState): number {

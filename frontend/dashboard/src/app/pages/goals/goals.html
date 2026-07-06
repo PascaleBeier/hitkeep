@@ -8,17 +8,9 @@
         </ng-template>
     </app-page-header>
 
-    <app-range-toolbar
-        [timeRanges]="timeRanges()"
-        [selectedRange]="selectedRange()"
-        [customRangeDates]="goalFilterForm.customRangeDates().value()"
-        [loading]="isRefreshing()"
-        (selectedRangeChange)="selectedRange.set($event)"
-        (customRangeDatesChange)="goalFilterForm.customRangeDates().control().setValue($event)"
-        (refresh)="refreshStats()"
-    >
+    <app-report-range-toolbar [loading]="isRefreshing()" (refresh)="refreshStats()">
         <p-button toolbar-right icon="pi pi-plus" [label]="'goals.manageAction' | transloco" (onClick)="openGoalManager()" class="p-button-rounded p-button-secondary" size="small"> </p-button>
-    </app-range-toolbar>
+    </app-report-range-toolbar>
 
     @if (siteService.isLoading()) {
     <div class="flex items-center gap-2 text-sm text-[var(--p-text-muted-color)]">

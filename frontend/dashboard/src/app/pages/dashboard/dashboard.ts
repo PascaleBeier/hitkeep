@@ -1,4 +1,4 @@
-import { Component, effect, inject, signal, computed, linkedSignal, ChangeDetectionStrategy, DestroyRef } from '@angular/core';
+import { Component, effect, inject, signal, computed, ChangeDetectionStrategy, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { injectActiveLang } from '@core/i18n/active-lang';
@@ -39,7 +39,8 @@ import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/
 import { WorkflowProgress, type WorkflowProgressStep } from '@components/workflow-progress/workflow-progress';
 import { KpiCard } from '@features/analytics/components/kpi-card';
 import { ShareService } from '@services/share.service';
-import { DEFAULT_RANGE_OPTIONS, isShortRange as isShortDateRange, RangeOption, RangeToolbar, resolveDateRange, selectDefaultRange, translateRangeLabel } from '@components/range-toolbar/range-toolbar';
+import { translateRangeLabel } from '@components/range-toolbar/range-toolbar';
+import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
 import { SiteSettingsService } from '@services/site-settings.service';
 import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
 import { buildTakeoutExportMenuItems, DEFAULT_HITS_EXPORT_FORMAT, TakeoutExportFormat } from '@core/export/export-formats';
@@ -48,6 +49,7 @@ import { AddSiteDialog } from '@features/sites/components/add-site-dialog';
 import { TeamService } from '@services/team.service';
 import { OnboardingService, OnboardingStep } from '@services/onboarding.service';
 import { browserAppUrl } from '@core/interceptors/base-path.interceptor';
+import { injectReportRange } from '@services/report-range-preferences.service';
 
 type MetricFilterType = 'path' | 'referrer' | 'device' | 'country' | 'city' | 'provider' | 'asn' | 'browser' | 'language';
 interface MetricFilter {
@@ -85,7 +87,7 @@ interface KpiCardData {
         PageHeaderLeft,
         PageBreadcrumb,
         WorkflowProgress,
-        RangeToolbar,
+        ReportRangeToolbar,
         RelativeDateTime,
         KpiCard,
         TrafficChart,
@@ -116,14 +118,9 @@ export class Dashboard {
     private onboarding = inject(OnboardingService);
     private document = inject(DOCUMENT);
     private realtimeRefresh = inject(RealtimeRefreshCoordinator);
+    protected readonly reportRange = injectReportRange();
     private readonly activeLanguage = injectActiveLang();
     private statsQuery = injectStatsQuery();
-    protected timeRanges = signal<RangeOption[]>(DEFAULT_RANGE_OPTIONS);
-    protected selectedRange = linkedSignal<RangeOption[], RangeOption>({
-        source: this.timeRanges,
-        computation: (ranges, previous) => selectDefaultRange(ranges, previous?.value)
-    });
-    protected readonly customRangeDates = signal<Date[] | null>(null);
     protected isShareMode = computed(() => this.shareService.isShareMode());
     protected stats = this.statsQuery.stats;
     protected isStatsLoading = this.statsQuery.isLoading;
@@ -462,16 +459,16 @@ export class Dashboard {
     private previousKpiSnapshot: Record<KpiMetricID, number> | null = null;
     private lastHandledStatsResultSequence = 0;
     private kpiHighlightTimer: ReturnType<typeof setTimeout> | null = null;
-    protected isShortRange = computed(() => isShortDateRange(this.selectedRange(), this.customRangeDates()));
+    protected readonly isShortRange = this.reportRange.isShortRange;
     protected chartTitle = computed(() => {
         this.activeLanguage();
-        const range = this.selectedRange();
+        const range = this.reportRange.selectedRange();
 
         if (range.value !== 'custom') {
             return this.transloco.translate('dashboard.chartTitleWithRange', { range: range.label ?? translateRangeLabel(this.transloco, range.value) });
         }
 
-        const dates = this.customRangeDates();
+        const dates = this.reportRange.customRangeDates();
         if (dates && dates.length === 2 && dates[0] && dates[1]) {
             const start = this.localeService.localizeDate(dates[0], undefined, { month: 'short', day: 'numeric' });
             const end = this.localeService.localizeDate(dates[1], undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -692,7 +689,7 @@ export class Dashboard {
     }
 
     protected getCurrentDateRange() {
-        return resolveDateRange(this.selectedRange(), this.customRangeDates());
+        return this.reportRange.currentDateRange();
     }
 
     protected formatDuration(seconds: number): string {

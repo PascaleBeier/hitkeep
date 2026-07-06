@@ -7,15 +7,7 @@
         </ng-template>
     </app-page-header>
 
-    <app-range-toolbar
-        [timeRanges]="timeRanges()"
-        [selectedRange]="selectedRange()"
-        [customRangeDates]="customRangeDates()"
-        [loading]="isLoading()"
-        (selectedRangeChange)="selectedRange.set($event)"
-        (customRangeDatesChange)="customRangeDates.set($event)"
-        (refresh)="refreshData()"
-    >
+    <app-report-range-toolbar [loading]="isLoading()" (refresh)="refreshData()">
         <a
             toolbar-right
             pButton
@@ -29,7 +21,7 @@
             [attr.aria-label]="'ecommerce.docsAction' | transloco"
             class="p-button-rounded p-button-secondary"
         ></a>
-    </app-range-toolbar>
+    </app-report-range-toolbar>
 
     @if (siteService.isLoading()) {
     <div class="flex items-center gap-2 text-sm text-[var(--p-text-muted-color)]">
