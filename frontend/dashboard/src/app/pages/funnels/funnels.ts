@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, linkedSignal, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, signal, untracked } from '@angular/core';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { compatForm } from '@angular/forms/signals/compat';
@@ -20,10 +20,11 @@ import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/
 import { SeriesChart, SeriesDefinition, SeriesChartPoint } from '@features/analytics/components/series-chart';
 import { FunnelSeriesPoint } from '@models/analytics.types';
 import { KpiCard } from '@features/analytics/components/kpi-card';
-import { DEFAULT_RANGE_OPTIONS, isShortRange as isShortDateRange, RangeOption, RangeToolbar, resolveDateRange, selectDefaultRange } from '@components/range-toolbar/range-toolbar';
+import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
 import { finalize } from 'rxjs';
 import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
 import { REALTIME_FUNNEL_KINDS } from '@services/realtime.service';
+import { injectReportRange } from '@services/report-range-preferences.service';
 
 type MetricFilterType = 'path' | 'referrer' | 'device' | 'country' | 'city' | 'provider' | 'asn';
 interface MetricFilter {
@@ -34,7 +35,7 @@ interface MetricFilter {
 @Component({
     selector: 'app-funnels',
     standalone: true,
-    imports: [ReactiveFormsModule, ButtonModule, CardModule, SelectModule, PageHeader, PageHeaderLeft, PageBreadcrumb, RangeToolbar, SeriesChart, KpiCard, MetricCardGroup, FunnelList, FunnelManager, FunnelViewer, TranslocoPipe],
+    imports: [ReactiveFormsModule, ButtonModule, CardModule, SelectModule, PageHeader, PageHeaderLeft, PageBreadcrumb, ReportRangeToolbar, SeriesChart, KpiCard, MetricCardGroup, FunnelList, FunnelManager, FunnelViewer, TranslocoPipe],
     templateUrl: './funnels.html',
     styleUrl: './funnels.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -46,20 +47,15 @@ export class Funnels {
     private transloco = inject(TranslocoService);
     private destroyRef = inject(DestroyRef);
     private realtimeRefresh = inject(RealtimeRefreshCoordinator);
+    private readonly reportRange = injectReportRange();
     private readonly activeLanguage = injectActiveLang();
     private statsQuery = injectStatsQuery();
 
-    protected timeRanges = signal<RangeOption[]>(DEFAULT_RANGE_OPTIONS);
-    protected selectedRange = linkedSignal<RangeOption[], RangeOption>({
-        source: this.timeRanges,
-        computation: (ranges, previous) => selectDefaultRange(ranges, previous?.value)
-    });
     private readonly funnelFilterFormModel = signal({
-        funnelFilter: new FormControl<{ id: string; name: string } | null>(null),
-        customRangeDates: new FormControl<Date[] | null>(null)
+        funnelFilter: new FormControl<{ id: string; name: string } | null>(null)
     });
     protected readonly funnelFilterForm = compatForm(this.funnelFilterFormModel);
-    protected isShortRange = computed(() => isShortDateRange(this.selectedRange(), this.funnelFilterForm.customRangeDates().value()));
+    protected readonly isShortRange = this.reportRange.isShortRange;
     protected isFunnelManagerVisible = signal(false);
     protected isFunnelViewerVisible = signal(false);
     protected selectedFunnel = signal<Funnel | null>(null);
@@ -493,7 +489,7 @@ export class Funnels {
     }
 
     protected getCurrentDateRange() {
-        return resolveDateRange(this.selectedRange(), this.funnelFilterForm.customRangeDates().value());
+        return this.reportRange.currentDateRange();
     }
 
     openFunnelManager() {
@@ -524,6 +520,6 @@ export class Funnels {
     getDateRange() {
         const range = this.getCurrentDateRange();
         if (range) return range;
-        return resolveDateRange(selectDefaultRange(this.timeRanges()), null)!;
+        return this.reportRange.defaultDateRange();
     }
 }

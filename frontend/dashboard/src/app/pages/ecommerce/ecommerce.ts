@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, linkedSignal, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, signal } from '@angular/core';
 import { DOCUMENT, NgOptimizedImage } from '@angular/common';
 import { ReactiveFormsModule } from '@angular/forms';
 import { finalize, forkJoin } from 'rxjs';
@@ -17,13 +17,14 @@ import { AnalyticsService } from '@core/services/analytics.service';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { KpiCard } from '@features/analytics/components/kpi-card';
-import { DEFAULT_RANGE_OPTIONS, isShortRange as isShortDateRange, RangeOption, RangeToolbar, resolveDateRange, selectDefaultRange } from '@components/range-toolbar/range-toolbar';
+import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
 import { MetricCardGroup, MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
 import { SeriesChart, SeriesChartPoint, SeriesDefinition } from '@features/analytics/components/series-chart';
 import { EcommerceProductStat, EcommerceSeriesPoint, EcommerceSourceStat, EcommerceSummary, MetricStat, SiteStats } from '@models/analytics.types';
 import { browserAppUrl } from '@core/interceptors/base-path.interceptor';
 import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
 import { REALTIME_EVENT_KINDS } from '@services/realtime.service';
+import { injectReportRange } from '@services/report-range-preferences.service';
 
 type MetricFilterType = 'referrer' | 'device' | 'country' | 'city' | 'provider' | 'asn' | 'utm_source';
 
@@ -53,7 +54,7 @@ interface ProductFilter {
         PageHeader,
         PageHeaderLeft,
         PageBreadcrumb,
-        RangeToolbar,
+        ReportRangeToolbar,
         KpiCard,
         MetricCardGroup,
         SeriesChart
@@ -71,6 +72,7 @@ export class EcommercePage {
     private document = inject(DOCUMENT);
     private destroyRef = inject(DestroyRef);
     private realtimeRefresh = inject(RealtimeRefreshCoordinator);
+    private readonly reportRange = injectReportRange();
     private readonly activeLanguage = injectActiveLang();
 
     protected readonly summary = signal<EcommerceSummary | null>(null);
@@ -81,13 +83,7 @@ export class EcommercePage {
     protected readonly isLoading = signal(false);
     private readonly realtimeRefreshKey = signal(0);
 
-    protected readonly timeRanges = signal<RangeOption[]>(DEFAULT_RANGE_OPTIONS);
-    protected readonly selectedRange = linkedSignal<RangeOption[], RangeOption>({
-        source: this.timeRanges,
-        computation: (ranges, previous) => selectDefaultRange(ranges, previous?.value)
-    });
-    protected readonly customRangeDates = signal<Date[] | null>(null);
-    protected readonly isShortRange = computed(() => isShortDateRange(this.selectedRange(), this.customRangeDates()));
+    protected readonly isShortRange = this.reportRange.isShortRange;
 
     protected readonly activeFilters = signal<MetricFilter[]>([]);
     protected readonly selectedProduct = signal<ProductFilter | null>(null);
@@ -484,7 +480,7 @@ export class EcommercePage {
     }
 
     private getCurrentDateRange() {
-        return resolveDateRange(this.selectedRange(), this.customRangeDates());
+        return this.reportRange.currentDateRange();
     }
 
     private normalizeUrl(raw: string | null | undefined): URL | null {

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, linkedSignal, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
@@ -9,7 +9,7 @@ import { SiteService } from '@features/sites/services/site.service';
 import { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { EmptyState } from '@components/molecules/empty-state';
 import { PageFrame } from '@components/page-frame/page-frame';
-import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar, resolveDateRange, selectDefaultRange } from '@components/range-toolbar/range-toolbar';
+import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
 import { INSTANCE_CAPABILITIES, SITE_CAPABILITIES } from '@core/access/capabilities';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { AdminSystemService, SystemAIStatus } from '@services/admin-system.service';
@@ -17,6 +17,7 @@ import { Opportunity, OpportunityStatus, OpportunitiesService } from '@services/
 import { AccessService } from '@services/access.service';
 import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
 import { REALTIME_OPPORTUNITY_KINDS } from '@services/realtime.service';
+import { injectReportRange } from '@services/report-range-preferences.service';
 import { OpportunityCard } from './opportunity-card';
 import { OpportunityDetailDrawer } from './opportunity-detail-drawer';
 import { OpportunityFilterRail } from './opportunity-filter-rail';
@@ -24,7 +25,7 @@ import { OpportunityEvidenceView, OpportunityFilter, OpportunityFilterItem, Oppo
 
 @Component({
     selector: 'app-opportunities',
-    imports: [TranslocoPipe, ButtonModule, MessageModule, TagModule, PageFrame, EmptyState, RangeToolbar, OpportunityFilterRail, OpportunityCard, OpportunityDetailDrawer],
+    imports: [TranslocoPipe, ButtonModule, MessageModule, TagModule, PageFrame, EmptyState, ReportRangeToolbar, OpportunityFilterRail, OpportunityCard, OpportunityDetailDrawer],
     templateUrl: './opportunities.html',
     styleUrl: './opportunities.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -37,14 +38,9 @@ export class OpportunitiesPage {
     private readonly transloco = inject(TranslocoService);
     private readonly destroyRef = inject(DestroyRef);
     private readonly realtimeRefresh = inject(RealtimeRefreshCoordinator);
+    private readonly reportRange = injectReportRange();
     private readonly activeLanguage = injectActiveLang();
 
-    protected readonly timeRanges = signal<RangeOption[]>(DEFAULT_RANGE_OPTIONS);
-    protected readonly selectedRange = linkedSignal<RangeOption[], RangeOption>({
-        source: this.timeRanges,
-        computation: (ranges, previous) => selectDefaultRange(ranges, previous?.value)
-    });
-    protected readonly customRangeDates = signal<Date[] | null>(null);
     protected readonly typeFilter = signal<OpportunityFilter>('all');
     protected readonly statusFilter = signal<StatusFilter>('all');
     protected readonly selectedOpportunityId = signal<string | null>(null);
@@ -424,6 +420,6 @@ export class OpportunitiesPage {
     }
 
     private getCurrentDateRange() {
-        return resolveDateRange(this.selectedRange(), this.customRangeDates());
+        return this.reportRange.currentDateRange();
     }
 }

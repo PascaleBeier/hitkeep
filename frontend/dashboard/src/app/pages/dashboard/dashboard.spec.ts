@@ -13,6 +13,7 @@ import { HitService } from '@features/hits/services/hit.service';
 import { TeamService } from '@services/team.service';
 import { OnboardingService } from '@services/onboarding.service';
 import { GoogleSearchConsoleService } from '@services/google-search-console.service';
+import { ReportRangePreferencesService } from '@services/report-range-preferences.service';
 
 describe('Dashboard', () => {
     let component: Dashboard;
@@ -73,6 +74,8 @@ describe('Dashboard', () => {
     };
 
     beforeEach(async () => {
+        localStorage.clear();
+
         await TestBed.configureTestingModule({
             imports: [
                 Dashboard,
@@ -120,9 +123,17 @@ describe('Dashboard', () => {
     });
 
     it('defaults the report range to today', () => {
-        const dashboard = component as unknown as { selectedRange: () => { value: string } };
+        const reportRange = TestBed.inject(ReportRangePreferencesService);
 
-        expect(dashboard.selectedRange().value).toBe('today');
+        expect(reportRange.selectedRange().value).toBe('today');
+    });
+
+    it('updates the shared report range state', () => {
+        const reportRange = TestBed.inject(ReportRangePreferencesService);
+
+        reportRange.selectRange({ value: { value: '7d' } });
+
+        expect(reportRange.selectedRange().value).toBe('7d');
     });
 
     it('should show team onboarding copy when the active team has no sites', () => {

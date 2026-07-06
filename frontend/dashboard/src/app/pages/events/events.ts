@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, linkedSignal, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, signal, untracked } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { TranslocoLocaleService } from '@jsverse/transloco-locale';
@@ -10,7 +10,7 @@ import { MessageModule } from 'primeng/message';
 import { SiteService } from '@features/sites/services/site.service';
 import { AnalyticsService, EventDimensionFilter } from '@core/services/analytics.service';
 import { MetricCardConfig, MetricCardGroup, MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
-import { DEFAULT_RANGE_OPTIONS, isShortRange as isShortDateRange, RangeOption, RangeToolbar, resolveDateRange, selectDefaultRange } from '@components/range-toolbar/range-toolbar';
+import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { SeriesChart, SeriesDefinition, SeriesChartPoint } from '@features/analytics/components/series-chart';
@@ -19,6 +19,7 @@ import { finalize } from 'rxjs';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
 import { REALTIME_EVENT_KINDS } from '@services/realtime.service';
+import { injectReportRange } from '@services/report-range-preferences.service';
 
 interface EventFilterChip {
     key: string;
@@ -45,7 +46,7 @@ const AUTOMATIC_EVENT_NAMES = Object.keys(AUTOMATIC_EVENT_META);
 
 @Component({
     selector: 'app-events',
-    imports: [FormsModule, ReactiveFormsModule, TranslocoPipe, SelectModule, CardModule, SkeletonModule, ButtonModule, MessageModule, MetricCardGroup, RangeToolbar, PageHeader, PageHeaderLeft, PageBreadcrumb, SeriesChart],
+    imports: [FormsModule, ReactiveFormsModule, TranslocoPipe, SelectModule, CardModule, SkeletonModule, ButtonModule, MessageModule, MetricCardGroup, ReportRangeToolbar, PageHeader, PageHeaderLeft, PageBreadcrumb, SeriesChart],
     templateUrl: './events.html',
     styleUrl: './events.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -58,15 +59,10 @@ export class Events {
     private transloco = inject(TranslocoService);
     private destroyRef = inject(DestroyRef);
     private realtimeRefresh = inject(RealtimeRefreshCoordinator);
+    private readonly reportRange = injectReportRange();
     private readonly activeLanguage = injectActiveLang();
 
-    protected timeRanges = signal<RangeOption[]>(DEFAULT_RANGE_OPTIONS);
-    protected selectedRange = linkedSignal<RangeOption[], RangeOption>({
-        source: this.timeRanges,
-        computation: (ranges, previous) => selectDefaultRange(ranges, previous?.value)
-    });
-    protected readonly customRangeDates = signal<Date[] | null>(null);
-    protected isShortRange = computed(() => isShortDateRange(this.selectedRange(), this.customRangeDates()));
+    protected readonly isShortRange = this.reportRange.isShortRange;
 
     protected eventNames = signal<string[]>([]);
     private realtimeRefreshKey = signal(0);
@@ -316,7 +312,7 @@ export class Events {
         // Load event names when site/range changes; reset selection
         effect(() => {
             const site = this.activeSite();
-            this.selectedRange();
+            this.reportRange.selectedRange();
             this.realtimeRefreshKey();
             if (!site) return;
             const dates = this.getCurrentDateRange();
@@ -328,7 +324,7 @@ export class Events {
         effect(() => {
             const site = this.activeSite();
             const eventName = this.selectedEvent();
-            this.selectedRange();
+            this.reportRange.selectedRange();
             this.realtimeRefreshKey();
             if (!site || !eventName) {
                 this.propertyKeys.set([]);
@@ -362,7 +358,7 @@ export class Events {
             const propKey = this.selectedPropertyKey();
             const propValue = this.selectedPropertyValue();
             const dimFilters = this.audienceDimFilters();
-            this.selectedRange();
+            this.reportRange.selectedRange();
             this.realtimeRefreshKey();
 
             if (!site || !eventName) {
@@ -388,7 +384,7 @@ export class Events {
             const site = this.activeSite();
             const eventName = this.selectedEvent();
             const propertyKey = this.selectedPropertyKey();
-            this.selectedRange();
+            this.reportRange.selectedRange();
             this.realtimeRefreshKey();
             if (!site || !eventName || !propertyKey) {
                 this.breakdown.set([]);
@@ -406,7 +402,7 @@ export class Events {
             const propKey = this.selectedPropertyKey();
             const propValue = this.selectedPropertyValue();
             const dimFilters = this.audienceDimFilters();
-            this.selectedRange();
+            this.reportRange.selectedRange();
             this.realtimeRefreshKey();
 
             if (!site || !eventName) {
@@ -515,7 +511,7 @@ export class Events {
     }
 
     protected getCurrentDateRange(): { from: string; to: string } | null {
-        return resolveDateRange(this.selectedRange(), this.customRangeDates());
+        return this.reportRange.currentDateRange();
     }
 
     private loadEventNames(siteId: string, from: string, to: string) {

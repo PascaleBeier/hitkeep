@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, linkedSignal, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, signal } from '@angular/core';
 import { DOCUMENT, NgOptimizedImage } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { finalize, forkJoin } from 'rxjs';
@@ -18,12 +18,13 @@ import { AnalyticsService } from '@core/services/analytics.service';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
-import { DEFAULT_RANGE_OPTIONS, isShortRange as isShortDateRange, RangeOption, RangeToolbar, resolveDateRange, selectDefaultRange } from '@components/range-toolbar/range-toolbar';
+import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
 import { SeriesChart, SeriesChartPoint, SeriesDefinition } from '@features/analytics/components/series-chart';
 import { browserAppUrl } from '@core/interceptors/base-path.interceptor';
 import { WebVitalDimension, WebVitalDimensionRow, WebVitalMetric, WebVitalMetricBreakdown, WebVitalPageRow, WebVitalRating, WebVitalSeriesPoint, WebVitalSummaryMetric } from '@models/analytics.types';
 import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
 import { REALTIME_KINDS } from '@services/realtime.service';
+import { injectReportRange } from '@services/report-range-preferences.service';
 
 interface SelectOption<T> {
     label: string;
@@ -85,7 +86,7 @@ const WEB_VITAL_THRESHOLDS: Record<WebVitalMetric, { good: number; poor: number 
         PageHeader,
         PageHeaderLeft,
         PageBreadcrumb,
-        RangeToolbar,
+        ReportRangeToolbar,
         SeriesChart
     ],
     templateUrl: './web-vitals.html',
@@ -102,6 +103,7 @@ export class WebVitalsPage {
     private readonly document = inject(DOCUMENT);
     private readonly destroyRef = inject(DestroyRef);
     private readonly realtimeRefresh = inject(RealtimeRefreshCoordinator);
+    private readonly reportRange = injectReportRange();
 
     protected readonly summary = signal<WebVitalSummaryMetric[]>([]);
     protected readonly series = signal<WebVitalSeriesPoint[]>([]);
@@ -120,13 +122,7 @@ export class WebVitalsPage {
         return domain ? browserAppUrl(this.document, `/api/favicon/${encodeURIComponent(domain)}`) : '';
     });
 
-    protected readonly timeRanges = signal<RangeOption[]>(DEFAULT_RANGE_OPTIONS);
-    protected readonly selectedRange = linkedSignal<RangeOption[], RangeOption>({
-        source: this.timeRanges,
-        computation: (ranges, previous) => selectDefaultRange(ranges, previous?.value)
-    });
-    protected readonly customRangeDates = signal<Date[] | null>(null);
-    protected readonly isShortRange = computed(() => isShortDateRange(this.selectedRange(), this.customRangeDates()));
+    protected readonly isShortRange = this.reportRange.isShortRange;
 
     protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
         this.activeLanguage();
@@ -499,6 +495,6 @@ export class WebVitalsPage {
     }
 
     private getCurrentDateRange() {
-        return resolveDateRange(this.selectedRange(), this.customRangeDates());
+        return this.reportRange.currentDateRange();
     }
 }
