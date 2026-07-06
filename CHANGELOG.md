@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.9.1](https://github.com/PascaleBeier/hitkeep/compare/v2.9.0...v2.9.1) (2026-07-06)
+
+
+### Bug Fixes
+
+* **frontend:** persist report ranges ([#230](https://github.com/PascaleBeier/hitkeep/issues/230)) ([1ee335d](https://github.com/PascaleBeier/hitkeep/commit/1ee335da5fab6f2d01f1484380356da5b8a5bbea)), closes [#228](https://github.com/PascaleBeier/hitkeep/issues/228)
+* use descriptive dashboard browser titles ([0dc1459](https://github.com/PascaleBeier/hitkeep/commit/0dc14594a55f33761d15ef3df834aba310e1f0af)), closes [#229](https://github.com/PascaleBeier/hitkeep/issues/229)
+
 ## [2.9.0](https://github.com/PascaleBeier/hitkeep/compare/v2.8.1...v2.9.0) (2026-07-04)
 
 
