@@ -1,5 +1,5 @@
 import { Clipboard } from '@angular/cdk/clipboard';
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, linkedSignal, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormControl, FormGroup, FormsModule, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -28,7 +28,7 @@ import { DialogShell } from '@components/dialog-shell/dialog-shell';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageState } from '@components/page-state/page-state';
-import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar, resolveDateRange, selectDefaultRange } from '@components/range-toolbar/range-toolbar';
+import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
 import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
 import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
 import { KpiCard } from '@features/analytics/components/kpi-card';
@@ -40,6 +40,7 @@ import { SiteService } from '@features/sites/services/site.service';
 import { MetricStat, QRCode, QRCodeRequest, QRCodeShareLink, QRCodeStyle, QRCodeSummary, Site } from '@models/analytics.types';
 import { QRCodesService, buildQRCodeDestination, qrExportFilename } from '@services/qr-codes.service';
 import { ShareService } from '@services/share.service';
+import { injectReportRange } from '@services/report-range-preferences.service';
 
 type QRMetricGroup = 'pages' | 'referrers' | 'devices' | 'countries';
 type QRExportSize = 1024 | 2048 | 4096;
@@ -88,7 +89,7 @@ const QR_CORNER_OPTIONS = ['square', 'dot', 'extra-rounded'] as const;
         PageState,
         RelativeDateTime,
         TableRowActions,
-        RangeToolbar,
+        ReportRangeToolbar,
         KpiCard,
         MetricCardGroup,
         SeriesChart,
@@ -111,6 +112,7 @@ export class QRCodesPage {
     private readonly activeLanguage = injectActiveLang();
     private readonly clipboard = inject(Clipboard);
     private readonly confirmation = inject(ConfirmationService);
+    private readonly reportRange = injectReportRange();
 
     protected readonly qrs = signal<QRCode[]>([]);
     protected readonly summary = signal<QRCodeSummary | null>(null);
@@ -143,12 +145,6 @@ export class QRCodesPage {
 
     private readonly routeQRID = toSignal(this.route.paramMap.pipe(map((params) => params.get('qrID'))), { initialValue: this.route.snapshot.paramMap.get('qrID') });
 
-    protected readonly timeRanges = signal<RangeOption[]>(DEFAULT_RANGE_OPTIONS);
-    protected readonly selectedRange = linkedSignal<RangeOption[], RangeOption>({
-        source: this.timeRanges,
-        computation: (ranges, previous) => selectDefaultRange(ranges, previous?.value)
-    });
-    protected readonly customRangeDates = signal<Date[] | null>(null);
     protected readonly isShareMode = computed(() => this.share.isShareMode());
     protected readonly isDetailRoute = computed(() => !!this.routeQRID());
 
@@ -867,7 +863,7 @@ export class QRCodesPage {
     }
 
     private currentDateRange(): { from: string; to: string } | null {
-        return resolveDateRange(this.selectedRange(), this.customRangeDates());
+        return this.reportRange.currentDateRange();
     }
 
     private urlValidator(control: AbstractControl<string>): ValidationErrors | null {

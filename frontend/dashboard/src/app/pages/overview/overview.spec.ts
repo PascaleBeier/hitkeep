@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { Router, provideRouter } from '@angular/router';
+import { By } from '@angular/platform-browser';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { provideTranslocoLocale } from '@jsverse/transloco-locale';
 import { of } from 'rxjs';
@@ -11,6 +12,8 @@ import { OverviewPage } from '@pages/overview/overview';
 import { SiteService } from '@features/sites/services/site.service';
 import { StatsService } from '@features/analytics/services/stats.service';
 import { SiteOverviewStats, SitesOverviewStatsResponse } from '@models/analytics.types';
+import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar } from '@components/range-toolbar/range-toolbar';
+import { ReportRangePreferencesService } from '@services/report-range-preferences.service';
 
 describe('OverviewPage', () => {
     let fixture: ComponentFixture<OverviewPage>;
@@ -234,10 +237,32 @@ describe('OverviewPage', () => {
         const betaCard = cards.find((card) => card.textContent?.includes('beta.example.com'));
         expect(betaCard).toBeTruthy();
 
-        betaCard?.querySelector('button')?.click();
+        betaCard?.click();
         fixture.detectChanges();
 
         expect(siteService.activeSite()?.id).toBe('site-beta');
+        expect(navigate).toHaveBeenCalledWith('/dashboard');
+    });
+
+    it('opens a site dashboard from keyboard activation on a site card', () => {
+        vi.spyOn(statsService, 'fetchSitesOverviewStats').mockReturnValue(of(overviewResponse(statsWithTraffic('site-alpha', 120, 45))));
+        siteService.applySites([
+            {
+                id: 'site-alpha',
+                user_id: 'user-1',
+                domain: 'alpha.example.com',
+                created_at: '2026-01-01T00:00:00Z'
+            }
+        ]);
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+        fixture = TestBed.createComponent(OverviewPage);
+        fixture.detectChanges();
+
+        const card = fixture.nativeElement.querySelector('.hk-overview-card__content[role="link"]') as HTMLElement;
+        card.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+        fixture.detectChanges();
+
+        expect(siteService.activeSite()?.id).toBe('site-alpha');
         expect(navigate).toHaveBeenCalledWith('/dashboard');
     });
 
@@ -288,10 +313,40 @@ describe('OverviewPage', () => {
         fixture.detectChanges();
 
         const searchLabel = fixture.nativeElement.querySelector('label[for="overview-site-search"]') as HTMLLabelElement;
-        const dashboardButtons = Array.from<HTMLButtonElement>(fixture.nativeElement.querySelectorAll('button[aria-label^="Open dashboard for"]'));
+        const dashboardLinks = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('.hk-overview-card__content[role="link"][aria-label^="Open dashboard for"]'));
 
         expect(searchLabel.textContent?.trim()).toBe('Filter sites');
-        expect(dashboardButtons.map((button) => button.getAttribute('aria-label'))).toEqual(['Open dashboard for alpha.example.com', 'Open dashboard for beta.example.com']);
+        expect(dashboardLinks.map((link) => link.getAttribute('aria-label'))).toEqual(['Open dashboard for alpha.example.com', 'Open dashboard for beta.example.com']);
+        expect(dashboardLinks.every((link) => link.getAttribute('tabindex') === '0')).toBe(true);
+    });
+
+    it('defaults the overview report range to the shared report default', () => {
+        fixture = TestBed.createComponent(OverviewPage);
+        fixture.detectChanges();
+
+        const reportRange = TestBed.inject(ReportRangePreferencesService);
+        expect(reportRange.selectedRange().value).toBe('today');
+    });
+
+    it('restores the last selected overview report range', () => {
+        localStorage.setItem('hitkeep.reportRange', JSON.stringify({ value: 'today' }));
+
+        fixture = TestBed.createComponent(OverviewPage);
+        fixture.detectChanges();
+
+        const reportRange = TestBed.inject(ReportRangePreferencesService);
+        expect(reportRange.selectedRange().value).toBe('today');
+    });
+
+    it('persists the selected overview report range', () => {
+        fixture = TestBed.createComponent(OverviewPage);
+        fixture.detectChanges();
+
+        const range = DEFAULT_RANGE_OPTIONS.find((option) => option.value === '7d') as RangeOption;
+        const toolbar = fixture.debugElement.query(By.directive(RangeToolbar)).componentInstance as RangeToolbar;
+        toolbar.rangeChange.emit({ value: range });
+
+        expect(JSON.parse(localStorage.getItem('hitkeep.reportRange') ?? '{}')).toEqual({ value: '7d' });
     });
 
     it('recomputes relative ranges when the overview is refreshed', () => {

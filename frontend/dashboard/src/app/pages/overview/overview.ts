@@ -14,7 +14,8 @@ import { MessageModule } from 'primeng/message';
 import { SelectModule } from 'primeng/select';
 import { SkeletonModule } from 'primeng/skeleton';
 import { injectActiveLang } from '@core/i18n/active-lang';
-import { DateRange, DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar, resolveDateRange } from '@components/range-toolbar/range-toolbar';
+import { DateRange } from '@components/range-toolbar/range-toolbar';
+import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { SiteFavicon } from '@features/sites/components/site-favicon';
@@ -22,6 +23,7 @@ import { SiteService } from '@features/sites/services/site.service';
 import { StatsService } from '@features/analytics/services/stats.service';
 import { ChartDataPoint, Site, SiteOverviewStats } from '@models/analytics.types';
 import { MainLayoutContextService } from '@layout/main-layout-context.service';
+import { injectReportRange } from '@services/report-range-preferences.service';
 
 type OverviewSortKey = 'domain' | 'pageviews' | 'visitors';
 type OverviewSiteStatus = 'loading' | 'ready' | 'error';
@@ -52,13 +54,12 @@ interface OverviewSiteRow {
     searchText: string;
 }
 
-const INITIAL_OVERVIEW_RANGE: RangeOption = DEFAULT_RANGE_OPTIONS.find((option) => option.value === '30d') ?? DEFAULT_RANGE_OPTIONS[0]!;
 const SPARKLINE_WIDTH = 160;
 const SPARKLINE_HEIGHT = 56;
 
 @Component({
     selector: 'app-overview-page',
-    imports: [FormsModule, ButtonModule, CardModule, IconFieldModule, InputIconModule, InputTextModule, MessageModule, PageBreadcrumb, PageHeader, PageHeaderLeft, RangeToolbar, SelectModule, SiteFavicon, SkeletonModule, TranslocoPipe],
+    imports: [FormsModule, ButtonModule, CardModule, IconFieldModule, InputIconModule, InputTextModule, MessageModule, PageBreadcrumb, PageHeader, PageHeaderLeft, ReportRangeToolbar, SelectModule, SiteFavicon, SkeletonModule, TranslocoPipe],
     templateUrl: './overview.html',
     styleUrl: './overview.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -71,13 +72,11 @@ export class OverviewPage {
     private readonly router = inject(Router);
     private readonly destroyRef = inject(DestroyRef);
     private readonly layoutContext = inject(MainLayoutContextService, { optional: true });
+    private readonly reportRange = injectReportRange();
     private readonly activeLanguage = injectActiveLang();
     private statsRequest: Subscription | null = null;
     private loadSequence = 0;
 
-    protected readonly timeRanges = signal<RangeOption[]>(DEFAULT_RANGE_OPTIONS);
-    protected readonly selectedRange = signal<RangeOption>(INITIAL_OVERVIEW_RANGE);
-    protected readonly customRangeDates = signal<Date[] | null>(null);
     protected readonly searchTerm = signal('');
     protected readonly sortValue = signal<OverviewSortKey>('domain');
     protected readonly siteStates = signal<Record<string, SiteStatsState>>({});
@@ -134,6 +133,15 @@ export class OverviewPage {
     protected openDashboard(site: Site): void {
         this.siteService.selectSite(site);
         void this.router.navigateByUrl('/dashboard');
+    }
+
+    protected openDashboardFromKeyboard(event: KeyboardEvent, site: Site): void {
+        if (event.key !== 'Enter' && event.key !== ' ') {
+            return;
+        }
+
+        event.preventDefault();
+        this.openDashboard(site);
     }
 
     private loadSiteStats(sites: Site[], range: DateRange | null): void {
@@ -250,6 +258,6 @@ export class OverviewPage {
     }
 
     private currentDateRange(): DateRange | null {
-        return resolveDateRange(this.selectedRange(), this.customRangeDates());
+        return this.reportRange.currentDateRange();
     }
 }

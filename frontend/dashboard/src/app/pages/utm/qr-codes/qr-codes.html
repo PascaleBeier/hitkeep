@@ -8,19 +8,11 @@
     </app-page-header>
 
     @if (isDetailRoute()) {
-    <app-range-toolbar
-        [timeRanges]="timeRanges()"
-        [selectedRange]="selectedRange()"
-        [customRangeDates]="customRangeDates()"
-        [loading]="isStatsLoading()"
-        (selectedRangeChange)="selectedRange.set($event)"
-        (customRangeDatesChange)="customRangeDates.set($event)"
-        (refresh)="refresh()"
-    >
+    <app-report-range-toolbar [loading]="isStatsLoading()" (refresh)="refresh()">
         @if (!isShareMode()) {
         <p-button toolbar-right icon="pi pi-plus" [label]="'qrCodes.actions.create' | transloco" size="small" (onClick)="openCreate()" />
         }
-    </app-range-toolbar>
+    </app-report-range-toolbar>
     } @if (siteService.isLoading() || isLoading()) {
     <div class="qr-codes-loading">
         <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>

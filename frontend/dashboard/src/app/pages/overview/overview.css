@@ -16,7 +16,7 @@
     --hk-ov-chart-line: color-mix(in srgb, var(--p-primary-color) 90%, var(--p-text-color));
 }
 
-app-range-toolbar + .hk-overview-toolbar {
+app-report-range-toolbar + .hk-overview-toolbar {
     margin-top: -0.75rem;
 }
 
@@ -56,6 +56,29 @@ app-range-toolbar + .hk-overview-toolbar {
     min-height: 17.5rem;
     flex-direction: column;
     gap: 0.875rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    outline: 0;
+    transition:
+        background-color 160ms ease,
+        box-shadow 160ms ease,
+        transform 160ms ease;
+}
+
+.hk-overview-card__content:hover {
+    background: color-mix(in srgb, var(--p-content-hover-background) 48%, transparent);
+}
+
+.hk-overview-card__content:focus-visible {
+    box-shadow:
+        0 0 0 2px var(--p-content-background),
+        0 0 0 4px var(--p-primary-color);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .hk-overview-card__content:hover {
+        transform: translateY(-1px);
+    }
 }
 
 .hk-overview-card__header,
@@ -170,6 +193,20 @@ app-range-toolbar + .hk-overview-toolbar {
 .hk-overview-card__footer {
     justify-content: flex-end;
     margin-top: auto;
+}
+
+.hk-overview-card__cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--p-primary-color);
+    font-size: 0.875rem;
+    font-weight: 650;
+    line-height: 1.2;
+}
+
+.hk-overview-card__cta i {
+    font-size: 0.75rem;
 }
 
 .hk-overview-empty {

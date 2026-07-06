@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, linkedSignal, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, signal, untracked } from '@angular/core';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { compatForm } from '@angular/forms/signals/compat';
@@ -20,10 +20,11 @@ import { PageState } from '@components/page-state/page-state';
 import { SeriesChart, SeriesDefinition, SeriesChartPoint } from '@features/analytics/components/series-chart';
 import { Goal, GoalSeriesPoint, SiteStats } from '@models/analytics.types';
 import { KpiCard } from '@features/analytics/components/kpi-card';
-import { DEFAULT_RANGE_OPTIONS, isShortRange as isShortDateRange, RangeOption, RangeToolbar, resolveDateRange, selectDefaultRange } from '@components/range-toolbar/range-toolbar';
+import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
 import { finalize } from 'rxjs';
 import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
 import { REALTIME_GOAL_KINDS } from '@services/realtime.service';
+import { injectReportRange } from '@services/report-range-preferences.service';
 
 type MetricFilterType = 'path' | 'referrer' | 'device' | 'country' | 'city' | 'provider' | 'asn';
 interface MetricFilter {
@@ -34,7 +35,7 @@ interface MetricFilter {
 @Component({
     selector: 'app-goals',
     standalone: true,
-    imports: [ReactiveFormsModule, ButtonModule, CardModule, SelectModule, PageHeader, PageHeaderLeft, PageBreadcrumb, PageState, RangeToolbar, SeriesChart, KpiCard, MetricCardGroup, GoalList, GoalManager, TranslocoPipe],
+    imports: [ReactiveFormsModule, ButtonModule, CardModule, SelectModule, PageHeader, PageHeaderLeft, PageBreadcrumb, PageState, ReportRangeToolbar, SeriesChart, KpiCard, MetricCardGroup, GoalList, GoalManager, TranslocoPipe],
     templateUrl: './goals.html',
     styleUrl: './goals.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -47,20 +48,15 @@ export class Goals {
     private transloco = inject(TranslocoService);
     private destroyRef = inject(DestroyRef);
     private realtimeRefresh = inject(RealtimeRefreshCoordinator);
+    private readonly reportRange = injectReportRange();
     private readonly activeLanguage = injectActiveLang();
     private statsQuery = injectStatsQuery();
 
-    protected timeRanges = signal<RangeOption[]>(DEFAULT_RANGE_OPTIONS);
-    protected selectedRange = linkedSignal<RangeOption[], RangeOption>({
-        source: this.timeRanges,
-        computation: (ranges, previous) => selectDefaultRange(ranges, previous?.value)
-    });
     private readonly goalFilterFormModel = signal({
-        goalFilter: new FormControl<{ id: string; name: string } | null>(null),
-        customRangeDates: new FormControl<Date[] | null>(null)
+        goalFilter: new FormControl<{ id: string; name: string } | null>(null)
     });
     protected readonly goalFilterForm = compatForm(this.goalFilterFormModel);
-    protected isShortRange = computed(() => isShortDateRange(this.selectedRange(), this.goalFilterForm.customRangeDates().value()));
+    protected readonly isShortRange = this.reportRange.isShortRange;
     protected isGoalManagerVisible = signal(false);
     protected goals = signal<Goal[]>([]);
     protected goalsLoading = signal(false);
@@ -480,6 +476,6 @@ export class Goals {
     }
 
     protected getCurrentDateRange() {
-        return resolveDateRange(this.selectedRange(), this.goalFilterForm.customRangeDates().value());
+        return this.reportRange.currentDateRange();
     }
 }
