@@ -3211,10 +3211,9 @@
   "cloud": {
     "retentionNotice": {
       "message": "I dati del piano gratuito sono conservati per {{count}} giorni.",
+      "hint": "Esegui l'upgrade per conservare l'intera cronologia dei visitatori e sbloccare più siti e posti nel team.",
       "upgradeAction": "Passa a Pro",
-      "compareAction": "Confronta i piani",
-      "dismissAction": "Chiudi avviso",
-      "checkoutError": "Non è stato possibile avviare il checkout. Riprova dalla fatturazione."
+      "dismissAction": "Chiudi avviso"
     }
   }
 }

@@ -3193,10 +3193,9 @@
   "cloud": {
     "retentionNotice": {
       "message": "Gegevens van het gratis plan worden {{count}} dagen bewaard.",
+      "hint": "Upgrade om je volledige bezoekersgeschiedenis te bewaren en meer sites en teamplekken te ontgrendelen.",
       "upgradeAction": "Upgrade naar Pro",
-      "compareAction": "Plannen vergelijken",
-      "dismissAction": "Melding sluiten",
-      "checkoutError": "Checkout kon niet worden gestart. Probeer het via facturering."
+      "dismissAction": "Melding sluiten"
     }
   }
 }

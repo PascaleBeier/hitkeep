@@ -3211,10 +3211,9 @@
   "cloud": {
     "retentionNotice": {
       "message": "Les données du forfait gratuit sont conservées pendant {{count}} jours.",
+      "hint": "Passez à l'offre supérieure pour conserver tout votre historique de visiteurs et débloquer plus de sites et de sièges d'équipe.",
       "upgradeAction": "Passer à Pro",
-      "compareAction": "Comparer les offres",
-      "dismissAction": "Fermer l’avis",
-      "checkoutError": "Impossible de lancer le paiement. Réessayez depuis la facturation."
+      "dismissAction": "Fermer l’avis"
     }
   }
 }

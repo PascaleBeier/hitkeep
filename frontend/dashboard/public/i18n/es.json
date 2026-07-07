@@ -3211,10 +3211,9 @@
   "cloud": {
     "retentionNotice": {
       "message": "Los datos del plan gratuito se conservan durante {{count}} días.",
+      "hint": "Mejora tu plan para conservar todo el historial de visitantes y desbloquear más sitios y asientos de equipo.",
       "upgradeAction": "Actualizar a Pro",
-      "compareAction": "Comparar planes",
-      "dismissAction": "Descartar aviso",
-      "checkoutError": "No se pudo iniciar el pago. Inténtalo desde facturación."
+      "dismissAction": "Descartar aviso"
     }
   }
 }

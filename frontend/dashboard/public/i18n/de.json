@@ -3211,10 +3211,9 @@
   "cloud": {
     "retentionNotice": {
       "message": "Daten im Free-Plan werden {{count}} Tage lang aufbewahrt.",
+      "hint": "Mit einem Upgrade behältst du deine gesamte Besucher-Historie und schaltest mehr Websites und Team-Plätze frei.",
       "upgradeAction": "Auf Pro upgraden",
-      "compareAction": "Pläne vergleichen",
-      "dismissAction": "Hinweis ausblenden",
-      "checkoutError": "Checkout konnte nicht gestartet werden. Versuche es über die Abrechnung."
+      "dismissAction": "Hinweis ausblenden"
     }
   }
 }

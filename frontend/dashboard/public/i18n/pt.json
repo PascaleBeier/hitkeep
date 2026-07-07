@@ -3187,10 +3187,9 @@
   "cloud": {
     "retentionNotice": {
       "message": "Os dados do plano gratuito são mantidos por {{count}} dias.",
+      "hint": "Faça upgrade para manter todo o histórico de visitantes e desbloquear mais sites e assentos de equipe.",
       "upgradeAction": "Fazer upgrade para Pro",
-      "compareAction": "Comparar planos",
-      "dismissAction": "Dispensar aviso",
-      "checkoutError": "Não foi possível iniciar o checkout. Tente novamente em faturamento."
+      "dismissAction": "Dispensar aviso"
     }
   }
 }

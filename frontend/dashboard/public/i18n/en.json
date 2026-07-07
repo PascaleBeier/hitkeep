@@ -3211,10 +3211,9 @@
   "cloud": {
     "retentionNotice": {
       "message": "Free plan data is retained for {{count}} days.",
+      "hint": "Upgrade to keep your full visitor history and unlock more sites and team seats.",
       "upgradeAction": "Upgrade to Pro",
-      "compareAction": "Compare plans",
-      "dismissAction": "Dismiss retention notice",
-      "checkoutError": "Could not start checkout. Try again from billing."
+      "dismissAction": "Dismiss retention notice"
     }
   }
 }
