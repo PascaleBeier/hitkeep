@@ -292,6 +292,48 @@ describe('OverviewPage', () => {
         expect(headings).toEqual(['beta.example.com', 'alpha.example.com']);
     });
 
+    it('remembers the selected sort order', () => {
+        vi.spyOn(statsService, 'fetchSitesOverviewStats').mockReturnValue(of(overviewResponse(statsWithTraffic('site-alpha', 30, 12), statsWithTraffic('site-beta', 120, 45))));
+        siteService.applySites([
+            {
+                id: 'site-alpha',
+                user_id: 'user-1',
+                domain: 'alpha.example.com',
+                created_at: '2026-01-01T00:00:00Z'
+            }
+        ]);
+        fixture = TestBed.createComponent(OverviewPage);
+        fixture.detectChanges();
+
+        (fixture.componentInstance as unknown as { setSort: (value: 'visitors') => void }).setSort('visitors');
+
+        expect(JSON.parse(localStorage.getItem('hitkeep.overviewSort') ?? '""')).toBe('visitors');
+    });
+
+    it('restores the stored sort order', () => {
+        localStorage.setItem('hitkeep.overviewSort', JSON.stringify('pageviews'));
+        vi.spyOn(statsService, 'fetchSitesOverviewStats').mockReturnValue(of(overviewResponse(statsWithTraffic('site-alpha', 30, 12), statsWithTraffic('site-beta', 120, 45))));
+        siteService.applySites([
+            {
+                id: 'site-alpha',
+                user_id: 'user-1',
+                domain: 'alpha.example.com',
+                created_at: '2026-01-01T00:00:00Z'
+            },
+            {
+                id: 'site-beta',
+                user_id: 'user-1',
+                domain: 'beta.example.com',
+                created_at: '2026-01-02T00:00:00Z'
+            }
+        ]);
+        fixture = TestBed.createComponent(OverviewPage);
+        fixture.detectChanges();
+
+        const headings = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('.hk-overview-card__identity h2')).map((heading) => heading.textContent?.trim());
+        expect(headings).toEqual(['beta.example.com', 'alpha.example.com']);
+    });
+
     it('labels search and repeated dashboard actions for assistive technology', () => {
         vi.spyOn(statsService, 'fetchSitesOverviewStats').mockReturnValue(of(overviewResponse(statsWithTraffic('site-alpha', 120, 45), statsWithTraffic('site-beta', 30, 12))));
         siteService.applySites([

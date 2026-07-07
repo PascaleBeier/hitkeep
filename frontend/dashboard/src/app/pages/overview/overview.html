@@ -14,7 +14,7 @@
             <input id="overview-site-search" pInputText type="search" [value]="searchTerm()" [placeholder]="'overview.searchPlaceholder' | transloco" (input)="onSearch($event)" />
         </p-iconfield>
         <div class="hk-overview-sort">
-            <label class="sr-only" for="overview-sort">{{ "overview.sortLabel" | transloco }}</label>
+            <label class="hk-overview-sort__label" for="overview-sort">{{ "overview.sortLabel" | transloco }}</label>
             <p-select inputId="overview-sort" [options]="sortOptions()" [ngModel]="sortValue()" (ngModelChange)="setSort($event)" optionLabel="label" optionValue="value" size="small" appendTo="body" />
         </div>
     </section>

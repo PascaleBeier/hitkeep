@@ -37,7 +37,17 @@ app-report-range-toolbar + .hk-overview-toolbar {
 }
 
 .hk-overview-sort {
+    display: flex;
     min-width: 11rem;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.hk-overview-sort__label {
+    color: var(--p-text-muted-color);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    white-space: nowrap;
 }
 
 .hk-overview-grid {
@@ -49,6 +59,26 @@ app-report-range-toolbar + .hk-overview-toolbar {
 .hk-overview-card {
     display: block;
     height: 100%;
+}
+
+:host ::ng-deep .hk-overview-card__surface {
+    transition:
+        border-color 160ms ease,
+        box-shadow 160ms ease,
+        transform 160ms ease;
+}
+
+.hk-overview-card:hover ::ng-deep .hk-overview-card__surface,
+.hk-overview-card:focus-within ::ng-deep .hk-overview-card__surface {
+    border-color: color-mix(in srgb, var(--p-primary-color) 45%, var(--hk-ov-border));
+    box-shadow: 0 12px 28px -16px color-mix(in srgb, var(--p-primary-color) 40%, rgb(15 23 42 / 0.45));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .hk-overview-card:hover ::ng-deep .hk-overview-card__surface,
+    .hk-overview-card:focus-within ::ng-deep .hk-overview-card__surface {
+        transform: translateY(-2px);
+    }
 }
 
 .hk-overview-card__content {
@@ -65,20 +95,10 @@ app-report-range-toolbar + .hk-overview-toolbar {
         transform 160ms ease;
 }
 
-.hk-overview-card__content:hover {
-    background: color-mix(in srgb, var(--p-content-hover-background) 48%, transparent);
-}
-
 .hk-overview-card__content:focus-visible {
     box-shadow:
         0 0 0 2px var(--p-content-background),
         0 0 0 4px var(--p-primary-color);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-    .hk-overview-card__content:hover {
-        transform: translateY(-1px);
-    }
 }
 
 .hk-overview-card__header,
@@ -134,6 +154,7 @@ app-report-range-toolbar + .hk-overview-toolbar {
 
 .hk-overview-card__chart polygon {
     fill: var(--hk-ov-chart-fill);
+    transition: fill 160ms ease;
 }
 
 .hk-overview-card__chart polyline {
@@ -142,6 +163,17 @@ app-report-range-toolbar + .hk-overview-toolbar {
     stroke-linecap: round;
     stroke-linejoin: round;
     stroke-width: 2.25;
+    transition: stroke-width 160ms ease;
+}
+
+.hk-overview-card__content:hover .hk-overview-card__chart polygon,
+.hk-overview-card__content:focus-visible .hk-overview-card__chart polygon {
+    fill: color-mix(in srgb, var(--p-primary-color) 26%, transparent);
+}
+
+.hk-overview-card__content:hover .hk-overview-card__chart polyline,
+.hk-overview-card__content:focus-visible .hk-overview-card__chart polyline {
+    stroke-width: 2.75;
 }
 
 .hk-overview-card__no-traffic {
@@ -209,6 +241,17 @@ app-report-range-toolbar + .hk-overview-toolbar {
     font-size: 0.75rem;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+    .hk-overview-card__cta i {
+        transition: transform 160ms ease;
+    }
+
+    .hk-overview-card__content:hover .hk-overview-card__cta i,
+    .hk-overview-card__content:focus-visible .hk-overview-card__cta i {
+        transform: translateX(3px);
+    }
+}
+
 .hk-overview-empty {
     display: flex;
     min-height: 22rem;
@@ -245,6 +288,10 @@ app-report-range-toolbar + .hk-overview-toolbar {
     .hk-overview-search,
     .hk-overview-sort {
         width: 100%;
+    }
+
+    .hk-overview-sort p-select {
+        flex: 1 1 auto;
     }
 
     .hk-overview-card__metrics {
