@@ -9,6 +9,7 @@ import { provideTranslocoLocale } from '@jsverse/transloco-locale';
 import { of } from 'rxjs';
 import { Team, TeamAuditListResponse, TeamInvite, TeamMember } from '@models/analytics.types';
 import { TEAM_CAPABILITIES } from '@core/access/capabilities';
+import { DashboardBootstrapService } from '@services/dashboard-bootstrap.service';
 import { PermissionService, UserPermissions } from '@services/permission.service';
 import { TeamService } from '@services/team.service';
 import { TeamAdminPage } from './team-admin';
@@ -73,8 +74,11 @@ describe('TeamAdminPage', () => {
             active_team_capabilities: [TEAM_CAPABILITIES.viewAudit, TEAM_CAPABILITIES.manageMembers, TEAM_CAPABILITIES.manageSettings, TEAM_CAPABILITIES.archive]
         })
     };
+    const cloudHosted = signal(false);
+    const bootstrapMock = { cloudHosted };
 
     beforeEach(async () => {
+        cloudHosted.set(false);
         permissionServiceMock.permissions.set({
             instance_role: 'user',
             permissions: {},
@@ -110,6 +114,10 @@ describe('TeamAdminPage', () => {
                 {
                     provide: PermissionService,
                     useValue: permissionServiceMock
+                },
+                {
+                    provide: DashboardBootstrapService,
+                    useValue: bootstrapMock
                 }
             ]
         }).compileComponents();
@@ -143,6 +151,22 @@ describe('TeamAdminPage', () => {
         expect(dangerTab?.icon).toBe('pi pi-exclamation-triangle');
         expect(dangerTab?.danger).toBe(true);
         expect(fixture.nativeElement.querySelector('.hk-admin-tab-label--danger i.pi-exclamation-triangle')).toBeTruthy();
+    });
+
+    it('marks custom domains with a PRO badge linking to the plan comparison for free cloud teams', () => {
+        const customDomainsTab = () => component['tabs']().find((tab) => tab.route === 'custom-domains');
+
+        expect(customDomainsTab()?.badge).toBeUndefined();
+        expect(customDomainsTab()?.link).toBe('/admin/team/custom-domains');
+        expect(fixture.nativeElement.querySelector('.hk-admin-tab-badge')).toBeNull();
+
+        cloudHosted.set(true);
+        activeTeam.set({ ...activeTeam(), plan: { code: 'free', name: 'Free' } });
+        fixture.detectChanges();
+
+        expect(customDomainsTab()?.badge).toBe('PRO');
+        expect(customDomainsTab()?.link).toBe('/admin/team/overview');
+        expect(fixture.nativeElement.querySelector('.hk-admin-tab-badge')?.textContent).toBe('PRO');
     });
 
     it('defaults the active tab to the overview child route and links every tab to its child path', () => {
@@ -211,7 +235,8 @@ describe('TeamAdminPage routing', () => {
                 ]),
                 provideTranslocoLocale({ langToLocaleMapping: { en: 'en-US' } }),
                 { provide: TeamService, useValue: teamServiceMock },
-                { provide: PermissionService, useValue: permissionServiceMock }
+                { provide: PermissionService, useValue: permissionServiceMock },
+                { provide: DashboardBootstrapService, useValue: { cloudHosted: signal(false) } }
             ]
         }).compileComponents();
     });

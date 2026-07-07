@@ -1643,12 +1643,20 @@
           "description": "Unlock longer retention, more sites, and team capacity.",
           "currentPlan": "Current plan",
           "recommended": "Recommended",
+          "perMonth": "/mo",
+          "openSource": {
+            "note": "HitKeep is fully open source — including every paid feature. Cloud plans fund hosting and ongoing development.",
+            "support": "Prefer to support us another way?",
+            "sponsor": "Sponsor the open-source development",
+            "spread": "Or simply spread the word — it helps more than you think."
+          },
           "upgradeAction": "Upgrade to {{plan}}",
           "features": {
             "sites": "Up to {{count}} sites",
             "members": "Up to {{count}} team members",
             "retention": "{{count}}-year data retention",
-            "retentionDays": "{{count}}-day data retention"
+            "retentionDays": "{{count}}-day data retention",
+            "customDomains": "Custom tracking domains"
           }
         }
       },

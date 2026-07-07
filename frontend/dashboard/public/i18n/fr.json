@@ -1643,12 +1643,20 @@
           "description": "Débloquez une rétention plus longue, plus de sites et de capacité d'équipe.",
           "currentPlan": "Plan actuel",
           "recommended": "Recommandé",
+          "perMonth": "/mois",
+          "openSource": {
+            "note": "HitKeep est entièrement open source – y compris toutes les fonctionnalités payantes. Les offres cloud financent l'hébergement et le développement.",
+            "support": "Vous préférez nous soutenir autrement ?",
+            "sponsor": "Sponsorisez le développement open source",
+            "spread": "Ou parlez simplement de HitKeep autour de vous – cela aide plus que vous ne le pensez."
+          },
           "upgradeAction": "Passer à {{plan}}",
           "features": {
             "sites": "Jusqu'à {{count}} sites",
             "members": "Jusqu'à {{count}} membres d'équipe",
             "retention": "{{count}} ans de rétention des données",
-            "retentionDays": "{{count}} jours de rétention des données"
+            "retentionDays": "{{count}} jours de rétention des données",
+            "customDomains": "Domaines de suivi personnalisés"
           }
         }
       },

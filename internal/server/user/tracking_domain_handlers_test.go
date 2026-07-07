@@ -12,6 +12,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	"hitkeep/internal/entitlements"
 )
 
 func TestRegisteredTrackingDomainRoutesAllowTeamAdminsAndOwners(t *testing.T) {
@@ -99,4 +100,36 @@ func serveRegisteredCreateTrackingDomain(t *testing.T, h *handler, userID, teamI
 	Register(mux, h.ctx)
 	mux.ServeHTTP(w, req)
 	return w
+}
+
+func TestCreateCustomTrackingDomainRequiresPaidCloudPlan(t *testing.T) {
+	h, store, ownerID := setupUserSecurityTestEnv(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	teamID, err := store.GetActiveTenantID(ctx, ownerID)
+	if err != nil {
+		t.Fatalf("get active team: %v", err)
+	}
+
+	h.ctx.Config.CloudHosted = true
+	h.ctx.Entitlements = entitlements.NewStaticProvider(entitlements.Entitlements{}, entitlements.PlanInfo{Code: "free", Name: "Free"})
+
+	if w := serveRegisteredCreateTrackingDomain(t, h, ownerID, teamID, "blocked.example.test"); w.Code != http.StatusForbidden {
+		t.Fatalf("expected free cloud plan to be blocked with %d, got %d: %s", http.StatusForbidden, w.Code, w.Body.String())
+	}
+
+	h.ctx.Entitlements = entitlements.NewStaticProvider(entitlements.Entitlements{}, entitlements.PlanInfo{Code: "pro", Name: "Pro"})
+
+	if w := serveRegisteredCreateTrackingDomain(t, h, ownerID, teamID, "allowed.example.test"); w.Code != http.StatusCreated {
+		t.Fatalf("expected pro cloud plan to create with %d, got %d: %s", http.StatusCreated, w.Code, w.Body.String())
+	}
+
+	// Self-hosted deployments are never plan-gated.
+	h.ctx.Config.CloudHosted = false
+	h.ctx.Entitlements = entitlements.NewStaticProvider(entitlements.Entitlements{}, entitlements.PlanInfo{Code: "free", Name: "Free"})
+
+	if w := serveRegisteredCreateTrackingDomain(t, h, ownerID, teamID, "selfhosted.example.test"); w.Code != http.StatusCreated {
+		t.Fatalf("expected self-hosted create with %d, got %d: %s", http.StatusCreated, w.Code, w.Body.String())
+	}
 }

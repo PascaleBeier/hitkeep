@@ -1643,12 +1643,20 @@
           "description": "Längere Aufbewahrung, mehr Websites und Teamkapazität freischalten.",
           "currentPlan": "Aktueller Tarif",
           "recommended": "Empfohlen",
+          "perMonth": "/Monat",
+          "openSource": {
+            "note": "HitKeep ist vollständig Open Source – einschließlich aller Bezahlfunktionen. Cloud-Tarife finanzieren Hosting und Weiterentwicklung.",
+            "support": "Möchtest du uns anders unterstützen?",
+            "sponsor": "Unterstütze die Open-Source-Entwicklung",
+            "spread": "Oder erzähle einfach weiter von HitKeep – das hilft mehr, als du denkst."
+          },
           "upgradeAction": "Auf {{plan}} upgraden",
           "features": {
             "sites": "Bis zu {{count}} Websites",
             "members": "Bis zu {{count}} Teammitglieder",
             "retention": "{{count}} Jahre Datenaufbewahrung",
-            "retentionDays": "{{count}} Tage Datenaufbewahrung"
+            "retentionDays": "{{count}} Tage Datenaufbewahrung",
+            "customDomains": "Eigene Tracking-Domains"
           }
         }
       },

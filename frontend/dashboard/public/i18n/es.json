@@ -1643,12 +1643,20 @@
           "description": "Desbloquea mayor retención, más sitios y capacidad de equipo.",
           "currentPlan": "Plan actual",
           "recommended": "Recomendado",
+          "perMonth": "/mes",
+          "openSource": {
+            "note": "HitKeep es completamente de código abierto, incluidas todas las funciones de pago. Los planes cloud financian el alojamiento y el desarrollo.",
+            "support": "¿Prefieres apoyarnos de otra manera?",
+            "sponsor": "Patrocina el desarrollo de código abierto",
+            "spread": "O simplemente corre la voz: ayuda más de lo que crees."
+          },
           "upgradeAction": "Mejorar a {{plan}}",
           "features": {
             "sites": "Hasta {{count}} sitios",
             "members": "Hasta {{count}} miembros del equipo",
             "retention": "{{count}} años de retención de datos",
-            "retentionDays": "{{count}} días de retención de datos"
+            "retentionDays": "{{count}} días de retención de datos",
+            "customDomains": "Dominios de seguimiento personalizados"
           }
         }
       },

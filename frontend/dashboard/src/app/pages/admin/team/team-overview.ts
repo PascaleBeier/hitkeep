@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, resource, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { TranslocoLocaleService } from '@jsverse/transloco-locale';
 import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
 import { ProgressBarModule } from 'primeng/progressbar';
@@ -14,6 +15,9 @@ import { firstValueFrom } from 'rxjs';
 
 import { CloudPlanTier, TeamPlan, TeamRole } from '@models/analytics.types';
 
+/** Monthly EUR list prices per cloud plan; formatted locale-aware at render time. */
+const PLAN_MONTHLY_PRICES_EUR: Record<string, number> = { free: 0, pro: 15, business: 39 };
+
 @Component({
     selector: 'app-team-overview',
     imports: [ButtonModule, CardModule, ProgressBarModule, TagModule, CopyControl, TranslocoPipe],
@@ -24,6 +28,7 @@ import { CloudPlanTier, TeamPlan, TeamRole } from '@models/analytics.types';
 export class TeamOverviewPage {
     private readonly destroyRef = inject(DestroyRef);
     private readonly transloco = inject(TranslocoService);
+    private readonly localeService = inject(TranslocoLocaleService);
     private readonly activeLanguage = injectActiveLang();
     private readonly analyticsService = inject(AnalyticsService);
     private readonly cloudService = inject(CloudService);
@@ -71,6 +76,15 @@ export class TeamOverviewPage {
         return this.planTiers().find((t) => t.code === code) ?? null;
     });
     protected readonly upgradeTiers = computed(() => this.planTiers().filter((t) => t.code !== 'free'));
+    /** Locale-aware plan prices, e.g. "€15" in English and "15 €" in German. */
+    protected readonly planPriceLabels = computed<Record<string, string>>(() => {
+        this.activeLanguage();
+        const labels: Record<string, string> = {};
+        for (const [code, amount] of Object.entries(PLAN_MONTHLY_PRICES_EUR)) {
+            labels[code] = this.localeService.localizeNumber(amount, 'currency', undefined, { currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        }
+        return labels;
+    });
     private planTiersLoaded = false;
 
     constructor() {

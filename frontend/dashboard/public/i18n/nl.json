@@ -1625,12 +1625,20 @@
           "description": "Ontgrendel langere retentie, meer sites en teamcapaciteit.",
           "currentPlan": "Huidig ​​abonnement",
           "recommended": "Aanbevolen",
+          "perMonth": "/mnd",
+          "openSource": {
+            "note": "HitKeep is volledig open source – inclusief alle betaalde functies. Cloudabonnementen financieren hosting en ontwikkeling.",
+            "support": "Wil je ons liever op een andere manier steunen?",
+            "sponsor": "Sponsor de opensource-ontwikkeling",
+            "spread": "Of vertel het gewoon door – dat helpt meer dan je denkt."
+          },
           "upgradeAction": "Upgrade naar {{plan}}",
           "features": {
             "sites": "Tot {{count}}-sites",
             "members": "Maximaal {{count}}-teamleden",
             "retention": "{{count}} jaar gegevensretentie",
-            "retentionDays": "{{count}}-dag gegevensretentie"
+            "retentionDays": "{{count}}-dag gegevensretentie",
+            "customDomains": "Aangepaste trackingdomeinen"
           }
         }
       },

@@ -24,6 +24,20 @@ import (
 
 var customTrackingHostnameRegex = regexp.MustCompile(`^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$`)
 
+// freeCloudPlanCode mirrors database.CloudPlanFree, which is only compiled in billing builds.
+const freeCloudPlanCode = "free"
+
+// customTrackingDomainPlanBlocked reports whether the team's managed-cloud plan
+// excludes custom tracking domains. Free cloud teams must upgrade to Pro or
+// higher; self-hosted deployments and non-cloud builds are never blocked.
+func (h *handler) customTrackingDomainPlanBlocked(r *http.Request, teamID uuid.UUID) bool {
+	if h.ctx.Config == nil || !h.ctx.Config.CloudHosted {
+		return false
+	}
+	plan := resolveTeamPlan(r.Context(), h.ctx.Store, h.ctx.Entitlements, teamID)
+	return plan != nil && plan.Code == freeCloudPlanCode
+}
+
 type trackingDomainVerifier struct {
 	lookupTXT    func(context.Context, string) ([]string, error)
 	lookupCNAME  func(context.Context, string) (string, error)
@@ -78,6 +92,10 @@ func (h *handler) handleCreateCustomTrackingDomain() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		teamID, ok := parseTeamIDPath(w, r)
 		if !ok {
+			return
+		}
+		if h.customTrackingDomainPlanBlocked(r, teamID) {
+			http.Error(w, "Custom tracking domains require the Pro plan or higher", http.StatusForbidden)
 			return
 		}
 		userID := shared.GetUserIDFromContext(r)
@@ -137,6 +155,10 @@ func (h *handler) handleVerifyCustomTrackingDomain() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		teamID, domainID, ok := parseTeamDomainIDs(w, r)
 		if !ok {
+			return
+		}
+		if h.customTrackingDomainPlanBlocked(r, teamID) {
+			http.Error(w, "Custom tracking domains require the Pro plan or higher", http.StatusForbidden)
 			return
 		}
 		userID := shared.GetUserIDFromContext(r)
