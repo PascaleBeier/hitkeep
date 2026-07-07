@@ -84,6 +84,22 @@ describe('SiteService', () => {
             families_cleared: ['native']
         });
     });
+
+    it('loads site tracking domain options', () => {
+        service.getTrackingDomainOptions('site-1').subscribe((response) => {
+            expect(response.default_url).toBe('https://hitkeep.test/hk.js');
+            expect(response.domains[0].hostname).toBe('analytics.example.com');
+        });
+
+        const req = httpMock.expectOne('/api/sites/site-1/tracking-domain-options');
+        expect(req.request.method).toBe('GET');
+        req.flush({
+            site_id: 'site-1',
+            team_id: 'team-1',
+            default_url: 'https://hitkeep.test/hk.js',
+            domains: [trackingDomain()]
+        });
+    });
 });
 
 function site(id: string, domain: string): Site {
@@ -93,4 +109,23 @@ function site(id: string, domain: string): Site {
         domain,
         created_at: '2026-01-01T00:00:00Z'
     };
+}
+
+function trackingDomain() {
+    return {
+        id: 'domain-1',
+        team_id: 'team-1',
+        hostname: 'analytics.example.com',
+        verification_status: 'verified',
+        target_status: 'verified',
+        tls_mode: 'external',
+        tls_status: 'verified',
+        enabled: true,
+        active: true,
+        dns_txt_name: '_hitkeep-tracking.analytics.example.com',
+        dns_txt_value: 'hitkeep-domain-verification=token',
+        dns_target: 'hitkeep.test',
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z'
+    } as const;
 }

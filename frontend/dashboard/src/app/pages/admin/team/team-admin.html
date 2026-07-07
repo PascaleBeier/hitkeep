@@ -1,25 +1,23 @@
 <app-admin-page-frame [breadcrumbItems]="breadcrumbItems()">
-    <p-tabs [value]="activeTab()" (valueChange)="onTabChange($event)" class="hk-admin-tabs">
-        <p-tablist>
-            @for (tab of tabs(); track tab.value) {
-            <p-tab [value]="tab.value">{{ tab.label }}</p-tab>
-            }
-        </p-tablist>
-        <p-tabpanels>
-            <p-tabpanel value="0">
-                <app-team-overview />
-            </p-tabpanel>
-            <p-tabpanel value="1">
-                <app-team-members />
-            </p-tabpanel>
-            <p-tabpanel value="2">
-                <app-team-settings />
-            </p-tabpanel>
-            @if (canViewAudit()) {
-            <p-tabpanel value="3">
-                <app-team-audit />
-            </p-tabpanel>
-            }
-        </p-tabpanels>
-    </p-tabs>
+    <section class="flex flex-col gap-4">
+        <p-tabs [value]="activeTab()" class="hk-admin-tabs">
+            <p-tablist>
+                @for (tab of tabs(); track tab.route) {
+                <p-tab [value]="tab.route" [routerLink]="tab.link">
+                    <span class="hk-admin-tab-label" [class.hk-admin-tab-label--danger]="tab.danger">
+                        @if (tab.icon) {
+                        <i [class]="tab.icon" aria-hidden="true"></i>
+                        }
+                        <span>{{ tab.label }}</span>
+                        @if (tab.badge) {
+                        <span class="hk-admin-tab-badge">{{ tab.badge }}</span>
+                        }
+                    </span>
+                </p-tab>
+                }
+            </p-tablist>
+        </p-tabs>
+
+        <router-outlet />
+    </section>
 </app-admin-page-frame>

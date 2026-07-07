@@ -2,35 +2,17 @@
     display: block;
 }
 
-:host ::ng-deep .team-overview__surface-card.p-card,
-:host ::ng-deep .team-overview__usage-card.p-card,
-:host ::ng-deep .plan-comparison__card.p-card {
-    border: 1px solid var(--p-content-border-color);
-    border-radius: 8px;
-    box-shadow: none;
-}
-
-:host ::ng-deep .team-overview__surface-card .p-card-body,
-:host ::ng-deep .team-overview__usage-card .p-card-body,
-:host ::ng-deep .plan-comparison__card .p-card-body {
-    padding: 1rem;
-}
-
-:host ::ng-deep .team-overview__cloud-card .p-card-body,
-:host ::ng-deep .team-overview__usage-card .p-card-body,
-:host ::ng-deep .plan-comparison__card .p-card-body {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    height: 100%;
-}
-
+/* Page-specific semantics on top of the global .hk-card chrome. */
 :host ::ng-deep .plan-comparison__card--current.p-card {
     opacity: 0.7;
 }
 
 :host ::ng-deep .plan-comparison__card--recommended.p-card {
     border-color: var(--p-primary-color);
+    box-shadow:
+        0 0 0 1px var(--p-primary-color),
+        0 10px 28px -14px color-mix(in srgb, var(--p-primary-color) 55%, transparent);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--p-primary-color) 5%, var(--p-content-background)) 0%, var(--p-content-background) 40%);
 }
 
 :host ::ng-deep .team-overview__usage-card .p-progressbar {
@@ -42,11 +24,11 @@
 }
 
 :host ::ng-deep .team-overview__usage-card--warning .p-progressbar-value {
-    background: #f59e0b;
+    background: var(--p-amber-500);
 }
 
 :host ::ng-deep .team-overview__usage-card--critical .p-progressbar-value {
-    background: #dc2626;
+    background: var(--p-red-600);
 }
 
 :host ::ng-deep .team-overview__usage-card--unlimited.p-card {

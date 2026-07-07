@@ -1,12 +1,13 @@
 import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { compatForm } from '@angular/forms/signals/compat';
-import { Site } from '@models/analytics.types';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { Site, SiteTrackingDomainOptions } from '@models/analytics.types';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
+import { SelectModule } from 'primeng/select';
 import { TagModule } from 'primeng/tag';
 import { ToggleSwitchModule } from 'primeng/toggleswitch';
 import { SiteService, SiteTrackingStatus } from '@features/sites/services/site.service';
@@ -14,10 +15,15 @@ import { RelativeDateTime } from '@components/relative-date-time/relative-date-t
 import { browserAbsoluteAppUrl } from '@core/interceptors/base-path.interceptor';
 import { finalize } from 'rxjs';
 
+interface TrackingDomainSelectOption {
+    label: string;
+    value: string | null;
+}
+
 @Component({
     selector: 'app-site-tracking-settings',
     standalone: true,
-    imports: [ReactiveFormsModule, ButtonModule, TagModule, ToggleSwitchModule, RelativeDateTime, TranslocoPipe],
+    imports: [ReactiveFormsModule, ButtonModule, SelectModule, TagModule, ToggleSwitchModule, RelativeDateTime, TranslocoPipe],
     template: `
         <div class="site-settings-stack">
             <section class="site-settings-card">
@@ -105,6 +111,27 @@ import { finalize } from 'rxjs';
                 </header>
                 <div class="site-settings-card__body">
                     <div class="site-settings-toggle-list">
+                        <div class="site-settings-toggle-row site-settings-toggle-row--domain">
+                            <div class="site-settings-toggle-row__text">
+                                <label id="tracking-domain-label" for="tracking-domain-select" class="site-settings-toggle-row__title">{{ "sites.tracking.domains.label" | transloco }}</label>
+                                <span class="site-settings-field-hint">{{ "sites.tracking.domains.description" | transloco }}</span>
+                            </div>
+                            <div class="site-settings-domain-select">
+                                <p-select
+                                    inputId="tracking-domain-select"
+                                    ariaLabelledBy="tracking-domain-label"
+                                    styleClass="w-full"
+                                    [options]="trackingDomainSelectOptions()"
+                                    optionLabel="label"
+                                    optionValue="value"
+                                    [formControl]="trackingDomainControl"
+                                    [loading]="isLoadingTrackingDomains()"
+                                    appendTo="body"
+                                />
+                                <span class="site-settings-field-hint">{{ selectedTrackingDomainHint() }}</span>
+                            </div>
+                        </div>
+
                         <div class="site-settings-toggle-row">
                             <div class="site-settings-toggle-row__text">
                                 <label id="collect-dnt-label" for="collect-dnt-switch" class="site-settings-toggle-row__title">{{ "sites.tracking.collectDntLabel" | transloco }}</label>
@@ -184,12 +211,19 @@ export class SiteTrackingSettings {
     private siteService = inject(SiteService);
     private destroyRef = inject(DestroyRef);
     private document = inject(DOCUMENT);
+    private transloco = inject(TranslocoService);
     site = input.required<Site | null>();
     protected trackingStatus = signal<SiteTrackingStatus | null>(null);
     protected isLoadingStatus = signal(false);
+    protected trackingDomainOptions = signal<SiteTrackingDomainOptions | null>(null);
+    protected isLoadingTrackingDomains = signal(false);
     private copyResetTimer: ReturnType<typeof setTimeout> | null = null;
     private statusRequestID = 0;
     private statusLoadingRequestID = 0;
+    private domainOptionsRequestID = 0;
+    protected readonly trackingDomainControl = new FormControl<string | null>(null);
+    private readonly selectedTrackingDomainID = toSignal(this.trackingDomainControl.valueChanges, { initialValue: this.trackingDomainControl.value });
+    private readonly activeLanguage = toSignal(this.transloco.langChanges$, { initialValue: this.transloco.getActiveLang() });
     private readonly trackingFormModel = signal({
         collectDnt: new FormControl(false, { nonNullable: true }),
         disableBeacon: new FormControl(false, { nonNullable: true }),
@@ -202,6 +236,23 @@ export class SiteTrackingSettings {
     protected copyButtonLabel = signal('sites.tracking.copyCode');
     protected copyButtonIcon = signal('pi pi-copy');
     protected statusLabelKey = computed(() => `sites.tracking.verifier.status.${this.trackingStatus()?.status ?? 'waiting'}`);
+    protected activeTrackingDomains = computed(() => (this.trackingDomainOptions()?.domains ?? []).filter((domain) => domain.active));
+    protected selectedSnippetTrackingDomain = computed(() => {
+        const selectedID = this.selectedTrackingDomainID();
+        return selectedID ? (this.activeTrackingDomains().find((domain) => domain.id === selectedID) ?? null) : null;
+    });
+    protected trackingDomainSelectOptions = computed<TrackingDomainSelectOption[]>(() => {
+        this.activeLanguage();
+        return [{ label: this.transloco.translate('sites.tracking.domains.defaultOption'), value: null }, ...this.activeTrackingDomains().map((domain) => ({ label: domain.hostname, value: domain.id }))];
+    });
+    protected selectedTrackingDomainHint = computed(() => {
+        this.activeLanguage();
+        const selectedDomain = this.selectedSnippetTrackingDomain();
+        if (selectedDomain) {
+            return this.transloco.translate('sites.tracking.domains.selectedHint', { hostname: selectedDomain.hostname });
+        }
+        return this.trackingDomainOptions()?.default_url || this.defaultTrackerURL();
+    });
     protected statusSeverity = computed<'success' | 'warn' | 'secondary' | 'danger'>(() => {
         switch (this.trackingStatus()?.status) {
             case 'live':
@@ -216,7 +267,8 @@ export class SiteTrackingSettings {
     });
 
     protected snippetCode = computed(() => {
-        const scriptURL = browserAbsoluteAppUrl(this.document, '/hk.js');
+        const selectedDomain = this.selectedSnippetTrackingDomain();
+        const scriptURL = selectedDomain ? `https://${selectedDomain.hostname}/hk.js` : this.defaultTrackerURL();
 
         let attrs = '';
         if (this.trackingForm.collectDnt().value()) attrs += ' data-collect-dnt="true"';
@@ -266,11 +318,14 @@ export class SiteTrackingSettings {
             const site = this.site();
             this.statusRequestID += 1;
             this.trackingStatus.set(null);
+            this.trackingDomainOptions.set(null);
+            this.trackingDomainControl.setValue(null);
             if (!site) {
                 return;
             }
 
             this.loadStatus(site.id);
+            this.loadTrackingDomainOptions(site.id);
             const startedAt = Date.now();
             const timer = setInterval(() => {
                 const current = this.trackingStatus();
@@ -294,6 +349,10 @@ export class SiteTrackingSettings {
         const site = this.site();
         if (!site) return;
         this.loadStatus(site.id);
+    }
+
+    protected defaultTrackerURL(): string {
+        return browserAbsoluteAppUrl(this.document, '/hk.js');
     }
 
     protected trackerLabel(status: SiteTrackingStatus): string {
@@ -329,5 +388,41 @@ export class SiteTrackingSettings {
                     }
                 }
             });
+    }
+
+    private loadTrackingDomainOptions(siteId: string) {
+        const requestID = ++this.domainOptionsRequestID;
+        this.isLoadingTrackingDomains.set(true);
+        this.siteService
+            .getTrackingDomainOptions(siteId)
+            .pipe(
+                finalize(() => {
+                    if (requestID === this.domainOptionsRequestID) {
+                        this.isLoadingTrackingDomains.set(false);
+                    }
+                }),
+                takeUntilDestroyed(this.destroyRef)
+            )
+            .subscribe({
+                next: (options) => {
+                    if (requestID === this.domainOptionsRequestID && this.site()?.id === siteId) {
+                        this.applyTrackingDomainOptions(options);
+                    }
+                },
+                error: () => {
+                    if (requestID === this.domainOptionsRequestID && this.site()?.id === siteId) {
+                        this.trackingDomainOptions.set(null);
+                        this.trackingDomainControl.setValue(null);
+                    }
+                }
+            });
+    }
+
+    private applyTrackingDomainOptions(options: SiteTrackingDomainOptions) {
+        this.trackingDomainOptions.set(options);
+        const selectedID = this.trackingDomainControl.value;
+        if (selectedID && !options.domains.some((domain) => domain.id === selectedID && domain.active)) {
+            this.trackingDomainControl.setValue(null);
+        }
     }
 }

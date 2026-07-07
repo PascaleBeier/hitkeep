@@ -23,6 +23,7 @@ import { SiteService } from '@features/sites/services/site.service';
 import { StatsService } from '@features/analytics/services/stats.service';
 import { ChartDataPoint, Site, SiteOverviewStats } from '@models/analytics.types';
 import { MainLayoutContextService } from '@layout/main-layout-context.service';
+import { PreferenceStorage } from '@services/preference-storage';
 import { injectReportRange } from '@services/report-range-preferences.service';
 
 type OverviewSortKey = 'domain' | 'pageviews' | 'visitors';
@@ -57,6 +58,9 @@ interface OverviewSiteRow {
 const SPARKLINE_WIDTH = 160;
 const SPARKLINE_HEIGHT = 56;
 
+const OVERVIEW_SORT_STORAGE_KEY = 'hitkeep.overviewSort';
+const OVERVIEW_SORT_KEYS: readonly OverviewSortKey[] = ['domain', 'pageviews', 'visitors'];
+
 @Component({
     selector: 'app-overview-page',
     imports: [FormsModule, ButtonModule, CardModule, IconFieldModule, InputIconModule, InputTextModule, MessageModule, PageBreadcrumb, PageHeader, PageHeaderLeft, ReportRangeToolbar, SelectModule, SiteFavicon, SkeletonModule, TranslocoPipe],
@@ -72,13 +76,14 @@ export class OverviewPage {
     private readonly router = inject(Router);
     private readonly destroyRef = inject(DestroyRef);
     private readonly layoutContext = inject(MainLayoutContextService, { optional: true });
+    private readonly preferenceStorage = inject(PreferenceStorage);
     private readonly reportRange = injectReportRange();
     private readonly activeLanguage = injectActiveLang();
     private statsRequest: Subscription | null = null;
     private loadSequence = 0;
 
     protected readonly searchTerm = signal('');
-    protected readonly sortValue = signal<OverviewSortKey>('domain');
+    protected readonly sortValue = signal<OverviewSortKey>(this.initialSort());
     protected readonly siteStates = signal<Record<string, SiteStatsState>>({});
     protected readonly isStatsLoading = signal(false);
 
@@ -119,6 +124,7 @@ export class OverviewPage {
     protected setSort(value: OverviewSortKey | null): void {
         if (value === 'domain' || value === 'pageviews' || value === 'visitors') {
             this.sortValue.set(value);
+            this.preferenceStorage.write(OVERVIEW_SORT_STORAGE_KEY, value);
         }
     }
 
@@ -255,6 +261,11 @@ export class OverviewPage {
                 return `${x.toFixed(1)},${y.toFixed(1)}`;
             })
             .join(' ');
+    }
+
+    private initialSort(): OverviewSortKey {
+        const stored = this.preferenceStorage.read<OverviewSortKey>(OVERVIEW_SORT_STORAGE_KEY);
+        return stored !== null && OVERVIEW_SORT_KEYS.includes(stored) ? stored : 'domain';
     }
 
     private currentDateRange(): DateRange | null {

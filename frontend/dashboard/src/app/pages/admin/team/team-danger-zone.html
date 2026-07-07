@@ -1,0 +1,73 @@
+@if (team(); as t) {
+<div class="site-settings-stack">
+    <section class="site-settings-card site-settings-card--danger" aria-labelledby="team-danger-leave-heading">
+        <header class="site-settings-card__header">
+            <div class="site-settings-card__title-row">
+                <span class="site-settings-card__icon site-settings-card__icon--danger"><i class="pi pi-sign-out" aria-hidden="true"></i></span>
+                <div>
+                    <h3 id="team-danger-leave-heading">{{ "admin.team.settings.leaveSectionTitle" | transloco }}</h3>
+                    <p>{{ "admin.team.settings.leaveSectionDescription" | transloco }}</p>
+                </div>
+            </div>
+        </header>
+        @if (leaveSuccessKey() || leaveErrorKey()) {
+        <div class="site-settings-card__body">
+            @if (leaveSuccessKey(); as key) {
+            <p-message severity="success">{{ key | transloco }}</p-message>
+            } @if (leaveErrorKey(); as key) {
+            <p-message severity="error">{{ key | transloco }}</p-message>
+            }
+        </div>
+        }
+        <footer class="site-settings-card__footer">
+            <p-button severity="danger" icon="pi pi-sign-out" [label]="'admin.team.settings.leaveAction' | transloco" [loading]="isLeaving()" [disabled]="isBusy()" (onClick)="openConfirmDialog('leave')" />
+        </footer>
+    </section>
+
+    @if (canArchive()) {
+    <section class="site-settings-card site-settings-card--danger" aria-labelledby="team-danger-archive-heading">
+        <header class="site-settings-card__header">
+            <div class="site-settings-card__title-row">
+                <span class="site-settings-card__icon site-settings-card__icon--danger"><i class="pi pi-box" aria-hidden="true"></i></span>
+                <div>
+                    <h3 id="team-danger-archive-heading">{{ "admin.team.settings.archiveSectionTitle" | transloco }}</h3>
+                    <p>{{ "admin.team.settings.archiveSectionDescription" | transloco }}</p>
+                    <p>{{ "admin.team.settings.archiveSectionHint" | transloco }}</p>
+                </div>
+            </div>
+        </header>
+        @if (archiveSuccessKey() || archiveErrorKey()) {
+        <div class="site-settings-card__body">
+            @if (archiveSuccessKey(); as key) {
+            <p-message severity="success">{{ key | transloco }}</p-message>
+            } @if (archiveErrorKey(); as key) {
+            <p-message severity="error">{{ key | transloco }}</p-message>
+            }
+        </div>
+        }
+        <footer class="site-settings-card__footer">
+            <p-button severity="danger" icon="pi pi-box" [label]="'admin.team.settings.archiveAction' | transloco" [loading]="isArchiving()" [disabled]="isBusy()" (onClick)="openConfirmDialog('archive')" />
+        </footer>
+    </section>
+    }
+
+    <app-dialog-shell
+        [title]="confirmTitleKey() | transloco"
+        [visible]="confirmDialogVisible()"
+        [busy]="isBusy()"
+        role="alertdialog"
+        [secondaryLabel]="'common.actions.cancel' | transloco"
+        [primaryLabel]="confirmActionKey() | transloco"
+        primarySeverity="danger"
+        [primaryDisabled]="!canSubmitConfirm()"
+        [primaryLoading]="isBusy()"
+        (visibleChange)="onConfirmDialogVisibleChange($event)"
+        (primaryAction)="runConfirmedAction()"
+    >
+        <div class="site-settings-field">
+            <label for="team-danger-confirm">{{ "admin.team.danger.confirmNameLabel" | transloco: { name: t.name } }}</label>
+            <input id="team-danger-confirm" pInputText class="w-full" [ngModel]="confirmValue()" (ngModelChange)="confirmValue.set($event)" [placeholder]="t.name" autocomplete="off" />
+        </div>
+    </app-dialog-shell>
+</div>
+}

@@ -9,6 +9,37 @@ export interface Site {
     data_retention_days?: number;
 }
 
+export type CustomTrackingDomainStatus = 'pending' | 'verified' | 'failed';
+export type CustomTrackingTLSMode = 'external' | 'caddy-on-demand';
+
+export interface CustomTrackingDomain {
+    id: string;
+    team_id: string;
+    hostname: string;
+    verification_status: CustomTrackingDomainStatus;
+    target_status: CustomTrackingDomainStatus;
+    tls_mode: CustomTrackingTLSMode;
+    tls_status: CustomTrackingDomainStatus;
+    enabled: boolean;
+    active: boolean;
+    dns_txt_name: string;
+    dns_txt_value: string;
+    dns_target: string;
+    last_error?: string;
+    verified_at?: string;
+    last_checked_at?: string;
+    last_tls_ask_at?: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface SiteTrackingDomainOptions {
+    site_id: string;
+    team_id: string;
+    default_url: string;
+    domains: CustomTrackingDomain[];
+}
+
 export interface Team {
     id: string;
     name: string;

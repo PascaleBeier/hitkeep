@@ -54,12 +54,21 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             {{- $env := .Values.env | default dict -}}
-            {{- $flags := dict "hasJoin" false "hasBind" false -}}
+            {{- $flags := dict "hasJoin" false "hasBind" false "hasCustomTrackingTLSMode" false "hasCustomTrackingDNSTarget" false "hasCaddyTLSAskToken" false -}}
             {{- if hasKey $env "HITKEEP_JOIN_ADDR" }}
             {{- $_ := set $flags "hasJoin" true }}
             {{- end }}
             {{- if hasKey $env "HITKEEP_BIND_ADDR" }}
             {{- $_ := set $flags "hasBind" true }}
+            {{- end }}
+            {{- if hasKey $env "HITKEEP_CUSTOM_TRACKING_TLS_MODE" }}
+            {{- $_ := set $flags "hasCustomTrackingTLSMode" true }}
+            {{- end }}
+            {{- if hasKey $env "HITKEEP_CUSTOM_TRACKING_DNS_TARGET" }}
+            {{- $_ := set $flags "hasCustomTrackingDNSTarget" true }}
+            {{- end }}
+            {{- if hasKey $env "HITKEEP_CADDY_TLS_ASK_TOKEN" }}
+            {{- $_ := set $flags "hasCaddyTLSAskToken" true }}
             {{- end }}
             {{- range .Values.extraEnv }}
             {{- if and (hasKey . "name") (eq .name "HITKEEP_JOIN_ADDR") }}
@@ -67,6 +76,15 @@ spec:
             {{- end }}
             {{- if and (hasKey . "name") (eq .name "HITKEEP_BIND_ADDR") }}
             {{- $_ := set $flags "hasBind" true }}
+            {{- end }}
+            {{- if and (hasKey . "name") (eq .name "HITKEEP_CUSTOM_TRACKING_TLS_MODE") }}
+            {{- $_ := set $flags "hasCustomTrackingTLSMode" true }}
+            {{- end }}
+            {{- if and (hasKey . "name") (eq .name "HITKEEP_CUSTOM_TRACKING_DNS_TARGET") }}
+            {{- $_ := set $flags "hasCustomTrackingDNSTarget" true }}
+            {{- end }}
+            {{- if and (hasKey . "name") (eq .name "HITKEEP_CADDY_TLS_ASK_TOKEN") }}
+            {{- $_ := set $flags "hasCaddyTLSAskToken" true }}
             {{- end }}
             {{- end }}
             {{- if gt (.Values.replicaCount | int) 1 }}
@@ -98,6 +116,23 @@ spec:
             {{- if not (hasKey $env "HITKEEP_SPAM_FILTER_PATH") }}
             - name: HITKEEP_SPAM_FILTER_PATH
               value: {{ printf "%s/spam-filter.json" .Values.persistence.mountPath | quote }}
+            {{- end }}
+            {{- if .Values.customTrackingDomains.enabled }}
+            {{- if not $flags.hasCustomTrackingTLSMode }}
+            - name: HITKEEP_CUSTOM_TRACKING_TLS_MODE
+              value: {{ .Values.customTrackingDomains.tlsMode | default "external" | quote }}
+            {{- end }}
+            {{- if and (not $flags.hasCustomTrackingDNSTarget) .Values.customTrackingDomains.dnsTarget }}
+            - name: HITKEEP_CUSTOM_TRACKING_DNS_TARGET
+              value: {{ .Values.customTrackingDomains.dnsTarget | quote }}
+            {{- end }}
+            {{- if and (not $flags.hasCaddyTLSAskToken) .Values.customTrackingDomains.caddyAskToken.existingSecret }}
+            - name: HITKEEP_CADDY_TLS_ASK_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.customTrackingDomains.caddyAskToken.existingSecret | quote }}
+                  key: {{ .Values.customTrackingDomains.caddyAskToken.existingSecretKey | default "token" | quote }}
+            {{- end }}
             {{- end }}
             {{- range $key, $value := $env }}
             - name: {{ $key }}

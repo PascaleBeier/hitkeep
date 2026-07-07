@@ -20,6 +20,8 @@
     <nav class="flex-1" [attr.aria-label]="'nav.primaryNavigationAria' | transloco">
         <ng-container *ngTemplateOutlet="sidebarMenu; context: { items: desktopMenuItems() }" />
     </nav>
+
+    <app-free-plan-chip class="px-1" />
 </aside>
 
 <p-drawer [visible]="isMobileDrawerOpen()" (visibleChange)="isMobileDrawerOpen.set($event)">
@@ -52,6 +54,8 @@
         <nav class="flex-1" [attr.aria-label]="'nav.primaryNavigationAria' | transloco">
             <ng-container *ngTemplateOutlet="sidebarMenu; context: { items: mobileMenuItems() }" />
         </nav>
+
+        <app-free-plan-chip />
     </div>
 </p-drawer>
 

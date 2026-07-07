@@ -125,6 +125,12 @@
                 </div>
 
                 <p-button [label]="'signup.submit' | transloco" type="submit" [loading]="isLoading()" [disabled]="isLoading() || signupForm().invalid()" class="w-full"> </p-button>
+
+                <ul class="hk-auth-trust">
+                    <li><i class="pi pi-check-circle" aria-hidden="true"></i>{{ "signup.trust.noCard" | transloco }}</li>
+                    <li><i class="pi pi-shield" aria-hidden="true"></i>{{ "signup.trust.region" | transloco }}</li>
+                    <li><i class="pi pi-download" aria-hidden="true"></i>{{ "signup.trust.export" | transloco }}</li>
+                </ul>
             </form>
         </div>
         }
@@ -133,6 +139,10 @@
             <p class="hk-auth-footer-text">
                 <span>{{ "signup.haveAccount" | transloco }}</span>
                 <a routerLink="/login" class="hk-auth-link">{{ "signup.signInAction" | transloco }}</a>
+            </p>
+            <p class="hk-auth-footer-text">
+                <span>{{ "signup.trust.openSource" | transloco }}</span>
+                <a href="https://github.com/pascalebeier/hitkeep" class="hk-auth-link" target="_blank" rel="noopener">{{ "signup.trust.github" | transloco }}</a>
             </p>
             <p class="hk-auth-footer-text">
                 <a href="https://hitkeep.com/guides/installation/binary/" class="hk-auth-link" target="_blank" rel="noopener">{{ "signup.selfHostLink" | transloco }}</a>

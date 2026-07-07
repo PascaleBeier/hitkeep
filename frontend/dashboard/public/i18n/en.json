@@ -1131,7 +1131,6 @@
       "description": "Create delegated API clients with permissions capped to your own access.",
       "loading": "Loading API clients...",
       "empty": "No API clients yet.",
-      "listTitle": "Existing API clients",
       "createDialogTitle": "Add API client",
       "editDialogTitle": "Edit API client",
       "confirmDelete": "Delete API client \"{{name}}\"?",
@@ -1312,15 +1311,16 @@
     "danger": {
       "resetTitle": "Reset stats",
       "resetDescription": "Permanently clears this site's measured stats while keeping settings, access, goals, funnels, and tracking setup.",
-      "resetConfirmLabel": "Type \"{{domain}}\" to confirm the stats reset",
+      "resetConfirmTitle": "Reset stats",
+      "resetConfirmMessage": "Type \"{{domain}}\" to reset stats for this site.",
       "resetConfirmHint": "Tracking stays active. New data collected after the reset will appear normally.",
       "resetAction": "Reset stats",
       "resetSuccess": "Stats reset. Cleared {{rows}} row(s) and marked {{imports}} completed import(s) deleted.",
       "resetFailed": "Failed to reset site stats.",
       "deleteTitle": "Delete site",
       "deleteDescription": "Permanently deletes this site and all associated analytics data.",
-      "confirmLabel": "Type \"{{domain}}\" to confirm",
-      "confirmPlaceholder": "example.com",
+      "deleteConfirmTitle": "Delete site",
+      "deleteConfirmMessage": "Type \"{{domain}}\" to delete this site.",
       "deleteAction": "Delete site",
       "deleteFailed": "Failed to delete site."
     },
@@ -1477,7 +1477,13 @@
         "empty": "Not seen yet"
       },
       "webVitalsLabel": "Web Vitals",
-      "webVitalsDescription": "Load the separate Web Vitals bundle and send LCP, INP, CLS, FCP, and TTFB samples. Off by default."
+      "webVitalsDescription": "Load the separate Web Vitals bundle and send LCP, INP, CLS, FCP, and TTFB samples. Off by default.",
+      "domains": {
+        "label": "Tracker host",
+        "description": "Choose which available host to use in the generated browser tracker snippet.",
+        "defaultOption": "HitKeep instance URL",
+        "selectedHint": "Tracker URL: https://{{ hostname }}/hk.js"
+      }
     }
   },
   "admin": {
@@ -1588,7 +1594,10 @@
       "tabs": {
         "overview": "Overview",
         "members": "Members",
-        "settings": "Settings",
+        "apiClients": "API Clients",
+        "customDomains": "Custom Domains",
+        "branding": "Branding",
+        "dangerZone": "Danger Zone",
         "activity": "Activity"
       },
       "overview": {
@@ -1634,12 +1643,20 @@
           "description": "Unlock longer retention, more sites, and team capacity.",
           "currentPlan": "Current plan",
           "recommended": "Recommended",
+          "perMonth": "/mo",
+          "openSource": {
+            "note": "HitKeep is fully open source — including every paid feature. Cloud plans fund hosting and ongoing development.",
+            "support": "Prefer to support us another way?",
+            "sponsor": "Sponsor the open-source development",
+            "spread": "Or simply spread the word — it helps more than you think."
+          },
           "upgradeAction": "Upgrade to {{plan}}",
           "features": {
             "sites": "Up to {{count}} sites",
             "members": "Up to {{count}} team members",
             "retention": "{{count}}-year data retention",
-            "retentionDays": "{{count}}-day data retention"
+            "retentionDays": "{{count}}-day data retention",
+            "customDomains": "Custom tracking domains"
           }
         }
       },
@@ -1681,7 +1698,69 @@
           "lastOwner": "You cannot leave as the last owner.",
           "onlyTeam": "You cannot leave your only team.",
           "generic": "Failed to leave team. Please try again."
+        },
+        "trackingDomains": {
+          "title": "Custom domains",
+          "description": "Verify custom domains once, then use any active domain as a tracker host for this team’s sites.",
+          "hostnamePlaceholder": "analytics.example.com",
+          "addAction": "Add domain",
+          "hostnameLabel": "Hostname",
+          "setupAction": "DNS setup",
+          "setupDescription": "Add these DNS records at your DNS provider, then run verification.",
+          "hostnameRequired": "Enter a hostname.",
+          "hostnameInvalid": "Use a valid hostname such as analytics.example.com.",
+          "hostnameTooLong": "Hostnames can be at most 253 characters.",
+          "empty": "No tracking domains have been added yet.",
+          "enabled": "Enabled",
+          "disabled": "Disabled",
+          "active": "Active",
+          "notActive": "Not active",
+          "added": "Tracking domain added. Add the DNS records, then verify it.",
+          "checked": "Verification checked. Review the status details below.",
+          "verified": "Tracking domain verified and ready to use.",
+          "enabledSuccess": "Tracking domain enabled.",
+          "disabledSuccess": "Tracking domain disabled. Sites using it were reset to the default URL.",
+          "deleted": "Tracking domain removed.",
+          "verifyAction": "Verify",
+          "disableAction": "Disable",
+          "enableAction": "Enable",
+          "deleteConfirm": "Remove {{ hostname }}? Sites using it will reset to the default tracker URL.",
+          "dns": {
+            "txtName": "TXT name",
+            "txtValue": "TXT value",
+            "target": "CNAME, A, or AAAA target"
+          },
+          "checks": {
+            "ownership": "Ownership",
+            "target": "Target",
+            "tls": "TLS"
+          },
+          "checksLabel": "Verification checks",
+          "lastChecked": "Last checked",
+          "lastTLSAsk": "Last TLS ask",
+          "status": {
+            "pending": "Pending",
+            "verified": "Verified",
+            "failed": "Failed"
+          },
+          "tlsMode": {
+            "external": "External TLS",
+            "caddy-on-demand": "Caddy on-demand TLS"
+          },
+          "errors": {
+            "load": "Failed to load tracking domains.",
+            "add": "Failed to add tracking domain.",
+            "conflict": "That hostname is already used by another site or tracking domain.",
+            "verify": "Failed to verify tracking domain.",
+            "update": "Failed to update tracking domain.",
+            "delete": "Failed to remove tracking domain."
+          }
         }
+      },
+      "danger": {
+        "leaveConfirmTitle": "Leave team",
+        "archiveConfirmTitle": "Archive team",
+        "confirmNameLabel": "Type {{name}} to confirm"
       },
       "audit": {
         "readOnly": "You do not have permission to view team activity.",
@@ -2306,6 +2385,13 @@
       }
     },
     "selfHostLink": "Want to self-host? See the docs →",
+    "trust": {
+      "noCard": "No credit card required",
+      "region": "Your data stays in the region you pick",
+      "export": "Export or self-host anytime",
+      "openSource": "HitKeep is fully open source.",
+      "github": "View the code on GitHub"
+    },
     "tosLabel": "I agree to the",
     "tosLink": "Terms of Service",
     "tosAnd": "and",
@@ -3140,10 +3226,15 @@
   "cloud": {
     "retentionNotice": {
       "message": "Free plan data is retained for {{count}} days.",
+      "hint": "Upgrade to keep your full visitor history and unlock more sites and team seats.",
+      "usageMessageSites": "Your team is using {{current}} of {{limit}} sites on the Free plan.",
+      "usageMessageMembers": "Your team is using {{current}} of {{limit}} team members on the Free plan.",
       "upgradeAction": "Upgrade to Pro",
-      "compareAction": "Compare plans",
-      "dismissAction": "Dismiss retention notice",
-      "checkoutError": "Could not start checkout. Try again from billing."
+      "dismissAction": "Dismiss retention notice"
+    },
+    "planChip": {
+      "free": "Free plan",
+      "aria": "You are on the Free plan — view plans and upgrade"
     }
   }
 }

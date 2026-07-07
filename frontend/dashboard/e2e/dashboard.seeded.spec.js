@@ -402,18 +402,50 @@ test("ai chatbot page filters by seeded audience geography and network metrics",
     await expect(page.getByText(/ASN: (AS15169|AS701|AS7922|AS3320|AS3209|AS2856|AS3215|AS1136)/)).toBeVisible();
 });
 
-test("team admin page shows seeded members and settings", async ({ page }) => {
+test("team admin page shows seeded members and administration tabs", async ({ page }) => {
     await login(page, "/admin/team");
     await expect(page.getByRole("heading", { name: "Acme Analytics" })).toBeVisible();
 
     await page.getByRole("tab", { name: /^Members$/i }).click();
-    const membersPanel = page.getByLabel("Members");
+    await expect(page).toHaveURL(/\/admin\/team\/members$/);
+    const membersPanel = page.locator("app-team-members");
     await expect(membersPanel.getByText("bob@devtools.co")).toBeVisible();
     await expect(membersPanel.getByText("diana@saaslaunch.com")).toBeVisible();
 
-    await page.getByRole("tab", { name: /^Settings$/i }).click();
-    await expect(page.getByText("Team name")).toBeVisible();
+    await page.getByRole("tab", { name: /^API Clients$/i }).click();
     await expect(page.getByRole("heading", { name: "Team API clients" })).toBeVisible();
+
+    await page.getByRole("tab", { name: /^Custom Domains$/i }).click();
+    await expect(page.getByRole("heading", { name: "Custom domains" })).toBeVisible();
+    const trackingDomain = `track-${Date.now()}.acme-analytics.io`;
+    const customDomainsUrl = page.url();
+    await page.locator("app-team-tracking-domains header").getByRole("button", { name: "Add domain" }).click();
+    const addDomainDialog = page.getByRole("dialog", { name: "Add domain" });
+    await addDomainDialog.getByPlaceholder("analytics.example.com").fill(trackingDomain);
+    await expect(addDomainDialog.getByRole("button", { name: "Add domain" })).toBeEnabled();
+    await addDomainDialog.getByRole("button", { name: "Add domain" }).click();
+    // A successful create opens the DNS setup dialog with the records to copy.
+    const setupDialog = page.getByRole("dialog", { name: "DNS setup" });
+    await expect(setupDialog.getByText(`_hitkeep-tracking.${trackingDomain}`)).toBeVisible();
+    await setupDialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(page).toHaveURL(customDomainsUrl);
+    await expect(page.getByText(/Tracking domain added\./)).toBeVisible();
+    await expect(page.locator("app-team-tracking-domains tbody").getByText(trackingDomain, { exact: true })).toBeVisible();
+
+    await page.getByRole("tab", { name: /^Branding$/i }).click();
+    await expect(page.getByText("Team name", { exact: true })).toBeVisible();
+    await expect(page.getByText("Team logo", { exact: true })).toBeVisible();
+
+    await page.getByRole("tab", { name: /^Danger Zone$/i }).click();
+    await expect(page.getByRole("heading", { name: "Leave team" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Archive team" })).toBeVisible();
+    await page.getByRole("button", { name: "Leave team" }).click();
+    const leaveDialog = page.getByRole("alertdialog", { name: "Leave team" });
+    await expect(leaveDialog).toBeVisible();
+    await expect(leaveDialog.getByRole("button", { name: "Leave team" })).toBeDisabled();
+    await leaveDialog.getByLabel("Type Acme Analytics to confirm").fill("Acme Analytics");
+    await expect(leaveDialog.getByRole("button", { name: "Leave team" })).toBeEnabled();
+    await leaveDialog.getByRole("button", { name: "Cancel" }).click();
 
     await page.getByRole("tab", { name: /^Activity$/i }).click();
     await expect(page.getByRole("search", { name: "Audit filters" })).toBeVisible();

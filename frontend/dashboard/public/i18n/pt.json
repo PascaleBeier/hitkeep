@@ -1124,7 +1124,6 @@
       "description": "Crie clientes de API delegados com permissões limitadas ao seu próprio acesso.",
       "loading": "Carregando clientes de API...",
       "empty": "Nenhum cliente de API ainda.",
-      "listTitle": "Clientes de API existentes",
       "createDialogTitle": "Adicionar cliente de API",
       "editDialogTitle": "Editar cliente de API",
       "confirmDelete": "Excluir o cliente de API \"{{name}}\"?",
@@ -1305,15 +1304,16 @@
     "danger": {
       "resetTitle": "Redefinir estatísticas",
       "resetDescription": "Apaga permanentemente as estatísticas medidas deste site, mantendo configurações, acessos, metas, funis e configuração de rastreamento.",
-      "resetConfirmLabel": "Digite \"{{domain}}\" para confirmar a redefinição das estatísticas",
+      "resetConfirmTitle": "Redefinir estatísticas",
+      "resetConfirmMessage": "Digite \"{{domain}}\" para redefinir as estatísticas deste site.",
       "resetConfirmHint": "O rastreamento continua ativo. Novos dados coletados após a redefinição aparecerão normalmente.",
       "resetAction": "Redefinir estatísticas",
       "resetSuccess": "Estatísticas redefinidas. {{rows}} linha(s) apagada(s) e {{imports}} importação(ões) concluída(s) marcada(s) como excluída(s).",
       "resetFailed": "Não foi possível redefinir as estatísticas do site.",
       "deleteTitle": "Excluir site",
       "deleteDescription": "Exclui permanentemente este site e todos os dados analíticos associados.",
-      "confirmLabel": "Digite \"{{domain}}\" para confirmar",
-      "confirmPlaceholder": "exemplo.com",
+      "deleteConfirmTitle": "Excluir site",
+      "deleteConfirmMessage": "Digite \"{{domain}}\" para excluir este site.",
       "deleteAction": "Excluir site",
       "deleteFailed": "Falha ao excluir site."
     },
@@ -1470,7 +1470,13 @@
         "empty": "Não visto ainda"
       },
       "webVitalsLabel": "Web Vitals",
-      "webVitalsDescription": "Carregar o pacote separado Web Vitals e enviar amostras de LCP, INP, CLS, FCP e TTFB. Desativado por padrão."
+      "webVitalsDescription": "Carregar o pacote separado Web Vitals e enviar amostras de LCP, INP, CLS, FCP e TTFB. Desativado por padrão.",
+      "domains": {
+        "label": "Host do tracker",
+        "description": "Escolha qual host disponível será usado no snippet gerado do tracker do navegador.",
+        "defaultOption": "URL da instância do HitKeep",
+        "selectedHint": "URL do tracker: https://{{ hostname }}/hk.js"
+      }
     }
   },
   "admin": {
@@ -1581,7 +1587,10 @@
       "tabs": {
         "overview": "Visão geral",
         "members": "Membros",
-        "settings": "Configurações",
+        "apiClients": "Clientes de API",
+        "customDomains": "Domínios personalizados",
+        "branding": "Marca",
+        "dangerZone": "Zona de perigo",
         "activity": "Atividade"
       },
       "overview": {
@@ -1627,12 +1636,20 @@
           "description": "Desbloqueie maior período de retenção, mais sites e capacidade da equipe.",
           "currentPlan": "Plano atual",
           "recommended": "Recomendado",
+          "perMonth": "/mês",
+          "openSource": {
+            "note": "O HitKeep é totalmente open source – incluindo todos os recursos pagos. Os planos cloud financiam a hospedagem e o desenvolvimento.",
+            "support": "Prefere nos apoiar de outra forma?",
+            "sponsor": "Patrocine o desenvolvimento open source",
+            "spread": "Ou simplesmente espalhe a palavra – ajuda mais do que você imagina."
+          },
           "upgradeAction": "Upgrade para o {{plan}}",
           "features": {
             "sites": "Até {{count}} sites",
             "members": "Até {{count}} membros na equipe",
             "retention": "{{count}} anos de retenção de dados",
-            "retentionDays": "{{count}} dias de retenção de dados"
+            "retentionDays": "{{count}} dias de retenção de dados",
+            "customDomains": "Domínios de rastreamento personalizados"
           }
         }
       },
@@ -1674,7 +1691,69 @@
           "lastOwner": "Você não pode sair como o único proprietário.",
           "onlyTeam": "Você não pode sair da sua única equipe.",
           "generic": "Falha ao sair da equipe. Tente novamente."
+        },
+        "trackingDomains": {
+          "title": "Domínios personalizados",
+          "description": "Verifique dominios personalizados uma vez e use qualquer dominio ativo como host do tracker para os sites desta equipe.",
+          "hostnamePlaceholder": "analytics.example.com",
+          "addAction": "Adicionar dominio",
+          "hostnameLabel": "Nome do host",
+          "setupAction": "Configuração de DNS",
+          "setupDescription": "Adicione estes registros DNS no seu provedor de DNS e depois execute a verificação.",
+          "hostnameRequired": "Informe um nome de host.",
+          "hostnameInvalid": "Use um nome de host válido, como analytics.example.com.",
+          "hostnameTooLong": "Nomes de host podem ter no máximo 253 caracteres.",
+          "empty": "Nenhum dominio de rastreamento foi adicionado ainda.",
+          "enabled": "Ativado",
+          "disabled": "Desativado",
+          "active": "Ativo",
+          "notActive": "Inativo",
+          "added": "Dominio de rastreamento adicionado. Configure os registros DNS e depois verifique.",
+          "checked": "Verificacao concluida. Revise os detalhes de status abaixo.",
+          "verified": "Dominio de rastreamento verificado e pronto para uso.",
+          "enabledSuccess": "Dominio de rastreamento ativado.",
+          "disabledSuccess": "Dominio de rastreamento desativado. Sites que o usavam voltaram para a URL padrao.",
+          "deleted": "Dominio de rastreamento removido.",
+          "verifyAction": "Verificar",
+          "disableAction": "Desativar",
+          "enableAction": "Ativar",
+          "deleteConfirm": "Remover {{ hostname }}? Sites que o usam voltarao para a URL padrao do tracker.",
+          "dns": {
+            "txtName": "Nome TXT",
+            "txtValue": "Valor TXT",
+            "target": "Destino CNAME, A ou AAAA"
+          },
+          "checks": {
+            "ownership": "Propriedade",
+            "target": "Destino",
+            "tls": "TLS"
+          },
+          "checksLabel": "Verificações",
+          "lastChecked": "Ultima verificacao",
+          "lastTLSAsk": "Última solicitação TLS",
+          "status": {
+            "pending": "Pendente",
+            "verified": "Verificado",
+            "failed": "Falhou"
+          },
+          "tlsMode": {
+            "external": "TLS externo",
+            "caddy-on-demand": "TLS sob demanda do Caddy"
+          },
+          "errors": {
+            "load": "Nao foi possivel carregar os dominios de rastreamento.",
+            "add": "Nao foi possivel adicionar o dominio de rastreamento.",
+            "conflict": "Esse hostname ja e usado por outro site ou dominio de rastreamento.",
+            "verify": "Nao foi possivel verificar o dominio de rastreamento.",
+            "update": "Nao foi possivel atualizar o dominio de rastreamento.",
+            "delete": "Nao foi possivel remover o dominio de rastreamento."
+          }
         }
+      },
+      "danger": {
+        "leaveConfirmTitle": "Sair da equipe",
+        "archiveConfirmTitle": "Arquivar equipe",
+        "confirmNameLabel": "Digite {{name}} para confirmar"
       },
       "audit": {
         "readOnly": "Você não tem permissão para visualizar a atividade da equipe.",
@@ -2282,6 +2361,13 @@
       }
     },
     "selfHostLink": "Quer fazer self-host? Consulte a documentação →",
+    "trust": {
+      "noCard": "Não precisa de cartão de crédito",
+      "region": "Seus dados permanecem na região escolhida",
+      "export": "Exporte ou hospede você mesmo a qualquer momento",
+      "openSource": "O HitKeep é totalmente open source.",
+      "github": "Veja o código no GitHub"
+    },
     "tosLabel": "Eu concordo com os",
     "tosLink": "Termos de Serviço",
     "tosAnd": "e",
@@ -3116,10 +3202,15 @@
   "cloud": {
     "retentionNotice": {
       "message": "Os dados do plano gratuito são mantidos por {{count}} dias.",
+      "hint": "Faça upgrade para manter todo o histórico de visitantes e desbloquear mais sites e assentos de equipe.",
+      "usageMessageSites": "Sua equipe está usando {{current}} de {{limit}} sites do plano gratuito.",
+      "usageMessageMembers": "Sua equipe está usando {{current}} de {{limit}} membros do plano gratuito.",
       "upgradeAction": "Fazer upgrade para Pro",
-      "compareAction": "Comparar planos",
-      "dismissAction": "Dispensar aviso",
-      "checkoutError": "Não foi possível iniciar o checkout. Tente novamente em faturamento."
+      "dismissAction": "Dispensar aviso"
+    },
+    "planChip": {
+      "free": "Plano gratuito",
+      "aria": "Você está no plano gratuito – veja os planos e faça upgrade"
     }
   }
 }

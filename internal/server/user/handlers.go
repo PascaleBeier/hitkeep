@@ -170,6 +170,26 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		TeamCap:     authcore.CapTeamManageSettings,
 		RateLimiter: ctx.ApiLimiter,
 	}, h.handleUpdateTeam()))
+	mux.HandleFunc("GET /api/user/teams/{id}/tracking-domains", ctx.Handler(shared.HandlerConfig{
+		TeamCap:     authcore.CapTeamManageSettings,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleListCustomTrackingDomains()))
+	mux.HandleFunc("POST /api/user/teams/{id}/tracking-domains", ctx.Handler(shared.HandlerConfig{
+		TeamCap:     authcore.CapTeamManageSettings,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleCreateCustomTrackingDomain()))
+	mux.HandleFunc("POST /api/user/teams/{id}/tracking-domains/{domainId}/verify", ctx.Handler(shared.HandlerConfig{
+		TeamCap:     authcore.CapTeamManageSettings,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleVerifyCustomTrackingDomain()))
+	mux.HandleFunc("PATCH /api/user/teams/{id}/tracking-domains/{domainId}", ctx.Handler(shared.HandlerConfig{
+		TeamCap:     authcore.CapTeamManageSettings,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleUpdateCustomTrackingDomain()))
+	mux.HandleFunc("DELETE /api/user/teams/{id}/tracking-domains/{domainId}", ctx.Handler(shared.HandlerConfig{
+		TeamCap:     authcore.CapTeamManageSettings,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleDeleteCustomTrackingDomain()))
 	mux.HandleFunc("POST /api/user/teams/{id}/transfer-ownership", ctx.Handler(shared.HandlerConfig{
 		TeamCap:     authcore.CapTeamTransferOwnership,
 		RateLimiter: ctx.ApiLimiter,

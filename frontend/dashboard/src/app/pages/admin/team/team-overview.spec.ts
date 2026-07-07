@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { TranslocoTestingModule } from '@jsverse/transloco';
+import { provideTranslocoLocale } from '@jsverse/transloco-locale';
 import { TeamOverviewPage } from './team-overview';
 import { TeamService } from '@services/team.service';
 import { AnalyticsService } from '@services/analytics.service';
@@ -157,6 +158,7 @@ describe('TeamOverviewPage', () => {
                 })
             ],
             providers: [
+                provideTranslocoLocale({ langToLocaleMapping: { en: 'en-US' } }),
                 {
                     provide: TeamService,
                     useValue: {

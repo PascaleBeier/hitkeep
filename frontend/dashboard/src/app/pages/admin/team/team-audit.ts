@@ -1,11 +1,13 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { MessageModule } from 'primeng/message';
 import { finalize } from 'rxjs';
 
 import { AuditTableComponent } from '@components/audit-table/audit-table';
 import { AuditTableQuery } from '@components/audit-table/audit-table.types';
 import { TEAM_CAPABILITIES } from '@core/access/capabilities';
+import { SettingsCard } from '@features/settings/components/settings-card';
 import { TeamAuditEntry } from '@models/analytics.types';
 import { AccessService } from '@services/access.service';
 import { AuditPresentationService } from '@services/audit-presentation.service';
@@ -13,9 +15,8 @@ import { TeamService } from '@services/team.service';
 
 @Component({
     selector: 'app-team-audit',
-    imports: [AuditTableComponent, TranslocoPipe],
+    imports: [AuditTableComponent, MessageModule, SettingsCard, TranslocoPipe],
     templateUrl: './team-audit.html',
-    styleUrl: './team-audit.css',
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class TeamAuditPage {

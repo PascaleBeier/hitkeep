@@ -82,6 +82,7 @@ func (w *CloudLifecycleWorker) RunAt(ctx context.Context, now time.Time) {
 
 	w.processKind(ctx, database.CloudLifecycleMessageWelcome, now.UTC())
 	w.processKind(ctx, database.CloudLifecycleMessageFreeRetentionReminder, now.UTC())
+	w.processKind(ctx, database.CloudLifecycleMessageFreeLimitReminder, now.UTC())
 }
 
 func (w *CloudLifecycleWorker) processKind(ctx context.Context, kind string, now time.Time) {
@@ -150,6 +151,14 @@ func cloudLifecycleMailable(kind string, recipient database.CloudLifecycleRecipi
 			cloudLifecycleFreeRetentionDays,
 			links,
 		)
+	case database.CloudLifecycleMessageFreeLimitReminder:
+		return mailables.NewCloudFreeLimitReminder(
+			recipient.Locale,
+			cloudLifecycleTeamName(recipient),
+			database.CloudFreePlanSiteLimit,
+			database.CloudFreePlanMemberLimit,
+			links,
+		)
 	default:
 		return nil
 	}
@@ -168,6 +177,8 @@ func cloudLifecycleLinks(conf *config.Config) mailables.CloudLifecycleLinks {
 
 	return mailables.CloudLifecycleLinks{
 		DashboardURL: appurl.Path(conf.PublicURL, "/admin/team"),
+		UpgradeURL:   appurl.Path(conf.PublicURL, "/admin/team/overview"),
+		FundingURL:   appurl.Path(docsBase, "/support/funding/"),
 		DocsURL:      appurl.Path(docsBase, "/guides/introduction/"),
 		WordPressURL: appurl.Path(docsBase, "/guides/integrations/wordpress/"),
 		FeedbackURL:  feedbackURL,

@@ -1,0 +1,16 @@
+{{ define "content" -}}
+{{ t "cloud.limit.heading" }}
+===========================
+
+{{ tf "cloud.limit.body" .TeamName .SiteLimit .MemberLimit }}
+
+{{ t "cloud.limit.reason" }}
+
+{{ t "cloud.retention.plans_button" }}: {{ .UpgradeURL }}
+
+--
+
+{{ t "cloud.opensource.note" }}
+{{ t "cloud.opensource.support" }} {{ t "cloud.opensource.sponsor" }}: {{ .FundingURL }}
+{{ t "cloud.opensource.spread" }}
+{{- end }}

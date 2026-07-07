@@ -251,6 +251,43 @@ describe('TeamService', () => {
         req.flush({ status: 'ok' });
     });
 
+    it('should manage tracking domain endpoints', () => {
+        service.listTrackingDomains('team-id').subscribe((domains) => {
+            expect(domains[0].hostname).toBe('analytics.example.com');
+        });
+        const listReq = httpMock.expectOne('/api/user/teams/team-id/tracking-domains');
+        expect(listReq.request.method).toBe('GET');
+        listReq.flush([trackingDomain()]);
+
+        service.createTrackingDomain('team-id', { hostname: 'analytics.example.com' }).subscribe((domain) => {
+            expect(domain.id).toBe('domain-1');
+        });
+        const createReq = httpMock.expectOne('/api/user/teams/team-id/tracking-domains');
+        expect(createReq.request.method).toBe('POST');
+        expect(createReq.request.body).toEqual({ hostname: 'analytics.example.com' });
+        createReq.flush(trackingDomain());
+
+        service.verifyTrackingDomain('team-id', 'domain-1').subscribe((domain) => {
+            expect(domain.active).toBe(true);
+        });
+        const verifyReq = httpMock.expectOne('/api/user/teams/team-id/tracking-domains/domain-1/verify');
+        expect(verifyReq.request.method).toBe('POST');
+        verifyReq.flush(trackingDomain());
+
+        service.updateTrackingDomain('team-id', 'domain-1', { enabled: false }).subscribe((domain) => {
+            expect(domain.enabled).toBe(false);
+        });
+        const updateReq = httpMock.expectOne('/api/user/teams/team-id/tracking-domains/domain-1');
+        expect(updateReq.request.method).toBe('PATCH');
+        expect(updateReq.request.body).toEqual({ enabled: false });
+        updateReq.flush({ ...trackingDomain(), enabled: false, active: false });
+
+        service.deleteTrackingDomain('team-id', 'domain-1').subscribe();
+        const deleteReq = httpMock.expectOne('/api/user/teams/team-id/tracking-domains/domain-1');
+        expect(deleteReq.request.method).toBe('DELETE');
+        deleteReq.flush(null);
+    });
+
     it('should leave team and update local state', () => {
         service.teams.set([
             { id: 'team-a', name: 'Team A', logo_url: '', role: 'owner', created_at: '2026-01-01T00:00:00Z' },
@@ -296,3 +333,22 @@ describe('TeamService', () => {
         expect(service.teams().map((team) => team.id)).toEqual(['team-a']);
     });
 });
+
+function trackingDomain() {
+    return {
+        id: 'domain-1',
+        team_id: 'team-id',
+        hostname: 'analytics.example.com',
+        verification_status: 'verified',
+        target_status: 'verified',
+        tls_mode: 'external',
+        tls_status: 'verified',
+        enabled: true,
+        active: true,
+        dns_txt_name: '_hitkeep-tracking.analytics.example.com',
+        dns_txt_value: 'hitkeep-domain-verification=token',
+        dns_target: 'hitkeep.test',
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z'
+    } as const;
+}

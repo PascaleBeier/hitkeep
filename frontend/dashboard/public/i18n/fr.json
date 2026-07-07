@@ -1131,7 +1131,6 @@
       "description": "Créez des clients API délégués avec des permissions limitées à votre propre accès.",
       "loading": "Chargement des clients API...",
       "empty": "Aucun client API pour le moment.",
-      "listTitle": "Clients API existants",
       "createDialogTitle": "Ajouter un client API",
       "editDialogTitle": "Modifier le client API",
       "confirmDelete": "Supprimer le client API \"{{name}}\" ?",
@@ -1312,15 +1311,16 @@
     "danger": {
       "resetTitle": "Réinitialiser les statistiques",
       "resetDescription": "Efface définitivement les statistiques mesurées de ce site tout en conservant les paramètres, les accès, les objectifs, les entonnoirs et la configuration du suivi.",
-      "resetConfirmLabel": "Saisissez \"{{domain}}\" pour confirmer la réinitialisation des statistiques",
+      "resetConfirmTitle": "Réinitialiser les statistiques",
+      "resetConfirmMessage": "Saisissez \"{{domain}}\" pour réinitialiser les statistiques de ce site.",
       "resetConfirmHint": "Le suivi reste actif. Les nouvelles données collectées après la réinitialisation s'afficheront normalement.",
       "resetAction": "Réinitialiser les statistiques",
       "resetSuccess": "Statistiques réinitialisées. {{rows}} ligne(s) effacée(s) et {{imports}} import(s) terminé(s) marqué(s) comme supprimé(s).",
       "resetFailed": "Impossible de réinitialiser les statistiques du site.",
       "deleteTitle": "Supprimer le site",
       "deleteDescription": "Supprime définitivement ce site et toutes les données analytiques associées.",
-      "confirmLabel": "Tapez \"{{domain}}\" pour confirmer",
-      "confirmPlaceholder": "example.com",
+      "deleteConfirmTitle": "Supprimer le site",
+      "deleteConfirmMessage": "Saisissez \"{{domain}}\" pour supprimer ce site.",
       "deleteAction": "Supprimer le site",
       "deleteFailed": "Echec de suppression du site."
     },
@@ -1477,7 +1477,13 @@
         "empty": "Pas encore vu"
       },
       "webVitalsLabel": "Web Vitals",
-      "webVitalsDescription": "Charge le bundle Web Vitals séparé et envoie des échantillons LCP, INP, CLS, FCP et TTFB. Désactivé par défaut."
+      "webVitalsDescription": "Charge le bundle Web Vitals séparé et envoie des échantillons LCP, INP, CLS, FCP et TTFB. Désactivé par défaut.",
+      "domains": {
+        "label": "Hôte du tracker",
+        "description": "Choisissez l’hôte disponible à utiliser dans le snippet de tracker navigateur généré.",
+        "defaultOption": "URL de l’instance HitKeep",
+        "selectedHint": "URL du tracker : https://{{ hostname }}/hk.js"
+      }
     }
   },
   "admin": {
@@ -1588,7 +1594,10 @@
       "tabs": {
         "overview": "Aperçu",
         "members": "Membres",
-        "settings": "Paramètres",
+        "apiClients": "Clients API",
+        "customDomains": "Domaines personnalisés",
+        "branding": "Identité",
+        "dangerZone": "Zone de danger",
         "activity": "Activité"
       },
       "overview": {
@@ -1634,12 +1643,20 @@
           "description": "Débloquez une rétention plus longue, plus de sites et de capacité d'équipe.",
           "currentPlan": "Plan actuel",
           "recommended": "Recommandé",
+          "perMonth": "/mois",
+          "openSource": {
+            "note": "HitKeep est entièrement open source – y compris toutes les fonctionnalités payantes. Les offres cloud financent l'hébergement et le développement.",
+            "support": "Vous préférez nous soutenir autrement ?",
+            "sponsor": "Sponsorisez le développement open source",
+            "spread": "Ou parlez simplement de HitKeep autour de vous – cela aide plus que vous ne le pensez."
+          },
           "upgradeAction": "Passer à {{plan}}",
           "features": {
             "sites": "Jusqu'à {{count}} sites",
             "members": "Jusqu'à {{count}} membres d'équipe",
             "retention": "{{count}} ans de rétention des données",
-            "retentionDays": "{{count}} jours de rétention des données"
+            "retentionDays": "{{count}} jours de rétention des données",
+            "customDomains": "Domaines de suivi personnalisés"
           }
         }
       },
@@ -1681,7 +1698,69 @@
           "lastOwner": "Vous ne pouvez pas quitter l'équipe en tant que dernier propriétaire.",
           "onlyTeam": "Vous ne pouvez pas quitter votre seule équipe.",
           "generic": "Impossible de quitter l'équipe. Veuillez réessayer."
+        },
+        "trackingDomains": {
+          "title": "Domaines personnalisés",
+          "description": "Verifiez des domaines personnalises une fois, puis utilisez tout domaine actif comme hote de tracker pour les sites de cette equipe.",
+          "hostnamePlaceholder": "analytics.example.com",
+          "addAction": "Ajouter un domaine",
+          "hostnameLabel": "Nom d'hôte",
+          "setupAction": "Configuration DNS",
+          "setupDescription": "Ajoutez ces enregistrements DNS chez votre fournisseur DNS, puis lancez la vérification.",
+          "hostnameRequired": "Saisissez un nom d'hôte.",
+          "hostnameInvalid": "Utilisez un nom d'hôte valide comme analytics.example.com.",
+          "hostnameTooLong": "Les noms d'hôte peuvent contenir au maximum 253 caractères.",
+          "empty": "Aucun domaine de suivi n a encore ete ajoute.",
+          "enabled": "Active",
+          "disabled": "Desactive",
+          "active": "Actif",
+          "notActive": "Inactif",
+          "added": "Domaine de suivi ajoute. Ajoutez les enregistrements DNS, puis verifiez-le.",
+          "checked": "Verification effectuee. Consultez les details de statut ci-dessous.",
+          "verified": "Domaine de suivi verifie et pret a etre utilise.",
+          "enabledSuccess": "Domaine de suivi active.",
+          "disabledSuccess": "Domaine de suivi desactive. Les sites qui l utilisaient ont ete remis sur l URL par defaut.",
+          "deleted": "Domaine de suivi supprime.",
+          "verifyAction": "Verifier",
+          "disableAction": "Desactiver",
+          "enableAction": "Activer",
+          "deleteConfirm": "Supprimer {{ hostname }} ? Les sites qui l utilisent reviendront a l URL de tracker par defaut.",
+          "dns": {
+            "txtName": "Nom TXT",
+            "txtValue": "Valeur TXT",
+            "target": "Cible CNAME, A ou AAAA"
+          },
+          "checks": {
+            "ownership": "Propriete",
+            "target": "Cible",
+            "tls": "TLS"
+          },
+          "checksLabel": "Contrôles de vérification",
+          "lastChecked": "Derniere verification",
+          "lastTLSAsk": "Dernière demande TLS",
+          "status": {
+            "pending": "En attente",
+            "verified": "Verifie",
+            "failed": "Echoue"
+          },
+          "tlsMode": {
+            "external": "TLS externe",
+            "caddy-on-demand": "TLS a la demande Caddy"
+          },
+          "errors": {
+            "load": "Impossible de charger les domaines de suivi.",
+            "add": "Impossible d ajouter le domaine de suivi.",
+            "conflict": "Ce hostname est deja utilise par un autre site ou domaine de suivi.",
+            "verify": "Impossible de verifier le domaine de suivi.",
+            "update": "Impossible de mettre a jour le domaine de suivi.",
+            "delete": "Impossible de supprimer le domaine de suivi."
+          }
         }
+      },
+      "danger": {
+        "leaveConfirmTitle": "Quitter l’équipe",
+        "archiveConfirmTitle": "Archiver l’équipe",
+        "confirmNameLabel": "Saisissez {{name}} pour confirmer"
       },
       "audit": {
         "readOnly": "Vous n'avez pas la permission de voir l'activité de l'équipe.",
@@ -2306,6 +2385,13 @@
       }
     },
     "selfHostLink": "Vous préférez héberger vous-même ? Voir la documentation →",
+    "trust": {
+      "noCard": "Aucune carte bancaire requise",
+      "region": "Vos données restent dans la région choisie",
+      "export": "Exportez ou auto-hébergez à tout moment",
+      "openSource": "HitKeep est entièrement open source.",
+      "github": "Voir le code sur GitHub"
+    },
     "tosLabel": "J'accepte les",
     "tosLink": "Conditions d'utilisation",
     "tosAnd": "et la",
@@ -3140,10 +3226,15 @@
   "cloud": {
     "retentionNotice": {
       "message": "Les données du forfait gratuit sont conservées pendant {{count}} jours.",
+      "hint": "Passez à l'offre supérieure pour conserver tout votre historique de visiteurs et débloquer plus de sites et de sièges d'équipe.",
+      "usageMessageSites": "Votre équipe utilise {{current}} sites sur {{limit}} dans l'offre gratuite.",
+      "usageMessageMembers": "Votre équipe utilise {{current}} sièges sur {{limit}} dans l'offre gratuite.",
       "upgradeAction": "Passer à Pro",
-      "compareAction": "Comparer les offres",
-      "dismissAction": "Fermer l’avis",
-      "checkoutError": "Impossible de lancer le paiement. Réessayez depuis la facturation."
+      "dismissAction": "Fermer l’avis"
+    },
+    "planChip": {
+      "free": "Offre gratuite",
+      "aria": "Vous utilisez l'offre gratuite – voir les offres et mettre à niveau"
     }
   }
 }

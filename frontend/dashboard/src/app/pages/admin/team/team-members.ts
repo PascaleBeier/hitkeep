@@ -9,6 +9,7 @@ import { dialogCancelButton, dialogDangerButton, dialogPrimaryButton } from '@co
 import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
 import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
 import { TEAM_CAPABILITIES } from '@core/access/capabilities';
+import { SettingsCard } from '@features/settings/components/settings-card';
 import { TeamInvite, TeamMember, TeamRole } from '@models/analytics.types';
 import { AccessService } from '@services/access.service';
 import { TeamService } from '@services/team.service';
@@ -18,6 +19,7 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
 import { InputTextModule } from 'primeng/inputtext';
+import { MessageModule } from 'primeng/message';
 import { SelectModule } from 'primeng/select';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
@@ -30,9 +32,8 @@ interface TeamRoleOption {
 
 @Component({
     selector: 'app-team-members',
-    imports: [ReactiveFormsModule, ButtonModule, ConfirmDialogModule, IconFieldModule, InputIconModule, InputTextModule, SelectModule, TableModule, TagModule, CrudDialog, RelativeDateTime, TableRowActions, TranslocoPipe],
+    imports: [ReactiveFormsModule, ButtonModule, ConfirmDialogModule, IconFieldModule, InputIconModule, InputTextModule, MessageModule, SelectModule, TableModule, TagModule, SettingsCard, CrudDialog, RelativeDateTime, TableRowActions, TranslocoPipe],
     templateUrl: './team-members.html',
-    styleUrl: './team-members.css',
     changeDetection: ChangeDetectionStrategy.OnPush,
     providers: [ConfirmationService]
 })
@@ -211,7 +212,7 @@ export class TeamMembersPage {
     protected roleControlFor(member: TeamMember): FormControl<TeamRole> {
         const existing = this.roleControls.get(member.user_id);
         if (existing) return existing;
-        const control = new FormControl<TeamRole>(member.role, { nonNullable: true });
+        const control = new FormControl<TeamRole>({ value: member.role, disabled: this.isRoleControlDisabled(member) }, { nonNullable: true });
         this.roleControls.set(member.user_id, control);
         return control;
     }
@@ -378,9 +379,15 @@ export class TeamMembersPage {
         this.errorKey.set(null);
         this.successKey.set(null);
         this.removingUserID.set(member.user_id);
+        this.setRoleControlDisabled(member.user_id, true);
         this.teamService
             .removeTeamMember(teamID, member.user_id)
-            .pipe(finalize(() => this.removingUserID.set(null)))
+            .pipe(
+                finalize(() => {
+                    this.removingUserID.set(null);
+                    this.setRoleControlDisabled(member.user_id, false);
+                })
+            )
             .subscribe({
                 next: () => {
                     this.members.update((current) => current.filter((entry) => entry.user_id !== member.user_id));
@@ -485,6 +492,7 @@ export class TeamMembersPage {
             delete next[userID];
             return next;
         });
+        this.setRoleControlDisabled(userID, value);
     }
 
     private setInviteActionState(inviteID: string, value: boolean) {
@@ -506,6 +514,23 @@ export class TeamMembersPage {
             if (control.value !== member.role) {
                 control.setValue(member.role, { emitEvent: false });
             }
+            this.setRoleControlDisabled(member.user_id, this.isRoleControlDisabled(member));
+        }
+    }
+
+    private isRoleControlDisabled(member: TeamMember): boolean {
+        return this.isRoleUpdating(member) || this.removingUserID() === member.user_id;
+    }
+
+    private setRoleControlDisabled(userID: string, disabled: boolean): void {
+        const control = this.roleControls.get(userID);
+        if (!control) return;
+        if (disabled && control.enabled) {
+            control.disable({ emitEvent: false });
+            return;
+        }
+        if (!disabled && control.disabled) {
+            control.enable({ emitEvent: false });
         }
     }
 

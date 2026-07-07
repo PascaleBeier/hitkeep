@@ -88,6 +88,57 @@ type Site struct {
 	CreatedAt         time.Time `json:"created_at"`
 }
 
+type CustomTrackingDomainStatus string
+
+const (
+	CustomTrackingDomainStatusPending  CustomTrackingDomainStatus = "pending"
+	CustomTrackingDomainStatusVerified CustomTrackingDomainStatus = "verified"
+	CustomTrackingDomainStatusFailed   CustomTrackingDomainStatus = "failed"
+)
+
+type CustomTrackingTLSMode string
+
+const (
+	CustomTrackingTLSModeExternal      CustomTrackingTLSMode = "external"
+	CustomTrackingTLSModeCaddyOnDemand CustomTrackingTLSMode = "caddy-on-demand"
+)
+
+type CustomTrackingDomain struct {
+	ID                 uuid.UUID                  `json:"id"`
+	TeamID             uuid.UUID                  `json:"team_id"`
+	Hostname           string                     `json:"hostname"`
+	VerificationStatus CustomTrackingDomainStatus `json:"verification_status"`
+	TargetStatus       CustomTrackingDomainStatus `json:"target_status"`
+	TLSMode            CustomTrackingTLSMode      `json:"tls_mode"`
+	TLSStatus          CustomTrackingDomainStatus `json:"tls_status"`
+	Enabled            bool                       `json:"enabled"`
+	Active             bool                       `json:"active"`
+	DNSTXTName         string                     `json:"dns_txt_name"`
+	DNSTXTValue        string                     `json:"dns_txt_value"`
+	DNSTarget          string                     `json:"dns_target"`
+	LastError          string                     `json:"last_error,omitempty"`
+	VerifiedAt         *time.Time                 `json:"verified_at,omitempty"`
+	LastCheckedAt      *time.Time                 `json:"last_checked_at,omitempty"`
+	LastTLSAskAt       *time.Time                 `json:"last_tls_ask_at,omitempty"`
+	CreatedAt          time.Time                  `json:"created_at"`
+	UpdatedAt          time.Time                  `json:"updated_at"`
+}
+
+type CreateCustomTrackingDomainRequest struct {
+	Hostname string `json:"hostname"`
+}
+
+type UpdateCustomTrackingDomainRequest struct {
+	Enabled *bool `json:"enabled"`
+}
+
+type SiteTrackingDomainOptions struct {
+	SiteID     uuid.UUID              `json:"site_id"`
+	TeamID     uuid.UUID              `json:"team_id"`
+	DefaultURL string                 `json:"default_url"`
+	Domains    []CustomTrackingDomain `json:"domains"`
+}
+
 type ShareLink struct {
 	ID        uuid.UUID `json:"id"`
 	SiteID    uuid.UUID `json:"site_id"`

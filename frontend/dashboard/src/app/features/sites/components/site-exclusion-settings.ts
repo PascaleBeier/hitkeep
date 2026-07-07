@@ -9,6 +9,8 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ConfirmationService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { IconFieldModule } from 'primeng/iconfield';
+import { InputIconModule } from 'primeng/inputicon';
 import { InputTextModule } from 'primeng/inputtext';
 import { MessageModule } from 'primeng/message';
 import { SelectModule } from 'primeng/select';
@@ -43,7 +45,23 @@ type ExclusionRow = IPExclusion & {
 @Component({
     selector: 'app-site-exclusion-settings',
     standalone: true,
-    imports: [ReactiveFormsModule, NgOptimizedImage, ButtonModule, ConfirmDialogModule, InputTextModule, MessageModule, SelectModule, TableModule, CopyControl, CrudDialog, RelativeDateTime, TableRowActions, TranslocoPipe],
+    imports: [
+        ReactiveFormsModule,
+        NgOptimizedImage,
+        ButtonModule,
+        ConfirmDialogModule,
+        IconFieldModule,
+        InputIconModule,
+        InputTextModule,
+        MessageModule,
+        SelectModule,
+        TableModule,
+        CopyControl,
+        CrudDialog,
+        RelativeDateTime,
+        TableRowActions,
+        TranslocoPipe
+    ],
     templateUrl: './site-exclusion-settings.html',
     styleUrl: './site-exclusion-settings.css',
     changeDetection: ChangeDetectionStrategy.OnPush,

@@ -586,6 +586,42 @@ async function openCreateTeamDialog(page) {
   }
 }
 
+async function captureTeamCustomDomains(page, record) {
+  if (!(await clickTab(page, "custom domains", TABLE_SETTLE))) {
+    console.warn("    ! Custom domains tab not found, skipping custom domain screenshots");
+    return;
+  }
+
+  const section = page.locator("app-team-tracking-domains");
+  const hasDomains = await section.locator("tbody tr").count();
+  if (!hasDomains) {
+    // Create one domain through the add dialog so the table has content;
+    // a successful create opens the DNS setup dialog on its own.
+    await section.locator("header").getByRole("button", { name: /add domain/i }).click();
+    const addDialog = page.getByRole("dialog", { name: /add domain/i });
+    await addDialog.getByPlaceholder("analytics.example.com").fill(`track.${DEMO_SITE_DOMAIN}`);
+    await addDialog.getByRole("button", { name: /add domain/i }).click();
+  } else {
+    const rowActions = section.locator("app-table-row-actions button").first();
+    if (await rowActions.count()) {
+      await rowActions.click();
+      await page.getByRole("menuitem", { name: /dns setup/i }).click();
+    }
+  }
+
+  const setupDialog = page.getByRole("dialog", { name: /dns setup/i });
+  await setupDialog.waitFor({ state: "visible", timeout: 8_000 }).catch(() => {});
+  if (await setupDialog.count()) {
+    await page.waitForTimeout(FORM_SETTLE);
+    record("feature-custom-domain-setup", await shoot(page, "feature-custom-domain-setup"));
+    await setupDialog.getByRole("button", { name: /cancel/i }).click();
+    await page.waitForTimeout(300);
+  }
+
+  await page.waitForTimeout(TABLE_SETTLE);
+  record("admin-team-custom-domains", await shoot(page, "admin-team-custom-domains"));
+}
+
 async function run() {
   console.log("\n  HitKeep Dashboard Screenshot Tool");
   console.log("  ────────────────────────────────");
@@ -770,16 +806,12 @@ async function run() {
     if (await clickTab(page, "members")) {
       record("admin-team-members", await shoot(page, "admin-team-members"));
     }
-    if (await clickTab(page, "settings", FORM_SETTLE)) {
-      record("admin-team-settings", await shoot(page, "admin-team-settings"));
-      await page.evaluate(() => {
-        const apiClients = document.querySelector("app-settings-api-clients");
-        if (apiClients) {
-          apiClients.scrollIntoView({ behavior: "instant", block: "start" });
-        }
-      });
-      await page.waitForTimeout(TABLE_SETTLE);
+    if (await clickTab(page, "api clients", TABLE_SETTLE)) {
       record("admin-team-api-clients", await shoot(page, "admin-team-api-clients"));
+    }
+    await captureTeamCustomDomains(page, record);
+    if (await clickTab(page, "branding", FORM_SETTLE)) {
+      record("admin-team-settings", await shoot(page, "admin-team-settings"));
     }
     if (await clickTab(page, "activity", FORM_SETTLE)) {
       record("admin-team-audit", await shoot(page, "admin-team-audit"));

@@ -1131,7 +1131,6 @@
       "description": "Crea client API delegati con permessi limitati al tuo livello di accesso.",
       "loading": "Caricamento client API...",
       "empty": "Nessun client API al momento.",
-      "listTitle": "Client API esistenti",
       "createDialogTitle": "Aggiungi client API",
       "editDialogTitle": "Modifica client API",
       "confirmDelete": "Eliminare il client API \"{{name}}\"?",
@@ -1312,15 +1311,16 @@
     "danger": {
       "resetTitle": "Reimposta statistiche",
       "resetDescription": "Cancella definitivamente le statistiche misurate di questo sito, mantenendo impostazioni, accessi, obiettivi, funnel e configurazione del tracciamento.",
-      "resetConfirmLabel": "Digita \"{{domain}}\" per confermare la reimpostazione delle statistiche",
+      "resetConfirmTitle": "Reimposta statistiche",
+      "resetConfirmMessage": "Digita \"{{domain}}\" per reimpostare le statistiche di questo sito.",
       "resetConfirmHint": "Il tracciamento resta attivo. I nuovi dati raccolti dopo la reimpostazione verranno mostrati normalmente.",
       "resetAction": "Reimposta statistiche",
       "resetSuccess": "Statistiche reimpostate. Cancellate {{rows}} riga/righe e contrassegnate {{imports}} importazione/i completate come eliminate.",
       "resetFailed": "Impossibile reimpostare le statistiche del sito.",
       "deleteTitle": "Elimina sito",
       "deleteDescription": "Elimina definitivamente questo sito e tutti i dati analitici associati.",
-      "confirmLabel": "Digita \"{{domain}}\" per confermare",
-      "confirmPlaceholder": "example.com",
+      "deleteConfirmTitle": "Elimina sito",
+      "deleteConfirmMessage": "Digita \"{{domain}}\" per eliminare questo sito.",
       "deleteAction": "Elimina sito",
       "deleteFailed": "Impossibile eliminare il sito."
     },
@@ -1477,7 +1477,13 @@
         "empty": "Non ancora visto"
       },
       "webVitalsLabel": "Web Vitals",
-      "webVitalsDescription": "Carica il bundle Web Vitals separato e invia campioni LCP, INP, CLS, FCP e TTFB. Disattivato per impostazione predefinita."
+      "webVitalsDescription": "Carica il bundle Web Vitals separato e invia campioni LCP, INP, CLS, FCP e TTFB. Disattivato per impostazione predefinita.",
+      "domains": {
+        "label": "Host del tracker",
+        "description": "Scegli l’host disponibile da usare nello snippet generato per il tracker del browser.",
+        "defaultOption": "URL dell’istanza HitKeep",
+        "selectedHint": "URL del tracker: https://{{ hostname }}/hk.js"
+      }
     }
   },
   "admin": {
@@ -1588,7 +1594,10 @@
       "tabs": {
         "overview": "Panoramica",
         "members": "Membri",
-        "settings": "Impostazioni",
+        "apiClients": "Client API",
+        "customDomains": "Domini personalizzati",
+        "branding": "Branding",
+        "dangerZone": "Zona pericolosa",
         "activity": "Attività"
       },
       "overview": {
@@ -1634,12 +1643,20 @@
           "description": "Sblocca una retention più lunga, più siti e capacità del team.",
           "currentPlan": "Piano attuale",
           "recommended": "Consigliato",
+          "perMonth": "/mese",
+          "openSource": {
+            "note": "HitKeep è completamente open source, incluse tutte le funzionalità a pagamento. I piani cloud finanziano hosting e sviluppo.",
+            "support": "Preferisci sostenerci in un altro modo?",
+            "sponsor": "Sponsorizza lo sviluppo open source",
+            "spread": "Oppure spargi la voce: aiuta più di quanto pensi."
+          },
           "upgradeAction": "Aggiorna a {{plan}}",
           "features": {
             "sites": "Fino a {{count}} siti",
             "members": "Fino a {{count}} membri del team",
             "retention": "{{count}} anni di retention dei dati",
-            "retentionDays": "{{count}} giorni di retention dei dati"
+            "retentionDays": "{{count}} giorni di retention dei dati",
+            "customDomains": "Domini di tracciamento personalizzati"
           }
         }
       },
@@ -1681,7 +1698,69 @@
           "lastOwner": "Non puoi lasciare il team come ultimo proprietario.",
           "onlyTeam": "Non puoi lasciare il tuo unico team.",
           "generic": "Impossibile lasciare il team. Riprova."
+        },
+        "trackingDomains": {
+          "title": "Domini personalizzati",
+          "description": "Verifica domini personalizzati una volta, poi usa qualsiasi dominio attivo come host tracker per i siti del team.",
+          "hostnamePlaceholder": "analytics.example.com",
+          "addAction": "Aggiungi dominio",
+          "hostnameLabel": "Nome host",
+          "setupAction": "Configurazione DNS",
+          "setupDescription": "Aggiungi questi record DNS presso il tuo provider DNS, quindi esegui la verifica.",
+          "hostnameRequired": "Inserisci un nome host.",
+          "hostnameInvalid": "Usa un nome host valido, ad esempio analytics.example.com.",
+          "hostnameTooLong": "I nomi host possono avere al massimo 253 caratteri.",
+          "empty": "Non e ancora stato aggiunto alcun dominio di tracciamento.",
+          "enabled": "Abilitato",
+          "disabled": "Disabilitato",
+          "active": "Attivo",
+          "notActive": "Non attivo",
+          "added": "Dominio di tracciamento aggiunto. Aggiungi i record DNS, poi verificalo.",
+          "checked": "Verifica completata. Controlla i dettagli di stato qui sotto.",
+          "verified": "Dominio di tracciamento verificato e pronto all uso.",
+          "enabledSuccess": "Dominio di tracciamento abilitato.",
+          "disabledSuccess": "Dominio di tracciamento disabilitato. I siti che lo usavano sono stati riportati all URL predefinito.",
+          "deleted": "Dominio di tracciamento rimosso.",
+          "verifyAction": "Verifica",
+          "disableAction": "Disabilita",
+          "enableAction": "Abilita",
+          "deleteConfirm": "Rimuovere {{ hostname }}? I siti che lo usano torneranno all URL tracker predefinito.",
+          "dns": {
+            "txtName": "Nome TXT",
+            "txtValue": "Valore TXT",
+            "target": "Target CNAME, A o AAAA"
+          },
+          "checks": {
+            "ownership": "Proprieta",
+            "target": "Target",
+            "tls": "TLS"
+          },
+          "checksLabel": "Controlli di verifica",
+          "lastChecked": "Ultimo controllo",
+          "lastTLSAsk": "Ultima richiesta TLS",
+          "status": {
+            "pending": "In sospeso",
+            "verified": "Verificato",
+            "failed": "Non riuscito"
+          },
+          "tlsMode": {
+            "external": "TLS esterno",
+            "caddy-on-demand": "TLS on-demand Caddy"
+          },
+          "errors": {
+            "load": "Impossibile caricare i domini di tracciamento.",
+            "add": "Impossibile aggiungere il dominio di tracciamento.",
+            "conflict": "Questo hostname e gia usato da un altro sito o dominio di tracciamento.",
+            "verify": "Impossibile verificare il dominio di tracciamento.",
+            "update": "Impossibile aggiornare il dominio di tracciamento.",
+            "delete": "Impossibile rimuovere il dominio di tracciamento."
+          }
         }
+      },
+      "danger": {
+        "leaveConfirmTitle": "Lascia il team",
+        "archiveConfirmTitle": "Archivia team",
+        "confirmNameLabel": "Digita {{name}} per confermare"
       },
       "audit": {
         "readOnly": "Non hai il permesso di vedere l'attività del team.",
@@ -2306,6 +2385,13 @@
       }
     },
     "selfHostLink": "Preferisci il self-hosting? Vedi la documentazione →",
+    "trust": {
+      "noCard": "Nessuna carta di credito richiesta",
+      "region": "I tuoi dati restano nella regione scelta",
+      "export": "Esporta o passa al self-hosting in qualsiasi momento",
+      "openSource": "HitKeep è completamente open source.",
+      "github": "Vedi il codice su GitHub"
+    },
     "tosLabel": "Accetto i",
     "tosLink": "Termini di Servizio",
     "tosAnd": "e la",
@@ -3140,10 +3226,15 @@
   "cloud": {
     "retentionNotice": {
       "message": "I dati del piano gratuito sono conservati per {{count}} giorni.",
+      "hint": "Esegui l'upgrade per conservare l'intera cronologia dei visitatori e sbloccare più siti e posti nel team.",
+      "usageMessageSites": "Il tuo team sta usando {{current}} di {{limit}} siti del piano gratuito.",
+      "usageMessageMembers": "Il tuo team sta usando {{current}} di {{limit}} membri del piano gratuito.",
       "upgradeAction": "Passa a Pro",
-      "compareAction": "Confronta i piani",
-      "dismissAction": "Chiudi avviso",
-      "checkoutError": "Non è stato possibile avviare il checkout. Riprova dalla fatturazione."
+      "dismissAction": "Chiudi avviso"
+    },
+    "planChip": {
+      "free": "Piano gratuito",
+      "aria": "Stai usando il piano gratuito: vedi i piani e fai l'upgrade"
     }
   }
 }

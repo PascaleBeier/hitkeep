@@ -4,14 +4,17 @@ import "hitkeep/internal/exportfmt"
 
 func openAPIV1Parameters() map[string]any {
 	return map[string]any{
-		"siteID":          map[string]any{"name": "id", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
-		"goalID":          map[string]any{"name": "goalID", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
-		"funnelID":        map[string]any{"name": "funnelID", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
-		"qrID":            map[string]any{"name": "qrID", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
-		"shareID":         map[string]any{"name": "shareID", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
-		"ruleID":          map[string]any{"name": "ruleID", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
-		"userID":          map[string]any{"name": "userId", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
-		"teamID":          map[string]any{"name": "id", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
+		"siteID":   map[string]any{"name": "id", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
+		"goalID":   map[string]any{"name": "goalID", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
+		"funnelID": map[string]any{"name": "funnelID", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
+		"qrID":     map[string]any{"name": "qrID", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
+		"shareID":  map[string]any{"name": "shareID", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
+		"ruleID":   map[string]any{"name": "ruleID", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
+		"userID":   map[string]any{"name": "userId", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
+		"teamID":   map[string]any{"name": "id", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
+		"trackingDomainID": map[string]any{
+			"name": "domainId", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"},
+		},
 		"adminUserID":     map[string]any{"name": "id", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
 		"apiClientID":     map[string]any{"name": "id", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},
 		"teamAPIClientID": map[string]any{"name": "clientId", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}},

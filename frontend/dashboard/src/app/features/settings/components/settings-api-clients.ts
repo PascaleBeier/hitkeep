@@ -467,12 +467,12 @@ export class SettingsAPIClients {
     protected clientStatusIconClass(client: APIClient): string {
         switch (this.clientStatus(client)) {
             case 'inactive':
-                return 'pi pi-ban api-client-status-icon api-client-status-icon--inactive';
+                return 'pi pi-ban hk-status-icon hk-status-icon--error';
             case 'expired':
-                return 'pi pi-clock api-client-status-icon api-client-status-icon--expired';
+                return 'pi pi-clock hk-status-icon hk-status-icon--warn';
             case 'active':
             default:
-                return 'pi pi-check-circle api-client-status-icon api-client-status-icon--active';
+                return 'pi pi-check-circle hk-status-icon hk-status-icon--ok';
         }
     }
 

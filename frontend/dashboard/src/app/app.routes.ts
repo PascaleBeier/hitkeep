@@ -254,11 +254,49 @@ export const routes: Routes = [
                         path: 'team',
                         loadComponent: () => import('@pages/admin/team/team-admin').then((m) => m.TeamAdminPage),
                         canActivate: [capabilityGuard],
-                        data: { ...titleData('nav.team', 'team'), activeTeamCapability: TEAM_CAPABILITIES.manageSettings }
+                        data: { activeTeamCapability: TEAM_CAPABILITIES.manageSettings },
+                        children: [
+                            { path: '', pathMatch: 'full', redirectTo: 'overview' },
+                            {
+                                path: 'overview',
+                                loadComponent: () => import('@pages/admin/team/team-overview').then((m) => m.TeamOverviewPage),
+                                data: titleData('admin.team.tabs.overview', 'team')
+                            },
+                            {
+                                path: 'members',
+                                loadComponent: () => import('@pages/admin/team/team-members').then((m) => m.TeamMembersPage),
+                                data: titleData('admin.team.tabs.members', 'team')
+                            },
+                            {
+                                path: 'api-clients',
+                                loadComponent: () => import('@pages/admin/team/team-api-clients').then((m) => m.TeamAPIClientsPage),
+                                data: titleData('admin.team.tabs.apiClients', 'team')
+                            },
+                            {
+                                path: 'custom-domains',
+                                loadComponent: () => import('@pages/admin/team/team-custom-domains').then((m) => m.TeamCustomDomainsPage),
+                                data: titleData('admin.team.tabs.customDomains', 'team')
+                            },
+                            {
+                                path: 'branding',
+                                loadComponent: () => import('@pages/admin/team/team-branding').then((m) => m.TeamBrandingPage),
+                                data: titleData('admin.team.tabs.branding', 'team')
+                            },
+                            {
+                                path: 'activity',
+                                loadComponent: () => import('@pages/admin/team/team-audit').then((m) => m.TeamAuditPage),
+                                canActivate: [capabilityGuard],
+                                data: { ...titleData('admin.team.tabs.activity', 'team'), activeTeamCapability: TEAM_CAPABILITIES.viewAudit }
+                            },
+                            {
+                                path: 'danger-zone',
+                                loadComponent: () => import('@pages/admin/team/team-danger-zone').then((m) => m.TeamDangerZonePage),
+                                data: titleData('admin.team.tabs.dangerZone', 'team')
+                            },
+                            { path: 'settings', pathMatch: 'full', redirectTo: 'api-clients' },
+                            { path: 'tracking-domains', pathMatch: 'full', redirectTo: 'custom-domains' }
+                        ]
                     },
-                    { path: 'team/overview', redirectTo: 'team', pathMatch: 'full' },
-                    { path: 'team/members', redirectTo: 'team', pathMatch: 'full' },
-                    { path: 'team/settings', redirectTo: 'team', pathMatch: 'full' },
                     { path: '', redirectTo: 'team', pathMatch: 'full' }
                 ]
             },

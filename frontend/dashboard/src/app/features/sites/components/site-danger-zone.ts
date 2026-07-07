@@ -1,7 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 
+import { DialogShell } from '@components/dialog-shell/dialog-shell';
 import { Site } from '@models/analytics.types';
 import { SITE_CAPABILITIES } from '@core/access/capabilities';
 import { AccessService } from '@services/access.service';
@@ -9,10 +11,12 @@ import { SiteService, SiteStatsResetResponse } from '@features/sites/services/si
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 
+type SiteDangerAction = 'reset' | 'delete';
+
 @Component({
     selector: 'app-site-danger-zone',
     standalone: true,
-    imports: [ButtonModule, InputTextModule, TranslocoPipe],
+    imports: [ButtonModule, DialogShell, FormsModule, InputTextModule, TranslocoPipe],
     template: `
         <div class="site-settings-stack">
             @if (canDeleteSite()) {
@@ -35,22 +39,17 @@ import { InputTextModule } from 'primeng/inputtext';
                         @if (resetError()) {
                             <div class="site-settings-alert site-settings-alert--error">{{ resetError() | transloco }}</div>
                         }
-                        <div class="site-settings-field">
-                            <label for="reset-site-confirm">{{ 'sites.danger.resetConfirmLabel' | transloco: { domain: confirmDomain() } }}</label>
-                            <input
-                                id="reset-site-confirm"
-                                pInputText
-                                class="w-full"
-                                [value]="resetConfirmValue()"
-                                #resetConfirmInput
-                                (input)="resetConfirmValue.set(resetConfirmInput.value)"
-                                [placeholder]="'sites.danger.confirmPlaceholder' | transloco"
-                            />
-                            <small class="site-settings-field-hint">{{ 'sites.danger.resetConfirmHint' | transloco }}</small>
-                        </div>
                     </div>
                     <footer class="site-settings-card__footer">
-                        <p-button styleClass="site-settings-danger-action" [label]="'sites.danger.resetAction' | transloco" icon="pi pi-refresh" severity="danger" [disabled]="!canConfirmReset()" [loading]="isResetting()" (onClick)="resetStats()" />
+                        <p-button
+                            styleClass="site-settings-danger-action"
+                            [label]="'sites.danger.resetAction' | transloco"
+                            icon="pi pi-refresh"
+                            severity="danger"
+                            [disabled]="isBusy()"
+                            [loading]="isResetting()"
+                            (onClick)="openConfirmDialog('reset')"
+                        />
                     </footer>
                 </section>
                 <section class="site-settings-card site-settings-card--danger">
@@ -67,16 +66,53 @@ import { InputTextModule } from 'primeng/inputtext';
                         @if (deleteError()) {
                             <div class="site-settings-alert site-settings-alert--error">{{ deleteError() | transloco }}</div>
                         }
-                        <div class="site-settings-field">
-                            <label for="delete-site-confirm">{{ 'sites.danger.confirmLabel' | transloco: { domain: deleteConfirmDomain() } }}</label>
-                            <input id="delete-site-confirm" pInputText class="w-full" [value]="confirmValue()" #confirmInput (input)="confirmValue.set(confirmInput.value)" [placeholder]="'sites.danger.confirmPlaceholder' | transloco" />
-                        </div>
                     </div>
                     <footer class="site-settings-card__footer">
-                        <p-button styleClass="site-settings-danger-action" [label]="'sites.danger.deleteAction' | transloco" icon="pi pi-trash" severity="danger" [disabled]="!canConfirmDelete()" [loading]="isDeleting()" (onClick)="deleteSite()" />
+                        <p-button
+                            styleClass="site-settings-danger-action"
+                            [label]="'sites.danger.deleteAction' | transloco"
+                            icon="pi pi-trash"
+                            severity="danger"
+                            [disabled]="isBusy()"
+                            [loading]="isDeleting()"
+                            (onClick)="openConfirmDialog('delete')"
+                        />
                     </footer>
                 </section>
             }
+
+            <app-dialog-shell
+                [title]="confirmTitleKey() | transloco"
+                [visible]="confirmDialogVisible()"
+                [busy]="isBusy()"
+                role="alertdialog"
+                [secondaryLabel]="'common.actions.cancel' | transloco"
+                [primaryLabel]="confirmActionKey() | transloco"
+                primarySeverity="danger"
+                [primaryDisabled]="!canSubmitConfirm()"
+                [primaryLoading]="isBusy()"
+                (visibleChange)="onConfirmDialogVisibleChange($event)"
+                (primaryAction)="runConfirmedAction()"
+            >
+                @if (site(); as activeSite) {
+                    <div class="site-settings-field">
+                        <p id="site-danger-confirm-instruction">{{ confirmMessageKey() | transloco: { domain: activeSite.domain } }}</p>
+                        <input
+                            id="site-danger-confirm"
+                            pInputText
+                            class="w-full"
+                            [ngModel]="confirmValue()"
+                            (ngModelChange)="confirmValue.set($event)"
+                            [placeholder]="activeSite.domain"
+                            aria-labelledby="site-danger-confirm-instruction"
+                            autocomplete="off"
+                        />
+                        @if (pendingAction() === 'reset') {
+                            <small class="site-settings-field-hint">{{ 'sites.danger.resetConfirmHint' | transloco }}</small>
+                        }
+                    </div>
+                }
+            </app-dialog-shell>
         </div>
     `,
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -88,8 +124,8 @@ export class SiteDangerZone {
     site = input.required<Site | null>();
     protected isDeleting = signal(false);
     protected isResetting = signal(false);
+    protected pendingAction = signal<SiteDangerAction | null>(null);
     protected confirmValue = signal('');
-    protected resetConfirmValue = signal('');
     protected resetSuccess = signal<SiteStatsResetResponse | null>(null);
     protected resetError = signal<string | null>(null);
     protected deleteError = signal<string | null>(null);
@@ -98,25 +134,50 @@ export class SiteDangerZone {
         if (!site) return false;
         return this.access.canSite(site.id, SITE_CAPABILITIES.delete);
     });
-    protected canConfirmDelete = computed(() => {
-        const site = this.site();
-        if (!site) return false;
-        return this.confirmValue().trim().toLowerCase() === site.domain.toLowerCase();
-    });
-    protected canConfirmReset = computed(() => {
-        const site = this.site();
-        if (!site) return false;
-        return this.resetConfirmValue().trim().toLowerCase() === site.domain.toLowerCase();
-    });
+    protected isBusy = computed(() => this.isDeleting() || this.isResetting());
+    protected confirmDialogVisible = computed(() => this.pendingAction() !== null);
     protected confirmDomain = computed(() => this.site()?.domain ?? '');
-    protected deleteConfirmDomain = this.confirmDomain;
+    protected canSubmitConfirm = computed(() => {
+        const domain = this.confirmDomain();
+        return domain.length > 0 && this.confirmValue().trim().toLowerCase() === domain.toLowerCase();
+    });
+    protected confirmTitleKey = computed(() => {
+        switch (this.pendingAction()) {
+            case 'reset':
+                return 'sites.danger.resetConfirmTitle';
+            case 'delete':
+                return 'sites.danger.deleteConfirmTitle';
+            default:
+                return '';
+        }
+    });
+    protected confirmMessageKey = computed(() => {
+        switch (this.pendingAction()) {
+            case 'reset':
+                return 'sites.danger.resetConfirmMessage';
+            case 'delete':
+                return 'sites.danger.deleteConfirmMessage';
+            default:
+                return '';
+        }
+    });
+    protected confirmActionKey = computed(() => {
+        switch (this.pendingAction()) {
+            case 'reset':
+                return 'sites.danger.resetAction';
+            case 'delete':
+                return 'sites.danger.deleteAction';
+            default:
+                return '';
+        }
+    });
 
     constructor() {
         effect(() => {
             const site = this.site();
             if (site) {
                 this.confirmValue.set('');
-                this.resetConfirmValue.set('');
+                this.pendingAction.set(null);
                 this.resetSuccess.set(null);
                 this.resetError.set(null);
                 this.deleteError.set(null);
@@ -124,10 +185,35 @@ export class SiteDangerZone {
         });
     }
 
+    protected openConfirmDialog(action: SiteDangerAction) {
+        if (this.isBusy()) return;
+        this.confirmValue.set('');
+        this.pendingAction.set(action);
+    }
+
+    protected onConfirmDialogVisibleChange(visible: boolean) {
+        if (!visible && !this.isBusy()) {
+            this.pendingAction.set(null);
+            this.confirmValue.set('');
+        }
+    }
+
+    protected runConfirmedAction() {
+        if (!this.canSubmitConfirm()) return;
+        switch (this.pendingAction()) {
+            case 'reset':
+                this.resetStats();
+                return;
+            case 'delete':
+                this.deleteSite();
+                return;
+        }
+    }
+
     deleteSite() {
         const site = this.site();
         if (!site || this.isDeleting()) return;
-        if (!this.canConfirmDelete()) return;
+        if (!this.canSubmitConfirm()) return;
 
         this.isDeleting.set(true);
         this.deleteError.set(null);
@@ -135,6 +221,10 @@ export class SiteDangerZone {
             .deleteSite(site.id)
             .pipe(finalize(() => this.isDeleting.set(false)))
             .subscribe({
+                next: () => {
+                    this.pendingAction.set(null);
+                    this.confirmValue.set('');
+                },
                 error: () => this.deleteError.set('sites.danger.deleteFailed')
             });
     }
@@ -142,9 +232,9 @@ export class SiteDangerZone {
     resetStats() {
         const site = this.site();
         if (!site || this.isResetting()) return;
-        if (!this.canConfirmReset()) return;
+        if (!this.canSubmitConfirm()) return;
 
-        const confirmDomain = this.resetConfirmValue().trim();
+        const confirmDomain = this.confirmValue().trim();
         this.isResetting.set(true);
         this.resetSuccess.set(null);
         this.resetError.set(null);
@@ -154,7 +244,8 @@ export class SiteDangerZone {
             .subscribe({
                 next: (result) => {
                     this.resetSuccess.set(result);
-                    this.resetConfirmValue.set('');
+                    this.pendingAction.set(null);
+                    this.confirmValue.set('');
                     this.siteService.loadSites();
                 },
                 error: () => this.resetError.set('sites.danger.resetFailed')

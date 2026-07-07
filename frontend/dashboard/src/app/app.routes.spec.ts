@@ -4,7 +4,7 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TranslocoTestingModule } from '@jsverse/transloco';
-import { INSTANCE_CAPABILITIES } from '@core/access/capabilities';
+import { INSTANCE_CAPABILITIES, TEAM_CAPABILITIES } from '@core/access/capabilities';
 import { PermissionService } from '@services/permission.service';
 import { SiteService } from '@features/sites/services/site.service';
 import { routes } from './app.routes';
@@ -38,6 +38,44 @@ describe('routes', () => {
 
         expect(statusRoute?.data?.['instanceCapability']).toBe(INSTANCE_CAPABILITIES.viewSystem);
         expect(settingsRoute?.data?.['instanceCapability']).toBe(INSTANCE_CAPABILITIES.manageUsers);
+    });
+
+    it('exposes team admin sections as addressable child routes with descriptive titles', () => {
+        const adminChildren = routes.find((route) => route.path === '')?.children?.find((route) => route.path === 'admin')?.children ?? [];
+        const teamRoute = adminChildren.find((route) => route.path === 'team');
+        const teamChildren = teamRoute?.children ?? [];
+        const child = (path: string) => teamChildren.find((route) => route.path === path);
+
+        expect(teamRoute?.data?.['activeTeamCapability']).toBe(TEAM_CAPABILITIES.manageSettings);
+        expect(teamRoute?.loadComponent).toBeTruthy();
+
+        // Default entry redirects to the overview child, not to /team itself.
+        expect(child('')?.redirectTo).toBe('overview');
+        expect(child('')?.pathMatch).toBe('full');
+
+        // Every visible section is a real, addressable child route (no redirect) with its own title key.
+        for (const [path, titleKey] of [
+            ['overview', 'admin.team.tabs.overview'],
+            ['members', 'admin.team.tabs.members'],
+            ['api-clients', 'admin.team.tabs.apiClients'],
+            ['custom-domains', 'admin.team.tabs.customDomains'],
+            ['branding', 'admin.team.tabs.branding'],
+            ['activity', 'admin.team.tabs.activity'],
+            ['danger-zone', 'admin.team.tabs.dangerZone']
+        ] as const) {
+            expect(child(path)?.redirectTo).toBeUndefined();
+            expect(child(path)?.loadComponent).toBeTruthy();
+            expect(child(path)?.data?.['titleKey']).toBe(titleKey);
+            expect(child(path)?.data?.['titleScope']).toBe('team');
+        }
+
+        // Activity additionally requires the audit capability.
+        expect(child('activity')?.data?.['activeTeamCapability']).toBe(TEAM_CAPABILITIES.viewAudit);
+        expect(child('activity')?.canActivate?.length).toBeTruthy();
+
+        // Legacy deep links keep working via redirects.
+        expect(child('settings')?.redirectTo).toBe('api-clients');
+        expect(child('tracking-domains')?.redirectTo).toBe('custom-domains');
     });
 
     it('exposes accept-invite as a public auth page route', () => {

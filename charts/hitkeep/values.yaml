@@ -36,6 +36,31 @@ ingress:
   hosts: []
   tls: []
 
+customTrackingDomains:
+  enabled: false
+  # Use "external" when TLS is terminated by your ingress controller, load
+  # balancer, or certificate manager. Use "caddy-on-demand" only when an
+  # external Caddy deployment calls HitKeep's ask endpoint.
+  tlsMode: external
+  # Optional DNS hostname or IP address that custom tracking domains must
+  # resolve to. Empty defaults to the host in HITKEEP_PUBLIC_URL.
+  dnsTarget: ""
+  caddyAskToken:
+    # Reference a Secret key containing HITKEEP_CADDY_TLS_ASK_TOKEN when
+    # tlsMode is caddy-on-demand. You can also set this through extraEnv.
+    existingSecret: ""
+    existingSecretKey: token
+  ingress:
+    # Creates a separate tracking-only Ingress for static/custom hosts managed
+    # by your cluster ingress controller. Caddy on-demand setups usually manage
+    # this listener outside the chart.
+    enabled: false
+    className: ""
+    annotations: {}
+    pathType: Exact
+    hosts: []
+    tls: []
+
 resources: {}
 
 nodeSelector: {}

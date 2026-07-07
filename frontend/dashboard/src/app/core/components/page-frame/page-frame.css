@@ -32,6 +32,34 @@
     white-space: nowrap;
 }
 
+:host ::ng-deep .hk-admin-tab-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: max-content;
+}
+
+:host ::ng-deep .hk-admin-tab-label i {
+    font-size: 0.875rem;
+}
+
+:host ::ng-deep .hk-admin-tab-label--danger i {
+    color: var(--p-red-500);
+}
+
+:host ::ng-deep .hk-admin-tab-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    background: var(--p-primary-color);
+    color: var(--p-primary-contrast-color);
+    font-size: 0.625rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    line-height: 1.2;
+}
+
 :host ::ng-deep .hk-page-tabs .p-tabpanels,
 :host ::ng-deep .hk-admin-tabs .p-tabpanels {
     padding: 1rem 0 0;

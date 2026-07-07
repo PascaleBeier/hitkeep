@@ -8,12 +8,13 @@ import { Brand } from '@components/brand/brand';
 import { TeamSwitcher } from '@components/team-switcher/team-switcher';
 import { SiteSelector } from '@features/sites/components/site-selector';
 import { AskAIControl } from '@layout/ask-ai-control';
+import { FreePlanChip } from '@layout/free-plan-chip';
 import { MainLayoutContextService } from '@layout/main-layout-context.service';
 import { SidebarMenuService } from '@layout/sidebar-menu.service';
 
 @Component({
     selector: 'app-layout-sidebar',
-    imports: [NgTemplateOutlet, Brand, SiteSelector, TeamSwitcher, AskAIControl, DrawerModule, RouterLink, RouterLinkActive, TranslocoPipe],
+    imports: [NgTemplateOutlet, Brand, SiteSelector, TeamSwitcher, AskAIControl, FreePlanChip, DrawerModule, RouterLink, RouterLinkActive, TranslocoPipe],
     templateUrl: './layout-sidebar.html',
     styleUrl: './layout-sidebar.css',
     changeDetection: ChangeDetectionStrategy.OnPush

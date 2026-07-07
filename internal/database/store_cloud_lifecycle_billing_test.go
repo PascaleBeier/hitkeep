@@ -235,3 +235,35 @@ func seedCloudLifecycleTeamWithoutBilling(t *testing.T, store *Store, email stri
 func ptrTime(value time.Time) *time.Time {
 	return &value
 }
+
+func TestListEligibleCloudLifecycleRecipientsFreeLimitReminder(t *testing.T) {
+	store := setupTenantStore(t)
+	now := time.Now().UTC()
+
+	// One activated site and one member: well below the free plan limits.
+	relaxed := seedCloudLifecycleTeam(t, store, "relaxed@example.com", "relaxed.example", CloudPlanFree, CloudSubscriptionStatusFree, ptrTime(now.Add(-time.Hour)))
+
+	// A team that has filled every free plan site slot.
+	crowded := seedCloudLifecycleTeam(t, store, "crowded@example.com", "crowded.example", CloudPlanFree, CloudSubscriptionStatusFree, ptrTime(now.Add(-time.Hour)))
+	ctx := context.Background()
+	for _, domain := range []string{"crowded-two.example", "crowded-three.example"} {
+		if _, err := store.CreateSite(ctx, crowded.UserID, domain); err != nil {
+			t.Fatalf("create extra site %s: %v", domain, err)
+		}
+	}
+
+	recipients, err := store.ListEligibleCloudLifecycleRecipients(ctx, CloudLifecycleMessageFreeLimitReminder, now, 100)
+	if err != nil {
+		t.Fatalf("list free limit recipients: %v", err)
+	}
+
+	if len(recipients) != 1 {
+		t.Fatalf("expected exactly one recipient at the free plan limit, got %d", len(recipients))
+	}
+	if recipients[0].TenantID != crowded.TenantID {
+		t.Fatalf("expected crowded tenant %s, got %s", crowded.TenantID, recipients[0].TenantID)
+	}
+	if recipients[0].TenantID == relaxed.TenantID {
+		t.Fatalf("relaxed tenant must not be eligible")
+	}
+}

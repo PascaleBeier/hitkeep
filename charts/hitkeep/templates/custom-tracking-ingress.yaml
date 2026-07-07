@@ -1,0 +1,40 @@
+{{- $customTracking := .Values.customTrackingDomains -}}
+{{- if and $customTracking.enabled $customTracking.ingress.enabled (not $customTracking.ingress.hosts) -}}
+{{- fail "customTrackingDomains.ingress.hosts must contain at least one host when customTrackingDomains.ingress.enabled=true" -}}
+{{- end -}}
+{{- if and $customTracking.enabled $customTracking.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "hitkeep.fullname" . }}-tracking
+  labels:
+    {{- include "hitkeep.labels" . | nindent 4 }}
+    app.kubernetes.io/component: tracking-ingress
+  {{- with $customTracking.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if $customTracking.ingress.className }}
+  ingressClassName: {{ $customTracking.ingress.className }}
+  {{- end }}
+  rules:
+    {{- range $customTracking.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range list "/hk.js" "/hk-vitals.js" "/ingest" "/ingest/event" "/ingest/web-vitals" }}
+          - path: {{ . | quote }}
+            pathType: {{ $customTracking.ingress.pathType | default "Exact" }}
+            backend:
+              service:
+                name: {{ include "hitkeep.fullname" $ }}
+                port:
+                  number: {{ $.Values.service.port }}
+          {{- end }}
+    {{- end }}
+  {{- if $customTracking.ingress.tls }}
+  tls:
+    {{- toYaml $customTracking.ingress.tls | nindent 4 }}
+  {{- end }}
+{{- end }}

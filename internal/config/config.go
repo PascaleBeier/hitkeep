@@ -86,6 +86,10 @@ type Config struct {
 	MCPDocsURL          string `env:"HITKEEP_MCP_DOCS_URL"           default:"https://hitkeep.com" desc:"Base URL for official HitKeep docs used by MCP docs tools"`
 	MCPDocsCacheMinutes int    `env:"HITKEEP_MCP_DOCS_CACHE_MINUTES" default:"60"     desc:"Minutes to cache fetched docs for MCP tools"`
 
+	CustomTrackingDNSTarget string `env:"HITKEEP_CUSTOM_TRACKING_DNS_TARGET" default:""         desc:"DNS host or IP custom tracking domains must point at; defaults to public URL host"`
+	CustomTrackingTLSMode   string `env:"HITKEEP_CUSTOM_TRACKING_TLS_MODE"   default:"external" desc:"TLS mode for custom tracking domains: external or caddy-on-demand"`
+	CaddyTLSAskToken        string `env:"HITKEEP_CADDY_TLS_ASK_TOKEN"        default:""         desc:"Bearer-free path token for Caddy on-demand TLS ask endpoint" sensitive:"redact"`
+
 	AIEnabled             bool   `env:"HITKEEP_AI_ENABLED"             default:"false" desc:"Enable optional AI-powered product features"`
 	AskAIEnabled          bool   `env:"HITKEEP_ASK_AI_ENABLED"         default:"false" desc:"Enable the optional dashboard Ask AI assistant; requires HITKEEP_AI_ENABLED and a configured AI model"`
 	AIProvider            string `env:"HITKEEP_AI_PROVIDER"            default:""      desc:"AI provider key supported by GoAI (openai, openai-compatible, bedrock, anthropic, google, mistral, ollama, openrouter)"`
@@ -360,6 +364,7 @@ func normalizeConfig(conf *Config) {
 
 	NormalizeMCPConfig(conf)
 	NormalizeAuthSessionConfig(conf)
+	NormalizeCustomTrackingConfig(conf)
 }
 
 func NormalizeAuthSessionConfig(conf *Config) {
@@ -402,6 +407,47 @@ func NormalizeMCPConfig(conf *Config) {
 		docsURL = "https://hitkeep.com"
 	}
 	conf.MCPDocsURL = docsURL
+}
+
+func NormalizeCustomTrackingConfig(conf *Config) {
+	mode := strings.ToLower(strings.TrimSpace(conf.CustomTrackingTLSMode))
+	switch mode {
+	case "caddy-on-demand":
+		conf.CustomTrackingTLSMode = mode
+	default:
+		conf.CustomTrackingTLSMode = "external"
+	}
+}
+
+func (c *Config) CustomTrackingDNSTargetValue() string {
+	if target := normalizeCustomTrackingDNSTarget(c.CustomTrackingDNSTarget); target != "" {
+		return target
+	}
+	if publicHost := publicURLHost(c.PublicURL); publicHost != "" {
+		return publicHost
+	}
+	return ""
+}
+
+func normalizeCustomTrackingDNSTarget(value string) string {
+	raw := strings.TrimSpace(value)
+	if raw == "" {
+		return ""
+	}
+	if strings.Contains(raw, "://") {
+		if parsed, err := url.Parse(raw); err == nil {
+			raw = parsed.Hostname()
+		}
+	}
+	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(raw)), ".")
+}
+
+func publicURLHost(value string) string {
+	parsed, err := url.Parse(strings.TrimSpace(value))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(parsed.Hostname())), ".")
 }
 
 func parseTrustedProxies(cidrs string) []netip.Prefix {

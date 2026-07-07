@@ -3,33 +3,23 @@ import { signal } from '@angular/core';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
-import { of, throwError } from 'rxjs';
-import { vi } from 'vitest';
 
 import { Team } from '@models/analytics.types';
-import { CloudService } from '@services/cloud.service';
 import { DashboardBootstrapService } from '@services/dashboard-bootstrap.service';
 import { ShareService } from '@services/share.service';
 import { TeamService } from '@services/team.service';
 import { FreePlanRetentionNotice } from './free-plan-retention-notice';
 
 describe('FreePlanRetentionNotice', () => {
-    type TestAccess = FreePlanRetentionNotice & {
-        startUpgrade(): void;
-        redirectTo(url: string): void;
-    };
-
     let fixture: ComponentFixture<FreePlanRetentionNotice>;
     let activeTeam = signal<Team | null>(freeTeam('team-a'));
     let cloudHosted = signal(true);
     let shareMode = signal(false);
-    let createBillingCheckoutSession = vi.fn();
 
     beforeEach(async () => {
         activeTeam = signal<Team | null>(freeTeam('team-a'));
         cloudHosted = signal(true);
         shareMode = signal(false);
-        createBillingCheckoutSession = vi.fn().mockReturnValue(of({ url: 'https://checkout.stripe.test/session' }));
         window.localStorage.removeItem('hitkeep.freeRetentionNotice.dismissed.team-a');
         window.localStorage.removeItem('hitkeep.freeRetentionNotice.dismissed.team-b');
 
@@ -43,10 +33,11 @@ describe('FreePlanRetentionNotice', () => {
                             cloud: {
                                 retentionNotice: {
                                     message: 'Free plan data is retained for {{count}} days.',
+                                    hint: 'Upgrade to keep your full visitor history.',
+                                    usageMessageSites: 'Your team is using {{current}} of {{limit}} sites on the Free plan.',
+                                    usageMessageMembers: 'Your team is using {{current}} of {{limit}} team members on the Free plan.',
                                     upgradeAction: 'Upgrade to Pro',
-                                    compareAction: 'Compare plans',
-                                    dismissAction: 'Dismiss retention notice',
-                                    checkoutError: 'Could not start checkout.'
+                                    dismissAction: 'Dismiss retention notice'
                                 }
                             }
                         }
@@ -76,12 +67,6 @@ describe('FreePlanRetentionNotice', () => {
                     useValue: {
                         isShareMode: shareMode
                     }
-                },
-                {
-                    provide: CloudService,
-                    useValue: {
-                        createBillingCheckoutSession
-                    }
                 }
             ]
         }).compileComponents();
@@ -93,7 +78,8 @@ describe('FreePlanRetentionNotice', () => {
     afterEach(() => {
         window.localStorage.removeItem('hitkeep.freeRetentionNotice.dismissed.team-a');
         window.localStorage.removeItem('hitkeep.freeRetentionNotice.dismissed.team-b');
-        vi.restoreAllMocks();
+        window.localStorage.removeItem('hitkeep.freeUsageNotice.dismissed.team-a.sites');
+        window.localStorage.removeItem('hitkeep.freeUsageNotice.dismissed.team-a.members');
     });
 
     it('shows the retention notice for hosted free-plan teams', () => {
@@ -101,7 +87,17 @@ describe('FreePlanRetentionNotice', () => {
 
         expect(notice).not.toBeNull();
         expect(notice?.textContent).toContain('Free plan data is retained for 60 days.');
-        expect(notice?.querySelector('a')?.getAttribute('href')).toBe('/admin/team');
+        expect(notice?.textContent).toContain('Upgrade to keep your full visitor history.');
+    });
+
+    it('offers a single upgrade CTA that leads to the team overview page', () => {
+        const notice = noticeElement();
+        const upgradeButton = notice?.querySelector('p-button[routerlink="/admin/team/overview"]');
+
+        expect(upgradeButton).not.toBeNull();
+        expect(upgradeButton?.textContent).toContain('Upgrade to Pro');
+        // The dismiss control is the only other interactive element — no competing CTAs.
+        expect(notice?.querySelectorAll('a, p-button').length).toBe(1);
     });
 
     it('hides the notice outside cloud free-plan dashboard mode', () => {
@@ -123,6 +119,27 @@ describe('FreePlanRetentionNotice', () => {
         expect(noticeElement()).toBeNull();
     });
 
+    it('escalates to a usage message when a plan limit is nearly exhausted', () => {
+        activeTeam.set({ ...freeTeam('team-a'), usage: { current_sites: 3, current_members: 1, current_pending_invites: 0 } });
+        fixture.detectChanges();
+
+        expect(noticeElement()?.textContent).toContain('Your team is using 3 of 3 sites on the Free plan.');
+    });
+
+    it('surfaces usage pressure with its own dismissal even after the retention notice was dismissed', () => {
+        window.localStorage.setItem('hitkeep.freeRetentionNotice.dismissed.team-a', 'dismissed');
+        activeTeam.set({ ...freeTeam('team-a'), usage: { current_sites: 1, current_members: 3, current_pending_invites: 0 } });
+        fixture.detectChanges();
+
+        expect(noticeElement()?.textContent).toContain('Your team is using 3 of 3 team members on the Free plan.');
+
+        dismissButton()?.click();
+        fixture.detectChanges();
+
+        expect(noticeElement()).toBeNull();
+        expect(window.localStorage.getItem('hitkeep.freeUsageNotice.dismissed.team-a.members')).toBe('dismissed');
+    });
+
     it('dismisses the notice per active team in localStorage', () => {
         dismissButton()?.click();
         fixture.detectChanges();
@@ -137,29 +154,6 @@ describe('FreePlanRetentionNotice', () => {
         activeTeam.set(freeTeam('team-a'));
         fixture.detectChanges();
         expect(noticeElement()).toBeNull();
-    });
-
-    it('starts a Pro checkout session and redirects to Stripe', () => {
-        const component = fixture.componentInstance as TestAccess;
-        const redirectSpy = vi.spyOn(component, 'redirectTo').mockImplementation(() => undefined);
-
-        component.startUpgrade();
-
-        expect(createBillingCheckoutSession).toHaveBeenCalledWith({
-            plan_code: 'pro',
-            locale: 'en'
-        });
-        expect(redirectSpy).toHaveBeenCalledWith('https://checkout.stripe.test/session');
-    });
-
-    it('shows an error when checkout cannot be started', () => {
-        const component = fixture.componentInstance as TestAccess;
-        createBillingCheckoutSession.mockReturnValueOnce(throwError(() => new Error('checkout unavailable')));
-
-        component.startUpgrade();
-        fixture.detectChanges();
-
-        expect(noticeElement()?.textContent).toContain('Could not start checkout.');
     });
 
     function noticeElement(): HTMLElement | null {

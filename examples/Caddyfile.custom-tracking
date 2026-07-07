@@ -1,0 +1,27 @@
+{
+	email {$CADDY_EMAIL}
+	on_demand_tls {
+		ask http://hitkeep:8080/internal/caddy/on-demand-tls/{$HITKEEP_CADDY_TLS_ASK_TOKEN}
+	}
+}
+
+{$HITKEEP_HOSTNAME} {
+	encode zstd gzip
+	reverse_proxy hitkeep:8080 {
+		header_up Host {host}
+		header_up X-Forwarded-Host {host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}
+
+https:// {
+	tls {
+		on_demand
+	}
+	encode zstd gzip
+	reverse_proxy hitkeep:8080 {
+		header_up Host {host}
+		header_up X-Forwarded-Host {host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}

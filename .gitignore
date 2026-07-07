@@ -2,6 +2,7 @@ tmp
 node_modules
 hitkeep
 hitkeep.db
+hitkeep.db.wal
 /archive
 /public
 !/public/embed.go

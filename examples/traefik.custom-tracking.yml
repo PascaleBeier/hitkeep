@@ -1,0 +1,29 @@
+# Example Traefik dynamic config for HitKeep custom tracking domains with
+# external TLS. Add every manual tracking hostname explicitly. Do not replace
+# this with a catch-all HostRegexp unless you intentionally want Traefik to
+# request certificates for arbitrary hostnames that reach the listener.
+
+http:
+  routers:
+    hitkeep-app:
+      rule: "Host(`analytics.example.com`)"
+      entryPoints:
+        - websecure
+      service: hitkeep
+      tls:
+        certResolver: letsencrypt
+
+    hitkeep-tracking:
+      rule: "(Host(`tracker.customer-one.example`) || Host(`tracker.customer-two.example`)) && (Path(`/hk.js`) || Path(`/hk-vitals.js`) || Path(`/ingest`) || Path(`/ingest/event`) || Path(`/ingest/web-vitals`))"
+      entryPoints:
+        - websecure
+      service: hitkeep
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    hitkeep:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: http://hitkeep:8080

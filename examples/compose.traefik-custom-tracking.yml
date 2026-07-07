@@ -1,0 +1,62 @@
+services:
+  traefik:
+    image: traefik:v3
+    container_name: hitkeep-traefik
+    restart: unless-stopped
+    command:
+      - --providers.file.filename=/etc/traefik/dynamic/hitkeep-custom-tracking.yml
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.letsencrypt.acme.email=${TRAEFIK_ACME_EMAIL:?set TRAEFIK_ACME_EMAIL in .env}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+    depends_on:
+      - hitkeep
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./traefik.custom-tracking.yml:/etc/traefik/dynamic/hitkeep-custom-tracking.yml:ro
+      - traefik_acme:/letsencrypt
+    networks:
+      - hitkeep
+
+  hitkeep:
+    image: pascalebeier/hitkeep:latest
+    container_name: hitkeep
+    restart: unless-stopped
+    networks:
+      - hitkeep
+    volumes:
+      - hitkeep_data:/var/lib/hitkeep/data
+      - hitkeep_archive:/var/lib/hitkeep/archive
+      - hitkeep_backups:/var/lib/hitkeep/backups
+    environment:
+      HITKEEP_NODE_NAME: leader
+      HITKEEP_PUBLIC_URL: https://${HITKEEP_HOSTNAME:?set HITKEEP_HOSTNAME in .env}
+      HITKEEP_JWT_SECRET: ${HITKEEP_JWT_SECRET:?set HITKEEP_JWT_SECRET in .env}
+      HITKEEP_TRUSTED_PROXIES: ${HITKEEP_TRUSTED_PROXIES:?set to your traefik network CIDR}
+      HITKEEP_DB_PATH: /var/lib/hitkeep/data/hitkeep.db
+      HITKEEP_DATA_PATH: /var/lib/hitkeep/data
+      HITKEEP_ARCHIVE_PATH: /var/lib/hitkeep/archive
+      HITKEEP_BACKUP_PATH: /var/lib/hitkeep/backups
+      HITKEEP_CUSTOM_TRACKING_TLS_MODE: external
+      HITKEEP_MAIL_HOST: ${HITKEEP_MAIL_HOST:-}
+      HITKEEP_MAIL_PORT: ${HITKEEP_MAIL_PORT:-587}
+      HITKEEP_MAIL_USERNAME: ${HITKEEP_MAIL_USERNAME:-}
+      HITKEEP_MAIL_PASSWORD: ${HITKEEP_MAIL_PASSWORD:-}
+      HITKEEP_MAIL_ENCRYPTION: ${HITKEEP_MAIL_ENCRYPTION:-tls}
+      HITKEEP_MAIL_FROM_ADDRESS: ${HITKEEP_MAIL_FROM_ADDRESS:-hitkeep@localhost}
+      HITKEEP_MAIL_FROM_NAME: ${HITKEEP_MAIL_FROM_NAME:-HitKeep}
+
+volumes:
+  traefik_acme: {}
+  hitkeep_data: {}
+  hitkeep_archive: {}
+  hitkeep_backups: {}
+
+networks:
+  hitkeep: {}

@@ -16,6 +16,7 @@ import (
 const (
 	CloudLifecycleMessageWelcome               = "cloud_welcome"
 	CloudLifecycleMessageFreeRetentionReminder = "cloud_free_retention_reminder"
+	CloudLifecycleMessageFreeLimitReminder     = "cloud_free_limit_reminder"
 	CloudLifecycleMessageStatusSent            = "sent"
 	CloudLifecycleMessageStatusFailed          = "failed"
 	CloudLifecycleMessageMaxAttempts           = 3
@@ -61,7 +62,7 @@ type CloudLifecycleMessageUpdate struct {
 
 func (s *Store) ListEligibleCloudLifecycleRecipients(ctx context.Context, kind string, now time.Time, limit int) ([]CloudLifecycleRecipient, error) {
 	kind = strings.TrimSpace(kind)
-	if kind != CloudLifecycleMessageWelcome && kind != CloudLifecycleMessageFreeRetentionReminder {
+	if kind != CloudLifecycleMessageWelcome && kind != CloudLifecycleMessageFreeRetentionReminder && kind != CloudLifecycleMessageFreeLimitReminder {
 		return nil, fmt.Errorf("unsupported cloud lifecycle message kind %q", kind)
 	}
 	if now.IsZero() {
@@ -89,6 +90,24 @@ func (s *Store) ListEligibleCloudLifecycleRecipients(ctx context.Context, kind s
 			"pending_checkout",
 			"canceled",
 			CloudSubscriptionStatusChargebackLost,
+		)
+	}
+	if kind == CloudLifecycleMessageFreeLimitReminder {
+		extraWhere = `
+			AND COALESCE(NULLIF(cba.subscription_status, ''), ?) IN (?, ?, ?, ?)
+			AND (
+				(SELECT COUNT(*) FROM site_tenants st2 WHERE st2.tenant_id = activated.tenant_id) >= ?
+				OR (SELECT COUNT(*) FROM tenant_members tm2 WHERE tm2.tenant_id = activated.tenant_id) >= ?
+			)
+		`
+		args = append(args,
+			CloudSubscriptionStatusFree,
+			CloudSubscriptionStatusFree,
+			"pending_checkout",
+			"canceled",
+			CloudSubscriptionStatusChargebackLost,
+			CloudFreePlanSiteLimit,
+			CloudFreePlanMemberLimit,
 		)
 	}
 	args = append(args, limit)

@@ -517,6 +517,11 @@ func (h *handler) handleIngestLeader(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
 		return
 	}
+	if !h.allowCustomTrackingHostForSite(r, site.ID) {
+		h.recordRejection()
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
 
 	trustedProxyNets := h.ctx.Config.GetTrustedProxyNetworks()
 	userIP := shared.GetRealIP(r, trustedProxyNets)
@@ -613,6 +618,8 @@ func (h *handler) forwardToLeader(w http.ResponseWriter, r *http.Request, target
 				proxyReq.Out.Header["X-Forwarded-For"] = append([]string(nil), forwardedFor...)
 			}
 			proxyReq.SetXForwarded()
+			proxyReq.Out.Host = proxyReq.In.Host
+			proxyReq.Out.Header.Set("X-Forwarded-Host", proxyReq.In.Host)
 		},
 		Transport: leaderForwardTransport,
 		ErrorHandler: func(rw http.ResponseWriter, req *http.Request, proxyErr error) {
@@ -662,6 +669,11 @@ func (h *handler) handleIngestWebVitalsLeader(w http.ResponseWriter, r *http.Req
 	}
 	if site == nil {
 		slog.Warn("Dropped web vital for unknown site")
+		h.recordRejection()
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+	if !h.allowCustomTrackingHostForSite(r, site.ID) {
 		h.recordRejection()
 		w.WriteHeader(http.StatusAccepted)
 		return
@@ -816,6 +828,11 @@ func (h *handler) handleIngestEventLeader(w http.ResponseWriter, r *http.Request
 		w.WriteHeader(http.StatusAccepted)
 		return
 	}
+	if !h.allowCustomTrackingHostForSite(r, site.ID) {
+		h.recordRejection()
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
 
 	trustedProxyNets := h.ctx.Config.GetTrustedProxyNetworks()
 	userIP := shared.GetRealIP(r, trustedProxyNets)
@@ -948,6 +965,121 @@ func newProxyTransport(timeout time.Duration) http.RoundTripper {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.ResponseHeaderTimeout = timeout
 	return transport
+}
+
+func (h *handler) allowCustomTrackingHostForSite(r *http.Request, siteID uuid.UUID) bool {
+	if h.ctx.Store == nil {
+		return true
+	}
+	trustedProxyNets := []netip.Prefix(nil)
+	if h.ctx.Config != nil {
+		trustedProxyNets = h.ctx.Config.GetTrustedProxyNetworks()
+	}
+	hostname := trackingRequestHostname(r, trustedProxyNets)
+	if hostname == "" {
+		return true
+	}
+
+	domain, err := h.ctx.Store.FindCustomTrackingDomainByHostname(r.Context(), hostname)
+	if err != nil {
+		slog.Error("Failed to resolve custom tracking ingest host", "error", err, "hostname", hostname, "site_id", siteID)
+		return false
+	}
+	if domain == nil {
+		return true
+	}
+	if !database.CustomTrackingDomainIsActive(*domain) {
+		slog.Warn("Dropped ingest through inactive custom tracking domain", "hostname", hostname, "site_id", siteID)
+		return false
+	}
+
+	teamID, err := h.ctx.Store.GetSiteTenantID(r.Context(), siteID)
+	if err != nil {
+		slog.Error("Failed to resolve ingest site team for custom tracking host guard", "error", err, "hostname", hostname, "site_id", siteID)
+		return false
+	}
+	if domain.TeamID != teamID {
+		slog.Warn("Dropped cross-team custom tracking domain ingest", "hostname", hostname, "site_id", siteID, "site_team_id", teamID, "domain_team_id", domain.TeamID)
+		return false
+	}
+	return true
+}
+
+func trackingRequestHostname(r *http.Request, trustedProxies []netip.Prefix) string {
+	if r == nil {
+		return ""
+	}
+	if isTrustedTrackingProxyRequest(r, trustedProxies) && !trustsAllTrackingProxies(trustedProxies) {
+		if host := forwardedTrackingHost(r.Header); host != "" {
+			return normalizeTrackingRequestHost(host)
+		}
+	}
+	return normalizeTrackingRequestHost(r.Host)
+}
+
+func normalizeTrackingRequestHost(host string) string {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return ""
+	}
+	if parsedHost, _, err := net.SplitHostPort(host); err == nil {
+		host = parsedHost
+	}
+	host = strings.Trim(host, "[]")
+	return database.NormalizeCustomTrackingHostname(host)
+}
+
+func isTrustedTrackingProxyRequest(r *http.Request, trustedProxies []netip.Prefix) bool {
+	directIP := shared.RemoteIPFromAddr(r.RemoteAddr)
+	parsedDirectIP, ok := shared.ParseAddr(directIP)
+	return ok && shared.IsTrustedProxy(parsedDirectIP, trustedProxies)
+}
+
+func trustsAllTrackingProxies(trustedProxies []netip.Prefix) bool {
+	for _, prefix := range trustedProxies {
+		if prefix.Bits() == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func forwardedTrackingHost(header http.Header) string {
+	if host := firstTrackingHeaderToken(header.Values("X-Forwarded-Host")); host != "" {
+		return host
+	}
+
+	for _, entry := range trackingHeaderTokens(header.Values("Forwarded")) {
+		for part := range strings.SplitSeq(entry, ";") {
+			key, value, ok := strings.Cut(part, "=")
+			if !ok || !strings.EqualFold(strings.TrimSpace(key), "host") {
+				continue
+			}
+			return strings.Trim(strings.TrimSpace(value), `"`)
+		}
+	}
+	return ""
+}
+
+func firstTrackingHeaderToken(values []string) string {
+	tokens := trackingHeaderTokens(values)
+	if len(tokens) == 0 {
+		return ""
+	}
+	return tokens[0]
+}
+
+func trackingHeaderTokens(values []string) []string {
+	tokens := make([]string, 0, len(values))
+	for _, value := range values {
+		for token := range strings.SplitSeq(value, ",") {
+			token = strings.TrimSpace(token)
+			if token != "" {
+				tokens = append(tokens, token)
+			}
+		}
+	}
+	return tokens
 }
 
 func normalizeOriginHostname(host string) string {

@@ -62,7 +62,7 @@ describe('SeriesChart', () => {
         fixture.detectChanges();
 
         expect(fixture.debugElement.query(By.css('[echarts]'))).toBeTruthy();
-        expect(fixture.debugElement.query(By.css('p-select'))).toBeTruthy();
+        expect(fixture.debugElement.query(By.css('app-chart-design-toggle'))).toBeTruthy();
         expect(fixture.debugElement.query(By.css('p-' + 'chart'))).toBeNull();
     });
 
@@ -90,13 +90,11 @@ describe('SeriesChart', () => {
         const inspectable = component as unknown as {
             chartFrameOptions: () => { series: { data: number[] }[] };
             chartMergeOptions: () => { xAxis: { data: string[] }; series: { name: string; type: string; data: number[]; lineStyle?: { type?: string } }[] };
-            chartOptions: () => { series: { name: string; type: string; lineStyle?: { type?: string } }[] };
         };
-        const options = inspectable.chartOptions();
         const frame = inspectable.chartFrameOptions();
         const merge = inspectable.chartMergeOptions();
-        expect(options.series.find((series) => series.name === 'Events')?.type).toBe('bar');
-        expect(options.series.find((series) => series.name === 'Events (prev.)')?.lineStyle?.type).toBe('dashed');
+        expect(merge.series.find((series) => series.name === 'Events')?.type).toBe('bar');
+        expect(merge.series.find((series) => series.name === 'Events (prev.)')?.lineStyle?.type).toBe('dashed');
         expect(frame.series.find((series) => series.data.length > 0)).toBeUndefined();
         expect(merge.xAxis.data.length).toBe(2);
         expect(merge.series.find((series) => series.name === 'Events')?.data).toEqual([5, 9]);
