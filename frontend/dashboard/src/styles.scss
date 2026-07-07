@@ -811,6 +811,17 @@
     border-bottom: 0;
 }
 
+.site-settings-toggle-row--domain {
+    align-items: flex-start;
+}
+
+.site-settings-domain-select {
+    display: grid;
+    min-width: 0;
+    width: min(24rem, 100%);
+    gap: 0.25rem;
+}
+
 .site-settings-subsection {
     display: grid;
     gap: 0.2rem;
@@ -1044,6 +1055,15 @@
     .site-settings-card__footer {
         align-items: stretch;
         flex-direction: column;
+    }
+
+    .site-settings-toggle-row--domain {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .site-settings-domain-select {
+        width: 100%;
     }
 
     .site-settings-action-btn.p-button,

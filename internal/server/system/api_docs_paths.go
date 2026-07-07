@@ -382,6 +382,45 @@ func openAPIV1CorePaths() map[string]any {
 					"403": errResp("Access denied"),
 				}),
 		},
+		"/api/user/teams/{id}/tracking-domains": map[string]any{
+			"get": op([]string{"Teams"}, "List tracking domains", "Lists custom tracking domains configured for the team, including DNS instructions and verification state. Requires team.manage_settings.", secCookie(), []any{paramRef("#/components/parameters/teamID")}, nil,
+				map[string]any{
+					"200": jsonSchemaResp("Tracking domains", map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/CustomTrackingDomain"}}),
+					"403": errResp("Access denied"),
+				}),
+			"post": op([]string{"Teams"}, "Create tracking domain", "Creates a custom tracking domain for the team and returns the DNS TXT ownership record plus DNS target instructions. Requires team.manage_settings.", secCookie(), []any{paramRef("#/components/parameters/teamID")},
+				jsonBody(map[string]any{"$ref": "#/components/schemas/CreateCustomTrackingDomainRequest"}),
+				map[string]any{
+					"201": jsonRefResp("Created tracking domain", "#/components/schemas/CustomTrackingDomain"),
+					"400": errResp("Invalid hostname"),
+					"403": errResp("Access denied"),
+					"409": errResp("Hostname conflict"),
+				}),
+		},
+		"/api/user/teams/{id}/tracking-domains/{domainId}/verify": map[string]any{
+			"post": op([]string{"Teams"}, "Verify tracking domain", "Checks TXT ownership, DNS target, and HTTPS tracker availability for a team custom tracking domain. Requires team.manage_settings.", secCookie(), []any{paramRef("#/components/parameters/teamID"), paramRef("#/components/parameters/trackingDomainID")}, nil,
+				map[string]any{
+					"200": jsonRefResp("Tracking domain", "#/components/schemas/CustomTrackingDomain"),
+					"403": errResp("Access denied"),
+					"404": errResp("Tracking domain not found"),
+				}),
+		},
+		"/api/user/teams/{id}/tracking-domains/{domainId}": map[string]any{
+			"patch": op([]string{"Teams"}, "Update tracking domain", "Enables or disables a team custom tracking domain. Disabled domains are not offered as snippet hosts and cannot serve tracker traffic. Requires team.manage_settings.", secCookie(), []any{paramRef("#/components/parameters/teamID"), paramRef("#/components/parameters/trackingDomainID")},
+				jsonBody(map[string]any{"$ref": "#/components/schemas/UpdateCustomTrackingDomainRequest"}),
+				map[string]any{
+					"200": jsonRefResp("Tracking domain", "#/components/schemas/CustomTrackingDomain"),
+					"400": errResp("Invalid request"),
+					"403": errResp("Access denied"),
+					"404": errResp("Tracking domain not found"),
+				}),
+			"delete": op([]string{"Teams"}, "Delete tracking domain", "Deletes a team custom tracking domain. Deleted domains are not offered as snippet hosts and cannot serve tracker traffic. Requires team.manage_settings.", secCookie(), []any{paramRef("#/components/parameters/teamID"), paramRef("#/components/parameters/trackingDomainID")}, nil,
+				map[string]any{
+					"204": desc("Deleted"),
+					"403": errResp("Access denied"),
+					"404": errResp("Tracking domain not found"),
+				}),
+		},
 		"/api/user/teams/{id}/transfer-ownership": map[string]any{
 			"post": op([]string{"Teams"}, "Transfer team ownership", "Transfers ownership from the current owner to another existing team member.", secCookie(), []any{paramRef("#/components/parameters/teamID")},
 				jsonBody(map[string]any{

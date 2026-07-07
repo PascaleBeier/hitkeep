@@ -105,6 +105,20 @@ Once your instance is running and a site is created, add:
 <script async src="https://your-hitkeep-instance.com/hk.js"></script>
 ```
 
+Team owners and admins can also add custom tracker domains in **Team Settings -> Tracking domains**. HitKeep asks for:
+
+- TXT ownership: `_hitkeep-tracking.<hostname>` with `hitkeep-domain-verification=<token>`
+- DNS target: CNAME, A, or AAAA pointing at the host from `HITKEEP_PUBLIC_URL`, or the configured deployment target on managed cloud
+- HTTPS readiness: `https://<hostname>/hk.js` must serve the tracker before the domain can be selected by a site
+
+After verification, each site can select any active domain from its team in the tracking settings. The generated snippet then uses:
+
+```html
+<script async src="https://analytics.example.com/hk.js"></script>
+```
+
+Managed cloud issues TLS for verified tracker domains on demand. Self-hosters can either terminate TLS in their own reverse proxy or use the optional Caddy on-demand TLS profile in [`examples/compose.caddy-on-demand.yml`](./examples/compose.caddy-on-demand.yml). External TLS examples are available for nginx ([`examples/compose.nginx-custom-tracking.yml`](./examples/compose.nginx-custom-tracking.yml), [`examples/nginx.custom-tracking.conf`](./examples/nginx.custom-tracking.conf)) and Traefik ([`examples/compose.traefik-custom-tracking.yml`](./examples/compose.traefik-custom-tracking.yml), [`examples/traefik.custom-tracking.yml`](./examples/traefik.custom-tracking.yml)). Kubernetes installs can use the Helm chart's `customTrackingDomains` values to configure the HitKeep pod and emit a tracking-only Ingress for static tracker hosts. The Caddy profile uses HitKeep's ask endpoint and must be configured with a private `HITKEEP_CADDY_TLS_ASK_TOKEN`.
+
 Custom event example:
 
 ```html

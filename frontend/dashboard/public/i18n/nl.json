@@ -1312,15 +1312,16 @@
     "danger": {
       "resetTitle": "Statistieken resetten",
       "resetDescription": "Wist de gemeten statistieken van deze site permanent, maar behoudt instellingen, toegang, doelen, funnels en trackingconfiguratie.",
-      "resetConfirmLabel": "Typ \"{{domain}}\" om de reset van statistieken te bevestigen",
+      "resetConfirmTitle": "Statistieken resetten",
+      "resetConfirmMessage": "Typ \"{{domain}}\" om de statistieken voor deze site te resetten.",
       "resetConfirmHint": "Tracking blijft actief. Nieuwe data die na de reset wordt verzameld, verschijnt normaal.",
       "resetAction": "Statistieken resetten",
       "resetSuccess": "Statistieken gereset. {{rows}} rij(en) gewist en {{imports}} voltooide import(s) als verwijderd gemarkeerd.",
       "resetFailed": "Kan de sitestatistieken niet resetten.",
       "deleteTitle": "Site verwijderen",
       "deleteDescription": "Verwijdert deze site en alle bijbehorende analytics-gegevens definitief.",
-      "confirmLabel": "Typ \"{{domain}}\" om te bevestigen",
-      "confirmPlaceholder": "voorbeeld.com",
+      "deleteConfirmTitle": "Site verwijderen",
+      "deleteConfirmMessage": "Typ \"{{domain}}\" om deze site te verwijderen.",
       "deleteAction": "Site verwijderen",
       "deleteFailed": "Kan site niet verwijderen."
     },
@@ -1468,7 +1469,13 @@
         "empty": "Nog niet gezien"
       },
       "webVitalsLabel": "Web Vitals",
-      "webVitalsDescription": "Laad de aparte Web Vitals-bundel en stuur LCP-, INP-, CLS-, FCP- en TTFB-samples. Standaard uitgeschakeld."
+      "webVitalsDescription": "Laad de aparte Web Vitals-bundel en stuur LCP-, INP-, CLS-, FCP- en TTFB-samples. Standaard uitgeschakeld.",
+      "domains": {
+        "label": "Trackerhost",
+        "description": "Kies welke beschikbare host wordt gebruikt in het gegenereerde browsertrackersnippet.",
+        "defaultOption": "HitKeep-instantie-URL",
+        "selectedHint": "Tracker-URL: https://{{ hostname }}/hk.js"
+      }
     }
   },
   "admin": {
@@ -1570,7 +1577,10 @@
       "tabs": {
         "overview": "Overzicht",
         "members": "Leden",
-        "settings": "Instellingen",
+        "apiClients": "API-clients",
+        "customDomains": "Aangepaste domeinen",
+        "branding": "Branding",
+        "dangerZone": "Gevarenzone",
         "activity": "Activiteit"
       },
       "overview": {
@@ -1663,7 +1673,66 @@
           "lastOwner": "Je kunt niet als laatste eigenaar vertrekken.",
           "onlyTeam": "Je kunt je enige team niet verlaten.",
           "generic": "Het is niet gelukt om het team te verlaten. Probeer het opnieuw."
+        },
+        "trackingDomains": {
+          "title": "Aangepaste domeinen",
+          "description": "Verifieer aangepaste domeinen eenmalig en gebruik daarna elk actief domein als trackerhost voor sites van dit team.",
+          "hostnamePlaceholder": "analytics.example.com",
+          "addAction": "Domein toevoegen",
+          "hostnameRequired": "Voer een hostnaam in.",
+          "hostnameInvalid": "Gebruik een geldige hostnaam zoals analytics.example.com.",
+          "hostnameTooLong": "Hostnamen mogen maximaal 253 tekens bevatten.",
+          "empty": "Er zijn nog geen trackingdomeinen toegevoegd.",
+          "enabled": "Ingeschakeld",
+          "disabled": "Uitgeschakeld",
+          "active": "Actief",
+          "notActive": "Niet actief",
+          "added": "Trackingdomein toegevoegd. Voeg de DNS-records toe en verifieer daarna.",
+          "checked": "Verificatie gecontroleerd. Bekijk de statusdetails hieronder.",
+          "verified": "Trackingdomein geverifieerd en klaar voor gebruik.",
+          "enabledSuccess": "Trackingdomein ingeschakeld.",
+          "disabledSuccess": "Trackingdomein uitgeschakeld. Sites die het gebruikten zijn teruggezet naar de standaard-URL.",
+          "deleted": "Trackingdomein verwijderd.",
+          "verifyAction": "Verifieren",
+          "disableAction": "Uitschakelen",
+          "enableAction": "Inschakelen",
+          "deleteConfirm": "{{ hostname }} verwijderen? Sites die het gebruiken gaan terug naar de standaard tracker-URL.",
+          "dns": {
+            "txtName": "TXT-naam",
+            "txtValue": "TXT-waarde",
+            "target": "CNAME-, A- of AAAA-doel"
+          },
+          "checks": {
+            "ownership": "Eigendom",
+            "target": "Doel",
+            "tls": "TLS"
+          },
+          "checksLabel": "Verificatiecontroles",
+          "lastChecked": "Laatst gecontroleerd",
+          "lastTLSAsk": "Laatste TLS-aanvraag",
+          "status": {
+            "pending": "In behandeling",
+            "verified": "Geverifieerd",
+            "failed": "Mislukt"
+          },
+          "tlsMode": {
+            "external": "Externe TLS",
+            "caddy-on-demand": "Caddy on-demand TLS"
+          },
+          "errors": {
+            "load": "Trackingdomeinen konden niet worden geladen.",
+            "add": "Trackingdomein kon niet worden toegevoegd.",
+            "conflict": "Deze hostname wordt al gebruikt door een site of trackingdomein.",
+            "verify": "Trackingdomein kon niet worden geverifieerd.",
+            "update": "Trackingdomein kon niet worden bijgewerkt.",
+            "delete": "Trackingdomein kon niet worden verwijderd."
+          }
         }
+      },
+      "danger": {
+        "leaveConfirmTitle": "Team verlaten",
+        "archiveConfirmTitle": "Team archiveren",
+        "confirmNameLabel": "Typ {{name}} om te bevestigen"
       },
       "audit": {
         "readOnly": "Je heeft geen toestemming om teamactiviteiten te bekijken.",

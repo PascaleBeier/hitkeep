@@ -204,6 +204,102 @@ func TestHandleIngestLeaderCountsBadBodyRejection(t *testing.T) {
 	}
 }
 
+func TestHandleIngestLeaderDropsCrossTeamCustomTrackingHost(t *testing.T) {
+	producer := &capturingProducer{}
+	h, cleanup := setupIngestHandler(t, func(ctx *shared.Context) {
+		ctx.Producer = producer
+		ownerID, err := ctx.Store.CreateUser(context.Background(), "cross-team-track@example.com", "hashed_secret")
+		if err != nil {
+			t.Fatalf("create other team owner: %v", err)
+		}
+		otherTeam, err := ctx.Store.CreateTenant(context.Background(), ownerID, "Cross Team Tracking", "")
+		if err != nil {
+			t.Fatalf("create other team: %v", err)
+		}
+		createActiveIngestTrackingDomainForTeam(t, ctx.Store, otherTeam.ID, "track.example.net")
+	})
+	defer cleanup()
+
+	req := newIngestRequest(t, "https://example.com", "198.51.100.22:1234", map[string]any{
+		"path":       "/docs",
+		"session_id": uuid.New(),
+		"page_id":    uuid.New(),
+	})
+	req.Host = "track.example.net"
+
+	rec := httptest.NewRecorder()
+	h.handleIngestLeader(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status %d, got %d", http.StatusAccepted, rec.Code)
+	}
+	if got := producer.messageCount("hits"); got != 0 {
+		t.Fatalf("expected cross-team custom tracking host to publish no hits, got %d", got)
+	}
+	if got := h.ctx.SystemCounters.Rejections.Load(); got != 1 {
+		t.Fatalf("expected rejection counter 1, got %d", got)
+	}
+}
+
+func TestHandleIngestLeaderAllowsAnyActiveTeamCustomTrackingHost(t *testing.T) {
+	producer := &capturingProducer{}
+	h, cleanup := setupIngestHandler(t, func(ctx *shared.Context) {
+		ctx.Producer = producer
+		createActiveIngestTrackingDomain(t, ctx.Store, "track.example.net")
+		createActiveIngestTrackingDomain(t, ctx.Store, "metrics.example.net")
+	})
+	defer cleanup()
+
+	req := newIngestRequest(t, "https://example.com", "198.51.100.22:1234", map[string]any{
+		"path":       "/docs",
+		"session_id": uuid.New(),
+		"page_id":    uuid.New(),
+	})
+	req.Host = "metrics.example.net"
+
+	rec := httptest.NewRecorder()
+	h.handleIngestLeader(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status %d, got %d body=%s", http.StatusAccepted, rec.Code, rec.Body.String())
+	}
+	if got := producer.messageCount("hits"); got != 1 {
+		t.Fatalf("expected team custom tracking host to publish 1 hit, got %d", got)
+	}
+	if got := h.ctx.SystemCounters.Rejections.Load(); got != 0 {
+		t.Fatalf("expected rejection counter 0, got %d", got)
+	}
+}
+
+func TestHandleIngestLeaderAllowsInstanceHostWhenTeamCustomTrackingDomainsExist(t *testing.T) {
+	producer := &capturingProducer{}
+	h, cleanup := setupIngestHandler(t, func(ctx *shared.Context) {
+		ctx.Producer = producer
+		createActiveIngestTrackingDomain(t, ctx.Store, "track.example.net")
+	})
+	defer cleanup()
+
+	req := newIngestRequest(t, "https://example.com", "198.51.100.22:1234", map[string]any{
+		"path":       "/docs",
+		"session_id": uuid.New(),
+		"page_id":    uuid.New(),
+	})
+	req.Host = "cloud.hitkeep.test"
+
+	rec := httptest.NewRecorder()
+	h.handleIngestLeader(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status %d, got %d body=%s", http.StatusAccepted, rec.Code, rec.Body.String())
+	}
+	if got := producer.messageCount("hits"); got != 1 {
+		t.Fatalf("expected instance host to publish 1 hit, got %d", got)
+	}
+	if got := h.ctx.SystemCounters.Rejections.Load(); got != 0 {
+		t.Fatalf("expected rejection counter 0, got %d", got)
+	}
+}
+
 func TestHandleIngestLeaderAllowsSameSiteReferrerToContinueToPublish(t *testing.T) {
 	producer, err := newTestProducer()
 	if err != nil {
@@ -1113,6 +1209,43 @@ func setupServerIngestTestEnv(t *testing.T, siteRole auth.SiteRole, mutateCtx fu
 		mutateCtx(ctx)
 	}
 	return store, ctx, userID, site.ID, token
+}
+
+func createActiveIngestTrackingDomain(t *testing.T, store *database.Store, hostname string) api.CustomTrackingDomain {
+	t.Helper()
+
+	teamID, err := store.GetDefaultTenantID(context.Background())
+	if err != nil {
+		t.Fatalf("get default tenant: %v", err)
+	}
+	return createActiveIngestTrackingDomainForTeam(t, store, teamID, hostname)
+}
+
+func createActiveIngestTrackingDomainForTeam(t *testing.T, store *database.Store, teamID uuid.UUID, hostname string) api.CustomTrackingDomain {
+	t.Helper()
+
+	domain, err := store.CreateCustomTrackingDomain(context.Background(), database.CustomTrackingDomainInput{
+		TeamID: teamID,
+		Host:   hostname,
+	})
+	if err != nil {
+		t.Fatalf("create custom tracking domain %q: %v", hostname, err)
+	}
+	now := time.Now().UTC()
+	verified, err := store.UpdateCustomTrackingDomainVerification(context.Background(), domain.ID, database.CustomTrackingDomainVerificationResult{
+		VerificationStatus: database.CustomTrackingVerificationVerified,
+		TargetStatus:       database.CustomTrackingVerificationVerified,
+		TLSStatus:          database.CustomTrackingVerificationVerified,
+		VerifiedAt:         &now,
+		LastCheckedAt:      now,
+	})
+	if err != nil {
+		t.Fatalf("verify custom tracking domain %q: %v", hostname, err)
+	}
+	if verified == nil {
+		t.Fatalf("expected verified custom tracking domain %q", hostname)
+	}
+	return *verified
 }
 
 type publishedMessage struct {

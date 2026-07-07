@@ -41,173 +41,170 @@
 </app-crud-dialog>
 
 @if (team(); as t) {
-
-<div class="team-members__meta">
-    <div class="team-members__meta-text">
-        <div class="team-members__meta-title">{{ "teams.management.title" | transloco }}</div>
-        <div class="team-members__meta-subtitle">{{ "teams.management.subtitle" | transloco: { team: t.name } }}</div>
-    </div>
-    <div class="team-members__header-actions">
-        <p-tag [value]="roleLabel(t.role)" [severity]="roleSeverity(t.role)" [rounded]="true" />
-        @if (canManageMembers()) {
-        <p-button [label]="'teams.management.invite.submitAction' | transloco" icon="pi pi-user-plus" [type]="'button'" (onClick)="openInviteDialog()" />
-        <p-button [label]="'common.actions.refresh' | transloco" icon="pi pi-refresh" [text]="true" [disabled]="isLoading()" [type]="'button'" (onClick)="refreshMembers()" />
-        }
-    </div>
-</div>
-
-@if (successKey(); as success) {
-<div class="team-members__alert team-members__alert--success">{{ success | transloco }}</div>
-} @if (errorKey() && !isInviteDialogVisible()) {
-<div class="team-members__alert team-members__alert--error">{{ errorKey() | transloco }}</div>
-} @if (!canManageMembers()) {
-<div class="team-members__readonly">{{ "teams.management.readOnly" | transloco }}</div>
-}
-
-<div class="flex justify-end mb-3">
-    <p-iconfield class="hk-crud-search">
-        <p-inputicon class="pi pi-search" />
-        <input pInputText id="team-members-search" #membersSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="membersTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
-    </p-iconfield>
-</div>
-
-<div class="hk-crud-table-wrap">
-    <p-table
-        #membersTable
-        [value]="members()"
-        [loading]="isLoading()"
-        [globalFilterFields]="['email', 'role', 'added_at']"
-        [sortField]="'added_at'"
-        [sortOrder]="-1"
-        [paginator]="true"
-        [rows]="10"
-        [rowsPerPageOptions]="[10, 25, 50]"
-        [rowHover]="true"
-        responsiveLayout="scroll"
-        styleClass="hk-crud-table p-datatable-sm"
-        [tableStyle]="{ 'min-width': '720px' }"
-    >
-        <ng-template pTemplate="header">
-            <tr>
-                <th pSortableColumn="email">
-                    {{ "common.columns.email" | transloco }}
-                    <p-sortIcon field="email" />
-                </th>
-                <th pSortableColumn="role">
-                    {{ "common.columns.role" | transloco }}
-                    <p-sortIcon field="role" />
-                </th>
-                <th pSortableColumn="added_at">
-                    {{ "common.columns.added" | transloco }}
-                    <p-sortIcon field="added_at" />
-                </th>
-                <th>{{ "common.columns.actions" | transloco }}</th>
-            </tr>
-        </ng-template>
-        <ng-template pTemplate="body" let-member>
-            <tr>
-                <td>{{ member.email }}</td>
-                <td class="team-members__role-cell">
-                    @if (canEditMember(member)) {
-                    <p-select
-                        class="team-members__role-select"
-                        [options]="roleOptionsForMember(member)"
-                        [formControl]="roleControlFor(member)"
-                        optionLabel="label"
-                        optionValue="value"
-                        appendTo="body"
-                        [disabled]="isRoleUpdating(member) || removingUserID() === member.user_id"
-                        (onChange)="onRoleChange(member, $event.value)"
-                    />
-                    } @else {
-                    <p-tag [value]="roleLabel(member.role)" [severity]="roleSeverity(member.role)" [rounded]="true" />
-                    }
-                </td>
-                <td><app-relative-date-time [value]="member.added_at" /></td>
-                <td class="team-members__actions">
-                    @if (memberActions(member).length > 0) {
-                    <app-table-row-actions [items]="memberActions(member)" [loading]="memberActionLoading(member)" />
-                    } @else {
-                    <span class="text-xs text-muted-color">{{ "teams.management.notAllowed" | transloco }}</span>
-                    }
-                </td>
-            </tr>
-        </ng-template>
-        <ng-template pTemplate="emptymessage">
-            <tr>
-                <td colspan="4" class="text-center text-muted-color py-4">{{ "teams.management.empty" | transloco }}</td>
-            </tr>
-        </ng-template>
-    </p-table>
-</div>
-
-@if (canManageMembers()) {
-<div class="team-members__pending">
-    <div class="team-members__pending-header">
-        <div>
-            <div class="team-members__pending-title">{{ "teams.management.pendingTitle" | transloco }}</div>
-            <div class="team-members__meta-subtitle">{{ "teams.management.pendingSubtitle" | transloco }}</div>
+<div class="team-members__stack">
+    <app-settings-card [title]="'teams.management.title' | transloco" [subtitle]="'teams.management.subtitle' | transloco: { team: t.name }" icon="pi pi-users">
+        <div settings-card-header class="team-members__header-actions">
+            <p-tag [value]="roleLabel(t.role)" [severity]="roleSeverity(t.role)" [rounded]="true" />
+            @if (canManageMembers()) {
+            <p-button [label]="'teams.management.invite.submitAction' | transloco" icon="pi pi-user-plus" [type]="'button'" (onClick)="openInviteDialog()" />
+            <p-button [label]="'common.actions.refresh' | transloco" icon="pi pi-refresh" [text]="true" [disabled]="isLoading()" [type]="'button'" (onClick)="refreshMembers()" />
+            }
         </div>
-        <p-iconfield class="hk-crud-search">
-            <p-inputicon class="pi pi-search" />
-            <input pInputText #pendingInvitesSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="pendingInvitesTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
-        </p-iconfield>
-    </div>
 
-    <div class="hk-crud-table-wrap">
-        <p-table
-            #pendingInvitesTable
-            [value]="pendingInvites()"
-            [loading]="isLoading()"
-            [globalFilterFields]="['email', 'role', 'created_at', 'expires_at']"
-            [sortField]="'created_at'"
-            [sortOrder]="-1"
-            [paginator]="true"
-            [rows]="10"
-            [rowsPerPageOptions]="[10, 25, 50]"
-            [rowHover]="true"
-            responsiveLayout="scroll"
-            styleClass="hk-crud-table p-datatable-sm"
-            [tableStyle]="{ 'min-width': '760px' }"
-        >
-            <ng-template pTemplate="header">
-                <tr>
-                    <th pSortableColumn="email">
-                        {{ "common.columns.email" | transloco }}
-                        <p-sortIcon field="email" />
-                    </th>
-                    <th pSortableColumn="role">
-                        {{ "common.columns.role" | transloco }}
-                        <p-sortIcon field="role" />
-                    </th>
-                    <th pSortableColumn="created_at">
-                        {{ "common.columns.created" | transloco }}
-                        <p-sortIcon field="created_at" />
-                    </th>
-                    <th pSortableColumn="expires_at">
-                        {{ "teams.management.expiresLabel" | transloco }}
-                        <p-sortIcon field="expires_at" />
-                    </th>
-                    <th>{{ "common.columns.actions" | transloco }}</th>
-                </tr>
-            </ng-template>
-            <ng-template pTemplate="body" let-invite>
-                <tr>
-                    <td>{{ invite.email }}</td>
-                    <td><p-tag [value]="inviteRoleLabel(invite.role)" [severity]="roleSeverity(invite.role)" [rounded]="true" /></td>
-                    <td><app-relative-date-time [value]="invite.created_at" /></td>
-                    <td><app-relative-date-time [value]="invite.expires_at" /></td>
-                    <td class="team-members__actions">
-                        <app-table-row-actions [items]="inviteActions(invite)" [loading]="isInviteActionLoading(invite)" />
-                    </td>
-                </tr>
-            </ng-template>
-            <ng-template pTemplate="emptymessage">
-                <tr>
-                    <td colspan="5" class="text-center text-muted-color py-4">{{ "teams.management.pendingEmpty" | transloco }}</td>
-                </tr>
-            </ng-template>
-        </p-table>
-    </div>
+        <div settings-card-body class="team-members__card-body">
+            @if (successKey(); as success) {
+            <div class="team-members__alert team-members__alert--success">{{ success | transloco }}</div>
+            } @if (errorKey() && !isInviteDialogVisible()) {
+            <div class="team-members__alert team-members__alert--error">{{ errorKey() | transloco }}</div>
+            } @if (!canManageMembers()) {
+            <div class="team-members__readonly">{{ "teams.management.readOnly" | transloco }}</div>
+            }
+
+            <div class="team-members__toolbar">
+                <p-iconfield class="hk-crud-search">
+                    <p-inputicon class="pi pi-search" />
+                    <input pInputText id="team-members-search" #membersSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="membersTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
+                </p-iconfield>
+            </div>
+
+            <div class="hk-crud-table-wrap">
+                <p-table
+                    #membersTable
+                    [value]="members()"
+                    [loading]="isLoading()"
+                    [globalFilterFields]="['email', 'role', 'added_at']"
+                    [sortField]="'added_at'"
+                    [sortOrder]="-1"
+                    [paginator]="true"
+                    [rows]="10"
+                    [rowsPerPageOptions]="[10, 25, 50]"
+                    [rowHover]="true"
+                    responsiveLayout="scroll"
+                    styleClass="hk-crud-table p-datatable-sm"
+                    [tableStyle]="{ 'min-width': '720px' }"
+                >
+                    <ng-template pTemplate="header">
+                        <tr>
+                            <th pSortableColumn="email">
+                                {{ "common.columns.email" | transloco }}
+                                <p-sortIcon field="email" />
+                            </th>
+                            <th pSortableColumn="role">
+                                {{ "common.columns.role" | transloco }}
+                                <p-sortIcon field="role" />
+                            </th>
+                            <th pSortableColumn="added_at">
+                                {{ "common.columns.added" | transloco }}
+                                <p-sortIcon field="added_at" />
+                            </th>
+                            <th>{{ "common.columns.actions" | transloco }}</th>
+                        </tr>
+                    </ng-template>
+                    <ng-template pTemplate="body" let-member>
+                        <tr>
+                            <td>{{ member.email }}</td>
+                            <td class="team-members__role-cell">
+                                @if (canEditMember(member)) {
+                                <p-select
+                                    class="team-members__role-select"
+                                    [options]="roleOptionsForMember(member)"
+                                    [formControl]="roleControlFor(member)"
+                                    optionLabel="label"
+                                    optionValue="value"
+                                    appendTo="body"
+                                    (onChange)="onRoleChange(member, $event.value)"
+                                />
+                                } @else {
+                                <p-tag [value]="roleLabel(member.role)" [severity]="roleSeverity(member.role)" [rounded]="true" />
+                                }
+                            </td>
+                            <td><app-relative-date-time [value]="member.added_at" /></td>
+                            <td class="team-members__actions">
+                                @if (memberActions(member).length > 0) {
+                                <app-table-row-actions [items]="memberActions(member)" [loading]="memberActionLoading(member)" />
+                                } @else {
+                                <span class="text-xs text-muted-color">{{ "teams.management.notAllowed" | transloco }}</span>
+                                }
+                            </td>
+                        </tr>
+                    </ng-template>
+                    <ng-template pTemplate="emptymessage">
+                        <tr>
+                            <td colspan="4" class="text-center text-muted-color py-4">{{ "teams.management.empty" | transloco }}</td>
+                        </tr>
+                    </ng-template>
+                </p-table>
+            </div>
+        </div>
+    </app-settings-card>
+
+    @if (canManageMembers()) {
+    <app-settings-card [title]="'teams.management.pendingTitle' | transloco" [subtitle]="'teams.management.pendingSubtitle' | transloco" icon="pi pi-envelope">
+        <div settings-card-header class="team-members__header-actions">
+            <p-iconfield class="hk-crud-search">
+                <p-inputicon class="pi pi-search" />
+                <input pInputText #pendingInvitesSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="pendingInvitesTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
+            </p-iconfield>
+        </div>
+
+        <div settings-card-body>
+            <div class="hk-crud-table-wrap">
+                <p-table
+                    #pendingInvitesTable
+                    [value]="pendingInvites()"
+                    [loading]="isLoading()"
+                    [globalFilterFields]="['email', 'role', 'created_at', 'expires_at']"
+                    [sortField]="'created_at'"
+                    [sortOrder]="-1"
+                    [paginator]="true"
+                    [rows]="10"
+                    [rowsPerPageOptions]="[10, 25, 50]"
+                    [rowHover]="true"
+                    responsiveLayout="scroll"
+                    styleClass="hk-crud-table p-datatable-sm"
+                    [tableStyle]="{ 'min-width': '760px' }"
+                >
+                    <ng-template pTemplate="header">
+                        <tr>
+                            <th pSortableColumn="email">
+                                {{ "common.columns.email" | transloco }}
+                                <p-sortIcon field="email" />
+                            </th>
+                            <th pSortableColumn="role">
+                                {{ "common.columns.role" | transloco }}
+                                <p-sortIcon field="role" />
+                            </th>
+                            <th pSortableColumn="created_at">
+                                {{ "common.columns.created" | transloco }}
+                                <p-sortIcon field="created_at" />
+                            </th>
+                            <th pSortableColumn="expires_at">
+                                {{ "teams.management.expiresLabel" | transloco }}
+                                <p-sortIcon field="expires_at" />
+                            </th>
+                            <th>{{ "common.columns.actions" | transloco }}</th>
+                        </tr>
+                    </ng-template>
+                    <ng-template pTemplate="body" let-invite>
+                        <tr>
+                            <td>{{ invite.email }}</td>
+                            <td><p-tag [value]="inviteRoleLabel(invite.role)" [severity]="roleSeverity(invite.role)" [rounded]="true" /></td>
+                            <td><app-relative-date-time [value]="invite.created_at" /></td>
+                            <td><app-relative-date-time [value]="invite.expires_at" /></td>
+                            <td class="team-members__actions">
+                                <app-table-row-actions [items]="inviteActions(invite)" [loading]="isInviteActionLoading(invite)" />
+                            </td>
+                        </tr>
+                    </ng-template>
+                    <ng-template pTemplate="emptymessage">
+                        <tr>
+                            <td colspan="5" class="text-center text-muted-color py-4">{{ "teams.management.pendingEmpty" | transloco }}</td>
+                        </tr>
+                    </ng-template>
+                </p-table>
+            </div>
+        </div>
+    </app-settings-card>
+    }
 </div>
-} }
+}

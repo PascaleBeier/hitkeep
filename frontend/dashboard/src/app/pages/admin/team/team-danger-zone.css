@@ -1,0 +1,119 @@
+.team-danger-zone {
+    display: grid;
+    gap: 1rem;
+    --team-danger-card-bg: var(--p-content-background);
+    --team-danger-border: var(--p-content-border-color);
+    --team-danger-divider: var(--p-content-border-color);
+}
+
+.team-danger-zone__panel {
+    border: 1px solid color-mix(in srgb, var(--p-red-500) 30%, var(--team-danger-border));
+    border-radius: 8px;
+    background: var(--team-danger-card-bg);
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+    overflow: hidden;
+}
+
+.team-danger-zone__header,
+.team-danger-zone__row {
+    padding: 0.95rem 1.05rem;
+}
+
+.team-danger-zone__header {
+    border-bottom: 1px solid var(--team-danger-divider);
+}
+
+.team-danger-zone__title-row {
+    align-items: flex-start;
+    display: flex;
+    gap: 0.8rem;
+    min-width: 0;
+}
+
+.team-danger-zone__icon {
+    align-items: center;
+    background: color-mix(in srgb, var(--p-red-50) 75%, var(--team-danger-card-bg));
+    border: 1px solid color-mix(in srgb, var(--p-red-500) 30%, var(--team-danger-border));
+    border-radius: 8px;
+    color: var(--p-red-600);
+    display: inline-flex;
+    flex: 0 0 auto;
+    height: 2rem;
+    justify-content: center;
+    width: 2rem;
+}
+
+.team-danger-zone__header h3,
+.team-danger-zone__copy h4 {
+    margin: 0;
+    color: var(--p-text-color);
+    font-size: 0.96rem;
+    font-weight: 750;
+    line-height: 1.35;
+}
+
+.team-danger-zone__header h3 {
+    color: var(--p-red-600);
+}
+
+.team-danger-zone__header p,
+.team-danger-zone__copy p,
+.team-danger-zone__hint {
+    margin: 0.25rem 0 0;
+    color: var(--p-text-muted-color);
+    font-size: 0.875rem;
+    line-height: 1.55;
+}
+
+.team-danger-zone__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.team-danger-zone__row + .team-danger-zone__row {
+    border-top: 1px solid var(--team-danger-divider);
+}
+
+.team-danger-zone__copy {
+    display: grid;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.team-danger-zone__dialog {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.team-danger-zone__dialog p {
+    margin: 0;
+    color: var(--p-text-muted-color);
+}
+
+.team-danger-zone__dialog label {
+    font-weight: 600;
+}
+
+:host-context(.p-dark) .team-danger-zone {
+    --team-danger-card-bg: color-mix(in srgb, var(--p-surface-900) 92%, var(--p-surface-950) 8%);
+    --team-danger-border: color-mix(in srgb, var(--p-surface-700) 82%, var(--p-surface-600) 18%);
+    --team-danger-divider: var(--p-surface-800);
+}
+
+:host-context(.p-dark) .team-danger-zone__panel {
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.28);
+}
+
+:host-context(.p-dark) .team-danger-zone__icon {
+    background: color-mix(in srgb, var(--p-red-950) 62%, var(--team-danger-card-bg));
+    color: var(--p-red-300);
+}
+
+@media (max-width: 640px) {
+    .team-danger-zone__row {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}

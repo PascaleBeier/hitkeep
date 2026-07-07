@@ -209,10 +209,12 @@ func New(conf *config.Config, publicFS fs.FS, store *database.Store, tenantStore
 
 	mux := http.NewServeMux()
 	s.setupRoutes(mux, publicFS)
-	handler := shared.FetchMetadataMiddleware(conf.PublicURL, mux)
+	rootHandler := shared.FetchMetadataMiddleware(conf.PublicURL, mux)
+	handler := rootHandler
 	if s.publicBasePath != "/" {
-		handler = s.stripPublicBasePath(handler)
+		handler = s.stripPublicBasePath(rootHandler)
 	}
+	handler = s.customTrackingHostMiddleware(publicFS, rootHandler, handler)
 
 	s.httpServer = &http.Server{
 		Addr:              conf.HTTPAddr,
@@ -324,7 +326,7 @@ func (s *Server) stripPublicBasePath(next http.Handler) http.Handler {
 				strippedPath = "/"
 			}
 			r = cloneRequestWithPath(r, strippedPath)
-		} else if r.URL.Path != "/healthz" && r.URL.Path != "/readyz" {
+		} else if r.URL.Path != "/healthz" && r.URL.Path != "/readyz" && !isCaddyTLSAskPath(r.URL.Path) {
 			http.NotFound(w, r)
 			return
 		}
@@ -344,6 +346,7 @@ func cloneRequestWithPath(r *http.Request, nextPath string) *http.Request {
 func (s *Server) setupRoutes(mux *http.ServeMux, publicFS fs.FS) {
 	ctx := s.ctx
 	system.Register(mux, ctx)
+	mux.HandleFunc("GET /internal/caddy/on-demand-tls/{token}", s.handleCaddyOnDemandTLSAsk())
 	ingest.Register(mux, ctx)
 	serverauth.Register(mux, ctx)
 	cloudhandlers.Register(mux, ctx)

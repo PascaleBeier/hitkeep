@@ -1,0 +1,60 @@
+@if (team(); as t) {
+<div class="team-danger-zone">
+    <section class="team-danger-zone__panel" aria-labelledby="team-danger-zone-heading">
+        <header class="team-danger-zone__header">
+            <div class="team-danger-zone__title-row">
+                <span class="team-danger-zone__icon"><i class="pi pi-exclamation-triangle" aria-hidden="true"></i></span>
+                <h3 id="team-danger-zone-heading">{{ "admin.team.tabs.dangerZone" | transloco }}</h3>
+            </div>
+        </header>
+
+        <div class="team-danger-zone__row">
+            <div class="team-danger-zone__copy">
+                <h4>{{ "admin.team.settings.leaveSectionTitle" | transloco }}</h4>
+                <p>{{ "admin.team.settings.leaveSectionDescription" | transloco }}</p>
+                @if (leaveSuccessKey(); as key) {
+                <p-message severity="success" [text]="key | transloco" />
+                } @if (leaveErrorKey(); as key) {
+                <p-message severity="error" [text]="key | transloco" />
+                }
+            </div>
+            <p-button severity="danger" [outlined]="true" [label]="'admin.team.settings.leaveAction' | transloco" [loading]="isLeaving()" [disabled]="isBusy()" (onClick)="openConfirmDialog('leave')" />
+        </div>
+
+        @if (canArchive()) {
+        <div class="team-danger-zone__row">
+            <div class="team-danger-zone__copy">
+                <h4>{{ "admin.team.settings.archiveSectionTitle" | transloco }}</h4>
+                <p>{{ "admin.team.settings.archiveSectionDescription" | transloco }}</p>
+                <p class="team-danger-zone__hint">{{ "admin.team.settings.archiveSectionHint" | transloco }}</p>
+                @if (archiveSuccessKey(); as key) {
+                <p-message severity="success" [text]="key | transloco" />
+                } @if (archiveErrorKey(); as key) {
+                <p-message severity="error" [text]="key | transloco" />
+                }
+            </div>
+            <p-button severity="danger" [outlined]="true" [label]="'admin.team.settings.archiveAction' | transloco" [loading]="isArchiving()" [disabled]="isBusy()" (onClick)="openConfirmDialog('archive')" />
+        </div>
+        }
+    </section>
+
+    <app-dialog-shell
+        [title]="confirmTitleKey() | transloco"
+        [visible]="confirmDialogVisible()"
+        [busy]="isBusy()"
+        role="alertdialog"
+        [secondaryLabel]="'common.actions.cancel' | transloco"
+        [primaryLabel]="confirmActionKey() | transloco"
+        primarySeverity="danger"
+        [primaryDisabled]="!canSubmitConfirm()"
+        [primaryLoading]="isBusy()"
+        (visibleChange)="onConfirmDialogVisibleChange($event)"
+        (primaryAction)="runConfirmedAction()"
+    >
+        <div class="team-danger-zone__dialog">
+            <label for="team-danger-confirm">{{ "admin.team.danger.confirmNameLabel" | transloco: { name: t.name } }}</label>
+            <input id="team-danger-confirm" pInputText class="w-full" [ngModel]="confirmValue()" (ngModelChange)="confirmValue.set($event)" [placeholder]="t.name" autocomplete="off" />
+        </div>
+    </app-dialog-shell>
+</div>
+}

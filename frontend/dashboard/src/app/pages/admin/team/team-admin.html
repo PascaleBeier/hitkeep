@@ -2,7 +2,14 @@
     <p-tabs [value]="activeTab()" (valueChange)="onTabChange($event)" class="hk-admin-tabs">
         <p-tablist>
             @for (tab of tabs(); track tab.value) {
-            <p-tab [value]="tab.value">{{ tab.label }}</p-tab>
+            <p-tab [value]="tab.value">
+                <span class="hk-admin-tab-label" [class.hk-admin-tab-label--danger]="tab.danger">
+                    @if (tab.icon) {
+                    <i [class]="tab.icon" aria-hidden="true"></i>
+                    }
+                    <span>{{ tab.label }}</span>
+                </span>
+            </p-tab>
             }
         </p-tablist>
         <p-tabpanels>
@@ -12,12 +19,23 @@
             <p-tabpanel value="1">
                 <app-team-members />
             </p-tabpanel>
+            @if (canManageSettings()) {
             <p-tabpanel value="2">
-                <app-team-settings />
+                <app-team-api-clients />
             </p-tabpanel>
-            @if (canViewAudit()) {
+            <p-tabpanel value="6">
+                <app-team-custom-domains />
+            </p-tabpanel>
             <p-tabpanel value="3">
+                <app-team-branding />
+            </p-tabpanel>
+            } @if (canViewAudit()) {
+            <p-tabpanel value="5">
                 <app-team-audit />
+            </p-tabpanel>
+            } @if (canManageSettings()) {
+            <p-tabpanel value="4">
+                <app-team-danger-zone />
             </p-tabpanel>
             }
         </p-tabpanels>

@@ -2,11 +2,12 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { of } from 'rxjs';
+import { Subject, of } from 'rxjs';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { provideTranslocoLocale } from '@jsverse/transloco-locale';
 import { vi } from 'vitest';
 import { TEAM_CAPABILITIES } from '@core/access/capabilities';
+import { TeamMember } from '@models/analytics.types';
 import { PermissionService } from '@services/permission.service';
 import { TeamMembersPage } from './team-members';
 import { TeamService } from '@services/team.service';
@@ -24,6 +25,10 @@ interface TeamMembersTestAccess {
     inviteMember(): void;
     isInviteDialogVisible(): boolean;
     successKey(): string | null;
+    roleControlFor(member: TeamMember): {
+        disabled: boolean;
+    };
+    onRoleChange(member: TeamMember, role: TeamMember['role']): void;
 }
 
 describe('TeamMembersPage', () => {
@@ -48,6 +53,13 @@ describe('TeamMembersPage', () => {
                     email: 'owner@example.com',
                     role: 'owner' as const,
                     added_at: '2026-01-01T00:00:00Z'
+                },
+                {
+                    id: 'member-admin-row',
+                    user_id: 'user-2',
+                    email: 'admin@example.com',
+                    role: 'admin' as const,
+                    added_at: '2026-01-02T00:00:00Z'
                 }
             ]);
         }),
@@ -167,7 +179,7 @@ describe('TeamMembersPage', () => {
         const access = component as unknown as TeamMembersTestAccess;
         expect(teamServiceMock.listTeamMembers).toHaveBeenCalledWith('team-1');
         expect(teamServiceMock.listTeamInvites).toHaveBeenCalledWith('team-1');
-        expect(access.members().length).toBe(1);
+        expect(access.members().length).toBe(2);
         expect(access.pendingInvites().length).toBe(1);
     });
 
@@ -203,5 +215,28 @@ describe('TeamMembersPage', () => {
         ]);
         expect(access.isInviteDialogVisible()).toBe(false);
         expect(access.successKey()).toBe('teams.management.status.inviteSent');
+    });
+
+    it('disables role form controls through the control state while role updates are pending', () => {
+        const access = component as unknown as TeamMembersTestAccess;
+        const adminMember = access.members().find((member): member is TeamMember => {
+            return typeof member === 'object' && member !== null && 'user_id' in member && (member as TeamMember).user_id === 'user-2';
+        });
+        if (!adminMember) {
+            throw new Error('expected admin member fixture');
+        }
+
+        const roleUpdate = new Subject<{ status: string; is_invite: boolean }>();
+        teamServiceMock.upsertTeamMember.mockReturnValueOnce(roleUpdate.asObservable());
+        const control = access.roleControlFor(adminMember);
+
+        expect(control.disabled).toBe(false);
+        access.onRoleChange(adminMember, 'member');
+        expect(control.disabled).toBe(true);
+
+        roleUpdate.next({ status: 'ok', is_invite: false });
+        roleUpdate.complete();
+
+        expect(control.disabled).toBe(false);
     });
 });

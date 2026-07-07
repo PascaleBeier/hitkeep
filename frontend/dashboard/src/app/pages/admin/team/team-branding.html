@@ -1,0 +1,41 @@
+@if (team(); as t) {
+<div class="team-branding__stack">
+    @if (successKey(); as key) {
+    <p-message severity="success" [text]="key | transloco" />
+    } @if (errorKey(); as key) {
+    <p-message severity="error" [text]="key | transloco" />
+    }
+
+    <app-settings-card [title]="'admin.team.tabs.branding' | transloco" icon="pi pi-image">
+        <div settings-card-body class="team-branding__form-grid">
+            <section class="team-branding__section">
+                <h3>{{ "admin.team.settings.nameSectionTitle" | transloco }}</h3>
+                <p class="team-branding__description">{{ "admin.team.settings.nameSectionDescription" | transloco }}</p>
+                <input type="text" pInputText [formControl]="form.controls.name" />
+                @if (form.controls.name.invalid && form.controls.name.touched) {
+                <small class="team-branding__error">{{ "admin.team.settings.nameRequired" | transloco }}</small>
+                }
+            </section>
+
+            <section class="team-branding__section">
+                <h3>{{ "admin.team.settings.logoSectionTitle" | transloco }}</h3>
+                <p class="team-branding__description">{{ "admin.team.settings.logoSectionDescription" | transloco }}</p>
+                <input type="url" pInputText [formControl]="form.controls.logo_url" [placeholder]="'admin.team.settings.logoPlaceholder' | transloco" />
+                @if (form.controls.logo_url.value) {
+                <div class="team-branding__logo-preview">
+                    <img [ngSrc]="form.controls.logo_url.value" [width]="48" [height]="48" [alt]="'admin.team.settings.logoPreviewAlt' | transloco" />
+                </div>
+                } @else if (t.logo_url) {
+                <div class="team-branding__logo-preview">
+                    <img [ngSrc]="t.logo_url" [width]="48" [height]="48" [alt]="'admin.team.settings.logoPreviewAlt' | transloco" />
+                </div>
+                }
+            </section>
+        </div>
+
+        <div settings-card-footer>
+            <p-button [label]="'admin.team.settings.saveAction' | transloco" [loading]="isSaving()" [disabled]="form.invalid || isSaving()" (onClick)="saveSettings()" />
+        </div>
+    </app-settings-card>
+</div>
+}

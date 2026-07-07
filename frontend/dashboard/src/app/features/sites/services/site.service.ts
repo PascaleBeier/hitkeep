@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { tap } from 'rxjs';
-import { Site } from '@models/analytics.types';
+import { Site, SiteTrackingDomainOptions } from '@models/analytics.types';
 import { sortSitesByDomain } from '@features/sites/utils/site-sort';
 
 const LAST_SITE_KEY = 'hk_last_site_id';
@@ -104,5 +104,9 @@ export class SiteService {
 
     getTrackingStatus(siteId: string) {
         return this.http.get<SiteTrackingStatus>(`/api/sites/${siteId}/tracking/status`);
+    }
+
+    getTrackingDomainOptions(siteId: string) {
+        return this.http.get<SiteTrackingDomainOptions>(`/api/sites/${encodeURIComponent(siteId)}/tracking-domain-options`);
     }
 }

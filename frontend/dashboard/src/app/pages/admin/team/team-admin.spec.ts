@@ -53,7 +53,12 @@ describe('TeamAdminPage', () => {
         loadTeams: () => {
             teams.set([activeTeam()]);
             return of({ teams: teams(), active_team_id: activeTeam().id });
-        }
+        },
+        listTrackingDomains: () => of([]),
+        createTrackingDomain: () => of({}),
+        verifyTrackingDomain: () => of({}),
+        updateTrackingDomain: () => of({}),
+        deleteTrackingDomain: () => of(undefined)
     };
     const permissionServiceMock = {
         permissions: signal<UserPermissions>({
@@ -118,6 +123,24 @@ describe('TeamAdminPage', () => {
         expect(fixture.nativeElement.textContent).toContain('admin.team.tabs.activity');
     });
 
+    it('shows dedicated infrastructure, branding, and danger-zone tabs for team admins and owners', () => {
+        expect(fixture.nativeElement.textContent).toContain('admin.team.tabs.apiClients');
+        expect(fixture.nativeElement.textContent).toContain('admin.team.tabs.customDomains');
+        expect(fixture.nativeElement.textContent).toContain('admin.team.tabs.branding');
+        expect(fixture.nativeElement.textContent).toContain('admin.team.tabs.dangerZone');
+        expect(fixture.nativeElement.textContent).not.toContain('admin.team.tabs.settings');
+    });
+
+    it('renders danger zone as the last visible team tab with danger styling', () => {
+        const tabs = component['tabs']();
+        expect(tabs.map((tab) => tab.value)).toEqual(['0', '1', '2', '6', '3', '5', '4']);
+        const dangerTab = tabs[tabs.length - 1];
+        expect(dangerTab?.value).toBe('4');
+        expect(dangerTab?.icon).toBe('pi pi-exclamation-triangle');
+        expect(dangerTab?.danger).toBe(true);
+        expect(fixture.nativeElement.querySelector('.hk-admin-tab-label--danger i.pi-exclamation-triangle')).toBeTruthy();
+    });
+
     it('should hide the activity tab for non-managers', () => {
         activeTeam.set({
             id: 'team-1',
@@ -136,7 +159,11 @@ describe('TeamAdminPage', () => {
 
         fixture.detectChanges();
 
+        expect(fixture.nativeElement.textContent).not.toContain('admin.team.tabs.apiClients');
+        expect(fixture.nativeElement.textContent).not.toContain('admin.team.tabs.customDomains');
         expect(fixture.nativeElement.textContent).not.toContain('admin.team.tabs.activity');
+        expect(fixture.nativeElement.textContent).not.toContain('admin.team.tabs.branding');
+        expect(fixture.nativeElement.textContent).not.toContain('admin.team.tabs.dangerZone');
     });
 
     it('should reset the active tab when audit access is lost', () => {
@@ -161,9 +188,19 @@ describe('TeamAdminPage', () => {
         expect(component['activeTab']()).toBe('0');
     });
 
-    it('maps settings query params to the settings tab deep link', () => {
+    it('maps team tab query params to dedicated infrastructure tab deep links', () => {
         expect(component['tabValueFromQuery']('settings')).toBe('2');
+        expect(component['tabValueFromQuery']('api-clients')).toBe('2');
         expect(component['tabValueFromQuery']('2')).toBe('2');
-        expect(component['tabQueryFromValue']('2')).toBe('settings');
+        expect(component['tabQueryFromValue']('2')).toBe('api-clients');
+        expect(component['tabValueFromQuery']('custom-domains')).toBe('6');
+        expect(component['tabValueFromQuery']('tracking-domains')).toBe('6');
+        expect(component['tabValueFromQuery']('domains')).toBe('6');
+        expect(component['tabQueryFromValue']('6')).toBe('custom-domains');
+        expect(component['tabValueFromQuery']('branding')).toBe('3');
+        expect(component['tabQueryFromValue']('3')).toBe('branding');
+        expect(component['tabValueFromQuery']('danger-zone')).toBe('4');
+        expect(component['tabValueFromQuery']('danger')).toBe('4');
+        expect(component['tabQueryFromValue']('4')).toBe('danger-zone');
     });
 });

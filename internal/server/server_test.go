@@ -8,7 +8,9 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
+	"hitkeep/internal/api"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
@@ -347,6 +349,107 @@ func TestServerBackupStatusReflectsConfig(t *testing.T) {
 	}
 }
 
+func TestServerCustomTrackingHostServesOnlyTrackerRoutes(t *testing.T) {
+	conf := testServerConfig(t)
+	conf.PublicURL = "https://app.example.net/hitkeep/"
+	store := testServerStore(t)
+	defer store.Close()
+	createRouteableCustomTrackingDomain(t, store, "track.example.net")
+
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	defer func() {
+		_ = srv.Shutdown(context.Background())
+	}()
+
+	tests := []struct {
+		name       string
+		method     string
+		path       string
+		wantStatus int
+		wantBody   string
+	}{
+		{name: "tracker asset", method: http.MethodGet, path: "/hk.js", wantStatus: http.StatusOK, wantBody: "tracker asset"},
+		{name: "vitals asset", method: http.MethodHead, path: "/hk-vitals.js", wantStatus: http.StatusOK},
+		{name: "ingest preflight", method: http.MethodOptions, path: "/ingest", wantStatus: http.StatusNoContent},
+		{name: "api denied", method: http.MethodGet, path: "/api/status", wantStatus: http.StatusNotFound},
+		{name: "dashboard denied", method: http.MethodGet, path: "/", wantStatus: http.StatusNotFound},
+		{name: "prefixed asset denied", method: http.MethodGet, path: "/hitkeep/hk.js", wantStatus: http.StatusNotFound},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, tt.path, nil)
+			req.Host = "track.example.net"
+			if tt.method == http.MethodOptions {
+				req.Header.Set("Origin", "https://site.example")
+				req.Header.Set("Access-Control-Request-Method", http.MethodPost)
+				req.Header.Set("Access-Control-Request-Headers", "content-type")
+			}
+			rec := httptest.NewRecorder()
+
+			srv.httpServer.Handler.ServeHTTP(rec, req)
+
+			if rec.Code != tt.wantStatus {
+				t.Fatalf("expected status %d, got %d body %q", tt.wantStatus, rec.Code, rec.Body.String())
+			}
+			if tt.wantBody != "" && rec.Body.String() != tt.wantBody {
+				t.Fatalf("expected body %q, got %q", tt.wantBody, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestServerCaddyOnDemandTLSAsk(t *testing.T) {
+	conf := testServerConfig(t)
+	conf.CaddyTLSAskToken = "ask-token"
+	store := testServerStore(t)
+	defer store.Close()
+	allowed := createRouteableCustomTrackingDomain(t, store, "allowed.example.net")
+	disabled := createRouteableCustomTrackingDomain(t, store, "disabled.example.net")
+	if _, err := store.UpdateCustomTrackingDomainEnabled(context.Background(), disabled.TeamID, disabled.ID, false); err != nil {
+		t.Fatalf("disable custom tracking domain: %v", err)
+	}
+
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	defer func() {
+		_ = srv.Shutdown(context.Background())
+	}()
+
+	tests := []struct {
+		name       string
+		path       string
+		wantStatus int
+	}{
+		{name: "allowed", path: "/internal/caddy/on-demand-tls/ask-token?domain=allowed.example.net", wantStatus: http.StatusNoContent},
+		{name: "disabled", path: "/internal/caddy/on-demand-tls/ask-token?domain=disabled.example.net", wantStatus: http.StatusForbidden},
+		{name: "unknown", path: "/internal/caddy/on-demand-tls/ask-token?domain=unknown.example.net", wantStatus: http.StatusForbidden},
+		{name: "invalid token", path: "/internal/caddy/on-demand-tls/wrong-token?domain=allowed.example.net", wantStatus: http.StatusNotFound},
+		{name: "malformed domain", path: "/internal/caddy/on-demand-tls/ask-token?domain=localhost", wantStatus: http.StatusBadRequest},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			req.Host = "app.example.net"
+			rec := httptest.NewRecorder()
+
+			srv.httpServer.Handler.ServeHTTP(rec, req)
+
+			if rec.Code != tt.wantStatus {
+				t.Fatalf("expected status %d, got %d body %q", tt.wantStatus, rec.Code, rec.Body.String())
+			}
+		})
+	}
+
+	refreshed, err := store.GetCustomTrackingDomain(context.Background(), allowed.ID)
+	if err != nil {
+		t.Fatalf("reload allowed custom tracking domain: %v", err)
+	}
+	if refreshed == nil || refreshed.LastTLSAskAt == nil {
+		t.Fatalf("expected successful ask to record last_tls_ask_at, got %+v", refreshed)
+	}
+}
+
 func testServerConfig(t *testing.T) *config.Config {
 	t.Helper()
 	return &config.Config{
@@ -388,5 +491,43 @@ func testPublicFS() fstest.MapFS {
 		"main.abc123.js": {
 			Data: []byte("console.log('hitkeep');"),
 		},
+		"hk.js": {
+			Data: []byte("tracker asset"),
+		},
+		"hk-vitals.js": {
+			Data: []byte("vitals tracker asset"),
+		},
 	}
+}
+
+func createRouteableCustomTrackingDomain(t *testing.T, store *database.Store, hostname string) *api.CustomTrackingDomain {
+	t.Helper()
+
+	ctx := context.Background()
+	teamID, err := store.GetDefaultTenantID(ctx)
+	if err != nil {
+		t.Fatalf("get default tenant: %v", err)
+	}
+	domain, err := store.CreateCustomTrackingDomain(ctx, database.CustomTrackingDomainInput{
+		TeamID: teamID,
+		Host:   hostname,
+	})
+	if err != nil {
+		t.Fatalf("create custom tracking domain %q: %v", hostname, err)
+	}
+	now := time.Now().UTC()
+	verified, err := store.UpdateCustomTrackingDomainVerification(ctx, domain.ID, database.CustomTrackingDomainVerificationResult{
+		VerificationStatus: database.CustomTrackingVerificationVerified,
+		TargetStatus:       database.CustomTrackingVerificationVerified,
+		TLSStatus:          database.CustomTrackingVerificationPending,
+		VerifiedAt:         &now,
+		LastCheckedAt:      now,
+	})
+	if err != nil {
+		t.Fatalf("verify custom tracking domain %q: %v", hostname, err)
+	}
+	if verified == nil {
+		t.Fatalf("expected custom tracking domain %q to exist after verification", hostname)
+	}
+	return verified
 }

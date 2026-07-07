@@ -4,7 +4,7 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TranslocoTestingModule } from '@jsverse/transloco';
-import { INSTANCE_CAPABILITIES } from '@core/access/capabilities';
+import { INSTANCE_CAPABILITIES, TEAM_CAPABILITIES } from '@core/access/capabilities';
 import { PermissionService } from '@services/permission.service';
 import { SiteService } from '@features/sites/services/site.service';
 import { routes } from './app.routes';
@@ -38,6 +38,36 @@ describe('routes', () => {
 
         expect(statusRoute?.data?.['instanceCapability']).toBe(INSTANCE_CAPABILITIES.viewSystem);
         expect(settingsRoute?.data?.['instanceCapability']).toBe(INSTANCE_CAPABILITIES.manageUsers);
+    });
+
+    it('keeps team API clients and custom domains addressable without redirecting to overview', () => {
+        const adminChildren = routes.find((route) => route.path === '')?.children?.find((route) => route.path === 'admin')?.children ?? [];
+        const teamRoute = adminChildren.find((route) => route.path === 'team');
+        const settingsRoute = adminChildren.find((route) => route.path === 'team/settings');
+        const apiClientsRoute = adminChildren.find((route) => route.path === 'team/api-clients');
+        const brandingRoute = adminChildren.find((route) => route.path === 'team/branding');
+        const dangerZoneRoute = adminChildren.find((route) => route.path === 'team/danger-zone');
+        const trackingDomainsRoute = adminChildren.find((route) => route.path === 'team/tracking-domains');
+        const customDomainsRoute = adminChildren.find((route) => route.path === 'team/custom-domains');
+
+        expect(teamRoute?.data?.['activeTeamCapability']).toBe(TEAM_CAPABILITIES.manageSettings);
+        expect(settingsRoute?.redirectTo).toBeUndefined();
+        expect(settingsRoute?.data?.['activeTeamCapability']).toBe(TEAM_CAPABILITIES.manageSettings);
+        expect(settingsRoute?.data?.['teamAdminTab']).toBe('api-clients');
+        expect(apiClientsRoute?.redirectTo).toBeUndefined();
+        expect(apiClientsRoute?.data?.['activeTeamCapability']).toBe(TEAM_CAPABILITIES.manageSettings);
+        expect(apiClientsRoute?.data?.['teamAdminTab']).toBe('api-clients');
+        expect(brandingRoute?.redirectTo).toBeUndefined();
+        expect(brandingRoute?.data?.['activeTeamCapability']).toBe(TEAM_CAPABILITIES.manageSettings);
+        expect(brandingRoute?.data?.['teamAdminTab']).toBe('branding');
+        expect(dangerZoneRoute?.redirectTo).toBeUndefined();
+        expect(dangerZoneRoute?.data?.['activeTeamCapability']).toBe(TEAM_CAPABILITIES.manageSettings);
+        expect(dangerZoneRoute?.data?.['teamAdminTab']).toBe('danger-zone');
+        expect(trackingDomainsRoute?.redirectTo).toBeUndefined();
+        expect(trackingDomainsRoute?.data?.['teamAdminTab']).toBe('custom-domains');
+        expect(customDomainsRoute?.redirectTo).toBeUndefined();
+        expect(customDomainsRoute?.data?.['activeTeamCapability']).toBe(TEAM_CAPABILITIES.manageSettings);
+        expect(customDomainsRoute?.data?.['teamAdminTab']).toBe('custom-domains');
     });
 
     it('exposes accept-invite as a public auth page route', () => {

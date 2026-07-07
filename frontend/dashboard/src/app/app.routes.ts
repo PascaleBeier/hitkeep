@@ -215,9 +215,54 @@ export const routes: Routes = [
                         canActivate: [capabilityGuard],
                         data: { activeTeamCapability: TEAM_CAPABILITIES.manageSettings }
                     },
-                    { path: 'team/overview', redirectTo: 'team', pathMatch: 'full' },
-                    { path: 'team/members', redirectTo: 'team', pathMatch: 'full' },
-                    { path: 'team/settings', redirectTo: 'team', pathMatch: 'full' },
+                    {
+                        path: 'team/overview',
+                        loadComponent: () => import('@pages/admin/team/team-admin').then((m) => m.TeamAdminPage),
+                        canActivate: [capabilityGuard],
+                        data: { activeTeamCapability: TEAM_CAPABILITIES.manageSettings, teamAdminTab: 'overview' }
+                    },
+                    {
+                        path: 'team/members',
+                        loadComponent: () => import('@pages/admin/team/team-admin').then((m) => m.TeamAdminPage),
+                        canActivate: [capabilityGuard],
+                        data: { activeTeamCapability: TEAM_CAPABILITIES.manageSettings, teamAdminTab: 'members' }
+                    },
+                    {
+                        path: 'team/settings',
+                        loadComponent: () => import('@pages/admin/team/team-admin').then((m) => m.TeamAdminPage),
+                        canActivate: [capabilityGuard],
+                        data: { activeTeamCapability: TEAM_CAPABILITIES.manageSettings, teamAdminTab: 'api-clients' }
+                    },
+                    {
+                        path: 'team/api-clients',
+                        loadComponent: () => import('@pages/admin/team/team-admin').then((m) => m.TeamAdminPage),
+                        canActivate: [capabilityGuard],
+                        data: { activeTeamCapability: TEAM_CAPABILITIES.manageSettings, teamAdminTab: 'api-clients' }
+                    },
+                    {
+                        path: 'team/branding',
+                        loadComponent: () => import('@pages/admin/team/team-admin').then((m) => m.TeamAdminPage),
+                        canActivate: [capabilityGuard],
+                        data: { activeTeamCapability: TEAM_CAPABILITIES.manageSettings, teamAdminTab: 'branding' }
+                    },
+                    {
+                        path: 'team/danger-zone',
+                        loadComponent: () => import('@pages/admin/team/team-admin').then((m) => m.TeamAdminPage),
+                        canActivate: [capabilityGuard],
+                        data: { activeTeamCapability: TEAM_CAPABILITIES.manageSettings, teamAdminTab: 'danger-zone' }
+                    },
+                    {
+                        path: 'team/tracking-domains',
+                        loadComponent: () => import('@pages/admin/team/team-admin').then((m) => m.TeamAdminPage),
+                        canActivate: [capabilityGuard],
+                        data: { activeTeamCapability: TEAM_CAPABILITIES.manageSettings, teamAdminTab: 'custom-domains' }
+                    },
+                    {
+                        path: 'team/custom-domains',
+                        loadComponent: () => import('@pages/admin/team/team-admin').then((m) => m.TeamAdminPage),
+                        canActivate: [capabilityGuard],
+                        data: { activeTeamCapability: TEAM_CAPABILITIES.manageSettings, teamAdminTab: 'custom-domains' }
+                    },
                     { path: '', redirectTo: 'team', pathMatch: 'full' }
                 ]
             },

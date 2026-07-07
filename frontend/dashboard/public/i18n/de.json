@@ -1312,15 +1312,16 @@
     "danger": {
       "resetTitle": "Statistiken zurücksetzen",
       "resetDescription": "Löscht die gemessenen Statistiken dieser Site dauerhaft, behält aber Einstellungen, Zugriffe, Ziele, Funnels und Tracking-Einrichtung bei.",
-      "resetConfirmLabel": "Gib \"{{domain}}\" ein, um das Zurücksetzen der Statistiken zu bestätigen",
+      "resetConfirmTitle": "Statistiken zurücksetzen",
+      "resetConfirmMessage": "Gib \"{{domain}}\" ein, um die Statistiken dieser Site zurückzusetzen.",
       "resetConfirmHint": "Das Tracking bleibt aktiv. Neue Daten nach dem Zurücksetzen werden normal angezeigt.",
       "resetAction": "Statistiken zurücksetzen",
       "resetSuccess": "Statistiken zurückgesetzt. {{rows}} Zeile(n) gelöscht und {{imports}} abgeschlossene Import(e) als gelöscht markiert.",
       "resetFailed": "Statistiken der Site konnten nicht zurückgesetzt werden.",
       "deleteTitle": "Seite löschen",
       "deleteDescription": "Löscht diese Seite und alle zugehörigen Analytics-Daten dauerhaft.",
-      "confirmLabel": "Gib \"{{domain}}\" zur Bestätigung ein",
-      "confirmPlaceholder": "example.com",
+      "deleteConfirmTitle": "Seite löschen",
+      "deleteConfirmMessage": "Gib \"{{domain}}\" ein, um diese Seite zu löschen.",
       "deleteAction": "Seite löschen",
       "deleteFailed": "Seite konnte nicht gelöscht werden."
     },
@@ -1477,7 +1478,13 @@
         "empty": "Noch nicht gesehen"
       },
       "webVitalsLabel": "Web Vitals",
-      "webVitalsDescription": "Lädt das separate Web-Vitals-Bundle und sendet LCP-, INP-, CLS-, FCP- und TTFB-Samples. Standardmäßig deaktiviert."
+      "webVitalsDescription": "Lädt das separate Web-Vitals-Bundle und sendet LCP-, INP-, CLS-, FCP- und TTFB-Samples. Standardmäßig deaktiviert.",
+      "domains": {
+        "label": "Tracker-Host",
+        "description": "Wähle den verfügbaren Host, der im generierten Browser-Tracker-Snippet verwendet wird.",
+        "defaultOption": "HitKeep-Instanz-URL",
+        "selectedHint": "Tracker-URL: https://{{ hostname }}/hk.js"
+      }
     }
   },
   "admin": {
@@ -1588,7 +1595,10 @@
       "tabs": {
         "overview": "Übersicht",
         "members": "Mitglieder",
-        "settings": "Einstellungen",
+        "apiClients": "API-Clients",
+        "customDomains": "Eigene Domains",
+        "branding": "Branding",
+        "dangerZone": "Gefahrenbereich",
         "activity": "Aktivität"
       },
       "overview": {
@@ -1681,7 +1691,66 @@
           "lastOwner": "Du kannst das Team nicht als letzter Eigentümer verlassen.",
           "onlyTeam": "Du kannst dein einziges Team nicht verlassen.",
           "generic": "Team konnte nicht verlassen werden. Bitte erneut versuchen."
+        },
+        "trackingDomains": {
+          "title": "Eigene Domains",
+          "description": "Verifiziere eigene Domains einmal und nutze danach jede aktive Domain als Tracker-Host fuer die Sites dieses Teams.",
+          "hostnamePlaceholder": "analytics.example.com",
+          "addAction": "Domain hinzufuegen",
+          "hostnameRequired": "Hostname eingeben.",
+          "hostnameInvalid": "Verwende einen gültigen Hostnamen wie analytics.example.com.",
+          "hostnameTooLong": "Hostnamen dürfen höchstens 253 Zeichen lang sein.",
+          "empty": "Es wurden noch keine Tracking-Domains hinzugefuegt.",
+          "enabled": "Aktiviert",
+          "disabled": "Deaktiviert",
+          "active": "Aktiv",
+          "notActive": "Nicht aktiv",
+          "added": "Tracking-Domain hinzugefuegt. DNS-Eintraege setzen und danach verifizieren.",
+          "checked": "Verifizierung geprueft. Pruefe die Statusdetails unten.",
+          "verified": "Tracking-Domain verifiziert und einsatzbereit.",
+          "enabledSuccess": "Tracking-Domain aktiviert.",
+          "disabledSuccess": "Tracking-Domain deaktiviert. Sites mit dieser Domain wurden auf die Standard-URL zurueckgesetzt.",
+          "deleted": "Tracking-Domain entfernt.",
+          "verifyAction": "Verifizieren",
+          "disableAction": "Deaktivieren",
+          "enableAction": "Aktivieren",
+          "deleteConfirm": "{{ hostname }} entfernen? Sites mit dieser Domain werden auf die Standard-Tracker-URL zurueckgesetzt.",
+          "dns": {
+            "txtName": "TXT-Name",
+            "txtValue": "TXT-Wert",
+            "target": "CNAME-, A- oder AAAA-Ziel"
+          },
+          "checks": {
+            "ownership": "Besitz",
+            "target": "Ziel",
+            "tls": "TLS"
+          },
+          "checksLabel": "Prüfungen zur Verifizierung",
+          "lastChecked": "Zuletzt geprueft",
+          "lastTLSAsk": "Letzte TLS-Anfrage",
+          "status": {
+            "pending": "Ausstehend",
+            "verified": "Verifiziert",
+            "failed": "Fehlgeschlagen"
+          },
+          "tlsMode": {
+            "external": "Externes TLS",
+            "caddy-on-demand": "Caddy On-Demand-TLS"
+          },
+          "errors": {
+            "load": "Tracking-Domains konnten nicht geladen werden.",
+            "add": "Tracking-Domain konnte nicht hinzugefuegt werden.",
+            "conflict": "Dieser Hostname wird bereits von einer Site oder Tracking-Domain verwendet.",
+            "verify": "Tracking-Domain konnte nicht verifiziert werden.",
+            "update": "Tracking-Domain konnte nicht aktualisiert werden.",
+            "delete": "Tracking-Domain konnte nicht entfernt werden."
+          }
         }
+      },
+      "danger": {
+        "leaveConfirmTitle": "Team verlassen",
+        "archiveConfirmTitle": "Team archivieren",
+        "confirmNameLabel": "Gib {{name}} zur Bestätigung ein"
       },
       "audit": {
         "readOnly": "Du hast keine Berechtigung, Team-Aktivitäten zu sehen.",

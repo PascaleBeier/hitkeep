@@ -1,0 +1,63 @@
+services:
+  caddy:
+    image: caddy:2.9-alpine
+    container_name: hitkeep-caddy
+    restart: unless-stopped
+    depends_on:
+      - hitkeep
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      CADDY_EMAIL: ${CADDY_EMAIL:?set CADDY_EMAIL in .env}
+      HITKEEP_HOSTNAME: ${HITKEEP_HOSTNAME:?set HITKEEP_HOSTNAME in .env}
+      HITKEEP_CADDY_TLS_ASK_TOKEN: ${HITKEEP_CADDY_TLS_ASK_TOKEN:?set HITKEEP_CADDY_TLS_ASK_TOKEN in .env}
+    volumes:
+      - ./Caddyfile.custom-tracking:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - hitkeep
+
+  hitkeep:
+    image: pascalebeier/hitkeep:latest
+    container_name: hitkeep
+    restart: unless-stopped
+    networks:
+      - hitkeep
+    volumes:
+      - hitkeep_data:/var/lib/hitkeep/data
+      - hitkeep_archive:/var/lib/hitkeep/archive
+      - hitkeep_backups:/var/lib/hitkeep/backups
+    environment:
+      HITKEEP_NODE_NAME: leader
+      HITKEEP_PUBLIC_URL: https://${HITKEEP_HOSTNAME:?set HITKEEP_HOSTNAME in .env}
+      HITKEEP_JWT_SECRET: ${HITKEEP_JWT_SECRET:?set HITKEEP_JWT_SECRET in .env}
+      HITKEEP_TRUSTED_PROXIES: ${HITKEEP_TRUSTED_PROXIES:?set to your caddy network CIDR}
+      HITKEEP_DB_PATH: /var/lib/hitkeep/data/hitkeep.db
+      HITKEEP_DATA_PATH: /var/lib/hitkeep/data
+      HITKEEP_ARCHIVE_PATH: /var/lib/hitkeep/archive
+      HITKEEP_BACKUP_PATH: /var/lib/hitkeep/backups
+      HITKEEP_CUSTOM_TRACKING_TLS_MODE: caddy-on-demand
+      HITKEEP_CADDY_TLS_ASK_TOKEN: ${HITKEEP_CADDY_TLS_ASK_TOKEN:?set HITKEEP_CADDY_TLS_ASK_TOKEN in .env}
+      # Optional: set only when tracker hostnames point at a deployment target
+      # other than the HITKEEP_PUBLIC_URL host.
+      HITKEEP_CUSTOM_TRACKING_DNS_TARGET: ${HITKEEP_CUSTOM_TRACKING_DNS_TARGET:-}
+      HITKEEP_MAIL_HOST: ${HITKEEP_MAIL_HOST:-}
+      HITKEEP_MAIL_PORT: ${HITKEEP_MAIL_PORT:-587}
+      HITKEEP_MAIL_USERNAME: ${HITKEEP_MAIL_USERNAME:-}
+      HITKEEP_MAIL_PASSWORD: ${HITKEEP_MAIL_PASSWORD:-}
+      HITKEEP_MAIL_ENCRYPTION: ${HITKEEP_MAIL_ENCRYPTION:-tls}
+      HITKEEP_MAIL_FROM_ADDRESS: ${HITKEEP_MAIL_FROM_ADDRESS:-hitkeep@localhost}
+      HITKEEP_MAIL_FROM_NAME: ${HITKEEP_MAIL_FROM_NAME:-HitKeep}
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}
+  hitkeep_data: {}
+  hitkeep_archive: {}
+  hitkeep_backups: {}
+
+networks:
+  hitkeep: {}

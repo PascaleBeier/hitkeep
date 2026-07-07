@@ -40,6 +40,8 @@ extraEnv:
 - `ingress.enabled`: creates an Ingress resource for your cluster's controller
 - `ingress.className`: leave empty to use the cluster default
 - `ingress.annotations`: controller-specific settings (cert-manager, auth, etc.)
+- `customTrackingDomains.enabled`: configures HitKeep custom tracking domain runtime settings
+- `customTrackingDomains.ingress.enabled`: creates a tracking-only Ingress for static custom tracker hosts
 - `env.HITKEEP_PUBLIC_URL`: set to the browser-visible URL, including any path prefix
 - `extraEnv`: use this for secret-backed values such as `HITKEEP_JWT_SECRET`
 - `persistence.*`: PVC settings for `/var/lib/hitkeep/data`
@@ -110,6 +112,49 @@ ingress:
         - analytics.example.com
       secretName: hitkeep-tls
 ```
+
+### Custom tracking domains
+
+Custom tracking domains work in Kubernetes with the same HitKeep dashboard flow as other self-hosted installs. The chart does not install an ingress controller or Caddy. It configures the HitKeep pod and can emit a separate tracking-only Ingress for static hostnames managed by your cluster ingress controller.
+
+Use external TLS mode when cert-manager, nginx ingress, Traefik, a cloud load balancer, or another certificate manager terminates TLS:
+
+```
+customTrackingDomains:
+  enabled: true
+  tlsMode: external
+  # Empty defaults to the host from env.HITKEEP_PUBLIC_URL.
+  # Set this when tracker domains point at a separate ingress hostname or IP.
+  dnsTarget: ""
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    hosts:
+      - host: tracker.customer-one.example
+      - host: tracker.customer-two.example
+    tls:
+      - hosts:
+          - tracker.customer-one.example
+          - tracker.customer-two.example
+        secretName: hitkeep-tracking-tls
+```
+
+The tracking Ingress only routes `/hk.js`, `/hk-vitals.js`, `/ingest`, `/ingest/event`, and `/ingest/web-vitals` to HitKeep. Other paths have no chart-generated rule, and HitKeep still returns `404` for dashboard/API routes on tracking hosts if a controller forwards them.
+
+Use Caddy mode only when an external Caddy deployment handles on-demand TLS and calls HitKeep's ask endpoint:
+
+```
+customTrackingDomains:
+  enabled: true
+  tlsMode: caddy-on-demand
+  caddyAskToken:
+    existingSecret: hitkeep-caddy-ask
+    existingSecretKey: token
+```
+
+For Caddy on-demand TLS, keep `customTrackingDomains.ingress.enabled=false` unless your Caddy ingress setup explicitly uses Kubernetes Ingress objects for those hostnames. Configure Caddy with `ask http://<hitkeep-service>/internal/caddy/on-demand-tls/<token>` and do not run Caddy on-demand TLS without the ask gate.
 
 ### Persistence
 

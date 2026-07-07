@@ -124,6 +124,54 @@ func openAPIV1AnalyticsSchemas() map[string]any {
 				"created_at":          map[string]any{"type": "string", "format": "date-time"},
 			},
 		},
+		"CustomTrackingDomain": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"id":                  map[string]any{"type": "string", "format": "uuid"},
+				"team_id":             map[string]any{"type": "string", "format": "uuid"},
+				"hostname":            map[string]any{"type": "string"},
+				"verification_status": map[string]any{"type": "string", "enum": []string{"pending", "verified", "failed"}},
+				"target_status":       map[string]any{"type": "string", "enum": []string{"pending", "verified", "failed"}},
+				"tls_mode":            map[string]any{"type": "string", "enum": []string{"external", "caddy-on-demand"}},
+				"tls_status":          map[string]any{"type": "string", "enum": []string{"pending", "verified", "failed"}},
+				"enabled":             map[string]any{"type": "boolean"},
+				"active":              map[string]any{"type": "boolean", "description": "True when the domain is enabled and all verification states are verified."},
+				"dns_txt_name":        map[string]any{"type": "string"},
+				"dns_txt_value":       map[string]any{"type": "string"},
+				"dns_target":          map[string]any{"type": "string"},
+				"last_error":          map[string]any{"type": "string"},
+				"verified_at":         map[string]any{"type": "string", "format": "date-time"},
+				"last_checked_at":     map[string]any{"type": "string", "format": "date-time"},
+				"last_tls_ask_at":     map[string]any{"type": "string", "format": "date-time"},
+				"created_at":          map[string]any{"type": "string", "format": "date-time"},
+				"updated_at":          map[string]any{"type": "string", "format": "date-time"},
+			},
+			"required": []string{"id", "team_id", "hostname", "verification_status", "target_status", "tls_mode", "tls_status", "enabled", "active", "dns_txt_name", "dns_txt_value", "dns_target", "created_at", "updated_at"},
+		},
+		"CreateCustomTrackingDomainRequest": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"hostname": map[string]any{"type": "string"},
+			},
+			"required": []string{"hostname"},
+		},
+		"UpdateCustomTrackingDomainRequest": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"enabled": map[string]any{"type": "boolean"},
+			},
+			"required": []string{"enabled"},
+		},
+		"SiteTrackingDomainOptions": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"site_id":     map[string]any{"type": "string", "format": "uuid"},
+				"team_id":     map[string]any{"type": "string", "format": "uuid"},
+				"default_url": map[string]any{"type": "string"},
+				"domains":     map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/CustomTrackingDomain"}},
+			},
+			"required": []string{"site_id", "team_id", "default_url", "domains"},
+		},
 		"SiteTrackingStatus": map[string]any{
 			"type": "object",
 			"properties": map[string]any{

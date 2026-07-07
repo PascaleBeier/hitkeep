@@ -1,0 +1,55 @@
+.team-branding__stack {
+    display: grid;
+    gap: 1rem;
+}
+
+.team-branding__form-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.team-branding__section {
+    min-width: 0;
+}
+
+.team-branding__section h3 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin: 0 0 0.25rem;
+}
+
+.team-branding__description {
+    color: var(--p-text-muted-color);
+    font-size: 0.85rem;
+    margin: 0 0 0.75rem;
+}
+
+.team-branding__section input {
+    width: 100%;
+}
+
+.team-branding__error {
+    color: var(--p-red-500);
+    display: block;
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+}
+
+.team-branding__logo-preview {
+    margin-top: 0.75rem;
+}
+
+.team-branding__logo-preview img {
+    border: 1px solid var(--p-content-border-color);
+    border-radius: 0.5rem;
+    height: 48px;
+    object-fit: cover;
+    width: 48px;
+}
+
+@media (max-width: 768px) {
+    .team-branding__form-grid {
+        grid-template-columns: 1fr;
+    }
+}

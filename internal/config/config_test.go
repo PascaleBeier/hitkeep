@@ -657,6 +657,47 @@ func TestS3UseSSLCanBeDisabledByEnv(t *testing.T) {
 	}
 }
 
+func TestCustomTrackingConfigNormalizesTLSModeAndTarget(t *testing.T) {
+	conf := load([]string{}, func(key, fallback string) string {
+		switch key {
+		case "HITKEEP_PUBLIC_URL":
+			return "https://Analytics.Example.com/hitkeep/"
+		case "HITKEEP_CUSTOM_TRACKING_TLS_MODE":
+			return " CADDY-ON-DEMAND "
+		case "HITKEEP_CUSTOM_TRACKING_DNS_TARGET":
+			return " https://Edge.Example.com "
+		default:
+			return fallback
+		}
+	})
+	if conf.CustomTrackingTLSMode != "caddy-on-demand" {
+		t.Fatalf("expected caddy-on-demand TLS mode, got %q", conf.CustomTrackingTLSMode)
+	}
+	target := conf.CustomTrackingDNSTargetValue()
+	if target != "edge.example.com" {
+		t.Fatalf("expected custom tracking DNS target %q, got %q", "edge.example.com", target)
+	}
+}
+
+func TestCustomTrackingDNSTargetDefaultsToPublicURLHost(t *testing.T) {
+	conf := load([]string{}, func(key, fallback string) string {
+		if key == "HITKEEP_PUBLIC_URL" {
+			return "https://Analytics.Example.com/hitkeep/"
+		}
+		if key == "HITKEEP_CUSTOM_TRACKING_TLS_MODE" {
+			return "unknown"
+		}
+		return fallback
+	})
+	if conf.CustomTrackingTLSMode != "external" {
+		t.Fatalf("expected invalid TLS mode to fall back to external, got %q", conf.CustomTrackingTLSMode)
+	}
+	target := conf.CustomTrackingDNSTargetValue()
+	if target != "analytics.example.com" {
+		t.Fatalf("expected public URL host target %q, got %q", "analytics.example.com", target)
+	}
+}
+
 func TestInvalidEnvVarValueLogsWarning(t *testing.T) {
 	conf := load([]string{}, func(key, fallback string) string {
 		if key == "HITKEEP_MAIL_PORT" {

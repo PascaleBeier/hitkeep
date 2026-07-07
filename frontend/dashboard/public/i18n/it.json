@@ -1312,15 +1312,16 @@
     "danger": {
       "resetTitle": "Reimposta statistiche",
       "resetDescription": "Cancella definitivamente le statistiche misurate di questo sito, mantenendo impostazioni, accessi, obiettivi, funnel e configurazione del tracciamento.",
-      "resetConfirmLabel": "Digita \"{{domain}}\" per confermare la reimpostazione delle statistiche",
+      "resetConfirmTitle": "Reimposta statistiche",
+      "resetConfirmMessage": "Digita \"{{domain}}\" per reimpostare le statistiche di questo sito.",
       "resetConfirmHint": "Il tracciamento resta attivo. I nuovi dati raccolti dopo la reimpostazione verranno mostrati normalmente.",
       "resetAction": "Reimposta statistiche",
       "resetSuccess": "Statistiche reimpostate. Cancellate {{rows}} riga/righe e contrassegnate {{imports}} importazione/i completate come eliminate.",
       "resetFailed": "Impossibile reimpostare le statistiche del sito.",
       "deleteTitle": "Elimina sito",
       "deleteDescription": "Elimina definitivamente questo sito e tutti i dati analitici associati.",
-      "confirmLabel": "Digita \"{{domain}}\" per confermare",
-      "confirmPlaceholder": "example.com",
+      "deleteConfirmTitle": "Elimina sito",
+      "deleteConfirmMessage": "Digita \"{{domain}}\" per eliminare questo sito.",
       "deleteAction": "Elimina sito",
       "deleteFailed": "Impossibile eliminare il sito."
     },
@@ -1477,7 +1478,13 @@
         "empty": "Non ancora visto"
       },
       "webVitalsLabel": "Web Vitals",
-      "webVitalsDescription": "Carica il bundle Web Vitals separato e invia campioni LCP, INP, CLS, FCP e TTFB. Disattivato per impostazione predefinita."
+      "webVitalsDescription": "Carica il bundle Web Vitals separato e invia campioni LCP, INP, CLS, FCP e TTFB. Disattivato per impostazione predefinita.",
+      "domains": {
+        "label": "Host del tracker",
+        "description": "Scegli l’host disponibile da usare nello snippet generato per il tracker del browser.",
+        "defaultOption": "URL dell’istanza HitKeep",
+        "selectedHint": "URL del tracker: https://{{ hostname }}/hk.js"
+      }
     }
   },
   "admin": {
@@ -1588,7 +1595,10 @@
       "tabs": {
         "overview": "Panoramica",
         "members": "Membri",
-        "settings": "Impostazioni",
+        "apiClients": "Client API",
+        "customDomains": "Domini personalizzati",
+        "branding": "Branding",
+        "dangerZone": "Zona pericolosa",
         "activity": "Attività"
       },
       "overview": {
@@ -1681,7 +1691,66 @@
           "lastOwner": "Non puoi lasciare il team come ultimo proprietario.",
           "onlyTeam": "Non puoi lasciare il tuo unico team.",
           "generic": "Impossibile lasciare il team. Riprova."
+        },
+        "trackingDomains": {
+          "title": "Domini personalizzati",
+          "description": "Verifica domini personalizzati una volta, poi usa qualsiasi dominio attivo come host tracker per i siti del team.",
+          "hostnamePlaceholder": "analytics.example.com",
+          "addAction": "Aggiungi dominio",
+          "hostnameRequired": "Inserisci un nome host.",
+          "hostnameInvalid": "Usa un nome host valido, ad esempio analytics.example.com.",
+          "hostnameTooLong": "I nomi host possono avere al massimo 253 caratteri.",
+          "empty": "Non e ancora stato aggiunto alcun dominio di tracciamento.",
+          "enabled": "Abilitato",
+          "disabled": "Disabilitato",
+          "active": "Attivo",
+          "notActive": "Non attivo",
+          "added": "Dominio di tracciamento aggiunto. Aggiungi i record DNS, poi verificalo.",
+          "checked": "Verifica completata. Controlla i dettagli di stato qui sotto.",
+          "verified": "Dominio di tracciamento verificato e pronto all uso.",
+          "enabledSuccess": "Dominio di tracciamento abilitato.",
+          "disabledSuccess": "Dominio di tracciamento disabilitato. I siti che lo usavano sono stati riportati all URL predefinito.",
+          "deleted": "Dominio di tracciamento rimosso.",
+          "verifyAction": "Verifica",
+          "disableAction": "Disabilita",
+          "enableAction": "Abilita",
+          "deleteConfirm": "Rimuovere {{ hostname }}? I siti che lo usano torneranno all URL tracker predefinito.",
+          "dns": {
+            "txtName": "Nome TXT",
+            "txtValue": "Valore TXT",
+            "target": "Target CNAME, A o AAAA"
+          },
+          "checks": {
+            "ownership": "Proprieta",
+            "target": "Target",
+            "tls": "TLS"
+          },
+          "checksLabel": "Controlli di verifica",
+          "lastChecked": "Ultimo controllo",
+          "lastTLSAsk": "Ultima richiesta TLS",
+          "status": {
+            "pending": "In sospeso",
+            "verified": "Verificato",
+            "failed": "Non riuscito"
+          },
+          "tlsMode": {
+            "external": "TLS esterno",
+            "caddy-on-demand": "TLS on-demand Caddy"
+          },
+          "errors": {
+            "load": "Impossibile caricare i domini di tracciamento.",
+            "add": "Impossibile aggiungere il dominio di tracciamento.",
+            "conflict": "Questo hostname e gia usato da un altro sito o dominio di tracciamento.",
+            "verify": "Impossibile verificare il dominio di tracciamento.",
+            "update": "Impossibile aggiornare il dominio di tracciamento.",
+            "delete": "Impossibile rimuovere il dominio di tracciamento."
+          }
         }
+      },
+      "danger": {
+        "leaveConfirmTitle": "Lascia il team",
+        "archiveConfirmTitle": "Archivia team",
+        "confirmNameLabel": "Digita {{name}} per confermare"
       },
       "audit": {
         "readOnly": "Non hai il permesso di vedere l'attività del team.",

@@ -203,6 +203,14 @@ func openAPIV1AdminSitePaths() map[string]any {
 					"404": errResp("Site not found"),
 				}),
 		},
+		"/api/sites/{id}/tracking-domain-options": map[string]any{
+			"get": op([]string{"Sites"}, "List tracking domain options", "Returns the default tracker URL and team custom tracking domains available to the site. Requires site.view.", secCookie(), []any{paramRef("#/components/parameters/siteID")}, nil,
+				map[string]any{
+					"200": jsonRefResp("Tracking domain options", "#/components/schemas/SiteTrackingDomainOptions"),
+					"403": errResp("Access denied"),
+					"404": errResp("Site not found"),
+				}),
+		},
 		"/api/sites/{id}/ask-ai": map[string]any{
 			"post": op([]string{"Sites"}, "Ask AI", "Runs the session-only, site-scoped dashboard assistant over read-only aggregate analytics tools. Requires a human dashboard session with site.view; API client bearer tokens and shared dashboard routes are rejected.", secCookie(), []any{paramRef("#/components/parameters/siteID")},
 				jsonBody(map[string]any{"$ref": "#/components/schemas/AskAIRequest"}),

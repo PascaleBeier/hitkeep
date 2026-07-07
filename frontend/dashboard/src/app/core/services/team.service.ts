@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { finalize, of, tap } from 'rxjs';
-import { Team, TeamAuditListResponse, TeamInvite, TeamMember, TeamRole, UserTeamsResponse } from '@models/analytics.types';
+import { CustomTrackingDomain, Team, TeamAuditListResponse, TeamInvite, TeamMember, TeamRole, UserTeamsResponse } from '@models/analytics.types';
 
 interface SetActiveTeamResponse {
     status: string;
@@ -34,6 +34,14 @@ interface LeaveTeamResponse {
     status: string;
     active_team_id: string;
     recent_team_ids?: string[];
+}
+
+interface CreateTrackingDomainRequest {
+    hostname: string;
+}
+
+interface UpdateTrackingDomainRequest {
+    enabled: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -143,6 +151,26 @@ export class TeamService {
         }
 
         return this.http.get<TeamAuditListResponse>(`/api/user/teams/${encodeURIComponent(teamID)}/audit`, { params: httpParams });
+    }
+
+    listTrackingDomains(teamID: string) {
+        return this.http.get<CustomTrackingDomain[]>(`/api/user/teams/${encodeURIComponent(teamID)}/tracking-domains`);
+    }
+
+    createTrackingDomain(teamID: string, payload: CreateTrackingDomainRequest) {
+        return this.http.post<CustomTrackingDomain>(`/api/user/teams/${encodeURIComponent(teamID)}/tracking-domains`, payload);
+    }
+
+    verifyTrackingDomain(teamID: string, domainID: string) {
+        return this.http.post<CustomTrackingDomain>(`/api/user/teams/${encodeURIComponent(teamID)}/tracking-domains/${encodeURIComponent(domainID)}/verify`, {});
+    }
+
+    updateTrackingDomain(teamID: string, domainID: string, payload: UpdateTrackingDomainRequest) {
+        return this.http.patch<CustomTrackingDomain>(`/api/user/teams/${encodeURIComponent(teamID)}/tracking-domains/${encodeURIComponent(domainID)}`, payload);
+    }
+
+    deleteTrackingDomain(teamID: string, domainID: string) {
+        return this.http.delete<void>(`/api/user/teams/${encodeURIComponent(teamID)}/tracking-domains/${encodeURIComponent(domainID)}`);
     }
 
     transferTeamOwnership(teamID: string, targetUserID: string) {
