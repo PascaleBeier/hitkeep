@@ -55,11 +55,7 @@ export class FreePlanRetentionNotice {
             { kind: 'sites', current: usage.current_sites ?? 0, limit: entitlements.max_sites_per_team },
             { kind: 'members', current: usage.current_members ?? 0, limit: entitlements.max_team_members }
         ];
-        return (
-            candidates
-                .filter((candidate) => candidate.limit > 0 && candidate.current / candidate.limit >= USAGE_PRESSURE_THRESHOLD)
-                .sort((left, right) => right.current / right.limit - left.current / left.limit)[0] ?? null
-        );
+        return candidates.filter((candidate) => candidate.limit > 0 && candidate.current / candidate.limit >= USAGE_PRESSURE_THRESHOLD).sort((left, right) => right.current / right.limit - left.current / left.limit)[0] ?? null;
     });
 
     protected readonly usageDismissalKey = computed(() => {

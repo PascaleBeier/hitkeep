@@ -200,7 +200,6 @@ describe('TeamAdminPage', () => {
         expect(fixture.nativeElement.textContent).not.toContain('admin.team.tabs.branding');
         expect(fixture.nativeElement.textContent).not.toContain('admin.team.tabs.dangerZone');
     });
-
 });
 
 describe('TeamAdminPage routing', () => {
