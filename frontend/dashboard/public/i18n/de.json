@@ -2385,6 +2385,13 @@
       }
     },
     "selfHostLink": "Du möchtest selbst hosten? Zur Dokumentation →",
+    "trust": {
+      "noCard": "Keine Kreditkarte erforderlich",
+      "region": "Deine Daten bleiben in der gewählten Region",
+      "export": "Jederzeit exportieren oder selbst hosten",
+      "openSource": "HitKeep ist vollständig Open Source.",
+      "github": "Code auf GitHub ansehen"
+    },
     "tosLabel": "Ich akzeptiere die",
     "tosLink": "Nutzungsbedingungen",
     "tosAnd": "und die",

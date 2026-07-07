@@ -529,6 +529,28 @@
     color: var(--p-primary-color);
 }
 
+.hk-auth-trust {
+    display: grid;
+    gap: 0.45rem;
+    margin: 0;
+    padding: 0.85rem 0 0;
+    list-style: none;
+}
+
+.hk-auth-trust li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--p-text-muted-color);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+}
+
+.hk-auth-trust i {
+    color: var(--p-primary-color);
+    font-size: 0.8rem;
+}
+
 .hk-auth-footer {
     margin-top: 1.5rem;
     text-align: center;

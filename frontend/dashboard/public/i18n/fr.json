@@ -2385,6 +2385,13 @@
       }
     },
     "selfHostLink": "Vous préférez héberger vous-même ? Voir la documentation →",
+    "trust": {
+      "noCard": "Aucune carte bancaire requise",
+      "region": "Vos données restent dans la région choisie",
+      "export": "Exportez ou auto-hébergez à tout moment",
+      "openSource": "HitKeep est entièrement open source.",
+      "github": "Voir le code sur GitHub"
+    },
     "tosLabel": "J'accepte les",
     "tosLink": "Conditions d'utilisation",
     "tosAnd": "et la",
