@@ -3224,6 +3224,10 @@
       "usageMessageMembers": "Your team is using {{current}} of {{limit}} team members on the Free plan.",
       "upgradeAction": "Upgrade to Pro",
       "dismissAction": "Dismiss retention notice"
+    },
+    "planChip": {
+      "free": "Free plan",
+      "aria": "You are on the Free plan — view plans and upgrade"
     }
   }
 }

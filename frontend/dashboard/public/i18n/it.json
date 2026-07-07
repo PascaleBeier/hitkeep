@@ -3224,6 +3224,10 @@
       "usageMessageMembers": "Il tuo team sta usando {{current}} di {{limit}} membri del piano gratuito.",
       "upgradeAction": "Passa a Pro",
       "dismissAction": "Chiudi avviso"
+    },
+    "planChip": {
+      "free": "Piano gratuito",
+      "aria": "Stai usando il piano gratuito: vedi i piani e fai l'upgrade"
     }
   }
 }

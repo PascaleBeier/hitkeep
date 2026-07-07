@@ -3224,6 +3224,10 @@
       "usageMessageMembers": "Dein Team nutzt {{current}} von {{limit}} Team-Plätzen im kostenlosen Tarif.",
       "upgradeAction": "Auf Pro upgraden",
       "dismissAction": "Hinweis ausblenden"
+    },
+    "planChip": {
+      "free": "Free-Tarif",
+      "aria": "Du nutzt den kostenlosen Tarif – Tarife ansehen und upgraden"
     }
   }
 }

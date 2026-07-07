@@ -3206,6 +3206,10 @@
       "usageMessageMembers": "Je team gebruikt {{current}} van {{limit}} teamplekken in het gratis abonnement.",
       "upgradeAction": "Upgrade naar Pro",
       "dismissAction": "Melding sluiten"
+    },
+    "planChip": {
+      "free": "Gratis abonnement",
+      "aria": "Je gebruikt het gratis abonnement – bekijk abonnementen en upgrade"
     }
   }
 }

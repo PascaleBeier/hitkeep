@@ -3224,6 +3224,10 @@
       "usageMessageMembers": "Tu equipo está usando {{current}} de {{limit}} miembros del plan gratuito.",
       "upgradeAction": "Actualizar a Pro",
       "dismissAction": "Descartar aviso"
+    },
+    "planChip": {
+      "free": "Plan gratuito",
+      "aria": "Estás en el plan gratuito: ver planes y mejorar"
     }
   }
 }

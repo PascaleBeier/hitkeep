@@ -3224,6 +3224,10 @@
       "usageMessageMembers": "Votre équipe utilise {{current}} sièges sur {{limit}} dans l'offre gratuite.",
       "upgradeAction": "Passer à Pro",
       "dismissAction": "Fermer l’avis"
+    },
+    "planChip": {
+      "free": "Offre gratuite",
+      "aria": "Vous utilisez l'offre gratuite – voir les offres et mettre à niveau"
     }
   }
 }
