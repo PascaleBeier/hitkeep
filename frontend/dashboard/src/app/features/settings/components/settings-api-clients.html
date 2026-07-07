@@ -141,7 +141,7 @@
 <app-settings-card [title]="titleKey() | transloco" [subtitle]="descriptionKey() | transloco" icon="pi pi-key">
     <div settings-card-header class="api-client-card-actions">
         @if (showTeamClientsLink() && !isTeamScope()) {
-        <p-button [label]="'integration.apiClients.manageTeamClients' | transloco" icon="pi pi-users" [outlined]="true" severity="secondary" [type]="'button'" routerLink="/admin/team" [queryParams]="{ tab: 'settings', section: 'api-clients' }" />
+        <p-button [label]="'integration.apiClients.manageTeamClients' | transloco" icon="pi pi-users" [outlined]="true" severity="secondary" [type]="'button'" routerLink="/admin/team/api-clients" />
         }
         <p-button [label]="'settings.apiClients.actions.add' | transloco" icon="pi pi-plus" [type]="'button'" (onClick)="openCreateDialog()" />
     </div>

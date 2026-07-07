@@ -1,18 +1,22 @@
-@if (!canViewAudit()) {
-<div class="team-audit__readonly">{{ "admin.team.audit.readOnly" | transloco }}</div>
-} @else {
-<app-audit-table
-    [rows]="rows()"
-    [total]="total()"
-    [loading]="isLoading()"
-    [errorKey]="errorKey()"
-    emptyTextKey="admin.team.audit.empty"
-    [actionOptions]="actionOptions()"
-    [outcomeOptions]="outcomeOptions()"
-    [targetTypeOptions]="targetTypeOptions()"
-    [query]="query()"
-    [exportEnabled]="false"
-    (queryChange)="onQueryChange($event)"
-    (refresh)="refresh()"
-/>
-}
+<app-settings-card [title]="'admin.team.tabs.activity' | transloco" icon="pi pi-history">
+    <div settings-card-body>
+        @if (!canViewAudit()) {
+        <div class="team-audit__readonly">{{ "admin.team.audit.readOnly" | transloco }}</div>
+        } @else {
+        <app-audit-table
+            [rows]="rows()"
+            [total]="total()"
+            [loading]="isLoading()"
+            [errorKey]="errorKey()"
+            emptyTextKey="admin.team.audit.empty"
+            [actionOptions]="actionOptions()"
+            [outcomeOptions]="outcomeOptions()"
+            [targetTypeOptions]="targetTypeOptions()"
+            [query]="query()"
+            [exportEnabled]="false"
+            (queryChange)="onQueryChange($event)"
+            (refresh)="refresh()"
+        />
+        }
+    </div>
+</app-settings-card>

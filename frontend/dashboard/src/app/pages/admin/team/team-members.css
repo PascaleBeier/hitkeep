@@ -1,13 +1,12 @@
-.team-members__title {
-    font-size: 1.5rem;
-    font-weight: 600;
-    margin-bottom: 1.5rem;
+.team-members__stack,
+.team-members__card-body {
+    display: grid;
+    gap: 1rem;
 }
 
 .team-members__alert {
     border-radius: 0.5rem;
     font-size: 0.85rem;
-    margin-bottom: 0.75rem;
     padding: 0.625rem 0.75rem;
 }
 
@@ -23,17 +22,6 @@
     color: var(--p-green-700);
 }
 
-.team-members__meta {
-    align-items: flex-start;
-    border: 1px solid var(--p-content-border-color);
-    border-radius: 0.75rem;
-    display: flex;
-    gap: 0.75rem;
-    justify-content: space-between;
-    margin-bottom: 1rem;
-    padding: 0.75rem;
-}
-
 .team-members__header-actions {
     align-items: center;
     display: flex;
@@ -42,15 +30,9 @@
     justify-content: flex-end;
 }
 
-.team-members__meta-title {
-    font-size: 0.95rem;
-    font-weight: 600;
-}
-
-.team-members__meta-subtitle {
-    color: var(--p-text-muted-color);
-    font-size: 0.82rem;
-    margin-top: 0.2rem;
+.team-members__toolbar {
+    display: flex;
+    justify-content: flex-end;
 }
 
 .team-members__invite-form {
@@ -87,7 +69,6 @@
     border-radius: 0.6rem;
     color: var(--p-text-muted-color);
     font-size: 0.85rem;
-    margin-bottom: 1rem;
     padding: 0.625rem 0.75rem;
 }
 
@@ -107,27 +88,6 @@
     justify-content: flex-end;
 }
 
-.team-members__pending {
-    border: 1px solid var(--p-content-border-color);
-    border-radius: 0.75rem;
-    margin-top: 1rem;
-    padding: 0.75rem;
-}
-
-.team-members__pending-header {
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    justify-content: space-between;
-    margin-bottom: 0.75rem;
-}
-
-.team-members__pending-title {
-    font-size: 0.95rem;
-    font-weight: 600;
-}
-
 :host-context(.p-dark) .team-members__alert--error {
     background: color-mix(in srgb, var(--p-red-950) 46%, var(--p-content-background));
     color: var(--p-red-300);
@@ -143,10 +103,6 @@
 }
 
 @media (max-width: 768px) {
-    .team-members__meta {
-        flex-direction: column;
-    }
-
     .team-members__invite-grid {
         grid-template-columns: 1fr;
     }
@@ -158,5 +114,9 @@
 
     .team-members__actions {
         justify-content: flex-start;
+    }
+
+    .team-members__toolbar {
+        justify-content: stretch;
     }
 }

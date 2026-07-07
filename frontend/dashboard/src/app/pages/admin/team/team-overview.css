@@ -42,11 +42,11 @@
 }
 
 :host ::ng-deep .team-overview__usage-card--warning .p-progressbar-value {
-    background: #f59e0b;
+    background: var(--p-amber-500);
 }
 
 :host ::ng-deep .team-overview__usage-card--critical .p-progressbar-value {
-    background: #dc2626;
+    background: var(--p-red-600);
 }
 
 :host ::ng-deep .team-overview__usage-card--unlimited.p-card {
