@@ -40,34 +40,42 @@ describe('routes', () => {
         expect(settingsRoute?.data?.['instanceCapability']).toBe(INSTANCE_CAPABILITIES.manageUsers);
     });
 
-    it('keeps team API clients and custom domains addressable without redirecting to overview', () => {
+    it('exposes team admin sections as addressable child routes with descriptive titles', () => {
         const adminChildren = routes.find((route) => route.path === '')?.children?.find((route) => route.path === 'admin')?.children ?? [];
         const teamRoute = adminChildren.find((route) => route.path === 'team');
-        const settingsRoute = adminChildren.find((route) => route.path === 'team/settings');
-        const apiClientsRoute = adminChildren.find((route) => route.path === 'team/api-clients');
-        const brandingRoute = adminChildren.find((route) => route.path === 'team/branding');
-        const dangerZoneRoute = adminChildren.find((route) => route.path === 'team/danger-zone');
-        const trackingDomainsRoute = adminChildren.find((route) => route.path === 'team/tracking-domains');
-        const customDomainsRoute = adminChildren.find((route) => route.path === 'team/custom-domains');
+        const teamChildren = teamRoute?.children ?? [];
+        const child = (path: string) => teamChildren.find((route) => route.path === path);
 
         expect(teamRoute?.data?.['activeTeamCapability']).toBe(TEAM_CAPABILITIES.manageSettings);
-        expect(settingsRoute?.redirectTo).toBeUndefined();
-        expect(settingsRoute?.data?.['activeTeamCapability']).toBe(TEAM_CAPABILITIES.manageSettings);
-        expect(settingsRoute?.data?.['teamAdminTab']).toBe('api-clients');
-        expect(apiClientsRoute?.redirectTo).toBeUndefined();
-        expect(apiClientsRoute?.data?.['activeTeamCapability']).toBe(TEAM_CAPABILITIES.manageSettings);
-        expect(apiClientsRoute?.data?.['teamAdminTab']).toBe('api-clients');
-        expect(brandingRoute?.redirectTo).toBeUndefined();
-        expect(brandingRoute?.data?.['activeTeamCapability']).toBe(TEAM_CAPABILITIES.manageSettings);
-        expect(brandingRoute?.data?.['teamAdminTab']).toBe('branding');
-        expect(dangerZoneRoute?.redirectTo).toBeUndefined();
-        expect(dangerZoneRoute?.data?.['activeTeamCapability']).toBe(TEAM_CAPABILITIES.manageSettings);
-        expect(dangerZoneRoute?.data?.['teamAdminTab']).toBe('danger-zone');
-        expect(trackingDomainsRoute?.redirectTo).toBeUndefined();
-        expect(trackingDomainsRoute?.data?.['teamAdminTab']).toBe('custom-domains');
-        expect(customDomainsRoute?.redirectTo).toBeUndefined();
-        expect(customDomainsRoute?.data?.['activeTeamCapability']).toBe(TEAM_CAPABILITIES.manageSettings);
-        expect(customDomainsRoute?.data?.['teamAdminTab']).toBe('custom-domains');
+        expect(teamRoute?.loadComponent).toBeTruthy();
+
+        // Default entry redirects to the overview child, not to /team itself.
+        expect(child('')?.redirectTo).toBe('overview');
+        expect(child('')?.pathMatch).toBe('full');
+
+        // Every visible section is a real, addressable child route (no redirect) with its own title key.
+        for (const [path, titleKey] of [
+            ['overview', 'admin.team.tabs.overview'],
+            ['members', 'admin.team.tabs.members'],
+            ['api-clients', 'admin.team.tabs.apiClients'],
+            ['custom-domains', 'admin.team.tabs.customDomains'],
+            ['branding', 'admin.team.tabs.branding'],
+            ['activity', 'admin.team.tabs.activity'],
+            ['danger-zone', 'admin.team.tabs.dangerZone']
+        ] as const) {
+            expect(child(path)?.redirectTo).toBeUndefined();
+            expect(child(path)?.loadComponent).toBeTruthy();
+            expect(child(path)?.data?.['titleKey']).toBe(titleKey);
+            expect(child(path)?.data?.['titleScope']).toBe('team');
+        }
+
+        // Activity additionally requires the audit capability.
+        expect(child('activity')?.data?.['activeTeamCapability']).toBe(TEAM_CAPABILITIES.viewAudit);
+        expect(child('activity')?.canActivate?.length).toBeTruthy();
+
+        // Legacy deep links keep working via redirects.
+        expect(child('settings')?.redirectTo).toBe('api-clients');
+        expect(child('tracking-domains')?.redirectTo).toBe('custom-domains');
     });
 
     it('exposes accept-invite as a public auth page route', () => {

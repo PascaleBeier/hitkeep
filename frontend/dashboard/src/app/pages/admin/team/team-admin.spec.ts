@@ -1,8 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { provideTranslocoLocale } from '@jsverse/transloco-locale';
 import { of } from 'rxjs';
@@ -11,6 +12,9 @@ import { TEAM_CAPABILITIES } from '@core/access/capabilities';
 import { PermissionService, UserPermissions } from '@services/permission.service';
 import { TeamService } from '@services/team.service';
 import { TeamAdminPage } from './team-admin';
+
+@Component({ selector: 'app-team-admin-test-child', template: '<p>child</p>' })
+class TeamAdminTestChild {}
 
 describe('TeamAdminPage', () => {
     let component: TeamAdminPage;
@@ -133,12 +137,19 @@ describe('TeamAdminPage', () => {
 
     it('renders danger zone as the last visible team tab with danger styling', () => {
         const tabs = component['tabs']();
-        expect(tabs.map((tab) => tab.value)).toEqual(['0', '1', '2', '6', '3', '5', '4']);
+        expect(tabs.map((tab) => tab.route)).toEqual(['overview', 'members', 'api-clients', 'custom-domains', 'branding', 'activity', 'danger-zone']);
         const dangerTab = tabs[tabs.length - 1];
-        expect(dangerTab?.value).toBe('4');
+        expect(dangerTab?.route).toBe('danger-zone');
         expect(dangerTab?.icon).toBe('pi pi-exclamation-triangle');
         expect(dangerTab?.danger).toBe(true);
         expect(fixture.nativeElement.querySelector('.hk-admin-tab-label--danger i.pi-exclamation-triangle')).toBeTruthy();
+    });
+
+    it('defaults the active tab to the overview child route and links every tab to its child path', () => {
+        expect(component['activeTab']()).toBe('overview');
+        const routerLinks = Array.from(fixture.nativeElement.querySelectorAll('p-tab a, p-tab[href], p-tab')).length;
+        expect(routerLinks).toBeGreaterThan(0);
+        expect(component['tabs']().every((tab) => tab.route.length > 0)).toBe(true);
     });
 
     it('should hide the activity tab for non-managers', () => {
@@ -166,41 +177,58 @@ describe('TeamAdminPage', () => {
         expect(fixture.nativeElement.textContent).not.toContain('admin.team.tabs.dangerZone');
     });
 
-    it('should reset the active tab when audit access is lost', () => {
-        component['activeTab'].set('3');
-        activeTeam.set({
-            id: 'team-1',
-            name: 'Acme',
-            logo_url: '',
-            role: 'member',
-            created_at: '2026-01-01T00:00:00Z'
-        });
-        permissionServiceMock.permissions.set({
+});
+
+describe('TeamAdminPage routing', () => {
+    const activeTeam = signal<Team>({ id: 'team-1', name: 'Acme', logo_url: '', role: 'owner', created_at: '2026-01-01T00:00:00Z' });
+    const teamServiceMock = { activeTeam, activeTeamId: signal('team-1'), teams: signal<Team[]>([activeTeam()]) };
+    const permissionServiceMock = {
+        permissions: signal<UserPermissions>({
             instance_role: 'user',
             permissions: {},
             active_team_id: 'team-1',
-            active_team_role: 'member',
-            active_team_capabilities: []
-        });
+            active_team_role: 'owner',
+            active_team_capabilities: [TEAM_CAPABILITIES.viewAudit, TEAM_CAPABILITIES.manageMembers, TEAM_CAPABILITIES.manageSettings, TEAM_CAPABILITIES.archive]
+        })
+    };
 
-        fixture.detectChanges();
-
-        expect(component['activeTab']()).toBe('0');
+    beforeEach(async () => {
+        await TestBed.configureTestingModule({
+            imports: [TranslocoTestingModule.forRoot({ langs: { en: {} }, translocoConfig: { availableLangs: ['en'], defaultLang: 'en' }, preloadLangs: true })],
+            providers: [
+                provideHttpClient(),
+                provideHttpClientTesting(),
+                provideRouter([
+                    {
+                        path: 'team',
+                        component: TeamAdminPage,
+                        children: [
+                            { path: '', pathMatch: 'full', redirectTo: 'overview' },
+                            { path: 'overview', component: TeamAdminTestChild },
+                            { path: 'branding', component: TeamAdminTestChild }
+                        ]
+                    }
+                ]),
+                provideTranslocoLocale({ langToLocaleMapping: { en: 'en-US' } }),
+                { provide: TeamService, useValue: teamServiceMock },
+                { provide: PermissionService, useValue: permissionServiceMock }
+            ]
+        }).compileComponents();
     });
 
-    it('maps team tab query params to dedicated infrastructure tab deep links', () => {
-        expect(component['tabValueFromQuery']('settings')).toBe('2');
-        expect(component['tabValueFromQuery']('api-clients')).toBe('2');
-        expect(component['tabValueFromQuery']('2')).toBe('2');
-        expect(component['tabQueryFromValue']('2')).toBe('api-clients');
-        expect(component['tabValueFromQuery']('custom-domains')).toBe('6');
-        expect(component['tabValueFromQuery']('tracking-domains')).toBe('6');
-        expect(component['tabValueFromQuery']('domains')).toBe('6');
-        expect(component['tabQueryFromValue']('6')).toBe('custom-domains');
-        expect(component['tabValueFromQuery']('branding')).toBe('3');
-        expect(component['tabQueryFromValue']('3')).toBe('branding');
-        expect(component['tabValueFromQuery']('danger-zone')).toBe('4');
-        expect(component['tabValueFromQuery']('danger')).toBe('4');
-        expect(component['tabQueryFromValue']('4')).toBe('danger-zone');
+    it('mounts on a directly-activated child route without crashing and reflects it in the tab bar', async () => {
+        const harness = await RouterTestingHarness.create('/team/branding');
+        const tabBar = harness.routeNativeElement!.ownerDocument.querySelector('[role="tablist"]');
+
+        expect(tabBar?.textContent).toContain('admin.team.tabs.branding');
+        const selected = harness.routeNativeElement!.ownerDocument.querySelector('[role="tab"][aria-selected="true"]');
+        expect(selected?.textContent).toContain('admin.team.tabs.branding');
+    });
+
+    it('redirects the bare team path to the overview child route', async () => {
+        const harness = await RouterTestingHarness.create('/team');
+
+        const selected = harness.routeNativeElement!.ownerDocument.querySelector('[role="tab"][aria-selected="true"]');
+        expect(selected?.textContent).toContain('admin.team.tabs.overview');
     });
 });

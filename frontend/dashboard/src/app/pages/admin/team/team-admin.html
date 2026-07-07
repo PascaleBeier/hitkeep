@@ -1,43 +1,20 @@
 <app-admin-page-frame [breadcrumbItems]="breadcrumbItems()">
-    <p-tabs [value]="activeTab()" (valueChange)="onTabChange($event)" class="hk-admin-tabs">
-        <p-tablist>
-            @for (tab of tabs(); track tab.value) {
-            <p-tab [value]="tab.value">
-                <span class="hk-admin-tab-label" [class.hk-admin-tab-label--danger]="tab.danger">
-                    @if (tab.icon) {
-                    <i [class]="tab.icon" aria-hidden="true"></i>
-                    }
-                    <span>{{ tab.label }}</span>
-                </span>
-            </p-tab>
-            }
-        </p-tablist>
-        <p-tabpanels>
-            <p-tabpanel value="0">
-                <app-team-overview />
-            </p-tabpanel>
-            <p-tabpanel value="1">
-                <app-team-members />
-            </p-tabpanel>
-            @if (canManageSettings()) {
-            <p-tabpanel value="2">
-                <app-team-api-clients />
-            </p-tabpanel>
-            <p-tabpanel value="6">
-                <app-team-custom-domains />
-            </p-tabpanel>
-            <p-tabpanel value="3">
-                <app-team-branding />
-            </p-tabpanel>
-            } @if (canViewAudit()) {
-            <p-tabpanel value="5">
-                <app-team-audit />
-            </p-tabpanel>
-            } @if (canManageSettings()) {
-            <p-tabpanel value="4">
-                <app-team-danger-zone />
-            </p-tabpanel>
-            }
-        </p-tabpanels>
-    </p-tabs>
+    <section class="flex flex-col gap-4">
+        <p-tabs [value]="activeTab()" class="hk-admin-tabs">
+            <p-tablist>
+                @for (tab of tabs(); track tab.route) {
+                <p-tab [value]="tab.route" [routerLink]="['/admin/team', tab.route]">
+                    <span class="hk-admin-tab-label" [class.hk-admin-tab-label--danger]="tab.danger">
+                        @if (tab.icon) {
+                        <i [class]="tab.icon" aria-hidden="true"></i>
+                        }
+                        <span>{{ tab.label }}</span>
+                    </span>
+                </p-tab>
+                }
+            </p-tablist>
+        </p-tabs>
+
+        <router-outlet />
+    </section>
 </app-admin-page-frame>
