@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/database"
+	"hitkeep/internal/entitlements"
 )
 
 func TestHandleAcceptInviteRejectsSecondHostedCloudTeam(t *testing.T) {
@@ -21,6 +22,8 @@ func TestHandleAcceptInviteRejectsSecondHostedCloudTeam(t *testing.T) {
 	defer store.Close()
 
 	h.ctx.Config.CloudHosted = true
+	// Mirrors the managed-cloud default of HITKEEP_CLOUD_MAX_TEAMS=1.
+	h.ctx.Entitlements = entitlements.NewStaticProvider(entitlements.Entitlements{MaxTeams: 1}, entitlements.PlanInfo{})
 
 	ownerHash, err := HashPassword("password123")
 	if err != nil {

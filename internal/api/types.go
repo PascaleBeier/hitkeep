@@ -593,6 +593,7 @@ type PermissionContext struct {
 	ActiveTeamID           *uuid.UUID          `json:"active_team_id,omitempty"`
 	ActiveTeamRole         string              `json:"active_team_role,omitempty"`
 	ActiveTeamCapabilities []string            `json:"active_team_capabilities"`
+	CanCreateTeams         bool                `json:"can_create_teams"`
 }
 
 type SystemStatus struct {

@@ -187,3 +187,16 @@ func isAddrInNetworks(ip netip.Addr, networks []netip.Prefix) bool {
 	}
 	return false
 }
+
+// WithRateLimit wraps a handler with IP-based rate limiting.
+func (c *Context) WithRateLimit(limiter *IPRateLimiter, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ip := GetRealIP(r, c.Config.GetTrustedProxyNetworks())
+		l := limiter.GetLimiter(ip)
+		if !l.Allow() {
+			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+			return
+		}
+		next(w, r)
+	}
+}

@@ -9,10 +9,14 @@ import (
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
+	"hitkeep/internal/entitlements"
 )
 
 type Builder struct {
 	Store *database.Store
+	// Limits derives plan-limit capabilities such as CanCreateTeams. A nil
+	// Limits is permissive, matching deployments without managed-cloud limits.
+	Limits *entitlements.Service
 }
 
 func (b Builder) ForUser(ctx context.Context, userID uuid.UUID) (api.PermissionContext, error) {
@@ -49,7 +53,15 @@ func (b Builder) ForUserSites(ctx context.Context, userID uuid.UUID, sites []api
 		ActiveTeamID:           activeTeamIDValue,
 		ActiveTeamRole:         activeTeamRole,
 		ActiveTeamCapabilities: authcore.TeamCapabilities(activeTeamRole),
+		CanCreateTeams:         b.canCreateTeams(ctx, userID),
 	}, nil
+}
+
+func (b Builder) canCreateTeams(ctx context.Context, userID uuid.UUID) bool {
+	if b.Limits == nil {
+		return true
+	}
+	return b.Limits.CanCreateTeam(ctx, userID) == nil
 }
 
 func (b Builder) siteAccess(ctx context.Context, userID uuid.UUID, sites []api.Site, instanceRole authcore.InstanceRole) (map[string]string, map[string][]string, error) {

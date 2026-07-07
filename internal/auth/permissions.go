@@ -123,6 +123,13 @@ func (r SiteRole) Permissions() []Permission {
 	return slices.Clone(sitePermissions[r])
 }
 
+// BypassesCloudLimits reports whether the instance role is exempt from
+// managed-cloud plan and account limitations. Instance admins and owners act
+// without plan limits in any context.
+func (r InstanceRole) BypassesCloudLimits() bool {
+	return r == InstanceOwner || r == InstanceAdmin
+}
+
 func IsValidInstanceRole(role InstanceRole) bool {
 	switch role {
 	case InstanceOwner, InstanceAdmin, InstanceUser:

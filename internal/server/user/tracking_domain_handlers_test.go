@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 )
@@ -103,25 +104,32 @@ func serveRegisteredCreateTrackingDomain(t *testing.T, h *handler, userID, teamI
 }
 
 func TestCreateCustomTrackingDomainRequiresPaidCloudPlan(t *testing.T) {
-	h, store, ownerID := setupUserSecurityTestEnv(t)
+	h, store, _ := setupUserSecurityTestEnv(t)
 	defer store.Close()
 
+	// The first user is the instance owner and therefore exempt from plan
+	// limits, so plan gating is exercised with a regular customer team.
 	ctx := context.Background()
-	teamID, err := store.GetActiveTenantID(ctx, ownerID)
+	customerID, err := store.CreateUser(ctx, "tracking-domain-customer@example.test", "hash")
 	if err != nil {
-		t.Fatalf("get active team: %v", err)
+		t.Fatalf("create customer user: %v", err)
 	}
+	customerTeam, err := store.CreateTenant(ctx, customerID, "Customer Team", "")
+	if err != nil {
+		t.Fatalf("create customer team: %v", err)
+	}
+	teamID := customerTeam.ID
 
 	h.ctx.Config.CloudHosted = true
 	h.ctx.Entitlements = entitlements.NewStaticProvider(entitlements.Entitlements{}, entitlements.PlanInfo{Code: "free", Name: "Free"})
 
-	if w := serveRegisteredCreateTrackingDomain(t, h, ownerID, teamID, "blocked.example.test"); w.Code != http.StatusForbidden {
+	if w := serveRegisteredCreateTrackingDomain(t, h, customerID, teamID, "blocked.example.test"); w.Code != http.StatusForbidden {
 		t.Fatalf("expected free cloud plan to be blocked with %d, got %d: %s", http.StatusForbidden, w.Code, w.Body.String())
 	}
 
 	h.ctx.Entitlements = entitlements.NewStaticProvider(entitlements.Entitlements{}, entitlements.PlanInfo{Code: "pro", Name: "Pro"})
 
-	if w := serveRegisteredCreateTrackingDomain(t, h, ownerID, teamID, "allowed.example.test"); w.Code != http.StatusCreated {
+	if w := serveRegisteredCreateTrackingDomain(t, h, customerID, teamID, "allowed.example.test"); w.Code != http.StatusCreated {
 		t.Fatalf("expected pro cloud plan to create with %d, got %d: %s", http.StatusCreated, w.Code, w.Body.String())
 	}
 
@@ -129,7 +137,59 @@ func TestCreateCustomTrackingDomainRequiresPaidCloudPlan(t *testing.T) {
 	h.ctx.Config.CloudHosted = false
 	h.ctx.Entitlements = entitlements.NewStaticProvider(entitlements.Entitlements{}, entitlements.PlanInfo{Code: "free", Name: "Free"})
 
-	if w := serveRegisteredCreateTrackingDomain(t, h, ownerID, teamID, "selfhosted.example.test"); w.Code != http.StatusCreated {
+	if w := serveRegisteredCreateTrackingDomain(t, h, customerID, teamID, "selfhosted.example.test"); w.Code != http.StatusCreated {
 		t.Fatalf("expected self-hosted create with %d, got %d: %s", http.StatusCreated, w.Code, w.Body.String())
+	}
+}
+
+func TestCreateCustomTrackingDomainExemptsInstanceStaff(t *testing.T) {
+	h, store, instanceOwnerID := setupUserSecurityTestEnv(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	teamID, err := store.GetActiveTenantID(ctx, instanceOwnerID)
+	if err != nil {
+		t.Fatalf("get active team: %v", err)
+	}
+	if role, err := store.GetInstanceRole(ctx, instanceOwnerID); err != nil || role != auth.InstanceOwner {
+		t.Fatalf("expected first user to be instance owner, got %q (err %v)", role, err)
+	}
+
+	h.ctx.Config.CloudHosted = true
+	h.ctx.Entitlements = entitlements.NewStaticProvider(entitlements.Entitlements{}, entitlements.PlanInfo{Code: "free", Name: "Free"})
+
+	// Instance owners are never plan-gated, even on the free plan.
+	if w := serveRegisteredCreateTrackingDomain(t, h, instanceOwnerID, teamID, "operator.example.test"); w.Code != http.StatusCreated {
+		t.Fatalf("expected instance owner create with %d, got %d: %s", http.StatusCreated, w.Code, w.Body.String())
+	}
+
+	// Instance admins bypass plan limits as well.
+	instanceAdminID, err := store.CreateUser(ctx, "tracking-domain-instance-admin@example.test", "hash")
+	if err != nil {
+		t.Fatalf("create instance admin user: %v", err)
+	}
+	if err := store.AddTeamMember(ctx, teamID, instanceAdminID, database.TenantRoleAdmin, instanceOwnerID); err != nil {
+		t.Fatalf("add instance admin to team: %v", err)
+	}
+	if err := store.UpdateInstanceRole(ctx, instanceAdminID, auth.InstanceAdmin, instanceOwnerID); err != nil {
+		t.Fatalf("grant instance admin role: %v", err)
+	}
+
+	if w := serveRegisteredCreateTrackingDomain(t, h, instanceAdminID, teamID, "instance-admin.example.test"); w.Code != http.StatusCreated {
+		t.Fatalf("expected instance admin create with %d, got %d: %s", http.StatusCreated, w.Code, w.Body.String())
+	}
+
+	// Team admins without an instance role stay plan-gated, even on a team
+	// owned by the instance owner.
+	teamAdminID, err := store.CreateUser(ctx, "tracking-domain-team-admin@example.test", "hash")
+	if err != nil {
+		t.Fatalf("create team admin user: %v", err)
+	}
+	if err := store.AddTeamMember(ctx, teamID, teamAdminID, database.TenantRoleAdmin, instanceOwnerID); err != nil {
+		t.Fatalf("add team admin to team: %v", err)
+	}
+
+	if w := serveRegisteredCreateTrackingDomain(t, h, teamAdminID, teamID, "team-admin.example.test"); w.Code != http.StatusForbidden {
+		t.Fatalf("expected non-staff team admin to be blocked with %d, got %d: %s", http.StatusForbidden, w.Code, w.Body.String())
 	}
 }

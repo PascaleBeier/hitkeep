@@ -24,18 +24,8 @@ import (
 
 var customTrackingHostnameRegex = regexp.MustCompile(`^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$`)
 
-// freeCloudPlanCode mirrors database.CloudPlanFree, which is only compiled in billing builds.
-const freeCloudPlanCode = "free"
-
-// customTrackingDomainPlanBlocked reports whether the team's managed-cloud plan
-// excludes custom tracking domains. Free cloud teams must upgrade to Pro or
-// higher; self-hosted deployments and non-cloud builds are never blocked.
 func (h *handler) customTrackingDomainPlanBlocked(r *http.Request, teamID uuid.UUID) bool {
-	if h.ctx.Config == nil || !h.ctx.Config.CloudHosted {
-		return false
-	}
-	plan := resolveTeamPlan(r.Context(), h.ctx.Store, h.ctx.Entitlements, teamID)
-	return plan != nil && plan.Code == freeCloudPlanCode
+	return !h.ctx.Limits().AllowsCustomTrackingDomains(r.Context(), shared.GetUserIDFromContext(r), teamID)
 }
 
 type trackingDomainVerifier struct {

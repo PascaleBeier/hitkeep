@@ -55,6 +55,8 @@ func TestHandleCreateTeamRejectsHostedCloudUser(t *testing.T) {
 	defer store.Close()
 
 	h.ctx.Config.CloudHosted = true
+	// Mirrors the managed-cloud default of HITKEEP_CLOUD_MAX_TEAMS=1.
+	h.ctx.Entitlements = entitlements.NewStaticProvider(entitlements.Entitlements{MaxTeams: 1}, entitlements.PlanInfo{})
 
 	hashed, err := serverauth.HashPassword("password123")
 	if err != nil {
@@ -205,6 +207,8 @@ func TestHandleUpsertTeamMemberRejectsExistingHostedCloudUserFromOtherTeam(t *te
 	defer store.Close()
 
 	h.ctx.Config.CloudHosted = true
+	// Mirrors the managed-cloud default of HITKEEP_CLOUD_MAX_TEAMS=1.
+	h.ctx.Entitlements = entitlements.NewStaticProvider(entitlements.Entitlements{MaxTeams: 1}, entitlements.PlanInfo{})
 
 	activeTeamID, err := store.GetActiveTenantID(context.Background(), ownerID)
 	if err != nil {
@@ -330,7 +334,7 @@ func TestHandleUpsertTeamMemberRejectsHostedCloudUserPastMemberLimit(t *testing.
 	}
 }
 
-func TestHandleUpsertTeamMemberDoesNotBypassLimitForOperatorWhoIsNotTeamOwner(t *testing.T) {
+func TestHandleUpsertTeamMemberBypassesLimitForOperatorOnAnyTeam(t *testing.T) {
 	h, store, ownerID := setupUserSecurityTestEnv(t)
 	defer store.Close()
 
@@ -371,7 +375,9 @@ func TestHandleUpsertTeamMemberDoesNotBypassLimitForOperatorWhoIsNotTeamOwner(t 
 	w := httptest.NewRecorder()
 	h.handleAddTeamMember().ServeHTTP(w, req)
 
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d: %s", http.StatusForbidden, w.Code, w.Body.String())
+	// Instance staff bypass cloud limits in any context, including teams they
+	// administer without owning.
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
 	}
 }

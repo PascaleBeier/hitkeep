@@ -12,6 +12,7 @@ export interface UserPermissions {
     active_team_id?: string;
     active_team_role?: TeamRole | '';
     active_team_capabilities?: string[];
+    can_create_teams?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -23,6 +24,9 @@ export class PermissionService {
     readonly isInstanceOwner = computed(() => this.permissions()?.instance_role === 'owner');
 
     readonly isInstanceAdmin = computed(() => ['owner', 'admin'].includes(this.permissions()?.instance_role || ''));
+
+    /** Server-derived: whether the current user may create another team. */
+    readonly canCreateTeams = computed(() => this.permissions()?.can_create_teams ?? false);
 
     loadPermissions() {
         return this.http.get<UserPermissions>('/api/user/permissions').pipe(tap((perms) => this.applyPermissions(perms)));

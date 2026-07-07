@@ -154,7 +154,7 @@ func (h *handler) userTeamsResponse(r *http.Request, userID uuid.UUID) (api.User
 }
 
 func (h *handler) userPermissionContext(ctx context.Context, userID uuid.UUID, sites []api.Site) (api.PermissionContext, error) {
-	return access.Builder{Store: h.ctx.Store}.ForUserSites(ctx, userID, sites)
+	return access.Builder{Store: h.ctx.Store, Limits: h.ctx.Limits()}.ForUserSites(ctx, userID, sites)
 }
 
 func (h *handler) userSitesResponse(ctx context.Context, userID uuid.UUID) ([]api.Site, error) {

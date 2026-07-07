@@ -787,6 +787,7 @@ func openAPIV1AccountSchemas() map[string]any {
 				"active_team_id":           map[string]any{"type": "string", "format": "uuid"},
 				"active_team_role":         map[string]any{"type": "string"},
 				"active_team_capabilities": map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+				"can_create_teams":         map[string]any{"type": "boolean"},
 			},
 		},
 		"APIClientSiteRole": map[string]any{

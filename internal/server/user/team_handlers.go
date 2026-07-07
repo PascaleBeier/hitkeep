@@ -1,7 +1,6 @@
 package user
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,7 +16,6 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/appurl"
-	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailables"
@@ -85,27 +83,6 @@ func writeTeamActionError(w http.ResponseWriter, statusCode int, code string, me
 	}
 }
 
-func (h *handler) isCloudOperator(r *http.Request, actorID uuid.UUID) bool {
-	if h == nil || h.ctx == nil || h.ctx.Config == nil || h.ctx.Store == nil {
-		return false
-	}
-	if !h.ctx.Config.CloudHosted || actorID == uuid.Nil {
-		return false
-	}
-
-	role, err := h.ctx.Store.GetInstanceRole(r.Context(), actorID)
-	return err == nil && role == authcore.InstanceOwner
-}
-
-func (h *handler) isCloudOperatorTeamOwner(r *http.Request, actorID, teamID uuid.UUID) bool {
-	if !h.isCloudOperator(r, actorID) || teamID == uuid.Nil {
-		return false
-	}
-
-	role, err := h.ctx.Store.GetTenantRole(r.Context(), teamID, actorID)
-	return err == nil && role == database.TenantRoleOwner
-}
-
 func operatorTeamEntitlements() *api.TeamEntitlements {
 	return &api.TeamEntitlements{
 		AllowSSO:            true,
@@ -120,23 +97,10 @@ func operatorTeamPlan() *api.TeamPlan {
 	}
 }
 
-func resolveTeamEntitlements(ctx context.Context, store *database.Store, provider entitlements.Provider, teamID uuid.UUID) *api.TeamEntitlements {
-	if override := resolveCloudBillingTeamEntitlements(ctx, store, teamID); override != nil {
-		return override
+func teamEntitlementsResponse(ent *entitlements.Entitlements) *api.TeamEntitlements {
+	if ent == nil {
+		return nil
 	}
-
-	defaults := &entitlements.Entitlements{
-		AllowSSO:            true,
-		AllowCustomBranding: true,
-	}
-
-	ent := defaults
-	if provider != nil {
-		if resolved, err := provider.ForTenant(ctx, teamID); err == nil && resolved != nil {
-			ent = resolved
-		}
-	}
-
 	return &api.TeamEntitlements{
 		MaxSitesPerTeam:     ent.MaxSitesPerTeam,
 		MaxTeamMembers:      ent.MaxTeamMembers,
@@ -146,29 +110,15 @@ func resolveTeamEntitlements(ctx context.Context, store *database.Store, provide
 	}
 }
 
-func resolveTeamPlan(ctx context.Context, store *database.Store, provider entitlements.Provider, teamID uuid.UUID) *api.TeamPlan {
-	if override := resolveCloudBillingTeamPlan(ctx, store, teamID); override != nil {
-		return override
-	}
-
-	describer, ok := provider.(entitlements.Describer)
-	if !ok || describer == nil {
+func teamPlanResponse(plan *entitlements.PlanInfo) *api.TeamPlan {
+	if plan == nil {
 		return nil
 	}
-
-	plan, err := describer.DescribeTenant(ctx, teamID)
-	if err != nil || plan == nil {
-		return nil
-	}
-	if strings.TrimSpace(plan.Name) == "" && strings.TrimSpace(plan.Code) == "" {
-		return nil
-	}
-
 	return &api.TeamPlan{
-		Code:       strings.TrimSpace(plan.Code),
-		Name:       strings.TrimSpace(plan.Name),
-		UpgradeURL: strings.TrimSpace(plan.UpgradeURL),
-		SupportURL: strings.TrimSpace(plan.SupportURL),
+		Code:       plan.Code,
+		Name:       plan.Name,
+		UpgradeURL: plan.UpgradeURL,
+		SupportURL: plan.SupportURL,
 	}
 }
 
@@ -180,14 +130,15 @@ func (h *handler) hydrateTeamSummaries(r *http.Request, teams []api.Team) []api.
 	enriched := make([]api.Team, len(teams))
 	copy(enriched, teams)
 	actorID := shared.GetUserIDFromContext(r)
-	isOperator := h.isCloudOperator(r, actorID)
+	limits := h.ctx.Limits()
+	isOperator := limits.BypassesCloudLimits(r.Context(), actorID)
 	for idx, team := range enriched {
 		if isOperator && team.Role == database.TenantRoleOwner {
 			enriched[idx].Entitlements = operatorTeamEntitlements()
 			enriched[idx].Plan = operatorTeamPlan()
 		} else {
-			enriched[idx].Entitlements = resolveTeamEntitlements(r.Context(), h.ctx.Store, h.ctx.Entitlements, team.ID)
-			enriched[idx].Plan = resolveTeamPlan(r.Context(), h.ctx.Store, h.ctx.Entitlements, team.ID)
+			enriched[idx].Entitlements = teamEntitlementsResponse(limits.TeamEntitlements(r.Context(), team.ID))
+			enriched[idx].Plan = teamPlanResponse(limits.TeamPlan(r.Context(), team.ID))
 		}
 
 		analyticsStore := h.ctx.Store
@@ -298,23 +249,14 @@ func (h *handler) handleCreateTeam() http.HandlerFunc {
 			}
 		}
 
-		if h.ctx.Config.CloudHosted && !h.isCloudOperator(r, actorID) {
-			http.Error(w, "Managed cloud accounts are limited to one team", http.StatusForbidden)
-			return
-		}
-
-		if h.ctx.Entitlements != nil && !h.isCloudOperator(r, actorID) {
-			activeTenantID, entErr := h.ctx.Store.GetActiveTenantID(r.Context(), actorID)
-			if entErr == nil {
-				ent, entErr := h.ctx.Entitlements.ForTenant(r.Context(), activeTenantID)
-				if entErr == nil && ent.MaxTeams > 0 {
-					teams, _, _ := h.ctx.Store.ListUserTeams(r.Context(), actorID)
-					if len(teams) >= ent.MaxTeams {
-						http.Error(w, "Team limit reached", http.StatusForbidden)
-						return
-					}
-				}
+		if err := h.ctx.Limits().CanCreateTeam(r.Context(), actorID); err != nil {
+			if errors.Is(err, entitlements.ErrTeamLimitReached) {
+				http.Error(w, "Team limit reached", http.StatusForbidden)
+			} else {
+				slog.Error("Failed to check team creation limit", "error", err, "actor_id", actorID)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
 			}
+			return
 		}
 
 		team, err := h.ctx.Store.CreateTenant(r.Context(), actorID, name, logoURL)

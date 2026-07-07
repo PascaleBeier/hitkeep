@@ -25,7 +25,9 @@ export class MainLayoutContextService {
 
     readonly cloudHosted = this.bootstrap.cloudHosted;
     readonly cloudSupportUrl = this.bootstrap.cloudSupportUrl;
-    readonly canCreateTeams = computed(() => !this.cloudHosted() || this.perms.isInstanceOwner());
+    // Self-hosted deployments have no plan limits; managed cloud trusts the
+    // server-derived flag instead of re-deriving policy in the frontend.
+    readonly canCreateTeams = computed(() => !this.cloudHosted() || this.perms.canCreateTeams());
     readonly isTeamAdmin = computed(() => this.access.canActiveTeam(TEAM_CAPABILITIES.manageSettings));
 
     readonly isMobileDrawerOpen = signal(false);

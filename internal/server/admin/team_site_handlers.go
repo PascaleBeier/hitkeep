@@ -17,12 +17,11 @@ import (
 	"hitkeep/internal/appurl"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
+	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailables"
 	serverauth "hitkeep/internal/server/auth"
 	"hitkeep/internal/server/shared"
 )
-
-var errHostedCloudSiteInviteTeamMemberLimitReached = errors.New("cloud team member limit reached")
 
 type resolvedSiteMemberUser struct {
 	userID                uuid.UUID
@@ -456,7 +455,8 @@ func (h *handler) resolveSiteMemberUser(ctx context.Context, teamID, actorID uui
 			return resolvedSiteMemberUser{}, err
 		}
 		if !isTeamMember && h.ctx.Config.CloudHosted {
-			if err := h.validateHostedCloudSiteInvitee(ctx, teamID, result.userID, email, invite == nil); err != nil {
+			requireCapacity := invite == nil && !h.ctx.Limits().BypassesCloudLimits(ctx, actorID)
+			if err := h.validateHostedCloudSiteInvitee(ctx, teamID, result.userID, email, requireCapacity); err != nil {
 				return resolvedSiteMemberUser{}, err
 			}
 		}
@@ -509,60 +509,32 @@ func (h *handler) findPendingTeamInviteForSite(ctx context.Context, teamID uuid.
 
 func (h *handler) validateHostedCloudSiteInvitee(ctx context.Context, teamID, userID uuid.UUID, email string, requireCapacity bool) error {
 	if requireCapacity {
-		if err := h.requireHostedCloudSiteInviteCapacity(ctx, teamID); err != nil {
+		if err := h.ctx.Limits().RequireTeamMemberCapacity(ctx, teamID); err != nil {
 			return err
 		}
 	}
-	teamCount, err := h.ctx.Store.CountUserNonDefaultTeams(ctx, userID)
-	if err != nil {
-		return fmt.Errorf("count cloud invitee teams: %w", err)
-	}
-	if teamCount > 0 {
-		return database.ErrManagedCloudSingleTeamLimit
-	}
-
+	// Pending invites to other teams reserve membership slots so the invitee
+	// cannot be promised more teams than their entitlement allows.
 	pendingInvites, err := h.ctx.Store.ListPendingTeamInvitesByEmail(ctx, email)
 	if err != nil {
 		return fmt.Errorf("load pending cloud invites: %w", err)
 	}
+	pendingOutsideTeam := 0
 	for _, pendingInvite := range pendingInvites {
 		if pendingInvite.TeamID != teamID {
-			return database.ErrManagedCloudSingleTeamLimit
+			pendingOutsideTeam++
 		}
 	}
-	return nil
-}
-
-func (h *handler) requireHostedCloudSiteInviteCapacity(ctx context.Context, teamID uuid.UUID) error {
-	if h.ctx.Entitlements == nil {
-		return nil
-	}
-	ent, err := h.ctx.Entitlements.ForTenant(ctx, teamID)
-	if err != nil || ent == nil || ent.MaxTeamMembers <= 0 {
-		return nil
-	}
-
-	memberCount, err := h.ctx.Store.CountTeamMembers(ctx, teamID)
-	if err != nil {
-		return err
-	}
-	pendingInviteCount, err := h.ctx.Store.CountPendingTeamInvites(ctx, teamID)
-	if err != nil {
-		return err
-	}
-	if memberCount+pendingInviteCount >= ent.MaxTeamMembers {
-		return errHostedCloudSiteInviteTeamMemberLimitReached
-	}
-	return nil
+	return h.ctx.Limits().RequireTeamMembershipCapacity(ctx, userID, 1+pendingOutsideTeam)
 }
 
 func (h *handler) writeSiteInvitePreflightError(w http.ResponseWriter, err error, email string, teamID, actorID uuid.UUID) bool {
 	switch {
-	case errors.Is(err, errHostedCloudSiteInviteTeamMemberLimitReached):
+	case errors.Is(err, entitlements.ErrTeamMemberLimitReached):
 		slog.Warn("Cloud team member limit reached for site invite", "error", err, "email", email, "team_id", teamID, "actor_id", actorID)
 		http.Error(w, "Team member limit reached", http.StatusForbidden)
 		return true
-	case errors.Is(err, database.ErrManagedCloudSingleTeamLimit):
+	case errors.Is(err, entitlements.ErrTeamMembershipLimitReached):
 		http.Error(w, "Managed cloud accounts are limited to one team", http.StatusConflict)
 		return true
 	default:

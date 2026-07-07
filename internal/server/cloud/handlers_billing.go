@@ -18,6 +18,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/appurl"
 	"hitkeep/internal/database"
+	"hitkeep/internal/entitlements"
 	"hitkeep/internal/localization"
 	"hitkeep/internal/mailables"
 	serverauth "hitkeep/internal/server/auth"
@@ -332,40 +333,21 @@ func (h *handler) handleVerifySignup() http.HandlerFunc {
 }
 
 func (h *handler) handleListCloudPlans() http.HandlerFunc {
-	plans := []api.CloudPlanTier{
-		{
-			Code: database.CloudPlanFree,
-			Name: planNameForCode(database.CloudPlanFree),
+	planCodes := []string{database.CloudPlanFree, database.CloudPlanPro, database.CloudPlanBusiness}
+	plans := make([]api.CloudPlanTier, 0, len(planCodes))
+	for _, code := range planCodes {
+		ent := entitlements.CloudPlanEntitlements(code)
+		plans = append(plans, api.CloudPlanTier{
+			Code: code,
+			Name: entitlements.CloudPlanName(code),
 			Entitlements: api.TeamEntitlements{
-				MaxSitesPerTeam:     database.CloudFreePlanSiteLimit,
-				MaxTeamMembers:      database.CloudFreePlanMemberLimit,
-				MaxRetentionDays:    60,
-				AllowSSO:            false,
-				AllowCustomBranding: false,
+				MaxSitesPerTeam:     ent.MaxSitesPerTeam,
+				MaxTeamMembers:      ent.MaxTeamMembers,
+				MaxRetentionDays:    ent.MaxRetentionDays,
+				AllowSSO:            ent.AllowSSO,
+				AllowCustomBranding: ent.AllowCustomBranding,
 			},
-		},
-		{
-			Code: database.CloudPlanPro,
-			Name: planNameForCode(database.CloudPlanPro),
-			Entitlements: api.TeamEntitlements{
-				MaxSitesPerTeam:     10,
-				MaxTeamMembers:      5,
-				MaxRetentionDays:    365,
-				AllowSSO:            false,
-				AllowCustomBranding: false,
-			},
-		},
-		{
-			Code: database.CloudPlanBusiness,
-			Name: planNameForCode(database.CloudPlanBusiness),
-			Entitlements: api.TeamEntitlements{
-				MaxSitesPerTeam:     50,
-				MaxTeamMembers:      20,
-				MaxRetentionDays:    1095,
-				AllowSSO:            true,
-				AllowCustomBranding: true,
-			},
-		},
+		})
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {

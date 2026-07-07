@@ -1147,7 +1147,12 @@ describe('MainLayout', () => {
         }
     });
 
-    it('should show create team actions in hosted cloud for instance owners', () => {
+    it('should show create team actions in hosted cloud when the server grants team creation', () => {
+        TestBed.inject(PermissionService).applyPermissions({
+            instance_role: 'owner',
+            permissions: {},
+            can_create_teams: true
+        });
         bootstrap.status.set({
             needs_setup: false,
             version: 'v2.0.0',
@@ -1281,9 +1286,10 @@ describe('MainLayout', () => {
         expect(secondItems).toBe(firstItems);
     });
 
-    it('should derive page-bar team creation affordance from cloud mode and instance owner role', () => {
+    it('should derive page-bar team creation affordance from cloud mode and the server permission flag', () => {
         const pageBar = fixture.debugElement.query(By.directive(LayoutPageBar)).componentInstance as LayoutPageBarTestAccess;
 
+        // Self-hosted deployments have no plan limits.
         expect(pageBar.canCreateTeams()).toBe(true);
 
         bootstrap.status.set({
@@ -1292,11 +1298,21 @@ describe('MainLayout', () => {
             cloud: { hosted: true, signup_enabled: false }
         });
 
+        // Hosted cloud without the server-derived flag stays hidden.
+        expect(pageBar.canCreateTeams()).toBe(false);
+
+        TestBed.inject(PermissionService).applyPermissions({
+            instance_role: 'user',
+            permissions: {},
+            can_create_teams: true
+        });
+
         expect(pageBar.canCreateTeams()).toBe(true);
 
         TestBed.inject(PermissionService).applyPermissions({
             instance_role: 'user',
-            permissions: {}
+            permissions: {},
+            can_create_teams: false
         });
 
         expect(pageBar.canCreateTeams()).toBe(false);

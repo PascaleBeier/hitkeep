@@ -10,7 +10,9 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
+	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	"hitkeep/internal/entitlements"
 )
 
 func TestBuilderForUserBuildsDerivedAccessContext(t *testing.T) {
@@ -109,6 +111,43 @@ func TestBuilderForUserSitesRejectsUnrelatedSiteWithoutInstanceVisibility(t *tes
 	_, err = (Builder{Store: store}).ForUserSites(ctx, memberID, []api.Site{{ID: site.ID, Domain: site.Domain}})
 	if err == nil || !strings.Contains(err.Error(), "resolve site role") {
 		t.Fatalf("expected site role resolution error, got %v", err)
+	}
+}
+
+func TestBuilderForUserDerivesCanCreateTeams(t *testing.T) {
+	ctx := context.Background()
+	store := newAccessTestStore(t)
+	defer store.Close()
+
+	ownerID, err := store.CreateUser(ctx, "limits-owner@example.test", "hash")
+	if err != nil {
+		t.Fatalf("create instance owner: %v", err)
+	}
+	memberID, err := store.CreateUser(ctx, "limits-member@example.test", "hash")
+	if err != nil {
+		t.Fatalf("create member: %v", err)
+	}
+
+	// Mirrors the managed-cloud default of HITKEEP_CLOUD_MAX_TEAMS=1.
+	cloudProvider := entitlements.NewStaticProvider(entitlements.Entitlements{MaxTeams: 1}, entitlements.PlanInfo{})
+	cloudLimits := entitlements.NewService(store, cloudProvider, &config.Config{CloudHosted: true})
+	cloudBuilder := Builder{Store: store, Limits: cloudLimits}
+
+	if resp, err := cloudBuilder.ForUser(ctx, ownerID); err != nil || !resp.CanCreateTeams {
+		t.Fatalf("expected instance owner to create teams on managed cloud, got %+v (err %v)", resp, err)
+	}
+	if resp, err := cloudBuilder.ForUser(ctx, memberID); err != nil || resp.CanCreateTeams {
+		t.Fatalf("expected cloud user at the team cap not to create teams, got %+v (err %v)", resp, err)
+	}
+
+	selfHostedLimits := entitlements.NewService(store, entitlements.NewDefaultProvider(), &config.Config{})
+	if resp, err := (Builder{Store: store, Limits: selfHostedLimits}).ForUser(ctx, memberID); err != nil || !resp.CanCreateTeams {
+		t.Fatalf("expected self-hosted user to create teams, got %+v (err %v)", resp, err)
+	}
+
+	// Builders assembled without a limits service stay permissive.
+	if resp, err := (Builder{Store: store}).ForUser(ctx, memberID); err != nil || !resp.CanCreateTeams {
+		t.Fatalf("expected builder without limits to allow team creation, got %+v (err %v)", resp, err)
 	}
 }
 

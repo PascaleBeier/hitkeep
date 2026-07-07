@@ -53,7 +53,7 @@ func (h *handler) accessBuilder(w http.ResponseWriter) (access.Builder, bool) {
 		http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
 		return access.Builder{}, false
 	}
-	return access.Builder{Store: h.ctx.Store}, true
+	return access.Builder{Store: h.ctx.Store, Limits: h.ctx.Limits()}, true
 }
 
 func writeJSON(w http.ResponseWriter, resp any) {

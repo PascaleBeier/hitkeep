@@ -19,6 +19,7 @@ import (
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	"hitkeep/internal/entitlements"
 )
 
 func (h *handler) handleStripeEvent(ctx context.Context, event stripe.Event) error {
@@ -164,27 +165,11 @@ func normalizePlanCode(planCode string) string {
 }
 
 func planNameForCode(planCode string) string {
-	switch normalizePlanCode(planCode) {
-	case database.CloudPlanBusiness:
-		return "Business"
-	case database.CloudPlanPro:
-		return "Pro"
-	default:
-		return "Free"
-	}
+	return entitlements.CloudPlanName(normalizePlanCode(planCode))
 }
 
 func effectivePlanCode(account *database.CloudBillingAccount) (string, string) {
-	if account == nil {
-		return "", ""
-	}
-
-	switch strings.TrimSpace(account.SubscriptionStatus) {
-	case "", database.CloudSubscriptionStatusFree, subscriptionStatusPending, subscriptionStatusCanceled, database.CloudSubscriptionStatusChargebackLost:
-		return database.CloudPlanFree, planNameForCode(database.CloudPlanFree)
-	default:
-		return strings.TrimSpace(account.PlanCode), strings.TrimSpace(account.PlanName)
-	}
+	return entitlements.EffectiveCloudPlan(account)
 }
 
 func stripeCustomerName(user *api.User, teamName string) string {

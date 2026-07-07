@@ -15,6 +15,7 @@ import (
 	"hitkeep/internal/appurl"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
+	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/server/shared"
 )
@@ -280,14 +281,10 @@ func (h *handler) validateCloudInviteAcceptance(ctx context.Context, email strin
 		}
 	}
 
-	teamCount, err := h.ctx.Store.CountUserNonDefaultTeams(ctx, userID)
-	if err != nil {
-		return fmt.Errorf("count cloud invite teams: %w", err)
+	if len(targetTeams) == 0 {
+		return nil
 	}
-	if len(targetTeams) > 1 || (teamCount > 0 && len(targetTeams) > 0) {
-		return database.ErrManagedCloudSingleTeamLimit
-	}
-	return nil
+	return h.ctx.Limits().RequireTeamMembershipCapacity(ctx, userID, len(targetTeams))
 }
 
 func (h *handler) writeInviteAcceptanceError(w http.ResponseWriter, err error, email string, userID uuid.UUID) {
@@ -298,7 +295,7 @@ func (h *handler) writeInviteAcceptanceError(w http.ResponseWriter, err error, e
 		http.Error(w, "Sign in to accept this invitation", http.StatusUnauthorized)
 	case errors.Is(err, database.ErrTeamInviteEmailMismatch):
 		http.Error(w, "Invite does not match signed-in user", http.StatusForbidden)
-	case errors.Is(err, database.ErrManagedCloudSingleTeamLimit):
+	case errors.Is(err, entitlements.ErrTeamMembershipLimitReached):
 		http.Error(w, "Managed cloud accounts are limited to one team", http.StatusForbidden)
 	default:
 		slog.Error("Failed to accept invite", "error", err, "email", email, "user_id", userID)
