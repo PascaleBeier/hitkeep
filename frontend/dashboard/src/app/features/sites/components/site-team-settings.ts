@@ -16,6 +16,8 @@ import { SiteService } from '@features/sites/services/site.service';
 import { ConfirmationService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { IconFieldModule } from 'primeng/iconfield';
+import { InputIconModule } from 'primeng/inputicon';
 import { InputTextModule } from 'primeng/inputtext';
 import { MessageModule } from 'primeng/message';
 import { SelectModule } from 'primeng/select';
@@ -31,7 +33,7 @@ interface SiteMember {
 
 @Component({
     selector: 'app-site-team-settings',
-    imports: [ReactiveFormsModule, ConfirmDialogModule, TableModule, ButtonModule, SelectModule, InputTextModule, MessageModule, CrudDialog, RelativeDateTime, TableRowActions, TranslocoPipe],
+    imports: [ReactiveFormsModule, ConfirmDialogModule, TableModule, ButtonModule, SelectModule, IconFieldModule, InputIconModule, InputTextModule, MessageModule, CrudDialog, RelativeDateTime, TableRowActions, TranslocoPipe],
     providers: [ConfirmationService],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -135,10 +137,10 @@ interface SiteMember {
                                 @if (canManageTeam()) {
                                     <p-button styleClass="site-settings-action-btn" [label]="'sites.team.addMemberAction' | transloco" icon="pi pi-user-plus" [type]="'button'" (onClick)="openAddMemberDialog()" />
                                 }
-                                <span class="p-input-icon-left hk-crud-search">
-                                    <i class="pi pi-search"></i>
+                                <p-iconfield class="hk-crud-search">
+                                    <p-inputicon class="pi pi-search" />
                                     <input pInputText #memberSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="membersTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
-                                </span>
+                                </p-iconfield>
                             </div>
                         </div>
                         <div class="hk-crud-table-wrap">

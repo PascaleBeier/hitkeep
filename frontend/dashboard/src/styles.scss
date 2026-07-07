@@ -72,31 +72,14 @@
 }
 
 /* Shared CRUD table styling */
-.hk-crud-search {
-    align-items: center;
-    display: inline-flex;
-    min-width: 14rem;
-    position: relative;
-    width: 100%;
-}
-
+/* Table search field: always a p-iconfield + p-inputicon — PrimeNG positions the icon via theme tokens. */
 .hk-crud-search.p-iconfield {
     display: block;
+    min-width: min(100%, 14rem);
     width: min(100%, 18rem);
 }
 
-.hk-crud-search > .pi {
-    color: var(--p-text-muted-color);
-    left: 0.75rem;
-    pointer-events: none;
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 1;
-}
-
 .hk-crud-search input {
-    padding-left: 2.25rem;
     width: 100%;
 }
 

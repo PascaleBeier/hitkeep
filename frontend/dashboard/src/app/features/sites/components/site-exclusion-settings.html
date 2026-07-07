@@ -129,10 +129,10 @@
             <div class="site-settings-table-shell">
                 <div class="site-settings-table-toolbar">
                     <span class="site-settings-chip">{{ exclusions().length }}</span>
-                    <span class="p-input-icon-left hk-crud-search">
-                        <i class="pi pi-search"></i>
+                    <p-iconfield class="hk-crud-search">
+                        <p-inputicon class="pi pi-search" />
                         <input pInputText #siteExclusionsSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="siteExclusionsTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
-                    </span>
+                    </p-iconfield>
                 </div>
                 <div class="hk-crud-table-wrap">
                     <p-table
