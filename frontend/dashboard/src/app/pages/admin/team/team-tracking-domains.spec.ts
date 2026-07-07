@@ -29,7 +29,7 @@ describe('TeamTrackingDomains', () => {
     };
 
     const teamServiceMock = {
-        listTrackingDomains: vi.fn(() => of([])),
+        listTrackingDomains: vi.fn(() => of<CustomTrackingDomain[]>([])),
         createTrackingDomain: vi.fn((teamID: string, payload: { hostname: string }) => {
             void teamID;
             void payload;
@@ -114,17 +114,28 @@ describe('TeamTrackingDomains', () => {
         fixture.detectChanges();
     });
 
-    it('adds a tracking domain through the form without native navigation', () => {
-        const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
-        const form = fixture.nativeElement.querySelector('form') as HTMLFormElement;
+    afterEach(() => {
+        document.querySelectorAll('.p-dialog-mask, .p-dialog').forEach((element) => element.remove());
+    });
 
+    it('adds a tracking domain through the add dialog and opens the DNS setup popup', async () => {
+        const addButton = Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>).find((button) => button.textContent?.includes('Add domain'));
+        expect(addButton).toBeTruthy();
+        addButton?.click();
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        const input = document.body.querySelector('#team-tracking-domain-hostname') as HTMLInputElement;
+        expect(input).toBeTruthy();
         input.value = 'analytics.example.com';
         input.dispatchEvent(new Event('input'));
         fixture.detectChanges();
 
+        const form = input.closest('form') as HTMLFormElement;
         const event = new Event('submit', { bubbles: true, cancelable: true });
         form.dispatchEvent(event);
         fixture.detectChanges();
+        await fixture.whenStable();
 
         expect(event.defaultPrevented).toBe(true);
         expect(teamServiceMock.createTrackingDomain).toHaveBeenCalledWith('team-1', {
@@ -132,5 +143,17 @@ describe('TeamTrackingDomains', () => {
         });
         expect(fixture.nativeElement.textContent).toContain('Tracking domain added.');
         expect(fixture.nativeElement.textContent).toContain('analytics.example.com');
+        // Successful create opens the DNS setup dialog with the records to copy.
+        expect(document.body.textContent).toContain('_hitkeep-tracking.analytics.example.com');
+    });
+
+    it('shows the domain in the table with validity icons', async () => {
+        teamServiceMock.listTrackingDomains.mockReturnValue(of([domain]));
+        fixture.componentInstance['loadDomains']('team-1');
+        fixture.detectChanges();
+
+        const hostnameCell = fixture.nativeElement.querySelector('td');
+        expect(hostnameCell?.textContent).toContain('analytics.example.com');
+        expect(fixture.nativeElement.querySelectorAll('i.hk-status-icon').length).toBeGreaterThanOrEqual(4);
     });
 });
