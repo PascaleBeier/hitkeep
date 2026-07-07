@@ -3220,6 +3220,8 @@
     "retentionNotice": {
       "message": "Los datos del plan gratuito se conservan durante {{count}} días.",
       "hint": "Mejora tu plan para conservar todo el historial de visitantes y desbloquear más sitios y asientos de equipo.",
+      "usageMessageSites": "Tu equipo está usando {{current}} de {{limit}} sitios del plan gratuito.",
+      "usageMessageMembers": "Tu equipo está usando {{current}} de {{limit}} miembros del plan gratuito.",
       "upgradeAction": "Actualizar a Pro",
       "dismissAction": "Descartar aviso"
     }

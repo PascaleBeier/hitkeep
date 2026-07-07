@@ -17,6 +17,8 @@ const (
 	CloudPlanFree                         = "free"
 	CloudPlanPro                          = "pro"
 	CloudPlanBusiness                     = "business"
+	CloudFreePlanSiteLimit                = 3
+	CloudFreePlanMemberLimit              = 3
 	CloudSubscriptionStatusFree           = "free"
 	CloudSubscriptionStatusActive         = "active"
 	CloudSubscriptionStatusPastDue        = "past_due"

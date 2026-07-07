@@ -120,3 +120,47 @@ func (m *CloudFreeRetentionReminder) Data() any {
 }
 
 func (m *CloudFreeRetentionReminder) Locale() string { return m.LocaleCode }
+
+type CloudFreeLimitReminder struct {
+	LocaleCode  string
+	TeamName    string
+	SiteLimit   int
+	MemberLimit int
+	Links       CloudLifecycleLinks
+}
+
+func NewCloudFreeLimitReminder(locale, teamName string, siteLimit, memberLimit int, links CloudLifecycleLinks) mailer.Mailable {
+	return &CloudFreeLimitReminder{
+		LocaleCode:  locale,
+		TeamName:    teamName,
+		SiteLimit:   siteLimit,
+		MemberLimit: memberLimit,
+		Links:       links,
+	}
+}
+
+func (m *CloudFreeLimitReminder) Subject() string {
+	return mailer.Translate(m.LocaleCode, "subject.cloud_free_limit_reminder")
+}
+
+func (m *CloudFreeLimitReminder) Template() string {
+	return "cloud_free_limit_reminder.mjml"
+}
+
+func (m *CloudFreeLimitReminder) Data() any {
+	return struct {
+		TeamName    string
+		SiteLimit   int
+		MemberLimit int
+		UpgradeURL  string
+		FundingURL  string
+	}{
+		TeamName:    m.TeamName,
+		SiteLimit:   m.SiteLimit,
+		MemberLimit: m.MemberLimit,
+		UpgradeURL:  m.Links.UpgradeURL,
+		FundingURL:  m.Links.FundingURL,
+	}
+}
+
+func (m *CloudFreeLimitReminder) Locale() string { return m.LocaleCode }

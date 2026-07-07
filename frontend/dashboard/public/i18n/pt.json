@@ -3196,6 +3196,8 @@
     "retentionNotice": {
       "message": "Os dados do plano gratuito são mantidos por {{count}} dias.",
       "hint": "Faça upgrade para manter todo o histórico de visitantes e desbloquear mais sites e assentos de equipe.",
+      "usageMessageSites": "Sua equipe está usando {{current}} de {{limit}} sites do plano gratuito.",
+      "usageMessageMembers": "Sua equipe está usando {{current}} de {{limit}} membros do plano gratuito.",
       "upgradeAction": "Fazer upgrade para Pro",
       "dismissAction": "Dispensar aviso"
     }

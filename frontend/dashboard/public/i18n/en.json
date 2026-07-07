@@ -3220,6 +3220,8 @@
     "retentionNotice": {
       "message": "Free plan data is retained for {{count}} days.",
       "hint": "Upgrade to keep your full visitor history and unlock more sites and team seats.",
+      "usageMessageSites": "Your team is using {{current}} of {{limit}} sites on the Free plan.",
+      "usageMessageMembers": "Your team is using {{current}} of {{limit}} team members on the Free plan.",
       "upgradeAction": "Upgrade to Pro",
       "dismissAction": "Dismiss retention notice"
     }

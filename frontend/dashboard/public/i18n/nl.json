@@ -3202,6 +3202,8 @@
     "retentionNotice": {
       "message": "Gegevens van het gratis plan worden {{count}} dagen bewaard.",
       "hint": "Upgrade om je volledige bezoekersgeschiedenis te bewaren en meer sites en teamplekken te ontgrendelen.",
+      "usageMessageSites": "Je team gebruikt {{current}} van {{limit}} sites in het gratis abonnement.",
+      "usageMessageMembers": "Je team gebruikt {{current}} van {{limit}} teamplekken in het gratis abonnement.",
       "upgradeAction": "Upgrade naar Pro",
       "dismissAction": "Melding sluiten"
     }

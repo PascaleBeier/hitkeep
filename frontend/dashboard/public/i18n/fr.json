@@ -3220,6 +3220,8 @@
     "retentionNotice": {
       "message": "Les données du forfait gratuit sont conservées pendant {{count}} jours.",
       "hint": "Passez à l'offre supérieure pour conserver tout votre historique de visiteurs et débloquer plus de sites et de sièges d'équipe.",
+      "usageMessageSites": "Votre équipe utilise {{current}} sites sur {{limit}} dans l'offre gratuite.",
+      "usageMessageMembers": "Votre équipe utilise {{current}} sièges sur {{limit}} dans l'offre gratuite.",
       "upgradeAction": "Passer à Pro",
       "dismissAction": "Fermer l’avis"
     }

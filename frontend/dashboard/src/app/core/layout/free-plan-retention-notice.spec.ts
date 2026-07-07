@@ -34,6 +34,8 @@ describe('FreePlanRetentionNotice', () => {
                                 retentionNotice: {
                                     message: 'Free plan data is retained for {{count}} days.',
                                     hint: 'Upgrade to keep your full visitor history.',
+                                    usageMessageSites: 'Your team is using {{current}} of {{limit}} sites on the Free plan.',
+                                    usageMessageMembers: 'Your team is using {{current}} of {{limit}} team members on the Free plan.',
                                     upgradeAction: 'Upgrade to Pro',
                                     dismissAction: 'Dismiss retention notice'
                                 }
@@ -76,6 +78,8 @@ describe('FreePlanRetentionNotice', () => {
     afterEach(() => {
         window.localStorage.removeItem('hitkeep.freeRetentionNotice.dismissed.team-a');
         window.localStorage.removeItem('hitkeep.freeRetentionNotice.dismissed.team-b');
+        window.localStorage.removeItem('hitkeep.freeUsageNotice.dismissed.team-a.sites');
+        window.localStorage.removeItem('hitkeep.freeUsageNotice.dismissed.team-a.members');
     });
 
     it('shows the retention notice for hosted free-plan teams', () => {
@@ -113,6 +117,27 @@ describe('FreePlanRetentionNotice', () => {
         shareMode.set(true);
         fixture.detectChanges();
         expect(noticeElement()).toBeNull();
+    });
+
+    it('escalates to a usage message when a plan limit is nearly exhausted', () => {
+        activeTeam.set({ ...freeTeam('team-a'), usage: { current_sites: 3, current_members: 1, current_pending_invites: 0 } });
+        fixture.detectChanges();
+
+        expect(noticeElement()?.textContent).toContain('Your team is using 3 of 3 sites on the Free plan.');
+    });
+
+    it('surfaces usage pressure with its own dismissal even after the retention notice was dismissed', () => {
+        window.localStorage.setItem('hitkeep.freeRetentionNotice.dismissed.team-a', 'dismissed');
+        activeTeam.set({ ...freeTeam('team-a'), usage: { current_sites: 1, current_members: 3, current_pending_invites: 0 } });
+        fixture.detectChanges();
+
+        expect(noticeElement()?.textContent).toContain('Your team is using 3 of 3 team members on the Free plan.');
+
+        dismissButton()?.click();
+        fixture.detectChanges();
+
+        expect(noticeElement()).toBeNull();
+        expect(window.localStorage.getItem('hitkeep.freeUsageNotice.dismissed.team-a.members')).toBe('dismissed');
     });
 
     it('dismisses the notice per active team in localStorage', () => {

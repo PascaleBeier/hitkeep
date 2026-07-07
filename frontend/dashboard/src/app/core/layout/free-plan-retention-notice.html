@@ -2,10 +2,16 @@
 <section class="free-plan-retention-notice" data-testid="free-plan-retention-notice" aria-live="polite">
     <div class="free-plan-retention-notice__copy">
         <span class="free-plan-retention-notice__icon" aria-hidden="true">
-            <i class="pi pi-clock"></i>
+            <i [class]="variant() === 'usage' ? 'pi pi-gauge' : 'pi pi-clock'"></i>
         </span>
         <div class="free-plan-retention-notice__text">
+            @if (variant() === "usage" && usagePressure(); as pressure) { @if (pressure.kind === "sites") {
+            <p class="free-plan-retention-notice__headline">{{ "cloud.retentionNotice.usageMessageSites" | transloco: { current: pressure.current, limit: pressure.limit } }}</p>
+            } @else {
+            <p class="free-plan-retention-notice__headline">{{ "cloud.retentionNotice.usageMessageMembers" | transloco: { current: pressure.current, limit: pressure.limit } }}</p>
+            } } @else {
             <p class="free-plan-retention-notice__headline">{{ "cloud.retentionNotice.message" | transloco: { count: retentionDays() } }}</p>
+            }
             <p class="free-plan-retention-notice__hint">{{ "cloud.retentionNotice.hint" | transloco }}</p>
         </div>
     </div>

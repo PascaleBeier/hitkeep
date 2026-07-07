@@ -47,6 +47,19 @@ func TestCloudLifecycleMailablesRenderForSupportedLocales(t *testing.T) {
 			}
 		})
 
+		t.Run(locale+"_limit", func(t *testing.T) {
+			driver := &cloudLifecycleMailDriver{}
+			m := mailer.NewWithDriver(driver, nil)
+			if err := m.Send("owner@example.com", NewCloudFreeLimitReminder(locale, "Acme", 3, 3, links)); err != nil {
+				t.Fatalf("send limit reminder: %v", err)
+			}
+			// The limit email carries a single upgrade CTA plus the open-source footer.
+			assertRenderedLifecycleEmail(t, driver, links.UpgradeURL, links.FundingURL)
+			if !strings.Contains(driver.textBody, "3") {
+				t.Fatalf("expected plan limits in limit reminder text body, got %q", driver.textBody)
+			}
+		})
+
 		t.Run(locale+"_retention", func(t *testing.T) {
 			driver := &cloudLifecycleMailDriver{}
 			m := mailer.NewWithDriver(driver, nil)

@@ -3220,6 +3220,8 @@
     "retentionNotice": {
       "message": "I dati del piano gratuito sono conservati per {{count}} giorni.",
       "hint": "Esegui l'upgrade per conservare l'intera cronologia dei visitatori e sbloccare più siti e posti nel team.",
+      "usageMessageSites": "Il tuo team sta usando {{current}} di {{limit}} siti del piano gratuito.",
+      "usageMessageMembers": "Il tuo team sta usando {{current}} di {{limit}} membri del piano gratuito.",
       "upgradeAction": "Passa a Pro",
       "dismissAction": "Chiudi avviso"
     }

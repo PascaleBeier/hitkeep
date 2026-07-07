@@ -3220,6 +3220,8 @@
     "retentionNotice": {
       "message": "Daten im Free-Plan werden {{count}} Tage lang aufbewahrt.",
       "hint": "Mit einem Upgrade behältst du deine gesamte Besucher-Historie und schaltest mehr Websites und Team-Plätze frei.",
+      "usageMessageSites": "Dein Team nutzt {{current}} von {{limit}} Websites im kostenlosen Tarif.",
+      "usageMessageMembers": "Dein Team nutzt {{current}} von {{limit}} Team-Plätzen im kostenlosen Tarif.",
       "upgradeAction": "Auf Pro upgraden",
       "dismissAction": "Hinweis ausblenden"
     }

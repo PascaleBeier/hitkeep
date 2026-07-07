@@ -337,8 +337,8 @@ func (h *handler) handleListCloudPlans() http.HandlerFunc {
 			Code: database.CloudPlanFree,
 			Name: planNameForCode(database.CloudPlanFree),
 			Entitlements: api.TeamEntitlements{
-				MaxSitesPerTeam:     3,
-				MaxTeamMembers:      3,
+				MaxSitesPerTeam:     database.CloudFreePlanSiteLimit,
+				MaxTeamMembers:      database.CloudFreePlanMemberLimit,
 				MaxRetentionDays:    60,
 				AllowSSO:            false,
 				AllowCustomBranding: false,
