@@ -1131,7 +1131,6 @@
       "description": "Creëer gedelegeerde API-clients met machtigingen die beperkt zijn tot je eigen toegang.",
       "loading": "API-clients laden...",
       "empty": "Nog geen API-clients.",
-      "listTitle": "Bestaande API-clients",
       "createDialogTitle": "API-client toevoegen",
       "editDialogTitle": "API-client bewerken",
       "confirmDelete": "API-client \"{{name}}\" verwijderen?",

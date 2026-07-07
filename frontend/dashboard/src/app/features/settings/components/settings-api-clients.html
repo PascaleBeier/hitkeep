@@ -148,12 +148,6 @@
 
     <div settings-card-body class="flex flex-col gap-4">
         <div class="api-client-listing">
-            <div class="api-client-listing-header">
-                <h4 class="font-semibold">{{ "settings.apiClients.listTitle" | transloco }}</h4>
-                <div class="api-client-table-tools">
-                    <p-button [label]="'settings.apiClients.actions.refresh' | transloco" icon="pi pi-refresh" [text]="true" [type]="'button'" [disabled]="isLoading()" (onClick)="reload()" />
-                </div>
-            </div>
             @if (listError(); as errorKey) {
             <div class="hk-feedback-message hk-feedback-message--error" role="alert" aria-live="assertive">{{ errorKey | transloco }}</div>
             } @if (listSuccess(); as successKey) {
@@ -170,7 +164,7 @@
             } @if (isLoading()) {
             <p class="text-sm text-[var(--p-text-muted-color)]">{{ "settings.apiClients.loading" | transloco }}</p>
             } @else if (clients().length === 0) {
-            <div class="api-client-empty-state">
+            <div class="hk-empty-state">
                 <p class="text-sm text-[var(--p-text-muted-color)]">{{ "settings.apiClients.empty" | transloco }}</p>
                 <p-button [label]="'settings.apiClients.actions.add' | transloco" icon="pi pi-plus" [outlined]="true" [type]="'button'" (onClick)="openCreateDialog()" />
             </div>
@@ -196,6 +190,7 @@
                                 <p-inputicon class="pi pi-search" />
                                 <input pInputText #apiClientsSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="apiClientsTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
                             </p-iconfield>
+                            <p-button icon="pi pi-refresh" [text]="true" [rounded]="true" [type]="'button'" [ariaLabel]="'settings.apiClients.actions.refresh' | transloco" [disabled]="isLoading()" (onClick)="reload()" />
                         </div>
                     </ng-template>
 

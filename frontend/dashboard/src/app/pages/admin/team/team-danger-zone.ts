@@ -21,7 +21,6 @@ type TeamDangerAction = 'leave' | 'archive';
     selector: 'app-team-danger-zone',
     imports: [ButtonModule, DialogShell, FormsModule, InputTextModule, MessageModule, TranslocoPipe],
     templateUrl: './team-danger-zone.html',
-    styleUrl: './team-danger-zone.css',
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class TeamDangerZonePage {

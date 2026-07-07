@@ -1131,7 +1131,6 @@
       "description": "Erstelle delegierte API-Clients mit Berechtigungen, die auf deinen eigenen Zugriff begrenzt sind.",
       "loading": "API-Clients werden geladen...",
       "empty": "Noch keine API-Clients.",
-      "listTitle": "Vorhandene API-Clients",
       "createDialogTitle": "API-Client hinzufügen",
       "editDialogTitle": "API-Client bearbeiten",
       "confirmDelete": "API-Client \"{{name}}\" löschen?",

@@ -1131,7 +1131,6 @@
       "description": "Crea client API delegati con permessi limitati al tuo livello di accesso.",
       "loading": "Caricamento client API...",
       "empty": "Nessun client API al momento.",
-      "listTitle": "Client API esistenti",
       "createDialogTitle": "Aggiungi client API",
       "editDialogTitle": "Modifica client API",
       "confirmDelete": "Eliminare il client API \"{{name}}\"?",

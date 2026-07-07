@@ -235,7 +235,7 @@ describe('SettingsAPIClients', () => {
 
     it('renders the API clients table first and opens create in a dialog', async () => {
         expect(fixture.nativeElement.querySelector('.api-client-form')).toBeNull();
-        expect(fixture.nativeElement.textContent).toContain('Existing');
+        expect(fixture.nativeElement.querySelector('.api-client-listing')).not.toBeNull();
         expect(fixture.nativeElement.textContent).toContain('Add API client');
 
         const addButton = Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>).find((button) => button.textContent?.includes('Add API client'));
@@ -305,9 +305,9 @@ describe('SettingsAPIClients', () => {
         ]);
         fixture.detectChanges();
 
-        expect(fixture.nativeElement.querySelector('.api-client-status-icon--active.pi-check-circle')).not.toBeNull();
-        expect(fixture.nativeElement.querySelector('.api-client-status-icon--inactive.pi-ban')).not.toBeNull();
-        expect(fixture.nativeElement.querySelector('.api-client-status-icon--expired.pi-clock')).not.toBeNull();
+        expect(fixture.nativeElement.querySelector('.hk-status-icon--ok.pi-check-circle')).not.toBeNull();
+        expect(fixture.nativeElement.querySelector('.hk-status-icon--error.pi-ban')).not.toBeNull();
+        expect(fixture.nativeElement.querySelector('.hk-status-icon--warn.pi-clock')).not.toBeNull();
         expect(fixture.nativeElement.querySelector('.api-client-status')).toBeNull();
     });
 

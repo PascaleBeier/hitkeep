@@ -1131,7 +1131,6 @@
       "description": "Create delegated API clients with permissions capped to your own access.",
       "loading": "Loading API clients...",
       "empty": "No API clients yet.",
-      "listTitle": "Existing API clients",
       "createDialogTitle": "Add API client",
       "editDialogTitle": "Edit API client",
       "confirmDelete": "Delete API client \"{{name}}\"?",

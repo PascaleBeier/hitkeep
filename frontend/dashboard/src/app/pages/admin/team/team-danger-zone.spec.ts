@@ -112,10 +112,10 @@ describe('TeamDangerZonePage', () => {
         document.querySelectorAll('.p-dialog-mask, .p-dialog').forEach((element) => element.remove());
     });
 
-    it('renders leave and archive actions without inline confirmation inputs', () => {
-        expect(fixture.nativeElement.textContent).toContain('Danger Zone');
+    it('renders leave and archive actions as danger cards without inline confirmation inputs', () => {
         expect(fixture.nativeElement.textContent).toContain('Leave team');
         expect(fixture.nativeElement.textContent).toContain('Archive team');
+        expect(fixture.nativeElement.querySelectorAll('.site-settings-card--danger').length).toBe(2);
         expect(fixture.nativeElement.querySelector('#team-danger-confirm')).toBeNull();
     });
 

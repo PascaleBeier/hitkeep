@@ -13,7 +13,6 @@ import { TeamService } from '@services/team.service';
     selector: 'app-team-branding',
     imports: [TranslocoPipe, ReactiveFormsModule, InputTextModule, ButtonModule, MessageModule, NgOptimizedImage, SettingsCard],
     templateUrl: './team-branding.html',
-    styleUrl: './team-branding.css',
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class TeamBrandingPage {

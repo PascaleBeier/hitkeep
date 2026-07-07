@@ -1131,7 +1131,6 @@
       "description": "Créez des clients API délégués avec des permissions limitées à votre propre accès.",
       "loading": "Chargement des clients API...",
       "empty": "Aucun client API pour le moment.",
-      "listTitle": "Clients API existants",
       "createDialogTitle": "Ajouter un client API",
       "editDialogTitle": "Modifier le client API",
       "confirmDelete": "Supprimer le client API \"{{name}}\" ?",

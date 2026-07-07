@@ -86,37 +86,11 @@
     gap: 0.75rem;
 }
 
-.api-client-listing-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.api-client-table-tools {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.75rem;
-}
-
 .api-client-table-caption {
     display: flex;
-    justify-content: flex-end;
-}
-
-.api-client-empty-state {
-    display: flex;
-    min-height: 10rem;
-    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 0.85rem;
-    border: 1px dashed var(--p-content-border-color);
-    border-radius: 0.75rem;
-    background: var(--p-content-hover-background);
-    text-align: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
 }
 
 .api-client-name-row {
@@ -128,24 +102,6 @@
 
 .api-client-date-cell {
     white-space: nowrap;
-}
-
-.api-client-status-icon {
-    flex: none;
-    font-size: 0.9rem;
-    line-height: 1;
-}
-
-.api-client-status-icon--active {
-    color: var(--p-green-700);
-}
-
-.api-client-status-icon--inactive {
-    color: var(--p-red-700);
-}
-
-.api-client-status-icon--expired {
-    color: var(--p-amber-700);
 }
 
 .api-client-site-grant-list {
@@ -197,37 +153,14 @@
     background: color-mix(in srgb, var(--p-surface-800) 78%, var(--p-content-background));
 }
 
-:host-context(.p-dark) .api-client-status-icon--active {
-    color: var(--p-green-300);
-}
-
-:host-context(.p-dark) .api-client-status-icon--inactive {
-    color: var(--p-red-300);
-}
-
-:host-context(.p-dark) .api-client-status-icon--expired {
-    color: var(--p-amber-300);
-}
-
 @media (max-width: 768px) {
     .api-client-scope-row {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .api-client-listing-header {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .api-client-table-caption {
+    .api-client-table-caption .hk-crud-search {
+        flex: 1 1 auto;
         width: 100%;
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .api-client-table-tools {
-        width: auto;
-        align-items: flex-start;
     }
 
     .api-client-card-actions {
@@ -236,9 +169,7 @@
     }
 
     :host ::ng-deep .api-client-card-actions p-button,
-    :host ::ng-deep .api-client-card-actions .p-button,
-    :host ::ng-deep .api-client-table-tools p-button,
-    :host ::ng-deep .api-client-table-tools .p-button {
+    :host ::ng-deep .api-client-card-actions .p-button {
         width: 100%;
     }
 }

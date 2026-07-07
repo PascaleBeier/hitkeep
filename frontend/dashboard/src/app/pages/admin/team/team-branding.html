@@ -1,36 +1,32 @@
 @if (team(); as t) {
-<div class="team-branding__stack">
+<div class="grid gap-4">
     @if (successKey(); as key) {
-    <p-message severity="success" [text]="key | transloco" />
+    <p-message severity="success">{{ key | transloco }}</p-message>
     } @if (errorKey(); as key) {
-    <p-message severity="error" [text]="key | transloco" />
+    <p-message severity="error">{{ key | transloco }}</p-message>
     }
 
     <app-settings-card [title]="'admin.team.tabs.branding' | transloco" icon="pi pi-image">
-        <div settings-card-body class="team-branding__form-grid">
-            <section class="team-branding__section">
-                <h3>{{ "admin.team.settings.nameSectionTitle" | transloco }}</h3>
-                <p class="team-branding__description">{{ "admin.team.settings.nameSectionDescription" | transloco }}</p>
-                <input type="text" pInputText [formControl]="form.controls.name" />
+        <div settings-card-body class="grid gap-4 md:grid-cols-2">
+            <div class="site-settings-field">
+                <label for="team-branding-name">{{ "admin.team.settings.nameSectionTitle" | transloco }}</label>
+                <span class="site-settings-field-hint">{{ "admin.team.settings.nameSectionDescription" | transloco }}</span>
+                <input id="team-branding-name" type="text" pInputText class="w-full" [formControl]="form.controls.name" />
                 @if (form.controls.name.invalid && form.controls.name.touched) {
-                <small class="team-branding__error">{{ "admin.team.settings.nameRequired" | transloco }}</small>
+                <p-message severity="error" variant="simple" size="small">{{ "admin.team.settings.nameRequired" | transloco }}</p-message>
                 }
-            </section>
+            </div>
 
-            <section class="team-branding__section">
-                <h3>{{ "admin.team.settings.logoSectionTitle" | transloco }}</h3>
-                <p class="team-branding__description">{{ "admin.team.settings.logoSectionDescription" | transloco }}</p>
-                <input type="url" pInputText [formControl]="form.controls.logo_url" [placeholder]="'admin.team.settings.logoPlaceholder' | transloco" />
-                @if (form.controls.logo_url.value) {
-                <div class="team-branding__logo-preview">
-                    <img [ngSrc]="form.controls.logo_url.value" [width]="48" [height]="48" [alt]="'admin.team.settings.logoPreviewAlt' | transloco" />
-                </div>
-                } @else if (t.logo_url) {
-                <div class="team-branding__logo-preview">
-                    <img [ngSrc]="t.logo_url" [width]="48" [height]="48" [alt]="'admin.team.settings.logoPreviewAlt' | transloco" />
+            <div class="site-settings-field">
+                <label for="team-branding-logo">{{ "admin.team.settings.logoSectionTitle" | transloco }}</label>
+                <span class="site-settings-field-hint">{{ "admin.team.settings.logoSectionDescription" | transloco }}</span>
+                <input id="team-branding-logo" type="url" pInputText class="w-full" [formControl]="form.controls.logo_url" [placeholder]="'admin.team.settings.logoPlaceholder' | transloco" />
+                @if (form.controls.logo_url.value || t.logo_url; as logoUrl) {
+                <div class="mt-2">
+                    <img [ngSrc]="logoUrl" [width]="48" [height]="48" class="size-12 rounded-lg border border-surface-200 object-cover dark:border-surface-700" [alt]="'admin.team.settings.logoPreviewAlt' | transloco" />
                 </div>
                 }
-            </section>
+            </div>
         </div>
 
         <div settings-card-footer>

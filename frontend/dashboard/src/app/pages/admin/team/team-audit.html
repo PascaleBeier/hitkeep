@@ -1,7 +1,7 @@
 <app-settings-card [title]="'admin.team.tabs.activity' | transloco" icon="pi pi-history">
     <div settings-card-body>
         @if (!canViewAudit()) {
-        <div class="team-audit__readonly">{{ "admin.team.audit.readOnly" | transloco }}</div>
+        <p-message severity="secondary">{{ "admin.team.audit.readOnly" | transloco }}</p-message>
         } @else {
         <app-audit-table
             [rows]="rows()"

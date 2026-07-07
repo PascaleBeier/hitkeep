@@ -10,9 +10,9 @@
     [saving]="isInviting()"
     (submitted)="inviteMember()"
 >
-    <form class="team-members__invite-form" (ngSubmit)="inviteMember()">
-        <div class="team-members__invite-grid">
-            <div class="team-members__field">
+    <form class="site-settings-dialog-form" (ngSubmit)="inviteMember()">
+        <div class="site-settings-field-grid site-settings-member-grid">
+            <div class="site-settings-field">
                 <label for="team-member-email">{{ "teams.management.invite.emailLabel" | transloco }}</label>
                 <input
                     pInputText
@@ -26,24 +26,24 @@
                     spellcheck="false"
                 />
                 @if (inviteForm.email().touched() && inviteForm.email().invalid()) {
-                <small>{{ "teams.management.invite.emailInvalid" | transloco }}</small>
+                <p-message severity="error" variant="simple" size="small">{{ "teams.management.invite.emailInvalid" | transloco }}</p-message>
                 }
             </div>
-            <div class="team-members__field team-members__field--role">
+            <div class="site-settings-field">
                 <label for="team-member-role">{{ "teams.management.invite.roleLabel" | transloco }}</label>
                 <p-select inputId="team-member-role" [options]="inviteRoleOptions()" [formControl]="inviteForm.role().control()" optionLabel="label" optionValue="value" appendTo="body" />
             </div>
         </div>
         @if (errorKey(); as error) {
-        <div class="team-members__alert team-members__alert--error">{{ error | transloco }}</div>
+        <p-message severity="error">{{ error | transloco }}</p-message>
         }
     </form>
 </app-crud-dialog>
 
 @if (team(); as t) {
-<div class="team-members__stack">
+<div class="grid gap-4">
     <app-settings-card [title]="'teams.management.title' | transloco" [subtitle]="'teams.management.subtitle' | transloco: { team: t.name }" icon="pi pi-users">
-        <div settings-card-header class="team-members__header-actions">
+        <div settings-card-header class="flex flex-wrap items-center gap-2">
             <p-tag [value]="roleLabel(t.role)" [severity]="roleSeverity(t.role)" [rounded]="true" />
             @if (canManageMembers()) {
             <p-button [label]="'teams.management.invite.submitAction' | transloco" icon="pi pi-user-plus" [type]="'button'" (onClick)="openInviteDialog()" />
@@ -51,16 +51,16 @@
             }
         </div>
 
-        <div settings-card-body class="team-members__card-body">
+        <div settings-card-body class="grid gap-4">
             @if (successKey(); as success) {
-            <div class="team-members__alert team-members__alert--success">{{ success | transloco }}</div>
+            <p-message severity="success">{{ success | transloco }}</p-message>
             } @if (errorKey() && !isInviteDialogVisible()) {
-            <div class="team-members__alert team-members__alert--error">{{ errorKey() | transloco }}</div>
+            <p-message severity="error">{{ errorKey() | transloco }}</p-message>
             } @if (!canManageMembers()) {
-            <div class="team-members__readonly">{{ "teams.management.readOnly" | transloco }}</div>
+            <p-message severity="secondary">{{ "teams.management.readOnly" | transloco }}</p-message>
             }
 
-            <div class="team-members__toolbar">
+            <div class="flex justify-end">
                 <p-iconfield class="hk-crud-search">
                     <p-inputicon class="pi pi-search" />
                     <input pInputText id="team-members-search" #membersSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="membersTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
@@ -97,16 +97,16 @@
                                 {{ "common.columns.added" | transloco }}
                                 <p-sortIcon field="added_at" />
                             </th>
-                            <th>{{ "common.columns.actions" | transloco }}</th>
+                            <th class="hk-actions-column">{{ "common.columns.actions" | transloco }}</th>
                         </tr>
                     </ng-template>
                     <ng-template pTemplate="body" let-member>
                         <tr>
                             <td>{{ member.email }}</td>
-                            <td class="team-members__role-cell">
+                            <td class="min-w-44">
                                 @if (canEditMember(member)) {
                                 <p-select
-                                    class="team-members__role-select"
+                                    class="w-full max-w-48"
                                     [options]="roleOptionsForMember(member)"
                                     [formControl]="roleControlFor(member)"
                                     optionLabel="label"
@@ -119,7 +119,7 @@
                                 }
                             </td>
                             <td><app-relative-date-time [value]="member.added_at" /></td>
-                            <td class="team-members__actions">
+                            <td class="hk-actions-cell">
                                 @if (memberActions(member).length > 0) {
                                 <app-table-row-actions [items]="memberActions(member)" [loading]="memberActionLoading(member)" />
                                 } @else {
@@ -140,7 +140,7 @@
 
     @if (canManageMembers()) {
     <app-settings-card [title]="'teams.management.pendingTitle' | transloco" [subtitle]="'teams.management.pendingSubtitle' | transloco" icon="pi pi-envelope">
-        <div settings-card-header class="team-members__header-actions">
+        <div settings-card-header class="flex flex-wrap items-center gap-2">
             <p-iconfield class="hk-crud-search">
                 <p-inputicon class="pi pi-search" />
                 <input pInputText #pendingInvitesSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="pendingInvitesTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
@@ -182,7 +182,7 @@
                                 {{ "teams.management.expiresLabel" | transloco }}
                                 <p-sortIcon field="expires_at" />
                             </th>
-                            <th>{{ "common.columns.actions" | transloco }}</th>
+                            <th class="hk-actions-column">{{ "common.columns.actions" | transloco }}</th>
                         </tr>
                     </ng-template>
                     <ng-template pTemplate="body" let-invite>
@@ -191,7 +191,7 @@
                             <td><p-tag [value]="inviteRoleLabel(invite.role)" [severity]="roleSeverity(invite.role)" [rounded]="true" /></td>
                             <td><app-relative-date-time [value]="invite.created_at" /></td>
                             <td><app-relative-date-time [value]="invite.expires_at" /></td>
-                            <td class="team-members__actions">
+                            <td class="hk-actions-cell">
                                 <app-table-row-actions [items]="inviteActions(invite)" [loading]="isInviteActionLoading(invite)" />
                             </td>
                         </tr>

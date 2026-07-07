@@ -1124,7 +1124,6 @@
       "description": "Crie clientes de API delegados com permissões limitadas ao seu próprio acesso.",
       "loading": "Carregando clientes de API...",
       "empty": "Nenhum cliente de API ainda.",
-      "listTitle": "Clientes de API existentes",
       "createDialogTitle": "Adicionar cliente de API",
       "editDialogTitle": "Editar cliente de API",
       "confirmDelete": "Excluir o cliente de API \"{{name}}\"?",
