@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.10.0](https://github.com/PascaleBeier/hitkeep/compare/v2.9.1...v2.10.0) (2026-07-07)
+
+
+### Features
+
+* **cloud:** add free-plan upgrade nudges ([d231acd](https://github.com/PascaleBeier/hitkeep/commit/d231acdebe49e3107d37033a7e4b9d69a743b203)), closes [#232](https://github.com/PascaleBeier/hitkeep/issues/232)
+* **cloud:** require Pro for managed custom domains ([df119d6](https://github.com/PascaleBeier/hitkeep/commit/df119d6e7dd5dd4cd0a68be4885eff9a63fa40c7)), closes [#232](https://github.com/PascaleBeier/hitkeep/issues/232)
+* **frontend:** manage custom domains with DNS setup ([2a51b18](https://github.com/PascaleBeier/hitkeep/commit/2a51b1875597076c1561b1abc81fa9148a5cd13b)), closes [#232](https://github.com/PascaleBeier/hitkeep/issues/232)
+* **frontend:** remember chart style and site sort preferences ([b448632](https://github.com/PascaleBeier/hitkeep/commit/b4486323e0c6f8f58a04ac3ed2075ed8615fcc77)), closes [#232](https://github.com/PascaleBeier/hitkeep/issues/232)
+* **frontend:** route team admin sections as subpages ([581935e](https://github.com/PascaleBeier/hitkeep/commit/581935edd76964b31734ffe18dfb7004520512f4)), closes [#232](https://github.com/PascaleBeier/hitkeep/issues/232)
+* **tracker:** add custom tracking domains ([cfd8be7](https://github.com/PascaleBeier/hitkeep/commit/cfd8be7a5b7651f7e2e471360fe577e48faf91e2)), closes [#232](https://github.com/PascaleBeier/hitkeep/issues/232)
+
+
+### Bug Fixes
+
+* **frontend:** align search icons with PrimeNG fields ([dd0901f](https://github.com/PascaleBeier/hitkeep/commit/dd0901f58d1bf377c69f9680e2e06ac3d25f8db2)), closes [#232](https://github.com/PascaleBeier/hitkeep/issues/232)
+
 ## [2.9.1](https://github.com/PascaleBeier/hitkeep/compare/v2.9.0...v2.9.1) (2026-07-06)
 
 
