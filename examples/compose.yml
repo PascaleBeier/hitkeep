@@ -1,0 +1,64 @@
+# Canonical HitKeep production baseline for Docker Compose.
+# Copy this file together with .env.example (rename it to .env and fill in
+# your values). Full guide: https://hitkeep.com/guides/installation/docker-compose/
+services:
+  hitkeep:
+    image: pascalebeier/hitkeep:latest
+    container_name: hitkeep
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - hitkeep_data:/var/lib/hitkeep/data
+      - hitkeep_archive:/var/lib/hitkeep/archive
+      - hitkeep_backups:/var/lib/hitkeep/backups
+    environment:
+      # Public URL must match the browser-visible origin, including any path prefix.
+      HITKEEP_PUBLIC_URL: ${HITKEEP_PUBLIC_URL:-http://localhost:8080}
+      # Required for stable sessions. Generate with: openssl rand -hex 32
+      HITKEEP_JWT_SECRET: ${HITKEEP_JWT_SECRET:?set HITKEEP_JWT_SECRET in .env}
+      # Behind a reverse proxy, set to the proxy network CIDR so real client IPs are used.
+      HITKEEP_TRUSTED_PROXIES: ${HITKEEP_TRUSTED_PROXIES:-}
+      # Keep live data, retention archives, and backup snapshots on persistent volumes.
+      HITKEEP_DB_PATH: /var/lib/hitkeep/data/hitkeep.db
+      HITKEEP_DATA_PATH: /var/lib/hitkeep/data
+      HITKEEP_ARCHIVE_PATH: /var/lib/hitkeep/archive
+      HITKEEP_BACKUP_PATH: /var/lib/hitkeep/backups
+      HITKEEP_BACKUP_INTERVAL: ${HITKEEP_BACKUP_INTERVAL:-60}
+      HITKEEP_BACKUP_RETENTION: ${HITKEEP_BACKUP_RETENTION:-24}
+      # Optional OSS spam-list refresh. Disable for fully offline/air-gapped installs.
+      HITKEEP_SPAM_FILTER_AUTO_UPDATE: "true"
+      HITKEEP_SPAM_FILTER_UPDATE_INTERVAL: ${HITKEEP_SPAM_FILTER_UPDATE_INTERVAL:-1440}
+      HITKEEP_SPAM_FILTER_PATH: /var/lib/hitkeep/data/spam-filter.json
+      # Optional read-only MCP endpoint for governed assistant/reporting access.
+      HITKEEP_MCP_ENABLED: "true"
+      HITKEEP_MCP_PATH: /mcp
+      HITKEEP_MCP_MAX_RANGE_DAYS: ${HITKEEP_MCP_MAX_RANGE_DAYS:-366}
+      # Optional AI model route for Opportunity enrichment. Provider credentials
+      # use the selected goAI provider's own env vars, such as OPENAI_API_KEY.
+      HITKEEP_AI_ENABLED: ${HITKEEP_AI_ENABLED:-false}
+      HITKEEP_AI_PROVIDER: ${HITKEEP_AI_PROVIDER:-}
+      HITKEEP_AI_MODEL: ${HITKEEP_AI_MODEL:-}
+      HITKEEP_AI_BASE_URL: ${HITKEEP_AI_BASE_URL:-}
+      HITKEEP_AI_REGION: ${HITKEEP_AI_REGION:-}
+      HITKEEP_AI_API_KEY: ${HITKEEP_AI_API_KEY:-}
+      HITKEEP_AI_REQUEST_LIMIT: ${HITKEEP_AI_REQUEST_LIMIT:-100}
+      HITKEEP_AI_TOKEN_LIMIT: ${HITKEEP_AI_TOKEN_LIMIT:-100000}
+      HITKEEP_AI_BUDGET_WINDOW: ${HITKEEP_AI_BUDGET_WINDOW:-1440}
+      # Optional Google Search Console OAuth integration.
+      HITKEEP_GOOGLE_SEARCH_CONSOLE_CLIENT_ID: ${HITKEEP_GOOGLE_SEARCH_CONSOLE_CLIENT_ID:-}
+      HITKEEP_GOOGLE_SEARCH_CONSOLE_CLIENT_SECRET: ${HITKEEP_GOOGLE_SEARCH_CONSOLE_CLIENT_SECRET:-}
+      HITKEEP_GOOGLE_SEARCH_CONSOLE_REDIRECT_URL: ${HITKEEP_GOOGLE_SEARCH_CONSOLE_REDIRECT_URL:-}
+      # SMTP powers invites, password reset, email reports, and security mail.
+      HITKEEP_MAIL_HOST: ${HITKEEP_MAIL_HOST:-}
+      HITKEEP_MAIL_PORT: ${HITKEEP_MAIL_PORT:-587}
+      HITKEEP_MAIL_USERNAME: ${HITKEEP_MAIL_USERNAME:-}
+      HITKEEP_MAIL_PASSWORD: ${HITKEEP_MAIL_PASSWORD:-}
+      HITKEEP_MAIL_ENCRYPTION: ${HITKEEP_MAIL_ENCRYPTION:-tls}
+      HITKEEP_MAIL_FROM_ADDRESS: ${HITKEEP_MAIL_FROM_ADDRESS:-hitkeep@localhost}
+      HITKEEP_MAIL_FROM_NAME: ${HITKEEP_MAIL_FROM_NAME:-HitKeep}
+
+volumes:
+  hitkeep_data: {}
+  hitkeep_archive: {}
+  hitkeep_backups: {}
