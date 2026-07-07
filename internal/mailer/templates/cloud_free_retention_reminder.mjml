@@ -11,31 +11,21 @@
   {{ t "cloud.retention.reason" }}
 </mj-text>
 
-<mj-button href="{{ .DashboardURL }}" padding-top="20px" padding-bottom="20px">
-  {{ t "cloud.retention.button" }}
+<mj-button href="{{ .UpgradeURL }}" padding-top="20px" padding-bottom="20px">
+  {{ t "cloud.retention.plans_button" }}
 </mj-button>
 
 <mj-text>
   {{ t "cloud.retention.docs" }}
+  <a href="{{ .DashboardURL }}">{{ t "cloud.welcome.dashboard_button" }}</a>
 </mj-text>
 
-<mj-button href="{{ .DocsURL }}" background-color="#475569" padding-top="8px" padding-bottom="16px">
-  {{ t "cloud.welcome.docs_button" }}
-</mj-button>
+<mj-divider border-width="1px" border-color="#e2e8f0" padding-top="16px" padding-bottom="8px" />
 
-<mj-text>
-  {{ t "cloud.welcome.wordpress" }}
+<mj-text font-size="12px" color="#64748b">
+  {{ t "cloud.opensource.note" }}
+  {{ t "cloud.opensource.support" }}
+  <a href="{{ .FundingURL }}">{{ t "cloud.opensource.sponsor" }}</a>.
+  {{ t "cloud.opensource.spread" }}
 </mj-text>
-
-<mj-button href="{{ .WordPressURL }}" background-color="#475569" padding-top="8px" padding-bottom="16px">
-  {{ t "cloud.welcome.wordpress_button" }}
-</mj-button>
-
-<mj-text>
-  {{ t "cloud.welcome.feedback" }}
-</mj-text>
-
-<mj-button href="{{ .FeedbackURL }}" background-color="#475569" padding-top="8px" padding-bottom="20px">
-  {{ t "cloud.welcome.feedback_button" }}
-</mj-button>
 {{ end }}

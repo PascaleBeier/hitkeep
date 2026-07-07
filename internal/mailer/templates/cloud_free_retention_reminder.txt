@@ -6,14 +6,14 @@
 
 {{ t "cloud.retention.reason" }}
 
-{{ t "cloud.retention.button" }}: {{ .DashboardURL }}
+{{ t "cloud.retention.plans_button" }}: {{ .UpgradeURL }}
 
 {{ t "cloud.retention.docs" }}
-{{ t "cloud.welcome.docs_button" }}: {{ .DocsURL }}
+{{ t "cloud.welcome.dashboard_button" }}: {{ .DashboardURL }}
 
-{{ t "cloud.welcome.wordpress" }}
-{{ t "cloud.welcome.wordpress_button" }}: {{ .WordPressURL }}
+--
 
-{{ t "cloud.welcome.feedback" }}
-{{ t "cloud.welcome.feedback_button" }}: {{ .FeedbackURL }}
+{{ t "cloud.opensource.note" }}
+{{ t "cloud.opensource.support" }} {{ t "cloud.opensource.sponsor" }}: {{ .FundingURL }}
+{{ t "cloud.opensource.spread" }}
 {{- end }}

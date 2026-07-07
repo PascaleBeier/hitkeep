@@ -15,8 +15,15 @@
 {{- if .IsFreePlan }}
 
 {{ tf "cloud.welcome.free_retention" .RetentionDays }}
+{{ t "cloud.welcome.plans_link" }}: {{ .UpgradeURL }}
 {{- end }}
 
 {{ t "cloud.welcome.feedback" }}
 {{ t "cloud.welcome.feedback_button" }}: {{ .FeedbackURL }}
+
+--
+
+{{ t "cloud.opensource.note" }}
+{{ t "cloud.opensource.support" }} {{ t "cloud.opensource.sponsor" }}: {{ .FundingURL }}
+{{ t "cloud.opensource.spread" }}
 {{- end }}

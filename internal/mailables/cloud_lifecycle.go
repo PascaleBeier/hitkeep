@@ -6,6 +6,8 @@ import "hitkeep/internal/mailer"
 
 type CloudLifecycleLinks struct {
 	DashboardURL string
+	UpgradeURL   string
+	FundingURL   string
 	DocsURL      string
 	WordPressURL string
 	FeedbackURL  string
@@ -46,6 +48,8 @@ func (m *CloudWelcome) Data() any {
 		IsFreePlan    bool
 		RetentionDays int
 		DashboardURL  string
+		UpgradeURL    string
+		FundingURL    string
 		DocsURL       string
 		WordPressURL  string
 		FeedbackURL   string
@@ -55,6 +59,8 @@ func (m *CloudWelcome) Data() any {
 		IsFreePlan:    m.IsFreePlan,
 		RetentionDays: m.RetentionDays,
 		DashboardURL:  m.Links.DashboardURL,
+		UpgradeURL:    m.Links.UpgradeURL,
+		FundingURL:    m.Links.FundingURL,
 		DocsURL:       m.Links.DocsURL,
 		WordPressURL:  m.Links.WordPressURL,
 		FeedbackURL:   m.Links.FeedbackURL,
@@ -95,6 +101,8 @@ func (m *CloudFreeRetentionReminder) Data() any {
 		SiteDomain    string
 		RetentionDays int
 		DashboardURL  string
+		UpgradeURL    string
+		FundingURL    string
 		DocsURL       string
 		WordPressURL  string
 		FeedbackURL   string
@@ -103,6 +111,8 @@ func (m *CloudFreeRetentionReminder) Data() any {
 		SiteDomain:    m.SiteDomain,
 		RetentionDays: m.RetentionDays,
 		DashboardURL:  m.Links.DashboardURL,
+		UpgradeURL:    m.Links.UpgradeURL,
+		FundingURL:    m.Links.FundingURL,
 		DocsURL:       m.Links.DocsURL,
 		WordPressURL:  m.Links.WordPressURL,
 		FeedbackURL:   m.Links.FeedbackURL,

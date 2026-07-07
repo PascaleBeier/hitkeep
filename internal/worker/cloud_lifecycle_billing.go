@@ -168,6 +168,8 @@ func cloudLifecycleLinks(conf *config.Config) mailables.CloudLifecycleLinks {
 
 	return mailables.CloudLifecycleLinks{
 		DashboardURL: appurl.Path(conf.PublicURL, "/admin/team"),
+		UpgradeURL:   appurl.Path(conf.PublicURL, "/admin/team/overview"),
+		FundingURL:   appurl.Path(docsBase, "/support/funding/"),
 		DocsURL:      appurl.Path(docsBase, "/guides/introduction/"),
 		WordPressURL: appurl.Path(docsBase, "/guides/integrations/wordpress/"),
 		FeedbackURL:  feedbackURL,
