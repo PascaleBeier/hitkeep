@@ -14,7 +14,7 @@ This file is public guidance for AI-assisted contributions to HitKeep. It is wri
 ## Product Invariants
 
 - HitKeep runs as a single Go binary with an embedded Angular dashboard.
-- The backend targets Go 1.26.4.
+- The backend targets Go 1.26.5.
 - The dashboard uses Angular 22, PrimeNG 21, Tailwind CSS 4, Transloco, and Angular Signals.
 - DuckDB is the storage engine. NSQ runs in process for queueing.
 - Do not introduce required PostgreSQL, Redis, Kafka, ClickHouse, hosted analytics, or a separate queue/cache/database service.

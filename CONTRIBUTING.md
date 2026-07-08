@@ -91,7 +91,7 @@ make dev-docker-seed
 
 This starts:
 
-- **Backend:** Go 1.26.4 with Air live reload on `http://localhost:8080`
+- **Backend:** Go 1.26.5 with Air live reload on `http://localhost:8080`
 - **Frontend:** Angular dev server with hot reload on `http://localhost:4200`
 - **Mailpit:** local mail UI on `http://localhost:8025`
 - **Seed data:** demo user, site, analytics, ecommerce, AI visibility, and chatbot data

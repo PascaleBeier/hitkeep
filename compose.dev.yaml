@@ -2,7 +2,7 @@ name: hitkeep-dev
 
 services:
   backend:
-    image: golang:1.26.4
+    image: golang:1.26.5
     working_dir: /workspace
     command: go tool air -c .air.toml
     ports:
@@ -47,7 +47,7 @@ services:
       - "8025:8025"
 
   seed:
-    image: golang:1.26.4
+    image: golang:1.26.5
     profiles:
       - seed
     working_dir: /workspace

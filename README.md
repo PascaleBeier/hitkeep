@@ -67,6 +67,7 @@ services:
     volumes:
       - hitkeep_data:/var/lib/hitkeep/data
     environment:
+      # use environment variables or command arguments
       HITKEEP_JWT_SECRET: replace-this-with-a-long-random-string
     command:
       - "-public-url=http://localhost:8080"
@@ -74,6 +75,8 @@ services:
 volumes:
   hitkeep_data: {}
 ```
+
+See 
 
 ```bash
 docker compose up -d
