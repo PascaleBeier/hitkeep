@@ -20,6 +20,9 @@ func (s *Store) withAppender(ctx context.Context, table string, fn func(rowAppen
 func (s *Store) withAppenderColumns(ctx context.Context, table string, columns []string, fn func(rowAppender) error) error {
 	return s.WithDuckDBSession(ctx, DuckDBSessionOptions{}, func(conn *sql.Conn) error {
 		return conn.Raw(func(driverConn any) error {
+			if unwrapper, ok := driverConn.(duckdbConnUnwrapper); ok {
+				driverConn = unwrapper.UnwrapDuckDBConn()
+			}
 			rawConn, ok := driverConn.(driver.Conn)
 			if !ok {
 				return fmt.Errorf("unexpected duckdb driver connection type %T", driverConn)
