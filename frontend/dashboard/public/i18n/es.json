@@ -1999,7 +1999,9 @@
           "tenant": "Tenant",
           "size": "Tamaño",
           "path": "Ruta"
-        }
+        },
+        "memory": "Memoria de DuckDB",
+        "memoryOther": "Otros"
       },
       "ingest": {
         "title": "Ingesta",
@@ -2241,7 +2243,8 @@
         "auditDescription": "Actividad append-only de operaciones sensibles de instancia.",
         "settingsSubtitle": "Gestiona usuarios, sitios, equipos y filtros globales de la instancia.",
         "copyReport": "Copiar informe del sistema",
-        "copyReportAria": "Copiar el informe del sistema para solicitudes de soporte"
+        "copyReportAria": "Copiar el informe del sistema para solicitudes de soporte",
+        "reportHint": "Comparta el estado de esta consola al informar de un problema."
       },
       "activation": {
         "title": "Activación de usuarios",

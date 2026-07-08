@@ -1999,7 +1999,9 @@
           "tenant": "Tenant",
           "size": "Size",
           "path": "Path"
-        }
+        },
+        "memory": "DuckDB memory",
+        "memoryOther": "Other"
       },
       "ingest": {
         "title": "Ingest",
@@ -2241,7 +2243,8 @@
         "auditDescription": "Append-only activity for sensitive instance operations.",
         "settingsSubtitle": "Manage instance users, sites, teams, and global filters.",
         "copyReport": "Copy system report",
-        "copyReportAria": "Copy the system report for support requests"
+        "copyReportAria": "Copy the system report for support requests",
+        "reportHint": "Share this console's state when reporting an issue."
       },
       "activation": {
         "title": "User activation",

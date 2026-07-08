@@ -1981,7 +1981,9 @@
           "tenant": "Huurder",
           "size": "Maat",
           "path": "Pad"
-        }
+        },
+        "memory": "DuckDB-geheugen",
+        "memoryOther": "Overig"
       },
       "ingest": {
         "title": "Innemen",
@@ -2223,7 +2225,8 @@
         "auditDescription": "Alleen-toevoegen-activiteit voor bewerkingen van gevoelige exemplaren.",
         "settingsSubtitle": "Beheer exemplaargebruikers, sites, teams en globale filters.",
         "copyReport": "Systeemrapport kopiëren",
-        "copyReportAria": "Kopieer het systeemrapport voor supportverzoeken"
+        "copyReportAria": "Kopieer het systeemrapport voor supportverzoeken",
+        "reportHint": "Deel de status van deze console wanneer je een probleem meldt."
       },
       "activation": {
         "title": "Activering van de gebruiker",

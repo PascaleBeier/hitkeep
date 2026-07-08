@@ -66,6 +66,12 @@ export interface TenantDBInfo {
     path: string;
 }
 
+export interface DuckDBMemoryStat {
+    tag: string;
+    memory_bytes: number;
+    temporary_storage_bytes: number;
+}
+
 export interface SystemStorage {
     shared_db_path: string;
     shared_db_bytes: number;
@@ -76,6 +82,7 @@ export interface SystemStorage {
     backup_path: string;
     disk_available_bytes: number;
     disk_total_bytes: number;
+    duckdb_memory?: DuckDBMemoryStat[];
 }
 
 export interface SystemIngestStats {
