@@ -27,9 +27,9 @@ import (
 
 const (
 	checkoutModeSubscription   = "subscription"
-	subscriptionStatusActive   = "active"
-	subscriptionStatusPending  = "pending_checkout"
-	subscriptionStatusCanceled = "canceled"
+	subscriptionStatusActive   = database.CloudSubscriptionStatusActive
+	subscriptionStatusPending  = database.CloudSubscriptionStatusPendingCheckout
+	subscriptionStatusCanceled = database.CloudSubscriptionStatusCanceled
 	stripeAPIVersion           = "2026-02-25.clover"
 )
 

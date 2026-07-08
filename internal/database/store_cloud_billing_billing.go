@@ -19,11 +19,17 @@ const (
 	CloudPlanBusiness                     = "business"
 	CloudFreePlanSiteLimit                = 3
 	CloudFreePlanMemberLimit              = 3
-	CloudSubscriptionStatusFree           = "free"
-	CloudSubscriptionStatusActive         = "active"
-	CloudSubscriptionStatusPastDue        = "past_due"
-	CloudSubscriptionStatusDisputed       = "disputed"
-	CloudSubscriptionStatusChargebackLost = "chargeback_lost"
+	CloudSubscriptionStatusFree              = "free"
+	CloudSubscriptionStatusPendingCheckout   = "pending_checkout"
+	CloudSubscriptionStatusActive            = "active"
+	CloudSubscriptionStatusPastDue           = "past_due"
+	CloudSubscriptionStatusCanceled          = "canceled"
+	CloudSubscriptionStatusUnpaid            = "unpaid"
+	CloudSubscriptionStatusPaused            = "paused"
+	CloudSubscriptionStatusIncomplete        = "incomplete"
+	CloudSubscriptionStatusIncompleteExpired = "incomplete_expired"
+	CloudSubscriptionStatusDisputed          = "disputed"
+	CloudSubscriptionStatusChargebackLost    = "chargeback_lost"
 	CloudBillingEventStatusSeen           = "seen"
 	CloudBillingEventStatusDone           = "processed"
 	CloudBillingEventStatusErrored        = "failed"
@@ -31,6 +37,42 @@ const (
 
 var ErrCloudBillingAccountNotFound = errors.New("cloud billing account not found")
 var ErrCloudBillingEventNotFound = errors.New("cloud billing event not found")
+
+// CloudFreeSubscriptionStatuses is the canonical list of subscription
+// statuses that grant only Free-plan entitlements: the local pre-payment
+// states plus every Stripe state in which the customer is no longer paying.
+// Statuses absent here (active, trialing, past_due, disputed, checkout's
+// "complete", and anything Stripe introduces later) keep the paid plan on
+// purpose — misclassifying a paying team as Free would destructively trim
+// its retained data.
+func CloudFreeSubscriptionStatuses() []string {
+	return []string{
+		CloudSubscriptionStatusFree,
+		CloudSubscriptionStatusPendingCheckout,
+		CloudSubscriptionStatusCanceled,
+		CloudSubscriptionStatusUnpaid,
+		CloudSubscriptionStatusPaused,
+		CloudSubscriptionStatusIncomplete,
+		CloudSubscriptionStatusIncompleteExpired,
+		CloudSubscriptionStatusChargebackLost,
+	}
+}
+
+// CloudSubscriptionStatusIsFree reports whether the status grants only
+// Free-plan entitlements. Blank statuses count as free: they belong to
+// accounts that never started a checkout.
+func CloudSubscriptionStatusIsFree(status string) bool {
+	status = strings.TrimSpace(status)
+	if status == "" {
+		return true
+	}
+	for _, free := range CloudFreeSubscriptionStatuses() {
+		if status == free {
+			return true
+		}
+	}
+	return false
+}
 
 type CreateManagedCloudAccountInput struct {
 	Email          string

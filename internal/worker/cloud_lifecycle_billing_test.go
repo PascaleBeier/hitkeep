@@ -238,3 +238,22 @@ func cloudLifecycleWorkerConfig() *config.Config {
 func ptrWorkerTime(value time.Time) *time.Time {
 	return &value
 }
+
+func TestCloudLifecycleIsFreePlanTreatsLapsedStatusesAsFree(t *testing.T) {
+	for _, status := range []string{
+		database.CloudSubscriptionStatusUnpaid,
+		database.CloudSubscriptionStatusPaused,
+		database.CloudSubscriptionStatusCanceled,
+		database.CloudSubscriptionStatusIncompleteExpired,
+	} {
+		recipient := database.CloudLifecycleRecipient{PlanCode: database.CloudPlanPro, SubscriptionStatus: status}
+		if !cloudLifecycleIsFreePlan(recipient) {
+			t.Errorf("status %q: expected lapsed pro subscription to count as free", status)
+		}
+	}
+
+	active := database.CloudLifecycleRecipient{PlanCode: database.CloudPlanPro, SubscriptionStatus: database.CloudSubscriptionStatusActive}
+	if cloudLifecycleIsFreePlan(active) {
+		t.Error("expected active pro subscription to count as paid")
+	}
+}

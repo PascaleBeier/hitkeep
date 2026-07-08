@@ -66,16 +66,22 @@ func TestListEligibleCloudLifecycleRecipientsForFreeRetentionReminder(t *testing
 	seedCloudLifecycleTeam(t, store, "young-free@example.com", "young-free.example", CloudPlanFree, CloudSubscriptionStatusFree, ptrTime(now.AddDate(0, 0, -7)))
 	seedCloudLifecycleTeam(t, store, "paid@example.com", "paid.example", CloudPlanPro, CloudSubscriptionStatusActive, ptrTime(now.AddDate(0, 0, -20)))
 	seedCloudLifecycleTeam(t, store, "no-hit-reminder@example.com", "no-hit-reminder.example", CloudPlanFree, CloudSubscriptionStatusFree, nil)
+	// A Pro plan whose subscription went unpaid is effectively on Free and
+	// should get the same lifecycle nudges.
+	unpaid := seedCloudLifecycleTeam(t, store, "unpaid@example.com", "unpaid.example", CloudPlanPro, CloudSubscriptionStatusUnpaid, ptrTime(now.AddDate(0, 0, -20)))
 
 	recipients, err := store.ListEligibleCloudLifecycleRecipients(ctx, CloudLifecycleMessageFreeRetentionReminder, now, 100)
 	if err != nil {
 		t.Fatalf("list reminder recipients: %v", err)
 	}
-	if len(recipients) != 1 {
-		t.Fatalf("expected one reminder recipient, got %d: %+v", len(recipients), recipients)
+	if len(recipients) != 2 {
+		t.Fatalf("expected two reminder recipients, got %d: %+v", len(recipients), recipients)
 	}
 	if recipients[0].TenantID != oldFree.TenantID || recipients[0].Email != "old-free@example.com" {
 		t.Fatalf("unexpected reminder recipient: %+v", recipients[0])
+	}
+	if recipients[1].TenantID != unpaid.TenantID || recipients[1].Email != "unpaid@example.com" {
+		t.Fatalf("expected unpaid pro team to be treated as free, got: %+v", recipients[1])
 	}
 }
 

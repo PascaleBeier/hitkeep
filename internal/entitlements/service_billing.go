@@ -11,24 +11,18 @@ import (
 	"hitkeep/internal/database"
 )
 
-const (
-	subscriptionStatusPendingCheckout = "pending_checkout"
-	subscriptionStatusCanceled        = "canceled"
-)
-
 // EffectiveCloudPlan resolves the billing account's effective plan code and
-// name. Accounts without an active subscription fall back to the free plan.
+// name. Accounts whose subscription no longer grants paid access fall back to
+// the free plan; unknown statuses keep the paid plan (see
+// database.CloudFreeSubscriptionStatuses for the rationale).
 func EffectiveCloudPlan(account *database.CloudBillingAccount) (string, string) {
 	if account == nil {
 		return "", ""
 	}
-
-	switch strings.TrimSpace(account.SubscriptionStatus) {
-	case "", database.CloudSubscriptionStatusFree, subscriptionStatusPendingCheckout, subscriptionStatusCanceled, database.CloudSubscriptionStatusChargebackLost:
+	if database.CloudSubscriptionStatusIsFree(account.SubscriptionStatus) {
 		return database.CloudPlanFree, CloudPlanName(database.CloudPlanFree)
-	default:
-		return strings.TrimSpace(account.PlanCode), strings.TrimSpace(account.PlanName)
 	}
+	return strings.TrimSpace(account.PlanCode), strings.TrimSpace(account.PlanName)
 }
 
 // CloudPlanName returns the display name for a managed-cloud plan code.

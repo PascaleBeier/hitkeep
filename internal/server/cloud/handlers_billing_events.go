@@ -102,10 +102,19 @@ func (h *handler) handleStripeEvent(ctx context.Context, event stripe.Event) err
 			handleErr = err
 			break
 		}
+		// The subscription's price is authoritative for the plan: a billing
+		// portal plan switch changes the price but never rewrites the
+		// metadata written at the original checkout.
+		planCode := planCodeForPrice(h.ctx.Config, subscription.FirstPriceID())
+		planName := planNameForCode(planCode)
+		if planCode == "" {
+			planCode = normalizePlanCode(subscription.Metadata["plan_code"])
+			planName = strings.TrimSpace(subscription.Metadata["plan_name"])
+		}
 		handleErr = h.ctx.Store.UpsertCloudBillingAccount(ctx, database.CloudBillingAccount{
 			TenantID:             tenantID,
-			PlanCode:             normalizePlanCode(subscription.Metadata["plan_code"]),
-			PlanName:             strings.TrimSpace(subscription.Metadata["plan_name"]),
+			PlanCode:             planCode,
+			PlanName:             planName,
 			SubscriptionStatus:   subscription.Status,
 			StripeCustomerID:     subscription.Customer.ID,
 			StripeSubscriptionID: subscription.ID,
@@ -212,6 +221,23 @@ func priceIDForPlan(conf *config.Config, planCode string) string {
 		return strings.TrimSpace(conf.StripePriceBusinessMonthly)
 	case database.CloudPlanPro:
 		return strings.TrimSpace(conf.StripePriceProMonthly)
+	default:
+		return ""
+	}
+}
+
+// planCodeForPrice is the inverse of priceIDForPlan. Returns "" for unknown
+// or blank prices so callers can fall back to subscription metadata.
+func planCodeForPrice(conf *config.Config, priceID string) string {
+	priceID = strings.TrimSpace(priceID)
+	if priceID == "" {
+		return ""
+	}
+	switch priceID {
+	case strings.TrimSpace(conf.StripePriceBusinessMonthly):
+		return database.CloudPlanBusiness
+	case strings.TrimSpace(conf.StripePriceProMonthly):
+		return database.CloudPlanPro
 	default:
 		return ""
 	}

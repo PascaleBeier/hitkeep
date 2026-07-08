@@ -162,6 +162,111 @@ func TestHandleStripeEventRetentionSyncPreservesManuallyCustomizedSite(t *testin
 	}
 }
 
+func TestHandleStripeEventPortalPlanSwitchResolvesPlanFromPriceID(t *testing.T) {
+	h, store := setupCloudTestHandlerWithTenantStores(t)
+	defer store.Close()
+
+	account, err := store.CreateManagedCloudAccount(context.Background(), database.CreateManagedCloudAccountInput{
+		Email:          "retention-switch@example.com",
+		HashedPassword: "hashed",
+		TeamName:       "Retention Switch Team",
+	})
+	if err != nil {
+		t.Fatalf("create managed account: %v", err)
+	}
+	if _, err := store.CreateSite(context.Background(), account.UserID, "retention-switch.example.com"); err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	if err := store.UpsertCloudBillingAccount(context.Background(), database.CloudBillingAccount{
+		TenantID:           account.TenantID,
+		PlanCode:           database.CloudPlanBusiness,
+		PlanName:           "Business",
+		SubscriptionStatus: database.CloudSubscriptionStatusActive,
+	}); err != nil {
+		t.Fatalf("seed business billing account: %v", err)
+	}
+
+	// A portal downgrade Business -> Pro changes the subscription's price but
+	// keeps the metadata written at the original checkout, so plan_code still
+	// says "business" while the price is Pro's.
+	event := stripe.Event{
+		ID:   "evt_portal_switch",
+		Type: "customer.subscription.updated",
+		Data: &stripe.EventData{
+			Raw: []byte(`{
+				"id":"sub_live",
+				"metadata":{"tenant_id":"` + account.TenantID.String() + `","plan_code":"business","plan_name":"Business"},
+				"customer":{"id":"cus_live"},
+				"status":"active",
+				"items":{"data":[{"price":{"id":"price_pro"}}]}
+			}`),
+		},
+	}
+	if err := h.handleStripeEvent(context.Background(), event); err != nil {
+		t.Fatalf("handle stripe event: %v", err)
+	}
+
+	billingAccount, err := store.GetCloudBillingAccount(context.Background(), account.TenantID)
+	if err != nil {
+		t.Fatalf("get billing account: %v", err)
+	}
+	if billingAccount.PlanCode != database.CloudPlanPro || billingAccount.PlanName != "Pro" {
+		t.Fatalf("expected plan resolved from price ID (pro), got code=%q name=%q", billingAccount.PlanCode, billingAccount.PlanName)
+	}
+	if got := siteRetentionDaysForTeam(t, store, account.TenantID); got != 365 {
+		t.Fatalf("expected retention lowered to 365 (Pro cap) after portal switch, got %d", got)
+	}
+}
+
+func TestHandleStripeEventUnpaidStatusDowngradesToFree(t *testing.T) {
+	h, store := setupCloudTestHandlerWithTenantStores(t)
+	defer store.Close()
+
+	account, err := store.CreateManagedCloudAccount(context.Background(), database.CreateManagedCloudAccountInput{
+		Email:          "retention-unpaid@example.com",
+		HashedPassword: "hashed",
+		TeamName:       "Retention Unpaid Team",
+	})
+	if err != nil {
+		t.Fatalf("create managed account: %v", err)
+	}
+	if _, err := store.CreateSite(context.Background(), account.UserID, "retention-unpaid.example.com"); err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	if err := store.UpsertCloudBillingAccount(context.Background(), database.CloudBillingAccount{
+		TenantID:           account.TenantID,
+		PlanCode:           database.CloudPlanPro,
+		PlanName:           "Pro",
+		SubscriptionStatus: database.CloudSubscriptionStatusActive,
+	}); err != nil {
+		t.Fatalf("seed pro billing account: %v", err)
+	}
+
+	// Dunning configurations that mark the subscription unpaid instead of
+	// canceling it never send subscription.deleted; unpaid must still revoke
+	// paid entitlements.
+	event := stripe.Event{
+		ID:   "evt_sub_unpaid",
+		Type: "customer.subscription.updated",
+		Data: &stripe.EventData{
+			Raw: []byte(`{
+				"id":"sub_live",
+				"metadata":{"tenant_id":"` + account.TenantID.String() + `","plan_code":"pro","plan_name":"Pro"},
+				"customer":{"id":"cus_live"},
+				"status":"unpaid",
+				"items":{"data":[{"price":{"id":"price_pro"}}]}
+			}`),
+		},
+	}
+	if err := h.handleStripeEvent(context.Background(), event); err != nil {
+		t.Fatalf("handle stripe event: %v", err)
+	}
+
+	if got := siteRetentionDaysForTeam(t, store, account.TenantID); got != 60 {
+		t.Fatalf("expected retention lowered to 60 (Free cap) on unpaid subscription, got %d", got)
+	}
+}
+
 func TestHandleStripeEventRetentionSyncHarmlessOnPaymentFailure(t *testing.T) {
 	h, store := setupCloudTestHandlerWithTenantStores(t)
 	defer store.Close()

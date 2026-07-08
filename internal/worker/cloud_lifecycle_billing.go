@@ -196,12 +196,10 @@ func cloudLifecycleLinks(conf *config.Config) mailables.CloudLifecycleLinks {
 }
 
 func cloudLifecycleIsFreePlan(recipient database.CloudLifecycleRecipient) bool {
-	switch strings.TrimSpace(recipient.SubscriptionStatus) {
-	case "", database.CloudSubscriptionStatusFree, "pending_checkout", "canceled", database.CloudSubscriptionStatusChargebackLost:
+	if database.CloudSubscriptionStatusIsFree(recipient.SubscriptionStatus) {
 		return true
-	default:
-		return strings.TrimSpace(recipient.PlanCode) == database.CloudPlanFree
 	}
+	return strings.TrimSpace(recipient.PlanCode) == database.CloudPlanFree
 }
 
 func cloudLifecycleTeamName(recipient database.CloudLifecycleRecipient) string {

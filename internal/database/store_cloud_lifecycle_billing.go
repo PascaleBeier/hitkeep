@@ -80,6 +80,16 @@ func (s *Store) ListEligibleCloudLifecycleRecipients(ctx context.Context, kind s
 		limit = 100
 	}
 
+	// Free-status filter shared by every free-plan lifecycle kind, built from
+	// the canonical list so eligibility can't drift from entitlements.
+	freeStatuses := CloudFreeSubscriptionStatuses()
+	freeStatusIn := "COALESCE(NULLIF(cba.subscription_status, ''), ?) IN (?" + strings.Repeat(", ?", len(freeStatuses)-1) + ")"
+	freeStatusArgs := make([]any, 0, len(freeStatuses)+1)
+	freeStatusArgs = append(freeStatusArgs, CloudSubscriptionStatusFree)
+	for _, status := range freeStatuses {
+		freeStatusArgs = append(freeStatusArgs, status)
+	}
+
 	extraWhere := ""
 	args := []any{
 		kind,
@@ -89,16 +99,10 @@ func (s *Store) ListEligibleCloudLifecycleRecipients(ctx context.Context, kind s
 	if kind == CloudLifecycleMessageFreeRetentionReminder {
 		extraWhere = `
 			AND activated.first_hit_at <= ?
-			AND COALESCE(NULLIF(cba.subscription_status, ''), ?) IN (?, ?, ?, ?)
+			AND ` + freeStatusIn + `
 		`
-		args = append(args,
-			now.UTC().AddDate(0, 0, -14),
-			CloudSubscriptionStatusFree,
-			CloudSubscriptionStatusFree,
-			"pending_checkout",
-			"canceled",
-			CloudSubscriptionStatusChargebackLost,
-		)
+		args = append(args, now.UTC().AddDate(0, 0, -14))
+		args = append(args, freeStatusArgs...)
 	}
 	if kind == CloudLifecycleMessageFreeRetentionPreTrim {
 		// Warn only inside the lead window: old enough that roll-off is
@@ -106,32 +110,24 @@ func (s *Store) ListEligibleCloudLifecycleRecipients(ctx context.Context, kind s
 		extraWhere = `
 			AND activated.first_hit_at <= ?
 			AND activated.first_hit_at > ?
-			AND COALESCE(NULLIF(cba.subscription_status, ''), ?) IN (?, ?, ?, ?)
+			AND ` + freeStatusIn + `
 		`
 		args = append(args,
 			now.UTC().AddDate(0, 0, -(CloudFreePlanRetentionDays-CloudRetentionPreTrimLeadDays)),
 			now.UTC().AddDate(0, 0, -CloudFreePlanRetentionDays),
-			CloudSubscriptionStatusFree,
-			CloudSubscriptionStatusFree,
-			"pending_checkout",
-			"canceled",
-			CloudSubscriptionStatusChargebackLost,
 		)
+		args = append(args, freeStatusArgs...)
 	}
 	if kind == CloudLifecycleMessageFreeLimitReminder {
 		extraWhere = `
-			AND COALESCE(NULLIF(cba.subscription_status, ''), ?) IN (?, ?, ?, ?)
+			AND ` + freeStatusIn + `
 			AND (
 				(SELECT COUNT(*) FROM site_tenants st2 WHERE st2.tenant_id = activated.tenant_id) >= ?
 				OR (SELECT COUNT(*) FROM tenant_members tm2 WHERE tm2.tenant_id = activated.tenant_id) >= ?
 			)
 		`
+		args = append(args, freeStatusArgs...)
 		args = append(args,
-			CloudSubscriptionStatusFree,
-			CloudSubscriptionStatusFree,
-			"pending_checkout",
-			"canceled",
-			CloudSubscriptionStatusChargebackLost,
 			CloudFreePlanSiteLimit,
 			CloudFreePlanMemberLimit,
 		)
