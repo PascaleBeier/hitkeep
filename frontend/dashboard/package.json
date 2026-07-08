@@ -22,7 +22,7 @@
     "private": true,
     "dependencies": {
         "@angular/animations": "^22.0.5",
-        "@angular/cdk": "~22.0.3",
+        "@angular/cdk": "~22.0.4",
         "@angular/common": "^22.0.5",
         "@angular/compiler": "^22.0.5",
         "@angular/core": "^22.0.5",
@@ -32,7 +32,7 @@
         "@fontsource-variable/lexend": "^5.2.11",
         "@jsverse/transloco-locale": "^8.4.0",
         "@primeuix/themes": "^2.0.3",
-        "@scalar/api-reference": "^1.62.3",
+        "@scalar/api-reference": "^1.62.5",
         "@tailwindcss/postcss": "^4.3.2",
         "circle-flags": "^2.8.3",
         "echarts": "^6.1.0",
@@ -56,19 +56,19 @@
         "@jsverse/transloco-optimize": "^8.4.0",
         "@playwright/test": "^1.61.1",
         "@types/jasmine": "~6.0.0",
-        "@vitest/browser-playwright": "^4.1.9",
-        "@vitest/coverage-v8": "^4.1.9",
+        "@vitest/browser-playwright": "^4.1.10",
+        "@vitest/coverage-v8": "^4.1.10",
         "angular-eslint": "22.0.0",
-        "baseline-browser-mapping": "^2.10.41",
+        "baseline-browser-mapping": "^2.10.42",
         "eslint": "^10.6.0",
         "jasmine-core": "~6.3.0",
         "jsdom": "^29.1.1",
-        "oxfmt": "^0.57.0",
+        "oxfmt": "^0.58.0",
         "playwright": "^1.61.1",
         "postcss": "^8.5.16",
         "typescript": "~6.0.3",
-        "typescript-eslint": "8.62.1",
-        "vitest": "^4.1.9"
+        "typescript-eslint": "8.63.0",
+        "vitest": "^4.1.10"
     },
     "engines": {
         "node": "24"
