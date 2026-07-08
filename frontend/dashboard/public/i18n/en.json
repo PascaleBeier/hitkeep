@@ -2239,7 +2239,9 @@
         "sitesDescription": "All sites visible to instance administrators.",
         "teamsDescription": "Team containers and their operational status.",
         "auditDescription": "Append-only activity for sensitive instance operations.",
-        "settingsSubtitle": "Manage instance users, sites, teams, and global filters."
+        "settingsSubtitle": "Manage instance users, sites, teams, and global filters.",
+        "copyReport": "Copy system report",
+        "copyReportAria": "Copy the system report for support requests"
       },
       "activation": {
         "title": "User activation",

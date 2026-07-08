@@ -2239,7 +2239,9 @@
         "sitesDescription": "Tous les sites visibles par les administrateurs d’instance.",
         "teamsDescription": "Conteneurs d’équipe et leur état opérationnel.",
         "auditDescription": "Activité append-only pour les opérations sensibles de l’instance.",
-        "settingsSubtitle": "Gérez les utilisateurs, sites, équipes et filtres globaux de l’instance."
+        "settingsSubtitle": "Gérez les utilisateurs, sites, équipes et filtres globaux de l’instance.",
+        "copyReport": "Copier le rapport système",
+        "copyReportAria": "Copier le rapport système pour les demandes d'assistance"
       },
       "activation": {
         "title": "Activation utilisateur",

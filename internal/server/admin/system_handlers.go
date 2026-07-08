@@ -397,6 +397,12 @@ func (h *handler) handleGetStorage() http.HandlerFunc {
 			storage.TenantDBs = tenants
 		}
 
+		if memoryStats, err := h.ctx.Store.GetDuckDBMemoryStats(ctx); err == nil {
+			storage.DuckDBMemory = memoryStats
+		} else {
+			slog.Debug("Failed to read DuckDB memory stats", "error", err)
+		}
+
 		spamCachePath := cfg.SpamFilterPath
 		if spamCachePath == "" {
 			spamCachePath = cfg.DataPath + "/spam-filter.json"

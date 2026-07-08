@@ -1745,15 +1745,24 @@ type TenantDBInfo struct {
 }
 
 type SystemStorage struct {
-	SharedDBPath  string         `json:"shared_db_path"`
-	SharedDBBytes int64          `json:"shared_db_bytes"`
-	DataPath      string         `json:"data_path"`
-	TenantDBCount int            `json:"tenant_db_count"`
-	TenantDBs     []TenantDBInfo `json:"tenant_dbs,omitempty"`
-	SpamCachePath string         `json:"spam_cache_path"`
-	BackupPath    string         `json:"backup_path"`
-	DiskAvailable int64          `json:"disk_available_bytes"`
-	DiskTotal     int64          `json:"disk_total_bytes"`
+	SharedDBPath  string             `json:"shared_db_path"`
+	SharedDBBytes int64              `json:"shared_db_bytes"`
+	DataPath      string             `json:"data_path"`
+	TenantDBCount int                `json:"tenant_db_count"`
+	TenantDBs     []TenantDBInfo     `json:"tenant_dbs,omitempty"`
+	SpamCachePath string             `json:"spam_cache_path"`
+	BackupPath    string             `json:"backup_path"`
+	DiskAvailable int64              `json:"disk_available_bytes"`
+	DiskTotal     int64              `json:"disk_total_bytes"`
+	DuckDBMemory  []DuckDBMemoryStat `json:"duckdb_memory,omitempty"`
+}
+
+// DuckDBMemoryStat is one row of DuckDB's duckdb_memory() breakdown for the
+// shared database, e.g. buffer-managed table data or in-memory ART indexes.
+type DuckDBMemoryStat struct {
+	Tag              string `json:"tag"`
+	MemoryBytes      int64  `json:"memory_bytes"`
+	TempStorageBytes int64  `json:"temporary_storage_bytes"`
 }
 
 type SystemIngestStats struct {

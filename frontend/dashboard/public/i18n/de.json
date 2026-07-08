@@ -2239,7 +2239,9 @@
         "sitesDescription": "Alle Websites, die für Instanz-Admins sichtbar sind.",
         "teamsDescription": "Team-Container und ihr Betriebsstatus.",
         "auditDescription": "Append-only-Aktivität für sensible Instanzoperationen.",
-        "settingsSubtitle": "Verwalte Instanzbenutzer, Websites, Teams und globale Filter."
+        "settingsSubtitle": "Verwalte Instanzbenutzer, Websites, Teams und globale Filter.",
+        "copyReport": "Systembericht kopieren",
+        "copyReportAria": "Systembericht für Support-Anfragen kopieren"
       },
       "activation": {
         "title": "Nutzeraktivierung",

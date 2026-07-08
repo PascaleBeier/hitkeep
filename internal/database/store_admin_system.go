@@ -214,6 +214,34 @@ func (s *Store) GetTenantList(ctx context.Context) ([]api.TenantDBInfo, error) {
 	return tenants, nil
 }
 
+// GetDuckDBMemoryStats reports DuckDB's memory breakdown for this database
+// (buffer-managed table data, in-memory ART indexes, and so on), ordered by
+// descending usage.
+func (s *Store) GetDuckDBMemoryStats(ctx context.Context) ([]api.DuckDBMemoryStat, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT tag, memory_usage_bytes, temporary_storage_bytes
+		FROM duckdb_memory()
+		ORDER BY memory_usage_bytes DESC, tag
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("could not read duckdb memory stats: %w", err)
+	}
+	defer rows.Close()
+
+	var stats []api.DuckDBMemoryStat
+	for rows.Next() {
+		var stat api.DuckDBMemoryStat
+		if err := rows.Scan(&stat.Tag, &stat.MemoryBytes, &stat.TempStorageBytes); err != nil {
+			return nil, fmt.Errorf("could not scan duckdb memory stat: %w", err)
+		}
+		stats = append(stats, stat)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("could not read duckdb memory stat rows: %w", err)
+	}
+	return stats, nil
+}
+
 func (s *Store) GetRecentHitsCount(ctx context.Context, since time.Time) (int, error) {
 	var count int
 	if err := s.db.QueryRowContext(ctx,

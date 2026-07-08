@@ -256,6 +256,10 @@ export class AdminSystemService {
         return this.http.get<SystemInfo>('/api/admin/system');
     }
 
+    getReport() {
+        return this.http.get('/api/admin/system/report', { responseType: 'text' });
+    }
+
     getHealth() {
         return this.http.get<SystemHealth>('/api/admin/system/health');
     }

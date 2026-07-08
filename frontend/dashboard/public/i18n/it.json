@@ -2239,7 +2239,9 @@
         "sitesDescription": "Tutti i siti visibili agli amministratori di istanza.",
         "teamsDescription": "Contenitori team e relativo stato operativo.",
         "auditDescription": "Attività append-only per operazioni sensibili dell’istanza.",
-        "settingsSubtitle": "Gestisci utenti, siti, team e filtri globali dell’istanza."
+        "settingsSubtitle": "Gestisci utenti, siti, team e filtri globali dell’istanza.",
+        "copyReport": "Copia rapporto di sistema",
+        "copyReportAria": "Copia il rapporto di sistema per le richieste di supporto"
       },
       "activation": {
         "title": "Attivazione utenti",
