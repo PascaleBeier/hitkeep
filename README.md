@@ -12,50 +12,27 @@
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/11990/badge)](https://www.bestpractices.dev/projects/11990)
 [![HitKeep MCP server](https://glama.ai/mcp/servers/PascaleBeier/hitkeep/badges/score.svg)](https://glama.ai/mcp/servers/PascaleBeier/hitkeep)
 
-HitKeep is open source web analytics for teams that want useful product reporting, conversion analytics, and AI-era search visibility without running PostgreSQL, Redis, ClickHouse, or a separate queue.
+HitKeep is open source web analytics for teams that want useful product reporting, conversion analytics, and AI-era search visibility without running PostgreSQL, Redis, ClickHouse, or a separate queue. It ships as a single Go binary with an embedded Angular dashboard, DuckDB storage, and in-process NSQ queueing.
 
-- Single Go binary with embedded DuckDB and NSQ
-- Cookie-less tracker by default, with Do Not Track support
-- Multi-site Overview, ECharts-based charts, expanded report ranges, and email reports
-- Traffic, events, goals, funnels, ecommerce, UTM, QR campaigns, and Web Vitals
-- Google Search Console aggregate import for query, page, country, and device reporting
-- AI visibility analytics for crawler fetches, AI-referred visits, and on-site AI chatbot outcomes
-- Optional Ask AI dashboard assistant for site-scoped aggregate questions, citations, small charts, and safe actions
-- Scoped API clients and a read-only MCP analytics server for approved assistants
-- Self-hosted or managed cloud with EU/US region choice
-
-[AI Performance](https://hitkeep.com/ai-performance/) · [Website](https://hitkeep.com) · [Cloud](https://hitkeep.com/cloud) · [Live Demo](https://demo.hitkeep.com/share/7a55968bb42df256512fbe7ff73ab88f29dd45c236eddc818bd66420b4ffbaad) · [Docs](https://hitkeep.com/guides/introduction/) · [Ask AI](https://hitkeep.com/guides/analytics/ask-ai/) · [API](https://hitkeep.com/api/) · [Releases](https://github.com/PascaleBeier/hitkeep/releases)
+[Website](https://hitkeep.com) · [Live Demo](https://demo.hitkeep.com/share/7a55968bb42df256512fbe7ff73ab88f29dd45c236eddc818bd66420b4ffbaad) · [Docs](https://hitkeep.com/guides/introduction/) · [Cloud](https://hitkeep.com/cloud) · [AI Performance](https://hitkeep.com/ai-performance/) · [API](https://hitkeep.com/api/) · [Releases](https://github.com/PascaleBeier/hitkeep/releases)
 
 ![HitKeep analytics dashboard with traffic overview, geographic breakdown, goals, funnels, and UTM attribution](./.github/assets/dashboard-overview.png)
 
 ## Why HitKeep
 
-HitKeep is for teams that need clear web analytics, conversion reporting, and AI-era search visibility in one small operational footprint.
-
-- **Low-ops self-hosting:** one binary, one data directory, embedded DuckDB and NSQ
-- **Useful reports:** multi-site Overview, top pages, landing and exit pages, events, goals, funnels, ecommerce, UTM attribution, QR campaigns, Web Vitals, and Search Console aggregates
-- **Privacy defaults:** focused data collection, cookie-less tracking, and DNT handling
-- **AI visibility:** server-side crawler fetch analytics, AI-referred visits, chatbot outcomes, and correlation reports
-- **Ask AI:** optional dashboard-session assistant for aggregate analytics answers with citations and safe dashboard actions
-- **Team controls:** passkeys, TOTP, site/team permissions, share links, audit logs, API clients, and read-only MCP access
+- **Low-ops self-hosting:** one binary, one data directory, embedded DuckDB and NSQ — no external services to run
+- **Useful reports:** multi-site Overview, top pages, landing and exit pages, events, goals, funnels, ecommerce, UTM attribution, QR campaigns, Web Vitals, email reports, and Google Search Console aggregates
+- **Privacy defaults:** cookie-less tracking, Do Not Track support, and focused data collection
+- **AI visibility:** server-side crawler fetch analytics, AI-referred visits, on-site chatbot outcomes, and correlation reports
+- **Ask AI:** optional dashboard assistant that answers site-scoped aggregate questions with citations, small charts, and safe dashboard actions
+- **Team controls:** passkeys, TOTP, site and team permissions, share links, audit logs, scoped API clients, and a read-only MCP analytics server
 - **Deployment choice:** run it yourself or use managed cloud in the EU or US
 
 ## Quick Start
 
-### Binary
-
-Download the latest release for your system:
-
-```bash
-wget https://github.com/PascaleBeier/hitkeep/releases/latest/download/hitkeep-linux-arm64
-chmod +x hitkeep-linux-arm64
-export HITKEEP_JWT_SECRET="replace-this-with-a-long-random-string"
-./hitkeep-linux-arm64 -public-url="http://localhost:8080"
-```
-
-Open `http://localhost:8080` and create your first account.
-
 ### Docker
+
+Save this as `compose.yml`:
 
 ```yaml
 services:
@@ -67,7 +44,7 @@ services:
     volumes:
       - hitkeep_data:/var/lib/hitkeep/data
     environment:
-      # use environment variables or command arguments
+      # any flag can also be set as an environment variable
       HITKEEP_JWT_SECRET: replace-this-with-a-long-random-string
     command:
       - "-public-url=http://localhost:8080"
@@ -76,53 +53,44 @@ volumes:
   hitkeep_data: {}
 ```
 
-See 
+Then start it:
 
 ```bash
 docker compose up -d
 ```
 
-For production setup, reverse proxies, SMTP, systemd, Kubernetes, S3 archiving, and every configuration flag, use the docs instead of this README:
+Open `http://localhost:8080` and create your first account. More compose examples — including Caddy, nginx, and Traefik setups — live in [`examples/`](./examples/).
+
+### Binary
+
+Download the latest release for your platform (`hitkeep-linux-amd64` or `hitkeep-linux-arm64`) and run it:
+
+```bash
+curl -LO https://github.com/PascaleBeier/hitkeep/releases/latest/download/hitkeep-linux-amd64
+chmod +x hitkeep-linux-amd64
+export HITKEEP_JWT_SECRET="$(openssl rand -hex 32)" # keep this stable across restarts
+./hitkeep-linux-amd64 -public-url="http://localhost:8080"
+```
+
+Open `http://localhost:8080` and create your first account.
+
+### Going to production
+
+For reverse proxies, SMTP, systemd, Kubernetes, S3 archiving, and every configuration flag, use the docs instead of this README:
 
 - [Installation guides](https://hitkeep.com/guides/installation/)
 - [Configuration reference](https://hitkeep.com/reference/configuration/)
 - [Cloud documentation](https://hitkeep.com/cloud)
 
-## Local Development
-
-Contributors can run the full hot-reload development stack with Docker:
-
-```bash
-make dev-docker-seed
-```
-
-This starts the Go backend, Angular dashboard, Mailpit, and seeded demo data.
-Open `http://localhost:4200` and sign in with `demo@example.com` / `demo1234`.
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for Docker-only and native workflows.
-
 ## Track Your Site
 
-Once your instance is running and a site is created, add:
+Create a site in the dashboard, then add the tracker to your pages:
 
 ```html
 <script async src="https://your-hitkeep-instance.com/hk.js"></script>
 ```
 
-Team owners and admins can also add custom tracker domains in **Team Settings -> Tracking domains**. HitKeep asks for:
-
-- TXT ownership: `_hitkeep-tracking.<hostname>` with `hitkeep-domain-verification=<token>`
-- DNS target: CNAME, A, or AAAA pointing at the host from `HITKEEP_PUBLIC_URL`, or the configured deployment target on managed cloud
-- HTTPS readiness: `https://<hostname>/hk.js` must serve the tracker before the domain can be selected by a site
-
-After verification, each site can select any active domain from its team in the tracking settings. The generated snippet then uses:
-
-```html
-<script async src="https://analytics.example.com/hk.js"></script>
-```
-
-Managed cloud issues TLS for verified tracker domains on demand. Self-hosters can either terminate TLS in their own reverse proxy or use the optional Caddy on-demand TLS profile in [`examples/compose.caddy-on-demand.yml`](./examples/compose.caddy-on-demand.yml). External TLS examples are available for nginx ([`examples/compose.nginx-custom-tracking.yml`](./examples/compose.nginx-custom-tracking.yml), [`examples/nginx.custom-tracking.conf`](./examples/nginx.custom-tracking.conf)) and Traefik ([`examples/compose.traefik-custom-tracking.yml`](./examples/compose.traefik-custom-tracking.yml), [`examples/traefik.custom-tracking.yml`](./examples/traefik.custom-tracking.yml)). Kubernetes installs can use the Helm chart's `customTrackingDomains` values to configure the HitKeep pod and emit a tracking-only Ingress for static tracker hosts. The Caddy profile uses HitKeep's ask endpoint and must be configured with a private `HITKEEP_CADDY_TLS_ASK_TOKEN`.
-
-Custom event example:
+Send a custom event:
 
 ```html
 <script>
@@ -131,20 +99,16 @@ Custom event example:
 </script>
 ```
 
-Tracker options, ecommerce events, custom events, and advanced tracking examples live here:
+Teams can also serve the tracker from their own verified domains, for example `https://analytics.example.com/hk.js`, via **Team Settings → Tracking domains**. DNS verification, TLS options, and ready-made Caddy, nginx, Traefik, and Helm configurations are covered in the [custom tracking domains guide](https://hitkeep.com/guides/tracking/custom-tracking-domains/) and [`examples/`](./examples/).
+
+More tracking guides:
 
 - [Tracking docs](https://hitkeep.com/guides/tracking/)
 - [Custom events](https://hitkeep.com/guides/tracking/custom-events/)
 - [Ecommerce analytics](https://hitkeep.com/guides/analytics/ecommerce/)
-- [Ask AI analytics assistant](https://hitkeep.com/guides/analytics/ask-ai/)
-- [Google Search Console integration](https://hitkeep.com/guides/integrations/google-search-console/)
-- [Read-only MCP server for web analytics](https://hitkeep.com/use-cases/read-only-mcp-server-web-analytics/)
-- [WordPress integration](https://hitkeep.com/guides/integrations/wordpress/)
 - [AI visibility analytics](https://hitkeep.com/guides/analytics/ai-visibility/)
 - [CloudFront AI crawler tracking](https://hitkeep.com/guides/tracking/cloudfront-ai-crawler-tracking/)
-- [AI chatbot analytics](https://hitkeep.com/guides/analytics/ai-chatbot-analytics/)
-- [REST API reference](https://hitkeep.com/api/)
-- [Compliance overview](https://hitkeep.com/compliance/overview/)
+- [WordPress integration](https://hitkeep.com/guides/integrations/wordpress/)
 
 ## Product Tour
 
@@ -179,6 +143,10 @@ The maintained reference lives on `hitkeep.com`.
 - [Installation](https://hitkeep.com/guides/installation/)
 - [Configuration](https://hitkeep.com/reference/configuration/)
 - [REST API reference](https://hitkeep.com/api/)
+- [Ask AI analytics assistant](https://hitkeep.com/guides/analytics/ask-ai/)
+- [Google Search Console integration](https://hitkeep.com/guides/integrations/google-search-console/)
+- [AI chatbot analytics](https://hitkeep.com/guides/analytics/ai-chatbot-analytics/)
+- [Read-only MCP server for web analytics](https://hitkeep.com/use-cases/read-only-mcp-server-web-analytics/)
 - [Compliance](https://hitkeep.com/compliance/overview/)
 - [Comparison pages](https://hitkeep.com/vs/)
 - [Agent Skills](./skills/)
@@ -193,14 +161,15 @@ If you want the same product without running it yourself, start here:
 
 ## Development
 
-Prerequisites:
+The fastest way to a working contributor setup is Docker — one command starts the Go backend, Angular dashboard, Mailpit, and seeded demo data:
 
-- Go 1.26+
-- Node.js 24+
-- Make
-- A working C toolchain for DuckDB builds
+```bash
+make dev-docker-seed
+```
 
-Build from source:
+Open `http://localhost:4200` and sign in with `demo@example.com` / `demo1234`.
+
+For native builds you need Go 1.26+, Node.js 24+, Make, and a working C toolchain for DuckDB:
 
 ```bash
 git clone https://github.com/pascalebeier/hitkeep.git
@@ -209,18 +178,11 @@ make build
 ./hitkeep
 ```
 
-For day-to-day development:
+For day-to-day native development with live reload on `http://localhost:4200`:
 
 ```bash
-make dev
-```
-
-This starts the Go backend with live reload and the Angular dashboard on `http://localhost:4200`.
-
-For a seeded local workspace with demo data:
-
-```bash
-make dev-seed
+make dev       # Go backend + Angular dashboard
+make dev-seed  # the same, plus seeded demo data
 ```
 
 Contributor docs and local development guides:
