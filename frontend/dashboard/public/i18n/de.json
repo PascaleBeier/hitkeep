@@ -1999,7 +1999,9 @@
           "tenant": "Mandant",
           "size": "Größe",
           "path": "Pfad"
-        }
+        },
+        "memory": "DuckDB-Speicher",
+        "memoryOther": "Sonstige"
       },
       "ingest": {
         "title": "Erfassung",
@@ -2241,7 +2243,8 @@
         "auditDescription": "Append-only-Aktivität für sensible Instanzoperationen.",
         "settingsSubtitle": "Verwalte Instanzbenutzer, Websites, Teams und globale Filter.",
         "copyReport": "Systembericht kopieren",
-        "copyReportAria": "Systembericht für Support-Anfragen kopieren"
+        "copyReportAria": "Systembericht für Support-Anfragen kopieren",
+        "reportHint": "Teilen Sie den Zustand dieser Konsole, wenn Sie ein Problem melden."
       },
       "activation": {
         "title": "Nutzeraktivierung",

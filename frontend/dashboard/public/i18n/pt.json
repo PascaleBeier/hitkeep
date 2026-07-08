@@ -1975,7 +1975,9 @@
           "tenant": "Tenant",
           "size": "Tamanho",
           "path": "Caminho"
-        }
+        },
+        "memory": "Memória do DuckDB",
+        "memoryOther": "Outros"
       },
       "ingest": {
         "title": "Ingestão",
@@ -2217,7 +2219,8 @@
         "auditDescription": "Atividade do tipo append-only (somente gravação) para operações confidenciais da instância.",
         "settingsSubtitle": "Gerencie usuários, sites, equipes e filtros globais da instância.",
         "copyReport": "Copiar relatório do sistema",
-        "copyReportAria": "Copiar o relatório do sistema para solicitações de suporte"
+        "copyReportAria": "Copiar o relatório do sistema para solicitações de suporte",
+        "reportHint": "Compartilhe o estado deste console ao relatar um problema."
       },
       "activation": {
         "title": "Ativação de usuários",

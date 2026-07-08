@@ -255,27 +255,34 @@
             </p-tabpanels>
         </p-tabs>
         } @else {
-        <div class="mb-4 grid overflow-hidden rounded-lg border border-surface-100 bg-[var(--p-content-background)] dark:border-surface-800 lg:grid-cols-[minmax(0,1.15fr)_repeat(3,minmax(0,0.95fr))]">
-            <div class="flex min-w-0 items-center justify-between gap-3 border-b border-surface-100 px-4 py-3 dark:border-surface-800 lg:border-r lg:border-b-0">
-                <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.system.health.title" | transloco }}</span>
-                <p-tag [value]="runtimeStatusKey() | transloco" [severity]="runtimeStatusSeverity()" />
+        <div class="mb-4 overflow-hidden rounded-lg border border-surface-100 bg-[var(--p-content-background)] dark:border-surface-800">
+            <div class="grid lg:grid-cols-[minmax(0,1.15fr)_repeat(3,minmax(0,0.95fr))]">
+                <div class="flex min-w-0 items-center justify-between gap-3 border-b border-surface-100 px-4 py-3 dark:border-surface-800 lg:border-r lg:border-b-0">
+                    <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.system.health.title" | transloco }}</span>
+                    <p-tag [value]="runtimeStatusKey() | transloco" [severity]="runtimeStatusSeverity()" />
+                </div>
+                <div class="flex min-w-0 items-center justify-between gap-3 border-b border-surface-100 px-4 py-3 dark:border-surface-800 lg:border-r lg:border-b-0">
+                    <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.system.overview.version" | transloco }}</span>
+                    <span class="truncate font-bold text-[var(--p-text-color)]">{{ systemInfo()?.version || "-" }}</span>
+                </div>
+                <div class="flex min-w-0 items-center justify-between gap-3 border-b border-surface-100 px-4 py-3 dark:border-surface-800 lg:border-r lg:border-b-0">
+                    <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.system.ingest.hits" | transloco }}</span>
+                    <span class="truncate font-bold text-[var(--p-text-color)]">{{ recentHits() | number }}</span>
+                </div>
+                <div class="grid min-w-0 content-center gap-1.5 px-4 py-3">
+                    <div class="flex min-w-0 items-center justify-between gap-3">
+                        <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.system.storage.diskUsage" | transloco }}</span>
+                        <span class="truncate font-bold text-[var(--p-text-color)]">{{ diskUsedPercent() }}%</span>
+                    </div>
+                    <div class="h-1.5 overflow-hidden rounded-full bg-surface-100 dark:bg-surface-700" aria-hidden="true">
+                        <span class="block h-full rounded-full" [class]="diskUsedPercent() > 90 ? 'bg-red-500' : 'bg-primary'" [style.width.%]="diskUsedPercent()"></span>
+                    </div>
+                </div>
             </div>
-            <div class="flex min-w-0 items-center justify-between gap-3 border-b border-surface-100 px-4 py-3 dark:border-surface-800 lg:border-r lg:border-b-0">
-                <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.system.overview.version" | transloco }}</span>
-                <span class="truncate font-bold text-[var(--p-text-color)]">{{ systemInfo()?.version || "-" }}</span>
+            <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-surface-100 px-4 py-2 dark:border-surface-800">
+                <span class="min-w-0 text-xs font-semibold text-[var(--p-text-muted-color)]">{{ "admin.system.console.reportHint" | transloco }}</span>
+                <app-copy-control [value]="systemReport()" [labelKey]="'admin.system.console.copyReport'" [ariaLabelKey]="'admin.system.console.copyReportAria'" size="small" [text]="true" />
             </div>
-            <div class="flex min-w-0 items-center justify-between gap-3 border-b border-surface-100 px-4 py-3 dark:border-surface-800 lg:border-r lg:border-b-0">
-                <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.system.ingest.hits" | transloco }}</span>
-                <span class="truncate font-bold text-[var(--p-text-color)]">{{ recentHits() | number }}</span>
-            </div>
-            <div class="flex min-w-0 items-center justify-between gap-3 px-4 py-3">
-                <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.system.storage.diskUsage" | transloco }}</span>
-                <span class="truncate font-bold text-[var(--p-text-color)]">{{ diskUsedPercent() }}%</span>
-            </div>
-        </div>
-
-        <div class="mb-3 flex justify-end">
-            <app-copy-control [value]="systemReport()" [labelKey]="'admin.system.console.copyReport'" [ariaLabelKey]="'admin.system.console.copyReportAria'" size="small" [text]="true" />
         </div>
 
         <p-tabs [(value)]="activeAdminTab" class="hk-admin-tabs">
@@ -520,6 +527,8 @@
                             </dl>
                             } @else if (isLoadingSystem()) {
                             <div class="admin-loading"><i class="pi pi-spin pi-spinner" aria-hidden="true"></i>{{ "common.loading" | transloco }}</div>
+                            } @else {
+                            <p-message severity="error" [text]="'admin.system.console.loadFailed' | transloco" styleClass="w-full" />
                             }
                         </app-system-status-card>
 
@@ -668,8 +677,32 @@
                                     </p-table>
                                 </div>
                             </div>
-                            } @else if (isLoadingStorage()) {
+
+                            @if (duckdbMemoryRows().length > 0) {
+                            <div class="admin-memory">
+                                <div class="admin-memory__header">
+                                    <span>{{ "admin.system.storage.memory" | transloco }}</span>
+                                    <strong>{{ formatBytesValue(duckdbMemoryTotalBytes()) }}</strong>
+                                </div>
+                                <div class="admin-memory__bar" aria-hidden="true">
+                                    @for (row of duckdbMemoryRows(); track row.tag) {
+                                    <span class="admin-memory__segment" [style.background]="memorySwatchColor(row.swatch)" [style.width.%]="row.percent"></span>
+                                    }
+                                </div>
+                                <ul class="admin-memory__legend">
+                                    @for (row of duckdbMemoryRows(); track row.tag) {
+                                    <li>
+                                        <span class="admin-memory__swatch" [style.background]="memorySwatchColor(row.swatch)" aria-hidden="true"></span>
+                                        <span class="admin-memory__tag admin-mono">{{ row.tag }}</span>
+                                        <span class="admin-memory__bytes">{{ formatBytesValue(row.bytes) }}</span>
+                                    </li>
+                                    }
+                                </ul>
+                            </div>
+                            } } @else if (isLoadingStorage()) {
                             <div class="admin-loading"><i class="pi pi-spin pi-spinner" aria-hidden="true"></i>{{ "common.loading" | transloco }}</div>
+                            } @else {
+                            <p-message severity="error" [text]="'admin.system.console.loadFailed' | transloco" styleClass="w-full" />
                             }
                         </app-system-status-card>
 
@@ -701,6 +734,8 @@
                             </div>
                             } @else if (isLoadingIngest()) {
                             <div class="admin-loading"><i class="pi pi-spin pi-spinner" aria-hidden="true"></i>{{ "common.loading" | transloco }}</div>
+                            } @else {
+                            <p-message severity="error" [text]="'admin.system.console.loadFailed' | transloco" styleClass="w-full" />
                             }
                         </app-system-status-card>
 

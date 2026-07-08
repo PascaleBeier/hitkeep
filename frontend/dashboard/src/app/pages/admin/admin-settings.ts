@@ -280,6 +280,36 @@ export class AdminSettings implements OnInit {
         return Math.round((used / storage.disk_total_bytes) * 100);
     });
     protected readonly recentHits = computed(() => this.systemIngest()?.recent_hits ?? 0);
+    protected readonly duckdbMemoryRows = computed(() => {
+        this.activeLanguage();
+        const stats = (this.systemStorage()?.duckdb_memory ?? []).filter((stat) => stat.memory_bytes > 0);
+        const total = stats.reduce((sum, stat) => sum + stat.memory_bytes, 0);
+        if (total === 0) return [];
+        const top = stats.slice(0, 5).map((stat, index) => ({
+            tag: stat.tag,
+            bytes: stat.memory_bytes,
+            percent: Math.max((stat.memory_bytes / total) * 100, 1),
+            swatch: index
+        }));
+        const restBytes = stats.slice(5).reduce((sum, stat) => sum + stat.memory_bytes, 0);
+        if (restBytes > 0) {
+            top.push({ tag: this.transloco.translate('admin.system.storage.memoryOther'), bytes: restBytes, percent: Math.max((restBytes / total) * 100, 1), swatch: 5 });
+        }
+        return top;
+    });
+    protected readonly duckdbMemoryTotalBytes = computed(() => (this.systemStorage()?.duckdb_memory ?? []).reduce((sum, stat) => sum + stat.memory_bytes, 0));
+    private static readonly memorySwatchColors = [
+        'var(--p-primary-color)',
+        'color-mix(in srgb, var(--p-primary-color) 72%, transparent)',
+        'color-mix(in srgb, var(--p-primary-color) 52%, transparent)',
+        'color-mix(in srgb, var(--p-primary-color) 36%, transparent)',
+        'color-mix(in srgb, var(--p-primary-color) 22%, transparent)',
+        'color-mix(in srgb, var(--p-text-muted-color) 35%, transparent)'
+    ];
+
+    protected memorySwatchColor(index: number): string {
+        return AdminSettings.memorySwatchColors[Math.min(index, AdminSettings.memorySwatchColors.length - 1)];
+    }
     protected readonly importCleanupActionDisabled = computed(() => {
         const cleanup = this.systemImportCleanup();
         return !this.canRunMaintenance() || !cleanup?.enabled || cleanup.stale_files === 0;

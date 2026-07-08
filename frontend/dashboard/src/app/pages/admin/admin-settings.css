@@ -3,6 +3,7 @@
 }
 
 .admin-metric span,
+.admin-memory__header span,
 .admin-definition-list dt {
     color: var(--p-text-muted-color);
     font-size: 0.75rem;
@@ -248,6 +249,85 @@
     gap: 0.55rem;
     min-height: 7rem;
     color: var(--p-text-muted-color);
+}
+
+.admin-memory {
+    display: grid;
+    gap: 0.6rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--p-content-border-color);
+}
+
+.admin-memory__header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.admin-memory__header strong {
+    color: var(--p-text-color);
+    font-size: 0.95rem;
+    font-weight: 750;
+}
+
+.admin-memory__bar {
+    display: flex;
+    height: 0.5rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--p-content-border-color);
+}
+
+.admin-memory__segment {
+    display: block;
+    height: 100%;
+    min-width: 2px;
+}
+
+.admin-memory__segment + .admin-memory__segment {
+    margin-left: 2px;
+}
+
+.admin-memory__legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 0.35rem 1.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.admin-memory__legend li {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.admin-memory__swatch {
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 3px;
+}
+
+.admin-memory__tag {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--p-text-muted-color);
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.admin-memory__bytes {
+    color: var(--p-text-color);
+    font-size: 0.82rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
 }
 
 .admin-path-cell {
