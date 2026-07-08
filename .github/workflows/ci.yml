@@ -46,10 +46,41 @@ jobs:
         run: go vet ./...
       - name: Staticcheck API
         run: go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 -tags "$(./scripts/go-build-tags.sh)" ./...
+
+  test:
+    name: Test API (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [heavy, rest]
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Resolve Go build tags
+        id: go-build-tags
+        shell: bash
+        run: echo "goflags=$(./scripts/go-build-tags.sh goflags)" >> "$GITHUB_OUTPUT"
+      - name: Setup Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
       - name: Test API
         env:
           GOFLAGS: ${{ steps.go-build-tags.outputs.goflags }}
-        run: go test -race ./...
+          TEST_SHARD: ${{ matrix.shard }}
+        run: |
+          set -euo pipefail
+          heavy='internal/(database|mcpserver|mailer)(/|$)'
+          if [ "$TEST_SHARD" = "heavy" ]; then
+            packages=$(go list ./... | grep -E "$heavy")
+          else
+            packages=$(go list ./... | grep -vE "$heavy")
+          fi
+          go test -race $packages
+
   mcp-audit:
     name: Audit MCP surface
     runs-on: ubuntu-latest
