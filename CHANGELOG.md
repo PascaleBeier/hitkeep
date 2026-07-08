@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.10.1](https://github.com/PascaleBeier/hitkeep/compare/v2.10.0...v2.10.1) (2026-07-08)
+
+
+### Bug Fixes
+
+* **admin:** add DuckDB memory breakdown and copyable system report ([db0588d](https://github.com/PascaleBeier/hitkeep/commit/db0588d9fe9ac8c96ba3d5acc50ae855e50d65ad))
+* **admin:** polish the system console ([0c19df7](https://github.com/PascaleBeier/hitkeep/commit/0c19df7e941c6fe07fd2c25b3664c4dbbbe2f300))
+* **db:** make deprecated-driver-call suppressions work for both linters ([2396af0](https://github.com/PascaleBeier/hitkeep/commit/2396af00fdb3b6d94fb5fcbf7127c1bcf7fe8ee7))
+* **db:** self-heal after a fatal DuckDB invalidation ([b1719ea](https://github.com/PascaleBeier/hitkeep/commit/b1719ea81e45bb44d82b958af749f207abf064e9))
+
+
+### Performance Improvements
+
+* **db:** bound DuckDB memory and drop analytics ART indexes ([8166a78](https://github.com/PascaleBeier/hitkeep/commit/8166a786e2bf24da26a78eeb6c7b4c60ebd533a8)), closes [#236](https://github.com/PascaleBeier/hitkeep/issues/236)
+
 ## [2.10.0](https://github.com/PascaleBeier/hitkeep/compare/v2.9.1...v2.10.0) (2026-07-07)
 
 
