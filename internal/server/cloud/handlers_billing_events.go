@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -129,7 +130,31 @@ func (h *handler) handleStripeEvent(ctx context.Context, event stripe.Event) err
 		return fmt.Errorf("mark stripe event processed: %w", err)
 	}
 
+	if tenantID != uuid.Nil {
+		h.syncTeamRetentionAfterBillingChange(ctx, tenantID)
+	}
+
 	return nil
+}
+
+// syncTeamRetentionAfterBillingChange applies the team's current plan's
+// retention cap to its sites immediately after a billing event, so an
+// upgrade or downgrade takes effect without waiting for the daily
+// CloudRetentionSyncWorker reconciliation pass. Deliberately best-effort:
+// this runs after the event is already marked Done, so a transient failure
+// here must not fail the webhook handler and trigger a pointless Stripe
+// retry of an already-processed event.
+func (h *handler) syncTeamRetentionAfterBillingChange(ctx context.Context, tenantID uuid.UUID) {
+	if h.ctx.TenantStores == nil {
+		return
+	}
+	ent := h.ctx.Limits().TeamEntitlements(ctx, tenantID)
+	if ent == nil {
+		return
+	}
+	if _, err := h.ctx.TenantStores.SyncTeamRetention(ctx, tenantID, ent.MaxRetentionDays); err != nil {
+		slog.Error("failed to sync team retention after billing event", "tenant_id", tenantID, "error", err)
+	}
 }
 
 func tenantIDFromStripeMetadata(metadata map[string]string) (uuid.UUID, error) {

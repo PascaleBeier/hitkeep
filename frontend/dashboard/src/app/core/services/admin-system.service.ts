@@ -333,6 +333,10 @@ export class AdminSystemService {
         return this.http.get<SystemActivationResponse>('/api/admin/system/activation', { params: httpParams });
     }
 
+    setActivationTeamPlan(teamId: string, planCode: string) {
+        return this.http.post<{ status: string; plan_code: string; plan_name: string }>(`/api/admin/system/activation/${teamId}/plan`, { plan_code: planCode });
+    }
+
     listAudit(params?: AuditFilterParams) {
         const httpParams = this.auditParams(params, { includePagination: true });
         return this.http.get<InstanceAuditListResponse>('/api/admin/system/audit', { params: httpParams });

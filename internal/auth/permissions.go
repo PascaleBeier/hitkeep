@@ -67,6 +67,7 @@ var instancePermissions = map[InstanceRole][]Permission{
 	InstanceAdmin: {
 		PermInstanceViewAllSites,
 		PermInstanceViewSystem,
+		PermInstanceViewActivation,
 		PermInstanceRunMaintenance,
 		PermInstanceViewAudit,
 		PermInstanceManageSiteExclusions,

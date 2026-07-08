@@ -255,7 +255,7 @@ func (h *handler) handleCreateSite() http.HandlerFunc {
 		}
 
 		if h.ctx.Config.DataRetentionDays > 0 {
-			if err := h.ctx.Store.UpdateSiteRetention(r.Context(), site.ID, userID, h.ctx.Config.DataRetentionDays); err != nil {
+			if err := h.ctx.Store.UpdateSiteRetention(r.Context(), site.ID, userID, h.ctx.Config.DataRetentionDays, true); err != nil {
 				slog.Warn("Failed to set default data retention policy", "site_id", site.ID, "error", err)
 			}
 		}
@@ -470,7 +470,7 @@ func (h *handler) handleUpdateSiteRetention() http.HandlerFunc {
 			return
 		}
 
-		if err := h.ctx.Store.UpdateSiteRetention(r.Context(), siteID, userID, req.Days); err != nil {
+		if err := h.ctx.Store.UpdateSiteRetention(r.Context(), siteID, userID, req.Days, false); err != nil {
 			slog.Error("Failed to update site retention", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return

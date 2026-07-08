@@ -80,12 +80,13 @@ type Hit struct {
 }
 
 type Site struct {
-	ID                uuid.UUID `json:"id"`
-	UserID            uuid.UUID `json:"user_id"`
-	Domain            string    `json:"domain"`
-	OwnerEmail        string    `json:"owner_email,omitempty"`
-	DataRetentionDays int       `json:"data_retention_days"`
-	CreatedAt         time.Time `json:"created_at"`
+	ID                      uuid.UUID `json:"id"`
+	UserID                  uuid.UUID `json:"user_id"`
+	Domain                  string    `json:"domain"`
+	OwnerEmail              string    `json:"owner_email,omitempty"`
+	DataRetentionDays       int       `json:"data_retention_days"`
+	RetentionSyncedFromPlan bool      `json:"retention_synced_from_plan"`
+	CreatedAt               time.Time `json:"created_at"`
 }
 
 type CustomTrackingDomainStatus string

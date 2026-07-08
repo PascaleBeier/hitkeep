@@ -278,7 +278,7 @@ func (s *Store) ListSitesForTenant(ctx context.Context, tenantID uuid.UUID) ([]a
 	}
 
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT s.id, s.user_id, s.domain, s.data_retention_days, s.created_at
+		SELECT s.id, s.user_id, s.domain, s.data_retention_days, s.retention_synced_from_plan, s.created_at
 		FROM sites s
 		LEFT JOIN site_tenants st ON st.site_id = s.id
 		LEFT JOIN tenant_archives ta ON ta.tenant_id = COALESCE(st.tenant_id, ?)
@@ -294,7 +294,7 @@ func (s *Store) ListSitesForTenant(ctx context.Context, tenantID uuid.UUID) ([]a
 	sites := make([]api.Site, 0)
 	for rows.Next() {
 		var site api.Site
-		if err := rows.Scan(&site.ID, &site.UserID, &site.Domain, &site.DataRetentionDays, &site.CreatedAt); err != nil {
+		if err := rows.Scan(&site.ID, &site.UserID, &site.Domain, &site.DataRetentionDays, &site.RetentionSyncedFromPlan, &site.CreatedAt); err != nil {
 			return nil, fmt.Errorf("could not scan tenant site: %w", err)
 		}
 		sites = append(sites, site)
@@ -306,13 +306,33 @@ func (s *Store) ListSitesForTenant(ctx context.Context, tenantID uuid.UUID) ([]a
 	return sites, nil
 }
 
-func (s *Store) UpdateSiteRetention(ctx context.Context, siteID uuid.UUID, userID uuid.UUID, days int) error {
+// UpdateSiteRetention updates a site's retention policy on behalf of its
+// owning user. syncedFromPlan should be false for user-initiated changes
+// (protects the value from being raised automatically by the plan-based
+// retention sync) and true when applying a deployment-wide default that
+// remains eligible for plan-based sync.
+func (s *Store) UpdateSiteRetention(ctx context.Context, siteID uuid.UUID, userID uuid.UUID, days int, syncedFromPlan bool) error {
 	_, err := s.db.ExecContext(ctx,
-		"UPDATE sites SET data_retention_days = ? WHERE id = ? AND user_id = ?",
-		days, siteID, userID,
+		"UPDATE sites SET data_retention_days = ?, retention_synced_from_plan = ? WHERE id = ? AND user_id = ?",
+		days, syncedFromPlan, siteID, userID,
 	)
 	if err != nil {
 		return fmt.Errorf("could not update site retention: %w", err)
+	}
+	return nil
+}
+
+// SetSiteRetentionDaysSystem updates a site's retention policy without a
+// user-ownership check. Used only by the plan-entitlement retention sync
+// (internal/database/tenant_store_manager_retention.go); user-initiated
+// requests must keep going through UpdateSiteRetention.
+func (s *Store) SetSiteRetentionDaysSystem(ctx context.Context, siteID uuid.UUID, days int, syncedFromPlan bool) error {
+	_, err := s.db.ExecContext(ctx,
+		"UPDATE sites SET data_retention_days = ?, retention_synced_from_plan = ? WHERE id = ?",
+		days, syncedFromPlan, siteID,
+	)
+	if err != nil {
+		return fmt.Errorf("could not set site retention: %w", err)
 	}
 	return nil
 }

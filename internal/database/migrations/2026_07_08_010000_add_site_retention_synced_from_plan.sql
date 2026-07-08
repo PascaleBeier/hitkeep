@@ -1,0 +1,1 @@
+ALTER TABLE sites ADD COLUMN IF NOT EXISTS retention_synced_from_plan BOOLEAN DEFAULT TRUE;

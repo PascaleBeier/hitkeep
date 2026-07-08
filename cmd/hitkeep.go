@@ -137,6 +137,12 @@ func Run() {
 		cloudLifecycleWorker := worker.NewCloudLifecycleWorker(tenantMgr, mailSvc, conf)
 		go cloudLifecycleWorker.Start(gCtx)
 
+		// Start cloud retention sync worker (daily reconciliation safety net
+		// for the webhook-triggered sync in internal/server/cloud). No-op in
+		// non-billing builds.
+		cloudRetentionSyncWorker := worker.NewCloudRetentionSyncWorker(tenantMgr, entitlements.NewService(store, ent, conf), conf)
+		go cloudRetentionSyncWorker.Start(gCtx)
+
 		startSearchConsoleSyncWorker(gCtx, conf, tenantMgr)
 
 		g.Go(func() error {

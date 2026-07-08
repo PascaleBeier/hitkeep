@@ -402,6 +402,7 @@ export class AdminSettings implements OnInit {
     protected deletingTeamId = signal('');
     protected currentUserId = signal<string>('');
     protected roleControls = signal<Record<string, FormControl<InstanceRole>>>({});
+    protected planControls = signal<Record<string, FormControl<string>>>({});
     protected deleteUserBlock = signal<DeleteUserBlockState | null>(null);
     protected userMfaStatus = signal<StatusState | null>(null);
     protected userActionStatus = signal<StatusState | null>(null);
@@ -444,6 +445,15 @@ export class AdminSettings implements OnInit {
             { label: this.transloco.translate('admin.roles.user'), value: 'user' }
         ];
     });
+
+    // Plan names are shown as-is everywhere else in the app (e.g. the team
+    // upgrade dialog's plan_name from entitlements.CloudPlanName()) rather
+    // than translated, so these labels intentionally aren't localized either.
+    protected planOptions = [
+        { label: 'Free', value: 'free' },
+        { label: 'Pro', value: 'pro' },
+        { label: 'Business', value: 'business' }
+    ];
 
     protected readonly localeTag = computed(() => {
         const lang = this.activeLanguage();
@@ -790,11 +800,18 @@ export class AdminSettings implements OnInit {
                 next: (activation) => {
                     if (requestID === this.activationRequestID) {
                         this.systemActivation.set(activation);
+                        this.planControls.set(
+                            activation.rows.reduce<Record<string, FormControl<string>>>((controls, row) => {
+                                controls[row.team_id] = new FormControl<string>(row.plan_code || 'free', { nonNullable: true });
+                                return controls;
+                            }, {})
+                        );
                     }
                 },
                 error: () => {
                     if (requestID === this.activationRequestID) {
                         this.systemActivation.set({ rows: [], total: 0, limit: 50, offset: 0, has_more: false });
+                        this.planControls.set({});
                     }
                 }
             });
@@ -1179,6 +1196,41 @@ export class AdminSettings implements OnInit {
         const previousRole = user.instance_role;
         user.instance_role = role;
         this.updateUserRole(user, role, previousRole);
+    }
+
+    private updateTeamPlan(row: SystemActivationRow, nextPlan: string, previousPlan: string): void {
+        this.system.setActivationTeamPlan(row.team_id, nextPlan).subscribe({
+            next: (response) => {
+                row.plan_code = response.plan_code;
+                row.plan_name = response.plan_name;
+                this.planControl(row.team_id).setValue(response.plan_code, { emitEvent: false });
+            },
+            error: (err) => {
+                row.plan_code = previousPlan;
+                this.planControl(row.team_id).setValue(previousPlan, { emitEvent: false });
+                console.error('Failed to update team plan', err);
+            }
+        });
+    }
+
+    protected planControl(teamId: string): FormControl<string> {
+        const existing = this.planControls()[teamId];
+        if (existing) {
+            return existing;
+        }
+
+        const fallback = new FormControl<string>('free', { nonNullable: true });
+        this.planControls.update((controls) => ({ ...controls, [teamId]: fallback }));
+        return fallback;
+    }
+
+    protected onPlanChange(row: SystemActivationRow, planCode: string | null | undefined): void {
+        if (!planCode || planCode === row.plan_code) {
+            return;
+        }
+
+        const previousPlan = row.plan_code || 'free';
+        this.updateTeamPlan(row, planCode, previousPlan);
     }
 
     protected isCurrentUser(user: User): boolean {

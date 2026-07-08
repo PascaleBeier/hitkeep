@@ -1104,9 +1104,23 @@
                                         </td>
                                         <td>
                                             <div class="max-w-52 truncate font-semibold text-[var(--p-text-color)]">{{ row.site_domain }}</div>
-                                            @if (row.plan_name || row.plan_code || row.cloud_region) {
+                                            @if (isManagedCloud() && canRunMaintenance()) {
+                                            <span class="admin-role-select-wrap mt-0.5 inline-block">
+                                                <p-select
+                                                    [options]="planOptions"
+                                                    [formControl]="planControl(row.team_id)"
+                                                    (onChange)="onPlanChange(row, $event.value)"
+                                                    optionLabel="label"
+                                                    optionValue="value"
+                                                    class="admin-role-select"
+                                                    appendTo="body"
+                                                />
+                                            </span>
+                                            @if (row.cloud_region) {
+                                            <div class="mt-0.5 max-w-52 truncate text-xs font-medium text-[var(--p-text-muted-color)]">{{ row.cloud_region }}</div>
+                                            } } @else { @if (row.plan_name || row.plan_code || row.cloud_region) {
                                             <div class="mt-0.5 max-w-52 truncate text-xs font-medium text-[var(--p-text-muted-color)]">{{ row.plan_name || row.plan_code || "-" }} · {{ row.cloud_region || "-" }}</div>
-                                            }
+                                            } }
                                         </td>
                                         <td><p-tag [value]="activationStatusLabel(row.status)" [severity]="activationStatusSeverity(row.status)" /></td>
                                         <td>

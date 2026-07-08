@@ -60,6 +60,7 @@ export const INSTANCE_ROLE_CAPABILITIES = {
     admin: [
         INSTANCE_CAPABILITIES.viewAllSites,
         INSTANCE_CAPABILITIES.viewSystem,
+        INSTANCE_CAPABILITIES.viewActivation,
         INSTANCE_CAPABILITIES.runMaintenance,
         INSTANCE_CAPABILITIES.viewAudit,
         INSTANCE_CAPABILITIES.manageSiteExclusions,
