@@ -79,6 +79,48 @@ func TestListEligibleCloudLifecycleRecipientsForFreeRetentionReminder(t *testing
 	}
 }
 
+func TestListEligibleCloudLifecycleRecipientsForFreeRetentionPreTrim(t *testing.T) {
+	store := setupTenantStore(t)
+	ctx := context.Background()
+	now := time.Date(2026, 6, 24, 12, 0, 0, 0, time.UTC)
+
+	inWindow := seedCloudLifecycleTeam(t, store, "pretrim@example.com", "pretrim.example", CloudPlanFree, CloudSubscriptionStatusFree, ptrTime(now.AddDate(0, 0, -(CloudFreePlanRetentionDays-CloudRetentionPreTrimLeadDays)-1)))
+	seedCloudLifecycleTeam(t, store, "too-young-pretrim@example.com", "too-young-pretrim.example", CloudPlanFree, CloudSubscriptionStatusFree, ptrTime(now.AddDate(0, 0, -30)))
+	seedCloudLifecycleTeam(t, store, "already-trimming@example.com", "already-trimming.example", CloudPlanFree, CloudSubscriptionStatusFree, ptrTime(now.AddDate(0, 0, -CloudFreePlanRetentionDays-1)))
+	seedCloudLifecycleTeam(t, store, "paid-pretrim@example.com", "paid-pretrim.example", CloudPlanPro, CloudSubscriptionStatusActive, ptrTime(now.AddDate(0, 0, -(CloudFreePlanRetentionDays-CloudRetentionPreTrimLeadDays)-1)))
+
+	recipients, err := store.ListEligibleCloudLifecycleRecipients(ctx, CloudLifecycleMessageFreeRetentionPreTrim, now, 100)
+	if err != nil {
+		t.Fatalf("list pre-trim recipients: %v", err)
+	}
+	if len(recipients) != 1 {
+		t.Fatalf("expected one pre-trim recipient, got %d: %+v", len(recipients), recipients)
+	}
+	if recipients[0].TenantID != inWindow.TenantID || recipients[0].Email != "pretrim@example.com" {
+		t.Fatalf("unexpected pre-trim recipient: %+v", recipients[0])
+	}
+	if recipients[0].FirstHitAt.IsZero() {
+		t.Fatalf("expected first hit timestamp on pre-trim recipient, got %+v", recipients[0])
+	}
+
+	if err := store.MarkCloudLifecycleMessageSent(ctx, CloudLifecycleMessageUpdate{
+		TenantID: inWindow.TenantID,
+		UserID:   inWindow.UserID,
+		Kind:     CloudLifecycleMessageFreeRetentionPreTrim,
+		Now:      now,
+	}); err != nil {
+		t.Fatalf("mark pre-trim sent: %v", err)
+	}
+
+	recipients, err = store.ListEligibleCloudLifecycleRecipients(ctx, CloudLifecycleMessageFreeRetentionPreTrim, now, 100)
+	if err != nil {
+		t.Fatalf("list pre-trim recipients after sent: %v", err)
+	}
+	if len(recipients) != 0 {
+		t.Fatalf("expected sent pre-trim recipient to be excluded, got %+v", recipients)
+	}
+}
+
 func TestCloudLifecycleMessageFailureRetriesAndCapsAttempts(t *testing.T) {
 	store := setupTenantStore(t)
 	ctx := context.Background()

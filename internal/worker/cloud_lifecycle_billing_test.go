@@ -68,6 +68,42 @@ func TestCloudLifecycleWorkerSendsWelcomeAndReminderOnce(t *testing.T) {
 	}
 }
 
+func TestCloudLifecycleWorkerSendsPreTrimWarningBeforeFirstRollOff(t *testing.T) {
+	store, mgr := setupCloudLifecycleWorkerStore(t)
+	now := time.Date(2026, 6, 24, 12, 0, 0, 0, time.UTC)
+	firstHit := now.AddDate(0, 0, -(database.CloudFreePlanRetentionDays - database.CloudRetentionPreTrimLeadDays + 1))
+	team := seedWorkerCloudLifecycleTeam(t, store, "pretrim-worker@example.com", "pretrim-worker.example", database.CloudPlanFree, database.CloudSubscriptionStatusFree, ptrWorkerTime(firstHit))
+	driver := &cloudLifecycleWorkerMailDriver{}
+	worker := NewCloudLifecycleWorker(mgr, mailer.NewWithDriver(driver, nil), cloudLifecycleWorkerConfig())
+
+	worker.RunAt(context.Background(), now)
+
+	message, err := store.GetCloudLifecycleMessage(context.Background(), team.TenantID, team.UserID, database.CloudLifecycleMessageFreeRetentionPreTrim)
+	if err != nil {
+		t.Fatalf("get pre-trim message: %v", err)
+	}
+	if message.Status != database.CloudLifecycleMessageStatusSent || message.Attempts != 1 || message.SentAt == nil {
+		t.Fatalf("unexpected pre-trim message: %+v", message)
+	}
+
+	rollOffDate := firstHit.UTC().AddDate(0, 0, database.CloudFreePlanRetentionDays).Format("2006-01-02")
+	found := false
+	for _, send := range driver.sends {
+		if strings.Contains(send.textBody, rollOffDate) && strings.Contains(send.textBody, "pretrim-worker.example") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected a pre-trim send containing roll-off date %s, got %+v", rollOffDate, driver.sends)
+	}
+
+	sendsAfterFirstRun := len(driver.sends)
+	worker.RunAt(context.Background(), now.Add(24*time.Hour))
+	if len(driver.sends) != sendsAfterFirstRun {
+		t.Fatalf("expected no duplicate pre-trim sends, got %d after %d", len(driver.sends), sendsAfterFirstRun)
+	}
+}
+
 func TestCloudLifecycleWorkerSkipsWhenMailerMissing(t *testing.T) {
 	store, mgr := setupCloudLifecycleWorkerStore(t)
 	now := time.Date(2026, 6, 24, 12, 0, 0, 0, time.UTC)

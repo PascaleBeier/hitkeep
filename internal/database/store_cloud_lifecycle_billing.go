@@ -16,10 +16,18 @@ import (
 const (
 	CloudLifecycleMessageWelcome               = "cloud_welcome"
 	CloudLifecycleMessageFreeRetentionReminder = "cloud_free_retention_reminder"
+	CloudLifecycleMessageFreeRetentionPreTrim  = "cloud_free_retention_pretrim"
 	CloudLifecycleMessageFreeLimitReminder     = "cloud_free_limit_reminder"
 	CloudLifecycleMessageStatusSent            = "sent"
 	CloudLifecycleMessageStatusFailed          = "failed"
 	CloudLifecycleMessageMaxAttempts           = 3
+
+	// CloudFreePlanRetentionDays mirrors the free plan's MaxRetentionDays
+	// entitlement so lifecycle eligibility can be computed in SQL.
+	CloudFreePlanRetentionDays = 60
+	// CloudRetentionPreTrimLeadDays is how many days before the first data
+	// roll-off the pre-trim warning goes out.
+	CloudRetentionPreTrimLeadDays = 7
 )
 
 var ErrCloudLifecycleMessageNotFound = errors.New("cloud lifecycle message not found")
@@ -62,7 +70,7 @@ type CloudLifecycleMessageUpdate struct {
 
 func (s *Store) ListEligibleCloudLifecycleRecipients(ctx context.Context, kind string, now time.Time, limit int) ([]CloudLifecycleRecipient, error) {
 	kind = strings.TrimSpace(kind)
-	if kind != CloudLifecycleMessageWelcome && kind != CloudLifecycleMessageFreeRetentionReminder && kind != CloudLifecycleMessageFreeLimitReminder {
+	if kind != CloudLifecycleMessageWelcome && kind != CloudLifecycleMessageFreeRetentionReminder && kind != CloudLifecycleMessageFreeRetentionPreTrim && kind != CloudLifecycleMessageFreeLimitReminder {
 		return nil, fmt.Errorf("unsupported cloud lifecycle message kind %q", kind)
 	}
 	if now.IsZero() {
@@ -85,6 +93,24 @@ func (s *Store) ListEligibleCloudLifecycleRecipients(ctx context.Context, kind s
 		`
 		args = append(args,
 			now.UTC().AddDate(0, 0, -14),
+			CloudSubscriptionStatusFree,
+			CloudSubscriptionStatusFree,
+			"pending_checkout",
+			"canceled",
+			CloudSubscriptionStatusChargebackLost,
+		)
+	}
+	if kind == CloudLifecycleMessageFreeRetentionPreTrim {
+		// Warn only inside the lead window: old enough that roll-off is
+		// imminent, but not so old that data is already being removed.
+		extraWhere = `
+			AND activated.first_hit_at <= ?
+			AND activated.first_hit_at > ?
+			AND COALESCE(NULLIF(cba.subscription_status, ''), ?) IN (?, ?, ?, ?)
+		`
+		args = append(args,
+			now.UTC().AddDate(0, 0, -(CloudFreePlanRetentionDays-CloudRetentionPreTrimLeadDays)),
+			now.UTC().AddDate(0, 0, -CloudFreePlanRetentionDays),
 			CloudSubscriptionStatusFree,
 			CloudSubscriptionStatusFree,
 			"pending_checkout",

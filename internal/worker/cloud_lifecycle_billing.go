@@ -15,7 +15,7 @@ import (
 	"hitkeep/internal/mailer"
 )
 
-const cloudLifecycleFreeRetentionDays = 60
+const cloudLifecycleFreeRetentionDays = database.CloudFreePlanRetentionDays
 
 type CloudLifecycleWorker struct {
 	tenantMgr *database.TenantStoreManager
@@ -82,6 +82,7 @@ func (w *CloudLifecycleWorker) RunAt(ctx context.Context, now time.Time) {
 
 	w.processKind(ctx, database.CloudLifecycleMessageWelcome, now.UTC())
 	w.processKind(ctx, database.CloudLifecycleMessageFreeRetentionReminder, now.UTC())
+	w.processKind(ctx, database.CloudLifecycleMessageFreeRetentionPreTrim, now.UTC())
 	w.processKind(ctx, database.CloudLifecycleMessageFreeLimitReminder, now.UTC())
 }
 
@@ -149,6 +150,15 @@ func cloudLifecycleMailable(kind string, recipient database.CloudLifecycleRecipi
 			cloudLifecycleTeamName(recipient),
 			cloudLifecycleSiteDomain(recipient),
 			cloudLifecycleFreeRetentionDays,
+			links,
+		)
+	case database.CloudLifecycleMessageFreeRetentionPreTrim:
+		return mailables.NewCloudFreeRetentionPreTrim(
+			recipient.Locale,
+			cloudLifecycleTeamName(recipient),
+			cloudLifecycleSiteDomain(recipient),
+			cloudLifecycleFreeRetentionDays,
+			recipient.FirstHitAt.UTC().AddDate(0, 0, cloudLifecycleFreeRetentionDays).Format("2006-01-02"),
 			links,
 		)
 	case database.CloudLifecycleMessageFreeLimitReminder:

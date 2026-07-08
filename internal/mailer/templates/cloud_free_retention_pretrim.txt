@@ -1,0 +1,19 @@
+{{ define "content" -}}
+{{ t "cloud.retention_pretrim.heading" }}
+===========================
+
+{{ tf "cloud.retention_pretrim.body" .RetentionDays .RollOffDate .SiteDomain }}
+
+{{ t "cloud.retention_pretrim.reason" }}
+
+{{ t "cloud.retention.plans_button" }}: {{ .UpgradeURL }}
+
+{{ t "cloud.retention.docs" }}
+{{ t "cloud.welcome.dashboard_button" }}: {{ .DashboardURL }}
+
+--
+
+{{ t "cloud.opensource.note" }}
+{{ t "cloud.opensource.support" }} {{ t "cloud.opensource.sponsor" }}: {{ .FundingURL }}
+{{ t "cloud.opensource.spread" }}
+{{- end }}

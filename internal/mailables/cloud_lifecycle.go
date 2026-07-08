@@ -121,6 +121,62 @@ func (m *CloudFreeRetentionReminder) Data() any {
 
 func (m *CloudFreeRetentionReminder) Locale() string { return m.LocaleCode }
 
+type CloudFreeRetentionPreTrim struct {
+	LocaleCode    string
+	TeamName      string
+	SiteDomain    string
+	RetentionDays int
+	RollOffDate   string
+	Links         CloudLifecycleLinks
+}
+
+func NewCloudFreeRetentionPreTrim(locale, teamName, siteDomain string, retentionDays int, rollOffDate string, links CloudLifecycleLinks) mailer.Mailable {
+	return &CloudFreeRetentionPreTrim{
+		LocaleCode:    locale,
+		TeamName:      teamName,
+		SiteDomain:    siteDomain,
+		RetentionDays: retentionDays,
+		RollOffDate:   rollOffDate,
+		Links:         links,
+	}
+}
+
+func (m *CloudFreeRetentionPreTrim) Subject() string {
+	return mailer.Translate(m.LocaleCode, "subject.cloud_free_retention_pretrim")
+}
+
+func (m *CloudFreeRetentionPreTrim) Template() string {
+	return "cloud_free_retention_pretrim.mjml"
+}
+
+func (m *CloudFreeRetentionPreTrim) Data() any {
+	return struct {
+		TeamName      string
+		SiteDomain    string
+		RetentionDays int
+		RollOffDate   string
+		DashboardURL  string
+		UpgradeURL    string
+		FundingURL    string
+		DocsURL       string
+		WordPressURL  string
+		FeedbackURL   string
+	}{
+		TeamName:      m.TeamName,
+		SiteDomain:    m.SiteDomain,
+		RetentionDays: m.RetentionDays,
+		RollOffDate:   m.RollOffDate,
+		DashboardURL:  m.Links.DashboardURL,
+		UpgradeURL:    m.Links.UpgradeURL,
+		FundingURL:    m.Links.FundingURL,
+		DocsURL:       m.Links.DocsURL,
+		WordPressURL:  m.Links.WordPressURL,
+		FeedbackURL:   m.Links.FeedbackURL,
+	}
+}
+
+func (m *CloudFreeRetentionPreTrim) Locale() string { return m.LocaleCode }
+
 type CloudFreeLimitReminder struct {
 	LocaleCode  string
 	TeamName    string
