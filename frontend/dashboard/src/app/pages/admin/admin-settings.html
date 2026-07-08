@@ -274,6 +274,10 @@
             </div>
         </div>
 
+        <div class="mb-3 flex justify-end">
+            <app-copy-control [value]="systemReport()" [labelKey]="'admin.system.console.copyReport'" [ariaLabelKey]="'admin.system.console.copyReportAria'" size="small" [text]="true" />
+        </div>
+
         <p-tabs [(value)]="activeAdminTab" class="hk-admin-tabs">
             <p-tablist>
                 <p-tab value="runtime">{{ "admin.system.console.tabs.runtime" | transloco }}</p-tab>

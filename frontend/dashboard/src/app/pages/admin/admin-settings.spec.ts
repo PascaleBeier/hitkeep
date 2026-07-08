@@ -630,6 +630,7 @@ describe('AdminSettings rendered system status', () => {
             recent_spam: 0,
             hits_per_second: 0
         });
+        httpMock.expectOne('/api/admin/system/report').flush('# HitKeep System Report');
     }
 
     it('shows public IP2Location attribution on the runtime status card', () => {

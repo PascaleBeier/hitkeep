@@ -316,6 +316,15 @@ func openAPIV1AccountSchemas() map[string]any {
 				"backup_path":          map[string]any{"type": "string"},
 				"disk_available_bytes": map[string]any{"type": "integer", "format": "int64"},
 				"disk_total_bytes":     map[string]any{"type": "integer", "format": "int64"},
+				"duckdb_memory":        map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/DuckDBMemoryStat"}},
+			},
+		},
+		"DuckDBMemoryStat": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"tag":                     map[string]any{"type": "string"},
+				"memory_bytes":            map[string]any{"type": "integer", "format": "int64"},
+				"temporary_storage_bytes": map[string]any{"type": "integer", "format": "int64"},
 			},
 		},
 		"SystemIngestStats": map[string]any{

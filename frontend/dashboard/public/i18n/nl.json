@@ -2221,7 +2221,9 @@
         "sitesDescription": "Alle sites zichtbaar voor exemplaarbeheerders.",
         "teamsDescription": "Teamcontainers en hun operationele status.",
         "auditDescription": "Alleen-toevoegen-activiteit voor bewerkingen van gevoelige exemplaren.",
-        "settingsSubtitle": "Beheer exemplaargebruikers, sites, teams en globale filters."
+        "settingsSubtitle": "Beheer exemplaargebruikers, sites, teams en globale filters.",
+        "copyReport": "Systeemrapport kopiëren",
+        "copyReportAria": "Kopieer het systeemrapport voor supportverzoeken"
       },
       "activation": {
         "title": "Activering van de gebruiker",

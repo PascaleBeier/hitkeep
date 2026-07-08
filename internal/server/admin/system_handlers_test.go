@@ -637,6 +637,14 @@ func TestHandleGetStorage(t *testing.T) {
 			t.Fatalf("expected positive disk_available_bytes, got %d", storage.DiskAvailable)
 		}
 	}
+	if len(storage.DuckDBMemory) == 0 {
+		t.Fatal("expected duckdb_memory breakdown in storage status")
+	}
+	for _, stat := range storage.DuckDBMemory {
+		if stat.Tag == "" {
+			t.Fatal("expected every duckdb_memory row to carry a tag")
+		}
+	}
 }
 
 func TestHandleGetIngestStats(t *testing.T) {

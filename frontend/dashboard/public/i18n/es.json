@@ -2239,7 +2239,9 @@
         "sitesDescription": "Todos los sitios visibles para administradores de instancia.",
         "teamsDescription": "Contenedores de equipo y su estado operativo.",
         "auditDescription": "Actividad append-only de operaciones sensibles de instancia.",
-        "settingsSubtitle": "Gestiona usuarios, sitios, equipos y filtros globales de la instancia."
+        "settingsSubtitle": "Gestiona usuarios, sitios, equipos y filtros globales de la instancia.",
+        "copyReport": "Copiar informe del sistema",
+        "copyReportAria": "Copiar el informe del sistema para solicitudes de soporte"
       },
       "activation": {
         "title": "Activación de usuarios",

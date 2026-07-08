@@ -37,8 +37,12 @@ func openAPIV1AdminSitePaths() map[string]any {
 			"get": op([]string{"Admin"}, "Get AI system status", "Returns non-sensitive AI gateway configuration status, provider/model labels, local budget usage, and the latest safe run state without exposing provider secrets, prompts, or raw provider payloads.", secCookie(), nil, nil,
 				map[string]any{"200": jsonRefResp("AI system status", "#/components/schemas/SystemAIStatus")}),
 		},
+		"/api/admin/system/report": map[string]any{
+			"get": op([]string{"Admin"}, "Get system report", "Returns a markdown system report with instance, configuration, storage, DuckDB memory, ingest, and feature information for support requests.", secCookie(), nil, nil,
+				map[string]any{"200": desc("System report (text/markdown)")}),
+		},
 		"/api/admin/system/storage": map[string]any{
-			"get": op([]string{"Admin"}, "Get system storage", "Returns configured data paths, shared and tenant database sizes, backup path, spam cache path, and disk capacity fields when available.", secCookie(), nil, nil,
+			"get": op([]string{"Admin"}, "Get system storage", "Returns configured data paths, shared and tenant database sizes, backup path, spam cache path, disk capacity fields when available, and the shared database's DuckDB memory breakdown.", secCookie(), nil, nil,
 				map[string]any{"200": jsonRefResp("System storage", "#/components/schemas/SystemStorage")}),
 		},
 		"/api/admin/system/ingest": map[string]any{

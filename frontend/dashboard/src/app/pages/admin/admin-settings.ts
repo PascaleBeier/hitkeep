@@ -177,6 +177,7 @@ export class AdminSettings implements OnInit {
     protected systemCaches = signal<SystemCacheStatus | null>(null);
     protected systemMail = signal<SystemMailStatus | null>(null);
     protected systemActivation = signal<SystemActivationResponse | null>(null);
+    protected systemReport = signal<string>('');
 
     protected isLoadingSystem = signal(false);
     protected isLoadingHealth = signal(false);
@@ -710,6 +711,13 @@ export class AdminSettings implements OnInit {
             });
     }
 
+    protected loadSystemReport() {
+        this.system.getReport().subscribe({
+            next: (report) => this.systemReport.set(report),
+            error: () => this.systemReport.set('')
+        });
+    }
+
     protected refreshRuntime() {
         this.loadSystemInfo();
         this.loadSystemHealth();
@@ -717,6 +725,7 @@ export class AdminSettings implements OnInit {
         this.loadSystemAIStatus();
         this.loadSystemStorage();
         this.loadSystemIngest();
+        this.loadSystemReport();
     }
 
     protected refreshOperations() {

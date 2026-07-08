@@ -2215,7 +2215,9 @@
         "sitesDescription": "Todos os sites visíveis para administradores da instância.",
         "teamsDescription": "Equipes da instância e o status operacional delas.",
         "auditDescription": "Atividade do tipo append-only (somente gravação) para operações confidenciais da instância.",
-        "settingsSubtitle": "Gerencie usuários, sites, equipes e filtros globais da instância."
+        "settingsSubtitle": "Gerencie usuários, sites, equipes e filtros globais da instância.",
+        "copyReport": "Copiar relatório do sistema",
+        "copyReportAria": "Copiar o relatório do sistema para solicitações de suporte"
       },
       "activation": {
         "title": "Ativação de usuários",
