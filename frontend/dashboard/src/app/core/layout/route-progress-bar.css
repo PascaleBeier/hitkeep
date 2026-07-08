@@ -1,0 +1,32 @@
+.hk-route-progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1200;
+    height: 2px;
+    width: 0;
+    opacity: 0;
+    background: var(--p-primary-color);
+    pointer-events: none;
+}
+
+.hk-route-progress.loading {
+    width: 90%;
+    opacity: 1;
+    transition: width 10s cubic-bezier(0.05, 0.7, 0.1, 1);
+}
+
+.hk-route-progress.done {
+    width: 100%;
+    opacity: 0;
+    transition:
+        width 200ms ease-out,
+        opacity 200ms linear 100ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hk-route-progress.loading,
+    .hk-route-progress.done {
+        transition: none;
+    }
+}
