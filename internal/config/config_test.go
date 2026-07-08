@@ -251,6 +251,27 @@ func TestParseTrustedProxiesWildcard(t *testing.T) {
 	}
 }
 
+func TestLoadDuckDBSettingsFromEnv(t *testing.T) {
+	env := map[string]string{
+		"HITKEEP_DUCKDB_MEMORY_LIMIT": "512MB",
+		"HITKEEP_DUCKDB_THREADS":      "4",
+	}
+
+	conf := load([]string{}, func(key, fallback string) string {
+		if val, ok := env[key]; ok {
+			return val
+		}
+		return fallback
+	})
+
+	if conf.DuckDBMemoryLimit != "512MB" {
+		t.Fatalf("expected DuckDBMemoryLimit 512MB, got %q", conf.DuckDBMemoryLimit)
+	}
+	if conf.DuckDBThreads != 4 {
+		t.Fatalf("expected DuckDBThreads 4, got %d", conf.DuckDBThreads)
+	}
+}
+
 func TestLoadS3ConfigDefaults(t *testing.T) {
 	conf := load([]string{}, func(key, fallback string) string {
 		return fallback
