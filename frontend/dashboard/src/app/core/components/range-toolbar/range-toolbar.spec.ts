@@ -1,6 +1,9 @@
 import { Signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideRouter } from '@angular/router';
 import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { provideTranslocoLocale } from '@jsverse/transloco-locale';
 import { PrimeNG } from 'primeng/config';
@@ -8,6 +11,9 @@ import { Select } from 'primeng/select';
 
 import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar } from './range-toolbar';
 import { PrimeLocaleSyncService } from '@core/i18n/prime-locale-sync.service';
+import { DashboardBootstrapService } from '@services/dashboard-bootstrap.service';
+import { ShareService } from '@services/share.service';
+import { TeamService } from '@services/team.service';
 
 describe('RangeToolbar', () => {
     let fixture: ComponentFixture<RangeToolbar>;
@@ -69,6 +75,12 @@ describe('RangeToolbar', () => {
                                 },
                                 timeRangeSelectorAria: 'Select range',
                                 refreshDataTooltip: 'Refresh'
+                            },
+                            cloud: {
+                                retentionHint: {
+                                    message: 'The Free plan keeps {{count}} days of data — older hits are not included in this view.',
+                                    upgradeAction: 'Upgrade for more history'
+                                }
                             }
                         },
                         de: {
@@ -155,6 +167,9 @@ describe('RangeToolbar', () => {
             ],
             providers: [
                 PrimeLocaleSyncService,
+                provideHttpClient(),
+                provideHttpClientTesting(),
+                provideRouter([]),
                 provideTranslocoLocale({
                     defaultLocale: 'en-US',
                     langToLocaleMapping: {
@@ -181,6 +196,61 @@ describe('RangeToolbar', () => {
         for (const property of darkModeTestProperties) {
             document.documentElement.style.removeProperty(property);
         }
+    });
+
+    function seedFreeCloudTeam(retentionDays = 60) {
+        const teamService = TestBed.inject(TeamService);
+        teamService.teams.set([
+            {
+                id: '00000000-0000-0000-0000-000000000001',
+                name: 'Alpha Team',
+                logo_url: '',
+                role: 'owner',
+                created_at: '2026-01-01T00:00:00Z',
+                plan: { code: 'free', name: 'Free' },
+                entitlements: {
+                    max_sites_per_team: 3,
+                    max_team_members: 3,
+                    max_retention_days: retentionDays,
+                    allow_sso: false,
+                    allow_custom_branding: false
+                }
+            }
+        ]);
+        teamService.activeTeamId.set('00000000-0000-0000-0000-000000000001');
+        TestBed.inject(DashboardBootstrapService).status.set({
+            needs_setup: false,
+            version: 'v2.0.0',
+            cloud: { hosted: true, signup_enabled: false }
+        });
+    }
+
+    it('shows the retention hint when a free cloud team selects a range beyond retention', () => {
+        seedFreeCloudTeam();
+        fixture.componentRef.setInput('selectedRange', DEFAULT_RANGE_OPTIONS.find((range) => range.value === '90d') as RangeOption);
+        fixture.detectChanges();
+
+        const hint = fixture.nativeElement.querySelector('[data-testid="range-retention-hint"]') as HTMLElement | null;
+        expect(hint).toBeTruthy();
+        expect(hint?.textContent).toContain('60 days');
+        expect(hint?.querySelector('a')?.getAttribute('href')).toBe('/admin/team/overview');
+    });
+
+    it('hides the retention hint for ranges within the retention window', () => {
+        seedFreeCloudTeam();
+        fixture.componentRef.setInput('selectedRange', DEFAULT_RANGE_OPTIONS.find((range) => range.value === '7d') as RangeOption);
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.querySelector('[data-testid="range-retention-hint"]')).toBeNull();
+    });
+
+    it('hides the retention hint in share mode', () => {
+        seedFreeCloudTeam();
+        TestBed.inject(ShareService).setToken('share-token');
+        fixture.componentRef.setInput('selectedRange', DEFAULT_RANGE_OPTIONS.find((range) => range.value === '90d') as RangeOption);
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.querySelector('[data-testid="range-retention-hint"]')).toBeNull();
     });
 
     const translatedLabels = (toolbar: RangeToolbar) => {

@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { compatForm } from '@angular/forms/signals/compat';
+import { RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { TranslocoLocaleService } from '@jsverse/transloco-locale';
 import { ButtonModule } from 'primeng/button';
@@ -10,7 +11,10 @@ import { SelectModule } from 'primeng/select';
 import { SelectButtonModule } from 'primeng/selectbutton';
 import { TooltipModule } from 'primeng/tooltip';
 import { injectActiveLang } from '@core/i18n/active-lang';
-import { type RangeOption, type RangeValue } from './range-options';
+import { DashboardBootstrapService } from '@services/dashboard-bootstrap.service';
+import { ShareService } from '@services/share.service';
+import { TeamService } from '@services/team.service';
+import { resolveDateRange, type RangeOption, type RangeValue } from './range-options';
 import { translateRangeLabel, translateRangeShortLabel } from './range-labels';
 
 export { DEFAULT_RANGE_OPTIONS, DEFAULT_RANGE_VALUE, isShortRange, resolveDateRange, selectDefaultRange } from './range-options';
@@ -31,7 +35,7 @@ const VISIBLE_PRESET_VALUES = new Set<RangeValue>(['today', 'yesterday', '24h', 
 
 @Component({
     selector: 'app-range-toolbar',
-    imports: [FormsModule, ReactiveFormsModule, DatePickerModule, PopoverModule, ButtonModule, SelectButtonModule, SelectModule, TooltipModule, TranslocoPipe],
+    imports: [FormsModule, ReactiveFormsModule, RouterLink, DatePickerModule, PopoverModule, ButtonModule, SelectButtonModule, SelectModule, TooltipModule, TranslocoPipe],
     templateUrl: './range-toolbar.html',
     styleUrl: './range-toolbar.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -40,6 +44,9 @@ export class RangeToolbar {
     private readonly transloco = inject(TranslocoService);
     private readonly localeService = inject(TranslocoLocaleService);
     private readonly activeLanguage = injectActiveLang();
+    private readonly bootstrap = inject(DashboardBootstrapService);
+    private readonly share = inject(ShareService);
+    private readonly teamService = inject(TeamService);
 
     timeRanges = input.required<RangeOption[]>();
     selectedRange = input.required<RangeOption>();
@@ -127,6 +134,24 @@ export class RangeToolbar {
         return Boolean(start && end && start.getTime() <= end.getTime());
     });
     protected readonly isCustomActive = computed(() => this.selectedRange().value === 'custom');
+
+    /** Free-plan retention cap in days when the selected range reaches past it, else null. */
+    protected readonly retentionHintDays = computed(() => {
+        const team = this.teamService.activeTeam();
+        const retentionDays = team?.entitlements?.max_retention_days ?? 0;
+        if (!this.bootstrap.cloudHosted() || this.share.isShareMode() || team?.plan?.code !== 'free' || retentionDays <= 0) {
+            return null;
+        }
+
+        const range = resolveDateRange(this.selectedRange(), this.customRangeDates());
+        if (!range) {
+            return null;
+        }
+
+        const retainedFrom = new Date();
+        retainedFrom.setDate(retainedFrom.getDate() - retentionDays);
+        return new Date(range.from).getTime() < retainedFrom.getTime() ? retentionDays : null;
+    });
 
     constructor() {
         effect(() => {

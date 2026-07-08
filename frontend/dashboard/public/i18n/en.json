@@ -3229,6 +3229,10 @@
     }
   },
   "cloud": {
+    "retentionHint": {
+      "message": "The Free plan keeps {{count}} days of data — older hits aren't included in this view.",
+      "upgradeAction": "Upgrade for more history"
+    },
     "retentionNotice": {
       "message": "Free plan data is retained for {{count}} days.",
       "hint": "Upgrade to keep your full visitor history and unlock more sites and team seats.",

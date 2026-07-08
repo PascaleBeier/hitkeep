@@ -3229,6 +3229,10 @@
     }
   },
   "cloud": {
+    "retentionHint": {
+      "message": "El plan Free conserva {{count}} días de datos; los hits más antiguos no se incluyen en esta vista.",
+      "upgradeAction": "Mejora tu plan para más historial"
+    },
     "retentionNotice": {
       "message": "Los datos del plan gratuito se conservan durante {{count}} días.",
       "hint": "Mejora tu plan para conservar todo el historial de visitantes y desbloquear más sitios y asientos de equipo.",

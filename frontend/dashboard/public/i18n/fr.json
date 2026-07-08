@@ -3229,6 +3229,10 @@
     }
   },
   "cloud": {
+    "retentionHint": {
+      "message": "L'offre Free conserve {{count}} jours de données – les hits plus anciens ne sont pas inclus dans cette vue.",
+      "upgradeAction": "Passez à une offre supérieure pour plus d'historique"
+    },
     "retentionNotice": {
       "message": "Les données du forfait gratuit sont conservées pendant {{count}} jours.",
       "hint": "Passez à l'offre supérieure pour conserver tout votre historique de visiteurs et débloquer plus de sites et de sièges d'équipe.",

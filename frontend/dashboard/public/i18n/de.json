@@ -3229,6 +3229,10 @@
     }
   },
   "cloud": {
+    "retentionHint": {
+      "message": "Der Free-Plan speichert {{count}} Tage an Daten – ältere Hits sind in dieser Ansicht nicht enthalten.",
+      "upgradeAction": "Upgrade für mehr Historie"
+    },
     "retentionNotice": {
       "message": "Daten im Free-Plan werden {{count}} Tage lang aufbewahrt.",
       "hint": "Mit einem Upgrade behältst du deine gesamte Besucher-Historie und schaltest mehr Websites und Team-Plätze frei.",
