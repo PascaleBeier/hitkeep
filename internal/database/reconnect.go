@@ -201,6 +201,7 @@ func (c *reconnectingConn) Begin() (driver.Tx, error) {
 	if c.connector.isDead() {
 		return nil, driver.ErrBadConn
 	}
+	//lint:ignore SA1019 driver.Conn interface compliance; BeginTx is preferred below.
 	tx, err := c.inner.Begin() //nolint:staticcheck // driver.Conn interface compliance; BeginTx is preferred below.
 	c.connector.observe(err)
 	if err != nil {
@@ -289,12 +290,14 @@ func (s *reconnectingStmt) Close() error  { return s.inner.Close() }
 func (s *reconnectingStmt) NumInput() int { return s.inner.NumInput() }
 
 func (s *reconnectingStmt) Exec(args []driver.Value) (driver.Result, error) {
+	//lint:ignore SA1019 driver.Stmt interface compliance.
 	result, err := s.inner.Exec(args) //nolint:staticcheck // driver.Stmt interface compliance.
 	s.connector.observe(err)
 	return result, err
 }
 
 func (s *reconnectingStmt) Query(args []driver.Value) (driver.Rows, error) {
+	//lint:ignore SA1019 driver.Stmt interface compliance.
 	rows, err := s.inner.Query(args) //nolint:staticcheck // driver.Stmt interface compliance.
 	s.connector.observe(err)
 	return rows, err
