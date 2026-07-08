@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.10.2](https://github.com/PascaleBeier/hitkeep/compare/v2.10.1...v2.10.2) (2026-07-08)
+
+
+### Performance Improvements
+
+* **frontend:** Preload dashboard routes ([0997660](https://github.com/PascaleBeier/hitkeep/commit/0997660143d7b45c72c194a144a8e2de7d0ca602))
+
 ## [2.10.1](https://github.com/PascaleBeier/hitkeep/compare/v2.10.0...v2.10.1) (2026-07-08)
 
 
