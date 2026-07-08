@@ -29,6 +29,8 @@ type TenantStoreManager struct {
 	stores map[uuid.UUID]*Store
 
 	defaultID uuid.UUID
+
+	maintenanceCtx context.Context
 }
 
 var siteAnalyticsTransferTables = []string{
@@ -84,6 +86,18 @@ func NewTenantStoreManager(shared *Store, basePath string) *TenantStoreManager {
 // Shared returns the main shared store (identity tables, default tenant data).
 func (m *TenantStoreManager) Shared() *Store {
 	return m.shared
+}
+
+// StartMaintenance runs periodic checkpoint maintenance on every per-tenant
+// store: those already open and those opened later. The shared store's
+// maintenance is managed by its owner.
+func (m *TenantStoreManager) StartMaintenance(ctx context.Context) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.maintenanceCtx = ctx
+	for _, store := range m.stores {
+		store.StartMaintenance(ctx)
+	}
 }
 
 // DefaultTenantID returns the cached default tenant ID, resolving lazily if needed.
@@ -424,7 +438,7 @@ func (m *TenantStoreManager) openTenantStore(ctx context.Context, tenantID uuid.
 	}
 
 	dbPath := filepath.Join(dir, "hitkeep.db")
-	store := NewStore(dbPath)
+	store := NewStore(dbPath, m.shared.duckDBOptions()...)
 	if err := store.Connect(); err != nil {
 		return nil, fmt.Errorf("could not connect to tenant database %s: %w", dbPath, err)
 	}
@@ -432,6 +446,10 @@ func (m *TenantStoreManager) openTenantStore(ctx context.Context, tenantID uuid.
 	if err := store.MigrateTenant(ctx); err != nil {
 		store.Close()
 		return nil, fmt.Errorf("could not migrate tenant database %s: %w", dbPath, err)
+	}
+
+	if m.maintenanceCtx != nil {
+		store.StartMaintenance(m.maintenanceCtx)
 	}
 
 	slog.Info("Opened per-tenant database", "tenant_id", tenantID, "path", dbPath)
@@ -514,6 +532,15 @@ func copySiteAnalyticsBetweenStores(ctx context.Context, sourceStore, destinatio
 }
 
 func copySiteAnalyticsTable(ctx context.Context, sourceDB, destinationDB *sql.DB, table string, siteID uuid.UUID) error {
+	// Replace the site's rows wholesale: the analytics tables carry no unique
+	// constraints (their ART indexes were dropped for memory and ingest
+	// performance), so conflict-based upserts are not available here.
+	// #nosec G201 -- table is validated via isSafeIdentifier before formatting.
+	deleteQuery := fmt.Sprintf("DELETE FROM %s WHERE site_id = ?", table)
+	if _, err := destinationDB.ExecContext(ctx, deleteQuery, siteID); err != nil {
+		return fmt.Errorf("clear destination rows: %w", err)
+	}
+
 	// #nosec G201 -- table is validated via isSafeIdentifier before formatting.
 	query := fmt.Sprintf("SELECT * FROM %s WHERE site_id = ?", table)
 	rows, err := sourceDB.QueryContext(ctx, query, siteID)
@@ -541,7 +568,7 @@ func copySiteAnalyticsTable(ctx context.Context, sourceDB, destinationDB *sql.DB
 
 	// #nosec G201 -- table and columns are validated via isSafeIdentifier before formatting.
 	insertSQL := fmt.Sprintf(
-		"INSERT OR REPLACE INTO %s (%s) VALUES (%s)",
+		"INSERT INTO %s (%s) VALUES (%s)",
 		table,
 		strings.Join(columns, ", "),
 		placeholders(len(columns)),

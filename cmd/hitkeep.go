@@ -210,7 +210,10 @@ func startSearchConsoleSyncWorker(ctx context.Context, conf *config.Config, tena
 func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.Logger, logLevel slog.Level, realtimeBroker *realtime.Broker) (*database.Store, *database.TenantStoreManager, *nsq.Producer, func(), error) {
 	slog.Debug("(Leader) Starting stateful services...")
 
-	store := database.NewStore(conf.DBPath)
+	store := database.NewStore(conf.DBPath,
+		database.WithMemoryLimit(conf.DuckDBMemoryLimit),
+		database.WithThreads(conf.DuckDBThreads),
+	)
 	if err := store.Connect(); err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -221,6 +224,7 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 	store.StartMaintenance(ctx)
 
 	tenantMgr := database.NewTenantStoreManager(store, conf.DataPath)
+	tenantMgr.StartMaintenance(ctx)
 	if err := tenantMgr.SyncAllTenants(ctx); err != nil {
 		store.Close()
 		return nil, nil, nil, nil, err

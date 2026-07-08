@@ -27,6 +27,9 @@ type Config struct {
 	DataRetentionDays int     `env:"HITKEEP_DATA_RETENTION_DAYS" default:"365"                             desc:"Default data retention in days"                         deprecated:"retention-days"`
 	NodeName          string  `env:"HITKEEP_NODE_NAME"         default:""                                  desc:"Unique node name"                                       deprecated:"name"`
 
+	DuckDBMemoryLimit string `env:"HITKEEP_DUCKDB_MEMORY_LIMIT" default:"" desc:"DuckDB memory limit per database (e.g. 2GB); empty derives a container-aware default, 'none' keeps the DuckDB default of 80% of system RAM"`
+	DuckDBThreads     int    `env:"HITKEEP_DUCKDB_THREADS"      default:"0" desc:"DuckDB threads per database; 0 derives the default from GOMAXPROCS"`
+
 	DataPath       string `env:"HITKEEP_DATA_PATH"          default:"data"           desc:"Base directory for per-tenant data files"`
 	ArchivePath    string `env:"HITKEEP_ARCHIVE_PATH"       default:"archive"        desc:"Data archive path"`
 	PublicURL      string `env:"HITKEEP_PUBLIC_URL"         default:"http://localhost:8080" desc:"Public URL"`
@@ -361,6 +364,8 @@ func normalizeConfig(conf *Config) {
 			slog.Debug("Loaded trusted proxy networks", "count", len(conf.trustedProxyNets))
 		}
 	}
+
+	resolveDuckDBDefaults(conf)
 
 	NormalizeMCPConfig(conf)
 	NormalizeAuthSessionConfig(conf)

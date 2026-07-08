@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,25 +23,75 @@ const (
 type Store struct {
 	db                  *sql.DB
 	path                string
+	memoryLimit         string
+	threads             int
 	analyticsMu         sync.Mutex
 	aiBudgetMu          sync.Mutex
 	analyticsStatements *analyticsStatements
 	runtime             *runtimeCache
+
+	maintenanceMu     sync.Mutex
+	maintenanceCancel context.CancelFunc
 }
 
-func NewStore(path string) *Store {
-	return &Store{
+// StoreOption configures a Store before Connect.
+type StoreOption func(*Store)
+
+// WithMemoryLimit caps DuckDB's memory usage for this database (e.g. "512MB").
+// An empty value keeps the DuckDB default of 80% of system RAM.
+func WithMemoryLimit(limit string) StoreOption {
+	return func(s *Store) {
+		s.memoryLimit = strings.TrimSpace(limit)
+	}
+}
+
+// WithThreads sets the number of DuckDB worker threads for this database.
+// Zero keeps the DuckDB default.
+func WithThreads(threads int) StoreOption {
+	return func(s *Store) {
+		s.threads = threads
+	}
+}
+
+// memoryLimitPattern accepts DuckDB memory sizes such as "512MB" or "1.5 GiB".
+var memoryLimitPattern = regexp.MustCompile(`(?i)^[0-9]+(\.[0-9]+)?\s*(B|KB|MB|GB|TB|KiB|MiB|GiB|TiB)?$`)
+
+func NewStore(path string, opts ...StoreOption) *Store {
+	store := &Store{
 		path:    path,
 		runtime: newRuntimeCache(),
 	}
+	for _, opt := range opts {
+		opt(store)
+	}
+	return store
+}
+
+// duckDBOptions returns the DuckDB tuning options this store was created
+// with, so per-tenant stores can inherit them.
+func (s *Store) duckDBOptions() []StoreOption {
+	var opts []StoreOption
+	if s.memoryLimit != "" {
+		opts = append(opts, WithMemoryLimit(s.memoryLimit))
+	}
+	if s.threads != 0 {
+		opts = append(opts, WithThreads(s.threads))
+	}
+	return opts
 }
 
 func (s *Store) Connect() error {
-	slog.Info("Connecting to database...", "path", s.path)
-	connector, err := duckdb.NewConnector(s.path, s.initConnection)
-	if err != nil {
-		return fmt.Errorf("could not create database connector: %w", err)
+	if s.memoryLimit != "" && !memoryLimitPattern.MatchString(s.memoryLimit) {
+		return fmt.Errorf("invalid DuckDB memory limit %q: expected a size such as 512MB or 1.5GiB", s.memoryLimit)
 	}
+	if s.threads < 0 {
+		return fmt.Errorf("invalid DuckDB threads %d: must be zero or positive", s.threads)
+	}
+
+	slog.Info("Connecting to database...", "path", s.path)
+	connector := newReconnectingConnector(s.path, func() (driver.Connector, error) {
+		return duckdb.NewConnector(s.path, s.initConnection)
+	})
 	db := sql.OpenDB(connector)
 
 	if err := db.PingContext(context.Background()); err != nil {
@@ -61,6 +113,16 @@ func (s *Store) initConnection(execer driver.ExecerContext) error {
 	}
 	if _, err := execer.ExecContext(context.Background(), fmt.Sprintf("PRAGMA wal_autocheckpoint='%s';", walAutoCheckpointSize), nil); err != nil {
 		slog.Warn("Failed to set wal_autocheckpoint", "size", walAutoCheckpointSize, "error", err)
+	}
+	if s.memoryLimit != "" {
+		if _, err := execer.ExecContext(context.Background(), fmt.Sprintf("SET memory_limit='%s';", s.memoryLimit), nil); err != nil {
+			return fmt.Errorf("set database memory limit %q: %w", s.memoryLimit, err)
+		}
+	}
+	if s.threads > 0 {
+		if _, err := execer.ExecContext(context.Background(), fmt.Sprintf("SET threads=%d;", s.threads), nil); err != nil {
+			return fmt.Errorf("set database threads %d: %w", s.threads, err)
+		}
 	}
 	s.loadInstalledExtension(context.Background(), execer, "httpfs")
 	s.loadInstalledExtension(context.Background(), execer, "excel")
@@ -95,26 +157,44 @@ func (s *Store) StartMaintenance(ctx context.Context) {
 		return
 	}
 
+	s.maintenanceMu.Lock()
+	defer s.maintenanceMu.Unlock()
+	if s.maintenanceCancel != nil {
+		return
+	}
+	maintenanceCtx, cancel := context.WithCancel(ctx)
+	s.maintenanceCancel = cancel
+
 	ticker := time.NewTicker(maintenanceCheckpointInterval)
 	go func() {
 		defer ticker.Stop()
 
 		for {
 			select {
-			case <-ctx.Done():
+			case <-maintenanceCtx.Done():
 				return
 			case <-ticker.C:
-				slog.Debug("Running database checkpoint...")
-				if _, err := s.db.ExecContext(ctx, "CHECKPOINT;"); err != nil && !errors.Is(err, context.Canceled) {
-					slog.Error("Checkpoint failed", "error", err)
+				slog.Debug("Running database checkpoint...", "path", s.path)
+				if _, err := s.db.ExecContext(maintenanceCtx, "CHECKPOINT;"); err != nil && !errors.Is(err, context.Canceled) {
+					slog.Error("Checkpoint failed", "path", s.path, "error", err)
 				}
 			}
 		}
 	}()
 }
 
+func (s *Store) stopMaintenance() {
+	s.maintenanceMu.Lock()
+	defer s.maintenanceMu.Unlock()
+	if s.maintenanceCancel != nil {
+		s.maintenanceCancel()
+		s.maintenanceCancel = nil
+	}
+}
+
 func (s *Store) Close() error {
 	slog.Debug("Closing database connection...")
+	s.stopMaintenance()
 	s.analyticsMu.Lock()
 	if s.analyticsStatements != nil {
 		_ = s.analyticsStatements.close()
