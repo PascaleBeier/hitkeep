@@ -10,9 +10,6 @@ import (
 	"hitkeep/internal/api"
 )
 
-//go:fix inline
-func strPtr(v string) *string { return new(v) }
-
 // The batched activity writer must preserve the per-hit upsert semantics:
 // first_hit_at = min, last_hit_at = max, hostname follows the latest hit but
 // never regresses to empty, and hourly counts sum across the batch.
