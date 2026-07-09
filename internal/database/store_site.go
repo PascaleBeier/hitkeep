@@ -14,10 +14,36 @@ import (
 	"hitkeep/internal/auth"
 )
 
+// FindSiteByDomain resolves a site by its tracked domain. It runs once per
+// ingested browser hit, so results — including misses, which bot traffic
+// produces in bulk — are held in a short-TTL cache with singleflight
+// collapsing concurrent lookups; domain writers must call invalidateSiteDomain.
 func (s *Store) FindSiteByDomain(ctx context.Context, domain string) (*api.Site, error) {
+	if site, ok := s.getCachedSiteByDomain(domain); ok {
+		return site, nil
+	}
+	if s.runtime == nil {
+		return s.querySiteByDomain(ctx, domain)
+	}
+
+	result, err, _ := s.runtime.siteDomainSF.Do(domain, func() (any, error) {
+		site, err := s.querySiteByDomain(ctx, domain)
+		if err != nil {
+			return nil, err
+		}
+		s.cacheSiteByDomain(domain, site)
+		return site, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return cloneSite(result.(*api.Site)), nil
+}
+
+func (s *Store) querySiteByDomain(ctx context.Context, domain string) (*api.Site, error) {
 	var site api.Site
 	err := s.db.QueryRowContext(ctx, "SELECT id, user_id, domain, created_at FROM sites WHERE domain = ?", domain).Scan(&site.ID, &site.UserID, &site.Domain, &site.CreatedAt)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("could not query for site: %w", err)
@@ -120,6 +146,7 @@ func (s *Store) CreateSite(ctx context.Context, userID uuid.UUID, domain string)
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("could not commit transaction: %w", err)
 	}
+	s.invalidateSiteDomain(domain)
 
 	return &api.Site{
 		ID:        id,
@@ -130,7 +157,11 @@ func (s *Store) CreateSite(ctx context.Context, userID uuid.UUID, domain string)
 }
 
 func (s *Store) UpdateSiteTenant(ctx context.Context, siteID, tenantID uuid.UUID) error {
-	return updateSiteTenant(ctx, s.db, siteID, tenantID)
+	if err := updateSiteTenant(ctx, s.db, siteID, tenantID); err != nil {
+		return err
+	}
+	s.invalidateSiteTenantID(siteID)
+	return nil
 }
 
 func updateSiteTenant(ctx context.Context, exec sqlExecContext, siteID, tenantID uuid.UUID) error {
@@ -378,13 +409,18 @@ func moveSiteForeignKeys(ctx context.Context, tx *sql.Tx, refs []fkEdge, fromSit
 // references on a shadow site, update the domain, then move them back.
 func (s *Store) UpdateSiteDomain(ctx context.Context, siteID uuid.UUID, domain string) error {
 	var userID uuid.UUID
+	var previousDomain string
 	var createdAt time.Time
-	if err := s.db.QueryRowContext(ctx, "SELECT user_id, created_at FROM sites WHERE id = ?", siteID).Scan(&userID, &createdAt); err != nil {
+	if err := s.db.QueryRowContext(ctx, "SELECT user_id, domain, created_at FROM sites WHERE id = ?", siteID).Scan(&userID, &previousDomain, &createdAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("site %s not found", siteID)
 		}
 		return fmt.Errorf("could not load site for domain update: %w", err)
 	}
+	defer func() {
+		s.invalidateSiteDomain(previousDomain)
+		s.invalidateSiteDomain(domain)
+	}()
 
 	refs, err := listSiteFKReferences(ctx, s.db)
 	if err != nil {
@@ -489,10 +525,20 @@ func (s *Store) ListAllSites(ctx context.Context) ([]api.Site, error) {
 }
 
 func (s *Store) DeleteSite(ctx context.Context, siteID uuid.UUID) error {
+	// Best-effort domain read for cache invalidation; tenant-store mirrors
+	// carry a reduced sites schema, so only the domain column is portable.
+	var domain string
+	_ = s.db.QueryRowContext(ctx, "SELECT domain FROM sites WHERE id = ?", siteID).Scan(&domain)
+
 	if err := s.deleteSiteData(ctx, siteID); err != nil {
 		return err
 	}
-	return s.deleteSiteRow(ctx, siteID)
+	if err := s.deleteSiteRow(ctx, siteID); err != nil {
+		return err
+	}
+	s.invalidateSiteTenantID(siteID)
+	s.invalidateSiteDomain(domain)
+	return nil
 }
 
 func (s *Store) deleteSiteData(ctx context.Context, siteID uuid.UUID) error {

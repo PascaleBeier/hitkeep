@@ -105,6 +105,7 @@ func (s *Store) CreateCustomTrackingDomain(ctx context.Context, input CustomTrac
 	if err != nil {
 		return nil, fmt.Errorf("create custom tracking domain: %w", err)
 	}
+	s.invalidateCustomTrackingDomainHost(hostname)
 	return s.GetCustomTrackingDomain(ctx, id)
 }
 
@@ -156,11 +157,38 @@ func (s *Store) GetCustomTrackingDomainForTeam(ctx context.Context, teamID, id u
 	return &domain, nil
 }
 
+// FindCustomTrackingDomainByHostname resolves a custom tracking domain by
+// hostname. It runs on every ingest request that carries a custom tracking
+// host, so results — including misses — are held in a short-TTL cache with
+// singleflight collapsing concurrent lookups; mutations must call
+// invalidateCustomTrackingDomainHost.
 func (s *Store) FindCustomTrackingDomainByHostname(ctx context.Context, hostname string) (*api.CustomTrackingDomain, error) {
 	hostname = NormalizeCustomTrackingHostname(hostname)
 	if hostname == "" {
 		return nil, nil
 	}
+	if domain, ok := s.getCachedCustomTrackingDomain(hostname); ok {
+		return domain, nil
+	}
+	if s.runtime == nil {
+		return s.queryCustomTrackingDomainByHostname(ctx, hostname)
+	}
+
+	result, err, _ := s.runtime.customTrackingSF.Do(hostname, func() (any, error) {
+		domain, err := s.queryCustomTrackingDomainByHostname(ctx, hostname)
+		if err != nil {
+			return nil, err
+		}
+		s.cacheCustomTrackingDomain(hostname, domain)
+		return domain, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return cloneCustomTrackingDomain(result.(*api.CustomTrackingDomain)), nil
+}
+
+func (s *Store) queryCustomTrackingDomainByHostname(ctx context.Context, hostname string) (*api.CustomTrackingDomain, error) {
 	row := s.db.QueryRowContext(ctx, customTrackingDomainSelect()+" WHERE hostname = ?", hostname)
 	domain, err := scanCustomTrackingDomain(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -208,7 +236,11 @@ func (s *Store) UpdateCustomTrackingDomainVerification(ctx context.Context, id u
 	if affected == 0 {
 		return nil, ErrCustomTrackingDomainNotFound
 	}
-	return s.GetCustomTrackingDomain(ctx, id)
+	updated, err := s.GetCustomTrackingDomain(ctx, id)
+	if err == nil && updated != nil {
+		s.invalidateCustomTrackingDomainHost(updated.Hostname)
+	}
+	return updated, err
 }
 
 func (s *Store) UpdateCustomTrackingDomainEnabled(ctx context.Context, teamID, id uuid.UUID, enabled bool) (*api.CustomTrackingDomain, error) {
@@ -235,7 +267,11 @@ func (s *Store) UpdateCustomTrackingDomainEnabled(ctx context.Context, teamID, i
 	if affected == 0 {
 		return nil, ErrCustomTrackingDomainNotFound
 	}
-	return s.GetCustomTrackingDomain(ctx, id)
+	updated, err := s.GetCustomTrackingDomain(ctx, id)
+	if err == nil && updated != nil {
+		s.invalidateCustomTrackingDomainHost(updated.Hostname)
+	}
+	return updated, err
 }
 
 func (s *Store) DeleteCustomTrackingDomain(ctx context.Context, teamID, id uuid.UUID) error {
@@ -254,6 +290,7 @@ func (s *Store) DeleteCustomTrackingDomain(ctx context.Context, teamID, id uuid.
 	if affected == 0 {
 		return ErrCustomTrackingDomainNotFound
 	}
+	s.invalidateCustomTrackingDomainHost(existing.Hostname)
 	return nil
 }
 
@@ -265,11 +302,15 @@ func (s *Store) RecordCustomTrackingDomainTLSAsk(ctx context.Context, hostname s
 	if at.IsZero() {
 		at = time.Now().UTC()
 	}
-	return s.Exec(ctx, `
+	if err := s.Exec(ctx, `
 		UPDATE custom_tracking_domains
 		SET last_tls_ask_at = ?, updated_at = ?
 		WHERE hostname = ?
-	`, at.UTC(), at.UTC(), hostname)
+	`, at.UTC(), at.UTC(), hostname); err != nil {
+		return err
+	}
+	s.invalidateCustomTrackingDomainHost(hostname)
+	return nil
 }
 
 func customTrackingDomainSelect() string {

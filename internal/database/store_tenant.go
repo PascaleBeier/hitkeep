@@ -97,7 +97,33 @@ func (s *Store) GetDefaultTenantID(ctx context.Context) (uuid.UUID, error) {
 	return getDefaultTenantID(ctx, s.db)
 }
 
+// GetSiteTenantID resolves the owning tenant for a site. The mapping is
+// near-static and read on every ingested hit, so results are held in a
+// short-TTL cache with singleflight collapsing concurrent misses; writers of
+// the site↔tenant mapping must call invalidateSiteTenantID.
 func (s *Store) GetSiteTenantID(ctx context.Context, siteID uuid.UUID) (uuid.UUID, error) {
+	if tenantID, ok := s.getCachedSiteTenantID(siteID); ok {
+		return tenantID, nil
+	}
+	if s.runtime == nil {
+		return s.querySiteTenantID(ctx, siteID)
+	}
+
+	result, err, _ := s.runtime.siteTenantSF.Do(siteID.String(), func() (any, error) {
+		tenantID, err := s.querySiteTenantID(ctx, siteID)
+		if err != nil {
+			return uuid.Nil, err
+		}
+		s.cacheSiteTenantID(siteID, tenantID)
+		return tenantID, nil
+	})
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return result.(uuid.UUID), nil
+}
+
+func (s *Store) querySiteTenantID(ctx context.Context, siteID uuid.UUID) (uuid.UUID, error) {
 	var tenantIDRaw sql.NullString
 	err := s.db.QueryRowContext(ctx, `
 		SELECT CAST(st.tenant_id AS VARCHAR)

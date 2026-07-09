@@ -8,7 +8,9 @@ import (
 
 	"github.com/google/uuid"
 	lru "github.com/hashicorp/golang-lru/v2/expirable"
+	"golang.org/x/sync/singleflight"
 
+	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
 )
 
@@ -24,6 +26,17 @@ const (
 
 	siteRoleCacheSize = 16384
 	siteRoleTTL       = 30 * time.Second
+
+	siteTenantCacheSize = 16384
+	siteTenantTTL       = 30 * time.Second
+
+	// Sized above the site count so junk-domain negative entries do not
+	// evict live sites.
+	siteDomainCacheSize = 16384
+	siteDomainTTL       = 30 * time.Second
+
+	customTrackingDomainCacheSize = 4096
+	customTrackingDomainTTL       = 30 * time.Second
 )
 
 type passwordResetEntry struct {
@@ -61,6 +74,17 @@ type runtimeCache struct {
 
 	siteRolesMu sync.Mutex
 	siteRoles   *lru.LRU[uuid.UUID, map[uuid.UUID]auth.SiteRole]
+
+	siteTenantIDs *lru.LRU[uuid.UUID, uuid.UUID]
+	siteTenantSF  singleflight.Group
+
+	// A nil value is a cached negative lookup.
+	sitesByDomain *lru.LRU[string, *api.Site]
+	siteDomainSF  singleflight.Group
+
+	// A nil value is a cached negative lookup.
+	customTrackingByHost *lru.LRU[string, *api.CustomTrackingDomain]
+	customTrackingSF     singleflight.Group
 }
 
 func newRuntimeCache() *runtimeCache {
@@ -71,6 +95,9 @@ func newRuntimeCache() *runtimeCache {
 		apiClientTokenByClient:  lru.NewLRU[uuid.UUID, string](apiClientAuthCacheSize, nil, apiClientAuthTTL),
 		instanceRoles:           lru.NewLRU[uuid.UUID, auth.InstanceRole](instanceRoleCacheSize, nil, instanceRoleTTL),
 		siteRoles:               lru.NewLRU[uuid.UUID, map[uuid.UUID]auth.SiteRole](siteRoleCacheSize, nil, siteRoleTTL),
+		siteTenantIDs:           lru.NewLRU[uuid.UUID, uuid.UUID](siteTenantCacheSize, nil, siteTenantTTL),
+		sitesByDomain:           lru.NewLRU[string, *api.Site](siteDomainCacheSize, nil, siteDomainTTL),
+		customTrackingByHost:    lru.NewLRU[string, *api.CustomTrackingDomain](customTrackingDomainCacheSize, nil, customTrackingDomainTTL),
 	}
 }
 
@@ -286,6 +313,104 @@ func (s *Store) invalidateAllSiteRolesForUser(userID uuid.UUID) {
 	defer s.runtime.siteRolesMu.Unlock()
 
 	s.runtime.siteRoles.Remove(userID)
+}
+
+func (s *Store) getCachedSiteTenantID(siteID uuid.UUID) (uuid.UUID, bool) {
+	if s == nil || s.runtime == nil || siteID == uuid.Nil {
+		return uuid.Nil, false
+	}
+	return s.runtime.siteTenantIDs.Get(siteID)
+}
+
+func (s *Store) cacheSiteTenantID(siteID, tenantID uuid.UUID) {
+	if s == nil || s.runtime == nil || siteID == uuid.Nil || tenantID == uuid.Nil {
+		return
+	}
+	s.runtime.siteTenantIDs.Add(siteID, tenantID)
+}
+
+func (s *Store) invalidateSiteTenantID(siteID uuid.UUID) {
+	if s == nil || s.runtime == nil || siteID == uuid.Nil {
+		return
+	}
+	s.runtime.siteTenantIDs.Remove(siteID)
+}
+
+func cloneSite(input *api.Site) *api.Site {
+	if input == nil {
+		return nil
+	}
+	cloned := *input
+	return &cloned
+}
+
+func cloneCustomTrackingDomain(input *api.CustomTrackingDomain) *api.CustomTrackingDomain {
+	if input == nil {
+		return nil
+	}
+	cloned := *input
+	cloned.VerifiedAt = cloneTimePtr(input.VerifiedAt)
+	cloned.LastCheckedAt = cloneTimePtr(input.LastCheckedAt)
+	cloned.LastTLSAskAt = cloneTimePtr(input.LastTLSAskAt)
+	return &cloned
+}
+
+func cloneTimePtr(input *time.Time) *time.Time {
+	if input == nil {
+		return nil
+	}
+	cloned := *input
+	return &cloned
+}
+
+func (s *Store) getCachedSiteByDomain(domain string) (*api.Site, bool) {
+	if s == nil || s.runtime == nil || domain == "" {
+		return nil, false
+	}
+	site, ok := s.runtime.sitesByDomain.Get(domain)
+	if !ok {
+		return nil, false
+	}
+	return cloneSite(site), true
+}
+
+func (s *Store) cacheSiteByDomain(domain string, site *api.Site) {
+	if s == nil || s.runtime == nil || domain == "" {
+		return
+	}
+	s.runtime.sitesByDomain.Add(domain, cloneSite(site))
+}
+
+func (s *Store) invalidateSiteDomain(domain string) {
+	if s == nil || s.runtime == nil || domain == "" {
+		return
+	}
+	s.runtime.sitesByDomain.Remove(domain)
+}
+
+func (s *Store) getCachedCustomTrackingDomain(hostname string) (*api.CustomTrackingDomain, bool) {
+	if s == nil || s.runtime == nil || hostname == "" {
+		return nil, false
+	}
+	domain, ok := s.runtime.customTrackingByHost.Get(hostname)
+	if !ok {
+		return nil, false
+	}
+	return cloneCustomTrackingDomain(domain), true
+}
+
+func (s *Store) cacheCustomTrackingDomain(hostname string, domain *api.CustomTrackingDomain) {
+	if s == nil || s.runtime == nil || hostname == "" {
+		return
+	}
+	s.runtime.customTrackingByHost.Add(hostname, cloneCustomTrackingDomain(domain))
+}
+
+func (s *Store) invalidateCustomTrackingDomainHost(hostname string) {
+	if s == nil || s.runtime == nil || hostname == "" {
+		return
+	}
+	s.runtime.customTrackingByHost.Remove(hostname)
 }
 
 func (s *Store) CacheInstanceRoleSize() int {

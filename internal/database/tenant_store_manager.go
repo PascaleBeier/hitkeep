@@ -10,11 +10,25 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
+	lru "github.com/hashicorp/golang-lru/v2/expirable"
 
 	"hitkeep/internal/api"
 )
+
+const (
+	siteSyncMemoSize = 16384
+	siteSyncMemoTTL  = 30 * time.Second
+)
+
+// siteSyncKey memoizes per-site mirror syncs. The tenant is part of the key
+// so a site transfer (new tenant) always syncs immediately.
+type siteSyncKey struct {
+	siteID   uuid.UUID
+	tenantID uuid.UUID
+}
 
 // TenantStoreManager provides per-tenant database isolation.
 //
@@ -27,6 +41,10 @@ type TenantStoreManager struct {
 
 	mu     sync.RWMutex
 	stores map[uuid.UUID]*Store
+
+	// recentSyncs suppresses repeated mirror syncs on the ingest path;
+	// explicit SyncSite calls bypass it and force a refresh.
+	recentSyncs *lru.LRU[siteSyncKey, struct{}]
 
 	defaultID uuid.UUID
 
@@ -51,9 +69,10 @@ func WithTenantCompaction(opts CompactionOptions) TenantStoreManagerOption {
 // It resolves and caches the default tenant ID from the shared database.
 func NewTenantStoreManager(shared *Store, basePath string, opts ...TenantStoreManagerOption) *TenantStoreManager {
 	mgr := &TenantStoreManager{
-		shared:   shared,
-		basePath: basePath,
-		stores:   make(map[uuid.UUID]*Store),
+		shared:      shared,
+		basePath:    basePath,
+		stores:      make(map[uuid.UUID]*Store),
+		recentSyncs: lru.NewLRU[siteSyncKey, struct{}](siteSyncMemoSize, nil, siteSyncMemoTTL),
 	}
 	for _, opt := range opts {
 		opt(mgr)
@@ -173,8 +192,14 @@ func (m *TenantStoreManager) ResolveSiteStore(ctx context.Context, siteID uuid.U
 		return nil, uuid.Nil, err
 	}
 
-	if err := m.SyncSite(ctx, siteID); err != nil {
-		return nil, uuid.Nil, err
+	// Ingest resolves the same sites continuously; memoize the mirror sync
+	// instead of re-running it per message.
+	key := siteSyncKey{siteID: siteID, tenantID: tenantID}
+	if _, ok := m.recentSyncs.Get(key); !ok {
+		if err := m.syncSiteTenantData(ctx, siteID, tenantID); err != nil {
+			return nil, uuid.Nil, err
+		}
+		m.recentSyncs.Add(key, struct{}{})
 	}
 
 	return store, tenantID, nil
@@ -182,12 +207,17 @@ func (m *TenantStoreManager) ResolveSiteStore(ctx context.Context, siteID uuid.U
 
 // SyncSite mirrors the site's metadata into the tenant-local store and
 // backfills legacy shared goals/funnels for bridge-release compatibility.
+// It always performs the sync; ResolveSiteStore memoizes it for ingest.
 func (m *TenantStoreManager) SyncSite(ctx context.Context, siteID uuid.UUID) error {
 	tenantID, err := m.shared.GetSiteTenantID(ctx, siteID)
 	if err != nil {
 		return fmt.Errorf("resolve tenant for site %s: %w", siteID, err)
 	}
-	return m.syncSiteTenantData(ctx, siteID, tenantID)
+	if err := m.syncSiteTenantData(ctx, siteID, tenantID); err != nil {
+		return err
+	}
+	m.recentSyncs.Add(siteSyncKey{siteID: siteID, tenantID: tenantID}, struct{}{})
+	return nil
 }
 
 // SyncAllTenants eagerly syncs all known sites into their tenant-local stores.

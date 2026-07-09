@@ -444,6 +444,7 @@ func (s *Store) DeleteGoogleSearchConsoleSiteMappingWithAudit(ctx context.Contex
 }
 
 func (s *Store) TransferSiteTeamWithAudit(ctx context.Context, siteID, destinationTeamID uuid.UUID, clearSearchConsoleMapping bool, audits []AuditEntryParams) error {
+	defer s.invalidateSiteTenantID(siteID)
 	return s.Transact(ctx, func(tx *sql.Tx) error {
 		if err := updateSiteTenant(ctx, tx, siteID, destinationTeamID); err != nil {
 			return err
