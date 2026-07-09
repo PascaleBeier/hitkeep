@@ -79,7 +79,29 @@ var hitAppenderValueFns = map[string]hitAppenderValueFunc{
 	"qr_code_id":      func(hit *api.Hit) driver.Value { return nullableDuckDBUUIDPtr(hit.QRCodeID) },
 }
 
+// availableHitAppenderColumns reports the intersection of hitAppenderColumns
+// and the live hits schema. The schema only changes through migrations at
+// startup, so the first successful result is cached for the store's lifetime.
 func (s *Store) availableHitAppenderColumns(ctx context.Context) ([]string, error) {
+	s.hitColumnsMu.Lock()
+	cached := s.hitColumns
+	s.hitColumnsMu.Unlock()
+	if cached != nil {
+		return cached, nil
+	}
+
+	columns, err := s.queryAvailableHitAppenderColumns(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	s.hitColumnsMu.Lock()
+	s.hitColumns = columns
+	s.hitColumnsMu.Unlock()
+	return columns, nil
+}
+
+func (s *Store) queryAvailableHitAppenderColumns(ctx context.Context) ([]string, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT column_name
 		FROM information_schema.columns

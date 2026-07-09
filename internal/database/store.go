@@ -32,6 +32,12 @@ type Store struct {
 
 	maintenanceMu     sync.Mutex
 	maintenanceCancel context.CancelFunc
+
+	activityPruneMu   sync.Mutex
+	lastActivityPrune time.Time
+
+	hitColumnsMu sync.Mutex
+	hitColumns   []string
 }
 
 // StoreOption configures a Store before Connect.

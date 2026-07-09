@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -48,32 +49,53 @@ func dirtyBucketsForHit(hit *api.Hit) []dirtyRollupBucket {
 	return buckets
 }
 
+type dirtyRollupBucketKey struct {
+	siteID     uuid.UUID
+	rollupType dirtyRollupType
+	bucketUnit string
+	bucketUnix int64
+}
+
 func (s *Store) markDirtyRollupBuckets(ctx context.Context, buckets []dirtyRollupBucket) error {
 	if len(buckets) == 0 {
 		return nil
 	}
 
-	seen := make(map[string]struct{}, len(buckets))
+	// Dedup, then upsert every distinct bucket in one multi-row statement —
+	// a batch of hits marks the same handful of buckets over and over.
+	seen := make(map[dirtyRollupBucketKey]struct{}, len(buckets))
 	now := time.Now().UTC()
+	args := make([]any, 0, len(buckets)*5)
 	for _, bucket := range buckets {
 		if bucket.SiteID == uuid.Nil || bucket.BucketUnit == "" || bucket.RollupType == "" || bucket.Bucket.IsZero() {
 			continue
 		}
 
-		key := fmt.Sprintf("%s|%s|%s|%s", bucket.SiteID, bucket.RollupType, bucket.BucketUnit, bucket.Bucket.UTC().Format(time.RFC3339Nano))
+		key := dirtyRollupBucketKey{
+			siteID:     bucket.SiteID,
+			rollupType: bucket.RollupType,
+			bucketUnit: bucket.BucketUnit,
+			bucketUnix: bucket.Bucket.UTC().UnixNano(),
+		}
 		if _, ok := seen[key]; ok {
 			continue
 		}
 		seen[key] = struct{}{}
+		args = append(args, bucket.SiteID, string(bucket.RollupType), bucket.BucketUnit, bucket.Bucket.UTC(), now)
+	}
+	if len(args) == 0 {
+		return nil
+	}
 
-		if _, err := s.db.ExecContext(ctx, `
-			INSERT INTO rollup_dirty_buckets (site_id, rollup_type, bucket_unit, bucket, updated_at)
-			VALUES (?, ?, ?, ?, ?)
-			ON CONFLICT (site_id, rollup_type, bucket_unit, bucket) DO UPDATE SET
-				updated_at = EXCLUDED.updated_at
-		`, bucket.SiteID, string(bucket.RollupType), bucket.BucketUnit, bucket.Bucket.UTC(), now); err != nil {
-			return fmt.Errorf("mark dirty rollup bucket: %w", err)
-		}
+	placeholders := strings.Repeat(", (?, ?, ?, ?, ?)", len(args)/5)[2:]
+	// #nosec G202 -- placeholders is only repeated "(?, ?, ?, ?, ?)" groups; every value is a bound arg.
+	if _, err := s.db.ExecContext(ctx, `
+		INSERT INTO rollup_dirty_buckets (site_id, rollup_type, bucket_unit, bucket, updated_at)
+		VALUES `+placeholders+`
+		ON CONFLICT (site_id, rollup_type, bucket_unit, bucket) DO UPDATE SET
+			updated_at = EXCLUDED.updated_at
+	`, args...); err != nil {
+		return fmt.Errorf("mark dirty rollup buckets: %w", err)
 	}
 
 	return nil

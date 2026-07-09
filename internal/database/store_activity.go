@@ -15,6 +15,10 @@ import (
 const (
 	activityDormantAfter = 7 * 24 * time.Hour
 	activityCountWindow  = 8 * 24 * time.Hour
+
+	// Pruning is garbage collection only — readers already filter by bucket
+	// age — so it does not need to run on every batch flush.
+	activityPruneInterval = 10 * time.Minute
 )
 
 var automaticActivityEvents = map[string]struct{}{
@@ -38,43 +42,134 @@ func normalizeTrackerMetadata(source, version string) (string, string) {
 	return source, version
 }
 
+// siteHitActivity accumulates one batch's hits for a site, mirroring the
+// upsert semantics the per-hit path had: first = min, last = max, hostname
+// follows the latest hit but empty values never overwrite earlier ones.
+type siteHitActivity struct {
+	firstAt  time.Time
+	lastAt   time.Time
+	hostname string
+	source   string
+	version  string
+}
+
+type activityCountKey struct {
+	siteID     uuid.UUID
+	bucketUnix int64
+}
+
+// RecordHitActivity summarizes the batch per site and issues one summary
+// upsert per site plus one count upsert per (site, hour), instead of two
+// writes per hit.
 func (s *Store) RecordHitActivity(ctx context.Context, hits []*api.Hit) error {
+	summaries := make(map[uuid.UUID]*siteHitActivity)
+	counts := make(map[activityCountKey]int)
 	for _, hit := range hits {
 		if hit == nil || hit.SiteID == uuid.Nil {
 			continue
 		}
+		ts := hit.Timestamp.UTC()
 		source, version := normalizeTrackerMetadata(hit.TrackerSource, hit.TrackerVersion)
 		hostname := ""
 		if hit.Hostname != nil {
 			hostname = strings.TrimSpace(*hit.Hostname)
 		}
-		if err := s.upsertSiteHitActivity(ctx, hit.SiteID, hit.Timestamp.UTC(), hostname, source, version); err != nil {
+
+		agg, ok := summaries[hit.SiteID]
+		if !ok {
+			agg = &siteHitActivity{firstAt: ts, lastAt: ts, hostname: hostname}
+			summaries[hit.SiteID] = agg
+		} else {
+			if ts.Before(agg.firstAt) {
+				agg.firstAt = ts
+			}
+			if !ts.Before(agg.lastAt) {
+				agg.lastAt = ts
+				if hostname != "" {
+					agg.hostname = hostname
+				}
+			}
+		}
+		agg.source = source
+		if version != "" {
+			agg.version = version
+		}
+
+		counts[activityCountKey{siteID: hit.SiteID, bucketUnix: ts.Truncate(time.Hour).Unix()}]++
+	}
+
+	for siteID, agg := range summaries {
+		if err := s.upsertSiteHitActivity(ctx, siteID, agg); err != nil {
 			return err
 		}
 	}
-	if err := s.pruneSiteActivityCounts(ctx); err != nil {
+	if err := s.flushSiteActivityCounts(ctx, counts, true); err != nil {
 		return err
 	}
-	return nil
+	return s.maybePruneSiteActivityCounts(ctx)
 }
 
+// siteEventActivity accumulates one batch's events for a site; name and
+// automatic-event fields follow the latest matching event.
+type siteEventActivity struct {
+	lastAt   time.Time
+	lastName string
+	autoAt   time.Time
+	autoName string
+	hasAuto  bool
+	source   string
+	version  string
+}
+
+// RecordEventActivity summarizes the batch per site, mirroring
+// RecordHitActivity.
 func (s *Store) RecordEventActivity(ctx context.Context, events []*api.Event) error {
+	summaries := make(map[uuid.UUID]*siteEventActivity)
+	counts := make(map[activityCountKey]int)
 	for _, event := range events {
 		if event == nil || event.SiteID == uuid.Nil {
 			continue
 		}
+		ts := event.Timestamp.UTC()
 		source, version := normalizeTrackerMetadata(event.TrackerSource, event.TrackerVersion)
-		if err := s.upsertSiteEventActivity(ctx, event.SiteID, event.Timestamp.UTC(), event.Name, source, version); err != nil {
+		name := strings.TrimSpace(event.Name)
+		_, isAutomatic := automaticActivityEvents[name]
+
+		agg, ok := summaries[event.SiteID]
+		if !ok {
+			agg = &siteEventActivity{lastAt: ts, lastName: name}
+			summaries[event.SiteID] = agg
+		} else if !ts.Before(agg.lastAt) {
+			agg.lastAt = ts
+			if name != "" {
+				agg.lastName = name
+			}
+		}
+		if isAutomatic && (!agg.hasAuto || !ts.Before(agg.autoAt)) {
+			agg.autoAt = ts
+			agg.autoName = name
+			agg.hasAuto = true
+		}
+		agg.source = source
+		if version != "" {
+			agg.version = version
+		}
+
+		counts[activityCountKey{siteID: event.SiteID, bucketUnix: ts.Truncate(time.Hour).Unix()}]++
+	}
+
+	for siteID, agg := range summaries {
+		if err := s.upsertSiteEventActivity(ctx, siteID, agg); err != nil {
 			return err
 		}
 	}
-	if err := s.pruneSiteActivityCounts(ctx); err != nil {
+	if err := s.flushSiteActivityCounts(ctx, counts, false); err != nil {
 		return err
 	}
-	return nil
+	return s.maybePruneSiteActivityCounts(ctx)
 }
 
-func (s *Store) upsertSiteHitActivity(ctx context.Context, siteID uuid.UUID, ts time.Time, hostname, source, version string) error {
+func (s *Store) upsertSiteHitActivity(ctx context.Context, siteID uuid.UUID, agg *siteHitActivity) error {
 	tenantID, err := s.GetSiteTenantID(ctx, siteID)
 	if err != nil {
 		return fmt.Errorf("resolve site tenant for hit activity: %w", err)
@@ -106,27 +201,25 @@ func (s *Store) upsertSiteHitActivity(ctx context.Context, siteID uuid.UUID, ts 
 			tracker_source = COALESCE(excluded.tracker_source, site_activity_summary.tracker_source),
 			tracker_version = COALESCE(excluded.tracker_version, site_activity_summary.tracker_version),
 			updated_at = excluded.updated_at
-	`, siteID, tenantID, ts, ts, hostname, source, version, now); err != nil {
+	`, siteID, tenantID, agg.firstAt, agg.lastAt, agg.hostname, agg.source, agg.version, now); err != nil {
 		return fmt.Errorf("upsert site hit activity: %w", err)
 	}
 
-	return s.incrementSiteActivityCount(ctx, siteID, tenantID, ts, 1, 0)
+	return nil
 }
 
-func (s *Store) upsertSiteEventActivity(ctx context.Context, siteID uuid.UUID, ts time.Time, eventName, source, version string) error {
+func (s *Store) upsertSiteEventActivity(ctx context.Context, siteID uuid.UUID, agg *siteEventActivity) error {
 	tenantID, err := s.GetSiteTenantID(ctx, siteID)
 	if err != nil {
 		return fmt.Errorf("resolve site tenant for event activity: %w", err)
 	}
-	eventName = strings.TrimSpace(eventName)
-	_, isAutomatic := automaticActivityEvents[eventName]
 	now := time.Now().UTC()
 
 	var automaticAt any
 	var automaticName any
-	if isAutomatic {
-		automaticAt = ts
-		automaticName = eventName
+	if agg.hasAuto {
+		automaticAt = agg.autoAt
+		automaticName = agg.autoName
 	}
 
 	if err := s.Exec(ctx, `
@@ -163,31 +256,54 @@ func (s *Store) upsertSiteEventActivity(ctx context.Context, siteID uuid.UUID, t
 			tracker_source = COALESCE(excluded.tracker_source, site_activity_summary.tracker_source),
 			tracker_version = COALESCE(excluded.tracker_version, site_activity_summary.tracker_version),
 			updated_at = excluded.updated_at
-	`, siteID, tenantID, ts, eventName, automaticAt, automaticName, source, version, now); err != nil {
+	`, siteID, tenantID, agg.lastAt, agg.lastName, automaticAt, automaticName, agg.source, agg.version, now); err != nil {
 		return fmt.Errorf("upsert site event activity: %w", err)
 	}
 
-	return s.incrementSiteActivityCount(ctx, siteID, tenantID, ts, 0, 1)
+	return nil
 }
 
-func (s *Store) incrementSiteActivityCount(ctx context.Context, siteID, tenantID uuid.UUID, ts time.Time, hits, events int) error {
-	bucket := ts.UTC().Truncate(time.Hour)
-	if err := s.Exec(ctx, `
-		INSERT INTO site_activity_hourly_counts (site_id, tenant_id, bucket, hits, events, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)
-		ON CONFLICT (site_id, bucket) DO UPDATE SET
-			tenant_id = excluded.tenant_id,
-			hits = site_activity_hourly_counts.hits + excluded.hits,
-			events = site_activity_hourly_counts.events + excluded.events,
-			updated_at = excluded.updated_at
-	`, siteID, tenantID, bucket, hits, events, time.Now().UTC()); err != nil {
-		return fmt.Errorf("increment site activity counts: %w", err)
+func (s *Store) flushSiteActivityCounts(ctx context.Context, counts map[activityCountKey]int, asHits bool) error {
+	for key, count := range counts {
+		tenantID, err := s.GetSiteTenantID(ctx, key.siteID)
+		if err != nil {
+			return fmt.Errorf("resolve site tenant for activity counts: %w", err)
+		}
+		hits, events := count, 0
+		if !asHits {
+			hits, events = 0, count
+		}
+		if err := s.Exec(ctx, `
+			INSERT INTO site_activity_hourly_counts (site_id, tenant_id, bucket, hits, events, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?)
+			ON CONFLICT (site_id, bucket) DO UPDATE SET
+				tenant_id = excluded.tenant_id,
+				hits = site_activity_hourly_counts.hits + excluded.hits,
+				events = site_activity_hourly_counts.events + excluded.events,
+				updated_at = excluded.updated_at
+		`, key.siteID, tenantID, time.Unix(key.bucketUnix, 0).UTC(), hits, events, time.Now().UTC()); err != nil {
+			return fmt.Errorf("increment site activity counts: %w", err)
+		}
 	}
 	return nil
 }
 
-func (s *Store) pruneSiteActivityCounts(ctx context.Context) error {
-	cutoff := time.Now().UTC().Add(-activityCountWindow).Truncate(time.Hour)
+// maybePruneSiteActivityCounts garbage-collects expired hourly buckets at
+// most once per activityPruneInterval.
+func (s *Store) maybePruneSiteActivityCounts(ctx context.Context) error {
+	now := time.Now().UTC()
+
+	s.activityPruneMu.Lock()
+	due := s.lastActivityPrune.IsZero() || now.Sub(s.lastActivityPrune) >= activityPruneInterval
+	if due {
+		s.lastActivityPrune = now
+	}
+	s.activityPruneMu.Unlock()
+	if !due {
+		return nil
+	}
+
+	cutoff := now.Add(-activityCountWindow).Truncate(time.Hour)
 	if err := s.Exec(ctx, "DELETE FROM site_activity_hourly_counts WHERE bucket < ?", cutoff); err != nil {
 		return fmt.Errorf("prune site activity counts: %w", err)
 	}
