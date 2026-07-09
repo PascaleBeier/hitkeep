@@ -222,6 +222,7 @@ test("dashboard filters by seeded geography and network metrics", async ({ page 
 test("ecommerce page surfaces seeded orders and products", async ({ page }) => {
     await login(page, "/ecommerce");
     await selectSeededSite(page);
+    await selectRange(page, SEEDED_EVENT_RANGE);
 
     await expect(page.getByText("Revenue over time")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Revenue breakdown" })).toBeVisible();
@@ -237,6 +238,7 @@ test("ecommerce page surfaces seeded orders and products", async ({ page }) => {
 test("ecommerce page filters by seeded geography and network metrics", async ({ page }) => {
     await login(page, "/ecommerce");
     await selectSeededSite(page);
+    await selectRange(page, SEEDED_EVENT_RANGE);
 
     await clickSeededMetricRow(page, "Cities", SEEDED_CITY_RE);
     await expect(page.getByText(/City: (Mountain View|New York|Seattle|Berlin|Munich|London|Paris|Amsterdam)/)).toBeVisible();
