@@ -776,3 +776,21 @@ func isIPInNetworksForTest(ip netip.Addr, networks []netip.Prefix) bool {
 	}
 	return false
 }
+
+func TestLoadDBCompactOnStartFromEnv(t *testing.T) {
+	conf := load([]string{}, func(key, fallback string) string { return fallback })
+	if !conf.DBCompactOnStart {
+		t.Fatal("expected DBCompactOnStart to default to true")
+	}
+
+	env := map[string]string{"HITKEEP_DB_COMPACT_ON_START": "false"}
+	conf = load([]string{}, func(key, fallback string) string {
+		if val, ok := env[key]; ok {
+			return val
+		}
+		return fallback
+	})
+	if conf.DBCompactOnStart {
+		t.Fatal("expected HITKEEP_DB_COMPACT_ON_START=false to disable compaction")
+	}
+}

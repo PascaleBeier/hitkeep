@@ -31,15 +31,32 @@ type TenantStoreManager struct {
 	defaultID uuid.UUID
 
 	maintenanceCtx context.Context
+
+	compaction *CompactionOptions
+}
+
+// TenantStoreManagerOption configures a TenantStoreManager.
+type TenantStoreManagerOption func(*TenantStoreManager)
+
+// WithTenantCompaction rewrites a tenant's database file on lazy open when
+// its share of free blocks exceeds the given thresholds, returning space
+// freed by retention and deletes to the operating system.
+func WithTenantCompaction(opts CompactionOptions) TenantStoreManagerOption {
+	return func(m *TenantStoreManager) {
+		m.compaction = &opts
+	}
 }
 
 // NewTenantStoreManager creates a TenantStoreManager that wraps the shared store.
 // It resolves and caches the default tenant ID from the shared database.
-func NewTenantStoreManager(shared *Store, basePath string) *TenantStoreManager {
+func NewTenantStoreManager(shared *Store, basePath string, opts ...TenantStoreManagerOption) *TenantStoreManager {
 	mgr := &TenantStoreManager{
 		shared:   shared,
 		basePath: basePath,
 		stores:   make(map[uuid.UUID]*Store),
+	}
+	for _, opt := range opts {
+		opt(mgr)
 	}
 
 	// Best-effort default tenant ID resolution. If the tenant table doesn't
@@ -413,6 +430,17 @@ func (m *TenantStoreManager) openTenantStore(ctx context.Context, tenantID uuid.
 	}
 
 	dbPath := filepath.Join(dir, "hitkeep.db")
+
+	// Compaction never blocks opening: a failure (file locked by another
+	// process, pending migrations) leaves the original file untouched.
+	if m.compaction != nil {
+		if result, err := MaybeCompactDatabase(ctx, dbPath, *m.compaction, PrepareTenantSchema); err != nil {
+			slog.Warn("Skipping tenant database compaction", "tenant_id", tenantID, "path", dbPath, "error", err)
+		} else if result.Compacted {
+			slog.Info("Compacted tenant database", "tenant_id", tenantID, "path", dbPath, "bytes_before", result.BytesBefore, "bytes_after", result.BytesAfter)
+		}
+	}
+
 	store := NewStore(dbPath, m.shared.duckDBOptions()...)
 	if err := store.Connect(); err != nil {
 		return nil, fmt.Errorf("could not connect to tenant database %s: %w", dbPath, err)

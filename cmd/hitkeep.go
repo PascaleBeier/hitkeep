@@ -216,6 +216,16 @@ func startSearchConsoleSyncWorker(ctx context.Context, conf *config.Config, tena
 func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.Logger, logLevel slog.Level, realtimeBroker *realtime.Broker) (*database.Store, *database.TenantStoreManager, *nsq.Producer, func(), error) {
 	slog.Debug("(Leader) Starting stateful services...")
 
+	// Compaction never blocks startup: a failure (pending migrations after an
+	// upgrade, file held by another process) leaves the original file intact.
+	if conf.DBCompactOnStart {
+		if result, err := database.MaybeCompactDatabase(ctx, conf.DBPath, database.DefaultCompactionOptions(), database.PrepareSharedSchema); err != nil {
+			slog.Warn("Skipping database compaction at startup", "path", conf.DBPath, "error", err)
+		} else if result.Compacted {
+			slog.Info("Compacted database at startup", "path", conf.DBPath, "bytes_before", result.BytesBefore, "bytes_after", result.BytesAfter)
+		}
+	}
+
 	store := database.NewStore(conf.DBPath,
 		database.WithMemoryLimit(conf.DuckDBMemoryLimit),
 		database.WithThreads(conf.DuckDBThreads),
@@ -229,7 +239,11 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 	}
 	store.StartMaintenance(ctx)
 
-	tenantMgr := database.NewTenantStoreManager(store, conf.DataPath)
+	var tenantOpts []database.TenantStoreManagerOption
+	if conf.DBCompactOnStart {
+		tenantOpts = append(tenantOpts, database.WithTenantCompaction(database.DefaultCompactionOptions()))
+	}
+	tenantMgr := database.NewTenantStoreManager(store, conf.DataPath, tenantOpts...)
 	tenantMgr.StartMaintenance(ctx)
 	if err := tenantMgr.SyncAllTenants(ctx); err != nil {
 		store.Close()

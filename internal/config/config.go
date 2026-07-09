@@ -29,6 +29,7 @@ type Config struct {
 
 	DuckDBMemoryLimit string `env:"HITKEEP_DUCKDB_MEMORY_LIMIT" default:"" desc:"DuckDB memory limit per database (e.g. 2GB); empty derives a container-aware default, 'none' keeps the DuckDB default of 80% of system RAM"`
 	DuckDBThreads     int    `env:"HITKEEP_DUCKDB_THREADS"      default:"0" desc:"DuckDB threads per database; 0 derives the default from GOMAXPROCS"`
+	DBCompactOnStart  bool   `env:"HITKEEP_DB_COMPACT_ON_START" default:"true" desc:"Rewrite fragmented database files on startup and tenant open to return space freed by retention and deletes to the operating system"`
 
 	DataPath       string `env:"HITKEEP_DATA_PATH"          default:"data"           desc:"Base directory for per-tenant data files"`
 	ArchivePath    string `env:"HITKEEP_ARCHIVE_PATH"       default:"archive"        desc:"Data archive path"`
