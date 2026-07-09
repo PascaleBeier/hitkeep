@@ -41,6 +41,23 @@ This file is public guidance for AI-assisted contributions to HitKeep. It is wri
 
 Public documentation lives in the separate `PascaleBeier/hitkeep-docs` repository. When it is checked out next to this repository, docs commands usually run from `../hitkeep-docs`.
 
+## Database Rules
+
+HitKeep runs on embedded DuckDB, which has no cascading deletes, no deferred constraints, and rewrites whole rows when an indexed column changes. The codebase encodes the safe patterns once; follow them instead of re-deriving workarounds.
+
+- Give new site-scoped tables a `site_id` column and new team-scoped tables a `tenant_id` (or `team_id`) column. Deletion plans are derived from the live schema (`internal/database/fk_cleanup.go`), so correctly scoped tables are cleaned up, transferred, and purged automatically.
+- Do not add static per-table delete or copy lists. If a table reaches its owner only through another table and the schema declares no foreign key for that hop, register the relationship in the relevant spec's `extraEdges` (see `siteDeleteSpec` and `tenantPurgeSpec`). Tables that must be nulled instead of deleted belong in `policyTables` with dedicated policy code.
+- `Migrate` and `MigrateTenant` validate the cleanup plans after applying migrations. A table that references `sites` or `tenants` without a scope column fails startup with an explanatory error; fix the schema or register the exception rather than weakening the check.
+- Updating a unique-indexed column on a foreign-key-referenced table (for example `sites.domain` or `users.email`) needs the shadow-row sequence; follow `Store.UpdateSiteDomain` or `Store.UpdateUserProfile`, including the separate transaction for the final shadow cleanup.
+- Only base tables accept DML. Compatibility views (for example `team_audit_log`) appear in `information_schema.columns` but cannot be deleted from.
+- Stats-reset and user-cleanup steps stay hand-written on purpose: they encode product policy (reset families, null-versus-delete choices), not foreign-key completeness.
+
+Useful checks:
+
+```bash
+GOFLAGS="$(./scripts/go-build-tags.sh goflags)" go test ./internal/database -run 'ScopedDeletePlan|FailsFastOnUnhandled|DeleteSiteRemovesAllSiteData'
+```
+
 ## MCP Server Rules
 
 HitKeep MCP is an optional, leader-only Streamable HTTP route for approved assistants and internal reporting tools. Keep this surface conservative.

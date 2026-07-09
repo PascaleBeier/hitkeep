@@ -319,6 +319,7 @@ Public behavior changes should update docs in the separate `hitkeep-docs` reposi
 Before opening an AI-assisted PR, review:
 
 - which public docs changed, or why docs were not needed
+- whether new database tables carry a scope column (`site_id`, `tenant_id`/`team_id`) or are registered in the cleanup specs (see Database Rules in `AGENTS.md`)
 - whether `server.json` changed because MCP Registry metadata changed
 - whether `public/openapi.yml` in the docs repo changed because public API shape changed
 - whether the PR description lists the commands run
