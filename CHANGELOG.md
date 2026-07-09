@@ -1,5 +1,31 @@
 # Changelog
 
+## [2.10.2](https://github.com/PascaleBeier/hitkeep/compare/v2.10.1...v2.10.2) (2026-07-09)
+
+
+### Bug Fixes
+
+* **cloud:** resolve plan changes from Stripe price and lapsed statuses ([98881f7](https://github.com/PascaleBeier/hitkeep/commit/98881f70cee82bc1c8c15b5b7d234be346552a79))
+* **cloud:** warn free teams by email before retention first trims data ([8cf5915](https://github.com/PascaleBeier/hitkeep/commit/8cf5915a14eac8241e317fcf99d48e80e563ad25))
+* **database:** compact fragmented database files on startup and tenant open ([9240341](https://github.com/PascaleBeier/hitkeep/commit/9240341f2726c43d72f0b065dfba3665d7715c72))
+* **database:** derive site and tenant cleanup plans from schema constraints ([9e194b8](https://github.com/PascaleBeier/hitkeep/commit/9e194b8aa83aa4ba12710f5c4b087c351e168c5b))
+* **database:** disable implicit duckdb extension fetching ([9869698](https://github.com/PascaleBeier/hitkeep/commit/9869698b96a5a0a0f2b832f46b6ffb1dda0c7786))
+* **database:** stop preserving insertion order to cut query memory ([2c59dba](https://github.com/PascaleBeier/hitkeep/commit/2c59dba108c3628e6e4d19749428774c62b86b29))
+* **docs:** document database scope-column rules for contributors ([03ae0b6](https://github.com/PascaleBeier/hitkeep/commit/03ae0b6b4ec8137d06e3838a7def56e6d9885219))
+* **e2e:** pin ecommerce dashboard specs to the 30d range ([09b5232](https://github.com/PascaleBeier/hitkeep/commit/09b5232670be4d45b8ea61c84fa96236230fd491))
+* **e2e:** pin remaining seeded analytics specs to the 30d range ([d4449d2](https://github.com/PascaleBeier/hitkeep/commit/d4449d20e41ad1a80cd7163c3d7ad8ebcf4d5ab3))
+* **frontend:** show retention hint when a range exceeds the plan window ([edb66fd](https://github.com/PascaleBeier/hitkeep/commit/edb66fd2f63a88d8e9107f22409dd95ed0d26820))
+* **sites:** let site admins and owners rename a site domain ([727e5ec](https://github.com/PascaleBeier/hitkeep/commit/727e5ec96ed31807f5f5e1a96e415cc9833f8cf3))
+* staticcheck ([6891d6f](https://github.com/PascaleBeier/hitkeep/commit/6891d6fec2d8b7a6f86d24a77eff8e4baa7e7e7a))
+
+
+### Performance Improvements
+
+* **database:** batch per-hit activity and rollup writes per ingest flush ([ab0b315](https://github.com/PascaleBeier/hitkeep/commit/ab0b3152c72b0a6c62ad00bf2533f4b9115fde07))
+* **database:** cache site tenant and domain lookups on the ingest path ([0b9ecdb](https://github.com/PascaleBeier/hitkeep/commit/0b9ecdb1e9af079ddf671aca5efdc94324a99111))
+* **frontend:** Preload dashboard routes ([0997660](https://github.com/PascaleBeier/hitkeep/commit/0997660143d7b45c72c194a144a8e2de7d0ca602))
+* **ingest:** tune nsq consumer delivery and wait for embedded nsqd readiness ([b361f1a](https://github.com/PascaleBeier/hitkeep/commit/b361f1a5847f16fb46155ef11cb4bab9194999e6))
+
 ## [2.10.1](https://github.com/PascaleBeier/hitkeep/compare/v2.10.0...v2.10.1) (2026-07-08)
 
 
