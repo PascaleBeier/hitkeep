@@ -129,7 +129,9 @@ func TestConnectionsDisableImplicitExtensionFetching(t *testing.T) {
 
 	// HitKeep loads everything it needs explicitly at bootstrap; implicit
 	// extension fetching would mean silent network egress at query time.
-	for _, setting := range []string{"autoinstall_known_extensions", "autoload_known_extensions", "allow_community_extensions"} {
+	// preserve_insertion_order buffers full result and insert order in memory;
+	// every user-visible ordering in HitKeep is an explicit ORDER BY.
+	for _, setting := range []string{"autoinstall_known_extensions", "autoload_known_extensions", "allow_community_extensions", "preserve_insertion_order"} {
 		var value bool
 		if err := store.DB().QueryRowContext(ctx, "SELECT current_setting(?)::BOOLEAN", setting).Scan(&value); err != nil {
 			t.Fatalf("read %s: %v", setting, err)

@@ -119,6 +119,12 @@ func (s *Store) initConnection(execer driver.ExecerContext) error {
 	if _, err := execer.ExecContext(context.Background(), "SET autoinstall_known_extensions=false; SET autoload_known_extensions=false; SET allow_community_extensions=false;", nil); err != nil {
 		return fmt.Errorf("disable implicit extension fetching: %w", err)
 	}
+	// Insertion-order preservation buffers whole results and parallel insert
+	// batches in memory; every user-visible ordering in HitKeep is an
+	// explicit ORDER BY, so trade the implicit order for lower memory use.
+	if _, err := execer.ExecContext(context.Background(), "SET preserve_insertion_order=false;", nil); err != nil {
+		return fmt.Errorf("disable insertion order preservation: %w", err)
+	}
 	if _, err := execer.ExecContext(context.Background(), fmt.Sprintf("PRAGMA wal_autocheckpoint='%s';", walAutoCheckpointSize), nil); err != nil {
 		slog.Warn("Failed to set wal_autocheckpoint", "size", walAutoCheckpointSize, "error", err)
 	}
