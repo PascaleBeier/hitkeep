@@ -64,6 +64,21 @@ describe('SiteService', () => {
         expect(service.activeSite()?.id).toBe('site-middle');
     });
 
+    it('renames a site domain and re-sorts the list and active site', () => {
+        service.applySites([site('site-zeta', 'zeta.example.com'), site('site-alpha', 'alpha.example.com')]);
+        service.selectSite(site('site-zeta', 'zeta.example.com'));
+
+        service.renameSiteDomain('site-zeta', 'beta.example.com').subscribe();
+
+        const req = httpMock.expectOne('/api/sites/site-zeta/domain');
+        expect(req.request.method).toBe('PUT');
+        expect(req.request.body).toEqual({ domain: 'beta.example.com' });
+        req.flush(site('site-zeta', 'beta.example.com'));
+
+        expect(service.sites().map((entry) => entry.domain)).toEqual(['alpha.example.com', 'beta.example.com']);
+        expect(service.activeSite()?.domain).toBe('beta.example.com');
+    });
+
     it('posts reset confirmation to the site stats reset endpoint', () => {
         service.resetSiteStats('site-1', 'example.com').subscribe((response) => {
             expect(response).toEqual({

@@ -221,6 +221,7 @@
       "siteCreated": "Sito creato",
       "siteDeleted": "Sito eliminato",
       "siteStatsReset": "Statistiche reimpostate",
+      "siteDomainRenamed": "Dominio rinominato",
       "siteRetentionUpdated": "Conservazione modificata",
       "siteTransferredIn": "Sito trasferito in ingresso",
       "siteTransferredOut": "Sito trasferito in uscita",
@@ -1399,6 +1400,12 @@
       "general": {
         "title": "Impostazioni generali",
         "domainLabel": "Dominio",
+        "renameAction": "Salva dominio",
+        "renameHint": "La ridenominazione cambia quale dominio viene riconosciuto dal tracker. Le analisi esistenti restano su questo sito.",
+        "renameErrors": {
+          "domainTaken": "Questo dominio è già usato da un altro sito.",
+          "renameFailed": "Impossibile rinominare il dominio. Riprova."
+        },
         "siteIdLabel": "ID sito",
         "dataExportTitle": "Esportazione dati",
         "exportSiteDataTitle": "Esporta dati sito",

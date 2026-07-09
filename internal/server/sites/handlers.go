@@ -110,6 +110,10 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 	mux.HandleFunc("GET /api/favicon/{domain}", ctx.Handler(shared.HandlerConfig{
 		RateLimiter: ctx.ApiLimiter,
 	}, h.handleGetFavicon()))
+	mux.HandleFunc("PUT /api/sites/{id}/domain", ctx.Handler(shared.HandlerConfig{
+		SitePerm:    authcore.PermSiteManageData,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleRenameSiteDomain()))
 	mux.HandleFunc("PUT /api/sites/{id}/retention", ctx.Handler(shared.HandlerConfig{
 		SitePerm:    authcore.PermSiteManageData,
 		RateLimiter: ctx.ApiLimiter,
@@ -136,6 +140,25 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 }
 
 var domainRegex = regexp.MustCompile(`^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$`)
+
+// normalizeSiteDomain lowercases and validates a user-supplied site domain.
+// It returns the normalized domain, or a user-facing error message.
+func normalizeSiteDomain(raw string) (string, string) {
+	domain := strings.ToLower(strings.TrimSpace(raw))
+	if domain == "" {
+		return "", "Domain is required"
+	}
+	if strings.Contains(domain, "://") {
+		return "", "Domain must not contain protocol (http:// or https://)"
+	}
+	if strings.HasPrefix(domain, "www.") {
+		return "", "Domain must not start with 'www.' (we track subdomains automatically)"
+	}
+	if len(domain) > 253 || !domainRegex.MatchString(domain) {
+		return "", "Invalid domain format (e.g. example.com)"
+	}
+	return domain, ""
+}
 
 func canManageTenantRole(role string) bool {
 	switch strings.TrimSpace(strings.ToLower(role)) {
@@ -226,24 +249,9 @@ func (h *handler) handleCreateSite() http.HandlerFunc {
 			return
 		}
 
-		domain := strings.ToLower(strings.TrimSpace(req.Domain))
-		if domain == "" {
-			http.Error(w, "Domain is required", http.StatusBadRequest)
-			return
-		}
-
-		if strings.Contains(domain, "://") {
-			http.Error(w, "Domain must not contain protocol (http:// or https://)", http.StatusBadRequest)
-			return
-		}
-
-		if strings.HasPrefix(domain, "www.") {
-			http.Error(w, "Domain must not start with 'www.' (we track subdomains automatically)", http.StatusBadRequest)
-			return
-		}
-
-		if len(domain) > 253 || !domainRegex.MatchString(domain) {
-			http.Error(w, "Invalid domain format (e.g. example.com)", http.StatusBadRequest)
+		domain, validationErr := normalizeSiteDomain(req.Domain)
+		if validationErr != "" {
+			http.Error(w, validationErr, http.StatusBadRequest)
 			return
 		}
 
@@ -429,6 +437,98 @@ func (h *handler) handleResetSiteStats() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(result); err != nil {
+			slog.Error("Failed to encode response", "error", err)
+		}
+	}
+}
+
+func (h *handler) handleRenameSiteDomain() http.HandlerFunc {
+	type request struct {
+		Domain string `json:"domain"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		if h.ctx.Store == nil {
+			http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
+			return
+		}
+
+		siteID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
+		if err != nil {
+			http.Error(w, "Invalid site_id", http.StatusBadRequest)
+			return
+		}
+
+		site, err := h.ctx.Store.GetSiteByID(r.Context(), siteID)
+		if err != nil {
+			slog.Error("Failed to get site for domain rename", "error", err, "site_id", siteID)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		if site == nil {
+			http.Error(w, "Site not found", http.StatusNotFound)
+			return
+		}
+
+		var req request
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&req); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		domain, validationErr := normalizeSiteDomain(req.Domain)
+		if validationErr != "" {
+			http.Error(w, validationErr, http.StatusBadRequest)
+			return
+		}
+
+		oldDomain := site.Domain
+		if domain != oldDomain {
+			existing, err := h.ctx.Store.FindSiteByDomain(r.Context(), domain)
+			if err != nil {
+				slog.Error("Failed to check domain availability", "error", err, "domain", domain)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			if existing != nil {
+				http.Error(w, "Domain already in use by another site", http.StatusConflict)
+				return
+			}
+
+			if err := h.ctx.Store.UpdateSiteDomain(r.Context(), siteID, domain); err != nil {
+				slog.Error("Failed to rename site domain", "error", err, "site_id", siteID, "domain", domain)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+
+			if h.ctx.TenantStores != nil {
+				if err := h.ctx.TenantStores.SyncSite(r.Context(), siteID); err != nil {
+					slog.Error("Failed to sync tenant site mirror after domain rename", "error", err, "site_id", siteID)
+					http.Error(w, "Internal server error", http.StatusInternalServerError)
+					return
+				}
+			}
+
+			userID := shared.GetUserIDFromContext(r)
+			if teamID, err := h.ctx.Store.GetSiteTenantID(r.Context(), siteID); err == nil {
+				h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
+					ActorID:     userID,
+					TeamID:      teamID,
+					Action:      "site.domain_renamed",
+					TargetType:  "site",
+					TargetID:    siteID.String(),
+					TargetLabel: domain,
+					Outcome:     "success",
+					Details:     fmt.Sprintf("Domain renamed from %s to %s", oldDomain, domain),
+				})
+			}
+
+			slog.Info("Site domain renamed", "site_id", siteID, "old_domain", oldDomain, "new_domain", domain, "user_id", userID)
+			site.Domain = domain
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(site); err != nil {
 			slog.Error("Failed to encode response", "error", err)
 		}
 	}

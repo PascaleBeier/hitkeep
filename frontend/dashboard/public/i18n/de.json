@@ -221,6 +221,7 @@
       "siteCreated": "Site erstellt",
       "siteDeleted": "Site gelöscht",
       "siteStatsReset": "Statistiken zurückgesetzt",
+      "siteDomainRenamed": "Domain umbenannt",
       "siteRetentionUpdated": "Aufbewahrung geändert",
       "siteTransferredIn": "Site eingehend übertragen",
       "siteTransferredOut": "Site ausgehend übertragen",
@@ -1399,6 +1400,12 @@
       "general": {
         "title": "Allgemeine Einstellungen",
         "domainLabel": "Domain",
+        "renameAction": "Domain speichern",
+        "renameHint": "Beim Umbenennen ändert sich, welche Domain der Tracker zuordnet. Vorhandene Analytics bleiben bei dieser Site.",
+        "renameErrors": {
+          "domainTaken": "Diese Domain wird bereits von einer anderen Site verwendet.",
+          "renameFailed": "Domain konnte nicht umbenannt werden. Bitte erneut versuchen."
+        },
         "siteIdLabel": "Site-ID",
         "dataExportTitle": "Datenexport",
         "exportSiteDataTitle": "Seitendaten exportieren",

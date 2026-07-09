@@ -337,6 +337,111 @@ func (s *Store) SetSiteRetentionDaysSystem(ctx context.Context, siteID uuid.UUID
 	return nil
 }
 
+// listSiteFKReferences discovers every table column that declares a foreign
+// key on sites(id), so domain updates keep working when new site-scoped
+// tables are added.
+func listSiteFKReferences(ctx context.Context, q queryer) ([]fkEdge, error) {
+	edges, err := listFKEdges(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	refs := make([]fkEdge, 0, len(edges))
+	for _, edge := range edges {
+		if edge.referencedTable != "sites" || edge.table == "sites" {
+			continue
+		}
+		if !isSafeIdentifier(edge.table) || !isSafeIdentifier(edge.column) {
+			continue
+		}
+		refs = append(refs, edge)
+	}
+	return refs, nil
+}
+
+func moveSiteForeignKeys(ctx context.Context, tx *sql.Tx, refs []fkEdge, fromSiteID, toSiteID uuid.UUID) error {
+	for _, ref := range refs {
+		// #nosec G201 -- table and column names come from duckdb_constraints and pass isSafeIdentifier.
+		query := fmt.Sprintf("UPDATE %s SET %s = ? WHERE %s = ?", ref.table, ref.column, ref.column)
+		if _, err := tx.ExecContext(ctx, query, toSiteID, fromSiteID); err != nil {
+			return fmt.Errorf("could not update site foreign key %s.%s: %w", ref.table, ref.column, err)
+		}
+	}
+	return nil
+}
+
+// UpdateSiteDomain renames a site's tracked domain. Callers must normalize
+// and validate the domain and enforce authorization before calling.
+//
+// DuckDB rewrites the whole sites row when the unique-indexed domain column
+// changes and rejects the rewrite while other tables hold foreign keys on the
+// site. Mirror the shadow-row sequence from UpdateUserProfile: park the
+// references on a shadow site, update the domain, then move them back.
+func (s *Store) UpdateSiteDomain(ctx context.Context, siteID uuid.UUID, domain string) error {
+	var userID uuid.UUID
+	var createdAt time.Time
+	if err := s.db.QueryRowContext(ctx, "SELECT user_id, created_at FROM sites WHERE id = ?", siteID).Scan(&userID, &createdAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("site %s not found", siteID)
+		}
+		return fmt.Errorf("could not load site for domain update: %w", err)
+	}
+
+	refs, err := listSiteFKReferences(ctx, s.db)
+	if err != nil {
+		return err
+	}
+
+	shadowSiteID := uuid.New()
+	shadowDomain := fmt.Sprintf("__shadow_%s.hitkeep.invalid", strings.ReplaceAll(shadowSiteID.String(), "-", ""))
+
+	if err := runStoreTx(ctx, s.db, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx,
+			"INSERT INTO sites (id, user_id, domain, created_at) VALUES (?, ?, ?, ?)",
+			shadowSiteID, userID, shadowDomain, createdAt,
+		); err != nil {
+			return fmt.Errorf("could not create shadow site for domain update: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	deleteShadow := func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, "DELETE FROM sites WHERE id = ?", shadowSiteID); err != nil {
+			return fmt.Errorf("could not cleanup shadow site for domain update: %w", err)
+		}
+		return nil
+	}
+
+	if err := runStoreTx(ctx, s.db, func(tx *sql.Tx) error {
+		return moveSiteForeignKeys(ctx, tx, refs, siteID, shadowSiteID)
+	}); err != nil {
+		_ = runStoreTx(ctx, s.db, func(tx *sql.Tx) error {
+			return moveSiteForeignKeys(ctx, tx, refs, shadowSiteID, siteID)
+		})
+		_ = runStoreTx(ctx, s.db, deleteShadow)
+		return err
+	}
+
+	if err := runStoreTx(ctx, s.db, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, "UPDATE sites SET domain = ? WHERE id = ?", domain, siteID); err != nil {
+			return fmt.Errorf("could not update site domain: %w", err)
+		}
+		return moveSiteForeignKeys(ctx, tx, refs, shadowSiteID, siteID)
+	}); err != nil {
+		// Best-effort rollback to keep references on the original site if the update sequence fails.
+		_ = runStoreTx(ctx, s.db, func(tx *sql.Tx) error {
+			return moveSiteForeignKeys(ctx, tx, refs, shadowSiteID, siteID)
+		})
+		_ = runStoreTx(ctx, s.db, deleteShadow)
+		return err
+	}
+
+	// DuckDB's foreign key check still sees the just-moved references inside
+	// the same transaction, so the shadow row is removed on its own.
+	return runStoreTx(ctx, s.db, deleteShadow)
+}
+
 func (s *Store) UpsertSiteMirror(ctx context.Context, site *api.Site) error {
 	if site == nil {
 		return fmt.Errorf("site is required")

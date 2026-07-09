@@ -483,6 +483,20 @@ func openAPIV1AdminSitePaths() map[string]any {
 		"/api/favicon/{domain}": map[string]any{
 			"get": op([]string{"Sites"}, "Get favicon", "Proxies favicon by domain.", nil, []any{paramRef("#/components/parameters/domain")}, nil, map[string]any{"200": desc("Favicon image")}),
 		},
+		"/api/sites/{id}/domain": map[string]any{
+			"put": op([]string{"Sites"}, "Rename site domain", "Renames the tracked domain of a site while keeping its analytics history. Requires site.manage_data (site admin or higher). The tracker only matches hits for the new domain after the rename.", secAnyAuth(), []any{paramRef("#/components/parameters/siteID")},
+				jsonBody(map[string]any{
+					"type":       "object",
+					"properties": map[string]any{"domain": map[string]any{"type": "string", "description": "New apex domain without protocol or www prefix (e.g. example.com)."}},
+					"required":   []string{"domain"},
+				}),
+				map[string]any{
+					"200": jsonRefResp("Renamed site", "#/components/schemas/Site"),
+					"400": errResp("Invalid domain"),
+					"404": errResp("Site not found"),
+					"409": errResp("Domain already in use by another site"),
+				}),
+		},
 		"/api/sites/{id}/retention": map[string]any{
 			"put": op([]string{"Sites"}, "Update retention policy", "Updates per-site retention days.", secCookie(), []any{paramRef("#/components/parameters/siteID")},
 				jsonBody(map[string]any{"type": "object", "properties": map[string]any{"days": map[string]any{"type": "integer", "minimum": 0}}, "required": []string{"days"}}),

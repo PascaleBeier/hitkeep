@@ -98,6 +98,18 @@ export class SiteService {
         );
     }
 
+    renameSiteDomain(siteId: string, domain: string) {
+        return this.http.put<Site>(`/api/sites/${siteId}/domain`, { domain }).pipe(
+            tap((updated) => {
+                this.sites.update((list) => sortSitesByDomain(list.map((site) => (site.id === updated.id ? { ...site, domain: updated.domain } : site))));
+                const active = this.activeSite();
+                if (active?.id === updated.id) {
+                    this.activeSite.set({ ...active, domain: updated.domain });
+                }
+            })
+        );
+    }
+
     resetSiteStats(siteId: string, confirmDomain: string) {
         return this.http.post<SiteStatsResetResponse>(`/api/sites/${siteId}/stats/reset`, { confirm_domain: confirmDomain });
     }

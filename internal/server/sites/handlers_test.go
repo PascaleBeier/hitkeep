@@ -1419,3 +1419,194 @@ func TestHandleExportSiteHitsSupportsAllFormats(t *testing.T) {
 		})
 	}
 }
+
+func newRenameSiteDomainRequest(siteID string, body string) *http.Request {
+	req := httptest.NewRequest(http.MethodPut, "/api/sites/"+siteID+"/domain", strings.NewReader(body))
+	req.SetPathValue("id", siteID)
+	return req
+}
+
+func TestRenameSiteDomainRequiresSiteAdminOrHigher(t *testing.T) {
+	ctx := context.Background()
+	h, store, ownerID := setupTestEnv(t)
+	defer store.Close()
+
+	editorID, err := store.CreateUser(ctx, "site-editor-rename@example.com", "hashed_secret")
+	if err != nil {
+		t.Fatalf("create site editor: %v", err)
+	}
+	adminID, err := store.CreateUser(ctx, "site-admin-rename@example.com", "hashed_secret")
+	if err != nil {
+		t.Fatalf("create site admin: %v", err)
+	}
+	defaultTeamID, err := store.GetDefaultTenantID(ctx)
+	if err != nil {
+		t.Fatalf("get default team: %v", err)
+	}
+	for _, memberID := range []uuid.UUID{editorID, adminID} {
+		if err := store.AddTeamMember(ctx, defaultTeamID, memberID, database.TenantRoleMember, ownerID); err != nil {
+			t.Fatalf("add team member: %v", err)
+		}
+	}
+	site, err := store.CreateSite(ctx, ownerID, "rename-permission.test")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	if err := store.AddSiteMember(ctx, site.ID, editorID, auth.SiteEditor, ownerID); err != nil {
+		t.Fatalf("add site editor: %v", err)
+	}
+	if err := store.AddSiteMember(ctx, site.ID, adminID, auth.SiteAdmin, ownerID); err != nil {
+		t.Fatalf("add site admin: %v", err)
+	}
+
+	handler := h.ctx.RequirePermission(auth.PermSiteManageData)(h.handleRenameSiteDomain())
+
+	unauthW := httptest.NewRecorder()
+	handler.ServeHTTP(unauthW, newRenameSiteDomainRequest(site.ID.String(), `{"domain":"unauth-rename.test"}`))
+	if unauthW.Code != http.StatusUnauthorized {
+		t.Fatalf("expected unauthenticated status %d, got %d: %s", http.StatusUnauthorized, unauthW.Code, unauthW.Body.String())
+	}
+
+	editorReq := newRenameSiteDomainRequest(site.ID.String(), `{"domain":"editor-rename.test"}`)
+	editorReq = editorReq.WithContext(context.WithValue(editorReq.Context(), shared.UserIDKey, editorID))
+	editorW := httptest.NewRecorder()
+	handler.ServeHTTP(editorW, editorReq)
+	if editorW.Code != http.StatusForbidden {
+		t.Fatalf("expected site editor status %d, got %d: %s", http.StatusForbidden, editorW.Code, editorW.Body.String())
+	}
+
+	adminReq := newRenameSiteDomainRequest(site.ID.String(), `{"domain":"admin-rename.test"}`)
+	adminReq = adminReq.WithContext(context.WithValue(adminReq.Context(), shared.UserIDKey, adminID))
+	adminW := httptest.NewRecorder()
+	handler.ServeHTTP(adminW, adminReq)
+	if adminW.Code != http.StatusOK {
+		t.Fatalf("expected site admin status %d, got %d: %s", http.StatusOK, adminW.Code, adminW.Body.String())
+	}
+
+	ownerReq := newRenameSiteDomainRequest(site.ID.String(), `{"domain":"owner-rename.test"}`)
+	ownerReq = ownerReq.WithContext(context.WithValue(ownerReq.Context(), shared.UserIDKey, ownerID))
+	ownerW := httptest.NewRecorder()
+	handler.ServeHTTP(ownerW, ownerReq)
+	if ownerW.Code != http.StatusOK {
+		t.Fatalf("expected site owner status %d, got %d: %s", http.StatusOK, ownerW.Code, ownerW.Body.String())
+	}
+
+	renamed, err := store.GetSiteByID(ctx, site.ID)
+	if err != nil || renamed == nil {
+		t.Fatalf("get renamed site: %v", err)
+	}
+	if renamed.Domain != "owner-rename.test" {
+		t.Fatalf("expected domain owner-rename.test, got %s", renamed.Domain)
+	}
+}
+
+func TestHandleRenameSiteDomainValidatesRequest(t *testing.T) {
+	ctx := context.Background()
+	h, store, userID := setupTestEnv(t)
+	defer store.Close()
+
+	site, err := store.CreateSite(ctx, userID, "rename-validation.test")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	if _, err := store.CreateSite(ctx, userID, "rename-taken.test"); err != nil {
+		t.Fatalf("create conflicting site: %v", err)
+	}
+
+	tests := []struct {
+		name           string
+		siteID         string
+		body           string
+		expectedStatus int
+	}{
+		{"invalid site id", "not-a-uuid", `{"domain":"valid-rename.test"}`, http.StatusBadRequest},
+		{"missing site", uuid.New().String(), `{"domain":"valid-rename.test"}`, http.StatusNotFound},
+		{"missing body", site.ID.String(), ``, http.StatusBadRequest},
+		{"empty domain", site.ID.String(), `{"domain":""}`, http.StatusBadRequest},
+		{"protocol", site.ID.String(), `{"domain":"https://example.com"}`, http.StatusBadRequest},
+		{"www prefix", site.ID.String(), `{"domain":"www.example.com"}`, http.StatusBadRequest},
+		{"invalid characters", site.ID.String(), `{"domain":"inva lid.com"}`, http.StatusBadRequest},
+		{"duplicate domain", site.ID.String(), `{"domain":"rename-taken.test"}`, http.StatusConflict},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := newRenameSiteDomainRequest(tt.siteID, tt.body)
+			req = req.WithContext(context.WithValue(req.Context(), shared.UserIDKey, userID))
+			w := httptest.NewRecorder()
+
+			h.handleRenameSiteDomain().ServeHTTP(w, req)
+
+			if w.Code != tt.expectedStatus {
+				t.Fatalf("expected status %d, got %d: %s", tt.expectedStatus, w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestHandleRenameSiteDomainSuccessUpdatesAndAudits(t *testing.T) {
+	ctx := context.Background()
+	h, store, userID := setupTestEnv(t)
+	defer store.Close()
+
+	site, err := store.CreateSite(ctx, userID, "rename-old.test")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+
+	req := newRenameSiteDomainRequest(site.ID.String(), `{"domain":"Rename-NEW.test"}`)
+	req = req.WithContext(context.WithValue(req.Context(), shared.UserIDKey, userID))
+	w := httptest.NewRecorder()
+
+	h.handleRenameSiteDomain().ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
+	}
+	var response api.Site
+	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.ID != site.ID || response.Domain != "rename-new.test" {
+		t.Fatalf("unexpected rename response: %+v", response)
+	}
+
+	stored, err := store.GetSiteByID(ctx, site.ID)
+	if err != nil || stored == nil {
+		t.Fatalf("get renamed site: %v", err)
+	}
+	if stored.Domain != "rename-new.test" {
+		t.Fatalf("expected stored domain rename-new.test, got %s", stored.Domain)
+	}
+
+	teamID, err := store.GetSiteTenantID(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("get site team: %v", err)
+	}
+	entries, total, err := store.ListTeamAuditEntries(ctx, teamID, "site.domain_renamed", 5, 0)
+	if err != nil {
+		t.Fatalf("list audit entries: %v", err)
+	}
+	if total != 1 || len(entries) != 1 {
+		t.Fatalf("expected one domain rename audit entry, got total=%d entries=%+v", total, entries)
+	}
+	entry := entries[0]
+	if entry.TargetType != "site" || entry.TargetID != site.ID.String() || entry.TargetLabel != "rename-new.test" || entry.Outcome != "success" {
+		t.Fatalf("unexpected audit entry: %+v", entry)
+	}
+	if !strings.Contains(entry.Details, "rename-old.test") || !strings.Contains(entry.Details, "rename-new.test") {
+		t.Fatalf("expected old and new domain in audit details, got %q", entry.Details)
+	}
+
+	// Renaming to the current domain is a no-op that must not add audit noise.
+	noopReq := newRenameSiteDomainRequest(site.ID.String(), `{"domain":"rename-new.test"}`)
+	noopReq = noopReq.WithContext(context.WithValue(noopReq.Context(), shared.UserIDKey, userID))
+	noopW := httptest.NewRecorder()
+	h.handleRenameSiteDomain().ServeHTTP(noopW, noopReq)
+	if noopW.Code != http.StatusOK {
+		t.Fatalf("expected no-op status %d, got %d: %s", http.StatusOK, noopW.Code, noopW.Body.String())
+	}
+	if _, total, err := store.ListTeamAuditEntries(ctx, teamID, "site.domain_renamed", 5, 0); err != nil || total != 1 {
+		t.Fatalf("expected audit total to stay 1 after no-op, got total=%d err=%v", total, err)
+	}
+}

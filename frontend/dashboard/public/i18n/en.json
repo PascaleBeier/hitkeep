@@ -221,6 +221,7 @@
       "siteCreated": "Site created",
       "siteDeleted": "Site deleted",
       "siteStatsReset": "Stats reset",
+      "siteDomainRenamed": "Domain renamed",
       "siteRetentionUpdated": "Retention updated",
       "siteTransferredIn": "Site moved in",
       "siteTransferredOut": "Site moved out",
@@ -1399,6 +1400,12 @@
       "general": {
         "title": "General settings",
         "domainLabel": "Domain",
+        "renameAction": "Save domain",
+        "renameHint": "Renaming changes which domain the tracker matches. Existing analytics stay with this site.",
+        "renameErrors": {
+          "domainTaken": "This domain is already used by another site.",
+          "renameFailed": "Failed to rename the domain. Please try again."
+        },
         "siteIdLabel": "Site ID",
         "dataExportTitle": "Data export",
         "exportSiteDataTitle": "Export site data",

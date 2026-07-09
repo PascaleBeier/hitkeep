@@ -10,8 +10,35 @@
         </header>
         <div class="site-settings-card__body">
             <div class="site-settings-field">
+                @if (canRenameDomain()) {
+                <label for="siteDomain" class="site-settings-field-label">{{ "sites.settings.general.domainLabel" | transloco }}</label>
+                <div class="site-settings-inline-control">
+                    <input pInputText id="siteDomain" class="font-mono" [formControl]="domainForm.domain().control()" (blur)="sanitizeDomain()" [class.ng-invalid]="isDomainInvalid()" [class.ng-dirty]="domainForm.domain().dirty()" />
+                    <p-button
+                        styleClass="site-settings-action-btn"
+                        [label]="'sites.settings.general.renameAction' | transloco"
+                        icon="pi pi-check"
+                        (onClick)="saveDomain()"
+                        [loading]="renaming()"
+                        [disabled]="!hasDomainChanged() || domainForm.domain().invalid()"
+                    />
+                </div>
+                @if (isDomainInvalid()) { @if (domainForm.domain().control().hasError("required")) {
+                <small class="text-red-500">{{ "sites.addDialog.errors.domainRequired" | transloco }}</small>
+                } @if (domainForm.domain().control().hasError("pattern")) {
+                <small class="text-red-500">{{ "sites.addDialog.errors.domainInvalid" | transloco }}</small>
+                } @if (domainForm.domain().control().hasError("containsProtocol")) {
+                <small class="text-red-500">{{ "sites.addDialog.errors.removeProtocol" | transloco }}</small>
+                } @if (domainForm.domain().control().hasError("containsWww")) {
+                <small class="text-red-500">{{ "sites.addDialog.errors.removeWww" | transloco }}</small>
+                } } @if (renameError()) {
+                <small class="text-red-500">{{ renameError() | transloco }}</small>
+                }
+                <small class="site-settings-field-hint">{{ "sites.settings.general.renameHint" | transloco }}</small>
+                } @else {
                 <span class="site-settings-field-label">{{ "sites.settings.general.domainLabel" | transloco }}</span>
                 <div class="site-settings-value font-mono">{{ site()?.domain }}</div>
+                }
             </div>
             @if (site(); as activeSite) {
             <div class="site-settings-field">

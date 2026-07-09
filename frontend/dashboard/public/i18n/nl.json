@@ -221,6 +221,7 @@
       "siteCreated": "Site gemaakt",
       "siteDeleted": "Site verwijderd",
       "siteStatsReset": "Statistieken gereset",
+      "siteDomainRenamed": "Domein hernoemd",
       "siteRetentionUpdated": "Retentie bijgewerkt",
       "siteTransferredIn": "Site is verhuisd",
       "siteTransferredOut": "Site is verhuisd",
@@ -1390,6 +1391,12 @@
       "general": {
         "title": "Algemene instellingen",
         "domainLabel": "Domein",
+        "renameAction": "Domein opslaan",
+        "renameHint": "Hernoemen wijzigt welk domein de tracker herkent. Bestaande statistieken blijven bij deze site.",
+        "renameErrors": {
+          "domainTaken": "Dit domein wordt al door een andere site gebruikt.",
+          "renameFailed": "Kon het domein niet hernoemen. Probeer het opnieuw."
+        },
         "siteIdLabel": "SiteID",
         "dataExportTitle": "Gegevens exporteren",
         "exportSiteDataTitle": "Sitegegevens exporteren",

@@ -1,12 +1,13 @@
 import { ChangeDetectionStrategy, Component, inject, model, signal } from '@angular/core';
 
-import { ReactiveFormsModule, FormControl, Validators, AbstractControl, ValidationErrors } from '@angular/forms';
+import { ReactiveFormsModule, FormControl, Validators } from '@angular/forms';
 import { compatForm } from '@angular/forms/signals/compat';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { InputTextModule } from 'primeng/inputtext';
 import { MessageModule } from 'primeng/message';
 import { DialogShell } from '@components/dialog-shell/dialog-shell';
 import { SiteService } from '@features/sites/services/site.service';
+import { domainValidator, sanitizeDomainInput } from '@features/sites/utils/domain-validator';
 @Component({
     selector: 'app-add-site-dialog',
     standalone: true,
@@ -77,36 +78,11 @@ export class AddSiteDialog {
     protected isSubmitting = signal(false);
     protected createError = signal<string | null>(null);
     private readonly formModel = signal({
-        domain: new FormControl('', { nonNullable: true, validators: [Validators.required, this.domainValidator] })
+        domain: new FormControl('', { nonNullable: true, validators: [Validators.required, domainValidator] })
     });
     protected readonly form = compatForm(this.formModel);
-    private domainValidator(control: AbstractControl): ValidationErrors | null {
-        const value = control.value as string;
-        if (!value) return null;
-
-        if (value.startsWith('http://') || value.startsWith('https://')) {
-            return { containsProtocol: true };
-        }
-
-        if (value.startsWith('www.')) {
-            return { containsWww: true };
-        }
-
-        const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9](?:\.[a-zA-Z]{2,})+$/;
-        if (!domainRegex.test(value)) {
-            return { pattern: true };
-        }
-
-        return null;
-    }
     sanitizeInput() {
-        let val = this.form.domain().value();
-        val = val.toLowerCase().trim();
-
-        val = val.replace(/^https?:\/\//, '');
-        val = val.replace(/\/$/, '');
-
-        this.form.domain().control().setValue(val);
+        this.form.domain().control().setValue(sanitizeDomainInput(this.form.domain().value()));
     }
     protected isInvalid() {
         return this.form.domain().invalid() && (this.form.domain().dirty() || this.form.domain().touched());
