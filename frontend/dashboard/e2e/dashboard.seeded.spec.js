@@ -173,6 +173,7 @@ function metricCardGroupHasPolish(result, expectedCardCount) {
 test("dashboard renders seeded data and product controls", async ({ page }) => {
     await login(page, "/dashboard");
     await selectSeededSite(page);
+    await selectRange(page, SEEDED_EVENT_RANGE);
     await expect(page).toHaveURL(/\/dashboard(?:\?.*)?$/);
     await expect(page.getByText("Latest Hits")).toBeVisible();
     await expect(page.getByText("Top Sources")).toBeVisible();
@@ -204,6 +205,7 @@ test("dashboard renders seeded data and product controls", async ({ page }) => {
 test("dashboard filters by seeded geography and network metrics", async ({ page }) => {
     await login(page, "/dashboard");
     await selectSeededSite(page);
+    await selectRange(page, SEEDED_EVENT_RANGE);
 
     await clickSeededMetricRow(page, "Cities", SEEDED_CITY_RE);
     await expect(page.getByText(/City: (Mountain View|New York|Seattle|Berlin|Munich|London|Paris|Amsterdam)/)).toBeVisible();
@@ -306,6 +308,7 @@ test("secondary analytics metric cards keep equal-height tabbed surfaces and scr
 test("goals page surfaces seeded geography and network data", async ({ page }) => {
     await login(page, "/goals");
     await selectSeededSite(page);
+    await selectRange(page, SEEDED_EVENT_RANGE);
 
     await expect(page.getByRole("heading", { name: "Goals" }).first()).toBeVisible();
     await expect(page.getByText("Conversions", { exact: true }).first()).toBeVisible();
@@ -318,6 +321,7 @@ test("goals page surfaces seeded geography and network data", async ({ page }) =
 test("goals page filters by seeded geography and network metrics", async ({ page }) => {
     await login(page, "/goals");
     await selectSeededSite(page);
+    await selectRange(page, SEEDED_EVENT_RANGE);
 
     await clickSeededMetricRow(page, "Cities", SEEDED_CITY_RE);
     await expect(page.getByText(/City: (Mountain View|New York|Seattle|Berlin|Munich|London|Paris|Amsterdam)/)).toBeVisible();
@@ -336,6 +340,7 @@ test("goals page filters by seeded geography and network metrics", async ({ page
 test("funnels page surfaces seeded geography and network data", async ({ page }) => {
     await login(page, "/funnels");
     await selectSeededSite(page);
+    await selectRange(page, SEEDED_EVENT_RANGE);
 
     await expect(page.getByText("Entries", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("Cities")).toBeVisible();
@@ -347,6 +352,7 @@ test("funnels page surfaces seeded geography and network data", async ({ page })
 test("funnels page filters by seeded geography and network metrics", async ({ page }) => {
     await login(page, "/funnels");
     await selectSeededSite(page);
+    await selectRange(page, SEEDED_EVENT_RANGE);
 
     await clickSeededMetricRow(page, "Cities", SEEDED_CITY_RE);
     await expect(page.getByText(/City: (Mountain View|New York|Seattle|Berlin|Munich|London|Paris|Amsterdam)/)).toBeVisible();
@@ -365,6 +371,7 @@ test("funnels page filters by seeded geography and network metrics", async ({ pa
 test("ai visibility page shows correlation insights", async ({ page }) => {
     await login(page, "/ai-visibility");
     await selectSeededSite(page);
+    await selectRange(page, SEEDED_EVENT_RANGE);
 
     await expect(page.getByRole("heading", { name: "Fetch volume over time" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Fetch-to-visit correlation" })).toBeVisible();
@@ -377,6 +384,7 @@ test("ai visibility page shows correlation insights", async ({ page }) => {
 test("ai chatbot page surfaces seeded audience geography and network data", async ({ page }) => {
     await login(page, "/ai-chatbots");
     await selectSeededSite(page);
+    await selectRange(page, SEEDED_EVENT_RANGE);
 
     await expect(page.getByRole("heading", { name: "Conversation activity" })).toBeVisible();
     await expect(page.getByText("Conversations", { exact: true }).first()).toBeVisible();
@@ -389,6 +397,7 @@ test("ai chatbot page surfaces seeded audience geography and network data", asyn
 test("ai chatbot page filters by seeded audience geography and network metrics", async ({ page }) => {
     await login(page, "/ai-chatbots");
     await selectSeededSite(page);
+    await selectRange(page, SEEDED_EVENT_RANGE);
 
     await clickSeededMetricRow(page, "Cities", SEEDED_CITY_RE);
     await expect(page.getByText(/City: (Mountain View|New York|Seattle|Berlin|Munich|London|Paris|Amsterdam)/)).toBeVisible();
@@ -455,6 +464,7 @@ test("team admin page shows seeded members and administration tabs", async ({ pa
 
 test("public share links render seeded analytics without login", async ({ page }) => {
     await page.goto(`/share/${E2E_SHARE_TOKEN}/dashboard`, { waitUntil: "domcontentloaded" });
+    await selectRange(page, SEEDED_EVENT_RANGE);
 
     await expect(page).toHaveURL(new RegExp(`/share/${E2E_SHARE_TOKEN}/dashboard`));
     await expect(page.getByText("Latest Hits")).toBeVisible();

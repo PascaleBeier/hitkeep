@@ -3,6 +3,7 @@ const { E2E_SHARE_TOKEN, login } = require("./support/auth");
 
 const TABLE_SETTLE_MS = 1000;
 const PRIMARY_SEEDED_SITE_DOMAIN = "acme-analytics.io";
+const SEEDED_RANGE = "30d";
 const SEEDED_CITY_RE = /Mountain View|New York|Seattle|Berlin|Munich|London|Paris|Amsterdam/;
 const SEEDED_PROVIDER_RE = /Google LLC|Verizon Business|Comcast Cable|Deutsche Telekom AG|Vodafone GmbH|BT|Orange|KPN/;
 const SEEDED_ASN_RE = /AS15169|AS701|AS7922|AS3320|AS3209|AS2856|AS3215|AS1136/;
@@ -26,6 +27,18 @@ async function selectSeededSite(page, domain = PRIMARY_SEEDED_SITE_DOMAIN) {
     await page.waitForTimeout(TABLE_SETTLE_MS);
 }
 
+async function selectRange(page, label) {
+    const rangeButton = page.getByRole("button", { name: label, exact: true }).first();
+    await expect(rangeButton).toBeVisible();
+
+    if ((await rangeButton.getAttribute("aria-pressed")) === "true") {
+        return;
+    }
+
+    await rangeButton.click();
+    await expect(rangeButton).toHaveAttribute("aria-pressed", "true");
+}
+
 async function expectBreakdownRow(page, tabName, valuePattern) {
     await page.getByRole("tab", { name: tabName }).click();
     const panel = page.getByRole("tabpanel", { name: tabName });
@@ -36,6 +49,7 @@ async function expectBreakdownRow(page, tabName, valuePattern) {
 test("web vitals dashboard renders seeded data and filters", async ({ page }) => {
     await login(page, "/web-vitals");
     await selectSeededSite(page);
+    await selectRange(page, SEEDED_RANGE);
 
     await expect(page.getByRole("button", { name: "Inspect LCP over time" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Inspect INP over time" })).toBeVisible();
@@ -76,6 +90,7 @@ test("web vitals dashboard renders seeded data and filters", async ({ page }) =>
 
 test("shared dashboard exposes seeded Web Vitals", async ({ page }) => {
     await page.goto(`/share/${E2E_SHARE_TOKEN}/web-vitals`, { waitUntil: "domcontentloaded" });
+    await selectRange(page, SEEDED_RANGE);
     await page.waitForTimeout(TABLE_SETTLE_MS);
 
     await expect(page).toHaveURL(new RegExp(`/share/${E2E_SHARE_TOKEN}/web-vitals`));
