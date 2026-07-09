@@ -32,40 +32,7 @@ func NewReportWorker(tenantMgr *database.TenantStoreManager, m *mailer.Mailer, p
 
 // Start waits until 08:00 UTC, then ticks every 24 hours.
 func (w *ReportWorker) Start(ctx context.Context) {
-	defer func() {
-		if r := recover(); r != nil {
-			slog.Error("ReportWorker panicked", "error", r)
-		}
-	}()
-
-	now := time.Now().UTC()
-	next := time.Date(now.Year(), now.Month(), now.Day(), 8, 0, 0, 0, time.UTC)
-	if !next.After(now) {
-		next = next.Add(24 * time.Hour)
-	}
-
-	timer := time.NewTimer(time.Until(next))
-	defer timer.Stop()
-
-	select {
-	case <-ctx.Done():
-		return
-	case <-timer.C:
-	}
-
-	w.Run(ctx)
-
-	ticker := time.NewTicker(24 * time.Hour)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			w.Run(ctx)
-		}
-	}
+	runDailyAtUTC(ctx, "ReportWorker", 8, w.Run)
 }
 
 // Run sends any reports that are due today.

@@ -14,11 +14,11 @@ import (
 )
 
 const (
-	CloudPlanFree                         = "free"
-	CloudPlanPro                          = "pro"
-	CloudPlanBusiness                     = "business"
-	CloudFreePlanSiteLimit                = 3
-	CloudFreePlanMemberLimit              = 3
+	CloudPlanFree                            = "free"
+	CloudPlanPro                             = "pro"
+	CloudPlanBusiness                        = "business"
+	CloudFreePlanSiteLimit                   = 3
+	CloudFreePlanMemberLimit                 = 3
 	CloudSubscriptionStatusFree              = "free"
 	CloudSubscriptionStatusPendingCheckout   = "pending_checkout"
 	CloudSubscriptionStatusActive            = "active"
@@ -30,9 +30,9 @@ const (
 	CloudSubscriptionStatusIncompleteExpired = "incomplete_expired"
 	CloudSubscriptionStatusDisputed          = "disputed"
 	CloudSubscriptionStatusChargebackLost    = "chargeback_lost"
-	CloudBillingEventStatusSeen           = "seen"
-	CloudBillingEventStatusDone           = "processed"
-	CloudBillingEventStatusErrored        = "failed"
+	CloudBillingEventStatusSeen              = "seen"
+	CloudBillingEventStatusDone              = "processed"
+	CloudBillingEventStatusErrored           = "failed"
 )
 
 var ErrCloudBillingAccountNotFound = errors.New("cloud billing account not found")
@@ -415,7 +415,7 @@ func (s *Store) getCloudBillingAccountByField(ctx context.Context, field string,
 		return nil, ErrCloudBillingAccountNotFound
 	}
 
-	queryField := ""
+	var queryField string
 	switch field {
 	case "stripe_customer_id", "stripe_subscription_id":
 		queryField = field
@@ -428,6 +428,7 @@ func (s *Store) getCloudBillingAccountByField(ctx context.Context, field string,
 	var subscriptionID sql.NullString
 	var priceID sql.NullString
 
+	// #nosec G201 -- queryField is restricted to the column whitelist in the switch above.
 	query := fmt.Sprintf(`
 		SELECT tenant_id, plan_code, plan_name, subscription_status,
 		       COALESCE(stripe_customer_id, ''), COALESCE(stripe_subscription_id, ''), COALESCE(stripe_price_id, ''),

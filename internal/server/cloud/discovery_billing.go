@@ -125,7 +125,7 @@ func (h *handler) mcpServerCard() map[string]any {
 func (h *handler) integrationsDeclaration() map[string]any {
 	publicURL := cloudPublicURL(h.ctx.Config)
 	source := appurl.Path(publicURL, "/.well-known/integrations.json")
-	credentialID := "hitkeep_api_client_token"
+	credentialID := "hitkeep_api_client_token" // #nosec G101 -- manifest identifier naming the credential type, not a secret.
 	surfaces := []map[string]any{
 		h.restSurface(publicURL, source, credentialID),
 	}

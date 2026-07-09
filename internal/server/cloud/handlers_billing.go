@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -368,48 +367,4 @@ func safeTokenPrefix(token string) string {
 		return token[:8] + "..."
 	}
 	return "***"
-}
-
-func (h *handler) createCheckout(ctx context.Context, account *database.ManagedCloudAccount, req signupRequest) (checkoutURL string, customerID string, sessionID string, priceID string, err error) {
-	planName := planNameForCode(req.PlanCode)
-	priceID = priceIDForPlan(h.ctx.Config, req.PlanCode)
-	if priceID == "" {
-		return "", "", "", "", fmt.Errorf("plan %s is not configured for checkout", req.PlanCode)
-	}
-	if strings.TrimSpace(h.ctx.Config.StripeSecretKey) == "" {
-		return "", "", "", "", fmt.Errorf("stripe secret key is not configured")
-	}
-
-	displayName := strings.TrimSpace(strings.Join([]string{req.GivenName, req.LastName}, " "))
-	customerID, err = h.stripe.CreateCustomer(ctx, createCustomerInput{
-		Email:          req.Email,
-		Name:           displayName,
-		UserID:         account.UserID,
-		TenantID:       account.TenantID,
-		PlanCode:       req.PlanCode,
-		Jurisdiction:   effectiveJurisdiction(h.ctx.Config, req.Jurisdiction),
-		IdempotencyKey: stripeCustomerCreateIdempotencyKey(account.UserID, account.TenantID, req.Email),
-	})
-	if err != nil {
-		return "", "", "", "", err
-	}
-
-	session, err := h.stripe.CreateCheckoutSession(ctx, createCheckoutSessionInput{
-		CustomerID:   customerID,
-		PriceID:      priceID,
-		SuccessURL:   checkoutSuccessURL(h.ctx.Config),
-		CancelURL:    checkoutCancelURL(h.ctx.Config),
-		Locale:       normalizeStripeLocale(req.Locale),
-		UserID:       account.UserID,
-		TenantID:     account.TenantID,
-		PlanCode:     req.PlanCode,
-		PlanName:     planName,
-		Jurisdiction: effectiveJurisdiction(h.ctx.Config, req.Jurisdiction),
-		Email:        req.Email,
-	})
-	if err != nil {
-		return "", "", "", "", err
-	}
-
-	return session.URL, customerID, session.ID, priceID, nil
 }

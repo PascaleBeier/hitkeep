@@ -243,13 +243,6 @@ func planCodeForPrice(conf *config.Config, priceID string) string {
 	}
 }
 
-func effectiveJurisdiction(conf *config.Config, requested string) string {
-	if trimmed := strings.TrimSpace(strings.ToUpper(requested)); trimmed != "" {
-		return trimmed
-	}
-	return strings.TrimSpace(strings.ToUpper(conf.CloudJurisdiction))
-}
-
 func checkoutSuccessURL(conf *config.Config) string {
 	if override := strings.TrimSpace(conf.CloudCheckoutSuccessURL); override != "" {
 		return override
