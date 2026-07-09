@@ -412,6 +412,9 @@ func queryUUIDPtr(values url.Values, key string) *uuid.UUID {
 	return &id
 }
 
+// publishJSON publishes synchronously on purpose: the 202 response must not
+// be sent before nsqd has accepted the message, and against the embedded
+// loopback nsqd the round-trip costs microseconds.
 func (h *handler) publishJSON(topic string, value any) error {
 	body, err := json.Marshal(value)
 	if err != nil {

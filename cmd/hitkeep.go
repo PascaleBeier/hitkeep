@@ -277,8 +277,6 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 		<-ctx.Done()
 		nsqdServer.Exit()
 	}()
-	time.Sleep(100 * time.Millisecond)
-
 	// Producer connects to the local embedded NSQ
 	producer, err := nsq.NewProducer(conf.NSQTCPAddress, nsq.NewConfig())
 	if err != nil {
@@ -287,6 +285,21 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 	}
 	// Wire up Producer logger to slog
 	producer.SetLogger(hklog.GoNSQLogger{Logger: logger}, hklog.NSQGoLevel(logLevel))
+
+	// The embedded nsqd starts asynchronously; wait until it accepts
+	// connections instead of racing it with a fixed sleep.
+	var pingErr error
+	for range 50 {
+		if pingErr = producer.Ping(); pingErr == nil {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if pingErr != nil {
+		producer.Stop()
+		store.Close()
+		return nil, nil, nil, nil, fmt.Errorf("embedded nsqd did not become ready: %w", pingErr)
+	}
 
 	consumer := ingest.NewConsumer(tenantMgr, logger, logLevel, realtimeBroker)
 	if err := consumer.Connect(conf.NSQTCPAddress); err != nil {

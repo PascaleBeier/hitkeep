@@ -66,11 +66,23 @@ func NewConsumer(tenantMgr *database.TenantStoreManager, logger *slog.Logger, le
 	return consumer
 }
 
+// newIngestConsumerConfig tunes delivery for the batching handlers: handlers
+// hold each message only until its batch flush (≤200ms) plus the 10s persist
+// timeout, so a 30s MsgTimeout redelivers wedged messages fast, and a 5s
+// requeue delay retries transient persist failures promptly instead of after
+// the 90s go-nsq default.
+func newIngestConsumerConfig() *nsq.Config {
+	config := nsq.NewConfig()
+	config.MaxInFlight = ingestConsumerConcurrency
+	config.MsgTimeout = 30 * time.Second
+	config.MaxAttempts = 5
+	config.DefaultRequeueDelay = 5 * time.Second
+	return config
+}
+
 func (c *Consumer) Connect(addr string) error {
 	// Hits Consumer
-	hitsConfig := nsq.NewConfig()
-	hitsConfig.MaxInFlight = ingestConsumerConcurrency
-	hitsConsumer, err := nsq.NewConsumer("hits", "db-writer", hitsConfig)
+	hitsConsumer, err := nsq.NewConsumer("hits", "db-writer", newIngestConsumerConfig())
 	if err != nil {
 		return err
 	}
@@ -82,9 +94,7 @@ func (c *Consumer) Connect(addr string) error {
 	c.hitsConsumer = hitsConsumer
 
 	// Events Consumer
-	eventConfig := nsq.NewConfig()
-	eventConfig.MaxInFlight = ingestConsumerConcurrency
-	eventConsumer, err := nsq.NewConsumer("events", "db-writer", eventConfig)
+	eventConsumer, err := nsq.NewConsumer("events", "db-writer", newIngestConsumerConfig())
 	if err != nil {
 		return err
 	}
@@ -95,9 +105,7 @@ func (c *Consumer) Connect(addr string) error {
 	}
 	c.eventConsumer = eventConsumer
 
-	vitalConfig := nsq.NewConfig()
-	vitalConfig.MaxInFlight = ingestConsumerConcurrency
-	vitalConsumer, err := nsq.NewConsumer("web_vitals", "db-writer", vitalConfig)
+	vitalConsumer, err := nsq.NewConsumer("web_vitals", "db-writer", newIngestConsumerConfig())
 	if err != nil {
 		return err
 	}
