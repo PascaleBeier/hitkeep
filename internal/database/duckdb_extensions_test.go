@@ -118,3 +118,24 @@ func stringsContainsAll(s string, parts []string) bool {
 	}
 	return true
 }
+
+func TestConnectionsDisableImplicitExtensionFetching(t *testing.T) {
+	ctx := context.Background()
+	store := NewStore(":memory:")
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	// HitKeep loads everything it needs explicitly at bootstrap; implicit
+	// extension fetching would mean silent network egress at query time.
+	for _, setting := range []string{"autoinstall_known_extensions", "autoload_known_extensions", "allow_community_extensions"} {
+		var value bool
+		if err := store.DB().QueryRowContext(ctx, "SELECT current_setting(?)::BOOLEAN", setting).Scan(&value); err != nil {
+			t.Fatalf("read %s: %v", setting, err)
+		}
+		if value {
+			t.Errorf("expected %s to be disabled on new connections", setting)
+		}
+	}
+}

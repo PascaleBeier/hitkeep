@@ -111,6 +111,14 @@ func (s *Store) initConnection(execer driver.ExecerContext) error {
 	if _, err := execer.ExecContext(context.Background(), "SET TimeZone = 'UTC';", nil); err != nil {
 		return fmt.Errorf("set database timezone: %w", err)
 	}
+	// Everything HitKeep needs is statically linked or installed explicitly
+	// at bootstrap; implicit extension fetching would mean silent network
+	// egress to the DuckDB extension repository at query time. Community
+	// extensions are never used, so that repository is locked out entirely
+	// (the setting is one-way until restart by design).
+	if _, err := execer.ExecContext(context.Background(), "SET autoinstall_known_extensions=false; SET autoload_known_extensions=false; SET allow_community_extensions=false;", nil); err != nil {
+		return fmt.Errorf("disable implicit extension fetching: %w", err)
+	}
 	if _, err := execer.ExecContext(context.Background(), fmt.Sprintf("PRAGMA wal_autocheckpoint='%s';", walAutoCheckpointSize), nil); err != nil {
 		slog.Warn("Failed to set wal_autocheckpoint", "size", walAutoCheckpointSize, "error", err)
 	}
