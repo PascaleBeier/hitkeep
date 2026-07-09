@@ -911,3 +911,89 @@ func requireNoGoogleSearchConsoleSiteMapping(t *testing.T, store *Store, siteID 
 		t.Fatalf("expected Search Console mapping to be cleared on team transfer, got %+v", mapping)
 	}
 }
+
+func TestTransferSiteCopiesAIFetchRowsIntoTenantStore(t *testing.T) {
+	ctx := context.Background()
+	store := newSharedTestStore(t)
+	mgr := NewTenantStoreManager(store, t.TempDir())
+	t.Cleanup(func() { _ = mgr.Close() })
+
+	userID, err := store.CreateUser(ctx, "transfer-ai-fetch@test.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	site, err := store.CreateSite(ctx, userID, "transfer-ai-fetch.test")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	if _, err := store.DB().ExecContext(ctx, `
+		INSERT INTO ai_fetches (id, site_id, timestamp, assistant_name, assistant_family, path, status_code, resource_type)
+		VALUES (?, ?, now(), 'TestBot', 'test', '/docs', 200, 'page')`,
+		uuid.New(), site.ID,
+	); err != nil {
+		t.Fatalf("insert ai fetch: %v", err)
+	}
+
+	destinationTeam, err := store.CreateTenant(ctx, userID, "AI Fetch Destination", "")
+	if err != nil {
+		t.Fatalf("create destination team: %v", err)
+	}
+	sourceTeamID, err := store.GetSiteTenantID(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("resolve source team: %v", err)
+	}
+
+	if err := mgr.TransferSite(ctx, site.ID, destinationTeam.ID, AuditEntryParams{
+		ActorID: userID, TeamID: sourceTeamID, Action: "site.transferred_out",
+		TargetType: "site", TargetID: site.ID.String(), TargetLabel: site.Domain, Outcome: "success",
+	}, AuditEntryParams{
+		ActorID: userID, TeamID: destinationTeam.ID, Action: "site.transferred_in",
+		TargetType: "site", TargetID: site.ID.String(), TargetLabel: site.Domain, Outcome: "success",
+	}); err != nil {
+		t.Fatalf("transfer site with ai fetch rows: %v", err)
+	}
+
+	destinationStore, err := mgr.ForTenant(ctx, destinationTeam.ID)
+	if err != nil {
+		t.Fatalf("open destination store: %v", err)
+	}
+	var count int
+	if err := destinationStore.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM ai_fetches WHERE site_id = ?", site.ID).Scan(&count); err != nil {
+		t.Fatalf("count destination ai fetches: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected 1 ai fetch row in destination tenant store, got %d", count)
+	}
+	var sourceCount int
+	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM ai_fetches WHERE site_id = ?", site.ID).Scan(&sourceCount); err != nil {
+		t.Fatalf("count source ai fetches: %v", err)
+	}
+	if sourceCount != 0 {
+		t.Fatalf("expected source ai fetch rows cleaned after transfer, got %d", sourceCount)
+	}
+
+	// Transfer back out of the tenant store: the FK-referenced sites mirror
+	// row must be removable after its analytics children are cleaned.
+	if err := mgr.TransferSite(ctx, site.ID, sourceTeamID, AuditEntryParams{
+		ActorID: userID, TeamID: destinationTeam.ID, Action: "site.transferred_out",
+		TargetType: "site", TargetID: site.ID.String(), TargetLabel: site.Domain, Outcome: "success",
+	}, AuditEntryParams{
+		ActorID: userID, TeamID: sourceTeamID, Action: "site.transferred_in",
+		TargetType: "site", TargetID: site.ID.String(), TargetLabel: site.Domain, Outcome: "success",
+	}); err != nil {
+		t.Fatalf("transfer site back out of tenant store: %v", err)
+	}
+	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM ai_fetches WHERE site_id = ?", site.ID).Scan(&sourceCount); err != nil {
+		t.Fatalf("count shared ai fetches after transfer back: %v", err)
+	}
+	if sourceCount != 1 {
+		t.Fatalf("expected ai fetch row back in shared store, got %d", sourceCount)
+	}
+	var mirrorCount int
+	if err := destinationStore.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM sites WHERE id = ?", site.ID).Scan(&mirrorCount); err != nil {
+		t.Fatalf("count tenant site mirror rows: %v", err)
+	}
+	if mirrorCount != 0 {
+		t.Fatalf("expected tenant site mirror removed after transfer back, got %d", mirrorCount)
+	}
+}

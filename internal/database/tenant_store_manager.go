@@ -33,35 +33,6 @@ type TenantStoreManager struct {
 	maintenanceCtx context.Context
 }
 
-var siteAnalyticsTransferTables = []string{
-	"imported_event_properties_daily",
-	"imported_event_dimensions_daily",
-	"imported_event_daily",
-	"imported_dimension_daily",
-	"imported_traffic_daily",
-	"search_console_facts",
-	"goal_rollups_hourly",
-	"goal_rollups_daily",
-	"goal_rollups_monthly",
-	"funnel_rollups_hourly",
-	"funnel_rollups_daily",
-	"funnel_rollups_monthly",
-	"session_rollups_hourly",
-	"session_rollups_daily",
-	"session_rollups_monthly",
-	"rollup_dirty_buckets",
-	"hit_rollups_hourly",
-	"hit_rollups_daily",
-	"hit_rollups_monthly",
-	"goals",
-	"funnels",
-	"events",
-	"hits",
-	"web_vitals",
-	"ai_fetches",
-	"qr_code_opens",
-}
-
 // NewTenantStoreManager creates a TenantStoreManager that wraps the shared store.
 // It resolves and caches the default tenant ID from the shared database.
 func NewTenantStoreManager(shared *Store, basePath string) *TenantStoreManager {
@@ -324,30 +295,34 @@ func (m *TenantStoreManager) TransferSite(ctx context.Context, siteID, destinati
 		return fmt.Errorf("search console transfer audit is required")
 	}
 
+	defaultID, err := m.DefaultTenantID(ctx)
+	if err != nil {
+		return fmt.Errorf("resolve default tenant for site transfer: %w", err)
+	}
+	// Mirror the site into the destination before copying analytics: tenant
+	// schemas keep foreign keys on sites (e.g. ai_fetches), so the parent row
+	// must exist first.
+	if destinationTenantID != defaultID {
+		if err := destinationStore.UpsertSiteMirror(ctx, site); err != nil {
+			return fmt.Errorf("upsert destination site mirror: %w", err)
+		}
+	}
+
 	if sourceStore != destinationStore {
 		if err := m.shared.AppendAuditEntry(ctx, siteTransferDataMovePreparedAudit(site, sourceTenantID, destinationTenantID, auditEntries)); err != nil {
 			return fmt.Errorf("append site transfer data move audit: %w", err)
 		}
-		if err := copySiteAnalyticsBetweenStores(ctx, sourceStore, destinationStore, siteID); err != nil {
+		copiedTables, err := copySiteAnalyticsBetweenStores(ctx, sourceStore, destinationStore, siteID)
+		if err != nil {
 			return err
 		}
-		if err := deleteSiteAnalyticsOnly(ctx, sourceStore, siteID, sourceStore != m.shared); err != nil {
+		if err := deleteSiteAnalyticsOnly(ctx, sourceStore, siteID, copiedTables, sourceStore != m.shared); err != nil {
 			return err
 		}
 	}
 
 	if err := m.shared.TransferSiteTeamWithAudit(ctx, siteID, destinationTenantID, searchConsoleMapping != nil, auditEntries); err != nil {
 		return fmt.Errorf("update shared site transfer records: %w", err)
-	}
-
-	defaultID, err := m.DefaultTenantID(ctx)
-	if err != nil {
-		return fmt.Errorf("resolve default tenant after site transfer: %w", err)
-	}
-	if destinationTenantID != defaultID {
-		if err := destinationStore.UpsertSiteMirror(ctx, site); err != nil {
-			return fmt.Errorf("upsert destination site mirror: %w", err)
-		}
 	}
 	if err := m.SyncSite(ctx, siteID); err != nil {
 		return err
@@ -511,24 +486,29 @@ func (m *TenantStoreManager) syncSiteTenantData(ctx context.Context, siteID, ten
 	return nil
 }
 
-func copySiteAnalyticsBetweenStores(ctx context.Context, sourceStore, destinationStore *Store, siteID uuid.UUID) error {
+// copySiteAnalyticsBetweenStores copies the site's rows for every site-scoped
+// table that exists in both schemas (derived from the live schemas, parents
+// before foreign-key children) and returns the copied tables so the caller
+// can clean exactly the same set from the source.
+func copySiteAnalyticsBetweenStores(ctx context.Context, sourceStore, destinationStore *Store, siteID uuid.UUID) ([]string, error) {
 	if sourceStore == nil || destinationStore == nil {
-		return fmt.Errorf("source and destination stores are required")
+		return nil, fmt.Errorf("source and destination stores are required")
 	}
 	if sourceStore.db == destinationStore.db {
-		return nil
+		return nil, nil
 	}
 
-	for _, table := range siteAnalyticsTransferTables {
-		if !isSafeIdentifier(table) {
-			return fmt.Errorf("unsafe analytics transfer table %q", table)
-		}
+	tables, err := listScopedCopyTables(ctx, sourceStore.db, destinationStore.db, "site_id", "sites")
+	if err != nil {
+		return nil, err
+	}
+	for _, table := range tables {
 		if err := copySiteAnalyticsTable(ctx, sourceStore.db, destinationStore.db, table, siteID); err != nil {
-			return fmt.Errorf("copy site analytics table %s: %w", table, err)
+			return nil, fmt.Errorf("copy site analytics table %s: %w", table, err)
 		}
 	}
 
-	return nil
+	return tables, nil
 }
 
 func copySiteAnalyticsTable(ctx context.Context, sourceDB, destinationDB *sql.DB, table string, siteID uuid.UUID) error {

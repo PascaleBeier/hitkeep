@@ -36,7 +36,7 @@ func (s *Store) MigrateTenant(ctx context.Context) error {
 
 	if len(pendingMigrations) == 0 {
 		slog.Debug("Tenant database schema is up to date.")
-		return nil
+		return validateCleanupPlans(ctx, s.db, siteDeleteSpec)
 	}
 
 	slog.Info("Applying pending tenant migrations...", "count", len(pendingMigrations), "path", s.path)
@@ -59,7 +59,7 @@ func (s *Store) MigrateTenant(ctx context.Context) error {
 	}
 
 	slog.Info("Successfully applied all tenant migrations.", "path", s.path)
-	return nil
+	return validateCleanupPlans(ctx, s.db, siteDeleteSpec)
 }
 
 func (s *Store) getTenantAppliedMigrations(ctx context.Context) (map[string]bool, error) {

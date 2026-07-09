@@ -249,6 +249,18 @@ func (s *Store) GetPurgeableTenant(ctx context.Context, tenantID uuid.UUID) (*ap
 	return team, nil
 }
 
+// tenantPurgeSpec derives the archived-tenant purge plan from the live
+// schema. Tables mark tenant ownership with either a tenant_id or a team_id
+// column; api_client_site_roles reaches the tenant only through api_clients
+// and carries no declared foreign key for that hop.
+var tenantPurgeSpec = scopedDeleteSpec{
+	scopeColumns: []string{"tenant_id", "team_id"},
+	rootTable:    "tenants",
+	extraEdges: []fkEdge{
+		{table: "api_client_site_roles", column: "api_client_id", referencedTable: "api_clients", referencedColumn: "id"},
+	},
+}
+
 func (s *Store) DeleteArchivedTenantMetadata(ctx context.Context, tenantID uuid.UUID) (*api.Team, error) {
 	deleted, err := s.GetPurgeableTenant(ctx, tenantID)
 	if err != nil || deleted == nil {
@@ -256,43 +268,20 @@ func (s *Store) DeleteArchivedTenantMetadata(ctx context.Context, tenantID uuid.
 	}
 
 	if err := s.Transact(ctx, func(tx *sql.Tx) error {
-		tables, err := listTables(ctx, tx)
+		steps, err := buildScopedDeletePlan(ctx, tx, tenantPurgeSpec)
 		if err != nil {
 			return err
 		}
-		execIfTableExists := func(table string, query string, args ...any) error {
-			if _, ok := tables[table]; !ok {
-				return nil
+		for _, step := range steps {
+			if _, err := tx.ExecContext(ctx, step.query, tenantID); err != nil {
+				return fmt.Errorf("could not purge archived tenant metadata from %s: %w", step.table, err)
 			}
-			if _, err := tx.ExecContext(ctx, query, args...); err != nil {
-				return err
-			}
-			return nil
 		}
 
-		statements := []struct {
-			table string
-			query string
-			args  []any
-		}{
-			{table: "api_client_site_roles", query: "DELETE FROM api_client_site_roles WHERE api_client_id IN (SELECT id FROM api_clients WHERE tenant_id = ?)", args: []any{tenantID}},
-			{table: "api_clients", query: "DELETE FROM api_clients WHERE tenant_id = ?", args: []any{tenantID}},
-			{table: "cloud_billing_events", query: "DELETE FROM cloud_billing_events WHERE tenant_id = ?", args: []any{tenantID}},
-			{table: "cloud_billing_accounts", query: "DELETE FROM cloud_billing_accounts WHERE tenant_id = ?", args: []any{tenantID}},
-			{table: "instance_audit_log", query: "DELETE FROM instance_audit_log WHERE team_id = ?", args: []any{tenantID}},
-			{table: "site_activity_hourly_counts", query: "DELETE FROM site_activity_hourly_counts WHERE tenant_id = ?", args: []any{tenantID}},
-			{table: "site_activity_summary", query: "DELETE FROM site_activity_summary WHERE tenant_id = ?", args: []any{tenantID}},
-			{table: "site_tenants", query: "DELETE FROM site_tenants WHERE tenant_id = ?", args: []any{tenantID}},
-			{table: "team_invites", query: "DELETE FROM team_invites WHERE tenant_id = ?", args: []any{tenantID}},
-			{table: "tenant_members", query: "DELETE FROM tenant_members WHERE tenant_id = ?", args: []any{tenantID}},
-			{table: "tenant_archives", query: "DELETE FROM tenant_archives WHERE tenant_id = ?", args: []any{tenantID}},
-			{table: "user_preferences", query: "UPDATE user_preferences SET active_tenant_id = NULL WHERE active_tenant_id = ?", args: []any{tenantID}},
-		}
-
-		for _, stmt := range statements {
-			if err := execIfTableExists(stmt.table, stmt.query, stmt.args...); err != nil {
-				return fmt.Errorf("could not purge archived tenant metadata: %w", err)
-			}
+		// user_preferences rows belong to users, not the tenant: detach the
+		// purged tenant instead of deleting the row.
+		if _, err := tx.ExecContext(ctx, "UPDATE user_preferences SET active_tenant_id = NULL WHERE active_tenant_id = ?", tenantID); err != nil {
+			return fmt.Errorf("could not detach purged tenant from user preferences: %w", err)
 		}
 		return nil
 	}); err != nil {

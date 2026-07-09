@@ -11,46 +11,9 @@ import (
 	"hitkeep/internal/database/migrations"
 )
 
-func TestSiteDeleteStepsCoverAllSiteTables(t *testing.T) {
-	entries, err := migrations.Fs.ReadDir(".")
-	if err != nil {
-		t.Fatalf("read migrations dir: %v", err)
-	}
-
-	siteTables := map[string]struct{}{}
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
-			continue
-		}
-		path := filepath.Join(".", entry.Name())
-		contents, err := migrations.Fs.ReadFile(path)
-		if err != nil {
-			t.Fatalf("read migration %s: %v", entry.Name(), err)
-		}
-		for table := range extractSiteIDTables(string(contents)) {
-			siteTables[table] = struct{}{}
-		}
-	}
-
-	var missing []string
-	for table := range siteTables {
-		if table == "sites" || isMigrationScratchTable(table) {
-			continue
-		}
-		if _, ok := knownSiteDeleteTables[table]; !ok {
-			missing = append(missing, table)
-		}
-	}
-
-	if len(missing) > 0 {
-		sort.Strings(missing)
-		t.Fatalf("site delete steps missing tables: %s", strings.Join(missing, ", "))
-	}
-}
-
-func isMigrationScratchTable(table string) bool {
-	return strings.HasSuffix(table, "_without_money_contract")
-}
+// Coverage of the site delete plan itself is asserted against the live
+// schema in TestBuildScopedDeletePlanCoversAllSiteScopedTables; the plan is
+// derived dynamically, so no per-table registration test is needed anymore.
 
 func TestGoalAndFunnelRollupTablesCovered(t *testing.T) {
 	entries, err := migrations.Fs.ReadDir(".")
@@ -80,15 +43,6 @@ func TestGoalAndFunnelRollupTablesCovered(t *testing.T) {
 
 	assertTablesCovered(t, "goal_rollups", expectedGoals, extractTablesFromDeletes(goalRollupQueries))
 	assertTablesCovered(t, "funnel_rollups", expectedFunnels, extractTablesFromDeletes(funnelRollupQueries))
-}
-
-func TestSiteTransferTablesCoverAnalyticsCleanupTables(t *testing.T) {
-	expected := map[string]struct{}{}
-	for _, step := range siteAnalyticsDeleteSteps {
-		expected[step.table] = struct{}{}
-	}
-
-	assertTablesCovered(t, "site analytics transfer", expected, siteAnalyticsTransferTables)
 }
 
 func extractSiteIDTables(sql string) map[string]struct{} {

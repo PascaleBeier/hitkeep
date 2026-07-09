@@ -13,99 +13,22 @@ import (
 	"hitkeep/internal/api"
 )
 
-type siteDeleteStep struct {
-	table string
-	query string
-}
-
 type siteStatsResetStep struct {
 	table  string
 	family string
 	query  string
 }
 
-var siteDeleteSteps = []siteDeleteStep{
-	{table: "share_links", query: "DELETE FROM share_links WHERE site_id = ?"},
-	{table: "opportunities", query: "DELETE FROM opportunities WHERE site_id = ?"},
-	{table: "ai_runs", query: "DELETE FROM ai_runs WHERE site_id = ?"},
-	{table: "site_activity_hourly_counts", query: "DELETE FROM site_activity_hourly_counts WHERE site_id = ?"},
-	{table: "site_activity_summary", query: "DELETE FROM site_activity_summary WHERE site_id = ?"},
-	{table: "site_exclusions", query: "DELETE FROM site_exclusions WHERE site_id = ?"},
-	{table: "site_country_exclusions", query: "DELETE FROM site_country_exclusions WHERE site_id = ?"},
-	{table: "api_client_site_roles", query: "DELETE FROM api_client_site_roles WHERE site_id = ?"},
-	{table: "google_search_console_sync_state", query: "DELETE FROM google_search_console_sync_state WHERE site_id = ?"},
-	{table: "google_search_console_site_mappings", query: "DELETE FROM google_search_console_site_mappings WHERE site_id = ?"},
-	{table: "site_members", query: "DELETE FROM site_members WHERE site_id = ?"},
-	{table: "site_tenants", query: "DELETE FROM site_tenants WHERE site_id = ?"},
-	{table: "site_import_files", query: "DELETE FROM site_import_files WHERE import_id IN (SELECT id FROM site_imports WHERE site_id = ?)"},
-	{table: "site_imports", query: "DELETE FROM site_imports WHERE site_id = ?"},
-	{table: "imported_event_properties_daily", query: "DELETE FROM imported_event_properties_daily WHERE site_id = ?"},
-	{table: "imported_event_dimensions_daily", query: "DELETE FROM imported_event_dimensions_daily WHERE site_id = ?"},
-	{table: "imported_event_daily", query: "DELETE FROM imported_event_daily WHERE site_id = ?"},
-	{table: "imported_dimension_daily", query: "DELETE FROM imported_dimension_daily WHERE site_id = ?"},
-	{table: "imported_traffic_daily", query: "DELETE FROM imported_traffic_daily WHERE site_id = ?"},
-	{table: "search_console_facts", query: "DELETE FROM search_console_facts WHERE site_id = ?"},
-	{table: "goal_rollups_hourly", query: "DELETE FROM goal_rollups_hourly WHERE site_id = ?"},
-	{table: "goal_rollups_daily", query: "DELETE FROM goal_rollups_daily WHERE site_id = ?"},
-	{table: "goal_rollups_monthly", query: "DELETE FROM goal_rollups_monthly WHERE site_id = ?"},
-	{table: "funnel_rollups_hourly", query: "DELETE FROM funnel_rollups_hourly WHERE site_id = ?"},
-	{table: "funnel_rollups_daily", query: "DELETE FROM funnel_rollups_daily WHERE site_id = ?"},
-	{table: "funnel_rollups_monthly", query: "DELETE FROM funnel_rollups_monthly WHERE site_id = ?"},
-	{table: "session_rollups_hourly", query: "DELETE FROM session_rollups_hourly WHERE site_id = ?"},
-	{table: "session_rollups_daily", query: "DELETE FROM session_rollups_daily WHERE site_id = ?"},
-	{table: "session_rollups_monthly", query: "DELETE FROM session_rollups_monthly WHERE site_id = ?"},
-	{table: "rollup_dirty_buckets", query: "DELETE FROM rollup_dirty_buckets WHERE site_id = ?"},
-	{table: "hit_rollups_hourly", query: "DELETE FROM hit_rollups_hourly WHERE site_id = ?"},
-	{table: "hit_rollups_daily", query: "DELETE FROM hit_rollups_daily WHERE site_id = ?"},
-	{table: "hit_rollups_monthly", query: "DELETE FROM hit_rollups_monthly WHERE site_id = ?"},
-	{table: "goals", query: "DELETE FROM goals WHERE site_id = ?"},
-	{table: "funnels", query: "DELETE FROM funnels WHERE site_id = ?"},
-	{table: "events", query: "DELETE FROM events WHERE site_id = ?"},
-	{table: "hits", query: "DELETE FROM hits WHERE site_id = ?"},
-	{table: "web_vitals", query: "DELETE FROM web_vitals WHERE site_id = ?"},
-	{table: "ai_fetches", query: "DELETE FROM ai_fetches WHERE site_id = ?"},
-	{table: "qr_code_opens", query: "DELETE FROM qr_code_opens WHERE site_id = ?"},
-	{table: "qr_code_assets", query: "DELETE FROM qr_code_assets WHERE site_id = ?"},
-	{table: "qr_code_share_links", query: "DELETE FROM qr_code_share_links WHERE site_id = ?"},
-	{table: "qr_codes", query: "DELETE FROM qr_codes WHERE site_id = ?"},
-	{table: "site_report_subscriptions", query: "DELETE FROM site_report_subscriptions WHERE site_id = ?"},
-}
-
-var knownSiteDeleteTables = func() map[string]struct{} {
-	known := make(map[string]struct{}, len(siteDeleteSteps))
-	for _, step := range siteDeleteSteps {
-		known[step.table] = struct{}{}
-	}
-	return known
-}()
-
-var siteAnalyticsDeleteSteps = []siteDeleteStep{
-	{table: "imported_event_properties_daily", query: "DELETE FROM imported_event_properties_daily WHERE site_id = ?"},
-	{table: "imported_event_dimensions_daily", query: "DELETE FROM imported_event_dimensions_daily WHERE site_id = ?"},
-	{table: "imported_event_daily", query: "DELETE FROM imported_event_daily WHERE site_id = ?"},
-	{table: "imported_dimension_daily", query: "DELETE FROM imported_dimension_daily WHERE site_id = ?"},
-	{table: "imported_traffic_daily", query: "DELETE FROM imported_traffic_daily WHERE site_id = ?"},
-	{table: "search_console_facts", query: "DELETE FROM search_console_facts WHERE site_id = ?"},
-	{table: "goal_rollups_hourly", query: "DELETE FROM goal_rollups_hourly WHERE site_id = ?"},
-	{table: "goal_rollups_daily", query: "DELETE FROM goal_rollups_daily WHERE site_id = ?"},
-	{table: "goal_rollups_monthly", query: "DELETE FROM goal_rollups_monthly WHERE site_id = ?"},
-	{table: "funnel_rollups_hourly", query: "DELETE FROM funnel_rollups_hourly WHERE site_id = ?"},
-	{table: "funnel_rollups_daily", query: "DELETE FROM funnel_rollups_daily WHERE site_id = ?"},
-	{table: "funnel_rollups_monthly", query: "DELETE FROM funnel_rollups_monthly WHERE site_id = ?"},
-	{table: "session_rollups_hourly", query: "DELETE FROM session_rollups_hourly WHERE site_id = ?"},
-	{table: "session_rollups_daily", query: "DELETE FROM session_rollups_daily WHERE site_id = ?"},
-	{table: "session_rollups_monthly", query: "DELETE FROM session_rollups_monthly WHERE site_id = ?"},
-	{table: "rollup_dirty_buckets", query: "DELETE FROM rollup_dirty_buckets WHERE site_id = ?"},
-	{table: "hit_rollups_hourly", query: "DELETE FROM hit_rollups_hourly WHERE site_id = ?"},
-	{table: "hit_rollups_daily", query: "DELETE FROM hit_rollups_daily WHERE site_id = ?"},
-	{table: "hit_rollups_monthly", query: "DELETE FROM hit_rollups_monthly WHERE site_id = ?"},
-	{table: "goals", query: "DELETE FROM goals WHERE site_id = ?"},
-	{table: "funnels", query: "DELETE FROM funnels WHERE site_id = ?"},
-	{table: "events", query: "DELETE FROM events WHERE site_id = ?"},
-	{table: "hits", query: "DELETE FROM hits WHERE site_id = ?"},
-	{table: "web_vitals", query: "DELETE FROM web_vitals WHERE site_id = ?"},
-	{table: "ai_fetches", query: "DELETE FROM ai_fetches WHERE site_id = ?"},
-	{table: "qr_code_opens", query: "DELETE FROM qr_code_opens WHERE site_id = ?"},
+// siteDeleteSpec derives the full site delete plan from the live schema:
+// every table with a site_id column is covered automatically, and foreign-key
+// children are deleted before their parents. Only relationships the schema
+// does not declare need to be registered here.
+var siteDeleteSpec = scopedDeleteSpec{
+	scopeColumns: []string{"site_id"},
+	rootTable:    "sites",
+	extraEdges: []fkEdge{
+		{table: "site_import_files", column: "import_id", referencedTable: "site_imports", referencedColumn: "id"},
+	},
 }
 
 var siteStatsResetAnalyticsSteps = []siteStatsResetStep{
@@ -148,83 +71,50 @@ type queryer interface {
 }
 
 func deleteSiteChildren(ctx context.Context, tx *sql.Tx, siteID uuid.UUID) error {
-	existingTables, err := listTables(ctx, tx)
+	steps, err := buildScopedDeletePlan(ctx, tx, siteDeleteSpec)
 	if err != nil {
 		return err
 	}
-
-	for _, step := range siteDeleteSteps {
-		if _, ok := existingTables[step.table]; !ok {
-			continue
-		}
-		if !isSafeIdentifier(step.table) {
-			return fmt.Errorf("unsafe table name %q", step.table)
-		}
+	for _, step := range steps {
 		if _, err := tx.ExecContext(ctx, step.query, siteID); err != nil {
 			return fmt.Errorf("could not delete from %s: %w", step.table, err)
 		}
 	}
-
-	siteTables, err := listSiteIDTables(ctx, tx)
-	if err != nil {
-		return err
-	}
-
-	for _, table := range siteTables {
-		if table == "sites" {
-			continue
-		}
-		if _, ok := knownSiteDeleteTables[table]; ok {
-			continue
-		}
-		if !isSafeIdentifier(table) {
-			return fmt.Errorf("unsafe table name %q", table)
-		}
-		slog.Info("Deleting site data from unexpected table", "table", table, "site_id", siteID)
-		// #nosec G201 -- table name is validated via isSafeIdentifier and discovered from information_schema.
-		query := fmt.Sprintf("DELETE FROM %s WHERE site_id = ?", table)
-		if _, err := tx.ExecContext(ctx, query, siteID); err != nil {
-			return fmt.Errorf("could not delete from %s: %w", table, err)
-		}
-	}
-
 	return nil
 }
 
-func deleteSiteAnalyticsOnly(ctx context.Context, store *Store, siteID uuid.UUID, deleteSiteRow bool) error {
+// deleteSiteAnalyticsOnly removes the site's rows from the given tables
+// (children-first: tables arrives in the parents-first copy order and is
+// walked in reverse) and optionally the mirrored site row afterwards.
+func deleteSiteAnalyticsOnly(ctx context.Context, store *Store, siteID uuid.UUID, tables []string, deleteSiteRow bool) error {
 	tx, err := store.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("could not begin analytics cleanup transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	existingTables, err := listTables(ctx, tx)
-	if err != nil {
-		return err
-	}
-
-	for _, step := range siteAnalyticsDeleteSteps {
-		if _, ok := existingTables[step.table]; !ok {
-			continue
+	for i := len(tables) - 1; i >= 0; i-- {
+		table := tables[i]
+		if !isSafeIdentifier(table) {
+			return fmt.Errorf("unsafe table name %q", table)
 		}
-		if !isSafeIdentifier(step.table) {
-			return fmt.Errorf("unsafe table name %q", step.table)
-		}
-		if _, err := tx.ExecContext(ctx, step.query, siteID); err != nil {
-			return fmt.Errorf("could not delete analytics from %s: %w", step.table, err)
-		}
-	}
-
-	if deleteSiteRow {
-		if _, ok := existingTables["sites"]; ok {
-			if _, err := tx.ExecContext(ctx, "DELETE FROM sites WHERE id = ?", siteID); err != nil {
-				return fmt.Errorf("could not delete mirrored site row: %w", err)
-			}
+		// #nosec G201 -- table names are discovered from the live schema and validated via isSafeIdentifier.
+		if _, err := tx.ExecContext(ctx, fmt.Sprintf("DELETE FROM %s WHERE site_id = ?", table), siteID); err != nil {
+			return fmt.Errorf("could not delete analytics from %s: %w", table, err)
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("could not commit analytics cleanup transaction: %w", err)
+	}
+
+	if deleteSiteRow {
+		// The mirrored site row is removed outside the cleanup transaction:
+		// DuckDB's foreign key check still sees child rows deleted in the
+		// same transaction and would reject the parent-row delete.
+		if _, err := store.db.ExecContext(ctx, "DELETE FROM sites WHERE id = ?", siteID); err != nil {
+			return fmt.Errorf("could not delete mirrored site row: %w", err)
+		}
 	}
 	return nil
 }
@@ -340,6 +230,7 @@ func listTables(ctx context.Context, q queryer) (map[string]struct{}, error) {
 		SELECT table_name
 		FROM information_schema.tables
 		WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
+			AND table_type = 'BASE TABLE'
 	`)
 	if err != nil {
 		return nil, fmt.Errorf("could not list tables: %w", err)

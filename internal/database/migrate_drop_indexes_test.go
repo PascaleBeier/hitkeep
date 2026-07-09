@@ -152,10 +152,19 @@ func TestDropAnalyticsIndexesMigrationPreservesData(t *testing.T) {
 // TestCopySiteAnalyticsIsIdempotentWithoutUniqueIndexes guards the site
 // transfer path: with the ART indexes gone there is no conflict-based upsert,
 // so repeating a copy must replace rather than duplicate the site's rows.
+// The destination carries the tenant-local data-plane schema, matching the
+// only pairings TransferSite produces.
 func TestCopySiteAnalyticsIsIdempotentWithoutUniqueIndexes(t *testing.T) {
 	ctx := context.Background()
 	source := newSharedTestStore(t)
-	destination := newSharedTestStore(t)
+	destination := NewStore(":memory:")
+	if err := destination.Connect(); err != nil {
+		t.Fatalf("connect destination: %v", err)
+	}
+	t.Cleanup(func() { _ = destination.Close() })
+	if err := destination.MigrateTenant(ctx); err != nil {
+		t.Fatalf("migrate destination tenant schema: %v", err)
+	}
 
 	userID, err := source.CreateUser(ctx, "copy-idempotent@test.com", "hash")
 	if err != nil {
@@ -173,7 +182,7 @@ func TestCopySiteAnalyticsIsIdempotentWithoutUniqueIndexes(t *testing.T) {
 	}
 
 	for range 2 {
-		if err := copySiteAnalyticsBetweenStores(ctx, source, destination, site.ID); err != nil {
+		if _, err := copySiteAnalyticsBetweenStores(ctx, source, destination, site.ID); err != nil {
 			t.Fatalf("copy site analytics: %v", err)
 		}
 	}
