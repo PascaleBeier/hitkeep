@@ -143,6 +143,11 @@ func TestConnectionsDisableImplicitExtensionFetching(t *testing.T) {
 }
 
 func TestS3SessionBootstrapsAWSSecretProvider(t *testing.T) {
+	// DuckDB validates the credential chain while creating the secret. Keep the
+	// test independent of developer or CI runner credential configuration.
+	t.Setenv("AWS_ACCESS_KEY_ID", "test-access-key")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "test-secret-key")
+
 	store := NewStore(":memory:")
 	if err := store.Connect(); err != nil {
 		t.Fatalf("connect: %v", err)
