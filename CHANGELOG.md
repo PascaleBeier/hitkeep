@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.10.3](https://github.com/PascaleBeier/hitkeep/compare/v2.10.2...v2.10.3) (2026-07-10)
+
+
+### Bug Fixes
+
+* **s3:** missing AWS extension ([a31c50e](https://github.com/PascaleBeier/hitkeep/commit/a31c50e073979ebea12f41fdd36b66a35595355e))
+
 ## [2.10.2](https://github.com/PascaleBeier/hitkeep/compare/v2.10.1...v2.10.2) (2026-07-09)
 
 
