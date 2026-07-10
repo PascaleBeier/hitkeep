@@ -4,7 +4,7 @@
 }
 
 .webhooks-page__subtitle,
-.delivery-dialog__header p,
+.delivery-dialog__toolbar p,
 .webhook-name-cell__description,
 .webhook-form small,
 .webhook-form fieldset > p {
@@ -28,13 +28,13 @@
 .webhooks-toolbar__actions,
 .webhooks-scope,
 .webhooks-table-caption,
-.delivery-dialog__header {
+.delivery-dialog__toolbar {
     display: flex;
     align-items: center;
 }
 
 .webhooks-toolbar,
-.delivery-dialog__header {
+.delivery-dialog__toolbar {
     justify-content: space-between;
     gap: 1rem;
 }
@@ -123,16 +123,14 @@
     white-space: nowrap;
 }
 
-.delivery-dialog__header {
+.delivery-dialog__toolbar {
     width: 100%;
+    margin-bottom: 1rem;
 }
 
-.delivery-dialog__header p {
-    margin: 0.25rem 0 0;
-}
-
-.delivery-table-wrap {
-    overflow-x: auto;
+.delivery-dialog__toolbar p {
+    max-width: 70ch;
+    margin: 0;
 }
 
 .delivery-dialog__empty {
@@ -203,16 +201,9 @@
     color: var(--p-red-600) !important;
 }
 
-.webhook-form footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.4rem;
-    padding-top: 0.25rem;
-}
-
 @media (max-width: 640px) {
     .webhooks-toolbar,
-    .delivery-dialog__header {
+    .delivery-dialog__toolbar {
         align-items: stretch;
         flex-direction: column;
     }

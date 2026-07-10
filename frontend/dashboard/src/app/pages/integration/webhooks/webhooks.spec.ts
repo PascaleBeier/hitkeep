@@ -193,4 +193,47 @@ describe('WebhooksPage', () => {
 
         expect(document.body.querySelector('.p-dialog')?.textContent).toContain('Delivery history could not be loaded.');
     });
+
+    it('uses the shared default modal components for forms and delivery history', async () => {
+        fixture.componentInstance['openCreate']();
+        await fixture.whenStable();
+
+        expect(fixture.nativeElement.querySelector(':scope > app-crud-dialog')).not.toBeNull();
+
+        fixture.componentInstance['dialogVisible'].set(false);
+        fixture.componentInstance['showDeliveries'](webhook);
+        await fixture.whenStable();
+
+        expect(Array.from(fixture.nativeElement.children as HTMLCollectionOf<Element>).some((element) => element.tagName === 'APP-DIALOG-SHELL')).toBe(true);
+    });
+
+    it('renders delivery history as the shared paginated and sortable table', async () => {
+        service.deliveries.mockReturnValueOnce(of(Array.from({ length: 12 }, (_, index) => delivery(index))));
+
+        fixture.componentInstance['showDeliveries'](webhook);
+        await fixture.whenStable();
+
+        const dialog = document.body.querySelector('.p-dialog') as HTMLElement | null;
+        const table = dialog?.querySelector('.hk-crud-table') as HTMLElement | null;
+
+        expect(table).not.toBeNull();
+        expect(table?.querySelectorAll('th.p-datatable-sortable-column').length).toBe(5);
+        expect(dialog?.querySelector('.p-paginator')).not.toBeNull();
+        expect(dialog?.querySelectorAll('tbody tr').length).toBe(10);
+    });
+
+    function delivery(index: number): WebhookDelivery {
+        return {
+            id: `delivery-${index}`,
+            event_id: `event-${index}`,
+            webhook_id: webhook.id,
+            site_id: 'site-1',
+            event_type: index % 2 === 0 ? 'goal.created' : 'webhook.test',
+            status: index % 2 === 0 ? 'succeeded' : 'failed',
+            attempt_count: index + 1,
+            response_status: index % 2 === 0 ? 204 : 500,
+            created_at: `2026-07-${String(index + 1).padStart(2, '0')}T12:00:00Z`,
+            attempts: []
+        };
+    }
 });

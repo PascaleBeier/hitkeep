@@ -102,32 +102,47 @@
     </main>
 </div>
 
-<p-dialog [visible]="selectedWebhook() !== null" (visibleChange)="onDeliveryDialogVisibleChange($event)" [modal]="true" [draggable]="false" [closeAriaLabel]="'common.actions.close' | transloco" [style]="{ width: 'min(64rem, calc(100vw - 2rem))' }">
-    @if (selectedWebhook(); as selected) {
-    <ng-template #header let-ariaLabelledBy="ariaLabelledBy">
-        <div class="delivery-dialog__header">
-            <div>
-                <strong [id]="ariaLabelledBy">{{ "integration.webhooks.deliveries.title" | transloco: { name: selected.name } }}</strong>
-                <p>{{ "integration.webhooks.deliveries.subtitle" | transloco }}</p>
-            </div>
-            <p-button icon="pi pi-refresh" [text]="true" [rounded]="true" [ariaLabel]="'integration.webhooks.actions.refresh' | transloco" (onClick)="showDeliveries(selected)" [loading]="deliveryLoading()" />
-        </div>
-    </ng-template>
+@if (selectedWebhook(); as selected) {
+<app-dialog-shell
+    [title]="'integration.webhooks.deliveries.title' | transloco: { name: selected.name }"
+    [visible]="true"
+    (visibleChange)="onDeliveryDialogVisibleChange($event)"
+    [secondaryLabel]="'common.actions.close' | transloco"
+    [showPrimary]="false"
+    width="64rem"
+>
+    <div class="delivery-dialog__toolbar">
+        <p>{{ "integration.webhooks.deliveries.subtitle" | transloco }}</p>
+        <p-button icon="pi pi-refresh" [text]="true" [rounded]="true" [ariaLabel]="'integration.webhooks.actions.refresh' | transloco" (onClick)="showDeliveries(selected)" [loading]="deliveryLoading()" />
+    </div>
     @if (deliveryError(); as errorKey) {
     <div class="hk-feedback-message hk-feedback-message--error" role="alert" aria-live="assertive">{{ errorKey | transloco }}</div>
     } @else {
-    <div class="delivery-table-wrap">
-        <p-table [value]="deliveries()" size="small" [loading]="deliveryLoading()">
-            <ng-template #header>
+    <div class="hk-crud-table-wrap">
+        <p-table
+            [value]="deliveries()"
+            dataKey="id"
+            [sortField]="'created_at'"
+            [sortOrder]="-1"
+            [paginator]="true"
+            [rows]="10"
+            [rowsPerPageOptions]="[10, 25, 50]"
+            [rowHover]="true"
+            [loading]="deliveryLoading()"
+            responsiveLayout="scroll"
+            styleClass="hk-crud-table p-datatable-sm"
+            [tableStyle]="{ 'min-width': '760px' }"
+        >
+            <ng-template pTemplate="header">
                 <tr>
-                    <th>{{ "integration.webhooks.deliveries.event" | transloco }}</th>
-                    <th>{{ "integration.webhooks.deliveries.status" | transloco }}</th>
-                    <th>{{ "integration.webhooks.deliveries.attempts" | transloco }}</th>
-                    <th>{{ "integration.webhooks.deliveries.response" | transloco }}</th>
-                    <th>{{ "integration.webhooks.deliveries.created" | transloco }}</th>
+                    <th pSortableColumn="event_type">{{ "integration.webhooks.deliveries.event" | transloco }} <p-sortIcon field="event_type" /></th>
+                    <th pSortableColumn="status">{{ "integration.webhooks.deliveries.status" | transloco }} <p-sortIcon field="status" /></th>
+                    <th pSortableColumn="attempt_count">{{ "integration.webhooks.deliveries.attempts" | transloco }} <p-sortIcon field="attempt_count" /></th>
+                    <th pSortableColumn="response_status">{{ "integration.webhooks.deliveries.response" | transloco }} <p-sortIcon field="response_status" /></th>
+                    <th pSortableColumn="created_at">{{ "integration.webhooks.deliveries.created" | transloco }} <p-sortIcon field="created_at" /></th>
                 </tr>
             </ng-template>
-            <ng-template #body let-delivery>
+            <ng-template pTemplate="body" let-delivery>
                 <tr>
                     <td><code>{{ delivery.event_type }}</code></td>
                     <td><p-tag [severity]="statusSeverity(delivery.status)" [value]="('integration.webhooks.deliveryStatus.' + delivery.status) | transloco" /></td>
@@ -136,20 +151,26 @@
                     <td><app-relative-date-time [value]="delivery.created_at" /></td>
                 </tr>
             </ng-template>
-            <ng-template #emptymessage>
+            <ng-template pTemplate="emptymessage">
                 <tr>
                     <td colspan="5" class="delivery-dialog__empty">{{ "integration.webhooks.deliveries.empty" | transloco }}</td>
                 </tr>
             </ng-template>
         </p-table>
     </div>
-    } }
-</p-dialog>
+    }
+</app-dialog-shell>
+}
 
-<p-dialog [visible]="dialogVisible()" (visibleChange)="dialogVisible.set($event)" [modal]="true" [draggable]="false" [closeAriaLabel]="'common.actions.close' | transloco" [style]="{ width: 'min(42rem, calc(100vw - 2rem))' }">
-    <ng-template #header let-ariaLabelledBy="ariaLabelledBy">
-        <div><strong [id]="ariaLabelledBy">{{ (editing() ? "integration.webhooks.form.editTitle" : "integration.webhooks.form.createTitle") | transloco }}</strong></div>
-    </ng-template>
+<app-crud-dialog
+    [title]="(editing() ? 'integration.webhooks.form.editTitle' : 'integration.webhooks.form.createTitle') | transloco"
+    [visible]="dialogVisible()"
+    (visibleChange)="dialogVisible.set($event)"
+    [submitLabel]="'integration.webhooks.actions.save' | transloco"
+    [cancelLabel]="'integration.webhooks.actions.cancel' | transloco"
+    [saving]="saving()"
+    (submitted)="save()"
+>
     <form class="webhook-form" [formGroup]="form" (ngSubmit)="save()">
         <label>
             <span>{{ "integration.webhooks.form.name" | transloco }}</span>
@@ -181,11 +202,7 @@
             </div>
             @if (form.touched && selectedEvents().length === 0) { <small class="field-error">{{ "integration.webhooks.form.eventsRequired" | transloco }}</small> }
         </fieldset>
-        <footer>
-            <p-button type="button" [text]="true" [label]="'integration.webhooks.actions.cancel' | transloco" (onClick)="dialogVisible.set(false)" />
-            <p-button type="submit" [label]="'integration.webhooks.actions.save' | transloco" [loading]="saving()" [disabled]="form.invalid || selectedEvents().length === 0" />
-        </footer>
     </form>
-</p-dialog>
+</app-crud-dialog>
 
 <p-confirm-dialog />

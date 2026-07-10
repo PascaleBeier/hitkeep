@@ -5,7 +5,6 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ConfirmationService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
-import { DialogModule } from 'primeng/dialog';
 import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
 import { InputTextModule } from 'primeng/inputtext';
@@ -16,7 +15,9 @@ import { TextareaModule } from 'primeng/textarea';
 import { catchError, distinctUntilChanged, finalize, forkJoin, map, Observable, of, switchMap, tap } from 'rxjs';
 
 import { OneTimeCredential } from '@components/one-time-credential/one-time-credential';
+import { CrudDialog } from '@components/crud-dialog/crud-dialog';
 import { dialogCancelButton, dialogDangerButton, dialogPrimaryButton } from '@components/dialog-actions/dialog-actions';
+import { DialogShell } from '@components/dialog-shell/dialog-shell';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageState } from '@components/page-state/page-state';
@@ -34,7 +35,6 @@ import { Webhook, WebhookDelivery, WebhookEventDescriptor, WebhookInput, Webhook
         TranslocoPipe,
         ButtonModule,
         ConfirmDialogModule,
-        DialogModule,
         IconFieldModule,
         InputIconModule,
         InputTextModule,
@@ -47,6 +47,8 @@ import { Webhook, WebhookDelivery, WebhookEventDescriptor, WebhookInput, Webhook
         PageBreadcrumb,
         PageState,
         OneTimeCredential,
+        CrudDialog,
+        DialogShell,
         RelativeDateTime,
         TableRowActions
     ],
