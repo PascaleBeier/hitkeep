@@ -48,9 +48,11 @@ describe('WebhooksPage', () => {
                                     subtitle: 'Send signed operational events to your systems.',
                                     scopes: { site: 'Site', instance: 'Instance' },
                                     actions: { create: 'Create webhook', refresh: 'Refresh' },
+                                    secret: { title: 'Save this signing secret now', message: 'It is shown once.', copy: 'Copy secret' },
                                     empty: { title: 'No webhooks yet', message: 'Create a webhook to start delivering operational events.' }
                                 }
-                            }
+                            },
+                            common: { copyControl: { copy: 'Copy', copied: 'Copied', failed: 'Copy failed', ariaLabel: 'Copy to clipboard' } }
                         }
                     },
                     translocoConfig: { availableLangs: ['en'], defaultLang: 'en' }
@@ -77,11 +79,25 @@ describe('WebhooksPage', () => {
     });
 
     it('reloads and clears site-scoped state when the active site changes', async () => {
+        fixture.componentInstance['revealedSecret'].set('whsec_old_site');
         activeSite.set({ id: 'site-2', domain: 'second.example.com' });
         await fixture.whenStable();
 
         expect(service.catalog).toHaveBeenCalledWith('site', 'site-2');
         expect(service.list).toHaveBeenCalledWith('site', 'site-2');
         expect(service.list).toHaveBeenCalledTimes(2);
+        expect(fixture.componentInstance['revealedSecret']()).toBe('');
+    });
+
+    it('presents a one-time signing secret with the shared API credential pattern', () => {
+        fixture.componentInstance['revealedSecret'].set('whsec_test_value');
+        fixture.detectChanges();
+
+        const notice = fixture.nativeElement.querySelector('.hk-feedback-message--token') as HTMLElement | null;
+        expect(notice).not.toBeNull();
+        expect(notice?.getAttribute('role')).toBe('status');
+        expect(notice?.getAttribute('aria-live')).toBe('polite');
+        expect(notice?.querySelector('.one-time-credential__value')?.textContent).toContain('whsec_test_value');
+        expect(notice?.querySelector('.p-button-text')).not.toBeNull();
     });
 });

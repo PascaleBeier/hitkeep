@@ -19,8 +19,8 @@ import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 
 import { SettingsCard } from '@features/settings/components/settings-card';
-import { CopyControl } from '@components/copy-control/copy-control';
 import { CrudDialog } from '@components/crud-dialog/crud-dialog';
+import { OneTimeCredential } from '@components/one-time-credential/one-time-credential';
 import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
 import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
 import { APIClient, APIClientSiteRole, APIClientsService, CreateAPIClientRequest, InstanceRole, SiteRole } from '@services/api-clients.service';
@@ -77,8 +77,8 @@ const expiresAtNotPastValidator = (): ValidatorFn => {
         TableModule,
         TagModule,
         SettingsCard,
-        CopyControl,
         CrudDialog,
+        OneTimeCredential,
         RelativeDateTime,
         TableRowActions,
         SiteSelectOption,

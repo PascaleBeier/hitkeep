@@ -13,7 +13,7 @@ import { TagModule } from 'primeng/tag';
 import { TextareaModule } from 'primeng/textarea';
 import { catchError, distinctUntilChanged, finalize, forkJoin, map, Observable, of, switchMap, tap } from 'rxjs';
 
-import { CopyControl } from '@components/copy-control/copy-control';
+import { OneTimeCredential } from '@components/one-time-credential/one-time-credential';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageState } from '@components/page-state/page-state';
@@ -40,7 +40,7 @@ import { Webhook, WebhookDelivery, WebhookEventDescriptor, WebhookInput, Webhook
         PageHeaderLeft,
         PageBreadcrumb,
         PageState,
-        CopyControl,
+        OneTimeCredential,
         RelativeDateTime
     ],
     providers: [ConfirmationService],
@@ -104,7 +104,9 @@ export class WebhooksPage implements OnInit {
         this.requestContext$
             .pipe(
                 distinctUntilChanged((previous, current) => previous.scope === current.scope && previous.siteID === current.siteID && previous.refresh === current.refresh),
-                tap(() => {
+                tap(({ scope, siteID }) => {
+                    const loaded = this.loadedContext();
+                    if (loaded && (loaded.scope !== scope || loaded.siteID !== siteID)) this.revealedSecret.set('');
                     this.loading.set(true);
                     this.feedback.set(null);
                     this.loadedContext.set(null);

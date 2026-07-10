@@ -29,8 +29,7 @@
 .webhooks-scope,
 .webhook-row__title,
 .webhook-row__actions,
-.delivery-log header,
-.secret-reveal {
+.delivery-log header {
     display: flex;
     align-items: center;
 }
@@ -85,28 +84,6 @@
     box-shadow: 0 1px 2px rgb(15 23 42 / 0.08);
 }
 
-.secret-reveal {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(12rem, auto) auto;
-    gap: 0.8rem;
-    padding: 0.9rem 1rem;
-    border: 1px solid var(--p-primary-200);
-    border-radius: 0.6rem;
-    background: var(--p-primary-50);
-    color: var(--p-primary-900);
-}
-
-.secret-reveal p,
-.secret-reveal strong {
-    margin: 0;
-}
-
-.secret-reveal p {
-    margin-top: 0.2rem;
-    font-size: 0.8rem;
-}
-
-.secret-reveal code,
 .webhook-row__url {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -271,13 +248,5 @@
 
     .webhooks-toolbar__actions {
         justify-content: space-between;
-    }
-
-    .secret-reveal {
-        grid-template-columns: minmax(0, 1fr) auto;
-    }
-
-    .secret-reveal > div {
-        grid-column: 1 / -1;
     }
 }

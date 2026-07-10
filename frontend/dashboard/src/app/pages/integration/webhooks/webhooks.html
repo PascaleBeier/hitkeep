@@ -31,15 +31,8 @@
 
         @if (feedback(); as state) {
         <p-message [severity]="state.severity" [text]="state.key | transloco" />
-        } @if (revealedSecret()) {
-        <section class="secret-reveal" aria-live="polite">
-            <div>
-                <strong>{{ "integration.webhooks.secret.title" | transloco }}</strong>
-                <p>{{ "integration.webhooks.secret.message" | transloco }}</p>
-            </div>
-            <code>{{ revealedSecret() }}</code>
-            <app-copy-control [value]="revealedSecret()" labelKey="integration.webhooks.secret.copy" />
-        </section>
+        } @if (revealedSecret(); as secret) {
+        <app-one-time-credential [value]="secret" titleKey="integration.webhooks.secret.title" descriptionKey="integration.webhooks.secret.message" copyLabelKey="integration.webhooks.secret.copy" />
         } @if (!canManageInstance() && !canManageSite()) {
         <app-page-state titleKey="integration.webhooks.empty.forbiddenTitle" messageKey="integration.webhooks.empty.forbiddenMessage" icon="pi pi-lock" />
         } @else if (scope() === 'site' && !activeSite()) {

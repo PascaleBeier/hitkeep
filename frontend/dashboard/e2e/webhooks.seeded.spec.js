@@ -27,7 +27,12 @@ test("webhook admin can create, test, inspect, rotate, and delete an endpoint", 
         await page.locator(".event-options label", { hasText: "goal.created" }).getByRole("checkbox").check();
         await page.getByRole("button", { name: "Save webhook" }).click();
 
-        const secretCode = page.locator(".secret-reveal code");
+        const secretNotice = page.locator("app-one-time-credential");
+        await expect(secretNotice.getByText("Save this signing secret now")).toBeVisible();
+        const copySecret = secretNotice.getByRole("button", { name: "Copy to clipboard" });
+        await expect(copySecret).toBeVisible();
+        await expect(copySecret).toContainText("Copy secret");
+        const secretCode = secretNotice.locator("code");
         await expect(secretCode).toHaveText(/^whsec_/);
         const originalSecret = (await secretCode.textContent()).trim();
         const row = page.locator("article", { hasText: "E2E receiver" });
