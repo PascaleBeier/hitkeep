@@ -64,6 +64,7 @@ describe('WebhooksPage', () => {
                                     secret: { title: 'Save this signing secret now', message: 'It is shown once.', copy: 'Copy secret' },
                                     empty: { title: 'No webhooks yet', message: 'Create a webhook to start delivering operational events.' },
                                     status: { enabled: 'Enabled', disabled: 'Disabled' },
+                                    events: { count: '{{count}} events', none: 'No events', popoverTitle: 'Subscribed events' },
                                     form: { url: 'Destination URL', events: 'Events' },
                                     deliveries: {
                                         title: 'Deliveries for {{name}}',
@@ -145,9 +146,41 @@ describe('WebhooksPage', () => {
         expect(table?.querySelector('input[placeholder="Search..."]')).not.toBeNull();
         expect(table?.querySelectorAll('th.p-datatable-sortable-column').length).toBe(4);
         expect(row?.textContent).toContain('Order processor');
-        expect(row?.textContent).toContain('https://example.com/hooks/orders');
+        expect(row?.querySelector('.webhook-endpoint__origin')?.textContent).toBe('https://example.com');
+        expect(row?.querySelector('.webhook-endpoint__resource')?.textContent).toBe('/hooks/orders');
+        expect(row?.querySelector('.webhook-endpoint')?.getAttribute('title')).toBe(webhook.url);
         expect(row?.querySelector('app-table-row-actions')).not.toBeNull();
         expect(row?.querySelector('button[aria-label="More actions"]')).not.toBeNull();
+    });
+
+    it('uses the API-client scope pattern for one, many, and no subscribed events', async () => {
+        fixture.componentInstance['webhooks'].set([webhook, { ...webhook, id: 'webhook-2', name: 'Fan-out webhook', events: ['goal.created', 'site.created', 'webhook.test'] }, { ...webhook, id: 'webhook-3', name: 'Legacy webhook', events: [] }]);
+        await fixture.whenStable();
+
+        const rows = fixture.nativeElement.querySelectorAll('tbody tr') as NodeListOf<HTMLElement>;
+        expect(rows[0].querySelector('.webhook-event-tag')?.textContent).toContain('goal.created');
+        expect(rows[1].querySelector('.webhook-event-count button')?.textContent).toContain('3 events');
+        expect(rows[2].querySelector('.webhook-no-events-tag')?.textContent).toContain('No events');
+
+        (rows[1].querySelector('.webhook-event-count button') as HTMLButtonElement).click();
+        await fixture.whenStable();
+
+        const popover = document.body.querySelector('.webhook-events-popover') as HTMLElement | null;
+        expect(popover?.textContent).toContain('Subscribed events');
+        expect(popover?.textContent).toContain('goal.created');
+        expect(popover?.textContent).toContain('site.created');
+        expect(popover?.textContent).toContain('webhook.test');
+    });
+
+    it('keeps long endpoint details scannable without losing the complete URL', async () => {
+        const url = 'https://hooks.example.com/v1/hitkeep/events?tenant=acme#delivery';
+        fixture.componentInstance['webhooks'].set([{ ...webhook, url }]);
+        await fixture.whenStable();
+
+        const endpoint = fixture.nativeElement.querySelector('.webhook-endpoint') as HTMLElement | null;
+        expect(endpoint?.querySelector('.webhook-endpoint__origin')?.textContent).toBe('https://hooks.example.com');
+        expect(endpoint?.querySelector('.webhook-endpoint__resource')?.textContent).toBe('/v1/hitkeep/events?tenant=acme#delivery');
+        expect(endpoint?.getAttribute('title')).toBe(url);
     });
 
     it('keeps the current table visible while refreshing like the API client list', async () => {

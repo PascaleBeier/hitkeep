@@ -82,9 +82,51 @@
                                 @if (webhook.description) { <span class="webhook-name-cell__description">{{ webhook.description }}</span> }
                             </div>
                         </td>
-                        <td><span class="webhook-url-cell" [attr.title]="webhook.url">{{ webhook.url }}</span></td>
                         <td>
-                            <div class="webhook-events-cell">@for (event of webhook.events; track event) { <code>{{ event }}</code> }</div>
+                            @if (webhookEndpoint(webhook.url); as endpoint) {
+                            <span class="webhook-endpoint" [attr.title]="webhook.url">
+                                <span class="webhook-endpoint__origin">{{ endpoint.origin }}</span>
+                                @if (endpoint.resource) { <span class="webhook-endpoint__resource">{{ endpoint.resource }}</span> }
+                            </span>
+                            }
+                        </td>
+                        <td>
+                            @if (webhook.events.length === 1) {
+                            <div class="webhook-event-list">
+                                <p-tag class="webhook-event-tag" styleClass="webhook-event-tag" icon="pi pi-bolt" [value]="webhook.events[0]" severity="info" [rounded]="true" [attr.title]="webhook.events[0]" />
+                            </div>
+                            } @else if (webhook.events.length > 1) {
+                            <div class="webhook-event-summary">
+                                <p-button
+                                    class="webhook-event-count"
+                                    styleClass="webhook-event-count-button"
+                                    icon="pi pi-list"
+                                    [label]="eventCountLabel(webhook.events.length)"
+                                    severity="info"
+                                    [outlined]="true"
+                                    [rounded]="true"
+                                    size="small"
+                                    [type]="'button'"
+                                    [ariaLabel]="eventCountLabel(webhook.events.length)"
+                                    (onClick)="eventsPopover.toggle($event)"
+                                />
+                                <p-popover #eventsPopover appendTo="body" styleClass="webhook-events-popover" [ariaLabel]="'integration.webhooks.events.popoverTitle' | transloco">
+                                    <div class="webhook-events-popover-content">
+                                        <div class="webhook-events-popover-title">{{ "integration.webhooks.events.popoverTitle" | transloco }}</div>
+                                        <div class="webhook-events-popover-list">
+                                            @for (event of webhook.events; track event) {
+                                            <div class="webhook-events-popover-row">
+                                                <i class="pi pi-bolt" aria-hidden="true"></i>
+                                                <code>{{ event }}</code>
+                                            </div>
+                                            }
+                                        </div>
+                                    </div>
+                                </p-popover>
+                            </div>
+                            } @else {
+                            <p-tag class="webhook-no-events-tag" styleClass="webhook-no-events-tag" icon="pi pi-ban" [value]="'integration.webhooks.events.none' | transloco" severity="secondary" [rounded]="true" />
+                            }
                         </td>
                         <td><p-tag [severity]="webhook.enabled ? 'success' : 'secondary'" [value]="(webhook.enabled ? 'integration.webhooks.status.enabled' : 'integration.webhooks.status.disabled') | transloco" /></td>
                         <td class="webhook-date-cell"><app-relative-date-time [value]="webhook.updated_at" /></td>

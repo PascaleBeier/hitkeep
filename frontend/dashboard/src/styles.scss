@@ -236,6 +236,55 @@
     line-height: 1.3;
 }
 
+.webhook-events-popover {
+    max-width: min(22rem, calc(100vw - 2rem));
+}
+
+.webhook-events-popover-content {
+    min-width: min(18rem, calc(100vw - 3.5rem));
+}
+
+.webhook-events-popover-title {
+    margin-bottom: 0.5rem;
+    color: var(--p-text-muted-color);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.webhook-events-popover-list {
+    display: flex;
+    max-height: 18rem;
+    flex-direction: column;
+    gap: 0.25rem;
+    overflow: auto;
+}
+
+.webhook-events-popover-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.55rem;
+    align-items: center;
+    padding: 0.4rem 0.45rem;
+    border-radius: 0.45rem;
+    color: var(--p-text-color);
+}
+
+.webhook-events-popover-row:hover {
+    background: var(--p-content-hover-background);
+}
+
+.webhook-events-popover-row i {
+    color: var(--p-text-muted-color);
+    font-size: 0.72rem;
+}
+
+.webhook-events-popover-row code {
+    overflow-wrap: anywhere;
+    font-size: 0.78rem;
+}
+
 .hk-owner-chip {
     border: 1px solid var(--p-primary-200);
     border-radius: 9999px;

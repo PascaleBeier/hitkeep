@@ -103,20 +103,71 @@
     max-width: 30rem;
 }
 
-.webhook-url-cell {
-    display: block;
-    max-width: 24rem;
+.webhook-endpoint {
+    display: flex;
+    min-width: 12rem;
+    max-width: 22rem;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.webhook-endpoint__origin,
+.webhook-endpoint__resource {
     overflow: hidden;
-    color: var(--p-text-color);
-    font-size: 0.78rem;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.webhook-events-cell {
+.webhook-endpoint__origin {
+    color: var(--p-text-color);
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.webhook-endpoint__resource {
+    color: var(--p-text-muted-color);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.72rem;
+}
+
+.webhook-event-list {
     display: flex;
+    max-width: 18rem;
     flex-wrap: wrap;
     gap: 0.35rem;
+}
+
+.webhook-event-summary {
+    display: inline-flex;
+    max-width: 18rem;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+:host ::ng-deep .webhook-event-tag,
+:host ::ng-deep .webhook-no-events-tag {
+    max-width: 100%;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+:host ::ng-deep .webhook-event-tag .p-tag-label,
+:host ::ng-deep .webhook-no-events-tag .p-tag-label {
+    max-width: 13rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+:host ::ng-deep .webhook-event-count-button.p-button {
+    flex: none;
+    padding: 0.22rem 0.55rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+:host ::ng-deep .webhook-event-count-button .p-button-label {
+    line-height: 1;
 }
 
 .webhook-date-cell {

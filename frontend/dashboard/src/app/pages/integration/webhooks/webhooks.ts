@@ -9,6 +9,7 @@ import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
 import { InputTextModule } from 'primeng/inputtext';
 import { MessageModule } from 'primeng/message';
+import { PopoverModule } from 'primeng/popover';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { TextareaModule } from 'primeng/textarea';
@@ -28,6 +29,11 @@ import { SiteService } from '@features/sites/services/site.service';
 import { AccessService } from '@services/access.service';
 import { Webhook, WebhookDelivery, WebhookEventDescriptor, WebhookInput, WebhookSecretResponse, WebhookScope, WebhooksService } from '@services/webhooks.service';
 
+interface WebhookEndpointDisplay {
+    origin: string;
+    resource: string;
+}
+
 @Component({
     selector: 'app-webhooks-page',
     imports: [
@@ -39,6 +45,7 @@ import { Webhook, WebhookDelivery, WebhookEventDescriptor, WebhookInput, Webhook
         InputIconModule,
         InputTextModule,
         MessageModule,
+        PopoverModule,
         TableModule,
         TagModule,
         TextareaModule,
@@ -184,6 +191,23 @@ export class WebhooksPage implements OnInit {
 
     protected eventSelected(eventType: string): boolean {
         return this.selectedEvents().includes(eventType);
+    }
+
+    protected eventCountLabel(count: number): string {
+        this.language();
+        return this.transloco.translate('integration.webhooks.events.count', { count });
+    }
+
+    protected webhookEndpoint(url: string): WebhookEndpointDisplay {
+        try {
+            const endpoint = new URL(url);
+            return {
+                origin: endpoint.origin,
+                resource: `${endpoint.pathname || '/'}${endpoint.search}${endpoint.hash}`
+            };
+        } catch {
+            return { origin: url, resource: '' };
+        }
     }
 
     protected webhookActions(webhook: Webhook): TableRowActionItem[] {
