@@ -35,8 +35,16 @@ test("webhook admin can create, test, inspect, rotate, and delete an endpoint", 
         const secretCode = secretNotice.locator("code");
         await expect(secretCode).toHaveText(/^whsec_/);
         const originalSecret = (await secretCode.textContent()).trim();
-        const row = page.locator("article", { hasText: "E2E receiver" });
-        await row.getByRole("button", { name: "Send test" }).click();
+        const row = page.locator("tbody tr", { hasText: "E2E receiver" });
+        await expect(row).toBeVisible();
+        const search = page.getByPlaceholder("Search...");
+        await search.fill("not present");
+        await expect(row).toBeHidden();
+        await search.fill("E2E receiver");
+        await expect(row).toBeVisible();
+        await runRowAction(page, row, "Send test");
+        const deliveriesDialog = page.getByRole("dialog", { name: "Deliveries for E2E receiver" });
+        await expect(deliveriesDialog).toBeVisible();
         await expect.poll(() => received.length).toBe(1);
 
         const delivery = received[0];
@@ -57,14 +65,16 @@ test("webhook admin can create, test, inspect, rotate, and delete an endpoint", 
                 return deliveries[0]?.status;
             })
             .toBe("succeeded");
-        await row.getByRole("button", { name: "Deliveries" }).click();
-        await expect(page.getByText("Succeeded")).toBeVisible();
+        await deliveriesDialog.getByRole("button", { name: "Refresh" }).click();
+        await expect(deliveriesDialog.getByText("Succeeded")).toBeVisible();
+        await page.keyboard.press("Escape");
+        await expect(deliveriesDialog).toBeHidden();
 
-        await row.getByRole("button", { name: "Rotate secret" }).click();
+        await runRowAction(page, row, "Rotate secret");
         await page.getByRole("alertdialog").getByRole("button", { name: "Rotate secret" }).click();
         await expect.poll(async () => (await secretCode.textContent()).trim()).not.toBe(originalSecret);
 
-        await row.getByRole("button", { name: "Delete" }).click();
+        await runRowAction(page, row, "Delete");
         await page.getByRole("alertdialog").getByRole("button", { name: "Delete" }).click();
         await expect(row).toHaveCount(0);
     } finally {
@@ -115,4 +125,11 @@ async function webhookID(page) {
     const response = await page.request.get(`/api/sites/${siteID}/webhooks`);
     const webhooks = await response.json();
     return webhooks.find((webhook) => webhook.name === "E2E receiver").id;
+}
+
+async function runRowAction(page, row, name) {
+    await row.getByRole("button", { name: "More actions" }).click();
+    const menu = page.locator(".table-row-actions-menu");
+    await expect(menu).toBeVisible();
+    await menu.getByRole("menuitem", { name }).click();
 }

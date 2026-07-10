@@ -6,6 +6,8 @@ import { ConfirmationService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { DialogModule } from 'primeng/dialog';
+import { IconFieldModule } from 'primeng/iconfield';
+import { InputIconModule } from 'primeng/inputicon';
 import { InputTextModule } from 'primeng/inputtext';
 import { MessageModule } from 'primeng/message';
 import { TableModule } from 'primeng/table';
@@ -14,10 +16,12 @@ import { TextareaModule } from 'primeng/textarea';
 import { catchError, distinctUntilChanged, finalize, forkJoin, map, Observable, of, switchMap, tap } from 'rxjs';
 
 import { OneTimeCredential } from '@components/one-time-credential/one-time-credential';
+import { dialogCancelButton, dialogDangerButton, dialogPrimaryButton } from '@components/dialog-actions/dialog-actions';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageState } from '@components/page-state/page-state';
 import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
+import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
 import { INSTANCE_CAPABILITIES, SITE_CAPABILITIES } from '@core/access/capabilities';
 import { SiteService } from '@features/sites/services/site.service';
 import { AccessService } from '@services/access.service';
@@ -31,6 +35,8 @@ import { Webhook, WebhookDelivery, WebhookEventDescriptor, WebhookInput, Webhook
         ButtonModule,
         ConfirmDialogModule,
         DialogModule,
+        IconFieldModule,
+        InputIconModule,
         InputTextModule,
         MessageModule,
         TableModule,
@@ -41,7 +47,8 @@ import { Webhook, WebhookDelivery, WebhookEventDescriptor, WebhookInput, Webhook
         PageBreadcrumb,
         PageState,
         OneTimeCredential,
-        RelativeDateTime
+        RelativeDateTime,
+        TableRowActions
     ],
     providers: [ConfirmationService],
     templateUrl: './webhooks.html',
@@ -70,6 +77,7 @@ export class WebhooksPage implements OnInit {
     protected readonly loading = signal(false);
     protected readonly saving = signal(false);
     protected readonly deliveryLoading = signal(false);
+    protected readonly deliveryError = signal<string | null>(null);
     protected readonly dialogVisible = signal(false);
     protected readonly editing = signal<Webhook | null>(null);
     protected readonly selectedEvents = signal<string[]>([]);
@@ -106,14 +114,18 @@ export class WebhooksPage implements OnInit {
                 distinctUntilChanged((previous, current) => previous.scope === current.scope && previous.siteID === current.siteID && previous.refresh === current.refresh),
                 tap(({ scope, siteID }) => {
                     const loaded = this.loadedContext();
-                    if (loaded && (loaded.scope !== scope || loaded.siteID !== siteID)) this.revealedSecret.set('');
+                    const contextChanged = !loaded || loaded.scope !== scope || loaded.siteID !== siteID;
+                    if (loaded && contextChanged) this.revealedSecret.set('');
                     this.loading.set(true);
                     this.feedback.set(null);
                     this.loadedContext.set(null);
-                    this.webhooks.set([]);
-                    this.catalog.set([]);
-                    this.selectedWebhook.set(null);
-                    this.deliveries.set([]);
+                    if (contextChanged) {
+                        this.webhooks.set([]);
+                        this.catalog.set([]);
+                        this.selectedWebhook.set(null);
+                        this.deliveries.set([]);
+                        this.deliveryError.set(null);
+                    }
                 }),
                 switchMap(({ scope, siteID }) => {
                     if (scope === 'site' && !siteID) return of({ scope, siteID, webhooks: [], catalog: [], failed: false });
@@ -142,6 +154,7 @@ export class WebhooksPage implements OnInit {
         this.revealedSecret.set('');
         this.selectedWebhook.set(null);
         this.deliveries.set([]);
+        this.deliveryError.set(null);
     }
 
     protected load(): void {
@@ -171,6 +184,40 @@ export class WebhooksPage implements OnInit {
         return this.selectedEvents().includes(eventType);
     }
 
+    protected webhookActions(webhook: Webhook): TableRowActionItem[] {
+        this.language();
+        return [
+            {
+                label: this.transloco.translate('integration.webhooks.actions.deliveries'),
+                icon: 'pi pi-list',
+                command: () => this.showDeliveries(webhook)
+            },
+            {
+                label: this.transloco.translate('integration.webhooks.actions.test'),
+                icon: 'pi pi-play',
+                disabled: !webhook.enabled,
+                command: () => this.sendTest(webhook)
+            },
+            {
+                label: this.transloco.translate('integration.webhooks.actions.edit'),
+                icon: 'pi pi-pencil',
+                command: () => this.openEdit(webhook)
+            },
+            {
+                label: this.transloco.translate('integration.webhooks.actions.rotate'),
+                icon: 'pi pi-refresh',
+                command: () => this.confirmRotate(webhook)
+            },
+            { separator: true },
+            {
+                label: this.transloco.translate('integration.webhooks.actions.delete'),
+                icon: 'pi pi-trash',
+                danger: true,
+                command: () => this.confirmDelete(webhook)
+            }
+        ];
+    }
+
     protected save(): void {
         this.form.markAllAsTouched();
         if (this.form.invalid || this.selectedEvents().length === 0) return;
@@ -194,10 +241,10 @@ export class WebhooksPage implements OnInit {
 
     protected confirmRotate(webhook: Webhook): void {
         this.confirmation.confirm({
-            header: this.transloco.translate('integration.webhooks.confirm.rotateTitle'),
             message: this.transloco.translate('integration.webhooks.confirm.rotateMessage', { name: webhook.name }),
-            acceptLabel: this.transloco.translate('integration.webhooks.actions.rotate'),
-            rejectLabel: this.transloco.translate('integration.webhooks.actions.cancel'),
+            icon: 'pi pi-refresh',
+            rejectButtonProps: dialogCancelButton(this.transloco.translate('integration.webhooks.actions.cancel')),
+            acceptButtonProps: dialogPrimaryButton(this.transloco.translate('integration.webhooks.actions.rotate')),
             accept: () => this.rotate(webhook)
         });
     }
@@ -231,23 +278,30 @@ export class WebhooksPage implements OnInit {
         const context = this.loadedActionContext();
         if (!context) return;
         this.selectedWebhook.set(webhook);
+        this.deliveryError.set(null);
         this.deliveryLoading.set(true);
         this.service
             .deliveries(webhook.id, context.scope, context.siteID)
             .pipe(finalize(() => this.deliveryLoading.set(false)))
             .subscribe({
                 next: (items) => this.deliveries.set(items),
-                error: () => this.feedback.set({ severity: 'error', key: 'integration.webhooks.feedback.deliveryError' })
+                error: () => this.deliveryError.set('integration.webhooks.feedback.deliveryError')
             });
+    }
+
+    protected onDeliveryDialogVisibleChange(visible: boolean): void {
+        if (visible) return;
+        this.selectedWebhook.set(null);
+        this.deliveries.set([]);
+        this.deliveryError.set(null);
     }
 
     protected confirmDelete(webhook: Webhook): void {
         this.confirmation.confirm({
-            header: this.transloco.translate('integration.webhooks.confirm.deleteTitle'),
             message: this.transloco.translate('integration.webhooks.confirm.deleteMessage', { name: webhook.name }),
-            acceptLabel: this.transloco.translate('integration.webhooks.actions.delete'),
-            rejectLabel: this.transloco.translate('integration.webhooks.actions.cancel'),
-            acceptButtonProps: { severity: 'danger' },
+            icon: 'pi pi-exclamation-triangle',
+            rejectButtonProps: dialogCancelButton(this.transloco.translate('integration.webhooks.actions.cancel')),
+            acceptButtonProps: dialogDangerButton(this.transloco.translate('integration.webhooks.actions.delete')),
             accept: () => this.delete(webhook)
         });
     }
