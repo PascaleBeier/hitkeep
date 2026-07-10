@@ -35,7 +35,7 @@ func addWebhookScopePaths(paths map[string]any, base string, scopeParams []any, 
 			map[string]any{"204": desc("Deleted")}),
 	}
 	paths[base+"/{webhookID}/rotate"] = map[string]any{
-		"post": op([]string{"Webhooks"}, "Rotate webhook signing secret", "Immediately replaces the secret and returns the new value exactly once.", secCookie(), itemParams, nil,
+		"post": op([]string{"Webhooks"}, "Rotate webhook signing secret", "Re-signs pending deliveries, replaces the configured secret, and returns the new value exactly once. A request already in flight may still use the previous secret.", secCookie(), itemParams, nil,
 			map[string]any{"200": jsonRefResp("Webhook and new one-time secret", "#/components/schemas/WebhookSecretResponse")}),
 	}
 	paths[base+"/{webhookID}/test"] = map[string]any{

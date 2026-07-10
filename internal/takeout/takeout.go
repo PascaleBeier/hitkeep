@@ -513,7 +513,6 @@ func webhookTakeoutSelect(whereClause string) string {
 			site_id,
 			name,
 			description,
-			destination_url,
 			enabled,
 			created_at,
 			updated_at
@@ -543,7 +542,6 @@ func webhookDeliveryTakeoutSelect(whereClause string) string {
 			site_id,
 			event_type,
 			webhook_name,
-			destination_url,
 			status,
 			attempt_count,
 			next_attempt_at,

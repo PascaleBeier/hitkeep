@@ -324,20 +324,7 @@ func (h *handler) handleDeleteSite() http.HandlerFunc {
 			siteLabel = site.Domain
 		}
 		teamID, teamErr := h.ctx.Store.GetSiteTenantID(r.Context(), siteID)
-		h.ctx.EmitWebhookEvent(r.Context(), webhooks.Event{
-			Type:                      webhooks.EventSiteDeleted,
-			SiteID:                    &siteID,
-			PreserveAfterSiteDeletion: true,
-			Data:                      map[string]any{"site_id": siteID.String(), "domain": siteLabel},
-		})
-
-		if h.ctx.TenantStores != nil {
-			if err := h.ctx.TenantStores.DeleteSite(r.Context(), siteID); err != nil {
-				slog.Error("Failed to delete site", "error", err, "site_id", siteID)
-				http.Error(w, "Failed to delete site", http.StatusInternalServerError)
-				return
-			}
-		} else if err := h.ctx.Store.DeleteSite(r.Context(), siteID); err != nil {
+		if err := h.ctx.DeleteSiteWithWebhookEvent(r.Context(), siteID, map[string]any{"site_id": siteID.String(), "domain": siteLabel}); err != nil {
 			slog.Error("Failed to delete site", "error", err, "site_id", siteID)
 			http.Error(w, "Failed to delete site", http.StatusInternalServerError)
 			return

@@ -1247,7 +1247,7 @@
       "deliveries": { "title": "Entregas de {{name}}", "subtitle": "Los intentos automáticos son al menos una vez y pueden llegar desordenados.", "event": "Evento", "status": "Estado", "attempts": "Intentos", "response": "Respuesta", "created": "Creado", "empty": "Aún no hay entregas." },
       "deliveryStatus": { "pending": "Pendiente", "processing": "Entregando", "retrying": "Reintentando", "succeeded": "Correcto", "failed": "Fallido" },
       "feedback": { "loadError": "No se pudieron cargar los webhooks.", "created": "Webhook creado. Guarda ahora el secreto de firma.", "updated": "Webhook actualizado.", "saveError": "No se pudo guardar el webhook.", "rotated": "Secreto rotado. Guarda ahora el nuevo secreto.", "rotateError": "No se pudo rotar el secreto.", "testQueued": "Entrega de prueba en cola.", "testError": "No se pudo poner en cola la prueba.", "deliveryError": "No se pudo cargar el historial.", "deleted": "Webhook eliminado.", "deleteError": "No se pudo eliminar el webhook." },
-      "confirm": { "rotateTitle": "Rotar secreto de firma", "rotateMessage": "¿Rotar el secreto de {{name}}? El secreto actual dejará de funcionar de inmediato.", "deleteTitle": "Eliminar webhook", "deleteMessage": "¿Eliminar {{name}}? Las entregas pendientes conservan su endpoint actual." }
+      "confirm": { "rotateTitle": "Rotar secreto de firma", "rotateMessage": "¿Rotar el secreto de {{name}}? Las entregas pendientes usarán el nuevo secreto; una solicitud ya en curso aún puede usar el actual.", "deleteTitle": "Eliminar webhook", "deleteMessage": "¿Eliminar {{name}}? Las entregas pendientes conservan su endpoint actual." }
     },
     "reset": {
       "title": "Establecer nueva contraseña",

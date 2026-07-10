@@ -12,6 +12,7 @@ import { WebhooksPage } from './webhooks';
 
 describe('WebhooksPage', () => {
     let fixture: ComponentFixture<WebhooksPage>;
+    const activeSite = signal({ id: 'site-1', domain: 'example.com' });
     const service = {
         catalog: vi.fn((scope: string, siteID?: string) => {
             void scope;
@@ -32,6 +33,8 @@ describe('WebhooksPage', () => {
     };
 
     beforeEach(async () => {
+        vi.clearAllMocks();
+        activeSite.set({ id: 'site-1', domain: 'example.com' });
         await TestBed.configureTestingModule({
             imports: [
                 WebhooksPage,
@@ -55,7 +58,7 @@ describe('WebhooksPage', () => {
             ],
             providers: [
                 { provide: WebhooksService, useValue: service },
-                { provide: SiteService, useValue: { activeSite: signal({ id: 'site-1', domain: 'example.com' }) } },
+                { provide: SiteService, useValue: { activeSite } },
                 {
                     provide: AccessService,
                     useValue: { hasInstance: () => false, canActiveSite: () => true }
@@ -71,5 +74,14 @@ describe('WebhooksPage', () => {
         expect(service.list).toHaveBeenCalledWith('site', 'site-1');
         expect(fixture.nativeElement.textContent).toContain('No webhooks yet');
         expect(fixture.nativeElement.querySelector('[data-testid="create-webhook"]')).toBeTruthy();
+    });
+
+    it('reloads and clears site-scoped state when the active site changes', async () => {
+        activeSite.set({ id: 'site-2', domain: 'second.example.com' });
+        await fixture.whenStable();
+
+        expect(service.catalog).toHaveBeenCalledWith('site', 'site-2');
+        expect(service.list).toHaveBeenCalledWith('site', 'site-2');
+        expect(service.list).toHaveBeenCalledTimes(2);
     });
 });

@@ -1247,7 +1247,7 @@
       "deliveries": { "title": "Consegne per {{name}}", "subtitle": "I tentativi automatici avvengono almeno una volta e possono arrivare fuori ordine.", "event": "Evento", "status": "Stato", "attempts": "Tentativi", "response": "Risposta", "created": "Creato", "empty": "Nessuna consegna registrata." },
       "deliveryStatus": { "pending": "In attesa", "processing": "In consegna", "retrying": "Nuovo tentativo", "succeeded": "Riuscita", "failed": "Fallita" },
       "feedback": { "loadError": "Impossibile caricare i webhook.", "created": "Webhook creato. Salva ora il segreto.", "updated": "Webhook aggiornato.", "saveError": "Impossibile salvare il webhook.", "rotated": "Segreto ruotato. Salva il nuovo segreto.", "rotateError": "Impossibile ruotare il segreto.", "testQueued": "Consegna di test accodata.", "testError": "Impossibile accodare il test.", "deliveryError": "Impossibile caricare la cronologia.", "deleted": "Webhook eliminato.", "deleteError": "Impossibile eliminare il webhook." },
-      "confirm": { "rotateTitle": "Ruota segreto di firma", "rotateMessage": "Ruotare il segreto per {{name}}? Il segreto attuale smetterà immediatamente di funzionare.", "deleteTitle": "Elimina webhook", "deleteMessage": "Eliminare {{name}}? Le consegne in attesa conservano la destinazione corrente." }
+      "confirm": { "rotateTitle": "Ruota segreto di firma", "rotateMessage": "Ruotare il segreto per {{name}}? Le consegne in attesa useranno il nuovo segreto; una richiesta già in corso può ancora usare quello attuale.", "deleteTitle": "Elimina webhook", "deleteMessage": "Eliminare {{name}}? Le consegne in attesa conservano la destinazione corrente." }
     },
     "reset": {
       "title": "Imposta nuova password",

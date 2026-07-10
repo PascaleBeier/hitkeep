@@ -39,26 +39,30 @@ func NewConsumer(tenantMgr *database.TenantStoreManager, logger *slog.Logger, le
 		realtime:  realtimeBroker,
 	}
 	consumer.hitBatcher = newStoreBatcher("hit", logger, ingestBatchSize, ingestBatchFlushInterval, ingestPersistTimeout, func(store *database.Store, ctx context.Context, hits []*api.Hit) error {
-		if err := store.CreateHitsBulk(ctx, hits); err != nil {
+		created, err := store.CreateHitsBulkIdempotent(ctx, hits)
+		if err != nil {
 			return err
 		}
-		if err := tenantMgr.Shared().RecordHitActivity(ctx, hits); err != nil {
-			logger.Warn("Failed to record hit activity summary after tenant persistence", "count", len(hits), "error", err)
+		if len(created) > 0 {
+			if err := tenantMgr.Shared().RecordHitActivity(ctx, created); err != nil {
+				logger.Warn("Failed to record hit activity summary after tenant persistence", "count", len(created), "error", err)
+			}
+			consumer.publishHitsChanged(created)
 		}
-		consumer.publishHitsChanged(hits)
-		consumer.emitHitGoalConversions(ctx, store, hits)
-		return nil
+		return consumer.emitHitGoalConversions(ctx, store, hits)
 	})
 	consumer.eventBatcher = newStoreBatcher("event", logger, ingestBatchSize, ingestBatchFlushInterval, ingestPersistTimeout, func(store *database.Store, ctx context.Context, events []*api.Event) error {
-		if err := store.CreateEventsBulk(ctx, events); err != nil {
+		created, err := store.CreateEventsBulkIdempotent(ctx, events)
+		if err != nil {
 			return err
 		}
-		if err := tenantMgr.Shared().RecordEventActivity(ctx, events); err != nil {
-			logger.Warn("Failed to record event activity summary after tenant persistence", "count", len(events), "error", err)
+		if len(created) > 0 {
+			if err := tenantMgr.Shared().RecordEventActivity(ctx, created); err != nil {
+				logger.Warn("Failed to record event activity summary after tenant persistence", "count", len(created), "error", err)
+			}
+			consumer.publishEventsChanged(created)
 		}
-		consumer.publishEventsChanged(events)
-		consumer.emitEventGoalConversions(ctx, store, events)
-		return nil
+		return consumer.emitEventGoalConversions(ctx, store, events)
 	})
 	consumer.vitalBatcher = newStoreBatcher("web_vital", logger, ingestBatchSize, ingestBatchFlushInterval, ingestPersistTimeout, func(store *database.Store, ctx context.Context, vitals []*api.WebVital) error {
 		if err := store.CreateWebVitalsBulk(ctx, vitals); err != nil {
@@ -74,13 +78,23 @@ func (c *Consumer) SetWebhookEmitter(emitter webhooks.EventEmitter) {
 	c.webhookEmitter = emitter
 }
 
-func (c *Consumer) emitHitGoalConversions(ctx context.Context, store *database.Store, hits []*api.Hit) {
+func (c *Consumer) emitHitGoalConversions(ctx context.Context, store *database.Store, hits []*api.Hit) error {
 	if c.webhookEmitter == nil {
-		return
+		return nil
 	}
 	bySite := make(map[uuid.UUID][]api.Goal)
+	subscriptions := make(map[uuid.UUID]bool)
+	conversionEvents := make([]webhooks.Event, 0)
 	for _, hit := range hits {
 		if hit == nil {
+			continue
+		}
+		subscribed, checked := subscriptions[hit.SiteID]
+		if !checked {
+			subscribed = c.hasGoalConversionSubscribers(ctx, hit.SiteID)
+			subscriptions[hit.SiteID] = subscribed
+		}
+		if !subscribed {
 			continue
 		}
 		goals, ok := bySite[hit.SiteID]
@@ -88,22 +102,32 @@ func (c *Consumer) emitHitGoalConversions(ctx context.Context, store *database.S
 			var err error
 			goals, err = store.GetGoals(ctx, hit.SiteID)
 			if err != nil {
-				c.logger.Warn("Failed to load goals for webhook conversion", "error", err, "site_id", hit.SiteID)
-				continue
+				return fmt.Errorf("load goals for hit webhook conversion: %w", err)
 			}
 			bySite[hit.SiteID] = goals
 		}
-		c.emitGoalConversions(ctx, goalConversionEvents(goals, hit.ID, hit.SiteID, "path", hit.Path, hit.Timestamp))
+		conversionEvents = append(conversionEvents, goalConversionEvents(goals, hit.ID, hit.SiteID, "path", hit.Path, hit.Timestamp)...)
 	}
+	return c.emitGoalConversions(ctx, conversionEvents)
 }
 
-func (c *Consumer) emitEventGoalConversions(ctx context.Context, store *database.Store, events []*api.Event) {
+func (c *Consumer) emitEventGoalConversions(ctx context.Context, store *database.Store, events []*api.Event) error {
 	if c.webhookEmitter == nil {
-		return
+		return nil
 	}
 	bySite := make(map[uuid.UUID][]api.Goal)
+	subscriptions := make(map[uuid.UUID]bool)
+	conversionEvents := make([]webhooks.Event, 0)
 	for _, event := range events {
 		if event == nil {
+			continue
+		}
+		subscribed, checked := subscriptions[event.SiteID]
+		if !checked {
+			subscribed = c.hasGoalConversionSubscribers(ctx, event.SiteID)
+			subscriptions[event.SiteID] = subscribed
+		}
+		if !subscribed {
 			continue
 		}
 		goals, ok := bySite[event.SiteID]
@@ -111,21 +135,44 @@ func (c *Consumer) emitEventGoalConversions(ctx context.Context, store *database
 			var err error
 			goals, err = store.GetGoals(ctx, event.SiteID)
 			if err != nil {
-				c.logger.Warn("Failed to load goals for webhook conversion", "error", err, "site_id", event.SiteID)
-				continue
+				return fmt.Errorf("load goals for event webhook conversion: %w", err)
 			}
 			bySite[event.SiteID] = goals
 		}
-		c.emitGoalConversions(ctx, goalConversionEvents(goals, event.ID, event.SiteID, "event", event.Name, event.Timestamp))
+		conversionEvents = append(conversionEvents, goalConversionEvents(goals, event.ID, event.SiteID, "event", event.Name, event.Timestamp)...)
 	}
+	return c.emitGoalConversions(ctx, conversionEvents)
 }
 
-func (c *Consumer) emitGoalConversions(ctx context.Context, events []webhooks.Event) {
+func (c *Consumer) emitGoalConversions(ctx context.Context, events []webhooks.Event) error {
+	if len(events) == 0 {
+		return nil
+	}
+	if emitter, ok := c.webhookEmitter.(webhooks.BatchEventEmitter); ok {
+		if _, err := emitter.EmitBatch(ctx, events); err != nil {
+			return fmt.Errorf("persist goal conversion webhook batch: %w", err)
+		}
+		return nil
+	}
 	for _, event := range events {
 		if _, err := c.webhookEmitter.Emit(ctx, event); err != nil {
-			c.logger.Warn("Goal conversion persisted but webhook emission was deferred", "error", err, "event_id", event.ID)
+			return fmt.Errorf("persist goal conversion webhook event %s: %w", event.ID, err)
 		}
 	}
+	return nil
+}
+
+func (c *Consumer) hasGoalConversionSubscribers(ctx context.Context, siteID uuid.UUID) bool {
+	checker, ok := c.webhookEmitter.(webhooks.SubscriptionChecker)
+	if !ok {
+		return true
+	}
+	hasSubscribers, err := checker.HasSubscribers(ctx, &siteID, webhooks.EventGoalConverted)
+	if err != nil {
+		c.logger.Warn("Failed to check goal conversion webhook subscriptions", "error", err, "site_id", siteID)
+		return true
+	}
+	return hasSubscribers
 }
 
 func goalConversionEvents(goals []api.Goal, sourceID, siteID uuid.UUID, sourceType, value string, occurredAt time.Time) []webhooks.Event {

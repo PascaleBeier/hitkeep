@@ -36,8 +36,19 @@ func (s *Sweeper) RunOnce(ctx context.Context, now time.Time) error {
 	if _, err := s.store.RecoverStaleWebhookDeliveries(ctx, now.Add(-staleAfter), now); err != nil {
 		return err
 	}
+	if _, err := s.store.RecoverStagedSiteDeletionWebhookEvents(ctx, now); err != nil {
+		return err
+	}
+	if _, err := s.store.DeleteAbandonedStagedSiteDeletionWebhookEvents(ctx, now.Add(-24*time.Hour)); err != nil {
+		return err
+	}
 
-	jobs, err := s.store.ListDueWebhookDeliveryJobs(ctx, now, 500)
+	sweepInterval := time.Duration(s.config.WebhookSweepSeconds) * time.Second
+	if sweepInterval <= 0 {
+		sweepInterval = 30 * time.Second
+	}
+	queueLease := max(2*sweepInterval, time.Minute)
+	jobs, err := s.store.ListDispatchableWebhookDeliveryJobs(ctx, now, now.Add(-queueLease), 500)
 	if err != nil {
 		return err
 	}
@@ -49,8 +60,19 @@ func (s *Sweeper) RunOnce(ctx context.Context, now time.Time) error {
 		if err != nil {
 			return fmt.Errorf("marshal recovered webhook delivery: %w", err)
 		}
+		marked := true
+		if err := s.store.MarkWebhookDeliveryQueued(ctx, job.DeliveryID, now); err != nil {
+			marked = false
+			slog.Warn("Webhook recovery publish could not acquire queue marker", "error", err, "delivery_id", job.DeliveryID)
+		}
 		if err := s.producer.Publish(Topic, body); err != nil {
 			slog.Warn("Webhook delivery remains pending after sweep publish failure", "error", err, "delivery_id", job.DeliveryID)
+			if marked {
+				if clearErr := s.store.ClearWebhookDeliveryQueued(ctx, job.DeliveryID, time.Now().UTC()); clearErr != nil {
+					slog.Warn("Failed to release webhook recovery queue marker", "error", clearErr, "delivery_id", job.DeliveryID)
+				}
+			}
+			continue
 		}
 	}
 

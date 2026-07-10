@@ -1240,7 +1240,7 @@
       "deliveries": { "title": "Entregas de {{name}}", "subtitle": "As tentativas automáticas ocorrem pelo menos uma vez e podem chegar fora de ordem.", "event": "Evento", "status": "Status", "attempts": "Tentativas", "response": "Resposta", "created": "Criado", "empty": "Nenhuma entrega registrada." },
       "deliveryStatus": { "pending": "Pendente", "processing": "Entregando", "retrying": "Tentando novamente", "succeeded": "Concluída", "failed": "Falhou" },
       "feedback": { "loadError": "Não foi possível carregar os webhooks.", "created": "Webhook criado. Salve agora o segredo.", "updated": "Webhook atualizado.", "saveError": "Não foi possível salvar o webhook.", "rotated": "Segredo girado. Salve o novo segredo.", "rotateError": "Não foi possível girar o segredo.", "testQueued": "Entrega de teste enfileirada.", "testError": "Não foi possível enfileirar o teste.", "deliveryError": "Não foi possível carregar o histórico.", "deleted": "Webhook excluído.", "deleteError": "Não foi possível excluir o webhook." },
-      "confirm": { "rotateTitle": "Girar segredo de assinatura", "rotateMessage": "Girar o segredo de {{name}}? O segredo atual deixará de funcionar imediatamente.", "deleteTitle": "Excluir webhook", "deleteMessage": "Excluir {{name}}? Entregas pendentes mantêm o destino atual." }
+      "confirm": { "rotateTitle": "Girar segredo de assinatura", "rotateMessage": "Girar o segredo de {{name}}? As entregas pendentes usarão o novo segredo; uma solicitação já em andamento ainda pode usar o atual.", "deleteTitle": "Excluir webhook", "deleteMessage": "Excluir {{name}}? Entregas pendentes mantêm o destino atual." }
     },
     "reset": {
       "title": "Definir nova senha",

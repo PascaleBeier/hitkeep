@@ -52,6 +52,10 @@ func TestEmitterPersistsBeforePublishingAndIgnoresProducerFailure(t *testing.T) 
 	if err != nil || len(due) != 1 {
 		t.Fatalf("delivery intent must remain durable, due=%+v err=%v", due, err)
 	}
+	dispatchable, err := store.ListDispatchableWebhookDeliveryJobs(context.Background(), time.Now().UTC().Add(time.Minute), time.Now().UTC(), 10)
+	if err != nil || len(dispatchable) != 1 {
+		t.Fatalf("failed publish must release its queue marker, dispatchable=%+v err=%v", dispatchable, err)
+	}
 }
 
 func setupDispatcherStore(t *testing.T) (*database.Store, string, api.Site) {

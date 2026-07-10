@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -539,6 +540,41 @@ func (s *Store) DeleteSite(ctx context.Context, siteID uuid.UUID) error {
 	s.invalidateSiteTenantID(siteID)
 	s.invalidateSiteDomain(domain)
 	return nil
+}
+
+// DeleteSiteWithWebhookEvent coordinates DuckDB's required multi-transaction
+// site cleanup with a durable staged outbox. The final deliveries cannot become
+// dispatchable until the site deletion succeeds, while a recovery sweep can
+// finish materializing them after a process interruption.
+func (s *Store) DeleteSiteWithWebhookEvent(ctx context.Context, siteID uuid.UUID, event WebhookEventInput) ([]WebhookDeliveryJob, error) {
+	event.SiteID = &siteID
+	event.PreserveAfterSiteDeletion = true
+	now := time.Now().UTC()
+	prepared, eventBody, _, err := prepareWebhookEventInput(event, now)
+	if err != nil {
+		return nil, err
+	}
+	subscribers, err := s.enabledWebhookSubscribers(ctx, &siteID, event.TargetWebhookID, event.EventType)
+	if err != nil {
+		return nil, err
+	}
+	if len(subscribers) == 0 {
+		return []WebhookDeliveryJob{}, s.DeleteSite(ctx, siteID)
+	}
+
+	if err := s.stageSiteDeletionWebhookEvent(ctx, siteID, prepared, eventBody, subscribers, now); err != nil {
+		return nil, err
+	}
+	if err := s.DeleteSite(ctx, siteID); err != nil {
+		_ = s.cancelStagedSiteDeletionWebhookEvent(ctx, prepared.ID)
+		return nil, err
+	}
+	jobs, err := s.CommitStagedSiteDeletionWebhookEvent(ctx, prepared.ID, now)
+	if err != nil {
+		slog.Warn("Site deleted with final webhook materialization deferred", "error", err, "site_id", siteID, "event_id", prepared.ID)
+		return []WebhookDeliveryJob{}, nil
+	}
+	return jobs, nil
 }
 
 func (s *Store) deleteSiteData(ctx context.Context, siteID uuid.UUID) error {

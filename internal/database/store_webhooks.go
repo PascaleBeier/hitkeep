@@ -20,6 +20,14 @@ import (
 var ErrWebhookNotFound = errors.New("webhook not found")
 
 func (s *Store) CreateWebhook(ctx context.Context, siteID *uuid.UUID, input api.WebhookInput) (*api.Webhook, string, error) {
+	return s.createWebhook(ctx, siteID, input, nil)
+}
+
+func (s *Store) CreateWebhookWithAudit(ctx context.Context, siteID *uuid.UUID, input api.WebhookInput, audit AuditEntryParams) (*api.Webhook, string, error) {
+	return s.createWebhook(ctx, siteID, input, &audit)
+}
+
+func (s *Store) createWebhook(ctx context.Context, siteID *uuid.UUID, input api.WebhookInput, audit *AuditEntryParams) (*api.Webhook, string, error) {
 	input, err := normalizeWebhookInput(siteID, input)
 	if err != nil {
 		return nil, "", err
@@ -38,7 +46,10 @@ func (s *Store) CreateWebhook(ctx context.Context, siteID *uuid.UUID, input api.
 		`, id, nullableUUIDPtr(siteID), input.Name, input.Description, input.URL, secret, input.Enabled, now, now); err != nil {
 			return fmt.Errorf("create webhook: %w", err)
 		}
-		return insertWebhookSubscriptions(ctx, tx, id, input.Events)
+		if err := insertWebhookSubscriptions(ctx, tx, id, input.Events); err != nil {
+			return err
+		}
+		return appendWebhookAuditTx(ctx, tx, audit, id, input.Name)
 	}); err != nil {
 		return nil, "", err
 	}
@@ -104,6 +115,14 @@ func (s *Store) GetWebhook(ctx context.Context, webhookID uuid.UUID, siteID *uui
 }
 
 func (s *Store) UpdateWebhook(ctx context.Context, webhookID uuid.UUID, siteID *uuid.UUID, input api.WebhookInput) (*api.Webhook, error) {
+	return s.updateWebhook(ctx, webhookID, siteID, input, nil)
+}
+
+func (s *Store) UpdateWebhookWithAudit(ctx context.Context, webhookID uuid.UUID, siteID *uuid.UUID, input api.WebhookInput, audit AuditEntryParams) (*api.Webhook, error) {
+	return s.updateWebhook(ctx, webhookID, siteID, input, &audit)
+}
+
+func (s *Store) updateWebhook(ctx context.Context, webhookID uuid.UUID, siteID *uuid.UUID, input api.WebhookInput, audit *AuditEntryParams) (*api.Webhook, error) {
 	input, err := normalizeWebhookInput(siteID, input)
 	if err != nil {
 		return nil, err
@@ -136,7 +155,10 @@ func (s *Store) UpdateWebhook(ctx context.Context, webhookID uuid.UUID, siteID *
 		if _, err := tx.ExecContext(ctx, "DELETE FROM webhook_event_subscriptions WHERE webhook_id = ?", webhookID); err != nil {
 			return fmt.Errorf("replace webhook event subscriptions: %w", err)
 		}
-		return insertWebhookSubscriptions(ctx, tx, webhookID, input.Events)
+		if err := insertWebhookSubscriptions(ctx, tx, webhookID, input.Events); err != nil {
+			return err
+		}
+		return appendWebhookAuditTx(ctx, tx, audit, webhookID, input.Name)
 	})
 	if err != nil {
 		return nil, err
@@ -153,6 +175,14 @@ func (s *Store) UpdateWebhook(ctx context.Context, webhookID uuid.UUID, siteID *
 }
 
 func (s *Store) RotateWebhookSecret(ctx context.Context, webhookID uuid.UUID, siteID *uuid.UUID) (*api.Webhook, string, error) {
+	return s.rotateWebhookSecret(ctx, webhookID, siteID, nil)
+}
+
+func (s *Store) RotateWebhookSecretWithAudit(ctx context.Context, webhookID uuid.UUID, siteID *uuid.UUID, audit AuditEntryParams) (*api.Webhook, string, error) {
+	return s.rotateWebhookSecret(ctx, webhookID, siteID, &audit)
+}
+
+func (s *Store) rotateWebhookSecret(ctx context.Context, webhookID uuid.UUID, siteID *uuid.UUID, audit *AuditEntryParams) (*api.Webhook, string, error) {
 	existing, err := s.GetWebhook(ctx, webhookID, siteID)
 	if err != nil {
 		return nil, "", err
@@ -165,17 +195,31 @@ func (s *Store) RotateWebhookSecret(ctx context.Context, webhookID uuid.UUID, si
 		return nil, "", err
 	}
 	where, args := webhookScopeWhere(siteID)
-	queryArgs := []any{secret, time.Now().UTC(), webhookID}
-	queryArgs = append(queryArgs, args...)
-	result, err := s.db.ExecContext(ctx, `
-		UPDATE webhooks SET secret = ?, updated_at = ? WHERE id = ? AND `+where,
-		queryArgs...,
-	)
+	now := time.Now().UTC()
+	err = s.Transact(ctx, func(tx *sql.Tx) error {
+		queryArgs := []any{secret, now, webhookID}
+		queryArgs = append(queryArgs, args...)
+		result, err := tx.ExecContext(ctx, `
+			UPDATE webhooks SET secret = ?, updated_at = ? WHERE id = ? AND `+where,
+			queryArgs...,
+		)
+		if err != nil {
+			return fmt.Errorf("rotate webhook secret: %w", err)
+		}
+		if affected, ok := rowsAffected(result); ok && affected == 0 {
+			return ErrWebhookNotFound
+		}
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE webhook_deliveries
+			SET signing_secret = ?, updated_at = ?
+			WHERE webhook_id = ? AND status IN (?, ?, ?)
+		`, secret, now, webhookID, WebhookDeliveryPending, WebhookDeliveryRetrying, WebhookDeliveryProcessing); err != nil {
+			return fmt.Errorf("rotate outstanding webhook delivery secrets: %w", err)
+		}
+		return appendWebhookAuditTx(ctx, tx, audit, webhookID, existing.Name)
+	})
 	if err != nil {
-		return nil, "", fmt.Errorf("rotate webhook secret: %w", err)
-	}
-	if affected, ok := rowsAffected(result); ok && affected == 0 {
-		return nil, "", ErrWebhookNotFound
+		return nil, "", err
 	}
 	updated, err := s.GetWebhook(ctx, webhookID, siteID)
 	if err != nil {
@@ -188,6 +232,14 @@ func (s *Store) RotateWebhookSecret(ctx context.Context, webhookID uuid.UUID, si
 }
 
 func (s *Store) DeleteWebhook(ctx context.Context, webhookID uuid.UUID, siteID *uuid.UUID) error {
+	return s.deleteWebhook(ctx, webhookID, siteID, nil)
+}
+
+func (s *Store) DeleteWebhookWithAudit(ctx context.Context, webhookID uuid.UUID, siteID *uuid.UUID, audit AuditEntryParams) error {
+	return s.deleteWebhook(ctx, webhookID, siteID, &audit)
+}
+
+func (s *Store) deleteWebhook(ctx context.Context, webhookID uuid.UUID, siteID *uuid.UUID, audit *AuditEntryParams) error {
 	found, err := s.GetWebhook(ctx, webhookID, siteID)
 	if err != nil {
 		return err
@@ -204,8 +256,22 @@ func (s *Store) DeleteWebhook(ctx context.Context, webhookID uuid.UUID, siteID *
 		if _, err := tx.ExecContext(ctx, "DELETE FROM webhooks WHERE id = ? AND "+where, queryArgs...); err != nil {
 			return fmt.Errorf("delete webhook: %w", err)
 		}
-		return nil
+		return appendWebhookAuditTx(ctx, tx, audit, webhookID, found.Name)
 	})
+}
+
+func appendWebhookAuditTx(ctx context.Context, tx *sql.Tx, audit *AuditEntryParams, webhookID uuid.UUID, webhookName string) error {
+	if audit == nil {
+		return nil
+	}
+	audit.TargetType = "webhook"
+	audit.TargetID = webhookID.String()
+	audit.TargetLabel = webhookName
+	audit.Details = fmt.Sprintf("Webhook %q %s (webhook_id=%s)", webhookName, strings.TrimPrefix(audit.Action, "webhook."), webhookID)
+	if err := appendAuditEntryTx(ctx, tx, *audit); err != nil {
+		return fmt.Errorf("append webhook audit entry: %w", err)
+	}
+	return nil
 }
 
 func (s *Store) getWebhookSecret(ctx context.Context, webhookID uuid.UUID) (string, error) {

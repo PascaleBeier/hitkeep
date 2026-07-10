@@ -115,3 +115,107 @@ func TestWebhookConfigurationValidatesScopeAndCleansUpWithSite(t *testing.T) {
 		t.Fatalf("site deletion must remove webhook configuration, found=%+v err=%v", found, err)
 	}
 }
+
+func TestRotateWebhookSecretUpdatesOutstandingDeliveries(t *testing.T) {
+	store, _, site := setupAppenderStore(t)
+	defer store.Close()
+	ctx := context.Background()
+
+	created, previousSecret, err := store.CreateWebhook(ctx, &site.ID, api.WebhookInput{
+		Name: "rotation", URL: "https://hooks.example.com", Enabled: true, Events: []string{webhooks.EventGoalCreated},
+	})
+	if err != nil {
+		t.Fatalf("create webhook: %v", err)
+	}
+	jobs, err := store.EnqueueWebhookEvent(ctx, WebhookEventInput{
+		SiteID: &site.ID, EventType: webhooks.EventGoalCreated, APIVersion: "2.10", Data: map[string]any{"site_id": site.ID.String()},
+	})
+	if err != nil || len(jobs) != 1 {
+		t.Fatalf("enqueue delivery: jobs=%+v err=%v", jobs, err)
+	}
+
+	_, nextSecret, err := store.RotateWebhookSecret(ctx, created.ID, &site.ID)
+	if err != nil {
+		t.Fatalf("rotate webhook secret: %v", err)
+	}
+	delivery, err := store.GetWebhookDelivery(ctx, jobs[0].DeliveryID)
+	if err != nil {
+		t.Fatalf("get outstanding delivery: %v", err)
+	}
+	if delivery.SigningSecret != nextSecret || delivery.SigningSecret == previousSecret {
+		t.Fatalf("outstanding delivery retained revoked secret: got %q want %q", delivery.SigningSecret, nextSecret)
+	}
+}
+
+func TestCreateWebhookWithAuditRollsBackWhenAuditFails(t *testing.T) {
+	store, _, site := setupAppenderStore(t)
+	defer store.Close()
+	ctx := context.Background()
+
+	_, _, err := store.CreateWebhookWithAudit(ctx, &site.ID, api.WebhookInput{
+		Name: "must roll back", URL: "https://hooks.example.com", Enabled: true, Events: []string{webhooks.EventGoalCreated},
+	}, AuditEntryParams{})
+	if err == nil {
+		t.Fatal("expected invalid audit entry to fail the mutation")
+	}
+	configured, listErr := store.ListWebhooks(ctx, &site.ID)
+	if listErr != nil {
+		t.Fatalf("list webhooks after rollback: %v", listErr)
+	}
+	if len(configured) != 0 {
+		t.Fatalf("audit failure committed webhook configuration: %+v", configured)
+	}
+}
+
+func TestRotateWebhookSecretWithAuditRollsBackWhenAuditFails(t *testing.T) {
+	store, _, site := setupAppenderStore(t)
+	defer store.Close()
+	ctx := context.Background()
+
+	created, previousSecret, err := store.CreateWebhook(ctx, &site.ID, api.WebhookInput{
+		Name: "must keep secret", URL: "https://hooks.example.com", Enabled: true, Events: []string{webhooks.EventGoalCreated},
+	})
+	if err != nil {
+		t.Fatalf("create webhook: %v", err)
+	}
+	if _, _, err := store.RotateWebhookSecretWithAudit(ctx, created.ID, &site.ID, AuditEntryParams{}); err == nil {
+		t.Fatal("expected invalid audit entry to fail rotation")
+	}
+	storedSecret, err := store.getWebhookSecret(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("get secret after rollback: %v", err)
+	}
+	if storedSecret != previousSecret {
+		t.Fatalf("audit failure rotated secret: got %q want %q", storedSecret, previousSecret)
+	}
+}
+
+func TestUpdateAndDeleteWebhookWithAuditRollBackWhenAuditFails(t *testing.T) {
+	store, _, site := setupAppenderStore(t)
+	defer store.Close()
+	ctx := context.Background()
+
+	created, _, err := store.CreateWebhook(ctx, &site.ID, api.WebhookInput{
+		Name: "original", URL: "https://hooks.example.com", Enabled: true, Events: []string{webhooks.EventGoalCreated},
+	})
+	if err != nil {
+		t.Fatalf("create webhook: %v", err)
+	}
+	if _, err := store.UpdateWebhookWithAudit(ctx, created.ID, &site.ID, api.WebhookInput{
+		Name: "changed", URL: "https://hooks.example.com", Enabled: true, Events: []string{webhooks.EventGoalDeleted},
+	}, AuditEntryParams{}); err == nil {
+		t.Fatal("expected invalid audit entry to fail update")
+	}
+	afterUpdate, err := store.GetWebhook(ctx, created.ID, &site.ID)
+	if err != nil || afterUpdate == nil || afterUpdate.Name != "original" || afterUpdate.Events[0] != webhooks.EventGoalCreated {
+		t.Fatalf("audit failure committed update: webhook=%+v err=%v", afterUpdate, err)
+	}
+
+	if err := store.DeleteWebhookWithAudit(ctx, created.ID, &site.ID, AuditEntryParams{}); err == nil {
+		t.Fatal("expected invalid audit entry to fail delete")
+	}
+	afterDelete, err := store.GetWebhook(ctx, created.ID, &site.ID)
+	if err != nil || afterDelete == nil {
+		t.Fatalf("audit failure committed delete: webhook=%+v err=%v", afterDelete, err)
+	}
+}

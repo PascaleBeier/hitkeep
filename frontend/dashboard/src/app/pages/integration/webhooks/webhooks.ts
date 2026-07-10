@@ -1,6 +1,6 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { ReactiveFormsModule, NonNullableFormBuilder, Validators } from '@angular/forms';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ConfirmationService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
@@ -11,7 +11,7 @@ import { MessageModule } from 'primeng/message';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { TextareaModule } from 'primeng/textarea';
-import { finalize, forkJoin, Observable } from 'rxjs';
+import { catchError, distinctUntilChanged, finalize, forkJoin, map, Observable, of, switchMap, tap } from 'rxjs';
 
 import { CopyControl } from '@components/copy-control/copy-control';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
@@ -55,6 +55,7 @@ export class WebhooksPage implements OnInit {
     private readonly fb = inject(NonNullableFormBuilder);
     private readonly confirmation = inject(ConfirmationService);
     private readonly transloco = inject(TranslocoService);
+    private readonly destroyRef = inject(DestroyRef);
     private readonly language = toSignal(this.transloco.langChanges$, { initialValue: this.transloco.getActiveLang() });
 
     protected readonly activeSite = this.sites.activeSite;
@@ -74,6 +75,14 @@ export class WebhooksPage implements OnInit {
     protected readonly selectedEvents = signal<string[]>([]);
     protected readonly revealedSecret = signal('');
     protected readonly feedback = signal<{ severity: 'success' | 'error'; key: string } | null>(null);
+    private readonly reloadSequence = signal(0);
+    private readonly loadedContext = signal<{ scope: WebhookScope; siteID?: string } | null>(null);
+    private readonly requestContext = computed(() => {
+        const refresh = this.reloadSequence();
+        const scope = this.scope();
+        return { scope, siteID: scope === 'site' ? this.activeSite()?.id : undefined, refresh };
+    });
+    private readonly requestContext$ = toObservable(this.requestContext);
 
     protected readonly form = this.fb.group({
         name: ['', [Validators.required, Validators.maxLength(120)]],
@@ -92,7 +101,37 @@ export class WebhooksPage implements OnInit {
 
     ngOnInit(): void {
         if (!this.canManageSite() && this.canManageInstance()) this.scope.set('instance');
-        this.load();
+        this.requestContext$
+            .pipe(
+                distinctUntilChanged((previous, current) => previous.scope === current.scope && previous.siteID === current.siteID && previous.refresh === current.refresh),
+                tap(() => {
+                    this.loading.set(true);
+                    this.feedback.set(null);
+                    this.loadedContext.set(null);
+                    this.webhooks.set([]);
+                    this.catalog.set([]);
+                    this.selectedWebhook.set(null);
+                    this.deliveries.set([]);
+                }),
+                switchMap(({ scope, siteID }) => {
+                    if (scope === 'site' && !siteID) return of({ scope, siteID, webhooks: [], catalog: [], failed: false });
+                    return forkJoin({ webhooks: this.service.list(scope, siteID), catalog: this.service.catalog(scope, siteID) }).pipe(
+                        map(({ webhooks, catalog }) => ({ scope, siteID, webhooks, catalog, failed: false })),
+                        catchError(() => of({ scope, siteID, webhooks: [], catalog: [], failed: true }))
+                    );
+                }),
+                takeUntilDestroyed(this.destroyRef)
+            )
+            .subscribe(({ scope, siteID, webhooks, catalog, failed }) => {
+                this.loading.set(false);
+                this.webhooks.set(webhooks);
+                this.catalog.set(catalog);
+                if (failed) {
+                    this.feedback.set({ severity: 'error', key: 'integration.webhooks.feedback.loadError' });
+                    return;
+                }
+                this.loadedContext.set({ scope, siteID });
+            });
     }
 
     protected switchScope(scope: WebhookScope): void {
@@ -101,30 +140,10 @@ export class WebhooksPage implements OnInit {
         this.revealedSecret.set('');
         this.selectedWebhook.set(null);
         this.deliveries.set([]);
-        this.load();
     }
 
     protected load(): void {
-        const siteID = this.siteID();
-        if (this.scope() === 'site' && !siteID) {
-            this.webhooks.set([]);
-            this.catalog.set([]);
-            return;
-        }
-        this.loading.set(true);
-        this.feedback.set(null);
-        forkJoin({
-            webhooks: this.service.list(this.scope(), siteID),
-            catalog: this.service.catalog(this.scope(), siteID)
-        })
-            .pipe(finalize(() => this.loading.set(false)))
-            .subscribe({
-                next: ({ webhooks, catalog }) => {
-                    this.webhooks.set(webhooks);
-                    this.catalog.set(catalog);
-                },
-                error: () => this.feedback.set({ severity: 'error', key: 'integration.webhooks.feedback.loadError' })
-            });
+        this.reloadSequence.update((value) => value + 1);
     }
 
     protected openCreate(): void {
@@ -135,6 +154,7 @@ export class WebhooksPage implements OnInit {
     }
 
     protected openEdit(webhook: Webhook): void {
+        if (!this.loadedActionContext()) return;
         this.editing.set(webhook);
         this.form.reset({ name: webhook.name, description: webhook.description, url: webhook.url, enabled: webhook.enabled });
         this.selectedEvents.set([...webhook.events]);
@@ -154,7 +174,9 @@ export class WebhooksPage implements OnInit {
         if (this.form.invalid || this.selectedEvents().length === 0) return;
         const input: WebhookInput = { ...this.form.getRawValue(), events: this.selectedEvents() };
         const editing = this.editing();
-        const request: Observable<Webhook | WebhookSecretResponse> = editing ? this.service.update(editing.id, input, this.scope(), this.siteID()) : this.service.create(input, this.scope(), this.siteID());
+        const context = editing ? this.loadedActionContext() : this.currentContext();
+        if (!context) return;
+        const request: Observable<Webhook | WebhookSecretResponse> = editing ? this.service.update(editing.id, input, context.scope, context.siteID) : this.service.create(input, context.scope, context.siteID);
         this.saving.set(true);
         request.pipe(finalize(() => this.saving.set(false))).subscribe({
             next: (result) => {
@@ -179,7 +201,9 @@ export class WebhooksPage implements OnInit {
     }
 
     private rotate(webhook: Webhook): void {
-        this.service.rotate(webhook.id, this.scope(), this.siteID()).subscribe({
+        const context = this.loadedActionContext();
+        if (!context) return;
+        this.service.rotate(webhook.id, context.scope, context.siteID).subscribe({
             next: (result) => {
                 this.revealedSecret.set(result.secret);
                 this.webhooks.update((items) => items.map((item) => (item.id === webhook.id ? result.webhook : item)));
@@ -190,7 +214,9 @@ export class WebhooksPage implements OnInit {
     }
 
     protected sendTest(webhook: Webhook): void {
-        this.service.test(webhook.id, this.scope(), this.siteID()).subscribe({
+        const context = this.loadedActionContext();
+        if (!context) return;
+        this.service.test(webhook.id, context.scope, context.siteID).subscribe({
             next: () => {
                 this.feedback.set({ severity: 'success', key: 'integration.webhooks.feedback.testQueued' });
                 this.showDeliveries(webhook);
@@ -200,10 +226,12 @@ export class WebhooksPage implements OnInit {
     }
 
     protected showDeliveries(webhook: Webhook): void {
+        const context = this.loadedActionContext();
+        if (!context) return;
         this.selectedWebhook.set(webhook);
         this.deliveryLoading.set(true);
         this.service
-            .deliveries(webhook.id, this.scope(), this.siteID())
+            .deliveries(webhook.id, context.scope, context.siteID)
             .pipe(finalize(() => this.deliveryLoading.set(false)))
             .subscribe({
                 next: (items) => this.deliveries.set(items),
@@ -230,7 +258,9 @@ export class WebhooksPage implements OnInit {
     }
 
     private delete(webhook: Webhook): void {
-        this.service.delete(webhook.id, this.scope(), this.siteID()).subscribe({
+        const context = this.loadedActionContext();
+        if (!context) return;
+        this.service.delete(webhook.id, context.scope, context.siteID).subscribe({
             next: () => {
                 this.webhooks.update((items) => items.filter((item) => item.id !== webhook.id));
                 if (this.selectedWebhook()?.id === webhook.id) {
@@ -245,5 +275,17 @@ export class WebhooksPage implements OnInit {
 
     private siteID(): string | undefined {
         return this.scope() === 'site' ? this.activeSite()?.id : undefined;
+    }
+
+    private currentContext(): { scope: WebhookScope; siteID?: string } {
+        return { scope: this.scope(), siteID: this.siteID() };
+    }
+
+    private loadedActionContext(): { scope: WebhookScope; siteID?: string } | null {
+        const loaded = this.loadedContext();
+        const current = this.currentContext();
+        if (loaded?.scope === current.scope && loaded.siteID === current.siteID) return current;
+        this.load();
+        return null;
     }
 }

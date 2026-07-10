@@ -32,7 +32,7 @@ func TestTakeoutWebhookExportsExcludeSecretsAndPayloadBodies(t *testing.T) {
 			t.Errorf("takeout query missing %s", required)
 		}
 	}
-	for _, forbidden := range []string{"signing_secret", "payload_json", "SELECT 'webhook' AS record_type, *"} {
+	for _, forbidden := range []string{"signing_secret", "payload_json", "destination_url", "SELECT 'webhook' AS record_type, *"} {
 		if strings.Contains(query, forbidden) {
 			t.Errorf("takeout query exposes forbidden webhook field %q", forbidden)
 		}

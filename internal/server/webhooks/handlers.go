@@ -92,15 +92,16 @@ func (h *handler) handleCreate(siteID *uuid.UUID) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		created, secret, err := h.ctx.Store.CreateWebhook(r.Context(), siteID, input)
+		audit, err := h.auditParams(r, siteID, "webhook.created", uuid.Nil, input.Name)
+		if err != nil {
+			slog.Error("Failed to prepare webhook create audit", "error", err)
+			http.Error(w, "Failed to audit webhook action", http.StatusInternalServerError)
+			return
+		}
+		created, secret, err := h.ctx.Store.CreateWebhookWithAudit(r.Context(), siteID, input, audit)
 		if err != nil {
 			slog.Error("Failed to create webhook", "error", err, "site_id", nullableSiteLogValue(siteID))
 			http.Error(w, "Failed to create webhook", http.StatusInternalServerError)
-			return
-		}
-		if err := h.appendAudit(r, siteID, "webhook.created", created); err != nil {
-			slog.Error("Failed to audit webhook create", "error", err, "webhook_id", created.ID)
-			http.Error(w, "Failed to audit webhook action", http.StatusInternalServerError)
 			return
 		}
 		writeJSON(w, http.StatusCreated, api.WebhookSecretResponse{Webhook: *created, Secret: secret})
@@ -117,7 +118,13 @@ func (h *handler) handleUpdate(siteID *uuid.UUID) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		updated, err := h.ctx.Store.UpdateWebhook(r.Context(), webhookID, siteID, input)
+		audit, err := h.auditParams(r, siteID, "webhook.updated", webhookID, input.Name)
+		if err != nil {
+			slog.Error("Failed to prepare webhook update audit", "error", err, "webhook_id", webhookID)
+			http.Error(w, "Failed to audit webhook action", http.StatusInternalServerError)
+			return
+		}
+		updated, err := h.ctx.Store.UpdateWebhookWithAudit(r.Context(), webhookID, siteID, input, audit)
 		if errors.Is(err, database.ErrWebhookNotFound) {
 			http.Error(w, "Webhook not found", http.StatusNotFound)
 			return
@@ -125,11 +132,6 @@ func (h *handler) handleUpdate(siteID *uuid.UUID) http.HandlerFunc {
 		if err != nil {
 			slog.Error("Failed to update webhook", "error", err, "webhook_id", webhookID)
 			http.Error(w, "Failed to update webhook", http.StatusInternalServerError)
-			return
-		}
-		if err := h.appendAudit(r, siteID, "webhook.updated", updated); err != nil {
-			slog.Error("Failed to audit webhook update", "error", err, "webhook_id", webhookID)
-			http.Error(w, "Failed to audit webhook action", http.StatusInternalServerError)
 			return
 		}
 		writeJSON(w, http.StatusOK, updated)
@@ -142,7 +144,13 @@ func (h *handler) handleRotate(siteID *uuid.UUID) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		updated, secret, err := h.ctx.Store.RotateWebhookSecret(r.Context(), webhookID, siteID)
+		audit, err := h.auditParams(r, siteID, "webhook.secret_rotated", webhookID, "")
+		if err != nil {
+			slog.Error("Failed to prepare webhook rotation audit", "error", err, "webhook_id", webhookID)
+			http.Error(w, "Failed to audit webhook action", http.StatusInternalServerError)
+			return
+		}
+		updated, secret, err := h.ctx.Store.RotateWebhookSecretWithAudit(r.Context(), webhookID, siteID, audit)
 		if errors.Is(err, database.ErrWebhookNotFound) {
 			http.Error(w, "Webhook not found", http.StatusNotFound)
 			return
@@ -150,11 +158,6 @@ func (h *handler) handleRotate(siteID *uuid.UUID) http.HandlerFunc {
 		if err != nil {
 			slog.Error("Failed to rotate webhook secret", "error", err, "webhook_id", webhookID)
 			http.Error(w, "Failed to rotate webhook secret", http.StatusInternalServerError)
-			return
-		}
-		if err := h.appendAudit(r, siteID, "webhook.secret_rotated", updated); err != nil {
-			slog.Error("Failed to audit webhook rotation", "error", err, "webhook_id", webhookID)
-			http.Error(w, "Failed to audit webhook action", http.StatusInternalServerError)
 			return
 		}
 		writeJSON(w, http.StatusOK, api.WebhookSecretResponse{Webhook: *updated, Secret: secret})
@@ -177,14 +180,15 @@ func (h *handler) handleDelete(siteID *uuid.UUID) http.HandlerFunc {
 			http.Error(w, "Webhook not found", http.StatusNotFound)
 			return
 		}
-		if err := h.ctx.Store.DeleteWebhook(r.Context(), webhookID, siteID); err != nil {
-			slog.Error("Failed to delete webhook", "error", err, "webhook_id", webhookID)
-			http.Error(w, "Failed to delete webhook", http.StatusInternalServerError)
+		audit, err := h.auditParams(r, siteID, "webhook.deleted", webhookID, existing.Name)
+		if err != nil {
+			slog.Error("Failed to prepare webhook delete audit", "error", err, "webhook_id", webhookID)
+			http.Error(w, "Failed to audit webhook action", http.StatusInternalServerError)
 			return
 		}
-		if err := h.appendAudit(r, siteID, "webhook.deleted", existing); err != nil {
-			slog.Error("Failed to audit webhook delete", "error", err, "webhook_id", webhookID)
-			http.Error(w, "Failed to audit webhook action", http.StatusInternalServerError)
+		if err := h.ctx.Store.DeleteWebhookWithAudit(r.Context(), webhookID, siteID, audit); err != nil {
+			slog.Error("Failed to delete webhook", "error", err, "webhook_id", webhookID)
+			http.Error(w, "Failed to delete webhook", http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -283,27 +287,28 @@ func (h *handler) decodeAndValidateInput(w http.ResponseWriter, r *http.Request,
 	return input, true
 }
 
-func (h *handler) appendAudit(r *http.Request, siteID *uuid.UUID, action string, webhook *api.Webhook) error {
-	if webhook == nil {
-		return nil
-	}
+func (h *handler) auditParams(r *http.Request, siteID *uuid.UUID, action string, webhookID uuid.UUID, webhookName string) (database.AuditEntryParams, error) {
 	teamID := uuid.Nil
 	if siteID != nil {
 		var err error
 		teamID, err = h.ctx.Store.GetSiteTenantID(r.Context(), *siteID)
 		if err != nil {
-			return fmt.Errorf("resolve webhook team for audit: %w", err)
+			return database.AuditEntryParams{}, fmt.Errorf("resolve webhook team for audit: %w", err)
 		}
 	}
-	return h.ctx.AppendAuditEventChecked(r.Context(), r, shared.AuditEvent{
+	scope := string(webhookcore.ScopeInstance)
+	if siteID != nil {
+		scope = string(webhookcore.ScopeSite)
+	}
+	return h.ctx.BuildAuditEntryParams(r.Context(), r, shared.AuditEvent{
 		ActorID:     shared.GetUserIDFromContext(r),
 		TeamID:      teamID,
 		Action:      action,
 		TargetType:  "webhook",
-		TargetID:    webhook.ID.String(),
-		TargetLabel: webhook.Name,
+		TargetID:    webhookID.String(),
+		TargetLabel: webhookName,
 		Outcome:     "success",
-		Details:     fmt.Sprintf("Webhook %q %s (scope=%s, webhook_id=%s)", webhook.Name, strings.TrimPrefix(action, "webhook."), webhook.Scope, webhook.ID),
+		Details:     fmt.Sprintf("Webhook %q %s (scope=%s, webhook_id=%s)", webhookName, strings.TrimPrefix(action, "webhook."), scope, webhookID),
 	})
 }
 

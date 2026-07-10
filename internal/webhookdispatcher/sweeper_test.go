@@ -65,3 +65,31 @@ func TestSweeperRecoversStaleProcessingAndPublishesDueDeliveries(t *testing.T) {
 		t.Fatalf("expected recovered retrying delivery, got %+v err=%v", delivery, err)
 	}
 }
+
+func TestSweeperDoesNotRepublishRecentlyQueuedDelivery(t *testing.T) {
+	store, _, site := setupDispatcherStore(t)
+	defer store.Close()
+	if _, _, err := store.CreateWebhook(context.Background(), &site.ID, api.WebhookInput{
+		Name: "Recovery", URL: "https://recovery.example/hook", Enabled: true, Events: []string{webhooks.EventGoalCreated},
+	}); err != nil {
+		t.Fatalf("create webhook: %v", err)
+	}
+	if _, err := store.EnqueueWebhookEvent(context.Background(), database.WebhookEventInput{
+		SiteID: &site.ID, EventType: webhooks.EventGoalCreated, APIVersion: "2.10", Data: map[string]any{},
+	}); err != nil {
+		t.Fatalf("enqueue: %v", err)
+	}
+
+	producer := &recordingProducer{}
+	sweeper := NewSweeper(store, producer, config.Config{WebhookSweepSeconds: 30})
+	now := time.Now().UTC()
+	if err := sweeper.RunOnce(context.Background(), now); err != nil {
+		t.Fatalf("first sweep: %v", err)
+	}
+	if err := sweeper.RunOnce(context.Background(), now.Add(10*time.Second)); err != nil {
+		t.Fatalf("second sweep: %v", err)
+	}
+	if len(producer.messages) != 1 {
+		t.Fatalf("expected one publish while queue lease is active, got %d", len(producer.messages))
+	}
+}

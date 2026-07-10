@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/nsqio/go-nsq"
@@ -92,18 +93,27 @@ func (w *Worker) handleMessage(message *nsq.Message) error {
 	if err != nil || delivery == nil {
 		return err
 	}
-	release := w.acquire(delivery.WebhookID)
+	release, ok := w.tryAcquire(delivery.WebhookID)
+	if !ok {
+		message.DisableAutoResponse()
+		message.RequeueWithoutBackoff(250 * time.Millisecond)
+		return nil
+	}
 	defer release()
 	return w.dispatcher.Dispatch(context.Background(), payload.DeliveryID)
 }
 
-func (w *Worker) acquire(webhookID uuid.UUID) func() {
+func (w *Worker) tryAcquire(webhookID uuid.UUID) (func(), bool) {
 	limit := w.config.WebhookPerEndpointConcurrency
 	if limit <= 0 {
 		limit = 1
 	}
 	value, _ := w.limits.LoadOrStore(webhookID, make(chan struct{}, limit))
 	semaphore := value.(chan struct{})
-	semaphore <- struct{}{}
-	return func() { <-semaphore }
+	select {
+	case semaphore <- struct{}{}:
+		return func() { <-semaphore }, true
+	default:
+		return nil, false
+	}
 }

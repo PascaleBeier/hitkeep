@@ -316,10 +316,22 @@ func (h *handler) refreshIPFilter(ctx context.Context) {
 }
 
 func (h *handler) deleteSite(ctx context.Context, siteID uuid.UUID) error {
-	if h.ctx.TenantStores != nil {
-		return h.ctx.TenantStores.DeleteSite(ctx, siteID)
+	siteLabel := siteID.String()
+	if site, err := h.ctx.Store.GetSiteByID(ctx, siteID); err == nil && site != nil && strings.TrimSpace(site.Domain) != "" {
+		siteLabel = site.Domain
 	}
-	return h.ctx.Store.DeleteSite(ctx, siteID)
+	return h.ctx.DeleteSiteWithWebhookEvent(ctx, siteID, map[string]any{"site_id": siteID.String(), "domain": siteLabel})
+}
+
+func (h *handler) archiveTeam(ctx context.Context, teamID, actorID uuid.UUID) error {
+	if err := h.ctx.Store.AdminArchiveTenant(ctx, teamID, actorID); err != nil {
+		return err
+	}
+	h.ctx.EmitWebhookEvent(ctx, webhooks.Event{
+		Type: webhooks.EventTeamArchived,
+		Data: map[string]any{"team_id": teamID.String()},
+	})
+	return nil
 }
 
 func (h *handler) actorInstanceRole(r *http.Request) (authcore.InstanceRole, error) {
@@ -494,7 +506,7 @@ func (h *handler) handleDeleteUser() http.HandlerFunc {
 					}
 				}
 
-				if archiveErr := h.ctx.Store.AdminArchiveTenant(r.Context(), team.ID, actorID); archiveErr != nil {
+				if archiveErr := h.archiveTeam(r.Context(), team.ID, actorID); archiveErr != nil {
 					slog.Error("Failed to archive team during force delete", "error", archiveErr, "team_id", team.ID, "target_user_id", targetUserID)
 					http.Error(w, "Failed to delete user", http.StatusInternalServerError)
 					return
@@ -521,7 +533,7 @@ func (h *handler) handleDeleteUser() http.HandlerFunc {
 				return
 			}
 			for _, siteID := range siteIDs {
-				if delErr := h.ctx.TenantStores.DeleteSite(r.Context(), siteID); delErr != nil {
+				if delErr := h.deleteSite(r.Context(), siteID); delErr != nil {
 					slog.Error("Failed to delete owned site before user delete", "error", delErr, "site_id", siteID, "target_user_id", targetUserID)
 					http.Error(w, "Failed to delete user", http.StatusInternalServerError)
 					return

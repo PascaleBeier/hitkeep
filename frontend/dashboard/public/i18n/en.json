@@ -2631,7 +2631,7 @@
       "deliveries": { "title": "Deliveries for {{name}}", "subtitle": "Automatic attempts are at-least-once and may arrive out of order.", "event": "Event", "status": "Status", "attempts": "Attempts", "response": "Response", "created": "Created", "empty": "No deliveries recorded yet." },
       "deliveryStatus": { "pending": "Pending", "processing": "Delivering", "retrying": "Retrying", "succeeded": "Succeeded", "failed": "Failed" },
       "feedback": { "loadError": "Webhooks could not be loaded.", "created": "Webhook created. Save the signing secret now.", "updated": "Webhook updated.", "saveError": "Webhook could not be saved.", "rotated": "Signing secret rotated. Save the new secret now.", "rotateError": "Signing secret could not be rotated.", "testQueued": "Test delivery queued.", "testError": "Test delivery could not be queued.", "deliveryError": "Delivery history could not be loaded.", "deleted": "Webhook deleted.", "deleteError": "Webhook could not be deleted." },
-      "confirm": { "rotateTitle": "Rotate signing secret", "rotateMessage": "Rotate the secret for {{name}}? The current secret will stop working immediately.", "deleteTitle": "Delete webhook", "deleteMessage": "Delete {{name}}? Pending deliveries keep their existing endpoint snapshot." }
+      "confirm": { "rotateTitle": "Rotate signing secret", "rotateMessage": "Rotate the secret for {{name}}? Pending deliveries will use the new secret; a request already in flight may still use the current one.", "deleteTitle": "Delete webhook", "deleteMessage": "Delete {{name}}? Pending deliveries keep their existing endpoint snapshot." }
     },
     "apiReference": {
       "subtitle": "Versioned REST API reference with session and API-key authentication details.",
