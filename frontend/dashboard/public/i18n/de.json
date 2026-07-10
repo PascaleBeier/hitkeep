@@ -28,6 +28,7 @@
     "funnels": "Funnels",
     "utm": "UTM",
     "apiClients": "API-Clients",
+    "webhooks": "Webhooks",
     "apiReference": "API-Referenz",
     "expandItem": "{{item}} aufklappen",
     "collapseItem": "{{item}} zuklappen",
@@ -1235,6 +1236,18 @@
       "errors": {
         "unexpected": "Etwas ist schiefgelaufen. Bitte versuche es später erneut."
       }
+    },
+    "webhooks": {
+      "subtitle": "Sende signierte Betriebsereignisse, ohne Produktaktionen zu verzögern.", "listLabel": "Konfigurierte Webhooks",
+      "scopes": { "label": "Webhook-Bereich", "site": "Website", "instance": "Instanz" },
+      "actions": { "create": "Webhook erstellen", "refresh": "Aktualisieren", "deliveries": "Zustellungen", "test": "Test senden", "edit": "Bearbeiten", "rotate": "Secret rotieren", "delete": "Löschen", "cancel": "Abbrechen", "save": "Webhook speichern" },
+      "empty": { "title": "Noch keine Webhooks", "message": "Erstelle einen Webhook, um Betriebsereignisse zuzustellen.", "noSiteTitle": "Website auswählen", "noSiteMessage": "Wähle eine Website, um ihre Webhooks zu verwalten.", "forbiddenTitle": "Webhook-Zugriff erforderlich", "forbiddenMessage": "Nur Instanz-, Website-Eigentümer und Website-Admins können Webhooks verwalten." }, "status": { "enabled": "Aktiv", "disabled": "Deaktiviert" },
+      "secret": { "title": "Signatur-Secret jetzt speichern", "message": "Es wird nur einmal angezeigt. Prüfe damit Zeitstempel und exakten Request-Body.", "copy": "Secret kopieren" },
+      "form": { "createTitle": "Webhook erstellen", "editTitle": "Webhook bearbeiten", "name": "Name", "url": "Ziel-URL", "urlHint": "HTTPS ist erforderlich, außer Entwicklungsziele sind ausdrücklich aktiviert.", "description": "Beschreibung", "enabled": "Ereignisse zustellen", "events": "Ereignisse", "eventsHint": "Wähle die Betriebsereignisse für diesen Endpunkt.", "eventsRequired": "Wähle mindestens ein Ereignis." },
+      "deliveries": { "title": "Zustellungen für {{name}}", "subtitle": "Automatische Versuche erfolgen mindestens einmal und ohne Reihenfolgegarantie.", "event": "Ereignis", "status": "Status", "attempts": "Versuche", "response": "Antwort", "created": "Erstellt", "empty": "Noch keine Zustellungen." },
+      "deliveryStatus": { "pending": "Ausstehend", "processing": "Wird zugestellt", "retrying": "Wiederholung", "succeeded": "Erfolgreich", "failed": "Fehlgeschlagen" },
+      "feedback": { "loadError": "Webhooks konnten nicht geladen werden.", "created": "Webhook erstellt. Speichere jetzt das Signatur-Secret.", "updated": "Webhook aktualisiert.", "saveError": "Webhook konnte nicht gespeichert werden.", "rotated": "Signatur-Secret rotiert. Speichere das neue Secret.", "rotateError": "Secret konnte nicht rotiert werden.", "testQueued": "Testzustellung eingeplant.", "testError": "Testzustellung konnte nicht eingeplant werden.", "deliveryError": "Zustellverlauf konnte nicht geladen werden.", "deleted": "Webhook gelöscht.", "deleteError": "Webhook konnte nicht gelöscht werden." },
+      "confirm": { "rotateTitle": "Signaturgeheimnis rotieren", "rotateMessage": "Das Geheimnis für {{name}} rotieren? Das aktuelle Geheimnis funktioniert sofort nicht mehr.", "deleteTitle": "Webhook löschen", "deleteMessage": "{{name}} löschen? Ausstehende Zustellungen behalten ihren Endpunkt-Snapshot." }
     },
     "reset": {
       "title": "Neues Passwort setzen",

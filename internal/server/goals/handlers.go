@@ -16,6 +16,7 @@ import (
 	"hitkeep/internal/database"
 	"hitkeep/internal/realtime"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/webhooks"
 )
 
 type handler struct {
@@ -36,6 +37,10 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		SitePerm:    authcore.PermSiteManageGoals,
 		RateLimiter: ctx.ApiLimiter,
 	}, h.handleCreateGoal()))
+	mux.HandleFunc("PUT /api/sites/{id}/goals/{goalID}", ctx.Handler(shared.HandlerConfig{
+		SitePerm:    authcore.PermSiteManageGoals,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleUpdateGoal()))
 	mux.HandleFunc("DELETE /api/sites/{id}/goals/{goalID}", ctx.Handler(shared.HandlerConfig{
 		SitePerm:    authcore.PermSiteManageGoals,
 		RateLimiter: ctx.ApiLimiter,
@@ -112,6 +117,7 @@ func (h *handler) handleDeleteDefinition(
 	deleteLogMessage string,
 	deleteLegacyLogMessage string,
 	realtimeKind string,
+	onDeleted func(context.Context, uuid.UUID, uuid.UUID),
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, ok := parseSiteID(w, r)
@@ -146,6 +152,9 @@ func (h *handler) handleDeleteDefinition(
 		}
 
 		h.publishDefinitionChange(siteID, realtimeKind)
+		if onDeleted != nil {
+			onDeleted(r.Context(), siteID, definitionID)
+		}
 		w.WriteHeader(http.StatusOK)
 	}
 }
@@ -209,6 +218,16 @@ func (h *handler) handleCreateGoal() http.HandlerFunc {
 			}
 		}
 		h.publishDefinitionChange(siteID, realtime.KindGoals)
+		h.ctx.EmitWebhookEvent(r.Context(), webhooks.Event{
+			Type:   webhooks.EventGoalCreated,
+			SiteID: &siteID,
+			Data: map[string]any{
+				"site_id": siteID.String(),
+				"goal_id": req.ID.String(),
+				"name":    req.Name,
+				"type":    req.Type,
+			},
+		})
 
 		w.WriteHeader(http.StatusCreated)
 	}
@@ -224,7 +243,81 @@ func (h *handler) handleDeleteGoal() http.HandlerFunc {
 		"Failed to delete goal",
 		"Failed to delete legacy shared goal",
 		realtime.KindGoals,
+		func(ctx context.Context, siteID, goalID uuid.UUID) {
+			h.ctx.EmitWebhookEvent(ctx, webhooks.Event{
+				Type:   webhooks.EventGoalDeleted,
+				SiteID: &siteID,
+				Data:   map[string]any{"site_id": siteID.String(), "goal_id": goalID.String()},
+			})
+		},
 	)
+}
+
+func (h *handler) handleUpdateGoal() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		siteID, ok := parseSiteID(w, r)
+		if !ok {
+			return
+		}
+		goalID, err := uuid.Parse(r.PathValue("goalID"))
+		if err != nil {
+			http.Error(w, "Invalid goal_id", http.StatusBadRequest)
+			return
+		}
+		var input api.Goal
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		if input.Name == "" || input.Value == "" || (input.Type != "event" && input.Type != "path") {
+			http.Error(w, "Invalid goal data", http.StatusBadRequest)
+			return
+		}
+		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
+		if err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		goals, err := analyticsStore.GetGoals(r.Context(), siteID)
+		if err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		var existing *api.Goal
+		for i := range goals {
+			if goals[i].ID == goalID {
+				existing = &goals[i]
+				break
+			}
+		}
+		if existing == nil {
+			http.Error(w, "Goal not found", http.StatusNotFound)
+			return
+		}
+		input.ID = goalID
+		input.SiteID = siteID
+		input.CreatedAt = existing.CreatedAt
+		if err := analyticsStore.UpsertGoal(r.Context(), &input); err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		if analyticsStore != h.ctx.Store {
+			if err := h.ctx.Store.UpsertGoal(r.Context(), &input); err != nil {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+		}
+		h.publishDefinitionChange(siteID, realtime.KindGoals)
+		h.ctx.EmitWebhookEvent(r.Context(), webhooks.Event{
+			Type:   webhooks.EventGoalUpdated,
+			SiteID: &siteID,
+			Data: map[string]any{
+				"site_id": siteID.String(), "goal_id": goalID.String(), "name": input.Name, "type": input.Type,
+			},
+		})
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(input)
+	}
 }
 
 // Funnels
@@ -384,6 +477,7 @@ func (h *handler) handleDeleteFunnel() http.HandlerFunc {
 		"Failed to delete funnel",
 		"Failed to delete legacy shared funnel",
 		realtime.KindFunnels,
+		nil,
 	)
 }
 

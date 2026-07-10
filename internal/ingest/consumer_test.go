@@ -17,10 +17,38 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
 	"hitkeep/internal/realtime"
+	"hitkeep/internal/webhooks"
 )
 
 func testBatchLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
+
+func TestGoalConversionEventsAreStableAndPrivacySafe(t *testing.T) {
+	t.Parallel()
+	siteID := uuid.New()
+	goalID := uuid.New()
+	sourceID := uuid.New()
+	occurredAt := time.Now().UTC()
+	goals := []api.Goal{
+		{ID: goalID, SiteID: siteID, Name: "Signup", Type: "event", Value: "signup"},
+		{ID: uuid.New(), SiteID: siteID, Name: "Other", Type: "event", Value: "other"},
+	}
+
+	first := goalConversionEvents(goals, sourceID, siteID, "event", "signup", occurredAt)
+	second := goalConversionEvents(goals, sourceID, siteID, "event", "signup", occurredAt)
+	if len(first) != 1 || len(second) != 1 {
+		t.Fatalf("expected one goal conversion, got first=%+v second=%+v", first, second)
+	}
+	if first[0].Type != webhooks.EventGoalConverted || first[0].ID == uuid.Nil || first[0].ID != second[0].ID {
+		t.Fatalf("expected stable goal.converted event ID, got first=%+v second=%+v", first[0], second[0])
+	}
+	if first[0].Data["goal_id"] != goalID.String() || first[0].Data["goal_name"] != "Signup" {
+		t.Fatalf("unexpected conversion summary: %+v", first[0].Data)
+	}
+	if _, ok := first[0].Data["properties"]; ok {
+		t.Fatalf("conversion payload must not contain raw event properties: %+v", first[0].Data)
+	}
 }
 
 func TestStoreBatcherFlushesByStore(t *testing.T) {

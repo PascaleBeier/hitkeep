@@ -17,7 +17,17 @@ import (
 	"hitkeep/internal/database"
 	"hitkeep/internal/mailer"
 	serverauth "hitkeep/internal/server/auth"
+	"hitkeep/internal/webhooks"
 )
+
+type teamRecordingWebhookEmitter struct {
+	events []webhooks.Event
+}
+
+func (e *teamRecordingWebhookEmitter) Emit(_ context.Context, event webhooks.Event) (webhooks.Emission, error) {
+	e.events = append(e.events, event)
+	return webhooks.Emission{}, nil
+}
 
 type teamTestMailDriver struct {
 	subject  string
@@ -88,6 +98,32 @@ func TestHandleGetTeams(t *testing.T) {
 	}
 	if resp.Teams[0].Usage.CurrentPendingInvites != 1 {
 		t.Fatalf("expected 1 pending invite, got %d", resp.Teams[0].Usage.CurrentPendingInvites)
+	}
+}
+
+func TestAppendTeamAuditEmitsOperationalWebhookEvent(t *testing.T) {
+	h, store, userID := setupUserSecurityTestEnv(t)
+	defer store.Close()
+
+	teamID, err := store.GetActiveTenantID(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("get active tenant: %v", err)
+	}
+	emitter := &teamRecordingWebhookEmitter{}
+	h.ctx.Webhooks = emitter
+	req := withTestUser(httptest.NewRequest(http.MethodPatch, "/api/user/teams/"+teamID.String(), strings.NewReader(`{"name":"Renamed team"}`)), userID)
+	req.SetPathValue("id", teamID.String())
+	w := httptest.NewRecorder()
+
+	h.handleUpdateTeam().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
+	}
+	if len(emitter.events) != 1 || emitter.events[0].Type != webhooks.EventTeamUpdated {
+		t.Fatalf("expected team.updated webhook event, got %+v", emitter.events)
+	}
+	if got := emitter.events[0].Data["team_id"]; got != teamID.String() {
+		t.Fatalf("expected team_id %s, got %v", teamID, got)
 	}
 }
 

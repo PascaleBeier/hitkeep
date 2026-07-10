@@ -32,6 +32,37 @@ func TestOpenAPISpecV1FormatParameterIncludesAllExportFormats(t *testing.T) {
 	}
 }
 
+func TestOpenAPISpecV1DocumentsWebhookManagementAndSigning(t *testing.T) {
+	spec := openAPISpecV1("https://hitkeep.test")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	for _, path := range []string{
+		"/api/admin/webhooks",
+		"/api/admin/webhooks/{webhookID}/test",
+		"/api/sites/{id}/webhooks",
+		"/api/sites/{id}/webhooks/{webhookID}/deliveries",
+	} {
+		if _, ok := paths[path]; !ok {
+			t.Fatalf("expected webhook path %s", path)
+		}
+	}
+	for _, schema := range []string{"Webhook", "WebhookInput", "WebhookSecretResponse", "WebhookDelivery", "WebhookEventDescriptor", "WebhookEventPayload"} {
+		if _, ok := schemas[schema]; !ok {
+			t.Fatalf("expected webhook schema %s", schema)
+		}
+	}
+	testPath := requireMap(t, paths, "/api/admin/webhooks/{webhookID}/test")
+	testOp := requireMap(t, testPath, "post")
+	description, _ := testOp["description"].(string)
+	for _, required := range []string{"X-HitKeep-Timestamp", "X-HitKeep-Signature", "timestamp + \".\" + body"} {
+		if !strings.Contains(description, required) {
+			t.Fatalf("expected signing description to contain %q, got %q", required, description)
+		}
+	}
+}
+
 func TestOpenAPISpecV1TakeoutAndExportPathsListAllFormats(t *testing.T) {
 	spec := openAPISpecV1("http://localhost:8080")
 	paths := requireMap(t, spec, "paths")

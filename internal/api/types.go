@@ -264,6 +264,67 @@ type APIClientSiteRole struct {
 	Role   string    `json:"role"`
 }
 
+type Webhook struct {
+	ID          uuid.UUID  `json:"id"`
+	SiteID      *uuid.UUID `json:"site_id,omitempty"`
+	Scope       string     `json:"scope"`
+	Name        string     `json:"name"`
+	Description string     `json:"description"`
+	URL         string     `json:"url"`
+	Enabled     bool       `json:"enabled"`
+	Events      []string   `json:"events"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+type WebhookInput struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	URL         string   `json:"url"`
+	Enabled     bool     `json:"enabled"`
+	Events      []string `json:"events"`
+}
+
+type WebhookSecretResponse struct {
+	Webhook Webhook `json:"webhook"`
+	Secret  string  `json:"secret"`
+}
+
+type WebhookTestResponse struct {
+	EventID     uuid.UUID   `json:"event_id"`
+	DeliveryIDs []uuid.UUID `json:"delivery_ids"`
+}
+
+type WebhookDelivery struct {
+	ID               uuid.UUID                `json:"id"`
+	EventID          uuid.UUID                `json:"event_id"`
+	WebhookID        uuid.UUID                `json:"webhook_id"`
+	SiteID           *uuid.UUID               `json:"site_id,omitempty"`
+	EventType        string                   `json:"event_type"`
+	Status           string                   `json:"status"`
+	AttemptCount     int                      `json:"attempt_count"`
+	NextAttemptAt    *time.Time               `json:"next_attempt_at,omitempty"`
+	LastAttemptAt    *time.Time               `json:"last_attempt_at,omitempty"`
+	CompletedAt      *time.Time               `json:"completed_at,omitempty"`
+	ResponseStatus   int                      `json:"response_status,omitempty"`
+	LastErrorCode    string                   `json:"last_error_code,omitempty"`
+	LastErrorMessage string                   `json:"last_error_message,omitempty"`
+	CreatedAt        time.Time                `json:"created_at"`
+	Attempts         []WebhookDeliveryAttempt `json:"attempts"`
+}
+
+type WebhookDeliveryAttempt struct {
+	ID             uuid.UUID  `json:"id"`
+	AttemptNumber  int        `json:"attempt_number"`
+	Status         string     `json:"status"`
+	ResponseStatus int        `json:"response_status,omitempty"`
+	ErrorCode      string     `json:"error_code,omitempty"`
+	ErrorMessage   string     `json:"error_message,omitempty"`
+	StartedAt      time.Time  `json:"started_at"`
+	CompletedAt    time.Time  `json:"completed_at"`
+	NextAttemptAt  *time.Time `json:"next_attempt_at,omitempty"`
+}
+
 type GoogleSearchConsoleStatus struct {
 	Status                 string     `json:"status"`
 	Configured             bool       `json:"configured"`

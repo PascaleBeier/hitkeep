@@ -28,6 +28,7 @@
     "funnels": "Funnels",
     "utm": "UTM",
     "apiClients": "API-clients",
+    "webhooks": "Webhooks",
     "apiReference": "API-referentie",
     "expandItem": "{{item}} uitklappen",
     "collapseItem": "{{item}} inklappen",
@@ -1235,6 +1236,18 @@
       "errors": {
         "unexpected": "Er is iets misgegaan. Probeer het later opnieuw."
       }
+    },
+    "webhooks": {
+      "subtitle": "Stuur ondertekende operationele gebeurtenissen zonder productacties te vertragen.", "listLabel": "Geconfigureerde webhooks",
+      "scopes": { "label": "Webhookbereik", "site": "Site", "instance": "Instantie" },
+      "actions": { "create": "Webhook maken", "refresh": "Vernieuwen", "deliveries": "Leveringen", "test": "Test sturen", "edit": "Bewerken", "rotate": "Geheim roteren", "delete": "Verwijderen", "cancel": "Annuleren", "save": "Webhook opslaan" },
+      "empty": { "title": "Nog geen webhooks", "message": "Maak een webhook om operationele gebeurtenissen te leveren.", "noSiteTitle": "Selecteer een site", "noSiteMessage": "Kies een site om de webhooks te beheren.", "forbiddenTitle": "Webhooktoegang vereist", "forbiddenMessage": "Alleen instantie- en site-eigenaren of -beheerders kunnen webhooks beheren." }, "status": { "enabled": "Actief", "disabled": "Uitgeschakeld" },
+      "secret": { "title": "Sla dit ondertekeningsgeheim nu op", "message": "Het wordt één keer getoond. Verifieer hiermee tijdstempel en exacte requestbody.", "copy": "Geheim kopiëren" },
+      "form": { "createTitle": "Webhook maken", "editTitle": "Webhook bewerken", "name": "Naam", "url": "Bestemmings-URL", "urlHint": "HTTPS is verplicht tenzij ontwikkeldoelen expliciet zijn ingeschakeld.", "description": "Beschrijving", "enabled": "Gebeurtenissen leveren", "events": "Gebeurtenissen", "eventsHint": "Kies welke operationele gebeurtenissen dit endpoint ontvangt.", "eventsRequired": "Selecteer minstens één gebeurtenis." },
+      "deliveries": { "title": "Leveringen voor {{name}}", "subtitle": "Automatische pogingen gebeuren minstens één keer en kunnen ongeordend aankomen.", "event": "Gebeurtenis", "status": "Status", "attempts": "Pogingen", "response": "Respons", "created": "Aangemaakt", "empty": "Nog geen leveringen geregistreerd." },
+      "deliveryStatus": { "pending": "In afwachting", "processing": "Wordt geleverd", "retrying": "Opnieuw proberen", "succeeded": "Geslaagd", "failed": "Mislukt" },
+      "feedback": { "loadError": "Webhooks konden niet worden geladen.", "created": "Webhook gemaakt. Sla het geheim nu op.", "updated": "Webhook bijgewerkt.", "saveError": "Webhook kon niet worden opgeslagen.", "rotated": "Geheim geroteerd. Sla het nieuwe geheim op.", "rotateError": "Geheim kon niet worden geroteerd.", "testQueued": "Testlevering ingepland.", "testError": "Testlevering kon niet worden ingepland.", "deliveryError": "Leveringsgeschiedenis kon niet worden geladen.", "deleted": "Webhook verwijderd.", "deleteError": "Webhook kon niet worden verwijderd." },
+      "confirm": { "rotateTitle": "Ondertekeningsgeheim roteren", "rotateMessage": "Het geheim voor {{name}} roteren? Het huidige geheim werkt direct niet meer.", "deleteTitle": "Webhook verwijderen", "deleteMessage": "{{name}} verwijderen? Wachtende leveringen behouden hun huidige bestemming." }
     },
     "reset": {
       "title": "Nieuw wachtwoord instellen",

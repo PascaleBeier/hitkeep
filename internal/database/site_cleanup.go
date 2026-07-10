@@ -28,6 +28,7 @@ var siteDeleteSpec = scopedDeleteSpec{
 	rootTable:    "sites",
 	extraEdges: []fkEdge{
 		{table: "site_import_files", column: "import_id", referencedTable: "site_imports", referencedColumn: "id"},
+		{table: "webhook_event_subscriptions", column: "webhook_id", referencedTable: "webhooks", referencedColumn: "id"},
 	},
 }
 

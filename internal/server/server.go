@@ -43,7 +43,9 @@ import (
 	"hitkeep/internal/server/system"
 	takeouthandlers "hitkeep/internal/server/takeout"
 	"hitkeep/internal/server/user"
+	webhookhandlers "hitkeep/internal/server/webhooks"
 	"hitkeep/internal/takeout"
+	"hitkeep/internal/webhookdispatcher"
 )
 
 const (
@@ -197,6 +199,7 @@ func New(conf *config.Config, publicFS fs.FS, store *database.Store, tenantStore
 		Realtime:                 realtimeBroker,
 		IPFilter:                 ipFilter,
 		SpamFilter:               spamFilter,
+		Webhooks:                 webhookdispatcher.NewEmitter(store, producer, conf.Version),
 		StartedAt:                time.Now().UTC(),
 		SystemCounters:           systemCounters,
 		BackupStatus:             backupStatus,
@@ -355,6 +358,7 @@ func (s *Server) setupRoutes(mux *http.ServeMux, publicFS fs.FS) {
 	admin.Register(mux, ctx)
 	sites.Register(mux, ctx)
 	goals.Register(mux, ctx)
+	webhookhandlers.Register(mux, ctx)
 	importhandlers.Register(mux, ctx)
 	events.Register(mux, ctx)
 	askaihandlers.Register(mux, ctx)

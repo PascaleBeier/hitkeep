@@ -1,0 +1,249 @@
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ReactiveFormsModule, NonNullableFormBuilder, Validators } from '@angular/forms';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { ConfirmationService } from 'primeng/api';
+import { ButtonModule } from 'primeng/button';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { DialogModule } from 'primeng/dialog';
+import { InputTextModule } from 'primeng/inputtext';
+import { MessageModule } from 'primeng/message';
+import { TableModule } from 'primeng/table';
+import { TagModule } from 'primeng/tag';
+import { TextareaModule } from 'primeng/textarea';
+import { finalize, forkJoin, Observable } from 'rxjs';
+
+import { CopyControl } from '@components/copy-control/copy-control';
+import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
+import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
+import { PageState } from '@components/page-state/page-state';
+import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
+import { INSTANCE_CAPABILITIES, SITE_CAPABILITIES } from '@core/access/capabilities';
+import { SiteService } from '@features/sites/services/site.service';
+import { AccessService } from '@services/access.service';
+import { Webhook, WebhookDelivery, WebhookEventDescriptor, WebhookInput, WebhookSecretResponse, WebhookScope, WebhooksService } from '@services/webhooks.service';
+
+@Component({
+    selector: 'app-webhooks-page',
+    imports: [
+        ReactiveFormsModule,
+        TranslocoPipe,
+        ButtonModule,
+        ConfirmDialogModule,
+        DialogModule,
+        InputTextModule,
+        MessageModule,
+        TableModule,
+        TagModule,
+        TextareaModule,
+        PageHeader,
+        PageHeaderLeft,
+        PageBreadcrumb,
+        PageState,
+        CopyControl,
+        RelativeDateTime
+    ],
+    providers: [ConfirmationService],
+    templateUrl: './webhooks.html',
+    styleUrl: './webhooks.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush
+})
+export class WebhooksPage implements OnInit {
+    private readonly service = inject(WebhooksService);
+    private readonly sites = inject(SiteService);
+    private readonly access = inject(AccessService);
+    private readonly fb = inject(NonNullableFormBuilder);
+    private readonly confirmation = inject(ConfirmationService);
+    private readonly transloco = inject(TranslocoService);
+    private readonly language = toSignal(this.transloco.langChanges$, { initialValue: this.transloco.getActiveLang() });
+
+    protected readonly activeSite = this.sites.activeSite;
+    protected readonly canManageInstance = computed(() => this.access.hasInstance(INSTANCE_CAPABILITIES.manageWebhooks));
+    protected readonly canManageSite = computed(() => !!this.activeSite() && this.access.canActiveSite(SITE_CAPABILITIES.manageWebhooks));
+    protected readonly canManageCurrentScope = computed(() => (this.scope() === 'instance' ? this.canManageInstance() : this.canManageSite()));
+    protected readonly scope = signal<WebhookScope>('site');
+    protected readonly webhooks = signal<Webhook[]>([]);
+    protected readonly catalog = signal<WebhookEventDescriptor[]>([]);
+    protected readonly deliveries = signal<WebhookDelivery[]>([]);
+    protected readonly selectedWebhook = signal<Webhook | null>(null);
+    protected readonly loading = signal(false);
+    protected readonly saving = signal(false);
+    protected readonly deliveryLoading = signal(false);
+    protected readonly dialogVisible = signal(false);
+    protected readonly editing = signal<Webhook | null>(null);
+    protected readonly selectedEvents = signal<string[]>([]);
+    protected readonly revealedSecret = signal('');
+    protected readonly feedback = signal<{ severity: 'success' | 'error'; key: string } | null>(null);
+
+    protected readonly form = this.fb.group({
+        name: ['', [Validators.required, Validators.maxLength(120)]],
+        description: ['', Validators.maxLength(500)],
+        url: ['', [Validators.required]],
+        enabled: [true]
+    });
+
+    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
+        this.language();
+        return [
+            { label: this.transloco.translate('nav.integration'), routerLink: '/integration/webhooks' },
+            { label: this.transloco.translate('nav.webhooks'), isCurrent: true }
+        ];
+    });
+
+    ngOnInit(): void {
+        if (!this.canManageSite() && this.canManageInstance()) this.scope.set('instance');
+        this.load();
+    }
+
+    protected switchScope(scope: WebhookScope): void {
+        if (scope === this.scope()) return;
+        this.scope.set(scope);
+        this.revealedSecret.set('');
+        this.selectedWebhook.set(null);
+        this.deliveries.set([]);
+        this.load();
+    }
+
+    protected load(): void {
+        const siteID = this.siteID();
+        if (this.scope() === 'site' && !siteID) {
+            this.webhooks.set([]);
+            this.catalog.set([]);
+            return;
+        }
+        this.loading.set(true);
+        this.feedback.set(null);
+        forkJoin({
+            webhooks: this.service.list(this.scope(), siteID),
+            catalog: this.service.catalog(this.scope(), siteID)
+        })
+            .pipe(finalize(() => this.loading.set(false)))
+            .subscribe({
+                next: ({ webhooks, catalog }) => {
+                    this.webhooks.set(webhooks);
+                    this.catalog.set(catalog);
+                },
+                error: () => this.feedback.set({ severity: 'error', key: 'integration.webhooks.feedback.loadError' })
+            });
+    }
+
+    protected openCreate(): void {
+        this.editing.set(null);
+        this.form.reset({ name: '', description: '', url: '', enabled: true });
+        this.selectedEvents.set([]);
+        this.dialogVisible.set(true);
+    }
+
+    protected openEdit(webhook: Webhook): void {
+        this.editing.set(webhook);
+        this.form.reset({ name: webhook.name, description: webhook.description, url: webhook.url, enabled: webhook.enabled });
+        this.selectedEvents.set([...webhook.events]);
+        this.dialogVisible.set(true);
+    }
+
+    protected toggleEvent(eventType: string, checked: boolean): void {
+        this.selectedEvents.update((events) => (checked ? [...events, eventType] : events.filter((item) => item !== eventType)));
+    }
+
+    protected eventSelected(eventType: string): boolean {
+        return this.selectedEvents().includes(eventType);
+    }
+
+    protected save(): void {
+        this.form.markAllAsTouched();
+        if (this.form.invalid || this.selectedEvents().length === 0) return;
+        const input: WebhookInput = { ...this.form.getRawValue(), events: this.selectedEvents() };
+        const editing = this.editing();
+        const request: Observable<Webhook | WebhookSecretResponse> = editing ? this.service.update(editing.id, input, this.scope(), this.siteID()) : this.service.create(input, this.scope(), this.siteID());
+        this.saving.set(true);
+        request.pipe(finalize(() => this.saving.set(false))).subscribe({
+            next: (result) => {
+                const webhook = 'webhook' in result ? result.webhook : result;
+                if ('secret' in result) this.revealedSecret.set(result.secret);
+                this.webhooks.update((items) => (editing ? items.map((item) => (item.id === webhook.id ? webhook : item)) : [webhook, ...items]));
+                this.dialogVisible.set(false);
+                this.feedback.set({ severity: 'success', key: editing ? 'integration.webhooks.feedback.updated' : 'integration.webhooks.feedback.created' });
+            },
+            error: () => this.feedback.set({ severity: 'error', key: 'integration.webhooks.feedback.saveError' })
+        });
+    }
+
+    protected confirmRotate(webhook: Webhook): void {
+        this.confirmation.confirm({
+            header: this.transloco.translate('integration.webhooks.confirm.rotateTitle'),
+            message: this.transloco.translate('integration.webhooks.confirm.rotateMessage', { name: webhook.name }),
+            acceptLabel: this.transloco.translate('integration.webhooks.actions.rotate'),
+            rejectLabel: this.transloco.translate('integration.webhooks.actions.cancel'),
+            accept: () => this.rotate(webhook)
+        });
+    }
+
+    private rotate(webhook: Webhook): void {
+        this.service.rotate(webhook.id, this.scope(), this.siteID()).subscribe({
+            next: (result) => {
+                this.revealedSecret.set(result.secret);
+                this.webhooks.update((items) => items.map((item) => (item.id === webhook.id ? result.webhook : item)));
+                this.feedback.set({ severity: 'success', key: 'integration.webhooks.feedback.rotated' });
+            },
+            error: () => this.feedback.set({ severity: 'error', key: 'integration.webhooks.feedback.rotateError' })
+        });
+    }
+
+    protected sendTest(webhook: Webhook): void {
+        this.service.test(webhook.id, this.scope(), this.siteID()).subscribe({
+            next: () => {
+                this.feedback.set({ severity: 'success', key: 'integration.webhooks.feedback.testQueued' });
+                this.showDeliveries(webhook);
+            },
+            error: () => this.feedback.set({ severity: 'error', key: 'integration.webhooks.feedback.testError' })
+        });
+    }
+
+    protected showDeliveries(webhook: Webhook): void {
+        this.selectedWebhook.set(webhook);
+        this.deliveryLoading.set(true);
+        this.service
+            .deliveries(webhook.id, this.scope(), this.siteID())
+            .pipe(finalize(() => this.deliveryLoading.set(false)))
+            .subscribe({
+                next: (items) => this.deliveries.set(items),
+                error: () => this.feedback.set({ severity: 'error', key: 'integration.webhooks.feedback.deliveryError' })
+            });
+    }
+
+    protected confirmDelete(webhook: Webhook): void {
+        this.confirmation.confirm({
+            header: this.transloco.translate('integration.webhooks.confirm.deleteTitle'),
+            message: this.transloco.translate('integration.webhooks.confirm.deleteMessage', { name: webhook.name }),
+            acceptLabel: this.transloco.translate('integration.webhooks.actions.delete'),
+            rejectLabel: this.transloco.translate('integration.webhooks.actions.cancel'),
+            acceptButtonProps: { severity: 'danger' },
+            accept: () => this.delete(webhook)
+        });
+    }
+
+    protected statusSeverity(status: string): 'success' | 'warn' | 'danger' | 'secondary' {
+        if (status === 'succeeded') return 'success';
+        if (status === 'pending' || status === 'retrying' || status === 'processing') return 'warn';
+        if (status === 'failed') return 'danger';
+        return 'secondary';
+    }
+
+    private delete(webhook: Webhook): void {
+        this.service.delete(webhook.id, this.scope(), this.siteID()).subscribe({
+            next: () => {
+                this.webhooks.update((items) => items.filter((item) => item.id !== webhook.id));
+                if (this.selectedWebhook()?.id === webhook.id) {
+                    this.selectedWebhook.set(null);
+                    this.deliveries.set([]);
+                }
+                this.feedback.set({ severity: 'success', key: 'integration.webhooks.feedback.deleted' });
+            },
+            error: () => this.feedback.set({ severity: 'error', key: 'integration.webhooks.feedback.deleteError' })
+        });
+    }
+
+    private siteID(): string | undefined {
+        return this.scope() === 'site' ? this.activeSite()?.id : undefined;
+    }
+}

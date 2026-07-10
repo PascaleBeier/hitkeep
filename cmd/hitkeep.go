@@ -27,6 +27,7 @@ import (
 	"hitkeep/internal/realtime"
 	"hitkeep/internal/searchconsole"
 	"hitkeep/internal/server"
+	"hitkeep/internal/webhookdispatcher"
 	"hitkeep/internal/worker"
 	"hitkeep/public"
 )
@@ -302,16 +303,25 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 	}
 
 	consumer := ingest.NewConsumer(tenantMgr, logger, logLevel, realtimeBroker)
+	consumer.SetWebhookEmitter(webhookdispatcher.NewEmitter(store, producer, conf.Version))
 	if err := consumer.Connect(conf.NSQTCPAddress); err != nil {
 		producer.Stop()
+		store.Close()
+		return nil, nil, nil, nil, err
+	}
+	webhookWorker := webhookdispatcher.NewWorker(store, producer, *conf, logger, logLevel)
+	if err := webhookWorker.Connect(ctx, conf.NSQTCPAddress); err != nil {
+		producer.Stop()
+		consumer.Stop()
 		store.Close()
 		return nil, nil, nil, nil, err
 	}
 
 	shutdownFunc := func() {
 		slog.Debug("(Leader) Shutting down stateful services...")
-		producer.Stop()
+		webhookWorker.Stop()
 		consumer.Stop()
+		producer.Stop()
 		store.Close()
 		os.RemoveAll(tmpDir)
 	}

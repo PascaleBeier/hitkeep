@@ -11,7 +11,8 @@ export const INSTANCE_CAPABILITIES = {
     viewAudit: 'instance.view_audit',
     exportAudit: 'instance.export_audit',
     manageSiteExclusions: 'instance.manage_site_exclusions',
-    manageImports: 'instance.manage_imports'
+    manageImports: 'instance.manage_imports',
+    manageWebhooks: 'instance.manage_webhooks'
 } as const;
 
 export const SITE_CAPABILITIES = {
@@ -19,7 +20,8 @@ export const SITE_CAPABILITIES = {
     manageData: 'site.manage_data',
     manageGoals: 'site.manage_goals',
     manageTeam: 'site.manage_team',
-    delete: 'site.delete'
+    delete: 'site.delete',
+    manageWebhooks: 'site.manage_webhooks'
 } as const;
 
 export const TEAM_CAPABILITIES = {
@@ -51,11 +53,13 @@ export const INSTANCE_ROLE_CAPABILITIES = {
         INSTANCE_CAPABILITIES.exportAudit,
         INSTANCE_CAPABILITIES.manageSiteExclusions,
         INSTANCE_CAPABILITIES.manageImports,
+        INSTANCE_CAPABILITIES.manageWebhooks,
         SITE_CAPABILITIES.view,
         SITE_CAPABILITIES.manageData,
         SITE_CAPABILITIES.manageGoals,
         SITE_CAPABILITIES.manageTeam,
-        SITE_CAPABILITIES.delete
+        SITE_CAPABILITIES.delete,
+        SITE_CAPABILITIES.manageWebhooks
     ],
     admin: [
         INSTANCE_CAPABILITIES.viewAllSites,
@@ -65,14 +69,16 @@ export const INSTANCE_ROLE_CAPABILITIES = {
         INSTANCE_CAPABILITIES.viewAudit,
         INSTANCE_CAPABILITIES.manageSiteExclusions,
         INSTANCE_CAPABILITIES.manageImports,
-        SITE_CAPABILITIES.view
+        INSTANCE_CAPABILITIES.manageWebhooks,
+        SITE_CAPABILITIES.view,
+        SITE_CAPABILITIES.manageWebhooks
     ],
     user: []
 } as const satisfies Record<string, readonly AccessCapability[]>;
 
 export const SITE_ROLE_CAPABILITIES = {
-    owner: [SITE_CAPABILITIES.view, SITE_CAPABILITIES.manageData, SITE_CAPABILITIES.manageGoals, SITE_CAPABILITIES.manageTeam, SITE_CAPABILITIES.delete],
-    admin: [SITE_CAPABILITIES.view, SITE_CAPABILITIES.manageData, SITE_CAPABILITIES.manageGoals, SITE_CAPABILITIES.manageTeam],
+    owner: [SITE_CAPABILITIES.view, SITE_CAPABILITIES.manageData, SITE_CAPABILITIES.manageGoals, SITE_CAPABILITIES.manageTeam, SITE_CAPABILITIES.manageWebhooks, SITE_CAPABILITIES.delete],
+    admin: [SITE_CAPABILITIES.view, SITE_CAPABILITIES.manageData, SITE_CAPABILITIES.manageGoals, SITE_CAPABILITIES.manageTeam, SITE_CAPABILITIES.manageWebhooks],
     editor: [SITE_CAPABILITIES.view, SITE_CAPABILITIES.manageGoals],
     viewer: [SITE_CAPABILITIES.view]
 } as const satisfies Record<string, readonly AccessCapability[]>;

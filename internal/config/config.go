@@ -67,6 +67,16 @@ type Config struct {
 	ImportMaxStageBytes      int `env:"HITKEEP_IMPORT_MAX_STAGE_BYTES"        default:"107374182400" desc:"Maximum staged import upload size in bytes"`
 	ImportStageRetentionDays int `env:"HITKEEP_IMPORT_STAGE_RETENTION_DAYS" default:"7"            desc:"Days to keep stale staged import upload files; 0 disables import staging cleanup"`
 
+	WebhookAllowDevelopmentTargets bool `env:"HITKEEP_WEBHOOK_ALLOW_DEVELOPMENT_TARGETS" default:"false" desc:"Allow HTTP and private webhook destinations for explicit development/self-host testing"`
+	WebhookDeliveryTimeoutSeconds  int  `env:"HITKEEP_WEBHOOK_DELIVERY_TIMEOUT"           default:"10"    desc:"Outbound webhook request timeout in seconds"`
+	WebhookDeliveryConcurrency     int  `env:"HITKEEP_WEBHOOK_DELIVERY_CONCURRENCY"       default:"8"     desc:"Maximum concurrent outbound webhook deliveries"`
+	WebhookPerEndpointConcurrency  int  `env:"HITKEEP_WEBHOOK_PER_ENDPOINT_CONCURRENCY"   default:"1"     desc:"Maximum concurrent deliveries for one webhook"`
+	WebhookMaxAttempts             int  `env:"HITKEEP_WEBHOOK_MAX_ATTEMPTS"               default:"6"     desc:"Maximum outbound webhook delivery attempts"`
+	WebhookRetryBaseSeconds        int  `env:"HITKEEP_WEBHOOK_RETRY_BASE_SECONDS"          default:"30"    desc:"Initial outbound webhook retry delay in seconds"`
+	WebhookRetryMaxSeconds         int  `env:"HITKEEP_WEBHOOK_RETRY_MAX_SECONDS"           default:"21600" desc:"Maximum outbound webhook retry delay in seconds"`
+	WebhookRetentionDays           int  `env:"HITKEEP_WEBHOOK_RETENTION_DAYS"             default:"30"    desc:"Days to retain webhook delivery logs"`
+	WebhookSweepSeconds            int  `env:"HITKEEP_WEBHOOK_SWEEP_SECONDS"              default:"30"    desc:"Seconds between pending webhook delivery recovery sweeps"`
+
 	GoogleSearchConsoleClientID     string `env:"HITKEEP_GOOGLE_SEARCH_CONSOLE_CLIENT_ID"     default:"" desc:"Google Search Console OAuth client ID"`
 	GoogleSearchConsoleClientSecret string `env:"HITKEEP_GOOGLE_SEARCH_CONSOLE_CLIENT_SECRET" default:"" desc:"Google Search Console OAuth client secret" sensitive:"redact"`
 	GoogleSearchConsoleRedirectURL  string `env:"HITKEEP_GOOGLE_SEARCH_CONSOLE_REDIRECT_URL"  default:"" desc:"Google Search Console OAuth callback URL override"`

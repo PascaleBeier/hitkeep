@@ -8,6 +8,7 @@ func openAPIV1Paths() map[string]any {
 		openAPIV1IntegrationPaths(),
 		openAPIV1QRPaths(),
 		openAPIV1SearchConsoleReportPaths(),
+		openAPIV1WebhookPaths(),
 	)
 }
 

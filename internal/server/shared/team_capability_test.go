@@ -22,6 +22,7 @@ func TestHandlerConfigAuthHelpers(t *testing.T) {
 		{"explicit auth", HandlerConfig{RequireAuth: true}, true, false},
 		{"instance permission", HandlerConfig{InstancePerm: auth.PermInstanceViewSystem}, true, true},
 		{"site permission", HandlerConfig{SitePerm: auth.PermSiteView}, true, true},
+		{"human-only permission", HandlerConfig{SitePerm: auth.PermSiteManageWebhooks, HumanOnly: true}, true, false},
 		{"team capability", HandlerConfig{TeamCap: auth.CapTeamManageSettings}, true, false},
 		{"api client only", HandlerConfig{APIClientOnly: true}, false, false},
 		{"open route", HandlerConfig{}, false, false},

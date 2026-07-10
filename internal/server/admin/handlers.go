@@ -15,6 +15,7 @@ import (
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/webhooks"
 )
 
 type handler struct {
@@ -438,6 +439,13 @@ func (h *handler) handleUpdateUserRole() http.HandlerFunc {
 			Outcome:      "success",
 			Details:      "Instance role changed from " + string(oldRole) + " to " + strings.TrimSpace(req.Role),
 		})
+		h.ctx.EmitWebhookEvent(r.Context(), webhooks.Event{
+			Type: webhooks.EventSystemUserUpdated,
+			Data: map[string]any{
+				"user_id": targetUserID.String(),
+				"role":    strings.TrimSpace(req.Role),
+			},
+		})
 
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
@@ -532,6 +540,10 @@ func (h *handler) handleDeleteUser() http.HandlerFunc {
 			http.Error(w, "Failed to delete user", http.StatusInternalServerError)
 			return
 		}
+		h.ctx.EmitWebhookEvent(r.Context(), webhooks.Event{
+			Type: webhooks.EventSystemUserDeleted,
+			Data: map[string]any{"user_id": targetUserID.String()},
+		})
 
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {

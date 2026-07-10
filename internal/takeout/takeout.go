@@ -359,6 +359,10 @@ func buildTakeoutQuery(sources []takeoutQuerySource, filename, format string) st
 				fmt.Sprintf("SELECT 'qr_code_share_link' AS record_type, * FROM qr_code_share_links WHERE %s", whereClause),
 				opportunityTakeoutSelect(whereClause),
 				aiRunTakeoutSelect(whereClause),
+				webhookTakeoutSelect(whereClause),
+				webhookSubscriptionTakeoutSelect(whereClause),
+				webhookDeliveryTakeoutSelect(whereClause),
+				webhookDeliveryAttemptTakeoutSelect(whereClause),
 			)
 		}
 	}
@@ -498,6 +502,81 @@ func aiRunTakeoutSelect(whereClause string) string {
 			created_at
 		FROM ai_runs
 		WHERE %s
+	`, whereClause)
+}
+
+func webhookTakeoutSelect(whereClause string) string {
+	return fmt.Sprintf(`
+		SELECT
+			'webhook' AS record_type,
+			id,
+			site_id,
+			name,
+			description,
+			destination_url,
+			enabled,
+			created_at,
+			updated_at
+		FROM webhooks
+		WHERE %s
+	`, whereClause)
+}
+
+func webhookSubscriptionTakeoutSelect(whereClause string) string {
+	return fmt.Sprintf(`
+		SELECT
+			'webhook_event_subscription' AS record_type,
+			webhook_id,
+			event_type
+		FROM webhook_event_subscriptions
+		WHERE webhook_id IN (SELECT id FROM webhooks WHERE %s)
+	`, whereClause)
+}
+
+func webhookDeliveryTakeoutSelect(whereClause string) string {
+	return fmt.Sprintf(`
+		SELECT
+			'webhook_delivery' AS record_type,
+			id,
+			event_id,
+			webhook_id,
+			site_id,
+			event_type,
+			webhook_name,
+			destination_url,
+			status,
+			attempt_count,
+			next_attempt_at,
+			last_attempt_at,
+			completed_at,
+			response_status,
+			last_error_code,
+			created_at,
+			updated_at
+		FROM webhook_deliveries
+		WHERE webhook_id IN (SELECT id FROM webhooks WHERE %s)
+	`, whereClause)
+}
+
+func webhookDeliveryAttemptTakeoutSelect(whereClause string) string {
+	return fmt.Sprintf(`
+		SELECT
+			'webhook_delivery_attempt' AS record_type,
+			id,
+			delivery_id,
+			site_id,
+			attempt_number,
+			status,
+			response_status,
+			error_code,
+			started_at,
+			completed_at,
+			next_attempt_at
+		FROM webhook_delivery_attempts
+		WHERE delivery_id IN (
+			SELECT id FROM webhook_deliveries
+			WHERE webhook_id IN (SELECT id FROM webhooks WHERE %s)
+		)
 	`, whereClause)
 }
 

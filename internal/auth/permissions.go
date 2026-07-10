@@ -35,13 +35,15 @@ const (
 	PermInstanceExportAudit          Permission = "instance.export_audit"
 	PermInstanceManageSiteExclusions Permission = "instance.manage_site_exclusions"
 	PermInstanceManageImports        Permission = "instance.manage_imports"
+	PermInstanceManageWebhooks       Permission = "instance.manage_webhooks"
 
 	// Site permissions
-	PermSiteView        Permission = "site.view"
-	PermSiteManageData  Permission = "site.manage_data"
-	PermSiteManageGoals Permission = "site.manage_goals"
-	PermSiteManageTeam  Permission = "site.manage_team"
-	PermSiteDelete      Permission = "site.delete"
+	PermSiteView           Permission = "site.view"
+	PermSiteManageData     Permission = "site.manage_data"
+	PermSiteManageGoals    Permission = "site.manage_goals"
+	PermSiteManageTeam     Permission = "site.manage_team"
+	PermSiteDelete         Permission = "site.delete"
+	PermSiteManageWebhooks Permission = "site.manage_webhooks"
 )
 
 // Role to permissions mapping
@@ -58,11 +60,13 @@ var instancePermissions = map[InstanceRole][]Permission{
 		PermInstanceExportAudit,
 		PermInstanceManageSiteExclusions,
 		PermInstanceManageImports,
+		PermInstanceManageWebhooks,
 		PermSiteView,
 		PermSiteManageData,
 		PermSiteManageGoals,
 		PermSiteManageTeam,
 		PermSiteDelete,
+		PermSiteManageWebhooks,
 	},
 	InstanceAdmin: {
 		PermInstanceViewAllSites,
@@ -72,7 +76,9 @@ var instancePermissions = map[InstanceRole][]Permission{
 		PermInstanceViewAudit,
 		PermInstanceManageSiteExclusions,
 		PermInstanceManageImports,
+		PermInstanceManageWebhooks,
 		PermSiteView,
+		PermSiteManageWebhooks,
 	},
 	InstanceUser: {},
 }
@@ -83,6 +89,7 @@ var sitePermissions = map[SiteRole][]Permission{
 		PermSiteManageData,
 		PermSiteManageGoals,
 		PermSiteManageTeam,
+		PermSiteManageWebhooks,
 		PermSiteDelete,
 	},
 	SiteAdmin: {
@@ -90,6 +97,7 @@ var sitePermissions = map[SiteRole][]Permission{
 		PermSiteManageData,
 		PermSiteManageGoals,
 		PermSiteManageTeam,
+		PermSiteManageWebhooks,
 	},
 	SiteEditor: {
 		PermSiteView,

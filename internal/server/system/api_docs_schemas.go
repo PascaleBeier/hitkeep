@@ -60,6 +60,7 @@ func openAPIV1Schemas() map[string]any {
 		openAPIV1WebVitalSchemas(),
 		openAPIV1QRSchemas(),
 		openAPIV1AccountSchemas(),
+		openAPIV1WebhookSchemas(),
 	)
 }
 

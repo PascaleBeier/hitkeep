@@ -20,6 +20,7 @@ import (
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/webhooks"
 )
 
 const (
@@ -69,6 +70,25 @@ func (h *handler) appendTeamAudit(r *http.Request, teamID, actorID uuid.UUID, ac
 		Outcome:      "success",
 		Details:      details,
 	})
+
+	eventType := ""
+	switch action {
+	case "team.created":
+		eventType = webhooks.EventTeamCreated
+	case "team.updated":
+		eventType = webhooks.EventTeamUpdated
+	case "team.archived":
+		eventType = webhooks.EventTeamArchived
+	case "member.removed", "member.left":
+		eventType = webhooks.EventTeamMemberRemoved
+	}
+	if eventType != "" {
+		data := map[string]any{"team_id": teamID.String()}
+		if resolvedTargetUserID != uuid.Nil {
+			data["user_id"] = resolvedTargetUserID.String()
+		}
+		h.ctx.EmitWebhookEvent(r.Context(), webhooks.Event{Type: eventType, Data: data})
+	}
 }
 
 func writeTeamActionError(w http.ResponseWriter, statusCode int, code string, message string) {

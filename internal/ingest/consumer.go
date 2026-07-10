@@ -14,19 +14,21 @@ import (
 	"hitkeep/internal/database"
 	"hitkeep/internal/hklog"
 	"hitkeep/internal/realtime"
+	"hitkeep/internal/webhooks"
 )
 
 type Consumer struct {
-	tenantMgr     *database.TenantStoreManager
-	hitsConsumer  *nsq.Consumer
-	eventConsumer *nsq.Consumer
-	vitalConsumer *nsq.Consumer
-	hitBatcher    *storeBatcher[*api.Hit]
-	eventBatcher  *storeBatcher[*api.Event]
-	vitalBatcher  *storeBatcher[*api.WebVital]
-	realtime      *realtime.Broker
-	logger        *slog.Logger
-	logLevel      slog.Level
+	tenantMgr      *database.TenantStoreManager
+	hitsConsumer   *nsq.Consumer
+	eventConsumer  *nsq.Consumer
+	vitalConsumer  *nsq.Consumer
+	hitBatcher     *storeBatcher[*api.Hit]
+	eventBatcher   *storeBatcher[*api.Event]
+	vitalBatcher   *storeBatcher[*api.WebVital]
+	realtime       *realtime.Broker
+	logger         *slog.Logger
+	logLevel       slog.Level
+	webhookEmitter webhooks.EventEmitter
 }
 
 func NewConsumer(tenantMgr *database.TenantStoreManager, logger *slog.Logger, level slog.Level, realtimeBroker *realtime.Broker) *Consumer {
@@ -44,6 +46,7 @@ func NewConsumer(tenantMgr *database.TenantStoreManager, logger *slog.Logger, le
 			logger.Warn("Failed to record hit activity summary after tenant persistence", "count", len(hits), "error", err)
 		}
 		consumer.publishHitsChanged(hits)
+		consumer.emitHitGoalConversions(ctx, store, hits)
 		return nil
 	})
 	consumer.eventBatcher = newStoreBatcher("event", logger, ingestBatchSize, ingestBatchFlushInterval, ingestPersistTimeout, func(store *database.Store, ctx context.Context, events []*api.Event) error {
@@ -54,6 +57,7 @@ func NewConsumer(tenantMgr *database.TenantStoreManager, logger *slog.Logger, le
 			logger.Warn("Failed to record event activity summary after tenant persistence", "count", len(events), "error", err)
 		}
 		consumer.publishEventsChanged(events)
+		consumer.emitEventGoalConversions(ctx, store, events)
 		return nil
 	})
 	consumer.vitalBatcher = newStoreBatcher("web_vital", logger, ingestBatchSize, ingestBatchFlushInterval, ingestPersistTimeout, func(store *database.Store, ctx context.Context, vitals []*api.WebVital) error {
@@ -64,6 +68,84 @@ func NewConsumer(tenantMgr *database.TenantStoreManager, logger *slog.Logger, le
 		return nil
 	})
 	return consumer
+}
+
+func (c *Consumer) SetWebhookEmitter(emitter webhooks.EventEmitter) {
+	c.webhookEmitter = emitter
+}
+
+func (c *Consumer) emitHitGoalConversions(ctx context.Context, store *database.Store, hits []*api.Hit) {
+	if c.webhookEmitter == nil {
+		return
+	}
+	bySite := make(map[uuid.UUID][]api.Goal)
+	for _, hit := range hits {
+		if hit == nil {
+			continue
+		}
+		goals, ok := bySite[hit.SiteID]
+		if !ok {
+			var err error
+			goals, err = store.GetGoals(ctx, hit.SiteID)
+			if err != nil {
+				c.logger.Warn("Failed to load goals for webhook conversion", "error", err, "site_id", hit.SiteID)
+				continue
+			}
+			bySite[hit.SiteID] = goals
+		}
+		c.emitGoalConversions(ctx, goalConversionEvents(goals, hit.ID, hit.SiteID, "path", hit.Path, hit.Timestamp))
+	}
+}
+
+func (c *Consumer) emitEventGoalConversions(ctx context.Context, store *database.Store, events []*api.Event) {
+	if c.webhookEmitter == nil {
+		return
+	}
+	bySite := make(map[uuid.UUID][]api.Goal)
+	for _, event := range events {
+		if event == nil {
+			continue
+		}
+		goals, ok := bySite[event.SiteID]
+		if !ok {
+			var err error
+			goals, err = store.GetGoals(ctx, event.SiteID)
+			if err != nil {
+				c.logger.Warn("Failed to load goals for webhook conversion", "error", err, "site_id", event.SiteID)
+				continue
+			}
+			bySite[event.SiteID] = goals
+		}
+		c.emitGoalConversions(ctx, goalConversionEvents(goals, event.ID, event.SiteID, "event", event.Name, event.Timestamp))
+	}
+}
+
+func (c *Consumer) emitGoalConversions(ctx context.Context, events []webhooks.Event) {
+	for _, event := range events {
+		if _, err := c.webhookEmitter.Emit(ctx, event); err != nil {
+			c.logger.Warn("Goal conversion persisted but webhook emission was deferred", "error", err, "event_id", event.ID)
+		}
+	}
+}
+
+func goalConversionEvents(goals []api.Goal, sourceID, siteID uuid.UUID, sourceType, value string, occurredAt time.Time) []webhooks.Event {
+	result := make([]webhooks.Event, 0)
+	for _, goal := range goals {
+		if goal.SiteID != siteID || goal.Type != sourceType || goal.Value != value {
+			continue
+		}
+		eventID := uuid.NewSHA1(uuid.NameSpaceOID, []byte(sourceID.String()+":"+goal.ID.String()+":"+webhooks.EventGoalConverted))
+		result = append(result, webhooks.Event{
+			ID:     eventID,
+			Type:   webhooks.EventGoalConverted,
+			SiteID: &siteID,
+			Data: map[string]any{
+				"site_id": siteID.String(), "goal_id": goal.ID.String(), "goal_name": goal.Name,
+				"goal_type": goal.Type, "converted_at": occurredAt.UTC(),
+			},
+		})
+	}
+	return result
 }
 
 // newIngestConsumerConfig tunes delivery for the batching handlers: handlers

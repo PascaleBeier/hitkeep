@@ -17,6 +17,7 @@ import (
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/webhooks"
 )
 
 type handler struct {
@@ -290,6 +291,11 @@ func (h *handler) handleCreateSite() http.HandlerFunc {
 		}
 
 		slog.Info("Site created", "id", site.ID, "domain", domain, "user_id", userID)
+		h.ctx.EmitWebhookEvent(r.Context(), webhooks.Event{
+			Type:   webhooks.EventSiteCreated,
+			SiteID: &site.ID,
+			Data:   map[string]any{"site_id": site.ID.String(), "domain": site.Domain},
+		})
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(site); err != nil {
 			slog.Error("Failed to encode response", "error", err)
@@ -318,6 +324,12 @@ func (h *handler) handleDeleteSite() http.HandlerFunc {
 			siteLabel = site.Domain
 		}
 		teamID, teamErr := h.ctx.Store.GetSiteTenantID(r.Context(), siteID)
+		h.ctx.EmitWebhookEvent(r.Context(), webhooks.Event{
+			Type:                      webhooks.EventSiteDeleted,
+			SiteID:                    &siteID,
+			PreserveAfterSiteDeletion: true,
+			Data:                      map[string]any{"site_id": siteID.String(), "domain": siteLabel},
+		})
 
 		if h.ctx.TenantStores != nil {
 			if err := h.ctx.TenantStores.DeleteSite(r.Context(), siteID); err != nil {
@@ -524,6 +536,13 @@ func (h *handler) handleRenameSiteDomain() http.HandlerFunc {
 			}
 
 			slog.Info("Site domain renamed", "site_id", siteID, "old_domain", oldDomain, "new_domain", domain, "user_id", userID)
+			h.ctx.EmitWebhookEvent(r.Context(), webhooks.Event{
+				Type:   webhooks.EventSiteUpdated,
+				SiteID: &siteID,
+				Data: map[string]any{
+					"site_id": siteID.String(), "change": "domain", "old_domain": oldDomain, "domain": domain,
+				},
+			})
 			site.Domain = domain
 		}
 
@@ -596,6 +615,13 @@ func (h *handler) handleUpdateSiteRetention() http.HandlerFunc {
 				Details:     fmt.Sprintf("Retention updated to %d days for %s", req.Days, site.Domain),
 			})
 		}
+		h.ctx.EmitWebhookEvent(r.Context(), webhooks.Event{
+			Type:   webhooks.EventSiteUpdated,
+			SiteID: &siteID,
+			Data: map[string]any{
+				"site_id": siteID.String(), "change": "retention", "data_retention_days": req.Days,
+			},
+		})
 
 		w.WriteHeader(http.StatusOK)
 	}

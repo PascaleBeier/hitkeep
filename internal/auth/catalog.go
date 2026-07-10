@@ -26,6 +26,7 @@ func InstanceCapabilityCatalog() []CapabilityEntry {
 		{Key: "exportAudit", Value: string(PermInstanceExportAudit)},
 		{Key: "manageSiteExclusions", Value: string(PermInstanceManageSiteExclusions)},
 		{Key: "manageImports", Value: string(PermInstanceManageImports)},
+		{Key: "manageWebhooks", Value: string(PermInstanceManageWebhooks)},
 	}
 }
 
@@ -36,6 +37,7 @@ func SiteCapabilityCatalog() []CapabilityEntry {
 		{Key: "manageGoals", Value: string(PermSiteManageGoals)},
 		{Key: "manageTeam", Value: string(PermSiteManageTeam)},
 		{Key: "delete", Value: string(PermSiteDelete)},
+		{Key: "manageWebhooks", Value: string(PermSiteManageWebhooks)},
 	}
 }
 

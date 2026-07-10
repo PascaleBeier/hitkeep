@@ -18,6 +18,7 @@ import (
 	"hitkeep/internal/realtime"
 	"hitkeep/internal/searchconsole"
 	"hitkeep/internal/takeout"
+	"hitkeep/internal/webhooks"
 )
 
 type contextKey string
@@ -34,12 +35,17 @@ type HandlerConfig struct {
 	TeamCap       auth.Capability
 	AllowAPIKey   bool
 	APIClientOnly bool
+	HumanOnly     bool
 	RateLimiter   *IPRateLimiter
 }
 
 type MessageProducer interface {
 	Publish(topic string, body []byte) error
 	Ping() error
+}
+
+type WebhookEventEmitter interface {
+	Emit(ctx context.Context, event webhooks.Event) (webhooks.Emission, error)
 }
 
 type ClusterState interface {
@@ -69,6 +75,7 @@ type Context struct {
 	Realtime       *realtime.Broker
 	IPFilter       *blocking.IPFilter
 	SpamFilter     *blocking.SpamFilter
+	Webhooks       WebhookEventEmitter
 
 	// Runtime system monitoring
 	StartedAt                time.Time
@@ -166,5 +173,8 @@ func (config HandlerConfig) requiresUserAuth() bool {
 }
 
 func (config HandlerConfig) allowsAPIKey() bool {
+	if config.HumanOnly {
+		return false
+	}
 	return config.AllowAPIKey || config.InstancePerm != "" || config.SitePerm != ""
 }

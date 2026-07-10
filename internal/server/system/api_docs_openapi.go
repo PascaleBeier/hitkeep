@@ -31,6 +31,7 @@ func openAPISpecV1(publicURL string) map[string]any {
 			{"name": "Takeout", "description": "Data export endpoints for user and site data."},
 			{"name": "Reports", "description": "Report subscription endpoints for digest and per-site scheduled analytics emails."},
 			{"name": "Teams", "description": "Tenant team membership and active-team context endpoints."},
+			{"name": "Webhooks", "description": "Human-administered instance and site operational webhook endpoints."},
 		},
 		"components": openAPIV1Components(),
 		"paths":      openAPIV1Paths(),
