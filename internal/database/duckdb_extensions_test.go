@@ -141,3 +141,18 @@ func TestConnectionsDisableImplicitExtensionFetching(t *testing.T) {
 		}
 	}
 }
+
+func TestS3SessionBootstrapsAWSSecretProvider(t *testing.T) {
+	store := NewStore(":memory:")
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	err := store.WithDuckDBSession(context.Background(), DuckDBSessionOptions{
+		S3: &S3SecretConfig{Region: "eu-central-1"},
+	}, func(_ *sql.Conn) error { return nil })
+	if err != nil {
+		t.Fatalf("prepare S3 session: %v", err)
+	}
+}

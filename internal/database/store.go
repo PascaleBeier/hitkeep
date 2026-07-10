@@ -20,6 +20,8 @@ const (
 	maintenanceCheckpointInterval = 15 * time.Minute
 )
 
+var duckDBCoreExtensions = [...]string{"httpfs", "aws", "excel"}
+
 type Store struct {
 	db                  *sql.DB
 	path                string
@@ -144,8 +146,9 @@ func (s *Store) initConnection(execer driver.ExecerContext) error {
 			return fmt.Errorf("set database threads %d: %w", s.threads, err)
 		}
 	}
-	s.loadInstalledExtension(context.Background(), execer, "httpfs")
-	s.loadInstalledExtension(context.Background(), execer, "excel")
+	for _, extension := range duckDBCoreExtensions {
+		s.loadInstalledExtension(context.Background(), execer, extension)
+	}
 	return nil
 }
 
@@ -154,11 +157,10 @@ func (s *Store) bootstrapCoreExtensions() error {
 	defer cancel()
 
 	return s.WithDuckDBSession(ctx, DuckDBSessionOptions{}, func(conn *sql.Conn) error {
-		if err := EnsureCoreExtension(ctx, conn, "httpfs"); err != nil {
-			return fmt.Errorf("bootstrap httpfs extension: %w", err)
-		}
-		if err := EnsureCoreExtension(ctx, conn, "excel"); err != nil {
-			return fmt.Errorf("bootstrap excel extension: %w", err)
+		for _, extension := range duckDBCoreExtensions {
+			if err := EnsureCoreExtension(ctx, conn, extension); err != nil {
+				return fmt.Errorf("bootstrap %s extension: %w", extension, err)
+			}
 		}
 		return nil
 	})
