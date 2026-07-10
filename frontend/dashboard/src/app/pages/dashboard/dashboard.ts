@@ -622,6 +622,7 @@ export class Dashboard {
     private refreshRealtimeData() {
         this.refreshStatsOnly('background');
         this.refreshHits();
+        this.refreshOnboarding();
     }
 
     protected comparisonLabel = computed(() => {

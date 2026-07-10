@@ -19,6 +19,10 @@ describe('PreferencesService', () => {
         });
     });
 
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
     it('should be created', () => {
         expect(service).toBeTruthy();
     });

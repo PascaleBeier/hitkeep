@@ -3,7 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { provideTranslocoLocale } from '@jsverse/transloco-locale';
-import { of } from 'rxjs';
+import { Subject, of } from 'rxjs';
 import { vi } from 'vitest';
 
 import { Dashboard } from '@pages/dashboard/dashboard';
@@ -12,12 +12,14 @@ import { StatsService } from '@features/analytics/services/stats.service';
 import { HitService } from '@features/hits/services/hit.service';
 import { TeamService } from '@services/team.service';
 import { OnboardingService } from '@services/onboarding.service';
+import { RealtimeEvent, RealtimeService } from '@services/realtime.service';
 import { GoogleSearchConsoleService } from '@services/google-search-console.service';
 import { ReportRangePreferencesService } from '@services/report-range-preferences.service';
 
 describe('Dashboard', () => {
     let component: Dashboard;
     let fixture: ComponentFixture<Dashboard>;
+    let realtimeEvents: Subject<RealtimeEvent>;
 
     const emptyStats = () => ({
         live_visitors: 0,
@@ -75,6 +77,7 @@ describe('Dashboard', () => {
 
     beforeEach(async () => {
         localStorage.clear();
+        realtimeEvents = new Subject<RealtimeEvent>();
 
         await TestBed.configureTestingModule({
             imports: [
@@ -107,6 +110,14 @@ describe('Dashboard', () => {
                         getQueries: vi.fn(),
                         getPages: vi.fn(),
                         getBreakdown: vi.fn()
+                    }
+                },
+                {
+                    provide: RealtimeService,
+                    useValue: {
+                        events$: realtimeEvents.asObservable(),
+                        isOpen: () => false,
+                        activeSiteId: () => null
                     }
                 }
             ]
@@ -180,6 +191,42 @@ describe('Dashboard', () => {
         expect(rail.querySelectorAll('button, a, [role="button"]').length).toBe(0);
         expect(rail.querySelectorAll('[aria-current="step"]').length).toBe(1);
         expect(rail.querySelector('[aria-current="step"]')?.textContent).toContain('dashboard.onboarding.steps.verify_tracking');
+    });
+
+    it('refreshes onboarding when realtime analytics activity changes', async () => {
+        vi.useFakeTimers();
+        try {
+            const siteService = TestBed.inject(SiteService);
+            const onboardingService = TestBed.inject(OnboardingService);
+            vi.spyOn(TestBed.inject(StatsService), 'loadStats').mockImplementation(() => undefined);
+            vi.spyOn(TestBed.inject(HitService), 'loadHits').mockImplementation(() => undefined);
+
+            vi.spyOn(onboardingService, 'load').mockReturnValue(of({ dismissed: false, complete: false, steps: [] }));
+            siteService.activeSite.set({
+                id: 'site-1',
+                user_id: 'user-1',
+                domain: 'example.com',
+                created_at: '2026-01-01T00:00:00Z'
+            });
+            fixture.detectChanges();
+
+            const load = onboardingService.load as ReturnType<typeof vi.fn>;
+            load.mockClear();
+            realtimeEvents.next({
+                type: 'analytics.changed',
+                site_id: 'site-1',
+                kinds: ['hits'],
+                changed_at: '2026-07-10T08:00:00Z',
+                bucket_start: '2026-07-10T08:00:00Z',
+                counts: { hits: 1 }
+            });
+
+            await vi.advanceTimersByTimeAsync(600);
+
+            expect(load).toHaveBeenCalledTimes(1);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('should group top, landing, and exit pages under the content metric tab', () => {
