@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.11.0](https://github.com/PascaleBeier/hitkeep/compare/v2.10.3...v2.11.0) (2026-07-11)
+
+
+### Features
+
+* implement outbound webhooks ([c64175e](https://github.com/PascaleBeier/hitkeep/commit/c64175e41c05f0544e09fedba9f92494c87ec4f7))
+
 ## [2.10.3](https://github.com/PascaleBeier/hitkeep/compare/v2.10.2...v2.10.3) (2026-07-10)
 
 

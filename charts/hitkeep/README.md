@@ -11,7 +11,7 @@ HitKeep follows the standard Helm pattern used by major charts: the chart emits 
 ### Install (OCI via GHCR)
 
 ```
-helm install hitkeep oci://ghcr.io/pascalebeier/charts/hitkeep --version 2.10.3 # x-release-please-version
+helm install hitkeep oci://ghcr.io/pascalebeier/charts/hitkeep --version 2.11.0 # x-release-please-version
 ```
 
 ### Minimal values
@@ -19,7 +19,7 @@ helm install hitkeep oci://ghcr.io/pascalebeier/charts/hitkeep --version 2.10.3 
 ```
 image:
   repository: ghcr.io/pascalebeier/hitkeep
-  tag: "2.10.3" # x-release-please-version
+  tag: "2.11.0" # x-release-please-version
 
 env:
   HITKEEP_PUBLIC_URL: "https://analytics.example.com"
@@ -169,7 +169,7 @@ persistence:
 
 ### Optional MCP and AI configuration
 
-HitKeep 2.10.3 can expose the read-only MCP endpoint, optional AI-backed Opportunity features, and the optional Ask AI dashboard assistant when you configure them explicitly. <!-- x-release-please-version -->
+HitKeep 2.11.0 can expose the read-only MCP endpoint, optional AI-backed Opportunity features, and the optional Ask AI dashboard assistant when you configure them explicitly. <!-- x-release-please-version -->
 
 ```
 env:
