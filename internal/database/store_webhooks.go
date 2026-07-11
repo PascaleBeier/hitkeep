@@ -96,6 +96,8 @@ func (s *Store) ListWebhooks(ctx context.Context, siteID *uuid.UUID) ([]api.Webh
 func (s *Store) GetWebhook(ctx context.Context, webhookID uuid.UUID, siteID *uuid.UUID) (*api.Webhook, error) {
 	where, args := webhookScopeWhere(siteID)
 	queryArgs := append([]any{webhookID}, args...)
+	// where comes from webhookScopeWhere and contains only fixed predicates.
+	//nolint:gosec
 	row := s.db.QueryRowContext(ctx, `
 		SELECT id, CAST(site_id AS VARCHAR), name, description, destination_url, enabled, created_at, updated_at
 		FROM webhooks
@@ -143,6 +145,8 @@ func (s *Store) updateWebhook(ctx context.Context, webhookID uuid.UUID, siteID *
 		queryArgs := make([]any, 0, 6+len(args))
 		queryArgs = append(queryArgs, input.Name, input.Description, input.URL, input.Enabled, now, webhookID)
 		queryArgs = append(queryArgs, args...)
+		// where comes from webhookScopeWhere and contains only fixed predicates.
+		//nolint:gosec
 		result, err := tx.ExecContext(ctx, `
 			UPDATE webhooks
 			SET name = ?, description = ?, destination_url = ?, enabled = ?, updated_at = ?
@@ -203,6 +207,8 @@ func (s *Store) rotateWebhookSecret(ctx context.Context, webhookID uuid.UUID, si
 		queryArgs := make([]any, 0, 3+len(args))
 		queryArgs = append(queryArgs, secret, now, webhookID)
 		queryArgs = append(queryArgs, args...)
+		// where comes from webhookScopeWhere and contains only fixed predicates.
+		//nolint:gosec
 		result, err := tx.ExecContext(ctx, `
 			UPDATE webhooks SET secret = ?, updated_at = ? WHERE id = ? AND `+where,
 			queryArgs...,
@@ -257,6 +263,8 @@ func (s *Store) deleteWebhook(ctx context.Context, webhookID uuid.UUID, siteID *
 		if _, err := tx.ExecContext(ctx, "DELETE FROM webhook_event_subscriptions WHERE webhook_id = ?", webhookID); err != nil {
 			return fmt.Errorf("delete webhook subscriptions: %w", err)
 		}
+		// where comes from webhookScopeWhere and contains only fixed predicates.
+		//nolint:gosec
 		if _, err := tx.ExecContext(ctx, "DELETE FROM webhooks WHERE id = ? AND "+where, queryArgs...); err != nil {
 			return fmt.Errorf("delete webhook: %w", err)
 		}
