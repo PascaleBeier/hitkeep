@@ -53,6 +53,24 @@ func TestOpenAPISpecV1DocumentsWebhookManagementAndSigning(t *testing.T) {
 			t.Fatalf("expected webhook schema %s", schema)
 		}
 	}
+	for _, tc := range []struct {
+		path    string
+		method  string
+		summary string
+	}{
+		{"/api/admin/webhooks/{webhookID}/rotate", "post", "Rotate instance webhook signing secret"},
+		{"/api/sites/{id}/webhooks/{webhookID}/rotate", "post", "Rotate site webhook signing secret"},
+		{"/api/admin/webhooks/{webhookID}/test", "post", "Queue instance webhook test"},
+		{"/api/sites/{id}/webhooks/{webhookID}/test", "post", "Queue site webhook test"},
+		{"/api/admin/webhooks/{webhookID}/deliveries", "get", "List instance webhook delivery outcomes"},
+		{"/api/sites/{id}/webhooks/{webhookID}/deliveries", "get", "List site webhook delivery outcomes"},
+	} {
+		pathItem := requireMap(t, paths, tc.path)
+		operation := requireMap(t, pathItem, tc.method)
+		if got, _ := operation["summary"].(string); got != tc.summary {
+			t.Errorf("unexpected summary for %s %s: got %q, want %q", tc.method, tc.path, got, tc.summary)
+		}
+	}
 	testPath := requireMap(t, paths, "/api/admin/webhooks/{webhookID}/test")
 	testOp := requireMap(t, testPath, "post")
 	description, _ := testOp["description"].(string)

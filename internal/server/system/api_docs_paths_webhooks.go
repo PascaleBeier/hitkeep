@@ -35,15 +35,15 @@ func addWebhookScopePaths(paths map[string]any, base string, scopeParams []any, 
 			map[string]any{"204": desc("Deleted")}),
 	}
 	paths[base+"/{webhookID}/rotate"] = map[string]any{
-		"post": op([]string{"Webhooks"}, "Rotate webhook signing secret", "Re-signs pending deliveries, replaces the configured secret, and returns the new value exactly once. A request already in flight may still use the previous secret.", secCookie(), itemParams, nil,
+		"post": op([]string{"Webhooks"}, "Rotate "+scope+" webhook signing secret", "Re-signs pending deliveries, replaces the configured secret, and returns the new value exactly once. A request already in flight may still use the previous secret.", secCookie(), itemParams, nil,
 			map[string]any{"200": jsonRefResp("Webhook and new one-time secret", "#/components/schemas/WebhookSecretResponse")}),
 	}
 	paths[base+"/{webhookID}/test"] = map[string]any{
-		"post": op([]string{"Webhooks"}, "Queue webhook test", signing, secCookie(), itemParams, nil,
+		"post": op([]string{"Webhooks"}, "Queue "+scope+" webhook test", signing, secCookie(), itemParams, nil,
 			map[string]any{"202": jsonRefResp("Queued test delivery", "#/components/schemas/WebhookTestResponse")}),
 	}
 	paths[base+"/{webhookID}/deliveries"] = map[string]any{
-		"get": op([]string{"Webhooks"}, "List webhook delivery outcomes", signing+" Response bodies and signing secrets are never returned.", secCookie(), itemParams, nil,
+		"get": op([]string{"Webhooks"}, "List "+scope+" webhook delivery outcomes", signing+" Response bodies and signing secrets are never returned.", secCookie(), itemParams, nil,
 			map[string]any{"200": jsonSchemaResp("Delivery outcomes", map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/WebhookDelivery"}})}),
 	}
 }
