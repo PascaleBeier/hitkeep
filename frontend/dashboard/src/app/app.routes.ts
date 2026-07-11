@@ -207,6 +207,11 @@ export const routes: Routes = [
                 data: titleData('nav.apiReference')
             },
             {
+                path: 'integration/webhooks',
+                loadComponent: () => import('@pages/integration/webhooks/webhooks').then((m) => m.WebhooksPage),
+                data: titleData('nav.webhooks', 'site')
+            },
+            {
                 path: 'integration/google-search-console',
                 loadComponent: () => import('@pages/integration/google-search-console/google-search-console').then((m) => m.GoogleSearchConsolePage),
                 canActivate: [capabilityGuard],

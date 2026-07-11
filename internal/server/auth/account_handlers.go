@@ -18,6 +18,7 @@ import (
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/webhooks"
 )
 
 func (h *handler) handleForgotPassword() http.HandlerFunc {
@@ -326,6 +327,13 @@ func (h *handler) appendInviteAcceptedAuditEvents(r *http.Request, userID uuid.U
 			TargetLabel:  email,
 			Outcome:      "success",
 			Details:      fmt.Sprintf("Member %s added after accepting an invitation", email),
+		})
+		h.ctx.EmitWebhookEvent(r.Context(), webhooks.Event{
+			Type: webhooks.EventTeamMemberAdded,
+			Data: map[string]any{
+				"team_id": invite.TeamID.String(),
+				"user_id": userID.String(),
+			},
 		})
 	}
 }

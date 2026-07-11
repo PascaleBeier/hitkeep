@@ -28,6 +28,7 @@
     "funnels": "Funnel",
     "utm": "UTM",
     "apiClients": "Client API",
+    "webhooks": "Webhook",
     "apiReference": "Riferimento API",
     "expandItem": "Espandi {{item}}",
     "collapseItem": "Comprimi {{item}}",
@@ -1235,6 +1236,19 @@
       "errors": {
         "unexpected": "Qualcosa è andato storto. Riprova più tardi."
       }
+    },
+    "webhooks": {
+      "subtitle": "Invia eventi operativi firmati senza rallentare le azioni del prodotto.", "listLabel": "Webhook configurati",
+      "scopes": { "label": "Ambito webhook", "site": "Sito", "instance": "Istanza" },
+      "actions": { "create": "Crea webhook", "refresh": "Aggiorna", "deliveries": "Consegne", "test": "Invia test", "edit": "Modifica", "rotate": "Ruota segreto", "delete": "Elimina", "cancel": "Annulla", "save": "Salva webhook" },
+      "empty": { "title": "Nessun webhook", "message": "Crea un webhook per iniziare a consegnare eventi operativi.", "noSiteTitle": "Seleziona un sito", "noSiteMessage": "Scegli un sito per gestirne i webhook.", "forbiddenTitle": "Accesso webhook richiesto", "forbiddenMessage": "Solo proprietari e amministratori di istanza o sito possono gestire i webhook." }, "status": { "enabled": "Attivo", "disabled": "Disattivato" },
+      "events": { "count": "{{count}} eventi", "none": "Nessun evento", "popoverTitle": "Eventi sottoscritti" },
+      "secret": { "title": "Salva ora questo segreto di firma", "message": "Viene mostrato una sola volta. Usalo per verificare timestamp e corpo esatto.", "copy": "Copia segreto" },
+      "form": { "createTitle": "Crea webhook", "editTitle": "Modifica webhook", "name": "Nome", "url": "URL di destinazione", "urlHint": "HTTPS è obbligatorio salvo l’abilitazione esplicita delle destinazioni di sviluppo.", "description": "Descrizione", "enabled": "Consegna eventi", "events": "Eventi", "eventsHint": "Scegli gli eventi operativi che questo endpoint deve ricevere.", "eventsRequired": "Seleziona almeno un evento." },
+      "deliveries": { "title": "Consegne per {{name}}", "subtitle": "I tentativi automatici avvengono almeno una volta e possono arrivare fuori ordine.", "event": "Evento", "status": "Stato", "attempts": "Tentativi", "response": "Risposta", "created": "Creato", "empty": "Nessuna consegna registrata." },
+      "deliveryStatus": { "pending": "In attesa", "processing": "In consegna", "retrying": "Nuovo tentativo", "succeeded": "Riuscita", "failed": "Fallita" },
+      "feedback": { "loadError": "Impossibile caricare i webhook.", "created": "Webhook creato. Salva ora il segreto.", "updated": "Webhook aggiornato.", "saveError": "Impossibile salvare il webhook.", "rotated": "Segreto ruotato. Salva il nuovo segreto.", "rotateError": "Impossibile ruotare il segreto.", "testQueued": "Consegna di test accodata.", "testError": "Impossibile accodare il test.", "deliveryError": "Impossibile caricare la cronologia.", "deleted": "Webhook eliminato.", "deleteError": "Impossibile eliminare il webhook." },
+      "confirm": { "rotateTitle": "Ruota segreto di firma", "rotateMessage": "Ruotare il segreto per {{name}}? Le consegne in attesa useranno il nuovo segreto; una richiesta già in corso può ancora usare quello attuale.", "deleteTitle": "Elimina webhook", "deleteMessage": "Eliminare {{name}}? Le consegne in attesa conservano la destinazione corrente." }
     },
     "reset": {
       "title": "Imposta nuova password",

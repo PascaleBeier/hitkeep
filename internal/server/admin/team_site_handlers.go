@@ -38,7 +38,6 @@ func (h *handler) handleAdminListTeams() http.HandlerFunc {
 			http.Error(w, "Internal error", http.StatusInternalServerError)
 			return
 		}
-
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(teams); err != nil {
 			slog.Error("Failed to encode teams response", "error", err)
@@ -61,7 +60,7 @@ func (h *handler) handleAdminArchiveTeam() http.HandlerFunc {
 			return
 		}
 
-		err = h.ctx.Store.AdminArchiveTenant(r.Context(), teamID, actorID)
+		err = h.archiveTeam(r.Context(), teamID, actorID)
 		if err != nil {
 			switch {
 			case errors.Is(err, database.ErrTeamArchiveDefaultTenant):
@@ -74,7 +73,6 @@ func (h *handler) handleAdminArchiveTeam() http.HandlerFunc {
 			}
 			return
 		}
-
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
 			slog.Error("Failed to encode archive team response", "error", err)
@@ -140,11 +138,7 @@ func (h *handler) handleAdminDeleteTeam() http.HandlerFunc {
 					return
 				}
 				for _, site := range sites {
-					if h.ctx.TenantStores != nil {
-						err = h.ctx.TenantStores.DeleteSite(r.Context(), site.ID)
-					} else {
-						err = h.ctx.Store.DeleteSite(r.Context(), site.ID)
-					}
+					err = h.deleteSite(r.Context(), site.ID)
 					if err != nil {
 						slog.Error("Failed to delete site during force team delete", "error", err, "site_id", site.ID, "team_id", teamID)
 						http.Error(w, "Failed to delete team", http.StatusInternalServerError)
@@ -152,7 +146,7 @@ func (h *handler) handleAdminDeleteTeam() http.HandlerFunc {
 					}
 				}
 
-				archiveErr := h.ctx.Store.AdminArchiveTenant(r.Context(), teamID, actorID)
+				archiveErr := h.archiveTeam(r.Context(), teamID, actorID)
 				if archiveErr != nil && !errors.Is(archiveErr, database.ErrTenantMembershipRequired) {
 					if errors.Is(archiveErr, database.ErrTeamArchiveDefaultTenant) {
 						http.Error(w, "The default team cannot be deleted", http.StatusBadRequest)
@@ -213,7 +207,7 @@ func (h *handler) archiveEmptyHostedCloudTeamForForceDelete(ctx context.Context,
 		return false, nil
 	}
 
-	if err := h.ctx.Store.AdminArchiveTenant(ctx, teamID, actorID); err != nil {
+	if err := h.archiveTeam(ctx, teamID, actorID); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -244,11 +238,7 @@ func (h *handler) handleAdminDeleteSite() http.HandlerFunc {
 			return
 		}
 
-		if h.ctx.TenantStores != nil {
-			err = h.ctx.TenantStores.DeleteSite(r.Context(), siteID)
-		} else {
-			err = h.ctx.Store.DeleteSite(r.Context(), siteID)
-		}
+		err = h.deleteSite(r.Context(), siteID)
 		if err != nil {
 			slog.Error("Failed to delete site", "error", err)
 			http.Error(w, "Failed to delete site", http.StatusInternalServerError)

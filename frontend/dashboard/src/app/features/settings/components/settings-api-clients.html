@@ -153,14 +153,7 @@
             } @if (listSuccess(); as successKey) {
             <div class="hk-feedback-message hk-feedback-message--success" role="status" aria-live="polite">{{ successKey | transloco }}</div>
             } @if (listCreatedToken(); as token) {
-            <div class="hk-feedback-message hk-feedback-message--token" role="status" aria-live="polite">
-                <div class="font-medium mb-1">{{ "settings.apiClients.tokenNotice.title" | transloco }}</div>
-                <p class="mb-2">{{ "settings.apiClients.tokenNotice.description" | transloco }}</p>
-                <code class="api-client-token">{{ token }}</code>
-                <div class="mt-2">
-                    <app-copy-control [value]="token" [text]="true" />
-                </div>
-            </div>
+            <app-one-time-credential [value]="token" titleKey="settings.apiClients.tokenNotice.title" descriptionKey="settings.apiClients.tokenNotice.description" />
             } @if (isLoading()) {
             <p class="text-sm text-[var(--p-text-muted-color)]">{{ "settings.apiClients.loading" | transloco }}</p>
             } @else if (clients().length === 0) {

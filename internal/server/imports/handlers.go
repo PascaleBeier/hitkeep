@@ -25,6 +25,7 @@ import (
 	"hitkeep/internal/importables"
 	"hitkeep/internal/realtime"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/webhooks"
 )
 
 const defaultImportChunkSize = 8 << 20
@@ -588,6 +589,13 @@ func (h *handler) runImport(siteID, importID uuid.UUID) {
 	markFailed := func(message string) {
 		_ = h.ctx.Store.MarkImportFailed(ctx, siteID, importID, message)
 		h.appendImportAudit(ctx, nil, siteID, importID, actorID, job.Provider, "import.failed", "failure", message)
+		h.ctx.EmitWebhookEvent(ctx, webhooks.Event{
+			Type:   webhooks.EventImportFailed,
+			SiteID: &siteID,
+			Data: map[string]any{
+				"site_id": siteID.String(), "import_id": importID.String(), "provider": job.Provider,
+			},
+		})
 	}
 	provider, ok := h.registry.Provider(job.Provider)
 	if !ok {
@@ -672,6 +680,13 @@ func (h *handler) runImport(siteID, importID uuid.UUID) {
 		h.appendImportAudit(ctx, nil, siteID, importID, actorID, job.Provider, "import.data_written", "success", fmt.Sprintf("Wrote %d imported row(s)", sink.Rows()))
 	}
 	h.appendImportAudit(ctx, nil, siteID, importID, actorID, job.Provider, "import.completed", "success", fmt.Sprintf("%s import completed with %d imported row(s)", job.Provider, sink.Rows()))
+	h.ctx.EmitWebhookEvent(ctx, webhooks.Event{
+		Type:   webhooks.EventImportCompleted,
+		SiteID: &siteID,
+		Data: map[string]any{
+			"site_id": siteID.String(), "import_id": importID.String(), "provider": job.Provider, "rows_imported": sink.Rows(),
+		},
+	})
 	h.publishImportChange(siteID, sink.Rows())
 	h.cleanupStagedFiles(importID)
 }

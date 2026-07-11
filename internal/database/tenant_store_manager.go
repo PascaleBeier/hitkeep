@@ -254,6 +254,23 @@ func (m *TenantStoreManager) DeleteSite(ctx context.Context, siteID uuid.UUID) e
 	return nil
 }
 
+func (m *TenantStoreManager) DeleteSiteWithWebhookEvent(ctx context.Context, siteID uuid.UUID, event WebhookEventInput) ([]WebhookDeliveryJob, error) {
+	analyticsStore, _, err := m.ResolveSiteStore(ctx, siteID)
+	if err != nil {
+		return nil, err
+	}
+	if analyticsStore != m.shared {
+		if err := analyticsStore.DeleteSite(ctx, siteID); err != nil {
+			return nil, fmt.Errorf("delete tenant analytics site %s: %w", siteID, err)
+		}
+	}
+	jobs, err := m.shared.DeleteSiteWithWebhookEvent(ctx, siteID, event)
+	if err != nil {
+		return nil, fmt.Errorf("delete shared site %s with webhook event: %w", siteID, err)
+	}
+	return jobs, nil
+}
+
 func (m *TenantStoreManager) ResetSiteStats(ctx context.Context, siteID uuid.UUID) (api.SiteStatsResetResponse, error) {
 	analyticsStore, _, err := m.ResolveSiteStore(ctx, siteID)
 	if err != nil {

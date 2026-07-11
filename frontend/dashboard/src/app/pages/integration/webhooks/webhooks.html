@@ -1,0 +1,250 @@
+<div class="webhooks-page">
+    <app-page-header>
+        <ng-template appPageHeaderLeft>
+            <div>
+                <app-page-breadcrumb [items]="breadcrumbItems()" />
+                <p class="webhooks-page__subtitle">{{ "integration.webhooks.subtitle" | transloco }}</p>
+            </div>
+        </ng-template>
+    </app-page-header>
+
+    <main class="webhooks-page__content">
+        <header class="webhooks-toolbar">
+            <div class="webhooks-scope" role="group" [attr.aria-label]="'integration.webhooks.scopes.label' | transloco">
+                @if (canManageSite()) {
+                <button type="button" [class.is-active]="scope() === 'site'" [attr.aria-pressed]="scope() === 'site'" (click)="switchScope('site')">
+                    <i class="pi pi-globe" aria-hidden="true"></i>
+                    {{ "integration.webhooks.scopes.site" | transloco }}
+                </button>
+                } @if (canManageInstance()) {
+                <button type="button" [class.is-active]="scope() === 'instance'" [attr.aria-pressed]="scope() === 'instance'" (click)="switchScope('instance')">
+                    <i class="pi pi-server" aria-hidden="true"></i>
+                    {{ "integration.webhooks.scopes.instance" | transloco }}
+                </button>
+                }
+            </div>
+            <div class="webhooks-toolbar__actions">@if (canManageCurrentScope()) { <p-button data-testid="create-webhook" icon="pi pi-plus" [label]="'integration.webhooks.actions.create' | transloco" (onClick)="openCreate()" /> }</div>
+        </header>
+
+        @if (feedback(); as state) {
+        <p-message [severity]="state.severity" [text]="state.key | transloco" />
+        } @if (revealedSecret(); as secret) {
+        <app-one-time-credential [value]="secret" titleKey="integration.webhooks.secret.title" descriptionKey="integration.webhooks.secret.message" copyLabelKey="integration.webhooks.secret.copy" />
+        } @if (!canManageInstance() && !canManageSite()) {
+        <app-page-state titleKey="integration.webhooks.empty.forbiddenTitle" messageKey="integration.webhooks.empty.forbiddenMessage" icon="pi pi-lock" />
+        } @else if (scope() === 'site' && !activeSite()) {
+        <app-page-state titleKey="integration.webhooks.empty.noSiteTitle" messageKey="integration.webhooks.empty.noSiteMessage" icon="pi pi-globe" />
+        } @else if (loading() && webhooks().length === 0) {
+        <p class="text-sm text-[var(--p-text-muted-color)]">{{ "common.loading" | transloco }}</p>
+        } @else if (!loading() && webhooks().length === 0) {
+        <app-page-state titleKey="integration.webhooks.empty.title" messageKey="integration.webhooks.empty.message" icon="pi pi-send" />
+        } @else if (webhooks().length > 0) {
+        <div class="hk-crud-table-wrap" [attr.aria-label]="'integration.webhooks.listLabel' | transloco">
+            <p-table
+                #webhooksTable
+                [value]="webhooks()"
+                dataKey="id"
+                [globalFilterFields]="['name', 'description', 'url', 'events', 'enabled', 'updated_at']"
+                [sortField]="'updated_at'"
+                [sortOrder]="-1"
+                [paginator]="true"
+                [rows]="10"
+                [rowsPerPageOptions]="[10, 25, 50]"
+                [rowHover]="true"
+                responsiveLayout="scroll"
+                styleClass="hk-crud-table p-datatable-sm"
+                [tableStyle]="{ 'min-width': '900px' }"
+            >
+                <ng-template pTemplate="caption">
+                    <div class="webhooks-table-caption">
+                        <p-iconfield class="hk-crud-search">
+                            <p-inputicon class="pi pi-search" />
+                            <input pInputText [placeholder]="'common.searchPlaceholder' | transloco" (input)="webhooksTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
+                        </p-iconfield>
+                        <p-button icon="pi pi-refresh" [text]="true" [rounded]="true" type="button" [ariaLabel]="'integration.webhooks.actions.refresh' | transloco" [disabled]="loading()" (onClick)="load()" />
+                    </div>
+                </ng-template>
+                <ng-template pTemplate="header">
+                    <tr>
+                        <th pSortableColumn="name">{{ "common.columns.name" | transloco }} <p-sortIcon field="name" /></th>
+                        <th pSortableColumn="url">{{ "integration.webhooks.form.url" | transloco }} <p-sortIcon field="url" /></th>
+                        <th>{{ "integration.webhooks.form.events" | transloco }}</th>
+                        <th pSortableColumn="enabled">{{ "common.columns.status" | transloco }} <p-sortIcon field="enabled" /></th>
+                        <th pSortableColumn="updated_at">{{ "common.columns.updated" | transloco }} <p-sortIcon field="updated_at" /></th>
+                        <th class="hk-actions-column">{{ "common.columns.actions" | transloco }}</th>
+                    </tr>
+                </ng-template>
+                <ng-template pTemplate="body" let-webhook>
+                    <tr>
+                        <td>
+                            <div class="webhook-name-cell">
+                                <span class="webhook-name-cell__title">{{ webhook.name }}</span>
+                                @if (webhook.description) { <span class="webhook-name-cell__description">{{ webhook.description }}</span> }
+                            </div>
+                        </td>
+                        <td>
+                            @if (webhookEndpoint(webhook.url); as endpoint) {
+                            <span class="webhook-endpoint" [attr.title]="webhook.url">
+                                <span class="webhook-endpoint__origin">{{ endpoint.origin }}</span>
+                                @if (endpoint.resource) { <span class="webhook-endpoint__resource">{{ endpoint.resource }}</span> }
+                            </span>
+                            }
+                        </td>
+                        <td>
+                            @if (webhook.events.length === 1) {
+                            <div class="webhook-event-list">
+                                <p-tag class="webhook-event-tag" styleClass="webhook-event-tag" icon="pi pi-bolt" [value]="webhook.events[0]" severity="info" [rounded]="true" [attr.title]="webhook.events[0]" />
+                            </div>
+                            } @else if (webhook.events.length > 1) {
+                            <div class="webhook-event-summary">
+                                <p-button
+                                    class="webhook-event-count"
+                                    styleClass="webhook-event-count-button"
+                                    icon="pi pi-list"
+                                    [label]="eventCountLabel(webhook.events.length)"
+                                    severity="info"
+                                    [outlined]="true"
+                                    [rounded]="true"
+                                    size="small"
+                                    [type]="'button'"
+                                    [ariaLabel]="eventCountLabel(webhook.events.length)"
+                                    (onClick)="eventsPopover.toggle($event)"
+                                />
+                                <p-popover #eventsPopover appendTo="body" styleClass="webhook-events-popover" [ariaLabel]="'integration.webhooks.events.popoverTitle' | transloco">
+                                    <div class="webhook-events-popover-content">
+                                        <div class="webhook-events-popover-title">{{ "integration.webhooks.events.popoverTitle" | transloco }}</div>
+                                        <div class="webhook-events-popover-list">
+                                            @for (event of webhook.events; track event) {
+                                            <div class="webhook-events-popover-row">
+                                                <i class="pi pi-bolt" aria-hidden="true"></i>
+                                                <code>{{ event }}</code>
+                                            </div>
+                                            }
+                                        </div>
+                                    </div>
+                                </p-popover>
+                            </div>
+                            } @else {
+                            <p-tag class="webhook-no-events-tag" styleClass="webhook-no-events-tag" icon="pi pi-ban" [value]="'integration.webhooks.events.none' | transloco" severity="secondary" [rounded]="true" />
+                            }
+                        </td>
+                        <td><p-tag [severity]="webhook.enabled ? 'success' : 'secondary'" [value]="(webhook.enabled ? 'integration.webhooks.status.enabled' : 'integration.webhooks.status.disabled') | transloco" /></td>
+                        <td class="webhook-date-cell"><app-relative-date-time [value]="webhook.updated_at" /></td>
+                        <td class="hk-actions-cell"><app-table-row-actions [items]="webhookActions(webhook)" [disabled]="saving()" /></td>
+                    </tr>
+                </ng-template>
+                <ng-template pTemplate="emptymessage">
+                    <tr>
+                        <td colspan="6" class="text-center text-muted-color py-4">{{ "integration.webhooks.empty.message" | transloco }}</td>
+                    </tr>
+                </ng-template>
+            </p-table>
+        </div>
+        }
+    </main>
+</div>
+
+@if (selectedWebhook(); as selected) {
+<app-dialog-shell
+    [title]="'integration.webhooks.deliveries.title' | transloco: { name: selected.name }"
+    [visible]="true"
+    (visibleChange)="onDeliveryDialogVisibleChange($event)"
+    [secondaryLabel]="'common.actions.close' | transloco"
+    [showPrimary]="false"
+    width="64rem"
+>
+    <div class="delivery-dialog__toolbar">
+        <p>{{ "integration.webhooks.deliveries.subtitle" | transloco }}</p>
+        <p-button icon="pi pi-refresh" [text]="true" [rounded]="true" [ariaLabel]="'integration.webhooks.actions.refresh' | transloco" (onClick)="showDeliveries(selected)" [loading]="deliveryLoading()" />
+    </div>
+    @if (deliveryError(); as errorKey) {
+    <div class="hk-feedback-message hk-feedback-message--error" role="alert" aria-live="assertive">{{ errorKey | transloco }}</div>
+    } @else {
+    <div class="hk-crud-table-wrap">
+        <p-table
+            [value]="deliveries()"
+            dataKey="id"
+            [sortField]="'created_at'"
+            [sortOrder]="-1"
+            [paginator]="true"
+            [rows]="10"
+            [rowsPerPageOptions]="[10, 25, 50]"
+            [rowHover]="true"
+            [loading]="deliveryLoading()"
+            responsiveLayout="scroll"
+            styleClass="hk-crud-table p-datatable-sm"
+            [tableStyle]="{ 'min-width': '760px' }"
+        >
+            <ng-template pTemplate="header">
+                <tr>
+                    <th pSortableColumn="event_type">{{ "integration.webhooks.deliveries.event" | transloco }} <p-sortIcon field="event_type" /></th>
+                    <th pSortableColumn="status">{{ "integration.webhooks.deliveries.status" | transloco }} <p-sortIcon field="status" /></th>
+                    <th pSortableColumn="attempt_count">{{ "integration.webhooks.deliveries.attempts" | transloco }} <p-sortIcon field="attempt_count" /></th>
+                    <th pSortableColumn="response_status">{{ "integration.webhooks.deliveries.response" | transloco }} <p-sortIcon field="response_status" /></th>
+                    <th pSortableColumn="created_at">{{ "integration.webhooks.deliveries.created" | transloco }} <p-sortIcon field="created_at" /></th>
+                </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-delivery>
+                <tr>
+                    <td><code>{{ delivery.event_type }}</code></td>
+                    <td><p-tag [severity]="statusSeverity(delivery.status)" [value]="('integration.webhooks.deliveryStatus.' + delivery.status) | transloco" /></td>
+                    <td>{{ delivery.attempt_count }}</td>
+                    <td>{{ delivery.response_status || delivery.last_error_code || "—" }}</td>
+                    <td><app-relative-date-time [value]="delivery.created_at" /></td>
+                </tr>
+            </ng-template>
+            <ng-template pTemplate="emptymessage">
+                <tr>
+                    <td colspan="5" class="delivery-dialog__empty">{{ "integration.webhooks.deliveries.empty" | transloco }}</td>
+                </tr>
+            </ng-template>
+        </p-table>
+    </div>
+    }
+</app-dialog-shell>
+}
+
+<app-crud-dialog
+    [title]="(editing() ? 'integration.webhooks.form.editTitle' : 'integration.webhooks.form.createTitle') | transloco"
+    [visible]="dialogVisible()"
+    (visibleChange)="dialogVisible.set($event)"
+    [submitLabel]="'integration.webhooks.actions.save' | transloco"
+    [cancelLabel]="'integration.webhooks.actions.cancel' | transloco"
+    [saving]="saving()"
+    (submitted)="save()"
+>
+    <form class="webhook-form" [formGroup]="form" (ngSubmit)="save()">
+        <label>
+            <span>{{ "integration.webhooks.form.name" | transloco }}</span>
+            <input pInputText formControlName="name" autocomplete="off" />
+        </label>
+        <label>
+            <span>{{ "integration.webhooks.form.url" | transloco }}</span>
+            <input pInputText formControlName="url" type="url" placeholder="https://example.com/webhooks/hitkeep" autocomplete="url" />
+            <small>{{ "integration.webhooks.form.urlHint" | transloco }}</small>
+        </label>
+        <label>
+            <span>{{ "integration.webhooks.form.description" | transloco }}</span>
+            <textarea pTextarea formControlName="description" rows="3"></textarea>
+        </label>
+        <label class="enabled-control">
+            <input type="checkbox" formControlName="enabled" />
+            <span>{{ "integration.webhooks.form.enabled" | transloco }}</span>
+        </label>
+        <fieldset>
+            <legend>{{ "integration.webhooks.form.events" | transloco }}</legend>
+            <p>{{ "integration.webhooks.form.eventsHint" | transloco }}</p>
+            <div class="event-options">
+                @for (event of catalog(); track event.type) {
+                <label>
+                    <input type="checkbox" [checked]="eventSelected(event.type)" (change)="toggleEvent(event.type, $any($event.target).checked)" />
+                    <code>{{ event.type }}</code>
+                </label>
+                }
+            </div>
+            @if (form.touched && selectedEvents().length === 0) { <small class="field-error">{{ "integration.webhooks.form.eventsRequired" | transloco }}</small> }
+        </fieldset>
+    </form>
+</app-crud-dialog>
+
+<p-confirm-dialog />

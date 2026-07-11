@@ -28,6 +28,7 @@
     "funnels": "Funnels",
     "utm": "UTM",
     "apiClients": "API Clients",
+    "webhooks": "Webhooks",
     "apiReference": "API Reference",
     "expandItem": "Expand {{item}}",
     "collapseItem": "Collapse {{item}}",
@@ -2617,6 +2618,21 @@
     "apiClients": {
       "subtitle": "Create and manage API clients for integrations.",
       "manageTeamClients": "Manage team API clients"
+    },
+    "webhooks": {
+      "subtitle": "Send signed operational events to your systems without delaying product actions.",
+      "listLabel": "Configured webhooks",
+      "scopes": { "label": "Webhook scope", "site": "Site", "instance": "Instance" },
+      "actions": { "create": "Create webhook", "refresh": "Refresh", "deliveries": "Deliveries", "test": "Send test", "edit": "Edit", "rotate": "Rotate secret", "delete": "Delete", "cancel": "Cancel", "save": "Save webhook" },
+      "empty": { "title": "No webhooks yet", "message": "Create a webhook to start delivering operational events.", "noSiteTitle": "Select a site", "noSiteMessage": "Choose a site to manage its webhooks.", "forbiddenTitle": "Webhook access required", "forbiddenMessage": "Only instance, site owners, and site admins can manage webhooks." },
+      "status": { "enabled": "Enabled", "disabled": "Disabled" },
+      "events": { "count": "{{count}} events", "none": "No events", "popoverTitle": "Subscribed events" },
+      "secret": { "title": "Save this signing secret now", "message": "It is shown once. Use it to verify the timestamp and exact request body.", "copy": "Copy secret" },
+      "form": { "createTitle": "Create webhook", "editTitle": "Edit webhook", "name": "Name", "url": "Destination URL", "urlHint": "HTTPS is required unless development targets are explicitly enabled.", "description": "Description", "enabled": "Deliver events", "events": "Events", "eventsHint": "Choose the operational events this endpoint should receive.", "eventsRequired": "Select at least one event." },
+      "deliveries": { "title": "Deliveries for {{name}}", "subtitle": "Automatic attempts are at-least-once and may arrive out of order.", "event": "Event", "status": "Status", "attempts": "Attempts", "response": "Response", "created": "Created", "empty": "No deliveries recorded yet." },
+      "deliveryStatus": { "pending": "Pending", "processing": "Delivering", "retrying": "Retrying", "succeeded": "Succeeded", "failed": "Failed" },
+      "feedback": { "loadError": "Webhooks could not be loaded.", "created": "Webhook created. Save the signing secret now.", "updated": "Webhook updated.", "saveError": "Webhook could not be saved.", "rotated": "Signing secret rotated. Save the new secret now.", "rotateError": "Signing secret could not be rotated.", "testQueued": "Test delivery queued.", "testError": "Test delivery could not be queued.", "deliveryError": "Delivery history could not be loaded.", "deleted": "Webhook deleted.", "deleteError": "Webhook could not be deleted." },
+      "confirm": { "rotateTitle": "Rotate signing secret", "rotateMessage": "Rotate the secret for {{name}}? Pending deliveries will use the new secret; a request already in flight may still use the current one.", "deleteTitle": "Delete webhook", "deleteMessage": "Delete {{name}}? Pending deliveries keep their existing endpoint snapshot." }
     },
     "apiReference": {
       "subtitle": "Versioned REST API reference with session and API-key authentication details.",

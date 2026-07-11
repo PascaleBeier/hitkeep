@@ -1,12 +1,3 @@
-.api-client-token {
-    display: block;
-    overflow-wrap: anywhere;
-    padding: 0.5rem 0.625rem;
-    border-radius: 0.5rem;
-    background: rgba(0, 0, 0, 0.06);
-    color: inherit;
-}
-
 .api-client-card-actions {
     display: flex;
     min-width: 0;
@@ -147,10 +138,6 @@
 :host-context(.p-dark) .api-client-required-asterisk,
 :host-context(.p-dark) .api-client-field-error {
     color: var(--p-red-300);
-}
-
-:host-context(.p-dark) .api-client-token {
-    background: color-mix(in srgb, var(--p-surface-800) 78%, var(--p-content-background));
 }
 
 @media (max-width: 768px) {

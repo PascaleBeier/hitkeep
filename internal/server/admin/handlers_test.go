@@ -19,7 +19,17 @@ import (
 	"hitkeep/internal/database"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/webhooks"
 )
+
+type adminRecordingWebhookEmitter struct {
+	events []webhooks.Event
+}
+
+func (e *adminRecordingWebhookEmitter) Emit(_ context.Context, event webhooks.Event) (webhooks.Emission, error) {
+	e.events = append(e.events, event)
+	return webhooks.Emission{}, nil
+}
 
 type adminTestMailDriver struct {
 	recipients []string
@@ -77,6 +87,29 @@ func setupAdminTestEnv(t *testing.T) (*handler, *database.Store, *database.Tenan
 
 func withAdminTestUser(req *http.Request, userID uuid.UUID) *http.Request {
 	return req.WithContext(context.WithValue(req.Context(), shared.UserIDKey, userID))
+}
+
+func TestHandleUpdateUserRoleEmitsOperationalWebhookEvent(t *testing.T) {
+	h, store, _, _, actorUserID, targetUserID := setupAdminTestEnv(t)
+	emitter := &adminRecordingWebhookEmitter{}
+	h.ctx.Webhooks = emitter
+	req := withAdminTestUser(httptest.NewRequest(http.MethodPost, "/api/admin/users/"+targetUserID.String()+"/role", strings.NewReader(`{"role":"admin"}`)), actorUserID)
+	req.SetPathValue("id", targetUserID.String())
+	w := httptest.NewRecorder()
+
+	h.handleUpdateUserRole().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
+	}
+	if len(emitter.events) != 1 || emitter.events[0].Type != webhooks.EventSystemUserUpdated {
+		t.Fatalf("expected system.user.updated webhook event, got %+v", emitter.events)
+	}
+	if got := emitter.events[0].Data["user_id"]; got != targetUserID.String() {
+		t.Fatalf("expected user_id %s, got %v", targetUserID, got)
+	}
+	if role, err := store.GetInstanceRole(context.Background(), targetUserID); err != nil || role != auth.InstanceAdmin {
+		t.Fatalf("expected persisted admin role, got role=%q err=%v", role, err)
+	}
 }
 
 func TestHandleCreateInstanceCountryExclusion(t *testing.T) {

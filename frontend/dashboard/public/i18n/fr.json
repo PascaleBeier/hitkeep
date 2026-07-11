@@ -28,6 +28,7 @@
     "funnels": "Entonnoirs",
     "utm": "UTM",
     "apiClients": "Clients API",
+    "webhooks": "Webhooks",
     "apiReference": "Référence API",
     "expandItem": "Développer {{item}}",
     "collapseItem": "Réduire {{item}}",
@@ -1235,6 +1236,19 @@
       "errors": {
         "unexpected": "Une erreur est survenue. Veuillez réessayer plus tard."
       }
+    },
+    "webhooks": {
+      "subtitle": "Envoyez des événements opérationnels signés sans ralentir les actions produit.", "listLabel": "Webhooks configurés",
+      "scopes": { "label": "Portée du webhook", "site": "Site", "instance": "Instance" },
+      "actions": { "create": "Créer un webhook", "refresh": "Actualiser", "deliveries": "Livraisons", "test": "Envoyer un test", "edit": "Modifier", "rotate": "Renouveler le secret", "delete": "Supprimer", "cancel": "Annuler", "save": "Enregistrer" },
+      "empty": { "title": "Aucun webhook", "message": "Créez un webhook pour livrer des événements opérationnels.", "noSiteTitle": "Sélectionnez un site", "noSiteMessage": "Choisissez un site pour gérer ses webhooks.", "forbiddenTitle": "Accès webhook requis", "forbiddenMessage": "Seuls les propriétaires et administrateurs d’instance ou de site peuvent gérer les webhooks." }, "status": { "enabled": "Activé", "disabled": "Désactivé" },
+      "events": { "count": "{{count}} événements", "none": "Aucun événement", "popoverTitle": "Événements suivis" },
+      "secret": { "title": "Enregistrez ce secret de signature", "message": "Il n’est affiché qu’une fois. Utilisez-le pour vérifier l’horodatage et le corps exact.", "copy": "Copier le secret" },
+      "form": { "createTitle": "Créer un webhook", "editTitle": "Modifier le webhook", "name": "Nom", "url": "URL de destination", "urlHint": "HTTPS est requis sauf si les cibles de développement sont activées.", "description": "Description", "enabled": "Livrer les événements", "events": "Événements", "eventsHint": "Choisissez les événements opérationnels à recevoir.", "eventsRequired": "Sélectionnez au moins un événement." },
+      "deliveries": { "title": "Livraisons de {{name}}", "subtitle": "Les tentatives sont au moins une fois et peuvent arriver dans le désordre.", "event": "Événement", "status": "Statut", "attempts": "Tentatives", "response": "Réponse", "created": "Créé", "empty": "Aucune livraison enregistrée." },
+      "deliveryStatus": { "pending": "En attente", "processing": "Livraison", "retrying": "Nouvel essai", "succeeded": "Réussie", "failed": "Échouée" },
+      "feedback": { "loadError": "Impossible de charger les webhooks.", "created": "Webhook créé. Enregistrez maintenant le secret.", "updated": "Webhook mis à jour.", "saveError": "Impossible d’enregistrer le webhook.", "rotated": "Secret renouvelé. Enregistrez le nouveau secret.", "rotateError": "Impossible de renouveler le secret.", "testQueued": "Livraison de test mise en file.", "testError": "Impossible de mettre le test en file.", "deliveryError": "Impossible de charger l’historique.", "deleted": "Webhook supprimé.", "deleteError": "Impossible de supprimer le webhook." },
+      "confirm": { "rotateTitle": "Renouveler le secret de signature", "rotateMessage": "Renouveler le secret de {{name}} ? Les livraisons en attente utiliseront le nouveau secret ; une requête déjà en cours peut encore utiliser l’actuel.", "deleteTitle": "Supprimer le webhook", "deleteMessage": "Supprimer {{name}} ? Les livraisons en attente conservent leur destination." }
     },
     "reset": {
       "title": "Définir un nouveau mot de passe",

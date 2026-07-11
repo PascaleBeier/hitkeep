@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -15,7 +16,18 @@ import (
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/webhooks"
 )
+
+type recordingWebhookEmitter struct {
+	events []webhooks.Event
+	err    error
+}
+
+func (e *recordingWebhookEmitter) Emit(_ context.Context, event webhooks.Event) (webhooks.Emission, error) {
+	e.events = append(e.events, event)
+	return webhooks.Emission{EventID: uuid.New()}, e.err
+}
 
 func setupTenantGoalsTestEnv(t *testing.T) (*handler, *database.Store, *database.Store, uuid.UUID) {
 	t.Helper()
@@ -74,6 +86,8 @@ func setupTenantGoalsTestEnv(t *testing.T) (*handler, *database.Store, *database
 func TestHandleGoalCRUDUsesTenantAnalyticsStore(t *testing.T) {
 	h, sharedStore, tenantStore, siteID := setupTenantGoalsTestEnv(t)
 	ctx := context.Background()
+	emitter := &recordingWebhookEmitter{err: errors.New("webhook storage unavailable")}
+	h.ctx.Webhooks = emitter
 
 	body, err := json.Marshal(api.Goal{
 		Name:  "Signup",
@@ -91,6 +105,9 @@ func TestHandleGoalCRUDUsesTenantAnalyticsStore(t *testing.T) {
 
 	if createResp.Code != http.StatusCreated {
 		t.Fatalf("expected create status %d, got %d: %s", http.StatusCreated, createResp.Code, createResp.Body.String())
+	}
+	if len(emitter.events) != 1 || emitter.events[0].Type != webhooks.EventGoalCreated || emitter.events[0].SiteID == nil || *emitter.events[0].SiteID != siteID {
+		t.Fatalf("expected non-blocking goal.created event, got %+v", emitter.events)
 	}
 
 	sharedGoals, err := sharedStore.GetGoals(ctx, siteID)
@@ -126,6 +143,19 @@ func TestHandleGoalCRUDUsesTenantAnalyticsStore(t *testing.T) {
 		t.Fatalf("expected tenant goal in response, got %+v", gotGoals)
 	}
 
+	updateBody, _ := json.Marshal(api.Goal{Name: "Activated", Type: "event", Value: "account_activated"})
+	updateReq := httptest.NewRequest(http.MethodPut, "/api/sites/"+siteID.String()+"/goals/"+gotGoals[0].ID.String(), bytes.NewReader(updateBody))
+	updateReq.SetPathValue("id", siteID.String())
+	updateReq.SetPathValue("goalID", gotGoals[0].ID.String())
+	updateResp := httptest.NewRecorder()
+	h.handleUpdateGoal().ServeHTTP(updateResp, updateReq)
+	if updateResp.Code != http.StatusOK {
+		t.Fatalf("expected update status %d, got %d: %s", http.StatusOK, updateResp.Code, updateResp.Body.String())
+	}
+	if len(emitter.events) != 2 || emitter.events[1].Type != webhooks.EventGoalUpdated {
+		t.Fatalf("expected non-blocking goal.updated event, got %+v", emitter.events)
+	}
+
 	deleteReq := httptest.NewRequest(http.MethodDelete, "/api/sites/"+siteID.String()+"/goals/"+tenantGoals[0].ID.String(), nil)
 	deleteReq.SetPathValue("id", siteID.String())
 	deleteReq.SetPathValue("goalID", tenantGoals[0].ID.String())
@@ -134,6 +164,9 @@ func TestHandleGoalCRUDUsesTenantAnalyticsStore(t *testing.T) {
 
 	if deleteResp.Code != http.StatusOK {
 		t.Fatalf("expected delete status %d, got %d: %s", http.StatusOK, deleteResp.Code, deleteResp.Body.String())
+	}
+	if len(emitter.events) != 3 || emitter.events[2].Type != webhooks.EventGoalDeleted {
+		t.Fatalf("expected non-blocking goal.deleted event, got %+v", emitter.events)
 	}
 
 	tenantGoals, err = tenantStore.GetGoals(ctx, siteID)

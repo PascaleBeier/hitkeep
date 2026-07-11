@@ -24,6 +24,21 @@ import (
 	"hitkeep/internal/importables"
 )
 
+func TestTakeoutWebhookExportsExcludeSecretsAndPayloadBodies(t *testing.T) {
+	t.Parallel()
+	query := buildTakeoutQuery([]takeoutQuerySource{{WhereClause: "site_id = 'site-1'", IncludeControl: true}}, "/tmp/takeout.parquet", "PARQUET")
+	for _, required := range []string{"'webhook' AS record_type", "'webhook_event_subscription' AS record_type", "'webhook_delivery' AS record_type", "'webhook_delivery_attempt' AS record_type"} {
+		if !strings.Contains(query, required) {
+			t.Errorf("takeout query missing %s", required)
+		}
+	}
+	for _, forbidden := range []string{"signing_secret", "payload_json", "destination_url", "SELECT 'webhook' AS record_type, *"} {
+		if strings.Contains(query, forbidden) {
+			t.Errorf("takeout query exposes forbidden webhook field %q", forbidden)
+		}
+	}
+}
+
 type takeoutSentinel struct {
 	RecordType string
 	Path       string

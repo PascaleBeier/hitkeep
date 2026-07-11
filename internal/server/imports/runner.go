@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/database"
+	"hitkeep/internal/webhooks"
 )
 
 type importRequest struct {
@@ -76,11 +77,17 @@ func (r *importRunner) recoverRunnable(ctx context.Context) {
 		if _, ok := r.h.registry.Provider(job.Provider); !ok {
 			_ = r.h.ctx.Store.MarkImportFailed(ctx, job.SiteID, job.ID, "unknown importer")
 			r.h.appendImportAudit(ctx, nil, job.SiteID, job.ID, importActorID(&job), job.Provider, "import.failed", "failure", "unknown importer")
+			r.h.ctx.EmitWebhookEvent(ctx, webhooks.Event{Type: webhooks.EventImportFailed, SiteID: &job.SiteID, Data: map[string]any{
+				"site_id": job.SiteID.String(), "import_id": job.ID.String(), "provider": job.Provider,
+			}})
 			continue
 		}
 		if _, err := r.h.sourceSet(ctx, job.SiteID, job.ID, false); err != nil {
 			_ = r.h.ctx.Store.MarkImportFailed(ctx, job.SiteID, job.ID, err.Error())
 			r.h.appendImportAudit(ctx, nil, job.SiteID, job.ID, importActorID(&job), job.Provider, "import.failed", "failure", err.Error())
+			r.h.ctx.EmitWebhookEvent(ctx, webhooks.Event{Type: webhooks.EventImportFailed, SiteID: &job.SiteID, Data: map[string]any{
+				"site_id": job.SiteID.String(), "import_id": job.ID.String(), "provider": job.Provider,
+			}})
 			continue
 		}
 		if job.Status == database.ImportStatusRunning {

@@ -4,7 +4,7 @@ import { NavigationEnd, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { MenuItem } from 'primeng/api';
 import { filter, map, startWith } from 'rxjs';
-import { INSTANCE_CAPABILITIES, TEAM_CAPABILITIES } from '@core/access/capabilities';
+import { INSTANCE_CAPABILITIES, SITE_CAPABILITIES, TEAM_CAPABILITIES } from '@core/access/capabilities';
 import { AccessService } from '@services/access.service';
 import { DashboardBootstrapService } from '@services/dashboard-bootstrap.service';
 import { ShareService } from '@services/share.service';
@@ -130,6 +130,7 @@ export class SidebarMenuService {
         const canManageUsers = () => this.access.hasInstance(INSTANCE_CAPABILITIES.manageUsers);
         const canManageTeamSettings = () => this.access.canActiveTeam(TEAM_CAPABILITIES.manageSettings);
         const canManageIntegrations = () => this.access.canActiveTeam(TEAM_CAPABILITIES.manageIntegrations);
+        const canManageWebhooks = () => this.access.hasInstance(INSTANCE_CAPABILITIES.manageWebhooks) || this.access.canActiveSite(SITE_CAPABILITIES.manageWebhooks);
         const supportURL = this.supportUrl();
         const utmItems: SidebarItem[] = shareMode
             ? [
@@ -179,6 +180,7 @@ export class SidebarMenuService {
                         exact: true,
                         items: [{ labelKey: 'nav.apiReference', icon: 'pi pi-book', routerLink: '/integration/api-reference' }]
                     },
+                    { labelKey: 'nav.webhooks', icon: 'pi pi-send', routerLink: '/integration/webhooks', visible: canManageWebhooks },
                     { labelKey: 'nav.googleSearchConsole', icon: 'pi pi-search', routerLink: '/integration/google-search-console', visible: canManageIntegrations }
                 ]
             },

@@ -1,0 +1,265 @@
+:host {
+    display: block;
+    width: 100%;
+}
+
+.webhooks-page__subtitle,
+.delivery-dialog__toolbar p,
+.webhook-name-cell__description,
+.webhook-form small,
+.webhook-form fieldset > p {
+    color: var(--p-text-muted-color);
+    font-size: 0.85rem;
+}
+
+.webhooks-page__subtitle {
+    margin: 0.2rem 0 0;
+}
+
+.webhooks-page__content {
+    display: grid;
+    gap: 1rem;
+    width: min(100%, 72rem);
+    margin-inline: auto;
+    padding: 1rem;
+}
+
+.webhooks-toolbar,
+.webhooks-toolbar__actions,
+.webhooks-scope,
+.webhooks-table-caption,
+.delivery-dialog__toolbar {
+    display: flex;
+    align-items: center;
+}
+
+.webhooks-toolbar,
+.delivery-dialog__toolbar {
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.webhooks-toolbar__actions,
+.webhooks-table-caption {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.webhooks-scope {
+    gap: 0.2rem;
+    padding: 0.2rem;
+    border-radius: 0.55rem;
+    background: var(--p-content-hover-background);
+}
+
+.webhooks-scope button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 2.25rem;
+    padding: 0.45rem 0.75rem;
+    border: 0;
+    border-radius: 0.4rem;
+    color: var(--p-text-muted-color);
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 650;
+}
+
+.webhooks-scope button:is(:hover, :focus-visible) {
+    color: var(--p-text-color);
+}
+
+.webhooks-scope button:focus-visible {
+    outline: 2px solid var(--p-primary-color);
+    outline-offset: 1px;
+}
+
+.webhooks-scope button.is-active {
+    color: var(--p-primary-700);
+    background: var(--p-content-background);
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.08);
+}
+
+.webhooks-table-caption {
+    justify-content: flex-end;
+}
+
+.webhook-name-cell {
+    display: flex;
+    min-width: 12rem;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.webhook-name-cell__title {
+    color: var(--p-text-color);
+    font-weight: 600;
+}
+
+.webhook-name-cell__description {
+    max-width: 30rem;
+}
+
+.webhook-endpoint {
+    display: flex;
+    min-width: 12rem;
+    max-width: 22rem;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.webhook-endpoint__origin,
+.webhook-endpoint__resource {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.webhook-endpoint__origin {
+    color: var(--p-text-color);
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.webhook-endpoint__resource {
+    color: var(--p-text-muted-color);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.72rem;
+}
+
+.webhook-event-list {
+    display: flex;
+    max-width: 18rem;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.webhook-event-summary {
+    display: inline-flex;
+    max-width: 18rem;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+:host ::ng-deep .webhook-event-tag,
+:host ::ng-deep .webhook-no-events-tag {
+    max-width: 100%;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+:host ::ng-deep .webhook-event-tag .p-tag-label,
+:host ::ng-deep .webhook-no-events-tag .p-tag-label {
+    max-width: 13rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+:host ::ng-deep .webhook-event-count-button.p-button {
+    flex: none;
+    padding: 0.22rem 0.55rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+:host ::ng-deep .webhook-event-count-button .p-button-label {
+    line-height: 1;
+}
+
+.webhook-date-cell {
+    white-space: nowrap;
+}
+
+.delivery-dialog__toolbar {
+    width: 100%;
+    margin-bottom: 1rem;
+}
+
+.delivery-dialog__toolbar p {
+    max-width: 70ch;
+    margin: 0;
+}
+
+.delivery-dialog__empty {
+    padding: 1.5rem !important;
+    color: var(--p-text-muted-color);
+    text-align: center;
+}
+
+.webhook-form {
+    display: grid;
+    gap: 1rem;
+}
+
+.webhook-form > label,
+.webhook-form fieldset {
+    display: grid;
+    gap: 0.4rem;
+}
+
+.webhook-form label > span,
+.webhook-form legend {
+    color: var(--p-text-color);
+    font-size: 0.85rem;
+    font-weight: 650;
+}
+
+.webhook-form input:not([type="checkbox"]),
+.webhook-form textarea {
+    width: 100%;
+}
+
+.webhook-form .enabled-control {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+
+.webhook-form fieldset {
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.webhook-form fieldset > p {
+    margin: 0;
+}
+
+.event-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    gap: 0.35rem 0.8rem;
+    max-height: 14rem;
+    overflow: auto;
+    padding: 0.7rem;
+    border: 1px solid var(--p-content-border-color);
+    border-radius: 0.5rem;
+}
+
+.event-options label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 1.8rem;
+    cursor: pointer;
+}
+
+.field-error {
+    color: var(--p-red-600) !important;
+}
+
+@media (max-width: 640px) {
+    .webhooks-toolbar,
+    .delivery-dialog__toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .webhooks-toolbar__actions {
+        justify-content: space-between;
+    }
+}
