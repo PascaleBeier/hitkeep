@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.10.3](https://github.com/PascaleBeier/hitkeep/compare/v2.10.2...v2.10.3) (2026-07-10)
+
+
+### Bug Fixes
+
+* **ci:** set test AWS environment ([9ecaf6f](https://github.com/PascaleBeier/hitkeep/commit/9ecaf6fa721a1cffc0a31622b9fbc3260ac2ac74))
+* **frontend:** Update Onboarding Dashboard from Realtime updates, closes [#240](https://github.com/PascaleBeier/hitkeep/issues/240) ([92963b9](https://github.com/PascaleBeier/hitkeep/commit/92963b99ee015c60050597d960f5f4f4148b2b27))
+* **s3:** missing AWS extension ([a31c50e](https://github.com/PascaleBeier/hitkeep/commit/a31c50e073979ebea12f41fdd36b66a35595355e))
+
 ## [2.10.2](https://github.com/PascaleBeier/hitkeep/compare/v2.10.1...v2.10.2) (2026-07-09)
 
 
