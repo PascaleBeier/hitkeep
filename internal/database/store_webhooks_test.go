@@ -65,10 +65,7 @@ func TestWebhookConfigurationLifecycle(t *testing.T) {
 	if rotated == nil || nextSecret == secret || !strings.HasPrefix(nextSecret, "whsec_") {
 		t.Fatalf("unexpected rotation result: webhook=%+v secret=%q", rotated, nextSecret)
 	}
-	storedSecret, err := store.getWebhookSecret(ctx, created.ID)
-	if err != nil {
-		t.Fatalf("get stored secret: %v", err)
-	}
+	storedSecret := getWebhookSecretForTest(t, store, ctx, created.ID)
 	if storedSecret != nextSecret {
 		t.Fatal("rotation must immediately replace the previous secret")
 	}
@@ -181,10 +178,7 @@ func TestRotateWebhookSecretWithAuditRollsBackWhenAuditFails(t *testing.T) {
 	if _, _, err := store.RotateWebhookSecretWithAudit(ctx, created.ID, &site.ID, AuditEntryParams{}); err == nil {
 		t.Fatal("expected invalid audit entry to fail rotation")
 	}
-	storedSecret, err := store.getWebhookSecret(ctx, created.ID)
-	if err != nil {
-		t.Fatalf("get secret after rollback: %v", err)
-	}
+	storedSecret := getWebhookSecretForTest(t, store, ctx, created.ID)
 	if storedSecret != previousSecret {
 		t.Fatalf("audit failure rotated secret: got %q want %q", storedSecret, previousSecret)
 	}
@@ -218,4 +212,13 @@ func TestUpdateAndDeleteWebhookWithAuditRollBackWhenAuditFails(t *testing.T) {
 	if err != nil || afterDelete == nil {
 		t.Fatalf("audit failure committed delete: webhook=%+v err=%v", afterDelete, err)
 	}
+}
+
+func getWebhookSecretForTest(t *testing.T, store *Store, ctx context.Context, webhookID uuid.UUID) string {
+	t.Helper()
+	var secret string
+	if err := store.db.QueryRowContext(ctx, "SELECT secret FROM webhooks WHERE id = ?", webhookID).Scan(&secret); err != nil {
+		t.Fatalf("get stored webhook secret: %v", err)
+	}
+	return secret
 }

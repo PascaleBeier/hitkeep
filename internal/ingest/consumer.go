@@ -82,64 +82,61 @@ func (c *Consumer) emitHitGoalConversions(ctx context.Context, store *database.S
 	if c.webhookEmitter == nil {
 		return nil
 	}
-	bySite := make(map[uuid.UUID][]api.Goal)
-	subscriptions := make(map[uuid.UUID]bool)
-	conversionEvents := make([]webhooks.Event, 0)
+	sources := make([]goalConversionSource, 0, len(hits))
 	for _, hit := range hits {
 		if hit == nil {
 			continue
 		}
-		subscribed, checked := subscriptions[hit.SiteID]
-		if !checked {
-			subscribed = c.hasGoalConversionSubscribers(ctx, hit.SiteID)
-			subscriptions[hit.SiteID] = subscribed
-		}
-		if !subscribed {
-			continue
-		}
-		goals, ok := bySite[hit.SiteID]
-		if !ok {
-			var err error
-			goals, err = store.GetGoals(ctx, hit.SiteID)
-			if err != nil {
-				return fmt.Errorf("load goals for hit webhook conversion: %w", err)
-			}
-			bySite[hit.SiteID] = goals
-		}
-		conversionEvents = append(conversionEvents, goalConversionEvents(goals, hit.ID, hit.SiteID, "path", hit.Path, hit.Timestamp)...)
+		sources = append(sources, goalConversionSource{id: hit.ID, siteID: hit.SiteID, sourceType: "path", value: hit.Path, occurredAt: hit.Timestamp})
 	}
-	return c.emitGoalConversions(ctx, conversionEvents)
+	return c.emitGoalConversionSources(ctx, store, "hit", sources)
 }
 
 func (c *Consumer) emitEventGoalConversions(ctx context.Context, store *database.Store, events []*api.Event) error {
 	if c.webhookEmitter == nil {
 		return nil
 	}
-	bySite := make(map[uuid.UUID][]api.Goal)
-	subscriptions := make(map[uuid.UUID]bool)
-	conversionEvents := make([]webhooks.Event, 0)
+	sources := make([]goalConversionSource, 0, len(events))
 	for _, event := range events {
 		if event == nil {
 			continue
 		}
-		subscribed, checked := subscriptions[event.SiteID]
+		sources = append(sources, goalConversionSource{id: event.ID, siteID: event.SiteID, sourceType: "event", value: event.Name, occurredAt: event.Timestamp})
+	}
+	return c.emitGoalConversionSources(ctx, store, "event", sources)
+}
+
+type goalConversionSource struct {
+	id         uuid.UUID
+	siteID     uuid.UUID
+	sourceType string
+	value      string
+	occurredAt time.Time
+}
+
+func (c *Consumer) emitGoalConversionSources(ctx context.Context, store *database.Store, sourceLabel string, sources []goalConversionSource) error {
+	bySite := make(map[uuid.UUID][]api.Goal)
+	subscriptions := make(map[uuid.UUID]bool)
+	conversionEvents := make([]webhooks.Event, 0)
+	for _, source := range sources {
+		subscribed, checked := subscriptions[source.siteID]
 		if !checked {
-			subscribed = c.hasGoalConversionSubscribers(ctx, event.SiteID)
-			subscriptions[event.SiteID] = subscribed
+			subscribed = c.hasGoalConversionSubscribers(ctx, source.siteID)
+			subscriptions[source.siteID] = subscribed
 		}
 		if !subscribed {
 			continue
 		}
-		goals, ok := bySite[event.SiteID]
+		goals, ok := bySite[source.siteID]
 		if !ok {
 			var err error
-			goals, err = store.GetGoals(ctx, event.SiteID)
+			goals, err = store.GetGoals(ctx, source.siteID)
 			if err != nil {
-				return fmt.Errorf("load goals for event webhook conversion: %w", err)
+				return fmt.Errorf("load goals for %s webhook conversion: %w", sourceLabel, err)
 			}
-			bySite[event.SiteID] = goals
+			bySite[source.siteID] = goals
 		}
-		conversionEvents = append(conversionEvents, goalConversionEvents(goals, event.ID, event.SiteID, "event", event.Name, event.Timestamp)...)
+		conversionEvents = append(conversionEvents, goalConversionEvents(goals, source.id, source.siteID, source.sourceType, source.value, source.occurredAt)...)
 	}
 	return c.emitGoalConversions(ctx, conversionEvents)
 }

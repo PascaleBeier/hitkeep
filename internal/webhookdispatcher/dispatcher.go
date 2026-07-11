@@ -79,10 +79,11 @@ func (d *Dispatcher) Dispatch(ctx context.Context, deliveryID uuid.UUID) error {
 	timestamp := strconv.FormatInt(startedAt.Unix(), 10)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "HitKeep-Webhook/"+webhooks.MinorAPIVersion(d.config.Version))
-	req.Header.Set(HeaderTimestamp, timestamp)
-	req.Header.Set(HeaderSignature, signPayload(delivery.SigningSecret, timestamp, delivery.Payload))
-	req.Header.Set(HeaderEventID, delivery.EventID.String())
-	req.Header.Set(HeaderDeliveryID, delivery.ID.String())
+	// Keep the documented HitKeep product spelling in the protocol constants.
+	req.Header.Set(HeaderTimestamp, timestamp)                                                        //nolint:canonicalheader
+	req.Header.Set(HeaderSignature, signPayload(delivery.SigningSecret, timestamp, delivery.Payload)) //nolint:canonicalheader
+	req.Header.Set(HeaderEventID, delivery.EventID.String())                                          //nolint:canonicalheader
+	req.Header.Set(HeaderDeliveryID, delivery.ID.String())                                            //nolint:canonicalheader
 
 	resp, err := d.httpClient.Do(req)
 	if err != nil {

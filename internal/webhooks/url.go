@@ -18,7 +18,7 @@ func ValidateDestination(ctx context.Context, rawURL string, allowDevelopmentTar
 	if err != nil || destination.Hostname() == "" {
 		return nil, fmt.Errorf("invalid webhook destination URL")
 	}
-	if destination.Scheme != "https" && !(allowDevelopmentTargets && destination.Scheme == "http") {
+	if destination.Scheme != "https" && (!allowDevelopmentTargets || destination.Scheme != "http") {
 		return nil, fmt.Errorf("webhook destination must use HTTPS")
 	}
 	if destination.User != nil {

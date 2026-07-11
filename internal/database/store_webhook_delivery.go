@@ -187,6 +187,8 @@ func (s *Store) existingWebhookDeliveryJobs(ctx context.Context, inputs []Webhoo
 	for index, id := range ids {
 		args[index] = id
 	}
+	// placeholders is generated from the input count and all IDs remain bound parameters.
+	//nolint:gosec
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT CAST(event.id AS VARCHAR), CAST(delivery.id AS VARCHAR),
 			CAST(delivery.webhook_id AS VARCHAR), CAST(delivery.payload_json AS VARCHAR)
@@ -351,34 +353,40 @@ func (s *Store) cancelStagedSiteDeletionWebhookEvent(ctx context.Context, eventI
 }
 
 func (s *Store) CommitStagedSiteDeletionWebhookEvent(ctx context.Context, eventID uuid.UUID, now time.Time) ([]WebhookDeliveryJob, error) {
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT delivery_id, webhook_id, event_type, api_version, webhook_name, destination_url,
-			signing_secret, CAST(event_payload_json AS VARCHAR), CAST(payload_json AS VARCHAR), occurred_at
-		FROM site_deletion_webhook_outbox
-		WHERE event_id = ?
-		ORDER BY delivery_id
-	`, eventID)
-	if err != nil {
-		return nil, fmt.Errorf("load staged site deletion webhook event: %w", err)
-	}
 	type stagedDelivery struct {
 		deliveryID, webhookID                           uuid.UUID
 		eventType, apiVersion, webhookName, destination string
 		secret, eventPayload, payload                   string
 		occurredAt                                      time.Time
 	}
-	staged := make([]stagedDelivery, 0)
-	for rows.Next() {
-		var item stagedDelivery
-		if err := rows.Scan(&item.deliveryID, &item.webhookID, &item.eventType, &item.apiVersion, &item.webhookName,
-			&item.destination, &item.secret, &item.eventPayload, &item.payload, &item.occurredAt); err != nil {
-			_ = rows.Close()
-			return nil, fmt.Errorf("scan staged site deletion webhook event: %w", err)
+	staged, err := func() ([]stagedDelivery, error) {
+		rows, err := s.db.QueryContext(ctx, `
+			SELECT delivery_id, webhook_id, event_type, api_version, webhook_name, destination_url,
+				signing_secret, CAST(event_payload_json AS VARCHAR), CAST(payload_json AS VARCHAR), occurred_at
+			FROM site_deletion_webhook_outbox
+			WHERE event_id = ?
+			ORDER BY delivery_id
+		`, eventID)
+		if err != nil {
+			return nil, fmt.Errorf("load staged site deletion webhook event: %w", err)
 		}
-		staged = append(staged, item)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, fmt.Errorf("close staged site deletion webhook rows: %w", err)
+		defer rows.Close()
+		result := make([]stagedDelivery, 0)
+		for rows.Next() {
+			var item stagedDelivery
+			if err := rows.Scan(&item.deliveryID, &item.webhookID, &item.eventType, &item.apiVersion, &item.webhookName,
+				&item.destination, &item.secret, &item.eventPayload, &item.payload, &item.occurredAt); err != nil {
+				return nil, fmt.Errorf("scan staged site deletion webhook event: %w", err)
+			}
+			result = append(result, item)
+		}
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("iterate staged site deletion webhook events: %w", err)
+		}
+		return result, nil
+	}()
+	if err != nil {
+		return nil, err
 	}
 	if len(staged) == 0 {
 		return []WebhookDeliveryJob{}, nil
@@ -418,25 +426,31 @@ func (s *Store) CommitStagedSiteDeletionWebhookEvent(ctx context.Context, eventI
 }
 
 func (s *Store) RecoverStagedSiteDeletionWebhookEvents(ctx context.Context, now time.Time) ([][]WebhookDeliveryJob, error) {
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT DISTINCT staged.event_id
-		FROM site_deletion_webhook_outbox staged
-		WHERE NOT EXISTS (SELECT 1 FROM sites WHERE sites.id = staged.source_site_id)
-		ORDER BY staged.event_id
-	`)
-	if err != nil {
-		return nil, fmt.Errorf("list recoverable site deletion webhook events: %w", err)
-	}
-	ids := make([]uuid.UUID, 0)
-	for rows.Next() {
-		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
-			_ = rows.Close()
-			return nil, fmt.Errorf("scan recoverable site deletion webhook event: %w", err)
+	ids, err := func() ([]uuid.UUID, error) {
+		rows, err := s.db.QueryContext(ctx, `
+			SELECT DISTINCT staged.event_id
+			FROM site_deletion_webhook_outbox staged
+			WHERE NOT EXISTS (SELECT 1 FROM sites WHERE sites.id = staged.source_site_id)
+			ORDER BY staged.event_id
+		`)
+		if err != nil {
+			return nil, fmt.Errorf("list recoverable site deletion webhook events: %w", err)
 		}
-		ids = append(ids, id)
-	}
-	if err := rows.Close(); err != nil {
+		defer rows.Close()
+		result := make([]uuid.UUID, 0)
+		for rows.Next() {
+			var id uuid.UUID
+			if err := rows.Scan(&id); err != nil {
+				return nil, fmt.Errorf("scan recoverable site deletion webhook event: %w", err)
+			}
+			result = append(result, id)
+		}
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("iterate recoverable site deletion webhook events: %w", err)
+		}
+		return result, nil
+	}()
+	if err != nil {
 		return nil, err
 	}
 	result := make([][]WebhookDeliveryJob, 0, len(ids))

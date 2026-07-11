@@ -60,6 +60,8 @@ func (s *Store) createWebhook(ctx context.Context, siteID *uuid.UUID, input api.
 
 func (s *Store) ListWebhooks(ctx context.Context, siteID *uuid.UUID) ([]api.Webhook, error) {
 	where, args := webhookScopeWhere(siteID)
+	// where comes from webhookScopeWhere and contains only fixed predicates.
+	//nolint:gosec
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, CAST(site_id AS VARCHAR), name, description, destination_url, enabled, created_at, updated_at
 		FROM webhooks
@@ -138,7 +140,8 @@ func (s *Store) updateWebhook(ctx context.Context, webhookID uuid.UUID, siteID *
 	now := time.Now().UTC()
 
 	err = s.Transact(ctx, func(tx *sql.Tx) error {
-		queryArgs := []any{input.Name, input.Description, input.URL, input.Enabled, now, webhookID}
+		queryArgs := make([]any, 0, 6+len(args))
+		queryArgs = append(queryArgs, input.Name, input.Description, input.URL, input.Enabled, now, webhookID)
 		queryArgs = append(queryArgs, args...)
 		result, err := tx.ExecContext(ctx, `
 			UPDATE webhooks
@@ -197,7 +200,8 @@ func (s *Store) rotateWebhookSecret(ctx context.Context, webhookID uuid.UUID, si
 	where, args := webhookScopeWhere(siteID)
 	now := time.Now().UTC()
 	err = s.Transact(ctx, func(tx *sql.Tx) error {
-		queryArgs := []any{secret, now, webhookID}
+		queryArgs := make([]any, 0, 3+len(args))
+		queryArgs = append(queryArgs, secret, now, webhookID)
 		queryArgs = append(queryArgs, args...)
 		result, err := tx.ExecContext(ctx, `
 			UPDATE webhooks SET secret = ?, updated_at = ? WHERE id = ? AND `+where,
@@ -272,17 +276,6 @@ func appendWebhookAuditTx(ctx context.Context, tx *sql.Tx, audit *AuditEntryPara
 		return fmt.Errorf("append webhook audit entry: %w", err)
 	}
 	return nil
-}
-
-func (s *Store) getWebhookSecret(ctx context.Context, webhookID uuid.UUID) (string, error) {
-	var secret string
-	if err := s.db.QueryRowContext(ctx, "SELECT secret FROM webhooks WHERE id = ?", webhookID).Scan(&secret); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", ErrWebhookNotFound
-		}
-		return "", fmt.Errorf("get webhook secret: %w", err)
-	}
-	return secret, nil
 }
 
 func normalizeWebhookInput(siteID *uuid.UUID, input api.WebhookInput) (api.WebhookInput, error) {

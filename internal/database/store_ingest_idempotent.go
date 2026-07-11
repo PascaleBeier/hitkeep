@@ -83,25 +83,23 @@ func filterMissingIngestRows[T any](ctx context.Context, store *Store, table str
 	for index, value := range ids {
 		args[index] = value
 	}
-	existingRows, err := store.db.QueryContext(ctx, "SELECT id FROM "+table+" WHERE id IN ("+placeholders+")", args...)
+	// table is selected only by CreateHitsBulkIdempotent and CreateEventsBulkIdempotent;
+	// placeholders are generated locally and values remain bound parameters.
+	existingRows, err := store.db.QueryContext(ctx, "SELECT id FROM "+table+" WHERE id IN ("+placeholders+")", args...) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("load existing %s ingest IDs: %w", table, err)
 	}
+	defer existingRows.Close()
 	existing := make(map[uuid.UUID]struct{}, len(ids))
 	for existingRows.Next() {
 		var value uuid.UUID
 		if err := existingRows.Scan(&value); err != nil {
-			_ = existingRows.Close()
 			return nil, fmt.Errorf("scan existing %s ingest ID: %w", table, err)
 		}
 		existing[value] = struct{}{}
 	}
 	if err := existingRows.Err(); err != nil {
-		_ = existingRows.Close()
 		return nil, fmt.Errorf("iterate existing %s ingest IDs: %w", table, err)
-	}
-	if err := existingRows.Close(); err != nil {
-		return nil, err
 	}
 	missing := make([]T, 0, len(rows)-len(existing))
 	for _, row := range rows {
