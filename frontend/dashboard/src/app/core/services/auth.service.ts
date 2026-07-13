@@ -24,6 +24,14 @@ export interface LoginResponse {
     passkey?: PasskeyLoginStartResponse['publicKey'];
 }
 
+export interface SSOAvailability {
+    enabled: boolean;
+}
+
+export interface SSOStartResponse {
+    auth_url: string;
+}
+
 export interface AuthSession {
     expires_at: string;
     issued_at: string;
@@ -75,6 +83,14 @@ export class AuthService {
                 }
             })
         );
+    }
+
+    getSSOAvailability(): Observable<SSOAvailability> {
+        return this.http.get<SSOAvailability>('/api/auth/sso');
+    }
+
+    startSSOLogin(payload: { email: string; return_url?: string; remember_me?: boolean }): Observable<SSOStartResponse> {
+        return this.http.post<SSOStartResponse>('/api/auth/sso/start', payload);
     }
 
     logout(): Observable<void> {

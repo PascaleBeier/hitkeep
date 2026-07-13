@@ -288,6 +288,52 @@ describe('TeamService', () => {
         deleteReq.flush(null);
     });
 
+    it('should load, update, test, and delete a redacted SSO configuration', () => {
+        const response = {
+            provider_type: 'oidc' as const,
+            issuer_url: 'https://identity.example.com',
+            client_id: 'hitkeep',
+            client_secret_configured: true,
+            allowed_domains: ['example.com'],
+            email_claim: 'email',
+            display_name_claim: 'name',
+            enabled: true,
+            callback_url: 'https://analytics.example.com/api/auth/sso/callback'
+        };
+
+        service.getTeamSSO('team-id').subscribe((config) => expect(config.client_secret_configured).toBe(true));
+        const getReq = httpMock.expectOne('/api/user/teams/team-id/sso');
+        expect(getReq.request.method).toBe('GET');
+        getReq.flush(response);
+
+        const payload = {
+            provider_type: 'oidc' as const,
+            issuer_url: response.issuer_url,
+            client_id: response.client_id,
+            client_secret: '',
+            allowed_domains: response.allowed_domains,
+            email_claim: response.email_claim,
+            display_name_claim: response.display_name_claim,
+            enabled: false
+        };
+        service.updateTeamSSO('team-id', payload).subscribe();
+        const updateReq = httpMock.expectOne('/api/user/teams/team-id/sso');
+        expect(updateReq.request.method).toBe('PUT');
+        expect(updateReq.request.body).toEqual(payload);
+        updateReq.flush({ ...response, enabled: false });
+
+        service.testTeamSSO('team-id').subscribe();
+        const testReq = httpMock.expectOne('/api/user/teams/team-id/sso/test');
+        expect(testReq.request.method).toBe('POST');
+        expect(testReq.request.body).toEqual({});
+        testReq.flush({ status: 'ok' });
+
+        service.deleteTeamSSO('team-id').subscribe();
+        const deleteReq = httpMock.expectOne('/api/user/teams/team-id/sso');
+        expect(deleteReq.request.method).toBe('DELETE');
+        deleteReq.flush(null);
+    });
+
     it('should leave team and update local state', () => {
         service.teams.set([
             { id: 'team-a', name: 'Team A', logo_url: '', role: 'owner', created_at: '2026-01-01T00:00:00Z' },

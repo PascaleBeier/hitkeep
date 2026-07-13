@@ -48,6 +48,8 @@ export class Login {
     private hasAttemptedConditionalPasskey = false;
     protected isLoading = signal(false);
     protected isPasskeyLoading = signal(false);
+    protected isSSOLoading = signal(false);
+    protected ssoAvailable = signal(false);
     protected errorMessage = signal<string | null>(null);
     protected infoMessage = signal<string | null>(null);
     protected currentYear = new Date().getFullYear();
@@ -66,6 +68,7 @@ export class Login {
     protected readonly mfaHasFallback = computed(() => this.mfaHasRecoveryCode() || this.mfaHasActionFallback());
     protected readonly mfaShowsFallbackDivider = computed(() => this.mfaHasFallback() && (this.mfaHasTotp() || (this.mfaHasRecoveryCode() && this.mfaHasActionFallback())));
     protected readonly showSignupLink = computed(() => Boolean(this.cloudStatus()?.hosted && this.cloudStatus()?.signup_enabled));
+    protected readonly hasAlternativeLogin = computed(() => this.isPasskeySupported() || this.ssoAvailable());
     protected readonly currentJurisdiction = computed(() => this.normalizeJurisdiction(this.cloudStatus()?.jurisdiction) ?? this.inferJurisdictionFromHost());
     protected readonly alternateJurisdiction = computed(() => (this.currentJurisdiction() === 'EU' ? 'US' : 'EU'));
     protected readonly primarySignupUrl = computed(() => this.signupUrlForJurisdiction(this.currentJurisdiction()));
@@ -91,14 +94,49 @@ export class Login {
                 }
             });
 
+        this.auth
+            .getSSOAvailability()
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+                next: (availability) => this.ssoAvailable.set(availability.enabled),
+                error: () => this.ssoAvailable.set(false)
+            });
+
         const authError = this.route.snapshot.queryParamMap.get('error')?.trim();
-        if (authError === 'mfa_link_invalid') {
-            this.errorMessage.set('login.errors.mfaEmailLinkInvalid');
+        const authErrorKey = this.authErrorKey(authError);
+        if (authErrorKey) {
+            this.errorMessage.set(authErrorKey);
         }
 
         if (this.shouldAttemptConditionalPasskey()) {
             void this.startConditionalPasskeyLogin();
         }
+    }
+
+    protected onSSOLogin(): void {
+        if (this.loginForm.email().invalid()) {
+            this.loginForm.email().markAsTouched();
+            return;
+        }
+
+        this.abortConditionalPasskeyPrompt();
+        this.isSSOLoading.set(true);
+        this.errorMessage.set(null);
+        this.infoMessage.set(null);
+
+        this.auth
+            .startSSOLogin({
+                email: this.loginForm.email().value(),
+                return_url: this.resolveReturnUrl(),
+                remember_me: this.loginForm.rememberMe().value()
+            })
+            .pipe(finalize(() => this.isSSOLoading.set(false)))
+            .subscribe({
+                next: (response) => this.navigateToSSOProvider(response.auth_url),
+                error: (err) => {
+                    this.errorMessage.set(err?.status === 400 || err?.status === 503 ? 'login.errors.ssoUnavailable' : 'login.errors.ssoFailed');
+                }
+            });
     }
 
     onSubmit(event?: Event): void {
@@ -243,6 +281,29 @@ export class Login {
         if (!returnUrl.startsWith('/') || returnUrl.startsWith('//')) return '/';
         if (returnUrl.startsWith('/login') || returnUrl.startsWith('/setup')) return '/';
         return returnUrl;
+    }
+
+    private authErrorKey(error: string | undefined): string | null {
+        switch (error) {
+            case 'mfa_link_invalid':
+                return 'login.errors.mfaEmailLinkInvalid';
+            case 'sso_provider_error':
+                return 'login.errors.ssoProviderError';
+            case 'sso_email_unverified':
+                return 'login.errors.ssoEmailUnverified';
+            case 'sso_email_not_allowed':
+                return 'login.errors.ssoEmailNotAllowed';
+            case 'sso_unavailable':
+                return 'login.errors.ssoUnavailable';
+            case 'sso_failed':
+                return 'login.errors.ssoFailed';
+            default:
+                return null;
+        }
+    }
+
+    private navigateToSSOProvider(authURL: string): void {
+        window.location.assign(authURL);
     }
 
     private enterMfaState(resp: LoginResponse): void {

@@ -11,6 +11,8 @@ const SYSTEM_ACTIONS = ['role.updated', 'mfa.disabled', 'backup.triggered', 'bac
 const SHARED_ACTIONS = [
     'auth.login_succeeded',
     'auth.login_failed',
+    'auth.sso_login_succeeded',
+    'auth.sso_login_failed',
     'auth.mfa_required',
     'auth.mfa_succeeded',
     'auth.logout',
@@ -19,6 +21,9 @@ const SHARED_ACTIONS = [
     'team.updated',
     'team.archived',
     'team.active_changed',
+    'sso.configuration_updated',
+    'sso.connection_tested',
+    'sso.configuration_deleted',
     'member.invited',
     'member.invite_resent',
     'member.invite_revoked',
@@ -82,6 +87,8 @@ const ACTION_KEYS: Record<string, string> = {
     'access.denied': 'auditTable.actions.accessDenied',
     'auth.login_succeeded': 'auditTable.actions.authLoginSucceeded',
     'auth.login_failed': 'auditTable.actions.authLoginFailed',
+    'auth.sso_login_succeeded': 'auditTable.actions.authSSOLoginSucceeded',
+    'auth.sso_login_failed': 'auditTable.actions.authSSOLoginFailed',
     'auth.mfa_required': 'auditTable.actions.authMfaRequired',
     'auth.mfa_succeeded': 'auditTable.actions.authMfaSucceeded',
     'auth.logout': 'auditTable.actions.authLogout',
@@ -90,6 +97,9 @@ const ACTION_KEYS: Record<string, string> = {
     'team.updated': 'auditTable.actions.teamUpdated',
     'team.archived': 'auditTable.actions.teamArchived',
     'team.active_changed': 'auditTable.actions.teamActiveChanged',
+    'sso.configuration_updated': 'auditTable.actions.ssoConfigurationUpdated',
+    'sso.connection_tested': 'auditTable.actions.ssoConnectionTested',
+    'sso.configuration_deleted': 'auditTable.actions.ssoConfigurationDeleted',
     'member.invited': 'auditTable.actions.memberInvited',
     'member.invite_accepted': 'auditTable.actions.memberInviteAccepted',
     'member.invite_resent': 'auditTable.actions.memberInviteResent',
@@ -156,7 +166,8 @@ const TARGET_TYPE_KEYS: Record<string, string> = {
     permission: 'auditTable.targetTypes.permission',
     google_search_console_connection: 'auditTable.targetTypes.googleSearchConsoleConnection',
     google_search_console_property: 'auditTable.targetTypes.googleSearchConsoleProperty',
-    google_search_console_sync: 'auditTable.targetTypes.googleSearchConsoleSync'
+    google_search_console_sync: 'auditTable.targetTypes.googleSearchConsoleSync',
+    sso_configuration: 'auditTable.targetTypes.ssoConfiguration'
 };
 
 const TARGET_TYPES = Object.keys(TARGET_TYPE_KEYS);
@@ -234,6 +245,7 @@ export class AuditPresentationService {
         const value = action ?? '';
         if (
             value === 'access.denied' ||
+            value === 'auth.sso_login_failed' ||
             value === 'site.stats_reset' ||
             value.endsWith('.failed') ||
             value.endsWith('.revoked') ||

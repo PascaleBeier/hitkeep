@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { finalize, of, tap } from 'rxjs';
-import { CustomTrackingDomain, Team, TeamAuditListResponse, TeamInvite, TeamMember, TeamRole, UserTeamsResponse } from '@models/analytics.types';
+import { CustomTrackingDomain, Team, TeamAuditListResponse, TeamInvite, TeamMember, TeamRole, TeamSSOConfig, UpdateTeamSSORequest, UserTeamsResponse } from '@models/analytics.types';
 
 interface SetActiveTeamResponse {
     status: string;
@@ -171,6 +171,22 @@ export class TeamService {
 
     deleteTrackingDomain(teamID: string, domainID: string) {
         return this.http.delete<void>(`/api/user/teams/${encodeURIComponent(teamID)}/tracking-domains/${encodeURIComponent(domainID)}`);
+    }
+
+    getTeamSSO(teamID: string) {
+        return this.http.get<TeamSSOConfig>(`/api/user/teams/${encodeURIComponent(teamID)}/sso`);
+    }
+
+    updateTeamSSO(teamID: string, payload: UpdateTeamSSORequest) {
+        return this.http.put<TeamSSOConfig>(`/api/user/teams/${encodeURIComponent(teamID)}/sso`, payload);
+    }
+
+    testTeamSSO(teamID: string) {
+        return this.http.post<{ status: string }>(`/api/user/teams/${encodeURIComponent(teamID)}/sso/test`, {});
+    }
+
+    deleteTeamSSO(teamID: string) {
+        return this.http.delete<void>(`/api/user/teams/${encodeURIComponent(teamID)}/sso`);
     }
 
     transferTeamOwnership(teamID: string, targetUserID: string) {

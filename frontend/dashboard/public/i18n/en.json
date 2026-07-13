@@ -202,6 +202,8 @@
       "accessDenied": "Access denied",
       "authLoginSucceeded": "Login succeeded",
       "authLoginFailed": "Login failed",
+      "authSSOLoginSucceeded": "SSO login succeeded",
+      "authSSOLoginFailed": "SSO login failed",
       "authMfaRequired": "MFA required",
       "authMfaSucceeded": "MFA succeeded",
       "authLogout": "Logout",
@@ -210,6 +212,9 @@
       "teamUpdated": "Team updated",
       "teamArchived": "Team archived",
       "teamActiveChanged": "Active team changed",
+      "ssoConfigurationUpdated": "SSO configuration updated",
+      "ssoConnectionTested": "SSO connection tested",
+      "ssoConfigurationDeleted": "SSO configuration deleted",
       "memberInvited": "Member invited",
       "memberInviteAccepted": "Invite accepted",
       "memberInviteResent": "Invite resent",
@@ -286,6 +291,7 @@
       "import": "Import",
       "siteExclusion": "Site exclusion",
       "apiClient": "API client",
+      "ssoConfiguration": "SSO configuration",
       "backup": "Backup",
       "spamFilter": "Spam filter",
       "diagnostics": "Diagnostics",
@@ -1602,6 +1608,7 @@
       "tabs": {
         "overview": "Overview",
         "members": "Members",
+        "sso": "SSO",
         "apiClients": "API Clients",
         "customDomains": "Custom Domains",
         "branding": "Branding",
@@ -1648,7 +1655,7 @@
         },
         "plans": {
           "title": "Upgrade your plan",
-          "description": "Unlock longer retention, more sites, and team capacity.",
+          "description": "Unlock longer retention, more sites, team capacity, and SSO on Business.",
           "currentPlan": "Current plan",
           "recommended": "Recommended",
           "perMonth": "/mo",
@@ -1664,13 +1671,74 @@
             "members": "Up to {{count}} team members",
             "retention": "{{count}}-year data retention",
             "retentionDays": "{{count}}-day data retention",
-            "customDomains": "Custom tracking domains"
+            "customDomains": "Custom tracking domains",
+            "sso": "Single sign-on (SSO)"
           }
         }
       },
       "members": {
         "breadcrumb": "Team Members",
         "title": "Team Members"
+      },
+      "sso": {
+        "title": "Single sign-on",
+        "description": "Connect this team to its OpenID Connect identity provider.",
+        "status": {
+          "enabled": "Enabled",
+          "disabled": "Disabled"
+        },
+        "provider": {
+          "title": "Identity provider",
+          "description": "HitKeep currently supports standards-based OpenID Connect."
+        },
+        "callbackURL": {
+          "label": "Callback URL",
+          "hint": "Add this exact redirect URI to your identity provider.",
+          "copy": "Copy URL"
+        },
+        "issuerURL": {
+          "label": "Issuer URL",
+          "hint": "The HTTPS issuer from your provider's OpenID configuration."
+        },
+        "clientID": {
+          "label": "Client ID",
+          "hint": "The public identifier for the HitKeep application."
+        },
+        "clientSecret": {
+          "label": "Client secret",
+          "requiredHint": "Required before this connection can be saved.",
+          "configuredHint": "A secret is stored. Enter a new one only to rotate it.",
+          "placeholder": "Enter client secret",
+          "keepPlaceholder": "Leave blank to keep the current secret"
+        },
+        "allowedDomains": {
+          "label": "Allowed email domains",
+          "hint": "One domain per line. Each domain can belong to only one team's SSO connection."
+        },
+        "claimMapping": {
+          "title": "Claim mapping",
+          "description": "Keep the defaults unless your provider uses different claim paths.",
+          "email": "Email claim",
+          "name": "Display name claim"
+        },
+        "securityNote": "HitKeep verifies the provider signature, issuer, audience, state, nonce, PKCE challenge, and verified email. Provider tokens are never stored.",
+        "enable": {
+          "label": "Enable SSO login",
+          "hint": "Shows SSO as a login option for people whose email matches an allowed domain. Password login stays available."
+        },
+        "saveAction": "Save SSO configuration",
+        "testAction": "Test connection",
+        "saveSuccess": "SSO configuration saved.",
+        "testSuccess": "The identity provider is reachable and its discovery document is valid.",
+        "errors": {
+          "loadFailed": "SSO configuration could not be loaded.",
+          "saveFailed": "SSO configuration could not be saved. Check the provider details and try again.",
+          "testFailed": "The identity provider could not be reached or returned an invalid discovery document.",
+          "domainConflict": "One of these email domains is already assigned to another team's SSO connection.",
+          "issuerRequired": "Enter a valid HTTPS issuer URL.",
+          "clientIDRequired": "Enter the client ID.",
+          "domainRequired": "Enter at least one email domain."
+        }
       },
       "settings": {
         "breadcrumb": "Team Settings",
@@ -2339,6 +2407,7 @@
     "signIn": "Sign in",
     "or": "or",
     "signInWithPasskey": "Sign in with passkey",
+    "signInWithSSO": "Log in with SSO",
     "mfaTitle": "Two-factor verification",
     "mfaSubtitle": "Complete sign-in with your authenticator code, a recovery code, a sign-in link, or a passkey.",
     "sendEmailLink": "Email me a sign-in link",
@@ -2353,6 +2422,11 @@
       "invalidCredentials": "Invalid email or password.",
       "passkeyNotSupported": "Passkey login is not supported on this device.",
       "passkeyFailed": "Passkey login failed. Please try again.",
+      "ssoProviderError": "Your identity provider cancelled or denied the login. Try again or use your password.",
+      "ssoEmailUnverified": "Your identity provider did not return a verified email address. Contact your team administrator.",
+      "ssoEmailNotAllowed": "The identity provider account does not match the email address or team domain you entered.",
+      "ssoUnavailable": "SSO is not configured for this email domain. Check the address or use your password.",
+      "ssoFailed": "SSO login could not be completed. Try again or use your password.",
       "invalidTotp": "Invalid authenticator code.",
       "invalidRecoveryCode": "Invalid recovery code.",
       "emailLinkFailed": "We could not send your sign-in link. Please try again.",

@@ -17,6 +17,7 @@ import (
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/realtime"
 	"hitkeep/internal/searchconsole"
+	"hitkeep/internal/sso"
 	"hitkeep/internal/takeout"
 	"hitkeep/internal/webhooks"
 )
@@ -71,6 +72,7 @@ type Context struct {
 	WebhookLimiter *IPRateLimiter
 	AuthState      *AuthStateStore
 	SearchConsole  searchconsole.Client
+	SSO            *sso.Client
 	AI             hitai.Client
 	Realtime       *realtime.Broker
 	IPFilter       *blocking.IPFilter

@@ -1,0 +1,148 @@
+@if (team()) {
+<div class="grid gap-4">
+    @if (successKey(); as key) {
+    <p-message severity="success" role="status">{{ key | transloco }}</p-message>
+    } @if (errorKey(); as key) {
+    <p-message severity="error" role="alert">{{ key | transloco }}</p-message>
+    }
+
+    <app-settings-card [title]="'admin.team.sso.title' | transloco" [subtitle]="'admin.team.sso.description' | transloco" icon="pi pi-shield">
+        <div settings-card-header>
+            <span class="sso-status" [class.sso-status--enabled]="persistedEnabled()">
+                <span class="sso-status-dot" aria-hidden="true"></span>
+                {{ (persistedEnabled() ? "admin.team.sso.status.enabled" : "admin.team.sso.status.disabled") | transloco }}
+            </span>
+        </div>
+
+        <form settings-card-body id="team-sso-form" class="sso-form" (submit)="$event.preventDefault(); saveSettings()" novalidate>
+            <section class="sso-provider" aria-labelledby="sso-provider-title">
+                <div>
+                    <p id="sso-provider-title" class="sso-section-title">{{ "admin.team.sso.provider.title" | transloco }}</p>
+                    <p class="sso-section-hint">{{ "admin.team.sso.provider.description" | transloco }}</p>
+                </div>
+                <span class="sso-provider-badge">OIDC</span>
+            </section>
+
+            <div class="sso-field sso-field--full">
+                <label for="sso-callback-url">{{ "admin.team.sso.callbackURL.label" | transloco }}</label>
+                <span class="sso-field-hint">{{ "admin.team.sso.callbackURL.hint" | transloco }}</span>
+                <div class="sso-copy-row">
+                    <input id="sso-callback-url" type="url" pInputText class="w-full" [value]="callbackURL()" readonly />
+                    <app-copy-control [value]="callbackURL()" [labelKey]="'admin.team.sso.callbackURL.copy'" />
+                </div>
+            </div>
+
+            <div class="sso-fields-grid">
+                <div class="sso-field sso-field--full">
+                    <label for="sso-issuer-url">{{ "admin.team.sso.issuerURL.label" | transloco }}</label>
+                    <span class="sso-field-hint">{{ "admin.team.sso.issuerURL.hint" | transloco }}</span>
+                    <input
+                        id="sso-issuer-url"
+                        type="url"
+                        pInputText
+                        [formField]="ssoForm.issuerURL"
+                        class="w-full"
+                        autocomplete="off"
+                        placeholder="https://id.example.com"
+                        [attr.aria-invalid]="ssoForm.issuerURL().touched() && ssoForm.issuerURL().invalid() ? true : null"
+                        [attr.aria-describedby]="ssoForm.issuerURL().touched() && ssoForm.issuerURL().invalid() ? 'sso-issuer-error' : null"
+                    />
+                    @if (ssoForm.issuerURL().touched() && ssoForm.issuerURL().invalid()) {
+                    <p-message id="sso-issuer-error" severity="error" variant="simple" size="small">{{ "admin.team.sso.errors.issuerRequired" | transloco }}</p-message>
+                    }
+                </div>
+
+                <div class="sso-field">
+                    <label for="sso-client-id">{{ "admin.team.sso.clientID.label" | transloco }}</label>
+                    <span class="sso-field-hint">{{ "admin.team.sso.clientID.hint" | transloco }}</span>
+                    <input
+                        id="sso-client-id"
+                        type="text"
+                        pInputText
+                        [formField]="ssoForm.clientID"
+                        class="w-full"
+                        autocomplete="off"
+                        [attr.aria-invalid]="ssoForm.clientID().touched() && ssoForm.clientID().invalid() ? true : null"
+                        [attr.aria-describedby]="ssoForm.clientID().touched() && ssoForm.clientID().invalid() ? 'sso-client-id-error' : null"
+                    />
+                    @if (ssoForm.clientID().touched() && ssoForm.clientID().invalid()) {
+                    <p-message id="sso-client-id-error" severity="error" variant="simple" size="small">{{ "admin.team.sso.errors.clientIDRequired" | transloco }}</p-message>
+                    }
+                </div>
+
+                <div class="sso-field">
+                    <label for="sso-client-secret">{{ "admin.team.sso.clientSecret.label" | transloco }}</label>
+                    <span class="sso-field-hint">{{ (clientSecretConfigured() ? "admin.team.sso.clientSecret.configuredHint" : "admin.team.sso.clientSecret.requiredHint") | transloco }}</span>
+                    <input
+                        id="sso-client-secret"
+                        type="password"
+                        pInputText
+                        [formField]="ssoForm.clientSecret"
+                        class="w-full"
+                        autocomplete="new-password"
+                        [placeholder]="(clientSecretConfigured() ? 'admin.team.sso.clientSecret.keepPlaceholder' : 'admin.team.sso.clientSecret.placeholder') | transloco"
+                    />
+                </div>
+
+                <div class="sso-field sso-field--full">
+                    <label for="sso-allowed-domains">{{ "admin.team.sso.allowedDomains.label" | transloco }}</label>
+                    <span class="sso-field-hint">{{ "admin.team.sso.allowedDomains.hint" | transloco }}</span>
+                    <textarea
+                        id="sso-allowed-domains"
+                        [formField]="ssoForm.allowedDomains"
+                        rows="3"
+                        class="sso-textarea w-full"
+                        placeholder="example.com&#10;example.org"
+                        [attr.aria-invalid]="ssoForm.allowedDomains().touched() && ssoForm.allowedDomains().invalid() ? true : null"
+                        [attr.aria-describedby]="ssoForm.allowedDomains().touched() && ssoForm.allowedDomains().invalid() ? 'sso-domains-error' : null"
+                    ></textarea>
+                    @if (ssoForm.allowedDomains().touched() && ssoForm.allowedDomains().invalid()) {
+                    <p-message id="sso-domains-error" severity="error" variant="simple" size="small">{{ "admin.team.sso.errors.domainRequired" | transloco }}</p-message>
+                    }
+                </div>
+            </div>
+
+            <details class="sso-advanced">
+                <summary>{{ "admin.team.sso.claimMapping.title" | transloco }}</summary>
+                <p class="sso-section-hint">{{ "admin.team.sso.claimMapping.description" | transloco }}</p>
+                <div class="sso-fields-grid">
+                    <div class="sso-field">
+                        <label for="sso-email-claim">{{ "admin.team.sso.claimMapping.email" | transloco }}</label>
+                        <input id="sso-email-claim" type="text" pInputText [formField]="ssoForm.emailClaim" class="w-full" autocomplete="off" />
+                    </div>
+                    <div class="sso-field">
+                        <label for="sso-name-claim">{{ "admin.team.sso.claimMapping.name" | transloco }}</label>
+                        <input id="sso-name-claim" type="text" pInputText [formField]="ssoForm.displayNameClaim" class="w-full" autocomplete="off" />
+                    </div>
+                </div>
+            </details>
+
+            <aside class="sso-security-note">
+                <i class="pi pi-lock" aria-hidden="true"></i>
+                <p>{{ "admin.team.sso.securityNote" | transloco }}</p>
+            </aside>
+
+            <label class="sso-enable-row" for="sso-enabled">
+                <span>
+                    <span class="sso-enable-title">{{ "admin.team.sso.enable.label" | transloco }}</span>
+                    <span class="sso-field-hint">{{ "admin.team.sso.enable.hint" | transloco }}</span>
+                </span>
+                <input id="sso-enabled" type="checkbox" [formField]="ssoForm.enabled" class="sso-switch" />
+            </label>
+        </form>
+
+        <div settings-card-footer class="sso-actions">
+            <p-button
+                [label]="'admin.team.sso.testAction' | transloco"
+                icon="pi pi-bolt"
+                severity="secondary"
+                [outlined]="true"
+                [loading]="isTesting()"
+                [disabled]="isLoading() || isSaving() || isTesting() || !clientSecretConfigured()"
+                (onClick)="testConnection()"
+            />
+            <p-button [label]="'admin.team.sso.saveAction' | transloco" icon="pi pi-check" [loading]="isSaving()" [disabled]="!canSave()" (onClick)="saveSettings()" />
+        </div>
+    </app-settings-card>
+</div>
+}

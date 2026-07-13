@@ -6,6 +6,7 @@ func openAPIV1Paths() map[string]any {
 		openAPIV1AdminSitePaths(),
 		openAPIV1WebVitalPaths(),
 		openAPIV1IntegrationPaths(),
+		openAPIV1SSOPaths(),
 		openAPIV1QRPaths(),
 		openAPIV1SearchConsoleReportPaths(),
 		openAPIV1WebhookPaths(),

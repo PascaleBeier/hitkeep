@@ -20,9 +20,12 @@ describe('Login', () => {
     let component: Login;
     let fixture: ComponentFixture<Login>;
     let returnUrl: string | null;
+    let authError: string | null;
     const authMock: {
         status: () => string;
         login: ReturnType<typeof vi.fn>;
+        getSSOAvailability: ReturnType<typeof vi.fn>;
+        startSSOLogin: ReturnType<typeof vi.fn>;
         startPasskeyLogin: ReturnType<typeof vi.fn>;
         finishPasskeyLogin: ReturnType<typeof vi.fn>;
         verifyMfaTotp: ReturnType<typeof vi.fn>;
@@ -31,6 +34,8 @@ describe('Login', () => {
     } = {
         status: () => 'unknown',
         login: vi.fn(() => of({ status: 'ok' as const })),
+        getSSOAvailability: vi.fn(() => of({ enabled: false })),
+        startSSOLogin: vi.fn(() => of({ auth_url: 'https://identity.example.com/authorize' })),
         startPasskeyLogin: vi.fn(() =>
             of({
                 challenge_token: '',
@@ -50,6 +55,7 @@ describe('Login', () => {
 
     beforeEach(async () => {
         returnUrl = null;
+        authError = null;
         vi.clearAllMocks();
 
         const preferencesMock = {
@@ -93,7 +99,7 @@ describe('Login', () => {
                     useValue: {
                         snapshot: {
                             get queryParamMap() {
-                                return convertToParamMap(returnUrl ? { returnUrl } : {});
+                                return convertToParamMap({ ...(returnUrl ? { returnUrl } : {}), ...(authError ? { error: authError } : {}) });
                             }
                         }
                     }
@@ -133,6 +139,45 @@ describe('Login', () => {
             remember_me: false
         });
         expect(navigate).toHaveBeenCalledWith('/');
+    });
+
+    it('shows SSO only when the instance has an enabled team configuration', () => {
+        component['isPasskeySupported'].set(false);
+        component['ssoAvailable'].set(false);
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.textContent).not.toContain('login.signInWithSSO');
+
+        component['ssoAvailable'].set(true);
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.textContent).toContain('login.signInWithSSO');
+    });
+
+    it('starts SSO with the entered email and preserves the safe return URL', () => {
+        const navigate = vi.spyOn(component as unknown as { navigateToSSOProvider: (authURL: string) => void }, 'navigateToSSOProvider').mockImplementation(() => undefined);
+        returnUrl = '/events?range=30d';
+        component['ssoAvailable'].set(true);
+        component['loginForm'].email().control().setValue('analyst@example.com');
+        component['loginForm'].rememberMe().control().setValue(true);
+
+        component['onSSOLogin']();
+
+        expect(authMock.startSSOLogin).toHaveBeenCalledWith({
+            email: 'analyst@example.com',
+            return_url: '/events?range=30d',
+            remember_me: true
+        });
+        expect(navigate).toHaveBeenCalledWith('https://identity.example.com/authorize');
+    });
+
+    it('requires a valid email before starting SSO', () => {
+        component['loginForm'].email().control().setValue('not-an-email');
+
+        component['onSSOLogin']();
+
+        expect(authMock.startSSOLogin).not.toHaveBeenCalled();
+        expect(component['loginForm'].email().touched()).toBe(true);
     });
 
     it('stores recovery-code MFA state from the login response', () => {

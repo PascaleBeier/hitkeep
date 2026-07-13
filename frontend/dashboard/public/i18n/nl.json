@@ -201,6 +201,8 @@
       "diagnosticsExported": "Diagnostiek geëxporteerd",
       "accessDenied": "Toegang geweigerd",
       "authLoginSucceeded": "Inloggen is gelukt",
+      "authSSOLoginSucceeded": "Inloggen met SSO is gelukt",
+      "authSSOLoginFailed": "Inloggen met SSO is mislukt",
       "authLoginFailed": "Inloggen mislukt",
       "authMfaRequired": "MFA vereist",
       "authMfaSucceeded": "MFA is geslaagd",
@@ -210,6 +212,9 @@
       "teamUpdated": "Team bijgewerkt",
       "teamArchived": "Team gearchiveerd",
       "teamActiveChanged": "Actief team gewijzigd",
+      "ssoConfigurationUpdated": "SSO-configuratie bijgewerkt",
+      "ssoConnectionTested": "SSO-verbinding getest",
+      "ssoConfigurationDeleted": "SSO-configuratie verwijderd",
       "memberInvited": "Lid uitgenodigd",
       "memberInviteAccepted": "Uitnodiging geaccepteerd",
       "memberInviteResent": "Uitnodiging opnieuw verzonden",
@@ -286,6 +291,7 @@
       "import": "Importeren",
       "siteExclusion": "Uitsluiting van sites",
       "apiClient": "API-client",
+      "ssoConfiguration": "SSO-configuratie",
       "backup": "Back-up",
       "spamFilter": "Spamfilter",
       "diagnostics": "Diagnostiek",
@@ -1597,6 +1603,7 @@
       "tabs": {
         "overview": "Overzicht",
         "members": "Leden",
+        "sso": "SSO",
         "apiClients": "API-clients",
         "customDomains": "Aangepaste domeinen",
         "branding": "Branding",
@@ -1643,7 +1650,7 @@
         },
         "plans": {
           "title": "Upgrade je abonnement",
-          "description": "Ontgrendel langere retentie, meer sites en teamcapaciteit.",
+          "description": "Ontgrendel langere retentie, meer sites, teamcapaciteit en SSO met Business.",
           "currentPlan": "Huidig ​​abonnement",
           "recommended": "Aanbevolen",
           "perMonth": "/mnd",
@@ -1659,13 +1666,47 @@
             "members": "Maximaal {{count}}-teamleden",
             "retention": "{{count}} jaar gegevensretentie",
             "retentionDays": "{{count}}-dag gegevensretentie",
-            "customDomains": "Aangepaste trackingdomeinen"
+            "customDomains": "Aangepaste trackingdomeinen",
+            "sso": "Single sign-on (SSO)"
           }
         }
       },
       "members": {
         "breadcrumb": "Teamleden",
         "title": "Teamleden"
+      },
+      "sso": {
+        "title": "Single sign-on",
+        "description": "Koppel dit team aan de OpenID Connect-identiteitsprovider.",
+        "status": { "enabled": "Ingeschakeld", "disabled": "Uitgeschakeld" },
+        "provider": { "title": "Identiteitsprovider", "description": "HitKeep ondersteunt momenteel op standaarden gebaseerde OpenID Connect." },
+        "callbackURL": { "label": "Callback-URL", "hint": "Voeg deze exacte omleidings-URI toe aan je identiteitsprovider.", "copy": "URL kopiëren" },
+        "issuerURL": { "label": "Issuer-URL", "hint": "De HTTPS-issuer uit de OpenID-configuratie van je provider." },
+        "clientID": { "label": "Client-ID", "hint": "De openbare identificatie van de HitKeep-applicatie." },
+        "clientSecret": {
+          "label": "Clientgeheim",
+          "requiredHint": "Vereist voordat deze verbinding kan worden opgeslagen.",
+          "configuredHint": "Er is een geheim opgeslagen. Voer alleen een nieuw geheim in om het te roteren.",
+          "placeholder": "Voer het clientgeheim in",
+          "keepPlaceholder": "Laat leeg om het huidige geheim te behouden"
+        },
+        "allowedDomains": { "label": "Toegestane e-maildomeinen", "hint": "Eén domein per regel. Elk domein kan maar bij de SSO-verbinding van één team horen." },
+        "claimMapping": { "title": "Claimtoewijzing", "description": "Behoud de standaardwaarden, tenzij je provider andere claimpaden gebruikt.", "email": "E-mailclaim", "name": "Claim voor weergavenaam" },
+        "securityNote": "HitKeep controleert handtekening, issuer, audience, state, nonce, PKCE-challenge en geverifieerde e-mail. Providertokens worden nooit opgeslagen.",
+        "enable": { "label": "Inloggen met SSO inschakelen", "hint": "Toont SSO als optie voor personen met een toegestaan e-maildomein. Inloggen met een wachtwoord blijft beschikbaar." },
+        "saveAction": "SSO-configuratie opslaan",
+        "testAction": "Verbinding testen",
+        "saveSuccess": "SSO-configuratie opgeslagen.",
+        "testSuccess": "De identiteitsprovider is bereikbaar en het discoverydocument is geldig.",
+        "errors": {
+          "loadFailed": "De SSO-configuratie kon niet worden geladen.",
+          "saveFailed": "De SSO-configuratie kon niet worden opgeslagen. Controleer de providergegevens en probeer opnieuw.",
+          "testFailed": "De identiteitsprovider is niet bereikbaar of gaf een ongeldig discoverydocument terug.",
+          "domainConflict": "Een van deze e-maildomeinen is al toegewezen aan de SSO-verbinding van een ander team.",
+          "issuerRequired": "Voer een geldige HTTPS-issuer-URL in.",
+          "clientIDRequired": "Voer de client-ID in.",
+          "domainRequired": "Voer ten minste één e-maildomein in."
+        }
       },
       "settings": {
         "breadcrumb": "Teaminstellingen",
@@ -2334,6 +2375,7 @@
     "signIn": "Log in",
     "or": "of",
     "signInWithPasskey": "Inloggen met passkey",
+    "signInWithSSO": "Inloggen met SSO",
     "mfaTitle": "Tweefactorauthenticatie",
     "mfaSubtitle": "Voltooi het inloggen met je authenticatiecode, een herstelcode, een inloglink of een toegangssleutel.",
     "sendEmailLink": "E-mail mij een inloglink",
@@ -2345,6 +2387,11 @@
     "verifyRecoveryCode": "Gebruik herstelcode",
     "footerRights": "HitKeep. Alle rechten voorbehouden.",
     "errors": {
+      "ssoProviderError": "Je identiteitsprovider heeft het inloggen geannuleerd of geweigerd. Probeer opnieuw of gebruik je wachtwoord.",
+      "ssoEmailUnverified": "Je identiteitsprovider gaf geen geverifieerd e-mailadres terug. Neem contact op met je teambeheerder.",
+      "ssoEmailNotAllowed": "Het provideraccount komt niet overeen met het ingevoerde e-mailadres of teamdomein.",
+      "ssoUnavailable": "SSO is niet geconfigureerd voor dit e-maildomein. Controleer het adres of gebruik je wachtwoord.",
+      "ssoFailed": "Inloggen met SSO kon niet worden voltooid. Probeer opnieuw of gebruik je wachtwoord.",
       "invalidCredentials": "Ongeldig e-mailadres of wachtwoord.",
       "passkeyNotSupported": "Inloggen met passkey wordt niet ondersteund op dit apparaat.",
       "passkeyFailed": "Inloggen met passkey is mislukt. Probeer het opnieuw.",

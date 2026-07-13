@@ -79,6 +79,13 @@ describe('TeamAdminPage', () => {
 
     beforeEach(async () => {
         cloudHosted.set(false);
+        activeTeam.set({
+            id: 'team-1',
+            name: 'Acme',
+            logo_url: '',
+            role: 'owner',
+            created_at: '2026-01-01T00:00:00Z'
+        });
         permissionServiceMock.permissions.set({
             instance_role: 'user',
             permissions: {},
@@ -137,6 +144,7 @@ describe('TeamAdminPage', () => {
 
     it('shows dedicated infrastructure, branding, and danger-zone tabs for team admins and owners', () => {
         expect(fixture.nativeElement.textContent).toContain('admin.team.tabs.apiClients');
+        expect(fixture.nativeElement.textContent).toContain('admin.team.tabs.sso');
         expect(fixture.nativeElement.textContent).toContain('admin.team.tabs.customDomains');
         expect(fixture.nativeElement.textContent).toContain('admin.team.tabs.branding');
         expect(fixture.nativeElement.textContent).toContain('admin.team.tabs.dangerZone');
@@ -145,7 +153,7 @@ describe('TeamAdminPage', () => {
 
     it('renders danger zone as the last visible team tab with danger styling', () => {
         const tabs = component['tabs']();
-        expect(tabs.map((tab) => tab.route)).toEqual(['overview', 'members', 'api-clients', 'custom-domains', 'branding', 'activity', 'danger-zone']);
+        expect(tabs.map((tab) => tab.route)).toEqual(['overview', 'members', 'sso', 'api-clients', 'custom-domains', 'branding', 'activity', 'danger-zone']);
         const dangerTab = tabs[tabs.length - 1];
         expect(dangerTab?.route).toBe('danger-zone');
         expect(dangerTab?.icon).toBe('pi pi-exclamation-triangle');
@@ -167,6 +175,43 @@ describe('TeamAdminPage', () => {
         expect(customDomainsTab()?.badge).toBe('PRO');
         expect(customDomainsTab()?.link).toBe('/admin/team/overview');
         expect(fixture.nativeElement.querySelector('.hk-admin-tab-badge')?.textContent).toBe('PRO');
+    });
+
+    it('marks SSO with a BUSINESS badge linking to the plan comparison when cloud entitlement is missing', async () => {
+        const ssoTab = () => component['tabs']().find((tab) => tab.route === 'sso');
+
+        activeTeam.set({
+            ...activeTeam(),
+            plan: { code: 'pro', name: 'Pro' },
+            entitlements: {
+                max_sites_per_team: 1,
+                max_team_members: 1,
+                max_retention_days: 30,
+                allow_sso: false,
+                allow_custom_branding: false
+            }
+        });
+        await fixture.whenStable();
+
+        expect(ssoTab()?.badge).toBeUndefined();
+        expect(ssoTab()?.link).toBe('/admin/team/sso');
+
+        cloudHosted.set(true);
+        await fixture.whenStable();
+
+        expect(ssoTab()?.badge).toBe('BUSINESS');
+        expect(ssoTab()?.link).toBe('/admin/team/overview');
+        expect(fixture.nativeElement.querySelector('.hk-admin-tab-badge')?.textContent).toBe('BUSINESS');
+
+        activeTeam.set({
+            ...activeTeam(),
+            plan: { code: 'business', name: 'Business' },
+            entitlements: { ...activeTeam().entitlements!, allow_sso: true }
+        });
+        await fixture.whenStable();
+
+        expect(ssoTab()?.badge).toBeUndefined();
+        expect(ssoTab()?.link).toBe('/admin/team/sso');
     });
 
     it('defaults the active tab to the overview child route and links every tab to its child path', () => {
@@ -195,6 +240,7 @@ describe('TeamAdminPage', () => {
         fixture.detectChanges();
 
         expect(fixture.nativeElement.textContent).not.toContain('admin.team.tabs.apiClients');
+        expect(fixture.nativeElement.textContent).not.toContain('admin.team.tabs.sso');
         expect(fixture.nativeElement.textContent).not.toContain('admin.team.tabs.customDomains');
         expect(fixture.nativeElement.textContent).not.toContain('admin.team.tabs.activity');
         expect(fixture.nativeElement.textContent).not.toContain('admin.team.tabs.branding');

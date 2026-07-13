@@ -14,3 +14,12 @@ to fill the container width
     flex-direction: column;
     gap: 0.75rem;
 }
+
+.hk-auth-actions-stack p-button {
+    width: min(100%, 18rem);
+}
+
+:host ::ng-deep .hk-auth-actions-stack .p-button {
+    width: 100%;
+    justify-content: center;
+}

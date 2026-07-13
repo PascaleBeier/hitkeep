@@ -59,3 +59,32 @@ func TestDeletePasskeyLoginChallengeRemovesIndexedChallenge(t *testing.T) {
 
 	state.ClearUser(userID)
 }
+
+func TestSSOOAuthStateIsOneTimeAndExpires(t *testing.T) {
+	stateStore := NewAuthStateStore()
+	stateID := stateStore.CreateSSOOAuthState(SSOOAuthState{
+		TeamID:       uuid.New(),
+		IssuerURL:    "https://id.example.com",
+		ClientID:     "hitkeep",
+		Email:        "user@example.com",
+		Nonce:        "nonce",
+		CodeVerifier: "verifier",
+		ExpiresAt:    time.Now().UTC().Add(time.Minute),
+	})
+
+	state, ok := stateStore.ConsumeSSOOAuthState(stateID)
+	if !ok || state.Email != "user@example.com" || state.CodeVerifier != "verifier" {
+		t.Fatalf("unexpected SSO state: state=%+v ok=%v", state, ok)
+	}
+	if _, ok := stateStore.ConsumeSSOOAuthState(stateID); ok {
+		t.Fatal("expected SSO state to be one-time")
+	}
+
+	expiredID := stateStore.CreateSSOOAuthState(SSOOAuthState{
+		TeamID:    uuid.New(),
+		ExpiresAt: time.Now().UTC().Add(-time.Second),
+	})
+	if _, ok := stateStore.ConsumeSSOOAuthState(expiredID); ok {
+		t.Fatal("expected expired SSO state to be rejected")
+	}
+}

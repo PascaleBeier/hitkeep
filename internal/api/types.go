@@ -1472,6 +1472,27 @@ type TeamPlan struct {
 	SupportURL string `json:"support_url,omitempty"`
 }
 
+type TeamSSOConfig struct {
+	ProviderType           string    `json:"provider_type"`
+	IssuerURL              string    `json:"issuer_url"`
+	ClientID               string    `json:"client_id"`
+	ClientSecretConfigured bool      `json:"client_secret_configured"`
+	AllowedDomains         []string  `json:"allowed_domains"`
+	EmailClaim             string    `json:"email_claim"`
+	DisplayNameClaim       string    `json:"display_name_claim"`
+	Enabled                bool      `json:"enabled"`
+	CallbackURL            string    `json:"callback_url"`
+	UpdatedAt              time.Time `json:"updated_at,omitempty"`
+}
+
+type SSOAvailability struct {
+	Enabled bool `json:"enabled"`
+}
+
+type SSOStartResponse struct {
+	AuthURL string `json:"auth_url"`
+}
+
 type CloudPlanTier struct {
 	Code         string           `json:"code"`
 	Name         string           `json:"name"`

@@ -133,6 +133,12 @@
                             <i class="pi pi-check text-sm font-bold text-primary"></i>
                             <span>{{ "admin.team.overview.plans.features.customDomains" | transloco }}</span>
                         </div>
+                        @if (tier.entitlements.allow_sso) {
+                        <div class="flex items-center gap-2 text-sm">
+                            <i class="pi pi-check text-sm font-bold text-primary"></i>
+                            <span>{{ "admin.team.overview.plans.features.sso" | transloco }}</span>
+                        </div>
+                        }
                     </div>
 
                     <div class="mt-auto pt-2">
@@ -140,7 +146,7 @@
                             [label]="'admin.team.overview.plans.upgradeAction' | transloco: { plan: tier.name }"
                             [loading]="checkoutPending()"
                             [disabled]="checkoutPending()"
-                            [severity]="tier.code === 'pro' ? 'primary' : 'secondary'"
+                            [severity]="tier.code === 'pro' || upgradeTiers().length === 1 ? 'primary' : 'secondary'"
                             [fluid]="true"
                             (onClick)="startCheckoutForPlan($any(tier.code))"
                         />

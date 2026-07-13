@@ -21,9 +21,14 @@ describe('AuditPresentationService', () => {
                                 actions: {
                                     askAIRequested: 'Ask AI requested',
                                     askAIResponded: 'Ask AI responded',
-                                    askAIHistoryViewed: 'Ask AI history viewed'
+                                    askAIHistoryViewed: 'Ask AI history viewed',
+                                    authSSOLoginSucceeded: 'SSO login succeeded',
+                                    authSSOLoginFailed: 'SSO login failed',
+                                    ssoConfigurationUpdated: 'SSO configuration updated',
+                                    ssoConnectionTested: 'SSO connection tested',
+                                    ssoConfigurationDeleted: 'SSO configuration deleted'
                                 },
-                                targetTypes: {},
+                                targetTypes: { ssoConfiguration: 'SSO configuration' },
                                 outcomes: {
                                     success: 'Success',
                                     failure: 'Failure',
@@ -68,5 +73,16 @@ describe('AuditPresentationService', () => {
         expect(service.actionSeverity('ask_ai.requested')).toBe('info');
         expect(service.actionSeverity('ask_ai.responded')).toBe('info');
         expect(service.actionSeverity('ask_ai.history_viewed')).toBe('info');
+    });
+
+    it('presents SSO audit actions and configuration targets', () => {
+        expect(service.actionLabel('auth.sso_login_succeeded')).toBe('SSO login succeeded');
+        expect(service.actionLabel('auth.sso_login_failed')).toBe('SSO login failed');
+        expect(service.actionLabel('sso.configuration_updated')).toBe('SSO configuration updated');
+        expect(service.actionLabel('sso.connection_tested')).toBe('SSO connection tested');
+        expect(service.actionLabel('sso.configuration_deleted')).toBe('SSO configuration deleted');
+        expect(service.targetTypeLabel('sso_configuration')).toBe('SSO configuration');
+        expect(service.actionSeverity('auth.sso_login_failed')).toBe('danger');
+        expect(service.actionSeverity('auth.sso_login_succeeded')).toBe('info');
     });
 });

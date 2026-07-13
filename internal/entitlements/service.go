@@ -114,6 +114,21 @@ func (s *Service) AllowsCustomTrackingDomains(ctx context.Context, actorID, team
 	return plan == nil || plan.Code != PlanCodeFree
 }
 
+// AllowsSSO reports whether the actor may use SSO for the team. Managed cloud
+// plans expose this entitlement only on Business; self-hosted deployments are
+// never gated. Passing uuid.Nil enforces the team entitlement without an actor
+// bypass, as required by public login routes.
+func (s *Service) AllowsSSO(ctx context.Context, actorID, teamID uuid.UUID) bool {
+	if !s.cloudHosted() {
+		return true
+	}
+	if s.BypassesCloudLimits(ctx, actorID) {
+		return true
+	}
+	ent := s.TeamEntitlements(ctx, teamID)
+	return ent != nil && ent.AllowSSO
+}
+
 // RequireTeamMemberCapacity returns ErrTeamMemberLimitReached when the team's
 // members plus pending invites have reached the plan's member limit.
 func (s *Service) RequireTeamMemberCapacity(ctx context.Context, teamID uuid.UUID) error {

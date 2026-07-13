@@ -201,6 +201,8 @@
       "diagnosticsExported": "Diagnostica esportata",
       "accessDenied": "Accesso negato",
       "authLoginSucceeded": "Accesso riuscito",
+      "authSSOLoginSucceeded": "Accesso SSO riuscito",
+      "authSSOLoginFailed": "Accesso SSO non riuscito",
       "authLoginFailed": "Accesso non riuscito",
       "authMfaRequired": "MFA richiesta",
       "authMfaSucceeded": "MFA riuscita",
@@ -210,6 +212,9 @@
       "teamUpdated": "Team aggiornato",
       "teamArchived": "Team archiviato",
       "teamActiveChanged": "Team attivo cambiato",
+      "ssoConfigurationUpdated": "Configurazione SSO aggiornata",
+      "ssoConnectionTested": "Connessione SSO testata",
+      "ssoConfigurationDeleted": "Configurazione SSO eliminata",
       "memberInvited": "Membro invitato",
       "memberInviteAccepted": "Invito accettato",
       "memberInviteResent": "Invito reinviato",
@@ -286,6 +291,7 @@
       "import": "Importazione",
       "siteExclusion": "Esclusione sito",
       "apiClient": "Client API",
+      "ssoConfiguration": "Configurazione SSO",
       "backup": "Backup",
       "spamFilter": "Filtro spam",
       "diagnostics": "Diagnostica",
@@ -1615,6 +1621,7 @@
       "tabs": {
         "overview": "Panoramica",
         "members": "Membri",
+        "sso": "SSO",
         "apiClients": "Client API",
         "customDomains": "Domini personalizzati",
         "branding": "Branding",
@@ -1661,7 +1668,7 @@
         },
         "plans": {
           "title": "Aggiorna il tuo piano",
-          "description": "Sblocca una retention più lunga, più siti e capacità del team.",
+          "description": "Sblocca una retention più lunga, più siti, capacità del team e l'SSO con Business.",
           "currentPlan": "Piano attuale",
           "recommended": "Consigliato",
           "perMonth": "/mese",
@@ -1677,13 +1684,47 @@
             "members": "Fino a {{count}} membri del team",
             "retention": "{{count}} anni di retention dei dati",
             "retentionDays": "{{count}} giorni di retention dei dati",
-            "customDomains": "Domini di tracciamento personalizzati"
+            "customDomains": "Domini di tracciamento personalizzati",
+            "sso": "Single sign-on (SSO)"
           }
         }
       },
       "members": {
         "breadcrumb": "Membri del team",
         "title": "Membri del team"
+      },
+      "sso": {
+        "title": "Single sign-on",
+        "description": "Collega questo team al suo provider di identità OpenID Connect.",
+        "status": { "enabled": "Attivato", "disabled": "Disattivato" },
+        "provider": { "title": "Provider di identità", "description": "HitKeep supporta attualmente OpenID Connect basato su standard." },
+        "callbackURL": { "label": "URL di callback", "hint": "Aggiungi questo URI di reindirizzamento esatto al provider di identità.", "copy": "Copia URL" },
+        "issuerURL": { "label": "URL issuer", "hint": "L’issuer HTTPS della configurazione OpenID del provider." },
+        "clientID": { "label": "ID client", "hint": "L’identificatore pubblico dell’applicazione HitKeep." },
+        "clientSecret": {
+          "label": "Segreto client",
+          "requiredHint": "Obbligatorio prima di poter salvare la connessione.",
+          "configuredHint": "È memorizzato un segreto. Inseriscine uno nuovo solo per ruotarlo.",
+          "placeholder": "Inserisci il segreto client",
+          "keepPlaceholder": "Lascia vuoto per mantenere il segreto attuale"
+        },
+        "allowedDomains": { "label": "Domini email consentiti", "hint": "Un dominio per riga. Ogni dominio può appartenere alla connessione SSO di un solo team." },
+        "claimMapping": { "title": "Mappatura dei claim", "description": "Mantieni i valori predefiniti a meno che il provider usi percorsi di claim diversi.", "email": "Claim email", "name": "Claim nome visualizzato" },
+        "securityNote": "HitKeep verifica firma, issuer, audience, state, nonce, challenge PKCE ed email verificata. I token del provider non vengono mai memorizzati.",
+        "enable": { "label": "Attiva accesso SSO", "hint": "Mostra SSO come opzione per chi usa un dominio email consentito. L’accesso con password resta disponibile." },
+        "saveAction": "Salva configurazione SSO",
+        "testAction": "Testa connessione",
+        "saveSuccess": "Configurazione SSO salvata.",
+        "testSuccess": "Il provider di identità è raggiungibile e il documento di discovery è valido.",
+        "errors": {
+          "loadFailed": "Impossibile caricare la configurazione SSO.",
+          "saveFailed": "Impossibile salvare la configurazione SSO. Controlla i dati del provider e riprova.",
+          "testFailed": "Il provider non è raggiungibile o ha restituito un documento di discovery non valido.",
+          "domainConflict": "Uno di questi domini email è già assegnato alla connessione SSO di un altro team.",
+          "issuerRequired": "Inserisci un URL issuer HTTPS valido.",
+          "clientIDRequired": "Inserisci l’ID client.",
+          "domainRequired": "Inserisci almeno un dominio email."
+        }
       },
       "settings": {
         "breadcrumb": "Impostazioni del team",
@@ -2352,6 +2393,7 @@
     "signIn": "Accedi",
     "or": "o",
     "signInWithPasskey": "Accedi con passkey",
+    "signInWithSSO": "Accedi con SSO",
     "mfaTitle": "Verifica a due fattori",
     "mfaSubtitle": "Completa l'accesso con il codice dell'autenticatore, un codice di recupero, un link di accesso o una passkey.",
     "sendEmailLink": "Inviami un link di accesso",
@@ -2363,6 +2405,11 @@
     "verifyRecoveryCode": "Usa codice di recupero",
     "footerRights": "HitKeep. Tutti i diritti riservati.",
     "errors": {
+      "ssoProviderError": "Il provider di identità ha annullato o negato l’accesso. Riprova o usa la password.",
+      "ssoEmailUnverified": "Il provider di identità non ha restituito un indirizzo email verificato. Contatta l’amministratore del team.",
+      "ssoEmailNotAllowed": "L’account del provider non corrisponde all’indirizzo email o al dominio del team inserito.",
+      "ssoUnavailable": "SSO non è configurato per questo dominio email. Controlla l’indirizzo o usa la password.",
+      "ssoFailed": "Impossibile completare l’accesso SSO. Riprova o usa la password.",
       "invalidCredentials": "Email o password non validi.",
       "passkeyNotSupported": "L'accesso con passkey non è supportato su questo dispositivo.",
       "passkeyFailed": "Accesso con passkey non riuscito. Riprova.",

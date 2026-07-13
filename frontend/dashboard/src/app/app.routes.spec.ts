@@ -57,6 +57,7 @@ describe('routes', () => {
         for (const [path, titleKey] of [
             ['overview', 'admin.team.tabs.overview'],
             ['members', 'admin.team.tabs.members'],
+            ['sso', 'admin.team.tabs.sso'],
             ['api-clients', 'admin.team.tabs.apiClients'],
             ['custom-domains', 'admin.team.tabs.customDomains'],
             ['branding', 'admin.team.tabs.branding'],

@@ -17,6 +17,7 @@ import { CloudPlanTier, TeamPlan, TeamRole } from '@models/analytics.types';
 
 /** Monthly EUR list prices per cloud plan; formatted locale-aware at render time. */
 const PLAN_MONTHLY_PRICES_EUR: Record<string, number> = { free: 0, pro: 15, business: 39 };
+const PLAN_RANK: Record<string, number> = { free: 0, pro: 1, business: 2 };
 
 @Component({
     selector: 'app-team-overview',
@@ -69,13 +70,18 @@ export class TeamOverviewPage {
         const plan = this.cloudPlan()?.plan;
         return Boolean(plan && plan.code !== 'free' && !this.isOperatorPlan(plan) && !this.portalPending());
     });
-    protected readonly canStartUpgrade = computed(() => this.cloudPlan()?.plan.code === 'free' && !this.checkoutPending());
-    protected readonly showPlanComparison = computed(() => this.canStartUpgrade() && this.planTiers().length > 1);
     protected readonly currentTier = computed(() => {
         const code = this.cloudPlan()?.plan.code;
         return this.planTiers().find((t) => t.code === code) ?? null;
     });
-    protected readonly upgradeTiers = computed(() => this.planTiers().filter((t) => t.code !== 'free'));
+    protected readonly upgradeTiers = computed(() => {
+        const currentRank = PLAN_RANK[this.cloudPlan()?.plan.code ?? ''];
+        if (currentRank === undefined) {
+            return [];
+        }
+        return this.planTiers().filter((tier) => (PLAN_RANK[tier.code] ?? -1) > currentRank);
+    });
+    protected readonly showPlanComparison = computed(() => this.upgradeTiers().length > 0);
     /** Locale-aware plan prices, e.g. "€15" in English and "15 €" in German. */
     protected readonly planPriceLabels = computed<Record<string, string>>(() => {
         this.activeLanguage();

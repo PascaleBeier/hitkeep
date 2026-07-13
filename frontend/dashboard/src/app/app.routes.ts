@@ -278,6 +278,11 @@ export const routes: Routes = [
                                 data: titleData('admin.team.tabs.apiClients', 'team')
                             },
                             {
+                                path: 'sso',
+                                loadComponent: () => import('@pages/admin/team/team-sso').then((m) => m.TeamSSOPage),
+                                data: titleData('admin.team.tabs.sso', 'team')
+                            },
+                            {
                                 path: 'custom-domains',
                                 loadComponent: () => import('@pages/admin/team/team-custom-domains').then((m) => m.TeamCustomDomainsPage),
                                 data: titleData('admin.team.tabs.customDomains', 'team')

@@ -202,6 +202,8 @@
       "accessDenied": "Zugriff verweigert",
       "authLoginSucceeded": "Login erfolgreich",
       "authLoginFailed": "Login fehlgeschlagen",
+      "authSSOLoginSucceeded": "SSO-Login erfolgreich",
+      "authSSOLoginFailed": "SSO-Login fehlgeschlagen",
       "authMfaRequired": "MFA erforderlich",
       "authMfaSucceeded": "MFA erfolgreich",
       "authLogout": "Logout",
@@ -210,6 +212,9 @@
       "teamUpdated": "Team aktualisiert",
       "teamArchived": "Team archiviert",
       "teamActiveChanged": "Aktives Team geändert",
+      "ssoConfigurationUpdated": "SSO-Konfiguration aktualisiert",
+      "ssoConnectionTested": "SSO-Verbindung getestet",
+      "ssoConfigurationDeleted": "SSO-Konfiguration gelöscht",
       "memberInvited": "Mitglied eingeladen",
       "memberInviteAccepted": "Einladung angenommen",
       "memberInviteResent": "Einladung erneut gesendet",
@@ -286,6 +291,7 @@
       "import": "Import",
       "siteExclusion": "Site-Ausschluss",
       "apiClient": "API-Client",
+      "ssoConfiguration": "SSO-Konfiguration",
       "backup": "Backup",
       "spamFilter": "Spamfilter",
       "diagnostics": "Diagnose",
@@ -1615,6 +1621,7 @@
       "tabs": {
         "overview": "Übersicht",
         "members": "Mitglieder",
+        "sso": "SSO",
         "apiClients": "API-Clients",
         "customDomains": "Eigene Domains",
         "branding": "Branding",
@@ -1661,7 +1668,7 @@
         },
         "plans": {
           "title": "Tarif upgraden",
-          "description": "Längere Aufbewahrung, mehr Websites und Teamkapazität freischalten.",
+          "description": "Schalte längere Aufbewahrung, mehr Websites, Teamkapazität und SSO im Business-Tarif frei.",
           "currentPlan": "Aktueller Tarif",
           "recommended": "Empfohlen",
           "perMonth": "/Monat",
@@ -1677,13 +1684,52 @@
             "members": "Bis zu {{count}} Teammitglieder",
             "retention": "{{count}} Jahre Datenaufbewahrung",
             "retentionDays": "{{count}} Tage Datenaufbewahrung",
-            "customDomains": "Eigene Tracking-Domains"
+            "customDomains": "Eigene Tracking-Domains",
+            "sso": "Single Sign-on (SSO)"
           }
         }
       },
       "members": {
         "breadcrumb": "Teammitglieder",
         "title": "Teammitglieder"
+      },
+      "sso": {
+        "title": "Single Sign-on",
+        "description": "Dieses Team mit seinem OpenID-Connect-Identitätsanbieter verbinden.",
+        "status": { "enabled": "Aktiviert", "disabled": "Deaktiviert" },
+        "provider": { "title": "Identitätsanbieter", "description": "HitKeep unterstützt derzeit standardbasiertes OpenID Connect." },
+        "callbackURL": { "label": "Callback-URL", "hint": "Diese exakte Weiterleitungs-URI beim Identitätsanbieter eintragen.", "copy": "URL kopieren" },
+        "issuerURL": { "label": "Issuer-URL", "hint": "Der HTTPS-Issuer aus der OpenID-Konfiguration des Anbieters." },
+        "clientID": { "label": "Client-ID", "hint": "Die öffentliche Kennung der HitKeep-Anwendung." },
+        "clientSecret": {
+          "label": "Client-Secret",
+          "requiredHint": "Erforderlich, bevor die Verbindung gespeichert werden kann.",
+          "configuredHint": "Ein Secret ist gespeichert. Nur zur Rotation ein neues eingeben.",
+          "placeholder": "Client-Secret eingeben",
+          "keepPlaceholder": "Leer lassen, um das aktuelle Secret zu behalten"
+        },
+        "allowedDomains": { "label": "Zulässige E-Mail-Domains", "hint": "Eine Domain pro Zeile. Jede Domain kann nur einer SSO-Verbindung eines Teams gehören." },
+        "claimMapping": {
+          "title": "Claim-Zuordnung",
+          "description": "Die Standardwerte beibehalten, sofern der Anbieter keine anderen Claim-Pfade verwendet.",
+          "email": "E-Mail-Claim",
+          "name": "Anzeigename-Claim"
+        },
+        "securityNote": "HitKeep prüft Anbietersignatur, Issuer, Audience, State, Nonce, PKCE-Challenge und verifizierte E-Mail. Anbieter-Token werden nie gespeichert.",
+        "enable": { "label": "SSO-Login aktivieren", "hint": "Zeigt SSO als Login-Option für Personen mit einer zulässigen E-Mail-Domain. Der Passwort-Login bleibt verfügbar." },
+        "saveAction": "SSO-Konfiguration speichern",
+        "testAction": "Verbindung testen",
+        "saveSuccess": "SSO-Konfiguration gespeichert.",
+        "testSuccess": "Der Identitätsanbieter ist erreichbar und sein Discovery-Dokument ist gültig.",
+        "errors": {
+          "loadFailed": "Die SSO-Konfiguration konnte nicht geladen werden.",
+          "saveFailed": "Die SSO-Konfiguration konnte nicht gespeichert werden. Anbieterdaten prüfen und erneut versuchen.",
+          "testFailed": "Der Identitätsanbieter ist nicht erreichbar oder lieferte ein ungültiges Discovery-Dokument.",
+          "domainConflict": "Eine dieser E-Mail-Domains ist bereits der SSO-Verbindung eines anderen Teams zugeordnet.",
+          "issuerRequired": "Eine gültige HTTPS-Issuer-URL eingeben.",
+          "clientIDRequired": "Die Client-ID eingeben.",
+          "domainRequired": "Mindestens eine E-Mail-Domain eingeben."
+        }
       },
       "settings": {
         "breadcrumb": "Team-Einstellungen",
@@ -2352,6 +2398,7 @@
     "signIn": "Anmelden",
     "or": "oder",
     "signInWithPasskey": "Mit Passkey anmelden",
+    "signInWithSSO": "Mit SSO anmelden",
     "mfaTitle": "Zwei-Faktor-Verifizierung",
     "mfaSubtitle": "Schließe die Anmeldung mit deinem Authenticator-Code, einem Wiederherstellungscode, einem Anmeldelink oder einem Passkey ab.",
     "sendEmailLink": "Anmeldelink per E-Mail senden",
@@ -2366,6 +2413,11 @@
       "invalidCredentials": "Ungültige E-Mail-Adresse oder Passwort.",
       "passkeyNotSupported": "Passkey-Anmeldung wird auf diesem Gerät nicht unterstützt.",
       "passkeyFailed": "Passkey-Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
+      "ssoProviderError": "Der Identitätsanbieter hat die Anmeldung abgebrochen oder abgelehnt. Versuche es erneut oder verwende dein Passwort.",
+      "ssoEmailUnverified": "Der Identitätsanbieter hat keine verifizierte E-Mail-Adresse geliefert. Kontaktiere deine Team-Administration.",
+      "ssoEmailNotAllowed": "Das Konto beim Identitätsanbieter stimmt nicht mit der eingegebenen E-Mail-Adresse oder Team-Domain überein.",
+      "ssoUnavailable": "Für diese E-Mail-Domain ist kein SSO konfiguriert. Prüfe die Adresse oder verwende dein Passwort.",
+      "ssoFailed": "Die SSO-Anmeldung konnte nicht abgeschlossen werden. Versuche es erneut oder verwende dein Passwort.",
       "invalidTotp": "Ungültiger Authenticator-Code.",
       "invalidRecoveryCode": "Ungültiger Wiederherstellungscode.",
       "emailLinkFailed": "Der Anmeldelink konnte nicht gesendet werden. Bitte versuche es erneut.",

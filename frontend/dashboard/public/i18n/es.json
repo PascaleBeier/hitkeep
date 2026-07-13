@@ -201,6 +201,8 @@
       "diagnosticsExported": "Diagnóstico exportado",
       "accessDenied": "Acceso denegado",
       "authLoginSucceeded": "Inicio de sesión correcto",
+      "authSSOLoginSucceeded": "Inicio de sesión SSO correcto",
+      "authSSOLoginFailed": "Inicio de sesión SSO fallido",
       "authLoginFailed": "Inicio de sesión fallido",
       "authMfaRequired": "MFA requerida",
       "authMfaSucceeded": "MFA correcta",
@@ -210,6 +212,9 @@
       "teamUpdated": "Equipo actualizado",
       "teamArchived": "Equipo archivado",
       "teamActiveChanged": "Equipo activo cambiado",
+      "ssoConfigurationUpdated": "Configuración SSO actualizada",
+      "ssoConnectionTested": "Conexión SSO probada",
+      "ssoConfigurationDeleted": "Configuración SSO eliminada",
       "memberInvited": "Miembro invitado",
       "memberInviteAccepted": "Invitación aceptada",
       "memberInviteResent": "Invitación reenviada",
@@ -286,6 +291,7 @@
       "import": "Importación",
       "siteExclusion": "Exclusión de sitio",
       "apiClient": "Cliente API",
+      "ssoConfiguration": "Configuración SSO",
       "backup": "Copia de seguridad",
       "spamFilter": "Filtro de spam",
       "diagnostics": "Diagnóstico",
@@ -1615,6 +1621,7 @@
       "tabs": {
         "overview": "Resumen",
         "members": "Miembros",
+        "sso": "SSO",
         "apiClients": "Clientes API",
         "customDomains": "Dominios personalizados",
         "branding": "Marca",
@@ -1661,7 +1668,7 @@
         },
         "plans": {
           "title": "Mejorar tu plan",
-          "description": "Desbloquea mayor retención, más sitios y capacidad de equipo.",
+          "description": "Desbloquea mayor retención, más sitios, capacidad de equipo y SSO con Business.",
           "currentPlan": "Plan actual",
           "recommended": "Recomendado",
           "perMonth": "/mes",
@@ -1677,13 +1684,47 @@
             "members": "Hasta {{count}} miembros del equipo",
             "retention": "{{count}} años de retención de datos",
             "retentionDays": "{{count}} días de retención de datos",
-            "customDomains": "Dominios de seguimiento personalizados"
+            "customDomains": "Dominios de seguimiento personalizados",
+            "sso": "Inicio de sesión único (SSO)"
           }
         }
       },
       "members": {
         "breadcrumb": "Miembros del equipo",
         "title": "Miembros del equipo"
+      },
+      "sso": {
+        "title": "Inicio de sesión único",
+        "description": "Conecta este equipo con su proveedor de identidad OpenID Connect.",
+        "status": { "enabled": "Activado", "disabled": "Desactivado" },
+        "provider": { "title": "Proveedor de identidad", "description": "HitKeep admite actualmente OpenID Connect basado en estándares." },
+        "callbackURL": { "label": "URL de retorno", "hint": "Añade esta URI de redirección exacta a tu proveedor de identidad.", "copy": "Copiar URL" },
+        "issuerURL": { "label": "URL del emisor", "hint": "El emisor HTTPS de la configuración OpenID del proveedor." },
+        "clientID": { "label": "ID de cliente", "hint": "El identificador público de la aplicación HitKeep." },
+        "clientSecret": {
+          "label": "Secreto de cliente",
+          "requiredHint": "Obligatorio para guardar esta conexión.",
+          "configuredHint": "Hay un secreto guardado. Introduce uno nuevo solo para rotarlo.",
+          "placeholder": "Introduce el secreto de cliente",
+          "keepPlaceholder": "Déjalo vacío para conservar el secreto actual"
+        },
+        "allowedDomains": { "label": "Dominios de correo permitidos", "hint": "Un dominio por línea. Cada dominio solo puede pertenecer a la conexión SSO de un equipo." },
+        "claimMapping": { "title": "Asignación de claims", "description": "Mantén los valores predeterminados salvo que tu proveedor use otras rutas de claims.", "email": "Claim de correo", "name": "Claim de nombre visible" },
+        "securityNote": "HitKeep verifica la firma, el emisor, la audiencia, el estado, el nonce, el desafío PKCE y el correo verificado. Los tokens del proveedor nunca se guardan.",
+        "enable": { "label": "Activar inicio de sesión SSO", "hint": "Muestra SSO como opción para las personas cuyo correo coincide con un dominio permitido. El acceso con contraseña sigue disponible." },
+        "saveAction": "Guardar configuración SSO",
+        "testAction": "Probar conexión",
+        "saveSuccess": "Configuración SSO guardada.",
+        "testSuccess": "El proveedor de identidad está disponible y su documento de descubrimiento es válido.",
+        "errors": {
+          "loadFailed": "No se pudo cargar la configuración SSO.",
+          "saveFailed": "No se pudo guardar la configuración SSO. Comprueba los datos del proveedor e inténtalo de nuevo.",
+          "testFailed": "No se pudo contactar con el proveedor o devolvió un documento de descubrimiento no válido.",
+          "domainConflict": "Uno de estos dominios ya está asignado a la conexión SSO de otro equipo.",
+          "issuerRequired": "Introduce una URL de emisor HTTPS válida.",
+          "clientIDRequired": "Introduce el ID de cliente.",
+          "domainRequired": "Introduce al menos un dominio de correo."
+        }
       },
       "settings": {
         "breadcrumb": "Configuración del equipo",
@@ -2352,6 +2393,7 @@
     "signIn": "Iniciar sesión",
     "or": "o",
     "signInWithPasskey": "Iniciar sesión con passkey",
+    "signInWithSSO": "Iniciar sesión con SSO",
     "mfaTitle": "Verificación en dos pasos",
     "mfaSubtitle": "Completa el acceso con tu código del autenticador, un código de recuperación, un enlace de acceso o una passkey.",
     "sendEmailLink": "Enviarme un enlace de acceso",
@@ -2363,6 +2405,11 @@
     "verifyRecoveryCode": "Usar código de recuperación",
     "footerRights": "HitKeep. Todos los derechos reservados.",
     "errors": {
+      "ssoProviderError": "El proveedor de identidad canceló o rechazó el acceso. Inténtalo de nuevo o usa tu contraseña.",
+      "ssoEmailUnverified": "El proveedor de identidad no devolvió un correo verificado. Contacta con quien administra tu equipo.",
+      "ssoEmailNotAllowed": "La cuenta del proveedor no coincide con el correo o el dominio de equipo introducido.",
+      "ssoUnavailable": "SSO no está configurado para este dominio de correo. Comprueba la dirección o usa tu contraseña.",
+      "ssoFailed": "No se pudo completar el acceso SSO. Inténtalo de nuevo o usa tu contraseña.",
       "invalidCredentials": "Correo o contraseña inválidos.",
       "passkeyNotSupported": "El inicio de sesión con passkey no está disponible en este dispositivo.",
       "passkeyFailed": "Error al iniciar sesión con passkey. Inténtalo de nuevo.",

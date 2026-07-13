@@ -80,10 +80,11 @@
 
                 <p-button [label]="'login.signIn' | transloco" type="submit" [loading]="isLoading()" class="w-full" [disabled]="isLoading() || loginForm.email().invalid() || loginForm.password().invalid()"> </p-button>
 
-                @if (isPasskeySupported()) {
+                @if (hasAlternativeLogin()) {
                 <div class="hk-auth-divider">{{ "login.or" | transloco }}</div>
 
-                <div class="hk-auth-actions-center">
+                <div class="hk-auth-actions-center hk-auth-actions-stack">
+                    @if (isPasskeySupported()) {
                     <p-button
                         [label]="'login.signInWithPasskey' | transloco"
                         type="button"
@@ -91,9 +92,21 @@
                         severity="secondary"
                         [outlined]="true"
                         [loading]="isPasskeyLoading()"
-                        [disabled]="isLoading() || isPasskeyLoading()"
+                        [disabled]="isLoading() || isPasskeyLoading() || isSSOLoading()"
                         (onClick)="onPasskeyLogin()"
                     />
+                    } @if (ssoAvailable()) {
+                    <p-button
+                        [label]="'login.signInWithSSO' | transloco"
+                        type="button"
+                        icon="pi pi-building"
+                        severity="secondary"
+                        [outlined]="true"
+                        [loading]="isSSOLoading()"
+                        [disabled]="isLoading() || isPasskeyLoading() || isSSOLoading()"
+                        (onClick)="onSSOLogin()"
+                    />
+                    }
                 </div>
                 } } @else {
                 <div class="hk-auth-field">

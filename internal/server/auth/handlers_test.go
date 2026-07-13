@@ -17,6 +17,7 @@ import (
 	"hitkeep/internal/auth"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/security"
 	"hitkeep/internal/server/shared"
@@ -157,6 +158,61 @@ func TestHandleCreateInitialUser(t *testing.T) {
 	handle.ServeHTTP(w2, req2)
 	if w2.Code != http.StatusForbidden {
 		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w2.Code)
+	}
+}
+
+func TestHandleSSOAvailabilityReflectsEnabledTeamConfiguration(t *testing.T) {
+	h, store := setupAuthTestEnv(t)
+	defer store.Close()
+	userID, err := store.CreateUser(context.Background(), "sso-availability@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	teamID, err := store.GetActiveTenantID(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("get active team: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/sso", nil)
+	w := httptest.NewRecorder()
+	h.handleSSOAvailability().ServeHTTP(w, req)
+	if w.Code != http.StatusOK || strings.TrimSpace(w.Body.String()) != `{"enabled":false}` {
+		t.Fatalf("expected SSO to be unavailable, status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	if err := store.UpsertTeamSSOConfig(context.Background(), database.TeamSSOConfig{
+		TeamID:                teamID,
+		ProviderType:          "oidc",
+		IssuerURL:             "https://id.example.com",
+		ClientID:              "hitkeep",
+		ClientSecretEncrypted: "v1.encrypted",
+		AllowedDomains:        []string{"example.com"},
+		EmailClaim:            "email",
+		DisplayNameClaim:      "name",
+		Enabled:               true,
+	}); err != nil {
+		t.Fatalf("save SSO config: %v", err)
+	}
+
+	w = httptest.NewRecorder()
+	h.handleSSOAvailability().ServeHTTP(w, req)
+	if w.Code != http.StatusOK || strings.TrimSpace(w.Body.String()) != `{"enabled":true}` {
+		t.Fatalf("expected SSO to be available, status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	h.ctx.Config.CloudHosted = true
+	h.ctx.Entitlements = entitlements.NewStaticProvider(entitlements.Entitlements{}, entitlements.PlanInfo{Code: "pro", Name: "Pro"})
+	w = httptest.NewRecorder()
+	h.handleSSOAvailability().ServeHTTP(w, req)
+	if w.Code != http.StatusOK || strings.TrimSpace(w.Body.String()) != `{"enabled":false}` {
+		t.Fatalf("expected non-Business cloud SSO to be unavailable, status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	h.ctx.Entitlements = entitlements.NewStaticProvider(entitlements.Entitlements{AllowSSO: true}, entitlements.PlanInfo{Code: "business", Name: "Business"})
+	w = httptest.NewRecorder()
+	h.handleSSOAvailability().ServeHTTP(w, req)
+	if w.Code != http.StatusOK || strings.TrimSpace(w.Body.String()) != `{"enabled":true}` {
+		t.Fatalf("expected Business cloud SSO to be available, status=%d body=%s", w.Code, w.Body.String())
 	}
 }
 

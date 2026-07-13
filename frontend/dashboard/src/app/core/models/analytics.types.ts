@@ -72,6 +72,30 @@ export interface TeamPlan {
     support_url?: string;
 }
 
+export interface TeamSSOConfig {
+    provider_type: 'oidc';
+    issuer_url: string;
+    client_id: string;
+    client_secret_configured: boolean;
+    allowed_domains: string[];
+    email_claim: string;
+    display_name_claim: string;
+    enabled: boolean;
+    callback_url: string;
+    updated_at?: string;
+}
+
+export interface UpdateTeamSSORequest {
+    provider_type: 'oidc';
+    issuer_url: string;
+    client_id: string;
+    client_secret: string;
+    allowed_domains: string[];
+    email_claim: string;
+    display_name_claim: string;
+    enabled: boolean;
+}
+
 export interface CloudPlanTier {
     code: string;
     name: string;

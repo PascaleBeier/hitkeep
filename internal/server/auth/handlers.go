@@ -128,6 +128,15 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 	mux.HandleFunc("POST /api/login", ctx.Handler(shared.HandlerConfig{
 		RateLimiter: ctx.AuthLimiter,
 	}, h.handleLogin()))
+	mux.HandleFunc("GET /api/auth/sso", ctx.Handler(shared.HandlerConfig{
+		RateLimiter: ctx.AuthLimiter,
+	}, h.handleSSOAvailability()))
+	mux.HandleFunc("POST /api/auth/sso/start", ctx.Handler(shared.HandlerConfig{
+		RateLimiter: ctx.AuthLimiter,
+	}, h.handleSSOStart()))
+	mux.HandleFunc("GET /api/auth/sso/callback", ctx.Handler(shared.HandlerConfig{
+		RateLimiter: ctx.AuthLimiter,
+	}, h.handleSSOCallback()))
 	mux.HandleFunc("POST /api/logout", ctx.Handler(shared.HandlerConfig{
 		RateLimiter: ctx.AuthLimiter,
 	}, h.handleLogout()))
@@ -170,6 +179,33 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		RequireAuth: true,
 		RateLimiter: ctx.AuthLimiter,
 	}, h.handleChangePassword()))
+}
+
+func (h *handler) handleSSOAvailability() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if h.ctx.Store == nil {
+			http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
+			return
+		}
+		teamIDs, err := h.ctx.Store.ListEnabledTeamSSOTeamIDs(r.Context())
+		if err != nil {
+			slog.Error("Failed to load SSO availability", "error", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		enabled := false
+		limits := h.ctx.Limits()
+		for _, teamID := range teamIDs {
+			if limits.AllowsSSO(r.Context(), uuid.Nil, teamID) {
+				enabled = true
+				break
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(api.SSOAvailability{Enabled: enabled}); err != nil {
+			slog.Error("Failed to encode SSO availability", "error", err)
+		}
+	}
 }
 
 func (h *handler) handleCreateInitialUser() http.HandlerFunc {

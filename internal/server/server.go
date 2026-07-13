@@ -44,6 +44,7 @@ import (
 	takeouthandlers "hitkeep/internal/server/takeout"
 	"hitkeep/internal/server/user"
 	webhookhandlers "hitkeep/internal/server/webhooks"
+	"hitkeep/internal/sso"
 	"hitkeep/internal/takeout"
 	"hitkeep/internal/webhookdispatcher"
 )
@@ -195,6 +196,7 @@ func New(conf *config.Config, publicFS fs.FS, store *database.Store, tenantStore
 			ClientID:     conf.GoogleSearchConsoleClientID,
 			ClientSecret: conf.GoogleSearchConsoleClientSecret,
 		}),
+		SSO:                      sso.NewClient(nil),
 		AI:                       aiService,
 		Realtime:                 realtimeBroker,
 		IPFilter:                 ipFilter,

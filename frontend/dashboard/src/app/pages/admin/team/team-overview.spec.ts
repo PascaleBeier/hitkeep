@@ -126,7 +126,9 @@ describe('TeamOverviewPage', () => {
                                                 sites: 'Up to {{count}} sites',
                                                 members: 'Up to {{count}} team members',
                                                 retention: '{{count}}-year data retention',
-                                                retentionDays: '{{count}}-day data retention'
+                                                retentionDays: '{{count}}-day data retention',
+                                                customDomains: 'Custom tracking domains',
+                                                sso: 'Single sign-on (SSO)'
                                             }
                                         }
                                     }
@@ -247,6 +249,22 @@ describe('TeamOverviewPage', () => {
         expect(text).toContain('Current plan');
         expect(text).toContain('Upgrade to Pro');
         expect(text).toContain('Upgrade to Business');
+        expect(text).toContain('Single sign-on (SSO)');
+    });
+
+    it('renders Business with SSO as the next upgrade for Pro users', async () => {
+        activeTeam.set({
+            ...createActiveTeam(),
+            plan: { code: 'pro', name: 'Pro' },
+            entitlements: { ...createActiveTeam().entitlements!, allow_sso: false }
+        });
+        await fixture.whenStable();
+
+        const text = fixture.nativeElement.textContent;
+        expect(text).toContain('Current plan');
+        expect(text).toContain('Upgrade to Business');
+        expect(text).toContain('Single sign-on (SSO)');
+        expect(text).not.toContain('Upgrade to Pro');
     });
 
     it('renders operator-owned cloud teams as internal and unlimited', () => {

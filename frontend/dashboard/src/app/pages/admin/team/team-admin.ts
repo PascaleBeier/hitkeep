@@ -48,14 +48,24 @@ export class TeamAdminPage {
 
     protected readonly canManageSettings = computed(() => this.access.canActiveTeam(TEAM_CAPABILITIES.manageSettings));
     protected readonly canViewAudit = computed(() => this.access.canActiveTeam(TEAM_CAPABILITIES.viewAudit));
+    /** SSO requires Business on managed cloud; locked tabs route to the plan comparison. */
+    protected readonly ssoLocked = computed(() => this.bootstrap.cloudHosted() && this.teamService.activeTeam()?.entitlements?.allow_sso === false);
     /** Custom domains require Pro or higher on managed cloud; locked tabs upsell instead of opening. */
     protected readonly customDomainsLocked = computed(() => this.bootstrap.cloudHosted() && this.teamService.activeTeam()?.plan?.code === 'free');
     protected readonly tabs = computed<TeamAdminTab[]>(() => {
         this.activeLanguage();
+        const ssoLocked = this.ssoLocked();
         const customDomainsLocked = this.customDomainsLocked();
         return [
             { label: this.transloco.translate('admin.team.tabs.overview'), route: 'overview', link: '/admin/team/overview', visible: true },
             { label: this.transloco.translate('admin.team.tabs.members'), route: 'members', link: '/admin/team/members', visible: true },
+            {
+                label: this.transloco.translate('admin.team.tabs.sso'),
+                route: 'sso',
+                link: ssoLocked ? '/admin/team/overview' : '/admin/team/sso',
+                visible: this.canManageSettings(),
+                badge: ssoLocked ? 'BUSINESS' : undefined
+            },
             { label: this.transloco.translate('admin.team.tabs.apiClients'), route: 'api-clients', link: '/admin/team/api-clients', visible: this.canManageSettings() },
             {
                 label: this.transloco.translate('admin.team.tabs.customDomains'),

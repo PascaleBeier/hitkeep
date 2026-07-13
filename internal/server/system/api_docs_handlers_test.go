@@ -860,6 +860,43 @@ func TestOpenAPISpecV1IncludesGoogleSearchConsoleConnectionPaths(t *testing.T) {
 	}
 }
 
+func TestOpenAPISpecV1DocumentsRedactedOIDCSSOFlows(t *testing.T) {
+	spec := OpenAPISpecV1("https://hitkeep.test")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	for path, methods := range map[string][]string{
+		"/api/auth/sso":                 {"get"},
+		"/api/auth/sso/start":           {"post"},
+		"/api/auth/sso/callback":        {"get"},
+		"/api/user/teams/{id}/sso":      {"get", "put", "delete"},
+		"/api/user/teams/{id}/sso/test": {"post"},
+	} {
+		pathItem := requireMap(t, paths, path)
+		for _, method := range methods {
+			if _, ok := pathItem[method]; !ok {
+				t.Fatalf("expected %s %s in OpenAPI paths", method, path)
+			}
+		}
+	}
+
+	responseSchema := requireMap(t, schemas, "TeamSSOConfig")
+	responseProperties := requireMap(t, responseSchema, "properties")
+	if _, ok := responseProperties["client_secret"]; ok {
+		t.Fatal("redacted TeamSSOConfig must not expose client_secret")
+	}
+	if _, ok := responseProperties["client_secret_configured"]; !ok {
+		t.Fatal("redacted TeamSSOConfig should expose client_secret_configured")
+	}
+	inputSchema := requireMap(t, schemas, "TeamSSOInput")
+	inputProperties := requireMap(t, inputSchema, "properties")
+	secret := requireMap(t, inputProperties, "client_secret")
+	if writeOnly, _ := secret["writeOnly"].(bool); !writeOnly {
+		t.Fatal("TeamSSOInput client_secret should be writeOnly")
+	}
+}
+
 func TestOpenAPISpecV1IncludesSearchConsoleReportPaths(t *testing.T) {
 	spec := openAPISpecV1("http://localhost:8080")
 	paths := requireMap(t, spec, "paths")

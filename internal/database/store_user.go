@@ -219,6 +219,7 @@ var userFKReferences = []userFKReference{
 	{table: "instance_roles", column: "user_id", query: "UPDATE instance_roles SET user_id = ? WHERE user_id = ?"},
 	{table: "remember_me_tokens", column: "user_id", query: "UPDATE remember_me_tokens SET user_id = ? WHERE user_id = ?"},
 	{table: "share_links", column: "created_by", query: "UPDATE share_links SET created_by = ? WHERE created_by = ?"},
+	{table: "sso_identities", column: "user_id", query: "UPDATE sso_identities SET user_id = ? WHERE user_id = ?"},
 	{table: "site_exclusions", column: "created_by", query: "UPDATE site_exclusions SET created_by = ? WHERE created_by = ?"},
 	{table: "site_country_exclusions", column: "created_by", query: "UPDATE site_country_exclusions SET created_by = ? WHERE created_by = ?"},
 	{table: "site_members", column: "added_by", query: "UPDATE site_members SET added_by = ? WHERE added_by = ?"},

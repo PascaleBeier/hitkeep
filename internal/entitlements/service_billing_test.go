@@ -53,3 +53,19 @@ func TestEffectiveCloudPlanMapsSubscriptionStatuses(t *testing.T) {
 		}
 	}
 }
+
+func TestCloudPlanEntitlementsGateSSOToBusiness(t *testing.T) {
+	free := CloudPlanEntitlements(database.CloudPlanFree)
+	pro := CloudPlanEntitlements(database.CloudPlanPro)
+	business := CloudPlanEntitlements(database.CloudPlanBusiness)
+
+	if free == nil || free.AllowSSO {
+		t.Fatalf("expected Free to exclude SSO, got %+v", free)
+	}
+	if pro == nil || pro.AllowSSO {
+		t.Fatalf("expected Pro to exclude SSO, got %+v", pro)
+	}
+	if business == nil || !business.AllowSSO {
+		t.Fatalf("expected Business to include SSO, got %+v", business)
+	}
+}

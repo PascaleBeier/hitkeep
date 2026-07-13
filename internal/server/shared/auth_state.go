@@ -18,6 +18,7 @@ const (
 	passkeyRegistrationTTL           = 5 * time.Minute
 	passkeyLoginChallengeTTL         = 5 * time.Minute
 	googleSearchConsoleOAuthStateTTL = 10 * time.Minute
+	ssoOAuthStateTTL                 = 10 * time.Minute
 )
 
 type PendingTOTPSetup struct {
@@ -45,11 +46,24 @@ type GoogleSearchConsoleOAuthState struct {
 	ExpiresAt  time.Time
 }
 
+type SSOOAuthState struct {
+	TeamID       uuid.UUID
+	IssuerURL    string
+	ClientID     string
+	Email        string
+	Nonce        string
+	CodeVerifier string
+	ReturnPath   string
+	RememberMe   bool
+	ExpiresAt    time.Time
+}
+
 type AuthStateStore struct {
 	pendingTOTP          *lru.LRU[uuid.UUID, PendingTOTPSetup]
 	passkeyRegistrations *lru.LRU[uuid.UUID, PasskeyRegistrationChallenge]
 	mfaEmailLinks        *lru.LRU[uuid.UUID, MFAEmailLink]
 	googleSearchConsole  *lru.LRU[uuid.UUID, GoogleSearchConsoleOAuthState]
+	ssoOAuth             *lru.LRU[uuid.UUID, SSOOAuthState]
 
 	loginChallengesMu       sync.Mutex
 	loginChallenges         *lru.LRU[uuid.UUID, database.LoginChallenge]
@@ -62,6 +76,7 @@ func NewAuthStateStore() *AuthStateStore {
 		passkeyRegistrations: lru.NewLRU[uuid.UUID, PasskeyRegistrationChallenge](authStateCacheSize, nil, passkeyRegistrationTTL),
 		mfaEmailLinks:        lru.NewLRU[uuid.UUID, MFAEmailLink](authStateCacheSize, nil, passkeyLoginChallengeTTL),
 		googleSearchConsole:  lru.NewLRU[uuid.UUID, GoogleSearchConsoleOAuthState](authStateCacheSize, nil, googleSearchConsoleOAuthStateTTL),
+		ssoOAuth:             lru.NewLRU[uuid.UUID, SSOOAuthState](authStateCacheSize, nil, ssoOAuthStateTTL),
 		loginChallenges:      lru.NewLRU[uuid.UUID, database.LoginChallenge](authStateCacheSize, nil, passkeyLoginChallengeTTL),
 		loginChallengeIDsByUser: lru.NewLRU[uuid.UUID, map[uuid.UUID]struct{}](
 			authStateCacheSize,
@@ -69,6 +84,35 @@ func NewAuthStateStore() *AuthStateStore {
 			passkeyLoginChallengeTTL,
 		),
 	}
+}
+
+func (s *AuthStateStore) CreateSSOOAuthState(state SSOOAuthState) string {
+	stateID := uuid.New()
+	if s == nil {
+		return stateID.String()
+	}
+	state.ExpiresAt = state.ExpiresAt.UTC()
+	s.ssoOAuth.Add(stateID, state)
+	return stateID.String()
+}
+
+func (s *AuthStateStore) ConsumeSSOOAuthState(rawState string) (SSOOAuthState, bool) {
+	if s == nil {
+		return SSOOAuthState{}, false
+	}
+	stateID, err := uuid.Parse(strings.TrimSpace(rawState))
+	if err != nil || stateID == uuid.Nil {
+		return SSOOAuthState{}, false
+	}
+	entry, ok := s.ssoOAuth.Get(stateID)
+	if !ok {
+		return SSOOAuthState{}, false
+	}
+	s.ssoOAuth.Remove(stateID)
+	if isExpired(entry.ExpiresAt) {
+		return SSOOAuthState{}, false
+	}
+	return entry, true
 }
 
 func cloneChallengeIDSet(input map[uuid.UUID]struct{}) map[uuid.UUID]struct{} {

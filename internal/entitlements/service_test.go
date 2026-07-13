@@ -159,6 +159,30 @@ func TestServiceAllowsCustomTrackingDomains(t *testing.T) {
 	}
 }
 
+func TestServiceAllowsSSO(t *testing.T) {
+	env := newServiceEnv(t)
+	ctx := context.Background()
+	memberID := env.createMember(t, "sso-member@example.test")
+
+	withoutSSO := entitlements.NewStaticProvider(entitlements.Entitlements{}, entitlements.PlanInfo{Code: "pro", Name: "Pro"})
+	if env.service(withoutSSO).AllowsSSO(ctx, memberID, env.teamID) {
+		t.Fatal("expected a cloud plan without the SSO entitlement to be blocked")
+	}
+
+	withSSO := entitlements.NewStaticProvider(entitlements.Entitlements{AllowSSO: true}, entitlements.PlanInfo{Code: "business", Name: "Business"})
+	if !env.service(withSSO).AllowsSSO(ctx, memberID, env.teamID) {
+		t.Fatal("expected a cloud plan with the SSO entitlement to be allowed")
+	}
+	if !env.service(withoutSSO).AllowsSSO(ctx, env.ownerID, env.teamID) {
+		t.Fatal("expected the instance owner to bypass the SSO plan gate")
+	}
+
+	env.cfg.CloudHosted = false
+	if !env.service(withoutSSO).AllowsSSO(ctx, memberID, env.teamID) {
+		t.Fatal("expected self-hosted deployments to allow SSO")
+	}
+}
+
 func TestServiceRequireTeamMemberCapacity(t *testing.T) {
 	env := newServiceEnv(t)
 	ctx := context.Background()

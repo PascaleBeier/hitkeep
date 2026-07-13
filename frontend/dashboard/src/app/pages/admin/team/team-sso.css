@@ -1,0 +1,251 @@
+:host {
+    display: block;
+}
+
+.sso-form {
+    display: grid;
+    gap: 1.25rem;
+}
+
+.sso-provider,
+.sso-enable-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.sso-section-title,
+.sso-enable-title {
+    margin: 0;
+    color: var(--p-text-color);
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.sso-section-hint,
+.sso-field-hint {
+    display: block;
+    margin: 0.2rem 0 0;
+    color: var(--p-text-muted-color);
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+
+.sso-provider-badge,
+.sso-status {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    border: 1px solid var(--p-content-border-color);
+    border-radius: 999px;
+    padding: 0.25rem 0.55rem;
+    color: var(--p-text-muted-color);
+    background: var(--p-surface-50);
+    font-size: 0.7rem;
+    font-weight: 750;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+:host-context(.p-dark) .sso-provider-badge,
+:host-context(.p-dark) .sso-status {
+    background: var(--p-surface-900);
+}
+
+.sso-status {
+    gap: 0.4rem;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.sso-status-dot {
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background: var(--p-text-muted-color);
+}
+
+.sso-status--enabled {
+    border-color: color-mix(in srgb, var(--p-green-500) 35%, transparent);
+    color: var(--p-green-700);
+    background: color-mix(in srgb, var(--p-green-500) 9%, var(--p-content-background));
+}
+
+.sso-status--enabled .sso-status-dot {
+    background: var(--p-green-500);
+}
+
+.sso-fields-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.sso-field {
+    display: grid;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+.sso-field--full {
+    grid-column: 1 / -1;
+}
+
+.sso-field label {
+    color: var(--p-text-color);
+    font-size: 0.82rem;
+    font-weight: 650;
+}
+
+.sso-textarea {
+    resize: vertical;
+    min-height: 5rem;
+    border: 1px solid var(--p-form-field-border-color);
+    border-radius: var(--p-form-field-border-radius);
+    padding: var(--p-form-field-padding-y) var(--p-form-field-padding-x);
+    color: var(--p-form-field-color);
+    background: var(--p-form-field-background);
+    font: inherit;
+    transition:
+        border-color var(--p-form-field-transition-duration),
+        box-shadow var(--p-form-field-transition-duration);
+}
+
+.sso-textarea:hover {
+    border-color: var(--p-form-field-hover-border-color);
+}
+
+.sso-textarea:focus-visible {
+    outline: 0;
+    border-color: var(--p-form-field-focus-border-color);
+    box-shadow: var(--p-form-field-focus-ring-shadow);
+}
+
+.sso-copy-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.5rem;
+}
+
+.sso-copy-row input[readonly] {
+    color: var(--p-text-muted-color);
+    background: var(--p-surface-50);
+}
+
+.sso-advanced {
+    border-top: 1px solid var(--p-content-border-color);
+    padding-top: 1rem;
+}
+
+.sso-advanced summary {
+    cursor: pointer;
+    color: var(--p-text-color);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.sso-advanced > .sso-section-hint {
+    margin-bottom: 0.85rem;
+}
+
+.sso-security-note {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.65rem;
+    align-items: start;
+    border: 1px solid var(--p-content-border-color);
+    border-radius: 6px;
+    padding: 0.75rem;
+    color: var(--p-text-muted-color);
+    background: var(--p-surface-50);
+}
+
+:host-context(.p-dark) .sso-security-note,
+:host-context(.p-dark) .sso-copy-row input[readonly] {
+    background: var(--p-surface-900);
+}
+
+.sso-security-note i {
+    margin-top: 0.15rem;
+    color: var(--p-primary-color);
+}
+
+.sso-security-note p {
+    margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.5;
+}
+
+.sso-enable-row {
+    cursor: pointer;
+    border-top: 1px solid var(--p-content-border-color);
+    padding-top: 1rem;
+}
+
+.sso-enable-row > span {
+    display: grid;
+}
+
+.sso-switch {
+    position: relative;
+    width: 2.5rem;
+    height: 1.4rem;
+    flex: 0 0 auto;
+    appearance: none;
+    cursor: pointer;
+    border: 1px solid var(--p-content-border-color);
+    border-radius: 999px;
+    background: var(--p-surface-300);
+    transition:
+        background-color 150ms ease,
+        border-color 150ms ease;
+}
+
+.sso-switch::after {
+    content: "";
+    position: absolute;
+    top: 0.16rem;
+    left: 0.18rem;
+    width: 0.95rem;
+    height: 0.95rem;
+    border-radius: 50%;
+    background: white;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 20%);
+    transition: transform 150ms ease;
+}
+
+.sso-switch:checked {
+    border-color: var(--p-primary-color);
+    background: var(--p-primary-color);
+}
+
+.sso-switch:checked::after {
+    transform: translateX(1.05rem);
+}
+
+.sso-switch:focus-visible {
+    outline: 2px solid var(--p-primary-color);
+    outline-offset: 2px;
+}
+
+.sso-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.65rem;
+}
+
+@media (max-width: 640px) {
+    .sso-fields-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .sso-copy-row {
+        grid-template-columns: 1fr;
+    }
+
+    .sso-actions {
+        display: grid;
+        gap: 0.5rem;
+    }
+}
