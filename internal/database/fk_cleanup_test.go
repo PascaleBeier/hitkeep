@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
@@ -174,7 +175,7 @@ func TestListScopedCopyTablesMatchesTenantAnalyticsSchema(t *testing.T) {
 		t.Fatalf("open tenant store: %v", err)
 	}
 
-	tables, err := listScopedCopyTables(ctx, store.DB(), tenantStore.DB(), "site_id", "sites")
+	tables, err := listScopedCopyTables(ctx, store.DB(), tenantStore.DB(), "site_id", "sites", siteExtraEdges)
 	if err != nil {
 		t.Fatalf("list copy tables: %v", err)
 	}
@@ -212,6 +213,42 @@ func TestListScopedCopyTablesMatchesTenantAnalyticsSchema(t *testing.T) {
 	}
 	if len(tables) != expected {
 		t.Errorf("expected %d copy tables, got %d (%v)", expected, len(tables), tables)
+	}
+}
+
+func TestListScopedCopyTablesUsesExtraEdges(t *testing.T) {
+	ctx := context.Background()
+	newCopyStore := func() *Store {
+		t.Helper()
+		store := NewStore(":memory:")
+		if err := store.Connect(); err != nil {
+			t.Fatalf("connect: %v", err)
+		}
+		t.Cleanup(func() { _ = store.Close() })
+		if _, err := store.DB().ExecContext(ctx, `
+			CREATE TABLE sites (id UUID PRIMARY KEY);
+			CREATE TABLE qr_codes (id UUID PRIMARY KEY, site_id UUID NOT NULL);
+			CREATE TABLE qr_code_assets (qr_code_id UUID PRIMARY KEY, site_id UUID NOT NULL);
+			CREATE TABLE qr_code_share_links (id UUID PRIMARY KEY, qr_code_id UUID NOT NULL, site_id UUID NOT NULL);
+		`); err != nil {
+			t.Fatalf("create copy schema: %v", err)
+		}
+		return store
+	}
+
+	source := newCopyStore()
+	destination := newCopyStore()
+	tables, err := listScopedCopyTables(ctx, source.DB(), destination.DB(), "site_id", "sites", siteExtraEdges)
+	if err != nil {
+		t.Fatalf("list copy tables: %v", err)
+	}
+
+	qrIdx := slices.Index(tables, "qr_codes")
+	for _, child := range []string{"qr_code_assets", "qr_code_share_links"} {
+		childIdx := slices.Index(tables, child)
+		if qrIdx < 0 || childIdx < 0 || qrIdx > childIdx {
+			t.Errorf("expected qr_codes (%d) before %s (%d)", qrIdx, child, childIdx)
+		}
 	}
 }
 
@@ -274,7 +311,7 @@ func TestListScopedCopyTablesRejectsIdentityEntangledPairs(t *testing.T) {
 	// Two full shared schemas intersect on identity-entangled tables such as
 	// site_tenants (FK to tenants); a derived copy plan must refuse them
 	// rather than produce foreign-key violations.
-	_, err := listScopedCopyTables(ctx, source.DB(), destination.DB(), "site_id", "sites")
+	_, err := listScopedCopyTables(ctx, source.DB(), destination.DB(), "site_id", "sites", siteExtraEdges)
 	if err == nil || !strings.Contains(err.Error(), "references") {
 		t.Fatalf("expected copy plan to reject identity-entangled schema pair, got err=%v", err)
 	}

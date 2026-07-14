@@ -573,7 +573,7 @@ func copySiteAnalyticsBetweenStores(ctx context.Context, sourceStore, destinatio
 		return nil, nil
 	}
 
-	tables, err := listScopedCopyTables(ctx, sourceStore.db, destinationStore.db, "site_id", "sites")
+	tables, err := listScopedCopyTables(ctx, sourceStore.db, destinationStore.db, "site_id", "sites", siteExtraEdges)
 	if err != nil {
 		return nil, err
 	}

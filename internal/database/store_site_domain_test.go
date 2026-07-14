@@ -38,6 +38,27 @@ func TestUpdateSiteDomainKeepsForeignKeyReferences(t *testing.T) {
 		t.Fatalf("insert goal: %v", err)
 	}
 
+	now := time.Now().UTC()
+	qrCodeID := uuid.New()
+	if _, err := store.DB().ExecContext(ctx,
+		"INSERT INTO qr_codes (id, site_id, created_by, name, destination_url, token, token_hash, token_hint, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		qrCodeID, site.ID, userID, "Launch", "https://domain-old.test/launch", "domain-update-token", "domain-update-token-hash", "domain...", now, now,
+	); err != nil {
+		t.Fatalf("insert qr code: %v", err)
+	}
+	if _, err := store.DB().ExecContext(ctx,
+		"INSERT INTO qr_code_assets (qr_code_id, site_id, filename, content_type, byte_size, checksum, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		qrCodeID, site.ID, "launch.png", "image/png", 42, "domain-update-checksum", now, now,
+	); err != nil {
+		t.Fatalf("insert qr code asset: %v", err)
+	}
+	if _, err := store.DB().ExecContext(ctx,
+		"INSERT INTO qr_code_share_links (id, site_id, qr_code_id, token_hash, token_hint, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		uuid.New(), site.ID, qrCodeID, "domain-update-share-hash", "domain...", userID, now,
+	); err != nil {
+		t.Fatalf("insert qr code share link: %v", err)
+	}
+
 	if err := store.UpdateSiteDomain(ctx, site.ID, "domain-new.test"); err != nil {
 		t.Fatalf("update site domain: %v", err)
 	}
@@ -67,7 +88,14 @@ func TestUpdateSiteDomainKeepsForeignKeyReferences(t *testing.T) {
 	if len(refs) == 0 {
 		t.Fatal("expected foreign key references on sites, got none")
 	}
-	expected := map[string]int{"goals": 1, "site_tenants": 1, "site_members": 1}
+	expected := map[string]int{
+		"goals":               1,
+		"qr_code_assets":      1,
+		"qr_code_share_links": 1,
+		"qr_codes":            1,
+		"site_tenants":        1,
+		"site_members":        1,
+	}
 	for _, ref := range refs {
 		want, ok := expected[ref.table]
 		if !ok {

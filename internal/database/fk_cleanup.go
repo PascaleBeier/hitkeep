@@ -173,14 +173,8 @@ func buildScopedDeletePlan(ctx context.Context, q queryer, spec scopedDeleteSpec
 	if err != nil {
 		return nil, err
 	}
-	for _, edge := range spec.extraEdges {
-		if _, ok := tables[edge.table]; !ok {
-			continue
-		}
-		if _, ok := tables[edge.referencedTable]; !ok {
-			continue
-		}
-		edges = append(edges, edge)
+	if err := appendExistingExtraEdges(tables, &edges, spec.extraEdges); err != nil {
+		return nil, err
 	}
 
 	policy := make(map[string]struct{}, len(spec.policyTables))
@@ -303,7 +297,7 @@ func validateCleanupPlans(ctx context.Context, q queryer, specs ...scopedDeleteS
 // exist in both the source and destination schemas, ordered so foreign-key
 // parents come before their children (safe insert order for copies). The
 // root table is excluded; callers mirror it explicitly.
-func listScopedCopyTables(ctx context.Context, source, destination queryer, scopeColumn, rootTable string) ([]string, error) {
+func listScopedCopyTables(ctx context.Context, source, destination queryer, scopeColumn, rootTable string, extraEdges []fkEdge) ([]string, error) {
 	sourceTables, err := listTables(ctx, source)
 	if err != nil {
 		return nil, err
@@ -345,6 +339,9 @@ func listScopedCopyTables(ctx context.Context, source, destination queryer, scop
 	if err != nil {
 		return nil, err
 	}
+	if err := appendExistingExtraEdges(destinationTables, &edges, extraEdges); err != nil {
+		return nil, err
+	}
 	// A copied table whose foreign key points outside the copy set (and not
 	// at the mirrored root) would land rows without their parents. Fail
 	// loudly instead of silently skipping or violating the constraint.
@@ -366,6 +363,22 @@ func listScopedCopyTables(ctx context.Context, source, destination queryer, scop
 	}
 	slices.Reverse(childrenFirst)
 	return childrenFirst, nil
+}
+
+func appendExistingExtraEdges(tables map[string]struct{}, edges *[]fkEdge, extraEdges []fkEdge) error {
+	for _, edge := range extraEdges {
+		if !isSafeIdentifier(edge.table) || !isSafeIdentifier(edge.column) || !isSafeIdentifier(edge.referencedTable) || !isSafeIdentifier(edge.referencedColumn) {
+			return fmt.Errorf("unsafe identifier in extra foreign key %s.%s -> %s.%s", edge.table, edge.column, edge.referencedTable, edge.referencedColumn)
+		}
+		if _, ok := tables[edge.table]; !ok {
+			continue
+		}
+		if _, ok := tables[edge.referencedTable]; !ok {
+			continue
+		}
+		*edges = append(*edges, edge)
+	}
+	return nil
 }
 
 // orderChildrenFirst returns the member tables ordered so every foreign-key

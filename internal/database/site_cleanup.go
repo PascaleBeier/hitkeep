@@ -23,13 +23,21 @@ type siteStatsResetStep struct {
 // every table with a site_id column is covered automatically, and foreign-key
 // children are deleted before their parents. Only relationships the schema
 // does not declare need to be registered here.
+var siteExtraEdges = []fkEdge{
+	{table: "site_import_files", column: "import_id", referencedTable: "site_imports", referencedColumn: "id"},
+	{table: "webhook_event_subscriptions", column: "webhook_id", referencedTable: "webhooks", referencedColumn: "id"},
+	// DuckDB rewrites a referenced row for any UPDATE, even when its primary
+	// key is unchanged. Keep these QR ownership relationships in the shared
+	// graph instead of physical constraints so qr_codes.site_id can move during
+	// a site-domain rename.
+	{table: "qr_code_assets", column: "qr_code_id", referencedTable: "qr_codes", referencedColumn: "id"},
+	{table: "qr_code_share_links", column: "qr_code_id", referencedTable: "qr_codes", referencedColumn: "id"},
+}
+
 var siteDeleteSpec = scopedDeleteSpec{
 	scopeColumns: []string{"site_id"},
 	rootTable:    "sites",
-	extraEdges: []fkEdge{
-		{table: "site_import_files", column: "import_id", referencedTable: "site_imports", referencedColumn: "id"},
-		{table: "webhook_event_subscriptions", column: "webhook_id", referencedTable: "webhooks", referencedColumn: "id"},
-	},
+	extraEdges:   siteExtraEdges,
 }
 
 var siteStatsResetAnalyticsSteps = []siteStatsResetStep{
