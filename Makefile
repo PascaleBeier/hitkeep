@@ -2,6 +2,16 @@ all: run
 
 STATICCHECK_VERSION ?= v0.7.0
 GO_BUILD_TAGS ?= $(shell ./scripts/go-build-tags.sh)
+CLOUD_GO_BUILD_TAGS ?= $(shell ./scripts/go-build-tags.sh cloud)
+DOCKER_PLATFORM ?= $(shell docker version --format '{{.Server.Os}}/{{.Server.Arch}}' 2>/dev/null || printf 'linux/amd64')
+DOCKER_IMAGE ?= ghcr.io/pascalebeier/hitkeep:snapshot
+DOCKER_CLOUD_IMAGE ?= hitkeep:cloud-local
+
+help: ## List the supported human and agent entry points
+	@awk 'BEGIN {FS = ":.*## "}; /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-24s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+doctor: ## Check whether Docker and/or native development prerequisites are ready
+	@bash ./scripts/dev-doctor.sh
 
 build: frontend-build go-build
 
@@ -19,17 +29,18 @@ frontend-dashboard-build:
 
 DEV_ARGS ?=
 DEV_COMPOSE ?= docker compose -f compose.dev.yaml
+DEV_CLOUD_COMPOSE ?= $(DEV_COMPOSE) -f compose.dev-cloud.yaml
 
-dev:
+dev: ## Start the native backend and frontend with live reload
 	@bash ./scripts/dev.sh $(DEV_ARGS)
 
-dev-seed:
+dev-seed: ## Seed data, then start native development
 	@bash ./scripts/dev.sh --seed
 
-dev-cloud:
+dev-cloud: ## Start native development with cloud build tags and defaults
 	@bash ./scripts/dev.sh --cloud
 
-dev-cloud-seed:
+dev-cloud-seed: ## Seed data, then start native cloud development
 	@bash ./scripts/dev.sh --cloud --seed
 
 dev-backend:
@@ -55,13 +66,31 @@ clean:
 	@rm -f ./hitkeep
 	@rm -rf frontend/dashboard/dist frontend/dashboard/node_modules
 
-build-docker:
-	@echo "Building binary for local platform..."
-	CGO_ENABLED=1 go build -tags "$(GO_BUILD_TAGS)" -ldflags="-w -s -X 'hitkeep/cmd.Version=snapshot'" -o hitkeep-linux-amd64 ./cmd/hitkeep/main.go
+build-docker: ## Build the self-hosted production image locally (never pushes)
+	@echo "Building self-hosted image for $(DOCKER_PLATFORM)..."
 	docker buildx build . \
-		--platform linux/amd64 \
-		--tag ghcr.io/pascalebeier/hitkeep:snapshot \
+		--target local-image \
+		--platform $(DOCKER_PLATFORM) \
+		--build-arg GO_BUILD_TAGS="$(GO_BUILD_TAGS)" \
+		--build-arg HITKEEP_VARIANT=self-hosted \
+		--tag $(DOCKER_IMAGE) \
 		--load
+
+build-docker-cloud: ## Build a production-style cloud image locally (never pushes)
+	@echo "Building local-only cloud image for $(DOCKER_PLATFORM)..."
+	docker buildx build . \
+		--target local-image \
+		--platform $(DOCKER_PLATFORM) \
+		--build-arg GO_BUILD_TAGS="$(CLOUD_GO_BUILD_TAGS)" \
+		--build-arg HITKEEP_VARIANT=cloud-local \
+		--tag $(DOCKER_CLOUD_IMAGE) \
+		--load
+
+smoke-docker: build-docker ## Build and health-check the self-hosted production container
+	@bash ./scripts/docker-smoke.sh $(DOCKER_IMAGE) self-hosted
+
+smoke-docker-cloud: build-docker-cloud ## Build and health-check the cloud production container
+	@bash ./scripts/docker-smoke.sh $(DOCKER_CLOUD_IMAGE) cloud-local --cloud
 
 update-default-spam-filter:
 	@./scripts/update-default-spam-filter.sh
@@ -86,24 +115,34 @@ dev-cloud-backend:
 		HITKEEP_CLOUD_CHECKOUT_CANCEL_URL=$${HITKEEP_CLOUD_CHECKOUT_CANCEL_URL:-http://localhost:4200/admin/team?checkout=cancelled} \
 		go tool air -c .air.toml
 
-dev-docker:
+dev-docker: ## Start the self-hosted Docker development stack
 	@echo "Starting Docker development environment..."
 	@$(DEV_COMPOSE) up --build backend frontend mailpit
 
-dev-docker-seed:
+dev-docker-seed: ## Seed data, then start the self-hosted Docker development stack
 	@echo "Seeding Docker development data..."
 	@$(DEV_COMPOSE) run --rm seed
 	@echo "Starting Docker development environment..."
 	@$(DEV_COMPOSE) up --build backend frontend mailpit
 
-dev-docker-down:
+dev-docker-cloud: ## Start the Docker development stack with cloud build tags and defaults
+	@echo "Starting Docker development environment (cloud/billing)..."
+	@$(DEV_CLOUD_COMPOSE) up --build backend frontend mailpit
+
+dev-docker-cloud-seed: ## Seed data, then start the Docker cloud development stack
+	@echo "Seeding Docker development data..."
+	@$(DEV_CLOUD_COMPOSE) run --rm seed
+	@echo "Starting Docker development environment (cloud/billing)..."
+	@$(DEV_CLOUD_COMPOSE) up --build backend frontend mailpit
+
+dev-docker-down: ## Stop either Docker development stack
 	@$(DEV_COMPOSE) down
 
-dev-docker-clean:
+dev-docker-clean: ## Stop Docker development and delete its local volumes
 	@$(DEV_COMPOSE) down --volumes --remove-orphans
 
 staticcheck:
 	@echo "Running Staticcheck..."
 	go run honnef.co/go/tools/cmd/staticcheck@$(STATICCHECK_VERSION) -tags "$(GO_BUILD_TAGS)" ./...
 
-.PHONY: all build go-build frontend-build frontend-dashboard-build run clean update-default-spam-filter dev dev-seed dev-backend dev-frontend dev-cloud dev-cloud-seed dev-cloud-backend dev-docker dev-docker-seed dev-docker-down dev-docker-clean staticcheck
+.PHONY: all help doctor build go-build frontend-build frontend-dashboard-build run clean build-docker build-docker-cloud smoke-docker smoke-docker-cloud update-default-spam-filter dev dev-seed dev-backend dev-frontend dev-cloud dev-cloud-seed dev-cloud-backend dev-docker dev-docker-seed dev-docker-cloud dev-docker-cloud-seed dev-docker-down dev-docker-clean staticcheck

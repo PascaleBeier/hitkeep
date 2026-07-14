@@ -116,6 +116,9 @@ Use `make dev-docker` when you want the same Docker stack without reseeding data
 
 ## Development Workflow
 
+Run `make help` for the maintained human/agent entry points and `make doctor`
+to see whether the Docker and native workflows are ready on your machine.
+
 ### Docker Development
 
 ```bash
@@ -124,6 +127,12 @@ make dev-docker
 
 # Seed demo data, then start the stack
 make dev-docker-seed
+
+# Cloud/billing build tags with safe local environment defaults
+make dev-docker-cloud
+
+# Seed demo data, then start the cloud development stack
+make dev-docker-cloud-seed
 
 # Stop containers
 make dev-docker-down
@@ -135,6 +144,11 @@ make dev-docker-clean
 The Docker stack keeps Go modules, Go build cache, npm cache, `node_modules`,
 and development data in named Docker volumes. Your source tree is bind-mounted,
 so changing Go or Angular files triggers the matching live-reload process.
+
+`compose.dev-cloud.yaml` is a small override of `compose.dev.yaml`; it changes
+only the backend build tags and cloud environment defaults. Both variants use
+the same ports, caches, source mounts, and cleanup commands, which keeps local
+cloud work close to the normal development path.
 
 ### Native Development
 
@@ -180,6 +194,28 @@ This:
 4. Compiles the Go binary with shared HitKeep build tags: `go build -tags "$(./scripts/go-build-tags.sh)" -o hitkeep ./cmd/hitkeep/main.go`
 
 The binary embeds the `public/` directory, so the build order matters.
+
+### Local Production Images
+
+```bash
+# Public/self-hosted variant
+make build-docker
+
+# Cloud-tagged variant for local parity checks only
+make build-docker-cloud
+
+# Build and verify that the cloud container actually starts and becomes healthy
+make smoke-docker-cloud
+```
+
+Both commands compile the dashboard and Linux binary inside BuildKit, then load
+the same distroless runtime stage used by CI. This works on ARM64 and AMD64
+without relying on the host Go/CGo toolchain. Override `DOCKER_PLATFORM`,
+`DOCKER_IMAGE`, or `DOCKER_CLOUD_IMAGE` when needed.
+
+The cloud image defaults to the clearly local tag `hitkeep:cloud-local`. The
+target never pushes, and the release workflow continues to publish only the
+self-hosted image assembled from CI-built public binaries.
 
 ### Running Tests
 

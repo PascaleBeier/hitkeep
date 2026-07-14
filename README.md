@@ -169,6 +169,10 @@ make dev-docker-seed
 
 Open `http://localhost:4200` and sign in with `demo@example.com` / `demo1234`.
 
+Use `make dev-docker-cloud-seed` for the same hot-reload stack with the local
+cloud/billing build tags and safe cloud defaults. `make help` lists the
+maintained entry points, and `make doctor` checks your local prerequisites.
+
 For native builds you need Go 1.26+, Node.js 24+, Make, and a working C toolchain for DuckDB:
 
 ```bash

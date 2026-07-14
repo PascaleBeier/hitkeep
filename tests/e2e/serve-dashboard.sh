@@ -115,6 +115,8 @@ HITKEEP_WEBHOOK_ALLOW_DEVELOPMENT_TARGETS="true" \
   -nsq-http-address "${NSQ_HTTP}" \
   -api-rate-limit "${HITKEEP_E2E_API_RATE_LIMIT:-1000}" \
   -api-burst "${HITKEEP_E2E_API_BURST:-1000}" \
+  -auth-rate-limit "${HITKEEP_E2E_AUTH_RATE_LIMIT:-1000}" \
+  -auth-burst "${HITKEEP_E2E_AUTH_BURST:-1000}" \
   -jwt-secret "e2e-only-${PORT}" \
   -log-level "${LOG_LEVEL}" \
   > >(sed 's/^/[hitkeep] /') 2>&1 &
