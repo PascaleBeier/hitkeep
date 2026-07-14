@@ -40,6 +40,7 @@ type teamSSORequest struct {
 	AllowedDomains   []string `json:"allowed_domains"`
 	EmailClaim       string   `json:"email_claim"`
 	DisplayNameClaim string   `json:"display_name_claim"`
+	AutoProvision    bool     `json:"auto_provision"`
 	Enabled          bool     `json:"enabled"`
 }
 
@@ -120,6 +121,7 @@ func (h *handler) handleUpsertTeamSSO() http.HandlerFunc {
 			AllowedDomains:        normalized.AllowedDomains,
 			EmailClaim:            normalized.EmailClaim,
 			DisplayNameClaim:      normalized.DisplayNameClaim,
+			AutoProvision:         normalized.AutoProvision,
 			Enabled:               normalized.Enabled,
 		}
 		if err := h.ctx.Store.UpsertTeamSSOConfig(r.Context(), config); err != nil {
@@ -329,6 +331,7 @@ func (h *handler) teamSSOResponse(config *database.TeamSSOConfig) api.TeamSSOCon
 	resp.AllowedDomains = config.AllowedDomains
 	resp.EmailClaim = config.EmailClaim
 	resp.DisplayNameClaim = config.DisplayNameClaim
+	resp.AutoProvision = config.AutoProvision
 	resp.Enabled = config.Enabled
 	resp.UpdatedAt = config.UpdatedAt
 	return resp
@@ -362,5 +365,5 @@ func (h *handler) ssoClient() *sso.Client {
 	if h.ctx.SSO != nil {
 		return h.ctx.SSO
 	}
-	return sso.NewClient(nil)
+	return sso.NewRuntimeClient(h.ctx.Config != nil && h.ctx.Config.CloudHosted)
 }

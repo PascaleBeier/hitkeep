@@ -7,16 +7,31 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 )
 
 type Client struct {
 	HTTPClient *http.Client
+
+	providersMu sync.Mutex
+	providers   map[string]*oidc.Provider
+	discoveries map[string]*providerDiscovery
 }
 
 func NewClient(httpClient *http.Client) *Client {
-	return &Client{HTTPClient: httpClient}
+	return &Client{
+		HTTPClient:  httpClient,
+		providers:   make(map[string]*oidc.Provider),
+		discoveries: make(map[string]*providerDiscovery),
+	}
+}
+
+type providerDiscovery struct {
+	done     chan struct{}
+	provider *oidc.Provider
+	err      error
 }
 
 func NormalizeIssuerURL(raw string) (string, error) {
@@ -28,13 +43,13 @@ func NormalizeIssuerURL(raw string) (string, error) {
 	if !strings.EqualFold(parsed.Scheme, "https") {
 		return "", errors.New("OIDC issuer must use HTTPS")
 	}
-	if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+	if parsed.User != nil || parsed.ForceQuery || parsed.RawQuery != "" || strings.Contains(raw, "#") {
 		return "", errors.New("OIDC issuer cannot contain credentials, a query, or a fragment")
 	}
-	parsed.Scheme = "https"
-	parsed.Host = strings.ToLower(parsed.Host)
-	parsed.Path = strings.TrimSuffix(parsed.Path, "/")
-	return parsed.String(), nil
+	// The issuer is an OIDC identifier, not merely a fetch URL. Providers and
+	// ID-token verifiers compare it exactly, so validation must not rewrite its
+	// host casing, escaped path, or trailing slash.
+	return raw, nil
 }
 
 func (c *Client) Discover(ctx context.Context, issuerURL string) (*oidc.Provider, error) {
@@ -42,8 +57,45 @@ func (c *Client) Discover(ctx context.Context, issuerURL string) (*oidc.Provider
 	if err != nil {
 		return nil, err
 	}
-	if c != nil && c.HTTPClient != nil {
-		ctx = oidc.ClientContext(ctx, c.HTTPClient)
+	if c == nil {
+		return discoverProvider(ctx, nil, issuerURL)
+	}
+
+	c.providersMu.Lock()
+	if provider := c.providers[issuerURL]; provider != nil {
+		c.providersMu.Unlock()
+		return provider, nil
+	}
+	if discovery := c.discoveries[issuerURL]; discovery != nil {
+		c.providersMu.Unlock()
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-discovery.done:
+			return discovery.provider, discovery.err
+		}
+	}
+	discovery := &providerDiscovery{done: make(chan struct{})}
+	c.discoveries[issuerURL] = discovery
+	c.providersMu.Unlock()
+
+	provider, err := discoverProvider(ctx, c.HTTPClient, issuerURL)
+
+	c.providersMu.Lock()
+	discovery.provider = provider
+	discovery.err = err
+	if err == nil {
+		c.providers[issuerURL] = provider
+	}
+	delete(c.discoveries, issuerURL)
+	close(discovery.done)
+	c.providersMu.Unlock()
+	return provider, err
+}
+
+func discoverProvider(ctx context.Context, httpClient *http.Client, issuerURL string) (*oidc.Provider, error) {
+	if httpClient != nil {
+		ctx = oidc.ClientContext(ctx, httpClient)
 	}
 	provider, err := oidc.NewProvider(ctx, issuerURL)
 	if err != nil {

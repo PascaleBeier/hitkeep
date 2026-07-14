@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	ErrTeamSSONotFound       = errors.New("team SSO configuration not found")
-	ErrTeamSSODomainConflict = errors.New("SSO domain is already configured for another team")
+	ErrTeamSSONotFound         = errors.New("team SSO configuration not found")
+	ErrTeamSSODomainConflict   = errors.New("SSO domain is already configured for another team")
+	ErrSSOIdentityUserMismatch = errors.New("SSO identity does not match the authorized user")
 )
 
 type TeamSSOConfig struct {
@@ -25,19 +26,21 @@ type TeamSSOConfig struct {
 	AllowedDomains        []string
 	EmailClaim            string
 	DisplayNameClaim      string
+	AutoProvision         bool
 	Enabled               bool
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
 }
 
 type ResolveSSOUserInput struct {
-	TeamID       uuid.UUID
-	IssuerURL    string
-	Subject      string
-	Email        string
-	GivenName    string
-	LastName     string
-	PasswordHash string
+	TeamID         uuid.UUID
+	IssuerURL      string
+	Subject        string
+	Email          string
+	GivenName      string
+	LastName       string
+	PasswordHash   string
+	ExpectedUserID uuid.UUID
 }
 
 type ResolveSSOUserResult struct {
@@ -48,7 +51,7 @@ type ResolveSSOUserResult struct {
 func (s *Store) GetTeamSSOConfig(ctx context.Context, teamID uuid.UUID) (*TeamSSOConfig, error) {
 	config, err := scanTeamSSOConfig(s.db.QueryRowContext(ctx, `
 		SELECT tenant_id, provider_type, issuer_url, client_id, client_secret_encrypted,
-		       email_claim, display_name_claim, enabled, created_at, updated_at
+		       email_claim, display_name_claim, auto_provision, enabled, created_at, updated_at
 		FROM team_sso_configs
 		WHERE tenant_id = ?
 	`, teamID))
@@ -73,7 +76,7 @@ func (s *Store) GetEnabledTeamSSOConfigByDomain(ctx context.Context, domain stri
 	}
 	config, err := scanTeamSSOConfig(s.db.QueryRowContext(ctx, `
 		SELECT c.tenant_id, c.provider_type, c.issuer_url, c.client_id, c.client_secret_encrypted,
-		       c.email_claim, c.display_name_claim, c.enabled, c.created_at, c.updated_at
+		       c.email_claim, c.display_name_claim, c.auto_provision, c.enabled, c.created_at, c.updated_at
 		FROM team_sso_configs c
 		JOIN team_sso_domains d ON d.tenant_id = c.tenant_id
 		LEFT JOIN tenant_archives ta ON ta.tenant_id = c.tenant_id
@@ -148,8 +151,8 @@ func (s *Store) UpsertTeamSSOConfig(ctx context.Context, config TeamSSOConfig) e
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO team_sso_configs (
 				tenant_id, provider_type, issuer_url, client_id, client_secret_encrypted,
-				email_claim, display_name_claim, enabled, created_at, updated_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				email_claim, display_name_claim, auto_provision, enabled, created_at, updated_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT (tenant_id) DO UPDATE SET
 				provider_type = excluded.provider_type,
 				issuer_url = excluded.issuer_url,
@@ -157,11 +160,12 @@ func (s *Store) UpsertTeamSSOConfig(ctx context.Context, config TeamSSOConfig) e
 				client_secret_encrypted = excluded.client_secret_encrypted,
 				email_claim = excluded.email_claim,
 				display_name_claim = excluded.display_name_claim,
+				auto_provision = excluded.auto_provision,
 				enabled = excluded.enabled,
 				updated_at = excluded.updated_at
 		`, config.TeamID, config.ProviderType, config.IssuerURL, config.ClientID,
 			config.ClientSecretEncrypted, config.EmailClaim, config.DisplayNameClaim,
-			config.Enabled, now, now); err != nil {
+			config.AutoProvision, config.Enabled, now, now); err != nil {
 			return fmt.Errorf("could not save team SSO configuration: %w", err)
 		}
 		if _, err := tx.ExecContext(ctx, "DELETE FROM team_sso_domains WHERE tenant_id = ?", config.TeamID); err != nil {
@@ -224,6 +228,9 @@ func (s *Store) ResolveSSOUser(ctx context.Context, input ResolveSSOUserInput) (
 		}
 
 		if linkedUserID != uuid.Nil {
+			if input.ExpectedUserID != uuid.Nil && linkedUserID != input.ExpectedUserID {
+				return ErrSSOIdentityUserMismatch
+			}
 			result.UserID = linkedUserID
 			if _, err := tx.ExecContext(ctx, `
 				UPDATE sso_identities
@@ -236,6 +243,12 @@ func (s *Store) ResolveSSOUser(ctx context.Context, input ResolveSSOUserInput) (
 			err = tx.QueryRowContext(ctx, "SELECT id FROM users WHERE lower(email) = lower(?)", input.Email).Scan(&result.UserID)
 			if err != nil && !errors.Is(err, sql.ErrNoRows) {
 				return fmt.Errorf("could not resolve SSO user by email: %w", err)
+			}
+			if errors.Is(err, sql.ErrNoRows) && input.ExpectedUserID != uuid.Nil {
+				return ErrSSOIdentityUserMismatch
+			}
+			if err == nil && input.ExpectedUserID != uuid.Nil && result.UserID != input.ExpectedUserID {
+				return ErrSSOIdentityUserMismatch
 			}
 			if errors.Is(err, sql.ErrNoRows) {
 				result.UserID = uuid.New()
@@ -256,13 +269,6 @@ func (s *Store) ResolveSSOUser(ctx context.Context, input ResolveSSOUserInput) (
 			}
 		}
 
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO tenant_members (id, tenant_id, user_id, role, added_at, added_by)
-			VALUES (?, ?, ?, ?, ?, NULL)
-			ON CONFLICT (tenant_id, user_id) DO NOTHING
-		`, uuid.New(), input.TeamID, result.UserID, TenantRoleMember, time.Now().UTC()); err != nil {
-			return fmt.Errorf("could not grant SSO team membership: %w", err)
-		}
 		if input.GivenName != "" || input.LastName != "" {
 			if _, err := tx.ExecContext(ctx, `
 				UPDATE users
@@ -272,16 +278,6 @@ func (s *Store) ResolveSSOUser(ctx context.Context, input ResolveSSOUserInput) (
 			`, nullableProfileName(input.GivenName), nullableProfileName(input.LastName), result.UserID); err != nil {
 				return fmt.Errorf("could not apply SSO display name: %w", err)
 			}
-		}
-
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO user_preferences (user_id, default_locale, updated_at, active_tenant_id)
-			VALUES (?, ?, ?, ?)
-			ON CONFLICT (user_id) DO UPDATE SET
-				active_tenant_id = excluded.active_tenant_id,
-				updated_at = excluded.updated_at
-		`, result.UserID, defaultLocaleCode, time.Now().UTC(), input.TeamID); err != nil {
-			return fmt.Errorf("could not activate SSO team: %w", err)
 		}
 		return nil
 	})
@@ -328,6 +324,7 @@ func scanTeamSSOConfig(row *sql.Row) (*TeamSSOConfig, error) {
 		&config.ClientSecretEncrypted,
 		&config.EmailClaim,
 		&config.DisplayNameClaim,
+		&config.AutoProvision,
 		&config.Enabled,
 		&config.CreatedAt,
 		&config.UpdatedAt,

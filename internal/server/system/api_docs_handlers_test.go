@@ -868,6 +868,7 @@ func TestOpenAPISpecV1DocumentsRedactedOIDCSSOFlows(t *testing.T) {
 
 	for path, methods := range map[string][]string{
 		"/api/auth/sso":                 {"get"},
+		"/api/auth/sso/invite":          {"post"},
 		"/api/auth/sso/start":           {"post"},
 		"/api/auth/sso/callback":        {"get"},
 		"/api/user/teams/{id}/sso":      {"get", "put", "delete"},
@@ -888,6 +889,9 @@ func TestOpenAPISpecV1DocumentsRedactedOIDCSSOFlows(t *testing.T) {
 	}
 	if _, ok := responseProperties["client_secret_configured"]; !ok {
 		t.Fatal("redacted TeamSSOConfig should expose client_secret_configured")
+	}
+	if _, ok := responseProperties["auto_provision"]; !ok {
+		t.Fatal("TeamSSOConfig should expose auto_provision")
 	}
 	inputSchema := requireMap(t, schemas, "TeamSSOInput")
 	inputProperties := requireMap(t, inputSchema, "properties")

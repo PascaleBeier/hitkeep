@@ -456,6 +456,118 @@ func (s *Store) AcceptInviteForAuthenticatedUser(ctx context.Context, token stri
 	return inviteEmail, accepted, nil
 }
 
+// AcceptTeamInviteForSSO accepts exactly one team's pending invitation after
+// the caller has verified the user's email through OIDC. When token is set it
+// is consumed and must belong to the same email; tokenless acceptance supports
+// the regular login flow where the verified identity itself proves ownership.
+func (s *Store) AcceptTeamInviteForSSO(ctx context.Context, token string, teamID, userID uuid.UUID) (api.TeamInvite, error) {
+	if teamID == uuid.Nil || userID == uuid.Nil {
+		return api.TeamInvite{}, ErrTeamInviteNotFound
+	}
+
+	token = strings.TrimSpace(token)
+	var tokenEntry passwordResetEntry
+	if token != "" {
+		entry, found, err := s.lookupPasswordResetToken(token, true)
+		if err != nil {
+			return api.TeamInvite{}, err
+		}
+		if !found {
+			return api.TeamInvite{}, ErrPasswordResetInvalid
+		}
+		tokenEntry = entry
+	}
+
+	accepted := api.TeamInvite{}
+	err := s.Transact(ctx, func(tx *sql.Tx) error {
+		var userEmail string
+		if err := tx.QueryRowContext(ctx, "SELECT email FROM users WHERE id = ?", userID).Scan(&userEmail); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrUserNotFound
+			}
+			return fmt.Errorf("could not load SSO invite user: %w", err)
+		}
+		userEmail = strings.ToLower(strings.TrimSpace(userEmail))
+		if token != "" && !strings.EqualFold(userEmail, strings.TrimSpace(tokenEntry.Email)) {
+			return ErrTeamInviteEmailMismatch
+		}
+
+		invite, err := scanTeamInviteRow(tx.QueryRowContext(ctx, `
+			SELECT
+				id,
+				tenant_id,
+				email,
+				role,
+				CAST(invited_user_id AS VARCHAR),
+				status,
+				requires_password_setup,
+				CAST(created_by AS VARCHAR),
+				created_at,
+				expires_at,
+				accepted_at,
+				revoked_at
+			FROM team_invites
+			WHERE tenant_id = ? AND lower(email) = lower(?) AND status = ?
+			ORDER BY created_at ASC
+			LIMIT 1
+		`, teamID, userEmail, TeamInviteStatusPending))
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrTeamInviteNotFound
+		}
+		if err != nil {
+			return err
+		}
+
+		now := time.Now().UTC()
+		if invite.ExpiresAt.Before(now) {
+			if _, err := tx.ExecContext(ctx, `
+				UPDATE team_invites
+				SET status = ?, revoked_at = ?
+				WHERE id = ?
+			`, TeamInviteStatusRevoked, now, invite.ID); err != nil {
+				return fmt.Errorf("could not expire SSO team invite: %w", err)
+			}
+			return ErrTeamInviteNotFound
+		}
+
+		createdBy := uuid.Nil
+		if invite.CreatedBy != nil {
+			createdBy = *invite.CreatedBy
+		}
+		if err := ensureTenantMemberTx(ctx, tx, teamID, userID, invite.Role, createdBy); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE team_invites
+			SET invited_user_id = ?, status = ?, accepted_at = ?
+			WHERE id = ? AND status = ?
+		`, userID, TeamInviteStatusAccepted, now, invite.ID, TeamInviteStatusPending); err != nil {
+			return fmt.Errorf("could not accept SSO team invite: %w", err)
+		}
+		if err := setActiveTenantTx(ctx, tx, userID, teamID); err != nil {
+			return err
+		}
+
+		userIDCopy := userID
+		invite.InvitedUserID = &userIDCopy
+		invite.Status = TeamInviteStatusAccepted
+		invite.AcceptedAt = &now
+		accepted = *invite
+		return nil
+	})
+	if err != nil {
+		if token != "" {
+			restorePasswordResetToken(s, token, tokenEntry)
+		}
+		return api.TeamInvite{}, err
+	}
+	if token == "" {
+		s.deletePasswordResetTokenForEmail(accepted.Email)
+	}
+	s.invalidateAllSiteRolesForUser(userID)
+	return accepted, nil
+}
+
 func restorePasswordResetToken(s *Store, token string, entry passwordResetEntry) {
 	if time.Now().UTC().Before(entry.ExpiresAt.UTC()) {
 		s.storePasswordResetToken(entry.Email, strings.TrimSpace(token), entry.ExpiresAt)

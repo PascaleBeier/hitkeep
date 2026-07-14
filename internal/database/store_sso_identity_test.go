@@ -2,10 +2,13 @@ package database
 
 import (
 	"context"
+	"errors"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
-func TestResolveSSOUserCreatesAndReusesIdentity(t *testing.T) {
+func TestResolveSSOUserCreatesAndReusesIdentityWithoutGrantingTeamAccess(t *testing.T) {
 	store := setupTenantStore(t)
 	ctx := context.Background()
 	ownerID, _ := store.CreateUser(ctx, "owner@sso-identity.test", "hash")
@@ -27,13 +30,8 @@ func TestResolveSSOUserCreatesAndReusesIdentity(t *testing.T) {
 	if first.UserID == ownerID || !first.Created {
 		t.Fatalf("expected a new SSO user, got %+v", first)
 	}
-	role, err := store.GetTenantRole(ctx, teamID, first.UserID)
-	if err != nil || role != TenantRoleMember {
-		t.Fatalf("expected member role, role=%q err=%v", role, err)
-	}
-	activeTeamID, err := store.GetActiveTenantID(ctx, first.UserID)
-	if err != nil || activeTeamID != teamID {
-		t.Fatalf("expected SSO team to be active, team=%s err=%v", activeTeamID, err)
+	if isMember, err := store.IsTenantMember(ctx, teamID, first.UserID); err != nil || isMember {
+		t.Fatalf("trusted domain granted team membership, is_member=%v err=%v", isMember, err)
 	}
 
 	input.Email = "renamed.user@example.com"
@@ -43,6 +41,42 @@ func TestResolveSSOUserCreatesAndReusesIdentity(t *testing.T) {
 	}
 	if second.UserID != first.UserID || second.Created {
 		t.Fatalf("expected linked user %s, got %+v", first.UserID, second)
+	}
+}
+
+func TestResolveSSOUserRejectsLinkedSubjectForDifferentAuthorizedUserBeforeMutation(t *testing.T) {
+	store := setupTenantStore(t)
+	ctx := context.Background()
+	ownerID, _ := store.CreateUser(ctx, "owner@sso-expected-user.test", "hash")
+	teamID, _ := store.GetActiveTenantID(ctx, ownerID)
+	linked, err := store.ResolveSSOUser(ctx, ResolveSSOUserInput{
+		TeamID:       teamID,
+		IssuerURL:    "https://id.example.com",
+		Subject:      "stable-subject",
+		Email:        "linked@example.com",
+		PasswordHash: "random-password-hash",
+	})
+	if err != nil {
+		t.Fatalf("create linked identity: %v", err)
+	}
+
+	_, err = store.ResolveSSOUser(ctx, ResolveSSOUserInput{
+		TeamID:         teamID,
+		IssuerURL:      "https://id.example.com",
+		Subject:        "stable-subject",
+		Email:          "authorized@example.com",
+		PasswordHash:   "random-password-hash",
+		ExpectedUserID: uuid.New(),
+	})
+	if !errors.Is(err, ErrSSOIdentityUserMismatch) {
+		t.Fatalf("expected linked identity user mismatch, got %v", err)
+	}
+	var identityEmail string
+	if err := store.DB().QueryRowContext(ctx, "SELECT email FROM sso_identities WHERE tenant_id = ? AND user_id = ?", teamID, linked.UserID).Scan(&identityEmail); err != nil {
+		t.Fatalf("load unchanged identity: %v", err)
+	}
+	if identityEmail != "linked@example.com" {
+		t.Fatalf("expected rejected identity to remain unchanged, got %q", identityEmail)
 	}
 }
 
@@ -72,9 +106,8 @@ func TestResolveSSOUserLinksExistingVerifiedEmail(t *testing.T) {
 	if err != nil || existing == nil || existing.Password != "local-password-hash" || existing.GivenName != "Existing" || existing.LastName != "Person" {
 		t.Fatalf("SSO link changed local credentials: user=%+v err=%v", existing, err)
 	}
-	role, err := store.GetTenantRole(ctx, team.ID, existingID)
-	if err != nil || role != TenantRoleMember {
-		t.Fatalf("expected linked team membership, role=%q err=%v", role, err)
+	if isMember, err := store.IsTenantMember(ctx, team.ID, existingID); err != nil || isMember {
+		t.Fatalf("identity linking granted team membership, is_member=%v err=%v", isMember, err)
 	}
 }
 

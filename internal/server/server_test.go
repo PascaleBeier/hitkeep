@@ -90,6 +90,36 @@ func TestServerDoesNotMountMCPRouteWhenDisabled(t *testing.T) {
 	}
 }
 
+func TestServerSelectsSSONetworkPolicyForDeploymentMode(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		cloudHosted    bool
+		wantHTTPClient bool
+	}{
+		{name: "managed cloud", cloudHosted: true, wantHTTPClient: true},
+		{name: "self-hosted", cloudHosted: false, wantHTTPClient: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			conf := testServerConfig(t)
+			conf.CloudHosted = test.cloudHosted
+			store := testServerStore(t)
+			defer store.Close()
+
+			srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+			defer func() {
+				_ = srv.Shutdown(context.Background())
+			}()
+
+			if srv.ctx == nil || srv.ctx.SSO == nil {
+				t.Fatal("server did not initialize the SSO client")
+			}
+			if got := srv.ctx.SSO.HTTPClient != nil; got != test.wantHTTPClient {
+				t.Fatalf("hardened SSO HTTP client configured=%t want=%t", got, test.wantHTTPClient)
+			}
+		})
+	}
+}
+
 func TestNormalizePublicBasePath(t *testing.T) {
 	tests := []struct {
 		name      string

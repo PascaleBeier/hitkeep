@@ -51,6 +51,7 @@ type SSOOAuthState struct {
 	IssuerURL    string
 	ClientID     string
 	Email        string
+	InviteToken  string
 	Nonce        string
 	CodeVerifier string
 	ReturnPath   string

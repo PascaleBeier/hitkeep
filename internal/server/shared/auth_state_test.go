@@ -67,13 +67,14 @@ func TestSSOOAuthStateIsOneTimeAndExpires(t *testing.T) {
 		IssuerURL:    "https://id.example.com",
 		ClientID:     "hitkeep",
 		Email:        "user@example.com",
+		InviteToken:  "invite-token",
 		Nonce:        "nonce",
 		CodeVerifier: "verifier",
 		ExpiresAt:    time.Now().UTC().Add(time.Minute),
 	})
 
 	state, ok := stateStore.ConsumeSSOOAuthState(stateID)
-	if !ok || state.Email != "user@example.com" || state.CodeVerifier != "verifier" {
+	if !ok || state.Email != "user@example.com" || state.InviteToken != "invite-token" || state.CodeVerifier != "verifier" {
 		t.Fatalf("unexpected SSO state: state=%+v ok=%v", state, ok)
 	}
 	if _, ok := stateStore.ConsumeSSOOAuthState(stateID); ok {

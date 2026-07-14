@@ -182,6 +182,24 @@ func (s *Store) lookupPasswordResetToken(token string, consume bool) (passwordRe
 	return entry, true, nil
 }
 
+func (s *Store) deletePasswordResetTokenForEmail(email string) {
+	if s == nil || s.runtime == nil {
+		return
+	}
+
+	emailKey := normalizeEmailCacheKey(email)
+	if emailKey == "" {
+		return
+	}
+	s.runtime.passwordResetMu.Lock()
+	defer s.runtime.passwordResetMu.Unlock()
+
+	if token, ok := s.runtime.passwordResetTokenIndex.Peek(emailKey); ok {
+		s.runtime.passwordResetsByToken.Remove(strings.TrimSpace(token))
+	}
+	s.runtime.passwordResetTokenIndex.Remove(emailKey)
+}
+
 func (s *Store) cacheAPIClientAuth(tokenHash string, authz APIClientAuth, expiresAt time.Time) {
 	if s == nil || s.runtime == nil || strings.TrimSpace(tokenHash) == "" {
 		return

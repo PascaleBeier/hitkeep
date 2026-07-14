@@ -1480,6 +1480,7 @@ type TeamSSOConfig struct {
 	AllowedDomains         []string  `json:"allowed_domains"`
 	EmailClaim             string    `json:"email_claim"`
 	DisplayNameClaim       string    `json:"display_name_claim"`
+	AutoProvision          bool      `json:"auto_provision"`
 	Enabled                bool      `json:"enabled"`
 	CallbackURL            string    `json:"callback_url"`
 	UpdatedAt              time.Time `json:"updated_at,omitempty"`

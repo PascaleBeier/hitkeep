@@ -1,0 +1,2 @@
+ALTER TABLE team_sso_configs
+ADD COLUMN IF NOT EXISTS auto_provision BOOLEAN DEFAULT FALSE;

@@ -131,6 +131,9 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 	mux.HandleFunc("GET /api/auth/sso", ctx.Handler(shared.HandlerConfig{
 		RateLimiter: ctx.AuthLimiter,
 	}, h.handleSSOAvailability()))
+	mux.HandleFunc("POST /api/auth/sso/invite", ctx.Handler(shared.HandlerConfig{
+		RateLimiter: ctx.AuthLimiter,
+	}, h.handleSSOInviteAvailability()))
 	mux.HandleFunc("POST /api/auth/sso/start", ctx.Handler(shared.HandlerConfig{
 		RateLimiter: ctx.AuthLimiter,
 	}, h.handleSSOStart()))

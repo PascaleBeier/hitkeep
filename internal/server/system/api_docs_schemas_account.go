@@ -53,11 +53,15 @@ func openAPIV1AccountSchemas() map[string]any {
 		"SSOStartRequest": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"email":       map[string]any{"type": "string", "format": "email"},
-				"return_url":  map[string]any{"type": "string", "description": "Optional same-origin application path. Unsafe or authentication paths fall back to /."},
-				"remember_me": map[string]any{"type": "boolean"},
+				"email":        map[string]any{"type": "string", "format": "email"},
+				"invite_token": map[string]any{"type": "string", "description": "Invitation token used instead of email when starting SSO from invitation acceptance."},
+				"return_url":   map[string]any{"type": "string", "description": "Optional same-origin application path. Unsafe or authentication paths fall back to /."},
+				"remember_me":  map[string]any{"type": "boolean"},
 			},
-			"required": []string{"email"},
+			"oneOf": []any{
+				map[string]any{"required": []string{"email"}},
+				map[string]any{"required": []string{"invite_token"}},
+			},
 		},
 		"SSOStartResponse": map[string]any{
 			"type": "object",
@@ -76,9 +80,10 @@ func openAPIV1AccountSchemas() map[string]any {
 				"allowed_domains":    map[string]any{"type": "array", "minItems": 1, "maxItems": 50, "items": map[string]any{"type": "string"}},
 				"email_claim":        map[string]any{"type": "string", "default": "email"},
 				"display_name_claim": map[string]any{"type": "string", "default": "name"},
+				"auto_provision":     map[string]any{"type": "boolean", "description": "When true, verified users from trusted domains may join this team as Members without an invitation. Managed-cloud seat and team limits still apply."},
 				"enabled":            map[string]any{"type": "boolean"},
 			},
-			"required": []string{"provider_type", "issuer_url", "client_id", "allowed_domains", "email_claim", "display_name_claim", "enabled"},
+			"required": []string{"provider_type", "issuer_url", "client_id", "allowed_domains", "email_claim", "display_name_claim", "auto_provision", "enabled"},
 		},
 		"TeamSSOConfig": map[string]any{
 			"type":        "object",
@@ -91,11 +96,12 @@ func openAPIV1AccountSchemas() map[string]any {
 				"allowed_domains":          map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
 				"email_claim":              map[string]any{"type": "string"},
 				"display_name_claim":       map[string]any{"type": "string"},
+				"auto_provision":           map[string]any{"type": "boolean"},
 				"enabled":                  map[string]any{"type": "boolean"},
 				"callback_url":             map[string]any{"type": "string", "format": "uri"},
 				"updated_at":               map[string]any{"type": "string", "format": "date-time"},
 			},
-			"required": []string{"provider_type", "issuer_url", "client_id", "client_secret_configured", "allowed_domains", "email_claim", "display_name_claim", "enabled", "callback_url"},
+			"required": []string{"provider_type", "issuer_url", "client_id", "client_secret_configured", "allowed_domains", "email_claim", "display_name_claim", "auto_provision", "enabled", "callback_url"},
 		},
 		"TeamPlan": map[string]any{
 			"type": "object",

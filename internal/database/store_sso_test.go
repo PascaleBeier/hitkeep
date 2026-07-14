@@ -27,6 +27,7 @@ func TestTeamSSOConfigLifecycleAndAvailability(t *testing.T) {
 		AllowedDomains:        []string{"example.com", "example.org"},
 		EmailClaim:            "email",
 		DisplayNameClaim:      "name",
+		AutoProvision:         true,
 		Enabled:               true,
 	}
 	if err := store.UpsertTeamSSOConfig(ctx, input); err != nil {
@@ -45,7 +46,7 @@ func TestTeamSSOConfigLifecycleAndAvailability(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve config: %v", err)
 	}
-	if resolved == nil || resolved.TeamID != teamID || resolved.ClientSecretEncrypted != "v1.encrypted" {
+	if resolved == nil || resolved.TeamID != teamID || resolved.ClientSecretEncrypted != "v1.encrypted" || !resolved.AutoProvision {
 		t.Fatalf("unexpected resolved config: %+v", resolved)
 	}
 	if len(resolved.AllowedDomains) != 2 || resolved.AllowedDomains[0] != "example.com" {
@@ -73,7 +74,7 @@ func TestTeamSSOConfigLifecycleAndAvailability(t *testing.T) {
 	if err != nil || stored == nil {
 		t.Fatalf("get stored config: config=%+v err=%v", stored, err)
 	}
-	if stored.ClientSecretEncrypted != "v1.rotated" || len(stored.AllowedDomains) != 1 || stored.AllowedDomains[0] != "example.net" {
+	if stored.ClientSecretEncrypted != "v1.rotated" || len(stored.AllowedDomains) != 1 || stored.AllowedDomains[0] != "example.net" || !stored.AutoProvision {
 		t.Fatalf("unexpected updated config: %+v", stored)
 	}
 

@@ -23,14 +23,16 @@ func TestTeamSSOConfigurationIsValidatedEncryptedAndRedacted(t *testing.T) {
 
 	issuer := newOIDCDiscoveryServer(t)
 	h.ctx.SSO = sso.NewClient(issuer.Client())
+	issuerURL := issuer.URL + "/"
 	body, _ := json.Marshal(map[string]any{
 		"provider_type":      "oidc",
-		"issuer_url":         issuer.URL,
+		"issuer_url":         issuerURL,
 		"client_id":          "hitkeep-dashboard",
 		"client_secret":      "super-secret-value",
 		"allowed_domains":    []string{"Example.COM", "example.org"},
 		"email_claim":        "user.email",
 		"display_name_claim": "user.name",
+		"auto_provision":     true,
 		"enabled":            true,
 	})
 	req := withTestUser(httptest.NewRequest(http.MethodPut, "/api/user/teams/"+teamID.String()+"/sso", bytes.NewReader(body)), userID)
@@ -48,8 +50,11 @@ func TestTeamSSOConfigurationIsValidatedEncryptedAndRedacted(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if !response.Enabled || !response.ClientSecretConfigured || response.CallbackURL != "http://localhost:8080/api/auth/sso/callback" {
+	if !response.Enabled || !response.AutoProvision || !response.ClientSecretConfigured || response.CallbackURL != "http://localhost:8080/api/auth/sso/callback" {
 		t.Fatalf("unexpected response: %+v", response)
+	}
+	if response.IssuerURL != issuerURL {
+		t.Fatalf("issuer identifier changed in response: got %q want %q", response.IssuerURL, issuerURL)
 	}
 	if len(response.AllowedDomains) != 2 || response.AllowedDomains[0] != "example.com" {
 		t.Fatalf("domains were not normalized: %+v", response.AllowedDomains)
@@ -61,6 +66,12 @@ func TestTeamSSOConfigurationIsValidatedEncryptedAndRedacted(t *testing.T) {
 	}
 	if stored.ClientSecretEncrypted == "super-secret-value" || strings.Contains(stored.ClientSecretEncrypted, "super-secret-value") {
 		t.Fatal("database stored a plaintext client secret")
+	}
+	if stored.IssuerURL != issuerURL {
+		t.Fatalf("issuer identifier changed in storage: got %q want %q", stored.IssuerURL, issuerURL)
+	}
+	if !stored.AutoProvision {
+		t.Fatal("automatic provisioning setting was not stored")
 	}
 	box, _ := sso.NewSecretBox(h.ctx.Config.JWTSecret)
 	opened, err := box.Open(stored.ClientSecretEncrypted)
@@ -107,7 +118,7 @@ func newOIDCDiscoveryServer(t *testing.T) *httptest.Server {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"issuer":                                server.URL,
+			"issuer":                                server.URL + "/",
 			"authorization_endpoint":                server.URL + "/authorize",
 			"token_endpoint":                        server.URL + "/token",
 			"jwks_uri":                              server.URL + "/keys",

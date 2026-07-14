@@ -196,7 +196,7 @@ func New(conf *config.Config, publicFS fs.FS, store *database.Store, tenantStore
 			ClientID:     conf.GoogleSearchConsoleClientID,
 			ClientSecret: conf.GoogleSearchConsoleClientSecret,
 		}),
-		SSO:                      sso.NewClient(nil),
+		SSO:                      sso.NewRuntimeClient(conf.CloudHosted),
 		AI:                       aiService,
 		Realtime:                 realtimeBroker,
 		IPFilter:                 ipFilter,

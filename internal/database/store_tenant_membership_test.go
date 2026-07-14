@@ -97,6 +97,80 @@ func TestAcceptInviteForAuthenticatedUserSetsActiveTenantToAcceptedTeam(t *testi
 	}
 }
 
+func TestAcceptTeamInviteForSSOPreservesRoleAndConsumesOnlyTheTargetInvite(t *testing.T) {
+	store := setupTenantStore(t)
+	ctx := context.Background()
+
+	ownerID, err := store.CreateUser(ctx, "sso-invite-owner@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create owner: %v", err)
+	}
+	firstTeam, err := store.CreateTenant(ctx, ownerID, "SSO Admin Team", "")
+	if err != nil {
+		t.Fatalf("create first team: %v", err)
+	}
+	secondTeam, err := store.CreateTenant(ctx, ownerID, "Other Pending Team", "")
+	if err != nil {
+		t.Fatalf("create second team: %v", err)
+	}
+	inviteeID, err := store.CreateUserWithoutDefaultTenant(ctx, "sso-invitee@example.com", "temporary-hash")
+	if err != nil {
+		t.Fatalf("create invitee: %v", err)
+	}
+	if _, err := store.CreateTeamInvite(ctx, firstTeam.ID, "sso-invitee@example.com", TenantRoleAdmin, &inviteeID, ownerID, true); err != nil {
+		t.Fatalf("create admin invite: %v", err)
+	}
+	if _, err := store.CreateTeamInvite(ctx, secondTeam.ID, "sso-invitee@example.com", TenantRoleMember, &inviteeID, ownerID, true); err != nil {
+		t.Fatalf("create second invite: %v", err)
+	}
+	token, err := store.CreatePasswordResetToken(ctx, "sso-invitee@example.com")
+	if err != nil {
+		t.Fatalf("create invite token: %v", err)
+	}
+
+	accepted, err := store.AcceptTeamInviteForSSO(ctx, token, firstTeam.ID, inviteeID)
+	if err != nil {
+		t.Fatalf("accept SSO invite: %v", err)
+	}
+	if accepted.TeamID != firstTeam.ID || accepted.Role != TenantRoleAdmin {
+		t.Fatalf("expected scoped admin invite, got %+v", accepted)
+	}
+	role, err := store.GetTenantRole(ctx, firstTeam.ID, inviteeID)
+	if err != nil || role != TenantRoleAdmin {
+		t.Fatalf("expected retained admin role, role=%q err=%v", role, err)
+	}
+	pending, err := store.ListPendingTeamInvitesByEmail(ctx, "sso-invitee@example.com")
+	if err != nil || len(pending) != 1 || pending[0].TeamID != secondTeam.ID {
+		t.Fatalf("expected only the other invite to remain pending, invites=%+v err=%v", pending, err)
+	}
+	if _, err := store.ResolvePasswordResetEmail(ctx, token); err == nil {
+		t.Fatal("expected accepted SSO invite token to be consumed")
+	}
+}
+
+func TestAcceptTeamInviteForSSOAllowsVerifiedEmailWithoutToken(t *testing.T) {
+	store := setupTenantStore(t)
+	ctx := context.Background()
+	ownerID, _ := store.CreateUser(ctx, "sso-email-owner@example.com", "hash")
+	team, _ := store.CreateTenant(ctx, ownerID, "SSO Email Team", "")
+	inviteeID, _ := store.CreateUserWithoutDefaultTenant(ctx, "verified-sso@example.com", "temporary-hash")
+	if _, err := store.CreateTeamInvite(ctx, team.ID, "verified-sso@example.com", TenantRoleMember, &inviteeID, ownerID, true); err != nil {
+		t.Fatalf("create invite: %v", err)
+	}
+	token, err := store.CreatePasswordResetToken(ctx, "verified-sso@example.com")
+	if err != nil {
+		t.Fatalf("create invite token: %v", err)
+	}
+
+	accepted, err := store.AcceptTeamInviteForSSO(ctx, "", team.ID, inviteeID)
+	if err != nil || accepted.TeamID != team.ID {
+		t.Fatalf("accept invite after verified SSO email: invite=%+v err=%v", accepted, err)
+	}
+	if _, err := store.ResolvePasswordResetEmail(ctx, token); err == nil {
+		t.Fatal("expected the password setup token to be invalidated after verified SSO acceptance")
+	}
+}
+
 func TestAcceptedTeamInviteMakesPendingSiteAccessEffective(t *testing.T) {
 	store := setupTenantStore(t)
 	ctx := context.Background()
