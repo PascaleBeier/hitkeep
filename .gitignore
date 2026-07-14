@@ -1,8 +1,10 @@
 tmp
 node_modules
 hitkeep
+main
 hitkeep.db
 hitkeep.db.wal
+/*-local-*.png
 /archive
 /public
 !/public/embed.go
@@ -12,3 +14,19 @@ hitkeep.db.wal
 frontend/dashboard/test-results
 frontend/dashboard/playwright-report
 data
+
+# Canonical contributor skills are versioned source, even with a global ignore.
+!/.agents/
+!/.agents/**
+
+# Portable project MCP registrations override common global ignore rules.
+!/.mcp.json
+!/.codex/
+!/.codex/config.toml
+!/.gemini/
+!/.gemini/settings.json
+!/.vscode/
+!/.vscode/mcp.json
+!/.cursor/
+/.cursor/*
+!/.cursor/mcp.json

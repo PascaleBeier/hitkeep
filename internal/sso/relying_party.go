@@ -196,7 +196,7 @@ func extractIdentity(idToken *oidc.IDToken, config TeamConfig) (Identity, error)
 
 func claimString(claims map[string]any, path string) (string, bool) {
 	var current any = claims
-	for _, segment := range strings.Split(strings.TrimSpace(path), ".") {
+	for segment := range strings.SplitSeq(strings.TrimSpace(path), ".") {
 		object, ok := current.(map[string]any)
 		if !ok {
 			return "", false

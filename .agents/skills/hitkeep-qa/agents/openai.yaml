@@ -1,0 +1,4 @@
+interface:
+  display_name: "Validate HitKeep changes"
+  short_description: "Plan and run canonical QA through hk"
+  default_prompt: "Use $hitkeep-qa to plan, run, investigate, and report the correct live QA profile for this change."

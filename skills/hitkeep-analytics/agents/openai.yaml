@@ -1,4 +1,4 @@
 interface:
-  display_name: "HitKeep Analytics"
-  short_description: "Analyze HitKeep data through MCP"
-  default_prompt: "Use $hitkeep-analytics to answer a HitKeep analytics question with aggregate MCP data and clear caveats."
+  display_name: "Analyze HitKeep"
+  short_description: "Analyze scoped HitKeep analytics safely"
+  default_prompt: "Use $hitkeep-analytics to answer this HitKeep analytics question with scoped aggregate evidence."

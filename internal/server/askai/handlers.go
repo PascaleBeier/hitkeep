@@ -539,7 +539,7 @@ func (h *handler) prepareAskAI(w http.ResponseWriter, r *http.Request) (askAIPre
 		AIRequest: hitai.AskAIRequest{
 			TeamID: teamID, SiteID: siteID, ActorID: userID, ActorType: "user", SiteDomain: site.Domain,
 			Query: request.Query, From: from, To: to, Route: request.Route, Filters: toAIAskFilters(filters), History: toAIAskHistory(request.History),
-			SkillText: publicskills.PublicAnalyticsSkillPack(), Tools: tools,
+			SkillText: publicskills.EmbeddedAnalyticsProcedurePack(), Tools: tools,
 		},
 	}, true
 }

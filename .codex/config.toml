@@ -1,0 +1,10 @@
+# Codex loads this file only after the repository is trusted. Relative paths
+# resolve from this .codex directory, so every Git worktree launches its own
+# developer MCP process without writing to the user's global Codex config.
+[mcp_servers.hitkeep-dev]
+command = "../hk"
+args = ["--workspace", "..", "mcp", "serve"]
+cwd = "."
+startup_timeout_sec = 60
+tool_timeout_sec = 60
+default_tools_approval_mode = "auto"

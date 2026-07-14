@@ -45,7 +45,13 @@ MAIL_ENCRYPTION="${HITKEEP_E2E_MAIL_ENCRYPTION:-none}"
 SKIP_DASHBOARD_BUILD="${HITKEEP_E2E_SKIP_DASHBOARD_BUILD:-${HITKEEP_E2E_SKIP_BUILD:-0}}"
 SKIP_BINARY_BUILD="${HITKEEP_E2E_SKIP_BINARY_BUILD:-${HITKEEP_E2E_SKIP_BUILD:-0}}"
 
-RUN_DIR="${HITKEEP_E2E_RUN_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/hitkeep-e2e.XXXXXX")}"
+REMOVE_RUN_DIR=false
+if [[ -n "${HITKEEP_E2E_RUN_DIR:-}" ]]; then
+  RUN_DIR="${HITKEEP_E2E_RUN_DIR}"
+else
+  RUN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/hitkeep-e2e.XXXXXX")"
+  REMOVE_RUN_DIR=true
+fi
 DATA_PATH="${HITKEEP_E2E_DATA_PATH:-${RUN_DIR}/data}"
 DB_PATH="${HITKEEP_E2E_DB_PATH:-${RUN_DIR}/hitkeep-e2e.db}"
 BIN_PATH="${HITKEEP_E2E_BIN_PATH:-${RUN_DIR}/hitkeep-e2e}"
@@ -61,7 +67,9 @@ cleanup() {
     kill "${HK_PID}" 2>/dev/null || true
     wait "${HK_PID}" 2>/dev/null || true
   fi
-  rm -rf "${RUN_DIR}"
+  if [[ "${REMOVE_RUN_DIR}" == "true" ]]; then
+    rm -rf "${RUN_DIR}"
+  fi
 }
 trap cleanup EXIT INT TERM
 
@@ -88,7 +96,7 @@ if [[ "${SKIP_BINARY_BUILD}" == "1" ]]; then
   echo "[e2e] reusing hitkeep binary"
 else
   echo "[e2e] building hitkeep binary"
-  (cd "${REPO_DIR}" && go build -tags "$("${REPO_DIR}/scripts/go-build-tags.sh")" -o "${BIN_PATH}" ./cmd/hitkeep/)
+  (cd "${REPO_DIR}" && go build -tags "$("${REPO_DIR}/hk" ci go-config tags --output plain)" -o "${BIN_PATH}" ./cmd/hitkeep/)
 fi
 
 echo "[e2e] seeding demo data"

@@ -1157,13 +1157,13 @@ func TestHandleStripeWebhookSignedChargeDisputeLifecycle(t *testing.T) {
 func TestStripeWebhookSDKUsesConfiguredAPIVersion(t *testing.T) {
 	t.Parallel()
 
-	payload := []byte(`{
+	payload := []byte(fmt.Sprintf(`{
 		"id":"evt_test_configured_api",
 		"object":"event",
-		"api_version":"2026-02-25.clover",
+		"api_version":%q,
 		"type":"invoice.payment_failed",
 		"data":{"object":{"customer":"cus_test","subscription":"sub_test"}}
-	}`)
+	}`, stripeAPIVersion))
 
 	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
 	mac := hmac.New(sha256.New, []byte("whsec_test_123"))

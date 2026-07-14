@@ -1,9 +1,15 @@
 # syntax=docker/dockerfile:1
 
-ARG GOLANG_VERSION=1.26.5
-ARG NODE_VERSION=24
+ARG GOLANG_VERSION
+ARG NODE_VERSION
+ARG NPM_VERSION
 
-FROM node:${NODE_VERSION}-bookworm AS frontend-builder
+FROM node:${NODE_VERSION}-bookworm AS frontend-dev
+
+ARG NPM_VERSION
+RUN npm install --global "npm@${NPM_VERSION}"
+
+FROM frontend-dev AS frontend-builder
 
 WORKDIR /workspace/frontend/dashboard
 
@@ -16,7 +22,7 @@ RUN mkdir -p /workspace/public && npm run build:prod
 
 FROM golang:${GOLANG_VERSION} AS source-builder
 
-ARG GO_BUILD_TAGS="hashicorpmetrics timetzdata"
+ARG GO_BUILD_TAGS
 ARG HITKEEP_VERSION="snapshot"
 
 WORKDIR /workspace
@@ -33,6 +39,7 @@ COPY --from=frontend-builder /workspace/public/ ./public/
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
+    test -n "${GO_BUILD_TAGS}" && \
     CGO_ENABLED=1 go build \
       -tags "${GO_BUILD_TAGS}" \
       -ldflags="-w -s -X 'hitkeep/cmd.Version=${HITKEEP_VERSION}'" \

@@ -1,0 +1,133 @@
+package devtool
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+)
+
+func TestDoctorDoesNotClaimNativeDevelopmentWithoutCompose(t *testing.T) {
+	root := initTestRepository(t)
+	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.test\n\ngo 1.26.5\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dashboard := filepath.Join(root, "frontend", "dashboard")
+	if err := os.MkdirAll(dashboard, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dashboard, ".nvmrc"), []byte("24.15.0\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dashboard, "package.json"), []byte(`{"packageManager":"npm@11.14.1"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	app, err := NewApp(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fakeBin := t.TempDir()
+	commands := map[string]string{
+		"git":  "git version 2.50.0",
+		"go":   "go version go1.26.5 test/arch",
+		"node": "v24.15.0",
+		"npm":  "11.14.1",
+		"cc":   "cc 1.0",
+	}
+	for name, output := range commands {
+		script := "#!/bin/sh\nprintf '%s\\n' '" + output + "'\n"
+		if err := os.WriteFile(filepath.Join(fakeBin, name), []byte(script), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", fakeBin)
+	report := app.Doctor(context.Background())
+	if !report.Ready {
+		t.Fatalf("exact native toolchain should make setup ready: %+v", report)
+	}
+	if report.Capabilities.NativeDevelopment || report.Capabilities.ContainerDevelopment {
+		t.Fatalf("native development requires Docker Compose for Mailpit: %+v", report.Capabilities)
+	}
+	if !nativeToolchainReady(report) {
+		t.Fatalf("exact native toolchain was not recognized: %+v", report.Checks)
+	}
+}
+
+func TestDoctorBoundsSlowChecksAndRunsThemInParallel(t *testing.T) {
+	root := initTestRepository(t)
+	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	app, err := NewApp(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fakeBin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(fakeBin, "docker"), []byte("#!/bin/sh\n/bin/sleep 10\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", fakeBin)
+	started := time.Now()
+	report := app.Doctor(context.Background())
+	if elapsed := time.Since(started); elapsed > 4*time.Second {
+		t.Fatalf("parallel bounded doctor took %s", elapsed)
+	}
+	for _, name := range []string{"docker", "compose", "buildx"} {
+		found := false
+		for _, check := range report.Checks {
+			if check.Name == name {
+				found = true
+				if check.Status != "unavailable" || !strings.Contains(check.Detected, "timed out") {
+					t.Fatalf("%s check was not bounded: %+v", name, check)
+				}
+			}
+		}
+		if !found {
+			t.Fatalf("missing %s check", name)
+		}
+	}
+}
+
+func TestCatalogUsesWorkspaceScopedLocalImages(t *testing.T) {
+	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	first, err := NewApp(initTestRepository(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := NewApp(initTestRepository(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstCatalog := first.Catalog()
+	secondCatalog := second.Catalog()
+	for index := range firstCatalog.Variants {
+		firstImage := firstCatalog.Variants[index].LocalImage
+		secondImage := secondCatalog.Variants[index].LocalImage
+		if firstImage == secondImage {
+			t.Fatalf("local image collided across workspaces: %s", firstImage)
+		}
+		if !strings.HasSuffix(firstImage, first.workspace.ID[:8]) || !strings.HasSuffix(secondImage, second.workspace.ID[:8]) {
+			t.Fatalf("local images do not identify their workspaces: %s %s", firstImage, secondImage)
+		}
+	}
+	variant, err := VariantByID("self-hosted")
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstCache := environmentValue(first.ComposeEnvironment(variant), "HITKEEP_FRONTEND_CACHE_DIR")
+	secondCache := environmentValue(second.ComposeEnvironment(variant), "HITKEEP_FRONTEND_CACHE_DIR")
+	if firstCache == secondCache || !pathWithin(first.workspace.StateDir, firstCache) || !pathWithin(second.workspace.StateDir, secondCache) {
+		t.Fatalf("mutable frontend caches are not workspace-confined: %q %q", firstCache, secondCache)
+	}
+}
+
+func environmentValue(environment []string, name string) string {
+	prefix := name + "="
+	for _, entry := range environment {
+		if value, ok := strings.CutPrefix(entry, prefix); ok {
+			return value
+		}
+	}
+	return ""
+}

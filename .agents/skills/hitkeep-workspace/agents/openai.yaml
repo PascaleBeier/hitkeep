@@ -1,0 +1,4 @@
+interface:
+  display_name: "Manage HitKeep workspaces"
+  short_description: "Isolate worktrees, services, runs, and logs"
+  default_prompt: "Use $hitkeep-workspace to inspect this worktree and safely manage its services, runs, logs, or handoff."

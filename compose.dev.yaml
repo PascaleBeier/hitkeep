@@ -1,12 +1,12 @@
-name: hitkeep-dev
+name: ${HK_COMPOSE_PROJECT:-hitkeep-dev}
 
 services:
   backend:
-    image: golang:1.26.5
+    image: golang:${HK_GO_VERSION:?start Compose through ./hk}
     working_dir: /workspace
     command: go tool air -c .air.toml
     ports:
-      - "8080:8080"
+      - "${HK_BACKEND_PORT:-8080}:8080"
     volumes:
       - .:/workspace
       - hitkeep-dev-go-mod:/go/pkg/mod
@@ -22,15 +22,31 @@ services:
       HITKEEP_MAIL_PORT: "1025"
       HITKEEP_MAIL_ENCRYPTION: none
       HITKEEP_MCP_ENABLED: "true"
+      HITKEEP_GO_BUILD_TAGS: ${HITKEEP_GO_BUILD_TAGS:?start Compose through ./hk dev --runtime container}
+      HITKEEP_CLOUD_HOSTED: ${HITKEEP_CLOUD_HOSTED:-}
+      HITKEEP_CLOUD_SIGNUP_ENABLED: ${HITKEEP_CLOUD_SIGNUP_ENABLED:-}
+      HITKEEP_CLOUD_JURISDICTION: ${HITKEEP_CLOUD_JURISDICTION:-}
+      HITKEEP_CLOUD_REGION: ${HITKEEP_CLOUD_REGION:-}
+      HITKEEP_CLOUD_UPGRADE_URL: ${HITKEEP_CLOUD_UPGRADE_URL:-}
+      HITKEEP_CLOUD_SUPPORT_URL: ${HITKEEP_CLOUD_SUPPORT_URL:-}
+      HITKEEP_CLOUD_CHECKOUT_SUCCESS_URL: ${HITKEEP_CLOUD_CHECKOUT_SUCCESS_URL:-}
+      HITKEEP_CLOUD_CHECKOUT_CANCEL_URL: ${HITKEEP_CLOUD_CHECKOUT_CANCEL_URL:-}
     depends_on:
       - mailpit
 
   frontend:
-    image: node:24
+    image: hitkeep-dev-frontend:${HK_NODE_VERSION:?run through hk}-${HK_NPM_VERSION:?run through hk}
+    build:
+      context: .
+      target: frontend-dev
+      args:
+        GOLANG_VERSION: ${HK_GO_VERSION:?run through hk}
+        NODE_VERSION: ${HK_NODE_VERSION:?run through hk}
+        NPM_VERSION: ${HK_NPM_VERSION:?run through hk}
     working_dir: /workspace/frontend/dashboard
     command: sh -c "npm ci --no-fund --no-audit && npm start -- --host 0.0.0.0 --poll 1000 --proxy-config proxy.conf.docker.json"
     ports:
-      - "4200:4200"
+      - "${HK_FRONTEND_PORT:-4200}:4200"
     volumes:
       - ./frontend/dashboard:/workspace/frontend/dashboard
       - hitkeep-dev-node-modules:/workspace/frontend/dashboard/node_modules
@@ -41,13 +57,13 @@ services:
       - backend
 
   mailpit:
-    image: axllent/mailpit:latest
+    image: axllent/mailpit@sha256:5a49a77c5bdbe7c5474450b4f46348d09949df3695257729c93a30369382d4f6
     ports:
-      - "1025:1025"
-      - "8025:8025"
+      - "${HK_SMTP_PORT:-1025}:1025"
+      - "${HK_MAIL_UI_PORT:-8025}:8025"
 
   seed:
-    image: golang:1.26.5
+    image: golang:${HK_GO_VERSION:?start Compose through ./hk}
     profiles:
       - seed
     working_dir: /workspace
@@ -74,8 +90,11 @@ services:
       - hitkeep-dev-data:/var/lib/hitkeep/data
 
 volumes:
-  hitkeep-dev-go-mod: {}
-  hitkeep-dev-go-build: {}
+  hitkeep-dev-go-mod:
+    name: hitkeep-dev-go-mod-cache
+  hitkeep-dev-go-build:
+    name: hitkeep-dev-go-build-cache
   hitkeep-dev-node-modules: {}
-  hitkeep-dev-npm-cache: {}
+  hitkeep-dev-npm-cache:
+    name: hitkeep-dev-npm-cache
   hitkeep-dev-data: {}

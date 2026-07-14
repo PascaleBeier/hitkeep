@@ -9,6 +9,9 @@ import { fileURLToPath } from "node:url";
 const dashboardDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const passthroughArgs = process.argv.slice(2);
 const npx = process.platform === "win32" ? "npx.cmd" : "npx";
+const basePort = Number(process.env.HITKEEP_E2E_PORT || 8098);
+const htmlReportRoot = process.env.HITKEEP_E2E_HTML_REPORT || "playwright-report";
+const outputRoot = process.env.HITKEEP_E2E_OUTPUT_DIR || "test-results";
 
 class PlaywrightFailure extends Error {
     constructor(exitCode) {
@@ -28,19 +31,19 @@ try {
             await runPlaywright("Seeded dashboard suite", [], {
                 ...process.env,
                 HITKEEP_E2E_BIN_PATH: binPath,
-                HITKEEP_E2E_HTML_REPORT: "playwright-report/seeded",
-                HITKEEP_E2E_OUTPUT_DIR: "test-results/seeded"
+                HITKEEP_E2E_HTML_REPORT: path.join(htmlReportRoot, "seeded"),
+                HITKEEP_E2E_OUTPUT_DIR: path.join(outputRoot, "seeded")
             });
 
             await runPlaywright("Subdirectory deployment smoke", ["e2e/deployment.smoke.spec.js", "--workers=1"], {
                 ...process.env,
                 HITKEEP_E2E_BIN_PATH: binPath,
-                HITKEEP_E2E_PORT: "8099",
+                HITKEEP_E2E_PORT: String(basePort + 1),
                 HITKEEP_E2E_PUBLIC_PATH: "/hitkeep",
                 HITKEEP_E2E_DAYS: "1",
                 HITKEEP_E2E_SKIP_BUILD: "1",
-                HITKEEP_E2E_HTML_REPORT: "playwright-report/subdirectory",
-                HITKEEP_E2E_OUTPUT_DIR: "test-results/subdirectory"
+                HITKEEP_E2E_HTML_REPORT: path.join(htmlReportRoot, "subdirectory"),
+                HITKEEP_E2E_OUTPUT_DIR: path.join(outputRoot, "subdirectory")
             });
         } finally {
             if (tempDir) {

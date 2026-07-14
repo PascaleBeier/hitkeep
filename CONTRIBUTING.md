@@ -1,464 +1,189 @@
 # Contributing to HitKeep
 
-HitKeep is an open-source project and contributions are welcome. This guide covers everything you need to set up a local development environment and submit a change.
+Thank you for improving HitKeep. The repository-owned `./hk` developer CLI is the canonical workflow surface for people, automation, and coding agents. It derives current build variants, workspace state, development defaults, and QA gates from one typed catalog.
 
-## Table of Contents
+Repository policy and product invariants live in [`AGENTS.md`](./AGENTS.md). Read it before making a change.
 
-- [Prerequisites](#prerequisites)
-- [Getting Started](#getting-started)
-- [Development Workflow](#development-workflow)
-- [AI-Assisted Contributions](#ai-assisted-contributions)
-- [Project Structure](#project-structure)
-- [Commit Conventions](#commit-conventions)
-- [Submitting a Pull Request](#submitting-a-pull-request)
-- [Reporting Bugs & Security Issues](#reporting-bugs--security-issues)
-
----
-
-## Prerequisites
-
-The easiest local setup only needs Docker with Docker Compose support. The
-Docker dev stack runs Go, Air, Angular, and Mailpit in containers.
-
-| Tool       | Version | Purpose                                  |
-|:-----------|:--------|:-----------------------------------------|
-| **Docker** | current | Full local development stack with Compose |
-
-If you prefer native development on your host, also install:
-
-| Tool                  | Version        | Purpose                                           |
-|:----------------------|:---------------|:--------------------------------------------------|
-| **Go**                | 1.26+          | Backend compilation and pinned Go tools           |
-| **CGo / C toolchain** | system default | Required by DuckDB's Go bindings                  |
-| **Node.js + npm**     | 24+ (LTS)      | Angular dashboard and tracker snippet build       |
-| **Mailpit**           | latest         | Local SMTP inbox for mail flows                   |
-
-Air is pinned in `go.mod` and runs through `go tool air`; do not install a
-separate global Air binary for normal HitKeep development.
-
-### Native macOS
-
-```bash
-# Go (via Homebrew or https://go.dev/dl/)
-brew install go
-
-# C toolchain (required for CGo / DuckDB)
-xcode-select --install
-
-# Node.js (via fnm, nvm, or Homebrew)
-brew install fnm
-fnm install 24
-fnm use 24
-
-# Local SMTP inbox
-brew install mailpit
-```
-
-### Native Linux (Ubuntu / Debian)
-
-```bash
-# Go — download from https://go.dev/dl/ and follow official instructions
-# Or via snap:
-sudo snap install go --classic
-
-# C toolchain
-sudo apt-get install -y gcc g++ make
-
-# Node.js (via fnm or nvm)
-curl -fsSL https://fnm.vercel.app/install | bash
-fnm install 24 && fnm use 24
-
-# Local SMTP inbox
-# See https://mailpit.axllent.org/docs/install/
-```
-
----
-
-## Getting Started
-
-**1. Clone the repository:**
+## Start in One Command
 
 ```bash
 git clone https://github.com/pascalebeier/hitkeep.git
 cd hitkeep
+./hk setup
 ```
 
-**2. Start the full Docker development stack:**
+`./hk` bootstraps itself with the exact Go version from `go.mod`. When that Go toolchain is unavailable, it can build itself through the pinned Go container image using writable host caches. `setup` prepares Go and frontend dependencies for the selected worktree. Existing mutable `node_modules` directories are safely migrated to content-addressed, read-only snapshots shared by warm worktrees.
+
+Check prerequisites and the current isolated workspace at any time:
 
 ```bash
-make dev-docker-seed
+./hk doctor
+./hk workspace status
 ```
 
-This starts:
+Use `./hk help` and subcommand help for the current command reference. Use `./hk catalog --output json` when a tool or agent needs the live variant and QA catalogs.
 
-- **Backend:** Go 1.26.5 with Air live reload on `http://localhost:8080`
-- **Frontend:** Angular dev server with hot reload on `http://localhost:4200`
-- **Mailpit:** local mail UI on `http://localhost:8025`
-- **Seed data:** demo user, site, analytics, ecommerce, AI visibility, and chatbot data
+## Develop
 
-Open `http://localhost:4200` and sign in with:
-
-```text
-demo@example.com
-demo1234
-```
-
-If you do not have `make`, use Docker Compose directly:
+Start the fast native workflow:
 
 ```bash
-docker compose -f compose.dev.yaml run --rm seed
-docker compose -f compose.dev.yaml up --build backend frontend mailpit
+./hk dev --seed
 ```
 
-Use `make dev-docker` when you want the same Docker stack without reseeding data.
+The application and dashboard run natively; Docker Compose supplies the isolated Mailpit service. `./hk doctor` reports native development ready only when both the exact host toolchain and that service runtime are available.
 
----
-
-## Development Workflow
-
-Run `make help` for the maintained human/agent entry points and `make doctor`
-to see whether the Docker and native workflows are ready on your machine.
-
-### Docker Development
+Use the reproducible container-backed workflow when host prerequisites are unavailable or container parity matters:
 
 ```bash
-# Full hot-reload stack
-make dev-docker
-
-# Seed demo data, then start the stack
-make dev-docker-seed
-
-# Cloud/billing build tags with safe local environment defaults
-make dev-docker-cloud
-
-# Seed demo data, then start the cloud development stack
-make dev-docker-cloud-seed
-
-# Stop containers
-make dev-docker-down
-
-# Stop containers and remove dev volumes
-make dev-docker-clean
+./hk dev --runtime container --seed
 ```
 
-The Docker stack keeps Go modules, Go build cache, npm cache, `node_modules`,
-and development data in named Docker volumes. Your source tree is bind-mounted,
-so changing Go or Angular files triggers the matching live-reload process.
-
-`compose.dev-cloud.yaml` is a small override of `compose.dev.yaml`; it changes
-only the backend build tags and cloud environment defaults. Both variants use
-the same ports, caches, source mounts, and cleanup commands, which keeps local
-cloud work close to the normal development path.
-
-### Native Development
-
-Use native dev if you already have Go, Node.js, npm, a C toolchain, and Mailpit
-installed on your host.
+Choose the cloud variant only for local managed-cloud parity work:
 
 ```bash
-make dev-seed
+./hk dev --variant cloud
 ```
 
-This runs the backend and frontend in parallel on your host. The backend serves
-the API on `:8080`, and the Angular dev server proxies `/api/*` and `/ingest`
-to the backend.
+`hk` allocates a stable workspace ID, ports, Compose project, data directory, run logs, and generated runtime configuration for each Git worktree. Always open the URLs returned by `./hk workspace status`; do not assume the conventional ports are available.
 
-### Backend Only
+Long operations wait by default for humans. Add `--detach` to receive a run ID immediately:
 
 ```bash
-make dev-backend
+./hk dev --detach --output json
+./hk run status <run_id> --output json
+./hk run logs <run_id> --limit 80 --output json
 ```
 
-The `.air.toml` configures Air to watch `*.go`, `*.sql`, `*.html`, `*.tpl`, and `*.tmpl` files. It excludes `frontend/`, `public/`, and `node_modules/`.
+Complete logs and artifacts stay on disk at the paths returned by `hk`, keeping successful terminal and agent output small.
 
-When you change a Go file, `go tool air` recompiles and restarts in ~1-2 seconds.
-
-### Frontend Only
+List recent work before starting a duplicate run, and use `next_cursor` when polling logs so an agent does not reload the same context:
 
 ```bash
-make dev-frontend
+./hk run list --output json
+./hk run logs <run_id> --cursor <next_cursor> --output json
 ```
 
-This starts `ng serve` on `http://localhost:4200`. The Angular proxy config forwards API calls to the backend.
+## Maintain Go Source
 
-### Full Build (Production Artifacts)
+Formatting and pinned Go migrations are part of the developer platform rather than ad hoc shell conventions:
 
 ```bash
-make build
+./hk fmt
+./hk fmt check
+./hk fix check
+./hk fix
 ```
 
-This:
-1. Runs `npm ci && ng build --configuration production` for the dashboard (output: `frontend/dashboard/dist/`)
-2. Minifies the tracker snippet (`src/tracker/index.ts` → `dist/dashboard/browser/hk.js`) via esbuild
-3. Copies the dashboard bundle to `public/`
-4. Compiles the Go binary with shared HitKeep build tags: `go build -tags "$(./scripts/go-build-tags.sh)" -o hitkeep ./cmd/hitkeep/main.go`
+`fmt` and `fix` deliberately rewrite repository Go files; their `check` modes are non-mutating and are what QA uses. The developer MCP does not expose source-rewrite tools, so an agent must make this mutation explicitly through the confined CLI and review the resulting diff.
 
-The binary embeds the `public/` directory, so the build order matters.
-
-### Local Production Images
+Shared dependency snapshots and workspace state are inspectable. Pruning is always a dry run unless `--apply` is supplied, and it can remove only hk-managed entries:
 
 ```bash
-# Public/self-hosted variant
-make build-docker
-
-# Cloud-tagged variant for local parity checks only
-make build-docker-cloud
-
-# Build and verify that the cloud container actually starts and becomes healthy
-make smoke-docker-cloud
+./hk cache status
+./hk cache prune
 ```
 
-Both commands compile the dashboard and Linux binary inside BuildKit, then load
-the same distroless runtime stage used by CI. This works on ARM64 and AMD64
-without relying on the host Go/CGo toolchain. Override `DOCKER_PLATFORM`,
-`DOCKER_IMAGE`, or `DOCKER_CLOUD_IMAGE` when needed.
+## Build and Smoke Test
 
-The cloud image defaults to the clearly local tag `hitkeep:cloud-local`. The
-target never pushes, and the release workflow continues to publish only the
-self-hosted image assembled from CI-built public binaries.
-
-### Running Tests
+Build variants and targets are selected through the live catalog:
 
 ```bash
-# Go checks
-GOFLAGS="$(./scripts/go-build-tags.sh goflags)" go test ./...
-GOFLAGS="$(./scripts/go-build-tags.sh goflags)" go test -race ./...
-golangci-lint run "$(./scripts/go-build-tags.sh golangci)"
-# Angular checks
-cd frontend/dashboard && npm run fmt && npm run fmt:check
-cd frontend/dashboard && npm run lint
-cd frontend/dashboard && npm run test -- --watch=false --no-progress
-
-# Seeded end-to-end tests
-cd frontend/dashboard && npx playwright install --with-deps chromium
-cd frontend/dashboard && npm run e2e
+./hk build binary
+./hk build image
+./hk build image --variant cloud
+./hk smoke --variant cloud
 ```
 
-Notes:
+The cloud image is local-only and cannot be published by `hk`. Local image references include the workspace ID so concurrent worktrees cannot overwrite or smoke-test each other's images; query `./hk catalog --output json` for the exact reference. Public release images continue to contain only self-hosted binaries; managed cloud continues to consume its separate cloud-tagged ARM64 artifact.
 
-- `npm run e2e` is the canonical entrypoint for browser end-to-end tests locally and in CI.
-- The e2e launcher builds the dashboard, builds the Go binary, seeds demo data, starts disposable local HitKeep instances, and also runs the `/hitkeep` subdirectory deployment smoke.
-- Angular 22 still supports `ng e2e`, but HitKeep uses Playwright directly so the documented command matches CI exactly.
+## Validate
 
-If you are making a change that touches frontend behavior, try to run the relevant browser coverage before opening a PR:
+Use the change-aware profile while iterating, the PR profile before review, and the full profile for exhaustive self-hosted, cloud, and image coverage:
 
 ```bash
-# Full seeded suite
-cd frontend/dashboard && npm run e2e
-
-# Or a focused spec while iterating
-cd frontend/dashboard && npm run e2e -- e2e/auth.seeded.spec.js --workers=1
+./hk qa
+./hk qa pr
+./hk qa full
 ```
 
-### Suggested Verification Before a PR
+Inspect a plan without running it:
 
 ```bash
-# Backend
-GOFLAGS="$(./scripts/go-build-tags.sh goflags)" go test ./...
-
-# Frontend
-cd frontend/dashboard && npm run fmt && npm run fmt:check
-cd frontend/dashboard && npm run lint
-cd frontend/dashboard && npm run test -- --watch=false --no-progress
-
-# Browser coverage for UI changes
-cd frontend/dashboard && npm run e2e
+./hk qa plan changed --output json
 ```
 
-### Cleanup
+The PR profile is the CI contract. Workflows resolve their execution groups from `hk` rather than copying gate lists or cloud tags. Gate names are stable, all selected gates run even when another gate fails, and complete gate logs remain available as run artifacts. Before opening a PR, report the profile and gate IDs that passed and explain anything you could not run.
+
+## Multiple Worktrees and Agents
+
+Git worktree creation and deletion remain your responsibility. `hk` never creates or deletes a worktree and never runs `git clean`.
 
 ```bash
-make clean
-# Removes: ./hitkeep binary, public/, frontend/*/dist/, frontend/*/node_modules/
+./hk workspace list
+./hk workspace handoff --output json
 ```
 
----
+Workspace state, application data, mutable frontend tool caches, services, logs, and generated configuration remain isolated. Immutable dependency snapshots and safe download/compiler caches are shared. This allows development and QA to run concurrently without fixed-port, dependency-cache, or Compose-project collisions.
 
-## AI-Assisted Contributions
+## Local Developer MCP
 
-AI-assisted PRs are welcome when they follow the same privacy, testing, and review bar as any other contribution. Start with the public [HitKeep Agent Guide](./AGENTS.md) before making repo changes.
+MCP-capable agents can use the same application services without parsing shell output. The developer server is model-agnostic: Claude, Gemini, GPT, or another model receives the same typed tools when its host supports local stdio MCP.
 
-Do not paste secrets, customer analytics, private deployment notes, local machine paths, or dashboard screenshots with private data into prompts, commits, docs, skills, or issue comments.
-
-### MCP Changes
-
-HitKeep's MCP server is intentionally read-only and aggregate-only.
-
-When changing `internal/mcpserver/`, check that:
-
-- every tool is read-only and sets `ReadOnlyHint`
-- analytics tools stay closed-world, while docs lookup tools are the only open-world tools
-- API client bearer tokens and explicit site grants remain the auth model
-- no tool exposes raw hit exports, write workflows, billing, site administration, token management, takeout, or dashboard sessions
-- `internal/mcpserver/audit_test.go`, `tests/scripts/mcp-audit.sh`, public docs, and Agent Skills stay aligned with any tool changes
-
-Run the focused audit:
+Setup is automatic for supported hosts through small, committed project-scoped MCP registrations. They use only worktree-relative paths, so every Git worktree starts its own `hitkeep-dev` process without modifying a user's global client configuration. The live client catalog and registration paths come from:
 
 ```bash
-GOFLAGS="$(./scripts/go-build-tags.sh goflags)" go test ./internal/mcpserver -run 'TestMCP.*Audit'
-tests/scripts/mcp-audit.sh --schema-only
+./hk mcp manifest
 ```
 
-### Agent Skills Changes
+Human output lists the checked-in integrations for Codex, Claude Code, Gemini CLI, Cursor, and VS Code, followed by a copyable generic `mcpServers` object for any other stdio-capable host. `./hk mcp manifest --output json` returns both in the standard `hk.dev/v1` envelope, including its own `hk.dev/mcp-manifest/v1` schema, workspace ID, isolated fallback server name, stable launcher path, transport, and arguments. Treat this output as authoritative instead of copying client paths into agent instructions.
 
-The `skills/` directory contains public instructions for end-user assistants.
+On first use, approve or trust the repository when the host asks, then restart or reload the host and verify discovery with its MCP status UI or `hk_workspace_status`. Existing conversations generally do not dynamically acquire newly added MCP configuration. This one-time safety decision belongs to the host and is deliberately not bypassed by `hk`.
 
-When adding or changing skills:
+Every registration launches `./hk mcp serve` over stdio for the selected worktree. For a host without a checked-in project convention, use the generated generic registration:
 
-- keep skill folders as direct children of `skills/`
-- do not include credentials, customer data, private URLs, or private screenshots
-- update `skills/README.md`
-- keep MCP tool names, filters, caveats, and output expectations synchronized with the live server and docs
+The generated registration is equivalent to:
 
-### Dashboard i18n Changes
-
-Use the public `hitkeep-i18n` skill when changing dashboard UI copy, translation keys, locale JSON files, language switching, PrimeNG locale behavior, or localized formatting.
-
-When changing dashboard text:
-
-- keep user-visible copy in Transloco keys instead of hardcoded component strings
-- update all seven locale files: `en`, `de`, `es`, `fr`, `it`, `nl`, and `pt`
-- preserve interpolation variables and placeholder syntax
-- use existing locale helpers for dates, numbers, percentages, and durations
-- keep short labels short enough for buttons, tabs, table columns, and mobile layouts
-
-Run:
-
-```bash
-cd frontend/dashboard && npm run i18n:check
-cd frontend/dashboard && npm run fmt:check
+```json
+{
+  "mcpServers": {
+    "hitkeep-dev-<workspace-id>": {
+      "command": "/absolute/path/to/worktree/hk",
+      "args": ["--workspace", "/absolute/path/to/worktree", "mcp", "serve"]
+    }
+  }
+}
 ```
 
-### AI Structured Output Changes
+The developer MCP uses local stdio only. Configure one process per worktree. Use `hk_run_list` before starting work and pass the returned log cursor to incremental log reads. It is separate from HitKeep's production analytics `/mcp` endpoint and exposes only bounded workspace, setup, development, build, smoke, QA, run-status, cancellation, and log operations. It cannot execute arbitrary commands, rewrite source, mutate Git, publish artifacts, manage credentials, delete worktrees, perform cleanup, or deploy infrastructure. Stdout is reserved for JSON-RPC.
 
-Optional AI features must save validated product data, not raw model traffic.
+The canonical contributor skills live under [`.agents/skills`](./.agents/skills):
 
-When changing AI provider or Opportunities behavior, check that:
+- `hitkeep-development` routes implementation and the contribution lifecycle.
+- `hitkeep-workspace` owns isolated worktree state, services, ports, runs, logs, and handoff.
+- `hitkeep-qa` owns live QA planning, execution, and completion evidence.
+- `hitkeep-i18n` owns dashboard localization procedure.
 
-- raw prompts, raw provider payloads, external error bodies, provider headers, and secrets are not persisted
-- final output passes structured validation before storage
-- cited evidence IDs refer to evidence supplied to the run
-- GoAI-backed Opportunity proposal changes keep the key/param contract deterministic and add validator coverage for new saved fields, message keys, params, action types, or evidence shapes
-- deterministic permission checks and analytics queries stay outside the model
-- saved copy remains localization-key based where the dashboard expects localized output
+These are normal publishable skill bodies, not generated proxies. Prefer the local developer MCP and use their structured CLI fallback when MCP is unavailable. The separate [`skills/`](./skills/) directory is the end-user analytics pack and supplies transport-neutral procedures to HitKeep Ask AI.
 
-Useful focused checks:
+## Documentation Authority
 
-```bash
-GOFLAGS="$(./scripts/go-build-tags.sh goflags)" go test ./internal/ai ./internal/opportunities ./internal/database ./internal/mcpserver
-```
+Development information has one owner:
 
-### Docs, OpenAPI, And Privacy Review
+1. `./hk help` and structured catalogs describe current commands and facts.
+2. Developer MCP exposes typed live workspace operations.
+3. Contributor skills provide workflow judgment and routing.
+4. `AGENTS.md` defines repository policy and invariants.
+5. This guide provides the human onboarding narrative.
 
-Public behavior changes should update docs in the separate `hitkeep-docs` repository. API contract changes should update both the runtime OpenAPI source and the docs OpenAPI file.
+Do not copy build tags, cloud defaults, port assignments, tool versions, or QA matrices into new documentation. Query `hk` instead. `./hk skills check` verifies both canonical skill packs and the product/contributor boundary.
 
-Before opening an AI-assisted PR, review:
+## Pull Requests
 
-- which public docs changed, or why docs were not needed
-- whether new database tables carry a scope column (`site_id`, `tenant_id`/`team_id`) or are registered in the cleanup specs (see Database Rules in `AGENTS.md`)
-- whether `server.json` changed because MCP Registry metadata changed
-- whether `public/openapi.yml` in the docs repo changed because public API shape changed
-- whether the PR description lists the commands run
-- whether the diff avoids secrets, local-only paths, private deployment details, and customer data
+- Keep changes focused and explain the user-visible or maintenance outcome.
+- Add tests at the narrowest useful level, then run the appropriate `hk` QA profile.
+- Describe the documentation impact when public behavior changes. The rendered docs are public, but their source repository is private; maintainers apply website changes that external contributors cannot make directly.
+- Do not include credentials, customer data, private infrastructure details, or private screenshots.
+- Follow the repository's conventional-commit and release guidance.
 
----
-
-## Project Structure
-
-```
-hitkeep/
-├── cmd/
-│   ├── hitkeep/           # Main application entry point
-│   └── seed/              # Local/demo data seeding
-├── internal/
-│   ├── database/          # DuckDB store — all SQL queries live here
-│   ├── server/            # HTTP server setup, middleware, shared handlers
-│   ├── ingest/            # In-process ingest consumers
-│   └── worker/            # Background workers (retention, rollups, reports)
-├── frontend/
-│   └── dashboard/         # Angular v21 SPA + tracker snippet (src/tracker/index.ts)
-├── public/                # Embedded static assets (built frontend output)
-├── scripts/               # Runtime/development scripts used outside tests
-├── tests/
-│   ├── e2e/               # E2E launchers and test-only harness scripts
-│   ├── fixtures/          # Shared test fixtures, outside app public/embed trees
-│   └── scripts/           # Test-only verification scripts, such as MCP audit
-├── .github/               # GitHub-native config only: workflows, templates, assets
-├── Makefile               # Development and build commands
-└── .air.toml              # Air (live-reload) configuration
-```
-
-Keep reusable fixtures, browser test harnesses, and test-only audit scripts under
-`tests/`. The `.github/` directory should contain GitHub configuration and
-presentation assets only, not build or test implementation files.
-
-## Commit Conventions
-
-HitKeep uses [Conventional Commits](https://www.conventionalcommits.org/) and [Release Please](https://github.com/googleapis/release-please) for automated changelog generation and version bumping.
-
-**Format:** `type(scope): description`
-
-| Type       | When to use                                             |
-|:-----------|:--------------------------------------------------------|
-| `feat`     | New user-facing feature                                 |
-| `fix`      | Bug fix                                                 |
-| `chore`    | Maintenance, dependency updates, tooling                |
-| `docs`     | Documentation changes                                   |
-| `refactor` | Code change that neither adds a feature nor fixes a bug |
-| `test`     | Adding or updating tests                                |
-| `perf`     | Performance improvement                                 |
-
-**Examples:**
-
-```
-feat(ingest): add support for custom event properties
-fix(auth): correct JWT expiry calculation for TOTP sessions
-chore(deps): update duckdb-go to v2.5.5
-docs(api): document /api/events endpoint
-```
-
-Breaking changes must include `BREAKING CHANGE:` in the commit body or footer:
-
-```
-feat(auth)!: remove legacy password-only login endpoint
-
-BREAKING CHANGE: The /api/login endpoint now requires 2FA if enabled.
-```
-
----
-
-## Submitting a Pull Request
-
-1. **Fork** the repository and create a branch from `main`:
-   ```bash
-   git checkout -b feat/my-new-feature
-   ```
-
-2. **Write your code** following the patterns above.
-
-3. **Test your changes:**
-   ```bash
-   GOFLAGS="$(./scripts/go-build-tags.sh goflags)" go test ./...
-   cd frontend/dashboard && npm run fmt && npm run fmt:check
-   cd frontend/dashboard && npm run lint
-   cd frontend/dashboard && npm run test -- --watch=false --no-progress
-   cd frontend/dashboard && npm run e2e
-   ```
-
-4. **Commit** using Conventional Commits format.
-
-5. **Push** your branch and open a PR against `main`.
-
-6. **PR description** should include:
-   - What problem this solves
-   - Any relevant issue numbers (`Closes #123`)
-   - Testing steps
-
----
-
-## Reporting Bugs & Security Issues
-
-- **Bugs and feature requests:** [GitHub Issues](https://github.com/pascalebeier/hitkeep/issues)
-- **Security vulnerabilities:** [GitHub Security Advisories](https://github.com/pascalebeier/hitkeep/security/advisories) — do not open a public issue for security vulnerabilities
-
-See [SECURITY.md](./SECURITY.md) for the full vulnerability disclosure policy.
+The Makefile remains a small compatibility adapter for familiar entry points; new workflows belong in `internal/devtool` and must be exposed consistently through CLI JSON and MCP adapters.

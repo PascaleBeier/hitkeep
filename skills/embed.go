@@ -2,38 +2,35 @@ package skills
 
 import (
 	"embed"
-	"io/fs"
-	"sort"
 	"strings"
 )
 
-//go:embed */SKILL.md
+// Keep the embedded files explicit. These are transport-neutral analytics
+// procedures, not external MCP adapters or contributor instructions.
+//
+//go:embed hitkeep-analytics/references/procedure.md hitkeep-traffic-diagnosis/references/procedure.md hitkeep-ai-visibility-analyst/references/procedure.md hitkeep-ecommerce-analyst/references/procedure.md hitkeep-tracking-verifier/references/procedure.md
 var skillFS embed.FS
 
-// PublicAnalyticsSkillPack returns the public HitKeep analytics skill text used
-// to ground the built-in Ask AI assistant.
-func PublicAnalyticsSkillPack() string {
-	names, err := fs.Glob(skillFS, "*/SKILL.md")
-	if err != nil {
-		return ""
-	}
-	sort.Strings(names)
+var embeddedAnalyticsProcedureFiles = []string{
+	"hitkeep-analytics/references/procedure.md",
+	"hitkeep-traffic-diagnosis/references/procedure.md",
+	"hitkeep-ai-visibility-analyst/references/procedure.md",
+	"hitkeep-ecommerce-analyst/references/procedure.md",
+	"hitkeep-tracking-verifier/references/procedure.md",
+}
 
+// EmbeddedAnalyticsProcedurePack returns the transport-neutral analytics
+// procedures used to ground HitKeep Ask AI.
+func EmbeddedAnalyticsProcedurePack() string {
 	var builder strings.Builder
-	for _, name := range names {
-		if strings.Contains(name, "hitkeep-i18n/") {
-			continue
-		}
-		data, err := skillFS.ReadFile(name)
+	for _, path := range embeddedAnalyticsProcedureFiles {
+		data, err := skillFS.ReadFile(path)
 		if err != nil {
-			continue
+			return ""
 		}
 		if builder.Len() > 0 {
 			builder.WriteString("\n\n---\n\n")
 		}
-		builder.WriteString("# ")
-		builder.WriteString(strings.TrimSuffix(name, "/SKILL.md"))
-		builder.WriteString("\n\n")
 		builder.Write(data)
 	}
 	return builder.String()

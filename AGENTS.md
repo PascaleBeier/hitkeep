@@ -7,6 +7,10 @@ This file is public guidance for AI-assisted contributions to HitKeep. It is wri
 ## Start Here
 
 - Treat the current repository as the source of truth. If an issue, prompt, or older document disagrees with the code, inspect the code first.
+- Use `./hk` as the workflow source of truth. Query its help and structured catalogs instead of copying commands, build tags, cloud defaults, ports, tool versions, or QA gates into instructions.
+- Prefer the project-scoped local developer MCP when available. Supported agent hosts load their checked-in worktree registration after repository trust; the server is independent of the selected model. Query `./hk mcp manifest --output json` for the live client catalog. Fall back to versioned `./hk --output json` results; reserve human output for people.
+- Inspect the current workspace before setup, services, builds, or QA. Reuse an active run instead of starting duplicate work.
+- Use the developer CLI's formatter and Go migration surfaces for deliberate source rewrites. QA and MCP checks must remain non-mutating.
 - Keep changes small and tied to the user-visible behavior or maintenance task being requested.
 - Do not include credentials, customer data, private deployment details, local machine paths, or screenshots that reveal private analytics.
 - Preserve HitKeep's product shape: one deployable application, clear operator controls, and no unnecessary service dependencies.
@@ -14,8 +18,8 @@ This file is public guidance for AI-assisted contributions to HitKeep. It is wri
 ## Product Invariants
 
 - HitKeep runs as a single Go binary with an embedded Angular dashboard.
-- The backend targets Go 1.26.5.
-- The dashboard uses Angular 22, PrimeNG 21, Tailwind CSS 4, Transloco, and Angular Signals.
+- Toolchain versions come from repository version files and are diagnosed by `hk`; do not restate them here.
+- The dashboard uses Angular, PrimeNG, Tailwind CSS, Transloco, and Angular Signals.
 - DuckDB is the storage engine. NSQ runs in process for queueing.
 - Do not introduce required PostgreSQL, Redis, Kafka, ClickHouse, hosted analytics, or a separate queue/cache/database service.
 - Tracking is cookieless by default and should collect only what is needed for analytics.
@@ -32,14 +36,25 @@ This file is public guidance for AI-assisted contributions to HitKeep. It is wri
 - `internal/worker`: background workers.
 - `internal/mcpserver`: optional read-only Model Context Protocol server.
 - `internal/ai` and `internal/opportunities`: optional AI provider integration and validated opportunity generation.
+- `internal/devtool`: developer-only application services used by `cmd/hk`; production builds must not depend on it.
 - `frontend/dashboard`: Angular dashboard and tracker source.
 - `frontend/dashboard/public/i18n`: dashboard translation JSON files.
 - `frontend/dashboard/src/app/core/i18n`: dashboard locale helpers and PrimeNG locale synchronization.
-- `skills`: public HitKeep Agent Skills.
+- `skills`: public product analytics skills and transport-neutral Ask AI procedures.
+- `.agents/skills`: canonical contributor skills for changing HitKeep through `hk`.
 - `server.json`: MCP Registry metadata.
 - `tests`: e2e fixtures, launchers, and audit scripts.
 
-Public documentation lives in the separate `PascaleBeier/hitkeep-docs` repository. When it is checked out next to this repository, docs commands usually run from `../hitkeep-docs`.
+The rendered product documentation is public, but its source lives in the private `PascaleBeier/hitkeep-docs` repository by design. It is not part of HitKeep's public MIT-licensed source. Contributors without access should describe the documentation impact in their pull request or issue; maintainers apply the corresponding website update. When the private repository is checked out next to this repository, docs commands usually run from `../hitkeep-docs`.
+
+## Contributor Workflow
+
+1. Use `$hitkeep-development` to inspect prerequisites and route setup, development, variants, and builds.
+2. Use `$hitkeep-workspace` before starting services, browser work, e2e, or concurrent QA. Trust returned workspace IDs, URLs, paths, and run IDs.
+3. Load the relevant backend, frontend, product, or delivery reference from `$hitkeep-development`; do not layer area-specific HitKeep skills over it.
+4. Use `$hitkeep-qa` while iterating and before reporting completion. Preserve run IDs, inspect bounded failure logs, and report stable gate IDs rather than pasting successful logs.
+
+Do not create or delete Git worktrees through `hk`. The developer MCP must not rewrite source. Do not run destructive cleanup, publish a cloud-enabled image, manage credentials, or invoke infrastructure deployment unless the user explicitly requests the separately authorized workflow.
 
 ## Database Rules
 
@@ -52,11 +67,7 @@ HitKeep runs on embedded DuckDB, which has no cascading deletes, no deferred con
 - Only base tables accept DML. Compatibility views (for example `team_audit_log`) appear in `information_schema.columns` but cannot be deleted from.
 - Stats-reset and user-cleanup steps stay hand-written on purpose: they encode product policy (reset families, null-versus-delete choices), not foreign-key completeness.
 
-Useful checks:
-
-```bash
-GOFLAGS="$(./scripts/go-build-tags.sh goflags)" go test ./internal/database -run 'ScopedDeletePlan|FailsFastOnUnhandled|DeleteSiteRemovesAllSiteData'
-```
+Use focused database tests while iterating, then let `$hitkeep-qa` select the required completion gates from the live catalog.
 
 ## MCP Server Rules
 
@@ -70,20 +81,7 @@ HitKeep MCP is an optional, leader-only Streamable HTTP route for approved assis
 - Do not add MCP tools for write workflows, raw hit exports, token management, billing, site administration, goal mutation, exclusions, takeout, or dashboard session access.
 - If a tool is added, renamed, removed, or changes behavior, update the MCP audit expectations, docs, public skills, and any registry metadata that changed.
 
-Useful checks:
-
-```bash
-GOFLAGS="$(./scripts/go-build-tags.sh goflags)" go test ./internal/mcpserver -run 'TestMCP.*Audit'
-tests/scripts/mcp-audit.sh --schema-only
-```
-
-Use the live audit only when you have a running MCP endpoint and a scoped test token:
-
-```bash
-HITKEEP_MCP_URL=http://127.0.0.1:8080/mcp \
-HITKEEP_MCP_TOKEN=<hitkeep-api-client-token> \
-tests/scripts/mcp-audit.sh
-```
+Use the production MCP audit gates selected by `$hitkeep-qa`. Run a live endpoint audit only when the task explicitly requires it and a scoped test token is already available; never place that token in commands, logs, or reports.
 
 ## AI Output Rules
 
@@ -97,42 +95,36 @@ HitKeep's optional AI features must store safe, validated product data instead o
 - GoAI-backed Opportunity proposal changes must keep the key/param contract deterministic. Add validator coverage before accepting new saved fields, message keys, interpolation params, action types, or evidence shapes.
 - Keep deterministic analytics and permission checks outside the model. AI may enrich or explain cited evidence, but it should not bypass product validation.
 
-Useful focused checks when AI behavior changes:
-
-```bash
-GOFLAGS="$(./scripts/go-build-tags.sh goflags)" go test ./internal/ai ./internal/opportunities ./internal/database ./internal/mcpserver
-```
+Use focused package tests while iterating and `$hitkeep-qa` for the required completion profile.
 
 ## Frontend And i18n Rules
 
 - Keep user-visible dashboard text in Transloco locale files, not hardcoded in Angular templates or component state.
-- Current dashboard languages are `en`, `de`, `es`, `fr`, `it`, `nl`, and `pt`.
-- Locale files live under `frontend/dashboard/public/i18n/`.
-- Add the same key path to all seven locale JSON files when adding UI copy.
+- Discover supported dashboard languages from the locale directory and runtime configuration; do not maintain the list here.
+- Locale files live under `frontend/dashboard/public/i18n/`. Add the same key path and value shape to every supported locale when adding UI copy.
 - Preserve interpolation variable names and placeholder syntax across locales.
 - Use `TranslocoPipe` in templates and `TranslocoService` for computed TypeScript labels.
 - When labels depend on language changes, make the computation depend on the active language so it recomputes after a switch.
 - For dates, numbers, percentages, and durations, use existing locale helpers, `@jsverse/transloco-locale`, or browser `Intl` APIs.
 - PrimeNG locale text is synchronized through `PrimeLocaleSyncService`. Do not hardcode PrimeNG component labels unless there is no localizable surface.
-- Portuguese dashboard copy uses the `pt` translation file and maps to `pt-BR` for formatting.
+- Keep translation IDs and formatting-locale mappings aligned with the runtime configuration.
 
-Useful checks:
-
-```bash
-cd frontend/dashboard && npm run i18n:check
-cd frontend/dashboard && npm run fmt:check
-```
+Use `$hitkeep-i18n` for localization procedure and `$hitkeep-qa` for the current frontend gates.
 
 ## Agent Skills
 
-The `skills/` directory contains public HitKeep Agent Skills. These are instructions for end-user assistants. They are not credentials and they do not query data by themselves.
+HitKeep has two canonical, non-overlapping Agent Skill packs. `skills/` contains product analytics skills for end-user assistants; `.agents/skills/` contains contributor skills for changing this repository. Neither pack contains credentials or queries data by itself.
 
-- Keep skill directories as direct children of `skills/` so clients can discover them.
+- Keep the product analytics identities `hitkeep-analytics`, `hitkeep-traffic-diagnosis`, `hitkeep-ai-visibility-analyst`, `hitkeep-ecommerce-analyst`, and `hitkeep-tracking-verifier` as direct children of `skills/`.
+- Keep `hitkeep-development`, `hitkeep-workspace`, `hitkeep-qa`, and `hitkeep-i18n` canonical under `.agents/skills/`. Do not create generated proxies or duplicate these bodies under `skills/`.
 - Do not embed tokens, customer data, private URLs, or private screenshots in skills.
-- Keep the parent `hitkeep-analytics` skill aligned with the current MCP tool list and privacy boundary.
-- Update narrower skills when relevant MCP tools, filters, metrics, or caveats change.
+- Keep mutable workflow facts in `hk`. Skills provide routing, judgment, safety rules, and interpretation—not copied command catalogs.
+- Put area-specific implementation guidance in direct references under `hitkeep-development`, not in separately triggerable skills.
+- Contributor skills must prefer developer MCP operations and support structured CLI fallback.
+- Contributor skills and external MCP adapter text must never enter Ask AI. Ask AI embeds only the exact transport-neutral `references/procedure.md` files from the five product analytics skills.
+- Keep each product skill's external MCP adapter and shared procedure aligned with the live analytics surface and privacy boundary.
 - Use and update `hitkeep-i18n` when dashboard copy, locale files, language behavior, or localized formatting changes.
-- Update `skills/README.md` when adding, removing, renaming, or changing the intended use of a skill.
+- Update `skills/README.md`, `CONTRIBUTING.md`, and public docs when either pack's shape or intended use changes.
 
 ## Docs And API References
 
@@ -141,36 +133,10 @@ The `skills/` directory contains public HitKeep Agent Skills. These are instruct
 - MCP, Agent Skills, AI provider configuration, privacy, and export behavior should be documented in reader-facing language.
 - Keep documentation factual. Avoid release promises, SEO filler, and claims that HitKeep cannot prove from product behavior.
 
-Docs verification when the docs repository is available:
-
-```bash
-cd ../hitkeep-docs && npm run build
-```
+Use the delivery reference under `$hitkeep-development` for adjacent documentation workflow and verification, then include its outcome in the final QA report.
 
 ## Testing Expectations
 
-Run the smallest useful checks while iterating, then broaden based on risk.
+Use `$hitkeep-qa` to plan the smallest useful checks while iterating, the PR-parity profile before review, and the exhaustive profile for release risk, cloud behavior, or image behavior. Query live `hk` catalogs; do not maintain a second command matrix here.
 
-Backend:
-
-```bash
-GOFLAGS="$(./scripts/go-build-tags.sh goflags)" go test ./...
-GOFLAGS="$(./scripts/go-build-tags.sh goflags)" go test -race ./...
-```
-
-Frontend:
-
-```bash
-cd frontend/dashboard && npm run fmt && npm run fmt:check
-cd frontend/dashboard && npm run lint
-cd frontend/dashboard && npm run test:ci
-cd frontend/dashboard && npm run i18n:check
-```
-
-Docs:
-
-```bash
-cd ../hitkeep-docs && npm run build
-```
-
-Before opening a PR, report what you ran and what you could not run. AI-assisted changes receive the same review standard as human-written changes.
+Before opening a PR, report the QA profile, stable gate IDs, and final run status, plus anything that could not run and why. AI-assisted changes receive the same review standard as human-written changes.

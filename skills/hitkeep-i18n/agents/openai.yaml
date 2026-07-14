@@ -1,4 +1,0 @@
-interface:
-  display_name: "HitKeep i18n"
-  short_description: "Maintain HitKeep dashboard localization"
-  default_prompt: "Use $hitkeep-i18n when adding or changing HitKeep dashboard UI text, translation keys, locale files, or locale-aware formatting."
