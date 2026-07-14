@@ -13,9 +13,13 @@ import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { CheckboxModule } from 'primeng/checkbox';
 import { InputOtpModule } from 'primeng/inputotp';
+import { MessageModule } from 'primeng/message';
 import { TooltipModule } from 'primeng/tooltip';
 
+import { AuthCard } from '@core/components/auth-card/auth-card';
+import { AuthDivider } from '@core/components/auth-divider/auth-divider';
 import { Brand } from '@components/brand/brand';
+import { AuthMethodOption, AuthMethods } from '@core/components/auth-methods/auth-methods';
 import { CloudStatus } from '@models/analytics.types';
 import { AuthService, LoginResponse, PasskeyLoginFinishRequest, PasskeyLoginStartResponse } from '@services/auth.service';
 import { AnalyticsService } from '@services/analytics.service';
@@ -23,19 +27,18 @@ import { UserPreferencesService } from '@services/user-preferences.service';
 import { toAssertionResponseJson, toPublicKeyRequestOptions } from '@core/utils/webauthn';
 
 type MfaFactor = 'totp' | 'passkey' | 'recovery_code' | 'email_link';
+type AuthMode = 'password' | 'sso';
 
 @Component({
     selector: 'app-login',
     standalone: true,
-    imports: [Brand, ReactiveFormsModule, PasswordModule, ButtonModule, InputTextModule, CheckboxModule, InputOtpModule, TooltipModule, RouterLink, TranslocoPipe],
+    imports: [AuthCard, AuthDivider, AuthMethods, Brand, ReactiveFormsModule, PasswordModule, ButtonModule, InputTextModule, CheckboxModule, InputOtpModule, MessageModule, TooltipModule, RouterLink, TranslocoPipe],
     templateUrl: './login.html',
     styleUrl: './login.css',
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Login {
     private static readonly PASSKEY_DEVICE_HISTORY_KEY = 'hitkeep.passkey.used_on_device';
-    private static readonly EU_SIGNUP_URL = 'https://cloud.hitkeep.eu/signup';
-    private static readonly US_SIGNUP_URL = 'https://cloud.hitkeep.com/signup';
     private destroyRef = inject(DestroyRef);
     private router = inject(Router);
     private route = inject(ActivatedRoute);
@@ -50,6 +53,7 @@ export class Login {
     protected isPasskeyLoading = signal(false);
     protected isSSOLoading = signal(false);
     protected ssoAvailable = signal(false);
+    protected readonly authMode = signal<AuthMode>('password');
     protected errorMessage = signal<string | null>(null);
     protected infoMessage = signal<string | null>(null);
     protected currentYear = new Date().getFullYear();
@@ -68,22 +72,74 @@ export class Login {
     protected readonly mfaHasFallback = computed(() => this.mfaHasRecoveryCode() || this.mfaHasActionFallback());
     protected readonly mfaShowsFallbackDivider = computed(() => this.mfaHasFallback() && (this.mfaHasTotp() || (this.mfaHasRecoveryCode() && this.mfaHasActionFallback())));
     protected readonly showSignupLink = computed(() => Boolean(this.cloudStatus()?.hosted && this.cloudStatus()?.signup_enabled));
-    protected readonly hasAlternativeLogin = computed(() => this.isPasskeySupported() || this.ssoAvailable());
-    protected readonly currentJurisdiction = computed(() => this.normalizeJurisdiction(this.cloudStatus()?.jurisdiction) ?? this.inferJurisdictionFromHost());
-    protected readonly alternateJurisdiction = computed(() => (this.currentJurisdiction() === 'EU' ? 'US' : 'EU'));
-    protected readonly primarySignupUrl = computed(() => this.signupUrlForJurisdiction(this.currentJurisdiction()));
-    protected readonly alternateSignupUrl = computed(() => this.signupUrlForJurisdiction(this.alternateJurisdiction()));
+    protected readonly authMethods = computed<readonly AuthMethodOption[]>(() => {
+        const disabled = this.isLoading() || this.isPasskeyLoading() || this.isSSOLoading();
+        if (this.authMode() === 'sso') {
+            return [
+                {
+                    id: 'password',
+                    labelKey: 'login.continueWithPassword',
+                    icon: 'pi pi-lock',
+                    wide: true,
+                    disabled
+                }
+            ];
+        }
+
+        const methods: AuthMethodOption[] = [];
+        if (this.isPasskeySupported()) {
+            methods.push({
+                id: 'passkey',
+                labelKey: 'login.signInWithPasskey',
+                icon: 'pi pi-key',
+                wide: true,
+                loading: this.isPasskeyLoading(),
+                disabled
+            });
+        }
+        if (this.ssoAvailable()) {
+            methods.push({
+                id: 'sso',
+                labelKey: 'login.continueWithSSO',
+                icon: 'pi pi-building',
+                wide: true,
+                loading: this.isSSOLoading(),
+                disabled
+            });
+        }
+        return methods;
+    });
+    protected readonly authSubtitleKey = computed(() => (this.authMode() === 'sso' ? 'login.ssoSubtitle' : 'login.subtitle'));
+    protected readonly primaryActionKey = computed(() => (this.authMode() === 'sso' ? 'login.continueWithSSO' : 'login.signIn'));
 
     private readonly loginModel = signal({
-        email: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.email] }),
-        password: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+        email: new FormControl('', {
+            nonNullable: true,
+            validators: [Validators.required, Validators.email]
+        }),
+        password: new FormControl('', {
+            nonNullable: true,
+            validators: [Validators.required]
+        }),
         rememberMe: new FormControl(false, { nonNullable: true }),
-        mfaCode: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.pattern(/^[0-9]{6}$/)] }),
-        recoveryCode: new FormControl('', { nonNullable: true, validators: [Validators.required] })
+        mfaCode: new FormControl('', {
+            nonNullable: true,
+            validators: [Validators.required, Validators.pattern(/^[0-9]{6}$/)]
+        }),
+        recoveryCode: new FormControl('', {
+            nonNullable: true,
+            validators: [Validators.required]
+        })
     });
     protected readonly loginForm = compatForm(this.loginModel);
 
     constructor() {
+        const requestedEmail = this.route.snapshot.queryParamMap.get('email')?.trim();
+        const requestedSSO = this.route.snapshot.queryParamMap.get('method')?.trim().toLowerCase() === 'sso';
+        if (requestedEmail) {
+            this.loginForm.email().control().setValue(requestedEmail);
+        }
+
         this.analytics
             .getSystemStatus()
             .pipe(takeUntilDestroyed(this.destroyRef))
@@ -98,8 +154,17 @@ export class Login {
             .getSSOAvailability()
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe({
-                next: (availability) => this.ssoAvailable.set(availability.enabled),
-                error: () => this.ssoAvailable.set(false)
+                next: (availability) => {
+                    this.ssoAvailable.set(availability.enabled);
+                    if (availability.enabled && requestedSSO) {
+                        this.abortConditionalPasskeyPrompt();
+                        this.authMode.set('sso');
+                    }
+                },
+                error: () => {
+                    this.ssoAvailable.set(false);
+                    this.authMode.set('password');
+                }
             });
 
         const authError = this.route.snapshot.queryParamMap.get('error')?.trim();
@@ -134,9 +199,35 @@ export class Login {
             .subscribe({
                 next: (response) => this.navigateToSSOProvider(response.auth_url),
                 error: (err) => {
-                    this.errorMessage.set(err?.status === 400 || err?.status === 503 ? 'login.errors.ssoUnavailable' : 'login.errors.ssoFailed');
+                    if (err?.status === 403 || err?.error?.code === 'sso_access_denied') {
+                        this.errorMessage.set('login.errors.ssoAccessDenied');
+                    } else {
+                        this.errorMessage.set(err?.status === 400 || err?.status === 503 ? 'login.errors.ssoUnavailable' : 'login.errors.ssoFailed');
+                    }
                 }
             });
+    }
+
+    protected selectAuthMethod(method: string): void {
+        switch (method) {
+            case 'password':
+                this.authMode.set('password');
+                this.errorMessage.set(null);
+                this.infoMessage.set(null);
+                break;
+            case 'sso':
+                if (!this.ssoAvailable()) {
+                    return;
+                }
+                this.abortConditionalPasskeyPrompt();
+                this.authMode.set('sso');
+                this.errorMessage.set(null);
+                this.infoMessage.set(null);
+                break;
+            case 'passkey':
+                void this.onPasskeyLogin();
+                break;
+        }
     }
 
     onSubmit(event?: Event): void {
@@ -155,6 +246,10 @@ export class Login {
                 return;
             }
             this.errorMessage.set('login.errors.unexpected');
+            return;
+        }
+        if (this.authMode() === 'sso') {
+            this.onSSOLogin();
             return;
         }
         if (this.loginForm.email().invalid() || this.loginForm.password().invalid()) {
@@ -295,6 +390,8 @@ export class Login {
                 return 'login.errors.ssoEmailNotAllowed';
             case 'sso_unavailable':
                 return 'login.errors.ssoUnavailable';
+            case 'sso_access_denied':
+                return 'login.errors.ssoAccessDenied';
             case 'sso_failed':
                 return 'login.errors.ssoFailed';
             default:
@@ -458,6 +555,9 @@ export class Login {
         if (this.hasAttemptedConditionalPasskey) {
             return false;
         }
+        if (this.authMode() !== 'password') {
+            return false;
+        }
         if (!this.isPasskeySupported()) {
             return false;
         }
@@ -546,29 +646,5 @@ export class Login {
         if (!challengeToken || this.standalonePasskeyStartResponse?.challenge_token === challengeToken) {
             this.standalonePasskeyStartResponse = null;
         }
-    }
-
-    private signupUrlForJurisdiction(jurisdiction: 'EU' | 'US'): string {
-        if (typeof window !== 'undefined' && this.inferJurisdictionFromHost(window.location.hostname) === jurisdiction) {
-            return '/signup';
-        }
-
-        return jurisdiction === 'US' ? Login.US_SIGNUP_URL : Login.EU_SIGNUP_URL;
-    }
-
-    private inferJurisdictionFromHost(hostname?: string): 'EU' | 'US' {
-        const value = (hostname ?? (typeof window !== 'undefined' ? window.location.hostname : '')).trim().toLowerCase();
-        if (value === 'cloud.hitkeep.com' || value.endsWith('.hitkeep.com')) {
-            return 'US';
-        }
-        return 'EU';
-    }
-
-    private normalizeJurisdiction(value: string | null | undefined): 'EU' | 'US' | null {
-        const normalized = value?.trim().toUpperCase();
-        if (normalized === 'EU' || normalized === 'US') {
-            return normalized;
-        }
-        return null;
     }
 }

@@ -8,6 +8,7 @@ import { vi } from 'vitest';
 
 import { Signup } from '@pages/signup/signup';
 import { AnalyticsService } from '@services/analytics.service';
+import { AuthService } from '@services/auth.service';
 import { CloudSignupTrackingService } from '@services/cloud-signup-tracking.service';
 import { CloudService, CloudSignupResponse } from '@services/cloud.service';
 
@@ -37,7 +38,11 @@ describe('Signup', () => {
     };
 
     const routerMock = {
+        navigate: vi.fn<(commands: readonly unknown[], extras: Record<string, unknown>) => Promise<boolean>>(() => Promise.resolve(true)),
         navigateByUrl: vi.fn(() => Promise.resolve(true))
+    };
+    const authServiceMock = {
+        getSSOAvailability: vi.fn(() => of({ enabled: false }))
     };
     const signupTrackingMock = {
         install: vi.fn(),
@@ -47,6 +52,8 @@ describe('Signup', () => {
     beforeEach(async () => {
         vi.clearAllMocks();
         routerMock.navigateByUrl.mockClear();
+        routerMock.navigate.mockClear();
+        authServiceMock.getSSOAvailability.mockReturnValue(of({ enabled: false }));
         signupTrackingMock.install.mockClear();
         signupTrackingMock.trackEvent.mockClear();
         locationAssignMock = vi.fn();
@@ -88,6 +95,7 @@ describe('Signup', () => {
             ],
             providers: [
                 { provide: Router, useValue: routerMock },
+                { provide: AuthService, useValue: authServiceMock },
                 { provide: CloudService, useValue: cloudServiceMock },
                 { provide: AnalyticsService, useValue: analyticsServiceMock },
                 { provide: CloudSignupTrackingService, useValue: signupTrackingMock },
@@ -161,6 +169,15 @@ describe('Signup', () => {
             source_path: '/signup',
             response_status: 'verification_sent'
         });
+    });
+
+    it('does not discover or offer enterprise SSO from public signup', () => {
+        expect(authServiceMock.getSSOAvailability).not.toHaveBeenCalled();
+    });
+
+    it('uses the scoped PrimeNG select-button design tokens', () => {
+        expect(component['jurisdictionFieldsetDesignTokens'].root?.background).toBe('{content.hover.background}');
+        expect(component['jurisdictionDesignTokens'].root?.borderRadius).toBe('{border.radius.xl}');
     });
 
     it('hydrates team name and email from query params', async () => {

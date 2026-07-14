@@ -33,4 +33,15 @@ describe('Setup', () => {
     it('should create', () => {
         expect(component).toBeTruthy();
     });
+
+    it('uses shared PrimeNG auth surfaces', async () => {
+        component['errorMessage'].set('setup.errors.unexpected');
+
+        await fixture.whenStable();
+
+        const element = fixture.nativeElement as HTMLElement;
+        expect(element.querySelector('app-auth-card p-card.p-card')).toBeTruthy();
+        expect(element.querySelector('p-message.p-message')).toBeTruthy();
+        expect(element.querySelector('#setup-password-help')?.getAttribute('role')).not.toBe('alert');
+    });
 });

@@ -36,7 +36,8 @@ describe('AcceptInvite', () => {
                                         tokenMissing: 'Invalid invitation link. The token is missing.',
                                         expiredOrInvalid: 'This invitation link has expired or is invalid.',
                                         teamLimit: 'This invite cannot be accepted because the account is already linked to another team.',
-                                        acceptFailed: 'We could not accept this invitation. Please try again.'
+                                        acceptFailed: 'We could not accept this invitation. Please try again.',
+                                        ssoFailed: 'We could not complete SSO for this invitation. Try again or use your password.'
                                     }
                                 }
                             }
@@ -79,6 +80,24 @@ describe('AcceptInvite', () => {
         TestBed.inject(HttpTestingController).expectNone('/api/auth/accept-invite');
     });
 
+    it('uses the shared PrimeNG auth card and message surfaces', () => {
+        fixture = TestBed.createComponent(AcceptInvite);
+        fixture.detectChanges();
+
+        const element = fixture.nativeElement as HTMLElement;
+        expect(element.querySelector('app-auth-card p-card.p-card')).toBeTruthy();
+        expect(element.querySelector('p-message.p-message')).toBeTruthy();
+    });
+
+    it('shows invitation-local guidance after an OIDC callback error', () => {
+        queryParams = { token: 'retry-token', error: 'sso_provider_error' };
+        fixture = TestBed.createComponent(AcceptInvite);
+        fixture.detectChanges();
+        flushUnauthenticatedSession(fixture);
+
+        expect(fixture.nativeElement.textContent).toContain('We could not complete SSO for this invitation. Try again or use your password.');
+    });
+
     it('keeps invite acceptance local when the password is invalid', () => {
         queryParams = { token: 'invite-token' };
         fixture = TestBed.createComponent(AcceptInvite);
@@ -91,6 +110,45 @@ describe('AcceptInvite', () => {
 
         expect(fixture.nativeElement.textContent).toContain('Must be at least 8 characters.');
         TestBed.inject(HttpTestingController).expectNone('/api/auth/accept-invite');
+    });
+
+    it('offers SSO for the invited team and preserves the invite token when starting OIDC', async () => {
+        queryParams = { token: 'sso-invite-token' };
+        fixture = TestBed.createComponent(AcceptInvite);
+        const component = fixture.componentInstance;
+        const navigate = vi
+            .spyOn(
+                component as unknown as {
+                    navigateToSSOProvider: (authURL: string) => void;
+                },
+                'navigateToSSOProvider'
+            )
+            .mockImplementation(() => undefined);
+        fixture.detectChanges();
+
+        TestBed.inject(HttpTestingController).expectOne('/api/auth/session').flush('Unauthorized', { status: 401, statusText: 'Unauthorized' });
+        await fixture.whenStable();
+        const availability = TestBed.inject(HttpTestingController).expectOne('/api/auth/sso/invite');
+        expect(availability.request.method).toBe('POST');
+        expect(availability.request.body).toEqual({
+            invite_token: 'sso-invite-token'
+        });
+        availability.flush({ enabled: true });
+        await fixture.whenStable();
+
+        const ssoButton = fixture.nativeElement.querySelector('[data-auth-method="sso"] button') as HTMLButtonElement;
+        expect(ssoButton).toBeTruthy();
+        ssoButton.click();
+
+        const start = TestBed.inject(HttpTestingController).expectOne('/api/auth/sso/start');
+        expect(start.request.body).toEqual({
+            invite_token: 'sso-invite-token',
+            return_url: '/dashboard'
+        });
+        start.flush({ auth_url: 'https://identity.example.com/authorize' });
+        await fixture.whenStable();
+
+        expect(navigate).toHaveBeenCalledWith('https://identity.example.com/authorize');
     });
 
     it('accepts an invitation with the token and password, signs in, and enters the dashboard', () => {
@@ -110,7 +168,10 @@ describe('AcceptInvite', () => {
 
         const request = TestBed.inject(HttpTestingController).expectOne('/api/auth/accept-invite');
         expect(request.request.method).toBe('POST');
-        expect(request.request.body).toEqual({ token: 'invite-token', password: 'password123' });
+        expect(request.request.body).toEqual({
+            token: 'invite-token',
+            password: 'password123'
+        });
         request.flush({ status: 'ok' });
         fixture.detectChanges();
 
@@ -145,8 +206,14 @@ describe('AcceptInvite', () => {
         enterPasswordAndSubmit(fixture, 'password123');
 
         const request = TestBed.inject(HttpTestingController).expectOne('/api/auth/accept-invite');
-        expect(request.request.body).toEqual({ token: 'existing-user-token', password: 'password123' });
-        request.flush('Sign in to accept this invitation', { status: 401, statusText: 'Unauthorized' });
+        expect(request.request.body).toEqual({
+            token: 'existing-user-token',
+            password: 'password123'
+        });
+        request.flush('Sign in to accept this invitation', {
+            status: 401,
+            statusText: 'Unauthorized'
+        });
         fixture.detectChanges();
 
         expect(fixture.nativeElement.textContent).toContain('Sign in with the email address that received this invite to accept it.');
@@ -167,7 +234,10 @@ describe('AcceptInvite', () => {
         enterPasswordAndSubmit(fixture, 'password123');
 
         const request = TestBed.inject(HttpTestingController).expectOne('/api/auth/accept-invite');
-        request.flush('Invalid or expired link', { status: 400, statusText: 'Bad Request' });
+        request.flush('Invalid or expired link', {
+            status: 400,
+            statusText: 'Bad Request'
+        });
         fixture.detectChanges();
 
         expect(fixture.nativeElement.textContent).toContain('This invitation link has expired or is invalid.');
@@ -182,7 +252,10 @@ describe('AcceptInvite', () => {
         enterPasswordAndSubmit(fixture, 'password123');
 
         const request = TestBed.inject(HttpTestingController).expectOne('/api/auth/accept-invite');
-        request.flush('Managed cloud accounts are limited to one team', { status: 403, statusText: 'Forbidden' });
+        request.flush('Managed cloud accounts are limited to one team', {
+            status: 403,
+            statusText: 'Forbidden'
+        });
         fixture.detectChanges();
 
         expect(fixture.nativeElement.textContent).toContain('This invite cannot be accepted because the account is already linked to another team.');
@@ -197,7 +270,10 @@ describe('AcceptInvite', () => {
         enterPasswordAndSubmit(fixture, 'password123');
 
         const request = TestBed.inject(HttpTestingController).expectOne('/api/auth/accept-invite');
-        request.flush('Internal server error', { status: 500, statusText: 'Internal Server Error' });
+        request.flush('Internal server error', {
+            status: 500,
+            statusText: 'Internal Server Error'
+        });
         fixture.detectChanges();
 
         expect(fixture.nativeElement.textContent).toContain('We could not accept this invitation. Please try again.');
@@ -208,6 +284,12 @@ function flushUnauthenticatedSession(fixture: ComponentFixture<AcceptInvite>): v
     const request = TestBed.inject(HttpTestingController).expectOne('/api/auth/session');
     expect(request.request.method).toBe('GET');
     request.flush('Unauthorized', { status: 401, statusText: 'Unauthorized' });
+    fixture.detectChanges();
+    const availability = TestBed.inject(HttpTestingController).expectOne('/api/auth/sso/invite');
+    expect(availability.request.body).toEqual({
+        invite_token: fixture.componentInstance['token']
+    });
+    availability.flush({ enabled: false });
     fixture.detectChanges();
 }
 

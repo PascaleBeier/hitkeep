@@ -1,24 +1,22 @@
 <main class="hk-auth-page">
     <section class="hk-auth-shell" aria-labelledby="login-title">
-        <div class="hk-auth-card">
+        <app-auth-card>
             <header class="hk-auth-header">
                 <app-brand size="large"></app-brand>
                 <h1 id="login-title" class="hk-auth-title">{{ "login.signIn" | transloco }}</h1>
-                <p class="hk-auth-subtitle">{{ "login.subtitle" | transloco }}</p>
+                <p class="hk-auth-subtitle">{{ authSubtitleKey() | transloco }}</p>
             </header>
 
             <form (submit)="onSubmit($event)" class="hk-auth-form" novalidate>
                 @if (errorMessage(); as errorMessageKey) {
-                <div class="hk-auth-alert hk-auth-alert-error" role="alert" aria-live="assertive">
-                    <i class="pi pi-exclamation-circle mt-0.5" aria-hidden="true"></i>
-                    <span class="text-sm font-medium">{{ errorMessageKey | transloco }}</span>
-                </div>
+                <p-message severity="error" role="alert" aria-live="assertive">{{ errorMessageKey | transloco }}</p-message>
                 } @if (infoMessage(); as infoMessageKey) {
-                <div class="hk-auth-alert hk-auth-alert-success" role="status" aria-live="polite">
-                    <i class="pi pi-envelope mt-0.5" aria-hidden="true"></i>
-                    <span class="text-sm font-medium">{{ infoMessageKey | transloco }}</span>
-                </div>
-                } @if (!isMfaRequired()) {
+                <p-message severity="success" icon="pi pi-envelope" role="status" aria-live="polite">{{ infoMessageKey | transloco }}</p-message>
+                } @if (!isMfaRequired()) { @if (authMethods().length > 0) {
+                <app-auth-methods [methods]="authMethods()" (methodSelected)="selectAuthMethod($event)" />
+                <app-auth-divider labelKey="login.or" />
+                }
+
                 <div class="hk-auth-field">
                     <label for="email" class="hk-auth-field-label">{{ "login.emailLabel" | transloco }}</label>
                     <input
@@ -29,8 +27,8 @@
                         autocapitalize="none"
                         spellcheck="false"
                         [formControl]="loginForm.email().control()"
-                        autocomplete="username webauthn"
-                        class="w-full"
+                        [attr.autocomplete]="authMode() === 'sso' ? 'email' : 'username webauthn'"
+                        [fluid]="true"
                         [class.ng-invalid]="loginForm.email().touched() && loginForm.email().invalid()"
                         [class.ng-dirty]="loginForm.email().dirty()"
                         [attr.aria-invalid]="loginForm.email().touched() && loginForm.email().invalid() ? true : null"
@@ -38,10 +36,11 @@
                         [placeholder]="'login.emailPlaceholder' | transloco"
                     />
                     @if (loginForm.email().touched() && loginForm.email().invalid()) {
-                    <small id="login-email-error" class="hk-auth-field-error" role="status">{{ "login.emailInvalid" | transloco }}</small>
+                    <p-message id="login-email-error" severity="error" variant="simple" size="small" role="status">{{ "login.emailInvalid" | transloco }}</p-message>
                     }
                 </div>
 
+                @if (authMode() === 'password') {
                 <div class="hk-auth-field">
                     <div class="flex items-center justify-between gap-3">
                         <label for="password" class="hk-auth-field-label">{{ "login.passwordLabel" | transloco }}</label>
@@ -53,62 +52,41 @@
                         autocomplete="current-password"
                         [toggleMask]="true"
                         [feedback]="false"
-                        class="w-full"
-                        inputclass="w-full"
+                        [fluid]="true"
                         [class.ng-invalid]="loginForm.password().touched() && loginForm.password().invalid()"
                         [class.ng-dirty]="loginForm.password().dirty()"
                     ></p-password>
                     @if (loginForm.password().touched() && loginForm.password().invalid()) {
-                    <small class="hk-auth-field-error" role="status">{{ "login.passwordRequired" | transloco }}</small>
+                    <p-message severity="error" variant="simple" size="small" role="status">{{ "login.passwordRequired" | transloco }}</p-message>
                     }
                 </div>
 
                 <div class="flex items-center gap-2">
                     <p-checkbox [formControl]="loginForm.rememberMe().control()" [binary]="true" inputId="rememberMe" [attr.aria-describedby]="'rememberMeHelp'"></p-checkbox>
                     <label for="rememberMe" class="text-sm text-[var(--p-text-color)] cursor-pointer select-none">{{ "login.rememberMe" | transloco }}</label>
-                    <button
+                    <p-button
                         id="rememberMeHelp"
                         type="button"
-                        class="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted-color transition-colors hover:bg-surface-100 hover:text-[var(--p-text-color)] focus:outline-none focus:ring-2 focus:ring-primary-500 dark:hover:bg-surface-800"
-                        [attr.aria-label]="'login.sessionHelp' | transloco"
+                        icon="pi pi-question-circle"
+                        severity="secondary"
+                        size="small"
+                        [text]="true"
+                        [rounded]="true"
+                        [ariaLabel]="'login.sessionHelp' | transloco"
                         [pTooltip]="'login.sessionHelp' | transloco"
                         tooltipPosition="top"
-                    >
-                        <i class="pi pi-question-circle text-sm" aria-hidden="true"></i>
-                    </button>
-                </div>
-
-                <p-button [label]="'login.signIn' | transloco" type="submit" [loading]="isLoading()" class="w-full" [disabled]="isLoading() || loginForm.email().invalid() || loginForm.password().invalid()"> </p-button>
-
-                @if (hasAlternativeLogin()) {
-                <div class="hk-auth-divider">{{ "login.or" | transloco }}</div>
-
-                <div class="hk-auth-actions-center hk-auth-actions-stack">
-                    @if (isPasskeySupported()) {
-                    <p-button
-                        [label]="'login.signInWithPasskey' | transloco"
-                        type="button"
-                        icon="pi pi-key"
-                        severity="secondary"
-                        [outlined]="true"
-                        [loading]="isPasskeyLoading()"
-                        [disabled]="isLoading() || isPasskeyLoading() || isSSOLoading()"
-                        (onClick)="onPasskeyLogin()"
                     />
-                    } @if (ssoAvailable()) {
-                    <p-button
-                        [label]="'login.signInWithSSO' | transloco"
-                        type="button"
-                        icon="pi pi-building"
-                        severity="secondary"
-                        [outlined]="true"
-                        [loading]="isSSOLoading()"
-                        [disabled]="isLoading() || isPasskeyLoading() || isSSOLoading()"
-                        (onClick)="onSSOLogin()"
-                    />
-                    }
                 </div>
-                } } @else {
+                }
+
+                <p-button
+                    [label]="primaryActionKey() | transloco"
+                    type="submit"
+                    [loading]="authMode() === 'sso' ? isSSOLoading() : isLoading()"
+                    [fluid]="true"
+                    [disabled]="isLoading() || isPasskeyLoading() || isSSOLoading() || loginForm.email().invalid() || (authMode() === 'password' && loginForm.password().invalid())"
+                />
+                } @else {
                 <div class="hk-auth-field">
                     <h2 class="text-base font-semibold text-[var(--p-text-color)] m-0">{{ "login.mfaTitle" | transloco }}</h2>
                     <p class="hk-auth-subtitle">{{ "login.mfaSubtitle" | transloco }}</p>
@@ -120,9 +98,9 @@
                     <p-inputotp inputId="mfaCode" [formControl]="loginForm.mfaCode().control()" [length]="6" [integerOnly]="true" [invalid]="loginForm.mfaCode().touched() && loginForm.mfaCode().invalid()" />
                 </div>
 
-                <p-button [label]="'login.verifyTotp' | transloco" type="submit" [loading]="isLoading()" class="w-full" [disabled]="isLoading() || loginForm.mfaCode().invalid()"> </p-button>
+                <p-button [label]="'login.verifyTotp' | transloco" type="submit" [loading]="isLoading()" [fluid]="true" [disabled]="isLoading() || loginForm.mfaCode().invalid()" />
                 } @if (mfaHasFallback()) { @if (mfaShowsFallbackDivider()) {
-                <div class="hk-auth-divider">{{ "login.or" | transloco }}</div>
+                <app-auth-divider labelKey="login.or" />
                 } @if (mfaHasRecoveryCode()) {
 
                 <div class="hk-auth-field">
@@ -134,17 +112,17 @@
                         autocapitalize="characters"
                         spellcheck="false"
                         [formControl]="loginForm.recoveryCode().control()"
-                        class="w-full"
+                        [fluid]="true"
                         [placeholder]="'login.recoveryCodePlaceholder' | transloco"
                         [class.ng-invalid]="loginForm.recoveryCode().touched() && loginForm.recoveryCode().invalid()"
                         [class.ng-dirty]="loginForm.recoveryCode().dirty()"
                     />
                 </div>
 
-                <p-button [label]="'login.verifyRecoveryCode' | transloco" type="button" [loading]="isLoading()" class="w-full" [disabled]="isLoading() || loginForm.recoveryCode().invalid()" (onClick)="verifyRecoveryCodeMfa()"> </p-button>
+                <p-button [label]="'login.verifyRecoveryCode' | transloco" type="button" [loading]="isLoading()" [fluid]="true" [disabled]="isLoading() || loginForm.recoveryCode().invalid()" (onClick)="verifyRecoveryCodeMfa()" />
                 } @if (mfaHasActionFallback()) {
 
-                <div class="hk-auth-actions-center hk-auth-actions-stack">
+                <div class="hk-auth-actions-stack">
                     @if (mfaHasVisiblePasskey()) {
                     <p-button
                         [label]="'login.signInWithPasskey' | transloco"
@@ -152,6 +130,7 @@
                         icon="pi pi-key"
                         severity="secondary"
                         [outlined]="true"
+                        [fluid]="true"
                         [loading]="isPasskeyLoading()"
                         [disabled]="isLoading() || isPasskeyLoading()"
                         (onClick)="onPasskeyLogin()"
@@ -164,6 +143,7 @@
                         icon="pi pi-envelope"
                         severity="secondary"
                         [outlined]="true"
+                        [fluid]="true"
                         [loading]="isLoading()"
                         [disabled]="isLoading() || isPasskeyLoading()"
                         (onClick)="requestEmailLinkMfa()"
@@ -172,17 +152,13 @@
                 </div>
                 } } }
             </form>
-        </div>
+        </app-auth-card>
 
         <footer class="hk-auth-footer">
             @if (showSignupLink()) {
             <p class="hk-auth-footer-text">
                 <span>{{ "login.cloudSignupPrompt" | transloco }}</span>
-                <a [href]="primarySignupUrl()" class="hk-auth-link"> {{ "login.cloudSignupAction" | transloco : { jurisdiction: ("signup.jurisdictions." + currentJurisdiction().toLowerCase()) | transloco } }} </a>
-            </p>
-            <p class="hk-auth-footer-text">
-                <span>{{ "login.cloudSignupAlternatePrompt" | transloco }}</span>
-                <a [href]="alternateSignupUrl()" class="hk-auth-link"> {{ "login.cloudSignupAlternateAction" | transloco : { jurisdiction: ("signup.jurisdictions." + alternateJurisdiction().toLowerCase()) | transloco } }} </a>
+                <a routerLink="/signup" class="hk-auth-link">{{ "login.cloudSignupAction" | transloco }}</a>
             </p>
             }
             <p class="hk-auth-footer-text">

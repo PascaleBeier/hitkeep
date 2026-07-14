@@ -544,6 +544,7 @@
       "errors": {
         "loadFailed": "No se pudieron cargar los miembros del equipo.",
         "inviteFailed": "No se pudo invitar al miembro.",
+        "inviteForbidden": "No tienes permiso para invitar a miembros del equipo.",
         "inviteResendFailed": "No se pudo reenviar la invitación.",
         "inviteRevokeFailed": "No se pudo revocar la invitación.",
         "roleUpdateFailed": "No se pudo actualizar el rol del miembro.",
@@ -1244,17 +1245,91 @@
       }
     },
     "webhooks": {
-      "subtitle": "Envía eventos operativos firmados sin retrasar las acciones del producto.", "listLabel": "Webhooks configurados",
-      "scopes": { "label": "Ámbito del webhook", "site": "Sitio", "instance": "Instancia" },
-      "actions": { "create": "Crear webhook", "refresh": "Actualizar", "deliveries": "Entregas", "test": "Enviar prueba", "edit": "Editar", "rotate": "Rotar secreto", "delete": "Eliminar", "cancel": "Cancelar", "save": "Guardar webhook" },
-      "empty": { "title": "Aún no hay webhooks", "message": "Crea un webhook para empezar a entregar eventos operativos.", "noSiteTitle": "Selecciona un sitio", "noSiteMessage": "Elige un sitio para gestionar sus webhooks.", "forbiddenTitle": "Se requiere acceso a webhooks", "forbiddenMessage": "Solo propietarios y administradores de instancia o sitio pueden gestionarlos." }, "status": { "enabled": "Activo", "disabled": "Desactivado" },
-      "events": { "count": "{{count}} eventos", "none": "Sin eventos", "popoverTitle": "Eventos suscritos" },
-      "secret": { "title": "Guarda ahora este secreto de firma", "message": "Solo se muestra una vez. Úsalo para verificar la marca de tiempo y el cuerpo exacto.", "copy": "Copiar secreto" },
-      "form": { "createTitle": "Crear webhook", "editTitle": "Editar webhook", "name": "Nombre", "url": "URL de destino", "urlHint": "Se requiere HTTPS salvo que los destinos de desarrollo estén habilitados.", "description": "Descripción", "enabled": "Entregar eventos", "events": "Eventos", "eventsHint": "Elige los eventos operativos que recibirá este endpoint.", "eventsRequired": "Selecciona al menos un evento." },
-      "deliveries": { "title": "Entregas de {{name}}", "subtitle": "Los intentos automáticos son al menos una vez y pueden llegar desordenados.", "event": "Evento", "status": "Estado", "attempts": "Intentos", "response": "Respuesta", "created": "Creado", "empty": "Aún no hay entregas." },
-      "deliveryStatus": { "pending": "Pendiente", "processing": "Entregando", "retrying": "Reintentando", "succeeded": "Correcto", "failed": "Fallido" },
-      "feedback": { "loadError": "No se pudieron cargar los webhooks.", "created": "Webhook creado. Guarda ahora el secreto de firma.", "updated": "Webhook actualizado.", "saveError": "No se pudo guardar el webhook.", "rotated": "Secreto rotado. Guarda ahora el nuevo secreto.", "rotateError": "No se pudo rotar el secreto.", "testQueued": "Entrega de prueba en cola.", "testError": "No se pudo poner en cola la prueba.", "deliveryError": "No se pudo cargar el historial.", "deleted": "Webhook eliminado.", "deleteError": "No se pudo eliminar el webhook." },
-      "confirm": { "rotateTitle": "Rotar secreto de firma", "rotateMessage": "¿Rotar el secreto de {{name}}? Las entregas pendientes usarán el nuevo secreto; una solicitud ya en curso aún puede usar el actual.", "deleteTitle": "Eliminar webhook", "deleteMessage": "¿Eliminar {{name}}? Las entregas pendientes conservan su endpoint actual." }
+      "subtitle": "Envía eventos operativos firmados sin retrasar las acciones del producto.",
+      "listLabel": "Webhooks configurados",
+      "scopes": {
+        "label": "Ámbito del webhook",
+        "site": "Sitio",
+        "instance": "Instancia"
+      },
+      "actions": {
+        "create": "Crear webhook",
+        "refresh": "Actualizar",
+        "deliveries": "Entregas",
+        "test": "Enviar prueba",
+        "edit": "Editar",
+        "rotate": "Rotar secreto",
+        "delete": "Eliminar",
+        "cancel": "Cancelar",
+        "save": "Guardar webhook"
+      },
+      "empty": {
+        "title": "Aún no hay webhooks",
+        "message": "Crea un webhook para empezar a entregar eventos operativos.",
+        "noSiteTitle": "Selecciona un sitio",
+        "noSiteMessage": "Elige un sitio para gestionar sus webhooks.",
+        "forbiddenTitle": "Se requiere acceso a webhooks",
+        "forbiddenMessage": "Solo propietarios y administradores de instancia o sitio pueden gestionarlos."
+      },
+      "status": { "enabled": "Activo", "disabled": "Desactivado" },
+      "events": {
+        "count": "{{count}} eventos",
+        "none": "Sin eventos",
+        "popoverTitle": "Eventos suscritos"
+      },
+      "secret": {
+        "title": "Guarda ahora este secreto de firma",
+        "message": "Solo se muestra una vez. Úsalo para verificar la marca de tiempo y el cuerpo exacto.",
+        "copy": "Copiar secreto"
+      },
+      "form": {
+        "createTitle": "Crear webhook",
+        "editTitle": "Editar webhook",
+        "name": "Nombre",
+        "url": "URL de destino",
+        "urlHint": "Se requiere HTTPS salvo que los destinos de desarrollo estén habilitados.",
+        "description": "Descripción",
+        "enabled": "Entregar eventos",
+        "events": "Eventos",
+        "eventsHint": "Elige los eventos operativos que recibirá este endpoint.",
+        "eventsRequired": "Selecciona al menos un evento."
+      },
+      "deliveries": {
+        "title": "Entregas de {{name}}",
+        "subtitle": "Los intentos automáticos son al menos una vez y pueden llegar desordenados.",
+        "event": "Evento",
+        "status": "Estado",
+        "attempts": "Intentos",
+        "response": "Respuesta",
+        "created": "Creado",
+        "empty": "Aún no hay entregas."
+      },
+      "deliveryStatus": {
+        "pending": "Pendiente",
+        "processing": "Entregando",
+        "retrying": "Reintentando",
+        "succeeded": "Correcto",
+        "failed": "Fallido"
+      },
+      "feedback": {
+        "loadError": "No se pudieron cargar los webhooks.",
+        "created": "Webhook creado. Guarda ahora el secreto de firma.",
+        "updated": "Webhook actualizado.",
+        "saveError": "No se pudo guardar el webhook.",
+        "rotated": "Secreto rotado. Guarda ahora el nuevo secreto.",
+        "rotateError": "No se pudo rotar el secreto.",
+        "testQueued": "Entrega de prueba en cola.",
+        "testError": "No se pudo poner en cola la prueba.",
+        "deliveryError": "No se pudo cargar el historial.",
+        "deleted": "Webhook eliminado.",
+        "deleteError": "No se pudo eliminar el webhook."
+      },
+      "confirm": {
+        "rotateTitle": "Rotar secreto de firma",
+        "rotateMessage": "¿Rotar el secreto de {{name}}? Las entregas pendientes usarán el nuevo secreto; una solicitud ya en curso aún puede usar el actual.",
+        "deleteTitle": "Eliminar webhook",
+        "deleteMessage": "¿Eliminar {{name}}? Las entregas pendientes conservan su endpoint actual."
+      }
     },
     "reset": {
       "title": "Establecer nueva contraseña",
@@ -1285,7 +1360,8 @@
         "tokenMissing": "Enlace de invitación inválido. Falta el token.",
         "expiredOrInvalid": "Este enlace de invitación ha expirado o no es válido.",
         "teamLimit": "No se puede aceptar esta invitación porque la cuenta ya está vinculada a otro equipo.",
-        "acceptFailed": "No se pudo aceptar esta invitación. Inténtalo de nuevo."
+        "acceptFailed": "No se pudo aceptar esta invitación. Inténtalo de nuevo.",
+        "ssoFailed": "No se pudo completar el SSO para esta invitación. Inténtalo de nuevo o usa tu contraseña."
       }
     }
   },
@@ -1414,8 +1490,14 @@
         "tracking": "Seguimiento",
         "filtering": "Filtrado",
         "retention": "Retencion",
-        "team": "Equipo",
+        "access": "Acceso",
         "dangerZone": "Zona de peligro"
+      },
+      "notices": {
+        "siteUnavailable": "Este sitio no está disponible o ya no tienes acceso.",
+        "sectionUnavailable": "No tienes permiso para abrir esta sección de configuración.",
+        "siteDeleted": "Sitio eliminado.",
+        "siteTransferred": "Sitio transferido al equipo seleccionado."
       },
       "general": {
         "title": "Configuración general",
@@ -1697,10 +1779,23 @@
         "title": "Inicio de sesión único",
         "description": "Conecta este equipo con su proveedor de identidad OpenID Connect.",
         "status": { "enabled": "Activado", "disabled": "Desactivado" },
-        "provider": { "title": "Proveedor de identidad", "description": "HitKeep admite actualmente OpenID Connect basado en estándares." },
-        "callbackURL": { "label": "URL de retorno", "hint": "Añade esta URI de redirección exacta a tu proveedor de identidad.", "copy": "Copiar URL" },
-        "issuerURL": { "label": "URL del emisor", "hint": "El emisor HTTPS de la configuración OpenID del proveedor." },
-        "clientID": { "label": "ID de cliente", "hint": "El identificador público de la aplicación HitKeep." },
+        "provider": {
+          "title": "Proveedor de identidad",
+          "description": "HitKeep admite actualmente OpenID Connect basado en estándares."
+        },
+        "callbackURL": {
+          "label": "URL de retorno",
+          "hint": "Añade esta URI de redirección exacta a tu proveedor de identidad.",
+          "copy": "Copiar URL"
+        },
+        "issuerURL": {
+          "label": "URL del emisor",
+          "hint": "El emisor HTTPS de la configuración OpenID del proveedor."
+        },
+        "clientID": {
+          "label": "ID de cliente",
+          "hint": "El identificador público de la aplicación HitKeep."
+        },
         "clientSecret": {
           "label": "Secreto de cliente",
           "requiredHint": "Obligatorio para guardar esta conexión.",
@@ -1708,10 +1803,26 @@
           "placeholder": "Introduce el secreto de cliente",
           "keepPlaceholder": "Déjalo vacío para conservar el secreto actual"
         },
-        "allowedDomains": { "label": "Dominios de correo permitidos", "hint": "Un dominio por línea. Cada dominio solo puede pertenecer a la conexión SSO de un equipo." },
-        "claimMapping": { "title": "Asignación de claims", "description": "Mantén los valores predeterminados salvo que tu proveedor use otras rutas de claims.", "email": "Claim de correo", "name": "Claim de nombre visible" },
+        "allowedDomains": {
+          "label": "Dominios de correo permitidos",
+          "hint": "Un dominio por línea. Cada dominio solo puede pertenecer a la conexión SSO de un equipo."
+        },
+        "claimMapping": {
+          "title": "Asignación de claims",
+          "description": "Mantén los valores predeterminados salvo que tu proveedor use otras rutas de claims.",
+          "email": "Claim de correo",
+          "name": "Claim de nombre visible"
+        },
         "securityNote": "HitKeep verifica la firma, el emisor, la audiencia, el estado, el nonce, el desafío PKCE y el correo verificado. Los tokens del proveedor nunca se guardan.",
-        "enable": { "label": "Activar inicio de sesión SSO", "hint": "Muestra SSO como opción para las personas cuyo correo coincide con un dominio permitido. El acceso con contraseña sigue disponible." },
+        "autoProvision": {
+          "label": "Aprovisionar automáticamente usuarios de dominios de confianza",
+          "hint": "Permite que usuarios verificados de estos dominios se unan como miembros sin invitación. Se siguen aplicando los límites de plazas y equipos de Cloud."
+        },
+        "enable": {
+          "label": "Activar inicio de sesión SSO",
+          "hint": "Muestra SSO para miembros existentes y usuarios invitados de dominios de confianza. El acceso con contraseña sigue disponible."
+        },
+        "docsAction": "Guía de configuración",
         "saveAction": "Guardar configuración SSO",
         "testAction": "Probar conexión",
         "saveSuccess": "Configuración SSO guardada.",
@@ -2377,10 +2488,10 @@
   },
   "login": {
     "subtitle": "Inicia sesión en tu panel",
+    "ssoSubtitle": "Introduce tu correo de trabajo para continuar con el proveedor de identidad de tu equipo.",
+    "authenticationMethods": "Opciones de inicio de sesión",
     "cloudSignupPrompt": "¿Nuevo en HitKeep Cloud?",
-    "cloudSignupAction": "Crear espacio de trabajo en {{jurisdiction}}",
-    "cloudSignupAlternatePrompt": "¿Necesitas otra jurisdicción?",
-    "cloudSignupAlternateAction": "Usar la nube de {{jurisdiction}}",
+    "cloudSignupAction": "Crear un espacio de trabajo",
     "emailLabel": "Correo electrónico",
     "emailPlaceholder": "you@example.com",
     "emailInvalid": "Ingresa una dirección de correo válida.",
@@ -2393,7 +2504,8 @@
     "signIn": "Iniciar sesión",
     "or": "o",
     "signInWithPasskey": "Iniciar sesión con passkey",
-    "signInWithSSO": "Iniciar sesión con SSO",
+    "continueWithSSO": "Continuar con SSO",
+    "continueWithPassword": "Continuar con contraseña",
     "mfaTitle": "Verificación en dos pasos",
     "mfaSubtitle": "Completa el acceso con tu código del autenticador, un código de recuperación, un enlace de acceso o una passkey.",
     "sendEmailLink": "Enviarme un enlace de acceso",
@@ -2409,6 +2521,7 @@
       "ssoEmailUnverified": "El proveedor de identidad no devolvió un correo verificado. Contacta con quien administra tu equipo.",
       "ssoEmailNotAllowed": "La cuenta del proveedor no coincide con el correo o el dominio de equipo introducido.",
       "ssoUnavailable": "SSO no está configurado para este dominio de correo. Comprueba la dirección o usa tu contraseña.",
+      "ssoAccessDenied": "Tu cuenta no tiene acceso a este equipo. Pide una invitación a un administrador del equipo o usa otro método de inicio de sesión.",
       "ssoFailed": "No se pudo completar el acceso SSO. Inténtalo de nuevo o usa tu contraseña.",
       "invalidCredentials": "Correo o contraseña inválidos.",
       "passkeyNotSupported": "El inicio de sesión con passkey no está disponible en este dispositivo.",
@@ -2424,7 +2537,6 @@
     "title": "Empieza a rastrear tus sitios gratis",
     "subtitle": "Crea tu espacio de trabajo y empieza a rastrear en menos de un minuto. Sin tarjeta de crédito.",
     "jurisdictionLabel": "Jurisdicción",
-    "jurisdictionDescription": "Este espacio de trabajo permanecerá vinculado al límite legal seleccionado.",
     "jurisdictions": {
       "eu": "EU",
       "us": "US"

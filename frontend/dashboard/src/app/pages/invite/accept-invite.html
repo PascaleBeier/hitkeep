@@ -1,6 +1,6 @@
 <main class="hk-auth-page">
     <section class="hk-auth-shell" aria-labelledby="accept-invite-title">
-        <div class="hk-auth-card">
+        <app-auth-card>
             <header class="hk-auth-header">
                 <app-brand size="large"></app-brand>
                 <h1 id="accept-invite-title" class="hk-auth-title">{{ "invite.accept.title" | transloco }}</h1>
@@ -8,22 +8,18 @@
             </header>
 
             @if (errorMessage()) {
-            <div class="hk-auth-alert hk-auth-alert-error" role="alert" aria-live="assertive">
-                <i class="pi pi-exclamation-circle mt-0.5" aria-hidden="true"></i>
-                <span class="text-sm font-medium">{{ errorMessage()! | transloco }}</span>
-            </div>
+            <p-message severity="error" role="alert" aria-live="assertive">{{ errorMessage()! | transloco }}</p-message>
             } @if (loginRequired()) {
-            <div class="hk-auth-alert" role="status" aria-live="polite">
-                <i class="pi pi-info-circle mt-0.5" aria-hidden="true"></i>
-                <span class="text-sm font-medium">{{ "invite.accept.loginRequired" | transloco }}</span>
-            </div>
+            <p-message severity="info" role="status" aria-live="polite">{{ "invite.accept.loginRequired" | transloco }}</p-message>
             <p-button [label]="'invite.accept.signIn' | transloco" type="button" class="w-full" (onClick)="goToLogin()"> </p-button>
             } @if (isCheckingSession() || isAutoAccepting()) {
-            <div class="hk-auth-alert" role="status" aria-live="polite">
-                <i class="pi pi-spin pi-spinner mt-0.5" aria-hidden="true"></i>
-                <span class="text-sm font-medium">{{ "invite.accept.checkingSession" | transloco }}</span>
+            <p-message severity="secondary" icon="pi pi-spin pi-spinner" role="status" aria-live="polite">{{ "invite.accept.checkingSession" | transloco }}</p-message>
+            } @if (token && !loginRequired() && !isCheckingSession() && !isAutoAccepting()) { @if (ssoAvailable()) {
+            <div class="hk-auth-actions-stack">
+                <app-auth-methods [methods]="authMethods()" (methodSelected)="selectAuthMethod($event)" />
+                <app-auth-divider labelKey="login.or" />
             </div>
-            } @if (token && !loginRequired() && !isCheckingSession() && !isAutoAccepting()) {
+            }
             <form (submit)="onSubmit($event)" class="hk-auth-form" novalidate>
                 <div class="hk-auth-field">
                     <label for="password" class="hk-auth-field-label">{{ "invite.accept.passwordLabel" | transloco }}</label>
@@ -45,6 +41,6 @@
                 <p-button [label]="'invite.accept.submit' | transloco" type="submit" [loading]="isLoading()" class="w-full" [disabled]="isLoading() || form().invalid()"> </p-button>
             </form>
             }
-        </div>
+        </app-auth-card>
     </section>
 </main>

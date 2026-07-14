@@ -1,19 +1,6 @@
 @use "./tailwind.css";
 @use "primeicons/primeicons.css";
 
-/* PrimeNG Overrides for cleaner look */
-.p-card .p-card-body {
-    padding: 1.25rem;
-}
-
-.p-dialog .p-dialog-header {
-    padding: 1.25rem 1.5rem 0.5rem 1.5rem;
-}
-
-.p-dialog .p-dialog-content {
-    padding: 0 1.5rem 1.5rem 1.5rem;
-}
-
 /* Make tables denser in dashboard */
 .p-datatable-sm .p-datatable-tbody > tr > td {
     padding: 0.5rem 0.75rem;
@@ -336,34 +323,14 @@
     transition: background-color 0.2s ease;
 }
 
-.p-dark .hk-auth-page {
-    background: var(--p-surface-ground);
-}
-
 .hk-auth-shell {
     margin-inline: auto;
     width: 100%;
     max-width: 28rem;
 }
 
-.hk-auth-card {
-    backdrop-filter: blur(4px);
-    background: color-mix(in srgb, var(--p-surface-0) 97%, var(--p-surface-100) 3%);
-    border: 1px solid color-mix(in srgb, var(--p-surface-300) 85%, var(--p-surface-200) 15%);
-    border-radius: 1.15rem;
-    box-shadow:
-        0 1px 1px rgba(15, 23, 42, 0.06),
-        0 16px 36px rgba(15, 23, 42, 0.12);
-    padding: clamp(1.5rem, 3vw, 2rem);
-    position: relative;
-}
-
-.p-dark .hk-auth-card {
-    background: color-mix(in srgb, var(--p-surface-900) 96%, #000 4%);
-    border-color: color-mix(in srgb, var(--p-surface-600) 82%, var(--p-surface-400) 18%);
-    box-shadow:
-        0 1px 1px rgba(0, 0, 0, 0.45),
-        0 18px 40px rgba(0, 0, 0, 0.5);
+.hk-auth-card.p-card {
+    border: 1px solid var(--p-content-border-color);
 }
 
 .hk-auth-header {
@@ -386,13 +353,9 @@
 
 .hk-auth-subtitle {
     color: var(--p-text-muted-color);
-    font-size: 0.95rem;
+    font-size: 1rem;
     line-height: 1.5;
     margin: 0;
-}
-
-.p-dark .hk-auth-subtitle {
-    color: color-mix(in srgb, var(--p-text-color) 72%, var(--p-surface-200) 28%);
 }
 
 .hk-auth-form {
@@ -418,90 +381,6 @@
     color: var(--p-text-muted-color);
     font-size: 0.75rem;
     line-height: 1.4;
-    margin: 0;
-}
-
-.hk-auth-field-error {
-    color: var(--p-red-500);
-    font-size: 0.75rem;
-    line-height: 1.4;
-    margin: 0;
-}
-
-.hk-auth-alert {
-    align-items: flex-start;
-    border-radius: 0.75rem;
-    display: flex;
-    gap: 0.625rem;
-    line-height: 1.4;
-    padding: 0.75rem 0.875rem;
-}
-
-.hk-auth-alert-error {
-    background: color-mix(in srgb, var(--p-red-500) 10%, transparent);
-    border: 1px solid color-mix(in srgb, var(--p-red-500) 30%, transparent);
-    color: var(--p-red-500);
-}
-
-.hk-auth-alert-success {
-    background: color-mix(in srgb, var(--p-green-500) 10%, transparent);
-    border: 1px solid color-mix(in srgb, var(--p-green-500) 30%, transparent);
-    color: var(--p-green-600);
-}
-
-.p-dark .hk-auth-alert-success {
-    color: var(--p-green-400);
-}
-
-.hk-auth-divider {
-    align-items: center;
-    color: var(--p-text-muted-color);
-    display: flex;
-    font-size: 0.75rem;
-    font-weight: 600;
-    gap: 0.75rem;
-    letter-spacing: 0.08em;
-    margin: 0.125rem 0;
-    text-transform: uppercase;
-}
-
-.p-dark .hk-auth-divider {
-    color: color-mix(in srgb, var(--p-text-color) 56%, var(--p-surface-300) 44%);
-}
-
-.hk-auth-divider::before,
-.hk-auth-divider::after {
-    background: var(--p-surface-400);
-    content: "";
-    flex: 1;
-    height: 1px;
-}
-
-.p-dark .hk-auth-divider::before,
-.p-dark .hk-auth-divider::after {
-    background: var(--p-surface-500);
-}
-
-.hk-auth-actions-center {
-    display: flex;
-    justify-content: center;
-}
-
-.hk-auth-actions-center .p-button {
-    justify-content: center;
-    min-width: 14rem;
-}
-
-.p-dark .hk-auth-actions-center .p-button.p-button-outlined {
-    background: color-mix(in srgb, var(--p-surface-900) 92%, #000 8%);
-    border-color: color-mix(in srgb, var(--p-surface-500) 80%, var(--p-primary-color) 20%);
-    color: color-mix(in srgb, var(--p-text-color) 88%, var(--p-surface-0) 12%);
-}
-
-.p-dark .hk-auth-actions-center .p-button.p-button-outlined:not(:disabled):hover {
-    background: color-mix(in srgb, var(--p-surface-800) 86%, #000 14%);
-    border-color: color-mix(in srgb, var(--p-surface-400) 78%, var(--p-primary-color) 22%);
-    color: var(--p-surface-0);
 }
 
 .hk-auth-link {
@@ -524,6 +403,13 @@
 
 .hk-auth-link-muted:hover {
     color: var(--p-primary-color);
+}
+
+.hk-auth-link:focus-visible,
+.hk-auth-link-muted:focus-visible {
+    border-radius: var(--p-form-field-border-radius);
+    outline: 2px solid var(--p-primary-color);
+    outline-offset: 2px;
 }
 
 .hk-auth-trust {
@@ -560,31 +446,6 @@
     margin: 0;
 }
 
-.p-dark .hk-auth-footer-text {
-    color: color-mix(in srgb, var(--p-text-color) 66%, var(--p-surface-200) 34%);
-}
-
-.hk-auth-card :where(.p-inputtext, .p-password-input, .p-select, .p-inputnumber-input, .p-inputotp-input) {
-    background: color-mix(in srgb, var(--p-surface-0) 95%, var(--p-surface-100) 5%);
-    border-color: var(--p-surface-300);
-}
-
-.p-dark .hk-auth-card :where(.p-inputtext, .p-password-input, .p-select, .p-inputnumber-input, .p-inputotp-input) {
-    background: color-mix(in srgb, var(--p-surface-950) 76%, #0b1220 24%);
-    border-color: color-mix(in srgb, var(--p-surface-500) 72%, var(--p-primary-color) 28%);
-    color: var(--p-text-color);
-}
-
-.p-dark .hk-auth-card :where(.p-inputtext, .p-password-input, .p-inputnumber-input)::placeholder {
-    color: color-mix(in srgb, var(--p-text-color) 52%, var(--p-surface-500) 48%);
-}
-
-.hk-auth-card :where(a, button, input, textarea, select):focus-visible {
-    border-radius: 0.5rem;
-    outline: 2px solid var(--p-primary-color);
-    outline-offset: 2px;
-}
-
 .api-client-required-asterisk {
     color: var(--p-red-600);
     margin-left: 0.125rem;
@@ -592,17 +453,6 @@
 
 .p-dark .api-client-required-asterisk {
     color: var(--p-red-300);
-}
-
-@media (max-width: 480px) {
-    .hk-auth-card {
-        border-radius: 0.875rem;
-        padding: 1.25rem;
-    }
-
-    .hk-auth-title {
-        font-size: 1.25rem;
-    }
 }
 
 .site-settings-stack {

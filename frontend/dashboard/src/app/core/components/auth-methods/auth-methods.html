@@ -1,0 +1,18 @@
+<div class="hk-auth-methods" role="group" [attr.aria-label]="ariaLabelKey() | transloco">
+    @for (method of methods(); track method.id) {
+    <p-button
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        [fluid]="true"
+        [label]="method.labelKey | transloco"
+        [icon]="method.icon"
+        [loading]="method.loading ?? false"
+        [disabled]="method.disabled || method.loading || false"
+        [class.hk-auth-method-wide]="method.wide"
+        [attr.aria-busy]="method.loading ? true : null"
+        [attr.data-auth-method]="method.id"
+        (onClick)="selectMethod(method)"
+    />
+    }
+</div>

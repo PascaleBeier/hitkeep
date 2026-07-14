@@ -9,15 +9,17 @@ import { TranslocoPipe } from '@jsverse/transloco';
 // PrimeNG
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
+import { MessageModule } from 'primeng/message';
 
 // Core
+import { AuthCard } from '@core/components/auth-card/auth-card';
 import { Brand } from '@components/brand/brand';
 import { AuthService } from '@services/auth.service';
 
 @Component({
     selector: 'app-forgot-password',
     standalone: true,
-    imports: [ReactiveFormsModule, RouterLink, Brand, ButtonModule, InputTextModule, TranslocoPipe],
+    imports: [AuthCard, ReactiveFormsModule, RouterLink, Brand, ButtonModule, InputTextModule, MessageModule, TranslocoPipe],
     templateUrl: './forgot-password.html',
     styleUrl: './forgot-password.css',
     changeDetection: ChangeDetectionStrategy.OnPush

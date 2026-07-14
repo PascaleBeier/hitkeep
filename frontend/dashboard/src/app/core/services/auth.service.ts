@@ -89,7 +89,13 @@ export class AuthService {
         return this.http.get<SSOAvailability>('/api/auth/sso');
     }
 
-    startSSOLogin(payload: { email: string; return_url?: string; remember_me?: boolean }): Observable<SSOStartResponse> {
+    getInviteSSOAvailability(inviteToken: string): Observable<SSOAvailability> {
+        return this.http.post<SSOAvailability>('/api/auth/sso/invite', {
+            invite_token: inviteToken
+        });
+    }
+
+    startSSOLogin(payload: { email?: string; invite_token?: string; return_url?: string; remember_me?: boolean }): Observable<SSOStartResponse> {
         return this.http.post<SSOStartResponse>('/api/auth/sso/start', payload);
     }
 
@@ -122,7 +128,10 @@ export class AuthService {
     }
 
     resetPassword(token: string, password: string): Observable<void> {
-        return this.http.post<void>('/api/auth/reset-password', { token, password });
+        return this.http.post<void>('/api/auth/reset-password', {
+            token,
+            password
+        });
     }
 
     acceptInvite(token: string, password?: string): Observable<LoginResponse> {
@@ -204,7 +213,9 @@ export class AuthService {
                 this.markUnauthenticated();
             }
         }, 1000);
-        const nodeTimer = this.ticker as ReturnType<typeof setInterval> & { unref?: () => void };
+        const nodeTimer = this.ticker as ReturnType<typeof setInterval> & {
+            unref?: () => void;
+        };
         nodeTimer.unref?.();
     }
 

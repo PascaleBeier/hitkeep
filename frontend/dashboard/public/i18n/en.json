@@ -544,6 +544,7 @@
       "errors": {
         "loadFailed": "Failed to load team members.",
         "inviteFailed": "Failed to invite member.",
+        "inviteForbidden": "You do not have permission to invite team members.",
         "inviteResendFailed": "Failed to resend invite.",
         "inviteRevokeFailed": "Failed to revoke invite.",
         "roleUpdateFailed": "Failed to update member role.",
@@ -1272,7 +1273,8 @@
         "tokenMissing": "Invalid invitation link. The token is missing.",
         "expiredOrInvalid": "This invitation link has expired or is invalid.",
         "teamLimit": "This invitation cannot be accepted because the account is already linked to another team.",
-        "acceptFailed": "We could not accept this invitation. Please try again."
+        "acceptFailed": "We could not accept this invitation. Please try again.",
+        "ssoFailed": "We could not complete SSO for this invitation. Try again or use your password."
       }
     }
   },
@@ -1401,8 +1403,14 @@
         "tracking": "Tracking",
         "filtering": "Filtering",
         "retention": "Retention",
-        "team": "Team",
+        "access": "Access",
         "dangerZone": "Danger zone"
+      },
+      "notices": {
+        "siteUnavailable": "This site is unavailable or you no longer have access.",
+        "sectionUnavailable": "You do not have permission to open that settings section.",
+        "siteDeleted": "Site deleted.",
+        "siteTransferred": "Site transferred to the selected team."
       },
       "general": {
         "title": "General settings",
@@ -1722,10 +1730,15 @@
           "name": "Display name claim"
         },
         "securityNote": "HitKeep verifies the provider signature, issuer, audience, state, nonce, PKCE challenge, and verified email. Provider tokens are never stored.",
+        "autoProvision": {
+          "label": "Automatically provision trusted-domain users",
+          "hint": "Let verified users from these domains join as Members without an invitation. Cloud seat and team limits still apply."
+        },
         "enable": {
           "label": "Enable SSO login",
-          "hint": "Shows SSO as a login option for people whose email matches an allowed domain. Password login stays available."
+          "hint": "Shows SSO for existing members and invited users from trusted domains. Password login stays available."
         },
+        "docsAction": "Setup guide",
         "saveAction": "Save SSO configuration",
         "testAction": "Test connection",
         "saveSuccess": "SSO configuration saved.",
@@ -2391,10 +2404,10 @@
   },
   "login": {
     "subtitle": "Sign in to your dashboard",
+    "ssoSubtitle": "Enter your work email to continue to your team's identity provider.",
+    "authenticationMethods": "Sign-in options",
     "cloudSignupPrompt": "New to HitKeep Cloud?",
-    "cloudSignupAction": "Create {{jurisdiction}} workspace",
-    "cloudSignupAlternatePrompt": "Need a different legal boundary?",
-    "cloudSignupAlternateAction": "Use the {{jurisdiction}} cloud",
+    "cloudSignupAction": "Create a workspace",
     "emailLabel": "Email address",
     "emailPlaceholder": "you@example.com",
     "emailInvalid": "Please enter a valid email address.",
@@ -2407,7 +2420,8 @@
     "signIn": "Sign in",
     "or": "or",
     "signInWithPasskey": "Sign in with passkey",
-    "signInWithSSO": "Log in with SSO",
+    "continueWithSSO": "Continue with SSO",
+    "continueWithPassword": "Continue with password",
     "mfaTitle": "Two-factor verification",
     "mfaSubtitle": "Complete sign-in with your authenticator code, a recovery code, a sign-in link, or a passkey.",
     "sendEmailLink": "Email me a sign-in link",
@@ -2426,6 +2440,7 @@
       "ssoEmailUnverified": "Your identity provider did not return a verified email address. Contact your team administrator.",
       "ssoEmailNotAllowed": "The identity provider account does not match the email address or team domain you entered.",
       "ssoUnavailable": "SSO is not configured for this email domain. Check the address or use your password.",
+      "ssoAccessDenied": "Your account does not have access to this team. Ask a team administrator for an invitation or use another sign-in method.",
       "ssoFailed": "SSO login could not be completed. Try again or use your password.",
       "invalidTotp": "Invalid authenticator code.",
       "invalidRecoveryCode": "Invalid recovery code.",
@@ -2438,7 +2453,6 @@
     "title": "Start tracking your sites for free",
     "subtitle": "Create your workspace and start tracking in under a minute. No credit card required.",
     "jurisdictionLabel": "Jurisdiction",
-    "jurisdictionDescription": "This workspace will stay pinned to the selected legal boundary.",
     "jurisdictions": {
       "eu": "EU",
       "us": "US"
@@ -2696,17 +2710,89 @@
     "webhooks": {
       "subtitle": "Send signed operational events to your systems without delaying product actions.",
       "listLabel": "Configured webhooks",
-      "scopes": { "label": "Webhook scope", "site": "Site", "instance": "Instance" },
-      "actions": { "create": "Create webhook", "refresh": "Refresh", "deliveries": "Deliveries", "test": "Send test", "edit": "Edit", "rotate": "Rotate secret", "delete": "Delete", "cancel": "Cancel", "save": "Save webhook" },
-      "empty": { "title": "No webhooks yet", "message": "Create a webhook to start delivering operational events.", "noSiteTitle": "Select a site", "noSiteMessage": "Choose a site to manage its webhooks.", "forbiddenTitle": "Webhook access required", "forbiddenMessage": "Only instance, site owners, and site admins can manage webhooks." },
+      "scopes": {
+        "label": "Webhook scope",
+        "site": "Site",
+        "instance": "Instance"
+      },
+      "actions": {
+        "create": "Create webhook",
+        "refresh": "Refresh",
+        "deliveries": "Deliveries",
+        "test": "Send test",
+        "edit": "Edit",
+        "rotate": "Rotate secret",
+        "delete": "Delete",
+        "cancel": "Cancel",
+        "save": "Save webhook"
+      },
+      "empty": {
+        "title": "No webhooks yet",
+        "message": "Create a webhook to start delivering operational events.",
+        "noSiteTitle": "Select a site",
+        "noSiteMessage": "Choose a site to manage its webhooks.",
+        "forbiddenTitle": "Webhook access required",
+        "forbiddenMessage": "Only instance, site owners, and site admins can manage webhooks."
+      },
       "status": { "enabled": "Enabled", "disabled": "Disabled" },
-      "events": { "count": "{{count}} events", "none": "No events", "popoverTitle": "Subscribed events" },
-      "secret": { "title": "Save this signing secret now", "message": "It is shown once. Use it to verify the timestamp and exact request body.", "copy": "Copy secret" },
-      "form": { "createTitle": "Create webhook", "editTitle": "Edit webhook", "name": "Name", "url": "Destination URL", "urlHint": "HTTPS is required unless development targets are explicitly enabled.", "description": "Description", "enabled": "Deliver events", "events": "Events", "eventsHint": "Choose the operational events this endpoint should receive.", "eventsRequired": "Select at least one event." },
-      "deliveries": { "title": "Deliveries for {{name}}", "subtitle": "Automatic attempts are at-least-once and may arrive out of order.", "event": "Event", "status": "Status", "attempts": "Attempts", "response": "Response", "created": "Created", "empty": "No deliveries recorded yet." },
-      "deliveryStatus": { "pending": "Pending", "processing": "Delivering", "retrying": "Retrying", "succeeded": "Succeeded", "failed": "Failed" },
-      "feedback": { "loadError": "Webhooks could not be loaded.", "created": "Webhook created. Save the signing secret now.", "updated": "Webhook updated.", "saveError": "Webhook could not be saved.", "rotated": "Signing secret rotated. Save the new secret now.", "rotateError": "Signing secret could not be rotated.", "testQueued": "Test delivery queued.", "testError": "Test delivery could not be queued.", "deliveryError": "Delivery history could not be loaded.", "deleted": "Webhook deleted.", "deleteError": "Webhook could not be deleted." },
-      "confirm": { "rotateTitle": "Rotate signing secret", "rotateMessage": "Rotate the secret for {{name}}? Pending deliveries will use the new secret; a request already in flight may still use the current one.", "deleteTitle": "Delete webhook", "deleteMessage": "Delete {{name}}? Pending deliveries keep their existing endpoint snapshot." }
+      "events": {
+        "count": "{{count}} events",
+        "none": "No events",
+        "popoverTitle": "Subscribed events"
+      },
+      "secret": {
+        "title": "Save this signing secret now",
+        "message": "It is shown once. Use it to verify the timestamp and exact request body.",
+        "copy": "Copy secret"
+      },
+      "form": {
+        "createTitle": "Create webhook",
+        "editTitle": "Edit webhook",
+        "name": "Name",
+        "url": "Destination URL",
+        "urlHint": "HTTPS is required unless development targets are explicitly enabled.",
+        "description": "Description",
+        "enabled": "Deliver events",
+        "events": "Events",
+        "eventsHint": "Choose the operational events this endpoint should receive.",
+        "eventsRequired": "Select at least one event."
+      },
+      "deliveries": {
+        "title": "Deliveries for {{name}}",
+        "subtitle": "Automatic attempts are at-least-once and may arrive out of order.",
+        "event": "Event",
+        "status": "Status",
+        "attempts": "Attempts",
+        "response": "Response",
+        "created": "Created",
+        "empty": "No deliveries recorded yet."
+      },
+      "deliveryStatus": {
+        "pending": "Pending",
+        "processing": "Delivering",
+        "retrying": "Retrying",
+        "succeeded": "Succeeded",
+        "failed": "Failed"
+      },
+      "feedback": {
+        "loadError": "Webhooks could not be loaded.",
+        "created": "Webhook created. Save the signing secret now.",
+        "updated": "Webhook updated.",
+        "saveError": "Webhook could not be saved.",
+        "rotated": "Signing secret rotated. Save the new secret now.",
+        "rotateError": "Signing secret could not be rotated.",
+        "testQueued": "Test delivery queued.",
+        "testError": "Test delivery could not be queued.",
+        "deliveryError": "Delivery history could not be loaded.",
+        "deleted": "Webhook deleted.",
+        "deleteError": "Webhook could not be deleted."
+      },
+      "confirm": {
+        "rotateTitle": "Rotate signing secret",
+        "rotateMessage": "Rotate the secret for {{name}}? Pending deliveries will use the new secret; a request already in flight may still use the current one.",
+        "deleteTitle": "Delete webhook",
+        "deleteMessage": "Delete {{name}}? Pending deliveries keep their existing endpoint snapshot."
+      }
     },
     "apiReference": {
       "subtitle": "Versioned REST API reference with session and API-key authentication details.",

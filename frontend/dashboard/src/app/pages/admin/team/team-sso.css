@@ -32,50 +32,6 @@
     line-height: 1.45;
 }
 
-.sso-provider-badge,
-.sso-status {
-    display: inline-flex;
-    align-items: center;
-    flex: 0 0 auto;
-    border: 1px solid var(--p-content-border-color);
-    border-radius: 999px;
-    padding: 0.25rem 0.55rem;
-    color: var(--p-text-muted-color);
-    background: var(--p-surface-50);
-    font-size: 0.7rem;
-    font-weight: 750;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-}
-
-:host-context(.p-dark) .sso-provider-badge,
-:host-context(.p-dark) .sso-status {
-    background: var(--p-surface-900);
-}
-
-.sso-status {
-    gap: 0.4rem;
-    letter-spacing: 0;
-    text-transform: none;
-}
-
-.sso-status-dot {
-    width: 0.45rem;
-    height: 0.45rem;
-    border-radius: 50%;
-    background: var(--p-text-muted-color);
-}
-
-.sso-status--enabled {
-    border-color: color-mix(in srgb, var(--p-green-500) 35%, transparent);
-    color: var(--p-green-700);
-    background: color-mix(in srgb, var(--p-green-500) 9%, var(--p-content-background));
-}
-
-.sso-status--enabled .sso-status-dot {
-    background: var(--p-green-500);
-}
-
 .sso-fields-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -94,32 +50,8 @@
 
 .sso-field label {
     color: var(--p-text-color);
-    font-size: 0.82rem;
+    font-size: 0.875rem;
     font-weight: 650;
-}
-
-.sso-textarea {
-    resize: vertical;
-    min-height: 5rem;
-    border: 1px solid var(--p-form-field-border-color);
-    border-radius: var(--p-form-field-border-radius);
-    padding: var(--p-form-field-padding-y) var(--p-form-field-padding-x);
-    color: var(--p-form-field-color);
-    background: var(--p-form-field-background);
-    font: inherit;
-    transition:
-        border-color var(--p-form-field-transition-duration),
-        box-shadow var(--p-form-field-transition-duration);
-}
-
-.sso-textarea:hover {
-    border-color: var(--p-form-field-hover-border-color);
-}
-
-.sso-textarea:focus-visible {
-    outline: 0;
-    border-color: var(--p-form-field-focus-border-color);
-    box-shadow: var(--p-form-field-focus-ring-shadow);
 }
 
 .sso-copy-row {
@@ -141,7 +73,7 @@
 .sso-advanced summary {
     cursor: pointer;
     color: var(--p-text-color);
-    font-size: 0.82rem;
+    font-size: 0.875rem;
     font-weight: 700;
 }
 
@@ -155,7 +87,7 @@
     gap: 0.65rem;
     align-items: start;
     border: 1px solid var(--p-content-border-color);
-    border-radius: 6px;
+    border-radius: var(--p-border-radius-md);
     padding: 0.75rem;
     color: var(--p-text-muted-color);
     background: var(--p-surface-50);
@@ -178,55 +110,12 @@
 }
 
 .sso-enable-row {
-    cursor: pointer;
     border-top: 1px solid var(--p-content-border-color);
     padding-top: 1rem;
 }
 
 .sso-enable-row > span {
     display: grid;
-}
-
-.sso-switch {
-    position: relative;
-    width: 2.5rem;
-    height: 1.4rem;
-    flex: 0 0 auto;
-    appearance: none;
-    cursor: pointer;
-    border: 1px solid var(--p-content-border-color);
-    border-radius: 999px;
-    background: var(--p-surface-300);
-    transition:
-        background-color 150ms ease,
-        border-color 150ms ease;
-}
-
-.sso-switch::after {
-    content: "";
-    position: absolute;
-    top: 0.16rem;
-    left: 0.18rem;
-    width: 0.95rem;
-    height: 0.95rem;
-    border-radius: 50%;
-    background: white;
-    box-shadow: 0 1px 2px rgb(0 0 0 / 20%);
-    transition: transform 150ms ease;
-}
-
-.sso-switch:checked {
-    border-color: var(--p-primary-color);
-    background: var(--p-primary-color);
-}
-
-.sso-switch:checked::after {
-    transform: translateX(1.05rem);
-}
-
-.sso-switch:focus-visible {
-    outline: 2px solid var(--p-primary-color);
-    outline-offset: 2px;
 }
 
 .sso-actions {

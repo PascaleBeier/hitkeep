@@ -1,25 +1,12 @@
 :host {
     display: block;
 }
-/*
-Force the inner input of the PrimeNG password component
-to fill the container width
-*/
-:host ::ng-deep .p-password input {
-    width: 100%;
-}
 
 .hk-auth-actions-stack {
     align-items: center;
+    display: flex;
     flex-direction: column;
     gap: 0.75rem;
-}
-
-.hk-auth-actions-stack p-button {
+    margin-inline: auto;
     width: min(100%, 18rem);
-}
-
-:host ::ng-deep .hk-auth-actions-stack .p-button {
-    width: 100%;
-    justify-content: center;
 }

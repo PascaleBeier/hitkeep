@@ -21,6 +21,8 @@ describe('Login', () => {
     let fixture: ComponentFixture<Login>;
     let returnUrl: string | null;
     let authError: string | null;
+    let authMethod: string | null;
+    let email: string | null;
     const authMock: {
         status: () => string;
         login: ReturnType<typeof vi.fn>;
@@ -56,6 +58,8 @@ describe('Login', () => {
     beforeEach(async () => {
         returnUrl = null;
         authError = null;
+        authMethod = null;
+        email = null;
         vi.clearAllMocks();
 
         const preferencesMock = {
@@ -99,7 +103,12 @@ describe('Login', () => {
                     useValue: {
                         snapshot: {
                             get queryParamMap() {
-                                return convertToParamMap({ ...(returnUrl ? { returnUrl } : {}), ...(authError ? { error: authError } : {}) });
+                                return convertToParamMap({
+                                    ...(returnUrl ? { returnUrl } : {}),
+                                    ...(authError ? { error: authError } : {}),
+                                    ...(authMethod ? { method: authMethod } : {}),
+                                    ...(email ? { email } : {})
+                                });
                             }
                         }
                     }
@@ -126,6 +135,10 @@ describe('Login', () => {
         expect(component['resolveReturnUrl']()).toBe('/');
     });
 
+    it('maps a revoked membership or invitation to the SSO access guidance', () => {
+        expect(component['authErrorKey']('sso_access_denied')).toBe('login.errors.ssoAccessDenied');
+    });
+
     it('routes successful logins without returnUrl through the authenticated start page', () => {
         const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
         component['loginForm'].email().control().setValue('user@example.com');
@@ -141,21 +154,86 @@ describe('Login', () => {
         expect(navigate).toHaveBeenCalledWith('/');
     });
 
-    it('shows SSO only when the instance has an enabled team configuration', () => {
+    it('shows SSO only when the instance has an enabled team configuration', async () => {
         component['isPasskeySupported'].set(false);
         component['ssoAvailable'].set(false);
-        fixture.detectChanges();
+        await fixture.whenStable();
 
         expect(fixture.nativeElement.textContent).not.toContain('login.signInWithSSO');
 
         component['ssoAvailable'].set(true);
-        fixture.detectChanges();
+        await fixture.whenStable();
 
-        expect(fixture.nativeElement.textContent).toContain('login.signInWithSSO');
+        expect(fixture.nativeElement.textContent).toContain('login.continueWithSSO');
+    });
+
+    it('puts available authentication methods before the password form', async () => {
+        component['isPasskeySupported'].set(false);
+        component['ssoAvailable'].set(true);
+
+        await fixture.whenStable();
+
+        const element = fixture.nativeElement as HTMLElement;
+        const methods = element.querySelector<HTMLElement>('app-auth-methods');
+        const emailField = element.querySelector<HTMLElement>('#email');
+        if (!methods || !emailField) {
+            throw new Error('expected authentication methods before the email field');
+        }
+        expect(methods.compareDocumentPosition(emailField) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('uses PrimeNG surfaces for the auth card, feedback, and method divider', async () => {
+        component['isPasskeySupported'].set(false);
+        component['ssoAvailable'].set(true);
+        component['errorMessage'].set('login.errors.unexpected');
+
+        await fixture.whenStable();
+
+        const element = fixture.nativeElement as HTMLElement;
+        expect(element.querySelector('app-auth-card p-card.p-card')).toBeTruthy();
+        expect(element.querySelector('p-message.p-message')).toBeTruthy();
+        expect(element.querySelector('app-auth-divider p-divider.p-divider')).toBeTruthy();
+    });
+
+    it('switches to an email-only SSO workflow with a password fallback', async () => {
+        component['isPasskeySupported'].set(false);
+        component['ssoAvailable'].set(true);
+        await fixture.whenStable();
+
+        const element = fixture.nativeElement as HTMLElement;
+        element.querySelector<HTMLButtonElement>('p-button[data-auth-method="sso"] button')?.click();
+        await fixture.whenStable();
+
+        expect(component['authMode']()).toBe('sso');
+        expect(element.querySelector('#email')).toBeTruthy();
+        expect(element.querySelector('#password')).toBeNull();
+        expect(element.querySelector('#rememberMe')).toBeNull();
+        expect(element.querySelector('p-button[data-auth-method="password"]')).toBeTruthy();
+        expect(element.querySelector<HTMLButtonElement>('button[type="submit"]')?.textContent).toContain('login.continueWithSSO');
+    });
+
+    it('hydrates a requested SSO workflow and email only when SSO is available', async () => {
+        authMethod = 'sso';
+        email = 'analyst@example.com';
+        authMock.getSSOAvailability.mockReturnValueOnce(of({ enabled: true }));
+
+        fixture = TestBed.createComponent(Login);
+        component = fixture.componentInstance;
+        await fixture.whenStable();
+
+        expect(component['authMode']()).toBe('sso');
+        expect(component['loginForm'].email().value()).toBe('analyst@example.com');
     });
 
     it('starts SSO with the entered email and preserves the safe return URL', () => {
-        const navigate = vi.spyOn(component as unknown as { navigateToSSOProvider: (authURL: string) => void }, 'navigateToSSOProvider').mockImplementation(() => undefined);
+        const navigate = vi
+            .spyOn(
+                component as unknown as {
+                    navigateToSSOProvider: (authURL: string) => void;
+                },
+                'navigateToSSOProvider'
+            )
+            .mockImplementation(() => undefined);
         returnUrl = '/events?range=30d';
         component['ssoAvailable'].set(true);
         component['loginForm'].email().control().setValue('analyst@example.com');
@@ -169,6 +247,37 @@ describe('Login', () => {
             remember_me: true
         });
         expect(navigate).toHaveBeenCalledWith('https://identity.example.com/authorize');
+    });
+
+    it('submits the email-only form through SSO instead of password login', () => {
+        vi.spyOn(
+            component as unknown as {
+                navigateToSSOProvider: (authURL: string) => void;
+            },
+            'navigateToSSOProvider'
+        ).mockImplementation(() => undefined);
+        component['ssoAvailable'].set(true);
+        component['selectAuthMethod']('sso');
+        component['loginForm'].email().control().setValue('analyst@example.com');
+
+        component.onSubmit();
+
+        expect(authMock.startSSOLogin).toHaveBeenCalledWith({
+            email: 'analyst@example.com',
+            return_url: '/',
+            remember_me: false
+        });
+        expect(authMock.login).not.toHaveBeenCalled();
+    });
+
+    it('does not start conditional passkey mediation in SSO mode', () => {
+        window.localStorage.setItem('hitkeep.passkey.used_on_device', '1');
+        component['isPasskeySupported'].set(true);
+        component['authMode'].set('sso');
+
+        expect(component['shouldAttemptConditionalPasskey']()).toBe(false);
+
+        window.localStorage.removeItem('hitkeep.passkey.used_on_device');
     });
 
     it('requires a valid email before starting SSO', () => {
@@ -222,7 +331,7 @@ describe('Login', () => {
 
         fixture.detectChanges();
 
-        expect(fixture.nativeElement.querySelectorAll('.hk-auth-divider').length).toBe(1);
+        expect(fixture.nativeElement.querySelectorAll('app-auth-divider p-divider').length).toBe(1);
         expect(fixture.nativeElement.querySelectorAll('.hk-auth-actions-stack p-button').length).toBe(2);
     });
 
@@ -247,11 +356,31 @@ describe('Login', () => {
         expect(component['infoMessage']()).toBe('login.emailLinkSent');
     });
 
-    it('builds region-aware signup URLs for hosted cloud', () => {
-        expect(component['currentJurisdiction']()).toBe('EU');
-        expect(component['primarySignupUrl']()).toBe('/signup');
-        expect(component['alternateJurisdiction']()).toBe('US');
-        expect(component['alternateSignupUrl']()).toBe('https://cloud.hitkeep.com/signup');
+    it('links hosted signup to the local signup route without regional cloud links', () => {
+        const footer = (fixture.nativeElement as HTMLElement).querySelector('.hk-auth-footer');
+        const signupLinks = Array.from(footer?.querySelectorAll<HTMLAnchorElement>('a[href$="/signup"]') ?? []);
+
+        expect(signupLinks.length).toBe(1);
+        expect(signupLinks[0]?.getAttribute('href')).toBe('/signup');
+        expect(footer?.querySelector('a[href^="https://cloud.hitkeep"]')).toBeNull();
+    });
+
+    it('hides the signup link when hosted signup is unavailable', async () => {
+        component['cloudStatus'].set({
+            hosted: false,
+            signup_enabled: true,
+            jurisdiction: 'EU'
+        });
+        await fixture.whenStable();
+        expect((fixture.nativeElement as HTMLElement).querySelector('.hk-auth-footer a[href$="/signup"]')).toBeNull();
+
+        component['cloudStatus'].set({
+            hosted: true,
+            signup_enabled: false,
+            jurisdiction: 'EU'
+        });
+        await fixture.whenStable();
+        expect((fixture.nativeElement as HTMLElement).querySelector('.hk-auth-footer a[href$="/signup"]')).toBeNull();
     });
 
     it('reuses a single passkey start request for concurrent standalone login attempts', async () => {

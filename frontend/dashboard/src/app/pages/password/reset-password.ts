@@ -8,16 +8,18 @@ import { TranslocoPipe } from '@jsverse/transloco';
 
 // PrimeNG
 import { ButtonModule } from 'primeng/button';
+import { MessageModule } from 'primeng/message';
 import { PasswordModule } from 'primeng/password';
 
 // Core
+import { AuthCard } from '@core/components/auth-card/auth-card';
 import { Brand } from '@components/brand/brand';
 import { AuthService } from '@services/auth.service';
 
 @Component({
     selector: 'app-reset-password',
     standalone: true,
-    imports: [ReactiveFormsModule, Brand, ButtonModule, PasswordModule, TranslocoPipe],
+    imports: [AuthCard, ReactiveFormsModule, Brand, ButtonModule, MessageModule, PasswordModule, TranslocoPipe],
     templateUrl: './reset-password.html',
     styleUrl: './reset-password.css',
     changeDetection: ChangeDetectionStrategy.OnPush

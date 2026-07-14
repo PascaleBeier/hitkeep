@@ -297,6 +297,7 @@ describe('TeamService', () => {
             allowed_domains: ['example.com'],
             email_claim: 'email',
             display_name_claim: 'name',
+            auto_provision: true,
             enabled: true,
             callback_url: 'https://analytics.example.com/api/auth/sso/callback'
         };
@@ -314,6 +315,7 @@ describe('TeamService', () => {
             allowed_domains: response.allowed_domains,
             email_claim: response.email_claim,
             display_name_claim: response.display_name_claim,
+            auto_provision: response.auto_provision,
             enabled: false
         };
         service.updateTeamSSO('team-id', payload).subscribe();

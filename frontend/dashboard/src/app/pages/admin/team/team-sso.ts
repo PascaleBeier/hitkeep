@@ -1,10 +1,14 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormsModule } from '@angular/forms';
 import { FormField, form, maxLength, pattern, required } from '@angular/forms/signals';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { MessageModule } from 'primeng/message';
+import { TagModule } from 'primeng/tag';
+import { TextareaModule } from 'primeng/textarea';
+import { ToggleSwitchModule } from 'primeng/toggleswitch';
 
 import { CopyControl } from '@components/copy-control/copy-control';
 import { TeamSSOConfig, UpdateTeamSSORequest } from '@models/analytics.types';
@@ -18,6 +22,7 @@ interface TeamSSOFormModel {
     allowedDomains: string;
     emailClaim: string;
     displayNameClaim: string;
+    autoProvision: boolean;
     enabled: boolean;
 }
 
@@ -28,12 +33,13 @@ const EMPTY_SSO_FORM: TeamSSOFormModel = {
     allowedDomains: '',
     emailClaim: 'email',
     displayNameClaim: 'name',
+    autoProvision: false,
     enabled: false
 };
 
 @Component({
     selector: 'app-team-sso',
-    imports: [TranslocoPipe, FormField, InputTextModule, ButtonModule, MessageModule, SettingsCard, CopyControl],
+    imports: [TranslocoPipe, FormsModule, FormField, InputTextModule, ButtonModule, MessageModule, TagModule, TextareaModule, ToggleSwitchModule, SettingsCard, CopyControl],
     templateUrl: './team-sso.html',
     styleUrl: './team-sso.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -42,6 +48,7 @@ export class TeamSSOPage {
     private readonly destroyRef = inject(DestroyRef);
     protected readonly teamService = inject(TeamService);
     protected readonly team = this.teamService.activeTeam;
+    protected readonly docsURL = 'https://hitkeep.com/guides/security/single-sign-on/';
 
     protected readonly model = signal<TeamSSOFormModel>({ ...EMPTY_SSO_FORM });
     protected readonly ssoForm = form(this.model, (schema) => {
@@ -142,6 +149,18 @@ export class TeamSSOPage {
         });
     }
 
+    protected setAutoProvision(value: boolean): void {
+        this.model.update((current) => ({ ...current, autoProvision: value }));
+    }
+
+    protected setAllowedDomains(value: string): void {
+        this.model.update((current) => ({ ...current, allowedDomains: value }));
+    }
+
+    protected setEnabled(value: boolean): void {
+        this.model.update((current) => ({ ...current, enabled: value }));
+    }
+
     private requestPayload(): UpdateTeamSSORequest {
         const value = this.model();
         return {
@@ -155,6 +174,7 @@ export class TeamSSOPage {
                 .filter(Boolean),
             email_claim: value.emailClaim.trim(),
             display_name_claim: value.displayNameClaim.trim(),
+            auto_provision: value.autoProvision,
             enabled: value.enabled
         };
     }
@@ -169,6 +189,7 @@ export class TeamSSOPage {
                       allowedDomains: config.allowed_domains.join('\n'),
                       emailClaim: config.email_claim || 'email',
                       displayNameClaim: config.display_name_claim || 'name',
+                      autoProvision: config.auto_provision,
                       enabled: config.enabled
                   }
                 : { ...EMPTY_SSO_FORM }

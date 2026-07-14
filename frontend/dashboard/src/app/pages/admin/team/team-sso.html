@@ -7,11 +7,22 @@
     }
 
     <app-settings-card [title]="'admin.team.sso.title' | transloco" [subtitle]="'admin.team.sso.description' | transloco" icon="pi pi-shield">
-        <div settings-card-header>
-            <span class="sso-status" [class.sso-status--enabled]="persistedEnabled()">
-                <span class="sso-status-dot" aria-hidden="true"></span>
-                {{ (persistedEnabled() ? "admin.team.sso.status.enabled" : "admin.team.sso.status.disabled") | transloco }}
-            </span>
+        <div settings-card-header class="sso-header-actions flex flex-wrap items-center justify-end gap-2 max-sm:w-full max-sm:justify-between">
+            <a
+                pButton
+                data-testid="sso-docs-link"
+                [href]="docsURL"
+                target="_blank"
+                rel="noopener"
+                size="small"
+                severity="secondary"
+                [outlined]="true"
+                icon="pi pi-external-link"
+                iconPos="right"
+                [label]="'admin.team.sso.docsAction' | transloco"
+                [attr.aria-label]="'admin.team.sso.docsAction' | transloco"
+            ></a>
+            <p-tag [severity]="persistedEnabled() ? 'success' : 'secondary'" [value]="(persistedEnabled() ? 'admin.team.sso.status.enabled' : 'admin.team.sso.status.disabled') | transloco" />
         </div>
 
         <form settings-card-body id="team-sso-form" class="sso-form" (submit)="$event.preventDefault(); saveSettings()" novalidate>
@@ -20,7 +31,7 @@
                     <p id="sso-provider-title" class="sso-section-title">{{ "admin.team.sso.provider.title" | transloco }}</p>
                     <p class="sso-section-hint">{{ "admin.team.sso.provider.description" | transloco }}</p>
                 </div>
-                <span class="sso-provider-badge">OIDC</span>
+                <p-tag severity="secondary" value="OIDC" />
             </section>
 
             <div class="sso-field sso-field--full">
@@ -89,9 +100,13 @@
                     <span class="sso-field-hint">{{ "admin.team.sso.allowedDomains.hint" | transloco }}</span>
                     <textarea
                         id="sso-allowed-domains"
-                        [formField]="ssoForm.allowedDomains"
+                        pTextarea
+                        [ngModel]="model().allowedDomains"
+                        [ngModelOptions]="{ standalone: true }"
+                        (ngModelChange)="setAllowedDomains($event)"
+                        (blur)="ssoForm.allowedDomains().markAsTouched()"
                         rows="3"
-                        class="sso-textarea w-full"
+                        class="w-full"
                         placeholder="example.com&#10;example.org"
                         [attr.aria-invalid]="ssoForm.allowedDomains().touched() && ssoForm.allowedDomains().invalid() ? true : null"
                         [attr.aria-describedby]="ssoForm.allowedDomains().touched() && ssoForm.allowedDomains().invalid() ? 'sso-domains-error' : null"
@@ -122,13 +137,21 @@
                 <p>{{ "admin.team.sso.securityNote" | transloco }}</p>
             </aside>
 
-            <label class="sso-enable-row" for="sso-enabled">
+            <div class="sso-enable-row">
                 <span>
-                    <span class="sso-enable-title">{{ "admin.team.sso.enable.label" | transloco }}</span>
+                    <label id="sso-auto-provision-label" class="sso-enable-title" for="sso-auto-provision">{{ "admin.team.sso.autoProvision.label" | transloco }}</label>
+                    <span class="sso-field-hint">{{ "admin.team.sso.autoProvision.hint" | transloco }}</span>
+                </span>
+                <p-toggleswitch inputId="sso-auto-provision" ariaLabelledBy="sso-auto-provision-label" [ngModel]="model().autoProvision" [ngModelOptions]="{ standalone: true }" (ngModelChange)="setAutoProvision($event)" />
+            </div>
+
+            <div class="sso-enable-row">
+                <span>
+                    <label id="sso-enabled-label" class="sso-enable-title" for="sso-enabled">{{ "admin.team.sso.enable.label" | transloco }}</label>
                     <span class="sso-field-hint">{{ "admin.team.sso.enable.hint" | transloco }}</span>
                 </span>
-                <input id="sso-enabled" type="checkbox" [formField]="ssoForm.enabled" class="sso-switch" />
-            </label>
+                <p-toggleswitch inputId="sso-enabled" ariaLabelledBy="sso-enabled-label" [ngModel]="model().enabled" [ngModelOptions]="{ standalone: true }" (ngModelChange)="setEnabled($event)" />
+            </div>
         </form>
 
         <div settings-card-footer class="sso-actions">

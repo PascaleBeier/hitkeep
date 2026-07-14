@@ -10,14 +10,16 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { PasswordModule } from 'primeng/password';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
+import { MessageModule } from 'primeng/message';
 
 // Corrected path to Core
+import { AuthCard } from '@core/components/auth-card/auth-card';
 import { Brand } from '@components/brand/brand';
 
 @Component({
     selector: 'app-setup',
     standalone: true,
-    imports: [Brand, ReactiveFormsModule, PasswordModule, ButtonModule, InputTextModule, TranslocoPipe],
+    imports: [AuthCard, Brand, ReactiveFormsModule, PasswordModule, ButtonModule, InputTextModule, MessageModule, TranslocoPipe],
     templateUrl: './setup.html',
     styleUrl: './setup.css',
     changeDetection: ChangeDetectionStrategy.OnPush

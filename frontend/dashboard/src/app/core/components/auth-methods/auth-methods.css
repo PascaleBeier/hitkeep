@@ -1,0 +1,13 @@
+:host {
+    display: block;
+}
+
+.hk-auth-methods {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(8.5rem, 100%), 1fr));
+    gap: 0.5rem;
+}
+
+.hk-auth-method-wide {
+    grid-column: 1 / -1;
+}

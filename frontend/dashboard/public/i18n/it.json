@@ -544,6 +544,7 @@
       "errors": {
         "loadFailed": "Impossibile caricare i membri del team.",
         "inviteFailed": "Impossibile invitare il membro.",
+        "inviteForbidden": "Non hai l'autorizzazione per invitare membri del team.",
         "inviteResendFailed": "Impossibile inviare di nuovo l'invito.",
         "inviteRevokeFailed": "Impossibile revocare l'invito.",
         "roleUpdateFailed": "Impossibile aggiornare il ruolo del membro.",
@@ -1244,17 +1245,91 @@
       }
     },
     "webhooks": {
-      "subtitle": "Invia eventi operativi firmati senza rallentare le azioni del prodotto.", "listLabel": "Webhook configurati",
-      "scopes": { "label": "Ambito webhook", "site": "Sito", "instance": "Istanza" },
-      "actions": { "create": "Crea webhook", "refresh": "Aggiorna", "deliveries": "Consegne", "test": "Invia test", "edit": "Modifica", "rotate": "Ruota segreto", "delete": "Elimina", "cancel": "Annulla", "save": "Salva webhook" },
-      "empty": { "title": "Nessun webhook", "message": "Crea un webhook per iniziare a consegnare eventi operativi.", "noSiteTitle": "Seleziona un sito", "noSiteMessage": "Scegli un sito per gestirne i webhook.", "forbiddenTitle": "Accesso webhook richiesto", "forbiddenMessage": "Solo proprietari e amministratori di istanza o sito possono gestire i webhook." }, "status": { "enabled": "Attivo", "disabled": "Disattivato" },
-      "events": { "count": "{{count}} eventi", "none": "Nessun evento", "popoverTitle": "Eventi sottoscritti" },
-      "secret": { "title": "Salva ora questo segreto di firma", "message": "Viene mostrato una sola volta. Usalo per verificare timestamp e corpo esatto.", "copy": "Copia segreto" },
-      "form": { "createTitle": "Crea webhook", "editTitle": "Modifica webhook", "name": "Nome", "url": "URL di destinazione", "urlHint": "HTTPS è obbligatorio salvo l’abilitazione esplicita delle destinazioni di sviluppo.", "description": "Descrizione", "enabled": "Consegna eventi", "events": "Eventi", "eventsHint": "Scegli gli eventi operativi che questo endpoint deve ricevere.", "eventsRequired": "Seleziona almeno un evento." },
-      "deliveries": { "title": "Consegne per {{name}}", "subtitle": "I tentativi automatici avvengono almeno una volta e possono arrivare fuori ordine.", "event": "Evento", "status": "Stato", "attempts": "Tentativi", "response": "Risposta", "created": "Creato", "empty": "Nessuna consegna registrata." },
-      "deliveryStatus": { "pending": "In attesa", "processing": "In consegna", "retrying": "Nuovo tentativo", "succeeded": "Riuscita", "failed": "Fallita" },
-      "feedback": { "loadError": "Impossibile caricare i webhook.", "created": "Webhook creato. Salva ora il segreto.", "updated": "Webhook aggiornato.", "saveError": "Impossibile salvare il webhook.", "rotated": "Segreto ruotato. Salva il nuovo segreto.", "rotateError": "Impossibile ruotare il segreto.", "testQueued": "Consegna di test accodata.", "testError": "Impossibile accodare il test.", "deliveryError": "Impossibile caricare la cronologia.", "deleted": "Webhook eliminato.", "deleteError": "Impossibile eliminare il webhook." },
-      "confirm": { "rotateTitle": "Ruota segreto di firma", "rotateMessage": "Ruotare il segreto per {{name}}? Le consegne in attesa useranno il nuovo segreto; una richiesta già in corso può ancora usare quello attuale.", "deleteTitle": "Elimina webhook", "deleteMessage": "Eliminare {{name}}? Le consegne in attesa conservano la destinazione corrente." }
+      "subtitle": "Invia eventi operativi firmati senza rallentare le azioni del prodotto.",
+      "listLabel": "Webhook configurati",
+      "scopes": {
+        "label": "Ambito webhook",
+        "site": "Sito",
+        "instance": "Istanza"
+      },
+      "actions": {
+        "create": "Crea webhook",
+        "refresh": "Aggiorna",
+        "deliveries": "Consegne",
+        "test": "Invia test",
+        "edit": "Modifica",
+        "rotate": "Ruota segreto",
+        "delete": "Elimina",
+        "cancel": "Annulla",
+        "save": "Salva webhook"
+      },
+      "empty": {
+        "title": "Nessun webhook",
+        "message": "Crea un webhook per iniziare a consegnare eventi operativi.",
+        "noSiteTitle": "Seleziona un sito",
+        "noSiteMessage": "Scegli un sito per gestirne i webhook.",
+        "forbiddenTitle": "Accesso webhook richiesto",
+        "forbiddenMessage": "Solo proprietari e amministratori di istanza o sito possono gestire i webhook."
+      },
+      "status": { "enabled": "Attivo", "disabled": "Disattivato" },
+      "events": {
+        "count": "{{count}} eventi",
+        "none": "Nessun evento",
+        "popoverTitle": "Eventi sottoscritti"
+      },
+      "secret": {
+        "title": "Salva ora questo segreto di firma",
+        "message": "Viene mostrato una sola volta. Usalo per verificare timestamp e corpo esatto.",
+        "copy": "Copia segreto"
+      },
+      "form": {
+        "createTitle": "Crea webhook",
+        "editTitle": "Modifica webhook",
+        "name": "Nome",
+        "url": "URL di destinazione",
+        "urlHint": "HTTPS è obbligatorio salvo l’abilitazione esplicita delle destinazioni di sviluppo.",
+        "description": "Descrizione",
+        "enabled": "Consegna eventi",
+        "events": "Eventi",
+        "eventsHint": "Scegli gli eventi operativi che questo endpoint deve ricevere.",
+        "eventsRequired": "Seleziona almeno un evento."
+      },
+      "deliveries": {
+        "title": "Consegne per {{name}}",
+        "subtitle": "I tentativi automatici avvengono almeno una volta e possono arrivare fuori ordine.",
+        "event": "Evento",
+        "status": "Stato",
+        "attempts": "Tentativi",
+        "response": "Risposta",
+        "created": "Creato",
+        "empty": "Nessuna consegna registrata."
+      },
+      "deliveryStatus": {
+        "pending": "In attesa",
+        "processing": "In consegna",
+        "retrying": "Nuovo tentativo",
+        "succeeded": "Riuscita",
+        "failed": "Fallita"
+      },
+      "feedback": {
+        "loadError": "Impossibile caricare i webhook.",
+        "created": "Webhook creato. Salva ora il segreto.",
+        "updated": "Webhook aggiornato.",
+        "saveError": "Impossibile salvare il webhook.",
+        "rotated": "Segreto ruotato. Salva il nuovo segreto.",
+        "rotateError": "Impossibile ruotare il segreto.",
+        "testQueued": "Consegna di test accodata.",
+        "testError": "Impossibile accodare il test.",
+        "deliveryError": "Impossibile caricare la cronologia.",
+        "deleted": "Webhook eliminato.",
+        "deleteError": "Impossibile eliminare il webhook."
+      },
+      "confirm": {
+        "rotateTitle": "Ruota segreto di firma",
+        "rotateMessage": "Ruotare il segreto per {{name}}? Le consegne in attesa useranno il nuovo segreto; una richiesta già in corso può ancora usare quello attuale.",
+        "deleteTitle": "Elimina webhook",
+        "deleteMessage": "Eliminare {{name}}? Le consegne in attesa conservano la destinazione corrente."
+      }
     },
     "reset": {
       "title": "Imposta nuova password",
@@ -1285,7 +1360,8 @@
         "tokenMissing": "Link di invito non valido. Token mancante.",
         "expiredOrInvalid": "Questo link di invito è scaduto o non valido.",
         "teamLimit": "Questo invito non può essere accettato perché l'account è già collegato a un altro team.",
-        "acceptFailed": "Non è stato possibile accettare questo invito. Riprova."
+        "acceptFailed": "Non è stato possibile accettare questo invito. Riprova.",
+        "ssoFailed": "Non è stato possibile completare l'SSO per questo invito. Riprova o usa la password."
       }
     }
   },
@@ -1414,8 +1490,14 @@
         "tracking": "Tracking",
         "filtering": "Filtraggio",
         "retention": "Retention",
-        "team": "Team",
+        "access": "Accesso",
         "dangerZone": "Zona pericolo"
+      },
+      "notices": {
+        "siteUnavailable": "Questo sito non è disponibile o non hai più accesso.",
+        "sectionUnavailable": "Non hai l'autorizzazione per aprire questa sezione delle impostazioni.",
+        "siteDeleted": "Sito eliminato.",
+        "siteTransferred": "Sito trasferito al team selezionato."
       },
       "general": {
         "title": "Impostazioni generali",
@@ -1697,10 +1779,23 @@
         "title": "Single sign-on",
         "description": "Collega questo team al suo provider di identità OpenID Connect.",
         "status": { "enabled": "Attivato", "disabled": "Disattivato" },
-        "provider": { "title": "Provider di identità", "description": "HitKeep supporta attualmente OpenID Connect basato su standard." },
-        "callbackURL": { "label": "URL di callback", "hint": "Aggiungi questo URI di reindirizzamento esatto al provider di identità.", "copy": "Copia URL" },
-        "issuerURL": { "label": "URL issuer", "hint": "L’issuer HTTPS della configurazione OpenID del provider." },
-        "clientID": { "label": "ID client", "hint": "L’identificatore pubblico dell’applicazione HitKeep." },
+        "provider": {
+          "title": "Provider di identità",
+          "description": "HitKeep supporta attualmente OpenID Connect basato su standard."
+        },
+        "callbackURL": {
+          "label": "URL di callback",
+          "hint": "Aggiungi questo URI di reindirizzamento esatto al provider di identità.",
+          "copy": "Copia URL"
+        },
+        "issuerURL": {
+          "label": "URL issuer",
+          "hint": "L’issuer HTTPS della configurazione OpenID del provider."
+        },
+        "clientID": {
+          "label": "ID client",
+          "hint": "L’identificatore pubblico dell’applicazione HitKeep."
+        },
         "clientSecret": {
           "label": "Segreto client",
           "requiredHint": "Obbligatorio prima di poter salvare la connessione.",
@@ -1708,10 +1803,26 @@
           "placeholder": "Inserisci il segreto client",
           "keepPlaceholder": "Lascia vuoto per mantenere il segreto attuale"
         },
-        "allowedDomains": { "label": "Domini email consentiti", "hint": "Un dominio per riga. Ogni dominio può appartenere alla connessione SSO di un solo team." },
-        "claimMapping": { "title": "Mappatura dei claim", "description": "Mantieni i valori predefiniti a meno che il provider usi percorsi di claim diversi.", "email": "Claim email", "name": "Claim nome visualizzato" },
+        "allowedDomains": {
+          "label": "Domini email consentiti",
+          "hint": "Un dominio per riga. Ogni dominio può appartenere alla connessione SSO di un solo team."
+        },
+        "claimMapping": {
+          "title": "Mappatura dei claim",
+          "description": "Mantieni i valori predefiniti a meno che il provider usi percorsi di claim diversi.",
+          "email": "Claim email",
+          "name": "Claim nome visualizzato"
+        },
         "securityNote": "HitKeep verifica firma, issuer, audience, state, nonce, challenge PKCE ed email verificata. I token del provider non vengono mai memorizzati.",
-        "enable": { "label": "Attiva accesso SSO", "hint": "Mostra SSO come opzione per chi usa un dominio email consentito. L’accesso con password resta disponibile." },
+        "autoProvision": {
+          "label": "Provisiona automaticamente gli utenti dei domini attendibili",
+          "hint": "Consente agli utenti verificati di questi domini di entrare come membri senza invito. I limiti Cloud per posti e team continuano ad applicarsi."
+        },
+        "enable": {
+          "label": "Attiva accesso SSO",
+          "hint": "Mostra SSO ai membri esistenti e agli utenti invitati dei domini attendibili. L’accesso con password resta disponibile."
+        },
+        "docsAction": "Guida alla configurazione",
         "saveAction": "Salva configurazione SSO",
         "testAction": "Testa connessione",
         "saveSuccess": "Configurazione SSO salvata.",
@@ -2377,10 +2488,10 @@
   },
   "login": {
     "subtitle": "Accedi alla tua dashboard",
+    "ssoSubtitle": "Inserisci il tuo indirizzo email di lavoro per continuare con il provider di identità del tuo team.",
+    "authenticationMethods": "Opzioni di accesso",
     "cloudSignupPrompt": "Nuovo su HitKeep Cloud?",
-    "cloudSignupAction": "Crea workspace {{jurisdiction}}",
-    "cloudSignupAlternatePrompt": "Ti serve un’altra giurisdizione?",
-    "cloudSignupAlternateAction": "Usa il cloud {{jurisdiction}}",
+    "cloudSignupAction": "Crea uno spazio di lavoro",
     "emailLabel": "Indirizzo email",
     "emailPlaceholder": "you@example.com",
     "emailInvalid": "Inserisci un indirizzo email valido.",
@@ -2393,7 +2504,8 @@
     "signIn": "Accedi",
     "or": "o",
     "signInWithPasskey": "Accedi con passkey",
-    "signInWithSSO": "Accedi con SSO",
+    "continueWithSSO": "Continua con SSO",
+    "continueWithPassword": "Continua con la password",
     "mfaTitle": "Verifica a due fattori",
     "mfaSubtitle": "Completa l'accesso con il codice dell'autenticatore, un codice di recupero, un link di accesso o una passkey.",
     "sendEmailLink": "Inviami un link di accesso",
@@ -2409,6 +2521,7 @@
       "ssoEmailUnverified": "Il provider di identità non ha restituito un indirizzo email verificato. Contatta l’amministratore del team.",
       "ssoEmailNotAllowed": "L’account del provider non corrisponde all’indirizzo email o al dominio del team inserito.",
       "ssoUnavailable": "SSO non è configurato per questo dominio email. Controlla l’indirizzo o usa la password.",
+      "ssoAccessDenied": "Il tuo account non ha accesso a questo team. Chiedi un invito a un amministratore del team o usa un altro metodo di accesso.",
       "ssoFailed": "Impossibile completare l’accesso SSO. Riprova o usa la password.",
       "invalidCredentials": "Email o password non validi.",
       "passkeyNotSupported": "L'accesso con passkey non è supportato su questo dispositivo.",
@@ -2424,7 +2537,6 @@
     "title": "Inizia a tracciare i tuoi siti gratis",
     "subtitle": "Crea il tuo workspace e inizia il tracciamento in meno di un minuto. Nessuna carta di credito richiesta.",
     "jurisdictionLabel": "Giurisdizione",
-    "jurisdictionDescription": "Questo workspace resterà vincolato al confine legale selezionato.",
     "jurisdictions": {
       "eu": "EU",
       "us": "US"

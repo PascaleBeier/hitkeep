@@ -544,6 +544,7 @@
       "errors": {
         "loadFailed": "Kan teamleden niet laden.",
         "inviteFailed": "Kan lid niet uitnodigen.",
+        "inviteForbidden": "Je hebt geen toestemming om teamleden uit te nodigen.",
         "inviteResendFailed": "Kan de uitnodiging niet opnieuw verzenden.",
         "inviteRevokeFailed": "Kan de uitnodiging niet intrekken.",
         "roleUpdateFailed": "Kan de rol van het lid niet updaten.",
@@ -1244,17 +1245,91 @@
       }
     },
     "webhooks": {
-      "subtitle": "Stuur ondertekende operationele gebeurtenissen zonder productacties te vertragen.", "listLabel": "Geconfigureerde webhooks",
-      "scopes": { "label": "Webhookbereik", "site": "Site", "instance": "Instantie" },
-      "actions": { "create": "Webhook maken", "refresh": "Vernieuwen", "deliveries": "Leveringen", "test": "Test sturen", "edit": "Bewerken", "rotate": "Geheim roteren", "delete": "Verwijderen", "cancel": "Annuleren", "save": "Webhook opslaan" },
-      "empty": { "title": "Nog geen webhooks", "message": "Maak een webhook om operationele gebeurtenissen te leveren.", "noSiteTitle": "Selecteer een site", "noSiteMessage": "Kies een site om de webhooks te beheren.", "forbiddenTitle": "Webhooktoegang vereist", "forbiddenMessage": "Alleen instantie- en site-eigenaren of -beheerders kunnen webhooks beheren." }, "status": { "enabled": "Actief", "disabled": "Uitgeschakeld" },
-      "events": { "count": "{{count}} gebeurtenissen", "none": "Geen gebeurtenissen", "popoverTitle": "Geabonneerde gebeurtenissen" },
-      "secret": { "title": "Sla dit ondertekeningsgeheim nu op", "message": "Het wordt één keer getoond. Verifieer hiermee tijdstempel en exacte requestbody.", "copy": "Geheim kopiëren" },
-      "form": { "createTitle": "Webhook maken", "editTitle": "Webhook bewerken", "name": "Naam", "url": "Bestemmings-URL", "urlHint": "HTTPS is verplicht tenzij ontwikkeldoelen expliciet zijn ingeschakeld.", "description": "Beschrijving", "enabled": "Gebeurtenissen leveren", "events": "Gebeurtenissen", "eventsHint": "Kies welke operationele gebeurtenissen dit endpoint ontvangt.", "eventsRequired": "Selecteer minstens één gebeurtenis." },
-      "deliveries": { "title": "Leveringen voor {{name}}", "subtitle": "Automatische pogingen gebeuren minstens één keer en kunnen ongeordend aankomen.", "event": "Gebeurtenis", "status": "Status", "attempts": "Pogingen", "response": "Respons", "created": "Aangemaakt", "empty": "Nog geen leveringen geregistreerd." },
-      "deliveryStatus": { "pending": "In afwachting", "processing": "Wordt geleverd", "retrying": "Opnieuw proberen", "succeeded": "Geslaagd", "failed": "Mislukt" },
-      "feedback": { "loadError": "Webhooks konden niet worden geladen.", "created": "Webhook gemaakt. Sla het geheim nu op.", "updated": "Webhook bijgewerkt.", "saveError": "Webhook kon niet worden opgeslagen.", "rotated": "Geheim geroteerd. Sla het nieuwe geheim op.", "rotateError": "Geheim kon niet worden geroteerd.", "testQueued": "Testlevering ingepland.", "testError": "Testlevering kon niet worden ingepland.", "deliveryError": "Leveringsgeschiedenis kon niet worden geladen.", "deleted": "Webhook verwijderd.", "deleteError": "Webhook kon niet worden verwijderd." },
-      "confirm": { "rotateTitle": "Ondertekeningsgeheim roteren", "rotateMessage": "Het geheim voor {{name}} roteren? Wachtende leveringen gebruiken het nieuwe geheim; een al lopend verzoek kan het huidige nog gebruiken.", "deleteTitle": "Webhook verwijderen", "deleteMessage": "{{name}} verwijderen? Wachtende leveringen behouden hun huidige bestemming." }
+      "subtitle": "Stuur ondertekende operationele gebeurtenissen zonder productacties te vertragen.",
+      "listLabel": "Geconfigureerde webhooks",
+      "scopes": {
+        "label": "Webhookbereik",
+        "site": "Site",
+        "instance": "Instantie"
+      },
+      "actions": {
+        "create": "Webhook maken",
+        "refresh": "Vernieuwen",
+        "deliveries": "Leveringen",
+        "test": "Test sturen",
+        "edit": "Bewerken",
+        "rotate": "Geheim roteren",
+        "delete": "Verwijderen",
+        "cancel": "Annuleren",
+        "save": "Webhook opslaan"
+      },
+      "empty": {
+        "title": "Nog geen webhooks",
+        "message": "Maak een webhook om operationele gebeurtenissen te leveren.",
+        "noSiteTitle": "Selecteer een site",
+        "noSiteMessage": "Kies een site om de webhooks te beheren.",
+        "forbiddenTitle": "Webhooktoegang vereist",
+        "forbiddenMessage": "Alleen instantie- en site-eigenaren of -beheerders kunnen webhooks beheren."
+      },
+      "status": { "enabled": "Actief", "disabled": "Uitgeschakeld" },
+      "events": {
+        "count": "{{count}} gebeurtenissen",
+        "none": "Geen gebeurtenissen",
+        "popoverTitle": "Geabonneerde gebeurtenissen"
+      },
+      "secret": {
+        "title": "Sla dit ondertekeningsgeheim nu op",
+        "message": "Het wordt één keer getoond. Verifieer hiermee tijdstempel en exacte requestbody.",
+        "copy": "Geheim kopiëren"
+      },
+      "form": {
+        "createTitle": "Webhook maken",
+        "editTitle": "Webhook bewerken",
+        "name": "Naam",
+        "url": "Bestemmings-URL",
+        "urlHint": "HTTPS is verplicht tenzij ontwikkeldoelen expliciet zijn ingeschakeld.",
+        "description": "Beschrijving",
+        "enabled": "Gebeurtenissen leveren",
+        "events": "Gebeurtenissen",
+        "eventsHint": "Kies welke operationele gebeurtenissen dit endpoint ontvangt.",
+        "eventsRequired": "Selecteer minstens één gebeurtenis."
+      },
+      "deliveries": {
+        "title": "Leveringen voor {{name}}",
+        "subtitle": "Automatische pogingen gebeuren minstens één keer en kunnen ongeordend aankomen.",
+        "event": "Gebeurtenis",
+        "status": "Status",
+        "attempts": "Pogingen",
+        "response": "Respons",
+        "created": "Aangemaakt",
+        "empty": "Nog geen leveringen geregistreerd."
+      },
+      "deliveryStatus": {
+        "pending": "In afwachting",
+        "processing": "Wordt geleverd",
+        "retrying": "Opnieuw proberen",
+        "succeeded": "Geslaagd",
+        "failed": "Mislukt"
+      },
+      "feedback": {
+        "loadError": "Webhooks konden niet worden geladen.",
+        "created": "Webhook gemaakt. Sla het geheim nu op.",
+        "updated": "Webhook bijgewerkt.",
+        "saveError": "Webhook kon niet worden opgeslagen.",
+        "rotated": "Geheim geroteerd. Sla het nieuwe geheim op.",
+        "rotateError": "Geheim kon niet worden geroteerd.",
+        "testQueued": "Testlevering ingepland.",
+        "testError": "Testlevering kon niet worden ingepland.",
+        "deliveryError": "Leveringsgeschiedenis kon niet worden geladen.",
+        "deleted": "Webhook verwijderd.",
+        "deleteError": "Webhook kon niet worden verwijderd."
+      },
+      "confirm": {
+        "rotateTitle": "Ondertekeningsgeheim roteren",
+        "rotateMessage": "Het geheim voor {{name}} roteren? Wachtende leveringen gebruiken het nieuwe geheim; een al lopend verzoek kan het huidige nog gebruiken.",
+        "deleteTitle": "Webhook verwijderen",
+        "deleteMessage": "{{name}} verwijderen? Wachtende leveringen behouden hun huidige bestemming."
+      }
     },
     "reset": {
       "title": "Nieuw wachtwoord instellen",
@@ -1285,7 +1360,8 @@
         "tokenMissing": "Ongeldige uitnodigingslink. Het token ontbreekt.",
         "expiredOrInvalid": "Deze uitnodigingslink is verlopen of ongeldig.",
         "teamLimit": "Deze uitnodiging kan niet worden geaccepteerd omdat het account al aan een ander team is gekoppeld.",
-        "acceptFailed": "We konden deze uitnodiging niet accepteren. Probeer het opnieuw."
+        "acceptFailed": "We konden deze uitnodiging niet accepteren. Probeer het opnieuw.",
+        "ssoFailed": "We konden SSO voor deze uitnodiging niet voltooien. Probeer het opnieuw of gebruik je wachtwoord."
       }
     }
   },
@@ -1405,8 +1481,14 @@
         "tracking": "Volgen",
         "filtering": "Filteren",
         "retention": "Behoud",
-        "team": "Team",
+        "access": "Toegang",
         "dangerZone": "Gevarenzone"
+      },
+      "notices": {
+        "siteUnavailable": "Deze site is niet beschikbaar of je hebt geen toegang meer.",
+        "sectionUnavailable": "Je hebt geen toestemming om dit instellingengedeelte te openen.",
+        "siteDeleted": "Site verwijderd.",
+        "siteTransferred": "Site overgedragen aan het geselecteerde team."
       },
       "general": {
         "title": "Algemene instellingen",
@@ -1679,10 +1761,23 @@
         "title": "Single sign-on",
         "description": "Koppel dit team aan de OpenID Connect-identiteitsprovider.",
         "status": { "enabled": "Ingeschakeld", "disabled": "Uitgeschakeld" },
-        "provider": { "title": "Identiteitsprovider", "description": "HitKeep ondersteunt momenteel op standaarden gebaseerde OpenID Connect." },
-        "callbackURL": { "label": "Callback-URL", "hint": "Voeg deze exacte omleidings-URI toe aan je identiteitsprovider.", "copy": "URL kopiëren" },
-        "issuerURL": { "label": "Issuer-URL", "hint": "De HTTPS-issuer uit de OpenID-configuratie van je provider." },
-        "clientID": { "label": "Client-ID", "hint": "De openbare identificatie van de HitKeep-applicatie." },
+        "provider": {
+          "title": "Identiteitsprovider",
+          "description": "HitKeep ondersteunt momenteel op standaarden gebaseerde OpenID Connect."
+        },
+        "callbackURL": {
+          "label": "Callback-URL",
+          "hint": "Voeg deze exacte omleidings-URI toe aan je identiteitsprovider.",
+          "copy": "URL kopiëren"
+        },
+        "issuerURL": {
+          "label": "Issuer-URL",
+          "hint": "De HTTPS-issuer uit de OpenID-configuratie van je provider."
+        },
+        "clientID": {
+          "label": "Client-ID",
+          "hint": "De openbare identificatie van de HitKeep-applicatie."
+        },
         "clientSecret": {
           "label": "Clientgeheim",
           "requiredHint": "Vereist voordat deze verbinding kan worden opgeslagen.",
@@ -1690,10 +1785,26 @@
           "placeholder": "Voer het clientgeheim in",
           "keepPlaceholder": "Laat leeg om het huidige geheim te behouden"
         },
-        "allowedDomains": { "label": "Toegestane e-maildomeinen", "hint": "Eén domein per regel. Elk domein kan maar bij de SSO-verbinding van één team horen." },
-        "claimMapping": { "title": "Claimtoewijzing", "description": "Behoud de standaardwaarden, tenzij je provider andere claimpaden gebruikt.", "email": "E-mailclaim", "name": "Claim voor weergavenaam" },
+        "allowedDomains": {
+          "label": "Toegestane e-maildomeinen",
+          "hint": "Eén domein per regel. Elk domein kan maar bij de SSO-verbinding van één team horen."
+        },
+        "claimMapping": {
+          "title": "Claimtoewijzing",
+          "description": "Behoud de standaardwaarden, tenzij je provider andere claimpaden gebruikt.",
+          "email": "E-mailclaim",
+          "name": "Claim voor weergavenaam"
+        },
         "securityNote": "HitKeep controleert handtekening, issuer, audience, state, nonce, PKCE-challenge en geverifieerde e-mail. Providertokens worden nooit opgeslagen.",
-        "enable": { "label": "Inloggen met SSO inschakelen", "hint": "Toont SSO als optie voor personen met een toegestaan e-maildomein. Inloggen met een wachtwoord blijft beschikbaar." },
+        "autoProvision": {
+          "label": "Gebruikers van vertrouwde domeinen automatisch provisioneren",
+          "hint": "Laat geverifieerde gebruikers van deze domeinen zonder uitnodiging als lid toetreden. Cloudlimieten voor plaatsen en teams blijven gelden."
+        },
+        "enable": {
+          "label": "Inloggen met SSO inschakelen",
+          "hint": "Toont SSO voor bestaande leden en uitgenodigde gebruikers van vertrouwde domeinen. Inloggen met een wachtwoord blijft beschikbaar."
+        },
+        "docsAction": "Configuratiehandleiding",
         "saveAction": "SSO-configuratie opslaan",
         "testAction": "Verbinding testen",
         "saveSuccess": "SSO-configuratie opgeslagen.",
@@ -2359,10 +2470,10 @@
   },
   "login": {
     "subtitle": "Log in op je dashboard",
+    "ssoSubtitle": "Voer je zakelijke e-mailadres in om door te gaan naar de identiteitsprovider van je team.",
+    "authenticationMethods": "Aanmeldopties",
     "cloudSignupPrompt": "Nieuw bij HitKeep Cloud?",
-    "cloudSignupAction": "Maak {{jurisdiction}}-workspace",
-    "cloudSignupAlternatePrompt": "Een andere wettelijke grens nodig?",
-    "cloudSignupAlternateAction": "Gebruik de {{jurisdiction}} cloud",
+    "cloudSignupAction": "Maak een werkruimte",
     "emailLabel": "E-mailadres",
     "emailPlaceholder": "jij@voorbeeld.com",
     "emailInvalid": "Voer een geldig e-mailadres in.",
@@ -2375,7 +2486,8 @@
     "signIn": "Log in",
     "or": "of",
     "signInWithPasskey": "Inloggen met passkey",
-    "signInWithSSO": "Inloggen met SSO",
+    "continueWithSSO": "Doorgaan met SSO",
+    "continueWithPassword": "Doorgaan met wachtwoord",
     "mfaTitle": "Tweefactorauthenticatie",
     "mfaSubtitle": "Voltooi het inloggen met je authenticatiecode, een herstelcode, een inloglink of een toegangssleutel.",
     "sendEmailLink": "E-mail mij een inloglink",
@@ -2391,6 +2503,7 @@
       "ssoEmailUnverified": "Je identiteitsprovider gaf geen geverifieerd e-mailadres terug. Neem contact op met je teambeheerder.",
       "ssoEmailNotAllowed": "Het provideraccount komt niet overeen met het ingevoerde e-mailadres of teamdomein.",
       "ssoUnavailable": "SSO is niet geconfigureerd voor dit e-maildomein. Controleer het adres of gebruik je wachtwoord.",
+      "ssoAccessDenied": "Je account heeft geen toegang tot dit team. Vraag een teambeheerder om een uitnodiging of gebruik een andere aanmeldmethode.",
       "ssoFailed": "Inloggen met SSO kon niet worden voltooid. Probeer opnieuw of gebruik je wachtwoord.",
       "invalidCredentials": "Ongeldig e-mailadres of wachtwoord.",
       "passkeyNotSupported": "Inloggen met passkey wordt niet ondersteund op dit apparaat.",
@@ -2406,7 +2519,6 @@
     "title": "Begin gratis met het volgen van je sites",
     "subtitle": "Creëer je werkruimte en begin binnen een minuut met volgen. Geen creditcard vereist.",
     "jurisdictionLabel": "Jurisdictie",
-    "jurisdictionDescription": "Deze werkruimte blijft gekoppeld aan de geselecteerde juridische grens.",
     "jurisdictions": {
       "eu": "EU",
       "us": "US"

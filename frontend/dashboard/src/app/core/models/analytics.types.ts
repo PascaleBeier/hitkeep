@@ -80,6 +80,7 @@ export interface TeamSSOConfig {
     allowed_domains: string[];
     email_claim: string;
     display_name_claim: string;
+    auto_provision: boolean;
     enabled: boolean;
     callback_url: string;
     updated_at?: string;
@@ -93,6 +94,7 @@ export interface UpdateTeamSSORequest {
     allowed_domains: string[];
     email_claim: string;
     display_name_claim: string;
+    auto_provision: boolean;
     enabled: boolean;
 }
 

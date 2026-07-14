@@ -1,7 +1,7 @@
 import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormControl, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { compatForm } from '@angular/forms/signals/compat';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs/operators';
@@ -11,21 +11,25 @@ import { PasswordModule } from 'primeng/password';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { CheckboxModule } from 'primeng/checkbox';
+import { FieldsetModule } from 'primeng/fieldset';
+import { MessageModule } from 'primeng/message';
+import { SelectButtonModule } from 'primeng/selectbutton';
 
+import { AuthCard } from '@core/components/auth-card/auth-card';
 import { Brand } from '@components/brand/brand';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { CloudStatus } from '@models/analytics.types';
 import { AnalyticsService } from '@services/analytics.service';
 import { CloudSignupTrackingService } from '@services/cloud-signup-tracking.service';
 import { CloudService, CloudSignupRequest } from '@services/cloud.service';
+import { AUTH_FIELDSET_DESIGN_TOKENS, AUTH_SELECT_BUTTON_DESIGN_TOKENS } from '@core/theme/hitkeep-preset';
 
 type Jurisdiction = 'EU' | 'US';
 
 @Component({
     selector: 'app-signup',
-    imports: [Brand, ReactiveFormsModule, PasswordModule, ButtonModule, InputTextModule, CheckboxModule, RouterLink, TranslocoPipe],
+    imports: [AuthCard, Brand, FormsModule, ReactiveFormsModule, PasswordModule, ButtonModule, InputTextModule, CheckboxModule, FieldsetModule, MessageModule, SelectButtonModule, RouterLink, TranslocoPipe],
     templateUrl: './signup.html',
-    styleUrl: './signup.css',
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Signup {
@@ -50,7 +54,9 @@ export class Signup {
     protected readonly submittedEmail = signal('');
     private readonly activeLanguage = injectActiveLang();
     protected readonly currentYear = new Date().getFullYear();
-    protected readonly jurisdictionOptions: readonly Jurisdiction[] = ['EU', 'US'];
+    protected readonly jurisdictionOptions: Jurisdiction[] = ['EU', 'US'];
+    protected readonly jurisdictionFieldsetDesignTokens = AUTH_FIELDSET_DESIGN_TOKENS;
+    protected readonly jurisdictionDesignTokens = AUTH_SELECT_BUTTON_DESIGN_TOKENS;
     protected readonly currentJurisdiction = computed<Jurisdiction>(() => this.normalizeJurisdiction(this.cloudStatus()?.jurisdiction) ?? this.inferJurisdictionFromHost());
     private trackedSignupPageView = false;
     private trackedInitialSignupError = false;

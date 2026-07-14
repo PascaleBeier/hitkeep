@@ -1,20 +1,24 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { compatForm } from '@angular/forms/signals/compat';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
+import { MessageModule } from 'primeng/message';
 import { PasswordModule } from 'primeng/password';
 import { finalize } from 'rxjs';
 
 import { Brand } from '@components/brand/brand';
+import { AuthCard } from '@core/components/auth-card/auth-card';
+import { AuthDivider } from '@core/components/auth-divider/auth-divider';
+import { AuthMethodOption, AuthMethods } from '@core/components/auth-methods/auth-methods';
 import { AuthService } from '@services/auth.service';
 
 @Component({
     selector: 'app-accept-invite',
     standalone: true,
-    imports: [ReactiveFormsModule, Brand, ButtonModule, PasswordModule, TranslocoPipe],
+    imports: [ReactiveFormsModule, AuthCard, AuthDivider, AuthMethods, Brand, ButtonModule, MessageModule, PasswordModule, TranslocoPipe],
     templateUrl: './accept-invite.html',
     styleUrl: './accept-invite.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -27,12 +31,27 @@ export class AcceptInvite implements OnInit {
     protected token: string | null = null;
     protected readonly isCheckingSession = signal(false);
     protected readonly isLoading = signal(false);
+    protected readonly isSSOLoading = signal(false);
+    protected readonly ssoAvailable = signal(false);
     protected readonly isAutoAccepting = signal(false);
     protected readonly errorMessage = signal<string | null>(null);
     protected readonly loginRequired = signal(false);
+    protected readonly authMethods = computed<readonly AuthMethodOption[]>(() => [
+        {
+            id: 'sso',
+            labelKey: 'login.continueWithSSO',
+            icon: 'pi pi-building',
+            wide: true,
+            loading: this.isSSOLoading(),
+            disabled: this.isLoading() || this.isSSOLoading()
+        }
+    ]);
 
     private readonly formModel = signal({
-        password: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.minLength(8)] })
+        password: new FormControl('', {
+            nonNullable: true,
+            validators: [Validators.required, Validators.minLength(8)]
+        })
     });
     protected readonly form = compatForm(this.formModel);
 
@@ -41,6 +60,9 @@ export class AcceptInvite implements OnInit {
         if (!this.token) {
             this.errorMessage.set('invite.accept.errors.tokenMissing');
             return;
+        }
+        if (this.route.snapshot.queryParamMap.get('error')?.trim().startsWith('sso_')) {
+            this.errorMessage.set('invite.accept.errors.ssoFailed');
         }
         if (this.authService.isAuthenticated()) {
             this.acceptAuthenticatedInvite();
@@ -56,6 +78,29 @@ export class AcceptInvite implements OnInit {
                     return;
                 }
                 this.authService.markUnauthenticated();
+                this.loadInviteSSOAvailability();
+            });
+    }
+
+    protected selectAuthMethod(method: string): void {
+        if (method === 'sso') {
+            this.onSSOLogin();
+        }
+    }
+
+    protected onSSOLogin(): void {
+        if (!this.token || !this.ssoAvailable() || this.isSSOLoading()) return;
+        this.isSSOLoading.set(true);
+        this.errorMessage.set(null);
+        this.authService
+            .startSSOLogin({
+                invite_token: this.token,
+                return_url: '/dashboard'
+            })
+            .pipe(finalize(() => this.isSSOLoading.set(false)))
+            .subscribe({
+                next: (response) => this.navigateToSSOProvider(response.auth_url),
+                error: () => this.errorMessage.set('invite.accept.errors.ssoFailed')
             });
     }
 
@@ -109,6 +154,18 @@ export class AcceptInvite implements OnInit {
                 },
                 error: (error: unknown) => this.handleAcceptError(error)
             });
+    }
+
+    private loadInviteSSOAvailability(): void {
+        if (!this.token) return;
+        this.authService.getInviteSSOAvailability(this.token).subscribe({
+            next: (availability) => this.ssoAvailable.set(availability.enabled),
+            error: () => this.ssoAvailable.set(false)
+        });
+    }
+
+    private navigateToSSOProvider(authURL: string): void {
+        window.location.assign(authURL);
     }
 
     private handleAcceptError(error: unknown): void {

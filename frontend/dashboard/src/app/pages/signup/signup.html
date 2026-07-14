@@ -1,15 +1,15 @@
 <main class="hk-auth-page">
     <section class="hk-auth-shell" aria-labelledby="signup-title">
         @if (verificationSent()) {
-        <div class="hk-auth-card">
+        <app-auth-card>
             <header class="hk-auth-header">
                 <i class="pi pi-envelope text-4xl text-primary-500"></i>
                 <h1 class="hk-auth-title">{{ "signup.verifyTitle" | transloco }}</h1>
                 <p class="hk-auth-subtitle">{{ "signup.verifySubtitle" | transloco : { email: submittedEmail() } }}</p>
             </header>
-        </div>
+        </app-auth-card>
         } @else {
-        <div class="hk-auth-card">
+        <app-auth-card>
             <header class="hk-auth-header">
                 <app-brand size="large"></app-brand>
                 <h1 id="signup-title" class="hk-auth-title">{{ "signup.title" | transloco }}</h1>
@@ -18,31 +18,26 @@
 
             <form (submit)="onSubmit($event)" class="hk-auth-form" novalidate>
                 @if (errorMessage(); as errorMessageKey) {
-                <div class="hk-auth-alert hk-auth-alert-error" role="alert" aria-live="assertive">
-                    <i class="pi pi-exclamation-circle mt-0.5" aria-hidden="true"></i>
-                    <span class="text-sm font-medium">{{ errorMessageKey | transloco }}</span>
-                </div>
+                <p-message severity="error" role="alert" aria-live="assertive">{{ errorMessageKey | transloco }}</p-message>
                 }
 
-                <section class="hk-auth-region" [attr.aria-label]="'signup.jurisdictionLabel' | transloco">
-                    <div class="hk-auth-region-copy">
-                        <span class="hk-auth-field-label">{{ "signup.jurisdictionLabel" | transloco }}</span>
-                        <p>{{ "signup.jurisdictionDescription" | transloco }}</p>
-                    </div>
-                    <div class="hk-auth-region-toggle" role="group" [attr.aria-label]="'signup.jurisdictionLabel' | transloco">
-                        @for (jurisdiction of jurisdictionOptions; track jurisdiction) {
-                        <button
-                            type="button"
-                            class="hk-auth-region-option"
-                            [class.hk-auth-region-option-active]="currentJurisdiction() === jurisdiction"
-                            [attr.aria-pressed]="currentJurisdiction() === jurisdiction"
-                            (click)="selectJurisdiction(jurisdiction)"
-                        >
-                            {{ ("signup.jurisdictions." + jurisdiction.toLowerCase()) | transloco }}
-                        </button>
-                        }
-                    </div>
-                </section>
+                <p-fieldset [dt]="jurisdictionFieldsetDesignTokens">
+                    <ng-template #header>
+                        <span id="signup-jurisdiction-label">{{ "signup.jurisdictionLabel" | transloco }}</span>
+                    </ng-template>
+                    <p-selectbutton
+                        [options]="jurisdictionOptions"
+                        [ngModel]="currentJurisdiction()"
+                        [ngModelOptions]="{ standalone: true }"
+                        [allowEmpty]="false"
+                        [fluid]="true"
+                        [dt]="jurisdictionDesignTokens"
+                        ariaLabelledBy="signup-jurisdiction-label"
+                        (onChange)="selectJurisdiction($event.value)"
+                    >
+                        <ng-template #item let-jurisdiction> {{ ("signup.jurisdictions." + jurisdiction.toLowerCase()) | transloco }} </ng-template>
+                    </p-selectbutton>
+                </p-fieldset>
 
                 <div class="hk-auth-field">
                     <label for="email" class="hk-auth-field-label">
@@ -57,14 +52,14 @@
                         autocapitalize="none"
                         spellcheck="false"
                         [formControl]="signupForm.email().control()"
-                        class="w-full"
+                        [fluid]="true"
                         autocomplete="email"
                         [attr.aria-invalid]="signupForm.email().touched() && signupForm.email().invalid() ? true : null"
                         [attr.aria-describedby]="signupForm.email().touched() && signupForm.email().invalid() ? 'signup-email-error' : null"
                         [placeholder]="'signup.emailPlaceholder' | transloco"
                     />
                     @if (signupForm.email().touched() && signupForm.email().invalid()) {
-                    <small id="signup-email-error" class="hk-auth-field-error" role="status">{{ "login.emailInvalid" | transloco }}</small>
+                    <p-message id="signup-email-error" severity="error" variant="simple" size="small" role="status">{{ "login.emailInvalid" | transloco }}</p-message>
                     }
                 </div>
 
@@ -77,15 +72,14 @@
                         id="password"
                         [formControl]="signupForm.password().control()"
                         [toggleMask]="true"
-                        class="w-full"
-                        inputclass="w-full"
+                        [fluid]="true"
                         [feedback]="false"
                         [attr.aria-invalid]="signupForm.password().touched() && signupForm.password().invalid() ? true : null"
                         [attr.aria-describedby]="'signup-password-help'"
                     ></p-password>
-                    <p id="signup-password-help" class="hk-auth-field-help">{{ "password.reset.minimumLength" | transloco }}</p>
+                    <small id="signup-password-help" class="hk-auth-field-help">{{ "password.reset.minimumLength" | transloco }}</small>
                     @if (signupForm.password().touched() && signupForm.password().invalid()) {
-                    <small class="hk-auth-field-error" role="status">{{ "password.reset.minimumLength" | transloco }}</small>
+                    <p-message severity="error" variant="simple" size="small" role="status">{{ "password.reset.minimumLength" | transloco }}</p-message>
                     }
                 </div>
 
@@ -98,14 +92,14 @@
                         pInputText
                         id="teamName"
                         [formControl]="signupForm.teamName().control()"
-                        class="w-full"
+                        [fluid]="true"
                         autocomplete="organization"
                         [attr.aria-invalid]="signupForm.teamName().touched() && signupForm.teamName().invalid() ? true : null"
                         [attr.aria-describedby]="signupForm.teamName().touched() && signupForm.teamName().invalid() ? 'signup-team-error' : null"
                         [placeholder]="'signup.teamNamePlaceholder' | transloco"
                     />
                     @if (signupForm.teamName().touched() && signupForm.teamName().invalid()) {
-                    <small id="signup-team-error" class="hk-auth-field-error" role="status">{{ "signup.teamNameRequired" | transloco }}</small>
+                    <p-message id="signup-team-error" severity="error" variant="simple" size="small" role="status">{{ "signup.teamNameRequired" | transloco }}</p-message>
                     }
                 </div>
 
@@ -120,11 +114,11 @@
                         </label>
                     </div>
                     @if (signupForm.acceptedTos().touched() && signupForm.acceptedTos().invalid()) {
-                    <small class="hk-auth-field-error" role="status">{{ "signup.tosRequired" | transloco }}</small>
+                    <p-message severity="error" variant="simple" size="small" role="status">{{ "signup.tosRequired" | transloco }}</p-message>
                     }
                 </div>
 
-                <p-button [label]="'signup.submit' | transloco" type="submit" [loading]="isLoading()" [disabled]="isLoading() || signupForm().invalid()" class="w-full"> </p-button>
+                <p-button [label]="'signup.submit' | transloco" type="submit" [loading]="isLoading()" [disabled]="isLoading() || signupForm().invalid()" [fluid]="true" />
 
                 <ul class="hk-auth-trust">
                     <li><i class="pi pi-check-circle" aria-hidden="true"></i>{{ "signup.trust.noCard" | transloco }}</li>
@@ -132,7 +126,7 @@
                     <li><i class="pi pi-download" aria-hidden="true"></i>{{ "signup.trust.export" | transloco }}</li>
                 </ul>
             </form>
-        </div>
+        </app-auth-card>
         }
 
         <footer class="hk-auth-footer">
