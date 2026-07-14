@@ -5,6 +5,7 @@ import { capabilityGuard } from '@guards/capability-guard';
 import { cloudSignupGuard } from '@guards/cloud-signup-guard';
 import { importExportDefaultGuard } from '@pages/import-export/import-export-default.guard';
 import { overviewDefaultGuard } from '@pages/overview/overview-default.guard';
+import { siteSettingsSectionGuard, siteSettingsSiteGuard } from '@pages/site-settings/site-settings.guard';
 import { INSTANCE_CAPABILITIES, TEAM_CAPABILITIES } from '@core/access/capabilities';
 import type { DashboardTitleScope } from '@services/dashboard-title.service';
 
@@ -193,6 +194,48 @@ export const routes: Routes = [
                 data: titleData('nav.qrCodes', 'site')
             },
             {
+                path: 'sites/:siteId/settings',
+                canActivate: [siteSettingsSiteGuard],
+                loadComponent: () => import('@pages/site-settings/site-settings').then((m) => m.SiteSettingsPage),
+                children: [
+                    { path: '', pathMatch: 'full', redirectTo: 'general' },
+                    {
+                        path: 'general',
+                        loadComponent: () => import('@pages/site-settings/site-general-settings-page').then((m) => m.SiteGeneralSettingsPage),
+                        data: titleData('sites.settings.tabs.general', 'site')
+                    },
+                    {
+                        path: 'tracking',
+                        loadComponent: () => import('@pages/site-settings/site-tracking-settings-page').then((m) => m.SiteTrackingSettingsPage),
+                        data: titleData('sites.settings.tabs.tracking', 'site')
+                    },
+                    {
+                        path: 'filtering',
+                        loadComponent: () => import('@pages/site-settings/site-filtering-settings-page').then((m) => m.SiteFilteringSettingsPage),
+                        canActivate: [siteSettingsSectionGuard],
+                        data: { ...titleData('sites.settings.tabs.filtering', 'site'), siteSettingsSection: 'filtering' }
+                    },
+                    {
+                        path: 'retention',
+                        loadComponent: () => import('@pages/site-settings/site-retention-settings-page').then((m) => m.SiteRetentionSettingsPage),
+                        canActivate: [siteSettingsSectionGuard],
+                        data: { ...titleData('sites.settings.tabs.retention', 'site'), siteSettingsSection: 'retention' }
+                    },
+                    {
+                        path: 'access',
+                        loadComponent: () => import('@pages/site-settings/site-access-settings-page').then((m) => m.SiteAccessSettingsPage),
+                        canActivate: [siteSettingsSectionGuard],
+                        data: { ...titleData('sites.settings.tabs.access', 'site'), siteSettingsSection: 'access' }
+                    },
+                    {
+                        path: 'danger-zone',
+                        loadComponent: () => import('@pages/site-settings/site-danger-zone-page').then((m) => m.SiteDangerZonePage),
+                        canActivate: [siteSettingsSectionGuard],
+                        data: { ...titleData('sites.settings.tabs.dangerZone', 'site'), siteSettingsSection: 'danger-zone' }
+                    }
+                ]
+            },
+            {
                 path: 'settings',
                 loadChildren: () => import('@pages/settings/settings.routes').then((m) => m.SETTINGS_ROUTES)
             },
@@ -269,8 +312,18 @@ export const routes: Routes = [
                             },
                             {
                                 path: 'members',
-                                loadComponent: () => import('@pages/admin/team/team-members').then((m) => m.TeamMembersPage),
-                                data: titleData('admin.team.tabs.members', 'team')
+                                children: [
+                                    {
+                                        path: '',
+                                        loadComponent: () => import('@pages/admin/team/team-members').then((m) => m.TeamMembersPage),
+                                        data: titleData('admin.team.tabs.members', 'team')
+                                    },
+                                    {
+                                        path: 'invite',
+                                        loadComponent: () => import('@pages/admin/team/team-members').then((m) => m.TeamMembersPage),
+                                        data: { ...titleData('admin.team.tabs.members', 'team'), openInvite: true }
+                                    }
+                                ]
                             },
                             {
                                 path: 'api-clients',

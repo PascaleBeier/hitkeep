@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { WritableSignal, signal } from '@angular/core';
+import { Router, provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TranslocoTestingModule } from '@jsverse/transloco';
@@ -9,6 +10,7 @@ import { SITE_CAPABILITIES } from '@core/access/capabilities';
 import { AccessService } from '@services/access.service';
 import { SiteService } from '@features/sites/services/site.service';
 import { TeamService } from '@services/team.service';
+import { NavigationNoticeService } from '@services/navigation-notice.service';
 import { SiteTeamSettings } from './site-team-settings';
 
 interface SiteTeamSettingsTestAccess {
@@ -157,6 +159,7 @@ describe('SiteTeamSettings', () => {
             providers: [
                 provideHttpClient(),
                 provideHttpClientTesting(),
+                provideRouter([]),
                 { provide: TeamService, useValue: teamServiceMock },
                 { provide: SiteService, useValue: siteServiceMock },
                 {
@@ -197,7 +200,8 @@ describe('SiteTeamSettings', () => {
         ]);
     });
 
-    it('transfers the site and refreshes scoped site state', () => {
+    it('transfers the site and returns to overview with feedback', async () => {
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
         const access = component as unknown as SiteTeamSettingsTestAccess;
         access.transferForm.teamId().control().setValue('team-2');
 
@@ -212,11 +216,14 @@ describe('SiteTeamSettings', () => {
             source_team_id: 'team-1',
             destination_team_id: 'team-2'
         });
+        await fixture.whenStable();
 
         expect(siteServiceMock.sites()).toEqual([]);
         expect(siteServiceMock.activeSite()).toBeNull();
         expect(siteServiceMock.loadSites).toHaveBeenCalled();
         expect(access.transferSuccessKey()).toBe('sites.team.transfer.success');
+        expect(navigate).toHaveBeenCalledWith(['/overview']);
+        expect(TestBed.inject(NavigationNoticeService).key()).toBe('sites.settings.notices.siteTransferred');
     });
 
     it('does not call write endpoints without site team-management capability', () => {

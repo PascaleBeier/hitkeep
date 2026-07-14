@@ -1,14 +1,13 @@
-import { Injectable, TemplateRef, computed, effect, inject, signal } from '@angular/core';
+import { Injectable, TemplateRef, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { TranslocoService } from '@jsverse/transloco';
-import { Team } from '@models/analytics.types';
+import { Site, Team } from '@models/analytics.types';
 import { TEAM_CAPABILITIES } from '@core/access/capabilities';
 import { DashboardBootstrapService } from '@services/dashboard-bootstrap.service';
 import { AccessService } from '@services/access.service';
 import { PermissionService } from '@services/permission.service';
 import { ShareService } from '@services/share.service';
-import { SiteSettingsService } from '@services/site-settings.service';
 import { TeamService } from '@services/team.service';
+import type { SiteSettingsSection } from '@features/sites/site-settings-section';
 import { SiteService } from '@features/sites/services/site.service';
 
 @Injectable()
@@ -16,12 +15,10 @@ export class MainLayoutContextService {
     private readonly router = inject(Router);
     readonly siteService = inject(SiteService);
     readonly shareService = inject(ShareService);
-    private readonly siteSettings = inject(SiteSettingsService);
     private readonly bootstrap = inject(DashboardBootstrapService);
     private readonly access = inject(AccessService);
     readonly teamService = inject(TeamService);
     readonly perms = inject(PermissionService);
-    private readonly transloco = inject(TranslocoService);
 
     readonly cloudHosted = this.bootstrap.cloudHosted;
     readonly cloudSupportUrl = this.bootstrap.cloudSupportUrl;
@@ -33,51 +30,29 @@ export class MainLayoutContextService {
     readonly isMobileDrawerOpen = signal(false);
     readonly isAddSiteVisible = signal(false);
     readonly isCreateTeamVisible = signal(false);
-    readonly isSiteSettingsVisible = signal(false);
-    readonly siteSettingsTab = signal('0');
     readonly pageHeaderLeft = signal<TemplateRef<unknown> | null>(null);
     readonly pageHeaderRight = signal<TemplateRef<unknown> | null>(null);
     readonly hasPageHeader = computed(() => this.pageHeaderLeft() !== null);
 
-    readonly beforeTeamSwitch = () => {
-        if (!this.isSiteSettingsVisible()) {
-            return true;
-        }
-        const proceed = window.confirm(this.transloco.translate('sites.settings.unsavedChangesConfirm'));
-        if (!proceed) {
-            return false;
-        }
-        this.isSiteSettingsVisible.set(false);
-        return true;
-    };
-
-    private initialized = false;
+    readonly beforeTeamSwitch = () => true;
     private pageHeaderOwner: symbol | null = null;
 
-    init() {
-        if (this.initialized) {
-            return;
-        }
-        this.initialized = true;
-
-        effect(() => {
-            const tab = this.siteSettings.request();
-            if (!tab) {
-                return;
-            }
-            this.openSiteSettings(tab);
-            this.siteSettings.clear();
-        });
+    openSiteSettings(section: SiteSettingsSection = 'general') {
+        const site = this.siteService.activeSite();
+        if (!site) return;
+        void this.router.navigate(['/sites', site.id, 'settings', section]);
     }
 
-    openSiteSettings(tab = '0') {
-        if (this.siteService.activeSite()) {
-            this.siteSettingsTab.set(tab);
-            this.isSiteSettingsVisible.set(true);
+    onSiteSelected(site: Site) {
+        this.siteService.selectSite(site);
+        const section = this.currentSiteSettingsSection();
+        if (section) {
+            void this.router.navigate(['/sites', site.id, 'settings', section]);
         }
     }
 
     onTeamSelected(team: Team) {
+        void this.router.navigate(['/overview']);
         this.teamService.setActiveTeam(team.id).subscribe({
             next: () => {
                 this.siteService.sites.set([]);
@@ -124,5 +99,10 @@ export class MainLayoutContextService {
         if ((currentURL.startsWith('/admin/team') || currentURL.startsWith('/integration/google-search-console')) && !this.isTeamAdmin()) {
             this.router.navigateByUrl('/dashboard');
         }
+    }
+
+    private currentSiteSettingsSection(): SiteSettingsSection | null {
+        const match = this.router.url.match(/^\/sites\/[^/]+\/settings\/(general|tracking|filtering|retention|access|danger-zone)(?:[/?#]|$)/);
+        return (match?.[1] as SiteSettingsSection | undefined) ?? null;
     }
 }

@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { provideTranslocoLocale } from '@jsverse/transloco-locale';
 import { Subject, of } from 'rxjs';
@@ -191,6 +191,31 @@ describe('Dashboard', () => {
         expect(rail.querySelectorAll('button, a, [role="button"]').length).toBe(0);
         expect(rail.querySelectorAll('[aria-current="step"]').length).toBe(1);
         expect(rail.querySelector('[aria-current="step"]')?.textContent).toContain('dashboard.onboarding.steps.verify_tracking');
+    });
+
+    it('routes the teammate onboarding action to the team invitation flow', () => {
+        const onboardingService = TestBed.inject(OnboardingService);
+        const router = TestBed.inject(Router);
+        const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+        onboardingService.onboarding.set({
+            dismissed: false,
+            complete: false,
+            steps: [
+                { key: 'create_site', complete: true },
+                { key: 'verify_tracking', complete: true },
+                { key: 'automatic_events', complete: true },
+                { key: 'invite_teammate', complete: false },
+                { key: 'schedule_report', complete: false }
+            ]
+        });
+        fixture.detectChanges();
+
+        const onboardingButtons = fixture.nativeElement.querySelectorAll('section[aria-labelledby="dashboard-onboarding-title"] p-button button') as NodeListOf<HTMLButtonElement>;
+        const action = onboardingButtons.item(onboardingButtons.length - 1);
+        expect(action).toBeTruthy();
+        action?.click();
+
+        expect(navigate).toHaveBeenCalledWith(['/admin/team/members/invite']);
     });
 
     it('refreshes onboarding when realtime analytics activity changes', async () => {

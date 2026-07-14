@@ -12,6 +12,7 @@ export const SETTINGS_ROUTES: Route[] = [
     },
     { path: 'user', redirectTo: '', pathMatch: 'full' },
     { path: 'preferences', redirectTo: '', pathMatch: 'full' },
+    { path: 'team', redirectTo: '/admin/team/members/invite', pathMatch: 'full' },
     {
         path: 'reports',
         loadComponent: () => import('@pages/settings/reports/report-settings').then((m) => m.ReportSettings),

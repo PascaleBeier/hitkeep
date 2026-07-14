@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 
@@ -8,6 +9,7 @@ import { Site } from '@models/analytics.types';
 import { SITE_CAPABILITIES } from '@core/access/capabilities';
 import { AccessService } from '@services/access.service';
 import { SiteService, SiteStatsResetResponse } from '@features/sites/services/site.service';
+import { NavigationNoticeService } from '@services/navigation-notice.service';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 
@@ -120,6 +122,8 @@ type SiteDangerAction = 'reset' | 'delete';
 export class SiteDangerZone {
     private access = inject(AccessService);
     private siteService = inject(SiteService);
+    private router = inject(Router);
+    private navigationNotice = inject(NavigationNoticeService);
 
     site = input.required<Site | null>();
     protected isDeleting = signal(false);
@@ -224,6 +228,9 @@ export class SiteDangerZone {
                 next: () => {
                     this.pendingAction.set(null);
                     this.confirmValue.set('');
+                    void this.router.navigate(['/overview']).then((navigated) => {
+                        if (navigated) this.navigationNotice.show('sites.settings.notices.siteDeleted');
+                    });
                 },
                 error: () => this.deleteError.set('sites.danger.deleteFailed')
             });

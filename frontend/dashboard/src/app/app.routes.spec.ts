@@ -9,6 +9,7 @@ import { PermissionService } from '@services/permission.service';
 import { SiteService } from '@features/sites/services/site.service';
 import { routes } from './app.routes';
 import { overviewDefaultGuard } from '@pages/overview/overview-default.guard';
+import { SETTINGS_ROUTES } from '@pages/settings/settings.routes';
 
 describe('routes', () => {
     it('should be accepted by Angular Router', () => {
@@ -56,7 +57,6 @@ describe('routes', () => {
         // Every visible section is a real, addressable child route (no redirect) with its own title key.
         for (const [path, titleKey] of [
             ['overview', 'admin.team.tabs.overview'],
-            ['members', 'admin.team.tabs.members'],
             ['sso', 'admin.team.tabs.sso'],
             ['api-clients', 'admin.team.tabs.apiClients'],
             ['custom-domains', 'admin.team.tabs.customDomains'],
@@ -70,6 +70,14 @@ describe('routes', () => {
             expect(child(path)?.data?.['titleScope']).toBe('team');
         }
 
+        const membersRoute = child('members');
+        const membersChild = (path: string) => membersRoute?.children?.find((route) => route.path === path);
+        expect(membersRoute?.loadComponent).toBeUndefined();
+        expect(membersChild('')?.loadComponent).toBeTruthy();
+        expect(membersChild('')?.data?.['titleKey']).toBe('admin.team.tabs.members');
+        expect(membersChild('invite')?.loadComponent).toBeTruthy();
+        expect(membersChild('invite')?.data?.['openInvite']).toBe(true);
+
         // Activity additionally requires the audit capability.
         expect(child('activity')?.data?.['activeTeamCapability']).toBe(TEAM_CAPABILITIES.viewAudit);
         expect(child('activity')?.canActivate?.length).toBeTruthy();
@@ -77,6 +85,32 @@ describe('routes', () => {
         // Legacy deep links keep working via redirects.
         expect(child('settings')?.redirectTo).toBe('api-clients');
         expect(child('tracking-domains')?.redirectTo).toBe('custom-domains');
+    });
+
+    it('redirects the obsolete user-settings team path to the routed team invitation flow', () => {
+        const route = SETTINGS_ROUTES.find((candidate) => candidate.path === 'team');
+
+        expect(route?.redirectTo).toBe('/admin/team/members/invite');
+    });
+
+    it('exposes site settings as lazy addressable sections', () => {
+        const mainChildren = routes.find((route) => route.path === '')?.children ?? [];
+        const settingsRoute = mainChildren.find((route) => route.path === 'sites/:siteId/settings');
+        const children = settingsRoute?.children ?? [];
+        const child = (path: string) => children.find((route) => route.path === path);
+
+        expect(settingsRoute?.canActivate?.length).toBeTruthy();
+        expect(settingsRoute?.loadComponent).toBeTruthy();
+        expect(child('')?.redirectTo).toBe('general');
+
+        for (const path of ['general', 'tracking', 'filtering', 'retention', 'access', 'danger-zone']) {
+            expect(child(path)?.loadComponent).toBeTruthy();
+            expect(child(path)?.data?.['titleScope']).toBe('site');
+        }
+
+        for (const path of ['filtering', 'retention', 'access', 'danger-zone']) {
+            expect(child(path)?.canActivate?.length).toBeTruthy();
+        }
     });
 
     it('exposes accept-invite as a public auth page route', () => {

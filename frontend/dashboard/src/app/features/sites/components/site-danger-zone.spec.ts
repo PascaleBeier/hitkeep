@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { Router, provideRouter } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
@@ -8,6 +9,7 @@ import { AccessService } from '@services/access.service';
 import { Site } from '@models/analytics.types';
 import { SiteDangerZone } from './site-danger-zone';
 import { SiteService } from '@features/sites/services/site.service';
+import { NavigationNoticeService } from '@services/navigation-notice.service';
 
 describe('SiteDangerZone', () => {
     let fixture: ComponentFixture<SiteDangerZone>;
@@ -74,10 +76,7 @@ describe('SiteDangerZone', () => {
                     preloadLangs: true
                 })
             ],
-            providers: [
-                { provide: AccessService, useValue: accessService },
-                { provide: SiteService, useValue: siteService }
-            ]
+            providers: [provideRouter([]), { provide: AccessService, useValue: accessService }, { provide: SiteService, useValue: siteService }]
         }).compileComponents();
 
         fixture = TestBed.createComponent(SiteDangerZone);
@@ -136,6 +135,7 @@ describe('SiteDangerZone', () => {
     });
 
     it('requires the site domain in the confirmation dialog before deleting the site', async () => {
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
         findButton('Delete site').click();
         fixture.detectChanges();
         await fixture.whenStable();
@@ -152,8 +152,11 @@ describe('SiteDangerZone', () => {
         expect(dialogPrimaryButton('Delete site').disabled).toBe(false);
 
         dialogPrimaryButton('Delete site').click();
+        await fixture.whenStable();
 
         expect(siteService.deleteSite).toHaveBeenCalledWith('site-1');
+        expect(navigate).toHaveBeenCalledWith(['/overview']);
+        expect(TestBed.inject(NavigationNoticeService).key()).toBe('sites.settings.notices.siteDeleted');
     });
 
     it('renders reset errors inline', () => {

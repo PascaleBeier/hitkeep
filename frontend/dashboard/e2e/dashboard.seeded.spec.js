@@ -191,15 +191,38 @@ test("dashboard renders seeded data and product controls", async ({ page }) => {
     await page.getByRole("button", { name: /close/i }).click();
 
     await page.getByRole("button", { name: /site settings/i }).click();
-    await expect(page.getByText("Site settings")).toBeVisible();
+    await expect(page).toHaveURL(/\/sites\/[^/]+\/settings\/general$/);
+    await expect(page.getByRole("tab", { name: /general/i })).toHaveAttribute("aria-selected", "true");
     await page.getByRole("tab", { name: /tracking/i }).click();
+    await expect(page).toHaveURL(/\/sites\/[^/]+\/settings\/tracking$/);
     await expect(page.getByText("Automatic event tracking")).toBeVisible();
     await expect(page.getByText("Track outbound clicks")).toBeVisible();
     await expect(page.getByText("Track file downloads")).toBeVisible();
     await expect(page.getByText("Track form submissions")).toBeVisible();
 
-    await page.getByRole("tab", { name: /team/i }).click();
+    await page.reload();
+    await expect(page).toHaveURL(/\/sites\/[^/]+\/settings\/tracking$/);
+    await expect(page.getByText("Automatic event tracking")).toBeVisible();
+
+    await page.getByRole("tab", { name: /access/i }).click();
+    await expect(page).toHaveURL(/\/sites\/[^/]+\/settings\/access$/);
     await expect(page.getByRole("heading", { name: "Transfer site" })).toBeVisible();
+});
+
+test("team invitation route opens and closes the invite dialog", async ({ page }) => {
+    await login(page, "/admin/team/members/invite");
+
+    await expect(page).toHaveURL(/\/admin\/team\/members\/invite$/);
+    await expect(page.getByRole("dialog").getByText("Invite team member")).toBeVisible();
+    await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
+    await expect(page).toHaveURL(/\/admin\/team\/members$/);
+});
+
+test("invalid site settings URLs fall back to overview with a notice", async ({ page }) => {
+    await login(page, "/sites/not-accessible/settings/general");
+
+    await expect(page).toHaveURL(/\/overview$/);
+    await expect(page.getByText("This site is unavailable or you no longer have access.")).toBeVisible();
 });
 
 test("dashboard filters by seeded geography and network metrics", async ({ page }) => {

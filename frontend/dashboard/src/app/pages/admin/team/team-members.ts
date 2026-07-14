@@ -1,6 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { compatForm } from '@angular/forms/signals/compat';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
@@ -12,6 +13,7 @@ import { TEAM_CAPABILITIES } from '@core/access/capabilities';
 import { SettingsCard } from '@features/settings/components/settings-card';
 import { TeamInvite, TeamMember, TeamRole } from '@models/analytics.types';
 import { AccessService } from '@services/access.service';
+import { NavigationNoticeService } from '@services/navigation-notice.service';
 import { TeamService } from '@services/team.service';
 import { ConfirmationService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
@@ -42,7 +44,11 @@ export class TeamMembersPage {
     private readonly teamService = inject(TeamService);
     private readonly access = inject(AccessService);
     private readonly confirmationService = inject(ConfirmationService);
+    private readonly route = inject(ActivatedRoute);
+    private readonly router = inject(Router);
+    private readonly navigationNotice = inject(NavigationNoticeService);
     private readonly activeLanguage = toSignal(this.transloco.langChanges$, { initialValue: this.transloco.getActiveLang() });
+    private readonly routeData = toSignal(this.route.data, { initialValue: this.route.snapshot.data });
 
     protected readonly team = this.teamService.activeTeam;
     protected readonly members = signal<TeamMember[]>([]);
@@ -86,6 +92,17 @@ export class TeamMembersPage {
             }
             this.loadTeamState(team.id);
         });
+
+        effect(() => {
+            if (this.routeData()['openInvite'] !== true) return;
+            if (this.canManageMembers()) {
+                this.isInviteDialogVisible.set(true);
+                return;
+            }
+            void this.router.navigate(['/admin/team/members'], { replaceUrl: true }).then((navigated) => {
+                if (navigated) this.navigationNotice.show('teams.management.errors.inviteForbidden');
+            });
+        });
     }
 
     protected refreshMembers() {
@@ -96,13 +113,16 @@ export class TeamMembersPage {
 
     protected openInviteDialog() {
         if (!this.canManageMembers()) return;
-        this.isInviteDialogVisible.set(true);
+        void this.router.navigate(['invite'], { relativeTo: this.route });
     }
 
     protected onInviteDialogVisibleChange(visible: boolean) {
         this.isInviteDialogVisible.set(visible);
         if (!visible) {
             this.resetInviteForm();
+            if (this.routeData()['openInvite'] === true) {
+                void this.router.navigate(['../'], { relativeTo: this.route, replaceUrl: true });
+            }
         }
     }
 
@@ -142,6 +162,9 @@ export class TeamMembersPage {
     private closeInviteDialog() {
         this.isInviteDialogVisible.set(false);
         this.resetInviteForm();
+        if (this.routeData()['openInvite'] === true) {
+            void this.router.navigate(['../'], { relativeTo: this.route, replaceUrl: true });
+        }
     }
 
     private resetInviteForm() {

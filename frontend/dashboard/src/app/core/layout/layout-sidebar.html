@@ -9,10 +9,10 @@
             [sites]="siteService.sites()"
             [current]="siteService.activeSite()"
             [loading]="siteService.isLoading()"
-            (siteSelected)="siteService.selectSite($event)"
+            (siteSelected)="context.onSiteSelected($event)"
             (addClicked)="isAddSiteVisible.set(true)"
-            (settingsClicked)="openSiteSettings('0')"
-            (trackingClicked)="openSiteSettings('1')"
+            (settingsClicked)="openSiteSettings('general')"
+            (trackingClicked)="openSiteSettings('tracking')"
         />
         <app-ask-ai-control (opened)="closeMobileDrawer()" />
     </div>
@@ -44,10 +44,10 @@
             [sites]="siteService.sites()"
             [current]="siteService.activeSite()"
             [loading]="siteService.isLoading()"
-            (siteSelected)="siteService.selectSite($event); closeMobileDrawer()"
+            (siteSelected)="context.onSiteSelected($event); closeMobileDrawer()"
             (addClicked)="isAddSiteVisible.set(true)"
-            (settingsClicked)="openSiteSettings('0'); closeMobileDrawer()"
-            (trackingClicked)="openSiteSettings('1'); closeMobileDrawer()"
+            (settingsClicked)="openSiteSettings('general'); closeMobileDrawer()"
+            (trackingClicked)="openSiteSettings('tracking'); closeMobileDrawer()"
         />
         <app-ask-ai-control (opened)="closeMobileDrawer()" />
 

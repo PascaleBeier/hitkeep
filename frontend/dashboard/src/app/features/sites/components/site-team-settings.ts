@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input, si
 import { toSignal } from '@angular/core/rxjs-interop';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
 import { compatForm } from '@angular/forms/signals/compat';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { CrudDialog } from '@components/crud-dialog/crud-dialog';
@@ -13,6 +14,7 @@ import { Site } from '@models/analytics.types';
 import { AccessService } from '@services/access.service';
 import { TeamService } from '@services/team.service';
 import { SiteService } from '@features/sites/services/site.service';
+import { NavigationNoticeService } from '@services/navigation-notice.service';
 import { ConfirmationService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
@@ -119,7 +121,7 @@ interface SiteMember {
                     <div class="site-settings-card__title-row">
                         <span class="site-settings-card__icon"><i class="pi pi-users" aria-hidden="true"></i></span>
                         <div>
-                            <h3>{{ "sites.settings.tabs.team" | transloco }}</h3>
+                            <h3>{{ "sites.settings.tabs.access" | transloco }}</h3>
                         </div>
                     </div>
                 </header>
@@ -195,6 +197,8 @@ export class SiteTeamSettings {
     private transloco = inject(TranslocoService);
     private teamService = inject(TeamService);
     private siteService = inject(SiteService);
+    private router = inject(Router);
+    private navigationNotice = inject(NavigationNoticeService);
     private access = inject(AccessService);
     private activeLanguage = toSignal(this.transloco.langChanges$, { initialValue: this.transloco.getActiveLang() });
 
@@ -342,6 +346,9 @@ export class SiteTeamSettings {
                     }
                     this.siteService.loadSites();
                     this.isTransferring.set(false);
+                    void this.router.navigate(['/overview']).then((navigated) => {
+                        if (navigated) this.navigationNotice.show('sites.settings.notices.siteTransferred');
+                    });
                 },
                 error: (error: unknown) => {
                     if (error instanceof HttpErrorResponse && error.status === 403) {

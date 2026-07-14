@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { MessageModule } from 'primeng/message';
 import { FreePlanRetentionNotice } from '@layout/free-plan-retention-notice';
 import { LayoutMobileHeader } from '@layout/layout-mobile-header';
 import { LayoutOverlays } from '@layout/layout-overlays';
@@ -8,6 +9,8 @@ import { LayoutPageBar } from '@layout/layout-page-bar';
 import { LayoutSidebar } from '@layout/layout-sidebar';
 import { MainLayoutContextService } from '@layout/main-layout-context.service';
 import { SidebarMenuService } from '@layout/sidebar-menu.service';
+import type { SiteSettingsSection } from '@features/sites/site-settings-section';
+import { NavigationNoticeService } from '@services/navigation-notice.service';
 
 @Component({
     selector: 'app-main-layout',
@@ -16,12 +19,13 @@ import { SidebarMenuService } from '@layout/sidebar-menu.service';
         '(document:keydown)': 'handleKeyboard($event)'
     },
     providers: [MainLayoutContextService, SidebarMenuService],
-    imports: [RouterOutlet, LayoutSidebar, LayoutMobileHeader, LayoutPageBar, LayoutOverlays, FreePlanRetentionNotice, TranslocoPipe],
+    imports: [RouterOutlet, LayoutSidebar, LayoutMobileHeader, LayoutPageBar, LayoutOverlays, FreePlanRetentionNotice, MessageModule, TranslocoPipe],
     templateUrl: './main-layout.html',
     styleUrl: './main-layout.css'
 })
 export class MainLayout {
     protected readonly context = inject(MainLayoutContextService);
+    protected readonly navigationNotice = inject(NavigationNoticeService);
 
     handleKeyboard(event: KeyboardEvent) {
         if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
@@ -30,11 +34,7 @@ export class MainLayout {
         }
     }
 
-    openSiteSettings(tab = '0') {
-        this.context.openSiteSettings(tab);
-    }
-
-    constructor() {
-        this.context.init();
+    openSiteSettings(section: SiteSettingsSection = 'general') {
+        this.context.openSiteSettings(section);
     }
 }

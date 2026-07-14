@@ -36,8 +36,8 @@ export class LayoutSidebar {
     private readonly closeMobileMenuCommand = () => this.closeMobileDrawer();
     protected readonly mobileMenuItems = computed(() => this.applyExpandedState(this.sidebarMenu.mobileItems(this.closeMobileMenuCommand)));
 
-    protected openSiteSettings(tab = '0') {
-        this.context.openSiteSettings(tab);
+    protected openSiteSettings(section: 'general' | 'tracking' = 'general') {
+        this.context.openSiteSettings(section);
     }
 
     protected closeMobileDrawer() {

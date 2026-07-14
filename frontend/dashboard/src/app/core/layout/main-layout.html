@@ -7,6 +7,9 @@
         <div class="flex-1 overflow-y-auto p-4 md:p-8 md:pt-4 relative">
             <app-layout-page-bar />
             <app-free-plan-retention-notice />
+            @if (navigationNotice.key(); as noticeKey) {
+            <p-message class="mb-4 block" severity="warn" [closable]="true" (onClose)="navigationNotice.clear()">{{ noticeKey | transloco }}</p-message>
+            }
 
             <router-outlet />
         </div>

@@ -41,7 +41,6 @@ import { KpiCard } from '@features/analytics/components/kpi-card';
 import { ShareService } from '@services/share.service';
 import { translateRangeLabel } from '@components/range-toolbar/range-toolbar';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
-import { SiteSettingsService } from '@services/site-settings.service';
 import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
 import { buildTakeoutExportMenuItems, DEFAULT_HITS_EXPORT_FORMAT, TakeoutExportFormat } from '@core/export/export-formats';
 import { TakeoutDownloadService } from '@services/takeout-download.service';
@@ -109,7 +108,6 @@ export class Dashboard {
     protected hitService = inject(HitService);
     private shareService = inject(ShareService);
     private teamService = inject(TeamService);
-    private siteSettings = inject(SiteSettingsService);
     private takeoutDownloadService = inject(TakeoutDownloadService);
     private localeService = inject(TranslocoLocaleService);
     private transloco = inject(TranslocoService);
@@ -439,10 +437,9 @@ export class Dashboard {
     });
 
     protected openTrackingSettings() {
-        if (!this.siteService.activeSite()) {
-            return;
-        }
-        this.siteSettings.open('1');
+        const site = this.siteService.activeSite();
+        if (!site) return;
+        void this.router.navigate(['/sites', site.id, 'settings', 'tracking']);
     }
     protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
         this.activeLanguage();
@@ -578,7 +575,7 @@ export class Dashboard {
                 this.openTrackingSettings();
                 break;
             case 'invite_teammate':
-                void this.router.navigate(['/settings/team']);
+                void this.router.navigate(['/admin/team/members/invite']);
                 break;
             case 'schedule_report':
                 void this.router.navigate(['/settings/reports']);

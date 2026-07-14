@@ -5,10 +5,11 @@ import { By } from '@angular/platform-browser';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TranslocoTestingModule } from '@jsverse/transloco';
-import { Observable, Subject } from 'rxjs';
+import { Observable, Subject, of } from 'rxjs';
 import { AskAIRequest, AskAIResponse, AskAIStreamEvent } from '@models/analytics.types';
 import { AskAIService, AskAIStreamStatusError } from '@services/ask-ai.service';
 import { DashboardBootstrapService } from '@services/dashboard-bootstrap.service';
+import { NavigationNoticeService } from '@services/navigation-notice.service';
 import { PermissionService } from '@services/permission.service';
 import { ShareService } from '@services/share.service';
 import { TeamService } from '@services/team.service';
@@ -22,7 +23,7 @@ import { MenuItem } from 'primeng/api';
 import { vi } from 'vitest';
 
 interface LayoutSidebarTestAccess {
-    openSiteSettings(tab?: string): void;
+    openSiteSettings(section?: string): void;
     closeMobileDrawer(): void;
     mobileMenuItems(): MenuItem[];
     canCreateTeams(): boolean;
@@ -178,6 +179,21 @@ describe('MainLayout', () => {
 
     it('should create', () => {
         expect(component).toBeTruthy();
+    });
+
+    it('renders and dismisses one-shot navigation feedback', () => {
+        const notice = TestBed.inject(NavigationNoticeService);
+        notice.show('sites.settings.notices.siteUnavailable');
+        fixture.detectChanges();
+
+        const message = fixture.nativeElement.querySelector('p-message');
+        expect(message?.textContent).toContain('sites.settings.notices.siteUnavailable');
+
+        const close = message?.querySelector('button') as HTMLButtonElement | null;
+        expect(close).toBeTruthy();
+        close?.click();
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('p-message')).toBeNull();
     });
 
     it('A11Y: should have correct landmarks', () => {
@@ -1198,66 +1214,51 @@ describe('MainLayout', () => {
         expect(supportLink?.querySelector('.pi-external-link')).toBeTruthy();
     });
 
-    it('should allow team switch without confirmation when settings drawer is closed', () => {
+    it('allows team switching without the retired drawer confirmation', () => {
         const confirmSpy = vi.spyOn(window, 'confirm');
         const result = layoutContext.beforeTeamSwitch();
         expect(result).toBe(true);
         expect(confirmSpy).not.toHaveBeenCalled();
     });
 
-    it('should block team switch when settings drawer is open and user cancels', () => {
-        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
-        layoutContext.isSiteSettingsVisible.set(true);
-        const result = layoutContext.beforeTeamSwitch();
-        expect(result).toBe(false);
-        expect(confirmSpy).toHaveBeenCalled();
-        expect(layoutContext.isSiteSettingsVisible()).toBe(true);
-    });
-
-    it('should close settings drawer when switch is confirmed', () => {
-        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-        layoutContext.isSiteSettingsVisible.set(true);
-        const result = layoutContext.beforeTeamSwitch();
-        expect(result).toBe(true);
-        expect(confirmSpy).toHaveBeenCalled();
-        expect(layoutContext.isSiteSettingsVisible()).toBe(false);
-    });
-
     it('should open site settings from keyboard shortcut when an active site exists', () => {
-        seedActiveSite();
+        const site = seedActiveSite();
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
         const event = new KeyboardEvent('keydown', { key: 'k', metaKey: true });
         const preventDefault = vi.spyOn(event, 'preventDefault');
 
         component.handleKeyboard(event);
 
         expect(preventDefault).toHaveBeenCalled();
-        expect(layoutContext.isSiteSettingsVisible()).toBe(true);
-        expect(layoutContext.siteSettingsTab()).toBe('0');
+        expect(navigate).toHaveBeenCalledWith(['/sites', site.id, 'settings', 'general']);
     });
 
     it('should handle the document keyboard shortcut binding and ctrl-key variant', () => {
-        seedActiveSite();
+        const site = seedActiveSite();
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
         const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true });
         const preventDefault = vi.spyOn(event, 'preventDefault');
 
         document.dispatchEvent(event);
 
         expect(preventDefault).toHaveBeenCalled();
-        expect(layoutContext.isSiteSettingsVisible()).toBe(true);
+        expect(navigate).toHaveBeenCalledWith(['/sites', site.id, 'settings', 'general']);
     });
 
     it('should ignore unrelated keyboard shortcuts', () => {
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
         const event = new KeyboardEvent('keydown', { key: 'x', metaKey: true });
         const preventDefault = vi.spyOn(event, 'preventDefault');
 
         component.handleKeyboard(event);
 
         expect(preventDefault).not.toHaveBeenCalled();
-        expect(layoutContext.isSiteSettingsVisible()).toBe(false);
+        expect(navigate).not.toHaveBeenCalled();
     });
 
     it('should keep sidebar drawer actions inside the sidebar component', () => {
-        seedActiveSite();
+        const site = seedActiveSite();
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
         const sidebar = fixture.debugElement.query(By.directive(LayoutSidebar)).componentInstance as LayoutSidebarTestAccess;
         layoutContext.isMobileDrawerOpen.set(true);
 
@@ -1270,10 +1271,46 @@ describe('MainLayout', () => {
             item: firstItem
         });
 
-        expect(layoutContext.isSiteSettingsVisible()).toBe(true);
+        expect(navigate).toHaveBeenCalledWith(['/sites', site.id, 'settings', 'general']);
         expect(layoutContext.isMobileDrawerOpen()).toBe(false);
         expect(menuItems.length).toBeGreaterThan(0);
         expect(sidebar.canCreateTeams()).toBe(true);
+    });
+
+    it('keeps the current settings section when selecting another site', () => {
+        const siteService = TestBed.inject(SiteService);
+        const firstSite = seedActiveSite();
+        const secondSite = { ...firstSite, id: '00000000-0000-0000-0000-0000000000cc', domain: 'next.example.com' };
+        siteService.applySites([firstSite, secondSite]);
+        siteService.selectSite(firstSite);
+        const router = TestBed.inject(Router);
+        vi.spyOn(router, 'url', 'get').mockReturnValue(`/sites/${firstSite.id}/settings/access`);
+        const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+        layoutContext.onSiteSelected(secondSite);
+
+        expect(siteService.activeSite()).toEqual(secondSite);
+        expect(navigate).toHaveBeenCalledWith(['/sites', secondSite.id, 'settings', 'access']);
+    });
+
+    it('returns to the team overview before switching team context', () => {
+        const router = TestBed.inject(Router);
+        const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+        const teamService = TestBed.inject(TeamService);
+        vi.spyOn(teamService, 'setActiveTeam').mockReturnValue(of({ status: 'ok', active_team_id: 'team-2' }));
+        vi.spyOn(teamService, 'loadTeams').mockReturnValue(of({ teams: [], active_team_id: 'team-2' }));
+        vi.spyOn(TestBed.inject(SiteService), 'loadSites').mockImplementation(() => undefined);
+        vi.spyOn(TestBed.inject(PermissionService), 'loadPermissions').mockReturnValue(of({ instance_role: 'user', permissions: {} }));
+
+        layoutContext.onTeamSelected({
+            id: 'team-2',
+            name: 'Second team',
+            logo_url: '',
+            role: 'owner',
+            created_at: '2026-01-01T00:00:00Z'
+        });
+
+        expect(navigate).toHaveBeenCalledWith(['/overview']);
     });
 
     it('should keep the mobile PrimeNG menu model stable between change detection passes', () => {
@@ -1367,14 +1404,14 @@ describe('MainLayout', () => {
     }
 
     function seedActiveSite() {
-        TestBed.inject(SiteService).applySites([
-            {
-                id: '00000000-0000-0000-0000-0000000000bb',
-                user_id: '00000000-0000-0000-0000-000000000001',
-                domain: 'active.example.com',
-                created_at: '2026-01-01T00:00:00Z'
-            }
-        ]);
+        const site = {
+            id: '00000000-0000-0000-0000-0000000000bb',
+            user_id: '00000000-0000-0000-0000-000000000001',
+            domain: 'active.example.com',
+            created_at: '2026-01-01T00:00:00Z'
+        };
+        TestBed.inject(SiteService).applySites([site]);
+        return site;
     }
 
     function submitAskAIQuestion(question: string) {
