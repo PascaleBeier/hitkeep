@@ -214,7 +214,7 @@ func New(conf *config.Config, publicFS fs.FS, store *database.Store, tenantStore
 
 	mux := http.NewServeMux()
 	s.setupRoutes(mux, publicFS)
-	rootHandler := shared.FetchMetadataMiddleware(conf.PublicURL, mux)
+	rootHandler := newCrossOriginProtection().Handler(mux)
 	handler := rootHandler
 	if s.publicBasePath != "/" {
 		handler = s.stripPublicBasePath(rootHandler)

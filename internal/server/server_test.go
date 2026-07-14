@@ -294,7 +294,7 @@ func TestServerRoutesPrefixedIngestPreflight(t *testing.T) {
 	}
 }
 
-func TestServerAppliesFetchMetadataAfterPrefixStripping(t *testing.T) {
+func TestServerAppliesCrossOriginProtectionAfterPrefixStripping(t *testing.T) {
 	conf := testServerConfig(t)
 	conf.PublicURL = "https://www.example.net/hitkeep/"
 	store := testServerStore(t)
@@ -314,6 +314,49 @@ func TestServerAppliesFetchMetadataAfterPrefixStripping(t *testing.T) {
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected prefixed cross-site API request to be blocked with %d, got %d", http.StatusNotFound, rec.Code)
+	}
+}
+
+func TestServerAllowsSafeCrossOriginRequestAfterPrefixStripping(t *testing.T) {
+	conf := testServerConfig(t)
+	conf.PublicURL = "https://www.example.net/hitkeep/"
+	store := testServerStore(t)
+	defer store.Close()
+
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	defer func() {
+		_ = srv.Shutdown(context.Background())
+	}()
+
+	req := httptest.NewRequest(http.MethodGet, "/hitkeep/api/status", nil)
+	req.Host = "www.example.net"
+	req.Header.Set("Sec-Fetch-Site", "cross-site")
+	rec := httptest.NewRecorder()
+
+	srv.httpServer.Handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected prefixed safe cross-origin request to reach the status handler, got %d body %q", rec.Code, rec.Body.String())
+	}
+}
+
+func TestServerAllowsHeaderlessNonBrowserMutationToReachAuthentication(t *testing.T) {
+	conf := testServerConfig(t)
+	store := testServerStore(t)
+	defer store.Close()
+
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	defer func() {
+		_ = srv.Shutdown(context.Background())
+	}()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/sites", nil)
+	rec := httptest.NewRecorder()
+
+	srv.httpServer.Handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected headerless server request to reach authentication, got %d body %q", rec.Code, rec.Body.String())
 	}
 }
 
@@ -371,6 +414,7 @@ func TestServerCustomTrackingHostServesOnlyTrackerRoutes(t *testing.T) {
 		{name: "tracker asset", method: http.MethodGet, path: "/hk.js", wantStatus: http.StatusOK, wantBody: "tracker asset"},
 		{name: "vitals asset", method: http.MethodHead, path: "/hk-vitals.js", wantStatus: http.StatusOK},
 		{name: "ingest preflight", method: http.MethodOptions, path: "/ingest", wantStatus: http.StatusNoContent},
+		{name: "cross-site ingest", method: http.MethodPost, path: "/ingest", wantStatus: http.StatusAccepted},
 		{name: "api denied", method: http.MethodGet, path: "/api/status", wantStatus: http.StatusNotFound},
 		{name: "dashboard denied", method: http.MethodGet, path: "/", wantStatus: http.StatusNotFound},
 		{name: "prefixed asset denied", method: http.MethodGet, path: "/hitkeep/hk.js", wantStatus: http.StatusNotFound},
@@ -384,6 +428,9 @@ func TestServerCustomTrackingHostServesOnlyTrackerRoutes(t *testing.T) {
 				req.Header.Set("Origin", "https://site.example")
 				req.Header.Set("Access-Control-Request-Method", http.MethodPost)
 				req.Header.Set("Access-Control-Request-Headers", "content-type")
+			} else if tt.method == http.MethodPost {
+				req.Header.Set("Origin", "https://unknown-site.example")
+				req.Header.Set("Sec-Fetch-Site", "cross-site")
 			}
 			rec := httptest.NewRecorder()
 
