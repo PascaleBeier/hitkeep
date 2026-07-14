@@ -146,9 +146,18 @@ describe('TeamOverviewPage', () => {
                             teams: { roles: { owner: 'Owner' } },
                             signup: {
                                 plans: {
-                                    free: { name: 'Free', price: '€0', description: '60-day retention to validate your sites.' },
-                                    pro: { name: 'Pro', price: '€15/mo', description: 'Longer retention and more room for a small team.' },
-                                    business: { name: 'Business', price: '€39/mo', description: 'More scale for agencies.' }
+                                    free: {
+                                        name: 'Free',
+                                        description: '60-day retention to validate your sites.'
+                                    },
+                                    pro: {
+                                        name: 'Pro',
+                                        description: 'Longer retention and more room for a small team.'
+                                    },
+                                    business: {
+                                        name: 'Business',
+                                        description: 'More scale for agencies.'
+                                    }
                                 }
                             }
                         }
@@ -183,17 +192,35 @@ describe('TeamOverviewPage', () => {
                                 {
                                     code: 'free',
                                     name: 'Free',
-                                    entitlements: { max_sites_per_team: 3, max_team_members: 3, max_retention_days: 60, allow_sso: false, allow_custom_branding: false }
+                                    entitlements: {
+                                        max_sites_per_team: 3,
+                                        max_team_members: 3,
+                                        max_retention_days: 60,
+                                        allow_sso: false,
+                                        allow_custom_branding: false
+                                    }
                                 },
                                 {
                                     code: 'pro',
                                     name: 'Pro',
-                                    entitlements: { max_sites_per_team: 10, max_team_members: 5, max_retention_days: 365, allow_sso: false, allow_custom_branding: false }
+                                    entitlements: {
+                                        max_sites_per_team: 10,
+                                        max_team_members: 5,
+                                        max_retention_days: 365,
+                                        allow_sso: false,
+                                        allow_custom_branding: false
+                                    }
                                 },
                                 {
                                     code: 'business',
                                     name: 'Business',
-                                    entitlements: { max_sites_per_team: 50, max_team_members: 20, max_retention_days: 1095, allow_sso: true, allow_custom_branding: true }
+                                    entitlements: {
+                                        max_sites_per_team: 50,
+                                        max_team_members: 20,
+                                        max_retention_days: 1095,
+                                        allow_sso: true,
+                                        allow_custom_branding: true
+                                    }
                                 }
                             ])
                         )
@@ -250,6 +277,27 @@ describe('TeamOverviewPage', () => {
         expect(text).toContain('Upgrade to Pro');
         expect(text).toContain('Upgrade to Business');
         expect(text).toContain('Single sign-on (SSO)');
+        expect(text).toContain('€150');
+        expect(text).toContain('€390');
+    });
+
+    it('formats the same annual tiers in USD for the US jurisdiction', async () => {
+        fixture.destroy();
+        systemStatusResponse.cloud = {
+            ...systemStatusResponse.cloud!,
+            jurisdiction: 'US',
+            region: 'us-east-1'
+        };
+
+        fixture = TestBed.createComponent(TeamOverviewPage);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+
+        const text = fixture.nativeElement.textContent;
+        expect(text).toContain('$150');
+        expect(text).toContain('$390');
+        expect(text).not.toContain('€150');
     });
 
     it('renders Business with SSO as the next upgrade for Pro users', async () => {
@@ -309,7 +357,9 @@ describe('TeamOverviewPage', () => {
 
         component.openBillingPortal();
 
-        expect(cloudService.createBillingPortalSession).toHaveBeenCalledWith({ locale: 'en' });
+        expect(cloudService.createBillingPortalSession).toHaveBeenCalledWith({
+            locale: 'en'
+        });
         expect(redirectSpy).toHaveBeenCalledWith('https://billing.stripe.test/session');
     });
 
@@ -320,7 +370,11 @@ describe('TeamOverviewPage', () => {
 
         component.startUpgradeCheckout();
 
-        expect(cloudService.createBillingCheckoutSession).toHaveBeenCalledWith({ plan_code: 'pro', locale: 'en' });
+        expect(cloudService.createBillingCheckoutSession).toHaveBeenCalledWith({
+            plan_code: 'pro',
+            billing: 'annual',
+            locale: 'en'
+        });
         expect(redirectSpy).toHaveBeenCalledWith('https://checkout.stripe.test/session');
     });
 

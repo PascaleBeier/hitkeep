@@ -102,6 +102,17 @@ func (s *Store) RecordHitActivity(ctx context.Context, hits []*api.Hit) error {
 		if err := s.upsertSiteHitActivity(ctx, siteID, agg); err != nil {
 			return err
 		}
+		tenantID, err := s.GetSiteTenantID(ctx, siteID)
+		if err != nil {
+			return fmt.Errorf("resolve site tenant for first hit conversion: %w", err)
+		}
+		if _, err := s.RecordCloudConversionEvent(ctx, CloudConversionEvent{
+			TenantID:   tenantID,
+			EventName:  CloudConversionFirstHitReceived,
+			OccurredAt: agg.firstAt,
+		}); err != nil {
+			return fmt.Errorf("record first hit conversion: %w", err)
+		}
 	}
 	if err := s.flushSiteActivityCounts(ctx, counts, true); err != nil {
 		return err

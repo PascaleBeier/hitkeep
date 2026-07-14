@@ -117,6 +117,64 @@ func TestGetSiteStatsNoComparison(t *testing.T) {
 	}
 }
 
+func TestGetSiteStatsFiltersGoalConversionsToMatchingSessionCohort(t *testing.T) {
+	store, userID := setupComparisonStore(t)
+	ctx := context.Background()
+
+	site, err := store.CreateSite(ctx, userID, "filtered-goals.example.com")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	if err := store.CreateGoal(ctx, &api.Goal{
+		SiteID: site.ID,
+		Name:   "Reached signup",
+		Type:   "path",
+		Value:  "/signup",
+	}); err != nil {
+		t.Fatalf("create goal: %v", err)
+	}
+
+	now := time.Now().UTC()
+	matchingSession := uuid.New()
+	unmatchedSession := uuid.New()
+	for _, hit := range []api.Hit{
+		{SiteID: site.ID, SessionID: matchingSession, PageID: uuid.New(), Timestamp: now.Add(-4 * time.Hour), Path: "/pricing"},
+		{SiteID: site.ID, SessionID: matchingSession, PageID: uuid.New(), Timestamp: now.Add(-3 * time.Hour), Path: "/signup"},
+		{SiteID: site.ID, SessionID: unmatchedSession, PageID: uuid.New(), Timestamp: now.Add(-2 * time.Hour), Path: "/blog"},
+		{SiteID: site.ID, SessionID: unmatchedSession, PageID: uuid.New(), Timestamp: now.Add(-time.Hour), Path: "/signup"},
+	} {
+		hit := hit
+		if err := store.CreateHit(ctx, &hit); err != nil {
+			t.Fatalf("create hit %s: %v", hit.Path, err)
+		}
+	}
+
+	stats, err := store.GetSiteStats(ctx, api.AnalyticsParams{
+		SiteID: site.ID,
+		UserID: userID,
+		Start:  now.Add(-24 * time.Hour),
+		End:    now,
+		Filters: []api.Filter{
+			{Type: "path", Value: "/pricing"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("GetSiteStats: %v", err)
+	}
+	if stats.UniqueSessions != 1 {
+		t.Fatalf("expected one session in the filtered cohort, got %d", stats.UniqueSessions)
+	}
+	if len(stats.Goals) != 1 {
+		t.Fatalf("expected one goal, got %+v", stats.Goals)
+	}
+	if stats.Goals[0].Conversions != 1 {
+		t.Fatalf("expected one conversion from the filtered session cohort, got %+v", stats.Goals[0])
+	}
+	if stats.Goals[0].ConversionRate != 100 {
+		t.Fatalf("expected a 100%% conversion rate, got %+v", stats.Goals[0])
+	}
+}
+
 func TestGetSiteStatsComparisonCurrentPeriodEmpty(t *testing.T) {
 	store, userID := setupComparisonStore(t)
 	ctx := context.Background()

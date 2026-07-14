@@ -397,29 +397,13 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 	}
 
 	for _, goal := range goals {
-		var conversions int
-		var err error
-
-		switch goal.Type {
-		case "path":
-			err = s.db.QueryRowContext(ctx, `
-				SELECT COUNT(DISTINCT session_id)
-				FROM hits
-				WHERE site_id = ? AND timestamp >= ? AND timestamp <= ? AND path = ?
-			`, params.SiteID, params.Start, params.End, goal.Value).Scan(&conversions)
-		case "event":
-			err = s.db.QueryRowContext(ctx, `
-				SELECT COUNT(DISTINCT session_id)
-				FROM events
-				WHERE site_id = ? AND timestamp >= ? AND timestamp <= ? AND name = ?
-			`, params.SiteID, params.Start, params.End, goal.Value).Scan(&conversions)
-			if err == nil && canIncludeImportedSiteAggregates(params, truncUnit) {
-				importedConversions, importErr := s.queryImportedEventGoalConversions(ctx, params, goal.Value)
-				if importErr != nil {
-					return nil, importErr
-				}
-				conversions += importedConversions
+		conversions, err := s.queryGoalConversions(ctx, params, goal, filterSQL, filterArgs)
+		if goal.Type == "event" && err == nil && canIncludeImportedSiteAggregates(params, truncUnit) {
+			importedConversions, importErr := s.queryImportedEventGoalConversions(ctx, params, goal.Value)
+			if importErr != nil {
+				return nil, importErr
 			}
+			conversions += importedConversions
 		}
 
 		if err != nil {

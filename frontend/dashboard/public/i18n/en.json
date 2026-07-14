@@ -1667,6 +1667,11 @@
           "currentPlan": "Current plan",
           "recommended": "Recommended",
           "perMonth": "/mo",
+          "perYear": "/yr",
+          "billingLabel": "Billing interval",
+          "monthly": "Monthly",
+          "annual": "Annual",
+          "annualSaving": "2 months free",
           "openSource": {
             "note": "HitKeep is fully open source — including every paid feature. Cloud plans fund hosting and ongoing development.",
             "support": "Prefer to support us another way?",
@@ -2452,6 +2457,20 @@
   "signup": {
     "title": "Start tracking your sites for free",
     "subtitle": "Create your workspace and start tracking in under a minute. No credit card required.",
+    "paidIntentNote": "After email verification, we'll open secure checkout. You can continue on Free instead.",
+    "billing": {
+      "monthly": "Monthly billing",
+      "annual": "Annual billing"
+    },
+    "verified": {
+      "title": "Your workspace is verified",
+      "subtitle": "{{plan}} with {{billing}} is ready. We're opening secure checkout.",
+      "openingCheckout": "Opening Stripe Checkout…",
+      "checkoutFailed": "Checkout did not open. Your workspace is active on Free and you can retry safely.",
+      "retryCheckout": "Retry checkout",
+      "continueFree": "Continue on Free",
+      "freeNote": "No card is charged unless you finish checkout."
+    },
     "jurisdictionLabel": "Jurisdiction",
     "jurisdictions": {
       "eu": "EU",
@@ -2471,18 +2490,15 @@
     "plans": {
       "free": {
         "name": "Free",
-        "price": "€0",
         "description": "60-day retention to validate your sites before you upgrade."
       },
       "pro": {
         "name": "Pro",
-        "price": "€15/mo",
         "description": "Longer retention and more room for a small team."
       },
       "business": {
         "name": "Business",
-        "price": "€39/mo",
-        "description": "More scale for agencies, product teams, and higher event volume."
+        "description": "For agencies managing multiple client sites, shared reporting, and larger teams."
       }
     },
     "selfHostLink": "Want to self-host? See the docs →",

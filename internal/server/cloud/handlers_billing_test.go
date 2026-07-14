@@ -18,8 +18,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	stripe "github.com/stripe/stripe-go/v84"
-	"github.com/stripe/stripe-go/v84/webhook"
+	stripe "github.com/stripe/stripe-go/v86"
+	"github.com/stripe/stripe-go/v86/webhook"
 	"golang.org/x/time/rate"
 
 	"hitkeep/internal/config"
@@ -120,6 +120,8 @@ func setupCloudTestHandler(t *testing.T) (*handler, *database.Store) {
 		StripeWebhookSecret:         "whsec_test_123",
 		StripePriceProMonthly:       "price_pro",
 		StripePriceBusinessMonthly:  "price_business",
+		StripePriceProAnnual:        "price_pro_annual",
+		StripePriceBusinessAnnual:   "price_business_annual",
 	}
 
 	h := &handler{
@@ -586,20 +588,21 @@ func TestHandleVerifySignupInvalidToken(t *testing.T) {
 	}
 }
 
-func TestHandleSignupForcesFreeEvenWhenPaidPlanRequested(t *testing.T) {
+func TestHandleSignupPreservesPaidAnnualIntentWithoutStartingCheckout(t *testing.T) {
 	h, store := setupCloudTestHandler(t)
 	defer store.Close()
 
 	body, err := json.Marshal(signupRequest{
-		Email:        "pro@example.com",
-		Password:     "password123",
-		GivenName:    "Pro",
-		LastName:     "User",
-		TeamName:     "Pro Team",
-		PlanCode:     database.CloudPlanPro,
-		Jurisdiction: "EU",
-		Locale:       "de-DE",
-		AcceptedTos:  true,
+		Email:           "pro@example.com",
+		Password:        "password123",
+		GivenName:       "Pro",
+		LastName:        "User",
+		TeamName:        "Pro Team",
+		PlanCode:        database.CloudPlanPro,
+		BillingInterval: database.CloudBillingIntervalAnnual,
+		Jurisdiction:    "EU",
+		Locale:          "de-DE",
+		AcceptedTos:     true,
 	})
 	if err != nil {
 		t.Fatalf("marshal request: %v", err)
@@ -620,8 +623,11 @@ func TestHandleSignupForcesFreeEvenWhenPaidPlanRequested(t *testing.T) {
 	if resp.Status != "verification_sent" {
 		t.Fatalf("expected status verification_sent, got %q", resp.Status)
 	}
-	if resp.PlanCode != database.CloudPlanFree {
-		t.Fatalf("expected free plan code, got %q", resp.PlanCode)
+	if resp.PlanCode != database.CloudPlanPro {
+		t.Fatalf("expected pro plan code, got %q", resp.PlanCode)
+	}
+	if resp.BillingInterval != database.CloudBillingIntervalAnnual {
+		t.Fatalf("expected annual billing interval, got %q", resp.BillingInterval)
 	}
 
 	stripeClient, ok := h.stripe.(*fakeStripeClient)
@@ -633,6 +639,36 @@ func TestHandleSignupForcesFreeEvenWhenPaidPlanRequested(t *testing.T) {
 	}
 	if stripeClient.lastCustomerInput != nil {
 		t.Fatal("expected no stripe customer to be created during signup")
+	}
+}
+
+func TestHandleVerifySignupRedirectsPaidIntentToCheckoutBridge(t *testing.T) {
+	h, store := setupCloudTestHandler(t)
+	defer store.Close()
+
+	token, err := store.CreatePendingSignup(context.Background(), database.PendingSignupEntry{
+		Email:           "annual-pro@example.com",
+		HashedPassword:  "$2a$10$testhashedpassword",
+		TeamName:        "Annual Pro Team",
+		Jurisdiction:    "EU",
+		Locale:          "en",
+		PlanCode:        database.CloudPlanPro,
+		BillingInterval: database.CloudBillingIntervalAnnual,
+	})
+	if err != nil {
+		t.Fatalf("create pending signup: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/cloud/signup/verify?token="+token, nil)
+	w := httptest.NewRecorder()
+	h.handleVerifySignup().ServeHTTP(w, req)
+
+	if w.Code != http.StatusFound {
+		t.Fatalf("expected redirect status %d, got %d: %s", http.StatusFound, w.Code, w.Body.String())
+	}
+	location := w.Header().Get("Location")
+	if location != "https://cloud.hitkeep.eu/signup/verified?billing=annual&plan=pro" {
+		t.Fatalf("expected paid checkout bridge redirect, got %q", location)
 	}
 }
 
@@ -954,7 +990,7 @@ func TestHandleStripeWebhookSignedSubscriptionLifecycle(t *testing.T) {
 		t.Fatalf("seed billing account: %v", err)
 	}
 
-	activate := postSignedStripeWebhook(t, h, "evt_sub_updated", "customer.subscription.updated", map[string]any{
+	activate := postSignedStripeWebhook(t, h, "evt_sub_created", "customer.subscription.created", map[string]any{
 		"id": "sub_live",
 		"metadata": map[string]string{
 			"tenant_id":    account.TenantID.String(),
@@ -984,8 +1020,15 @@ func TestHandleStripeWebhookSignedSubscriptionLifecycle(t *testing.T) {
 	if billingAccount.StripeSubscriptionID != "sub_live" || billingAccount.StripePriceID != "price_pro" {
 		t.Fatalf("expected subscription identifiers to be stored, got %+v", billingAccount)
 	}
+	conversionEvents, err := store.ListCloudConversionEvents(context.Background(), account.TenantID)
+	if err != nil {
+		t.Fatalf("list subscription conversion events: %v", err)
+	}
+	if len(conversionEvents) != 1 || conversionEvents[0].EventName != database.CloudConversionSubscriptionActivated || conversionEvents[0].PlanCode != database.CloudPlanPro || conversionEvents[0].BillingInterval != database.CloudBillingIntervalMonthly {
+		t.Fatalf("expected one Pro monthly subscription activation, got %+v", conversionEvents)
+	}
 
-	replayed := postSignedStripeWebhook(t, h, "evt_sub_updated", "customer.subscription.updated", map[string]any{
+	replayed := postSignedStripeWebhook(t, h, "evt_sub_created", "customer.subscription.created", map[string]any{
 		"id": "sub_live",
 		"metadata": map[string]string{
 			"tenant_id": account.TenantID.String(),
@@ -1023,7 +1066,7 @@ func TestHandleStripeWebhookSignedSubscriptionLifecycle(t *testing.T) {
 		t.Fatalf("expected past_due status, got %+v", billingAccount)
 	}
 
-	storedEvent, err := store.GetCloudBillingEvent(context.Background(), "evt_sub_updated")
+	storedEvent, err := store.GetCloudBillingEvent(context.Background(), "evt_sub_created")
 	if err != nil {
 		t.Fatalf("get replayed billing event: %v", err)
 	}
@@ -1264,7 +1307,11 @@ func TestHandleCreateBillingCheckoutSession(t *testing.T) {
 		t.Fatalf("upsert cloud billing account: %v", err)
 	}
 
-	body, err := json.Marshal(billingCheckoutSessionRequest{PlanCode: database.CloudPlanPro, Locale: "de-DE"})
+	body, err := json.Marshal(billingCheckoutSessionRequest{
+		PlanCode:        database.CloudPlanPro,
+		BillingInterval: database.CloudBillingIntervalAnnual,
+		Locale:          "de-DE",
+	})
 	if err != nil {
 		t.Fatalf("marshal request: %v", err)
 	}
@@ -1306,6 +1353,12 @@ func TestHandleCreateBillingCheckoutSession(t *testing.T) {
 	if stripeClient.lastCheckoutInput.PlanCode != database.CloudPlanPro {
 		t.Fatalf("expected checkout plan %q, got %q", database.CloudPlanPro, stripeClient.lastCheckoutInput.PlanCode)
 	}
+	if stripeClient.lastCheckoutInput.BillingInterval != database.CloudBillingIntervalAnnual {
+		t.Fatalf("expected annual checkout interval, got %q", stripeClient.lastCheckoutInput.BillingInterval)
+	}
+	if stripeClient.lastCheckoutInput.PriceID != "price_pro_annual" {
+		t.Fatalf("expected annual Pro price, got %q", stripeClient.lastCheckoutInput.PriceID)
+	}
 	if stripeClient.lastCheckoutInput.SuccessURL != "https://cloud.hitkeep.eu/hitkeep/admin/team?checkout=success" {
 		t.Fatalf("expected prefixed checkout success URL, got %q", stripeClient.lastCheckoutInput.SuccessURL)
 	}
@@ -1326,8 +1379,11 @@ func TestHandleCreateBillingCheckoutSession(t *testing.T) {
 	if storedAccount.StripeCustomerID != "cus_test" {
 		t.Fatalf("expected persisted customer id cus_test, got %q", storedAccount.StripeCustomerID)
 	}
-	if storedAccount.StripePriceID != "price_pro" {
-		t.Fatalf("expected persisted price id price_pro, got %q", storedAccount.StripePriceID)
+	if storedAccount.StripePriceID != "price_pro_annual" {
+		t.Fatalf("expected persisted price id price_pro_annual, got %q", storedAccount.StripePriceID)
+	}
+	if storedAccount.BillingInterval != database.CloudBillingIntervalAnnual {
+		t.Fatalf("expected persisted annual interval, got %q", storedAccount.BillingInterval)
 	}
 }
 

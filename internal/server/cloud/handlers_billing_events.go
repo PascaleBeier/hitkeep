@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	stripe "github.com/stripe/stripe-go/v84"
+	stripe "github.com/stripe/stripe-go/v86"
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/appurl"
@@ -86,12 +86,13 @@ func (h *handler) handleStripeEvent(ctx context.Context, event stripe.Event) err
 			TenantID:             tenantID,
 			PlanCode:             normalizePlanCode(session.Metadata["plan_code"]),
 			PlanName:             strings.TrimSpace(session.Metadata["plan_name"]),
+			BillingInterval:      normalizeBillingInterval(session.Metadata["billing_interval"]),
 			SubscriptionStatus:   session.Status,
 			StripeCustomerID:     session.Customer.ID,
 			StripeSubscriptionID: session.Subscription.ID,
 			StripePriceID:        session.FirstPriceID(),
 		})
-	case "customer.subscription.updated", "customer.subscription.deleted":
+	case "customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted":
 		subscription, err := parseStripeSubscriptionEvent(event.Data.Raw)
 		if err != nil {
 			handleErr = fmt.Errorf("decode subscription event: %w", err)
@@ -106,15 +107,20 @@ func (h *handler) handleStripeEvent(ctx context.Context, event stripe.Event) err
 		// portal plan switch changes the price but never rewrites the
 		// metadata written at the original checkout.
 		planCode := planCodeForPrice(h.ctx.Config, subscription.FirstPriceID())
+		billingInterval := billingIntervalForPrice(h.ctx.Config, subscription.FirstPriceID())
 		planName := planNameForCode(planCode)
 		if planCode == "" {
 			planCode = normalizePlanCode(subscription.Metadata["plan_code"])
 			planName = strings.TrimSpace(subscription.Metadata["plan_name"])
 		}
+		if billingInterval == "" {
+			billingInterval = normalizeBillingInterval(subscription.Metadata["billing_interval"])
+		}
 		handleErr = h.ctx.Store.UpsertCloudBillingAccount(ctx, database.CloudBillingAccount{
 			TenantID:             tenantID,
 			PlanCode:             planCode,
 			PlanName:             planName,
+			BillingInterval:      billingInterval,
 			SubscriptionStatus:   subscription.Status,
 			StripeCustomerID:     subscription.Customer.ID,
 			StripeSubscriptionID: subscription.ID,
@@ -140,6 +146,17 @@ func (h *handler) handleStripeEvent(ctx context.Context, event stripe.Event) err
 	}
 
 	if tenantID != uuid.Nil {
+		if account, err := h.ctx.Store.GetCloudBillingAccount(ctx, tenantID); err == nil && account != nil && account.SubscriptionStatus == database.CloudSubscriptionStatusActive {
+			if _, err := h.ctx.Store.RecordCloudConversionEvent(ctx, database.CloudConversionEvent{
+				TenantID:        tenantID,
+				EventName:       database.CloudConversionSubscriptionActivated,
+				PlanCode:        account.PlanCode,
+				BillingInterval: account.BillingInterval,
+				DedupeKey:       tenantID.String() + ":subscription_activated:" + account.StripeSubscriptionID,
+			}); err != nil {
+				slog.Error("failed to record subscription activation conversion", "tenant_id", tenantID, "stripe_event_id", event.ID, "error", err)
+			}
+		}
 		h.syncTeamRetentionAfterBillingChange(ctx, tenantID)
 	}
 
@@ -198,6 +215,15 @@ func normalizePlanCode(planCode string) string {
 	}
 }
 
+func normalizeBillingInterval(interval string) string {
+	switch strings.TrimSpace(strings.ToLower(interval)) {
+	case database.CloudBillingIntervalAnnual:
+		return database.CloudBillingIntervalAnnual
+	default:
+		return database.CloudBillingIntervalMonthly
+	}
+}
+
 func planNameForCode(planCode string) string {
 	return entitlements.CloudPlanName(normalizePlanCode(planCode))
 }
@@ -215,7 +241,17 @@ func stripeCustomerName(user *api.User, teamName string) string {
 	return strings.TrimSpace(teamName)
 }
 
-func priceIDForPlan(conf *config.Config, planCode string) string {
+func priceIDForPlan(conf *config.Config, planCode, billingInterval string) string {
+	if normalizeBillingInterval(billingInterval) == database.CloudBillingIntervalAnnual {
+		switch normalizePlanCode(planCode) {
+		case database.CloudPlanBusiness:
+			return strings.TrimSpace(conf.StripePriceBusinessAnnual)
+		case database.CloudPlanPro:
+			return strings.TrimSpace(conf.StripePriceProAnnual)
+		default:
+			return ""
+		}
+	}
 	switch normalizePlanCode(planCode) {
 	case database.CloudPlanBusiness:
 		return strings.TrimSpace(conf.StripePriceBusinessMonthly)
@@ -236,8 +272,27 @@ func planCodeForPrice(conf *config.Config, priceID string) string {
 	switch priceID {
 	case strings.TrimSpace(conf.StripePriceBusinessMonthly):
 		return database.CloudPlanBusiness
+	case strings.TrimSpace(conf.StripePriceBusinessAnnual):
+		return database.CloudPlanBusiness
 	case strings.TrimSpace(conf.StripePriceProMonthly):
 		return database.CloudPlanPro
+	case strings.TrimSpace(conf.StripePriceProAnnual):
+		return database.CloudPlanPro
+	default:
+		return ""
+	}
+}
+
+func billingIntervalForPrice(conf *config.Config, priceID string) string {
+	priceID = strings.TrimSpace(priceID)
+	if priceID == "" {
+		return ""
+	}
+	switch priceID {
+	case strings.TrimSpace(conf.StripePriceBusinessAnnual), strings.TrimSpace(conf.StripePriceProAnnual):
+		return database.CloudBillingIntervalAnnual
+	case strings.TrimSpace(conf.StripePriceBusinessMonthly), strings.TrimSpace(conf.StripePriceProMonthly):
+		return database.CloudBillingIntervalMonthly
 	default:
 		return ""
 	}

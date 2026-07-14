@@ -21,7 +21,7 @@ import { injectActiveLang } from '@core/i18n/active-lang';
 import { CloudStatus } from '@models/analytics.types';
 import { AnalyticsService } from '@services/analytics.service';
 import { CloudSignupTrackingService } from '@services/cloud-signup-tracking.service';
-import { CloudService, CloudSignupRequest } from '@services/cloud.service';
+import { BillingInterval, CloudPlanCode, CloudService, CloudSignupRequest } from '@services/cloud.service';
 import { AUTH_FIELDSET_DESIGN_TOKENS, AUTH_SELECT_BUTTON_DESIGN_TOKENS } from '@core/theme/hitkeep-preset';
 
 type Jurisdiction = 'EU' | 'US';
@@ -37,7 +37,7 @@ export class Signup {
         EU: 'https://cloud.hitkeep.eu',
         US: 'https://cloud.hitkeep.com'
     };
-    private static readonly PRESERVED_QUERY_PARAMS = new Set(['ref', 'source', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'utm_id', 'utm_source_platform', 'utm_creative_format', 'utm_marketing_tactic']);
+    private static readonly PRESERVED_QUERY_PARAMS = new Set(['ref', 'source', 'plan', 'billing', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'utm_id', 'utm_source_platform', 'utm_creative_format', 'utm_marketing_tactic']);
 
     private readonly document = inject(DOCUMENT);
     private readonly destroyRef = inject(DestroyRef);
@@ -52,6 +52,8 @@ export class Signup {
     protected readonly cloudStatus = signal<CloudStatus | null>(null);
     protected readonly verificationSent = signal(false);
     protected readonly submittedEmail = signal('');
+    protected readonly selectedPlan = signal<CloudPlanCode>('free');
+    protected readonly selectedBilling = signal<BillingInterval>('monthly');
     private readonly activeLanguage = injectActiveLang();
     protected readonly currentYear = new Date().getFullYear();
     protected readonly jurisdictionOptions: Jurisdiction[] = ['EU', 'US'];
@@ -62,10 +64,22 @@ export class Signup {
     private trackedInitialSignupError = false;
 
     private readonly signupModel = signal({
-        email: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.email] }),
-        password: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.minLength(8)] }),
-        teamName: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(120)] }),
-        acceptedTos: new FormControl(false, { nonNullable: true, validators: [Validators.requiredTrue] })
+        email: new FormControl('', {
+            nonNullable: true,
+            validators: [Validators.required, Validators.email]
+        }),
+        password: new FormControl('', {
+            nonNullable: true,
+            validators: [Validators.required, Validators.minLength(8)]
+        }),
+        teamName: new FormControl('', {
+            nonNullable: true,
+            validators: [Validators.required, Validators.maxLength(120)]
+        }),
+        acceptedTos: new FormControl(false, {
+            nonNullable: true,
+            validators: [Validators.requiredTrue]
+        })
     });
     protected readonly signupForm = compatForm(this.signupModel);
 
@@ -113,7 +127,8 @@ export class Signup {
             email: this.signupForm.email().value().trim().toLowerCase(),
             password: this.signupForm.password().value(),
             team_name: this.signupForm.teamName().value().trim(),
-            plan_code: 'free',
+            plan_code: this.selectedPlan(),
+            billing: this.selectedBilling(),
             jurisdiction: this.currentJurisdiction(),
             locale: this.activeLanguage(),
             accepted_tos: true
@@ -127,7 +142,9 @@ export class Signup {
             .pipe(finalize(() => this.isLoading.set(false)))
             .subscribe({
                 next: (response) => {
-                    this.trackSignupEvent('signup_completed_candidate', { response_status: response.status });
+                    this.trackSignupEvent('signup_completed_candidate', {
+                        response_status: response.status
+                    });
                     if (response.status === 'verification_sent') {
                         this.submittedEmail.set(payload.email);
                         this.verificationSent.set(true);
@@ -140,11 +157,17 @@ export class Signup {
                     console.error('Cloud signup failed', err);
                     if (err.status === 409) {
                         this.errorMessage.set('signup.errors.emailExists');
-                        this.trackSignupEvent('signup_error_view', { error_status: 409, error_code: 'email_exists' });
+                        this.trackSignupEvent('signup_error_view', {
+                            error_status: 409,
+                            error_code: 'email_exists'
+                        });
                         return;
                     }
                     this.errorMessage.set('signup.errors.unexpected');
-                    this.trackSignupEvent('signup_error_view', { error_status: err.status ?? 0, error_code: 'unexpected' });
+                    this.trackSignupEvent('signup_error_view', {
+                        error_status: err.status ?? 0,
+                        error_code: 'unexpected'
+                    });
                 }
             });
     }
@@ -166,11 +189,16 @@ export class Signup {
     }
 
     protected trackRegionSwitchClick(jurisdiction: Jurisdiction): void {
-        this.trackSignupEvent('cloud_region_switch_click', { target_jurisdiction: jurisdiction });
+        this.trackSignupEvent('cloud_region_switch_click', {
+            target_jurisdiction: jurisdiction
+        });
     }
 
     private hydrateFromQuery(): void {
         const params = this.route.snapshot.queryParamMap;
+
+        this.selectedPlan.set(this.normalizePlan(params.get('plan')));
+        this.selectedBilling.set(this.selectedPlan() === 'free' ? 'monthly' : this.normalizeBilling(params.get('billing')));
 
         const teamName = params.get('team_name')?.trim();
         if (teamName) {
@@ -236,13 +264,16 @@ export class Signup {
             return;
         }
         this.trackedInitialSignupError = true;
-        this.trackSignupEvent('signup_error_view', { error_code: 'verification_redirect' });
+        this.trackSignupEvent('signup_error_view', {
+            error_code: 'verification_redirect'
+        });
     }
 
     private trackSignupEvent(name: string, properties: Record<string, unknown> = {}): void {
         this.signupTracking.trackEvent(name, {
             jurisdiction: this.currentJurisdiction(),
-            plan_code: 'free',
+            plan: this.selectedPlan(),
+            interval: this.selectedBilling(),
             source_path: '/signup',
             ...properties
         });
@@ -262,5 +293,14 @@ export class Signup {
             return normalized;
         }
         return null;
+    }
+
+    private normalizePlan(value: string | null | undefined): CloudPlanCode {
+        const normalized = value?.trim().toLowerCase();
+        return normalized === 'pro' || normalized === 'business' ? normalized : 'free';
+    }
+
+    private normalizeBilling(value: string | null | undefined): BillingInterval {
+        return value?.trim().toLowerCase() === 'annual' ? 'annual' : 'monthly';
     }
 }

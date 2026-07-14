@@ -26,6 +26,8 @@ func TestLoadCloudConfigFromEnv(t *testing.T) {
 		"HITKEEP_STRIPE_PORTAL_CONFIGURATION_ID": "bpc_123",
 		"HITKEEP_STRIPE_PRICE_PRO_MONTHLY":       "price_pro",
 		"HITKEEP_STRIPE_PRICE_BUSINESS_MONTHLY":  "price_business",
+		"HITKEEP_STRIPE_PRICE_PRO_ANNUAL":        "price_pro_annual",
+		"HITKEEP_STRIPE_PRICE_BUSINESS_ANNUAL":   "price_business_annual",
 		"HITKEEP_CLOUD_CHECKOUT_SUCCESS_URL":     "https://cloud.hitkeep.eu/admin/team?checkout=success",
 		"HITKEEP_CLOUD_CHECKOUT_CANCEL_URL":      "https://cloud.hitkeep.eu/admin/team?checkout=cancelled",
 	}
@@ -55,7 +57,8 @@ func TestLoadCloudConfigFromEnv(t *testing.T) {
 	if conf.StripePortalConfigurationID != "bpc_123" {
 		t.Fatalf("unexpected stripe portal config: %+v", conf)
 	}
-	if conf.StripePriceProMonthly != "price_pro" || conf.StripePriceBusinessMonthly != "price_business" {
+	if conf.StripePriceProMonthly != "price_pro" || conf.StripePriceBusinessMonthly != "price_business" ||
+		conf.StripePriceProAnnual != "price_pro_annual" || conf.StripePriceBusinessAnnual != "price_business_annual" {
 		t.Fatalf("unexpected stripe price config: %+v", conf)
 	}
 }

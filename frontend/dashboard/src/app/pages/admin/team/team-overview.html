@@ -68,6 +68,13 @@
                 <h4 class="m-0 text-base font-bold">{{ "admin.team.overview.plans.title" | transloco }}</h4>
                 <p class="m-0 text-sm text-[var(--p-text-muted-color)]">{{ "admin.team.overview.plans.description" | transloco }}</p>
             </div>
+            <div class="plan-comparison__billing" role="group" [attr.aria-label]="'admin.team.overview.plans.billingLabel' | transloco">
+                <button type="button" [attr.aria-pressed]="billingInterval() === 'monthly'" (click)="billingInterval.set('monthly')">{{ "admin.team.overview.plans.monthly" | transloco }}</button>
+                <button type="button" [attr.aria-pressed]="billingInterval() === 'annual'" (click)="billingInterval.set('annual')">
+                    {{ "admin.team.overview.plans.annual" | transloco }}
+                    <span>{{ "admin.team.overview.plans.annualSaving" | transloco }}</span>
+                </button>
+            </div>
             <div class="grid grid-cols-[repeat(auto-fit,minmax(16rem,1fr))] gap-4">
                 @if (currentTier(); as current) {
                 <p-card styleClass="hk-card plan-comparison__card--current">
@@ -79,7 +86,7 @@
                         <span class="flex items-baseline gap-1">
                             <span class="text-3xl font-extrabold">{{ planPriceLabels()[current.code] }}</span>
                             @if (current.code !== "free") {
-                            <span class="text-sm font-semibold text-[var(--p-text-muted-color)]">{{ "admin.team.overview.plans.perMonth" | transloco }}</span>
+                            <span class="text-sm font-semibold text-[var(--p-text-muted-color)]">{{ (billingInterval() === "annual" ? "admin.team.overview.plans.perYear" : "admin.team.overview.plans.perMonth") | transloco }}</span>
                             }
                         </span>
                         <p class="mt-1 mb-0 text-sm text-[var(--p-text-muted-color)]">{{ ("signup.plans." + current.code + ".description") | transloco }}</p>
@@ -111,7 +118,7 @@
                         </div>
                         <span class="flex items-baseline gap-1">
                             <span class="text-3xl font-extrabold">{{ planPriceLabels()[tier.code] }}</span>
-                            <span class="text-sm font-semibold text-[var(--p-text-muted-color)]">{{ "admin.team.overview.plans.perMonth" | transloco }}</span>
+                            <span class="text-sm font-semibold text-[var(--p-text-muted-color)]">{{ (billingInterval() === "annual" ? "admin.team.overview.plans.perYear" : "admin.team.overview.plans.perMonth") | transloco }}</span>
                         </span>
                         <p class="mt-1 mb-0 text-sm text-[var(--p-text-muted-color)]">{{ ("signup.plans." + tier.code + ".description") | transloco }}</p>
                     </div>
@@ -160,7 +167,9 @@
                 <p class="m-0">
                     {{ "admin.team.overview.plans.openSource.support" | transloco }}
                     <a href="https://hitkeep.com/support/funding/" target="_blank" rel="noreferrer" class="font-semibold text-primary no-underline hover:underline">{{ "admin.team.overview.plans.openSource.sponsor" | transloco }}</a>
-                    · <a href="https://x.com/gethitkeep" target="_blank" rel="noreferrer" class="font-semibold text-primary no-underline hover:underline">X</a> ·
+                    ·
+                    <a href="https://x.com/gethitkeep" target="_blank" rel="noreferrer" class="font-semibold text-primary no-underline hover:underline">X</a>
+                    ·
                     <a href="https://www.linkedin.com/company/hitkeep" target="_blank" rel="noreferrer" class="font-semibold text-primary no-underline hover:underline">LinkedIn</a>
                     · {{ "admin.team.overview.plans.openSource.spread" | transloco }}
                 </p>

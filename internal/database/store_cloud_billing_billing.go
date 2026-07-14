@@ -17,6 +17,8 @@ const (
 	CloudPlanFree                            = "free"
 	CloudPlanPro                             = "pro"
 	CloudPlanBusiness                        = "business"
+	CloudBillingIntervalMonthly              = "monthly"
+	CloudBillingIntervalAnnual               = "annual"
 	CloudFreePlanSiteLimit                   = 3
 	CloudFreePlanMemberLimit                 = 3
 	CloudSubscriptionStatusFree              = "free"
@@ -92,6 +94,7 @@ type CloudBillingAccount struct {
 	TenantID             uuid.UUID
 	PlanCode             string
 	PlanName             string
+	BillingInterval      string
 	SubscriptionStatus   string
 	StripeCustomerID     string
 	StripeSubscriptionID string
@@ -180,6 +183,7 @@ func (s *Store) CreateManagedCloudAccount(ctx context.Context, input CreateManag
 
 func (s *Store) UpsertCloudBillingAccount(ctx context.Context, account CloudBillingAccount) error {
 	now := time.Now().UTC()
+	account.BillingInterval = normalizeCloudBillingInterval(account.BillingInterval)
 	if account.CreatedAt.IsZero() {
 		account.CreatedAt = now
 	}
@@ -189,18 +193,20 @@ func (s *Store) UpsertCloudBillingAccount(ctx context.Context, account CloudBill
 		INSERT INTO cloud_billing_accounts (
 			tenant_id,
 			plan_code,
-			plan_name,
-			subscription_status,
+				plan_name,
+				billing_interval,
+				subscription_status,
 			stripe_customer_id,
 			stripe_subscription_id,
 			stripe_price_id,
 			created_at,
 			updated_at
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT (tenant_id) DO UPDATE SET
-			plan_code = excluded.plan_code,
-			plan_name = excluded.plan_name,
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT (tenant_id) DO UPDATE SET
+				plan_code = excluded.plan_code,
+				plan_name = excluded.plan_name,
+				billing_interval = excluded.billing_interval,
 			subscription_status = excluded.subscription_status,
 			stripe_customer_id = excluded.stripe_customer_id,
 			stripe_subscription_id = excluded.stripe_subscription_id,
@@ -210,6 +216,7 @@ func (s *Store) UpsertCloudBillingAccount(ctx context.Context, account CloudBill
 		account.TenantID,
 		account.PlanCode,
 		account.PlanName,
+		account.BillingInterval,
 		account.SubscriptionStatus,
 		nullIfBlank(account.StripeCustomerID),
 		nullIfBlank(account.StripeSubscriptionID),
@@ -219,6 +226,13 @@ func (s *Store) UpsertCloudBillingAccount(ctx context.Context, account CloudBill
 	)
 }
 
+func normalizeCloudBillingInterval(interval string) string {
+	if strings.EqualFold(strings.TrimSpace(interval), CloudBillingIntervalAnnual) {
+		return CloudBillingIntervalAnnual
+	}
+	return CloudBillingIntervalMonthly
+}
+
 func (s *Store) GetCloudBillingAccount(ctx context.Context, tenantID uuid.UUID) (*CloudBillingAccount, error) {
 	var account CloudBillingAccount
 	var customerID sql.NullString
@@ -226,7 +240,7 @@ func (s *Store) GetCloudBillingAccount(ctx context.Context, tenantID uuid.UUID) 
 	var priceID sql.NullString
 
 	err := s.db.QueryRowContext(ctx, `
-		SELECT tenant_id, plan_code, plan_name, subscription_status,
+			SELECT tenant_id, plan_code, plan_name, billing_interval, subscription_status,
 		       COALESCE(stripe_customer_id, ''), COALESCE(stripe_subscription_id, ''), COALESCE(stripe_price_id, ''),
 		       created_at, updated_at
 		FROM cloud_billing_accounts
@@ -235,6 +249,7 @@ func (s *Store) GetCloudBillingAccount(ctx context.Context, tenantID uuid.UUID) 
 		&account.TenantID,
 		&account.PlanCode,
 		&account.PlanName,
+		&account.BillingInterval,
 		&account.SubscriptionStatus,
 		&customerID,
 		&subscriptionID,
@@ -430,7 +445,7 @@ func (s *Store) getCloudBillingAccountByField(ctx context.Context, field string,
 
 	// #nosec G201 -- queryField is restricted to the column whitelist in the switch above.
 	query := fmt.Sprintf(`
-		SELECT tenant_id, plan_code, plan_name, subscription_status,
+			SELECT tenant_id, plan_code, plan_name, billing_interval, subscription_status,
 		       COALESCE(stripe_customer_id, ''), COALESCE(stripe_subscription_id, ''), COALESCE(stripe_price_id, ''),
 		       created_at, updated_at
 		FROM cloud_billing_accounts
@@ -441,6 +456,7 @@ func (s *Store) getCloudBillingAccountByField(ctx context.Context, field string,
 		&account.TenantID,
 		&account.PlanCode,
 		&account.PlanName,
+		&account.BillingInterval,
 		&account.SubscriptionStatus,
 		&customerID,
 		&subscriptionID,

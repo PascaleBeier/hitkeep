@@ -8,11 +8,12 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	stripe "github.com/stripe/stripe-go/v84"
+	stripe "github.com/stripe/stripe-go/v86"
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/appurl"
@@ -29,7 +30,7 @@ const (
 	subscriptionStatusActive   = database.CloudSubscriptionStatusActive
 	subscriptionStatusPending  = database.CloudSubscriptionStatusPendingCheckout
 	subscriptionStatusCanceled = database.CloudSubscriptionStatusCanceled
-	stripeAPIVersion           = "2026-02-25.clover"
+	stripeAPIVersion           = "2026-06-24.dahlia"
 )
 
 type stripeClient interface {
@@ -50,27 +51,28 @@ type handler struct {
 }
 
 type createCustomerInput struct {
-	Email          string
-	Name           string
-	UserID         uuid.UUID
-	TenantID       uuid.UUID
-	PlanCode       string
-	Jurisdiction   string
-	IdempotencyKey string
+	Email           string
+	Name            string
+	UserID          uuid.UUID
+	TenantID        uuid.UUID
+	PlanCode        string
+	BillingInterval string
+	Jurisdiction    string
+	IdempotencyKey  string
 }
 
 type createCheckoutSessionInput struct {
-	CustomerID   string
-	PriceID      string
-	SuccessURL   string
-	CancelURL    string
-	Locale       string
-	UserID       uuid.UUID
-	TenantID     uuid.UUID
-	PlanCode     string
-	PlanName     string
-	Jurisdiction string
-	Email        string
+	CustomerID      string
+	PriceID         string
+	SuccessURL      string
+	CancelURL       string
+	Locale          string
+	UserID          uuid.UUID
+	TenantID        uuid.UUID
+	PlanCode        string
+	PlanName        string
+	BillingInterval string
+	Jurisdiction    string
 }
 
 type checkoutSessionOutput struct {
@@ -133,22 +135,24 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 }
 
 type signupRequest struct {
-	Email        string `json:"email"`
-	Password     string `json:"password"`
-	GivenName    string `json:"given_name"`
-	LastName     string `json:"last_name"`
-	TeamName     string `json:"team_name"`
-	PlanCode     string `json:"plan_code"`
-	Jurisdiction string `json:"jurisdiction"`
-	Locale       string `json:"locale"`
-	AcceptedTos  bool   `json:"accepted_tos"`
+	Email           string `json:"email"`
+	Password        string `json:"password"`
+	GivenName       string `json:"given_name"`
+	LastName        string `json:"last_name"`
+	TeamName        string `json:"team_name"`
+	PlanCode        string `json:"plan_code"`
+	BillingInterval string `json:"billing"`
+	Jurisdiction    string `json:"jurisdiction"`
+	Locale          string `json:"locale"`
+	AcceptedTos     bool   `json:"accepted_tos"`
 }
 
 type signupResponse struct {
-	Status      string `json:"status"`
-	PlanCode    string `json:"plan_code"`
-	RedirectURL string `json:"redirect_url,omitempty"`
-	CheckoutURL string `json:"checkout_url,omitempty"`
+	Status          string `json:"status"`
+	PlanCode        string `json:"plan_code"`
+	BillingInterval string `json:"billing"`
+	RedirectURL     string `json:"redirect_url,omitempty"`
+	CheckoutURL     string `json:"checkout_url,omitempty"`
 }
 
 type billingPortalSessionResponse struct {
@@ -160,8 +164,9 @@ type billingPortalSessionRequest struct {
 }
 
 type billingCheckoutSessionRequest struct {
-	PlanCode string `json:"plan_code"`
-	Locale   string `json:"locale"`
+	PlanCode        string `json:"plan_code"`
+	BillingInterval string `json:"billing"`
+	Locale          string `json:"locale"`
 }
 
 type billingCheckoutSessionResponse struct {
@@ -189,7 +194,12 @@ func (h *handler) handleSignup() http.HandlerFunc {
 		req.GivenName = strings.TrimSpace(req.GivenName)
 		req.LastName = strings.TrimSpace(req.LastName)
 		req.TeamName = strings.TrimSpace(req.TeamName)
-		req.PlanCode = database.CloudPlanFree // signup always starts on free
+		requestedPlanCode := strings.TrimSpace(req.PlanCode)
+		if requestedPlanCode == "" {
+			requestedPlanCode = database.CloudPlanFree
+		}
+		req.PlanCode = normalizePlanCode(requestedPlanCode)
+		req.BillingInterval = normalizeBillingInterval(req.BillingInterval)
 		req.Jurisdiction = strings.TrimSpace(strings.ToUpper(req.Jurisdiction))
 		req.Locale = normalizeStripeLocale(req.Locale)
 		if req.TeamName == "" {
@@ -198,6 +208,10 @@ func (h *handler) handleSignup() http.HandlerFunc {
 
 		if req.Email == "" || len(req.Password) < 8 {
 			http.Error(w, "Email required; Password must be at least 8 characters", http.StatusBadRequest)
+			return
+		}
+		if req.PlanCode == "" {
+			http.Error(w, "Valid plan code is required", http.StatusBadRequest)
 			return
 		}
 		if !req.AcceptedTos {
@@ -223,14 +237,16 @@ func (h *handler) handleSignup() http.HandlerFunc {
 		}
 
 		token, err := h.ctx.Store.CreatePendingSignup(r.Context(), database.PendingSignupEntry{
-			Email:          req.Email,
-			HashedPassword: hashedPassword,
-			GivenName:      req.GivenName,
-			LastName:       req.LastName,
-			TeamName:       req.TeamName,
-			Jurisdiction:   req.Jurisdiction,
-			Locale:         req.Locale,
-			AcceptedTosAt:  time.Now().UTC(),
+			Email:           req.Email,
+			HashedPassword:  hashedPassword,
+			GivenName:       req.GivenName,
+			LastName:        req.LastName,
+			TeamName:        req.TeamName,
+			Jurisdiction:    req.Jurisdiction,
+			Locale:          req.Locale,
+			PlanCode:        req.PlanCode,
+			BillingInterval: req.BillingInterval,
+			AcceptedTosAt:   time.Now().UTC(),
 		})
 		if err != nil {
 			slog.Error("Failed to create pending signup token", "error", err, "email", req.Email)
@@ -246,8 +262,9 @@ func (h *handler) handleSignup() http.HandlerFunc {
 		}
 
 		resp := signupResponse{
-			Status:   "verification_sent",
-			PlanCode: database.CloudPlanFree,
+			Status:          "verification_sent",
+			PlanCode:        req.PlanCode,
+			BillingInterval: req.BillingInterval,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -313,11 +330,20 @@ func (h *handler) handleVerifySignup() http.HandlerFunc {
 			TenantID:           account.TenantID,
 			PlanCode:           database.CloudPlanFree,
 			PlanName:           planNameForCode(database.CloudPlanFree),
+			BillingInterval:    normalizeBillingInterval(entry.BillingInterval),
 			SubscriptionStatus: database.CloudSubscriptionStatusFree,
 		}); err != nil {
 			slog.Error("Failed to initialize cloud billing account", "error", err, "team_id", account.TenantID)
 			http.Redirect(w, r, signupURL("expired"), http.StatusFound)
 			return
+		}
+		if _, err := h.ctx.Store.RecordCloudConversionEvent(r.Context(), database.CloudConversionEvent{
+			TenantID:        account.TenantID,
+			EventName:       database.CloudConversionSignupVerified,
+			PlanCode:        entry.PlanCode,
+			BillingInterval: entry.BillingInterval,
+		}); err != nil {
+			slog.Warn("Failed to record verified signup conversion", "error", err, "team_id", account.TenantID)
 		}
 
 		if err := issueLoginSession(w, h.ctx.Config, account.UserID); err != nil {
@@ -326,8 +352,16 @@ func (h *handler) handleVerifySignup() http.HandlerFunc {
 			return
 		}
 
-		dashboardURL := appurl.Path(h.ctx.Config.PublicURL, "/dashboard")
-		http.Redirect(w, r, dashboardURL, http.StatusFound)
+		if entry.PlanCode == database.CloudPlanPro || entry.PlanCode == database.CloudPlanBusiness {
+			query := url.Values{}
+			query.Set("plan", entry.PlanCode)
+			query.Set("billing", normalizeBillingInterval(entry.BillingInterval))
+			verifiedURL := appurl.Path(h.ctx.Config.PublicURL, "/signup/verified") + "?" + query.Encode()
+			http.Redirect(w, r, verifiedURL, http.StatusFound)
+			return
+		}
+
+		http.Redirect(w, r, appurl.Path(h.ctx.Config.PublicURL, "/dashboard"), http.StatusFound)
 	}
 }
 

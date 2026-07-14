@@ -19,6 +19,12 @@
             <form (submit)="onSubmit($event)" class="hk-auth-form" novalidate>
                 @if (errorMessage(); as errorMessageKey) {
                 <p-message severity="error" role="alert" aria-live="assertive">{{ errorMessageKey | transloco }}</p-message>
+                } @if (selectedPlan() !== "free") {
+                <div class="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm" data-testid="signup-paid-intent">
+                    <span class="font-semibold">{{ ("signup.plans." + selectedPlan() + ".name") | transloco }}</span>
+                    <span class="text-[var(--p-text-muted-color)]"> · {{ ("signup.billing." + selectedBilling()) | transloco }}</span>
+                    <p class="mt-1 mb-0 text-[var(--p-text-muted-color)]">{{ "signup.paidIntentNote" | transloco }}</p>
+                </div>
                 }
 
                 <p-fieldset [dt]="jurisdictionFieldsetDesignTokens">

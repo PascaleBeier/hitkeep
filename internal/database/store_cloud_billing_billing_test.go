@@ -104,6 +104,66 @@ func TestUpsertCloudBillingAccountRoundTrips(t *testing.T) {
 	}
 }
 
+func TestRecordCloudConversionEventsPreservesIntentAndDeduplicatesMilestones(t *testing.T) {
+	store := NewStore(":memory:")
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect store: %v", err)
+	}
+	defer store.Close()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatalf("migrate store: %v", err)
+	}
+
+	account, err := store.CreateManagedCloudAccount(context.Background(), CreateManagedCloudAccountInput{
+		Email:          "conversion-owner@example.com",
+		HashedPassword: "hashed",
+		TeamName:       "Conversion Team",
+	})
+	if err != nil {
+		t.Fatalf("create managed cloud account: %v", err)
+	}
+	if err := store.UpsertCloudBillingAccount(context.Background(), CloudBillingAccount{
+		TenantID:           account.TenantID,
+		PlanCode:           CloudPlanFree,
+		PlanName:           "Free",
+		BillingInterval:    CloudBillingIntervalAnnual,
+		SubscriptionStatus: CloudSubscriptionStatusFree,
+	}); err != nil {
+		t.Fatalf("upsert billing account: %v", err)
+	}
+
+	inserted, err := store.RecordCloudConversionEvent(context.Background(), CloudConversionEvent{
+		TenantID:        account.TenantID,
+		EventName:       CloudConversionSignupVerified,
+		PlanCode:        CloudPlanPro,
+		BillingInterval: CloudBillingIntervalAnnual,
+	})
+	if err != nil || !inserted {
+		t.Fatalf("record signup conversion: inserted=%v err=%v", inserted, err)
+	}
+	inserted, err = store.RecordCloudConversionEvent(context.Background(), CloudConversionEvent{
+		TenantID:  account.TenantID,
+		EventName: CloudConversionSignupVerified,
+	})
+	if err != nil {
+		t.Fatalf("repeat signup conversion: %v", err)
+	}
+	if inserted {
+		t.Fatal("expected repeated one-time milestone to be deduplicated")
+	}
+
+	events, err := store.ListCloudConversionEvents(context.Background(), account.TenantID)
+	if err != nil {
+		t.Fatalf("list conversion events: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("expected one conversion event, got %d", len(events))
+	}
+	if events[0].PlanCode != CloudPlanPro || events[0].BillingInterval != CloudBillingIntervalAnnual {
+		t.Fatalf("expected pro annual intent, got %+v", events[0])
+	}
+}
+
 func TestCloudBillingEventsAreIdempotentAndTrackStatus(t *testing.T) {
 	store := NewStore(":memory:")
 	if err := store.Connect(); err != nil {

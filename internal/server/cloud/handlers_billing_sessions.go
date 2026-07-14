@@ -187,6 +187,7 @@ func (h *handler) handleCreateBillingCheckoutSession() http.HandlerFunc {
 		}
 
 		req.PlanCode = normalizePlanCode(req.PlanCode)
+		req.BillingInterval = normalizeBillingInterval(req.BillingInterval)
 		req.Locale = normalizeStripeLocale(req.Locale)
 		if req.PlanCode != database.CloudPlanPro && req.PlanCode != database.CloudPlanBusiness {
 			http.Error(w, "Paid plan code is required", http.StatusBadRequest)
@@ -231,24 +232,24 @@ func (h *handler) handleCreateBillingCheckoutSession() http.HandlerFunc {
 			}
 		}
 
-		priceID := priceIDForPlan(h.ctx.Config, req.PlanCode)
+		priceID := priceIDForPlan(h.ctx.Config, req.PlanCode, req.BillingInterval)
 		if priceID == "" {
 			http.Error(w, "Plan is not configured for checkout", http.StatusBadRequest)
 			return
 		}
 
 		session, err := h.stripe.CreateCheckoutSession(r.Context(), createCheckoutSessionInput{
-			CustomerID:   customerID,
-			PriceID:      priceID,
-			SuccessURL:   checkoutSuccessURL(h.ctx.Config),
-			CancelURL:    checkoutCancelURL(h.ctx.Config),
-			Locale:       req.Locale,
-			UserID:       user.ID,
-			TenantID:     activeTenantID,
-			PlanCode:     req.PlanCode,
-			PlanName:     planNameForCode(req.PlanCode),
-			Jurisdiction: strings.TrimSpace(strings.ToUpper(h.ctx.Config.CloudJurisdiction)),
-			Email:        strings.TrimSpace(strings.ToLower(user.Email)),
+			CustomerID:      customerID,
+			PriceID:         priceID,
+			SuccessURL:      checkoutSuccessURL(h.ctx.Config),
+			CancelURL:       checkoutCancelURL(h.ctx.Config),
+			Locale:          req.Locale,
+			UserID:          user.ID,
+			TenantID:        activeTenantID,
+			PlanCode:        req.PlanCode,
+			PlanName:        planNameForCode(req.PlanCode),
+			BillingInterval: req.BillingInterval,
+			Jurisdiction:    strings.TrimSpace(strings.ToUpper(h.ctx.Config.CloudJurisdiction)),
 		})
 		if err != nil {
 			slog.Error("Failed to create Stripe upgrade checkout session", "error", err)
@@ -260,6 +261,7 @@ func (h *handler) handleCreateBillingCheckoutSession() http.HandlerFunc {
 			TenantID:             activeTenantID,
 			PlanCode:             database.CloudPlanFree,
 			PlanName:             planNameForCode(database.CloudPlanFree),
+			BillingInterval:      req.BillingInterval,
 			SubscriptionStatus:   subscriptionStatusPending,
 			StripeCustomerID:     customerID,
 			StripeSubscriptionID: "",
@@ -268,6 +270,15 @@ func (h *handler) handleCreateBillingCheckoutSession() http.HandlerFunc {
 			slog.Error("Failed to persist Stripe upgrade checkout metadata", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
+		}
+		if _, err := h.ctx.Store.RecordCloudConversionEvent(r.Context(), database.CloudConversionEvent{
+			TenantID:        activeTenantID,
+			EventName:       database.CloudConversionCheckoutStarted,
+			PlanCode:        req.PlanCode,
+			BillingInterval: req.BillingInterval,
+			DedupeKey:       activeTenantID.String() + ":checkout:" + session.ID,
+		}); err != nil {
+			slog.Warn("Failed to record checkout conversion", "error", err, "team_id", activeTenantID, "checkout_session_id", session.ID)
 		}
 
 		w.Header().Set("Content-Type", "application/json")

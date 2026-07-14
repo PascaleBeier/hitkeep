@@ -1736,6 +1736,11 @@
           "currentPlan": "Huidig ​​abonnement",
           "recommended": "Aanbevolen",
           "perMonth": "/mnd",
+          "perYear": "/jaar",
+          "billingLabel": "Factureringsperiode",
+          "monthly": "Maandelijks",
+          "annual": "Jaarlijks",
+          "annualSaving": "2 maanden gratis",
           "openSource": {
             "note": "HitKeep is volledig open source – inclusief alle betaalde functies. Cloudabonnementen financieren hosting en ontwikkeling.",
             "support": "Wil je ons liever op een andere manier steunen?",
@@ -2518,6 +2523,20 @@
   "signup": {
     "title": "Begin gratis met het volgen van je sites",
     "subtitle": "Creëer je werkruimte en begin binnen een minuut met volgen. Geen creditcard vereist.",
+    "paidIntentNote": "Na e-mailverificatie openen we de beveiligde checkout. Je kunt ook doorgaan met Free.",
+    "billing": {
+      "monthly": "Maandelijkse facturering",
+      "annual": "Jaarlijkse facturering"
+    },
+    "verified": {
+      "title": "Je werkruimte is geverifieerd",
+      "subtitle": "{{plan}} met {{billing}} staat klaar. We openen de beveiligde checkout.",
+      "openingCheckout": "Stripe Checkout wordt geopend…",
+      "checkoutFailed": "De checkout kon niet worden geopend. Je werkruimte is actief op Free en je kunt het opnieuw proberen.",
+      "retryCheckout": "Checkout opnieuw proberen",
+      "continueFree": "Doorgaan met Free",
+      "freeNote": "Je kaart wordt pas belast als je de checkout afrondt."
+    },
     "jurisdictionLabel": "Jurisdictie",
     "jurisdictions": {
       "eu": "EU",
@@ -2537,18 +2556,15 @@
     "plans": {
       "free": {
         "name": "Vrij",
-        "price": "€ 0",
         "description": "Retentie van 60 dagen om je sites te valideren voordat je een upgrade uitvoert."
       },
       "pro": {
         "name": "Pro",
-        "price": "€ 15/maand",
         "description": "Langere retentie en meer ruimte voor een klein team."
       },
       "business": {
         "name": "Bedrijf",
-        "price": "€ 39/maand",
-        "description": "Meer schaalgrootte voor bureaus, productteams en een hoger evenementenvolume."
+        "description": "Voor bureaus met meerdere klantsites, gedeelde rapportages en grotere teams."
       }
     },
     "selfHostLink": "Wil je zelf hosten? Zie de documenten →",

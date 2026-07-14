@@ -37,6 +37,9 @@ const (
 
 	customTrackingDomainCacheSize = 4096
 	customTrackingDomainTTL       = 30 * time.Second
+
+	cloudConversionMilestoneCacheSize = 32768
+	cloudConversionMilestoneTTL       = 24 * time.Hour
 )
 
 type passwordResetEntry struct {
@@ -45,15 +48,17 @@ type passwordResetEntry struct {
 }
 
 type PendingSignupEntry struct {
-	Email          string
-	HashedPassword string
-	GivenName      string
-	LastName       string
-	TeamName       string
-	Jurisdiction   string
-	Locale         string
-	AcceptedTosAt  time.Time
-	ExpiresAt      time.Time
+	Email           string
+	HashedPassword  string
+	GivenName       string
+	LastName        string
+	TeamName        string
+	Jurisdiction    string
+	Locale          string
+	PlanCode        string
+	BillingInterval string
+	AcceptedTosAt   time.Time
+	ExpiresAt       time.Time
 }
 
 type apiClientAuthCacheEntry struct {
@@ -85,19 +90,22 @@ type runtimeCache struct {
 	// A nil value is a cached negative lookup.
 	customTrackingByHost *lru.LRU[string, *api.CustomTrackingDomain]
 	customTrackingSF     singleflight.Group
+
+	cloudConversionMilestones *lru.LRU[string, bool]
 }
 
 func newRuntimeCache() *runtimeCache {
 	return &runtimeCache{
-		passwordResetsByToken:   lru.NewLRU[string, passwordResetEntry](passwordResetCacheSize, nil, passwordResetTTL),
-		passwordResetTokenIndex: lru.NewLRU[string, string](passwordResetCacheSize, nil, passwordResetTTL),
-		apiClientAuthByToken:    lru.NewLRU[string, apiClientAuthCacheEntry](apiClientAuthCacheSize, nil, apiClientAuthTTL),
-		apiClientTokenByClient:  lru.NewLRU[uuid.UUID, string](apiClientAuthCacheSize, nil, apiClientAuthTTL),
-		instanceRoles:           lru.NewLRU[uuid.UUID, auth.InstanceRole](instanceRoleCacheSize, nil, instanceRoleTTL),
-		siteRoles:               lru.NewLRU[uuid.UUID, map[uuid.UUID]auth.SiteRole](siteRoleCacheSize, nil, siteRoleTTL),
-		siteTenantIDs:           lru.NewLRU[uuid.UUID, uuid.UUID](siteTenantCacheSize, nil, siteTenantTTL),
-		sitesByDomain:           lru.NewLRU[string, *api.Site](siteDomainCacheSize, nil, siteDomainTTL),
-		customTrackingByHost:    lru.NewLRU[string, *api.CustomTrackingDomain](customTrackingDomainCacheSize, nil, customTrackingDomainTTL),
+		passwordResetsByToken:     lru.NewLRU[string, passwordResetEntry](passwordResetCacheSize, nil, passwordResetTTL),
+		passwordResetTokenIndex:   lru.NewLRU[string, string](passwordResetCacheSize, nil, passwordResetTTL),
+		apiClientAuthByToken:      lru.NewLRU[string, apiClientAuthCacheEntry](apiClientAuthCacheSize, nil, apiClientAuthTTL),
+		apiClientTokenByClient:    lru.NewLRU[uuid.UUID, string](apiClientAuthCacheSize, nil, apiClientAuthTTL),
+		instanceRoles:             lru.NewLRU[uuid.UUID, auth.InstanceRole](instanceRoleCacheSize, nil, instanceRoleTTL),
+		siteRoles:                 lru.NewLRU[uuid.UUID, map[uuid.UUID]auth.SiteRole](siteRoleCacheSize, nil, siteRoleTTL),
+		siteTenantIDs:             lru.NewLRU[uuid.UUID, uuid.UUID](siteTenantCacheSize, nil, siteTenantTTL),
+		sitesByDomain:             lru.NewLRU[string, *api.Site](siteDomainCacheSize, nil, siteDomainTTL),
+		customTrackingByHost:      lru.NewLRU[string, *api.CustomTrackingDomain](customTrackingDomainCacheSize, nil, customTrackingDomainTTL),
+		cloudConversionMilestones: lru.NewLRU[string, bool](cloudConversionMilestoneCacheSize, nil, cloudConversionMilestoneTTL),
 	}
 }
 

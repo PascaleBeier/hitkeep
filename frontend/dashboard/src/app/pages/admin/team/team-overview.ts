@@ -10,13 +10,16 @@ import { CopyControl } from '@components/copy-control/copy-control';
 import { TeamService } from '@services/team.service';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { AnalyticsService } from '@services/analytics.service';
-import { CloudService } from '@services/cloud.service';
+import { BillingInterval, CloudService } from '@services/cloud.service';
 import { firstValueFrom } from 'rxjs';
 
 import { CloudPlanTier, TeamPlan, TeamRole } from '@models/analytics.types';
 
-/** Monthly EUR list prices per cloud plan; formatted locale-aware at render time. */
-const PLAN_MONTHLY_PRICES_EUR: Record<string, number> = { free: 0, pro: 15, business: 39 };
+/** Canonical regional list-price amounts; EUR and USD use the same numeric tiers. */
+const PLAN_PRICES: Record<BillingInterval, Record<string, number>> = {
+    monthly: { free: 0, pro: 15, business: 39 },
+    annual: { free: 0, pro: 150, business: 390 }
+};
 const PLAN_RANK: Record<string, number> = { free: 0, pro: 1, business: 2 };
 
 @Component({
@@ -43,6 +46,7 @@ export class TeamOverviewPage {
     protected readonly planTiers = signal<CloudPlanTier[]>([]);
     protected readonly portalPending = signal(false);
     protected readonly checkoutPending = signal(false);
+    protected readonly billingInterval = signal<BillingInterval>('annual');
     protected readonly usageCards = computed(() => {
         const team = this.team();
         const cloud = this.systemStatus()?.cloud;
@@ -82,12 +86,14 @@ export class TeamOverviewPage {
         return this.planTiers().filter((tier) => (PLAN_RANK[tier.code] ?? -1) > currentRank);
     });
     protected readonly showPlanComparison = computed(() => this.upgradeTiers().length > 0);
-    /** Locale-aware plan prices, e.g. "€15" in English and "15 €" in German. */
+    protected readonly planCurrency = computed<'EUR' | 'USD'>(() => (this.systemStatus()?.cloud?.jurisdiction?.trim().toUpperCase() === 'US' ? 'USD' : 'EUR'));
+    /** Locale-aware regional plan prices, e.g. "€150" or "$150". */
     protected readonly planPriceLabels = computed<Record<string, string>>(() => {
         this.activeLanguage();
+        const currency = this.planCurrency();
         const labels: Record<string, string> = {};
-        for (const [code, amount] of Object.entries(PLAN_MONTHLY_PRICES_EUR)) {
-            labels[code] = this.localeService.localizeNumber(amount, 'currency', undefined, { currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        for (const [code, amount] of Object.entries(PLAN_PRICES[this.billingInterval()])) {
+            labels[code] = this.localeService.localizeNumber(amount, 'currency', undefined, { currency, minimumFractionDigits: 0, maximumFractionDigits: 0 });
         }
         return labels;
     });
@@ -123,14 +129,18 @@ export class TeamOverviewPage {
     }
 
     protected usageDescription(current: number): string {
-        return this.transloco.translate('admin.team.overview.usage.currentUsage', { count: current });
+        return this.transloco.translate('admin.team.overview.usage.currentUsage', {
+            count: current
+        });
     }
 
     protected usageLimitLabel(limit: number): string {
         if (limit <= 0) {
             return this.transloco.translate('admin.team.overview.usage.unlimited');
         }
-        return this.transloco.translate('admin.team.overview.usage.limitValue', { count: limit });
+        return this.transloco.translate('admin.team.overview.usage.limitValue', {
+            count: limit
+        });
     }
 
     protected usageStateClass(percentage: number, limit: number): string {
@@ -157,7 +167,9 @@ export class TeamOverviewPage {
         if (days <= 0) {
             return this.transloco.translate('admin.team.overview.cloud.unlimitedRetention');
         }
-        return this.transloco.translate('admin.team.overview.cloud.retentionDays', { count: days });
+        return this.transloco.translate('admin.team.overview.cloud.retentionDays', {
+            count: days
+        });
     }
 
     protected planName(plan: TeamPlan): string {
@@ -203,7 +215,11 @@ export class TeamOverviewPage {
 
         this.checkoutPending.set(true);
         this.cloudService
-            .createBillingCheckoutSession({ plan_code: planCode, locale: this.activeLanguage() })
+            .createBillingCheckoutSession({
+                plan_code: planCode,
+                billing: this.billingInterval(),
+                locale: this.activeLanguage()
+            })
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe({
                 next: ({ url }) => {
@@ -223,7 +239,11 @@ export class TeamOverviewPage {
 
         this.checkoutPending.set(true);
         this.cloudService
-            .createBillingCheckoutSession({ plan_code: 'pro', locale: this.activeLanguage() })
+            .createBillingCheckoutSession({
+                plan_code: 'pro',
+                billing: this.billingInterval(),
+                locale: this.activeLanguage()
+            })
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe({
                 next: ({ url }) => {
