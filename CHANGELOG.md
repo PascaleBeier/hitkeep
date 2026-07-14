@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.12.0](https://github.com/PascaleBeier/hitkeep/compare/v2.11.0...v2.12.0) (2026-07-14)
+
+
+### Features
+
+* **auth:** add team OIDC SSO ([b48f42e](https://github.com/PascaleBeier/hitkeep/commit/b48f42e5d0cbb253ca484256e0ef4756c9a8b43c))
+* **auth:** streamline SSO login and invitation UX ([2a5a981](https://github.com/PascaleBeier/hitkeep/commit/2a5a98150fac6945fb5f51c1979d50a911caa188)), closes [#225](https://github.com/PascaleBeier/hitkeep/issues/225) [#226](https://github.com/PascaleBeier/hitkeep/issues/226)
+* **billing:** add annual conversion flow ([#251](https://github.com/PascaleBeier/hitkeep/issues/251)) ([d1c2e3c](https://github.com/PascaleBeier/hitkeep/commit/d1c2e3ce960d51149b089b18ffd624787ebfe849))
+* **frontend:** route site settings and invitations ([4c0a0a2](https://github.com/PascaleBeier/hitkeep/commit/4c0a0a257fe5ca72e084c5b021a2c1833fff54cd)), closes [#246](https://github.com/PascaleBeier/hitkeep/issues/246) [#247](https://github.com/PascaleBeier/hitkeep/issues/247)
+* **sso:** authorize invite-aware OIDC provisioning ([d5270f6](https://github.com/PascaleBeier/hitkeep/commit/d5270f69054b5330078632ef3bbea755bbbab721)), closes [#225](https://github.com/PascaleBeier/hitkeep/issues/225) [#226](https://github.com/PascaleBeier/hitkeep/issues/226)
+
+
+### Bug Fixes
+
+* **database:** preserve QR data during site changes ([24a5765](https://github.com/PascaleBeier/hitkeep/commit/24a5765284e8acac947d5d3aa52375d662084def)), closes [#248](https://github.com/PascaleBeier/hitkeep/issues/248)
+* **security:** use standard cross-origin protection ([3daa095](https://github.com/PascaleBeier/hitkeep/commit/3daa0955111446f7cfd4b1144904bfec3dd33ada))
+
 ## [2.11.0](https://github.com/PascaleBeier/hitkeep/compare/v2.10.3...v2.11.0) (2026-07-11)
 
 
