@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.13.0](https://github.com/PascaleBeier/hitkeep/compare/v2.12.0...v2.13.0) (2026-07-14)
+
+
+### Features
+
+* **dev:** add unified developer platform ([#252](https://github.com/PascaleBeier/hitkeep/issues/252)) ([96cba3e](https://github.com/PascaleBeier/hitkeep/commit/96cba3e084fdf2ae1d5641be2139e3a063f9181c))
+
 ## [2.12.0](https://github.com/PascaleBeier/hitkeep/compare/v2.11.0...v2.12.0) (2026-07-14)
 
 
