@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.12.0](https://github.com/PascaleBeier/hitkeep/compare/v2.11.0...v2.12.0) (2026-07-14)
+
+
+### Features
+
+* **auth:** add team OIDC SSO ([b48f42e](https://github.com/PascaleBeier/hitkeep/commit/b48f42e5d0cbb253ca484256e0ef4756c9a8b43c))
+
+
+### Bug Fixes
+
+* **security:** use standard cross-origin protection ([3daa095](https://github.com/PascaleBeier/hitkeep/commit/3daa0955111446f7cfd4b1144904bfec3dd33ada))
+
 ## [2.11.0](https://github.com/PascaleBeier/hitkeep/compare/v2.10.3...v2.11.0) (2026-07-11)
 
 
