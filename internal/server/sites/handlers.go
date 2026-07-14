@@ -278,6 +278,12 @@ func (h *handler) handleCreateSite() http.HandlerFunc {
 		}
 
 		if teamID, err := h.ctx.Store.GetSiteTenantID(r.Context(), site.ID); err == nil {
+			if _, conversionErr := h.ctx.Store.RecordCloudConversionEvent(r.Context(), database.CloudConversionEvent{
+				TenantID:  teamID,
+				EventName: database.CloudConversionFirstSiteCreated,
+			}); conversionErr != nil {
+				slog.Warn("Failed to record first site conversion", "error", conversionErr, "team_id", teamID, "site_id", site.ID)
+			}
 			h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
 				ActorID:     userID,
 				TeamID:      teamID,

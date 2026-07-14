@@ -417,10 +417,13 @@ func (s *Store) GetFunnelStats(ctx context.Context, funnelID uuid.UUID, params a
 // so any arbitrary window is supported.
 func (s *Store) GetComparisonStats(ctx context.Context, params api.AnalyticsParams) (*api.ComparisonStats, error) {
 	cmp := api.AnalyticsParams{
-		SiteID: params.SiteID,
-		UserID: params.UserID,
-		Start:  params.CompareStart,
-		End:    params.CompareEnd,
+		SiteID:    params.SiteID,
+		UserID:    params.UserID,
+		Start:     params.CompareStart,
+		End:       params.CompareEnd,
+		Filters:   params.Filters,
+		GoalIDs:   params.GoalIDs,
+		FunnelIDs: params.FunnelIDs,
 	}
 
 	stats := &api.ComparisonStats{
@@ -430,20 +433,33 @@ func (s *Store) GetComparisonStats(ctx context.Context, params api.AnalyticsPara
 	truncUnit := truncUnitForRange(cmp.Start, cmp.End)
 	gridStart := truncToUnit(cmp.Start, truncUnit)
 	gridEnd := truncToUnit(cmp.End, truncUnit)
+	filterSQL, filterArgs := buildHitFilters(cmp.Filters, "h")
+	funnelPathSQL, funnelPathArgs, err := s.buildFunnelPathFilter(ctx, cmp, "h")
+	if err != nil {
+		return nil, err
+	}
+	sessionSQL, sessionArgs, err := s.buildSessionFilter(ctx, cmp, "h")
+	if err != nil {
+		return nil, err
+	}
+	filterSQL += funnelPathSQL
+	filterSQL += sessionSQL
+	filterArgs = append(filterArgs, funnelPathArgs...)
+	filterArgs = append(filterArgs, sessionArgs...)
 
-	if err := s.queryKpis(ctx, cmp, "", nil, false, rollupHourly,
+	if err := s.queryKpis(ctx, cmp, filterSQL, filterArgs, false, rollupHourly,
 		&stats.TotalPageviews, &stats.UniqueSessions, &stats.BounceRate, &stats.AvgSessionDuration, &stats.PagesPerSession,
 	); err != nil {
 		return nil, fmt.Errorf("comparison KPI query failed: %w", err)
 	}
 
-	if err := s.queryUTMKpis(ctx, cmp, "", nil,
+	if err := s.queryUTMKpis(ctx, cmp, filterSQL, filterArgs,
 		&stats.UTMCampaignHits, &stats.UTMContentHits, &stats.UTMMediumHits, &stats.UTMSourceHits, &stats.UTMTermHits,
 	); err != nil {
 		return nil, fmt.Errorf("comparison UTM KPI query failed: %w", err)
 	}
 
-	rows, err := s.queryChartData(ctx, cmp, gridStart, gridEnd, truncUnit, "", nil, false, rollupHourly)
+	rows, err := s.queryChartData(ctx, cmp, gridStart, gridEnd, truncUnit, filterSQL, filterArgs, false, rollupHourly)
 	if err != nil {
 		return nil, fmt.Errorf("comparison chart query failed: %w", err)
 	}
@@ -466,24 +482,7 @@ func (s *Store) GetComparisonStats(ctx context.Context, params api.AnalyticsPara
 	}
 
 	for _, goal := range goals {
-		var conversions int
-		var err error
-
-		switch goal.Type {
-		case "path":
-			err = s.db.QueryRowContext(ctx, `
-				SELECT COUNT(DISTINCT session_id)
-				FROM hits
-				WHERE site_id = ? AND timestamp >= ? AND timestamp <= ? AND path = ?
-			`, cmp.SiteID, cmp.Start, cmp.End, goal.Value).Scan(&conversions)
-		case "event":
-			err = s.db.QueryRowContext(ctx, `
-				SELECT COUNT(DISTINCT session_id)
-				FROM events
-				WHERE site_id = ? AND timestamp >= ? AND timestamp <= ? AND name = ?
-			`, cmp.SiteID, cmp.Start, cmp.End, goal.Value).Scan(&conversions)
-		}
-
+		conversions, err := s.queryGoalConversions(ctx, cmp, goal, filterSQL, filterArgs)
 		if err != nil {
 			return nil, fmt.Errorf("comparison goal conversions query failed: %w", err)
 		}
@@ -503,6 +502,59 @@ func (s *Store) GetComparisonStats(ctx context.Context, params api.AnalyticsPara
 	}
 
 	return stats, nil
+}
+
+func (s *Store) queryGoalConversions(
+	ctx context.Context,
+	params api.AnalyticsParams,
+	goal api.Goal,
+	filterSQL string,
+	filterArgs []any,
+) (int, error) {
+	var goalTable string
+	var goalColumn string
+	switch goal.Type {
+	case "path":
+		goalTable = "hits"
+		goalColumn = "path"
+	case "event":
+		goalTable = "events"
+		goalColumn = "name"
+	default:
+		return 0, nil
+	}
+
+	// Goal conversions belong to the report's session cohort. Applying a page
+	// filter directly to the goal row would incorrectly require the goal page to
+	// be the filtered page, so the filtered hits are selected as a cohort first.
+	//nolint:gosec // table/column are fixed above and filterSQL comes from allowlisted filters
+	query := fmt.Sprintf(`
+		SELECT COUNT(DISTINCT g.session_id)
+		FROM %s g
+		WHERE g.site_id = ?
+			AND g.timestamp >= ?
+			AND g.timestamp <= ?
+			AND g.%s = ?
+	`, goalTable, goalColumn)
+	args := []any{params.SiteID, params.Start, params.End, goal.Value}
+	if filterSQL != "" {
+		//nolint:gosec // filterSQL comes from allowlisted analytics filters
+		query += fmt.Sprintf(`
+			AND g.session_id IN (
+				SELECT DISTINCT h.session_id
+				FROM hits h
+				WHERE h.site_id = ? AND h.timestamp >= ? AND h.timestamp <= ?%s
+			)
+		`, filterSQL)
+		args = append(args, params.SiteID, params.Start, params.End)
+		args = append(args, filterArgs...)
+	}
+
+	var conversions int
+	if err := s.db.QueryRowContext(ctx, query, args...).Scan(&conversions); err != nil {
+		return 0, err
+	}
+	return conversions, nil
 }
 
 func (s *Store) queryFunnelStepSessions(ctx context.Context, params api.AnalyticsParams, step api.FunnelStep) (map[uuid.UUID]bool, error) {

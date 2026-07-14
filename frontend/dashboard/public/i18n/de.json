@@ -1754,6 +1754,11 @@
           "currentPlan": "Aktueller Tarif",
           "recommended": "Empfohlen",
           "perMonth": "/Monat",
+          "perYear": "/Jahr",
+          "billingLabel": "Abrechnungsintervall",
+          "monthly": "Monatlich",
+          "annual": "Jährlich",
+          "annualSaving": "2 Monate kostenlos",
           "openSource": {
             "note": "HitKeep ist vollständig Open Source – einschließlich aller Bezahlfunktionen. Cloud-Tarife finanzieren Hosting und Weiterentwicklung.",
             "support": "Möchtest du uns anders unterstützen?",
@@ -2536,6 +2541,20 @@
   "signup": {
     "title": "Starte kostenloses Tracking für deine Websites",
     "subtitle": "Erstelle deinen Workspace und tracke in unter einer Minute. Keine Kreditkarte erforderlich.",
+    "paidIntentNote": "Nach der E-Mail-Bestätigung öffnen wir den sicheren Checkout. Du kannst stattdessen kostenlos fortfahren.",
+    "billing": {
+      "monthly": "Monatliche Abrechnung",
+      "annual": "Jährliche Abrechnung"
+    },
+    "verified": {
+      "title": "Dein Workspace ist bestätigt",
+      "subtitle": "{{plan}} mit {{billing}} ist bereit. Wir öffnen den sicheren Checkout.",
+      "openingCheckout": "Stripe Checkout wird geöffnet…",
+      "checkoutFailed": "Der Checkout konnte nicht geöffnet werden. Dein Workspace ist im Free-Tarif aktiv und du kannst es erneut versuchen.",
+      "retryCheckout": "Checkout erneut öffnen",
+      "continueFree": "Mit Free fortfahren",
+      "freeNote": "Eine Belastung erfolgt nur, wenn du den Checkout abschließt."
+    },
     "jurisdictionLabel": "Jurisdiktion",
     "jurisdictions": {
       "eu": "EU",
@@ -2555,18 +2574,15 @@
     "plans": {
       "free": {
         "name": "Free",
-        "price": "€0",
         "description": "60 Tage Aufbewahrung, um deine Websites zu validieren, bevor du upgradest."
       },
       "pro": {
         "name": "Pro",
-        "price": "€15/Monat",
         "description": "Längere Aufbewahrung und mehr Spielraum für kleine Teams."
       },
       "business": {
         "name": "Business",
-        "price": "€39/Monat",
-        "description": "Mehr Skalierung für Agenturen, Produktteams und höheres Event-Volumen."
+        "description": "Für Agenturen mit mehreren Kunden-Websites, gemeinsamem Reporting und größeren Teams."
       }
     },
     "selfHostLink": "Du möchtest selbst hosten? Zur Dokumentation →",

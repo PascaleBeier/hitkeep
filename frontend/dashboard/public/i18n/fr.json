@@ -1754,6 +1754,11 @@
           "currentPlan": "Plan actuel",
           "recommended": "Recommandé",
           "perMonth": "/mois",
+          "perYear": "/an",
+          "billingLabel": "Période de facturation",
+          "monthly": "Mensuel",
+          "annual": "Annuel",
+          "annualSaving": "2 mois offerts",
           "openSource": {
             "note": "HitKeep est entièrement open source – y compris toutes les fonctionnalités payantes. Les offres cloud financent l'hébergement et le développement.",
             "support": "Vous préférez nous soutenir autrement ?",
@@ -2536,6 +2541,20 @@
   "signup": {
     "title": "Commencez à suivre vos sites gratuitement",
     "subtitle": "Créez votre espace de travail et commencez le suivi en moins d'une minute. Aucune carte bancaire requise.",
+    "paidIntentNote": "Après vérification de l'e-mail, nous ouvrirons le paiement sécurisé. Vous pouvez aussi continuer avec Free.",
+    "billing": {
+      "monthly": "Facturation mensuelle",
+      "annual": "Facturation annuelle"
+    },
+    "verified": {
+      "title": "Votre espace de travail est vérifié",
+      "subtitle": "{{plan}} avec {{billing}} est prêt. Nous ouvrons le paiement sécurisé.",
+      "openingCheckout": "Ouverture de Stripe Checkout…",
+      "checkoutFailed": "Le paiement ne s'est pas ouvert. Votre espace est actif sur Free et vous pouvez réessayer.",
+      "retryCheckout": "Réessayer le paiement",
+      "continueFree": "Continuer avec Free",
+      "freeNote": "Aucune carte n'est débitée tant que vous ne terminez pas le paiement."
+    },
     "jurisdictionLabel": "Juridiction",
     "jurisdictions": {
       "eu": "EU",
@@ -2555,18 +2574,15 @@
     "plans": {
       "free": {
         "name": "Free",
-        "price": "€0",
         "description": "60 jours de rétention pour valider vos sites avant une montée en gamme."
       },
       "pro": {
         "name": "Pro",
-        "price": "€15/mois",
         "description": "Plus de rétention et plus de marge pour une petite équipe."
       },
       "business": {
         "name": "Business",
-        "price": "€39/mois",
-        "description": "Plus d'échelle pour les agences, les équipes produit et un volume d'événements plus élevé."
+        "description": "Pour les agences qui gèrent plusieurs sites clients, des rapports partagés et de grandes équipes."
       }
     },
     "selfHostLink": "Vous préférez héberger vous-même ? Voir la documentation →",

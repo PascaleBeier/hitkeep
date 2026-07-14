@@ -1754,6 +1754,11 @@
           "currentPlan": "Plan actual",
           "recommended": "Recomendado",
           "perMonth": "/mes",
+          "perYear": "/año",
+          "billingLabel": "Periodo de facturación",
+          "monthly": "Mensual",
+          "annual": "Anual",
+          "annualSaving": "2 meses gratis",
           "openSource": {
             "note": "HitKeep es completamente de código abierto, incluidas todas las funciones de pago. Los planes cloud financian el alojamiento y el desarrollo.",
             "support": "¿Prefieres apoyarnos de otra manera?",
@@ -2536,6 +2541,20 @@
   "signup": {
     "title": "Empieza a rastrear tus sitios gratis",
     "subtitle": "Crea tu espacio de trabajo y empieza a rastrear en menos de un minuto. Sin tarjeta de crédito.",
+    "paidIntentNote": "Tras verificar el correo, abriremos el pago seguro. También puedes continuar con Free.",
+    "billing": {
+      "monthly": "Facturación mensual",
+      "annual": "Facturación anual"
+    },
+    "verified": {
+      "title": "Tu espacio de trabajo está verificado",
+      "subtitle": "{{plan}} con {{billing}} está listo. Estamos abriendo el pago seguro.",
+      "openingCheckout": "Abriendo Stripe Checkout…",
+      "checkoutFailed": "No se pudo abrir el pago. Tu espacio está activo en Free y puedes volver a intentarlo.",
+      "retryCheckout": "Reintentar el pago",
+      "continueFree": "Continuar con Free",
+      "freeNote": "No se cobra ninguna tarjeta hasta que completes el pago."
+    },
     "jurisdictionLabel": "Jurisdicción",
     "jurisdictions": {
       "eu": "EU",
@@ -2555,18 +2574,15 @@
     "plans": {
       "free": {
         "name": "Free",
-        "price": "€0",
         "description": "Retención de 60 días para validar tus sitios antes de ampliar el plan."
       },
       "pro": {
         "name": "Pro",
-        "price": "€15/mes",
         "description": "Más retención y más margen para un equipo pequeño."
       },
       "business": {
         "name": "Business",
-        "price": "€39/mes",
-        "description": "Más escala para agencias, equipos de producto y mayor volumen de eventos."
+        "description": "Para agencias con varios sitios de clientes, informes compartidos y equipos más grandes."
       }
     },
     "selfHostLink": "¿Prefieres autoalojar? Ver la documentación →",

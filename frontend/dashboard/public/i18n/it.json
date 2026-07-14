@@ -1754,6 +1754,11 @@
           "currentPlan": "Piano attuale",
           "recommended": "Consigliato",
           "perMonth": "/mese",
+          "perYear": "/anno",
+          "billingLabel": "Periodo di fatturazione",
+          "monthly": "Mensile",
+          "annual": "Annuale",
+          "annualSaving": "2 mesi gratis",
           "openSource": {
             "note": "HitKeep è completamente open source, incluse tutte le funzionalità a pagamento. I piani cloud finanziano hosting e sviluppo.",
             "support": "Preferisci sostenerci in un altro modo?",
@@ -2536,6 +2541,20 @@
   "signup": {
     "title": "Inizia a tracciare i tuoi siti gratis",
     "subtitle": "Crea il tuo workspace e inizia il tracciamento in meno di un minuto. Nessuna carta di credito richiesta.",
+    "paidIntentNote": "Dopo la verifica dell'e-mail apriremo il pagamento sicuro. Puoi anche continuare con Free.",
+    "billing": {
+      "monthly": "Fatturazione mensile",
+      "annual": "Fatturazione annuale"
+    },
+    "verified": {
+      "title": "Il tuo workspace è verificato",
+      "subtitle": "{{plan}} con {{billing}} è pronto. Stiamo aprendo il pagamento sicuro.",
+      "openingCheckout": "Apertura di Stripe Checkout…",
+      "checkoutFailed": "Il pagamento non si è aperto. Il workspace è attivo su Free e puoi riprovare.",
+      "retryCheckout": "Riprova il pagamento",
+      "continueFree": "Continua con Free",
+      "freeNote": "La carta viene addebitata solo se completi il pagamento."
+    },
     "jurisdictionLabel": "Giurisdizione",
     "jurisdictions": {
       "eu": "EU",
@@ -2555,18 +2574,15 @@
     "plans": {
       "free": {
         "name": "Free",
-        "price": "€0",
         "description": "Retenzione di 60 giorni per validare i tuoi siti prima di passare a un piano superiore."
       },
       "pro": {
         "name": "Pro",
-        "price": "€15/mese",
         "description": "Più retention e più margine per un piccolo team."
       },
       "business": {
         "name": "Business",
-        "price": "€39/mese",
-        "description": "Più scala per agenzie, team di prodotto e volumi di eventi più alti."
+        "description": "Per agenzie con più siti cliente, report condivisi e team più grandi."
       }
     },
     "selfHostLink": "Preferisci il self-hosting? Vedi la documentazione →",

@@ -4,11 +4,15 @@ import { Observable } from 'rxjs';
 
 import { CloudPlanTier } from '@models/analytics.types';
 
+export type CloudPlanCode = 'free' | 'pro' | 'business';
+export type BillingInterval = 'monthly' | 'annual';
+
 export interface CloudSignupRequest {
     email: string;
     password: string;
     team_name: string;
-    plan_code: 'free' | 'pro' | 'business';
+    plan_code: CloudPlanCode;
+    billing: BillingInterval;
     jurisdiction?: string;
     locale?: string;
     given_name?: string;
@@ -19,6 +23,7 @@ export interface CloudSignupRequest {
 export interface CloudSignupResponse {
     status: string;
     plan_code: string;
+    billing: BillingInterval;
     redirect_url?: string;
     checkout_url?: string;
 }
@@ -33,6 +38,7 @@ export interface BillingPortalSessionRequest {
 
 export interface BillingCheckoutSessionRequest {
     plan_code: 'pro' | 'business';
+    billing: BillingInterval;
     locale?: string;
 }
 

@@ -26,7 +26,7 @@ require (
 	github.com/nsqio/nsq v1.3.0
 	github.com/pquerna/otp v1.5.0
 	github.com/rs/cors v1.11.1
-	github.com/stripe/stripe-go/v84 v84.4.1
+	github.com/stripe/stripe-go/v86 v86.1.0
 	github.com/wneessen/go-mail v0.8.0
 	github.com/zendev-sh/goai v0.8.6
 	golang.org/x/crypto v0.53.0

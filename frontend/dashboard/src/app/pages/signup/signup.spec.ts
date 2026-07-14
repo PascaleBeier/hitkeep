@@ -136,13 +136,20 @@ describe('Signup', () => {
     it('tracks the signup page view when hosted signup is available', () => {
         expect(signupTrackingMock.trackEvent).toHaveBeenCalledWith('signup_page_view', {
             jurisdiction: 'EU',
-            plan_code: 'free',
+            plan: 'free',
+            interval: 'monthly',
             source_path: '/signup'
         });
     });
 
     it('submits a cloud signup request with free plan', () => {
-        cloudServiceMock.signup.mockReturnValue(of({ status: 'verification_sent', plan_code: 'free' } as CloudSignupResponse));
+        cloudServiceMock.signup.mockReturnValue(
+            of({
+                status: 'verification_sent',
+                plan_code: 'free',
+                billing: 'monthly'
+            } as CloudSignupResponse)
+        );
 
         component['signupForm'].teamName().control().setValue('Cloud Team');
         component['signupForm'].email().control().setValue('user@example.com');
@@ -155,20 +162,52 @@ describe('Signup', () => {
         expect(payload?.['team_name']).toBe('Cloud Team');
         expect(payload?.['email']).toBe('user@example.com');
         expect(payload?.['plan_code']).toBe('free');
+        expect(payload?.['billing']).toBe('monthly');
         expect(payload?.['jurisdiction']).toBe('EU');
         expect(payload?.['locale']).toBe('en');
         expect(payload?.['accepted_tos']).toBe(true);
         expect(signupTrackingMock.trackEvent).toHaveBeenCalledWith('signup_started', {
             jurisdiction: 'EU',
-            plan_code: 'free',
+            plan: 'free',
+            interval: 'monthly',
             source_path: '/signup'
         });
         expect(signupTrackingMock.trackEvent).toHaveBeenCalledWith('signup_completed_candidate', {
             jurisdiction: 'EU',
-            plan_code: 'free',
+            plan: 'free',
+            interval: 'monthly',
             source_path: '/signup',
             response_status: 'verification_sent'
         });
+    });
+
+    it('hydrates and submits paid annual intent from query params', () => {
+        queryParams = {
+            plan: 'business',
+            billing: 'annual'
+        };
+        cloudServiceMock.signup.mockReturnValue(
+            of({
+                status: 'verification_sent',
+                plan_code: 'business',
+                billing: 'annual'
+            } as CloudSignupResponse)
+        );
+
+        fixture = TestBed.createComponent(Signup);
+        component = fixture.componentInstance;
+        fixture.detectChanges();
+        component['signupForm'].teamName().control().setValue('Agency Team');
+        component['signupForm'].email().control().setValue('agency@example.com');
+        component['signupForm'].password().control().setValue('password123');
+        component['signupForm'].acceptedTos().control().setValue(true);
+
+        component['onSubmit']();
+
+        const payload = cloudServiceMock.signup.mock.calls.at(-1)?.[0] as Record<string, unknown> | undefined;
+        expect(payload?.['plan_code']).toBe('business');
+        expect(payload?.['billing']).toBe('annual');
+        expect(signupTrackingMock.trackEvent.mock.calls.some(([name, properties]) => name === 'signup_started' && properties?.plan === 'business' && properties?.interval === 'annual')).toBe(true);
     });
 
     it('does not discover or offer enterprise SSO from public signup', () => {
@@ -199,6 +238,8 @@ describe('Signup', () => {
             region: 'EU',
             utm_source: 'hitkeep_docs',
             utm_campaign: 'agency_pilot',
+            plan: 'business',
+            billing: 'annual',
             error: 'exists'
         };
         fixture = TestBed.createComponent(Signup);
@@ -216,13 +257,20 @@ describe('Signup', () => {
         expect(href).toContain('email=user%40example.com');
         expect(href).toContain('utm_source=hitkeep_docs');
         expect(href).toContain('utm_campaign=agency_pilot');
+        expect(href).toContain('plan=business');
+        expect(href).toContain('billing=annual');
         expect(href).not.toContain('region=');
         expect(href).not.toContain('error=');
         expect(href).not.toContain('password123');
     });
 
     it('does nothing when the selected jurisdiction is already active', () => {
-        const redirectSpy = vi.spyOn(component as unknown as { redirectToJurisdiction: (jurisdiction: 'EU' | 'US') => void }, 'redirectToJurisdiction');
+        const redirectSpy = vi.spyOn(
+            component as unknown as {
+                redirectToJurisdiction: (jurisdiction: 'EU' | 'US') => void;
+            },
+            'redirectToJurisdiction'
+        );
 
         component['selectJurisdiction']('EU');
 
@@ -230,13 +278,21 @@ describe('Signup', () => {
     });
 
     it('tracks and redirects when selecting the alternate region', () => {
-        const redirectSpy = vi.spyOn(component as unknown as { redirectToJurisdiction: (jurisdiction: 'EU' | 'US') => void }, 'redirectToJurisdiction').mockImplementation(() => undefined);
+        const redirectSpy = vi
+            .spyOn(
+                component as unknown as {
+                    redirectToJurisdiction: (jurisdiction: 'EU' | 'US') => void;
+                },
+                'redirectToJurisdiction'
+            )
+            .mockImplementation(() => undefined);
 
         component['selectJurisdiction']('US');
 
         expect(signupTrackingMock.trackEvent).toHaveBeenCalledWith('cloud_region_switch_click', {
             jurisdiction: 'EU',
-            plan_code: 'free',
+            plan: 'free',
+            interval: 'monthly',
             source_path: '/signup',
             target_jurisdiction: 'US'
         });

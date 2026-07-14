@@ -136,6 +136,8 @@ type Config struct {
 	StripePortalConfigurationID string `env:"HITKEEP_STRIPE_PORTAL_CONFIGURATION_ID" default:""   desc:"Stripe customer portal configuration ID for managed cloud billing" cloud:"true"`
 	StripePriceProMonthly       string `env:"HITKEEP_STRIPE_PRICE_PRO_MONTHLY"       default:""      desc:"Stripe monthly recurring price ID for the Pro plan"               cloud:"true"`
 	StripePriceBusinessMonthly  string `env:"HITKEEP_STRIPE_PRICE_BUSINESS_MONTHLY" default:""     desc:"Stripe monthly recurring price ID for the Business plan"          cloud:"true"`
+	StripePriceProAnnual        string `env:"HITKEEP_STRIPE_PRICE_PRO_ANNUAL"        default:""      desc:"Stripe annual recurring price ID for the Pro plan"                cloud:"true"`
+	StripePriceBusinessAnnual   string `env:"HITKEEP_STRIPE_PRICE_BUSINESS_ANNUAL"   default:""      desc:"Stripe annual recurring price ID for the Business plan"           cloud:"true"`
 	CloudCheckoutSuccessURL     string `env:"HITKEEP_CLOUD_CHECKOUT_SUCCESS_URL"     default:""      desc:"Managed cloud checkout success URL override"                      cloud:"true"`
 	CloudCheckoutCancelURL      string `env:"HITKEEP_CLOUD_CHECKOUT_CANCEL_URL"      default:""      desc:"Managed cloud checkout cancel URL override"                       cloud:"true"`
 

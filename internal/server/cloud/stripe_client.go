@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	stripe "github.com/stripe/stripe-go/v84"
-	"github.com/stripe/stripe-go/v84/webhook"
+	stripe "github.com/stripe/stripe-go/v86"
+	"github.com/stripe/stripe-go/v86/webhook"
 )
 
 func (c *stripeSDKClient) CreateCustomer(ctx context.Context, input createCustomerInput) (string, error) {
@@ -24,6 +24,7 @@ func (c *stripeSDKClient) CreateCustomer(ctx context.Context, input createCustom
 	params.AddMetadata("user_id", input.UserID.String())
 	params.AddMetadata("tenant_id", input.TenantID.String())
 	params.AddMetadata("plan_code", input.PlanCode)
+	params.AddMetadata("billing_interval", input.BillingInterval)
 	params.AddMetadata("jurisdiction", input.Jurisdiction)
 
 	created, err := c.client.V1Customers.Create(ctx, params)
@@ -47,11 +48,12 @@ func (c *stripeSDKClient) CreateCheckoutSession(ctx context.Context, input creat
 		},
 		SubscriptionData: &stripe.CheckoutSessionCreateSubscriptionDataParams{
 			Metadata: map[string]string{
-				"user_id":      input.UserID.String(),
-				"tenant_id":    input.TenantID.String(),
-				"plan_code":    input.PlanCode,
-				"plan_name":    input.PlanName,
-				"jurisdiction": input.Jurisdiction,
+				"user_id":          input.UserID.String(),
+				"tenant_id":        input.TenantID.String(),
+				"plan_code":        input.PlanCode,
+				"plan_name":        input.PlanName,
+				"billing_interval": input.BillingInterval,
+				"jurisdiction":     input.Jurisdiction,
 			},
 		},
 		CustomerUpdate: &stripe.CheckoutSessionCreateCustomerUpdateParams{
@@ -65,8 +67,8 @@ func (c *stripeSDKClient) CreateCheckoutSession(ctx context.Context, input creat
 	params.AddMetadata("tenant_id", input.TenantID.String())
 	params.AddMetadata("plan_code", input.PlanCode)
 	params.AddMetadata("plan_name", input.PlanName)
+	params.AddMetadata("billing_interval", input.BillingInterval)
 	params.AddMetadata("jurisdiction", input.Jurisdiction)
-	params.AddMetadata("email", input.Email)
 
 	created, err := c.client.V1CheckoutSessions.Create(ctx, params)
 	if err != nil {

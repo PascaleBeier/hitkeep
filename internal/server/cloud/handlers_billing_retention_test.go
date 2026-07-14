@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	stripe "github.com/stripe/stripe-go/v84"
+	stripe "github.com/stripe/stripe-go/v86"
 
 	"hitkeep/internal/database"
 )

@@ -27,6 +27,11 @@ func (s *Store) CreatePendingSignup(ctx context.Context, entry PendingSignupEntr
 	}
 	token := hex.EncodeToString(bytes)
 	entry.ExpiresAt = time.Now().UTC().Add(pendingSignupTTL)
+	entry.PlanCode = strings.TrimSpace(strings.ToLower(entry.PlanCode))
+	if entry.PlanCode == "" {
+		entry.PlanCode = CloudPlanFree
+	}
+	entry.BillingInterval = normalizeCloudBillingInterval(entry.BillingInterval)
 
 	// Remove any existing pending signup for this email.
 	normalizedEmail := strings.TrimSpace(strings.ToLower(entry.Email))
@@ -38,10 +43,11 @@ func (s *Store) CreatePendingSignup(ctx context.Context, entry PendingSignupEntr
 	}
 
 	if _, err := s.db.ExecContext(ctx, `
-		INSERT INTO pending_signups (token, email, hashed_password, given_name, last_name, team_name, jurisdiction, locale, accepted_tos_at, expires_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO pending_signups (token, email, hashed_password, given_name, last_name, team_name, jurisdiction, locale, plan_code, billing_interval, accepted_tos_at, expires_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		token, entry.Email, entry.HashedPassword, entry.GivenName, entry.LastName,
-		entry.TeamName, entry.Jurisdiction, entry.Locale, sql.NullTime{Time: entry.AcceptedTosAt, Valid: !entry.AcceptedTosAt.IsZero()}, entry.ExpiresAt,
+		entry.TeamName, entry.Jurisdiction, entry.Locale, entry.PlanCode, entry.BillingInterval,
+		sql.NullTime{Time: entry.AcceptedTosAt, Valid: !entry.AcceptedTosAt.IsZero()}, entry.ExpiresAt,
 	); err != nil {
 		return "", fmt.Errorf("insert pending signup: %w", err)
 	}
@@ -58,10 +64,10 @@ func (s *Store) CompletePendingSignup(ctx context.Context, token string) (*Pendi
 	var entry PendingSignupEntry
 	var acceptedTosAt sql.NullTime
 	err := s.db.QueryRowContext(ctx, `
-		SELECT email, hashed_password, given_name, last_name, team_name, jurisdiction, locale, accepted_tos_at, expires_at
+		SELECT email, hashed_password, given_name, last_name, team_name, jurisdiction, locale, plan_code, billing_interval, accepted_tos_at, expires_at
 		FROM pending_signups WHERE token = ?`, token,
 	).Scan(&entry.Email, &entry.HashedPassword, &entry.GivenName, &entry.LastName,
-		&entry.TeamName, &entry.Jurisdiction, &entry.Locale, &acceptedTosAt, &entry.ExpiresAt)
+		&entry.TeamName, &entry.Jurisdiction, &entry.Locale, &entry.PlanCode, &entry.BillingInterval, &acceptedTosAt, &entry.ExpiresAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrPendingSignupInvalid
 	}

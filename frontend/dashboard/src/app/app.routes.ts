@@ -31,6 +31,12 @@ export const routes: Routes = [
         data: titleData('signup.title')
     },
     {
+        path: 'signup/verified',
+        loadComponent: () => import('@pages/signup/verified-signup').then((m) => m.VerifiedSignup),
+        canActivate: [setupGuard, authGuard],
+        data: titleData('signup.verified.title')
+    },
+    {
         path: 'forgot-password',
         loadComponent: () => import('@pages/password/forgot-password').then((m) => m.ForgotPassword),
         data: titleData('password.forgot.title')
@@ -213,25 +219,37 @@ export const routes: Routes = [
                         path: 'filtering',
                         loadComponent: () => import('@pages/site-settings/site-filtering-settings-page').then((m) => m.SiteFilteringSettingsPage),
                         canActivate: [siteSettingsSectionGuard],
-                        data: { ...titleData('sites.settings.tabs.filtering', 'site'), siteSettingsSection: 'filtering' }
+                        data: {
+                            ...titleData('sites.settings.tabs.filtering', 'site'),
+                            siteSettingsSection: 'filtering'
+                        }
                     },
                     {
                         path: 'retention',
                         loadComponent: () => import('@pages/site-settings/site-retention-settings-page').then((m) => m.SiteRetentionSettingsPage),
                         canActivate: [siteSettingsSectionGuard],
-                        data: { ...titleData('sites.settings.tabs.retention', 'site'), siteSettingsSection: 'retention' }
+                        data: {
+                            ...titleData('sites.settings.tabs.retention', 'site'),
+                            siteSettingsSection: 'retention'
+                        }
                     },
                     {
                         path: 'access',
                         loadComponent: () => import('@pages/site-settings/site-access-settings-page').then((m) => m.SiteAccessSettingsPage),
                         canActivate: [siteSettingsSectionGuard],
-                        data: { ...titleData('sites.settings.tabs.access', 'site'), siteSettingsSection: 'access' }
+                        data: {
+                            ...titleData('sites.settings.tabs.access', 'site'),
+                            siteSettingsSection: 'access'
+                        }
                     },
                     {
                         path: 'danger-zone',
                         loadComponent: () => import('@pages/site-settings/site-danger-zone-page').then((m) => m.SiteDangerZonePage),
                         canActivate: [siteSettingsSectionGuard],
-                        data: { ...titleData('sites.settings.tabs.dangerZone', 'site'), siteSettingsSection: 'danger-zone' }
+                        data: {
+                            ...titleData('sites.settings.tabs.dangerZone', 'site'),
+                            siteSettingsSection: 'danger-zone'
+                        }
                     }
                 ]
             },
@@ -258,7 +276,10 @@ export const routes: Routes = [
                 path: 'integration/google-search-console',
                 loadComponent: () => import('@pages/integration/google-search-console/google-search-console').then((m) => m.GoogleSearchConsolePage),
                 canActivate: [capabilityGuard],
-                data: { ...titleData('nav.googleSearchConsole', 'team'), activeTeamCapability: TEAM_CAPABILITIES.manageIntegrations }
+                data: {
+                    ...titleData('nav.googleSearchConsole', 'team'),
+                    activeTeamCapability: TEAM_CAPABILITIES.manageIntegrations
+                }
             },
             {
                 path: 'import-export',
@@ -290,13 +311,21 @@ export const routes: Routes = [
                         path: 'status',
                         loadComponent: () => import('@pages/admin/admin-settings').then((m) => m.AdminSettings),
                         canActivate: [capabilityGuard],
-                        data: { ...titleData('nav.systemStatus'), adminPage: 'status', instanceCapability: INSTANCE_CAPABILITIES.viewSystem }
+                        data: {
+                            ...titleData('nav.systemStatus'),
+                            adminPage: 'status',
+                            instanceCapability: INSTANCE_CAPABILITIES.viewSystem
+                        }
                     },
                     {
                         path: 'system',
                         loadComponent: () => import('@pages/admin/admin-settings').then((m) => m.AdminSettings),
                         canActivate: [capabilityGuard],
-                        data: { ...titleData('nav.systemSettings'), adminPage: 'settings', instanceCapability: INSTANCE_CAPABILITIES.manageUsers }
+                        data: {
+                            ...titleData('nav.systemSettings'),
+                            adminPage: 'settings',
+                            instanceCapability: INSTANCE_CAPABILITIES.manageUsers
+                        }
                     },
                     {
                         path: 'team',
@@ -321,7 +350,10 @@ export const routes: Routes = [
                                     {
                                         path: 'invite',
                                         loadComponent: () => import('@pages/admin/team/team-members').then((m) => m.TeamMembersPage),
-                                        data: { ...titleData('admin.team.tabs.members', 'team'), openInvite: true }
+                                        data: {
+                                            ...titleData('admin.team.tabs.members', 'team'),
+                                            openInvite: true
+                                        }
                                     }
                                 ]
                             },
@@ -349,15 +381,26 @@ export const routes: Routes = [
                                 path: 'activity',
                                 loadComponent: () => import('@pages/admin/team/team-audit').then((m) => m.TeamAuditPage),
                                 canActivate: [capabilityGuard],
-                                data: { ...titleData('admin.team.tabs.activity', 'team'), activeTeamCapability: TEAM_CAPABILITIES.viewAudit }
+                                data: {
+                                    ...titleData('admin.team.tabs.activity', 'team'),
+                                    activeTeamCapability: TEAM_CAPABILITIES.viewAudit
+                                }
                             },
                             {
                                 path: 'danger-zone',
                                 loadComponent: () => import('@pages/admin/team/team-danger-zone').then((m) => m.TeamDangerZonePage),
                                 data: titleData('admin.team.tabs.dangerZone', 'team')
                             },
-                            { path: 'settings', pathMatch: 'full', redirectTo: 'api-clients' },
-                            { path: 'tracking-domains', pathMatch: 'full', redirectTo: 'custom-domains' }
+                            {
+                                path: 'settings',
+                                pathMatch: 'full',
+                                redirectTo: 'api-clients'
+                            },
+                            {
+                                path: 'tracking-domains',
+                                pathMatch: 'full',
+                                redirectTo: 'custom-domains'
+                            }
                         ]
                     },
                     { path: '', redirectTo: 'team', pathMatch: 'full' }
