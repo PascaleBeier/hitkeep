@@ -43,6 +43,9 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.28
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.27
 	github.com/coreos/go-oidc/v3 v3.20.0
+	github.com/go-jose/go-jose/v4 v4.1.4
+	github.com/google/jsonschema-go v0.4.3
+	github.com/spf13/cobra v1.10.2
 )
 
 require (
@@ -81,7 +84,6 @@ require (
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.2 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
@@ -93,7 +95,6 @@ require (
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/flatbuffers v25.12.19+incompatible // indirect
 	github.com/google/go-tpm v0.9.8 // indirect
-	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.18 // indirect
 	github.com/googleapis/gax-go/v2 v2.23.0 // indirect
@@ -104,6 +105,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-sockaddr v1.0.7 // indirect
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/julienschmidt/httprouter v1.3.0 // indirect
@@ -121,6 +123,7 @@ require (
 	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/spf13/afero v1.14.0 // indirect
 	github.com/spf13/cast v1.9.2 // indirect
+	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/tdewolff/parse/v2 v2.8.3 // indirect
 	github.com/tetratelabs/wazero v1.12.0 // indirect
 	github.com/tinylib/msgp v1.6.4 // indirect

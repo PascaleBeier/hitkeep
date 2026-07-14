@@ -2,65 +2,33 @@
 
 set -euo pipefail
 
-COMMON_TAGS="${HITKEEP_GO_BUILD_TAGS:-hashicorpmetrics timetzdata}"
-CLOUD_TAGS="${HITKEEP_CLOUD_GO_BUILD_TAGS:-s3 billing tenancy}"
-
-join_tags() {
-  printf '%s\n' "$@" | awk '
-    {
-      for (i = 1; i <= NF; i++) {
-        if (!seen[$i]++) {
-          tags[++count] = $i
-        }
-      }
-    }
-    END {
-      for (i = 1; i <= count; i++) {
-        printf "%s%s", sep, tags[i]
-        sep = " "
-      }
-      printf "\n"
-    }
-  '
-}
-
-comma_tags() {
-  join_tags "$@" | tr ' ' ','
-}
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 mode="${1:-default}"
 case "$mode" in
   default|common)
-    shift || true
-    join_tags "$COMMON_TAGS" "$@"
+    variant=self-hosted
+    field=tags
     ;;
   cloud)
-    shift || true
-    if [[ "$#" -gt 0 ]]; then
-      join_tags "$COMMON_TAGS" "$@"
-    else
-      join_tags "$COMMON_TAGS" "$CLOUD_TAGS"
-    fi
+    variant=cloud
+    field=tags
     ;;
   csv)
-    shift || true
-    comma_tags "$COMMON_TAGS" "$@"
+    variant=self-hosted
+    field=csv
     ;;
   cloud-csv)
-    shift || true
-    if [[ "$#" -gt 0 ]]; then
-      comma_tags "$COMMON_TAGS" "$@"
-    else
-      comma_tags "$COMMON_TAGS" "$CLOUD_TAGS"
-    fi
+    variant=cloud
+    field=csv
     ;;
   goflags)
-    shift || true
-    printf -- '-tags=%s\n' "$(comma_tags "$COMMON_TAGS" "$@")"
+    variant=self-hosted
+    field=goflags
     ;;
   golangci)
-    shift || true
-    printf -- '--build-tags=%s\n' "$(comma_tags "$COMMON_TAGS" "$@")"
+    variant=self-hosted
+    field=golangci
     ;;
   *)
     cat >&2 <<'EOF'
@@ -69,3 +37,10 @@ EOF
     exit 2
     ;;
 esac
+
+shift || true
+args=("$ROOT_DIR/hk" ci go-config "$field" --variant "$variant" --output plain)
+for tag in "$@"; do
+  args+=(--extra-tag "$tag")
+done
+exec "${args[@]}"

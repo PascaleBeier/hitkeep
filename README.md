@@ -149,7 +149,8 @@ The maintained reference lives on `hitkeep.com`.
 - [Read-only MCP server for web analytics](https://hitkeep.com/use-cases/read-only-mcp-server-web-analytics/)
 - [Compliance](https://hitkeep.com/compliance/overview/)
 - [Comparison pages](https://hitkeep.com/vs/)
-- [Agent Skills](./skills/)
+- [Analytics Agent Skills](./skills/)
+- [Contributor Agent Skills](./.agents/skills/)
 
 ## Cloud
 
@@ -161,33 +162,16 @@ If you want the same product without running it yourself, start here:
 
 ## Development
 
-The fastest way to a working contributor setup is Docker — one command starts the Go backend, Angular dashboard, Mailpit, and seeded demo data:
+The repository-owned developer CLI provides reproducible setup, isolated worktrees, native or container-backed development, cloud-parity builds, and the same QA contract used by automation:
 
 ```bash
-make dev-docker-seed
+./hk setup
+./hk dev --seed
 ```
 
-Open `http://localhost:4200` and sign in with `demo@example.com` / `demo1234`.
+Use the URLs printed by `hk`; ports and state are isolated per Git worktree. Add `--runtime container` for container-backed development or `--variant cloud` for local managed-cloud parity.
 
-Use `make dev-docker-cloud-seed` for the same hot-reload stack with the local
-cloud/billing build tags and safe cloud defaults. `make help` lists the
-maintained entry points, and `make doctor` checks your local prerequisites.
-
-For native builds you need Go 1.26+, Node.js 24+, Make, and a working C toolchain for DuckDB:
-
-```bash
-git clone https://github.com/pascalebeier/hitkeep.git
-cd hitkeep
-make build
-./hitkeep
-```
-
-For day-to-day native development with live reload on `http://localhost:4200`:
-
-```bash
-make dev       # Go backend + Angular dashboard
-make dev-seed  # the same, plus seeded demo data
-```
+Run `./hk help` for current commands, `./hk doctor` for prerequisites, and `./hk qa pr` before review. The Makefile contains compatibility aliases only.
 
 Contributor docs and local development guides:
 

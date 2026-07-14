@@ -1,37 +1,37 @@
-# Official HitKeep Agent Skills
+# Official HitKeep Analytics Skills
 
-This directory contains official HitKeep Agent Skills for AI assistants and humans working with HitKeep analytics and contributor workflows.
+This directory is the canonical product analytics skill pack. Its five skills are published for external assistants, and their transport-neutral procedure references are compiled into HitKeep Ask AI.
 
-The pack starts with one parent skill and several narrower child skills:
+The pack contains:
 
-- `hitkeep-analytics` is the parent, or spine, skill. It routes analytics questions, explains the HitKeep MCP boundary, and tells agents when to use MCP, docs, REST API, open exports, or takeout.
-- `hitkeep-traffic-diagnosis` handles traffic drops, spikes, and source changes.
-- `hitkeep-ai-visibility-analyst` handles AI crawler fetches, AI-referred visits, assistant families, citation yield, and fetch failure hotspots.
-- `hitkeep-ecommerce-analyst` handles revenue, products, sources, city/provider/ASN aggregates, and conversion context.
-- `hitkeep-tracking-verifier` handles tracker install checks, WordPress-style installs, and automatic event verification.
-- `hitkeep-i18n` handles dashboard UI strings, Transloco keys, locale files, PrimeNG locale behavior, and localized formatting.
+- `hitkeep-analytics`: broad analytics routing, scope, evidence, and privacy judgment.
+- `hitkeep-traffic-diagnosis`: traffic drops, spikes, source shifts, and measurement checks.
+- `hitkeep-ai-visibility-analyst`: crawler fetches, AI referrals, correlation, and failure analysis.
+- `hitkeep-ecommerce-analyst`: revenue, products, acquisition quality, and conversion movement.
+- `hitkeep-tracking-verifier`: installation and automatic-event verification.
 
-The child skills are siblings on disk, not physically nested under the parent skill. Many skills-compatible clients discover skills by scanning direct child directories of a configured skills root, so nested `SKILL.md` files can be invisible. Treat them as one logical HitKeep Analytics pack.
-
-The repository path is `skills/` so clients and directories that understand the conventional skills layout can discover the official HitKeep pack without extra mapping.
+Each `SKILL.md` is a thin external-agent adapter for production HitKeep MCP. Each `references/procedure.md` contains the transport-neutral reasoning shared with Ask AI. Ask AI uses its internal analytics tool bridge, not MCP, and never embeds contributor skills.
 
 ## Install
 
-Install the full pack from the HitKeep repository when your client supports GitHub subdirectory skill installation:
+List only the analytics pack:
 
 ```bash
-npx skills add https://github.com/PascaleBeier/hitkeep/tree/main/skills/hitkeep-analytics
-npx skills add https://github.com/PascaleBeier/hitkeep/tree/main/skills/hitkeep-traffic-diagnosis
-npx skills add https://github.com/PascaleBeier/hitkeep/tree/main/skills/hitkeep-ai-visibility-analyst
-npx skills add https://github.com/PascaleBeier/hitkeep/tree/main/skills/hitkeep-ecommerce-analyst
-npx skills add https://github.com/PascaleBeier/hitkeep/tree/main/skills/hitkeep-tracking-verifier
-npx skills add https://github.com/PascaleBeier/hitkeep/tree/main/skills/hitkeep-i18n
+npx skills add https://github.com/PascaleBeier/hitkeep/tree/main/skills --list
 ```
 
-For manual installs, copy the skill directories you want into your agent's skills directory.
+Install the complete analytics pack for Codex:
 
-## Pair With HitKeep MCP
+```bash
+npx skills add https://github.com/PascaleBeier/hitkeep/tree/main/skills --skill '*' --agent codex --copy -y
+```
 
-The analytics skills work best with the official HitKeep MCP server configured. They teach the agent how to reason about HitKeep data, while the MCP server provides scoped, read-only aggregate analytics and official docs tools. The `hitkeep-i18n` skill is for repository localization work and does not need MCP access.
+Install one specialist by replacing the skill name:
 
-The skills do not include scripts and do not store credentials. Keep HitKeep MCP tokens narrow: create API clients for the assistant, grant only the sites it needs, and revoke tokens when access is no longer required.
+```bash
+npx skills add https://github.com/PascaleBeier/hitkeep/tree/main/skills --skill hitkeep-traffic-diagnosis --agent codex --copy -y
+```
+
+For live analytics, pair the installed skill with HitKeep's scoped, read-only production MCP endpoint. Skills contain no credentials or customer data.
+
+Contributor skills for changing HitKeep itself are canonical under `.agents/skills` and documented in `CONTRIBUTING.md`. Do not install the repository root with `--skill '*'` when only one audience is intended.

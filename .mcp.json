@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "hitkeep-dev": {
+      "command": "${CLAUDE_PROJECT_DIR:-.}/hk",
+      "args": ["--workspace", "${CLAUDE_PROJECT_DIR:-.}", "mcp", "serve"]
+    }
+  }
+}

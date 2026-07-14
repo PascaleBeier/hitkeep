@@ -1,4 +1,4 @@
 interface:
-  display_name: "HitKeep Traffic Diagnosis"
-  short_description: "Diagnose HitKeep traffic changes"
-  default_prompt: "Use $hitkeep-traffic-diagnosis to investigate a HitKeep traffic drop, spike, or source shift."
+  display_name: "Diagnose HitKeep Traffic"
+  short_description: "Explain HitKeep traffic changes safely"
+  default_prompt: "Use $hitkeep-traffic-diagnosis to investigate this HitKeep traffic change with scoped aggregate evidence."

@@ -1,0 +1,10 @@
+{
+  "servers": {
+    "hitkeepDev": {
+      "type": "stdio",
+      "command": "${workspaceFolder}/hk",
+      "args": ["--workspace", "${workspaceFolder}", "mcp", "serve"],
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}

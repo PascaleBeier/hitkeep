@@ -23,8 +23,22 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Setup Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Resolve canonical zizmor version
+        id: tool-version
+        shell: bash
+        run: |
+          echo "version=$(jq -r '.zizmor' internal/devtool/tool-versions.json)" >> "$GITHUB_OUTPUT"
+          ./hk ci qa-matrix --profile pr --group zizmor --output json >/dev/null
+
       - name: Run zizmor
         uses: zizmorcore/zizmor-action@192e21d79ab29983730a13d1382995c2307fbcaa # v0.5.7
         with:
           advanced-security: false
           annotations: true
+          version: ${{ steps.tool-version.outputs.version }}

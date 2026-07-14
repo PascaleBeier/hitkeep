@@ -1,0 +1,394 @@
+package devtool
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"slices"
+	"strconv"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
+)
+
+const doctorCommandTimeout = 2 * time.Second
+
+type App struct {
+	workspace  Workspace
+	executable string
+}
+
+func NewApp(workspacePath string) (*App, error) {
+	workspace, err := ResolveWorkspace(workspacePath)
+	if err != nil {
+		return nil, err
+	}
+	executable, err := os.Executable()
+	if err != nil {
+		return nil, fmt.Errorf("resolve hk executable: %w", err)
+	}
+	return &App{workspace: workspace, executable: executable}, nil
+}
+
+func (a *App) Workspace(context.Context) (Workspace, error) {
+	workspace, err := ResolveWorkspace(a.workspace.Root)
+	if err == nil {
+		a.workspace = workspace
+		workspace.Services = probeWorkspaceServices(workspace)
+		runs, _ := a.ListRuns(100)
+		for _, run := range runs {
+			if !isTerminal(run.Status) {
+				workspace.ActiveRuns = append(workspace.ActiveRuns, summarizeRun(run))
+			}
+		}
+	}
+	return workspace, err
+}
+
+func (a *App) RecentRuns(limit int) ([]RunSummary, error) {
+	runs, err := a.ListRuns(limit)
+	if err != nil {
+		return nil, err
+	}
+	summaries := make([]RunSummary, 0, len(runs))
+	for _, run := range runs {
+		summaries = append(summaries, summarizeRun(run))
+	}
+	return summaries, nil
+}
+
+func (a *App) Workspaces(context.Context) ([]Workspace, error) {
+	return ListWorkspaces(a.workspace.Root)
+}
+
+func (a *App) Handoff(ctx context.Context) (Handoff, error) {
+	workspace, err := a.Workspace(ctx)
+	if err != nil {
+		return Handoff{}, err
+	}
+	boundedPaths, truncated := boundedStrings(workspace.ChangedPaths, maxHandoffPaths)
+	workspace.ChangedPaths = boundedPaths
+	truncated = truncated || workspace.ChangedPathsTruncated
+	workspace.ChangedPathsTruncated = truncated
+	runs, _ := a.ListRuns(5)
+	recent := make([]RunSummary, 0, len(runs))
+	for _, run := range runs {
+		recent = append(recent, summarizeRun(run))
+	}
+	next := []string{"./hk qa plan changed --output json"}
+	if workspace.DirtyCount == 0 {
+		next = []string{"./hk workspace status --output json"}
+	}
+	return Handoff{Workspace: workspace, RecentRuns: recent, NextActions: next, Truncated: truncated, GeneratedAt: time.Now().UTC()}, nil
+}
+
+func (a *App) Doctor(ctx context.Context) DoctorReport {
+	goVersion := requiredVersion(a.workspace.Root, "go.mod", "go ")
+	nodeVersion := requiredVersion(a.workspace.Root, filepath.Join("frontend", "dashboard", ".nvmrc"), "")
+	npmVersion := requiredPackageManagerVersion(a.workspace.Root)
+	probes := []func(context.Context) Check{
+		func(ctx context.Context) Check { return checkCommand(ctx, "git", "git", "--version") },
+		func(ctx context.Context) Check {
+			return checkExactCommand(ctx, "go", goVersion, "go"+goVersion, "go", "version")
+		},
+		func(ctx context.Context) Check {
+			return checkExactCommand(ctx, "node", nodeVersion, "v"+nodeVersion, "node", "--version")
+		},
+		func(ctx context.Context) Check {
+			return checkExactCommand(ctx, "npm", npmVersion, npmVersion, "npm", "--version")
+		},
+		func(ctx context.Context) Check { return checkCommand(ctx, "c-compiler", "cc", "--version") },
+		func(ctx context.Context) Check {
+			return checkCommand(ctx, "docker", "docker", "version", "--format", "{{.Server.Version}}")
+		},
+		func(ctx context.Context) Check {
+			return checkCommand(ctx, "compose", "docker", "compose", "version", "--short")
+		},
+		func(ctx context.Context) Check { return checkCommand(ctx, "buildx", "docker", "buildx", "version") },
+		func(ctx context.Context) Check {
+			return checkExactCommand(ctx, "golangci", ToolVersion("golangci-lint"), ToolVersion("golangci-lint"), "golangci-lint", "--version")
+		},
+		func(ctx context.Context) Check {
+			return checkExactCommand(ctx, "zizmor", ToolVersion("zizmor"), ToolVersion("zizmor"), "zizmor", "--version")
+		},
+	}
+	checks := make([]Check, len(probes))
+	var wait sync.WaitGroup
+	for index, probe := range probes {
+		wait.Go(func() { checks[index] = probe(ctx) })
+	}
+	wait.Wait()
+	statuses := map[string]bool{}
+	for _, check := range checks {
+		statuses[check.Name] = check.Status == "ok"
+	}
+	nativeToolchainReady := statuses["go"] && statuses["node"] && statuses["npm"] && statuses["c-compiler"]
+	containerReady := statuses["docker"] && statuses["compose"]
+	nativeDevelopmentReady := nativeToolchainReady && containerReady
+	prQA := nativeToolchainReady && statuses["golangci"] && statuses["zizmor"]
+	fullQA := prQA && statuses["docker"] && statuses["buildx"]
+	ready := statuses["git"] && (nativeToolchainReady || containerReady)
+	return DoctorReport{Ready: ready, Capabilities: DoctorCapabilities{NativeDevelopment: nativeDevelopmentReady, ContainerDevelopment: containerReady, PRQA: prQA, FullQA: fullQA}, Checks: checks}
+}
+
+func nativeToolchainReady(report DoctorReport) bool {
+	required := map[string]bool{"go": false, "node": false, "npm": false, "c-compiler": false}
+	for _, check := range report.Checks {
+		if _, ok := required[check.Name]; ok {
+			required[check.Name] = check.Status == "ok"
+		}
+	}
+	for _, ready := range required {
+		if !ready {
+			return false
+		}
+	}
+	return true
+}
+
+func (a *App) QAPlan(ctx context.Context, profile, baseRef string) (QAPlan, error) {
+	if !slices.Contains([]string{"changed", "pr", "full"}, profile) {
+		return QAPlan{}, fmt.Errorf("unknown QA profile %q", profile)
+	}
+	plan := QAPlan{Profile: profile, BaseRef: baseRef}
+	if profile != "changed" {
+		plan.GateIDs = profileGateIDs(profile)
+		return plan, nil
+	}
+	if baseRef == "" {
+		baseRef = "origin/main"
+		plan.BaseRef = baseRef
+	}
+	changed, err := changedPaths(a.workspace.Root, baseRef)
+	if err != nil {
+		changed, err = workingTreeChangedPaths(a.workspace.Root)
+		if err != nil {
+			return QAPlan{}, err
+		}
+	}
+	plan.ChangedPathCount = len(changed)
+	plan.ChangedPaths, plan.ChangedPathsTruncated = boundedStrings(changed, maxStructuredPaths)
+	selected := map[string]bool{}
+	unknown := false
+	for _, path := range changed {
+		matched := false
+		for _, gate := range gates {
+			if gateMatchesPath(gate, path) {
+				selected[gate.ID] = true
+				matched = true
+			}
+		}
+		if strings.HasPrefix(path, "scripts/") || strings.HasPrefix(path, ".github/") || path == "Makefile" || path == "Dockerfile" || path == "compose.dev.yaml" || path == "compose.dev-cloud.yaml" {
+			unknown = true
+			matched = true
+		}
+		if !matched {
+			unknown = true
+		}
+	}
+	if unknown {
+		plan.GateIDs = profileGateIDs("pr")
+		plan.Escalated = true
+		plan.EscalationWhy = "tooling or unclassified paths changed"
+		return plan, nil
+	}
+	for _, gate := range gates {
+		if selected[gate.ID] && slices.Contains(gate.Profiles, "pr") {
+			plan.GateIDs = append(plan.GateIDs, gate.ID)
+		}
+	}
+	if len(plan.GateIDs) == 0 {
+		plan.GateIDs = []string{"go-vet"}
+	}
+	return plan, nil
+}
+
+func (a *App) Catalog() Catalog {
+	catalog := CatalogSnapshot()
+	for index := range catalog.Variants {
+		catalog.Variants[index].LocalImage = a.localImageRef(catalog.Variants[index])
+	}
+	return catalog
+}
+
+func (a *App) Root() string { return a.workspace.Root }
+
+func (a *App) WorkspaceID() string { return a.workspace.ID }
+
+func (a *App) localImageRef(variant Variant) string {
+	return variant.LocalImage + "-" + a.workspace.ID[:8]
+}
+
+func (a *App) SharedCacheEnvironment() []string {
+	// Go, npm, and Playwright already use safe user-level caches shared by all
+	// worktrees. Keep those native defaults instead of creating a second large
+	// cache tree under hk state. Only prevent implicit Go toolchain downloads;
+	// the bootstrap has already verified the exact repository toolchain.
+	return []string{"GOTOOLCHAIN=local"}
+}
+
+func (a *App) commandEnvironment(overrides []string) []string {
+	return mergedCommandEnvironment(append(a.SharedCacheEnvironment(), overrides...))
+}
+
+func (a *App) ComposeEnvironment(variant Variant) []string {
+	toolchain, _ := a.ToolchainConfig()
+	values := map[string]string{
+		"HK_COMPOSE_PROJECT":         a.workspace.ComposeProject,
+		"HK_BACKEND_PORT":            fmt.Sprint(a.workspace.Ports.Backend),
+		"HK_FRONTEND_PORT":           fmt.Sprint(a.workspace.Ports.Frontend),
+		"HK_SMTP_PORT":               fmt.Sprint(a.workspace.Ports.SMTP),
+		"HK_MAIL_UI_PORT":            fmt.Sprint(a.workspace.Ports.MailUI),
+		"HK_GO_VERSION":              toolchain.Go,
+		"HK_NODE_VERSION":            toolchain.Node,
+		"HK_NPM_VERSION":             toolchain.NPM,
+		"HITKEEP_E2E_PORT":           fmt.Sprint(a.workspace.Ports.E2E),
+		"HITKEEP_E2E_MAIL_PORT":      fmt.Sprint(a.workspace.Ports.E2E + 53),
+		"HITKEEP_E2E_HTML_REPORT":    filepath.Join(a.workspace.StateDir, "e2e", "report"),
+		"HITKEEP_E2E_OUTPUT_DIR":     filepath.Join(a.workspace.StateDir, "e2e", "results"),
+		"HITKEEP_FRONTEND_CACHE_DIR": filepath.Join(a.workspace.StateDir, "frontend-cache"),
+		"HITKEEP_GO_BUILD_TAGS":      strings.Join(variant.BuildTags, " "),
+		"HITKEEP_PUBLIC_URL":         a.workspace.URLs.Web,
+		"HITKEEP_MAIL_DRIVER":        "smtp",
+		"HITKEEP_MAIL_ENCRYPTION":    "none",
+		"HITKEEP_MCP_ENABLED":        "true",
+	}
+	for key, value := range variant.Environment {
+		values[key] = replaceDefaultPorts(value, a.workspace.Ports)
+	}
+	values["HITKEEP_JWT_SECRET"] = "dev-workspace-" + a.workspace.ID
+	environment := make([]string, 0, len(values))
+	for key, value := range values {
+		environment = append(environment, key+"="+value)
+	}
+	slices.Sort(environment)
+	return environment
+}
+
+func checkCommand(ctx context.Context, name string, executable string, args ...string) Check {
+	path, err := exec.LookPath(executable)
+	if err != nil {
+		return Check{Name: name, Status: "missing", Remediation: "install " + executable + " or use the container runtime"}
+	}
+	probeContext, cancel := context.WithTimeout(ctx, doctorCommandTimeout)
+	defer cancel()
+	command := exec.CommandContext(probeContext, path, args...)
+	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	command.Cancel = func() error {
+		if command.Process == nil {
+			return nil
+		}
+		err := syscall.Kill(-command.Process.Pid, syscall.SIGKILL)
+		if errors.Is(err, syscall.ESRCH) {
+			return nil
+		}
+		return err
+	}
+	command.WaitDelay = 250 * time.Millisecond
+	output, runErr := command.CombinedOutput()
+	if runErr != nil {
+		if errors.Is(probeContext.Err(), context.DeadlineExceeded) {
+			return Check{Name: name, Status: "unavailable", Detected: "timed out after " + doctorCommandTimeout.String(), Remediation: "check " + executable + " configuration"}
+		}
+		return Check{Name: name, Status: "unavailable", Detected: strings.TrimSpace(string(output)), Remediation: "check " + executable + " configuration"}
+	}
+	return Check{Name: name, Status: "ok", Detected: strings.TrimSpace(string(output))}
+}
+
+func checkExactCommand(ctx context.Context, name, required, expected, executable string, args ...string) Check {
+	check := checkCommand(ctx, name, executable, args...)
+	check.Required = required
+	if check.Status == "ok" && required != "" && !strings.Contains(check.Detected, expected) {
+		check.Status = "mismatch"
+		check.Remediation = "install the exact repository version or use the container runtime"
+	}
+	return check
+}
+
+func requiredVersion(root, relativePath, prefix string) string {
+	raw, err := os.ReadFile(filepath.Join(root, relativePath))
+	if err != nil {
+		return ""
+	}
+	for line := range strings.SplitSeq(string(raw), "\n") {
+		line = strings.TrimSpace(line)
+		if prefix == "" && line != "" {
+			return line
+		}
+		if after, ok := strings.CutPrefix(line, prefix); ok {
+			return strings.TrimSpace(after)
+		}
+	}
+	return ""
+}
+
+func requiredPackageManagerVersion(root string) string {
+	raw, err := os.ReadFile(filepath.Join(root, "frontend", "dashboard", "package.json"))
+	if err != nil {
+		return ""
+	}
+	manifest := struct {
+		PackageManager string `json:"packageManager"`
+	}{}
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		return ""
+	}
+	version, ok := strings.CutPrefix(manifest.PackageManager, "npm@")
+	if !ok || !exactToolVersionPattern.MatchString(version) {
+		return ""
+	}
+	return version
+}
+
+func changedPaths(root, baseRef string) ([]string, error) {
+	mergeBase, err := gitOutput(root, "merge-base", baseRef, "HEAD")
+	if err != nil {
+		return nil, err
+	}
+	tracked, err := gitLines(root, "diff", "--name-only", mergeBase)
+	if err != nil {
+		return nil, err
+	}
+	untracked, _ := gitLines(root, "ls-files", "--others", "--exclude-standard")
+	return compactSorted(append(tracked, untracked...)), nil
+}
+
+func replaceDefaultPorts(value string, ports Ports) string {
+	replacements := map[string]string{
+		"localhost:8080": "localhost:" + fmt.Sprint(ports.Backend),
+		"localhost:4200": "localhost:" + fmt.Sprint(ports.Frontend),
+		"127.0.0.1:8080": "127.0.0.1:" + fmt.Sprint(ports.Backend),
+		"127.0.0.1:4200": "127.0.0.1:" + fmt.Sprint(ports.Frontend),
+	}
+	for from, to := range replacements {
+		value = strings.ReplaceAll(value, from, to)
+	}
+	return value
+}
+
+func maxParallelism() int {
+	if override := validatedQASlotOverride(); override != "" {
+		if slots, err := strconv.Atoi(override); err == nil {
+			return slots
+		}
+	}
+	if runtime.NumCPU() <= 2 {
+		return 1
+	}
+	return max(2, min(8, runtime.NumCPU()/2))
+}
+
+func validatedQASlotOverride() string {
+	value := strings.TrimSpace(os.Getenv("HK_QA_SLOTS"))
+	slots, err := strconv.Atoi(value)
+	if err != nil || slots < 1 || slots > 32 {
+		return ""
+	}
+	return strconv.Itoa(slots)
+}

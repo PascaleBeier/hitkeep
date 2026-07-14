@@ -1,0 +1,4 @@
+interface:
+  display_name: "Maintain HitKeep localization"
+  short_description: "Keep dashboard localization correct"
+  default_prompt: "Use $hitkeep-i18n to implement and validate this dashboard localization change across the current locale set."

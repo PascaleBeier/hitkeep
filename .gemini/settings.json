@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "hitkeep-dev": {
+      "command": "./hk",
+      "args": ["--workspace", ".", "mcp", "serve"],
+      "cwd": ".",
+      "timeout": 60000,
+      "trust": false
+    }
+  }
+}
