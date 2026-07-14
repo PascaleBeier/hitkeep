@@ -417,7 +417,7 @@ func tenantIDFromStripeEvent(event stripe.Event) (uuid.UUID, error) {
 			return uuid.Nil, fmt.Errorf("decode checkout.session.completed: %w", err)
 		}
 		return uuid.Parse(strings.TrimSpace(session.Metadata["tenant_id"]))
-	case "customer.subscription.updated", "customer.subscription.deleted":
+	case "customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted":
 		subscription, err := parseStripeSubscriptionEvent(event.Data.Raw)
 		if err != nil {
 			return uuid.Nil, fmt.Errorf("decode subscription event: %w", err)
