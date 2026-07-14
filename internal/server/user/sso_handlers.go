@@ -292,7 +292,7 @@ func validSSODomain(domain string) bool {
 	if domain == "" || len(domain) > 253 || strings.ContainsAny(domain, "/:@[]") {
 		return false
 	}
-	for _, label := range strings.Split(domain, ".") {
+	for label := range strings.SplitSeq(domain, ".") {
 		if label == "" || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
 			return false
 		}

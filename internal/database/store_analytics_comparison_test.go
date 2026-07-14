@@ -143,7 +143,6 @@ func TestGetSiteStatsFiltersGoalConversionsToMatchingSessionCohort(t *testing.T)
 		{SiteID: site.ID, SessionID: unmatchedSession, PageID: uuid.New(), Timestamp: now.Add(-2 * time.Hour), Path: "/blog"},
 		{SiteID: site.ID, SessionID: unmatchedSession, PageID: uuid.New(), Timestamp: now.Add(-time.Hour), Path: "/signup"},
 	} {
-		hit := hit
 		if err := store.CreateHit(ctx, &hit); err != nil {
 			t.Fatalf("create hit %s: %v", hit.Path, err)
 		}

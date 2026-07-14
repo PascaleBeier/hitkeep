@@ -1483,7 +1483,7 @@ type TeamSSOConfig struct {
 	AutoProvision          bool      `json:"auto_provision"`
 	Enabled                bool      `json:"enabled"`
 	CallbackURL            string    `json:"callback_url"`
-	UpdatedAt              time.Time `json:"updated_at,omitempty"`
+	UpdatedAt              time.Time `json:"updated_at"`
 }
 
 type SSOAvailability struct {
