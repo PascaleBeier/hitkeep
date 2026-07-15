@@ -986,17 +986,60 @@
       "sourceRequired": "La fuente de campaña es obligatoria."
     }
   },
+  "social": {
+    "continueWith": { "google": "Continuar con Google", "github": "Continuar con GitHub", "microsoft": "Continuar con Microsoft" },
+    "signupMethods": "Métodos de registro social",
+    "confirmEmailSubtitle": "Confirma a qué cuenta de HitKeep debe acceder esta identidad de Microsoft.",
+    "confirmEmailPrompt": "Los datos de correo de Microsoft pueden cambiar. Revisa el correo de HitKeep antes de que enviemos un enlace de confirmación.",
+    "confirmEmailAction": "Enviar enlace de confirmación",
+    "completeSignupTitle": "Termina de crear tu equipo",
+    "completeSignupSubtitle": "Has iniciado sesión con {{provider}}. Añade los pocos datos que HitKeep aún necesita.",
+    "createTeam": "Crear equipo",
+    "regionLocked": "La región está bloqueada para esta autorización. Reinicia el registro para cambiarla.",
+    "microsoftEmailHelp": "Las direcciones de correo de Microsoft pueden cambiar. Confirma el correo de HitKeep que te pertenece; enviaremos un enlace de verificación.",
+    "confirmationTitle": "Confirma tu correo",
+    "confirmationSent": "Revisa tu bandeja de entrada y sigue el enlace seguro para terminar.",
+    "confirmedSignIn": "Tu proveedor está vinculado. Inicia sesión una vez más para continuar.",
+    "mfaSignInRequired": "Tu invitación fue aceptada. Inicia sesión de nuevo para completar la autenticación multifactor.",
+    "errors": {
+      "failed": "No se pudo completar el inicio de sesión social. Inténtalo de nuevo.",
+      "unavailable": "Este proveedor de inicio de sesión no está disponible ahora.",
+      "cancelled": "Se canceló el inicio de sesión social.",
+      "emailUnverified": "El proveedor no proporcionó un correo verificado.",
+      "emailRequired": "Introduce el correo de HitKeep que quieres confirmar.",
+      "identityConflict": "Esta cuenta del proveedor ya está vinculada a otra cuenta de HitKeep.",
+      "accountNotFound": "No hay una cuenta de HitKeep que coincida. Crea una cuenta o usa otro método.",
+      "confirmationFailed": "No pudimos enviar el correo de confirmación. Inténtalo de nuevo.",
+      "completionExpired": "Este inicio de sesión social ha caducado. Reinicia el registro.",
+      "regionMismatch": "La región seleccionada no coincide con esta autorización. Reinicia el registro en la región correcta.",
+      "signupFailed": "No se pudo crear tu equipo. Inténtalo de nuevo."
+    }
+  },
   "settings": {
     "security": {
       "title": "Seguridad",
       "loading": "Cargando configuración de seguridad...",
       "changePasswordTitle": "Cambiar contraseña",
       "changePasswordDescription": "Actualiza la contraseña de esta cuenta.",
+      "setPasswordTitle": "Establecer una contraseña",
+      "setPasswordDescription": "Añade el inicio de sesión con contraseña como otra forma de acceder a esta cuenta.",
+      "setPasswordHelp": "HitKeep enviará un enlace seguro para configurar la contraseña al correo de tu cuenta.",
+      "setPasswordAction": "Enviar correo de configuración",
+      "setPasswordSent": "Correo de configuración de contraseña enviado.",
       "passwordUpdated": "Contraseña actualizada correctamente.",
       "currentPasswordLabel": "Contraseña actual",
       "newPasswordLabel": "Nueva contraseña",
       "minimumLengthHint": "Mínimo 8 caracteres",
       "updatePassword": "Actualizar contraseña",
+      "social": {
+        "title": "Inicio de sesión social",
+        "description": "Conecta cuentas de proveedores que puedas usar para iniciar sesión en HitKeep.",
+        "empty": "No hay proveedores de inicio de sesión social vinculados.",
+        "linkedDate": "Vinculado", "lastUsed": "Último uso", "connectAction": "Conectar {{provider}}", "unlinkAction": "Desvincular",
+        "passwordConfirmationHint": "Introduce tu contraseña actual en la sección de contraseña antes de desvincular tu único proveedor social.",
+        "linked": "Proveedor vinculado correctamente.", "unlinked": "Proveedor desvinculado correctamente.",
+        "errors": { "linkFailed": "No se pudo vincular este proveedor.", "unlinkFailed": "No se pudo desvincular este proveedor.", "lastMethod": "Añade otro proveedor social o una clave de acceso, o confirma una contraseña habilitada." }
+      },
       "twoFactor": {
         "title": "Autenticación en dos pasos",
         "description": "Protege tu cuenta con un código de un solo uso de una app autenticadora.",
@@ -2043,6 +2086,10 @@
         "cloud_signup": {
           "label": "Registro cloud"
         },
+        "social_google": { "label": "Inicio de sesión con Google" },
+        "social_github": { "label": "Inicio de sesión con GitHub" },
+        "social_microsoft": { "label": "Inicio de sesión con Microsoft" },
+        "social_signup": { "label": "Registro social" },
         "ai": {
           "label": "Pasarela de IA"
         },
@@ -2061,7 +2108,14 @@
         "driver": "Driver {{driver}}",
         "interval": "Cada {{interval}}",
         "stripe": "Stripe configurado",
-        "plan": "Plan {{plan}}"
+        "plan": "Plan {{plan}}",
+		"social": {
+		  "configured": "Configurado",
+		  "partial_configuration": "Degradado: configuración incompleta",
+		  "not_configured": "No configurado",
+		  "soleMethodUser": "Único método de acceso para {{count}} usuario",
+		  "soleMethodUsers": "Único método de acceso para {{count}} usuarios"
+		}
       },
       "mcp": {
         "title": "Acceso MCP",

@@ -986,17 +986,64 @@
       "sourceRequired": "Kampagnenquelle ist erforderlich."
     }
   },
+  "social": {
+    "continueWith": { "google": "Mit Google fortfahren", "github": "Mit GitHub fortfahren", "microsoft": "Mit Microsoft fortfahren" },
+    "signupMethods": "Soziale Registrierungsmethoden",
+    "confirmEmailSubtitle": "Bestätige, auf welches HitKeep-Konto diese Microsoft-Identität zugreifen soll.",
+    "confirmEmailPrompt": "Microsoft-E-Mail-Angaben können sich ändern. Prüfe die HitKeep-E-Mail-Adresse, bevor wir einen Bestätigungslink senden.",
+    "confirmEmailAction": "Bestätigungslink senden",
+    "completeSignupTitle": "Erstellung deines Teams abschließen",
+    "completeSignupSubtitle": "Mit {{provider}} angemeldet. Ergänze die wenigen Angaben, die HitKeep noch benötigt.",
+    "createTeam": "Team erstellen",
+    "regionLocked": "Die Region ist für diese Autorisierung festgelegt. Starte die Registrierung neu, um sie zu ändern.",
+    "microsoftEmailHelp": "Microsoft-E-Mail-Angaben können sich ändern. Bestätige die HitKeep-E-Mail-Adresse, die dir gehört; wir senden einen Bestätigungslink.",
+    "confirmationTitle": "E-Mail-Adresse bestätigen",
+    "confirmationSent": "Prüfe deinen Posteingang und folge dem sicheren Link, um den Vorgang abzuschließen.",
+    "confirmedSignIn": "Dein Anbieter wurde verknüpft. Melde dich erneut an, um fortzufahren.",
+    "mfaSignInRequired": "Deine Einladung wurde angenommen. Melde dich erneut an, um die Mehrfaktor-Authentifizierung abzuschließen.",
+    "errors": {
+      "failed": "Die soziale Anmeldung konnte nicht abgeschlossen werden. Versuche es erneut.",
+      "unavailable": "Dieser Anmeldeanbieter ist derzeit nicht verfügbar.",
+      "cancelled": "Die soziale Anmeldung wurde abgebrochen.",
+      "emailUnverified": "Der Anbieter hat keine bestätigte E-Mail-Adresse übermittelt.",
+      "emailRequired": "Gib die HitKeep-E-Mail-Adresse ein, die du bestätigen möchtest.",
+      "identityConflict": "Dieses Anbieterkonto ist bereits mit einem anderen HitKeep-Konto verknüpft.",
+      "accountNotFound": "Kein HitKeep-Konto passt zu dieser Anmeldung. Erstelle ein Konto oder verwende eine andere Methode.",
+      "confirmationFailed": "Die Bestätigungs-E-Mail konnte nicht gesendet werden. Versuche es erneut.",
+      "completionExpired": "Diese soziale Anmeldung ist abgelaufen. Starte die Registrierung neu.",
+      "regionMismatch": "Die gewählte Region passt nicht zu dieser Autorisierung. Starte die Registrierung in der richtigen Region neu.",
+      "signupFailed": "Dein Team konnte nicht erstellt werden. Versuche es erneut."
+    }
+  },
   "settings": {
     "security": {
       "title": "Sicherheit",
       "loading": "Sicherheitseinstellungen werden geladen...",
       "changePasswordTitle": "Passwort ändern",
       "changePasswordDescription": "Aktualisiere das Passwort für dieses Konto.",
+      "setPasswordTitle": "Passwort festlegen",
+      "setPasswordDescription": "Füge die Passwortanmeldung als weitere Zugriffsmöglichkeit hinzu.",
+      "setPasswordHelp": "HitKeep sendet einen sicheren Link zum Einrichten des Passworts an deine Konto-E-Mail-Adresse.",
+      "setPasswordAction": "E-Mail zum Einrichten senden",
+      "setPasswordSent": "E-Mail zum Einrichten des Passworts wurde gesendet.",
       "passwordUpdated": "Passwort erfolgreich aktualisiert.",
       "currentPasswordLabel": "Aktuelles Passwort",
       "newPasswordLabel": "Neues Passwort",
       "minimumLengthHint": "Mindestens 8 Zeichen",
       "updatePassword": "Passwort aktualisieren",
+      "social": {
+        "title": "Soziale Anmeldung",
+        "description": "Verknüpfe Anbieterkonten, mit denen du dich bei HitKeep anmelden kannst.",
+        "empty": "Es sind keine sozialen Anmeldeanbieter verknüpft.",
+        "linkedDate": "Verknüpft",
+        "lastUsed": "Zuletzt verwendet",
+        "connectAction": "{{provider}} verbinden",
+        "unlinkAction": "Verknüpfung lösen",
+        "passwordConfirmationHint": "Gib im Passwortbereich dein aktuelles Passwort ein, bevor du deinen einzigen sozialen Anbieter entfernst.",
+        "linked": "Anbieter erfolgreich verknüpft.",
+        "unlinked": "Anbieter erfolgreich getrennt.",
+        "errors": { "linkFailed": "Dieser Anbieter konnte nicht verknüpft werden.", "unlinkFailed": "Dieser Anbieter konnte nicht getrennt werden.", "lastMethod": "Füge einen weiteren Anbieter oder Passkey hinzu oder bestätige ein aktiviertes Passwort." }
+      },
       "twoFactor": {
         "title": "Zwei-Faktor-Authentifizierung",
         "description": "Schütze dein Konto mit einem Einmalcode aus einer Authenticator-App.",
@@ -2043,6 +2090,10 @@
         "cloud_signup": {
           "label": "Cloud-Registrierung"
         },
+        "social_google": { "label": "Google-Anmeldung" },
+        "social_github": { "label": "GitHub-Anmeldung" },
+        "social_microsoft": { "label": "Microsoft-Anmeldung" },
+        "social_signup": { "label": "Soziale Registrierung" },
         "ai": {
           "label": "KI-Gateway"
         },
@@ -2061,7 +2112,14 @@
         "driver": "{{driver}}-Treiber",
         "interval": "Alle {{interval}}",
         "stripe": "Stripe konfiguriert",
-        "plan": "Tarif {{plan}}"
+        "plan": "Tarif {{plan}}",
+		"social": {
+		  "configured": "Konfiguriert",
+		  "partial_configuration": "Beeinträchtigt: Konfiguration unvollständig",
+		  "not_configured": "Nicht konfiguriert",
+		  "soleMethodUser": "Einzige Anmeldemethode für {{count}} Benutzer",
+		  "soleMethodUsers": "Einzige Anmeldemethode für {{count}} Benutzer"
+		}
       },
       "mcp": {
         "title": "MCP-Zugriff",

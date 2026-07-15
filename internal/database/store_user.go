@@ -49,8 +49,8 @@ func (s *Store) GetUserCount(ctx context.Context) (int, error) {
 func (s *Store) GetUserByEmail(ctx context.Context, email string) (*api.User, error) {
 	var user api.User
 	err := s.QueryRowOrNil(ctx,
-		"SELECT id, email, password, COALESCE(given_name, ''), COALESCE(last_name, ''), created_at FROM users WHERE email = ?",
-		[]any{&user.ID, &user.Email, &user.Password, &user.GivenName, &user.LastName, &user.CreatedAt},
+		"SELECT id, email, password, COALESCE(given_name, ''), COALESCE(last_name, ''), COALESCE(password_login_enabled, TRUE), created_at FROM users WHERE lower(email) = lower(?)",
+		[]any{&user.ID, &user.Email, &user.Password, &user.GivenName, &user.LastName, &user.PasswordLoginEnabled, &user.CreatedAt},
 		email,
 	)
 
@@ -68,8 +68,8 @@ func (s *Store) GetUserByEmail(ctx context.Context, email string) (*api.User, er
 func (s *Store) GetUserByID(ctx context.Context, id uuid.UUID) (*api.User, error) {
 	var user api.User
 	err := s.QueryRowOrNil(ctx,
-		"SELECT id, email, password, COALESCE(given_name, ''), COALESCE(last_name, ''), created_at FROM users WHERE id = ?",
-		[]any{&user.ID, &user.Email, &user.Password, &user.GivenName, &user.LastName, &user.CreatedAt},
+		"SELECT id, email, password, COALESCE(given_name, ''), COALESCE(last_name, ''), COALESCE(password_login_enabled, TRUE), created_at FROM users WHERE id = ?",
+		[]any{&user.ID, &user.Email, &user.Password, &user.GivenName, &user.LastName, &user.PasswordLoginEnabled, &user.CreatedAt},
 		id,
 	)
 
@@ -115,11 +115,22 @@ func (s *Store) CreateUser(ctx context.Context, email string, hashedPassword str
 }
 
 func (s *Store) CreateUserWithoutDefaultTenant(ctx context.Context, email string, hashedPassword string) (uuid.UUID, error) {
+	return s.createUserWithoutDefaultTenant(ctx, email, hashedPassword, true)
+}
+
+// CreatePlaceholderUserWithoutDefaultTenant creates an invited account whose
+// generated hash is intentionally not usable for password login. Completing a
+// password setup or reset enables password login later.
+func (s *Store) CreatePlaceholderUserWithoutDefaultTenant(ctx context.Context, email string, hashedPassword string) (uuid.UUID, error) {
+	return s.createUserWithoutDefaultTenant(ctx, email, hashedPassword, false)
+}
+
+func (s *Store) createUserWithoutDefaultTenant(ctx context.Context, email string, hashedPassword string, passwordLoginEnabled bool) (uuid.UUID, error) {
 	id := uuid.New()
 
 	if err := s.Exec(ctx,
-		"INSERT INTO users (id, email, password, created_at) VALUES (?, ?, ?, ?)",
-		id, email, hashedPassword, time.Now(),
+		"INSERT INTO users (id, email, password, password_login_enabled, created_at) VALUES (?, ?, ?, ?, ?)",
+		id, email, hashedPassword, passwordLoginEnabled, time.Now(),
 	); err != nil {
 		return uuid.Nil, fmt.Errorf("could not create user: %w", err)
 	}
@@ -134,6 +145,16 @@ func (s *Store) CreateUserWithNames(ctx context.Context, email string, hashedPas
 
 // CreateUserWithNamesAndDefaultTenantName creates a user and uses defaultTenantName when the first-user setup creates the default team.
 func (s *Store) CreateUserWithNamesAndDefaultTenantName(ctx context.Context, email string, hashedPassword string, givenName string, lastName string, defaultTenantName string) (uuid.UUID, error) {
+	return s.createUserWithNamesAndDefaultTenantName(ctx, email, hashedPassword, givenName, lastName, defaultTenantName, true)
+}
+
+// CreatePlaceholderUser creates an invited self-hosted account with an
+// inaccessible generated password until the invitee explicitly sets one.
+func (s *Store) CreatePlaceholderUser(ctx context.Context, email string, hashedPassword string) (uuid.UUID, error) {
+	return s.createUserWithNamesAndDefaultTenantName(ctx, email, hashedPassword, "", "", defaultTenantNameForSetup(""), false)
+}
+
+func (s *Store) createUserWithNamesAndDefaultTenantName(ctx context.Context, email string, hashedPassword string, givenName string, lastName string, defaultTenantName string, passwordLoginEnabled bool) (uuid.UUID, error) {
 	id := uuid.New()
 	givenName = strings.TrimSpace(givenName)
 	lastName = strings.TrimSpace(lastName)
@@ -149,8 +170,8 @@ func (s *Store) CreateUserWithNamesAndDefaultTenantName(ctx context.Context, ema
 	defer func() { _ = tx.Rollback() }()
 
 	_, err = tx.ExecContext(ctx,
-		"INSERT INTO users (id, email, password, given_name, last_name, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-		id, email, hashedPassword, nullableProfileName(givenName), nullableProfileName(lastName), time.Now(),
+		"INSERT INTO users (id, email, password, given_name, last_name, password_login_enabled, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		id, email, hashedPassword, nullableProfileName(givenName), nullableProfileName(lastName), passwordLoginEnabled, time.Now(),
 	)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("could not create user: %w", err)
@@ -219,6 +240,8 @@ var userFKReferences = []userFKReference{
 	{table: "instance_roles", column: "user_id", query: "UPDATE instance_roles SET user_id = ? WHERE user_id = ?"},
 	{table: "remember_me_tokens", column: "user_id", query: "UPDATE remember_me_tokens SET user_id = ? WHERE user_id = ?"},
 	{table: "share_links", column: "created_by", query: "UPDATE share_links SET created_by = ? WHERE created_by = ?"},
+	{table: "social_identities", column: "user_id", query: "UPDATE social_identities SET user_id = ? WHERE user_id = ?"},
+	{table: "pending_social_confirmations", column: "target_user_id", query: "UPDATE pending_social_confirmations SET target_user_id = ? WHERE target_user_id = ?"},
 	{table: "sso_identities", column: "user_id", query: "UPDATE sso_identities SET user_id = ? WHERE user_id = ?"},
 	{table: "site_exclusions", column: "created_by", query: "UPDATE site_exclusions SET created_by = ? WHERE created_by = ?"},
 	{table: "site_country_exclusions", column: "created_by", query: "UPDATE site_country_exclusions SET created_by = ? WHERE created_by = ?"},
@@ -274,7 +297,8 @@ func (s *Store) UpdateUserProfile(ctx context.Context, userID uuid.UUID, email s
 	var currentEmail string
 	var currentPassword string
 	var currentCreatedAt time.Time
-	if err := s.db.QueryRowContext(ctx, "SELECT email, password, created_at FROM users WHERE id = ?", userID).Scan(&currentEmail, &currentPassword, &currentCreatedAt); err != nil {
+	var currentPasswordLoginEnabled bool
+	if err := s.db.QueryRowContext(ctx, "SELECT email, password, COALESCE(password_login_enabled, TRUE), created_at FROM users WHERE id = ?", userID).Scan(&currentEmail, &currentPassword, &currentPasswordLoginEnabled, &currentCreatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrUserNotFound
 		}
@@ -301,8 +325,8 @@ func (s *Store) UpdateUserProfile(ctx context.Context, userID uuid.UUID, email s
 
 	if err := runStoreTx(ctx, s.db, func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx,
-			"INSERT INTO users (id, email, password, created_at) VALUES (?, ?, ?, ?)",
-			shadowUserID, shadowEmail, currentPassword, currentCreatedAt,
+			"INSERT INTO users (id, email, password, password_login_enabled, created_at) VALUES (?, ?, ?, ?, ?)",
+			shadowUserID, shadowEmail, currentPassword, currentPasswordLoginEnabled, currentCreatedAt,
 		); err != nil {
 			return fmt.Errorf("could not create shadow user for profile update: %w", err)
 		}
@@ -486,6 +510,12 @@ func cleanupUserRows(ctx context.Context, tx *sql.Tx, userID uuid.UUID) error {
 	}
 	if err := execIfTableExists("remember_me_tokens", "DELETE FROM remember_me_tokens WHERE user_id = ?", userID); err != nil {
 		return fmt.Errorf("could not delete remember tokens: %w", err)
+	}
+	if err := execIfTableExists("social_identities", "DELETE FROM social_identities WHERE user_id = ?", userID); err != nil {
+		return fmt.Errorf("could not delete user social identities: %w", err)
+	}
+	if err := execIfTableExists("pending_social_confirmations", "DELETE FROM pending_social_confirmations WHERE target_user_id = ? OR lower(target_email) = lower((SELECT email FROM users WHERE id = ?))", userID, userID); err != nil {
+		return fmt.Errorf("could not delete pending social confirmations: %w", err)
 	}
 	if err := execIfTableExists("user_passkey_challenges", "DELETE FROM user_passkey_challenges WHERE user_id = ?", userID); err != nil {
 		return fmt.Errorf("could not delete pending user passkey challenges: %w", err)

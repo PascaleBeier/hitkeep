@@ -986,17 +986,48 @@
       "sourceRequired": "La sorgente campagna è obbligatoria."
     }
   },
+  "social": {
+    "continueWith": { "google": "Continua con Google", "github": "Continua con GitHub", "microsoft": "Continua con Microsoft" },
+    "signupMethods": "Metodi di registrazione social",
+    "confirmEmailSubtitle": "Conferma a quale account HitKeep deve accedere questa identità Microsoft.",
+    "confirmEmailPrompt": "Gli indirizzi Microsoft possono cambiare. Controlla l’e-mail HitKeep prima dell’invio del link di conferma.",
+    "confirmEmailAction": "Invia link di conferma",
+    "completeSignupTitle": "Completa la creazione del team",
+    "completeSignupSubtitle": "Accesso eseguito con {{provider}}. Aggiungi i pochi dati ancora necessari a HitKeep.",
+    "createTeam": "Crea team",
+    "regionLocked": "La regione è vincolata a questa autorizzazione. Riavvia la registrazione per cambiarla.",
+    "microsoftEmailHelp": "Gli indirizzi Microsoft possono cambiare. Conferma l’e-mail HitKeep che possiedi; invieremo un link di verifica.",
+    "confirmationTitle": "Conferma la tua e-mail", "confirmationSent": "Controlla la posta e segui il link sicuro per completare.",
+    "confirmedSignIn": "Il provider è collegato. Accedi di nuovo per continuare.", "mfaSignInRequired": "L’invito è stato accettato. Accedi di nuovo per completare l’autenticazione a più fattori.",
+    "errors": {
+      "failed": "Impossibile completare l’accesso social. Riprova.", "unavailable": "Questo provider di accesso non è disponibile.", "cancelled": "L’accesso social è stato annullato.",
+      "emailUnverified": "Il provider non ha fornito un indirizzo e-mail verificato.", "emailRequired": "Inserisci l’e-mail HitKeep da confermare.", "identityConflict": "Questo account del provider è già collegato a un altro account HitKeep.",
+      "accountNotFound": "Nessun account HitKeep corrisponde a questo accesso. Crea un account o usa un altro metodo.", "confirmationFailed": "Impossibile inviare l’e-mail di conferma. Riprova.",
+      "completionExpired": "Questo accesso social è scaduto. Riavvia la registrazione.", "regionMismatch": "La regione selezionata non corrisponde all’autorizzazione. Riavvia nella regione corretta.", "signupFailed": "Impossibile creare il team. Riprova."
+    }
+  },
   "settings": {
     "security": {
       "title": "Sicurezza",
       "loading": "Caricamento impostazioni di sicurezza...",
       "changePasswordTitle": "Cambia password",
       "changePasswordDescription": "Aggiorna la password di questo account.",
+      "setPasswordTitle": "Imposta una password",
+      "setPasswordDescription": "Aggiungi l’accesso con password come altro modo per accedere a questo account.",
+      "setPasswordHelp": "HitKeep invierà un link sicuro per impostare la password all’e-mail dell’account.",
+      "setPasswordAction": "Invia e-mail di configurazione",
+      "setPasswordSent": "E-mail di configurazione della password inviata.",
       "passwordUpdated": "Password aggiornata con successo.",
       "currentPasswordLabel": "Password attuale",
       "newPasswordLabel": "Nuova password",
       "minimumLengthHint": "Minimo 8 caratteri",
       "updatePassword": "Aggiorna password",
+      "social": {
+        "title": "Accesso social", "description": "Collega gli account dei provider utilizzabili per accedere a HitKeep.", "empty": "Nessun provider di accesso social collegato.",
+        "linkedDate": "Collegato", "lastUsed": "Ultimo utilizzo", "connectAction": "Collega {{provider}}", "unlinkAction": "Scollega",
+        "passwordConfirmationHint": "Inserisci la password attuale nella sezione password prima di scollegare il tuo unico provider social.", "linked": "Provider collegato.", "unlinked": "Provider scollegato.",
+        "errors": { "linkFailed": "Impossibile collegare questo provider.", "unlinkFailed": "Impossibile scollegare questo provider.", "lastMethod": "Aggiungi un altro provider social o una passkey, oppure conferma una password abilitata." }
+      },
       "twoFactor": {
         "title": "Autenticazione a due fattori",
         "description": "Proteggi il tuo account con un codice monouso da un'app di autenticazione.",
@@ -2043,6 +2074,10 @@
         "cloud_signup": {
           "label": "Registrazione cloud"
         },
+        "social_google": { "label": "Accesso con Google" },
+        "social_github": { "label": "Accesso con GitHub" },
+        "social_microsoft": { "label": "Accesso con Microsoft" },
+        "social_signup": { "label": "Registrazione social" },
         "ai": {
           "label": "Gateway IA"
         },
@@ -2061,7 +2096,14 @@
         "driver": "Driver {{driver}}",
         "interval": "Ogni {{interval}}",
         "stripe": "Stripe configurato",
-        "plan": "Piano {{plan}}"
+        "plan": "Piano {{plan}}",
+		"social": {
+		  "configured": "Configurato",
+		  "partial_configuration": "Degradato: configurazione incompleta",
+		  "not_configured": "Non configurato",
+		  "soleMethodUser": "Unico metodo di accesso per {{count}} utente",
+		  "soleMethodUsers": "Unico metodo di accesso per {{count}} utenti"
+		}
       },
       "mcp": {
         "title": "Accesso MCP",

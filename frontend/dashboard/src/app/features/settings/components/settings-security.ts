@@ -15,8 +15,11 @@ import { RelativeDateTime } from '@components/relative-date-time/relative-date-t
 
 // Core
 import { AuthService } from '@services/auth.service';
+import { SocialProvider, SocialProviderID } from '@services/auth.service';
 import { PasskeyRegistrationFinishRequest, PasskeyRegistrationStartResponse, UserRecoveryCodesResponse, UserSecurityService, UserSecurityStatus, UserTotpSetup } from '@services/user-security.service';
+import { UserProfileService } from '@services/user-profile.service';
 import { toCreationResponseJson, toPublicKeyCreationOptions } from '@core/utils/webauthn';
+import { ActivatedRoute } from '@angular/router';
 
 @Component({
     selector: 'app-settings-security',
@@ -28,10 +31,17 @@ import { toCreationResponseJson, toPublicKeyCreationOptions } from '@core/utils/
 export class SettingsSecurity {
     private authService = inject(AuthService);
     private securityService = inject(UserSecurityService);
+    private profileService = inject(UserProfileService);
+    private route = inject(ActivatedRoute, { optional: true });
 
     protected readonly isPasswordLoading = signal(false);
     protected readonly passwordError = signal<string | null>(null);
     protected readonly passwordSuccess = signal(false);
+    protected readonly setPasswordSent = signal(false);
+    protected readonly socialProviders = signal<readonly SocialProvider[]>([]);
+    protected readonly socialLoading = signal<SocialProviderID | null>(null);
+    protected readonly socialError = signal<string | null>(null);
+    protected readonly socialSuccess = signal<string | null>(null);
 
     protected readonly isSecurityLoading = signal(false);
     protected readonly securityError = signal<string | null>(null);
@@ -61,9 +71,25 @@ export class SettingsSecurity {
     protected readonly hasMfaProtection = computed(() => this.totpEnabled() || this.passkeys().length > 0);
     protected readonly recoveryCodesGenerated = computed(() => this.securityStatus()?.recovery_codes_generated ?? false);
     protected readonly recoveryCodesRemaining = computed(() => this.securityStatus()?.recovery_codes_remaining ?? 0);
+    protected readonly passwordLoginEnabled = computed(() => this.securityStatus()?.password_login_enabled ?? true);
+    protected readonly socialIdentities = computed(() => this.securityStatus()?.social_identities ?? []);
+    protected readonly availableSocialProviders = computed(() => {
+        const linked = new Set(this.socialIdentities().map((identity) => identity.provider));
+        return this.socialProviders().filter((provider) => !linked.has(provider.id));
+    });
 
     constructor() {
         this.loadSecurityStatus();
+        this.authService.getSocialProviders().subscribe({
+            next: (response) => this.socialProviders.set(response.providers),
+            error: () => this.socialProviders.set([])
+        });
+        const socialResult = this.route?.snapshot.queryParamMap.get('social');
+        if (socialResult === 'linked') {
+            this.socialSuccess.set('settings.security.social.linked');
+        } else if (socialResult) {
+            this.socialError.set('settings.security.social.errors.linkFailed');
+        }
     }
 
     protected onSubmit(event?: Event): void {
@@ -97,6 +123,67 @@ export class SettingsSecurity {
                     this.passwordError.set(msg);
                 }
             });
+    }
+
+    protected requestSetPassword(): void {
+        const email = this.profileService.profile()?.email;
+        if (!email) {
+            this.passwordError.set('settings.security.errors.updateFailed');
+            return;
+        }
+        this.isPasswordLoading.set(true);
+        this.passwordError.set(null);
+        this.setPasswordSent.set(false);
+        this.authService
+            .requestPasswordReset(email)
+            .pipe(finalize(() => this.isPasswordLoading.set(false)))
+            .subscribe({
+                next: () => this.setPasswordSent.set(true),
+                error: () => this.passwordError.set('settings.security.errors.updateFailed')
+            });
+    }
+
+    protected connectSocial(provider: SocialProviderID): void {
+        if (this.socialLoading() !== null) return;
+        this.socialLoading.set(provider);
+        this.socialError.set(null);
+        this.socialSuccess.set(null);
+        this.securityService
+            .startSocialLink(provider)
+            .pipe(finalize(() => this.socialLoading.set(null)))
+            .subscribe({
+                next: (response) => window.location.assign(response.auth_url),
+                error: () => this.socialError.set('settings.security.social.errors.linkFailed')
+            });
+    }
+
+    protected unlinkSocial(provider: SocialProviderID): void {
+        this.socialLoading.set(provider);
+        this.socialError.set(null);
+        this.socialSuccess.set(null);
+        this.securityService
+            .unlinkSocial(provider, this.form.currentPassword().value())
+            .pipe(finalize(() => this.socialLoading.set(null)))
+            .subscribe({
+                next: () => {
+                    this.securityStatus.update((current) =>
+                        current
+                            ? {
+                                  ...current,
+                                  social_identities: current.social_identities.filter((identity) => identity.provider !== provider)
+                              }
+                            : current
+                    );
+                    this.socialSuccess.set('settings.security.social.unlinked');
+                },
+                error: (err) => {
+                    this.socialError.set(err?.error?.code === 'social_last_login_method' ? 'settings.security.social.errors.lastMethod' : 'settings.security.social.errors.unlinkFailed');
+                }
+            });
+    }
+
+    protected providerName(provider: SocialProviderID): string {
+        return this.socialProviders().find((entry) => entry.id === provider)?.display_name ?? provider;
     }
 
     protected startTotpSetup(): void {

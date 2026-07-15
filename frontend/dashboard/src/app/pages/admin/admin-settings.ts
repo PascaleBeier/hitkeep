@@ -1102,6 +1102,20 @@ export class AdminSettings implements OnInit {
         if (feature.key === 'managed_cloud') {
             return this.transloco.translate('admin.system.featureDetails.plan', { plan: detail });
         }
+        if (feature.key.startsWith('social_')) {
+            const [state, risk] = detail.split(';');
+            const parts: string[] = [];
+            if (state) {
+                const stateKey = `admin.system.featureDetails.social.${state}`;
+                const translated = this.transloco.translate(stateKey);
+                parts.push(translated === stateKey ? state : translated);
+            }
+            const soleUsers = Number(risk?.match(/^sole_method_users=(\d+)$/)?.[1] ?? 0);
+            if (soleUsers > 0) {
+                parts.push(this.transloco.translate(soleUsers === 1 ? 'admin.system.featureDetails.social.soleMethodUser' : 'admin.system.featureDetails.social.soleMethodUsers', { count: soleUsers }));
+            }
+            return parts.join(' · ');
+        }
 
         return detail;
     }

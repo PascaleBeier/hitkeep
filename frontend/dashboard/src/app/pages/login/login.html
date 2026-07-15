@@ -27,7 +27,7 @@
                         autocapitalize="none"
                         spellcheck="false"
                         [formControl]="loginForm.email().control()"
-                        [attr.autocomplete]="authMode() === 'sso' ? 'email' : 'username webauthn'"
+                        [attr.autocomplete]="authMode() === 'sso' || authMode() === 'social' ? 'email' : 'username webauthn'"
                         [fluid]="true"
                         [class.ng-invalid]="loginForm.email().touched() && loginForm.email().invalid()"
                         [class.ng-dirty]="loginForm.email().dirty()"
@@ -84,7 +84,7 @@
                     type="submit"
                     [loading]="authMode() === 'sso' ? isSSOLoading() : isLoading()"
                     [fluid]="true"
-                    [disabled]="isLoading() || isPasskeyLoading() || isSSOLoading() || loginForm.email().invalid() || (authMode() === 'password' && loginForm.password().invalid())"
+                    [disabled]="isLoading() || isPasskeyLoading() || isSSOLoading() || socialLoading() !== null || loginForm.email().invalid() || (authMode() === 'password' && loginForm.password().invalid())"
                 />
                 } @else {
                 <div class="hk-auth-field">

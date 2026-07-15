@@ -423,9 +423,9 @@ func (h *handler) resolveSiteMemberUser(ctx context.Context, teamID, actorID uui
 		}
 
 		if h.ctx.Config.CloudHosted {
-			result.userID, err = h.ctx.Store.CreateUserWithoutDefaultTenant(ctx, email, hashedPassword)
+			result.userID, err = h.ctx.Store.CreatePlaceholderUserWithoutDefaultTenant(ctx, email, hashedPassword)
 		} else {
-			result.userID, err = h.ctx.Store.CreateUser(ctx, email, hashedPassword)
+			result.userID, err = h.ctx.Store.CreatePlaceholderUser(ctx, email, hashedPassword)
 		}
 		if err != nil {
 			return resolvedSiteMemberUser{}, fmt.Errorf("create user: %w", err)

@@ -404,7 +404,7 @@ func (s *Store) AcceptInviteWithPassword(ctx context.Context, token string, newH
 			return ErrTeamInviteLoginRequired
 		}
 
-		if _, err := tx.ExecContext(ctx, "UPDATE users SET password = ? WHERE id = ?", newHashedPassword, userID); err != nil {
+		if _, err := tx.ExecContext(ctx, "UPDATE users SET password = ?, password_login_enabled = TRUE WHERE id = ?", newHashedPassword, userID); err != nil {
 			return fmt.Errorf("could not update invited user password: %w", err)
 		}
 		if _, err := tx.ExecContext(ctx, "DELETE FROM remember_me_tokens WHERE user_id = ?", userID); err != nil {

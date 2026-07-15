@@ -21,13 +21,13 @@ import { AuthDivider } from '@core/components/auth-divider/auth-divider';
 import { Brand } from '@components/brand/brand';
 import { AuthMethodOption, AuthMethods } from '@core/components/auth-methods/auth-methods';
 import { CloudStatus } from '@models/analytics.types';
-import { AuthService, LoginResponse, PasskeyLoginFinishRequest, PasskeyLoginStartResponse } from '@services/auth.service';
+import { AuthService, LoginResponse, PasskeyLoginFinishRequest, PasskeyLoginStartResponse, SocialProvider, SocialProviderID } from '@services/auth.service';
 import { AnalyticsService } from '@services/analytics.service';
 import { UserPreferencesService } from '@services/user-preferences.service';
 import { toAssertionResponseJson, toPublicKeyRequestOptions } from '@core/utils/webauthn';
 
 type MfaFactor = 'totp' | 'passkey' | 'recovery_code' | 'email_link';
-type AuthMode = 'password' | 'sso';
+type AuthMode = 'password' | 'sso' | 'social';
 
 @Component({
     selector: 'app-login',
@@ -52,7 +52,11 @@ export class Login {
     protected isLoading = signal(false);
     protected isPasskeyLoading = signal(false);
     protected isSSOLoading = signal(false);
+    protected socialLoading = signal<SocialProviderID | null>(null);
     protected ssoAvailable = signal(false);
+    protected socialProviders = signal<readonly SocialProvider[]>([]);
+    protected pendingSocialCompletion = signal<string | null>(null);
+    private readonly pendingSocialReturnUrl = signal<string | null>(null);
     protected readonly authMode = signal<AuthMode>('password');
     protected errorMessage = signal<string | null>(null);
     protected infoMessage = signal<string | null>(null);
@@ -73,8 +77,19 @@ export class Login {
     protected readonly mfaShowsFallbackDivider = computed(() => this.mfaHasFallback() && (this.mfaHasTotp() || (this.mfaHasRecoveryCode() && this.mfaHasActionFallback())));
     protected readonly showSignupLink = computed(() => Boolean(this.cloudStatus()?.hosted && this.cloudStatus()?.signup_enabled));
     protected readonly authMethods = computed<readonly AuthMethodOption[]>(() => {
-        const disabled = this.isLoading() || this.isPasskeyLoading() || this.isSSOLoading();
+        const disabled = this.isLoading() || this.isPasskeyLoading() || this.isSSOLoading() || this.socialLoading() !== null;
         if (this.authMode() === 'sso') {
+            return [
+                {
+                    id: 'password',
+                    labelKey: 'login.continueWithPassword',
+                    icon: 'pi pi-lock',
+                    wide: true,
+                    disabled
+                }
+            ];
+        }
+        if (this.authMode() === 'social') {
             return [
                 {
                     id: 'password',
@@ -87,6 +102,16 @@ export class Login {
         }
 
         const methods: AuthMethodOption[] = [];
+        for (const provider of this.socialProviders()) {
+            methods.push({
+                id: provider.id,
+                labelKey: `social.continueWith.${provider.id}`,
+                icon: this.socialIcon(provider.id),
+                wide: true,
+                loading: this.socialLoading() === provider.id,
+                disabled
+            });
+        }
         if (this.isPasskeySupported()) {
             methods.push({
                 id: 'passkey',
@@ -109,8 +134,8 @@ export class Login {
         }
         return methods;
     });
-    protected readonly authSubtitleKey = computed(() => (this.authMode() === 'sso' ? 'login.ssoSubtitle' : 'login.subtitle'));
-    protected readonly primaryActionKey = computed(() => (this.authMode() === 'sso' ? 'login.continueWithSSO' : 'login.signIn'));
+    protected readonly authSubtitleKey = computed(() => (this.authMode() === 'sso' ? 'login.ssoSubtitle' : this.authMode() === 'social' ? 'social.confirmEmailSubtitle' : 'login.subtitle'));
+    protected readonly primaryActionKey = computed(() => (this.authMode() === 'sso' ? 'login.continueWithSSO' : this.authMode() === 'social' ? 'social.confirmEmailAction' : 'login.signIn'));
 
     private readonly loginModel = signal({
         email: new FormControl('', {
@@ -167,13 +192,38 @@ export class Login {
                 }
             });
 
+        this.auth
+            .getSocialProviders()
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+                next: (response) => this.socialProviders.set(response.providers),
+                error: () => this.socialProviders.set([])
+            });
+
         const authError = this.route.snapshot.queryParamMap.get('error')?.trim();
         const authErrorKey = this.authErrorKey(authError);
         if (authErrorKey) {
             this.errorMessage.set(authErrorKey);
         }
+        if (this.route.snapshot.queryParamMap.get('info') === 'social_confirmed') {
+            this.infoMessage.set('social.confirmedSignIn');
+        }
 
-        if (this.shouldAttemptConditionalPasskey()) {
+        const socialMfaHandoff = this.auth.consumeSocialMfaHandoff();
+        const completionToken = this.socialCompletionToken();
+        if (socialMfaHandoff?.status === 'mfa_required') {
+            this.pendingSocialReturnUrl.set(this.safeReturnUrl(socialMfaHandoff.redirect_url));
+            this.enterMfaState({
+                status: 'mfa_required',
+                challenge_token: socialMfaHandoff.challenge_token,
+                factors: socialMfaHandoff.factors,
+                passkey: socialMfaHandoff.passkey
+            });
+        } else if (completionToken) {
+            this.completeSocialLogin(completionToken);
+        }
+
+        if (!completionToken && this.shouldAttemptConditionalPasskey()) {
             void this.startConditionalPasskeyLogin();
         }
     }
@@ -212,6 +262,8 @@ export class Login {
         switch (method) {
             case 'password':
                 this.authMode.set('password');
+                this.pendingSocialCompletion.set(null);
+                this.pendingSocialReturnUrl.set(null);
                 this.errorMessage.set(null);
                 this.infoMessage.set(null);
                 break;
@@ -227,7 +279,104 @@ export class Login {
             case 'passkey':
                 void this.onPasskeyLogin();
                 break;
+            default:
+                if (this.socialProviders().some((provider) => provider.id === method)) {
+                    this.startSocialLogin(method as SocialProviderID);
+                }
         }
+    }
+
+    private startSocialLogin(provider: SocialProviderID): void {
+        if (this.socialLoading() !== null) return;
+        this.abortConditionalPasskeyPrompt();
+        this.socialLoading.set(provider);
+        this.errorMessage.set(null);
+        this.infoMessage.set(null);
+        this.auth
+            .startSocial(provider, {
+                flow: 'login',
+                return_url: this.resolveReturnUrl(),
+                remember_me: this.loginForm.rememberMe().value()
+            })
+            .pipe(finalize(() => this.socialLoading.set(null)))
+            .subscribe({
+                next: (response) => this.navigateToSSOProvider(response.auth_url),
+                error: (err) => this.errorMessage.set(this.socialErrorKey(err?.error?.code))
+            });
+    }
+
+    private completeSocialLogin(completionToken: string): void {
+        this.isLoading.set(true);
+        this.errorMessage.set(null);
+        this.auth.previewSocial(completionToken).subscribe({
+            next: (preview) => {
+                const requestedEmail = this.loginForm.email().value().trim();
+                if (preview.email_confirmation_required && this.route.snapshot.queryParamMap.get('info') !== 'social_confirmed') {
+                    this.isLoading.set(false);
+                    this.pendingSocialCompletion.set(completionToken);
+                    this.authMode.set('social');
+                    if (!requestedEmail && preview.observed_email) {
+                        this.loginForm.email().control().setValue(preview.observed_email);
+                    }
+                    this.infoMessage.set('social.confirmEmailPrompt');
+                    return;
+                }
+                this.submitSocialCompletion(completionToken);
+            },
+            error: (err) => {
+                this.isLoading.set(false);
+                this.errorMessage.set(this.socialErrorKey(err?.error?.code));
+            }
+        });
+    }
+
+    private submitSocialCompletion(completionToken: string, email?: string): void {
+        this.pendingSocialCompletion.set(null);
+        this.isLoading.set(true);
+        this.auth
+            .completeSocial(completionToken, email)
+            .pipe(finalize(() => this.isLoading.set(false)))
+            .subscribe({
+                next: (response) => {
+                    const socialReturnUrl = this.safeReturnUrl(response.redirect_url);
+                    if (response.status === 'mfa_required') {
+                        this.pendingSocialReturnUrl.set(socialReturnUrl);
+                        this.enterMfaState({
+                            status: 'mfa_required',
+                            challenge_token: response.challenge_token,
+                            factors: response.factors,
+                            passkey: response.passkey
+                        });
+                        return;
+                    }
+                    if (response.status === 'signup_required') {
+                        this.pendingSocialReturnUrl.set(null);
+                        const signupToken = response.completion_token?.trim();
+                        if (!signupToken) {
+                            this.authMode.set('password');
+                            this.errorMessage.set('social.errors.failed');
+                            return;
+                        }
+                        void this.router.navigate(['/signup/social/complete'], {
+                            fragment: `social_token=${encodeURIComponent(signupToken)}`
+                        });
+                        return;
+                    }
+                    if (response.status === 'verification_sent') {
+                        this.pendingSocialReturnUrl.set(null);
+                        this.authMode.set('password');
+                        this.infoMessage.set('social.confirmationSent');
+                        return;
+                    }
+                    this.clearMfaState();
+                    this.redirectAfterLogin(socialReturnUrl);
+                },
+                error: (err) => {
+                    this.pendingSocialReturnUrl.set(null);
+                    this.authMode.set('password');
+                    this.errorMessage.set(this.socialErrorKey(err?.error?.code));
+                }
+            });
     }
 
     onSubmit(event?: Event): void {
@@ -250,6 +399,15 @@ export class Login {
         }
         if (this.authMode() === 'sso') {
             this.onSSOLogin();
+            return;
+        }
+        const socialCompletion = this.pendingSocialCompletion();
+        if (this.authMode() === 'social' && socialCompletion) {
+            if (this.loginForm.email().invalid()) {
+                this.loginForm.email().markAsTouched();
+                return;
+            }
+            this.submitSocialCompletion(socialCompletion, this.loginForm.email().value().trim());
             return;
         }
         if (this.loginForm.email().invalid() || this.loginForm.password().invalid()) {
@@ -358,8 +516,9 @@ export class Login {
         this.infoMessage.set(null);
     }
 
-    private redirectAfterLogin() {
-        const targetUrl = this.resolveReturnUrl();
+    private redirectAfterLogin(preferredReturnUrl?: string | null) {
+        const targetUrl = preferredReturnUrl ?? this.pendingSocialReturnUrl() ?? this.resolveReturnUrl();
+        this.pendingSocialReturnUrl.set(null);
         this.preferences.load().subscribe({
             next: () => {
                 void this.router.navigateByUrl(targetUrl);
@@ -371,10 +530,22 @@ export class Login {
     }
 
     private resolveReturnUrl(): string {
-        const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl')?.trim();
-        if (!returnUrl) return '/';
-        if (!returnUrl.startsWith('/') || returnUrl.startsWith('//')) return '/';
-        if (returnUrl.startsWith('/login') || returnUrl.startsWith('/setup')) return '/';
+        return this.safeReturnUrl(this.route.snapshot.queryParamMap.get('returnUrl')) ?? '/';
+    }
+
+    private safeReturnUrl(raw: string | null | undefined): string | null {
+        const returnUrl = raw?.trim();
+        if (!returnUrl) return null;
+        const containsUnsafeCharacter = ['#', '\\', '\r', '\n', '\t', String.fromCharCode(0)].some((character) => returnUrl.includes(character));
+        if (!returnUrl.startsWith('/') || returnUrl.startsWith('//') || containsUnsafeCharacter) return null;
+        try {
+            const parsed = new URL(returnUrl, 'https://hitkeep.invalid');
+            const decodedPath = decodeURIComponent(parsed.pathname);
+            const decodedPathContainsUnsafeCharacter = ['\\', '\r', '\n', '\t', String.fromCharCode(0)].some((character) => decodedPath.includes(character));
+            if (parsed.origin !== 'https://hitkeep.invalid' || !decodedPath.startsWith('/') || decodedPath.startsWith('//') || decodedPathContainsUnsafeCharacter || decodedPath.startsWith('/login') || decodedPath.startsWith('/setup')) return null;
+        } catch {
+            return null;
+        }
         return returnUrl;
     }
 
@@ -394,9 +565,49 @@ export class Login {
                 return 'login.errors.ssoAccessDenied';
             case 'sso_failed':
                 return 'login.errors.ssoFailed';
+            case 'social_provider_cancelled':
+            case 'social_state_invalid':
+            case 'social_completion_invalid':
+            case 'social_email_unverified':
+            case 'social_provider_unavailable':
+            case 'social_identity_conflict':
+            case 'social_confirmation_invalid':
+            case 'social_login_failed':
+                return this.socialErrorKey(error);
             default:
                 return null;
         }
+    }
+
+    private socialCompletionToken(): string | null {
+        if (typeof window === 'undefined') return null;
+        const token = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('social_token');
+        return token?.trim() || null;
+    }
+
+    private socialErrorKey(code?: string): string {
+        switch (code) {
+            case 'social_email_unverified':
+                return 'social.errors.emailUnverified';
+            case 'social_identity_conflict':
+                return 'social.errors.identityConflict';
+            case 'social_provider_cancelled':
+                return 'social.errors.cancelled';
+            case 'social_email_required':
+                return 'social.errors.emailRequired';
+            case 'social_account_not_found':
+                return 'social.errors.accountNotFound';
+            case 'social_confirmation_failed':
+                return 'social.errors.confirmationFailed';
+            case 'social_provider_unavailable':
+                return 'social.errors.unavailable';
+            default:
+                return 'social.errors.failed';
+        }
+    }
+
+    private socialIcon(provider: SocialProviderID): string {
+        return provider === 'github' ? 'pi pi-github' : provider === 'google' ? 'pi pi-google' : 'pi pi-microsoft';
     }
 
     private navigateToSSOProvider(authURL: string): void {
@@ -496,7 +707,7 @@ export class Login {
         this.errorMessage.set(null);
         this.infoMessage.set(null);
         this.auth
-            .requestMfaEmailLink(challengeToken, this.resolveReturnUrl())
+            .requestMfaEmailLink(challengeToken, this.pendingSocialReturnUrl() ?? this.resolveReturnUrl())
             .pipe(finalize(() => this.isLoading.set(false)))
             .subscribe({
                 next: () => {
@@ -553,6 +764,9 @@ export class Login {
 
     private shouldAttemptConditionalPasskey(): boolean {
         if (this.hasAttemptedConditionalPasskey) {
+            return false;
+        }
+        if (this.isMfaRequired()) {
             return false;
         }
         if (this.authMode() !== 'password') {

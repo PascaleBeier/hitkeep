@@ -231,9 +231,9 @@ func (h *handler) createInviteeUser(ctx context.Context, email string) (uuid.UUI
 		return uuid.Nil, fmt.Errorf("hash invitee password: %w", err)
 	}
 	if h.ctx.Config.CloudHosted {
-		return h.ctx.Store.CreateUserWithoutDefaultTenant(ctx, email, hashedPassword)
+		return h.ctx.Store.CreatePlaceholderUserWithoutDefaultTenant(ctx, email, hashedPassword)
 	}
-	return h.ctx.Store.CreateUser(ctx, email, hashedPassword)
+	return h.ctx.Store.CreatePlaceholderUser(ctx, email, hashedPassword)
 }
 
 func (h *handler) validateHostedCloudInvitee(ctx context.Context, teamID, targetUserID uuid.UUID, email string, requireCapacity bool) error {

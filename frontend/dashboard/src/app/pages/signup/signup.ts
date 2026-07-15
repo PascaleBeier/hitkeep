@@ -16,6 +16,8 @@ import { MessageModule } from 'primeng/message';
 import { SelectButtonModule } from 'primeng/selectbutton';
 
 import { AuthCard } from '@core/components/auth-card/auth-card';
+import { AuthDivider } from '@core/components/auth-divider/auth-divider';
+import { AuthMethodOption, AuthMethods } from '@core/components/auth-methods/auth-methods';
 import { Brand } from '@components/brand/brand';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { CloudStatus } from '@models/analytics.types';
@@ -23,12 +25,13 @@ import { AnalyticsService } from '@services/analytics.service';
 import { CloudSignupTrackingService } from '@services/cloud-signup-tracking.service';
 import { BillingInterval, CloudPlanCode, CloudService, CloudSignupRequest } from '@services/cloud.service';
 import { AUTH_FIELDSET_DESIGN_TOKENS, AUTH_SELECT_BUTTON_DESIGN_TOKENS } from '@core/theme/hitkeep-preset';
+import { AuthService, SocialProvider, SocialProviderID } from '@services/auth.service';
 
 type Jurisdiction = 'EU' | 'US';
 
 @Component({
     selector: 'app-signup',
-    imports: [AuthCard, Brand, FormsModule, ReactiveFormsModule, PasswordModule, ButtonModule, InputTextModule, CheckboxModule, FieldsetModule, MessageModule, SelectButtonModule, RouterLink, TranslocoPipe],
+    imports: [AuthCard, AuthDivider, AuthMethods, Brand, FormsModule, ReactiveFormsModule, PasswordModule, ButtonModule, InputTextModule, CheckboxModule, FieldsetModule, MessageModule, SelectButtonModule, RouterLink, TranslocoPipe],
     templateUrl: './signup.html',
     changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -44,10 +47,13 @@ export class Signup {
     private readonly router = inject(Router);
     private readonly route = inject(ActivatedRoute);
     private readonly analytics = inject(AnalyticsService);
+    private readonly auth = inject(AuthService);
     private readonly cloud = inject(CloudService);
     private readonly signupTracking = inject(CloudSignupTrackingService);
 
     protected readonly isLoading = signal(false);
+    protected readonly socialLoading = signal<SocialProviderID | null>(null);
+    protected readonly socialProviders = signal<readonly SocialProvider[]>([]);
     protected readonly errorMessage = signal<string | null>(null);
     protected readonly cloudStatus = signal<CloudStatus | null>(null);
     protected readonly verificationSent = signal(false);
@@ -60,6 +66,16 @@ export class Signup {
     protected readonly jurisdictionFieldsetDesignTokens = AUTH_FIELDSET_DESIGN_TOKENS;
     protected readonly jurisdictionDesignTokens = AUTH_SELECT_BUTTON_DESIGN_TOKENS;
     protected readonly currentJurisdiction = computed<Jurisdiction>(() => this.normalizeJurisdiction(this.cloudStatus()?.jurisdiction) ?? this.inferJurisdictionFromHost());
+    protected readonly socialMethods = computed<readonly AuthMethodOption[]>(() =>
+        this.socialProviders().map((provider) => ({
+            id: provider.id,
+            labelKey: `social.continueWith.${provider.id}`,
+            icon: provider.id === 'github' ? 'pi pi-github' : provider.id === 'google' ? 'pi pi-google' : 'pi pi-microsoft',
+            wide: true,
+            loading: this.socialLoading() === provider.id,
+            disabled: this.isLoading() || this.socialLoading() !== null
+        }))
+    );
     private trackedSignupPageView = false;
     private trackedInitialSignupError = false;
 
@@ -102,6 +118,13 @@ export class Signup {
                     console.error('Failed to load cloud status for signup', err);
                 }
             });
+        this.auth
+            .getSocialProviders()
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+                next: (response) => this.socialProviders.set(response.signup_enabled ? response.providers : []),
+                error: () => this.socialProviders.set([])
+            });
     }
 
     protected selectJurisdiction(jurisdiction: Jurisdiction): void {
@@ -136,13 +159,14 @@ export class Signup {
 
         this.isLoading.set(true);
         this.errorMessage.set(null);
-        this.trackSignupEvent('signup_started');
+        this.trackSignupEvent('signup_started', { auth_method: 'password' });
         this.cloud
             .signup(payload)
             .pipe(finalize(() => this.isLoading.set(false)))
             .subscribe({
                 next: (response) => {
                     this.trackSignupEvent('signup_completed_candidate', {
+                        auth_method: 'password',
                         response_status: response.status
                     });
                     if (response.status === 'verification_sent') {
@@ -158,6 +182,7 @@ export class Signup {
                     if (err.status === 409) {
                         this.errorMessage.set('signup.errors.emailExists');
                         this.trackSignupEvent('signup_error_view', {
+                            auth_method: 'password',
                             error_status: 409,
                             error_code: 'email_exists'
                         });
@@ -165,8 +190,39 @@ export class Signup {
                     }
                     this.errorMessage.set('signup.errors.unexpected');
                     this.trackSignupEvent('signup_error_view', {
+                        auth_method: 'password',
                         error_status: err.status ?? 0,
                         error_code: 'unexpected'
+                    });
+                }
+            });
+    }
+
+    protected selectSocialMethod(method: string): void {
+        if (!this.socialProviders().some((provider) => provider.id === method)) return;
+        const provider = method as SocialProviderID;
+        this.socialLoading.set(provider);
+        this.errorMessage.set(null);
+        this.trackSignupEvent('signup_started', { auth_method: 'social', provider });
+        const query = new URLSearchParams({
+            plan: this.selectedPlan(),
+            billing: this.selectedBilling(),
+            region: this.currentJurisdiction()
+        });
+        this.auth
+            .startSocial(provider, {
+                flow: 'signup',
+                return_url: `/signup/social/complete?${query.toString()}`
+            })
+            .pipe(finalize(() => this.socialLoading.set(null)))
+            .subscribe({
+                next: (response) => this.document.defaultView?.location.assign(response.auth_url),
+                error: (err) => {
+                    this.errorMessage.set(this.socialErrorKey(err?.error?.code));
+                    this.trackSignupEvent('signup_error_view', {
+                        auth_method: 'social',
+                        provider,
+                        error_code: err?.error?.code ?? 'social_start_failed'
                     });
                 }
             });
@@ -215,6 +271,8 @@ export class Signup {
             this.errorMessage.set('signup.errors.verificationExpired');
         } else if (errorParam === 'exists') {
             this.errorMessage.set('signup.errors.emailExists');
+        } else if (errorParam?.startsWith('social_')) {
+            this.errorMessage.set(this.socialErrorKey(errorParam));
         }
     }
 
@@ -302,5 +360,13 @@ export class Signup {
 
     private normalizeBilling(value: string | null | undefined): BillingInterval {
         return value?.trim().toLowerCase() === 'annual' ? 'annual' : 'monthly';
+    }
+
+    private socialErrorKey(code?: string): string {
+        if (code === 'social_provider_unavailable') return 'social.errors.unavailable';
+        if (code === 'social_email_unverified') return 'social.errors.emailUnverified';
+        if (code === 'social_provider_cancelled') return 'social.errors.cancelled';
+        if (code === 'social_identity_conflict') return 'social.errors.identityConflict';
+        return 'social.errors.failed';
     }
 }

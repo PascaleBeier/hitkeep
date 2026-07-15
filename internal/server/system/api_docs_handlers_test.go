@@ -901,6 +901,46 @@ func TestOpenAPISpecV1DocumentsRedactedOIDCSSOFlows(t *testing.T) {
 	}
 }
 
+func TestOpenAPISpecV1DocumentsSocialAuthenticationWithoutProviderSubjects(t *testing.T) {
+	spec := OpenAPISpecV1("https://hitkeep.test")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	for path, methods := range map[string][]string{
+		"/api/auth/social/providers":                 {"get"},
+		"/api/auth/social/{provider}/start":          {"post"},
+		"/api/auth/social/{provider}/callback":       {"get"},
+		"/api/auth/social/preview":                   {"post"},
+		"/api/auth/social/complete":                  {"post"},
+		"/api/auth/social/confirm":                   {"get"},
+		"/api/cloud/signup/social/complete":          {"post"},
+		"/api/user/security/social/{provider}/start": {"post"},
+		"/api/user/security/social/{provider}":       {"delete"},
+	} {
+		pathItem := requireMap(t, paths, path)
+		for _, method := range methods {
+			if _, ok := pathItem[method]; !ok {
+				t.Fatalf("expected %s %s in OpenAPI paths", method, path)
+			}
+		}
+	}
+
+	securityStatus := requireMap(t, schemas, "UserSecurityStatus")
+	securityProperties := requireMap(t, securityStatus, "properties")
+	if _, ok := securityProperties["password_login_enabled"]; !ok {
+		t.Fatal("UserSecurityStatus should expose password_login_enabled")
+	}
+	if _, ok := securityProperties["social_identities"]; !ok {
+		t.Fatal("UserSecurityStatus should expose redacted social identity summaries")
+	}
+	identity := requireMap(t, schemas, "UserSocialIdentity")
+	identityProperties := requireMap(t, identity, "properties")
+	if _, ok := identityProperties["subject"]; ok {
+		t.Fatal("UserSocialIdentity must not expose immutable provider subjects")
+	}
+}
+
 func TestOpenAPISpecV1IncludesSearchConsoleReportPaths(t *testing.T) {
 	spec := openAPISpecV1("http://localhost:8080")
 	paths := requireMap(t, spec, "paths")

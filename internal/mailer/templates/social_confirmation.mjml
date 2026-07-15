@@ -1,0 +1,24 @@
+{{ define "content" }}
+<mj-text font-size="20px" font-weight="600" padding-bottom="10px">
+  {{ t "auth.social_confirmation.heading" }}
+</mj-text>
+
+<mj-text> {{ t "common.hello" }} </mj-text>
+
+<mj-text>
+  {{ tf "auth.social_confirmation.body" .Provider }}
+</mj-text>
+
+<mj-button href="{{ .Link }}" padding-top="20px" padding-bottom="20px">
+  {{ t "auth.social_confirmation.button" }}
+</mj-button>
+
+<mj-text font-size="13px" color="#64748b">
+  {{ t "common.copy_link" }}
+  <a href="{{ .Link }}" style="color: #33d399">{{ .Link }}</a>
+</mj-text>
+
+<mj-text font-size="13px" color="#64748b" padding-top="10px">
+  {{ tf "auth.social_confirmation.expires" .ExpiresInMinutes }}
+</mj-text>
+{{ end }}

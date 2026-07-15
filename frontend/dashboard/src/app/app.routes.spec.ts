@@ -120,6 +120,12 @@ describe('routes', () => {
         expect(route?.canActivate).toBeUndefined();
     });
 
+    it('exposes the social signup completion as a guarded public cloud route', () => {
+        const route = routes.find((entry) => entry.path === 'signup/social/complete');
+        expect(route?.loadComponent).toBeTruthy();
+        expect(route?.canActivate?.length).toBeGreaterThan(0);
+    });
+
     it('exposes the multi-site overview page and delegates the authenticated start page to its default guard', () => {
         const children = routes.find((route) => route.path === '')?.children ?? [];
         const overviewRoute = children.find((route) => route.path === 'overview');

@@ -32,6 +32,58 @@ export interface SSOStartResponse {
     auth_url: string;
 }
 
+export type SocialProviderID = 'google' | 'github' | 'microsoft';
+
+export interface SocialProvider {
+    id: SocialProviderID;
+    display_name: string;
+}
+
+export interface SocialProvidersResponse {
+    providers: SocialProvider[];
+    signup_enabled: boolean;
+}
+
+export interface SocialStartResponse {
+    auth_url: string;
+}
+
+export interface SocialPreviewResponse {
+    provider: SocialProviderID;
+    display_name: string;
+    observed_email?: string;
+    email_verified: boolean;
+    email_confirmation_required: boolean;
+    flow: 'login' | 'signup' | 'invite';
+}
+
+export interface SocialCompleteResponse {
+    status: 'ok' | 'mfa_required' | 'signup_required' | 'verification_sent';
+    redirect_url?: string;
+    completion_token?: string;
+    challenge_token?: string;
+    factors?: ('totp' | 'passkey' | 'recovery_code' | 'email_link')[];
+    passkey?: PasskeyLoginStartResponse['publicKey'];
+}
+
+export interface SocialSignupCompleteRequest {
+    completion_token: string;
+    email?: string;
+    team_name: string;
+    plan_code: string;
+    billing: string;
+    jurisdiction: string;
+    locale: string;
+    accepted_tos: boolean;
+}
+
+export interface SocialSignupCompleteResponse {
+    status: 'ok' | 'verification_sent';
+    redirect_url?: string;
+    plan_code: string;
+    billing: string;
+}
+
 export interface AuthSession {
     expires_at: string;
     issued_at: string;
@@ -48,6 +100,7 @@ export interface AuthSession {
 export class AuthService {
     private http = inject(HttpClient);
     private ticker: ReturnType<typeof setInterval> | null = null;
+    private socialMfaHandoff: SocialCompleteResponse | null = null;
     readonly status = signal<AuthStatus>('unknown');
     readonly session = signal<AuthSession | null>(null);
     readonly sessionLoading = signal(false);
@@ -97,6 +150,48 @@ export class AuthService {
 
     startSSOLogin(payload: { email?: string; invite_token?: string; return_url?: string; remember_me?: boolean }): Observable<SSOStartResponse> {
         return this.http.post<SSOStartResponse>('/api/auth/sso/start', payload);
+    }
+
+    getSocialProviders(): Observable<SocialProvidersResponse> {
+        return this.http.get<SocialProvidersResponse>('/api/auth/social/providers');
+    }
+
+    startSocial(provider: SocialProviderID, payload: { flow: 'login' | 'signup' | 'invite'; invite_token?: string; return_url?: string; remember_me?: boolean }): Observable<SocialStartResponse> {
+        return this.http.post<SocialStartResponse>(`/api/auth/social/${provider}/start`, payload);
+    }
+
+    previewSocial(completionToken: string): Observable<SocialPreviewResponse> {
+        return this.http.post<SocialPreviewResponse>('/api/auth/social/preview', { completion_token: completionToken });
+    }
+
+    completeSocial(completionToken: string, email?: string): Observable<SocialCompleteResponse> {
+        return this.http.post<SocialCompleteResponse>('/api/auth/social/complete', { completion_token: completionToken, email }).pipe(
+            tap((response) => {
+                if (response.status === 'ok') {
+                    this.status.set('authenticated');
+                }
+            })
+        );
+    }
+
+    completeSocialSignup(payload: SocialSignupCompleteRequest): Observable<SocialSignupCompleteResponse> {
+        return this.http.post<SocialSignupCompleteResponse>('/api/cloud/signup/social/complete', payload).pipe(
+            tap((response) => {
+                if (response.status === 'ok') {
+                    this.status.set('authenticated');
+                }
+            })
+        );
+    }
+
+    setSocialMfaHandoff(response: SocialCompleteResponse): void {
+        this.socialMfaHandoff = response.status === 'mfa_required' ? response : null;
+    }
+
+    consumeSocialMfaHandoff(): SocialCompleteResponse | null {
+        const response = this.socialMfaHandoff;
+        this.socialMfaHandoff = null;
+        return response;
     }
 
     logout(): Observable<void> {

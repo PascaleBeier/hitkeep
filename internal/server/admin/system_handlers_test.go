@@ -88,7 +88,7 @@ func setupSystemTestEnv(t *testing.T) (*handler, *database.Store, *database.Tena
 }
 
 func TestHandleGetSystem(t *testing.T) {
-	h, _, _, ownerID, _, _ := setupSystemTestEnv(t)
+	h, store, _, ownerID, _, regularUserID := setupSystemTestEnv(t)
 	h.ctx.Config.MCPEnabled = true
 	h.ctx.Config.MCPPath = "/agent"
 	h.ctx.Config.MCPDocsEnabled = true
@@ -103,7 +103,19 @@ func TestHandleGetSystem(t *testing.T) {
 	h.ctx.Config.CloudPlanName = "Pro"
 	h.ctx.Config.CloudSignupEnabled = true
 	h.ctx.Config.StripeSecretKey = "sk_test_123"
+	h.ctx.Config.SocialGoogleClientID = "google-client"
+	h.ctx.Config.SocialGoogleClientSecret = "google-secret"
+	h.ctx.Config.SocialGitHubClientID = "github-partial-client"
+	h.ctx.Config.SocialSignupEnabled = true
 	h.ctx.Mailer = mailer.NewWithDriver(&adminTestMailDriver{}, h.ctx.Config)
+	if err := store.SetPasswordLoginEnabled(context.Background(), regularUserID, false); err != nil {
+		t.Fatalf("disable regular user password login: %v", err)
+	}
+	if _, err := store.LinkSocialIdentity(context.Background(), database.LinkSocialIdentityInput{
+		UserID: regularUserID, Provider: "microsoft", Subject: "11111111-2222-3333-4444-555555555555:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+	}); err != nil {
+		t.Fatalf("link sole Microsoft identity: %v", err)
+	}
 
 	req := withAdminTestUser(httptest.NewRequest(http.MethodGet, "/api/admin/system", nil), ownerID)
 	w := httptest.NewRecorder()
@@ -112,8 +124,9 @@ func TestHandleGetSystem(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
+	responseBody := w.Body.String()
 	var info api.SystemInfo
-	if err := json.NewDecoder(w.Body).Decode(&info); err != nil {
+	if err := json.NewDecoder(strings.NewReader(responseBody)).Decode(&info); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if info.PublicURL != "http://localhost:8080" {
@@ -130,7 +143,7 @@ func TestHandleGetSystem(t *testing.T) {
 	}
 
 	features := featureStatusByKey(info.EnabledFeatures)
-	for _, key := range []string{"mcp", "mcp_docs", "automatic_backups", "spam_auto_update", "mail_delivery", "google_search_console", "managed_cloud", "cloud_signup", "billing"} {
+	for _, key := range []string{"mcp", "mcp_docs", "automatic_backups", "spam_auto_update", "mail_delivery", "google_search_console", "managed_cloud", "cloud_signup", "billing", "social_google", "social_signup"} {
 		feature, ok := features[key]
 		if !ok {
 			t.Fatalf("expected feature %q to be reported", key)
@@ -150,6 +163,18 @@ func TestHandleGetSystem(t *testing.T) {
 	}
 	if features["google_search_console"].Detail != "oauth" {
 		t.Fatalf("expected Search Console oauth detail, got %q", features["google_search_console"].Detail)
+	}
+	if features["social_google"].Detail != "configured;sole_method_users=0" {
+		t.Fatalf("expected configured Google social status, got %#v", features["social_google"])
+	}
+	if features["social_github"].Enabled || features["social_github"].Detail != "partial_configuration;sole_method_users=0" {
+		t.Fatalf("expected degraded partial GitHub configuration, got %#v", features["social_github"])
+	}
+	if features["social_microsoft"].Enabled || features["social_microsoft"].Detail != "not_configured;sole_method_users=1" {
+		t.Fatalf("expected Microsoft lockout risk despite removed credentials, got %#v", features["social_microsoft"])
+	}
+	if strings.Contains(responseBody, "google-secret") {
+		t.Fatal("system status exposed a social provider secret")
 	}
 }
 

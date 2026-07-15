@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { vi } from 'vitest';
 
 import { Login } from '@pages/login/login';
@@ -27,6 +27,11 @@ describe('Login', () => {
         status: () => string;
         login: ReturnType<typeof vi.fn>;
         getSSOAvailability: ReturnType<typeof vi.fn>;
+        getSocialProviders: ReturnType<typeof vi.fn>;
+        startSocial: ReturnType<typeof vi.fn>;
+        previewSocial: ReturnType<typeof vi.fn>;
+        completeSocial: ReturnType<typeof vi.fn>;
+        consumeSocialMfaHandoff: ReturnType<typeof vi.fn>;
         startSSOLogin: ReturnType<typeof vi.fn>;
         startPasskeyLogin: ReturnType<typeof vi.fn>;
         finishPasskeyLogin: ReturnType<typeof vi.fn>;
@@ -37,6 +42,11 @@ describe('Login', () => {
         status: () => 'unknown',
         login: vi.fn(() => of({ status: 'ok' as const })),
         getSSOAvailability: vi.fn(() => of({ enabled: false })),
+        getSocialProviders: vi.fn(() => of({ providers: [], signup_enabled: false })),
+        startSocial: vi.fn(() => of({ auth_url: 'https://identity.example.com/authorize' })),
+        previewSocial: vi.fn(() => of({ provider: 'google', display_name: 'Google', observed_email: 'user@example.com', email_verified: true, email_confirmation_required: false, flow: 'login' })),
+        completeSocial: vi.fn(() => of({ status: 'ok' as const })),
+        consumeSocialMfaHandoff: vi.fn(() => null),
         startSSOLogin: vi.fn(() => of({ auth_url: 'https://identity.example.com/authorize' })),
         startPasskeyLogin: vi.fn(() =>
             of({
@@ -61,6 +71,9 @@ describe('Login', () => {
         authMethod = null;
         email = null;
         vi.clearAllMocks();
+        authMock.getSocialProviders.mockReturnValue(of({ providers: [], signup_enabled: false }));
+        authMock.startSocial.mockReturnValue(of({ auth_url: 'https://accounts.example.com/authorize' }));
+        authMock.consumeSocialMfaHandoff.mockReturnValue(null);
 
         const preferencesMock = {
             load: () => of(void 0)
@@ -131,8 +144,10 @@ describe('Login', () => {
     });
 
     it('falls back for unsafe returnUrl', () => {
-        returnUrl = 'https://evil.example/phish';
-        expect(component['resolveReturnUrl']()).toBe('/');
+        for (const unsafe of ['https://evil.example/phish', '//evil.example/phish', '/\\evil.example/phish', '/%2f%2fevil.example/phish', '/%5cevil.example/phish', '/login?next=/dashboard']) {
+            returnUrl = unsafe;
+            expect(component['resolveReturnUrl']()).toBe('/');
+        }
     });
 
     it('maps a revoked membership or invitation to the SSO access guidance', () => {
@@ -180,6 +195,98 @@ describe('Login', () => {
             throw new Error('expected authentication methods before the email field');
         }
         expect(methods.compareDocumentPosition(emailField) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('starts configured social login with the safe return URL and remember-me choice', () => {
+        const navigate = vi.spyOn(component as unknown as { navigateToSSOProvider: (url: string) => void }, 'navigateToSSOProvider').mockImplementation(() => undefined);
+        component['socialProviders'].set([{ id: 'google', display_name: 'Google' }]);
+        component['loginForm'].rememberMe().control().setValue(true);
+        returnUrl = '/events?range=30d';
+
+        component['selectAuthMethod']('google');
+
+        expect(authMock.startSocial).toHaveBeenCalledWith('google', {
+            flow: 'login',
+            return_url: '/events?range=30d',
+            remember_me: true
+        });
+        expect(navigate).toHaveBeenCalledWith('https://accounts.example.com/authorize');
+    });
+
+    it('requires an explicit HitKeep email before completing a first Microsoft login', () => {
+        authMock.previewSocial.mockReturnValueOnce(of({ provider: 'microsoft', display_name: 'Microsoft', observed_email: 'mutable@example.com', email_verified: false, email_confirmation_required: true, flow: 'login' }));
+
+        component['completeSocialLogin']('completion-token');
+
+        expect(component['authMode']()).toBe('social');
+        expect(component['loginForm'].email().value()).toBe('mutable@example.com');
+        expect(authMock.completeSocial).not.toHaveBeenCalled();
+
+        component['loginForm'].email().control().setValue('owner@example.com');
+        component.onSubmit();
+
+        expect(authMock.completeSocial).toHaveBeenCalledWith('completion-token', 'owner@example.com');
+    });
+
+    it('completes an already-linked Microsoft identity without asking for mutable email', () => {
+        authMock.previewSocial.mockReturnValueOnce(of({ provider: 'microsoft', display_name: 'Microsoft', observed_email: 'mutable@example.com', email_verified: false, email_confirmation_required: false, flow: 'login' }));
+
+        component['completeSocialLogin']('linked-completion-token');
+
+        expect(authMock.completeSocial).toHaveBeenCalledWith('linked-completion-token', undefined);
+        expect(component['authMode']()).toBe('password');
+    });
+
+    it('honors the server-bound return path after social callback completion', () => {
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+        authMock.completeSocial.mockReturnValueOnce(of({ status: 'ok' as const, redirect_url: '/events?range=30d' }));
+
+        component['completeSocialLogin']('return-path-token');
+
+        expect(navigate).toHaveBeenCalledWith('/events?range=30d');
+    });
+
+    it('stays loading while preview hands off to social completion', () => {
+        const preview = new Subject<{ provider: 'google'; display_name: string; observed_email: string; email_verified: boolean; email_confirmation_required: boolean; flow: 'login' }>();
+        const completion = new Subject<{ status: 'ok'; redirect_url: string }>();
+        authMock.previewSocial.mockReturnValueOnce(preview);
+        authMock.completeSocial.mockReturnValueOnce(completion);
+
+        component['completeSocialLogin']('loading-token');
+        expect(component['isLoading']()).toBe(true);
+
+        preview.next({ provider: 'google', display_name: 'Google', observed_email: 'user@example.com', email_verified: true, email_confirmation_required: false, flow: 'login' });
+        preview.complete();
+        expect(component['isLoading']()).toBe(true);
+
+        completion.next({ status: 'ok', redirect_url: '/dashboard' });
+        completion.complete();
+        expect(component['isLoading']()).toBe(false);
+    });
+
+    it('keeps the server-bound social return path through MFA email verification', () => {
+        authMock.completeSocial.mockReturnValueOnce(of({ status: 'mfa_required' as const, redirect_url: '/events?range=30d', challenge_token: 'social-mfa', factors: ['email_link' as const] }));
+
+        component['completeSocialLogin']('social-mfa-token');
+        component['requestEmailLinkMfa']();
+
+        expect(authMock.requestMfaEmailLink).toHaveBeenCalledWith('social-mfa', '/events?range=30d');
+    });
+
+    it('resumes invitation social MFA in the existing login verification UI', () => {
+        authMock.consumeSocialMfaHandoff.mockReturnValueOnce({
+            status: 'mfa_required',
+            challenge_token: 'social-invite-challenge',
+            factors: ['totp']
+        });
+
+        fixture = TestBed.createComponent(Login);
+        component = fixture.componentInstance;
+        fixture.detectChanges();
+
+        expect(component['mfaChallengeToken']()).toBe('social-invite-challenge');
+        expect(component['mfaHasTotp']()).toBe(true);
+        expect(fixture.nativeElement.textContent).toContain('login.mfaTitle');
     });
 
     it('uses PrimeNG surfaces for the auth card, feedback, and method divider', async () => {

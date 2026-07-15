@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 import { PublicKeyCredentialCreationJson, PublicKeyCredentialCreationOptionsJson } from '@core/utils/webauthn';
+import { SocialProviderID, SocialStartResponse } from '@services/auth.service';
 
 export interface UserPasskey {
     id: string;
@@ -17,6 +18,15 @@ export interface UserSecurityStatus {
     passkeys: UserPasskey[];
     recovery_codes_generated: boolean;
     recovery_codes_remaining: number;
+    password_login_enabled: boolean;
+    social_identities: UserSocialIdentity[];
+}
+
+export interface UserSocialIdentity {
+    provider: SocialProviderID;
+    observed_email?: string;
+    linked_at: string;
+    last_used_at?: string;
 }
 
 export interface UserTotpSetup {
@@ -70,5 +80,15 @@ export class UserSecurityService {
 
     regenerateRecoveryCodes(): Observable<UserRecoveryCodesResponse> {
         return this.http.post<UserRecoveryCodesResponse>('/api/user/security/recovery-codes/regenerate', {});
+    }
+
+    startSocialLink(provider: SocialProviderID): Observable<SocialStartResponse> {
+        return this.http.post<SocialStartResponse>(`/api/user/security/social/${provider}/start`, {});
+    }
+
+    unlinkSocial(provider: SocialProviderID, currentPassword?: string): Observable<void> {
+        return this.http.delete<void>(`/api/user/security/social/${provider}`, {
+            body: currentPassword ? { current_password: currentPassword } : {}
+        });
     }
 }

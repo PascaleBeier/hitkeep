@@ -986,17 +986,72 @@
       "sourceRequired": "Campaign source is required."
     }
   },
+  "social": {
+    "continueWith": {
+      "google": "Continue with Google",
+      "github": "Continue with GitHub",
+      "microsoft": "Continue with Microsoft"
+    },
+    "signupMethods": "Social signup methods",
+    "confirmEmailSubtitle": "Confirm which HitKeep account this Microsoft identity should access.",
+    "confirmEmailPrompt": "Microsoft email claims can change. Review the HitKeep email below before we send a confirmation link.",
+    "confirmEmailAction": "Send confirmation link",
+    "completeSignupTitle": "Finish creating your team",
+    "completeSignupSubtitle": "Signed in with {{provider}}. Add the few details HitKeep still needs.",
+    "createTeam": "Create team",
+    "regionLocked": "The region is locked for this authorization. Restart signup to change it.",
+    "microsoftEmailHelp": "Microsoft email claims can change. Confirm the HitKeep email you own; we will send a verification link.",
+    "confirmationTitle": "Confirm your email",
+    "confirmationSent": "Check your inbox and follow the secure link to finish.",
+    "confirmedSignIn": "Your provider is linked. Sign in once more to continue.",
+    "mfaSignInRequired": "Your invitation was accepted. Sign in again to complete multi-factor authentication.",
+    "errors": {
+      "failed": "Social sign-in could not be completed. Please try again.",
+      "unavailable": "This sign-in provider is unavailable right now.",
+      "cancelled": "Social sign-in was cancelled.",
+      "emailUnverified": "The provider did not supply a verified email address.",
+      "emailRequired": "Enter the HitKeep email address you want to confirm.",
+      "identityConflict": "This provider account is already linked to another HitKeep account.",
+      "accountNotFound": "No HitKeep account matches this sign-in. Create an account or use another method.",
+      "confirmationFailed": "We could not send the confirmation email. Please try again.",
+      "completionExpired": "This social sign-in has expired. Restart signup.",
+      "regionMismatch": "The selected region does not match this authorization. Restart signup in the correct region.",
+      "signupFailed": "Your team could not be created. Please try again."
+    }
+  },
   "settings": {
     "security": {
       "title": "Security",
       "loading": "Loading security settings...",
       "changePasswordTitle": "Change password",
       "changePasswordDescription": "Update the password for this account.",
+      "setPasswordTitle": "Set a password",
+      "setPasswordDescription": "Add password sign-in as another way to access this account.",
+      "setPasswordHelp": "HitKeep will send a secure password setup link to your account email.",
+      "setPasswordAction": "Send password setup email",
+      "setPasswordSent": "Password setup email sent.",
       "passwordUpdated": "Password updated successfully.",
       "currentPasswordLabel": "Current password",
       "newPasswordLabel": "New password",
       "minimumLengthHint": "Minimum 8 characters",
       "updatePassword": "Update password",
+      "social": {
+        "title": "Social sign-in",
+        "description": "Connect provider accounts you can use to sign in to HitKeep.",
+        "empty": "No social sign-in providers are linked.",
+        "linkedDate": "Linked",
+        "lastUsed": "Last used",
+        "connectAction": "Connect {{provider}}",
+        "unlinkAction": "Unlink",
+        "passwordConfirmationHint": "Enter your current password in the password section before unlinking your only social provider.",
+        "linked": "Provider linked successfully.",
+        "unlinked": "Provider unlinked successfully.",
+        "errors": {
+          "linkFailed": "Unable to link this provider.",
+          "unlinkFailed": "Unable to unlink this provider.",
+          "lastMethod": "Add another social provider or passkey, or confirm an enabled password before unlinking."
+        }
+      },
       "twoFactor": {
         "title": "Two-factor authentication",
         "description": "Protect your account with a one-time code from an authenticator app.",
@@ -1959,6 +2014,18 @@
         "cloud_signup": {
           "label": "Cloud signup"
         },
+        "social_google": {
+          "label": "Google sign-in"
+        },
+        "social_github": {
+          "label": "GitHub sign-in"
+        },
+        "social_microsoft": {
+          "label": "Microsoft sign-in"
+        },
+        "social_signup": {
+          "label": "Social signup"
+        },
         "ai": {
           "label": "AI gateway"
         },
@@ -1977,7 +2044,14 @@
         "driver": "{{driver}} driver",
         "interval": "Every {{interval}}",
         "stripe": "Stripe configured",
-        "plan": "{{plan}} plan"
+        "plan": "{{plan}} plan",
+		"social": {
+		  "configured": "Configured",
+		  "partial_configuration": "Degraded: configuration incomplete",
+		  "not_configured": "Not configured",
+		  "soleMethodUser": "Sole login method for {{count}} user",
+		  "soleMethodUsers": "Sole login method for {{count}} users"
+		}
       },
       "mcp": {
         "title": "MCP access",

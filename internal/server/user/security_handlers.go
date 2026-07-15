@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -16,6 +17,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/database"
 	appsecurity "hitkeep/internal/security"
 	"hitkeep/internal/server/shared"
 )
@@ -377,6 +379,10 @@ func (h *handler) handleDeleteUserPasskey() http.HandlerFunc {
 				http.Error(w, "Passkey not found", http.StatusNotFound)
 				return
 			}
+			if errors.Is(err, database.ErrLastPrimaryLoginMethod) {
+				http.Error(w, "Passkey is the last usable login method", http.StatusConflict)
+				return
+			}
 			slog.Error("Failed to delete user passkey", "error", err, "user_id", userID, "passkey_id", passkeyID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
@@ -444,6 +450,13 @@ func (h *handler) handleRegenerateRecoveryCodes() http.HandlerFunc {
 }
 
 func (h *handler) getUserSecurityStatus(ctx context.Context, userID uuid.UUID) (api.UserSecurityStatus, error) {
+	user, err := h.ctx.Store.GetUserByID(ctx, userID)
+	if err != nil {
+		return api.UserSecurityStatus{}, err
+	}
+	if user == nil {
+		return api.UserSecurityStatus{}, fmt.Errorf("user not found")
+	}
 	totpEnabled, err := h.ctx.Store.HasEnabledTOTP(ctx, userID)
 	if err != nil {
 		return api.UserSecurityStatus{}, err
@@ -460,12 +473,18 @@ func (h *handler) getUserSecurityStatus(ctx context.Context, userID uuid.UUID) (
 	if err != nil {
 		return api.UserSecurityStatus{}, err
 	}
+	socialIdentities, err := h.ctx.Store.ListUserSocialIdentities(ctx, userID)
+	if err != nil {
+		return api.UserSecurityStatus{}, err
+	}
 	return api.UserSecurityStatus{
 		TOTPEnabled:            totpEnabled,
 		TOTPPending:            totpPending,
 		Passkeys:               passkeys,
 		RecoveryCodesGenerated: recoveryStatus.Generated,
 		RecoveryCodesRemaining: recoveryStatus.Remaining,
+		PasswordLoginEnabled:   user.PasswordLoginEnabled,
+		SocialIdentities:       socialIdentities,
 	}, nil
 }
 

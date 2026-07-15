@@ -617,13 +617,14 @@ type Funnel struct {
 }
 
 type User struct {
-	ID           uuid.UUID `json:"id"`
-	Email        string    `json:"email"`
-	GivenName    string    `json:"given_name,omitempty"`
-	LastName     string    `json:"last_name,omitempty"`
-	InstanceRole string    `json:"instance_role,omitempty"`
-	Password     string    `json:"-"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID                   uuid.UUID `json:"id"`
+	Email                string    `json:"email"`
+	GivenName            string    `json:"given_name,omitempty"`
+	LastName             string    `json:"last_name,omitempty"`
+	InstanceRole         string    `json:"instance_role,omitempty"`
+	Password             string    `json:"-"`
+	PasswordLoginEnabled bool      `json:"-"`
+	CreatedAt            time.Time `json:"created_at"`
 }
 
 type UserProfile struct {
@@ -718,12 +719,21 @@ type UserPasskey struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type UserSocialIdentity struct {
+	Provider      string     `json:"provider"`
+	ObservedEmail string     `json:"observed_email,omitempty"`
+	LinkedAt      time.Time  `json:"linked_at"`
+	LastUsedAt    *time.Time `json:"last_used_at,omitempty"`
+}
+
 type UserSecurityStatus struct {
-	TOTPEnabled            bool          `json:"totp_enabled"`
-	TOTPPending            bool          `json:"totp_pending"`
-	Passkeys               []UserPasskey `json:"passkeys"`
-	RecoveryCodesGenerated bool          `json:"recovery_codes_generated"`
-	RecoveryCodesRemaining int           `json:"recovery_codes_remaining"`
+	TOTPEnabled            bool                 `json:"totp_enabled"`
+	TOTPPending            bool                 `json:"totp_pending"`
+	Passkeys               []UserPasskey        `json:"passkeys"`
+	RecoveryCodesGenerated bool                 `json:"recovery_codes_generated"`
+	RecoveryCodesRemaining int                  `json:"recovery_codes_remaining"`
+	PasswordLoginEnabled   bool                 `json:"password_login_enabled"`
+	SocialIdentities       []UserSocialIdentity `json:"social_identities"`
 }
 
 type UserTOTPSetup struct {
@@ -1492,6 +1502,16 @@ type SSOAvailability struct {
 
 type SSOStartResponse struct {
 	AuthURL string `json:"auth_url"`
+}
+
+type SocialProvider struct {
+	ID          string `json:"id"`
+	DisplayName string `json:"display_name"`
+}
+
+type SocialProvidersResponse struct {
+	Providers     []SocialProvider `json:"providers"`
+	SignupEnabled bool             `json:"signup_enabled"`
 }
 
 type CloudPlanTier struct {

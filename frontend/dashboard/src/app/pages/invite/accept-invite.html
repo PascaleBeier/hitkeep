@@ -14,7 +14,7 @@
             <p-button [label]="'invite.accept.signIn' | transloco" type="button" class="w-full" (onClick)="goToLogin()"> </p-button>
             } @if (isCheckingSession() || isAutoAccepting()) {
             <p-message severity="secondary" icon="pi pi-spin pi-spinner" role="status" aria-live="polite">{{ "invite.accept.checkingSession" | transloco }}</p-message>
-            } @if (token && !loginRequired() && !isCheckingSession() && !isAutoAccepting()) { @if (ssoAvailable()) {
+            } @if (token && !loginRequired() && !isCheckingSession() && !isAutoAccepting()) { @if (authMethods().length > 0) {
             <div class="hk-auth-actions-stack">
                 <app-auth-methods [methods]="authMethods()" (methodSelected)="selectAuthMethod($event)" />
                 <app-auth-divider labelKey="login.or" />

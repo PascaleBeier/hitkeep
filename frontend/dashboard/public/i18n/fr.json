@@ -986,17 +986,51 @@
       "sourceRequired": "La source de campagne est requise."
     }
   },
+  "social": {
+    "continueWith": { "google": "Continuer avec Google", "github": "Continuer avec GitHub", "microsoft": "Continuer avec Microsoft" },
+    "signupMethods": "Méthodes d’inscription sociale",
+    "confirmEmailSubtitle": "Confirmez le compte HitKeep auquel cette identité Microsoft doit accéder.",
+    "confirmEmailPrompt": "Les adresses Microsoft peuvent changer. Vérifiez l’adresse HitKeep avant l’envoi du lien de confirmation.",
+    "confirmEmailAction": "Envoyer le lien de confirmation",
+    "completeSignupTitle": "Terminez la création de votre équipe",
+    "completeSignupSubtitle": "Connecté avec {{provider}}. Ajoutez les quelques informations dont HitKeep a encore besoin.",
+    "createTeam": "Créer l’équipe",
+    "regionLocked": "La région est verrouillée pour cette autorisation. Recommencez l’inscription pour la modifier.",
+    "microsoftEmailHelp": "Les adresses Microsoft peuvent changer. Confirmez l’adresse HitKeep qui vous appartient ; nous enverrons un lien de vérification.",
+    "confirmationTitle": "Confirmez votre adresse e-mail",
+    "confirmationSent": "Consultez votre boîte de réception et suivez le lien sécurisé pour terminer.",
+    "confirmedSignIn": "Votre fournisseur est associé. Reconnectez-vous pour continuer.",
+    "mfaSignInRequired": "Votre invitation a été acceptée. Reconnectez-vous pour terminer l’authentification multifacteur.",
+    "errors": {
+      "failed": "La connexion sociale n’a pas pu être finalisée. Réessayez.", "unavailable": "Ce fournisseur de connexion est indisponible.", "cancelled": "La connexion sociale a été annulée.",
+      "emailUnverified": "Le fournisseur n’a pas transmis d’adresse e-mail vérifiée.", "emailRequired": "Saisissez l’adresse HitKeep à confirmer.",
+      "identityConflict": "Ce compte fournisseur est déjà associé à un autre compte HitKeep.", "accountNotFound": "Aucun compte HitKeep ne correspond. Créez un compte ou utilisez une autre méthode.",
+      "confirmationFailed": "L’e-mail de confirmation n’a pas pu être envoyé. Réessayez.", "completionExpired": "Cette connexion sociale a expiré. Recommencez l’inscription.",
+      "regionMismatch": "La région sélectionnée ne correspond pas à cette autorisation. Recommencez dans la bonne région.", "signupFailed": "Votre équipe n’a pas pu être créée. Réessayez."
+    }
+  },
   "settings": {
     "security": {
       "title": "Sécurité",
       "loading": "Chargement des paramètres de sécurité...",
       "changePasswordTitle": "Changer le mot de passe",
       "changePasswordDescription": "Mettez à jour le mot de passe de ce compte.",
+      "setPasswordTitle": "Définir un mot de passe",
+      "setPasswordDescription": "Ajoutez la connexion par mot de passe comme autre moyen d’accéder à ce compte.",
+      "setPasswordHelp": "HitKeep enverra un lien sécurisé de configuration à l’adresse e-mail de votre compte.",
+      "setPasswordAction": "Envoyer l’e-mail de configuration",
+      "setPasswordSent": "E-mail de configuration du mot de passe envoyé.",
       "passwordUpdated": "Mot de passe mis à jour avec succès.",
       "currentPasswordLabel": "Mot de passe actuel",
       "newPasswordLabel": "Nouveau mot de passe",
       "minimumLengthHint": "Minimum 8 caractères",
       "updatePassword": "Mettre à jour le mot de passe",
+      "social": {
+        "title": "Connexion sociale", "description": "Associez les comptes fournisseurs utilisables pour vous connecter à HitKeep.", "empty": "Aucun fournisseur de connexion sociale n’est associé.",
+        "linkedDate": "Associé", "lastUsed": "Dernière utilisation", "connectAction": "Associer {{provider}}", "unlinkAction": "Dissocier",
+        "passwordConfirmationHint": "Saisissez votre mot de passe actuel dans la section mot de passe avant de dissocier votre seul fournisseur social.", "linked": "Fournisseur associé.", "unlinked": "Fournisseur dissocié.",
+        "errors": { "linkFailed": "Impossible d’associer ce fournisseur.", "unlinkFailed": "Impossible de dissocier ce fournisseur.", "lastMethod": "Ajoutez un autre fournisseur social ou une clé d’accès, ou confirmez un mot de passe activé." }
+      },
       "twoFactor": {
         "title": "Authentification à deux facteurs",
         "description": "Protégez votre compte avec un code à usage unique depuis une application d'authentification.",
@@ -2043,6 +2077,10 @@
         "cloud_signup": {
           "label": "Inscription cloud"
         },
+        "social_google": { "label": "Connexion Google" },
+        "social_github": { "label": "Connexion GitHub" },
+        "social_microsoft": { "label": "Connexion Microsoft" },
+        "social_signup": { "label": "Inscription sociale" },
         "ai": {
           "label": "Passerelle IA"
         },
@@ -2061,7 +2099,14 @@
         "driver": "Pilote {{driver}}",
         "interval": "Toutes les {{interval}}",
         "stripe": "Stripe configuré",
-        "plan": "Forfait {{plan}}"
+        "plan": "Forfait {{plan}}",
+		"social": {
+		  "configured": "Configuré",
+		  "partial_configuration": "Dégradé : configuration incomplète",
+		  "not_configured": "Non configuré",
+		  "soleMethodUser": "Seule méthode de connexion pour {{count}} utilisateur",
+		  "soleMethodUsers": "Seule méthode de connexion pour {{count}} utilisateurs"
+		}
       },
       "mcp": {
         "title": "Accès MCP",

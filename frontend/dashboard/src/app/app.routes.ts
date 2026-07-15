@@ -37,6 +37,12 @@ export const routes: Routes = [
         data: titleData('signup.verified.title')
     },
     {
+        path: 'signup/social/complete',
+        loadComponent: () => import('@pages/signup/social-signup').then((m) => m.SocialSignup),
+        canActivate: [cloudSignupGuard],
+        data: titleData('social.completeSignupTitle')
+    },
+    {
         path: 'forgot-password',
         loadComponent: () => import('@pages/password/forgot-password').then((m) => m.ForgotPassword),
         data: titleData('password.forgot.title')

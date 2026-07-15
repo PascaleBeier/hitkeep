@@ -13,7 +13,7 @@ import { Brand } from '@components/brand/brand';
 import { AuthCard } from '@core/components/auth-card/auth-card';
 import { AuthDivider } from '@core/components/auth-divider/auth-divider';
 import { AuthMethodOption, AuthMethods } from '@core/components/auth-methods/auth-methods';
-import { AuthService } from '@services/auth.service';
+import { AuthService, SocialProvider, SocialProviderID } from '@services/auth.service';
 
 @Component({
     selector: 'app-accept-invite',
@@ -32,20 +32,34 @@ export class AcceptInvite implements OnInit {
     protected readonly isCheckingSession = signal(false);
     protected readonly isLoading = signal(false);
     protected readonly isSSOLoading = signal(false);
+    protected readonly socialLoading = signal<SocialProviderID | null>(null);
     protected readonly ssoAvailable = signal(false);
+    protected readonly socialProviders = signal<readonly SocialProvider[]>([]);
     protected readonly isAutoAccepting = signal(false);
     protected readonly errorMessage = signal<string | null>(null);
     protected readonly loginRequired = signal(false);
-    protected readonly authMethods = computed<readonly AuthMethodOption[]>(() => [
-        {
-            id: 'sso',
-            labelKey: 'login.continueWithSSO',
-            icon: 'pi pi-building',
+    protected readonly authMethods = computed<readonly AuthMethodOption[]>(() => {
+        const disabled = this.isLoading() || this.isSSOLoading() || this.socialLoading() !== null;
+        const methods: AuthMethodOption[] = this.socialProviders().map((provider) => ({
+            id: provider.id,
+            labelKey: `social.continueWith.${provider.id}`,
+            icon: provider.id === 'github' ? 'pi pi-github' : provider.id === 'google' ? 'pi pi-google' : 'pi pi-microsoft',
             wide: true,
-            loading: this.isSSOLoading(),
-            disabled: this.isLoading() || this.isSSOLoading()
+            loading: this.socialLoading() === provider.id,
+            disabled
+        }));
+        if (this.ssoAvailable()) {
+            methods.push({
+                id: 'sso',
+                labelKey: 'login.continueWithSSO',
+                icon: 'pi pi-building',
+                wide: true,
+                loading: this.isSSOLoading(),
+                disabled
+            });
         }
-    ]);
+        return methods;
+    });
 
     private readonly formModel = signal({
         password: new FormControl('', {
@@ -63,6 +77,18 @@ export class AcceptInvite implements OnInit {
         }
         if (this.route.snapshot.queryParamMap.get('error')?.trim().startsWith('sso_')) {
             this.errorMessage.set('invite.accept.errors.ssoFailed');
+        }
+        if (this.route.snapshot.queryParamMap.get('error')?.trim().startsWith('social_')) {
+            this.errorMessage.set('social.errors.failed');
+        }
+        this.authService.getSocialProviders().subscribe({
+            next: (response) => this.socialProviders.set(response.providers),
+            error: () => this.socialProviders.set([])
+        });
+        const completionToken = this.socialCompletionToken();
+        if (completionToken) {
+            this.completeSocialInvite(completionToken);
+            return;
         }
         if (this.authService.isAuthenticated()) {
             this.acceptAuthenticatedInvite();
@@ -85,7 +111,28 @@ export class AcceptInvite implements OnInit {
     protected selectAuthMethod(method: string): void {
         if (method === 'sso') {
             this.onSSOLogin();
+            return;
         }
+        if (this.socialProviders().some((provider) => provider.id === method)) {
+            this.onSocialLogin(method as SocialProviderID);
+        }
+    }
+
+    protected onSocialLogin(provider: SocialProviderID): void {
+        if (!this.token || this.socialLoading() !== null) return;
+        this.socialLoading.set(provider);
+        this.errorMessage.set(null);
+        this.authService
+            .startSocial(provider, {
+                flow: 'invite',
+                invite_token: this.token,
+                return_url: '/dashboard'
+            })
+            .pipe(finalize(() => this.socialLoading.set(null)))
+            .subscribe({
+                next: (response) => this.navigateToSSOProvider(response.auth_url),
+                error: () => this.errorMessage.set('social.errors.failed')
+            });
     }
 
     protected onSSOLogin(): void {
@@ -166,6 +213,35 @@ export class AcceptInvite implements OnInit {
 
     private navigateToSSOProvider(authURL: string): void {
         window.location.assign(authURL);
+    }
+
+    private completeSocialInvite(completionToken: string): void {
+        this.isLoading.set(true);
+        this.authService
+            .completeSocial(completionToken)
+            .pipe(finalize(() => this.isLoading.set(false)))
+            .subscribe({
+                next: (response) => {
+                    if (response.status === 'ok') {
+                        void this.router.navigateByUrl(response.redirect_url || '/dashboard');
+                        return;
+                    }
+                    if (response.status === 'mfa_required') {
+                        this.authService.setSocialMfaHandoff(response);
+                        void this.router.navigate(['/login'], {
+                            queryParams: { returnUrl: response.redirect_url || '/dashboard' }
+                        });
+                        return;
+                    }
+                    this.errorMessage.set('social.errors.failed');
+                },
+                error: () => this.errorMessage.set('social.errors.failed')
+            });
+    }
+
+    private socialCompletionToken(): string | null {
+        if (typeof window === 'undefined') return null;
+        return new URLSearchParams(window.location.hash.replace(/^#/, '')).get('social_token')?.trim() || null;
     }
 
     private handleAcceptError(error: unknown): void {

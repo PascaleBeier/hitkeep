@@ -37,20 +37,22 @@ type PasskeyCredential struct {
 }
 
 type CreateLoginChallengeInput struct {
-	UserID     *uuid.UUID
-	RememberMe bool
-	Flow       string
+	UserID       *uuid.UUID
+	RememberMe   bool
+	Flow         string
+	AuthProvider string
 }
 
 type LoginChallenge struct {
-	ID         uuid.UUID
-	UserID     uuid.UUID
-	HasUserID  bool
-	RememberMe bool
-	Flow       string
-	Challenge  string
-	Session    *webauthnlib.SessionData
-	ExpiresAt  time.Time
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	HasUserID    bool
+	RememberMe   bool
+	Flow         string
+	AuthProvider string
+	Challenge    string
+	Session      *webauthnlib.SessionData
+	ExpiresAt    time.Time
 }
 
 type DisableUserMFAResult struct {
@@ -373,10 +375,50 @@ func (s *Store) ListUserPasskeys(ctx context.Context, userID uuid.UUID) ([]api.U
 }
 
 func (s *Store) DeleteUserPasskey(ctx context.Context, userID uuid.UUID, passkeyID uuid.UUID) error {
-	if err := s.ExecRowsAffected(ctx, "DELETE FROM user_passkeys WHERE id = ? AND user_id = ?", passkeyID, userID); err != nil {
-		return fmt.Errorf("could not delete user passkey: %w", err)
-	}
-	return nil
+	s.primaryAuthMu.Lock()
+	defer s.primaryAuthMu.Unlock()
+
+	return s.Transact(ctx, func(tx *sql.Tx) error {
+		var targetCount, otherPasskeyCount, socialCount int
+		var passwordLoginEnabled bool
+		if err := tx.QueryRowContext(ctx,
+			"SELECT COUNT(*) FROM user_passkeys WHERE id = ? AND user_id = ?",
+			passkeyID, userID,
+		).Scan(&targetCount); err != nil {
+			return fmt.Errorf("could not check user passkey: %w", err)
+		}
+		if targetCount == 0 {
+			return fmt.Errorf("could not delete user passkey: no rows affected")
+		}
+		if err := tx.QueryRowContext(ctx,
+			"SELECT COUNT(*) FROM user_passkeys WHERE user_id = ? AND id <> ?",
+			userID, passkeyID,
+		).Scan(&otherPasskeyCount); err != nil {
+			return fmt.Errorf("could not count alternative passkeys: %w", err)
+		}
+		if err := tx.QueryRowContext(ctx,
+			"SELECT COUNT(*) FROM social_identities WHERE user_id = ?",
+			userID,
+		).Scan(&socialCount); err != nil {
+			return fmt.Errorf("could not count alternative social identities: %w", err)
+		}
+		if err := tx.QueryRowContext(ctx,
+			"SELECT COALESCE(password_login_enabled, TRUE) FROM users WHERE id = ?",
+			userID,
+		).Scan(&passwordLoginEnabled); err != nil {
+			return fmt.Errorf("could not load password login state: %w", err)
+		}
+		if otherPasskeyCount == 0 && socialCount == 0 && !passwordLoginEnabled {
+			return ErrLastPrimaryLoginMethod
+		}
+		if _, err := tx.ExecContext(ctx,
+			"DELETE FROM user_passkeys WHERE id = ? AND user_id = ?",
+			passkeyID, userID,
+		); err != nil {
+			return fmt.Errorf("could not delete user passkey: %w", err)
+		}
+		return nil
+	})
 }
 
 func (s *Store) GetPasskeyByCredentialID(ctx context.Context, credentialID string) (*PasskeyCredential, error) {

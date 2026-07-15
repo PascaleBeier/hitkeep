@@ -1,35 +1,97 @@
-<app-settings-card [title]="'settings.security.changePasswordTitle' | transloco" [subtitle]="'settings.security.changePasswordDescription' | transloco" icon="pi pi-shield">
-    <form id="settings-security-form" settings-card-body (submit)="onSubmit($event)" class="flex flex-col gap-4" novalidate>
-        @if (passwordError()) {
-        <p-message severity="error" styleClass="w-full">{{ passwordError()! | transloco }}</p-message>
-        } @if (passwordSuccess()) {
-        <p-message severity="success" styleClass="w-full">{{ "settings.security.passwordUpdated" | transloco }}</p-message>
+<app-settings-card [title]="'settings.security.social.title' | transloco" [subtitle]="'settings.security.social.description' | transloco" icon="pi pi-users">
+    <div settings-card-body class="flex flex-col gap-4">
+        @if (socialError()) {
+        <p-message severity="error" styleClass="w-full">{{ socialError()! | transloco }}</p-message>
+        } @if (socialSuccess()) {
+        <p-message severity="success" styleClass="w-full">{{ socialSuccess()! | transloco }}</p-message>
+        } @if (socialIdentities().length === 0) {
+        <p class="text-sm text-muted-color">{{ "settings.security.social.empty" | transloco }}</p>
+        } @else {
+        <div class="passkey-list">
+            @for (identity of socialIdentities(); track identity.provider) {
+            <div class="passkey-item">
+                <div class="passkey-meta">
+                    <span class="font-medium text-sm">{{ providerName(identity.provider) }}</span>
+                    @if (identity.observed_email) {
+                    <span class="text-xs text-muted-color">{{ identity.observed_email }}</span>
+                    }
+                    <span class="text-xs text-muted-color"> {{ "settings.security.social.linkedDate" | transloco }} <app-relative-date-time [value]="identity.linked_at" /> </span>
+                    @if (identity.last_used_at) {
+                    <span class="text-xs text-muted-color"> {{ "settings.security.social.lastUsed" | transloco }} <app-relative-date-time [value]="identity.last_used_at" /> </span>
+                    }
+                </div>
+                <button pButton type="button" severity="secondary" [outlined]="true" icon="pi pi-unlink" [loading]="socialLoading() === identity.provider" [disabled]="socialLoading() !== null" (click)="unlinkSocial(identity.provider)">
+                    {{ "settings.security.social.unlinkAction" | transloco }}
+                </button>
+            </div>
+            }
+        </div>
+        } @if (availableSocialProviders().length > 0) {
+        <div class="flex flex-wrap gap-2">
+            @for (provider of availableSocialProviders(); track provider.id) {
+            <button pButton type="button" severity="secondary" [outlined]="true" icon="pi pi-plus" [loading]="socialLoading() === provider.id" [disabled]="socialLoading() !== null" (click)="connectSocial(provider.id)">
+                {{ "settings.security.social.connectAction" | transloco : { provider: provider.display_name } }}
+            </button>
+            }
+        </div>
+        } @if (passwordLoginEnabled() && socialIdentities().length === 1 && passkeys().length === 0) {
+        <small class="text-xs text-muted-color">{{ "settings.security.social.passwordConfirmationHint" | transloco }}</small>
         }
+    </div>
+</app-settings-card>
 
-        <div class="flex flex-col gap-2">
-            <label for="currentPassword" class="text-sm font-medium">{{ "settings.security.currentPasswordLabel" | transloco }}</label>
-            <p-password
-                id="currentPassword"
-                [formControl]="form.currentPassword().control()"
-                [toggleMask]="true"
-                [feedback]="false"
-                class="w-full"
-                [class.ng-invalid]="form.currentPassword().touched() && form.currentPassword().invalid()"
-                [class.ng-dirty]="form.currentPassword().dirty()"
-            ></p-password>
+<app-settings-card
+    [title]="(passwordLoginEnabled() ? 'settings.security.changePasswordTitle' : 'settings.security.setPasswordTitle') | transloco"
+    [subtitle]="(passwordLoginEnabled() ? 'settings.security.changePasswordDescription' : 'settings.security.setPasswordDescription') | transloco"
+    icon="pi pi-shield"
+>
+    <div settings-card-body>
+        @if (passwordLoginEnabled()) {
+        <form id="settings-security-form" (submit)="onSubmit($event)" class="flex flex-col gap-4" novalidate>
+            @if (passwordError()) {
+            <p-message severity="error" styleClass="w-full">{{ passwordError()! | transloco }}</p-message>
+            } @if (passwordSuccess()) {
+            <p-message severity="success" styleClass="w-full">{{ "settings.security.passwordUpdated" | transloco }}</p-message>
+            }
+
+            <div class="flex flex-col gap-2">
+                <label for="currentPassword" class="text-sm font-medium">{{ "settings.security.currentPasswordLabel" | transloco }}</label>
+                <p-password
+                    id="currentPassword"
+                    [formControl]="form.currentPassword().control()"
+                    [toggleMask]="true"
+                    [feedback]="false"
+                    class="w-full"
+                    [class.ng-invalid]="form.currentPassword().touched() && form.currentPassword().invalid()"
+                    [class.ng-dirty]="form.currentPassword().dirty()"
+                ></p-password>
+            </div>
+
+            <div class="flex flex-col gap-2">
+                <label for="newPassword" class="text-sm font-medium">{{ "settings.security.newPasswordLabel" | transloco }}</label>
+                <p-password id="newPassword" [formControl]="form.newPassword().control()" [toggleMask]="true" [feedback]="false" class="w-full"></p-password>
+                <small class="text-xs text-muted-color">{{ "settings.security.minimumLengthHint" | transloco }}</small>
+            </div>
+        </form>
+        } @else {
+        <div class="flex flex-col gap-4">
+            @if (passwordError()) {
+            <p-message severity="error" styleClass="w-full">{{ passwordError()! | transloco }}</p-message>
+            } @if (setPasswordSent()) {
+            <p-message severity="success" styleClass="w-full">{{ "settings.security.setPasswordSent" | transloco }}</p-message>
+            }
+            <p class="text-sm text-muted-color">{{ "settings.security.setPasswordHelp" | transloco }}</p>
         </div>
-
-        <div class="flex flex-col gap-2">
-            <label for="newPassword" class="text-sm font-medium">{{ "settings.security.newPasswordLabel" | transloco }}</label>
-            <p-password id="newPassword" [formControl]="form.newPassword().control()" [toggleMask]="true" [feedback]="false" class="w-full"></p-password>
-            <small class="text-xs text-muted-color">{{ "settings.security.minimumLengthHint" | transloco }}</small>
-        </div>
-    </form>
-
+        }
+    </div>
     <div settings-card-footer>
+        @if (passwordLoginEnabled()) {
         <button pButton type="submit" form="settings-security-form" icon="pi pi-check" [loading]="isPasswordLoading()" [disabled]="isPasswordLoading() || form.currentPassword().invalid() || form.newPassword().invalid()" class="settings-action-btn">
             {{ "settings.security.updatePassword" | transloco }}
         </button>
+        } @else {
+        <button pButton type="button" icon="pi pi-envelope" [loading]="isPasswordLoading()" [disabled]="isPasswordLoading()" class="settings-action-btn" (click)="requestSetPassword()">{{ "settings.security.setPasswordAction" | transloco }}</button>
+        }
     </div>
 </app-settings-card>
 

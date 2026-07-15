@@ -70,6 +70,86 @@ func openAPIV1AccountSchemas() map[string]any {
 			},
 			"required": []string{"auth_url"},
 		},
+		"SocialProvider": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"id":           map[string]any{"type": "string", "enum": []string{"google", "github", "microsoft"}},
+				"display_name": map[string]any{"type": "string"},
+			},
+			"required": []string{"id", "display_name"},
+		},
+		"SocialProvidersResponse": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"providers":      map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/SocialProvider"}},
+				"signup_enabled": map[string]any{"type": "boolean"},
+			},
+			"required": []string{"providers", "signup_enabled"},
+		},
+		"SocialStartRequest": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"flow":         map[string]any{"type": "string", "enum": []string{"login", "signup", "invite"}},
+				"invite_token": map[string]any{"type": "string"},
+				"return_url":   map[string]any{"type": "string", "description": "Optional safe local application path."},
+				"remember_me":  map[string]any{"type": "boolean"},
+			},
+			"required": []string{"flow"},
+		},
+		"SocialCompleteRequest": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"completion_token": map[string]any{"type": "string", "writeOnly": true},
+				"email":            map[string]any{"type": "string", "format": "email", "description": "HitKeep target email required for a first unauthenticated Microsoft link."},
+			},
+			"required": []string{"completion_token"},
+		},
+		"SocialPreviewResponse": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"provider":                    map[string]any{"type": "string", "enum": []string{"google", "github", "microsoft"}},
+				"display_name":                map[string]any{"type": "string"},
+				"observed_email":              map[string]any{"type": "string", "format": "email"},
+				"email_verified":              map[string]any{"type": "boolean"},
+				"email_confirmation_required": map[string]any{"type": "boolean", "description": "Whether this completion requires the user to confirm a HitKeep email before continuing."},
+				"flow":                        map[string]any{"type": "string", "enum": []string{"login", "signup", "invite"}},
+			},
+			"required": []string{"provider", "display_name", "email_verified", "email_confirmation_required", "flow"},
+		},
+		"SocialCompleteResponse": map[string]any{
+			"allOf": []any{
+				map[string]any{"$ref": "#/components/schemas/LoginResponse"},
+				map[string]any{"type": "object", "properties": map[string]any{
+					"status":           map[string]any{"type": "string", "enum": []string{"ok", "mfa_required", "signup_required", "verification_sent"}},
+					"redirect_url":     map[string]any{"type": "string"},
+					"completion_token": map[string]any{"type": "string", "readOnly": true, "description": "Replacement one-time token returned only when signup details are required."},
+				}, "required": []string{"status"}},
+			},
+		},
+		"SocialSignupCompleteRequest": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"completion_token": map[string]any{"type": "string", "writeOnly": true},
+				"email":            map[string]any{"type": "string", "format": "email"},
+				"team_name":        map[string]any{"type": "string", "maxLength": 120},
+				"plan_code":        map[string]any{"type": "string", "enum": []string{"free", "pro", "business"}},
+				"billing":          map[string]any{"type": "string", "enum": []string{"monthly", "annual"}},
+				"jurisdiction":     map[string]any{"type": "string", "enum": []string{"EU", "US"}},
+				"locale":           map[string]any{"type": "string"},
+				"accepted_tos":     map[string]any{"type": "boolean"},
+			},
+			"required": []string{"completion_token", "team_name", "plan_code", "billing", "jurisdiction", "locale", "accepted_tos"},
+		},
+		"SocialSignupCompleteResponse": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"status":       map[string]any{"type": "string", "enum": []string{"ok", "verification_sent"}},
+				"plan_code":    map[string]any{"type": "string"},
+				"billing":      map[string]any{"type": "string"},
+				"redirect_url": map[string]any{"type": "string"},
+			},
+			"required": []string{"status", "plan_code", "billing"},
+		},
 		"TeamSSOInput": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -819,7 +899,22 @@ func openAPIV1AccountSchemas() map[string]any {
 				"passkeys":                 map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/UserPasskey"}},
 				"recovery_codes_generated": map[string]any{"type": "boolean"},
 				"recovery_codes_remaining": map[string]any{"type": "integer"},
+				"password_login_enabled":   map[string]any{"type": "boolean"},
+				"social_identities": map[string]any{
+					"type": "array", "items": map[string]any{"$ref": "#/components/schemas/UserSocialIdentity"},
+				},
 			},
+		},
+		"UserSocialIdentity": map[string]any{
+			"type":        "object",
+			"description": "Safe linked-provider metadata. Immutable provider subjects are intentionally omitted.",
+			"properties": map[string]any{
+				"provider":       map[string]any{"type": "string", "enum": []string{"google", "github", "microsoft"}},
+				"observed_email": map[string]any{"type": "string", "format": "email"},
+				"linked_at":      map[string]any{"type": "string", "format": "date-time"},
+				"last_used_at":   map[string]any{"type": "string", "format": "date-time"},
+			},
+			"required": []string{"provider", "linked_at"},
 		},
 		"UserRecoveryCodesResponse": map[string]any{
 			"type": "object",

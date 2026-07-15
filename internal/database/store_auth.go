@@ -40,7 +40,7 @@ func (s *Store) CompletePasswordReset(ctx context.Context, token string, newHash
 	email := entry.Email
 
 	err = s.Transact(ctx, func(tx *sql.Tx) error {
-		res, err := tx.ExecContext(ctx, "UPDATE users SET password = ? WHERE email = ?", newHashedPassword, email)
+		res, err := tx.ExecContext(ctx, "UPDATE users SET password = ?, password_login_enabled = TRUE WHERE email = ?", newHashedPassword, email)
 		if err != nil {
 			return err
 		}
@@ -73,7 +73,7 @@ func (s *Store) ResolvePasswordResetEmail(ctx context.Context, token string) (st
 
 func (s *Store) UpdatePasswordByID(ctx context.Context, userID string, newHashedPassword string) error {
 	return s.Transact(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, "UPDATE users SET password = ? WHERE id = ?", newHashedPassword, userID); err != nil {
+		if _, err := tx.ExecContext(ctx, "UPDATE users SET password = ?, password_login_enabled = TRUE WHERE id = ?", newHashedPassword, userID); err != nil {
 			return err
 		}
 		// Wipe active sessions

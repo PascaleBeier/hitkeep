@@ -42,7 +42,9 @@ describe('Signup', () => {
         navigateByUrl: vi.fn(() => Promise.resolve(true))
     };
     const authServiceMock = {
-        getSSOAvailability: vi.fn(() => of({ enabled: false }))
+        getSSOAvailability: vi.fn(() => of({ enabled: false })),
+        getSocialProviders: vi.fn(() => of({ providers: [], signup_enabled: false })),
+        startSocial: vi.fn<AuthService['startSocial']>(() => NEVER)
     };
     const signupTrackingMock = {
         install: vi.fn(),
@@ -54,6 +56,7 @@ describe('Signup', () => {
         routerMock.navigateByUrl.mockClear();
         routerMock.navigate.mockClear();
         authServiceMock.getSSOAvailability.mockReturnValue(of({ enabled: false }));
+        authServiceMock.getSocialProviders.mockReturnValue(of({ providers: [], signup_enabled: false }));
         signupTrackingMock.install.mockClear();
         signupTrackingMock.trackEvent.mockClear();
         locationAssignMock = vi.fn();
@@ -170,13 +173,15 @@ describe('Signup', () => {
             jurisdiction: 'EU',
             plan: 'free',
             interval: 'monthly',
-            source_path: '/signup'
+            source_path: '/signup',
+            auth_method: 'password'
         });
         expect(signupTrackingMock.trackEvent).toHaveBeenCalledWith('signup_completed_candidate', {
             jurisdiction: 'EU',
             plan: 'free',
             interval: 'monthly',
             source_path: '/signup',
+            auth_method: 'password',
             response_status: 'verification_sent'
         });
     });
@@ -210,6 +215,29 @@ describe('Signup', () => {
         expect(signupTrackingMock.trackEvent.mock.calls.some(([name, properties]) => name === 'signup_started' && properties?.plan === 'business' && properties?.interval === 'annual')).toBe(true);
     });
 
+    it('starts social signup after region selection and records provider-only growth metadata', () => {
+        authServiceMock.startSocial.mockReturnValue(of({ auth_url: 'https://accounts.example.com/authorize' }));
+        component['socialProviders'].set([{ id: 'github', display_name: 'GitHub' }]);
+        component['selectedPlan'].set('pro');
+        component['selectedBilling'].set('annual');
+
+        component['selectSocialMethod']('github');
+
+        expect(authServiceMock.startSocial).toHaveBeenCalledWith('github', {
+            flow: 'signup',
+            return_url: '/signup/social/complete?plan=pro&billing=annual&region=EU'
+        });
+        expect(signupTrackingMock.trackEvent).toHaveBeenCalledWith('signup_started', {
+            jurisdiction: 'EU',
+            plan: 'pro',
+            interval: 'annual',
+            source_path: '/signup',
+            auth_method: 'social',
+            provider: 'github'
+        });
+        expect(locationAssignMock).toHaveBeenCalledWith('https://accounts.example.com/authorize');
+    });
+
     it('does not discover or offer enterprise SSO from public signup', () => {
         expect(authServiceMock.getSSOAvailability).not.toHaveBeenCalled();
     });
@@ -231,6 +259,16 @@ describe('Signup', () => {
 
         expect(component['signupForm'].teamName().value()).toBe('Analytical Engine');
         expect(component['signupForm'].email().value()).toBe('ada@example.com');
+    });
+
+    it('shows stable provider cancellation feedback after returning to signup', () => {
+        queryParams = { error: 'social_provider_cancelled' };
+
+        fixture = TestBed.createComponent(Signup);
+        component = fixture.componentInstance;
+        fixture.detectChanges();
+
+        expect(component['errorMessage']()).toBe('social.errors.cancelled');
     });
 
     it('builds a jurisdiction URL for the alternate region with safe funnel context', () => {

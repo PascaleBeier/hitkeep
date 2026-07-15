@@ -7,6 +7,7 @@ func openAPIV1Paths() map[string]any {
 		openAPIV1WebVitalPaths(),
 		openAPIV1IntegrationPaths(),
 		openAPIV1SSOPaths(),
+		openAPIV1SocialAuthPaths(),
 		openAPIV1QRPaths(),
 		openAPIV1SearchConsoleReportPaths(),
 		openAPIV1WebhookPaths(),
@@ -609,8 +610,8 @@ func openAPIV1CorePaths() map[string]any {
 				map[string]any{"200": jsonRefResp("Security status", "#/components/schemas/UserSecurityStatus")}),
 		},
 		"/api/user/security/passkeys/{id}": map[string]any{
-			"delete": op([]string{"User"}, "Delete passkey", "Deletes a registered passkey credential.", secCookie(), []any{paramRef("#/components/parameters/passkeyID")}, nil,
-				map[string]any{"200": jsonRefResp("Security status", "#/components/schemas/UserSecurityStatus")}),
+			"delete": op([]string{"User"}, "Delete passkey", "Deletes a registered passkey only when another passkey, social provider, or enabled password remains usable.", secCookie(), []any{paramRef("#/components/parameters/passkeyID")}, nil,
+				map[string]any{"204": desc("Passkey deleted"), "404": errResp("Passkey not found"), "409": errResp("Passkey is the last usable primary login method")}),
 		},
 		"/api/user/security/recovery-codes/regenerate": map[string]any{
 			"post": op([]string{"User"}, "Regenerate recovery codes", "Generates a new one-time set of backup recovery codes for the authenticated user.", secCookie(), nil, nil,

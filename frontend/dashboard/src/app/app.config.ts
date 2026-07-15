@@ -14,6 +14,7 @@ import { providePreloadUserLang } from '@core/i18n/preload-user-lang';
 import { PrimeLocaleSyncService } from '@core/i18n/prime-locale-sync.service';
 import { DASHBOARD_LANGUAGE_CODES, DASHBOARD_LOCALE_MAPPING, DEFAULT_DASHBOARD_LANGUAGE, SOURCE_LOCALE } from '@core/i18n/supported-locales';
 import { DashboardTitleService } from '@services/dashboard-title.service';
+import { PreferencesService } from '@services/preferences.service';
 import { HitKeepPreset } from '@core/theme/hitkeep-preset';
 
 export const appConfig: ApplicationConfig = {
@@ -47,6 +48,7 @@ export const appConfig: ApplicationConfig = {
         }),
         provideEnvironmentInitializer(() => inject(PrimeLocaleSyncService)),
         provideEnvironmentInitializer(() => inject(DashboardTitleService)),
+        provideEnvironmentInitializer(() => inject(PreferencesService)),
         providePreloadUserLang()
     ]
 };

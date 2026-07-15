@@ -5,7 +5,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { compatForm } from '@angular/forms/signals/compat';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { CopyControl } from '@components/copy-control/copy-control';
@@ -51,6 +51,7 @@ export class UserSettings {
     private preferencesService = inject(UserPreferencesService);
     private profileService = inject(UserProfileService);
     private transloco = inject(TranslocoService);
+    private route = inject(ActivatedRoute);
     private activeLanguage = toSignal(this.transloco.langChanges$, { initialValue: this.transloco.getActiveLang() });
 
     private readonly profileFormModel = signal({
@@ -143,6 +144,9 @@ export class UserSettings {
     });
 
     constructor() {
+        if (this.route.snapshot.queryParamMap.get('tab') === 'security') {
+            this.activeTab.set('security');
+        }
         effect(() => {
             const shouldDisable = this.isProfileLoading() || this.isProfileSaving();
             const controls = [this.profileForm.email().control(), this.profileForm.givenName().control(), this.profileForm.lastName().control()];

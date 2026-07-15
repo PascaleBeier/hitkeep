@@ -1,0 +1,62 @@
+<main class="hk-auth-page">
+    <section class="hk-auth-shell" aria-labelledby="social-signup-title">
+        <app-auth-card>
+            @if (verificationSent()) {
+            <header class="hk-auth-header">
+                <i class="pi pi-envelope text-4xl text-primary-500" aria-hidden="true"></i>
+                <h1 id="social-signup-title" class="hk-auth-title">{{ "social.confirmationTitle" | transloco }}</h1>
+                <p class="hk-auth-subtitle">{{ "social.confirmationSent" | transloco }}</p>
+            </header>
+            } @else {
+            <header class="hk-auth-header">
+                <app-brand size="large" />
+                <h1 id="social-signup-title" class="hk-auth-title">{{ "social.completeSignupTitle" | transloco }}</h1>
+                <p class="hk-auth-subtitle">{{ "social.completeSignupSubtitle" | transloco : { provider: preview()?.display_name ?? '' } }}</p>
+            </header>
+
+            @if (errorMessage(); as error) {
+            <p-message severity="error" role="alert">{{ error | transloco }}</p-message>
+            } @if (isLoading() && !preview()) {
+            <p-message severity="secondary" icon="pi pi-spin pi-spinner">{{ "common.loading" | transloco }}</p-message>
+            } @if (preview()) {
+            <form (submit)="onSubmit($event)" class="hk-auth-form" novalidate>
+                <div class="rounded-lg border border-surface px-4 py-3 text-sm">
+                    <div class="font-semibold">{{ preview()!.display_name }}</div>
+                    <div class="text-[var(--p-text-muted-color)]">{{ ("signup.jurisdictions." + jurisdiction().toLowerCase()) | transloco }}</div>
+                    <small>{{ "social.regionLocked" | transloco }}</small>
+                </div>
+
+                <div class="hk-auth-field">
+                    <label for="social-email" class="hk-auth-field-label">{{ "common.emailAddress" | transloco }}</label>
+                    <input pInputText id="social-email" type="email" [formControl]="form.email().control()" [readonly]="preview()!.provider !== 'microsoft'" [fluid]="true" autocomplete="email" />
+                    @if (preview()!.provider === 'microsoft') {
+                    <small class="hk-auth-field-help">{{ "social.microsoftEmailHelp" | transloco }}</small>
+                    }
+                </div>
+
+                <div class="hk-auth-field">
+                    <label for="social-team-name" class="hk-auth-field-label">{{ "signup.teamNameLabel" | transloco }}</label>
+                    <input pInputText id="social-team-name" [formControl]="form.teamName().control()" [fluid]="true" autocomplete="organization" [placeholder]="'signup.teamNamePlaceholder' | transloco" />
+                </div>
+
+                <div class="flex items-start gap-2">
+                    <p-checkbox [formControl]="form.acceptedTos().control()" [binary]="true" inputId="socialAcceptedTos" />
+                    <label for="socialAcceptedTos" class="text-sm">
+                        {{ "signup.tosLabel" | transloco }}
+                        <a href="https://hitkeep.com/legal/terms-of-service/" target="_blank" rel="noopener" class="hk-auth-link">{{ "signup.tosLink" | transloco }}</a>
+                        {{ "signup.tosAnd" | transloco }}
+                        <a href="https://hitkeep.com/legal/privacy-policy/" target="_blank" rel="noopener" class="hk-auth-link">{{ "signup.privacyLink" | transloco }}</a>.
+                    </label>
+                </div>
+
+                <p-button [label]="'social.createTeam' | transloco" type="submit" [loading]="isLoading()" [disabled]="isLoading() || form().invalid()" [fluid]="true" />
+            </form>
+            } }
+        </app-auth-card>
+
+        <footer class="hk-auth-footer">
+            <a routerLink="/login" class="hk-auth-link">{{ "signup.signInAction" | transloco }}</a>
+            <p class="hk-auth-footer-text"><span aria-hidden="true">&copy;</span> {{ currentYear }} {{ "login.footerRights" | transloco }}</p>
+        </footer>
+    </section>
+</main>

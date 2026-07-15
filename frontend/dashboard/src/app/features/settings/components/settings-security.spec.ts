@@ -18,7 +18,9 @@ describe('SettingsSecurity', () => {
 
     const authServiceMock = {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        changePassword: vi.fn((current: string, newPass: string) => of(void 0))
+        changePassword: vi.fn((current: string, newPass: string) => of(void 0)),
+        getSocialProviders: vi.fn(() => of({ providers: [], signup_enabled: false })),
+        requestPasswordReset: vi.fn(() => of(void 0))
     };
 
     const userSecurityServiceMock = {
@@ -28,7 +30,9 @@ describe('SettingsSecurity', () => {
                 totp_pending: false,
                 passkeys: [{ id: 'pk-1', name: 'Laptop', created_at: '2026-03-10T00:00:00Z', updated_at: '2026-03-10T00:00:00Z' }],
                 recovery_codes_generated: true,
-                recovery_codes_remaining: 4
+                recovery_codes_remaining: 4,
+                password_login_enabled: true,
+                social_identities: []
             })
         ),
         startTotpSetup: vi.fn(() => of({ secret: '', otpauth_url: '', expires_at: '2026-03-10T00:00:00Z' })),
@@ -42,7 +46,9 @@ describe('SettingsSecurity', () => {
                 codes: ['ABCD-EFGH', 'JKLM-NPQR'],
                 remaining: 2
             })
-        )
+        ),
+        startSocialLink: vi.fn<UserSecurityService['startSocialLink']>(() => of({ auth_url: 'https://identity.example.com/authorize' })),
+        unlinkSocial: vi.fn<UserSecurityService['unlinkSocial']>(() => of(void 0))
     };
 
     beforeEach(async () => {
@@ -119,6 +125,24 @@ describe('SettingsSecurity', () => {
         expect(component['recoveryCodesGenerated']()).toBe(true);
         expect(component['recoveryCodesRemaining']()).toBe(4);
         expect(component['hasMfaProtection']()).toBe(true);
+    });
+
+    it('removes a linked provider summary after a guarded unlink succeeds', () => {
+        component['securityStatus'].update((status) =>
+            status
+                ? {
+                      ...status,
+                      social_identities: [{ provider: 'github', observed_email: 'user@example.com', linked_at: '2026-03-10T00:00:00Z' }]
+                  }
+                : status
+        );
+        component['form'].currentPassword().control().setValue('password123');
+
+        component['unlinkSocial']('github');
+
+        expect(userSecurityServiceMock.unlinkSocial).toHaveBeenCalledWith('github', 'password123');
+        expect(component['socialIdentities']()).toEqual([]);
+        expect(component['socialSuccess']()).toBe('settings.security.social.unlinked');
     });
 
     it('regenerates recovery codes and updates the visible state', () => {

@@ -254,8 +254,8 @@ func (s *Store) ResolveSSOUser(ctx context.Context, input ResolveSSOUserInput) (
 				result.UserID = uuid.New()
 				result.Created = true
 				if _, err := tx.ExecContext(ctx, `
-					INSERT INTO users (id, email, password, given_name, last_name, created_at)
-					VALUES (?, ?, ?, ?, ?, ?)
+					INSERT INTO users (id, email, password, given_name, last_name, password_login_enabled, created_at)
+					VALUES (?, ?, ?, ?, ?, FALSE, ?)
 				`, result.UserID, input.Email, input.PasswordHash, nullableProfileName(input.GivenName), nullableProfileName(input.LastName), time.Now().UTC()); err != nil {
 					return fmt.Errorf("could not create SSO user: %w", err)
 				}

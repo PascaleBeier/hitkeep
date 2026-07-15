@@ -986,17 +986,48 @@
       "sourceRequired": "Campagnebron is vereist."
     }
   },
+  "social": {
+    "continueWith": { "google": "Doorgaan met Google", "github": "Doorgaan met GitHub", "microsoft": "Doorgaan met Microsoft" },
+    "signupMethods": "Sociale registratiemethoden",
+    "confirmEmailSubtitle": "Bevestig tot welk HitKeep-account deze Microsoft-identiteit toegang moet krijgen.",
+    "confirmEmailPrompt": "Microsoft-e-mailadressen kunnen wijzigen. Controleer het HitKeep-adres voordat we een bevestigingslink sturen.",
+    "confirmEmailAction": "Bevestigingslink sturen",
+    "completeSignupTitle": "Rond het maken van je team af",
+    "completeSignupSubtitle": "Aangemeld met {{provider}}. Voeg de paar gegevens toe die HitKeep nog nodig heeft.",
+    "createTeam": "Team maken",
+    "regionLocked": "De regio is voor deze autorisatie vastgezet. Start de registratie opnieuw om deze te wijzigen.",
+    "microsoftEmailHelp": "Microsoft-e-mailadressen kunnen wijzigen. Bevestig het HitKeep-adres waarvan jij eigenaar bent; we sturen een verificatielink.",
+    "confirmationTitle": "Bevestig je e-mailadres", "confirmationSent": "Controleer je inbox en volg de beveiligde link om af te ronden.",
+    "confirmedSignIn": "Je provider is gekoppeld. Meld je nogmaals aan om door te gaan.", "mfaSignInRequired": "Je uitnodiging is geaccepteerd. Meld je opnieuw aan om meervoudige verificatie af te ronden.",
+    "errors": {
+      "failed": "Sociale aanmelding kon niet worden voltooid. Probeer het opnieuw.", "unavailable": "Deze aanmeldprovider is nu niet beschikbaar.", "cancelled": "Sociale aanmelding is geannuleerd.",
+      "emailUnverified": "De provider heeft geen geverifieerd e-mailadres geleverd.", "emailRequired": "Voer het HitKeep-adres in dat je wilt bevestigen.", "identityConflict": "Dit provideraccount is al aan een ander HitKeep-account gekoppeld.",
+      "accountNotFound": "Er is geen overeenkomend HitKeep-account. Maak een account of gebruik een andere methode.", "confirmationFailed": "De bevestigingsmail kon niet worden verzonden. Probeer het opnieuw.",
+      "completionExpired": "Deze sociale aanmelding is verlopen. Start de registratie opnieuw.", "regionMismatch": "De gekozen regio komt niet overeen met deze autorisatie. Start opnieuw in de juiste regio.", "signupFailed": "Je team kon niet worden gemaakt. Probeer het opnieuw."
+    }
+  },
   "settings": {
     "security": {
       "title": "Beveiliging",
       "loading": "Beveiligingsinstellingen laden...",
       "changePasswordTitle": "Wachtwoord wijzigen",
       "changePasswordDescription": "Update het wachtwoord voor dit account.",
+      "setPasswordTitle": "Een wachtwoord instellen",
+      "setPasswordDescription": "Voeg aanmelden met een wachtwoord toe als extra toegangsmethode.",
+      "setPasswordHelp": "HitKeep stuurt een beveiligde instellink naar het e-mailadres van je account.",
+      "setPasswordAction": "Instellink verzenden",
+      "setPasswordSent": "E-mail voor het instellen van een wachtwoord verzonden.",
       "passwordUpdated": "Wachtwoord succesvol bijgewerkt.",
       "currentPasswordLabel": "Huidig ​​wachtwoord",
       "newPasswordLabel": "Nieuw wachtwoord",
       "minimumLengthHint": "Minimaal 8 tekens",
       "updatePassword": "Wachtwoord bijwerken",
+      "social": {
+        "title": "Sociale aanmelding", "description": "Koppel provideraccounts waarmee je je bij HitKeep kunt aanmelden.", "empty": "Er zijn geen sociale aanmeldproviders gekoppeld.",
+        "linkedDate": "Gekoppeld", "lastUsed": "Laatst gebruikt", "connectAction": "{{provider}} koppelen", "unlinkAction": "Ontkoppelen",
+        "passwordConfirmationHint": "Voer je huidige wachtwoord in het wachtwoordgedeelte in voordat je je enige sociale provider ontkoppelt.", "linked": "Provider gekoppeld.", "unlinked": "Provider ontkoppeld.",
+        "errors": { "linkFailed": "Deze provider kon niet worden gekoppeld.", "unlinkFailed": "Deze provider kon niet worden ontkoppeld.", "lastMethod": "Voeg een andere sociale provider of passkey toe, of bevestig een ingeschakeld wachtwoord." }
+      },
       "twoFactor": {
         "title": "Tweefactorauthenticatie",
         "description": "Bescherm je account met een eenmalige code van een authenticator-app.",
@@ -2025,6 +2056,10 @@
         "cloud_signup": {
           "label": "Cloud-aanmelding"
         },
+        "social_google": { "label": "Aanmelden met Google" },
+        "social_github": { "label": "Aanmelden met GitHub" },
+        "social_microsoft": { "label": "Aanmelden met Microsoft" },
+        "social_signup": { "label": "Sociale registratie" },
         "ai": {
           "label": "AI-gateway"
         },
@@ -2043,7 +2078,14 @@
         "driver": "{{driver}}-stuurprogramma",
         "interval": "Elke {{interval}}",
         "stripe": "Stripe geconfigureerd",
-        "plan": "{{plan}}-abonnement"
+        "plan": "{{plan}}-abonnement",
+		"social": {
+		  "configured": "Geconfigureerd",
+		  "partial_configuration": "Gedegradeerd: configuratie onvolledig",
+		  "not_configured": "Niet geconfigureerd",
+		  "soleMethodUser": "Enige aanmeldmethode voor {{count}} gebruiker",
+		  "soleMethodUsers": "Enige aanmeldmethode voor {{count}} gebruikers"
+		}
       },
       "mcp": {
         "title": "MCP-toegang",

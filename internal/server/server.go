@@ -44,6 +44,7 @@ import (
 	takeouthandlers "hitkeep/internal/server/takeout"
 	"hitkeep/internal/server/user"
 	webhookhandlers "hitkeep/internal/server/webhooks"
+	"hitkeep/internal/socialauth"
 	"hitkeep/internal/sso"
 	"hitkeep/internal/takeout"
 	"hitkeep/internal/webhookdispatcher"
@@ -208,6 +209,7 @@ func New(conf *config.Config, publicFS fs.FS, store *database.Store, tenantStore
 		ImportStageCleanupStatus: importStageCleanupStatus,
 		MailTestTracker:          mailTestTracker,
 	}
+	s.ctx.SocialAuth = socialauth.NewClient(s.ctx.SSO)
 
 	// Load static HTML into memory
 	s.loadStaticAssets(publicFS)

@@ -126,6 +126,7 @@ describe('AcceptInvite', () => {
             .mockImplementation(() => undefined);
         fixture.detectChanges();
 
+        flushSocialProviders();
         TestBed.inject(HttpTestingController).expectOne('/api/auth/session').flush('Unauthorized', { status: 401, statusText: 'Unauthorized' });
         await fixture.whenStable();
         const availability = TestBed.inject(HttpTestingController).expectOne('/api/auth/sso/invite');
@@ -149,6 +150,35 @@ describe('AcceptInvite', () => {
         await fixture.whenStable();
 
         expect(navigate).toHaveBeenCalledWith('https://identity.example.com/authorize');
+    });
+
+    it('offers configured social providers without requiring social signup to be open', async () => {
+        queryParams = { token: 'social-invite-token' };
+        fixture = TestBed.createComponent(AcceptInvite);
+        const component = fixture.componentInstance;
+        const navigate = vi.spyOn(component as unknown as { navigateToSSOProvider: (authURL: string) => void }, 'navigateToSSOProvider').mockImplementation(() => undefined);
+        fixture.detectChanges();
+
+        TestBed.inject(HttpTestingController)
+            .expectOne('/api/auth/social/providers')
+            .flush({ providers: [{ id: 'google', display_name: 'Google' }], signup_enabled: false });
+        TestBed.inject(HttpTestingController).expectOne('/api/auth/session').flush('Unauthorized', { status: 401, statusText: 'Unauthorized' });
+        const availability = TestBed.inject(HttpTestingController).expectOne('/api/auth/sso/invite');
+        availability.flush({ enabled: false });
+        await fixture.whenStable();
+
+        const button = fixture.nativeElement.querySelector('[data-auth-method="google"] button') as HTMLButtonElement;
+        expect(button).toBeTruthy();
+        button.click();
+        const start = TestBed.inject(HttpTestingController).expectOne('/api/auth/social/google/start');
+        expect(start.request.body).toEqual({
+            flow: 'invite',
+            invite_token: 'social-invite-token',
+            return_url: '/dashboard'
+        });
+        start.flush({ auth_url: 'https://accounts.example.com/authorize' });
+        await fixture.whenStable();
+        expect(navigate).toHaveBeenCalledWith('https://accounts.example.com/authorize');
     });
 
     it('accepts an invitation with the token and password, signs in, and enters the dashboard', () => {
@@ -186,6 +216,7 @@ describe('AcceptInvite', () => {
         fixture = TestBed.createComponent(AcceptInvite);
         fixture.detectChanges();
 
+        flushSocialProviders();
         const request = TestBed.inject(HttpTestingController).expectOne('/api/auth/accept-invite');
         expect(request.request.method).toBe('POST');
         expect(request.request.body).toEqual({ token: 'existing-user-token' });
@@ -281,6 +312,7 @@ describe('AcceptInvite', () => {
 });
 
 function flushUnauthenticatedSession(fixture: ComponentFixture<AcceptInvite>): void {
+    flushSocialProviders();
     const request = TestBed.inject(HttpTestingController).expectOne('/api/auth/session');
     expect(request.request.method).toBe('GET');
     request.flush('Unauthorized', { status: 401, statusText: 'Unauthorized' });
@@ -291,6 +323,12 @@ function flushUnauthenticatedSession(fixture: ComponentFixture<AcceptInvite>): v
     });
     availability.flush({ enabled: false });
     fixture.detectChanges();
+}
+
+function flushSocialProviders(): void {
+    const request = TestBed.inject(HttpTestingController).expectOne('/api/auth/social/providers');
+    expect(request.request.method).toBe('GET');
+    request.flush({ providers: [], signup_enabled: false });
 }
 
 function enterPasswordAndSubmit(fixture: ComponentFixture<AcceptInvite>, password: string): void {

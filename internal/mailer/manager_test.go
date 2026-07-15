@@ -218,6 +218,19 @@ func newMFAMagicLinkMailable(link string, expiresInMinutes int) *stubMailable {
 	}
 }
 
+func newSocialConfirmationMailable(link, provider string, expiresInMinutes int) *stubMailable {
+	return &stubMailable{
+		subject:  Translate("en", "subject.social_confirmation"),
+		template: "social_confirmation.mjml",
+		data: struct {
+			Link             string
+			Provider         string
+			ExpiresInMinutes int
+		}{Link: link, Provider: provider, ExpiresInMinutes: expiresInMinutes},
+		locale: "en",
+	}
+}
+
 func newUserInviteMailable(link, siteName, inviter string) *stubMailable {
 	return &stubMailable{
 		subject:  "You've been invited to join " + siteName,
@@ -528,6 +541,10 @@ func TestSendPlainTextMailsUseRFC3676SignatureSeparator(t *testing.T) {
 		{
 			name:     "mfa_magic_link",
 			mailable: newMFAMagicLinkMailable("https://example.com/api/auth/mfa/email-link/verify?token=abc123", 10),
+		},
+		{
+			name:     "social_confirmation",
+			mailable: newSocialConfirmationMailable("https://example.com/api/auth/social/confirm?token=abc123", "Microsoft", 30),
 		},
 		{
 			name:     "site_report",

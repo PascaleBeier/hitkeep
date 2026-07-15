@@ -19,6 +19,8 @@ const (
 	passkeyLoginChallengeTTL         = 5 * time.Minute
 	googleSearchConsoleOAuthStateTTL = 10 * time.Minute
 	ssoOAuthStateTTL                 = 10 * time.Minute
+	socialOAuthStateTTL              = 10 * time.Minute
+	socialCompletionTTL              = 5 * time.Minute
 )
 
 type PendingTOTPSetup struct {
@@ -59,12 +61,40 @@ type SSOOAuthState struct {
 	ExpiresAt    time.Time
 }
 
+type SocialOAuthState struct {
+	Provider     string
+	Flow         string
+	InviteToken  string
+	ReturnPath   string
+	RememberMe   bool
+	UserID       uuid.UUID
+	Nonce        string
+	CodeVerifier string
+	ExpiresAt    time.Time
+}
+
+type SocialCompletion struct {
+	Provider      string
+	Subject       string
+	ObservedEmail string
+	EmailVerified bool
+	Flow          string
+	InviteToken   string
+	ReturnPath    string
+	RememberMe    bool
+	ExpiresAt     time.Time
+}
+
 type AuthStateStore struct {
 	pendingTOTP          *lru.LRU[uuid.UUID, PendingTOTPSetup]
 	passkeyRegistrations *lru.LRU[uuid.UUID, PasskeyRegistrationChallenge]
 	mfaEmailLinks        *lru.LRU[uuid.UUID, MFAEmailLink]
 	googleSearchConsole  *lru.LRU[uuid.UUID, GoogleSearchConsoleOAuthState]
 	ssoOAuth             *lru.LRU[uuid.UUID, SSOOAuthState]
+	socialOAuth          *lru.LRU[uuid.UUID, SocialOAuthState]
+	socialCompletions    *lru.LRU[uuid.UUID, SocialCompletion]
+	socialOAuthMu        sync.Mutex
+	socialCompletionMu   sync.Mutex
 
 	loginChallengesMu       sync.Mutex
 	loginChallenges         *lru.LRU[uuid.UUID, database.LoginChallenge]
@@ -78,6 +108,8 @@ func NewAuthStateStore() *AuthStateStore {
 		mfaEmailLinks:        lru.NewLRU[uuid.UUID, MFAEmailLink](authStateCacheSize, nil, passkeyLoginChallengeTTL),
 		googleSearchConsole:  lru.NewLRU[uuid.UUID, GoogleSearchConsoleOAuthState](authStateCacheSize, nil, googleSearchConsoleOAuthStateTTL),
 		ssoOAuth:             lru.NewLRU[uuid.UUID, SSOOAuthState](authStateCacheSize, nil, ssoOAuthStateTTL),
+		socialOAuth:          lru.NewLRU[uuid.UUID, SocialOAuthState](authStateCacheSize, nil, socialOAuthStateTTL),
+		socialCompletions:    lru.NewLRU[uuid.UUID, SocialCompletion](authStateCacheSize, nil, socialCompletionTTL),
 		loginChallenges:      lru.NewLRU[uuid.UUID, database.LoginChallenge](authStateCacheSize, nil, passkeyLoginChallengeTTL),
 		loginChallengeIDsByUser: lru.NewLRU[uuid.UUID, map[uuid.UUID]struct{}](
 			authStateCacheSize,
@@ -85,6 +117,90 @@ func NewAuthStateStore() *AuthStateStore {
 			passkeyLoginChallengeTTL,
 		),
 	}
+}
+
+func (s *AuthStateStore) CreateSocialOAuthState(state SocialOAuthState) string {
+	stateID := uuid.New()
+	if s == nil {
+		return stateID.String()
+	}
+	s.socialOAuthMu.Lock()
+	defer s.socialOAuthMu.Unlock()
+	state.ExpiresAt = state.ExpiresAt.UTC()
+	s.socialOAuth.Add(stateID, state)
+	return stateID.String()
+}
+
+func (s *AuthStateStore) ConsumeSocialOAuthState(rawState string) (SocialOAuthState, bool) {
+	if s == nil {
+		return SocialOAuthState{}, false
+	}
+	s.socialOAuthMu.Lock()
+	defer s.socialOAuthMu.Unlock()
+	stateID, err := uuid.Parse(strings.TrimSpace(rawState))
+	if err != nil || stateID == uuid.Nil {
+		return SocialOAuthState{}, false
+	}
+	entry, ok := s.socialOAuth.Get(stateID)
+	if !ok {
+		return SocialOAuthState{}, false
+	}
+	s.socialOAuth.Remove(stateID)
+	if isExpired(entry.ExpiresAt) {
+		return SocialOAuthState{}, false
+	}
+	return entry, true
+}
+
+func (s *AuthStateStore) CreateSocialCompletion(entry SocialCompletion) string {
+	tokenID := uuid.New()
+	if s == nil {
+		return tokenID.String()
+	}
+	s.socialCompletionMu.Lock()
+	defer s.socialCompletionMu.Unlock()
+	entry.ExpiresAt = entry.ExpiresAt.UTC()
+	s.socialCompletions.Add(tokenID, entry)
+	return tokenID.String()
+}
+
+func (s *AuthStateStore) GetSocialCompletion(rawToken string) (SocialCompletion, bool) {
+	if s == nil {
+		return SocialCompletion{}, false
+	}
+	s.socialCompletionMu.Lock()
+	defer s.socialCompletionMu.Unlock()
+	return s.getSocialCompletionLocked(rawToken)
+}
+
+func (s *AuthStateStore) getSocialCompletionLocked(rawToken string) (SocialCompletion, bool) {
+	tokenID, err := uuid.Parse(strings.TrimSpace(rawToken))
+	if err != nil || tokenID == uuid.Nil {
+		return SocialCompletion{}, false
+	}
+	entry, ok := s.socialCompletions.Get(tokenID)
+	if !ok || isExpired(entry.ExpiresAt) {
+		if ok {
+			s.socialCompletions.Remove(tokenID)
+		}
+		return SocialCompletion{}, false
+	}
+	return entry, true
+}
+
+func (s *AuthStateStore) ConsumeSocialCompletion(rawToken string) (SocialCompletion, bool) {
+	if s == nil {
+		return SocialCompletion{}, false
+	}
+	s.socialCompletionMu.Lock()
+	defer s.socialCompletionMu.Unlock()
+	entry, ok := s.getSocialCompletionLocked(rawToken)
+	if !ok {
+		return SocialCompletion{}, false
+	}
+	tokenID, _ := uuid.Parse(strings.TrimSpace(rawToken))
+	s.socialCompletions.Remove(tokenID)
+	return entry, true
 }
 
 func (s *AuthStateStore) CreateSSOOAuthState(state SSOOAuthState) string {
@@ -310,12 +426,13 @@ func (s *AuthStateStore) CreatePasskeyLoginChallenge(challenge string, input dat
 	}
 
 	entry := database.LoginChallenge{
-		ID:         challengeID,
-		RememberMe: input.RememberMe,
-		Flow:       flow,
-		Challenge:  strings.TrimSpace(challenge),
-		Session:    session,
-		ExpiresAt:  expiresAt.UTC(),
+		ID:           challengeID,
+		RememberMe:   input.RememberMe,
+		Flow:         flow,
+		AuthProvider: strings.TrimSpace(input.AuthProvider),
+		Challenge:    strings.TrimSpace(challenge),
+		Session:      session,
+		ExpiresAt:    expiresAt.UTC(),
 	}
 	if input.UserID != nil && *input.UserID != uuid.Nil {
 		entry.UserID = *input.UserID

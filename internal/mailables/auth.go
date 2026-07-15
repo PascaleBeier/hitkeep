@@ -59,3 +59,41 @@ func (m *MFAMagicLink) Data() any {
 }
 
 func (m *MFAMagicLink) Locale() string { return m.LocaleCode }
+
+type SocialConfirmation struct {
+	LocaleCode       string
+	Link             string
+	Provider         string
+	ExpiresInMinutes int
+}
+
+func NewSocialConfirmation(link, provider, locale string, expiresInMinutes int) mailer.Mailable {
+	return &SocialConfirmation{
+		Link:             link,
+		Provider:         provider,
+		LocaleCode:       locale,
+		ExpiresInMinutes: expiresInMinutes,
+	}
+}
+
+func (m *SocialConfirmation) Subject() string {
+	return mailer.Translate(m.LocaleCode, "subject.social_confirmation")
+}
+
+func (m *SocialConfirmation) Template() string {
+	return "social_confirmation.mjml"
+}
+
+func (m *SocialConfirmation) Data() any {
+	return struct {
+		Link             string
+		Provider         string
+		ExpiresInMinutes int
+	}{
+		Link:             m.Link,
+		Provider:         m.Provider,
+		ExpiresInMinutes: m.ExpiresInMinutes,
+	}
+}
+
+func (m *SocialConfirmation) Locale() string { return m.LocaleCode }

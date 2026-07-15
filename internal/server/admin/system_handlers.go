@@ -23,6 +23,7 @@ import (
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/socialauth"
 	"hitkeep/internal/worker"
 )
 
@@ -35,17 +36,47 @@ func (h *handler) handleGetSystem() http.HandlerFunc {
 		cfg := h.ctx.Config
 
 		uptime := time.Since(h.ctx.StartedAt).String()
+		features := systemFeatureStatuses(cfg, h.ctx.Mailer != nil)
+		features = append(features, h.socialFeatureStatuses(r.Context())...)
 		info := api.SystemInfo{
 			Version:         cfg.Version,
 			RuntimeMode:     systemRuntimeMode(cfg),
 			Uptime:          uptime,
 			PublicURL:       cfg.PublicURL,
-			EnabledFeatures: systemFeatureStatuses(cfg, h.ctx.Mailer != nil),
+			EnabledFeatures: features,
 			ConfigFlags:     map[string]any{},
 		}
 
 		writeJSON(w, http.StatusOK, info)
 	}
+}
+
+func (h *handler) socialFeatureStatuses(ctx context.Context) []api.SystemFeatureStatus {
+	statuses := socialauth.ProviderStatuses(h.ctx.Config)
+	features := make([]api.SystemFeatureStatus, 0, len(statuses)+1)
+	for _, status := range statuses {
+		detail := "not_configured"
+		if status.Partial {
+			detail = "partial_configuration"
+		} else if status.Configured {
+			detail = "configured"
+		}
+		if h.ctx.Store != nil {
+			soleUsers, err := h.ctx.Store.CountSoleSocialProviderUsers(ctx, status.Provider)
+			if err != nil {
+				slog.Warn("Failed to count sole social login methods", "error", err, "provider", status.Provider)
+			} else {
+				detail += fmt.Sprintf(";sole_method_users=%d", soleUsers)
+			}
+		}
+		features = append(features, api.SystemFeatureStatus{
+			Key: "social_" + status.Provider, Enabled: status.Configured, Detail: detail,
+		})
+	}
+	features = append(features, api.SystemFeatureStatus{
+		Key: "social_signup", Enabled: h.ctx.Config.CloudHosted && h.ctx.Config.CloudSignupEnabled && h.ctx.Config.SocialSignupEnabled,
+	})
+	return features
 }
 
 func systemRuntimeMode(cfg *config.Config) string {

@@ -11,11 +11,11 @@ import (
 	"log/slog"
 	"math"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/go-webauthn/webauthn/protocol"
-	webauthnlib "github.com/go-webauthn/webauthn/webauthn"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/text/language"
@@ -23,10 +23,8 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/appurl"
 	authcore "hitkeep/internal/auth"
-	"hitkeep/internal/database"
 	"hitkeep/internal/localization"
 	"hitkeep/internal/mailer"
-	"hitkeep/internal/security"
 	"hitkeep/internal/server/shared"
 )
 
@@ -69,13 +67,17 @@ func sanitizeAuthReturnPath(raw string) string {
 	if value == "" {
 		return "/dashboard"
 	}
-	if !strings.HasPrefix(value, "/") || strings.HasPrefix(value, "//") {
+	if !strings.HasPrefix(value, "/") || strings.HasPrefix(value, "//") || strings.ContainsAny(value, "#\\\r\n\t\x00") {
 		return "/dashboard"
 	}
-	if strings.HasPrefix(value, "/login") || strings.HasPrefix(value, "/setup") {
+	parsed, err := url.ParseRequestURI(value)
+	if err != nil || parsed.IsAbs() || parsed.Host != "" || parsed.Fragment != "" || !strings.HasPrefix(parsed.Path, "/") || strings.HasPrefix(parsed.Path, "//") || strings.ContainsAny(parsed.Path, "\\\r\n\t\x00") {
 		return "/dashboard"
 	}
-	return value
+	if strings.HasPrefix(parsed.Path, "/login") || strings.HasPrefix(parsed.Path, "/setup") {
+		return "/dashboard"
+	}
+	return parsed.RequestURI()
 }
 
 func (h *handler) publicRedirectURL(relativePath string) string {
@@ -140,6 +142,35 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 	mux.HandleFunc("GET /api/auth/sso/callback", ctx.Handler(shared.HandlerConfig{
 		RateLimiter: ctx.AuthLimiter,
 	}, h.handleSSOCallback()))
+	mux.HandleFunc("GET /api/auth/social/providers", ctx.Handler(shared.HandlerConfig{
+		RateLimiter: ctx.AuthLimiter,
+	}, h.handleSocialProviders()))
+	mux.HandleFunc("POST /api/auth/social/{provider}/start", ctx.Handler(shared.HandlerConfig{
+		RateLimiter: ctx.AuthLimiter,
+	}, h.handleSocialStart(false)))
+	mux.HandleFunc("GET /api/auth/social/{provider}/callback", ctx.Handler(shared.HandlerConfig{
+		RateLimiter: ctx.AuthLimiter,
+	}, h.handleSocialCallback()))
+	mux.HandleFunc("POST /api/auth/social/preview", ctx.Handler(shared.HandlerConfig{
+		RateLimiter: ctx.AuthLimiter,
+	}, h.handleSocialPreview()))
+	mux.HandleFunc("POST /api/auth/social/complete", ctx.Handler(shared.HandlerConfig{
+		RateLimiter: ctx.AuthLimiter,
+	}, h.handleSocialComplete()))
+	mux.HandleFunc("GET /api/auth/social/confirm", ctx.Handler(shared.HandlerConfig{
+		RateLimiter: ctx.AuthLimiter,
+	}, h.handleSocialConfirmation()))
+	mux.HandleFunc("POST /api/cloud/signup/social/complete", ctx.Handler(shared.HandlerConfig{
+		RateLimiter: ctx.AuthLimiter,
+	}, h.handleSocialCloudSignupComplete()))
+	mux.HandleFunc("POST /api/user/security/social/{provider}/start", ctx.Handler(shared.HandlerConfig{
+		RequireAuth: true,
+		RateLimiter: ctx.AuthLimiter,
+	}, h.handleSocialStart(true)))
+	mux.HandleFunc("DELETE /api/user/security/social/{provider}", ctx.Handler(shared.HandlerConfig{
+		RequireAuth: true,
+		RateLimiter: ctx.AuthLimiter,
+	}, h.handleSocialUnlink()))
 	mux.HandleFunc("POST /api/logout", ctx.Handler(shared.HandlerConfig{
 		RateLimiter: ctx.AuthLimiter,
 	}, h.handleLogout()))
@@ -324,6 +355,12 @@ func (h *handler) handleLogin() http.HandlerFunc {
 			http.Error(w, "Invalid email or password", http.StatusUnauthorized)
 			return
 		}
+		if !user.PasswordLoginEnabled {
+			burnLoginKDF(req.Password)
+			h.appendAuthAuditForUserTeams(r, user.ID, "auth.login_failed", "failure", "Login failed because password login is disabled", false)
+			http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+			return
+		}
 
 		match, err := verifyPassword(req.Password, user.Password)
 		if err != nil {
@@ -337,130 +374,21 @@ func (h *handler) handleLogin() http.HandlerFunc {
 			return
 		}
 
-		totpEnabled, err := h.ctx.Store.HasEnabledTOTP(r.Context(), user.ID)
+		resp, err := h.beginUserLogin(r, w, user.ID, req.RememberMe, "")
 		if err != nil {
-			//nolint:gosec // user_id comes from authenticated lookup and is logged for auditability.
-			slog.Error("Failed to check user totp status during login", "error", err, "user_id", user.ID)
+			slog.Error("Failed to prepare login", "error", err, "user_id", user.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-
-		passkeys, err := h.ctx.Store.ListUserPasskeys(r.Context(), user.ID)
-		if err != nil {
-			//nolint:gosec // user_id comes from authenticated lookup and is logged for auditability.
-			slog.Error("Failed to list user passkeys during login", "error", err, "user_id", user.ID)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-		hasPasskey := len(passkeys) > 0
-		recoveryCodesRemaining, err := h.ctx.Store.CountActiveRecoveryCodes(r.Context(), user.ID)
-		if err != nil {
-			slog.Error("Failed to count user recovery codes during login", "error", err, "user_id", user.ID)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-		hasRecoveryCode := recoveryCodesRemaining > 0
-
-		if totpEnabled || hasPasskey {
-			userID := user.ID
-			var (
-				challenge      string
-				session        *webauthnlib.SessionData
-				passkeyOptions *protocol.PublicKeyCredentialRequestOptions
-			)
-
-			if hasPasskey {
-				passkeyUser, err := h.loadPasskeyUser(r.Context(), user.ID)
-				if err != nil {
-					slog.Error("Failed to load passkey user during login", "error", err, "user_id", user.ID)
-					http.Error(w, "Internal server error", http.StatusInternalServerError)
-					return
-				}
-
-				webAuthn, err := security.NewWebAuthn(h.ctx.Config.PublicURL, r)
-				if err != nil {
-					slog.Error("Failed to configure MFA passkey login", "error", err, "user_id", user.ID)
-					http.Error(w, "Internal server error", http.StatusInternalServerError)
-					return
-				}
-
-				assertion, beginSession, err := webAuthn.BeginLogin(passkeyUser)
-				if err != nil {
-					slog.Error("Failed to begin MFA passkey login", "error", err, "user_id", user.ID)
-					http.Error(w, "Internal server error", http.StatusInternalServerError)
-					return
-				}
-
-				challenge = beginSession.Challenge
-				session = beginSession
-				passkeyOptions = &assertion.Response
-			} else {
-				var err error
-				challenge, err = security.GenerateRandomChallenge(32)
-				if err != nil {
-					slog.Error("Failed to generate mfa challenge for login", "error", err, "user_id", user.ID)
-					http.Error(w, "Internal server error", http.StatusInternalServerError)
-					return
-				}
-			}
-
-			expiresAt := time.Now().UTC().Add(passkeyLoginChallengeTTL)
-			if session != nil && !session.Expires.IsZero() {
-				expiresAt = session.Expires
-			}
-
-			if h.ctx.AuthState == nil {
-				http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
-				return
-			}
-			challengeID := h.ctx.AuthState.CreatePasskeyLoginChallenge(challenge, database.CreateLoginChallengeInput{
-				UserID:     &userID,
-				RememberMe: req.RememberMe,
-				Flow:       "mfa",
-			}, expiresAt, session)
-
-			factors := make([]string, 0, 2)
-			if totpEnabled {
-				factors = append(factors, "totp")
-			}
-			if hasRecoveryCode {
-				factors = append(factors, "recovery_code")
-			}
-			if h.ctx.Mailer != nil {
-				factors = append(factors, "email_link")
-			}
-			resp := loginResponse{
-				Status:         "mfa_required",
-				ChallengeToken: challengeID.String(),
-				Factors:        factors,
-			}
-
-			if hasPasskey {
-				resp.Factors = append(resp.Factors, "passkey")
-				resp.Passkey = passkeyOptions
-			}
-
+		if resp.Status == "mfa_required" {
 			h.appendAuthAuditForUserTeams(r, user.ID, "auth.mfa_required", "success", "Login requires multi-factor authentication", true)
-
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			if err := json.NewEncoder(w).Encode(resp); err != nil {
-				slog.Error("Failed to encode mfa-required login response", "error", err, "user_id", user.ID)
-			}
-			return
+		} else {
+			h.appendAuthAuditForUserTeams(r, user.ID, "auth.login_succeeded", "success", "Login succeeded", true)
 		}
-
-		if err := h.issueLoginSession(r.Context(), w, user.ID, req.RememberMe); err != nil {
-			slog.Error("Failed to issue login session", "error", err, "user_id", user.ID)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		h.appendAuthAuditForUserTeams(r, user.ID, "auth.login_succeeded", "success", "Login succeeded", true)
 		slog.Info("User logged in", "user_id", user.ID)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(loginResponse{Status: "ok"}); err != nil {
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			slog.Error("Failed to encode response", "error", err)
 		}
 	}

@@ -979,17 +979,48 @@
       "sourceRequired": "A origem da campanha é obrigatória."
     }
   },
+  "social": {
+    "continueWith": { "google": "Continuar com Google", "github": "Continuar com GitHub", "microsoft": "Continuar com Microsoft" },
+    "signupMethods": "Métodos de cadastro social",
+    "confirmEmailSubtitle": "Confirme qual conta do HitKeep esta identidade da Microsoft deve acessar.",
+    "confirmEmailPrompt": "Os endereços da Microsoft podem mudar. Revise o e-mail do HitKeep antes de enviarmos o link de confirmação.",
+    "confirmEmailAction": "Enviar link de confirmação",
+    "completeSignupTitle": "Conclua a criação da sua equipe",
+    "completeSignupSubtitle": "Login feito com {{provider}}. Adicione os poucos dados que o HitKeep ainda precisa.",
+    "createTeam": "Criar equipe",
+    "regionLocked": "A região está vinculada a esta autorização. Reinicie o cadastro para alterá-la.",
+    "microsoftEmailHelp": "Os endereços da Microsoft podem mudar. Confirme o e-mail do HitKeep que pertence a você; enviaremos um link de verificação.",
+    "confirmationTitle": "Confirme seu e-mail", "confirmationSent": "Verifique sua caixa de entrada e siga o link seguro para concluir.",
+    "confirmedSignIn": "Seu provedor foi vinculado. Entre novamente para continuar.", "mfaSignInRequired": "Seu convite foi aceito. Entre novamente para concluir a autenticação multifator.",
+    "errors": {
+      "failed": "Não foi possível concluir o login social. Tente novamente.", "unavailable": "Este provedor de login não está disponível agora.", "cancelled": "O login social foi cancelado.",
+      "emailUnverified": "O provedor não forneceu um e-mail verificado.", "emailRequired": "Digite o e-mail do HitKeep que deseja confirmar.", "identityConflict": "Esta conta do provedor já está vinculada a outra conta do HitKeep.",
+      "accountNotFound": "Nenhuma conta do HitKeep corresponde a este login. Crie uma conta ou use outro método.", "confirmationFailed": "Não foi possível enviar o e-mail de confirmação. Tente novamente.",
+      "completionExpired": "Este login social expirou. Reinicie o cadastro.", "regionMismatch": "A região selecionada não corresponde a esta autorização. Reinicie na região correta.", "signupFailed": "Não foi possível criar sua equipe. Tente novamente."
+    }
+  },
   "settings": {
     "security": {
       "title": "Segurança",
       "loading": "Carregando configurações de segurança...",
       "changePasswordTitle": "Alterar senha",
       "changePasswordDescription": "Atualize a senha desta conta.",
+      "setPasswordTitle": "Definir uma senha",
+      "setPasswordDescription": "Adicione o login por senha como outra forma de acessar esta conta.",
+      "setPasswordHelp": "O HitKeep enviará um link seguro de configuração para o e-mail da sua conta.",
+      "setPasswordAction": "Enviar e-mail de configuração",
+      "setPasswordSent": "E-mail de configuração de senha enviado.",
       "passwordUpdated": "Senha atualizada com sucesso.",
       "currentPasswordLabel": "Senha atual",
       "newPasswordLabel": "Nova senha",
       "minimumLengthHint": "Mínimo de 8 caracteres",
       "updatePassword": "Atualizar senha",
+      "social": {
+        "title": "Login social", "description": "Vincule contas de provedores que podem ser usadas para entrar no HitKeep.", "empty": "Nenhum provedor de login social está vinculado.",
+        "linkedDate": "Vinculado", "lastUsed": "Último uso", "connectAction": "Vincular {{provider}}", "unlinkAction": "Desvincular",
+        "passwordConfirmationHint": "Digite sua senha atual na seção de senha antes de desvincular seu único provedor social.", "linked": "Provedor vinculado.", "unlinked": "Provedor desvinculado.",
+        "errors": { "linkFailed": "Não foi possível vincular este provedor.", "unlinkFailed": "Não foi possível desvincular este provedor.", "lastMethod": "Adicione outro provedor social ou chave de acesso, ou confirme uma senha habilitada." }
+      },
       "twoFactor": {
         "title": "Autenticação de dois fatores",
         "description": "Proteja sua conta com um código único de um aplicativo autenticador.",
@@ -2036,6 +2067,10 @@
         "cloud_signup": {
           "label": "Cadastro na nuvem"
         },
+        "social_google": { "label": "Login com Google" },
+        "social_github": { "label": "Login com GitHub" },
+        "social_microsoft": { "label": "Login com Microsoft" },
+        "social_signup": { "label": "Cadastro social" },
         "ai": {
           "label": "Gateway de IA"
         },
@@ -2054,7 +2089,14 @@
         "driver": "Driver {{driver}}",
         "interval": "A cada {{interval}}",
         "stripe": "Stripe configurado",
-        "plan": "Plano {{plan}}"
+        "plan": "Plano {{plan}}",
+		"social": {
+		  "configured": "Configurado",
+		  "partial_configuration": "Degradado: configuração incompleta",
+		  "not_configured": "Não configurado",
+		  "soleMethodUser": "Único método de login para {{count}} usuário",
+		  "soleMethodUsers": "Único método de login para {{count}} usuários"
+		}
       },
       "health": {
         "title": "Verificação de Integridade",

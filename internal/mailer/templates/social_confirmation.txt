@@ -1,0 +1,12 @@
+{{ define "content" -}}
+{{ t "auth.social_confirmation.heading" }}
+==================
+
+{{ t "common.hello" }}
+
+{{ tf "auth.social_confirmation.body" .Provider }}
+
+{{ t "auth.social_confirmation.button" }}: {{ .Link }}
+
+{{ tf "auth.social_confirmation.expires" .ExpiresInMinutes }}
+{{- end }}

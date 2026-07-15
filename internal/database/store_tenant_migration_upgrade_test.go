@@ -92,13 +92,21 @@ func TestCentralAuditMigrationBackfillsTeamAuditView(t *testing.T) {
 		t.Fatalf("apply baseline migrations: %v", err)
 	}
 
-	actorID, err := store.CreateUser(ctx, "legacy-audit-actor@example.com", "hash")
-	if err != nil {
-		t.Fatalf("create actor: %v", err)
-	}
-	targetID, err := store.CreateUser(ctx, "legacy-audit-target@example.com", "hash")
-	if err != nil {
-		t.Fatalf("create target: %v", err)
+	actorID := uuid.New()
+	targetID := uuid.New()
+	for _, legacyUser := range []struct {
+		id    uuid.UUID
+		email string
+	}{
+		{id: actorID, email: "legacy-audit-actor@example.com"},
+		{id: targetID, email: "legacy-audit-target@example.com"},
+	} {
+		if _, err := store.DB().ExecContext(ctx,
+			"INSERT INTO users (id, email, password, created_at) VALUES (?, ?, ?, ?)",
+			legacyUser.id, legacyUser.email, "hash", time.Now().UTC(),
+		); err != nil {
+			t.Fatalf("insert legacy user: %v", err)
+		}
 	}
 	tenantID, err := store.GetDefaultTenantID(ctx)
 	if err != nil {

@@ -39,6 +39,28 @@ func TestTakeoutWebhookExportsExcludeSecretsAndPayloadBodies(t *testing.T) {
 	}
 }
 
+func TestUserTakeoutIncludesLinkedSocialIdentityMetadataOnlyForTargetUser(t *testing.T) {
+	userID := uuid.New()
+	query := buildTakeoutQuery([]takeoutQuerySource{{
+		WhereClause: "FALSE", IncludeControl: true, UserID: &userID,
+	}}, "/tmp/user-takeout.parquet", "PARQUET")
+	for _, expected := range []string{"'social_identity' AS record_type", "provider", "subject", "observed_email", "linked_at", "last_used_at", "WHERE user_id = '" + userID.String() + "'"} {
+		if !strings.Contains(query, expected) {
+			t.Fatalf("user takeout missing social identity metadata %q", expected)
+		}
+	}
+	for _, forbidden := range []string{"access_token", "refresh_token", "raw_profile", "provider_response"} {
+		if strings.Contains(query, forbidden) {
+			t.Fatalf("user takeout exposes forbidden provider data %q", forbidden)
+		}
+	}
+
+	siteQuery := buildTakeoutQuery([]takeoutQuerySource{{WhereClause: "site_id = 'site-1'", IncludeControl: true}}, "/tmp/site-takeout.parquet", "PARQUET")
+	if strings.Contains(siteQuery, "social_identity") {
+		t.Fatal("site takeout must not include user-wide social identities")
+	}
+}
+
 type takeoutSentinel struct {
 	RecordType string
 	Path       string

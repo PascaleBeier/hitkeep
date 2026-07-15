@@ -58,7 +58,7 @@ func (s *TakeoutService) ExportUserData(ctx context.Context, userID uuid.UUID, f
 	filename := filepath.Join(s.path, fmt.Sprintf("user_takeout_%s_%d.%s", userID, time.Now().Unix(), normalizedFormat))
 
 	if s.tenantStores != nil {
-		sources, err := s.takeoutSourcesForSites(ctx, sites)
+		sources, err := s.takeoutSourcesForSites(ctx, userID, sites)
 		if err != nil {
 			return "", err
 		}
@@ -66,7 +66,7 @@ func (s *TakeoutService) ExportUserData(ctx context.Context, userID uuid.UUID, f
 	}
 
 	return s.exportTakeoutFromStore(ctx, s.store, "user", filename, normalizedFormat, exportfmt.DuckDBCopyOptions(normalizedFormat), []takeoutQuerySource{
-		{WhereClause: takeoutWhereClauseForSites(sites), IncludeAnalytics: true, IncludeControl: true},
+		{WhereClause: takeoutWhereClauseForSites(sites), IncludeAnalytics: true, IncludeControl: true, UserID: &userID},
 	})
 }
 
@@ -156,6 +156,7 @@ type takeoutQuerySource struct {
 	WhereClause      string
 	IncludeAnalytics bool
 	IncludeControl   bool
+	UserID           *uuid.UUID
 }
 
 type takeoutStoreSource struct {
@@ -222,9 +223,9 @@ func (s *TakeoutService) exportTakeoutFromStore(ctx context.Context, store *data
 	return filename, nil
 }
 
-func (s *TakeoutService) takeoutSourcesForSites(ctx context.Context, sites []api.Site) ([]takeoutStoreSource, error) {
+func (s *TakeoutService) takeoutSourcesForSites(ctx context.Context, userID uuid.UUID, sites []api.Site) ([]takeoutStoreSource, error) {
 	if len(sites) == 0 {
-		return []takeoutStoreSource{{Store: s.store, Source: takeoutQuerySource{WhereClause: "FALSE", IncludeAnalytics: true, IncludeControl: true}}}, nil
+		return []takeoutStoreSource{{Store: s.store, Source: takeoutQuerySource{WhereClause: "FALSE", IncludeAnalytics: true, IncludeControl: true, UserID: &userID}}}, nil
 	}
 
 	sharedIDs := make([]uuid.UUID, 0)
@@ -250,7 +251,7 @@ func (s *TakeoutService) takeoutSourcesForSites(ctx context.Context, sites []api
 	}
 	sources = append(sources, takeoutStoreSource{
 		Store:  s.store,
-		Source: takeoutQuerySource{WhereClause: takeoutWhereClauseForSites(sites), IncludeControl: true},
+		Source: takeoutQuerySource{WhereClause: takeoutWhereClauseForSites(sites), IncludeControl: true, UserID: &userID},
 	})
 
 	for store, ids := range tenantIDsByStore {
@@ -260,7 +261,7 @@ func (s *TakeoutService) takeoutSourcesForSites(ctx context.Context, sites []api
 		})
 	}
 	if len(sources) == 0 {
-		return []takeoutStoreSource{{Store: s.store, Source: takeoutQuerySource{WhereClause: "FALSE", IncludeAnalytics: true, IncludeControl: true}}}, nil
+		return []takeoutStoreSource{{Store: s.store, Source: takeoutQuerySource{WhereClause: "FALSE", IncludeAnalytics: true, IncludeControl: true, UserID: &userID}}}, nil
 	}
 	return sources, nil
 }
@@ -364,6 +365,9 @@ func buildTakeoutQuery(sources []takeoutQuerySource, filename, format string) st
 				webhookDeliveryTakeoutSelect(whereClause),
 				webhookDeliveryAttemptTakeoutSelect(whereClause),
 			)
+			if source.UserID != nil && *source.UserID != uuid.Nil {
+				selects = append(selects, socialIdentityTakeoutSelect(*source.UserID))
+			}
 		}
 	}
 	if len(selects) == 0 {
@@ -375,6 +379,22 @@ func buildTakeoutQuery(sources []takeoutQuerySource, filename, format string) st
 		%s
 	) TO '%s' (FORMAT %s);
 `, strings.Join(selects, "\n\t\tUNION BY NAME\n\t\t"), escapeTakeoutSQLString(filename), format)
+}
+
+func socialIdentityTakeoutSelect(userID uuid.UUID) string {
+	return fmt.Sprintf(`
+		SELECT
+			'social_identity' AS record_type,
+			user_id,
+			provider,
+			subject,
+			observed_email,
+			linked_at,
+			updated_at,
+			last_used_at
+		FROM social_identities
+		WHERE user_id = '%s'
+	`, userID)
 }
 
 func (s *TakeoutService) exportQRCodeTakeoutFromStore(ctx context.Context, store *database.Store, filename, normalizedFormat, duckFormat string, siteID, qrCodeID uuid.UUID, includeControl, includeAnalytics bool) (string, error) {

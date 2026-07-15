@@ -29,6 +29,7 @@ type Store struct {
 	threads             int
 	analyticsMu         sync.Mutex
 	aiBudgetMu          sync.Mutex
+	primaryAuthMu       sync.Mutex
 	analyticsStatements *analyticsStatements
 	runtime             *runtimeCache
 

@@ -45,6 +45,13 @@
                     </p-selectbutton>
                 </p-fieldset>
 
+                @if (socialMethods().length > 0) {
+                <div class="hk-auth-actions-stack">
+                    <app-auth-methods [methods]="socialMethods()" ariaLabelKey="social.signupMethods" (methodSelected)="selectSocialMethod($event)" />
+                    <app-auth-divider labelKey="login.or" />
+                </div>
+                }
+
                 <div class="hk-auth-field">
                     <label for="email" class="hk-auth-field-label">
                         {{ "common.emailAddress" | transloco }}

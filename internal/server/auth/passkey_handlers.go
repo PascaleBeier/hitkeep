@@ -202,8 +202,8 @@ func (h *handler) handlePasskeyLoginFinish() http.HandlerFunc {
 			return
 		}
 		if flow == "mfa" {
-			h.appendAuthAuditForUserTeams(r, userID, "auth.mfa_succeeded", "success", "Passkey multi-factor authentication succeeded", true)
-			h.appendAuthAuditForUserTeams(r, userID, "auth.login_succeeded", "success", "Login succeeded after multi-factor authentication", true)
+			h.appendAuthAuditForUserTeams(r, userID, "auth.mfa_succeeded", "success", mfaAuditDetails(challenge, "passkey_succeeded"), true)
+			h.appendAuthAuditForUserTeams(r, userID, "auth.login_succeeded", "success", mfaAuditDetails(challenge, "mfa_succeeded"), true)
 		} else {
 			h.appendAuthAuditForUserTeams(r, userID, "auth.login_succeeded", "success", "Passkey login succeeded", true)
 		}

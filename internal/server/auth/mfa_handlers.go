@@ -25,6 +25,14 @@ type mfaEmailLinkRequest struct {
 	ReturnURL      string `json:"return_url,omitempty"`
 }
 
+func mfaAuditDetails(challenge database.LoginChallenge, reason string) string {
+	details := "reason=" + strings.TrimSpace(reason)
+	if provider := strings.TrimSpace(challenge.AuthProvider); provider != "" {
+		details = "provider=" + provider + ";" + details
+	}
+	return details
+}
+
 func (h *handler) loadMFAChallenge(w http.ResponseWriter, r *http.Request, challengeToken string) (database.LoginChallenge, bool) {
 	challengeID, err := uuid.Parse(strings.TrimSpace(challengeToken))
 	if err != nil {
@@ -94,8 +102,8 @@ func (h *handler) handleMFATOTPVerify() http.HandlerFunc {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		h.appendAuthAuditForUserTeams(r, challenge.UserID, "auth.mfa_succeeded", "success", "TOTP multi-factor authentication succeeded", true)
-		h.appendAuthAuditForUserTeams(r, challenge.UserID, "auth.login_succeeded", "success", "Login succeeded after multi-factor authentication", true)
+		h.appendAuthAuditForUserTeams(r, challenge.UserID, "auth.mfa_succeeded", "success", mfaAuditDetails(challenge, "totp_succeeded"), true)
+		h.appendAuthAuditForUserTeams(r, challenge.UserID, "auth.login_succeeded", "success", mfaAuditDetails(challenge, "mfa_succeeded"), true)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -140,8 +148,8 @@ func (h *handler) handleMFARecoveryCodeVerify() http.HandlerFunc {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		h.appendAuthAuditForUserTeams(r, challenge.UserID, "auth.mfa_succeeded", "success", "Recovery code multi-factor authentication succeeded", true)
-		h.appendAuthAuditForUserTeams(r, challenge.UserID, "auth.login_succeeded", "success", "Login succeeded after multi-factor authentication", true)
+		h.appendAuthAuditForUserTeams(r, challenge.UserID, "auth.mfa_succeeded", "success", mfaAuditDetails(challenge, "recovery_code_succeeded"), true)
+		h.appendAuthAuditForUserTeams(r, challenge.UserID, "auth.login_succeeded", "success", mfaAuditDetails(challenge, "mfa_succeeded"), true)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -237,8 +245,8 @@ func (h *handler) handleMFAEmailLinkVerify() http.HandlerFunc {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		h.appendAuthAuditForUserTeams(r, challenge.UserID, "auth.mfa_succeeded", "success", "Email link multi-factor authentication succeeded", true)
-		h.appendAuthAuditForUserTeams(r, challenge.UserID, "auth.login_succeeded", "success", "Login succeeded after multi-factor authentication", true)
+		h.appendAuthAuditForUserTeams(r, challenge.UserID, "auth.mfa_succeeded", "success", mfaAuditDetails(challenge, "email_link_succeeded"), true)
+		h.appendAuthAuditForUserTeams(r, challenge.UserID, "auth.login_succeeded", "success", mfaAuditDetails(challenge, "mfa_succeeded"), true)
 
 		h.ctx.AuthState.DeletePasskeyLoginChallenge(link.ChallengeID)
 		http.Redirect(w, r, h.publicRedirectURL(link.ReturnPath), http.StatusSeeOther)

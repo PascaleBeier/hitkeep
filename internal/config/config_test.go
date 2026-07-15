@@ -563,6 +563,9 @@ func TestLogValueRedactsSecrets(t *testing.T) {
 		S3SecretAccessKey:               "super-secret",
 		GoogleSearchConsoleClientSecret: "google-client-secret",
 		AIAPIKey:                        "ai-provider-secret",
+		SocialGoogleClientSecret:        "social-google-secret",
+		SocialGitHubClientSecret:        "social-github-secret",
+		SocialMicrosoftClientSecret:     "social-microsoft-secret",
 	}
 	logVal := conf.LogValue()
 	got := logVal.String()
@@ -582,11 +585,57 @@ func TestLogValueRedactsSecrets(t *testing.T) {
 	if strings.Contains(got, "ai-provider-secret") {
 		t.Fatal("LogValue leaked AIAPIKey")
 	}
+	for _, secret := range []string{"social-google-secret", "social-github-secret", "social-microsoft-secret"} {
+		if strings.Contains(got, secret) {
+			t.Fatalf("LogValue leaked social provider secret %q", secret)
+		}
+	}
 	if !strings.Contains(got, "AKIA") {
 		t.Fatal("LogValue should show masked S3AccessKeyID prefix")
 	}
 	if !strings.Contains(got, "[redacted]") {
 		t.Fatal("LogValue should contain [redacted] markers")
+	}
+}
+
+func TestLoadSocialAuthConfigFromEnv(t *testing.T) {
+	env := map[string]string{
+		"HITKEEP_SOCIAL_GOOGLE_CLIENT_ID":        "google-client",
+		"HITKEEP_SOCIAL_GOOGLE_CLIENT_SECRET":    "google-secret",
+		"HITKEEP_SOCIAL_GITHUB_CLIENT_ID":        "github-client",
+		"HITKEEP_SOCIAL_GITHUB_CLIENT_SECRET":    "github-secret",
+		"HITKEEP_SOCIAL_MICROSOFT_CLIENT_ID":     "microsoft-client",
+		"HITKEEP_SOCIAL_MICROSOFT_CLIENT_SECRET": "microsoft-secret",
+		"HITKEEP_SOCIAL_MICROSOFT_TENANT":        "organizations",
+		"HITKEEP_SOCIAL_SIGNUP_ENABLED":          "true",
+	}
+	conf := load([]string{}, func(key, fallback string) string {
+		if value, ok := env[key]; ok {
+			return value
+		}
+		return fallback
+	})
+	if conf.SocialGoogleClientID != "google-client" || conf.SocialGoogleClientSecret != "google-secret" {
+		t.Fatalf("unexpected Google social config: %+v", conf)
+	}
+	if conf.SocialGitHubClientID != "github-client" || conf.SocialGitHubClientSecret != "github-secret" {
+		t.Fatalf("unexpected GitHub social config: %+v", conf)
+	}
+	if conf.SocialMicrosoftClientID != "microsoft-client" || conf.SocialMicrosoftClientSecret != "microsoft-secret" || conf.SocialMicrosoftTenant != "organizations" {
+		t.Fatalf("unexpected Microsoft social config: %+v", conf)
+	}
+	if !conf.SocialSignupEnabled {
+		t.Fatal("expected social signup flag from environment")
+	}
+}
+
+func TestSocialAuthDefaultsAreClosed(t *testing.T) {
+	conf := load([]string{}, func(_ string, fallback string) string { return fallback })
+	if conf.SocialSignupEnabled {
+		t.Fatal("social signup should default to disabled")
+	}
+	if conf.SocialMicrosoftTenant != "common" {
+		t.Fatalf("expected Microsoft common tenant default, got %q", conf.SocialMicrosoftTenant)
 	}
 }
 
