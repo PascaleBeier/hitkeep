@@ -429,6 +429,9 @@ func (s *Store) CreatePendingSocialConfirmation(ctx context.Context, entry Pendi
 		entry.ReturnPath = "/dashboard"
 	}
 
+	s.socialConfirmationMu.Lock()
+	defer s.socialConfirmationMu.Unlock()
+
 	err = s.Transact(ctx, func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, "DELETE FROM pending_social_confirmations WHERE expires_at <= ? OR (provider = ? AND subject = ?)", now, provider, strings.TrimSpace(entry.Subject)); err != nil {
 			return fmt.Errorf("clear pending social confirmations: %w", err)
@@ -460,6 +463,13 @@ func (s *Store) ConsumePendingSocialConfirmation(ctx context.Context, token stri
 	if token == "" {
 		return nil, ErrSocialConfirmationInvalid
 	}
+
+	// DuckDB uses optimistic concurrency for deletes. Serializing these
+	// short-lived one-time token operations prevents a competing consume or
+	// replacement from surfacing an internal tuple-deletion conflict.
+	s.socialConfirmationMu.Lock()
+	defer s.socialConfirmationMu.Unlock()
+
 	tokenHash := socialConfirmationTokenHash(token)
 	var entry PendingSocialConfirmation
 	var targetUserID sql.NullString

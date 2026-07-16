@@ -43,6 +43,8 @@ type Store struct {
 	analyticsStatements *analyticsStatements
 	runtime             *runtimeCache
 
+	socialConfirmationMu sync.Mutex
+
 	maintenanceMu     sync.Mutex
 	maintenanceCancel context.CancelFunc
 
