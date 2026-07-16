@@ -1,0 +1,74 @@
+name: Refresh Spam Lists
+
+on:
+  schedule:
+    - cron: "0 19 1,15 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    name: Refresh embedded spam lists
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Generate embedded spam lists
+        run: ./scripts/update-default-spam-filter.sh
+
+      - name: Test embedded spam data
+        run: go test ./internal/blocking
+
+      - name: Open refresh pull request
+        env:
+          GH_TOKEN: ${{ secrets.GHT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- internal/blocking/default_spam_filter.json; then
+            echo "Embedded spam lists are already up to date."
+            exit 0
+          fi
+
+          branch="automation/spam-filter-refresh"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          gh auth setup-git
+          git switch -c "$branch"
+          git add internal/blocking/default_spam_filter.json
+          git commit -m "chore(security): refresh default spam filter data"
+          git push --force-with-lease origin "$branch"
+
+          body=$(printf '%s\n\n%s\n\n```sh\n%s\n```' \
+            "Refreshes HitKeep's embedded Matomo referrer-spam and Spamhaus DROP datasets." \
+            "Generated with:" \
+            "./scripts/update-default-spam-filter.sh")
+
+          pr_number="$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')"
+          if [[ -n "$pr_number" ]]; then
+            gh pr edit "$pr_number" \
+              --title "chore(security): refresh default spam filter data" \
+              --body "$body"
+          else
+            gh pr create \
+              --base main \
+              --head "$branch" \
+              --title "chore(security): refresh default spam filter data" \
+              --body "$body"
+          fi

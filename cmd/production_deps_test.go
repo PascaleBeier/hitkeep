@@ -75,3 +75,26 @@ func TestIPMetadataRefreshWorkflowUsesGitHubSecretToken(t *testing.T) {
 		t.Fatal("IP metadata refresh workflow must not pass the download token on the command line")
 	}
 }
+
+func TestSpamListRefreshWorkflowUsesScopedPullRequest(t *testing.T) {
+	workflow, err := os.ReadFile(filepath.Join("..", ".github", "workflows", "spam-list-refresh.yml"))
+	if err != nil {
+		t.Fatalf("read spam list refresh workflow: %v", err)
+	}
+	contents := string(workflow)
+	for _, required := range []string{
+		`cron: "0 19 1,15 * *"`,
+		"workflow_dispatch:",
+		"persist-credentials: false",
+		"run: ./scripts/update-default-spam-filter.sh",
+		"run: go test ./internal/blocking",
+		"GH_TOKEN: ${{ secrets.GHT }}",
+		`branch="automation/spam-filter-refresh"`,
+		"git diff --quiet -- internal/blocking/default_spam_filter.json",
+		"git add internal/blocking/default_spam_filter.json",
+	} {
+		if !strings.Contains(contents, required) {
+			t.Fatalf("spam list refresh workflow must contain %q", required)
+		}
+	}
+}
