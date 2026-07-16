@@ -2,12 +2,14 @@ package blocking
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestNormalizeReferrerHost(t *testing.T) {
@@ -188,6 +190,19 @@ func TestSaveAndLoadSpamFeedData(t *testing.T) {
 	tempDir := t.TempDir()
 	path := filepath.Join(tempDir, "spam-filter.json")
 	input := SpamFeedData{
+		GeneratedAt: time.Date(2026, time.July, 16, 12, 0, 0, 0, time.UTC),
+		Sources: map[string]string{
+			matomoReferrerSpamSource: matomoReferrerSpamURL,
+			spamhausDropSource:       spamhausDropURL,
+			spamhausDropV6Source:     spamhausDropV6URL,
+		},
+		SourceMetadata: map[string]SpamFeedSourceMetadata{
+			spamhausDropSource: {
+				Timestamp: 1_784_054_642,
+				Copyright: "(c) 2026 The Spamhaus Project SLU",
+				Terms:     "https://www.spamhaus.org/drop/terms/",
+			},
+		},
 		ReferrerHostDenylist: []string{"b.example", "a.example"},
 		NetworkDenylist:      []string{"203.0.113.0/24"},
 	}
@@ -204,6 +219,98 @@ func TestSaveAndLoadSpamFeedData(t *testing.T) {
 	}
 	if len(loaded.NetworkDenylist) != 1 || loaded.NetworkDenylist[0] != "203.0.113.0/24" {
 		t.Fatalf("unexpected network list: %+v", loaded.NetworkDenylist)
+	}
+	if !reflect.DeepEqual(loaded.SourceMetadata, input.SourceMetadata) {
+		t.Fatalf("unexpected source metadata: %+v", loaded.SourceMetadata)
+	}
+}
+
+func TestDecodeSpamFeedDataAcceptsLegacyCacheWithoutSourceMetadata(t *testing.T) {
+	data, err := decodeSpamFeedData([]byte(`{
+  "generated_at": "2026-07-16T12:00:00Z",
+  "sources": {"legacy": "https://example.com/list.txt"},
+  "referrer_host_denylist": ["spam.example"],
+  "network_denylist": ["203.0.113.0/24"]
+}`))
+	if err != nil {
+		t.Fatalf("decode legacy cache: %v", err)
+	}
+	if data.SourceMetadata != nil {
+		t.Fatalf("expected absent source metadata to remain nil, got %+v", data.SourceMetadata)
+	}
+}
+
+func TestValidateEmbeddedSpamFeedData(t *testing.T) {
+	tests := []struct {
+		name    string
+		mutate  func(*SpamFeedData)
+		wantErr string
+	}{
+		{name: "complete"},
+		{
+			name: "missing referrers",
+			mutate: func(data *SpamFeedData) {
+				data.ReferrerHostDenylist = nil
+			},
+			wantErr: "no referrer hosts",
+		},
+		{
+			name: "missing IPv4",
+			mutate: func(data *SpamFeedData) {
+				data.NetworkDenylist = []string{"2001:db8::/32"}
+			},
+			wantErr: "no IPv4 networks",
+		},
+		{
+			name: "missing IPv6",
+			mutate: func(data *SpamFeedData) {
+				data.NetworkDenylist = []string{"203.0.113.0/24"}
+			},
+			wantErr: "no IPv6 networks",
+		},
+		{
+			name: "invalid network",
+			mutate: func(data *SpamFeedData) {
+				data.NetworkDenylist = []string{"invalid", "2001:db8::/32"}
+			},
+			wantErr: "invalid network",
+		},
+		{
+			name: "missing attribution",
+			mutate: func(data *SpamFeedData) {
+				delete(data.SourceMetadata, spamhausDropV6Source)
+			},
+			wantErr: "missing metadata",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			data := completeTestSpamFeedData()
+			if tc.mutate != nil {
+				tc.mutate(&data)
+			}
+			err := ValidateEmbeddedSpamFeedData(data)
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Fatalf("validate complete embedded data: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("expected error containing %q, got %v", tc.wantErr, err)
+			}
+		})
+	}
+}
+
+func TestEmbeddedSpamFeedDataIsComplete(t *testing.T) {
+	data, err := LoadEmbeddedSpamFeedData()
+	if err != nil {
+		t.Fatalf("load embedded spam data: %v", err)
+	}
+	if err := ValidateEmbeddedSpamFeedData(data); err != nil {
+		t.Fatalf("validate embedded spam data: %v", err)
 	}
 }
 
@@ -229,12 +336,46 @@ func (f fakeHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	}, nil
 }
 
+func completeTestSpamFeedData() SpamFeedData {
+	return SpamFeedData{
+		GeneratedAt: time.Date(2026, time.July, 16, 12, 0, 0, 0, time.UTC),
+		Sources: map[string]string{
+			matomoReferrerSpamSource: matomoReferrerSpamURL,
+			spamhausDropSource:       spamhausDropURL,
+			spamhausDropV6Source:     spamhausDropV6URL,
+		},
+		SourceMetadata: map[string]SpamFeedSourceMetadata{
+			spamhausDropSource: {
+				Timestamp: 1_784_054_642,
+				Copyright: "(c) 2026 The Spamhaus Project SLU",
+				Terms:     "https://www.spamhaus.org/drop/terms/",
+			},
+			spamhausDropV6Source: {
+				Timestamp: 1_784_164_442,
+				Copyright: "(c) 2026 The Spamhaus Project SLU",
+				Terms:     "https://www.spamhaus.org/drop/terms/",
+			},
+		},
+		ReferrerHostDenylist: []string{"spam.example"},
+		NetworkDenylist:      []string{"203.0.113.0/24", "2001:db8::/32"},
+	}
+}
+
+func spamhausJSONFeed(cidr string, timestamp int64) string {
+	return fmt.Sprintf(
+		"{\"cidr\":%q,\"sblid\":\"SBL1\",\"rir\":\"test\"}\n"+
+			"{\"type\":\"metadata\",\"timestamp\":%d,\"size\":100,\"records\":1,\"copyright\":\"(c) 2026 The Spamhaus Project SLU\",\"terms\":\"https://www.spamhaus.org/drop/terms/\"}\n",
+		cidr,
+		timestamp,
+	)
+}
+
 func TestFetchSpamFeedData(t *testing.T) {
 	client := fakeHTTPClient{
 		responses: map[string]string{
 			matomoReferrerSpamURL: "spam.example\nwww.bad.example\n",
-			spamhausDropURL:       "; header\n203.0.113.0/24 ; SBL1\n",
-			spamhausDropV6URL:     "; header\n2001:db8::/32 ; SBL2\n",
+			spamhausDropURL:       spamhausJSONFeed("203.0.113.0/24", 1_784_054_642),
+			spamhausDropV6URL:     spamhausJSONFeed("2001:db8::/32", 1_784_164_442),
 		},
 	}
 
@@ -247,6 +388,12 @@ func TestFetchSpamFeedData(t *testing.T) {
 	}
 	if got := data.NetworkDenylist; len(got) != 2 {
 		t.Fatalf("unexpected network denylist: %+v", got)
+	}
+	if got := data.SourceMetadata[spamhausDropSource]; got.Timestamp != 1_784_054_642 || got.Copyright != "(c) 2026 The Spamhaus Project SLU" || got.Terms != "https://www.spamhaus.org/drop/terms/" {
+		t.Fatalf("unexpected IPv4 source metadata: %+v", got)
+	}
+	if got := data.SourceMetadata[spamhausDropV6Source]; got.Timestamp != 1_784_164_442 {
+		t.Fatalf("unexpected IPv6 source metadata: %+v", got)
 	}
 }
 
@@ -268,6 +415,9 @@ func TestFetchSpamFeedDataPartialFailure(t *testing.T) {
 	if len(data.NetworkDenylist) != 0 {
 		t.Fatalf("expected empty network denylist, got: %+v", data.NetworkDenylist)
 	}
+	if len(data.SourceMetadata) != 0 {
+		t.Fatalf("expected no source metadata for failed Spamhaus feeds, got: %+v", data.SourceMetadata)
+	}
 }
 
 func TestFetchSpamFeedDataAllFeedsFail(t *testing.T) {
@@ -281,5 +431,78 @@ func TestFetchSpamFeedDataAllFeedsFail(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "all spam feeds failed") {
 		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
+func TestFetchSpamhausCIDRsRejectsInvalidJSONFeeds(t *testing.T) {
+	metadata := `{"type":"metadata","timestamp":1784054642,"records":1,"copyright":"(c) 2026 The Spamhaus Project SLU","terms":"https://www.spamhaus.org/drop/terms/"}` + "\n"
+	tests := []struct {
+		name           string
+		body           string
+		expectedBitLen int
+		wantErr        string
+	}{
+		{
+			name:           "malformed JSON",
+			body:           `{"cidr":`,
+			expectedBitLen: 32,
+			wantErr:        "decode spamhaus JSON",
+		},
+		{
+			name:           "invalid CIDR",
+			body:           `{"cidr":"invalid"}` + "\n" + metadata,
+			expectedBitLen: 32,
+			wantErr:        "invalid cidr",
+		},
+		{
+			name:           "wrong address family",
+			body:           spamhausJSONFeed("2001:db8::/32", 1_784_054_642),
+			expectedBitLen: 32,
+			wantErr:        "IPv6 cidr",
+		},
+		{
+			name:           "missing metadata",
+			body:           `{"cidr":"203.0.113.0/24"}` + "\n",
+			expectedBitLen: 32,
+			wantErr:        "missing terminal metadata",
+		},
+		{
+			name: "duplicate metadata",
+			body: spamhausJSONFeed("203.0.113.0/24", 1_784_054_642) +
+				`{"type":"metadata","timestamp":1784054643,"records":1,"copyright":"(c) 2026 The Spamhaus Project SLU","terms":"https://www.spamhaus.org/drop/terms/"}` + "\n",
+			expectedBitLen: 32,
+			wantErr:        "duplicate metadata",
+		},
+		{
+			name: "metadata not terminal",
+			body: metadata +
+				`{"cidr":"203.0.113.0/24"}` + "\n",
+			expectedBitLen: 32,
+			wantErr:        "must be terminal",
+		},
+		{
+			name: "record count mismatch",
+			body: `{"cidr":"203.0.113.0/24"}` + "\n" +
+				`{"type":"metadata","timestamp":1784054642,"records":2,"copyright":"(c) 2026 The Spamhaus Project SLU","terms":"https://www.spamhaus.org/drop/terms/"}` + "\n",
+			expectedBitLen: 32,
+			wantErr:        "declares 2 records but contains 1",
+		},
+		{
+			name: "missing attribution",
+			body: `{"cidr":"203.0.113.0/24"}` + "\n" +
+				`{"type":"metadata","timestamp":1784054642,"records":1}` + "\n",
+			expectedBitLen: 32,
+			wantErr:        "missing copyright",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := fakeHTTPClient{responses: map[string]string{spamhausDropURL: tc.body}}
+			_, err := fetchSpamhausCIDRs(context.Background(), client, spamhausDropURL, tc.expectedBitLen)
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("expected error containing %q, got %v", tc.wantErr, err)
+			}
+		})
 	}
 }

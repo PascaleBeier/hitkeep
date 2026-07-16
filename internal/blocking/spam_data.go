@@ -4,6 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,11 +15,24 @@ import (
 //go:embed default_spam_filter.json
 var embeddedSpamDataFS embed.FS
 
+const (
+	matomoReferrerSpamSource = "matomo_referrer_spam_list"
+	spamhausDropSource       = "spamhaus_drop"
+	spamhausDropV6Source     = "spamhaus_dropv6"
+)
+
+type SpamFeedSourceMetadata struct {
+	Timestamp int64  `json:"timestamp,omitempty"`
+	Copyright string `json:"copyright,omitempty"`
+	Terms     string `json:"terms,omitempty"`
+}
+
 type SpamFeedData struct {
-	GeneratedAt          time.Time         `json:"generated_at"`
-	Sources              map[string]string `json:"sources"`
-	ReferrerHostDenylist []string          `json:"referrer_host_denylist"`
-	NetworkDenylist      []string          `json:"network_denylist"`
+	GeneratedAt          time.Time                         `json:"generated_at"`
+	Sources              map[string]string                 `json:"sources"`
+	SourceMetadata       map[string]SpamFeedSourceMetadata `json:"source_metadata,omitempty"`
+	ReferrerHostDenylist []string                          `json:"referrer_host_denylist"`
+	NetworkDenylist      []string                          `json:"network_denylist"`
 }
 
 func LoadEmbeddedSpamFeedData() (SpamFeedData, error) {
@@ -63,6 +77,60 @@ func decodeSpamFeedData(raw []byte) (SpamFeedData, error) {
 	}
 	data.normalize()
 	return data, nil
+}
+
+// ValidateEmbeddedSpamFeedData verifies the stricter completeness contract for
+// the generated fallback bundled with HitKeep. Runtime refreshes intentionally
+// remain tolerant of individual feed failures.
+func ValidateEmbeddedSpamFeedData(data SpamFeedData) error {
+	if data.GeneratedAt.IsZero() {
+		return fmt.Errorf("embedded spam data is missing its generation timestamp")
+	}
+	for _, source := range []string{matomoReferrerSpamSource, spamhausDropSource, spamhausDropV6Source} {
+		if strings.TrimSpace(data.Sources[source]) == "" {
+			return fmt.Errorf("embedded spam data is missing source %q", source)
+		}
+	}
+	if len(data.ReferrerHostDenylist) == 0 {
+		return fmt.Errorf("embedded spam data has no referrer hosts")
+	}
+
+	hasIPv4 := false
+	hasIPv6 := false
+	for _, cidr := range data.NetworkDenylist {
+		prefix, err := netip.ParsePrefix(cidr)
+		if err != nil {
+			return fmt.Errorf("embedded spam data contains invalid network %q: %w", cidr, err)
+		}
+		if prefix.Addr().Is4() {
+			hasIPv4 = true
+		} else {
+			hasIPv6 = true
+		}
+	}
+	if !hasIPv4 {
+		return fmt.Errorf("embedded spam data has no IPv4 networks")
+	}
+	if !hasIPv6 {
+		return fmt.Errorf("embedded spam data has no IPv6 networks")
+	}
+
+	for _, source := range []string{spamhausDropSource, spamhausDropV6Source} {
+		metadata, ok := data.SourceMetadata[source]
+		if !ok {
+			return fmt.Errorf("embedded spam data is missing metadata for source %q", source)
+		}
+		if metadata.Timestamp <= 0 {
+			return fmt.Errorf("embedded spam data source %q has no timestamp", source)
+		}
+		if strings.TrimSpace(metadata.Copyright) == "" {
+			return fmt.Errorf("embedded spam data source %q has no copyright", source)
+		}
+		if strings.TrimSpace(metadata.Terms) == "" {
+			return fmt.Errorf("embedded spam data source %q has no terms", source)
+		}
+	}
+	return nil
 }
 
 func (d *SpamFeedData) normalize() {

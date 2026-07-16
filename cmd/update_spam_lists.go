@@ -34,6 +34,10 @@ func UpdateSpamLists(args []string) {
 		fmt.Fprintf(os.Stderr, "Error: could not fetch spam feeds: %v\n", err)
 		os.Exit(1)
 	}
+	if err := blocking.ValidateEmbeddedSpamFeedData(data); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: refusing to write incomplete embedded spam data: %v\n", err)
+		os.Exit(1)
+	}
 	if err := blocking.SaveSpamFeedData(*outputPath, data); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: could not write spam cache: %v\n", err)
 		os.Exit(1)
