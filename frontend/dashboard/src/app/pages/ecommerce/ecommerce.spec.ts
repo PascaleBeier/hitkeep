@@ -10,6 +10,7 @@ import { TRANSLOCO_LOCALE_CONFIG, TRANSLOCO_LOCALE_LANG_MAPPING, TranslocoLocale
 import { EcommercePage } from './ecommerce';
 import { SiteService } from '@features/sites/services/site.service';
 import { AnalyticsService } from '@core/services/analytics.service';
+import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
 
 type EcommercePageTestAccess = EcommercePage & {
     activeFilters(): { type: string; value: string }[];
@@ -25,6 +26,7 @@ describe('EcommercePage', () => {
         getEcommerceSources: ReturnType<typeof vi.fn>;
         getSiteStats: ReturnType<typeof vi.fn>;
     };
+    let realtimeRefresh: (() => void) | undefined;
 
     const clickTab = (label: string): void => {
         const tab = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('p-tab')).find((element) => element.textContent?.includes(label));
@@ -34,6 +36,7 @@ describe('EcommercePage', () => {
     };
 
     beforeEach(async () => {
+        realtimeRefresh = undefined;
         analyticsServiceMock = {
             getEcommerceSummary: vi.fn(() =>
                 of({
@@ -56,11 +59,34 @@ describe('EcommercePage', () => {
             ),
             getEcommerceProducts: vi.fn(() =>
                 of([
-                    { item_id: 'pro', item_name: 'Pro', revenue: 120, orders: 1, quantity: 1 },
-                    { item_id: 'starter', item_name: 'Starter', revenue: 60, orders: 1, quantity: 2 }
+                    {
+                        item_id: 'pro',
+                        item_name: 'Pro',
+                        revenue: 120,
+                        orders: 1,
+                        quantity: 1
+                    },
+                    {
+                        item_id: 'starter',
+                        item_name: 'Starter',
+                        revenue: 60,
+                        orders: 1,
+                        quantity: 2
+                    }
                 ])
             ),
-            getEcommerceSources: vi.fn(() => of([{ utm_source: 'google.com', utm_medium: 'cpc', utm_campaign: 'launch', referrer: 'https://google.com/search', revenue: 120, orders: 1 }])),
+            getEcommerceSources: vi.fn(() =>
+                of([
+                    {
+                        utm_source: 'google.com',
+                        utm_medium: 'cpc',
+                        utm_campaign: 'launch',
+                        referrer: 'https://google.com/search',
+                        revenue: 120,
+                        orders: 1
+                    }
+                ])
+            ),
             getSiteStats: vi.fn(() =>
                 of({
                     live_visitors: 0,
@@ -111,7 +137,12 @@ describe('EcommercePage', () => {
                                 removeFilterAria: 'Remove filter',
                                 selectDateRange: 'Select date range',
                                 searchPlaceholder: 'Search...',
-                                actions: { apply: 'Apply', cancel: 'Cancel', clearAll: 'Clear all', more: 'More actions' },
+                                actions: {
+                                    apply: 'Apply',
+                                    cancel: 'Cancel',
+                                    clearAll: 'Clear all',
+                                    more: 'More actions'
+                                },
                                 columns: { actions: 'Actions' },
                                 timeRanges: {
                                     today: 'Today',
@@ -217,6 +248,14 @@ describe('EcommercePage', () => {
                     useValue: analyticsServiceMock
                 },
                 {
+                    provide: RealtimeRefreshCoordinator,
+                    useValue: {
+                        registerUntilDestroyed: vi.fn((_destroyRef: unknown, options: { refresh: () => void }) => {
+                            realtimeRefresh = options.refresh;
+                        })
+                    }
+                },
+                {
                     provide: TranslocoLocaleService,
                     useValue: {
                         langChanges$: of('en'),
@@ -250,6 +289,66 @@ describe('EcommercePage', () => {
         expect(text).toContain('Pro');
     });
 
+    it('keeps currency and conversion KPIs numeric with locale-aware formatting metadata', () => {
+        const cards = (
+            fixture.componentInstance as unknown as {
+                kpiCards: () => {
+                    value: string | number;
+                    format?: Intl.NumberFormatOptions;
+                    suffix?: string;
+                }[];
+            }
+        ).kpiCards();
+
+        expect(cards.map((card) => card.value)).toEqual([180, 2, 90, 66.7]);
+        expect(cards[0]?.format).toEqual({
+            style: 'currency',
+            currency: 'USD',
+            maximumFractionDigits: 2
+        });
+        expect(cards[2]?.format).toEqual({
+            style: 'currency',
+            currency: 'USD',
+            maximumFractionDigits: 2
+        });
+        expect(cards[3]?.format).toEqual({
+            minimumFractionDigits: 1,
+            maximumFractionDigits: 1
+        });
+        expect(cards[3]?.suffix).toBe('%');
+    });
+
+    it('commits custom-loader realtime results in the background and advances the KPI update key', () => {
+        analyticsServiceMock.getEcommerceSummary.mockReturnValue(
+            of({
+                revenue: 450,
+                orders: 5,
+                average_order_value: 90,
+                checkout_starts: 6,
+                checkout_conversion_rate: 83.3,
+                currency: 'USD',
+                top_cities: [],
+                top_providers: [],
+                top_asns: []
+            })
+        );
+
+        expect(typeof realtimeRefresh).toBe('function');
+        realtimeRefresh?.();
+        fixture.detectChanges();
+
+        const component = fixture.componentInstance as unknown as {
+            isLoading: () => boolean;
+            kpiCards: () => { value: string | number; updateKey?: number }[];
+        };
+        const cards = component.kpiCards();
+
+        expect(component.isLoading()).toBe(false);
+        expect(cards.map((card) => card.value)).toEqual([450, 5, 90, 83.3]);
+        expect(cards.every((card) => card.updateKey === 1)).toBe(true);
+        expect(fixture.nativeElement.querySelectorAll('app-kpi-card p-skeleton').length).toBe(0);
+    });
+
     it('keeps revenue tables searchable, sortable, and paginated', () => {
         const searches = Array.from<HTMLInputElement>(fixture.nativeElement.querySelectorAll('input[placeholder="Search..."]'));
         const tables = fixture.debugElement.queryAll(By.css('p-table'));
@@ -263,7 +362,10 @@ describe('EcommercePage', () => {
 
     it('renders source and referrer URLs with favicons and hover links', () => {
         const component = fixture.componentInstance as unknown as {
-            metricCardTabs: () => { id: string; cards: { id: string; linkMode?: string }[] }[];
+            metricCardTabs: () => {
+                id: string;
+                cards: { id: string; linkMode?: string }[];
+            }[];
         };
         const acquisitionCards = component.metricCardTabs().find((tab) => tab.id === 'acquisition')?.cards ?? [];
         expect(acquisitionCards.find((card) => card.id === 'utm-sources')?.linkMode).toBeUndefined();
@@ -288,7 +390,10 @@ describe('EcommercePage', () => {
         productRow?.click();
         fixture.detectChanges();
 
-        expect(component.selectedProduct()).toEqual({ itemId: 'pro', itemName: 'Pro' });
+        expect(component.selectedProduct()).toEqual({
+            itemId: 'pro',
+            itemName: 'Pro'
+        });
         expect(fixture.nativeElement.textContent).toContain('Product: Pro');
         expect(fixture.nativeElement.querySelector('tr.ecommerce-filter-row--active')?.textContent).toContain('Pro');
 
@@ -348,5 +453,19 @@ describe('EcommercePage', () => {
         expect(text).toContain('Revenue');
         expect(text).toContain('Avg. order value');
         expect(text).toContain('No ecommerce data yet');
+
+        const cards = (
+            fixture.componentInstance as unknown as {
+                kpiCards: () => {
+                    value: string | number;
+                    format?: Intl.NumberFormatOptions;
+                }[];
+            }
+        ).kpiCards();
+        expect(cards[0]?.value).toBe(0);
+        expect(cards[0]?.format).toEqual({
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
     });
 });

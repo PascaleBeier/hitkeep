@@ -20,7 +20,7 @@
     } @else if (siteService.activeSite()) {
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         @for (card of goalKpis(); track card.label) {
-        <app-kpi-card [label]="card.label" [value]="card.value" [loading]="card.loading" [valueClass]="card.valueClass" [delta]="card.delta ?? null" />
+        <app-kpi-card [label]="card.label" [value]="card.value" [loading]="card.loading" [updateKey]="card.updateKey ?? 0" [valueClass]="card.valueClass ?? ''" [format]="card.format" [suffix]="card.suffix" [delta]="card.delta ?? null" />
         }
     </div>
 

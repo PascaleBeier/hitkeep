@@ -142,8 +142,21 @@ describe('SearchConsoleDrilldown', () => {
         fixture.detectChanges();
 
         expect(fixture.nativeElement.textContent).toContain('Search Console');
-        expect(fixture.nativeElement.textContent).toContain('42');
         expect(fixture.nativeElement.textContent).toContain('hitkeep analytics');
+
+        const cards = (
+            fixture.componentInstance as unknown as {
+                kpiCards: () => { value: string | number; format?: Intl.NumberFormatOptions; suffix?: string }[];
+            }
+        ).kpiCards();
+        expect(cards.map((card) => card.value)).toEqual([42, 420, 10, 3.2]);
+        expect(cards[2]?.format).toEqual({ minimumFractionDigits: 1, maximumFractionDigits: 1 });
+        expect(cards[2]?.suffix).toBe('%');
+        expect(cards[3]?.format).toEqual({ minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+        const accessibleKpiValues = Array.from<HTMLElement & { _internals?: ElementInternals }>(fixture.nativeElement.querySelectorAll('number-flow-ng')).map((element) => element._internals?.ariaLabel);
+        expect(accessibleKpiValues).toContain('42');
+
         clickTab('Top pages');
         expect(fixture.nativeElement.textContent).toContain('/docs');
         const pageLink = fixture.nativeElement.querySelector('a[href="https://example.com/docs"]') as HTMLAnchorElement | null;
@@ -158,6 +171,19 @@ describe('SearchConsoleDrilldown', () => {
             country: null,
             device: null
         });
+    });
+
+    it('keeps unavailable Search Console headline values as static placeholders', () => {
+        fixture = TestBed.createComponent(SearchConsoleDrilldown);
+        fixture.detectChanges();
+
+        const cards = (
+            fixture.componentInstance as unknown as {
+                kpiCards: () => { value: string | number }[];
+            }
+        ).kpiCards();
+
+        expect(cards.map((card) => card.value)).toEqual(['-', '-', '-', '-']);
     });
 
     it('uses the shared metric card pattern without unsupported Search Console groups', async () => {

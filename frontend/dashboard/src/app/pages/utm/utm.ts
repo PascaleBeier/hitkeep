@@ -7,7 +7,7 @@ import { TranslocoLocaleService } from '@jsverse/transloco-locale';
 import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
 import { SiteService } from '@features/sites/services/site.service';
-import { injectStatsQuery } from '@features/analytics/services/stats-query';
+import { injectStatsQuery, type StatsQueryMode } from '@features/analytics/services/stats-query';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { PageState } from '@components/page-state/page-state';
@@ -46,6 +46,7 @@ export class UtmDashboard {
     protected stats = this.statsQuery.stats;
     protected isStatsLoading = this.statsQuery.isLoading;
     protected currentComparisonRange = this.statsQuery.comparisonRange;
+    protected readonly kpiUpdateKey = signal(0);
     protected isRefreshing = computed(() => this.isStatsLoading());
     protected readonly isShortRange = this.reportRange.isShortRange;
     protected activeFilters = signal<MetricFilter[]>([]);
@@ -118,12 +119,14 @@ export class UtmDashboard {
         const stats = this.stats();
         const cmp = stats?.comparison;
         const loading = this.isStatsLoading();
+        const updateKey = this.kpiUpdateKey();
 
         return [
             {
                 label: this.transloco.translate('utm.kpis.campaign'),
                 value: stats?.utm_campaign_hits ?? 0,
                 loading,
+                updateKey,
                 valueClass: 'text-2xl xl:text-3xl font-bold',
                 delta: cmp ? this.calcDelta(stats?.utm_campaign_hits ?? 0, cmp.utm_campaign_hits) : null
             },
@@ -131,6 +134,7 @@ export class UtmDashboard {
                 label: this.transloco.translate('utm.kpis.content'),
                 value: stats?.utm_content_hits ?? 0,
                 loading,
+                updateKey,
                 valueClass: 'text-2xl xl:text-3xl font-bold',
                 delta: cmp ? this.calcDelta(stats?.utm_content_hits ?? 0, cmp.utm_content_hits) : null
             },
@@ -138,6 +142,7 @@ export class UtmDashboard {
                 label: this.transloco.translate('utm.kpis.medium'),
                 value: stats?.utm_medium_hits ?? 0,
                 loading,
+                updateKey,
                 valueClass: 'text-2xl xl:text-3xl font-bold',
                 delta: cmp ? this.calcDelta(stats?.utm_medium_hits ?? 0, cmp.utm_medium_hits) : null
             },
@@ -145,6 +150,7 @@ export class UtmDashboard {
                 label: this.transloco.translate('utm.kpis.source'),
                 value: stats?.utm_source_hits ?? 0,
                 loading,
+                updateKey,
                 valueClass: 'text-2xl xl:text-3xl font-bold',
                 delta: cmp ? this.calcDelta(stats?.utm_source_hits ?? 0, cmp.utm_source_hits) : null
             },
@@ -152,6 +158,7 @@ export class UtmDashboard {
                 label: this.transloco.translate('utm.kpis.term'),
                 value: stats?.utm_term_hits ?? 0,
                 loading,
+                updateKey,
                 valueClass: 'text-2xl xl:text-3xl font-bold',
                 delta: cmp ? this.calcDelta(stats?.utm_term_hits ?? 0, cmp.utm_term_hits) : null
             }
@@ -236,22 +243,30 @@ export class UtmDashboard {
             siteId: () => this.siteService.activeSite()?.id ?? null,
             kinds: REALTIME_TRAFFIC_KINDS,
             enabled: () => !!this.siteService.activeSite() && !!this.getCurrentDateRange(),
-            refresh: () => this.refreshStats(),
+            refresh: () => this.refreshStats('background'),
             debounceMs: 700
         });
     }
 
-    protected refreshStats() {
+    protected refreshStats(mode: StatsQueryMode = 'blocking') {
         const site = this.siteService.activeSite();
         const dates = this.getCurrentDateRange();
         if (!site || !dates) {
             return;
         }
-        this.loadStats(site.id, dates.from, dates.to, this.activeFilters());
+        this.loadStats(site.id, dates.from, dates.to, this.activeFilters(), mode);
     }
 
-    private loadStats(siteId: string, from: string, to: string, filters: MetricFilter[]) {
-        this.statsQuery.load({ siteId, from, to, filters });
+    private loadStats(siteId: string, from: string, to: string, filters: MetricFilter[], mode: StatsQueryMode = 'blocking') {
+        const effectiveMode = mode === 'background' && this.stats() && !this.isStatsLoading() ? 'background' : 'blocking';
+        this.statsQuery.load({
+            siteId,
+            from,
+            to,
+            filters,
+            mode: effectiveMode,
+            onSuccess: effectiveMode === 'background' ? () => this.kpiUpdateKey.update((key) => key + 1) : undefined
+        });
     }
 
     protected calcDelta(current: number, previous: number): number | null {
@@ -295,15 +310,25 @@ export class UtmDashboard {
     private filterLabel(filter: MetricFilter): string {
         switch (filter.type) {
             case 'utm_campaign':
-                return this.transloco.translate('utm.filters.campaign', { value: filter.value });
+                return this.transloco.translate('utm.filters.campaign', {
+                    value: filter.value
+                });
             case 'utm_content':
-                return this.transloco.translate('utm.filters.content', { value: filter.value });
+                return this.transloco.translate('utm.filters.content', {
+                    value: filter.value
+                });
             case 'utm_medium':
-                return this.transloco.translate('utm.filters.medium', { value: filter.value });
+                return this.transloco.translate('utm.filters.medium', {
+                    value: filter.value
+                });
             case 'utm_source':
-                return this.transloco.translate('utm.filters.source', { value: filter.value });
+                return this.transloco.translate('utm.filters.source', {
+                    value: filter.value
+                });
             case 'utm_term':
-                return this.transloco.translate('utm.filters.term', { value: filter.value });
+                return this.transloco.translate('utm.filters.term', {
+                    value: filter.value
+                });
             default:
                 return `${filter.type}: ${filter.value}`;
         }

@@ -4,6 +4,8 @@ import { provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { provideTranslocoLocale } from '@jsverse/transloco-locale';
+import { By } from '@angular/platform-browser';
+import { NumberFlowComponent } from 'ng-number-flow';
 import { of } from 'rxjs';
 
 import { Events } from '@pages/events/events';
@@ -160,6 +162,20 @@ describe('Events', () => {
         expect(optionValues).toContain('file_download');
         expect(optionValues).toContain('form_submit');
         expect(optionValues).toContain('newsletter_signup');
+    });
+
+    it('renders the chart total through the animated number facade', async () => {
+        const events = component as unknown as {
+            selectedEvent: { set: (value: string) => void };
+        };
+        events.selectedEvent.set('newsletter_signup');
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.querySelector('app-animated-number')).not.toBeNull();
+        const flow = fixture.debugElement.query(By.directive(NumberFlowComponent)).componentInstance as NumberFlowComponent;
+        expect(flow.value()).toBe(12);
     });
 
     it('keeps multiple audience dimension filters active together', () => {

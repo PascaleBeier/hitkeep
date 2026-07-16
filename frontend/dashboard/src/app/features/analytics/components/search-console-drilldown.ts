@@ -10,13 +10,15 @@ import { TagModule } from 'primeng/tag';
 
 import { MetricStat } from '@models/analytics.types';
 import { GoogleSearchConsoleService, GoogleSearchConsoleSiteMapping, SearchConsoleDimensionRow, SearchConsoleMetricPoint, SearchConsoleOverview, SearchConsoleReportFilters } from '@services/google-search-console.service';
-import { KpiCard } from './kpi-card';
+import { KPI_ONE_DECIMAL_FORMAT, KPI_PERCENT_FORMAT, KpiCard } from './kpi-card';
 import { MetricCardGroup, MetricCardGroupTab } from './metric-card-group';
 import { SeriesChart, SeriesChartPoint, SeriesDefinition } from './series-chart';
 
 interface KpiCardData {
     label: string;
-    value: string;
+    value: string | number;
+    format?: Intl.NumberFormatOptions;
+    suffix?: string;
 }
 
 const SEARCH_CONSOLE_ALPHA3_TO_ALPHA2 = new Map(
@@ -325,19 +327,22 @@ export class SearchConsoleDrilldown {
         return [
             {
                 label: this.transloco.translate('searchConsole.kpis.clicks'),
-                value: overview ? this.formatNumber(overview.clicks, { maximumFractionDigits: 0 }) : '-'
+                value: overview ? overview.clicks : '-'
             },
             {
                 label: this.transloco.translate('searchConsole.kpis.impressions'),
-                value: overview ? this.formatNumber(overview.impressions, { maximumFractionDigits: 0 }) : '-'
+                value: overview ? overview.impressions : '-'
             },
             {
                 label: this.transloco.translate('searchConsole.kpis.ctr'),
-                value: overview ? `${this.formatNumber(overview.ctr * 100, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%` : '-'
+                value: overview ? overview.ctr * 100 : '-',
+                format: KPI_PERCENT_FORMAT,
+                suffix: '%'
             },
             {
                 label: this.transloco.translate('searchConsole.kpis.position'),
-                value: overview ? this.formatNumber(overview.average_position, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '-'
+                value: overview ? overview.average_position : '-',
+                format: KPI_ONE_DECIMAL_FORMAT
             }
         ];
     });
@@ -587,9 +592,5 @@ export class SearchConsoleDrilldown {
         } catch {
             return value;
         }
-    }
-
-    private formatNumber(value: number, options: Intl.NumberFormatOptions): string {
-        return new Intl.NumberFormat(this.activeLanguage(), options).format(value);
     }
 }

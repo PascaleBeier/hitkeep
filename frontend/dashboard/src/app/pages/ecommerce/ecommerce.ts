@@ -16,7 +16,7 @@ import { SiteService } from '@features/sites/services/site.service';
 import { AnalyticsService } from '@core/services/analytics.service';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
-import { KpiCard } from '@features/analytics/components/kpi-card';
+import { KPI_MONEY_FALLBACK_FORMAT, KPI_PERCENT_FORMAT, KpiCard, KpiCardModel } from '@features/analytics/components/kpi-card';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
 import { MetricCardGroup, MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
 import { SeriesChart, SeriesChartPoint, SeriesDefinition } from '@features/analytics/components/series-chart';
@@ -37,6 +37,8 @@ interface ProductFilter {
     itemId: string;
     itemName: string;
 }
+
+type DataLoadMode = 'blocking' | 'background';
 
 @Component({
     selector: 'app-ecommerce',
@@ -81,7 +83,7 @@ export class EcommercePage {
     protected readonly sources = signal<EcommerceSourceStat[]>([]);
     protected readonly filterStats = signal<SiteStats | null>(null);
     protected readonly isLoading = signal(false);
-    private readonly realtimeRefreshKey = signal(0);
+    protected readonly kpiUpdateKey = signal(0);
 
     protected readonly isShortRange = this.reportRange.isShortRange;
 
@@ -101,35 +103,51 @@ export class EcommercePage {
         ];
     });
 
-    protected readonly kpiCards = computed(() => {
+    protected readonly kpiCards = computed<KpiCardModel[]>(() => {
         this.activeLanguage();
         const summary = this.summary();
         const loading = this.isLoading();
+        const updateKey = this.kpiUpdateKey();
         const currency = this.resolveCurrency(summary?.currency);
+        const moneyFormat: Intl.NumberFormatOptions = currency
+            ? {
+                  style: 'currency',
+                  currency,
+                  maximumFractionDigits: 2
+              }
+            : KPI_MONEY_FALLBACK_FORMAT;
 
         return [
             {
                 label: this.transloco.translate('ecommerce.kpis.revenue'),
-                value: summary ? this.formatMoney(summary.revenue, currency) : this.formatMoney(0, currency),
+                value: summary?.revenue ?? 0,
+                format: moneyFormat,
                 loading,
+                updateKey,
                 valueClass: 'text-2xl xl:text-3xl font-bold'
             },
             {
                 label: this.transloco.translate('ecommerce.kpis.orders'),
                 value: summary?.orders ?? 0,
                 loading,
+                updateKey,
                 valueClass: 'text-2xl xl:text-3xl font-bold'
             },
             {
                 label: this.transloco.translate('ecommerce.kpis.averageOrderValue'),
-                value: summary ? this.formatMoney(summary.average_order_value, currency) : this.formatMoney(0, currency),
+                value: summary?.average_order_value ?? 0,
+                format: moneyFormat,
                 loading,
+                updateKey,
                 valueClass: 'text-2xl xl:text-3xl font-bold'
             },
             {
                 label: this.transloco.translate('ecommerce.kpis.checkoutConversion'),
-                value: `${this.formatPercent(summary?.checkout_conversion_rate ?? 0)}%`,
+                value: summary?.checkout_conversion_rate ?? 0,
+                format: KPI_PERCENT_FORMAT,
+                suffix: '%',
                 loading,
+                updateKey,
                 valueClass: 'text-2xl xl:text-3xl font-bold'
             }
         ];
@@ -171,7 +189,9 @@ export class EcommercePage {
         if (product) {
             chips.push({
                 key: `item:${product.itemId || product.itemName}`,
-                label: this.transloco.translate('ecommerce.filters.product', { value: product.itemName || product.itemId }),
+                label: this.transloco.translate('ecommerce.filters.product', {
+                    value: product.itemName || product.itemId
+                }),
                 remove: () => this.selectedProduct.set(null)
             });
         }
@@ -272,7 +292,16 @@ export class EcommercePage {
                         activeValue: this.activeFilterValue('provider'),
                         filterType: 'provider'
                     },
-                    { id: 'asns', title: this.transloco.translate('common.metrics.asns'), icon: 'pi-sitemap', data: summary?.top_asns ?? [], isLoading: loading, isRowClickable: true, activeValue: this.activeFilterValue('asn'), filterType: 'asn' }
+                    {
+                        id: 'asns',
+                        title: this.transloco.translate('common.metrics.asns'),
+                        icon: 'pi-sitemap',
+                        data: summary?.top_asns ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('asn'),
+                        filterType: 'asn'
+                    }
                 ]
             }
         ];
@@ -284,7 +313,6 @@ export class EcommercePage {
             const dates = this.getCurrentDateRange();
             const filters = this.activeFilters();
             const product = this.selectedProduct();
-            this.realtimeRefreshKey();
             if (!site || !dates) {
                 this.summary.set(null);
                 this.series.set([]);
@@ -295,22 +323,22 @@ export class EcommercePage {
             }
             this.loadData(site.id, dates.from, dates.to, filters, product);
         });
-        this.realtimeRefresh.registerSignalUntilDestroyed(this.destroyRef, {
+        this.realtimeRefresh.registerUntilDestroyed(this.destroyRef, {
             siteId: () => this.siteService.activeSite()?.id ?? null,
             kinds: REALTIME_EVENT_KINDS,
             enabled: () => !!this.siteService.activeSite() && !!this.getCurrentDateRange(),
-            signal: this.realtimeRefreshKey,
+            refresh: () => this.refreshData('background'),
             debounceMs: 700
         });
     }
 
-    protected refreshData() {
+    protected refreshData(mode: DataLoadMode = 'blocking') {
         const site = this.siteService.activeSite();
         const dates = this.getCurrentDateRange();
         if (!site || !dates) {
             return;
         }
-        this.loadData(site.id, dates.from, dates.to, this.activeFilters(), this.selectedProduct());
+        this.loadData(site.id, dates.from, dates.to, this.activeFilters(), this.selectedProduct(), mode);
     }
 
     protected applyMetricFilter(type: MetricFilterType, metric: MetricStat) {
@@ -371,7 +399,10 @@ export class EcommercePage {
         if (!sourceValue) {
             return;
         }
-        this.applyMetricFilter('utm_source', { name: sourceValue, value: source.orders });
+        this.applyMetricFilter('utm_source', {
+            name: sourceValue,
+            value: source.orders
+        });
     }
 
     protected isSourceFilterActive(source: EcommerceSourceStat): boolean {
@@ -436,8 +467,9 @@ export class EcommercePage {
         return null;
     }
 
-    private loadData(siteId: string, from: string, to: string, filters: MetricFilter[], product: ProductFilter | null) {
-        this.isLoading.set(true);
+    private loadData(siteId: string, from: string, to: string, filters: MetricFilter[], product: ProductFilter | null, mode: DataLoadMode = 'blocking') {
+        const blocking = mode === 'blocking' || this.isLoading() || !this.summary();
+        if (blocking) this.isLoading.set(true);
         forkJoin({
             summary: this.analyticsService.getEcommerceSummary(siteId, from, to, filters, product?.itemId, product?.itemName),
             series: this.analyticsService.getEcommerceTimeseries(siteId, from, to, filters, product?.itemId, product?.itemName),
@@ -445,7 +477,11 @@ export class EcommercePage {
             sources: this.analyticsService.getEcommerceSources(siteId, from, to, filters, product?.itemId, product?.itemName),
             stats: this.analyticsService.getSiteStats(siteId, from, to, undefined, undefined, filters)
         })
-            .pipe(finalize(() => this.isLoading.set(false)))
+            .pipe(
+                finalize(() => {
+                    if (blocking) this.isLoading.set(false);
+                })
+            )
             .subscribe({
                 next: ({ summary, series, products, sources, stats }) => {
                     this.summary.set(summary);
@@ -453,6 +489,7 @@ export class EcommercePage {
                     this.products.set(products);
                     this.sources.set(sources);
                     this.filterStats.set(stats);
+                    if (!blocking) this.kpiUpdateKey.update((key) => key + 1);
                 },
                 error: (error) => console.error(error)
             });
@@ -461,19 +498,33 @@ export class EcommercePage {
     private filterLabel(filter: MetricFilter): string {
         switch (filter.type) {
             case 'referrer':
-                return this.transloco.translate('common.filters.source', { value: filter.value });
+                return this.transloco.translate('common.filters.source', {
+                    value: filter.value
+                });
             case 'device':
-                return this.transloco.translate('common.filters.device', { value: filter.value });
+                return this.transloco.translate('common.filters.device', {
+                    value: filter.value
+                });
             case 'country':
-                return this.transloco.translate('common.filters.country', { value: filter.value });
+                return this.transloco.translate('common.filters.country', {
+                    value: filter.value
+                });
             case 'city':
-                return this.transloco.translate('common.filters.city', { value: filter.value });
+                return this.transloco.translate('common.filters.city', {
+                    value: filter.value
+                });
             case 'provider':
-                return this.transloco.translate('common.filters.provider', { value: filter.value });
+                return this.transloco.translate('common.filters.provider', {
+                    value: filter.value
+                });
             case 'asn':
-                return this.transloco.translate('common.filters.asn', { value: filter.value });
+                return this.transloco.translate('common.filters.asn', {
+                    value: filter.value
+                });
             case 'utm_source':
-                return this.transloco.translate('ecommerce.filters.utmSource', { value: filter.value });
+                return this.transloco.translate('ecommerce.filters.utmSource', {
+                    value: filter.value
+                });
             default:
                 return `${filter.type}: ${filter.value}`;
         }

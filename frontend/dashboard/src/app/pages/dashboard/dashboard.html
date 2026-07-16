@@ -51,7 +51,18 @@
     <!-- TODO: Refactor for mobile, weird UX -->
     <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
         @for (card of kpiCards(); track card.id) {
-        <app-kpi-card [label]="card.label" [value]="card.value" [loading]="card.loading" [highlight]="card.highlight ?? false" [valueClass]="card.valueClass" [delta]="card.delta ?? null" [invertDelta]="card.invertDelta ?? false" />
+        <app-kpi-card
+            [label]="card.label"
+            [value]="card.value"
+            [loading]="card.loading"
+            [updateKey]="card.updateKey ?? 0"
+            [valueClass]="card.valueClass"
+            [format]="card.format"
+            [suffix]="card.suffix"
+            [duration]="card.duration ?? false"
+            [delta]="card.delta ?? null"
+            [invertDelta]="card.invertDelta ?? false"
+        />
         }
     </div>
 
@@ -199,7 +210,9 @@
                             }
                         </div>
                     </td>
-                    <td class="whitespace-nowrap text-muted-color"><app-relative-date-time [value]="hit.timestamp" /></td>
+                    <td class="whitespace-nowrap text-muted-color">
+                        <app-relative-date-time [value]="hit.timestamp" />
+                    </td>
                     <td class="truncate max-w-[200px] text-muted-color" [title]="hit.referrer">
                         @if (hit.referrer) {
                         <div class="flex items-center gap-2 min-w-0">

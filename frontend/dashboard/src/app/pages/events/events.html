@@ -109,7 +109,7 @@
                     @if (isLoadingEventSeries()) {
                     <p-skeleton width="80px" height="2rem" />
                     } @else {
-                    <div class="text-2xl xl:text-3xl font-bold tabular-nums leading-none">{{ totalEventCountDisplay() }}</div>
+                    <div class="text-2xl xl:text-3xl font-bold tabular-nums leading-none"><app-animated-number [value]="totalEventCount()" /></div>
                     @if (totalEventDelta() !== null) {
                     <span [class]="totalEventDeltaClass()">{{ totalEventDeltaLabel() }}</span>
                     }
