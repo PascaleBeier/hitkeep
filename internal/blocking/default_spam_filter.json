@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-16T02:04:55.426819Z",
+  "generated_at": "2026-07-16T03:07:01.120458997Z",
   "sources": {
     "matomo_referrer_spam_list": "https://raw.githubusercontent.com/matomo-org/referrer-spam-list/master/spammers.txt",
     "spamhaus_drop": "https://www.spamhaus.org/drop/drop_v4.json",
@@ -7,12 +7,12 @@
   },
   "source_metadata": {
     "spamhaus_drop": {
-      "timestamp": 1784054642,
+      "timestamp": 1784052842,
       "copyright": "(c) 2026 The Spamhaus Project SLU",
       "terms": "https://www.spamhaus.org/drop/terms/"
     },
     "spamhaus_dropv6": {
-      "timestamp": 1784164442,
+      "timestamp": 1783683842,
       "copyright": "(c) 2026 The Spamhaus Project SLU",
       "terms": "https://www.spamhaus.org/drop/terms/"
     }
