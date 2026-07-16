@@ -196,6 +196,7 @@
       "backupTriggered": "Sauvegarde lancée",
       "backupCompleted": "Sauvegarde terminée",
       "backupFailed": "Sauvegarde échouée",
+      "databaseCheckpointRequested": "Point de contrôle de la base",
       "spamRefreshed": "Filtre anti-spam actualisé",
       "mailTested": "Test e-mail",
       "diagnosticsExported": "Diagnostic exporté",
@@ -2233,6 +2234,22 @@
         "rejections": "Rejets",
         "spam": "Spam bloqué",
         "hitsPerSecond": "Hits/s"
+      },
+      "database": {
+        "title": "Résilience de la base de données",
+        "autoRecovery": "Récupération automatique des index",
+        "automaticWalRecovery": "Contournement automatique du WAL",
+        "checkpointInterval": "Intervalle des points de contrôle",
+        "lastCheckpoint": "Dernier point de contrôle de cette exécution",
+        "lastRecovery": "Dernière récupération",
+        "removedUnsafeIndexes": "Index non sûrs supprimés",
+        "recoveryBundle": "Archive de récupération conservée",
+        "actions": {
+          "checkpoint": "Créer un point de contrôle"
+        },
+        "statusUnavailable": "L’état de la base de données est indisponible pendant la récupération ou lorsqu’une intervention est requise.",
+        "checkpointSuccess": "Point de contrôle de la base terminé.",
+        "checkpointFailed": "Échec du point de contrôle de la base."
       },
       "backups": {
         "title": "Sauvegardes",

@@ -318,3 +318,57 @@ func TestBackupHandlesMultipleTenants(t *testing.T) {
 		t.Fatal("expected parquet files in tenant backup snapshot")
 	}
 }
+
+func TestBackupFailsWhenTenantSnapshotFails(t *testing.T) {
+	ctx := context.Background()
+	store := newTestStore(t)
+	backupDir := filepath.Join(t.TempDir(), "backups")
+	dataPath := t.TempDir()
+
+	customTenantID := uuid.New()
+	if _, err := store.DB().ExecContext(ctx,
+		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
+		customTenantID, "Broken Backup Tenant", time.Now().UTC(),
+	); err != nil {
+		t.Fatalf("insert custom tenant: %v", err)
+	}
+
+	mgr := database.NewTenantStoreManager(store, dataPath)
+	t.Cleanup(func() { _ = mgr.Close() })
+	tenantStore, err := mgr.ForTenant(ctx, customTenantID)
+	if err != nil {
+		t.Fatalf("open tenant store: %v", err)
+	}
+	if err := tenantStore.Close(); err != nil {
+		t.Fatalf("close tenant store: %v", err)
+	}
+
+	w := NewBackupWorker(mgr, dataPath, backupDir, 60, 24, nil, nil)
+	err = w.Run(ctx)
+	if err == nil || !strings.Contains(err.Error(), customTenantID.String()) {
+		t.Fatalf("expected tenant-specific backup failure, got %v", err)
+	}
+
+	tenantBackupDir := filepath.Join(backupDir, "tenants", customTenantID.String())
+	if entries, readErr := os.ReadDir(tenantBackupDir); readErr == nil && len(entries) != 0 {
+		t.Fatalf("expected incomplete tenant snapshot cleanup, found %d entries", len(entries))
+	} else if readErr != nil && !os.IsNotExist(readErr) {
+		t.Fatalf("inspect tenant backup directory: %v", readErr)
+	}
+}
+
+func TestRemoveIncompleteLocalSnapshot(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "partial")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("create partial snapshot: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "partial.parquet"), []byte("partial"), 0o600); err != nil {
+		t.Fatalf("write partial snapshot: %v", err)
+	}
+
+	worker := &BackupWorker{}
+	worker.removeIncompleteLocalSnapshot(dir, false)
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("expected incomplete local snapshot to be removed, got %v", err)
+	}
+}

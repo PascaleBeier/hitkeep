@@ -3,15 +3,22 @@ package hitkeepcmd
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/klauspost/compress/zstd"
 
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
@@ -32,6 +39,8 @@ func Recover() {
 		recoverDisable2FA(os.Args[3:])
 	case "restore-backup":
 		recoverRestoreBackup(os.Args[3:])
+	case "restore-database-bundle":
+		recoverRestoreDatabaseBundle(os.Args[3:])
 	default:
 		//nolint:gosec // G705: writes to stderr, not an HTTP response; %q safely quotes the argument.
 		fmt.Fprintf(os.Stderr, "Unknown recover subcommand: %q\n\n%s\n", os.Args[2], recoverUsage)
@@ -45,6 +54,9 @@ Subcommands:
   disable-2fa      Remove all 2FA methods (TOTP + passkeys) for a user.
                    Allows the user to log in with email/password again.
   restore-backup   Restore databases from a backup snapshot.
+  restore-database-bundle
+                   Restore the exact database and WAL files retained before
+                   an automatic DuckDB recovery.
 
 Flags for disable-2fa:
   -email string   User email address (required)
@@ -60,8 +72,24 @@ Flags for restore-backup:
   -s3-access-key-id, -s3-secret-access-key, -s3-region, -s3-endpoint,
   -s3-url-style, -s3-use-ssl   (fall back to HITKEEP_S3_* env vars)
 
+Flags for restore-database-bundle:
+  -from string   Recovery bundle directory containing manifest.json (required)
+  -db   string   Target hitkeep.db path (default: same as server config)
+  -yes           Skip interactive confirmation prompt
+
 NOTE: HitKeep must be stopped before running recovery commands.
       DuckDB does not allow concurrent write access.`
+
+type databaseRecoveryBundleManifest struct {
+	Version   int                              `json:"version"`
+	Artifacts []databaseRecoveryBundleArtifact `json:"artifacts"`
+}
+
+type databaseRecoveryBundleArtifact struct {
+	Name         string `json:"name"`
+	OriginalSize int64  `json:"original_size"`
+	SHA256       string `json:"sha256"`
+}
 
 func recoverDisable2FA(args []string) {
 	fs := flag.NewFlagSet("disable-2fa", flag.ExitOnError)
@@ -218,6 +246,208 @@ func recoverDisable2FA(args []string) {
 
 	fmt.Printf("\nDone. %s can now log in with email and password.\n", user.Email)
 	os.Exit(0)
+}
+
+func recoverRestoreDatabaseBundle(args []string) {
+	fs := flag.NewFlagSet("restore-database-bundle", flag.ExitOnError)
+	from := fs.String("from", "", "Recovery bundle directory containing manifest.json (required)")
+	dbPath := fs.String("db", "", "Target hitkeep.db path (defaults to server config value)")
+	yes := fs.Bool("yes", false, "Skip confirmation prompt")
+	if err := fs.Parse(args); err != nil {
+		os.Exit(1)
+	}
+	if strings.TrimSpace(*from) == "" {
+		fmt.Fprintln(os.Stderr, "Error: -from is required")
+		fs.Usage()
+		os.Exit(1)
+	}
+	if strings.TrimSpace(*dbPath) == "" {
+		*dbPath = config.Load().DBPath
+	}
+
+	manifest, err := readDatabaseRecoveryBundle(*from)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: invalid recovery bundle: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("HitKeep Recovery — Restore Database Bundle")
+	fmt.Println("==========================================")
+	fmt.Printf("Source:    %s\n", *from)
+	fmt.Printf("Target DB: %s\n", *dbPath)
+	fmt.Println()
+	fmt.Println("This restores the exact pre-recovery database and WAL state.")
+	fmt.Println("It may intentionally restore the original DuckDB failure for rollback or forensic work.")
+	fmt.Println()
+	if !*yes {
+		fmt.Print(`Type "yes" to confirm: `)
+		scanner := bufio.NewScanner(os.Stdin)
+		scanner.Scan()
+		if strings.TrimSpace(scanner.Text()) != "yes" {
+			fmt.Println("Aborted.")
+			os.Exit(0)
+		}
+	}
+
+	if err := restoreDatabaseRecoveryBundle(*from, *dbPath, manifest); err != nil {
+		fmt.Fprintf(os.Stderr, "Error restoring database recovery bundle: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("Database recovery bundle restored successfully.")
+	os.Exit(0)
+}
+
+func readDatabaseRecoveryBundle(bundleDir string) (databaseRecoveryBundleManifest, error) {
+	data, err := os.ReadFile(filepath.Join(bundleDir, "manifest.json"))
+	if err != nil {
+		return databaseRecoveryBundleManifest{}, err
+	}
+	var manifest databaseRecoveryBundleManifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return databaseRecoveryBundleManifest{}, err
+	}
+	if manifest.Version != 1 {
+		return databaseRecoveryBundleManifest{}, fmt.Errorf("unsupported manifest version %d", manifest.Version)
+	}
+	if len(manifest.Artifacts) == 0 {
+		return databaseRecoveryBundleManifest{}, fmt.Errorf("manifest has no artifacts")
+	}
+	hasDatabase := false
+	for _, artifact := range manifest.Artifacts {
+		switch artifact.Name {
+		case "database.zst":
+			hasDatabase = true
+		case "wal.zst":
+		default:
+			return databaseRecoveryBundleManifest{}, fmt.Errorf("unsupported artifact %q", artifact.Name)
+		}
+		if artifact.OriginalSize < 0 || len(strings.TrimSpace(artifact.SHA256)) != sha256.Size*2 {
+			return databaseRecoveryBundleManifest{}, fmt.Errorf("invalid metadata for artifact %q", artifact.Name)
+		}
+	}
+	if !hasDatabase {
+		return databaseRecoveryBundleManifest{}, fmt.Errorf("manifest has no database artifact")
+	}
+	return manifest, nil
+}
+
+func restoreDatabaseRecoveryBundle(bundleDir, targetPath string, manifest databaseRecoveryBundleManifest) error {
+	targetDir := filepath.Dir(targetPath)
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		return fmt.Errorf("create target directory: %w", err)
+	}
+	tempBase := filepath.Join(targetDir, fmt.Sprintf(".%s.bundle-restore-%d.tmp", filepath.Base(targetPath), time.Now().UTC().UnixNano()))
+	tempWal := tempBase + ".wal"
+	defer func() {
+		_ = os.Remove(tempBase)
+		_ = os.Remove(tempWal)
+	}()
+
+	for _, artifact := range manifest.Artifacts {
+		target := tempBase
+		if artifact.Name == "wal.zst" {
+			target = tempWal
+		}
+		if err := decompressRecoveryBundleArtifact(
+			filepath.Join(bundleDir, artifact.Name),
+			target,
+			artifact,
+		); err != nil {
+			return err
+		}
+	}
+
+	backupPath, err := moveExistingDatabaseAside(targetPath)
+	if err != nil {
+		return err
+	}
+	return activateRestoredDatabase(tempBase, tempWal, targetPath, backupPath)
+}
+
+func decompressRecoveryBundleArtifact(sourcePath, targetPath string, artifact databaseRecoveryBundleArtifact) error {
+	source, err := os.Open(sourcePath)
+	if err != nil {
+		return fmt.Errorf("open recovery artifact %q: %w", artifact.Name, err)
+	}
+	defer source.Close()
+	target, err := os.OpenFile(targetPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return fmt.Errorf("create restored artifact %q: %w", artifact.Name, err)
+	}
+	defer target.Close()
+	decoder, err := zstd.NewReader(source, zstd.WithDecoderConcurrency(1), zstd.WithDecoderLowmem(true))
+	if err != nil {
+		return fmt.Errorf("create recovery artifact decoder %q: %w", artifact.Name, err)
+	}
+	defer decoder.Close()
+	hash := sha256.New()
+	written, err := io.Copy(io.MultiWriter(target, hash), decoder)
+	if err != nil {
+		return fmt.Errorf("decompress recovery artifact %q: %w", artifact.Name, err)
+	}
+	if written != artifact.OriginalSize {
+		return fmt.Errorf("recovery artifact %q size mismatch", artifact.Name)
+	}
+	if actual := hex.EncodeToString(hash.Sum(nil)); !strings.EqualFold(actual, artifact.SHA256) {
+		return fmt.Errorf("recovery artifact %q checksum mismatch", artifact.Name)
+	}
+	if err := target.Sync(); err != nil {
+		return fmt.Errorf("sync restored artifact %q: %w", artifact.Name, err)
+	}
+	return nil
+}
+
+func restoreMovedDatabaseBackup(targetPath, backupPath string) error {
+	if backupPath == "" {
+		return nil
+	}
+	var restoreErrors []error
+	if fileExistsForRestore(backupPath) {
+		if err := os.Rename(backupPath, targetPath); err != nil {
+			restoreErrors = append(restoreErrors, fmt.Errorf("restore database: %w", err))
+		}
+	}
+	if fileExistsForRestore(backupPath + ".wal") {
+		if err := os.Rename(backupPath+".wal", targetPath+".wal"); err != nil {
+			restoreErrors = append(restoreErrors, fmt.Errorf("restore WAL: %w", err))
+		}
+	}
+	return errors.Join(restoreErrors...)
+}
+
+func activateRestoredDatabase(tempDatabasePath, tempWALPath, targetPath, backupPath string) (retErr error) {
+	defer func() {
+		if retErr == nil {
+			return
+		}
+		_ = os.Remove(targetPath)
+		_ = os.Remove(targetPath + ".wal")
+		if restoreErr := restoreMovedDatabaseBackup(targetPath, backupPath); restoreErr != nil {
+			retErr = fmt.Errorf("%w (failed to restore original database: %v)", retErr, restoreErr)
+		}
+	}()
+
+	if err := os.Rename(tempDatabasePath, targetPath); err != nil {
+		return fmt.Errorf("activate restored database: %w", err)
+	}
+	if fileExistsForRestore(tempWALPath) {
+		if err := os.Rename(tempWALPath, targetPath+".wal"); err != nil {
+			return fmt.Errorf("activate restored WAL: %w", err)
+		}
+	}
+	if err := os.Chmod(targetPath, 0o600); err != nil {
+		return fmt.Errorf("secure restored database: %w", err)
+	}
+	if fileExistsForRestore(targetPath + ".wal") {
+		if err := os.Chmod(targetPath+".wal", 0o600); err != nil {
+			return fmt.Errorf("secure restored WAL: %w", err)
+		}
+	}
+	return nil
+}
+
+func fileExistsForRestore(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func recoverRestoreBackup(args []string) {
@@ -394,20 +624,13 @@ func restoreDatabase(ctx context.Context, targetPath, sourcePath string, isS3 bo
 		_ = os.Remove(tempPath)
 	}()
 
-	backupPath, err := moveExistingDatabaseAside(targetPath)
-	if err != nil {
-		return err
-	}
-	if backupPath != "" {
-		fmt.Printf("  Existing DB renamed to %s\n", backupPath)
-	}
-
 	// Import into a temporary database first so the final restored DB does not
 	// depend on a WAL created by the recovery command itself.
 	store := database.NewStore(tempPath)
 	if err := store.Connect(); err != nil {
 		return fmt.Errorf("could not create target database: %w", err)
 	}
+	defer func() { _ = store.Close() }()
 
 	db := store.DB()
 	if err := database.WithDuckDBSession(ctx, db, database.DuckDBSessionOptions{
@@ -430,11 +653,14 @@ func restoreDatabase(ctx context.Context, targetPath, sourcePath string, isS3 bo
 		return err
 	}
 
-	if err := os.Rename(tempPath, targetPath); err != nil {
-		return fmt.Errorf("activate restored database %s: %w", targetPath, err)
+	backupPath, err := moveExistingDatabaseAside(targetPath)
+	if err != nil {
+		return err
 	}
-
-	return nil
+	if backupPath != "" {
+		fmt.Printf("  Existing DB renamed to %s\n", backupPath)
+	}
+	return activateRestoredDatabase(tempPath, tempWalPath, targetPath, backupPath)
 }
 
 func s3ConfigForRestore(enabled bool, cfg *worker.S3Config) *database.S3SecretConfig {
@@ -460,14 +686,15 @@ func finalizeRestoredDatabase(dbPath string, store *database.Store) error {
 }
 
 func moveExistingDatabaseAside(targetPath string) (string, error) {
-	backup := fmt.Sprintf("%s.pre-restore.%s", targetPath, time.Now().UTC().Format("2006-01-02T150405Z"))
-	renamed := false
+	backup := fmt.Sprintf("%s.pre-restore.%s", targetPath, time.Now().UTC().Format("2006-01-02T150405.000000000Z"))
+	databaseRenamed := false
+	walRenamed := false
 
 	if _, err := os.Stat(targetPath); err == nil {
 		if err := os.Rename(targetPath, backup); err != nil {
 			return "", fmt.Errorf("could not rename existing database %s to %s: %w", targetPath, backup, err)
 		}
-		renamed = true
+		databaseRenamed = true
 	} else if err != nil && !os.IsNotExist(err) {
 		return "", fmt.Errorf("stat existing database %s: %w", targetPath, err)
 	}
@@ -476,14 +703,29 @@ func moveExistingDatabaseAside(targetPath string) (string, error) {
 	if _, err := os.Stat(walPath); err == nil {
 		walBackup := backup + ".wal"
 		if renameErr := os.Rename(walPath, walBackup); renameErr != nil {
+			rollbackErr := restoreMovedDatabaseBackup(targetPath, backup)
+			if rollbackErr != nil {
+				return "", fmt.Errorf(
+					"could not rename existing WAL %s to %s: %w (failed to restore database: %v)",
+					walPath,
+					walBackup,
+					renameErr,
+					rollbackErr,
+				)
+			}
 			return "", fmt.Errorf("could not rename existing WAL %s to %s: %w", walPath, walBackup, renameErr)
 		}
-		renamed = true
+		walRenamed = true
 	} else if err != nil && !os.IsNotExist(err) {
+		if databaseRenamed {
+			if rollbackErr := restoreMovedDatabaseBackup(targetPath, backup); rollbackErr != nil {
+				return "", fmt.Errorf("stat existing WAL %s: %w (failed to restore database: %v)", walPath, err, rollbackErr)
+			}
+		}
 		return "", fmt.Errorf("stat existing WAL %s: %w", walPath, err)
 	}
 
-	if renamed {
+	if databaseRenamed || walRenamed {
 		return backup, nil
 	}
 

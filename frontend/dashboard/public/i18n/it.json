@@ -196,6 +196,7 @@
       "backupTriggered": "Backup avviato",
       "backupCompleted": "Backup completato",
       "backupFailed": "Backup non riuscito",
+      "databaseCheckpointRequested": "Checkpoint del database",
       "spamRefreshed": "Filtro spam aggiornato",
       "mailTested": "Test email",
       "diagnosticsExported": "Diagnostica esportata",
@@ -2230,6 +2231,22 @@
         "rejections": "Rifiuti",
         "spam": "Spam bloccato",
         "hitsPerSecond": "Hit/s"
+      },
+      "database": {
+        "title": "Resilienza del database",
+        "autoRecovery": "Ripristino automatico degli indici",
+        "automaticWalRecovery": "Esclusione automatica del WAL",
+        "checkpointInterval": "Intervallo dei checkpoint",
+        "lastCheckpoint": "Ultimo checkpoint di questa esecuzione",
+        "lastRecovery": "Ultimo ripristino",
+        "removedUnsafeIndexes": "Indici non sicuri rimossi",
+        "recoveryBundle": "Pacchetto di ripristino conservato",
+        "actions": {
+          "checkpoint": "Esegui checkpoint"
+        },
+        "statusUnavailable": "Lo stato del database non è disponibile durante il ripristino o quando è richiesto un intervento.",
+        "checkpointSuccess": "Checkpoint del database completato.",
+        "checkpointFailed": "Checkpoint del database non riuscito."
       },
       "backups": {
         "title": "Backup",

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 const fakeInvalidationMessage = "FATAL Error: Failed: database has been invalidated because of a previous fatal error. The database must be restarted prior to being used again."
@@ -81,7 +82,7 @@ func (f *fakeFactory) instance(i int) *fakeInstance {
 func TestReconnectingConnectorHealsAfterInvalidation(t *testing.T) {
 	ctx := context.Background()
 	factory := &fakeFactory{}
-	db := sql.OpenDB(newReconnectingConnector("fake.db", factory.new))
+	db := sql.OpenDB(newReconnectingConnector("fake.db", factory.new, nil))
 	t.Cleanup(func() { _ = db.Close() })
 
 	if _, err := db.ExecContext(ctx, "SELECT 1"); err != nil {
@@ -110,10 +111,62 @@ func TestReconnectingConnectorHealsAfterInvalidation(t *testing.T) {
 	}
 }
 
+func TestReconnectingConnectorRunsRecoveryAfterConnectionsDrain(t *testing.T) {
+	ctx := context.Background()
+	factory := &fakeFactory{}
+	var recoveryCalls atomic.Int64
+	db := sql.OpenDB(newReconnectingConnector("fake.db", factory.new, func(_ context.Context, trigger error) error {
+		if trigger == nil || !strings.Contains(trigger.Error(), "database has been invalidated") {
+			t.Fatalf("unexpected recovery trigger: %v", trigger)
+		}
+		recoveryCalls.Add(1)
+		return nil
+	}))
+	t.Cleanup(func() { _ = db.Close() })
+
+	if _, err := db.ExecContext(ctx, "SELECT 1"); err != nil {
+		t.Fatalf("healthy exec: %v", err)
+	}
+	factory.instance(0).invalidated.Store(true)
+	if _, err := db.ExecContext(ctx, "SELECT 1"); err == nil {
+		t.Fatal("expected invalidation to surface")
+	}
+	if _, err := db.ExecContext(ctx, "SELECT 1"); err != nil {
+		t.Fatalf("expected recovery followed by a fresh connection, got %v", err)
+	}
+	if recoveryCalls.Load() != 1 {
+		t.Fatalf("expected one recovery callback, got %d", recoveryCalls.Load())
+	}
+}
+
+func TestReconnectingConnectorDoesNotReopenAfterRecoveryFailure(t *testing.T) {
+	ctx := context.Background()
+	factory := &fakeFactory{}
+	recoveryErr := errors.New("synthetic recovery failure")
+	db := sql.OpenDB(newReconnectingConnector("fake.db", factory.new, func(context.Context, error) error {
+		return recoveryErr
+	}))
+	t.Cleanup(func() { _ = db.Close() })
+
+	if _, err := db.ExecContext(ctx, "SELECT 1"); err != nil {
+		t.Fatalf("healthy exec: %v", err)
+	}
+	factory.instance(0).invalidated.Store(true)
+	if _, err := db.ExecContext(ctx, "SELECT 1"); err == nil {
+		t.Fatal("expected invalidation to surface")
+	}
+	if _, err := db.ExecContext(ctx, "SELECT 1"); !errors.Is(err, recoveryErr) {
+		t.Fatalf("expected recovery failure to surface, got %v", err)
+	}
+	if factory.count() != 1 {
+		t.Fatalf("expected no fresh instance after failed recovery, got %d", factory.count())
+	}
+}
+
 func TestReconnectingConnectorFailsFastWhileDraining(t *testing.T) {
 	ctx := context.Background()
 	factory := &fakeFactory{}
-	db := sql.OpenDB(newReconnectingConnector("fake.db", factory.new))
+	db := sql.OpenDB(newReconnectingConnector("fake.db", factory.new, nil))
 	t.Cleanup(func() { _ = db.Close() })
 
 	pinned, err := db.Conn(ctx)
@@ -144,6 +197,37 @@ func TestReconnectingConnectorFailsFastWhileDraining(t *testing.T) {
 	}
 	if !factory.instance(0).closed.Load() {
 		t.Fatal("expected drained instance to be closed")
+	}
+}
+
+func TestReconnectingConnectorReportsDrainTimeout(t *testing.T) {
+	ctx := context.Background()
+	factory := &fakeFactory{}
+	connector := newReconnectingConnector("fake.db", factory.new, nil)
+	timedOut := make(chan error, 1)
+	connector.configureDrainWatchdog(10*time.Millisecond, func(err error) {
+		timedOut <- err
+	})
+	db := sql.OpenDB(connector)
+	t.Cleanup(func() { _ = db.Close() })
+
+	pinned, err := db.Conn(ctx)
+	if err != nil {
+		t.Fatalf("pin conn: %v", err)
+	}
+	t.Cleanup(func() { _ = pinned.Close() })
+	factory.instance(0).invalidated.Store(true)
+	if _, err := pinned.ExecContext(ctx, "SELECT 1"); err == nil {
+		t.Fatal("expected pinned exec to invalidate the database")
+	}
+
+	select {
+	case err := <-timedOut:
+		if err == nil || !strings.Contains(err.Error(), "drain timed out") {
+			t.Fatalf("unexpected drain timeout error: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for drain watchdog")
 	}
 }
 

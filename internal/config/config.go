@@ -9,6 +9,7 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -27,9 +28,13 @@ type Config struct {
 	DataRetentionDays int     `env:"HITKEEP_DATA_RETENTION_DAYS" default:"365"                             desc:"Default data retention in days"                         deprecated:"retention-days"`
 	NodeName          string  `env:"HITKEEP_NODE_NAME"         default:""                                  desc:"Unique node name"                                       deprecated:"name"`
 
-	DuckDBMemoryLimit string `env:"HITKEEP_DUCKDB_MEMORY_LIMIT" default:"" desc:"DuckDB memory limit per database (e.g. 2GB); empty derives a container-aware default, 'none' keeps the DuckDB default of 80% of system RAM"`
-	DuckDBThreads     int    `env:"HITKEEP_DUCKDB_THREADS"      default:"0" desc:"DuckDB threads per database; 0 derives the default from GOMAXPROCS"`
-	DBCompactOnStart  bool   `env:"HITKEEP_DB_COMPACT_ON_START" default:"true" desc:"Rewrite fragmented database files on startup and tenant open to return space freed by retention and deletes to the operating system"`
+	DuckDBMemoryLimit           string `env:"HITKEEP_DUCKDB_MEMORY_LIMIT" default:"" desc:"DuckDB memory limit per database (e.g. 2GB); empty derives a container-aware default, 'none' keeps the DuckDB default of 80% of system RAM"`
+	DuckDBThreads               int    `env:"HITKEEP_DUCKDB_THREADS"      default:"0" desc:"DuckDB threads per database; 0 derives the default from GOMAXPROCS"`
+	DBCompactOnStart            bool   `env:"HITKEEP_DB_COMPACT_ON_START" default:"true" desc:"Rewrite fragmented database files on startup and tenant open to return space freed by retention and deletes to the operating system"`
+	DBAutoRecover               bool   `env:"HITKEEP_DB_AUTO_RECOVER" default:"true" desc:"Automatically recover the allowlisted DuckDB index invalidation after creating a local recovery bundle"`
+	DBAutoRecoverWAL            bool   `env:"HITKEEP_DB_AUTO_RECOVER_WAL" default:"false" desc:"After retaining a recovery bundle, automatically bypass the recognized unreplayable WAL and accept loss of WAL-only changes"`
+	DBCheckpointIntervalMinutes int    `env:"HITKEEP_DB_CHECKPOINT_INTERVAL" default:"5" desc:"Minutes between periodic DuckDB checkpoints; 0 disables periodic checkpoints"`
+	DBRecoveryPath              string `env:"HITKEEP_DB_RECOVERY_PATH" default:"" desc:"Directory for permission-restricted DuckDB recovery bundles; defaults to <data-path>/recovery"`
 
 	DataPath       string `env:"HITKEEP_DATA_PATH"          default:"data"           desc:"Base directory for per-tenant data files"`
 	ArchivePath    string `env:"HITKEEP_ARCHIVE_PATH"       default:"archive"        desc:"Data archive path"`
@@ -388,10 +393,24 @@ func normalizeConfig(conf *Config) {
 	}
 
 	resolveDuckDBDefaults(conf)
+	NormalizeDatabaseRecoveryConfig(conf)
 
 	NormalizeMCPConfig(conf)
 	NormalizeAuthSessionConfig(conf)
 	NormalizeCustomTrackingConfig(conf)
+}
+
+func NormalizeDatabaseRecoveryConfig(conf *Config) {
+	if conf == nil {
+		return
+	}
+	if conf.DBCheckpointIntervalMinutes < 0 {
+		conf.DBCheckpointIntervalMinutes = 0
+	}
+	conf.DBRecoveryPath = strings.TrimSpace(conf.DBRecoveryPath)
+	if conf.DBRecoveryPath == "" {
+		conf.DBRecoveryPath = filepath.Join(conf.DataPath, "recovery")
+	}
 }
 
 func NormalizeAuthSessionConfig(conf *Config) {

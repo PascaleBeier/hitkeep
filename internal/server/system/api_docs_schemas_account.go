@@ -491,6 +491,19 @@ func openAPIV1AccountSchemas() map[string]any {
 				"recent_failures": map[string]any{"type": "integer"},
 			},
 		},
+		"SystemDatabaseStatus": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"recovery_enabled":               map[string]any{"type": "boolean"},
+				"automatic_wal_recovery_enabled": map[string]any{"type": "boolean"},
+				"recovery_bundle_available":      map[string]any{"type": "boolean"},
+				"removed_unsafe_indexes":         map[string]any{"type": "integer"},
+				"checkpoint_interval_min":        map[string]any{"type": "integer"},
+				"last_checkpoint_at":             map[string]any{"type": "string", "format": "date-time"},
+				"last_checkpoint_error":          map[string]any{"type": "string"},
+				"last_recovery_at":               map[string]any{"type": "string", "format": "date-time"},
+			},
+		},
 		"SystemSpamStatus": map[string]any{
 			"type": "object",
 			"properties": map[string]any{

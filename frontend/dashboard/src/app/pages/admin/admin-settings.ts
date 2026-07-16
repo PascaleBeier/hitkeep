@@ -48,6 +48,7 @@ import {
     SystemStorage,
     SystemIngestStats,
     SystemBackupStatus,
+    SystemDatabaseStatus,
     SystemSpamStatus,
     SystemImportStageCleanupStatus,
     SystemCacheStatus,
@@ -172,6 +173,7 @@ export class AdminSettings implements OnInit {
     protected systemStorage = signal<SystemStorage | null>(null);
     protected systemIngest = signal<SystemIngestStats | null>(null);
     protected systemBackups = signal<SystemBackupStatus | null>(null);
+    protected systemDatabase = signal<SystemDatabaseStatus | null>(null);
     protected systemSpam = signal<SystemSpamStatus | null>(null);
     protected systemImportCleanup = signal<SystemImportStageCleanupStatus | null>(null);
     protected systemCaches = signal<SystemCacheStatus | null>(null);
@@ -186,11 +188,13 @@ export class AdminSettings implements OnInit {
     protected isLoadingStorage = signal(false);
     protected isLoadingIngest = signal(false);
     protected isLoadingBackups = signal(false);
+    protected isLoadingDatabase = signal(false);
     protected isLoadingSpam = signal(false);
     protected isLoadingImportCleanup = signal(false);
     protected isLoadingCaches = signal(false);
     protected isLoadingMail = signal(false);
     protected isLoadingActivation = signal(false);
+    protected isCheckpointingDatabase = signal(false);
     protected isRefreshingSpam = signal(false);
     protected isRunningImportCleanup = signal(false);
     protected isTestingMail = signal(false);
@@ -203,6 +207,7 @@ export class AdminSettings implements OnInit {
     private activationCopyResetTimer: ReturnType<typeof setTimeout> | null = null;
     private activationRequestID = 0;
 
+    protected databaseActionStatus = signal<StatusState | null>(null);
     protected spamActionStatus = signal<StatusState | null>(null);
     protected importCleanupActionStatus = signal<StatusState | null>(null);
     protected mailTestResult = signal<{ severity: 'success' | 'error'; message: string } | null>(null);
@@ -423,6 +428,7 @@ export class AdminSettings implements OnInit {
     protected readonly userMfaStatusMessage = computed(() => {
         return this.actionStatusMessage(this.userMfaStatus());
     });
+    protected readonly databaseActionStatusMessage = computed(() => this.actionStatusMessage(this.databaseActionStatus()));
     protected readonly spamActionStatusMessage = computed(() => this.actionStatusMessage(this.spamActionStatus()));
     protected readonly importCleanupActionStatusMessage = computed(() => this.actionStatusMessage(this.importCleanupActionStatus()));
     protected readonly userActionStatusMessage = computed(() => this.actionStatusMessage(this.userActionStatus()));
@@ -625,6 +631,54 @@ export class AdminSettings implements OnInit {
             });
     }
 
+    protected loadSystemDatabase() {
+        this.isLoadingDatabase.set(true);
+        this.system
+            .getDatabase()
+            .pipe(finalize(() => this.isLoadingDatabase.set(false)))
+            .subscribe({
+                next: (status) => {
+                    this.systemDatabase.set(status);
+                    if (this.databaseActionStatus()?.key === 'admin.system.database.statusUnavailable') {
+                        this.databaseActionStatus.set(null);
+                    }
+                },
+                error: () => {
+                    this.systemDatabase.set(null);
+                    this.databaseActionStatus.set({
+                        severity: 'error',
+                        key: 'admin.system.database.statusUnavailable'
+                    });
+                }
+            });
+    }
+
+    protected checkpointDatabase() {
+        if (!this.canRunMaintenance() || !this.systemDatabase()) {
+            return;
+        }
+        this.isCheckpointingDatabase.set(true);
+        this.databaseActionStatus.set(null);
+        this.system
+            .checkpointDatabase()
+            .pipe(finalize(() => this.isCheckpointingDatabase.set(false)))
+            .subscribe({
+                next: () => {
+                    this.databaseActionStatus.set({
+                        severity: 'success',
+                        key: 'admin.system.database.checkpointSuccess'
+                    });
+                    this.loadSystemDatabase();
+                },
+                error: () => {
+                    this.databaseActionStatus.set({
+                        severity: 'error',
+                        key: 'admin.system.database.checkpointFailed'
+                    });
+                }
+            });
+    }
+
     protected loadSystemSpam() {
         this.isLoadingSpam.set(true);
         this.system
@@ -769,6 +823,7 @@ export class AdminSettings implements OnInit {
     }
 
     protected refreshOperations() {
+        this.loadSystemDatabase();
         this.loadSystemBackups();
         this.loadSystemSpam();
         this.loadImportStageCleanup();
@@ -1040,6 +1095,8 @@ export class AdminSettings implements OnInit {
             case 'syncing':
             case 'degraded':
                 return 'warn';
+            case 'recovering':
+                return 'info';
             default:
                 return 'secondary';
         }

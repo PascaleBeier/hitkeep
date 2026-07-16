@@ -48,6 +48,17 @@ interface AdminSettingsTestAccess {
         params?: Record<string, string | number>;
     } | null;
     spamActionStatusMessage(): string;
+    systemDatabase: {
+        set(value: { recovery_enabled: boolean; automatic_wal_recovery_enabled: boolean; recovery_bundle_available: boolean; removed_unsafe_indexes: number; checkpoint_interval_min: number }): void;
+    };
+    isCheckpointingDatabase(): boolean;
+    loadSystemDatabase(): void;
+    checkpointDatabase(): void;
+    databaseActionStatus(): {
+        severity: 'success' | 'error';
+        key: string;
+    } | null;
+    databaseActionStatusMessage(): string;
     isRunningImportCleanup(): boolean;
     runImportStageCleanup(): void;
     importCleanupActionStatus(): {
@@ -146,6 +157,11 @@ describe('AdminSettings', () => {
                                     deleteSiteSuccess: 'Deleted site {{domain}}.'
                                 },
                                 system: {
+                                    database: {
+                                        checkpointSuccess: 'Database checkpoint completed.',
+                                        checkpointFailed: 'Database checkpoint failed.',
+                                        statusUnavailable: 'Database status is unavailable while recovery is running or requires operator attention.'
+                                    },
                                     spam: {
                                         refreshTriggered: 'Spam filter refreshed.',
                                         refreshFailed: 'Could not refresh the spam filter.'
@@ -340,6 +356,53 @@ describe('AdminSettings', () => {
             key: 'admin.system.spam.refreshTriggered'
         });
         expect(component.spamActionStatusMessage()).toBe('Spam filter refreshed.');
+    });
+
+    it('runs a manual database checkpoint and refreshes its status', () => {
+        component.systemDatabase.set({
+            recovery_enabled: true,
+            automatic_wal_recovery_enabled: false,
+            recovery_bundle_available: false,
+            removed_unsafe_indexes: 0,
+            checkpoint_interval_min: 5
+        });
+
+        component.checkpointDatabase();
+
+        expect(component.isCheckpointingDatabase()).toBe(true);
+        const checkpointRequest = httpMock.expectOne('/api/admin/system/database/checkpoint');
+        expect(checkpointRequest.request.method).toBe('POST');
+        checkpointRequest.flush({ status: 'ok', message: 'completed' });
+
+        const reloadRequest = httpMock.expectOne('/api/admin/system/database');
+        reloadRequest.flush({
+            recovery_enabled: true,
+            automatic_wal_recovery_enabled: false,
+            recovery_bundle_available: false,
+            removed_unsafe_indexes: 0,
+            checkpoint_interval_min: 5,
+            last_checkpoint_at: '2026-07-16T12:00:00Z'
+        });
+
+        expect(component.isCheckpointingDatabase()).toBe(false);
+        expect(component.databaseActionStatus()).toEqual({
+            severity: 'success',
+            key: 'admin.system.database.checkpointSuccess'
+        });
+        expect(component.databaseActionStatusMessage()).toBe('Database checkpoint completed.');
+    });
+
+    it('shows an unavailable state when database status cannot be loaded', () => {
+        component.loadSystemDatabase();
+
+        const request = httpMock.expectOne('/api/admin/system/database');
+        request.flush('recovering', { status: 503, statusText: 'Service Unavailable' });
+
+        expect(component.databaseActionStatus()).toEqual({
+            severity: 'error',
+            key: 'admin.system.database.statusUnavailable'
+        });
+        expect(component.databaseActionStatusMessage()).toBe('Database status is unavailable while recovery is running or requires operator attention.');
     });
 
     it('shows in-place error feedback when refreshing the spam filter fails', () => {

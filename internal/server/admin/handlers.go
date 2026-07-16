@@ -66,6 +66,14 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		InstancePerm: authcore.PermInstanceViewSystem,
 		RateLimiter:  ctx.ApiLimiter,
 	}, h.handleGetBackups()))
+	mux.HandleFunc("GET /api/admin/system/database", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceViewSystem,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleGetDatabase()))
+	mux.HandleFunc("POST /api/admin/system/database/checkpoint", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceRunMaintenance,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleRunDatabaseCheckpoint()))
 	mux.HandleFunc("GET /api/admin/system/spam-filter", ctx.Handler(shared.HandlerConfig{
 		InstancePerm: authcore.PermInstanceViewSystem,
 		RateLimiter:  ctx.ApiLimiter,

@@ -1920,6 +1920,17 @@ type SystemBackupStatus struct {
 	RecentFailures int        `json:"recent_failures"`
 }
 
+type SystemDatabaseStatus struct {
+	RecoveryEnabled             bool       `json:"recovery_enabled"`
+	AutomaticWALRecoveryEnabled bool       `json:"automatic_wal_recovery_enabled"`
+	RecoveryBundleAvailable     bool       `json:"recovery_bundle_available"`
+	RemovedUnsafeIndexes        int        `json:"removed_unsafe_indexes"`
+	CheckpointIntervalMinutes   int        `json:"checkpoint_interval_min"`
+	LastCheckpointAt            *time.Time `json:"last_checkpoint_at,omitempty"`
+	LastCheckpointError         string     `json:"last_checkpoint_error,omitempty"`
+	LastRecoveryAt              *time.Time `json:"last_recovery_at,omitempty"`
+}
+
 type SystemSpamStatus struct {
 	DBPath      string     `json:"db_path"`
 	LastRefresh *time.Time `json:"last_refresh,omitempty"`

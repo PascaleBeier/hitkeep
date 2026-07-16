@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
 )
 
@@ -33,18 +34,29 @@ func (h *handler) handleHealthz() http.HandlerFunc {
 func (h *handler) handleReadyz() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if h.ctx.Cluster != nil && !h.ctx.Cluster.IsLeader() {
-			http.Error(w, "Service not ready", http.StatusServiceUnavailable)
+			writeNotReady(w, "not_leader")
 			return
 		}
 
 		if h.ctx.Store == nil {
-			http.Error(w, "Service not ready", http.StatusServiceUnavailable)
+			writeNotReady(w, "database_unavailable")
+			return
+		}
+
+		status := h.ctx.Store.DatabaseStatus()
+		if status.State == database.DatabaseStateHealthy && h.ctx.TenantStores != nil {
+			if tenantStatus, unavailable := h.ctx.TenantStores.UnavailableDatabaseStatus(); unavailable {
+				status = tenantStatus
+			}
+		}
+		if status.State != database.DatabaseStateHealthy {
+			writeNotReady(w, databaseReadinessReason(status.State))
 			return
 		}
 
 		if err := h.ctx.Store.DB().Ping(); err != nil {
 			slog.Error("Readiness check failed: database unreachable", "error", err)
-			http.Error(w, "Database unavailable", http.StatusServiceUnavailable)
+			writeNotReady(w, "database_unavailable")
 			return
 		}
 
@@ -52,6 +64,30 @@ func (h *handler) handleReadyz() http.HandlerFunc {
 		if _, err := w.Write([]byte("ok")); err != nil {
 			slog.Error("Failed to write readiness response", "error", err)
 		}
+	}
+}
+
+func databaseReadinessReason(state string) string {
+	switch state {
+	case database.DatabaseStateRecovering:
+		return "database_recovering"
+	case database.DatabaseStateNeedsAttention:
+		return "database_needs_attention"
+	default:
+		return "database_unavailable"
+	}
+}
+
+func writeNotReady(w http.ResponseWriter, reason string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", "5")
+	w.WriteHeader(http.StatusServiceUnavailable)
+	if err := json.NewEncoder(w).Encode(map[string]any{
+		"status":              "not_ready",
+		"reason":              reason,
+		"retry_after_seconds": 5,
+	}); err != nil {
+		slog.Error("Failed to encode readiness response", "error", err)
 	}
 }
 

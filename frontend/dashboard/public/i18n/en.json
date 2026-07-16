@@ -196,6 +196,7 @@
       "backupTriggered": "Backup triggered",
       "backupCompleted": "Backup completed",
       "backupFailed": "Backup failed",
+      "databaseCheckpointRequested": "Database checkpoint",
       "spamRefreshed": "Spam refresh",
       "mailTested": "Mail test",
       "diagnosticsExported": "Diagnostics exported",
@@ -2178,6 +2179,22 @@
         "rejections": "Rejections",
         "spam": "Spam blocked",
         "hitsPerSecond": "Hits/sec"
+      },
+      "database": {
+        "title": "Database resilience",
+        "autoRecovery": "Automatic index recovery",
+        "automaticWalRecovery": "Automatic WAL bypass",
+        "checkpointInterval": "Checkpoint interval",
+        "lastCheckpoint": "Last checkpoint this run",
+        "lastRecovery": "Last recovery",
+        "removedUnsafeIndexes": "Removed unsafe indexes",
+        "recoveryBundle": "Recovery bundle retained",
+        "actions": {
+          "checkpoint": "Checkpoint now"
+        },
+        "statusUnavailable": "Database status is unavailable while recovery is running or requires operator attention.",
+        "checkpointSuccess": "Database checkpoint completed.",
+        "checkpointFailed": "Database checkpoint failed."
       },
       "backups": {
         "title": "Backups",

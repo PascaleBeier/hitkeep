@@ -72,6 +72,52 @@ func openAPIV1AnalyticsSchemas() map[string]any {
 				"message": map[string]any{"type": "string"},
 			},
 		},
+		"DatabaseUnavailable": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"status": map[string]any{
+					"type": "string",
+					"enum": []string{"error"},
+				},
+				"code": map[string]any{
+					"type": "string",
+					"enum": []string{
+						"database_unavailable",
+						"database_recovering",
+						"database_needs_attention",
+					},
+				},
+				"message": map[string]any{"type": "string"},
+				"retry_after_seconds": map[string]any{
+					"type":    "integer",
+					"minimum": 1,
+				},
+			},
+			"required": []string{"status", "code", "message", "retry_after_seconds"},
+		},
+		"ReadinessUnavailable": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"status": map[string]any{
+					"type": "string",
+					"enum": []string{"not_ready"},
+				},
+				"reason": map[string]any{
+					"type": "string",
+					"enum": []string{
+						"not_leader",
+						"database_unavailable",
+						"database_recovering",
+						"database_needs_attention",
+					},
+				},
+				"retry_after_seconds": map[string]any{
+					"type":    "integer",
+					"minimum": 1,
+				},
+			},
+			"required": []string{"status", "reason", "retry_after_seconds"},
+		},
 		"Status": map[string]any{
 			"type": "object",
 			"properties": map[string]any{

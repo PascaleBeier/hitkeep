@@ -196,6 +196,7 @@
       "backupTriggered": "Copia iniciada",
       "backupCompleted": "Copia completada",
       "backupFailed": "Copia fallida",
+      "databaseCheckpointRequested": "Punto de control de la base de datos",
       "spamRefreshed": "Filtro de spam actualizado",
       "mailTested": "Prueba de correo",
       "diagnosticsExported": "Diagnóstico exportado",
@@ -2242,6 +2243,22 @@
         "rejections": "Rechazos",
         "spam": "Spam bloqueado",
         "hitsPerSecond": "Hits/s"
+      },
+      "database": {
+        "title": "Resiliencia de la base de datos",
+        "autoRecovery": "Recuperación automática de índices",
+        "automaticWalRecovery": "Omisión automática del WAL",
+        "checkpointInterval": "Intervalo de puntos de control",
+        "lastCheckpoint": "Último punto de control de esta ejecución",
+        "lastRecovery": "Última recuperación",
+        "removedUnsafeIndexes": "Índices no seguros eliminados",
+        "recoveryBundle": "Paquete de recuperación conservado",
+        "actions": {
+          "checkpoint": "Crear punto de control"
+        },
+        "statusUnavailable": "El estado de la base de datos no está disponible mientras la recuperación está en curso o requiere intervención.",
+        "checkpointSuccess": "Punto de control de la base de datos completado.",
+        "checkpointFailed": "Falló el punto de control de la base de datos."
       },
       "backups": {
         "title": "Copias",

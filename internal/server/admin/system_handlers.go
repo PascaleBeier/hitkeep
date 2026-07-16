@@ -508,6 +508,55 @@ func (h *handler) handleGetBackups() http.HandlerFunc {
 	}
 }
 
+func (h *handler) handleGetDatabase() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if h.ctx.Store == nil {
+			http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
+			return
+		}
+		writeJSON(w, http.StatusOK, systemDatabaseStatus(h.ctx.Store.DatabaseStatus()))
+	}
+}
+
+func (h *handler) handleRunDatabaseCheckpoint() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if h.ctx.Store == nil {
+			http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		if err := h.ctx.Store.Checkpoint(ctx, "manual"); err != nil {
+			slog.Error("Manual database checkpoint failed", "error", err)
+			h.appendAudit(r, "database.checkpoint_requested", "database", "", "shared", "failure", "checkpoint_failed")
+			writeJSON(w, http.StatusInternalServerError, api.SystemActionResponse{
+				Status:  "error",
+				Message: "Database checkpoint failed",
+			})
+			return
+		}
+
+		h.appendAudit(r, "database.checkpoint_requested", "database", "", "shared", "success", "checkpoint_completed")
+		writeJSON(w, http.StatusOK, api.SystemActionResponse{
+			Status:  "ok",
+			Message: "Database checkpoint completed",
+		})
+	}
+}
+
+func systemDatabaseStatus(status database.DatabaseStatus) api.SystemDatabaseStatus {
+	return api.SystemDatabaseStatus{
+		RecoveryEnabled:             status.RecoveryEnabled,
+		AutomaticWALRecoveryEnabled: status.AutomaticWALRecoveryEnabled,
+		RecoveryBundleAvailable:     status.RecoveryBundleAvailable,
+		RemovedUnsafeIndexes:        status.RemovedUnsafeIndexes,
+		CheckpointIntervalMinutes:   status.CheckpointIntervalMinutes,
+		LastCheckpointAt:            status.LastCheckpointAt,
+		LastCheckpointError:         status.LastCheckpointError,
+		LastRecoveryAt:              status.LastRecoveryAt,
+	}
+}
+
 func (h *handler) handleGetSpamFilter() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		status := api.SystemSpamStatus{

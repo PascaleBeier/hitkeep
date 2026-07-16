@@ -19,7 +19,11 @@ var serverCustomTrackingHostnameRegex = regexp.MustCompile(`^(?:[a-z0-9](?:[a-z0
 func (s *Server) customTrackingHostMiddleware(publicFS fs.FS, rootHandler, normalHandler http.Handler) http.Handler {
 	fileServer := http.FileServer(http.FS(publicFS))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		domain, known := s.customTrackingDomainForRequest(r)
+		domain, known, err := s.customTrackingDomainForRequest(r)
+		if err != nil {
+			s.writeDatabaseQueryFailure(w)
+			return
+		}
 		if !known {
 			normalHandler.ServeHTTP(w, r)
 			return
@@ -40,20 +44,20 @@ func (s *Server) customTrackingHostMiddleware(publicFS fs.FS, rootHandler, norma
 	})
 }
 
-func (s *Server) customTrackingDomainForRequest(r *http.Request) (*api.CustomTrackingDomain, bool) {
+func (s *Server) customTrackingDomainForRequest(r *http.Request) (*api.CustomTrackingDomain, bool, error) {
 	if s == nil || s.store == nil || r == nil {
-		return nil, false
+		return nil, false, nil
 	}
 	hostname := requestHostname(r.Host)
 	if !isValidServerCustomTrackingHostname(hostname) {
-		return nil, false
+		return nil, false, nil
 	}
 	domain, err := s.store.FindCustomTrackingDomainByHostname(r.Context(), hostname)
 	if err != nil {
-		slog.Error("Failed to resolve custom tracking request host", "error", err, "hostname", hostname)
-		return nil, true
+		slog.Error("Failed to resolve custom tracking request host", "error", err)
+		return nil, true, err
 	}
-	return domain, domain != nil
+	return domain, domain != nil, nil
 }
 
 func requestHostname(host string) string {
@@ -148,8 +152,8 @@ func (s *Server) handleCaddyOnDemandTLSAsk() http.HandlerFunc {
 
 		domain, err := s.store.FindCustomTrackingDomainByHostname(r.Context(), hostname)
 		if err != nil {
-			slog.Error("Failed to resolve Caddy on-demand TLS domain", "error", err, "hostname", hostname)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			slog.Error("Failed to resolve Caddy on-demand TLS domain", "error", err)
+			s.writeDatabaseQueryFailure(w)
 			return
 		}
 		if domain == nil || !customTrackingDomainCanRoute(*domain) {
@@ -162,4 +166,14 @@ func (s *Server) handleCaddyOnDemandTLSAsk() http.HandlerFunc {
 		}
 		w.WriteHeader(http.StatusNoContent)
 	}
+}
+
+func (s *Server) writeDatabaseQueryFailure(w http.ResponseWriter) {
+	if s != nil && s.store != nil {
+		if status := s.store.DatabaseStatus(); status.State != database.DatabaseStateHealthy {
+			writeDatabaseUnavailable(w, status.State)
+			return
+		}
+	}
+	http.Error(w, "Internal server error", http.StatusInternalServerError)
 }

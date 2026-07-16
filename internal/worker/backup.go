@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -103,7 +104,8 @@ func (w *BackupWorker) Run(ctx context.Context) (err error) {
 
 	// Backup shared DB.
 	sharedDest := joinArchivePath(w.backupPath, "shared", timestamp)
-	if err := w.exportDatabase(ctx, w.tenantMgr.Shared().DB(), sharedDest, isS3); err != nil {
+	if err := w.exportDatabase(ctx, w.tenantMgr.Shared(), sharedDest, isS3); err != nil {
+		w.removeIncompleteLocalSnapshot(sharedDest, isS3)
 		return fmt.Errorf("backup shared database: %w", err)
 	}
 	slog.Info("Shared database backed up", "dest", sharedDest)
@@ -122,16 +124,20 @@ func (w *BackupWorker) Run(ctx context.Context) (err error) {
 	}
 
 	// Backup each non-default tenant DB.
+	var tenantErrors []error
 	for _, tenantID := range tenantIDs {
 		tenantStore, err := w.tenantMgr.ForTenant(ctx, tenantID)
 		if err != nil {
 			slog.Error("Failed to open tenant store for backup", "tenant_id", tenantID, "error", err)
+			tenantErrors = append(tenantErrors, fmt.Errorf("open tenant %s database for backup: %w", tenantID, err))
 			continue
 		}
 
 		tenantDest := joinArchivePath(w.backupPath, "tenants", tenantID.String(), timestamp)
-		if err := w.exportDatabase(ctx, tenantStore.DB(), tenantDest, isS3); err != nil {
+		if err := w.exportDatabase(ctx, tenantStore, tenantDest, isS3); err != nil {
 			slog.Error("Failed to backup tenant database", "tenant_id", tenantID, "error", err)
+			w.removeIncompleteLocalSnapshot(tenantDest, isS3)
+			tenantErrors = append(tenantErrors, fmt.Errorf("backup tenant %s database: %w", tenantID, err))
 			continue
 		}
 		slog.Info("Tenant database backed up", "tenant_id", tenantID, "dest", tenantDest)
@@ -146,9 +152,21 @@ func (w *BackupWorker) Run(ctx context.Context) (err error) {
 	} else {
 		slog.Debug("S3 backup pruning: configure S3 lifecycle policies to manage snapshot retention")
 	}
+	if len(tenantErrors) > 0 {
+		return fmt.Errorf("backup incomplete: %w", errors.Join(tenantErrors...))
+	}
 
 	slog.Info("Database backup completed", "timestamp", timestamp)
 	return nil
+}
+
+func (w *BackupWorker) removeIncompleteLocalSnapshot(path string, isS3 bool) {
+	if isS3 || strings.TrimSpace(path) == "" {
+		return
+	}
+	if err := os.RemoveAll(path); err != nil {
+		slog.Warn("Could not remove incomplete backup snapshot", "path", path, "error", err)
+	}
 }
 
 func (w *BackupWorker) recordSuccess(at time.Time) {
@@ -186,7 +204,13 @@ func (w *BackupWorker) nextBackupTime(after time.Time) (time.Time, bool) {
 }
 
 // exportDatabase checkpoints and exports a DuckDB database to the given destination.
-func (w *BackupWorker) exportDatabase(ctx context.Context, db *sql.DB, dest string, isS3 bool) error {
+func (w *BackupWorker) exportDatabase(ctx context.Context, store *database.Store, dest string, isS3 bool) error {
+	if store == nil {
+		return errors.New("database store is not available")
+	}
+	if err := store.Checkpoint(ctx, "backup"); err != nil {
+		return fmt.Errorf("checkpoint before export: %w", err)
+	}
 	// Ensure local directory exists.
 	if !isS3 {
 		if err := os.MkdirAll(dest, 0755); err != nil {
@@ -196,12 +220,9 @@ func (w *BackupWorker) exportDatabase(ctx context.Context, db *sql.DB, dest stri
 
 	safeDest := strings.ReplaceAll(dest, "'", "''")
 	query := fmt.Sprintf("EXPORT DATABASE '%s' (FORMAT PARQUET);", safeDest)
-	return database.WithDuckDBSession(ctx, db, database.DuckDBSessionOptions{
+	return database.WithDuckDBSession(ctx, store.DB(), database.DuckDBSessionOptions{
 		S3: s3ConfigForSession(isS3, w.s3Config),
 	}, func(conn *sql.Conn) error {
-		if _, err := conn.ExecContext(ctx, "CHECKPOINT;"); err != nil {
-			slog.Warn("Checkpoint before export failed (continuing)", "error", err)
-		}
 		if _, err := conn.ExecContext(ctx, query); err != nil {
 			return fmt.Errorf("export database to %s: %w", dest, err)
 		}

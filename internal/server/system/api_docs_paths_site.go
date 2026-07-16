@@ -53,6 +53,21 @@ func openAPIV1AdminSitePaths() map[string]any {
 			"get": op([]string{"Admin"}, "Get backup status", "Returns automatic backup configuration and recent backup status.", secCookie(), nil, nil,
 				map[string]any{"200": jsonRefResp("System backup status", "#/components/schemas/SystemBackupStatus")}),
 		},
+		"/api/admin/system/database": map[string]any{
+			"get": op([]string{"Admin"}, "Get database resilience status", "Returns sanitized recovery configuration, retained recovery history, and checkpoint state while the database is available. Live recovery state is reported through readiness and 503 responses.", secCookie(), nil, nil,
+				map[string]any{
+					"200": jsonRefResp("System database status", "#/components/schemas/SystemDatabaseStatus"),
+					"503": errResp("Database recovery is in progress or requires operator attention"),
+				}),
+		},
+		"/api/admin/system/database/checkpoint": map[string]any{
+			"post": op([]string{"Admin"}, "Checkpoint the shared database", "Runs an immediate serialized DuckDB checkpoint and records the operator action in the instance audit log.", secCookie(), nil, nil,
+				map[string]any{
+					"200": jsonRefResp("Checkpoint result", "#/components/schemas/SystemActionResponse"),
+					"500": errResp("Database checkpoint failed"),
+					"503": errResp("Database recovery is in progress or requires operator attention"),
+				}),
+		},
 		"/api/admin/system/spam-filter": map[string]any{
 			"get": op([]string{"Admin"}, "Get spam filter status", "Returns spam database path, rule count, auto-update state, last refresh time, and last error.", secCookie(), nil, nil,
 				map[string]any{"200": jsonRefResp("Spam filter status", "#/components/schemas/SystemSpamStatus")}),

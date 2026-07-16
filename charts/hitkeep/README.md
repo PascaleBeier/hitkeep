@@ -45,7 +45,7 @@ extraEnv:
 - `env.HITKEEP_PUBLIC_URL`: set to the browser-visible URL, including any path prefix
 - `extraEnv`: use this for secret-backed values such as `HITKEEP_JWT_SECRET`
 - `persistence.*`: PVC settings for `/var/lib/hitkeep/data`
-- Probes: liveness uses `/healthz`, readiness uses `/readyz`
+- Probes: liveness uses `/healthz`; readiness uses `/readyz` and returns `503` with a stable reason while a shared or open tenant database is recovering or needs operator attention
 
 By default, the chart stores the shared DuckDB database, tenant DuckDB databases, retention archives, QR Code graphic assets, and optional spam-list cache below the persistent mount:
 
@@ -53,8 +53,11 @@ By default, the chart stores the shared DuckDB database, tenant DuckDB databases
 - `HITKEEP_DATA_PATH=/var/lib/hitkeep/data`
 - `HITKEEP_ARCHIVE_PATH=/var/lib/hitkeep/data/archive`
 - `HITKEEP_SPAM_FILTER_PATH=/var/lib/hitkeep/data/spam-filter.json`
+- `HITKEEP_DB_RECOVERY_PATH=/var/lib/hitkeep/data/recovery` (derived from `HITKEEP_DATA_PATH` unless overridden)
 
 Override those keys in `env` only when you also change the matching storage layout.
+
+The recovery directory contains permission-restricted database/WAL bundles and resumable markers. It is intentionally persistent and is not pruned by `HITKEEP_BACKUP_RETENTION`; apply a separate access-control and retention policy.
 
 ### Scaling & clustering
 

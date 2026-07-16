@@ -149,6 +149,86 @@ func TestDropAnalyticsIndexesMigrationPreservesData(t *testing.T) {
 	}
 }
 
+func TestDroppingGSCControlIndexesPreservesSiteCleanup(t *testing.T) {
+	ctx := context.Background()
+	store := newSharedTestStore(t)
+
+	var unsafeIndexes int
+	if err := store.DB().QueryRowContext(ctx, `
+		SELECT count(*)
+		FROM duckdb_indexes()
+		WHERE index_name IN (?, ?, ?, ?, ?)`,
+		unsafeGoogleSearchConsoleIndexes[0],
+		unsafeGoogleSearchConsoleIndexes[1],
+		unsafeGoogleSearchConsoleIndexes[2],
+		unsafeGoogleSearchConsoleIndexes[3],
+		unsafeGoogleSearchConsoleIndexes[4],
+	).Scan(&unsafeIndexes); err != nil {
+		t.Fatalf("count GSC indexes: %v", err)
+	}
+	if unsafeIndexes != 0 {
+		t.Fatalf("expected unsafe GSC indexes to be absent, got %d", unsafeIndexes)
+	}
+
+	userID, err := store.CreateUser(ctx, "gsc-cleanup@test.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	site, err := store.CreateSite(ctx, userID, "gsc-cleanup.test")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	teamID, err := store.GetSiteTenantID(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("resolve site team: %v", err)
+	}
+	if err := store.UpsertGoogleSearchConsoleProperty(ctx, GoogleSearchConsolePropertyInput{
+		TeamID:          teamID,
+		URI:             "sc-domain:gsc-cleanup.test",
+		PermissionLevel: "siteOwner",
+		SeenAt:          time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("upsert GSC property: %v", err)
+	}
+	if err := store.UpsertGoogleSearchConsoleSiteMapping(ctx, GoogleSearchConsoleSiteMappingInput{
+		SiteID:      site.ID,
+		TeamID:      teamID,
+		PropertyURI: "sc-domain:gsc-cleanup.test",
+		MappedBy:    userID,
+		MappedAt:    time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("upsert GSC mapping: %v", err)
+	}
+	if err := store.UpsertGoogleSearchConsoleSyncState(ctx, GoogleSearchConsoleSyncStateInput{
+		SiteID: site.ID,
+		TeamID: teamID,
+		State:  "idle",
+	}); err != nil {
+		t.Fatalf("upsert GSC sync state: %v", err)
+	}
+
+	if err := store.DeleteSite(ctx, site.ID); err != nil {
+		t.Fatalf("delete site: %v", err)
+	}
+
+	var mappings, syncStates, properties int
+	if err := store.DB().QueryRowContext(ctx, `
+		SELECT
+			(SELECT count(*) FROM google_search_console_site_mappings WHERE site_id = ?),
+			(SELECT count(*) FROM google_search_console_sync_state WHERE site_id = ?),
+			(SELECT count(*) FROM google_search_console_properties WHERE team_id = ?)`,
+		site.ID, site.ID, teamID,
+	).Scan(&mappings, &syncStates, &properties); err != nil {
+		t.Fatalf("inspect GSC cleanup: %v", err)
+	}
+	if mappings != 0 || syncStates != 0 {
+		t.Fatalf("expected site-scoped GSC rows to be deleted, got mappings=%d sync_states=%d", mappings, syncStates)
+	}
+	if properties != 1 {
+		t.Fatalf("expected team-scoped GSC property to remain after site deletion, got %d", properties)
+	}
+}
+
 // TestCopySiteAnalyticsIsIdempotentWithoutUniqueIndexes guards the site
 // transfer path: with the ART indexes gone there is no conflict-based upsert,
 // so repeating a copy must replace rather than duplicate the site's rows.

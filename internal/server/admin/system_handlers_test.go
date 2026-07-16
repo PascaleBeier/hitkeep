@@ -773,6 +773,34 @@ func TestHandleGetBackups(t *testing.T) {
 	}
 }
 
+func TestHandleGetDatabaseAndRunCheckpoint(t *testing.T) {
+	h, store, _, ownerID, _, _ := setupSystemTestEnv(t)
+
+	getReq := withAdminTestUser(httptest.NewRequest(http.MethodGet, "/api/admin/system/database", nil), ownerID)
+	getRecorder := httptest.NewRecorder()
+	h.handleGetDatabase().ServeHTTP(getRecorder, getReq)
+	if getRecorder.Code != http.StatusOK {
+		t.Fatalf("expected database status 200, got %d: %s", getRecorder.Code, getRecorder.Body.String())
+	}
+	var before api.SystemDatabaseStatus
+	if err := json.NewDecoder(getRecorder.Body).Decode(&before); err != nil {
+		t.Fatalf("decode database status: %v", err)
+	}
+	if before.CheckpointIntervalMinutes <= 0 {
+		t.Fatalf("expected configured checkpoint interval, got %d", before.CheckpointIntervalMinutes)
+	}
+
+	checkpointReq := withAdminTestUser(httptest.NewRequest(http.MethodPost, "/api/admin/system/database/checkpoint", nil), ownerID)
+	checkpointRecorder := httptest.NewRecorder()
+	h.handleRunDatabaseCheckpoint().ServeHTTP(checkpointRecorder, checkpointReq)
+	if checkpointRecorder.Code != http.StatusOK {
+		t.Fatalf("expected checkpoint 200, got %d: %s", checkpointRecorder.Code, checkpointRecorder.Body.String())
+	}
+	if status := store.DatabaseStatus(); status.LastCheckpointAt == nil {
+		t.Fatal("expected manual checkpoint to update database status")
+	}
+}
+
 func TestHandleGetSpamFilter(t *testing.T) {
 	h, _, _, ownerID, _, _ := setupSystemTestEnv(t)
 	generatedAt := time.Date(2026, 4, 28, 12, 0, 0, 0, time.UTC)

@@ -105,6 +105,17 @@ export interface SystemBackupStatus {
     recent_failures: number;
 }
 
+export interface SystemDatabaseStatus {
+    recovery_enabled: boolean;
+    automatic_wal_recovery_enabled: boolean;
+    recovery_bundle_available: boolean;
+    removed_unsafe_indexes: number;
+    checkpoint_interval_min: number;
+    last_checkpoint_at?: string;
+    last_checkpoint_error?: string;
+    last_recovery_at?: string;
+}
+
 export interface SystemSpamStatus {
     db_path: string;
     last_refresh?: string;
@@ -289,6 +300,14 @@ export class AdminSystemService {
 
     getBackups() {
         return this.http.get<SystemBackupStatus>('/api/admin/system/backups');
+    }
+
+    getDatabase() {
+        return this.http.get<SystemDatabaseStatus>('/api/admin/system/database');
+    }
+
+    checkpointDatabase() {
+        return this.http.post<{ status: string; message: string }>('/api/admin/system/database/checkpoint', {});
     }
 
     getSpamFilter() {

@@ -79,7 +79,13 @@ func (s *Store) Migrate(ctx context.Context) error {
 	}
 
 	slog.Info("Successfully applied all database migrations.")
-	return validateCleanupPlans(ctx, s.db, siteDeleteSpec, tenantPurgeSpec)
+	if err := validateCleanupPlans(ctx, s.db, siteDeleteSpec, tenantPurgeSpec); err != nil {
+		return err
+	}
+	if err := s.Checkpoint(ctx, "shared_migrations"); err != nil {
+		return fmt.Errorf("checkpoint shared migrations: %w", err)
+	}
+	return nil
 }
 
 func (s *Store) getAppliedMigrations(ctx context.Context) (map[string]bool, error) {

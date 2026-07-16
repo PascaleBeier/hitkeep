@@ -50,7 +50,8 @@ type TenantStoreManager struct {
 
 	maintenanceCtx context.Context
 
-	compaction *CompactionOptions
+	compaction  *CompactionOptions
+	fatalErrors chan error
 }
 
 // TenantStoreManagerOption configures a TenantStoreManager.
@@ -73,6 +74,7 @@ func NewTenantStoreManager(shared *Store, basePath string, opts ...TenantStoreMa
 		basePath:    basePath,
 		stores:      make(map[uuid.UUID]*Store),
 		recentSyncs: lru.NewLRU[siteSyncKey, struct{}](siteSyncMemoSize, nil, siteSyncMemoTTL),
+		fatalErrors: make(chan error, 1),
 	}
 	for _, opt := range opts {
 		opt(mgr)
@@ -93,6 +95,32 @@ func NewTenantStoreManager(shared *Store, basePath string, opts ...TenantStoreMa
 // Shared returns the main shared store (identity tables, default tenant data).
 func (m *TenantStoreManager) Shared() *Store {
 	return m.shared
+}
+
+// FatalErrors reports tenant database conditions that require a controlled
+// process restart.
+func (m *TenantStoreManager) FatalErrors() <-chan error {
+	if m == nil {
+		return nil
+	}
+	return m.fatalErrors
+}
+
+// UnavailableDatabaseStatus returns one non-healthy tenant database status.
+// Callers use it to make readiness and request availability conservative while
+// a tenant database is recovering.
+func (m *TenantStoreManager) UnavailableDatabaseStatus() (DatabaseStatus, bool) {
+	if m == nil {
+		return DatabaseStatus{}, false
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, store := range m.stores {
+		if status := store.DatabaseStatus(); status.State != DatabaseStateHealthy {
+			return status, true
+		}
+	}
+	return DatabaseStatus{}, false
 }
 
 // StartMaintenance runs periodic checkpoint maintenance on every per-tenant
@@ -478,8 +506,9 @@ func (m *TenantStoreManager) openTenantStore(ctx context.Context, tenantID uuid.
 
 	dbPath := filepath.Join(dir, "hitkeep.db")
 
-	// Compaction never blocks opening: a failure (file locked by another
-	// process, pending migrations) leaves the original file untouched.
+	// Compaction remains best effort. A replay-failing WAL makes measurement
+	// fail without rewriting the file; the subsequent Store.Connect call then
+	// retains a recovery bundle and follows the configured recovery policy.
 	if m.compaction != nil {
 		if result, err := MaybeCompactDatabase(ctx, dbPath, *m.compaction, PrepareTenantSchema); err != nil {
 			slog.Warn("Skipping tenant database compaction", "tenant_id", tenantID, "path", dbPath, "error", err)
@@ -488,8 +517,12 @@ func (m *TenantStoreManager) openTenantStore(ctx context.Context, tenantID uuid.
 		}
 	}
 
-	store := NewStore(dbPath, m.shared.duckDBOptions()...)
+	storeOptions := append(m.shared.duckDBOptions(), withFatalReporter(m.tenantFatalReporter(tenantID)))
+	store := NewStore(dbPath, storeOptions...)
 	if err := store.Connect(); err != nil {
+		if status := store.DatabaseStatus(); status.State != DatabaseStateHealthy {
+			m.tenantFatalReporter(tenantID)(fmt.Errorf("tenant database recovery failed during open: %w", err))
+		}
 		return nil, fmt.Errorf("could not connect to tenant database %s: %w", dbPath, err)
 	}
 
@@ -504,6 +537,18 @@ func (m *TenantStoreManager) openTenantStore(ctx context.Context, tenantID uuid.
 
 	slog.Info("Opened per-tenant database", "tenant_id", tenantID, "path", dbPath)
 	return store, nil
+}
+
+func (m *TenantStoreManager) tenantFatalReporter(tenantID uuid.UUID) func(error) {
+	return func(err error) {
+		if m == nil || err == nil {
+			return
+		}
+		select {
+		case m.fatalErrors <- fmt.Errorf("tenant %s database requires controlled restart: %w", tenantID, err):
+		default:
+		}
+	}
 }
 
 func (m *TenantStoreManager) tenantDataDir(tenantID uuid.UUID) string {

@@ -147,8 +147,18 @@ func Run() {
 		startSearchConsoleSyncWorker(gCtx, conf, tenantMgr)
 
 		g.Go(func() error {
+			select {
+			case <-gCtx.Done():
+				return nil
+			case fatalErr := <-store.FatalErrors():
+				return fmt.Errorf("database requires controlled restart: %w", fatalErr)
+			case fatalErr := <-tenantMgr.FatalErrors():
+				return fatalErr
+			}
+		})
+
+		g.Go(func() error {
 			<-gCtx.Done()
-			tenantMgr.Close()
 			leaderShutdown()
 			return nil
 		})
@@ -217,26 +227,43 @@ func startSearchConsoleSyncWorker(ctx context.Context, conf *config.Config, tena
 func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.Logger, logLevel slog.Level, realtimeBroker *realtime.Broker) (*database.Store, *database.TenantStoreManager, *nsq.Producer, func(), error) {
 	slog.Debug("(Leader) Starting stateful services...")
 
-	// Compaction never blocks startup: a failure (pending migrations after an
-	// upgrade, file held by another process) leaves the original file intact.
-	if conf.DBCompactOnStart {
-		if result, err := database.MaybeCompactDatabase(ctx, conf.DBPath, database.DefaultCompactionOptions(), database.PrepareSharedSchema); err != nil {
-			slog.Warn("Skipping database compaction at startup", "path", conf.DBPath, "error", err)
-		} else if result.Compacted {
-			slog.Info("Compacted database at startup", "path", conf.DBPath, "bytes_before", result.BytesBefore, "bytes_after", result.BytesAfter)
-		}
+	newStore := func() *database.Store {
+		return database.NewStore(conf.DBPath,
+			database.WithMemoryLimit(conf.DuckDBMemoryLimit),
+			database.WithThreads(conf.DuckDBThreads),
+			database.WithCheckpointInterval(time.Duration(conf.DBCheckpointIntervalMinutes)*time.Minute),
+			database.WithAutomaticRecovery(conf.DBAutoRecover, conf.DBRecoveryPath),
+			database.WithAutomaticWALRecovery(conf.DBAutoRecoverWAL),
+		)
 	}
 
-	store := database.NewStore(conf.DBPath,
-		database.WithMemoryLimit(conf.DuckDBMemoryLimit),
-		database.WithThreads(conf.DuckDBThreads),
-	)
+	store := newStore()
 	if err := store.Connect(); err != nil {
 		return nil, nil, nil, nil, err
 	}
 	if err := store.Migrate(ctx); err != nil {
 		store.Close()
 		return nil, nil, nil, nil, err
+	}
+
+	// Recover and migrate before compaction so a problematic database is never
+	// rewritten before its recovery bundle exists.
+	recoveredAtStartup := store.RecoveredDuringConnect()
+	if conf.DBCompactOnStart && recoveredAtStartup {
+		slog.Info("Skipping database compaction immediately after automatic recovery", "path", conf.DBPath)
+	} else if conf.DBCompactOnStart {
+		if err := store.Close(); err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("close database before startup compaction: %w", err)
+		}
+		if result, err := database.MaybeCompactDatabase(ctx, conf.DBPath, database.DefaultCompactionOptions(), database.PrepareSharedSchema); err != nil {
+			slog.Warn("Skipping database compaction at startup", "path", conf.DBPath, "error", err)
+		} else if result.Compacted {
+			slog.Info("Compacted database at startup", "path", conf.DBPath, "bytes_before", result.BytesBefore, "bytes_after", result.BytesAfter)
+		}
+		store = newStore()
+		if err := store.Connect(); err != nil {
+			return nil, nil, nil, nil, err
+		}
 	}
 	store.StartMaintenance(ctx)
 
@@ -245,9 +272,17 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 		tenantOpts = append(tenantOpts, database.WithTenantCompaction(database.DefaultCompactionOptions()))
 	}
 	tenantMgr := database.NewTenantStoreManager(store, conf.DataPath, tenantOpts...)
+	closeStores := func() {
+		if err := tenantMgr.Close(); err != nil {
+			slog.Error("Failed to close tenant databases during startup cleanup", "error", err)
+		}
+		if err := store.Close(); err != nil {
+			slog.Error("Failed to close shared database during startup cleanup", "error", err)
+		}
+	}
 	tenantMgr.StartMaintenance(ctx)
 	if err := tenantMgr.SyncAllTenants(ctx); err != nil {
-		store.Close()
+		closeStores()
 		return nil, nil, nil, nil, err
 	}
 
@@ -264,7 +299,7 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 
 	nsqdServer, err := nsqd.New(nsqdOpts)
 	if err != nil {
-		store.Close()
+		closeStores()
 		return nil, nil, nil, nil, err
 	}
 
@@ -281,7 +316,7 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 	// Producer connects to the local embedded NSQ
 	producer, err := nsq.NewProducer(conf.NSQTCPAddress, nsq.NewConfig())
 	if err != nil {
-		store.Close()
+		closeStores()
 		return nil, nil, nil, nil, err
 	}
 	// Wire up Producer logger to slog
@@ -298,7 +333,7 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 	}
 	if pingErr != nil {
 		producer.Stop()
-		store.Close()
+		closeStores()
 		return nil, nil, nil, nil, fmt.Errorf("embedded nsqd did not become ready: %w", pingErr)
 	}
 
@@ -306,14 +341,14 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 	consumer.SetWebhookEmitter(webhookdispatcher.NewEmitter(store, producer, conf.Version))
 	if err := consumer.Connect(conf.NSQTCPAddress); err != nil {
 		producer.Stop()
-		store.Close()
+		closeStores()
 		return nil, nil, nil, nil, err
 	}
 	webhookWorker := webhookdispatcher.NewWorker(store, producer, *conf, logger, logLevel)
 	if err := webhookWorker.Connect(ctx, conf.NSQTCPAddress); err != nil {
 		producer.Stop()
 		consumer.Stop()
-		store.Close()
+		closeStores()
 		return nil, nil, nil, nil, err
 	}
 
@@ -322,7 +357,12 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 		webhookWorker.Stop()
 		consumer.Stop()
 		producer.Stop()
-		store.Close()
+		if err := tenantMgr.Close(); err != nil {
+			slog.Error("Failed to close tenant databases", "error", err)
+		}
+		if err := store.Close(); err != nil {
+			slog.Error("Failed to close shared database cleanly", "error", err)
+		}
 		os.RemoveAll(tmpDir)
 	}
 

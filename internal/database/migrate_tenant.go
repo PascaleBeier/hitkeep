@@ -59,7 +59,13 @@ func (s *Store) MigrateTenant(ctx context.Context) error {
 	}
 
 	slog.Info("Successfully applied all tenant migrations.", "path", s.path)
-	return validateCleanupPlans(ctx, s.db, siteDeleteSpec)
+	if err := validateCleanupPlans(ctx, s.db, siteDeleteSpec); err != nil {
+		return err
+	}
+	if err := s.Checkpoint(ctx, "tenant_migrations"); err != nil {
+		return fmt.Errorf("checkpoint tenant migrations: %w", err)
+	}
+	return nil
 }
 
 func (s *Store) getTenantAppliedMigrations(ctx context.Context) (map[string]bool, error) {

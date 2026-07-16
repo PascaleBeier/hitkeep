@@ -6,7 +6,7 @@ import { AuditTableOption, AuditTableRow, AuditTableSeverity } from '@components
 
 type AuditScope = 'system' | 'team';
 
-const SYSTEM_ACTIONS = ['role.updated', 'mfa.disabled', 'backup.triggered', 'backup.completed', 'backup.failed', 'spam_filter.refresh', 'mail.test', 'diagnostics.export', 'access.denied'];
+const SYSTEM_ACTIONS = ['role.updated', 'mfa.disabled', 'backup.triggered', 'backup.completed', 'backup.failed', 'database.checkpoint_requested', 'spam_filter.refresh', 'mail.test', 'diagnostics.export', 'access.denied'];
 
 const SHARED_ACTIONS = [
     'auth.login_succeeded',
@@ -81,6 +81,7 @@ const ACTION_KEYS: Record<string, string> = {
     'backup.triggered': 'auditTable.actions.backupTriggered',
     'backup.completed': 'auditTable.actions.backupCompleted',
     'backup.failed': 'auditTable.actions.backupFailed',
+    'database.checkpoint_requested': 'auditTable.actions.databaseCheckpointRequested',
     'spam_filter.refresh': 'auditTable.actions.spamRefreshed',
     'mail.test': 'auditTable.actions.mailTested',
     'diagnostics.export': 'auditTable.actions.diagnosticsExported',

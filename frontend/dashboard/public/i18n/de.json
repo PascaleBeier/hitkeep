@@ -196,6 +196,7 @@
       "backupTriggered": "Backup gestartet",
       "backupCompleted": "Backup abgeschlossen",
       "backupFailed": "Backup fehlgeschlagen",
+      "databaseCheckpointRequested": "Datenbank-Checkpoint",
       "spamRefreshed": "Spamfilter aktualisiert",
       "mailTested": "E-Mail-Test",
       "diagnosticsExported": "Diagnose exportiert",
@@ -2246,6 +2247,22 @@
         "rejections": "Ablehnungen",
         "spam": "Spam blockiert",
         "hitsPerSecond": "Hits/s"
+      },
+      "database": {
+        "title": "Datenbank-Widerstandsfähigkeit",
+        "autoRecovery": "Automatische Indexwiederherstellung",
+        "automaticWalRecovery": "Automatische WAL-Umgehung",
+        "checkpointInterval": "Checkpoint-Intervall",
+        "lastCheckpoint": "Letzter Checkpoint in diesem Lauf",
+        "lastRecovery": "Letzte Wiederherstellung",
+        "removedUnsafeIndexes": "Entfernte unsichere Indizes",
+        "recoveryBundle": "Wiederherstellungspaket aufbewahrt",
+        "actions": {
+          "checkpoint": "Checkpoint ausführen"
+        },
+        "statusUnavailable": "Der Datenbankstatus ist während der Wiederherstellung oder bei erforderlichem Eingriff nicht verfügbar.",
+        "checkpointSuccess": "Datenbank-Checkpoint abgeschlossen.",
+        "checkpointFailed": "Datenbank-Checkpoint fehlgeschlagen."
       },
       "backups": {
         "title": "Backups",

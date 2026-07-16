@@ -196,6 +196,7 @@
       "backupTriggered": "Back-up geactiveerd",
       "backupCompleted": "Back-up voltooid",
       "backupFailed": "Back-up mislukt",
+      "databaseCheckpointRequested": "Databasecheckpoint",
       "spamRefreshed": "Spam vernieuwen",
       "mailTested": "Mail-test",
       "diagnosticsExported": "Diagnostiek geëxporteerd",
@@ -2212,6 +2213,22 @@
         "rejections": "Afwijzingen",
         "spam": "Spam geblokkeerd",
         "hitsPerSecond": "Hits/sec"
+      },
+      "database": {
+        "title": "Databasebestendigheid",
+        "autoRecovery": "Automatisch indexherstel",
+        "automaticWalRecovery": "Automatische WAL-omzeiling",
+        "checkpointInterval": "Checkpointinterval",
+        "lastCheckpoint": "Laatste checkpoint in deze uitvoering",
+        "lastRecovery": "Laatste herstel",
+        "removedUnsafeIndexes": "Verwijderde onveilige indexen",
+        "recoveryBundle": "Herstelbundel bewaard",
+        "actions": {
+          "checkpoint": "Checkpoint uitvoeren"
+        },
+        "statusUnavailable": "De databasestatus is niet beschikbaar tijdens herstel of wanneer beheeractie vereist is.",
+        "checkpointSuccess": "Databasecheckpoint voltooid.",
+        "checkpointFailed": "Databasecheckpoint mislukt."
       },
       "backups": {
         "title": "Back-ups",

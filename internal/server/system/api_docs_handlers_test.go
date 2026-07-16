@@ -32,6 +32,47 @@ func TestOpenAPISpecV1FormatParameterIncludesAllExportFormats(t *testing.T) {
 	}
 }
 
+func TestOpenAPISpecV1DocumentsReadinessRecoveryResponse(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+	componentResponses := requireMap(t, components, "responses")
+
+	readinessSchema := requireMap(t, schemas, "ReadinessUnavailable")
+	readinessProps := requireMap(t, readinessSchema, "properties")
+	reasonSchema := requireMap(t, readinessProps, "reason")
+	reasons := asStringSlice(t, reasonSchema["enum"])
+	for _, want := range []string{"not_leader", "database_unavailable", "database_recovering", "database_needs_attention"} {
+		if !slices.Contains(reasons, want) {
+			t.Fatalf("expected readiness reason enum to include %q, got %v", want, reasons)
+		}
+	}
+
+	readyPath := requireMap(t, paths, "/readyz")
+	getOperation := requireMap(t, readyPath, "get")
+	responses := requireMap(t, getOperation, "responses")
+	unavailable := requireMap(t, responses, "503")
+	headers := requireMap(t, unavailable, "headers")
+	if _, ok := headers["Retry-After"]; !ok {
+		t.Fatal("expected /readyz 503 response to document Retry-After")
+	}
+	content := requireMap(t, unavailable, "content")
+	jsonContent := requireMap(t, content, "application/json")
+	responseSchema := requireMap(t, jsonContent, "schema")
+	if got, _ := responseSchema["$ref"].(string); got != "#/components/schemas/ReadinessUnavailable" {
+		t.Fatalf("unexpected /readyz 503 schema ref %q", got)
+	}
+
+	databaseUnavailable := requireMap(t, componentResponses, "DatabaseUnavailable")
+	databaseUnavailableContent := requireMap(t, databaseUnavailable, "content")
+	databaseUnavailableJSON := requireMap(t, databaseUnavailableContent, "application/json")
+	databaseUnavailableSchema := requireMap(t, databaseUnavailableJSON, "schema")
+	if got, _ := databaseUnavailableSchema["$ref"].(string); got != "#/components/schemas/DatabaseUnavailable" {
+		t.Fatalf("unexpected database unavailable schema ref %q", got)
+	}
+}
+
 func TestOpenAPISpecV1DocumentsWebhookManagementAndSigning(t *testing.T) {
 	spec := openAPISpecV1("https://hitkeep.test")
 	paths := requireMap(t, spec, "paths")
@@ -268,6 +309,7 @@ func TestOpenAPISpecV1IncludesAdminSystemPaths(t *testing.T) {
 		"SystemStorage",
 		"SystemIngestStats",
 		"SystemBackupStatus",
+		"SystemDatabaseStatus",
 		"SystemSpamStatus",
 		"SystemCacheStatus",
 		"SystemMailStatus",
@@ -303,6 +345,8 @@ func TestOpenAPISpecV1IncludesAdminSystemPaths(t *testing.T) {
 		"/api/admin/system/storage",
 		"/api/admin/system/ingest",
 		"/api/admin/system/backups",
+		"/api/admin/system/database",
+		"/api/admin/system/database/checkpoint",
 		"/api/admin/system/spam-filter",
 		"/api/admin/system/spam-filter/refresh",
 		"/api/admin/system/caches",

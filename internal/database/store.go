@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	walAutoCheckpointSize         = "64MB"
-	maintenanceCheckpointInterval = 15 * time.Minute
+	walAutoCheckpointSize                = "64MB"
+	defaultMaintenanceCheckpointInterval = 5 * time.Minute
 )
 
 var duckDBCoreExtensions = [...]string{"httpfs", "aws", "excel"}
@@ -27,6 +27,16 @@ type Store struct {
 	path                string
 	memoryLimit         string
 	threads             int
+	checkpointInterval  time.Duration
+	checkpointMu        sync.Mutex
+	status              *databaseStatusTracker
+	recovery            *databaseRecovery
+	recoveryOptions     recoveryOptions
+	fatalErrors         chan error
+	fatalReporter       func(error)
+	recoveredOnConnect  bool
+	closeMu             sync.Mutex
+	closed              bool
 	analyticsMu         sync.Mutex
 	aiBudgetMu          sync.Mutex
 	primaryAuthMu       sync.Mutex
@@ -62,17 +72,58 @@ func WithThreads(threads int) StoreOption {
 	}
 }
 
+// WithCheckpointInterval configures periodic checkpoint maintenance. A zero
+// interval disables the periodic loop while preserving required checkpoints.
+func WithCheckpointInterval(interval time.Duration) StoreOption {
+	return func(s *Store) {
+		s.checkpointInterval = interval
+	}
+}
+
+// WithAutomaticRecovery enables the allowlisted DuckDB recovery procedures
+// and configures where their permission-restricted bundles are retained.
+func WithAutomaticRecovery(enabled bool, recoveryPath string) StoreOption {
+	return func(s *Store) {
+		s.recoveryOptions.enabled = enabled
+		s.recoveryOptions.root = strings.TrimSpace(recoveryPath)
+	}
+}
+
+// WithAutomaticWALRecovery opts into discarding a narrowly recognized,
+// replay-failing WAL after retaining an exact recovery bundle. It is disabled
+// by default because WAL-only committed changes are excluded from the recovered
+// live database.
+func WithAutomaticWALRecovery(enabled bool) StoreOption {
+	return func(s *Store) {
+		s.recoveryOptions.automaticWALRecovery = enabled
+	}
+}
+
+func withFatalReporter(reporter func(error)) StoreOption {
+	return func(s *Store) {
+		s.fatalReporter = reporter
+	}
+}
+
 // memoryLimitPattern accepts DuckDB memory sizes such as "512MB" or "1.5 GiB".
 var memoryLimitPattern = regexp.MustCompile(`(?i)^[0-9]+(\.[0-9]+)?\s*(B|KB|MB|GB|TB|KiB|MiB|GiB|TiB)?$`)
 
 func NewStore(path string, opts ...StoreOption) *Store {
 	store := &Store{
-		path:    path,
-		runtime: newRuntimeCache(),
+		path:               path,
+		checkpointInterval: defaultMaintenanceCheckpointInterval,
+		runtime:            newRuntimeCache(),
+		fatalErrors:        make(chan error, 1),
 	}
 	for _, opt := range opts {
 		opt(store)
 	}
+	store.status = newDatabaseStatusTracker(
+		store.recoveryOptions.enabled,
+		store.recoveryOptions.automaticWALRecovery,
+		store.checkpointInterval,
+	)
+	store.recovery = newDatabaseRecovery(store, store.recoveryOptions, store.status)
 	return store
 }
 
@@ -86,10 +137,16 @@ func (s *Store) duckDBOptions() []StoreOption {
 	if s.threads != 0 {
 		opts = append(opts, WithThreads(s.threads))
 	}
+	opts = append(opts,
+		WithCheckpointInterval(s.checkpointInterval),
+		WithAutomaticRecovery(s.recoveryOptions.enabled, s.recoveryOptions.root),
+		WithAutomaticWALRecovery(s.recoveryOptions.automaticWALRecovery),
+	)
 	return opts
 }
 
 func (s *Store) Connect() error {
+	s.recoveredOnConnect = false
 	if s.memoryLimit != "" && !memoryLimitPattern.MatchString(s.memoryLimit) {
 		return fmt.Errorf("invalid DuckDB memory limit %q: expected a size such as 512MB or 1.5GiB", s.memoryLimit)
 	}
@@ -97,23 +154,102 @@ func (s *Store) Connect() error {
 		return fmt.Errorf("invalid DuckDB threads %d: must be zero or positive", s.threads)
 	}
 
-	slog.Info("Connecting to database...", "path", s.path)
-	connector := newReconnectingConnector(s.path, func() (driver.Connector, error) {
-		return duckdb.NewConnector(s.path, s.initConnection)
-	})
-	db := sql.OpenDB(connector)
+	ctx := context.Background()
+	s.recovery.loadRecoveryHistory()
+	recoveryBeforeConnect := s.DatabaseStatus().LastRecoveryAt
+	if err := s.recovery.recoverStartup(ctx); err != nil {
+		return fmt.Errorf("resume database recovery: %w", err)
+	}
 
-	if err := db.PingContext(context.Background()); err != nil {
-		_ = db.Close()
+	slog.Info("Connecting to database...", "path", s.path)
+	db, err := s.openReconnectingDB(ctx)
+	if err != nil && isKnownWALReplayError(err) && s.recovery.available() {
+		if recoveryErr := s.recovery.recoverWAL(ctx, err); recoveryErr != nil {
+			return fmt.Errorf("recover database WAL: %w", recoveryErr)
+		}
+		db, err = s.openReconnectingDB(ctx)
+	}
+	if err != nil {
 		return fmt.Errorf("could not connect to database: %w", err)
 	}
 
 	s.db = db
+	s.closeMu.Lock()
+	s.closed = false
+	s.closeMu.Unlock()
+	s.recoveredOnConnect = recoveryTimestampChanged(recoveryBeforeConnect, s.DatabaseStatus().LastRecoveryAt)
 	if err := s.bootstrapCoreExtensions(); err != nil {
 		slog.Warn("DuckDB core extension bootstrap incomplete; XLSX exports and S3-backed flows may fail", "error", err)
 	}
 	slog.Debug("Database connection established successfully.")
 	return nil
+}
+
+func recoveryTimestampChanged(before, after *time.Time) bool {
+	if after == nil {
+		return false
+	}
+	return before == nil || !before.Equal(*after)
+}
+
+func (s *Store) openReconnectingDB(ctx context.Context) (*sql.DB, error) {
+	connector := newReconnectingConnector(s.path, func() (driver.Connector, error) {
+		return duckdb.NewConnector(s.path, s.initConnection)
+	}, func(ctx context.Context, trigger error) error {
+		err := s.recovery.recoverInvalidation(ctx, trigger)
+		if err != nil {
+			s.reportFatal(fmt.Errorf("automatic database recovery failed: %w", err))
+		}
+		return err
+	})
+	connector.configureDrainWatchdog(10*time.Second, s.reportDrainTimeout)
+	connector.configureInvalidationObserver(func(trigger error) {
+		recoveryTrigger := "fatal_invalidation"
+		if isIndexMutationCorruption(trigger) {
+			recoveryTrigger = "index_mutation_corruption"
+		}
+		s.status.recovering("drain_connections", recoveryTrigger)
+	})
+	db := sql.OpenDB(connector)
+	if err := db.PingContext(ctx); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	return db, nil
+}
+
+func (s *Store) reportDrainTimeout(err error) {
+	if s == nil || err == nil {
+		return
+	}
+	s.status.recoveryFailed("connection_drain_timeout", "drain_connections")
+	s.reportFatal(err)
+}
+
+func (s *Store) reportFatal(err error) {
+	if s == nil || err == nil {
+		return
+	}
+	select {
+	case s.fatalErrors <- err:
+	default:
+	}
+	if s.fatalReporter != nil {
+		s.fatalReporter(err)
+	}
+}
+
+func (s *Store) openRawDB(ctx context.Context) (*sql.DB, error) {
+	connector, err := duckdb.NewConnector(s.path, s.initConnection)
+	if err != nil {
+		return nil, err
+	}
+	db := sql.OpenDB(connector)
+	if err := db.PingContext(ctx); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	return db, nil
 }
 
 func (s *Store) initConnection(execer driver.ExecerContext) error {
@@ -179,6 +315,9 @@ func (s *Store) StartMaintenance(ctx context.Context) {
 		slog.Warn("Skipping database maintenance loop because database is not connected")
 		return
 	}
+	if s.checkpointInterval <= 0 {
+		return
+	}
 
 	s.maintenanceMu.Lock()
 	defer s.maintenanceMu.Unlock()
@@ -188,7 +327,7 @@ func (s *Store) StartMaintenance(ctx context.Context) {
 	maintenanceCtx, cancel := context.WithCancel(ctx)
 	s.maintenanceCancel = cancel
 
-	ticker := time.NewTicker(maintenanceCheckpointInterval)
+	ticker := time.NewTicker(s.checkpointInterval)
 	go func() {
 		defer ticker.Stop()
 
@@ -197,13 +336,42 @@ func (s *Store) StartMaintenance(ctx context.Context) {
 			case <-maintenanceCtx.Done():
 				return
 			case <-ticker.C:
-				slog.Debug("Running database checkpoint...", "path", s.path)
-				if _, err := s.db.ExecContext(maintenanceCtx, "CHECKPOINT;"); err != nil && !errors.Is(err, context.Canceled) {
-					slog.Error("Checkpoint failed", "path", s.path, "error", err)
+				if err := s.Checkpoint(maintenanceCtx, "periodic"); err != nil && !errors.Is(err, context.Canceled) {
+					slog.Error("Periodic database checkpoint failed", "error", err)
+					retry := time.NewTimer(30 * time.Second)
+					select {
+					case <-maintenanceCtx.Done():
+						if !retry.Stop() {
+							<-retry.C
+						}
+						return
+					case <-retry.C:
+						if retryErr := s.Checkpoint(maintenanceCtx, "periodic_retry"); retryErr != nil && !errors.Is(retryErr, context.Canceled) {
+							slog.Error("Periodic database checkpoint retry failed", "error", retryErr)
+						}
+					}
 				}
 			}
 		}
 	}()
+}
+
+// Checkpoint durably flushes the current database WAL. Checkpoints are
+// serialized because DuckDB cannot run more than one checkpoint per database.
+func (s *Store) Checkpoint(ctx context.Context, reason string) error {
+	if s == nil || s.db == nil {
+		return errors.New("database is not connected")
+	}
+	s.checkpointMu.Lock()
+	defer s.checkpointMu.Unlock()
+
+	if _, err := s.db.ExecContext(ctx, "CHECKPOINT;"); err != nil {
+		s.status.checkpointFailed()
+		return fmt.Errorf("checkpoint database (%s): %w", strings.TrimSpace(reason), err)
+	}
+	s.status.checkpointSucceeded(time.Now().UTC())
+	slog.Debug("Database checkpoint completed", "reason", strings.TrimSpace(reason))
+	return nil
 }
 
 func (s *Store) stopMaintenance() {
@@ -216,6 +384,12 @@ func (s *Store) stopMaintenance() {
 }
 
 func (s *Store) Close() error {
+	s.closeMu.Lock()
+	defer s.closeMu.Unlock()
+	if s.closed {
+		return nil
+	}
+
 	slog.Debug("Closing database connection...")
 	s.stopMaintenance()
 	s.analyticsMu.Lock()
@@ -225,11 +399,45 @@ func (s *Store) Close() error {
 	}
 	s.analyticsMu.Unlock()
 	if s.db != nil {
-		return s.db.Close()
+		db := s.db
+		var checkpointErr error
+		if s.DatabaseStatus().State == DatabaseStateHealthy {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			checkpointErr = s.Checkpoint(ctx, "shutdown")
+			cancel()
+		}
+		closeErr := db.Close()
+		s.closed = true
+		return errors.Join(checkpointErr, closeErr)
 	}
+	s.closed = true
 	return nil
 }
 
 func (s *Store) DB() *sql.DB {
 	return s.db
+}
+
+// DatabaseStatus returns a sanitized snapshot for health and operator APIs.
+func (s *Store) DatabaseStatus() DatabaseStatus {
+	if s == nil {
+		return DatabaseStatus{State: DatabaseStateFailed}
+	}
+	return s.status.snapshot()
+}
+
+// RecoveredDuringConnect reports whether this Store.Connect call completed an
+// automatic recovery. It intentionally excludes recovery history loaded from
+// retained bundles.
+func (s *Store) RecoveredDuringConnect() bool {
+	return s != nil && s.recoveredOnConnect
+}
+
+// FatalErrors reports database conditions that require a controlled process
+// restart, such as a fatal instance that cannot release pinned connections.
+func (s *Store) FatalErrors() <-chan error {
+	if s == nil {
+		return nil
+	}
+	return s.fatalErrors
 }

@@ -3,6 +3,7 @@ package config
 import (
 	"flag"
 	"net/netip"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -841,5 +842,46 @@ func TestLoadDBCompactOnStartFromEnv(t *testing.T) {
 	})
 	if conf.DBCompactOnStart {
 		t.Fatal("expected HITKEEP_DB_COMPACT_ON_START=false to disable compaction")
+	}
+}
+
+func TestLoadDatabaseRecoverySettings(t *testing.T) {
+	defaults := load([]string{}, func(key, fallback string) string { return fallback })
+	if !defaults.DBAutoRecover {
+		t.Fatal("expected automatic database recovery to default to enabled")
+	}
+	if defaults.DBAutoRecoverWAL {
+		t.Fatal("expected destructive automatic WAL recovery to default to disabled")
+	}
+	if defaults.DBCheckpointIntervalMinutes != 5 {
+		t.Fatalf("expected five-minute checkpoint interval, got %d", defaults.DBCheckpointIntervalMinutes)
+	}
+	if defaults.DBRecoveryPath != filepath.Join(defaults.DataPath, "recovery") {
+		t.Fatalf("unexpected default recovery path %q", defaults.DBRecoveryPath)
+	}
+
+	env := map[string]string{
+		"HITKEEP_DB_AUTO_RECOVER":        "false",
+		"HITKEEP_DB_AUTO_RECOVER_WAL":    "true",
+		"HITKEEP_DB_CHECKPOINT_INTERVAL": "0",
+		"HITKEEP_DB_RECOVERY_PATH":       "/srv/hitkeep/recovery",
+	}
+	conf := load([]string{}, func(key, fallback string) string {
+		if val, ok := env[key]; ok {
+			return val
+		}
+		return fallback
+	})
+	if conf.DBAutoRecover {
+		t.Fatal("expected automatic database recovery to be disabled")
+	}
+	if !conf.DBAutoRecoverWAL {
+		t.Fatal("expected automatic WAL recovery opt-in to be enabled")
+	}
+	if conf.DBCheckpointIntervalMinutes != 0 {
+		t.Fatalf("expected periodic checkpoints disabled, got %d", conf.DBCheckpointIntervalMinutes)
+	}
+	if conf.DBRecoveryPath != "/srv/hitkeep/recovery" {
+		t.Fatalf("unexpected configured recovery path %q", conf.DBRecoveryPath)
 	}
 }

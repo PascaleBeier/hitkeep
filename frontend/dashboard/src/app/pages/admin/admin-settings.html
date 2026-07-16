@@ -782,6 +782,66 @@
                     @if (activeAdminTab() === "operations") {
                     <div class="admin-status__panel-grid admin-status__panel-grid--operations">
                         <app-system-status-card
+                            titleId="operations-database-title"
+                            [title]="'admin.system.database.title' | transloco"
+                            [loading]="isLoadingDatabase()"
+                            [refreshLabel]="'admin.system.console.refreshCard' | transloco"
+                            [actionLabel]="canRunMaintenance() ? ('admin.system.database.actions.checkpoint' | transloco) : ''"
+                            actionIcon="pi pi-save"
+                            [actionLoading]="isCheckpointingDatabase()"
+                            [actionDisabled]="!systemDatabase()"
+                            (refreshClicked)="loadSystemDatabase()"
+                            (actionClicked)="checkpointDatabase()"
+                        >
+                            @if (systemDatabase(); as database) {
+                            <dl class="admin-definition-list">
+                                <div>
+                                    <dt>{{ "admin.system.database.autoRecovery" | transloco }}</dt>
+                                    <dd><p-tag [value]="database.recovery_enabled ? ('common.enabled' | transloco) : ('common.disabled' | transloco)" [severity]="database.recovery_enabled ? 'success' : 'warn'" /></dd>
+                                </div>
+                                <div>
+                                    <dt>{{ "admin.system.database.automaticWalRecovery" | transloco }}</dt>
+                                    <dd><p-tag [value]="database.automatic_wal_recovery_enabled ? ('common.enabled' | transloco) : ('common.disabled' | transloco)" [severity]="database.automatic_wal_recovery_enabled ? 'warn' : 'success'" /></dd>
+                                </div>
+                                <div>
+                                    <dt>{{ "admin.system.database.checkpointInterval" | transloco }}</dt>
+                                    <dd>{{ formatMinutes(database.checkpoint_interval_min) }}</dd>
+                                </div>
+                                <div>
+                                    <dt>{{ "admin.system.database.lastCheckpoint" | transloco }}</dt>
+                                    <dd>
+                                        @if (database.last_checkpoint_at) {
+                                        <app-relative-date-time [value]="database.last_checkpoint_at" />
+                                        } @else { - }
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt>{{ "admin.system.database.lastRecovery" | transloco }}</dt>
+                                    <dd>
+                                        @if (database.last_recovery_at) {
+                                        <app-relative-date-time [value]="database.last_recovery_at" />
+                                        } @else { - }
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt>{{ "admin.system.database.removedUnsafeIndexes" | transloco }}</dt>
+                                    <dd>{{ database.removed_unsafe_indexes | number }}</dd>
+                                </div>
+                                <div>
+                                    <dt>{{ "admin.system.database.recoveryBundle" | transloco }}</dt>
+                                    <dd>{{ (database.recovery_bundle_available ? "common.yes" : "common.no") | transloco }}</dd>
+                                </div>
+                            </dl>
+                            @if (database.last_checkpoint_error) {
+                            <p-message severity="error" styleClass="w-full mt-3" [text]="'admin.system.database.checkpointFailed' | transloco" />
+                            } } @else if (isLoadingDatabase()) {
+                            <div class="admin-loading"><i class="pi pi-spin pi-spinner" aria-hidden="true"></i>{{ "common.loading" | transloco }}</div>
+                            } @if (databaseActionStatus(); as status) {
+                            <p-message [severity]="status.severity" styleClass="w-full mt-3" [text]="databaseActionStatusMessage()" />
+                            }
+                        </app-system-status-card>
+
+                        <app-system-status-card
                             titleId="operations-backups-title"
                             [title]="'admin.system.backups.title' | transloco"
                             [loading]="isLoadingBackups()"

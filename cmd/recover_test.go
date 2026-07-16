@@ -2,19 +2,103 @@ package hitkeepcmd
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/klauspost/compress/zstd"
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
 	"hitkeep/internal/worker"
 )
+
+func TestRestoreDatabaseRecoveryBundleRestoresExactDatabaseAndWal(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	bundleDir := filepath.Join(dir, "bundle")
+	if err := os.Mkdir(bundleDir, 0o700); err != nil {
+		t.Fatalf("create bundle directory: %v", err)
+	}
+	databaseBytes := []byte("recovered database bytes")
+	walBytes := []byte("recovered wal bytes")
+	manifest := databaseRecoveryBundleManifest{
+		Version: 1,
+		Artifacts: []databaseRecoveryBundleArtifact{
+			writeRecoveryBundleTestArtifact(t, bundleDir, "database.zst", databaseBytes),
+			writeRecoveryBundleTestArtifact(t, bundleDir, "wal.zst", walBytes),
+		},
+	}
+
+	targetPath := filepath.Join(dir, "hitkeep.db")
+	if err := os.WriteFile(targetPath, []byte("old database"), 0o600); err != nil {
+		t.Fatalf("write existing database: %v", err)
+	}
+	if err := os.WriteFile(targetPath+".wal", []byte("old wal"), 0o600); err != nil {
+		t.Fatalf("write existing WAL: %v", err)
+	}
+	if err := restoreDatabaseRecoveryBundle(bundleDir, targetPath, manifest); err != nil {
+		t.Fatalf("restore database bundle: %v", err)
+	}
+
+	restoredDatabase, err := os.ReadFile(targetPath)
+	if err != nil {
+		t.Fatalf("read restored database: %v", err)
+	}
+	restoredWAL, err := os.ReadFile(targetPath + ".wal")
+	if err != nil {
+		t.Fatalf("read restored WAL: %v", err)
+	}
+	if string(restoredDatabase) != string(databaseBytes) || string(restoredWAL) != string(walBytes) {
+		t.Fatal("restored bundle contents do not match the retained artifacts")
+	}
+}
+
+func TestRestoreDatabaseRecoveryBundleRejectsChecksumMismatch(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	bundleDir := filepath.Join(dir, "bundle")
+	if err := os.Mkdir(bundleDir, 0o700); err != nil {
+		t.Fatalf("create bundle directory: %v", err)
+	}
+	artifact := writeRecoveryBundleTestArtifact(t, bundleDir, "database.zst", []byte("database"))
+	artifact.SHA256 = strings.Repeat("0", sha256.Size*2)
+	err := restoreDatabaseRecoveryBundle(bundleDir, filepath.Join(dir, "hitkeep.db"), databaseRecoveryBundleManifest{
+		Version:   1,
+		Artifacts: []databaseRecoveryBundleArtifact{artifact},
+	})
+	if err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
+		t.Fatalf("expected checksum mismatch, got %v", err)
+	}
+}
+
+func writeRecoveryBundleTestArtifact(t *testing.T, dir, name string, content []byte) databaseRecoveryBundleArtifact {
+	t.Helper()
+	encoder, err := zstd.NewWriter(nil)
+	if err != nil {
+		t.Fatalf("create zstd encoder: %v", err)
+	}
+	compressed := encoder.EncodeAll(content, nil)
+	encoder.Close()
+	if err := os.WriteFile(filepath.Join(dir, name), compressed, 0o600); err != nil {
+		t.Fatalf("write test recovery artifact: %v", err)
+	}
+	sum := sha256.Sum256(content)
+	return databaseRecoveryBundleArtifact{
+		Name:         name,
+		OriginalSize: int64(len(content)),
+		SHA256:       hex.EncodeToString(sum[:]),
+	}
+}
 
 func TestMoveExistingDatabaseAsideRenamesDatabaseAndWal(t *testing.T) {
 	t.Parallel()
@@ -46,6 +130,44 @@ func TestMoveExistingDatabaseAsideRenamesDatabaseAndWal(t *testing.T) {
 	}
 	if _, err := os.Stat(backupPath + ".wal"); err != nil {
 		t.Fatalf("expected backup wal to exist: %v", err)
+	}
+}
+
+func TestActivateRestoredDatabaseRollsBackOriginalOnFailure(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	targetPath := filepath.Join(dir, "hitkeep.db")
+	if err := os.WriteFile(targetPath, []byte("original database"), 0o600); err != nil {
+		t.Fatalf("write original database: %v", err)
+	}
+	if err := os.WriteFile(targetPath+".wal", []byte("original WAL"), 0o600); err != nil {
+		t.Fatalf("write original WAL: %v", err)
+	}
+	backupPath, err := moveExistingDatabaseAside(targetPath)
+	if err != nil {
+		t.Fatalf("move original database aside: %v", err)
+	}
+
+	err = activateRestoredDatabase(
+		filepath.Join(dir, "missing-restored.db"),
+		"",
+		targetPath,
+		backupPath,
+	)
+	if err == nil {
+		t.Fatal("expected activation failure")
+	}
+	databaseBytes, readErr := os.ReadFile(targetPath)
+	if readErr != nil {
+		t.Fatalf("read rolled-back database: %v", readErr)
+	}
+	walBytes, readErr := os.ReadFile(targetPath + ".wal")
+	if readErr != nil {
+		t.Fatalf("read rolled-back WAL: %v", readErr)
+	}
+	if string(databaseBytes) != "original database" || string(walBytes) != "original WAL" {
+		t.Fatalf("unexpected rolled-back contents: database=%q wal=%q", databaseBytes, walBytes)
 	}
 }
 

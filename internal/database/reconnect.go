@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 )
 
 // invalidatedDatabaseMarker is DuckDB's fatal-error signature after an
@@ -18,9 +19,9 @@ import (
 // replay.
 const invalidatedDatabaseMarker = "database has been invalidated"
 
-// errDatabaseRecovering is returned to callers that hit the short window in
+// ErrDatabaseRecovering is returned to callers that hit the short window in
 // which the invalidated instance is still draining its open connections.
-var errDatabaseRecovering = errors.New("database is recovering from a fatal error, retry shortly")
+var ErrDatabaseRecovering = errors.New("database is recovering from a fatal error, retry shortly")
 
 func isInvalidatedDatabaseError(err error) bool {
 	return err != nil && strings.Contains(strings.ToLower(err.Error()), invalidatedDatabaseMarker)
@@ -41,31 +42,57 @@ type duckdbConnUnwrapper interface {
 type reconnectingConnector struct {
 	path    string
 	factory func() (driver.Connector, error)
+	recover func(context.Context, error) error
 
-	mu        sync.Mutex
-	inner     driver.Connector
-	openConns int
-	dead      bool
+	mu         sync.Mutex
+	inner      driver.Connector
+	openConns  int
+	dead       bool
+	recovering bool
+	trigger    error
+	drainTimer *time.Timer
+
+	drainTimeout   time.Duration
+	onDrainTimeout func(error)
+	onInvalidated  func(error)
 }
 
-func newReconnectingConnector(path string, factory func() (driver.Connector, error)) *reconnectingConnector {
-	return &reconnectingConnector{path: path, factory: factory}
+func newReconnectingConnector(path string, factory func() (driver.Connector, error), recover func(context.Context, error) error) *reconnectingConnector {
+	return &reconnectingConnector{path: path, factory: factory, recover: recover}
 }
 
 func (c *reconnectingConnector) Connect(ctx context.Context) (driver.Conn, error) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 
 	if c.dead {
-		if c.openConns > 0 {
-			return nil, fmt.Errorf("%s: %w", c.path, errDatabaseRecovering)
+		if c.openConns > 0 || c.recovering {
+			c.mu.Unlock()
+			return nil, fmt.Errorf("%s: %w", c.path, ErrDatabaseRecovering)
 		}
 		c.closeInnerLocked()
+		c.recovering = true
+		trigger := c.trigger
+		c.mu.Unlock()
+
+		var recoveryErr error
+		if c.recover != nil {
+			recoveryErr = c.recover(ctx, trigger)
+		}
+
+		c.mu.Lock()
+		c.recovering = false
+		if recoveryErr != nil {
+			c.mu.Unlock()
+			return nil, fmt.Errorf("%s: recovery failed: %w", c.path, recoveryErr)
+		}
+		c.dead = false
+		c.trigger = nil
 	}
 
 	if c.inner == nil {
 		inner, err := c.factory()
 		if err != nil {
+			c.mu.Unlock()
 			return nil, fmt.Errorf("open database %s: %w", c.path, err)
 		}
 		c.inner = inner
@@ -73,9 +100,11 @@ func (c *reconnectingConnector) Connect(ctx context.Context) (driver.Conn, error
 
 	conn, err := c.inner.Connect(ctx)
 	if err != nil {
+		c.mu.Unlock()
 		return nil, err
 	}
 	c.openConns++
+	c.mu.Unlock()
 	return &reconnectingConn{inner: conn, connector: c}, nil
 }
 
@@ -88,6 +117,12 @@ func (c *reconnectingConnector) Close() error {
 	inner := c.inner
 	c.inner = nil
 	c.dead = false
+	c.recovering = false
+	c.trigger = nil
+	if c.drainTimer != nil {
+		c.drainTimer.Stop()
+		c.drainTimer = nil
+	}
 	if closer, ok := inner.(io.Closer); ok {
 		return closer.Close()
 	}
@@ -96,15 +131,25 @@ func (c *reconnectingConnector) Close() error {
 
 // markDead flags the current instance after an invalidation error. The first
 // caller logs the incident; the swap happens once the pool has drained.
-func (c *reconnectingConnector) markDead() {
+func (c *reconnectingConnector) markDead(trigger error) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	if c.dead {
+		if c.trigger == nil {
+			c.trigger = trigger
+		}
+		c.mu.Unlock()
 		return
 	}
 	c.dead = true
+	c.trigger = trigger
+	observer := c.onInvalidated
 	slog.Error("DuckDB database invalidated by a fatal error; reopening after connections drain",
 		"path", c.path, "open_connections", c.openConns)
+	c.startDrainWatchdogLocked()
+	c.mu.Unlock()
+	if observer != nil {
+		observer(trigger)
+	}
 }
 
 func (c *reconnectingConnector) isDead() bool {
@@ -122,13 +167,48 @@ func (c *reconnectingConnector) connClosed() {
 		c.openConns--
 	}
 	if c.dead && c.openConns == 0 {
+		if c.drainTimer != nil {
+			c.drainTimer.Stop()
+			c.drainTimer = nil
+		}
 		c.closeInnerLocked()
 	}
 }
 
+func (c *reconnectingConnector) configureDrainWatchdog(timeout time.Duration, callback func(error)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.drainTimeout = timeout
+	c.onDrainTimeout = callback
+}
+
+func (c *reconnectingConnector) configureInvalidationObserver(callback func(error)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.onInvalidated = callback
+}
+
+func (c *reconnectingConnector) startDrainWatchdogLocked() {
+	if c.openConns == 0 || c.drainTimeout <= 0 || c.onDrainTimeout == nil || c.drainTimer != nil {
+		return
+	}
+	c.drainTimer = time.AfterFunc(c.drainTimeout, func() {
+		c.mu.Lock()
+		if !c.dead || c.openConns == 0 {
+			c.drainTimer = nil
+			c.mu.Unlock()
+			return
+		}
+		openConnections := c.openConns
+		callback := c.onDrainTimeout
+		c.drainTimer = nil
+		c.mu.Unlock()
+		callback(fmt.Errorf("database recovery drain timed out with %d open connection(s)", openConnections))
+	})
+}
+
 func (c *reconnectingConnector) closeInnerLocked() {
 	if c.inner == nil {
-		c.dead = false
 		return
 	}
 	if closer, ok := c.inner.(io.Closer); ok {
@@ -137,14 +217,13 @@ func (c *reconnectingConnector) closeInnerLocked() {
 		}
 	}
 	c.inner = nil
-	c.dead = false
-	slog.Info("Reopening DuckDB database after fatal invalidation", "path", c.path)
+	slog.Info("Closed invalidated DuckDB database before recovery", "path", c.path)
 }
 
 // observe inspects an operation error and flags the instance on invalidation.
 func (c *reconnectingConnector) observe(err error) {
 	if isInvalidatedDatabaseError(err) {
-		c.markDead()
+		c.markDead(err)
 	}
 }
 

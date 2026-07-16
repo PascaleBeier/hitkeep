@@ -20,7 +20,23 @@ func openAPIV1CorePaths() map[string]any {
 			"get": op([]string{"System"}, "Health check", "Liveness endpoint.", nil, nil, nil, map[string]any{"200": desc("OK")}),
 		},
 		"/readyz": map[string]any{
-			"get": op([]string{"System"}, "Readiness check", "Readiness endpoint (leader and DB readiness).", nil, nil, nil, map[string]any{"200": desc("Ready"), "503": errResp("Not ready")}),
+			"get": op([]string{"System"}, "Readiness check", "Readiness endpoint for leader state and shared or open tenant database availability. Recovery and operator-attention states return a stable reason with a short retry interval.", nil, nil, nil, map[string]any{
+				"200": desc("Ready"),
+				"503": map[string]any{
+					"description": "Not ready",
+					"headers": map[string]any{
+						"Retry-After": map[string]any{
+							"description": "Seconds before retrying the readiness check.",
+							"schema":      map[string]any{"type": "integer", "minimum": 1},
+						},
+					},
+					"content": map[string]any{
+						"application/json": map[string]any{
+							"schema": map[string]any{"$ref": "#/components/schemas/ReadinessUnavailable"},
+						},
+					},
+				},
+			}),
 		},
 		"/api/status": map[string]any{
 			"get": op([]string{"System"}, "Instance status", "Setup and version status, plus optional managed-cloud metadata.", nil, nil, nil, map[string]any{

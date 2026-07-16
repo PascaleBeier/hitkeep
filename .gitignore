@@ -2,8 +2,11 @@ tmp
 node_modules
 hitkeep
 main
+*.test
 hitkeep.db
 hitkeep.db.wal
+hitkeep.db.zst
+hitkeep.db.zstd
 /*-local-*.png
 /archive
 /public
