@@ -122,6 +122,32 @@ func TestCatalogUsesWorkspaceScopedLocalImages(t *testing.T) {
 	}
 }
 
+func TestComposeEnvironmentExposesSocialProvidersInLocalDevelopment(t *testing.T) {
+	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	app, err := NewApp(initTestRepository(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	variant, err := VariantByID("self-hosted")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	environment := app.ComposeEnvironment(variant)
+	for _, name := range []string{
+		"HITKEEP_SOCIAL_GOOGLE_CLIENT_ID",
+		"HITKEEP_SOCIAL_GOOGLE_CLIENT_SECRET",
+		"HITKEEP_SOCIAL_GITHUB_CLIENT_ID",
+		"HITKEEP_SOCIAL_GITHUB_CLIENT_SECRET",
+		"HITKEEP_SOCIAL_MICROSOFT_CLIENT_ID",
+		"HITKEEP_SOCIAL_MICROSOFT_CLIENT_SECRET",
+	} {
+		if value := environmentValue(environment, name); value == "" {
+			t.Fatalf("local development environment does not configure %s", name)
+		}
+	}
+}
+
 func environmentValue(environment []string, name string) string {
 	prefix := name + "="
 	for _, entry := range environment {

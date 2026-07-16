@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -136,6 +137,68 @@ func TestMCPStdioWritesNoNonProtocolOutput(t *testing.T) {
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("unexpected stderr: %q", stderr.String())
+	}
+}
+
+func TestMCPStdioWithoutWorkspaceRoutesByClientRoots(t *testing.T) {
+	if testing.Short() {
+		t.Skip("builds the hk command")
+	}
+	_, source, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("resolve source path")
+	}
+	projectRoot := filepath.Clean(filepath.Join(filepath.Dir(source), "..", ".."))
+	binary := filepath.Join(t.TempDir(), "hk")
+	build := exec.Command("go", "build", "-o", binary, "./cmd/hk")
+	build.Dir = projectRoot
+	if output, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build hk: %v: %s", err, output)
+	}
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	if output, err := exec.Command("git", "init", "--quiet", workspace).CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, output)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, "CONTRIBUTING.md"), []byte("# Contributing\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, "go.mod"), []byte("module hitkeep\n\ngo 1.26.5\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	delegated := filepath.Join(t.TempDir(), "delegated")
+	launcher := "#!/bin/sh\n: > " + delegated + "\nexec " + binary + " \"$@\"\n"
+	if err := os.WriteFile(filepath.Join(workspace, "hk"), []byte(launcher), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	stateDir := filepath.Join(t.TempDir(), "state")
+	t.Setenv("HK_STATE_DIR", stateDir)
+	wantApp, err := devtool.NewApp(workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	command := exec.Command(binary, "mcp", "serve")
+	command.Dir = projectRoot
+	command.Env = append(os.Environ(), "HK_STATE_DIR="+stateDir)
+	client := mcp.NewClient(&mcp.Implementation{Name: "hk-central-integration-test", Version: "test"}, nil)
+	client.AddRoots(&mcp.Root{URI: (&url.URL{Scheme: "file", Path: filepath.ToSlash(workspace)}).String()})
+	session, err := client.Connect(ctx, &mcp.CommandTransport{Command: command}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "hk_workspace_status", Arguments: map[string]any{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	envelope := result.StructuredContent.(map[string]any)
+	if result.IsError || envelope["workspace_id"] != wantApp.WorkspaceID() {
+		t.Fatalf("central stdio server did not route by client root: %#v", envelope)
+	}
+	if _, err := os.Stat(delegated); err != nil {
+		t.Fatalf("central server did not delegate to the workspace MCP: %v", err)
 	}
 }
 

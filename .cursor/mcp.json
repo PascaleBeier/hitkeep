@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "hitkeep-dev": {
-      "command": "./hk",
-      "args": ["--workspace", ".", "mcp", "serve"]
-    }
-  }
-}

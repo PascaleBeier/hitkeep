@@ -186,9 +186,59 @@ jobs:
             hitkeep-${{ matrix.artifact_suffix }}
             hitkeep-cloud-${{ matrix.artifact_suffix }}
 
+  verify-developer-portability:
+    name: Verify hk on ${{ matrix.label }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: darwin-amd64
+            label: macOS amd64
+            goos: darwin
+            goarch: amd64
+          - id: darwin-arm64
+            label: macOS arm64
+            goos: darwin
+            goarch: arm64
+          - id: linux-amd64
+            label: Linux amd64
+            goos: linux
+            goarch: amd64
+          - id: linux-arm64
+            label: Linux arm64
+            goos: linux
+            goarch: arm64
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.checkout_ref || github.sha }}
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Cross-compile standalone developer CLI
+        env:
+          HK_DEVELOPER_GOARCH: ${{ matrix.goarch }}
+          HK_DEVELOPER_GOOS: ${{ matrix.goos }}
+          HK_DEVELOPER_VERSION: ${{ inputs.version }}
+        run: |
+          ./hk ci build-developer \
+            --version "${HK_DEVELOPER_VERSION}" \
+            --goos "${HK_DEVELOPER_GOOS}" \
+            --goarch "${HK_DEVELOPER_GOARCH}"
+
   upload-release-binaries:
     name: Upload release binaries
-    needs: build-binaries
+    needs:
+      - build-binaries
+      - verify-developer-portability
     if: ${{ inputs.upload_to_release && inputs.release_tag_name != '' }}
     runs-on: ubuntu-24.04
     permissions:

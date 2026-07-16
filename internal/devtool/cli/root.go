@@ -326,6 +326,16 @@ func ciCommand(options *options) *cobra.Command {
 	build.Flags().StringVar(&request.GOARCH, "goarch", "", "release architecture: amd64 or arm64")
 	_ = build.MarkFlagRequired("version")
 	_ = build.MarkFlagRequired("goarch")
+	var developerRequest devtool.ReleaseBuildRequest
+	buildDeveloper := &cobra.Command{Use: "build-developer", Args: cobra.NoArgs, RunE: withApp(options, "ci build-developer", func(ctx context.Context, app *devtool.App) (any, error) {
+		return app.BuildDeveloperBinary(ctx, developerRequest, options.stderr)
+	})}
+	buildDeveloper.Flags().StringVar(&developerRequest.Version, "version", "", "release version embedded in hk")
+	buildDeveloper.Flags().StringVar(&developerRequest.GOOS, "goos", "", "developer release operating system: darwin or linux")
+	buildDeveloper.Flags().StringVar(&developerRequest.GOARCH, "goarch", "", "developer release architecture: amd64 or arm64")
+	_ = buildDeveloper.MarkFlagRequired("version")
+	_ = buildDeveloper.MarkFlagRequired("goos")
+	_ = buildDeveloper.MarkFlagRequired("goarch")
 	var shard string
 	race := &cobra.Command{Use: "race", Short: "Run one canonical Go race shard", Args: cobra.NoArgs, RunE: withApp(options, "ci race", func(ctx context.Context, app *devtool.App) (any, error) {
 		return app.RunRaceShard(ctx, shard, options.stderr)
@@ -351,6 +361,7 @@ func ciCommand(options *options) *cobra.Command {
 		goConfig,
 		toolchain,
 		build,
+		buildDeveloper,
 		race,
 		cloudTest,
 		verifyBuild,
@@ -368,15 +379,19 @@ func ciCommand(options *options) *cobra.Command {
 func mcpCommand(options *options) *cobra.Command {
 	command := &cobra.Command{Use: "mcp", Short: "Expose hk over local Model Context Protocol"}
 	command.AddCommand(
-		&cobra.Command{Use: "manifest", Short: "Emit worktree-specific client registration", Args: cobra.NoArgs, RunE: withApp(options, "mcp manifest", func(_ context.Context, app *devtool.App) (any, error) {
+		&cobra.Command{Use: "manifest", Short: "Emit the central client registration", Args: cobra.NoArgs, RunE: withApp(options, "mcp manifest", func(_ context.Context, app *devtool.App) (any, error) {
 			return app.MCPManifest()
 		})},
 		&cobra.Command{Use: "serve", Short: "Serve MCP over stdio", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
-			app, err := devtool.NewApp(options.workspace)
-			if err != nil {
-				return err
+			if cmd.Root().PersistentFlags().Changed("workspace") {
+				app, err := devtool.NewApp(options.workspace)
+				if err != nil {
+					return err
+				}
+				return devmcp.RunStdio(cmd.Context(), app, options.version)
 			}
-			return devmcp.RunStdio(cmd.Context(), app, options.version)
+			fallback, _ := os.Getwd()
+			return devmcp.RunCentralStdio(cmd.Context(), fallback, options.version)
 		}},
 	)
 	return command
@@ -590,15 +605,7 @@ func renderHuman(writer io.Writer, envelope devtool.Envelope) error {
 			_, _ = fmt.Fprintf(writer, "  %-24s %-7s %s\n", gate.ID, gate.Timeout, gate.Description)
 		}
 	case devtool.DeveloperMCPManifest:
-		_, _ = fmt.Fprintln(writer, "Project-scoped MCP (model-agnostic):")
-		for _, client := range value.ProjectClients {
-			trust := ""
-			if client.RequiresTrustedProject {
-				trust = "; approve the worktree once"
-			}
-			_, _ = fmt.Fprintf(writer, "  %-12s automatic via %s%s\n", client.ClientName, client.ConfigPath, trust)
-		}
-		_, _ = fmt.Fprintln(writer, "Generic registration for any other stdio MCP host:")
+		_, _ = fmt.Fprintln(writer, "One-time central MCP registration (model-agnostic; routes by client roots):")
 		raw, err := json.MarshalIndent(value.ClientConfig, "", "  ")
 		if err != nil {
 			return err

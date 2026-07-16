@@ -12,7 +12,7 @@ import (
 func ValidateDevelopmentDocs(root string) error {
 	files := map[string][]string{
 		"README.md":       {"./hk setup", "./hk dev --seed", "./hk qa pr", "CONTRIBUTING.md"},
-		"CONTRIBUTING.md": {"./hk help", "./hk catalog --output json", "model-agnostic", "project-scoped MCP", "approve or trust the repository", "./hk mcp manifest", "./hk mcp serve", "./hk skills check", "./hk fmt", "./hk fix check", "./hk cache status", "./hk run list", "next_cursor", "AGENTS.md", "source repository is private"},
+		"CONTRIBUTING.md": {"./hk help", "./hk catalog --output json", "model-agnostic", "central MCP", "client roots", "macOS or Linux", "AMD64 or ARM64", "builds the broker locally", "./hk mcp manifest", "./hk mcp serve", "./hk skills check", "./hk fmt", "./hk fix check", "./hk cache status", "./hk run list", "next_cursor", "AGENTS.md", "source repository is private"},
 		"AGENTS.md":       {"Use `./hk` as the workflow source of truth", "$hitkeep-development", "$hitkeep-workspace", "$hitkeep-qa", "private `PascaleBeier/hitkeep-docs`"},
 		".agents/skills/hitkeep-development/references/delivery.md": {
 			"private source for the public documentation website",
@@ -32,9 +32,6 @@ func ValidateDevelopmentDocs(root string) error {
 		}
 	}
 	if err := validateAgentInstructionDrift(root); err != nil {
-		return err
-	}
-	if err := validateProjectMCPConfigurations(root); err != nil {
 		return err
 	}
 	if err := validateCIWorkflowContract(root); err != nil {
@@ -80,27 +77,6 @@ func validateCIWorkflowContract(root string) error {
 	for group, gateIDs := range groups {
 		if !bytes.Contains(workflows, []byte("--group "+group)) {
 			return fmt.Errorf("canonical CI group %s for gates %s is not referenced by a workflow", group, strings.Join(gateIDs, ", "))
-		}
-	}
-	return nil
-}
-
-func validateProjectMCPConfigurations(root string) error {
-	for _, spec := range mcpProjectClientSpecs {
-		path := filepath.Join(root, filepath.FromSlash(spec.ConfigPath))
-		raw, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		for _, required := range spec.RequiredFragments {
-			if !bytes.Contains(raw, []byte(required)) {
-				return fmt.Errorf("%s is missing worktree-confined MCP setting %q", spec.ConfigPath, required)
-			}
-		}
-		for _, forbidden := range []string{"/Users/", "/home/", "bearer", "token", "secret"} {
-			if bytes.Contains(bytes.ToLower(raw), []byte(strings.ToLower(forbidden))) {
-				return fmt.Errorf("%s contains non-portable or secret-bearing value %q", spec.ConfigPath, forbidden)
-			}
 		}
 	}
 	return nil

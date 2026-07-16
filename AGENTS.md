@@ -8,7 +8,7 @@ This file is public guidance for AI-assisted contributions to HitKeep. It is wri
 
 - Treat the current repository as the source of truth. If an issue, prompt, or older document disagrees with the code, inspect the code first.
 - Use `./hk` as the workflow source of truth. Query its help and structured catalogs instead of copying commands, build tags, cloud defaults, ports, tool versions, or QA gates into instructions.
-- Prefer the project-scoped local developer MCP when available. Supported agent hosts load their checked-in worktree registration after repository trust; the server is independent of the selected model. Query `./hk mcp manifest --output json` for the live client catalog. Fall back to versioned `./hk --output json` results; reserve human output for people.
+- Prefer the central local developer MCP when available. Register one long-lived clone's locally built `./hk` launcher once; it routes each request from the MCP client's active roots to the matching worktree MCP. Query `./hk mcp manifest --output json` for the live registration contract. Fall back to versioned `./hk --output json` results; reserve human output for people.
 - Inspect the current workspace before setup, services, builds, or QA. Reuse an active run instead of starting duplicate work.
 - Use the developer CLI's formatter and Go migration surfaces for deliberate source rewrites. QA and MCP checks must remain non-mutating.
 - Keep changes small and tied to the user-visible behavior or maintenance task being requested.

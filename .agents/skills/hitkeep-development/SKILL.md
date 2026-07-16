@@ -9,9 +9,9 @@ Treat `AGENTS.md` as policy and `hk` as workflow truth. Never copy commands, bui
 
 ## Connect
 
-Prefer the local HitKeep developer MCP when configured. It is a worktree-confined stdio adapter over the same services as the CLI and is separate from the production analytics `/mcp` endpoint.
+Prefer the central local HitKeep developer MCP when configured. It is a root-routed stdio adapter over the same worktree-confined services as the CLI and is separate from the production analytics `/mcp` endpoint.
 
-Allow a supported host to load the checked-in project registration after worktree trust, then verify the returned workspace ID. Query `./hk mcp manifest --output json` for the live host catalog or a worktree-specific generic stdio definition; do not encode client names or config paths in this skill. Never guess the launcher path, reuse one worktree's server name for another, or silently edit client-owned global configuration.
+Register one long-lived clone's locally built `./hk` launcher in the host, then verify that the returned workspace ID matches the client's active root. Query `./hk mcp manifest --output json` for the live model-agnostic registration. If the client exposes multiple HitKeep roots, pass the intended root name, workspace ID, or path through the tools' optional `workspace` input. Never guess a workspace or silently edit client-owned global configuration.
 
 When MCP is unavailable, use the equivalent command discovered through `./hk help` with `--output json`. Consume `schema_version`, `status`, `workspace_id`, `data`, and `error`; do not parse human output. Stop and report an unknown schema version instead of guessing.
 

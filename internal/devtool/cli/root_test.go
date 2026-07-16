@@ -51,6 +51,28 @@ func TestJSONErrorsRemainMachineReadable(t *testing.T) {
 	}
 }
 
+func TestCentralMCPManifestUsesTheSelectedLocalLauncher(t *testing.T) {
+	root := testRepository(t)
+	if err := os.WriteFile(filepath.Join(root, "hk"), []byte("#!/bin/sh\nexit 0\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	var stdout, stderr bytes.Buffer
+	if err := Execute(context.Background(), "test", []string{"--workspace", root, "--output", "json", "mcp", "manifest"}, &stdout, &stderr); err != nil {
+		t.Fatal(err)
+	}
+	var envelope devtool.Envelope
+	if err := json.Unmarshal(stdout.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode output: %v\n%s", err, stdout.String())
+	}
+	if envelope.Status != "ok" || envelope.WorkspaceID == "" {
+		t.Fatalf("manifest lost its local launcher anchor: %+v", envelope)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("unexpected stderr: %s", stderr.String())
+	}
+}
+
 func testRepository(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()

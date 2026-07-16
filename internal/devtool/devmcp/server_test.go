@@ -2,16 +2,198 @@ package devmcp
 
 import (
 	"context"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"hitkeep/internal/devtool"
 )
+
+type directCentralResolver struct{ fallback string }
+
+func (resolver directCentralResolver) Resolve(ctx context.Context, session *mcp.ServerSession, selector string) (*devtool.App, error) {
+	return centralAppResolver(resolver).Resolve(ctx, session, selector)
+}
+
+func newDirectCentralServer(fallback, version string) *mcp.Server {
+	return newServer(directCentralResolver{fallback: fallback}, version)
+}
+
+func TestCentralDeveloperMCPRoutesByClientRoots(t *testing.T) {
+	ctx := context.Background()
+	firstRoot := testRepository(t)
+	secondRoot := testRepository(t)
+	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+	serverSession, err := newDirectCentralServer("", "test").Connect(ctx, serverTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer serverSession.Close()
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "test"}, nil)
+	client.AddRoots(&mcp.Root{URI: fileURI(firstRoot), Name: "first"})
+	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clientSession.Close()
+
+	assertWorkspace := func(root string) {
+		t.Helper()
+		app, appErr := devtool.NewApp(root)
+		if appErr != nil {
+			t.Fatal(appErr)
+		}
+		result, callErr := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "hk_workspace_status", Arguments: map[string]any{}})
+		if callErr != nil {
+			t.Fatal(callErr)
+		}
+		structured := result.StructuredContent.(map[string]any)
+		if result.IsError || structured["workspace_id"] != app.WorkspaceID() {
+			t.Fatalf("central server routed to the wrong workspace: %#v", structured)
+		}
+	}
+
+	assertWorkspace(firstRoot)
+	client.RemoveRoots(fileURI(firstRoot))
+	client.AddRoots(&mcp.Root{URI: fileURI(secondRoot), Name: "second"})
+	assertWorkspace(secondRoot)
+}
+
+func TestCentralDeveloperMCPRequiresSelectorForAmbiguousRoots(t *testing.T) {
+	ctx := context.Background()
+	firstRoot := testRepository(t)
+	secondRoot := testRepository(t)
+	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	firstApp, err := devtool.NewApp(firstRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+	serverSession, err := newDirectCentralServer("", "test").Connect(ctx, serverTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer serverSession.Close()
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "test"}, nil)
+	client.AddRoots(
+		&mcp.Root{URI: fileURI(firstRoot), Name: "first"},
+		&mcp.Root{URI: fileURI(secondRoot), Name: "second"},
+	)
+	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clientSession.Close()
+
+	ambiguous, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "hk_workspace_status", Arguments: map[string]any{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	structured := ambiguous.StructuredContent.(map[string]any)
+	if !ambiguous.IsError || !strings.Contains(structured["error"].(string), "multiple HitKeep workspaces") {
+		t.Fatalf("ambiguous workspace roots were accepted: %#v", structured)
+	}
+
+	selected, err := clientSession.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "hk_workspace_status",
+		Arguments: map[string]any{"workspace": firstApp.WorkspaceID()},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedEnvelope := selected.StructuredContent.(map[string]any)
+	if selected.IsError || selectedEnvelope["workspace_id"] != firstApp.WorkspaceID() {
+		t.Fatalf("explicit workspace selector did not disambiguate roots: %#v", selectedEnvelope)
+	}
+}
+
+func TestCentralDeveloperMCPIgnoresNonHitKeepClientRoots(t *testing.T) {
+	ctx := context.Background()
+	hitkeepRoot := testRepository(t)
+	unrelatedRoot := t.TempDir()
+	if output, err := exec.Command("git", "init", "--quiet", unrelatedRoot).CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, output)
+	}
+	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	wantApp, err := devtool.NewApp(hitkeepRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+	serverSession, err := newDirectCentralServer("", "test").Connect(ctx, serverTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer serverSession.Close()
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "test"}, nil)
+	client.AddRoots(
+		&mcp.Root{URI: fileURI(hitkeepRoot), Name: "hitkeep"},
+		&mcp.Root{URI: fileURI(unrelatedRoot), Name: "unrelated"},
+	)
+	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clientSession.Close()
+
+	result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "hk_workspace_status", Arguments: map[string]any{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	envelope := result.StructuredContent.(map[string]any)
+	if result.IsError || envelope["workspace_id"] != wantApp.WorkspaceID() {
+		t.Fatalf("non-HitKeep client root affected routing: %#v", envelope)
+	}
+}
+
+func TestCentralDeveloperMCPRejectsUnadvertisedWorkspaceSelector(t *testing.T) {
+	ctx := context.Background()
+	hiddenHitKeepRoot := testRepository(t)
+	unrelatedRoot := t.TempDir()
+	if output, err := exec.Command("git", "init", "--quiet", unrelatedRoot).CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, output)
+	}
+	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+	serverSession, err := newDirectCentralServer("", "test").Connect(ctx, serverTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer serverSession.Close()
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "test"}, nil)
+	client.AddRoots(&mcp.Root{URI: fileURI(unrelatedRoot), Name: "unrelated"})
+	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clientSession.Close()
+
+	result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "hk_workspace_status",
+		Arguments: map[string]any{"workspace": hiddenHitKeepRoot},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.IsError {
+		t.Fatalf("unadvertised workspace selector was accepted: %#v", result.StructuredContent)
+	}
+}
+
+func fileURI(path string) string {
+	return (&url.URL{Scheme: "file", Path: filepath.ToSlash(path)}).String()
+}
 
 func TestDeveloperMCPContract(t *testing.T) {
 	ctx := context.Background()
@@ -169,6 +351,9 @@ func testRepository(t *testing.T) string {
 		t.Fatalf("git init: %v: %s", err, output)
 	}
 	if err := os.WriteFile(filepath.Join(root, "CONTRIBUTING.md"), []byte("# Contributing\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module hitkeep\n\ngo 1.26.5\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return root

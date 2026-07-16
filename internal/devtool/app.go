@@ -258,6 +258,15 @@ func (a *App) ComposeEnvironment(variant Variant) []string {
 		"HITKEEP_MAIL_DRIVER":        "smtp",
 		"HITKEEP_MAIL_ENCRYPTION":    "none",
 		"HITKEEP_MCP_ENABLED":        "true",
+		// Provider discovery and button rendering require complete client pairs.
+		// These values are confined to hk-managed local development processes;
+		// real provider credentials are used only in staging and production.
+		"HITKEEP_SOCIAL_GOOGLE_CLIENT_ID":        "hitkeep-local-google-client",
+		"HITKEEP_SOCIAL_GOOGLE_CLIENT_SECRET":    "hitkeep-local-google-secret",
+		"HITKEEP_SOCIAL_GITHUB_CLIENT_ID":        "hitkeep-local-github-client",
+		"HITKEEP_SOCIAL_GITHUB_CLIENT_SECRET":    "hitkeep-local-github-secret",
+		"HITKEEP_SOCIAL_MICROSOFT_CLIENT_ID":     "hitkeep-local-microsoft-client",
+		"HITKEEP_SOCIAL_MICROSOFT_CLIENT_SECRET": "hitkeep-local-microsoft-secret",
 	}
 	for key, value := range variant.Environment {
 		values[key] = replaceDefaultPorts(value, a.workspace.Ports)

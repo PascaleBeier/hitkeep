@@ -130,32 +130,34 @@ Workspace state, application data, mutable frontend tool caches, services, logs,
 
 MCP-capable agents can use the same application services without parsing shell output. The developer server is model-agnostic: Claude, Gemini, GPT, or another model receives the same typed tools when its host supports local stdio MCP.
 
-Setup is automatic for supported hosts through small, committed project-scoped MCP registrations. They use only worktree-relative paths, so every Git worktree starts its own `hitkeep-dev` process without modifying a user's global client configuration. The live client catalog and registration paths come from:
+Choose one long-lived HitKeep clone as the central launch point. Its checked-in `./hk` launcher builds the broker locally, caches it by source content, and selects the host's native macOS or Linux and AMD64 or ARM64 target. A compatible Go toolchain is used directly; Docker remains the first-bootstrap fallback. Because the executable is produced locally, macOS distribution signing and quarantine workarounds are not involved. CI still cross-compiles all four targets so portability regressions fail before release, but these verification binaries are not published as release assets.
+
+The live one-time registration comes from:
 
 ```bash
 ./hk mcp manifest
 ```
 
-Human output lists the checked-in integrations for Codex, Claude Code, Gemini CLI, Cursor, and VS Code, followed by a copyable generic `mcpServers` object for any other stdio-capable host. `./hk mcp manifest --output json` returns both in the standard `hk.dev/v1` envelope, including its own `hk.dev/mcp-manifest/v1` schema, workspace ID, isolated fallback server name, stable launcher path, transport, and arguments. Treat this output as authoritative instead of copying client paths into agent instructions.
+Human output prints a copyable generic `mcpServers` object. `./hk mcp manifest --output json` returns the same registration in the standard `hk.dev/v1` envelope, with the `hk.dev/mcp-manifest/v2` schema, central scope, client-root routing, workspace-MCP delegation, stable server name, absolute local launcher, transport, and arguments. Treat this output as authoritative instead of copying host-specific config paths into agent instructions.
 
-On first use, approve or trust the repository when the host asks, then restart or reload the host and verify discovery with its MCP status UI or `hk_workspace_status`. Existing conversations generally do not dynamically acquire newly added MCP configuration. This one-time safety decision belongs to the host and is deliberately not bypassed by `hk`.
+Add that object to the host's user-level MCP configuration, approve the local binary when the host asks, then restart or reload the host and verify discovery with its MCP status UI or `hk_workspace_status`. Existing conversations generally do not dynamically acquire newly added MCP configuration. This one-time safety decision belongs to the host and is deliberately not bypassed by `hk`.
 
-Every registration launches `./hk mcp serve` over stdio for the selected worktree. For a host without a checked-in project convention, use the generated generic registration:
-
-The generated registration is equivalent to:
+The generated central registration is equivalent to:
 
 ```json
 {
   "mcpServers": {
-    "hitkeep-dev-<workspace-id>": {
-      "command": "/absolute/path/to/worktree/hk",
-      "args": ["--workspace", "/absolute/path/to/worktree", "mcp", "serve"]
+    "hitkeep-dev": {
+      "command": "/absolute/path/to/the/central/hitkeep/clone/hk",
+      "args": ["mcp", "serve"]
     }
   }
 }
 ```
 
-The developer MCP uses local stdio only. Configure one process per worktree. Use `hk_run_list` before starting work and pass the returned log cursor to incremental log reads. It is separate from HitKeep's production analytics `/mcp` endpoint and exposes only bounded workspace, setup, development, build, smoke, QA, run-status, cancellation, and log operations. It cannot execute arbitrary commands, rewrite source, mutate Git, publish artifacts, manage credentials, delete worktrees, perform cleanup, or deploy infrastructure. Stdout is reserved for JSON-RPC.
+The central `./hk mcp serve` resolves the active HitKeep worktree from the MCP client's file-based client roots on every request, then forwards the call to that workspace's own `./hk --workspace <path> mcp serve`. This keeps each worktree's checked-in developer implementation authoritative while one long-lived central session follows root changes. When a client exposes multiple HitKeep roots, every tool accepts an optional `workspace` name, workspace ID, or path to disambiguate. Clients without roots support can use an explicit compatibility registration with `/absolute/path/to/hitkeep/hk --workspace /absolute/path/to/worktree mcp serve`.
+
+The central MCP uses local stdio only. Use `hk_run_list` before starting work and pass the returned log cursor to incremental log reads. It is separate from HitKeep's production analytics `/mcp` endpoint and exposes only bounded workspace, setup, development, build, smoke, QA, run-status, cancellation, and log operations. It cannot execute arbitrary commands, rewrite source, mutate Git, publish artifacts, manage credentials, delete worktrees, perform cleanup, or deploy infrastructure. Stdout is reserved for JSON-RPC.
 
 The canonical contributor skills live under [`.agents/skills`](./.agents/skills):
 

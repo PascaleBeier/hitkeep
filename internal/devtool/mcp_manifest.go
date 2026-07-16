@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 )
 
-const DeveloperMCPManifestSchemaVersion = "hk.dev/mcp-manifest/v1"
+const DeveloperMCPManifestSchemaVersion = "hk.dev/mcp-manifest/v2"
 
 const developerMCPServerName = "hitkeep-dev"
 
@@ -19,122 +19,21 @@ type MCPClientConfiguration struct {
 	MCPServers map[string]MCPServerDefinition `json:"mcpServers"`
 }
 
-type CodexProjectMCP struct {
-	Automatic              bool   `json:"automatic"`
-	ConfigPath             string `json:"config_path"`
-	ServerName             string `json:"server_name"`
-	RequiresTrustedProject bool   `json:"requires_trusted_project"`
-}
-
-// MCPProjectIntegration describes a checked-in, worktree-relative registration
-// consumed by an agent host. The MCP server itself is model-agnostic; these
-// files only adapt each host's project discovery convention.
-type MCPProjectIntegration struct {
-	ClientID               string `json:"client_id"`
-	ClientName             string `json:"client_name"`
-	Automatic              bool   `json:"automatic"`
-	ConfigPath             string `json:"config_path"`
-	ServerName             string `json:"server_name"`
-	RequiresTrustedProject bool   `json:"requires_trusted_project"`
-}
-
-type mcpProjectClientSpec struct {
-	ID                     string
-	Name                   string
-	ConfigPath             string
-	ServerName             string
-	RequiresTrustedProject bool
-	RequiredFragments      []string
-}
-
-var mcpProjectClientSpecs = []mcpProjectClientSpec{
-	{
-		ID:                     "claude-code",
-		Name:                   "Claude Code",
-		ConfigPath:             ".mcp.json",
-		ServerName:             developerMCPServerName,
-		RequiresTrustedProject: true,
-		RequiredFragments: []string{
-			`"mcpServers"`,
-			`"hitkeep-dev"`,
-			`"command": "${CLAUDE_PROJECT_DIR:-.}/hk"`,
-			`"args": ["--workspace", "${CLAUDE_PROJECT_DIR:-.}", "mcp", "serve"]`,
-		},
-	},
-	{
-		ID:                     "codex",
-		Name:                   "Codex",
-		ConfigPath:             ".codex/config.toml",
-		ServerName:             developerMCPServerName,
-		RequiresTrustedProject: true,
-		RequiredFragments: []string{
-			"[mcp_servers.hitkeep-dev]",
-			`command = "../hk"`,
-			`args = ["--workspace", "..", "mcp", "serve"]`,
-			`cwd = "."`,
-		},
-	},
-	{
-		ID:                     "cursor",
-		Name:                   "Cursor",
-		ConfigPath:             ".cursor/mcp.json",
-		ServerName:             developerMCPServerName,
-		RequiresTrustedProject: true,
-		RequiredFragments: []string{
-			`"mcpServers"`,
-			`"hitkeep-dev"`,
-			`"command": "./hk"`,
-			`"args": ["--workspace", ".", "mcp", "serve"]`,
-		},
-	},
-	{
-		ID:                     "gemini-cli",
-		Name:                   "Gemini CLI",
-		ConfigPath:             ".gemini/settings.json",
-		ServerName:             developerMCPServerName,
-		RequiresTrustedProject: true,
-		RequiredFragments: []string{
-			`"mcpServers"`,
-			`"hitkeep-dev"`,
-			`"command": "./hk"`,
-			`"args": ["--workspace", ".", "mcp", "serve"]`,
-			`"cwd": "."`,
-			`"trust": false`,
-		},
-	},
-	{
-		ID:                     "vscode",
-		Name:                   "VS Code",
-		ConfigPath:             ".vscode/mcp.json",
-		ServerName:             "hitkeepDev",
-		RequiresTrustedProject: true,
-		RequiredFragments: []string{
-			`"servers"`,
-			`"hitkeepDev"`,
-			`"type": "stdio"`,
-			`"command": "${workspaceFolder}/hk"`,
-			`"args": ["--workspace", "${workspaceFolder}", "mcp", "serve"]`,
-			`"cwd": "${workspaceFolder}"`,
-		},
-	},
-}
-
 type DeveloperMCPManifest struct {
-	SchemaVersion  string                  `json:"schema_version"`
-	ServerName     string                  `json:"server_name"`
-	Transport      string                  `json:"transport"`
-	WorkspaceID    string                  `json:"workspace_id"`
-	WorkspaceRoot  string                  `json:"workspace_root"`
-	Command        string                  `json:"command"`
-	Args           []string                `json:"args"`
-	ClientConfig   MCPClientConfiguration  `json:"client_config"`
-	Codex          CodexProjectMCP         `json:"codex"`
-	ProjectClients []MCPProjectIntegration `json:"project_clients"`
+	SchemaVersion    string                 `json:"schema_version"`
+	ServerName       string                 `json:"server_name"`
+	Transport        string                 `json:"transport"`
+	Scope            string                 `json:"scope"`
+	WorkspaceRouting string                 `json:"workspace_routing"`
+	Delegation       string                 `json:"delegation"`
+	Command          string                 `json:"command"`
+	Args             []string               `json:"args"`
+	ClientConfig     MCPClientConfiguration `json:"client_config"`
 }
 
-// MCPManifest returns a worktree-specific stdio registration without editing
-// any client-owned configuration. The repository launcher is stable across hk
-// rebuilds, unlike the content-addressed bootstrap binary behind it.
+// MCPManifest returns a one-time central registration anchored to this
+// checkout's portable launcher. The launcher builds hk locally for the host,
+// while the server routes client roots to each workspace's own MCP process.
 func (a *App) MCPManifest() (DeveloperMCPManifest, error) {
 	launcher := filepath.Join(a.workspace.Root, "hk")
 	info, err := os.Lstat(launcher)
@@ -144,37 +43,19 @@ func (a *App) MCPManifest() (DeveloperMCPManifest, error) {
 	if !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
 		return DeveloperMCPManifest{}, fmt.Errorf("hk launcher must be a regular executable file: %s", launcher)
 	}
-	serverName := developerMCPServerName + "-" + a.workspace.ID[:8]
-	arguments := []string{"--workspace", a.workspace.Root, "mcp", "serve"}
+	arguments := []string{"mcp", "serve"}
 	definition := MCPServerDefinition{Command: launcher, Args: arguments}
-	projectClients := make([]MCPProjectIntegration, 0, len(mcpProjectClientSpecs))
-	for _, spec := range mcpProjectClientSpecs {
-		projectClients = append(projectClients, MCPProjectIntegration{
-			ClientID:               spec.ID,
-			ClientName:             spec.Name,
-			Automatic:              true,
-			ConfigPath:             filepath.Join(a.workspace.Root, filepath.FromSlash(spec.ConfigPath)),
-			ServerName:             spec.ServerName,
-			RequiresTrustedProject: spec.RequiresTrustedProject,
-		})
-	}
 	return DeveloperMCPManifest{
-		SchemaVersion: DeveloperMCPManifestSchemaVersion,
-		ServerName:    serverName,
-		Transport:     "stdio",
-		WorkspaceID:   a.workspace.ID,
-		WorkspaceRoot: a.workspace.Root,
-		Command:       launcher,
-		Args:          arguments,
-		Codex: CodexProjectMCP{
-			Automatic:              true,
-			ConfigPath:             filepath.Join(a.workspace.Root, ".codex", "config.toml"),
-			ServerName:             "hitkeep-dev",
-			RequiresTrustedProject: true,
-		},
-		ProjectClients: projectClients,
+		SchemaVersion:    DeveloperMCPManifestSchemaVersion,
+		ServerName:       developerMCPServerName,
+		Transport:        "stdio",
+		Scope:            "central",
+		WorkspaceRouting: "client-roots",
+		Delegation:       "workspace-mcp",
+		Command:          definition.Command,
+		Args:             arguments,
 		ClientConfig: MCPClientConfiguration{MCPServers: map[string]MCPServerDefinition{
-			serverName: definition,
+			developerMCPServerName: definition,
 		}},
 	}, nil
 }

@@ -5,6 +5,7 @@ import (
 	"io"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -23,6 +24,45 @@ func TestReleaseBuildRejectsUnboundedInputs(t *testing.T) {
 		if _, err := app.BuildReleaseBinaries(context.Background(), request, io.Discard); err == nil {
 			t.Fatalf("unsafe release request was accepted: %+v", request)
 		}
+	}
+}
+
+func TestDeveloperReleaseTargetsCoverMacAndLinuxOnArmAndAMD(t *testing.T) {
+	want := []string{
+		"hk-darwin-amd64",
+		"hk-darwin-arm64",
+		"hk-linux-amd64",
+		"hk-linux-arm64",
+	}
+	var got []string
+	for _, goos := range []string{"darwin", "linux"} {
+		for _, goarch := range []string{"amd64", "arm64"} {
+			artifact, err := developerReleaseArtifact("/release", goos, goarch)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got = append(got, filepath.Base(artifact))
+		}
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("developer release targets = %v, want %v", got, want)
+	}
+	for _, target := range [][2]string{{"windows", "amd64"}, {"linux", "386"}, {"freebsd", "arm64"}} {
+		if _, err := developerReleaseArtifact("/release", target[0], target[1]); err == nil || !strings.Contains(err.Error(), "unsupported developer release target") {
+			t.Fatalf("unsupported developer target was accepted: %s/%s (%v)", target[0], target[1], err)
+		}
+	}
+}
+
+func TestDeveloperReleaseBuildRejectsUnsafeVersionBeforeBuilding(t *testing.T) {
+	root := initTestRepository(t)
+	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	app, err := NewApp(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := app.BuildDeveloperBinary(context.Background(), ReleaseBuildRequest{Version: "v1; unsafe", GOOS: "linux", GOARCH: "amd64"}, io.Discard); err == nil {
+		t.Fatal("unsafe developer release version was accepted")
 	}
 }
 
