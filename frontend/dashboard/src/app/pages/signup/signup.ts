@@ -70,7 +70,7 @@ export class Signup {
         this.socialProviders().map((provider) => ({
             id: provider.id,
             labelKey: `social.continueWith.${provider.id}`,
-            icon: provider.id === 'github' ? 'pi pi-github' : provider.id === 'google' ? 'pi pi-google' : 'pi pi-microsoft',
+            providerIcon: provider.id,
             wide: true,
             loading: this.socialLoading() === provider.id,
             disabled: this.isLoading() || this.socialLoading() !== null

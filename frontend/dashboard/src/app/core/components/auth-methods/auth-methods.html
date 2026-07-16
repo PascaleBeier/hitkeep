@@ -1,5 +1,23 @@
 <div class="hk-auth-methods" role="group" [attr.aria-label]="ariaLabelKey() | transloco">
-    @for (method of methods(); track method.id) {
+    @for (method of methods(); track method.id) { @if (method.providerIcon; as providerIcon) {
+    <p-button
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        [fluid]="true"
+        [label]="method.labelKey | transloco"
+        [loading]="method.loading ?? false"
+        [disabled]="method.disabled || method.loading || false"
+        [class.hk-auth-method-wide]="method.wide"
+        [attr.aria-busy]="method.loading ? true : null"
+        [attr.data-auth-method]="method.id"
+        (onClick)="selectMethod(method)"
+    >
+        <ng-template #icon let-iconClass="class">
+            <app-social-provider-icon [provider]="providerIcon" [class]="iconClass" />
+        </ng-template>
+    </p-button>
+    } @else {
     <p-button
         type="button"
         severity="secondary"
@@ -14,5 +32,5 @@
         [attr.data-auth-method]="method.id"
         (onClick)="selectMethod(method)"
     />
-    }
+    } }
 </div>

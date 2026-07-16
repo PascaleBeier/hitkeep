@@ -213,6 +213,19 @@ describe('Login', () => {
         expect(navigate).toHaveBeenCalledWith('https://accounts.example.com/authorize');
     });
 
+    it('maps social providers to branded marks while retaining generic authentication icons', () => {
+        component['isPasskeySupported'].set(false);
+        component['socialProviders'].set([{ id: 'google', display_name: 'Google' }]);
+        component['ssoAvailable'].set(true);
+
+        const methods = component['authMethods']();
+        const googleMethod = methods.find((method) => method.id === 'google');
+        const ssoMethod = methods.find((method) => method.id === 'sso');
+
+        expect(googleMethod?.providerIcon).toBe('google');
+        expect(ssoMethod?.icon).toBe('pi pi-building');
+    });
+
     it('requires an explicit HitKeep email before completing a first Microsoft login', () => {
         authMock.previewSocial.mockReturnValueOnce(of({ provider: 'microsoft', display_name: 'Microsoft', observed_email: 'mutable@example.com', email_verified: false, email_confirmation_required: true, flow: 'login' }));
 

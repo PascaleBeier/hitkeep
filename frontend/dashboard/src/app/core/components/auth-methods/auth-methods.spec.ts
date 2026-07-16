@@ -18,6 +18,13 @@ describe('AuthMethods', () => {
                                 authenticationMethods: 'Authentication methods',
                                 continueWithPassword: 'Continue with password',
                                 continueWithSSO: 'Continue with SSO'
+                            },
+                            social: {
+                                continueWith: {
+                                    google: 'Continue with Google',
+                                    github: 'Continue with GitHub',
+                                    microsoft: 'Continue with Microsoft'
+                                }
                             }
                         }
                     },
@@ -56,8 +63,28 @@ describe('AuthMethods', () => {
         expect(selected).toHaveBeenCalledWith('sso');
     });
 
-    it('keeps loading methods disabled and exposes the group label', async () => {
-        fixture.componentRef.setInput('methods', [{ id: 'sso', labelKey: 'login.continueWithSSO', icon: 'pi pi-building', loading: true }]);
+    it('renders official provider marks without monochrome PrimeIcons', async () => {
+        fixture.componentRef.setInput('methods', [
+            { id: 'google', labelKey: 'social.continueWith.google', providerIcon: 'google' },
+            { id: 'github', labelKey: 'social.continueWith.github', providerIcon: 'github' },
+            { id: 'microsoft', labelKey: 'social.continueWith.microsoft', providerIcon: 'microsoft' }
+        ]);
+
+        await fixture.whenStable();
+
+        const element = fixture.nativeElement as HTMLElement;
+        const providerIcons = Array.from(element.querySelectorAll<HTMLElement>('app-social-provider-icon'));
+        expect(providerIcons.map((icon) => icon.dataset['providerIcon'])).toEqual(['google', 'github', 'microsoft']);
+        expect(providerIcons.every((icon) => icon.getAttribute('aria-hidden') === 'true')).toBe(true);
+        expect(element.querySelector('.pi-google, .pi-github, .pi-microsoft')).toBeNull();
+        expect(element.querySelector('.hk-social-provider-mark--google')).toBeTruthy();
+        expect(element.querySelector('.hk-social-provider-mark--github-light')).toBeTruthy();
+        expect(element.querySelector('.hk-social-provider-mark--github-dark')).toBeTruthy();
+        expect(element.querySelector('.hk-social-provider-mark--microsoft')).toBeTruthy();
+    });
+
+    it('replaces a loading provider mark with the PrimeNG spinner and exposes the group label', async () => {
+        fixture.componentRef.setInput('methods', [{ id: 'google', labelKey: 'social.continueWith.google', providerIcon: 'google', loading: true }]);
 
         await fixture.whenStable();
 
@@ -67,5 +94,7 @@ describe('AuthMethods', () => {
         expect(group?.getAttribute('aria-label')).toBe('Authentication methods');
         expect(button?.disabled).toBe(true);
         expect(element.querySelector('p-button')?.getAttribute('aria-busy')).toBe('true');
+        expect(element.querySelector('app-social-provider-icon')).toBeNull();
+        expect(element.querySelector('svg[data-p-icon="spinner"]')).toBeTruthy();
     });
 });

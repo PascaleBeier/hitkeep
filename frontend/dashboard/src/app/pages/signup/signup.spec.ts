@@ -238,6 +238,16 @@ describe('Signup', () => {
         expect(locationAssignMock).toHaveBeenCalledWith('https://accounts.example.com/authorize');
     });
 
+    it('maps configured social signup providers to branded marks', () => {
+        component['socialProviders'].set([
+            { id: 'google', display_name: 'Google' },
+            { id: 'github', display_name: 'GitHub' },
+            { id: 'microsoft', display_name: 'Microsoft' }
+        ]);
+
+        expect(component['socialMethods']().map((method) => method.providerIcon)).toEqual(['google', 'github', 'microsoft']);
+    });
+
     it('does not discover or offer enterprise SSO from public signup', () => {
         expect(authServiceMock.getSSOAvailability).not.toHaveBeenCalled();
     });

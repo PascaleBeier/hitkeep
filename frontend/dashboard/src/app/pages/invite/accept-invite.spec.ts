@@ -167,6 +167,9 @@ describe('AcceptInvite', () => {
         availability.flush({ enabled: false });
         await fixture.whenStable();
 
+        expect(component['authMethods']()[0]?.providerIcon).toBe('google');
+        expect(fixture.nativeElement.querySelector('app-social-provider-icon[data-provider-icon="google"]')).toBeTruthy();
+
         const button = fixture.nativeElement.querySelector('[data-auth-method="google"] button') as HTMLButtonElement;
         expect(button).toBeTruthy();
         button.click();

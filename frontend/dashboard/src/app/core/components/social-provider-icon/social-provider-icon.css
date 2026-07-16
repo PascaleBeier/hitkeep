@@ -1,0 +1,27 @@
+:host {
+    align-items: center;
+    display: inline-flex;
+    flex: 0 0 1.25rem;
+    height: 1.25rem;
+    justify-content: center;
+    width: 1.25rem;
+}
+
+.hk-social-provider-mark {
+    display: block;
+    height: 1.25rem;
+    object-fit: contain;
+    width: 1.25rem;
+}
+
+.hk-social-provider-mark--github-dark {
+    display: none;
+}
+
+:host-context(.p-dark) .hk-social-provider-mark--github-light {
+    display: none;
+}
+
+:host-context(.p-dark) .hk-social-provider-mark--github-dark {
+    display: block;
+}

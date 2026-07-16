@@ -106,7 +106,7 @@ export class Login {
             methods.push({
                 id: provider.id,
                 labelKey: `social.continueWith.${provider.id}`,
-                icon: this.socialIcon(provider.id),
+                providerIcon: provider.id,
                 wide: true,
                 loading: this.socialLoading() === provider.id,
                 disabled
@@ -604,10 +604,6 @@ export class Login {
             default:
                 return 'social.errors.failed';
         }
-    }
-
-    private socialIcon(provider: SocialProviderID): string {
-        return provider === 'github' ? 'pi pi-github' : provider === 'google' ? 'pi pi-google' : 'pi pi-microsoft';
     }
 
     private navigateToSSOProvider(authURL: string): void {
