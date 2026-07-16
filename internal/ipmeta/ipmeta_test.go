@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"net/netip"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/klauspost/compress/zstd"
@@ -41,18 +40,14 @@ func TestLookupKeepsDB1CountryWhenCityOverlayDiffers(t *testing.T) {
 	originalNetworkRanges := embeddedNetworkRanges
 	t.Cleanup(func() {
 		embeddedCountryZSTDData = originalCountryZSTDData
-		countryPackedOnce = sync.Once{}
-		countryPacked = packedCountryAsset{}
-		errCountryPacked = nil
 		embeddedCountryRanges = originalCountryRanges
 		embeddedCityRanges = originalCityRanges
 		embeddedNetworkRanges = originalNetworkRanges
+		resetPackedLookupAssetsForTest()
 	})
 
 	embeddedCountryZSTDData = testCountryAsset(t, []byte{9, 9, 9, 0}, "DE", nil, "")
-	countryPackedOnce = sync.Once{}
-	countryPacked = packedCountryAsset{}
-	errCountryPacked = nil
+	resetPackedLookupAssetsForTest()
 	embeddedCountryRanges = []geoRange{{
 		first:    netip.MustParseAddr("9.9.9.0"),
 		last:     netip.MustParseAddr("9.9.9.255"),
@@ -79,16 +74,12 @@ func TestLookupPackedIPv6CountryMetadata(t *testing.T) {
 	originalCountryRanges := embeddedCountryRanges
 	t.Cleanup(func() {
 		embeddedCountryZSTDData = originalCountryZSTDData
-		countryPackedOnce = sync.Once{}
-		countryPacked = packedCountryAsset{}
-		errCountryPacked = nil
 		embeddedCountryRanges = originalCountryRanges
+		resetPackedLookupAssetsForTest()
 	})
 
 	embeddedCountryZSTDData = testCountryAsset(t, nil, "", []byte{0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, "NL")
-	countryPackedOnce = sync.Once{}
-	countryPacked = packedCountryAsset{}
-	errCountryPacked = nil
+	resetPackedLookupAssetsForTest()
 	embeddedCountryRanges = nil
 
 	meta := Lookup(netip.MustParseAddr("2001:db8::1"))
@@ -99,23 +90,30 @@ func TestLookupPackedIPv6CountryMetadata(t *testing.T) {
 
 func testCountryAsset(t *testing.T, ipv4Starts []byte, ipv4Codes string, ipv6Starts []byte, ipv6Codes string) []byte {
 	t.Helper()
-	var raw bytes.Buffer
-	raw.WriteString("HKCO")
-	writeTestUint32(&raw, uint32(len(ipv4Starts)/4))
-	writeTestUint32(&raw, uint32(len(ipv6Starts)/16))
-	raw.Write(ipv4Starts)
-	raw.WriteString(ipv4Codes)
-	raw.Write(ipv6Starts)
-	raw.WriteString(ipv6Codes)
-	writer, err := zstd.NewWriter(nil)
-	if err != nil {
-		t.Fatalf("create country asset writer: %v", err)
+	var ipv4Frames []testFrame
+	if len(ipv4Starts) > 0 {
+		ipv4Frames = append(ipv4Frames, testFrame{
+			first:   netip.AddrFrom4([4]byte(ipv4Starts[:4])),
+			records: testCountryFrameRecords(ipv4Starts, ipv4Codes, 4),
+		})
 	}
-	compressed := writer.EncodeAll(raw.Bytes(), nil)
-	if err := writer.Close(); err != nil {
-		t.Fatalf("close country asset: %v", err)
+	var ipv6Frames []testFrame
+	if len(ipv6Starts) > 0 {
+		ipv6Frames = append(ipv6Frames, testFrame{
+			first:   netip.AddrFrom16([16]byte(ipv6Starts[:16])),
+			records: testCountryFrameRecords(ipv6Starts, ipv6Codes, 16),
+		})
 	}
-	return compressed
+	return testFramedAsset(t, "HKC2", 0, nil, ipv4Frames, ipv6Frames)
+}
+
+func testCountryFrameRecords(starts []byte, codes string, addressSize int) []byte {
+	var records bytes.Buffer
+	for index := 0; index < len(starts)/addressSize; index++ {
+		records.Write(starts[index*addressSize : (index+1)*addressSize])
+		records.WriteString(codes[index*2 : (index+1)*2])
+	}
+	return records.Bytes()
 }
 
 func writeTestUint32(w *bytes.Buffer, value uint32) {
@@ -131,6 +129,66 @@ func TestLookupSkipsPrivateAndInvalidMetadataIPs(t *testing.T) {
 				t.Fatalf("expected empty metadata for %s, got %+v", raw, meta)
 			}
 		})
+	}
+}
+
+func TestLookupCountryDoesNotLoadCityOrASNAssets(t *testing.T) {
+	originalCityData := embeddedCityZSTDData
+	originalASNData := embeddedASNZSTDData
+	t.Cleanup(func() {
+		embeddedCityZSTDData = originalCityData
+		embeddedASNZSTDData = originalASNData
+		resetPackedLookupAssetsForTest()
+	})
+
+	embeddedCityZSTDData = []byte("invalid city asset")
+	embeddedASNZSTDData = []byte("invalid ASN asset")
+	resetPackedLookupAssetsForTest()
+
+	if got := LookupCountry(netip.MustParseAddr("8.8.8.8")); got != "US" {
+		t.Fatalf("expected country US, got %q", got)
+	}
+	if cityLookupAsset.parseErr != nil {
+		t.Fatalf("country-only lookup loaded city asset: %v", cityLookupAsset.parseErr)
+	}
+	if asnLookupAsset.parseErr != nil {
+		t.Fatalf("country-only lookup loaded ASN asset: %v", asnLookupAsset.parseErr)
+	}
+}
+
+func TestLookupWithCountryDoesNotLoadCountryAsset(t *testing.T) {
+	originalCountryData := embeddedCountryZSTDData
+	t.Cleanup(func() {
+		embeddedCountryZSTDData = originalCountryData
+		resetPackedLookupAssetsForTest()
+	})
+
+	embeddedCountryZSTDData = []byte("invalid country asset")
+	resetPackedLookupAssetsForTest()
+
+	meta := LookupWithCountry(netip.MustParseAddr("8.8.8.8"), "US")
+	if meta.CountryCode != "US" || meta.City != "Mountain View" || meta.ASN != 15169 {
+		t.Fatalf("unexpected metadata: %+v", meta)
+	}
+	if countryLookupAsset.parseErr != nil {
+		t.Fatalf("lookup with resolved country loaded country asset: %v", countryLookupAsset.parseErr)
+	}
+}
+
+func TestLookupSteadyStateDoesNotAllocate(t *testing.T) {
+	resetPackedLookupAssetsForTest()
+	ip := netip.MustParseAddr("8.8.8.8")
+	_ = Lookup(ip)
+
+	var metadata Metadata
+	allocations := testing.AllocsPerRun(1000, func() {
+		metadata = Lookup(ip)
+	})
+	if metadata.IsZero() {
+		t.Fatal("expected public IP metadata")
+	}
+	if allocations != 0 {
+		t.Fatalf("expected zero steady-state allocations, got %.2f", allocations)
 	}
 }
 
@@ -150,28 +208,14 @@ func TestAssetLoadErrorsEmptyForGeneratedAssets(t *testing.T) {
 	}
 }
 
-func TestCompressedAssetsExposeDecodeErrors(t *testing.T) {
-	asset := &compressedAsset{compressed: []byte("not zstd")}
-
-	if got := asset.bytes(); len(got) != 0 {
-		t.Fatalf("expected invalid asset to decode empty, got %d bytes", len(got))
+func TestFramedAssetsExposeParseErrors(t *testing.T) {
+	asset := newFramedAsset([]byte("not a lookup asset"), "HKY2", framedLookupAsset, 1<<20)
+	if _, ok := asset.lookupMetadataID(netip.MustParseAddr("8.8.8.8")); ok {
+		t.Fatal("expected invalid lookup asset to return no metadata")
 	}
-	if asset.err == nil || !strings.Contains(asset.err.Error(), "decode zstd asset") {
-		t.Fatalf("expected decode error, got %v", asset.err)
-	}
-}
-
-func TestPackedLookupAssetsExposeParseErrors(t *testing.T) {
-	asset := &compressedLookupAsset{
-		compressed: testCompressedBytes(t, []byte("not a lookup asset")),
-		magic:      "HKCY",
-	}
-
-	if got := asset.data(); len(got.metadata) != 0 {
-		t.Fatalf("expected invalid lookup asset to parse empty, got %#v", got)
-	}
-	if asset.err == nil || !strings.Contains(asset.err.Error(), "invalid magic") {
-		t.Fatalf("expected parse error, got %v", asset.err)
+	errs := asset.errors()
+	if len(errs) == 0 || !strings.Contains(errs[0].Error(), "truncated header") {
+		t.Fatalf("expected parse error, got %v", errs)
 	}
 }
 

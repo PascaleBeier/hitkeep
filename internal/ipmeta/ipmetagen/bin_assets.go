@@ -12,8 +12,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/klauspost/compress/zstd"
 )
 
 const (
@@ -78,7 +76,11 @@ func WritePackedCityBINAssets(dir string, data []byte) error {
 	}); err != nil {
 		return err
 	}
-	return writePackedLookupAsset(dir, cityAssetFile, "HKCY", builder.ipv4Starts, builder.ipv4Meta, builder.ipv6Starts, builder.ipv6Meta, renderCityMeta(builder.metaRecords))
+	metadataCount, err := checkedUint32(len(builder.metaRecords), "city metadata records")
+	if err != nil {
+		return err
+	}
+	return writePackedLookupAsset(dir, cityAssetFile, "HKY2", builder.ipv4Starts, builder.ipv4Meta, builder.ipv6Starts, builder.ipv6Meta, renderCityMeta(builder.metaRecords), metadataCount)
 }
 
 // WritePackedASNBINAssets writes compact ASN lookup assets from an IP2Location
@@ -112,7 +114,11 @@ func WritePackedASNBINAssets(dir string, data []byte) error {
 	}); err != nil {
 		return err
 	}
-	return writePackedLookupAsset(dir, asnAssetFile, "HKAS", builder.ipv4Starts, builder.ipv4Meta, builder.ipv6Starts, builder.ipv6Meta, renderASNMeta(builder.metaRecords))
+	metadataCount, err := checkedUint32(len(builder.metaRecords), "ASN metadata records")
+	if err != nil {
+		return err
+	}
+	return writePackedLookupAsset(dir, asnAssetFile, "HKA2", builder.ipv4Starts, builder.ipv4Meta, builder.ipv6Starts, builder.ipv6Meta, renderASNMeta(builder.metaRecords), metadataCount)
 }
 
 // WritePackedCityNetworkEmbedSource writes the generated Go source that embeds
@@ -273,51 +279,24 @@ func readBINString(data []byte, pointer uint32) string {
 	return string(data[start:end])
 }
 
-func writePackedLookupAsset(dir string, name string, magic string, ipv4Starts []byte, ipv4Meta []byte, ipv6Starts []byte, ipv6Meta []byte, meta []byte) error {
-	if len(magic) != 4 {
-		return fmt.Errorf("asset magic %q must be 4 bytes", magic)
-	}
-	var raw bytes.Buffer
-	raw.WriteString(magic)
-	ipv4Count, err := checkedRangeCount(ipv4Starts, 4, "IPv4 ranges")
+func writePackedLookupAsset(dir string, name string, magic string, ipv4Starts []byte, ipv4Meta []byte, ipv6Starts []byte, ipv6Meta []byte, meta []byte, metadataCount uint32) error {
+	compressed, err := buildFramedLookupAsset(
+		magic,
+		ipv4Starts,
+		ipv4Meta,
+		ipv6Starts,
+		ipv6Meta,
+		meta,
+		metadataCount,
+		framedRangeBlockTarget,
+	)
 	if err != nil {
-		return err
-	}
-	ipv6Count, err := checkedRangeCount(ipv6Starts, 16, "IPv6 ranges")
-	if err != nil {
-		return err
-	}
-	metaSize, err := checkedUint32(len(meta), "metadata payload")
-	if err != nil {
-		return err
-	}
-	writeUint32(&raw, ipv4Count)
-	writeUint32(&raw, ipv6Count)
-	writeUint32(&raw, metaSize)
-	raw.Write(ipv4Starts)
-	raw.Write(ipv4Meta)
-	raw.Write(ipv6Starts)
-	raw.Write(ipv6Meta)
-	raw.Write(meta)
-
-	compressed, err := zstdBytes(raw.Bytes())
-	if err != nil {
-		return fmt.Errorf("compress asset %s: %w", name, err)
+		return fmt.Errorf("build asset %s: %w", name, err)
 	}
 	if err := writePublicGeneratedFile(filepath.Join(dir, name), compressed); err != nil {
 		return fmt.Errorf("write asset %s: %w", name, err)
 	}
 	return nil
-}
-
-func checkedRangeCount(data []byte, stride int, label string) (uint32, error) {
-	if stride <= 0 {
-		return 0, fmt.Errorf("%s stride must be positive", label)
-	}
-	if len(data)%stride != 0 {
-		return 0, fmt.Errorf("%s data length %d is not divisible by stride %d", label, len(data), stride)
-	}
-	return checkedUint32(len(data)/stride, label)
 }
 
 func checkedUint32(value int, label string) (uint32, error) {
@@ -339,15 +318,6 @@ func writeUint32(w *bytes.Buffer, value uint32) {
 	var raw [4]byte
 	binary.BigEndian.PutUint32(raw[:], value)
 	w.Write(raw[:])
-}
-
-func zstdBytes(data []byte) ([]byte, error) {
-	writer, err := zstd.NewWriter(nil, zstd.WithEncoderLevel(zstd.SpeedBestCompression))
-	if err != nil {
-		return nil, err
-	}
-	defer writer.Close()
-	return writer.EncodeAll(data, nil), nil
 }
 
 func renderCityMeta(records []cityMeta) []byte {

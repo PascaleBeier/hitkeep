@@ -13,7 +13,7 @@ import (
 type CountryCodeResolver func(netip.Addr) string
 
 func DefaultCountryCodeResolver(ip netip.Addr) string {
-	return ipmeta.Lookup(ip).CountryCode
+	return ipmeta.LookupCountry(ip)
 }
 
 func CountryCodeFromRequest(r *http.Request, trustedProxies []netip.Prefix) string {

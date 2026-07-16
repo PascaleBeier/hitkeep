@@ -58,7 +58,7 @@ jobs:
           git push --force-with-lease origin "$branch"
 
           body=$(printf '%s\n\n%s\n\n```sh\n%s\n```' \
-            "Refreshes compressed HitKeep IP metadata assets for country, city, and ASN/provider lookup." \
+            "Refreshes block-addressable compressed HitKeep IP metadata assets for country, city, and ASN/provider lookup." \
             "Generated with:" \
             "go run ./cmd/ipmeta-generate")
 

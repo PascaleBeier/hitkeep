@@ -19,7 +19,7 @@ The no-argument command is the release path. It:
 - writes the compact country asset and embed source:
   `data_country.hk.zst` and `data_country_lite.go`
 - downloads the IPv6 BIN packages `DB3LITEBINIPV6` and `DBASNLITEBINIPV6`
-- distills those BIN payloads into HitKeep-owned compressed lookup assets:
+- distills those BIN payloads into HitKeep-owned framed lookup assets:
   `data_city.hk.zst`, `data_asn.hk.zst`, and `data_city_network_lite.go`
 - discards upstream ZIP/BIN payloads after generation
 
@@ -27,6 +27,13 @@ IP2Location's IPv6 BIN packages cover both IPv4 and IPv6 lookups, so the normal
 release refresh does not download CSV/CIDR variants or separate IPv4 BIN
 packages. Raw upstream BIN files, text metadata files, and separate source
 dataset IPv4 artifacts are not checked in.
+
+The `.hk.zst` files are HitKeep containers rather than single Zstandard frames.
+They keep sorted address ranges in independently compressed blocks, allowing
+runtime lookups to decode only the selected block and retain a bounded cache.
+The generator uses the pinned reference Zstandard encoder at a release-oriented
+compression level; the production binary keeps the pure-Go decoder and has no
+generator or C encoder dependency.
 
 The generator can still accept explicit CSV/ZIP inputs for tests and unusual
 fixture work, but that is not the release workflow. Run `go run

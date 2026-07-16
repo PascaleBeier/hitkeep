@@ -6,20 +6,13 @@
 package ipmeta
 
 import (
-	"encoding/binary"
-	"fmt"
 	"net/netip"
 	"sort"
-	"sync"
 )
 
 const attribution = "HitKeep uses the IP2Location LITE database for IP geolocation. https://www.ip2location.com"
 
-var (
-	countryPackedOnce sync.Once
-	countryPacked     packedCountryAsset
-	errCountryPacked  error
-)
+var countryLookupAsset = newFramedAsset(embeddedCountryZSTDData, "HKC2", framedCountryAsset, framedCountryCacheBytes)
 
 // Metadata is coarse aggregate-only IP metadata for analytics dimensions.
 type Metadata struct {
@@ -47,33 +40,38 @@ func Attribution() string {
 	return attribution
 }
 
-// AssetLoadErrors reports embedded metadata asset errors observed by the lazy
-// lookup loaders. Empty generated assets are ignored so tests can inject
-// fixture ranges without writing packed assets.
+// AssetLoadErrors fully validates the embedded metadata containers and reports
+// any header, frame, checksum, or range-ordering errors.
 func AssetLoadErrors() []error {
-	packedCountryData()
-	cityLookupAsset.data()
-	asnLookupAsset.data()
-
-	var errs []error
-	if errCountryPacked != nil {
-		errs = append(errs, errCountryPacked)
-	}
-	if cityLookupAsset.err != nil {
-		errs = append(errs, cityLookupAsset.err)
-	}
-	if asnLookupAsset.err != nil {
-		errs = append(errs, asnLookupAsset.err)
-	}
+	countryErrors := countryLookupAsset.validateAll()
+	cityErrors := cityLookupAsset.validateAll()
+	asnErrors := asnLookupAsset.validateAll()
+	errs := make([]error, 0, len(countryErrors)+len(cityErrors)+len(asnErrors))
+	errs = append(errs, countryErrors...)
+	errs = append(errs, cityErrors...)
+	errs = append(errs, asnErrors...)
 	return errs
 }
 
 // Lookup resolves coarse metadata for a public IP address.
 func Lookup(ip netip.Addr) Metadata {
+	return lookup(ip, "", false)
+}
+
+// LookupWithCountry resolves city and network metadata while reusing an
+// already-resolved country code.
+func LookupWithCountry(ip netip.Addr, countryCode string) Metadata {
+	return lookup(ip, countryCode, true)
+}
+
+func lookup(ip netip.Addr, countryCode string, countryResolved bool) Metadata {
 	if !ip.IsValid() || isPrivateMetadataIP(ip) {
 		return Metadata{}
 	}
-	meta := lookupCountryMetadata(ip)
+	meta := Metadata{CountryCode: countryCode}
+	if !countryResolved {
+		meta = lookupCountryMetadata(ip)
+	}
 	if city := lookupCityMetadata(ip); !city.IsZero() {
 		if meta.CountryCode == "" {
 			meta.CountryCode = city.CountryCode
@@ -81,12 +79,21 @@ func Lookup(ip netip.Addr) Metadata {
 		meta.Region = city.Region
 		meta.City = city.City
 	}
-	if network := lookupNetworkMetadata(ip); network != nil {
+	if network, ok := lookupNetworkMetadata(ip); ok {
 		meta.Provider = network.Provider
 		meta.ASN = network.ASN
 		meta.ASNOrg = network.ASNOrg
 	}
 	return meta
+}
+
+// LookupCountry resolves only the country code for a public IP address without
+// loading city or network metadata.
+func LookupCountry(ip netip.Addr) string {
+	if !ip.IsValid() || isPrivateMetadataIP(ip) {
+		return ""
+	}
+	return lookupCountryMetadata(ip).CountryCode
 }
 
 func isPrivateMetadataIP(ip netip.Addr) bool {
@@ -127,102 +134,10 @@ func (r networkRange) contains(ip netip.Addr) bool {
 }
 
 func lookupCountryMetadata(ip netip.Addr) Metadata {
-	if countryCode := lookupPackedCountryCode(ip); countryCode != "" {
+	if countryCode := countryLookupAsset.lookupCountry(ip); countryCode != "" {
 		return Metadata{CountryCode: countryCode}
 	}
 	return lookupGeoMetadata(ip, embeddedCountryRanges)
-}
-
-func lookupPackedCountryCode(ip netip.Addr) string {
-	asset := packedCountryData()
-	if ip.Is4() && len(asset.ipv4Starts) >= 4 {
-		raw := ip.As4()
-		value := binary.BigEndian.Uint32(raw[:])
-		count := len(asset.ipv4Starts) / 4
-		index := sort.Search(count, func(i int) bool {
-			return binary.BigEndian.Uint32(asset.ipv4Starts[i*4:i*4+4]) > value
-		})
-		return packedCountryCodeAt(asset.ipv4Codes, index-1)
-	}
-	if !ip.Is4() && len(asset.ipv6Starts) >= 16 {
-		raw := ip.As16()
-		high := binary.BigEndian.Uint64(raw[:8])
-		low := binary.BigEndian.Uint64(raw[8:])
-		count := len(asset.ipv6Starts) / 16
-		index := sort.Search(count, func(i int) bool {
-			offset := i * 16
-			startHigh := binary.BigEndian.Uint64(asset.ipv6Starts[offset : offset+8])
-			startLow := binary.BigEndian.Uint64(asset.ipv6Starts[offset+8 : offset+16])
-			return startHigh > high || (startHigh == high && startLow > low)
-		})
-		return packedCountryCodeAt(asset.ipv6Codes, index-1)
-	}
-	return ""
-}
-
-type packedCountryAsset struct {
-	ipv4Starts []byte
-	ipv4Codes  string
-	ipv6Starts []byte
-	ipv6Codes  string
-}
-
-func packedCountryData() packedCountryAsset {
-	countryPackedOnce.Do(func() {
-		compressed := &compressedAsset{compressed: embeddedCountryZSTDData}
-		raw := compressed.bytes()
-		if compressed.err != nil {
-			errCountryPacked = fmt.Errorf("country asset: %w", compressed.err)
-			return
-		}
-		asset, err := parsePackedCountryData(raw)
-		if err != nil {
-			errCountryPacked = fmt.Errorf("country asset: %w", err)
-			return
-		}
-		countryPacked = asset
-	})
-	return countryPacked
-}
-
-func parsePackedCountryData(raw []byte) (packedCountryAsset, error) {
-	if len(raw) == 0 {
-		return packedCountryAsset{}, nil
-	}
-	if len(raw) < 12 || string(raw[:4]) != "HKCO" {
-		return packedCountryAsset{}, fmt.Errorf("invalid magic or header")
-	}
-	ipv4Count := int(binary.BigEndian.Uint32(raw[4:8]))
-	ipv6Count := int(binary.BigEndian.Uint32(raw[8:12]))
-	offset := 12
-	ipv4StartsLen := ipv4Count * 4
-	ipv4CodesLen := ipv4Count * 2
-	ipv6StartsLen := ipv6Count * 16
-	ipv6CodesLen := ipv6Count * 2
-	total := offset + ipv4StartsLen + ipv4CodesLen + ipv6StartsLen + ipv6CodesLen
-	if ipv4Count < 0 || ipv6Count < 0 || total > len(raw) {
-		return packedCountryAsset{}, fmt.Errorf("truncated asset")
-	}
-	asset := packedCountryAsset{}
-	asset.ipv4Starts = raw[offset : offset+ipv4StartsLen]
-	offset += ipv4StartsLen
-	asset.ipv4Codes = string(raw[offset : offset+ipv4CodesLen])
-	offset += ipv4CodesLen
-	asset.ipv6Starts = raw[offset : offset+ipv6StartsLen]
-	offset += ipv6StartsLen
-	asset.ipv6Codes = string(raw[offset : offset+ipv6CodesLen])
-	return asset, nil
-}
-
-func packedCountryCodeAt(codes string, index int) string {
-	if index < 0 {
-		return ""
-	}
-	offset := index * 2
-	if offset+2 > len(codes) {
-		return ""
-	}
-	return codes[offset : offset+2]
 }
 
 func lookupCityMetadata(ip netip.Addr) Metadata {
@@ -246,19 +161,19 @@ func lookupGeoMetadata(ip netip.Addr, ranges []geoRange) Metadata {
 	return Metadata{}
 }
 
-func lookupNetworkMetadata(ip netip.Addr) *NetworkMetadata {
-	if metadata := lookupPackedASNMetadata(ip); metadata != nil {
-		return metadata
+func lookupNetworkMetadata(ip netip.Addr) (NetworkMetadata, bool) {
+	if metadata, ok := lookupPackedASNMetadata(ip); ok {
+		return metadata, true
 	}
 	index := sort.Search(len(embeddedNetworkRanges), func(i int) bool {
 		return embeddedNetworkRanges[i].first.Compare(ip) > 0
 	})
 	if index == 0 {
-		return nil
+		return NetworkMetadata{}, false
 	}
 	entry := embeddedNetworkRanges[index-1]
 	if !entry.contains(ip) {
-		return nil
+		return NetworkMetadata{}, false
 	}
-	return &entry.metadata
+	return entry.metadata, true
 }

@@ -2,11 +2,11 @@ package ipmeta
 
 import (
 	"net/netip"
-	"sync"
 	"testing"
 )
 
 var benchmarkMetadata Metadata
+var benchmarkCountryCode string
 
 func BenchmarkLookupPackedSteadyIPv4(b *testing.B) {
 	resetPackedLookupAssetsForTest()
@@ -30,6 +30,115 @@ func BenchmarkLookupPackedSteadyIPv6(b *testing.B) {
 	}
 }
 
+func BenchmarkLookupCountryPackedSteadyIPv4(b *testing.B) {
+	resetPackedLookupAssetsForTest()
+	ip := netip.MustParseAddr("80.187.73.186")
+	benchmarkCountryCode = LookupCountry(ip)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		benchmarkCountryCode = LookupCountry(ip)
+	}
+}
+
+func BenchmarkLookupWithCountryPackedSteadyIPv4(b *testing.B) {
+	resetPackedLookupAssetsForTest()
+	ip := netip.MustParseAddr("80.187.73.186")
+	benchmarkMetadata = LookupWithCountry(ip, "DE")
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		benchmarkMetadata = LookupWithCountry(ip, "DE")
+	}
+}
+
+func BenchmarkLookupCountryThenPackedSteadyIPv4(b *testing.B) {
+	resetPackedLookupAssetsForTest()
+	ip := netip.MustParseAddr("80.187.73.186")
+	benchmarkCountryCode = LookupCountry(ip)
+	benchmarkMetadata = Lookup(ip)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		benchmarkCountryCode = LookupCountry(ip)
+		benchmarkMetadata = Lookup(ip)
+	}
+}
+
+func BenchmarkLookupCountryThenWithCountryPackedSteadyIPv4(b *testing.B) {
+	resetPackedLookupAssetsForTest()
+	ip := netip.MustParseAddr("80.187.73.186")
+	benchmarkCountryCode = LookupCountry(ip)
+	benchmarkMetadata = LookupWithCountry(ip, benchmarkCountryCode)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		benchmarkCountryCode = LookupCountry(ip)
+		benchmarkMetadata = LookupWithCountry(ip, benchmarkCountryCode)
+	}
+}
+
+func BenchmarkLookupTwicePackedSteadyIPv4(b *testing.B) {
+	resetPackedLookupAssetsForTest()
+	ip := netip.MustParseAddr("80.187.73.186")
+	benchmarkCountryCode = Lookup(ip).CountryCode
+	benchmarkMetadata = Lookup(ip)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		benchmarkCountryCode = Lookup(ip).CountryCode
+		benchmarkMetadata = Lookup(ip)
+	}
+}
+
+func BenchmarkLookupCountryPackedColdIPv4(b *testing.B) {
+	ip := netip.MustParseAddr("80.187.73.186")
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		resetPackedLookupAssetsForTest()
+		benchmarkCountryCode = LookupCountry(ip)
+	}
+}
+
+func BenchmarkLookupWithCountryPackedColdIPv4(b *testing.B) {
+	ip := netip.MustParseAddr("80.187.73.186")
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		resetPackedLookupAssetsForTest()
+		benchmarkMetadata = LookupWithCountry(ip, "DE")
+	}
+}
+
+func BenchmarkLookupCountryThenPackedColdIPv4(b *testing.B) {
+	ip := netip.MustParseAddr("80.187.73.186")
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		resetPackedLookupAssetsForTest()
+		benchmarkCountryCode = LookupCountry(ip)
+		benchmarkMetadata = Lookup(ip)
+	}
+}
+
+func BenchmarkLookupCountryThenWithCountryPackedColdIPv4(b *testing.B) {
+	ip := netip.MustParseAddr("80.187.73.186")
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		resetPackedLookupAssetsForTest()
+		benchmarkCountryCode = LookupCountry(ip)
+		benchmarkMetadata = LookupWithCountry(ip, benchmarkCountryCode)
+	}
+}
+
+func BenchmarkLookupTwicePackedColdIPv4(b *testing.B) {
+	ip := netip.MustParseAddr("80.187.73.186")
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		resetPackedLookupAssetsForTest()
+		benchmarkCountryCode = Lookup(ip).CountryCode
+		benchmarkMetadata = Lookup(ip)
+	}
+}
+
 func BenchmarkLookupPackedColdIPv4(b *testing.B) {
 	ip := netip.MustParseAddr("80.187.73.186")
 	b.ReportAllocs()
@@ -49,10 +158,13 @@ func BenchmarkLookupPackedColdIPv6(b *testing.B) {
 }
 
 func resetPackedLookupAssetsForTest() {
-	countryPackedOnce = sync.Once{}
-	countryPacked = packedCountryAsset{}
-	cityLookupAsset.once = sync.Once{}
-	cityLookupAsset.asset = packedLookupAsset{}
-	asnLookupAsset.once = sync.Once{}
-	asnLookupAsset.asset = packedLookupAsset{}
+	countryLookupAsset = newFramedAsset(embeddedCountryZSTDData, "HKC2", framedCountryAsset, framedCountryCacheBytes)
+	cityLookupAsset = newFramedAsset(embeddedCityZSTDData, "HKY2", framedLookupAsset, framedCityCacheBytes)
+	asnLookupAsset = newFramedAsset(embeddedASNZSTDData, "HKA2", framedLookupAsset, framedASNCacheBytes)
+	framedDecoderState.Lock()
+	if framedDecoderState.decoder != nil {
+		framedDecoderState.decoder.Close()
+		framedDecoderState.decoder = nil
+	}
+	framedDecoderState.Unlock()
 }

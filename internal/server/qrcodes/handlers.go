@@ -36,7 +36,8 @@ import (
 const maxAssetBytes = 2 << 20
 
 type handler struct {
-	ctx *shared.Context
+	ctx              *shared.Context
+	lookupIPMetadata func(netip.Addr) ipmeta.Metadata
 }
 
 func Register(mux *http.ServeMux, ctx *shared.Context) {
@@ -829,14 +830,17 @@ func (h *handler) qrOpenRequestContext(r *http.Request) (string, string, ipmeta.
 		trusted = h.ctx.Config.GetTrustedProxyNetworks()
 	}
 	userIP := shared.GetRealIP(r, trusted)
-	countryCode := shared.CountryCodeFromRequest(r, trusted)
 	metadata := ipmeta.Metadata{}
 	if parsedIP, ok := shared.ParseAddr(userIP); ok {
-		metadata = ipmeta.Lookup(parsedIP)
+		lookup := h.lookupIPMetadata
+		if lookup == nil {
+			lookup = ipmeta.Lookup
+		}
+		metadata = lookup(parsedIP)
 	}
-	if countryCode == "" {
-		countryCode = metadata.CountryCode
-	}
+	countryCode := shared.CountryCodeFromRequestWithResolver(r, trusted, func(netip.Addr) string {
+		return metadata.CountryCode
+	})
 	return userIP, countryCode, metadata
 }
 

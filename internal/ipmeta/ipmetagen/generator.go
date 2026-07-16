@@ -1,7 +1,6 @@
 package ipmetagen
 
 import (
-	"bytes"
 	"encoding/csv"
 	"fmt"
 	"go/format"
@@ -314,25 +313,15 @@ type packedCountryAssets struct {
 
 func writePackedCountryAssets(dir string, records []geoRecord) error {
 	assets := buildPackedCountryAssets(records)
-	var raw bytes.Buffer
-	raw.WriteString("HKCO")
-	ipv4Count, err := checkedRangeCount(assets.ipv4StartData, 4, "country IPv4 ranges")
+	compressed, err := buildFramedCountryAsset(
+		assets.ipv4StartData,
+		assets.ipv4Codes,
+		assets.ipv6StartData,
+		assets.ipv6Codes,
+		framedRangeBlockTarget,
+	)
 	if err != nil {
-		return err
-	}
-	ipv6Count, err := checkedRangeCount(assets.ipv6StartData, 16, "country IPv6 ranges")
-	if err != nil {
-		return err
-	}
-	writeUint32(&raw, ipv4Count)
-	writeUint32(&raw, ipv6Count)
-	raw.Write(assets.ipv4StartData)
-	raw.WriteString(assets.ipv4Codes)
-	raw.Write(assets.ipv6StartData)
-	raw.WriteString(assets.ipv6Codes)
-	compressed, err := zstdBytes(raw.Bytes())
-	if err != nil {
-		return fmt.Errorf("compress country asset: %w", err)
+		return fmt.Errorf("build country asset: %w", err)
 	}
 	if err := writePublicGeneratedFile(filepath.Join(dir, countryAssetFile), compressed); err != nil {
 		return fmt.Errorf("write country asset %s: %w", countryAssetFile, err)

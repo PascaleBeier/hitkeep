@@ -22,6 +22,7 @@ func TestProductionCommandDoesNotDependOnGenerators(t *testing.T) {
 	for _, unwanted := range []string{
 		"hitkeep/cmd/ipmeta-generate",
 		"hitkeep/internal/ipmeta/ipmetagen",
+		"github.com/DataDog/zstd",
 		"github.com/ip2location/ip2location-go/v9",
 		"lukechampine.com/uint128",
 	} {

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"strings"
 	"sync"
 	"testing"
@@ -20,8 +21,58 @@ import (
 	"hitkeep/internal/blocking"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	"hitkeep/internal/ipmeta"
 	"hitkeep/internal/server/shared"
 )
+
+func TestGeoNetworkFromVisitorIPLooksUpMetadataOnce(t *testing.T) {
+	lookups := 0
+	countryCode, metadata := geoNetworkFromVisitorIP("8.8.8.8", nil, func(ip netip.Addr) ipmeta.Metadata {
+		lookups++
+		if got := ip.String(); got != "8.8.8.8" {
+			t.Fatalf("expected lookup for 8.8.8.8, got %s", got)
+		}
+		return ipmeta.Metadata{
+			CountryCode: "US",
+			Region:      "California",
+			City:        "Mountain View",
+			Provider:    "Google LLC",
+			ASN:         15169,
+			ASNOrg:      "Google LLC",
+		}
+	})
+
+	if lookups != 1 {
+		t.Fatalf("expected one metadata lookup, got %d", lookups)
+	}
+	if countryCode == nil || *countryCode != "US" {
+		t.Fatalf("expected country US, got %v", countryCode)
+	}
+	if metadata.City != "Mountain View" || metadata.ASN != 15169 {
+		t.Fatalf("unexpected metadata: %+v", metadata)
+	}
+}
+
+func TestMetadataFromVisitorIPWithCountryReusesResolvedCountry(t *testing.T) {
+	lookups := 0
+	metadata := metadataFromVisitorIPWithCountry("8.8.8.8", "US", func(ip netip.Addr, countryCode string) ipmeta.Metadata {
+		lookups++
+		if got := ip.String(); got != "8.8.8.8" {
+			t.Fatalf("expected lookup for 8.8.8.8, got %s", got)
+		}
+		if countryCode != "US" {
+			t.Fatalf("expected resolved country US, got %q", countryCode)
+		}
+		return ipmeta.Metadata{CountryCode: countryCode, City: "Mountain View", ASN: 15169}
+	})
+
+	if lookups != 1 {
+		t.Fatalf("expected one metadata lookup, got %d", lookups)
+	}
+	if metadata.CountryCode != "US" || metadata.City != "Mountain View" || metadata.ASN != 15169 {
+		t.Fatalf("unexpected metadata: %+v", metadata)
+	}
+}
 
 func TestIngestCORSPreflightAddsCachingHeaders(t *testing.T) {
 	handler := newIngestCORS().Handler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

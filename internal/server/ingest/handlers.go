@@ -145,7 +145,7 @@ func (h *handler) handleServerPageviewIngestLeader() http.HandlerFunc {
 			return
 		}
 
-		countryCodePtr, metadata := geoNetworkFromVisitorIP(ingestCtx.visitorIP, h.ctx.Config.GetTrustedProxyNetworks())
+		countryCodePtr, metadata := geoNetworkFromVisitorIP(ingestCtx.visitorIP, h.ctx.Config.GetTrustedProxyNetworks(), ipmeta.Lookup)
 		if h.ctx.IPFilter != nil && h.ctx.IPFilter.Evaluate(ingestCtx.site.ID, ingestCtx.visitorIP, stringValue(countryCodePtr)).Blocked {
 			h.recordRejection()
 			w.WriteHeader(http.StatusAccepted)
@@ -445,29 +445,42 @@ func countryCodeFromVisitorIP(visitorIP string, trustedProxyNets []netip.Prefix)
 	return shared.CountryCodeFromRequest(req, trustedProxyNets)
 }
 
-func countryCodeFromRequest(r *http.Request, visitorIP string, trustedProxyNets []netip.Prefix) string {
-	countryCode := shared.CountryCodeFromRequest(r, trustedProxyNets)
-	if countryCode != "" {
-		return countryCode
-	}
-	return metadataFromVisitorIP(visitorIP).CountryCode
+func countryCodeFromRequestWithFallback(r *http.Request, trustedProxyNets []netip.Prefix, fallback string) string {
+	return shared.CountryCodeFromRequestWithResolver(r, trustedProxyNets, func(netip.Addr) string {
+		return fallback
+	})
 }
 
-func geoNetworkFromVisitorIP(visitorIP string, trustedProxyNets []netip.Prefix) (*string, ipmeta.Metadata) {
-	metadata := metadataFromVisitorIP(visitorIP)
-	countryCode := countryCodeFromVisitorIP(visitorIP, trustedProxyNets)
-	if countryCode == "" {
-		countryCode = metadata.CountryCode
+func geoNetworkFromVisitorIP(visitorIP string, trustedProxyNets []netip.Prefix, lookup func(netip.Addr) ipmeta.Metadata) (*string, ipmeta.Metadata) {
+	metadata := metadataFromVisitorIP(visitorIP, lookup)
+	req := &http.Request{
+		Header:     http.Header{},
+		RemoteAddr: net.JoinHostPort(visitorIP, "0"),
 	}
+	countryCode := countryCodeFromRequestWithFallback(req, trustedProxyNets, metadata.CountryCode)
 	return stringPtrIfNotEmpty(countryCode), metadata
 }
 
-func metadataFromVisitorIP(visitorIP string) ipmeta.Metadata {
+func metadataFromVisitorIP(visitorIP string, lookup func(netip.Addr) ipmeta.Metadata) ipmeta.Metadata {
 	addr, ok := shared.ParseAddr(visitorIP)
 	if !ok {
 		return ipmeta.Metadata{}
 	}
-	return ipmeta.Lookup(addr)
+	if lookup == nil {
+		lookup = ipmeta.Lookup
+	}
+	return lookup(addr)
+}
+
+func metadataFromVisitorIPWithCountry(visitorIP, countryCode string, lookup func(netip.Addr, string) ipmeta.Metadata) ipmeta.Metadata {
+	addr, ok := shared.ParseAddr(visitorIP)
+	if !ok {
+		return ipmeta.Metadata{}
+	}
+	if lookup == nil {
+		lookup = ipmeta.LookupWithCountry
+	}
+	return lookup(addr, countryCode)
 }
 
 func stringPtrIfNotEmpty(value string) *string {
@@ -528,7 +541,7 @@ func (h *handler) handleIngestLeader(w http.ResponseWriter, r *http.Request) {
 
 	trustedProxyNets := h.ctx.Config.GetTrustedProxyNetworks()
 	userIP := shared.GetRealIP(r, trustedProxyNets)
-	countryCode := countryCodeFromRequest(r, userIP, trustedProxyNets)
+	countryCode := shared.CountryCodeFromRequest(r, trustedProxyNets)
 	if h.ctx.IPFilter != nil && h.ctx.IPFilter.Evaluate(site.ID, userIP, countryCode).Blocked {
 		h.recordRejection()
 		w.WriteHeader(http.StatusAccepted)
@@ -552,7 +565,7 @@ func (h *handler) handleIngestLeader(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	metadata := metadataFromVisitorIP(userIP)
+	metadata := metadataFromVisitorIPWithCountry(userIP, countryCode, ipmeta.LookupWithCountry)
 	if countryCode == "" {
 		countryCode = metadata.CountryCode
 	}
@@ -684,7 +697,7 @@ func (h *handler) handleIngestWebVitalsLeader(w http.ResponseWriter, r *http.Req
 
 	trustedProxyNets := h.ctx.Config.GetTrustedProxyNetworks()
 	userIP := shared.GetRealIP(r, trustedProxyNets)
-	countryCode := countryCodeFromRequest(r, userIP, trustedProxyNets)
+	countryCode := shared.CountryCodeFromRequest(r, trustedProxyNets)
 	if h.ctx.IPFilter != nil && h.ctx.IPFilter.Evaluate(site.ID, userIP, countryCode).Blocked {
 		h.recordRejection()
 		w.WriteHeader(http.StatusAccepted)
@@ -839,7 +852,7 @@ func (h *handler) handleIngestEventLeader(w http.ResponseWriter, r *http.Request
 
 	trustedProxyNets := h.ctx.Config.GetTrustedProxyNetworks()
 	userIP := shared.GetRealIP(r, trustedProxyNets)
-	countryCode := countryCodeFromRequest(r, userIP, trustedProxyNets)
+	countryCode := shared.CountryCodeFromRequest(r, trustedProxyNets)
 	if h.ctx.IPFilter != nil && h.ctx.IPFilter.Evaluate(site.ID, userIP, countryCode).Blocked {
 		h.recordRejection()
 		w.WriteHeader(http.StatusAccepted)
