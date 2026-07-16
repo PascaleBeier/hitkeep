@@ -104,7 +104,14 @@ describe('Dashboard', () => {
                 {
                     provide: GoogleSearchConsoleService,
                     useValue: {
-                        getSiteMapping: vi.fn(() => of({ site_id: 'site-1', team_id: 'team-1', mapped: false, can_manage: false })),
+                        getSiteMapping: vi.fn(() =>
+                            of({
+                                site_id: 'site-1',
+                                team_id: 'team-1',
+                                mapped: false,
+                                can_manage: false
+                            })
+                        ),
                         getOverview: vi.fn(),
                         getSeries: vi.fn(),
                         getQueries: vi.fn(),
@@ -131,6 +138,49 @@ describe('Dashboard', () => {
 
     it('should create', () => {
         expect(component).toBeTruthy();
+    });
+
+    it('keeps headline values numeric with formatting metadata and no permanent live pulse', () => {
+        setDashboardStats({
+            ...emptyStats(),
+            live_visitors: 3,
+            bounce_rate: 41.25,
+            avg_session_duration: 83,
+            pages_per_session: 2.75
+        });
+
+        const cards = (
+            component as unknown as {
+                kpiCards: () => {
+                    id: string;
+                    value: string | number;
+                    valueClass: string;
+                    format?: Intl.NumberFormatOptions;
+                    suffix?: string;
+                    duration?: boolean;
+                }[];
+            }
+        ).kpiCards();
+        const live = cards.find((card) => card.id === 'live_visitors');
+        const bounce = cards.find((card) => card.id === 'bounce_rate');
+        const duration = cards.find((card) => card.id === 'avg_session_duration');
+        const pages = cards.find((card) => card.id === 'pages_per_session');
+
+        expect(live?.value).toBe(3);
+        expect(live?.valueClass).not.toContain('animate-pulse');
+        expect(bounce?.value).toBe(41.25);
+        expect(bounce?.format).toEqual({
+            minimumFractionDigits: 1,
+            maximumFractionDigits: 1
+        });
+        expect(bounce?.suffix).toBe('%');
+        expect(duration?.value).toBe(83);
+        expect(duration?.duration).toBe(true);
+        expect(pages?.value).toBe(2.75);
+        expect(pages?.format).toEqual({
+            minimumFractionDigits: 1,
+            maximumFractionDigits: 2
+        });
     });
 
     it('defaults the report range to today', () => {
@@ -254,6 +304,64 @@ describe('Dashboard', () => {
         }
     });
 
+    it('commits StatsQuery realtime results without remounting KPI values and advances the page update key', async () => {
+        vi.useFakeTimers();
+        try {
+            const siteService = TestBed.inject(SiteService);
+            const statsService = TestBed.inject(StatsService);
+            vi.spyOn(TestBed.inject(HitService), 'loadHits').mockImplementation(() => undefined);
+
+            const baseline = {
+                ...emptyStats(),
+                total_pageviews: 10,
+                unique_sessions: 5
+            };
+            const updated = { ...baseline, total_pageviews: 28, unique_sessions: 23 };
+            vi.mocked(statsService.fetchStats).mockReturnValueOnce(of(baseline)).mockReturnValueOnce(of(updated));
+
+            siteService.activeSite.set({
+                id: 'site-1',
+                user_id: 'user-1',
+                domain: 'example.com',
+                created_at: '2026-01-01T00:00:00Z'
+            });
+            fixture.detectChanges();
+
+            realtimeEvents.next({
+                type: 'analytics.changed',
+                site_id: 'site-1',
+                kinds: ['hits'],
+                changed_at: '2026-07-10T08:00:00Z',
+                bucket_start: '2026-07-10T08:00:00Z',
+                counts: { hits: 18 }
+            });
+            vi.advanceTimersByTime(600);
+            fixture.detectChanges();
+
+            const dashboard = component as unknown as {
+                kpiCards: () => {
+                    id: string;
+                    value: string | number;
+                    loading: boolean;
+                    updateKey?: number;
+                }[];
+            };
+            const cards = dashboard.kpiCards();
+            const pageviews = cards.find((card) => card.id === 'total_pageviews');
+            const sessions = cards.find((card) => card.id === 'unique_sessions');
+
+            expect(pageviews?.value).toBe(28);
+            expect(pageviews?.loading).toBe(false);
+            expect(pageviews?.updateKey).toBe(1);
+            expect(sessions?.value).toBe(23);
+            expect(sessions?.loading).toBe(false);
+            expect(sessions?.updateKey).toBe(1);
+            expect(fixture.nativeElement.querySelectorAll('app-kpi-card p-skeleton').length).toBe(0);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it('should group top, landing, and exit pages under the content metric tab', () => {
         const siteService = TestBed.inject(SiteService);
         const statsService = TestBed.inject(StatsService);
@@ -307,7 +415,14 @@ describe('Dashboard', () => {
             funnels: []
         });
 
-        const tabs = (component as unknown as { metricCardTabs: () => { id: string; cards: { id: string; data: { name: string; value: number }[] }[] }[] }).metricCardTabs();
+        const tabs = (
+            component as unknown as {
+                metricCardTabs: () => {
+                    id: string;
+                    cards: { id: string; data: { name: string; value: number }[] }[];
+                }[];
+            }
+        ).metricCardTabs();
         const content = tabs.find((tab) => tab.id === 'content');
 
         expect(content?.cards.map((card) => card.id)).toEqual(['top-pages', 'landing-pages', 'exit-pages']);
@@ -369,7 +484,11 @@ describe('Dashboard', () => {
             funnels: []
         });
 
-        const tabs = (component as unknown as { metricCardTabs: () => { id: string; cards: { id: string }[] }[] }).metricCardTabs();
+        const tabs = (
+            component as unknown as {
+                metricCardTabs: () => { id: string; cards: { id: string }[] }[];
+            }
+        ).metricCardTabs();
 
         expect(tabs.find((tab) => tab.id === 'location')?.cards.map((card) => card.id)).toEqual(['countries', 'cities']);
         expect(tabs.find((tab) => tab.id === 'network')?.cards.map((card) => card.id)).toEqual(['providers', 'asns']);
@@ -427,7 +546,14 @@ describe('Dashboard', () => {
             funnels: []
         });
 
-        const dashboardStats = (component as unknown as { stats: () => { top_countries: unknown[]; top_languages: unknown[] } | null }).stats();
+        const dashboardStats = (
+            component as unknown as {
+                stats: () => {
+                    top_countries: unknown[];
+                    top_languages: unknown[];
+                } | null;
+            }
+        ).stats();
         expect(dashboardStats?.top_countries).toEqual([{ name: 'DE', value: 4 }]);
         expect(dashboardStats?.top_languages).toEqual([{ name: 'de', value: 3 }]);
     });
@@ -527,7 +653,15 @@ describe('Dashboard', () => {
                 can_manage: true
             })
         );
-        searchConsoleService.getOverview.mockReturnValue(of({ data_source: 'google_search_console', clicks: 1, impressions: 10, ctr: 0.1, average_position: 2 }));
+        searchConsoleService.getOverview.mockReturnValue(
+            of({
+                data_source: 'google_search_console',
+                clicks: 1,
+                impressions: 10,
+                ctr: 0.1,
+                average_position: 2
+            })
+        );
         searchConsoleService.getSeries.mockReturnValue(of({ data_source: 'google_search_console', series: [] }));
         searchConsoleService.getQueries.mockReturnValue(of({ data_source: 'google_search_console', rows: [] }));
         searchConsoleService.getPages.mockReturnValue(of({ data_source: 'google_search_console', rows: [] }));
@@ -611,19 +745,80 @@ describe('Dashboard', () => {
                 can_manage: true
             })
         );
-        searchConsoleService.getOverview.mockReturnValue(of({ data_source: 'google_search_console', clicks: 24, impressions: 180, ctr: 0.1333, average_position: 3.4 }));
+        searchConsoleService.getOverview.mockReturnValue(
+            of({
+                data_source: 'google_search_console',
+                clicks: 24,
+                impressions: 180,
+                ctr: 0.1333,
+                average_position: 3.4
+            })
+        );
         searchConsoleService.getSeries.mockReturnValue(
             of({
                 data_source: 'google_search_console',
-                series: [{ date: '2026-05-01', clicks: 24, impressions: 180, ctr: 0.1333, average_position: 3.4 }]
+                series: [
+                    {
+                        date: '2026-05-01',
+                        clicks: 24,
+                        impressions: 180,
+                        ctr: 0.1333,
+                        average_position: 3.4
+                    }
+                ]
             })
         );
-        searchConsoleService.getQueries.mockReturnValue(of({ data_source: 'google_search_console', rows: [{ value: 'privacy analytics', clicks: 24, impressions: 180, ctr: 0.1333, average_position: 3.4 }] }));
-        searchConsoleService.getPages.mockReturnValue(of({ data_source: 'google_search_console', rows: [{ value: 'https://example.com/pricing', clicks: 10, impressions: 90, ctr: 0.1111, average_position: 4.1 }] }));
+        searchConsoleService.getQueries.mockReturnValue(
+            of({
+                data_source: 'google_search_console',
+                rows: [
+                    {
+                        value: 'privacy analytics',
+                        clicks: 24,
+                        impressions: 180,
+                        ctr: 0.1333,
+                        average_position: 3.4
+                    }
+                ]
+            })
+        );
+        searchConsoleService.getPages.mockReturnValue(
+            of({
+                data_source: 'google_search_console',
+                rows: [
+                    {
+                        value: 'https://example.com/pricing',
+                        clicks: 10,
+                        impressions: 90,
+                        ctr: 0.1111,
+                        average_position: 4.1
+                    }
+                ]
+            })
+        );
         searchConsoleService.getBreakdown.mockImplementation((_siteID: string, dimension: string) =>
             of({
                 data_source: 'google_search_console',
-                rows: dimension === 'country' ? [{ value: 'usa', clicks: 14, impressions: 100, ctr: 0.14, average_position: 3 }] : [{ value: 'desktop', clicks: 12, impressions: 80, ctr: 0.15, average_position: 2.8 }]
+                rows:
+                    dimension === 'country'
+                        ? [
+                              {
+                                  value: 'usa',
+                                  clicks: 14,
+                                  impressions: 100,
+                                  ctr: 0.14,
+                                  average_position: 3
+                              }
+                          ]
+                        : [
+                              {
+                                  value: 'desktop',
+                                  clicks: 12,
+                                  impressions: 80,
+                                  ctr: 0.15,
+                                  average_position: 2.8
+                              }
+                          ]
             })
         );
 

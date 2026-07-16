@@ -33,11 +33,11 @@ import { FunnelList } from '@features/analytics/components/funnel-list';
 import { SearchConsoleDrilldown } from '@features/analytics/components/search-console-drilldown';
 import { FunnelManager } from '@features/funnels/components/funnel-manager';
 import { FunnelViewer } from '@features/funnels/components/funnel-viewer';
-import type { Funnel, MetricStat, SiteStats } from '@models/analytics.types';
+import type { Funnel, MetricStat } from '@models/analytics.types';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { WorkflowProgress, type WorkflowProgressStep } from '@components/workflow-progress/workflow-progress';
-import { KpiCard } from '@features/analytics/components/kpi-card';
+import { KPI_PERCENT_FORMAT, KPI_SHORT_DECIMAL_FORMAT, KpiCard } from '@features/analytics/components/kpi-card';
 import { ShareService } from '@services/share.service';
 import { translateRangeLabel } from '@components/range-toolbar/range-toolbar';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
@@ -62,7 +62,10 @@ interface KpiCardData {
     value: number | string;
     loading: boolean;
     valueClass: string;
-    highlight?: boolean;
+    format?: Intl.NumberFormatOptions;
+    suffix?: string;
+    duration?: boolean;
+    updateKey?: number;
     delta?: number | null;
     invertDelta?: boolean;
 }
@@ -123,7 +126,7 @@ export class Dashboard {
     protected stats = this.statsQuery.stats;
     protected isStatsLoading = this.statsQuery.isLoading;
     protected currentComparisonRange = this.statsQuery.comparisonRange;
-    protected highlightedKpis = signal<Set<KpiMetricID>>(new Set());
+    protected readonly kpiUpdateKey = signal(0);
     protected showFunnelManager = signal(false);
     protected showFunnelViewer = signal(false);
     protected selectedFunnelId = signal<string | null>(null);
@@ -308,7 +311,16 @@ export class Dashboard {
                         activeValue: this.activeFilterValue('provider'),
                         filterType: 'provider'
                     },
-                    { id: 'asns', title: this.transloco.translate('common.metrics.asns'), icon: 'pi-sitemap', data: stats?.top_asns ?? [], isLoading: loading, isRowClickable: true, activeValue: this.activeFilterValue('asn'), filterType: 'asn' }
+                    {
+                        id: 'asns',
+                        title: this.transloco.translate('common.metrics.asns'),
+                        icon: 'pi-sitemap',
+                        data: stats?.top_asns ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('asn'),
+                        filterType: 'asn'
+                    }
                 ]
             }
         ];
@@ -364,27 +376,18 @@ export class Dashboard {
         this.activeLanguage();
         const stats = this.stats();
         const loading = this.isStatsLoading();
-        const highlighted = this.highlightedKpis();
+        const updateKey = this.kpiUpdateKey();
         const cmp = stats?.comparison;
         const baseClass = 'text-2xl xl:text-3xl font-bold';
         const liveVisitors = stats?.live_visitors ?? 0;
-        const bounceValue = this.localeService.localizeNumber(stats?.bounce_rate ?? 0, 'decimal', undefined, {
-            minimumFractionDigits: 1,
-            maximumFractionDigits: 1
-        });
-        const pagesValue = this.localeService.localizeNumber(stats?.pages_per_session ?? 0, 'decimal', undefined, {
-            minimumFractionDigits: 1,
-            maximumFractionDigits: 2
-        });
-
         return [
             {
                 id: 'live_visitors',
                 label: this.transloco.translate('dashboard.kpis.liveVisitors'),
                 value: liveVisitors,
                 loading,
-                highlight: highlighted.has('live_visitors'),
-                valueClass: liveVisitors > 0 ? `${baseClass} text-green-600 dark:text-green-400 animate-pulse` : baseClass,
+                updateKey,
+                valueClass: liveVisitors > 0 ? `${baseClass} text-green-600 dark:text-green-400` : baseClass,
                 delta: null
             },
             {
@@ -392,7 +395,7 @@ export class Dashboard {
                 label: this.transloco.translate('dashboard.kpis.pageviews'),
                 value: stats?.total_pageviews ?? 0,
                 loading,
-                highlight: highlighted.has('total_pageviews'),
+                updateKey,
                 valueClass: baseClass,
                 delta: cmp ? this.calcDelta(stats?.total_pageviews ?? 0, cmp.total_pageviews) : null
             },
@@ -401,36 +404,40 @@ export class Dashboard {
                 label: this.transloco.translate('dashboard.kpis.uniqueSessions'),
                 value: stats?.unique_sessions ?? 0,
                 loading,
-                highlight: highlighted.has('unique_sessions'),
+                updateKey,
                 valueClass: baseClass,
                 delta: cmp ? this.calcDelta(stats?.unique_sessions ?? 0, cmp.unique_sessions) : null
             },
             {
                 id: 'bounce_rate',
                 label: this.transloco.translate('dashboard.kpis.bounceRate'),
-                value: `${bounceValue}%`,
+                value: stats?.bounce_rate ?? 0,
                 loading,
-                highlight: highlighted.has('bounce_rate'),
+                updateKey,
                 valueClass: baseClass,
+                format: KPI_PERCENT_FORMAT,
+                suffix: '%',
                 delta: cmp ? this.calcDelta(stats?.bounce_rate ?? 0, cmp.bounce_rate) : null,
                 invertDelta: true
             },
             {
                 id: 'avg_session_duration',
                 label: this.transloco.translate('dashboard.kpis.avgDuration'),
-                value: this.formatDuration(stats?.avg_session_duration || 0),
+                value: stats?.avg_session_duration ?? 0,
                 loading,
-                highlight: highlighted.has('avg_session_duration'),
+                updateKey,
                 valueClass: baseClass,
+                duration: true,
                 delta: cmp ? this.calcDelta(stats?.avg_session_duration ?? 0, cmp.avg_session_duration) : null
             },
             {
                 id: 'pages_per_session',
                 label: this.transloco.translate('dashboard.kpis.pagesPerSession'),
-                value: pagesValue,
+                value: stats?.pages_per_session ?? 0,
                 loading,
-                highlight: highlighted.has('pages_per_session'),
+                updateKey,
                 valueClass: baseClass,
+                format: KPI_SHORT_DECIMAL_FORMAT,
                 delta: cmp ? this.calcDelta(stats?.pages_per_session ?? 0, cmp.pages_per_session) : null
             }
         ];
@@ -445,7 +452,12 @@ export class Dashboard {
         this.activeLanguage();
         const site = this.siteService.activeSite();
         if (!site) {
-            return [{ label: this.transloco.translate('dashboard.breadcrumbOverview'), isCurrent: true }];
+            return [
+                {
+                    label: this.transloco.translate('dashboard.breadcrumbOverview'),
+                    isCurrent: true
+                }
+            ];
         }
         return [{ label: site.domain, favicon: site, isCurrent: true }];
     });
@@ -453,23 +465,32 @@ export class Dashboard {
     private searchSubject = new Subject<string>();
     protected searchQuery = signal('');
     private lastTableEvent: TableLazyLoadEvent | null = null;
-    private previousKpiSnapshot: Record<KpiMetricID, number> | null = null;
-    private lastHandledStatsResultSequence = 0;
-    private kpiHighlightTimer: ReturnType<typeof setTimeout> | null = null;
     protected readonly isShortRange = this.reportRange.isShortRange;
     protected chartTitle = computed(() => {
         this.activeLanguage();
         const range = this.reportRange.selectedRange();
 
         if (range.value !== 'custom') {
-            return this.transloco.translate('dashboard.chartTitleWithRange', { range: range.label ?? translateRangeLabel(this.transloco, range.value) });
+            return this.transloco.translate('dashboard.chartTitleWithRange', {
+                range: range.label ?? translateRangeLabel(this.transloco, range.value)
+            });
         }
 
         const dates = this.reportRange.customRangeDates();
         if (dates && dates.length === 2 && dates[0] && dates[1]) {
-            const start = this.localeService.localizeDate(dates[0], undefined, { month: 'short', day: 'numeric' });
-            const end = this.localeService.localizeDate(dates[1], undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-            return this.transloco.translate('dashboard.chartTitleCustomRange', { start, end });
+            const start = this.localeService.localizeDate(dates[0], undefined, {
+                month: 'short',
+                day: 'numeric'
+            });
+            const end = this.localeService.localizeDate(dates[1], undefined, {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
+            return this.transloco.translate('dashboard.chartTitleCustomRange', {
+                start,
+                end
+            });
         }
 
         return this.transloco.translate('dashboard.chartTitleOverview');
@@ -488,29 +509,6 @@ export class Dashboard {
             if (site && dates) {
                 this.loadStatsForCurrentRange();
                 this.refreshHits();
-            }
-        });
-
-        effect(() => {
-            const result = this.statsQuery.lastResult();
-            if (!result || result.sequence === this.lastHandledStatsResultSequence) return;
-
-            this.lastHandledStatsResultSequence = result.sequence;
-            const stats = this.stats();
-            if (!stats) {
-                this.previousKpiSnapshot = null;
-                this.clearKpiHighlights();
-                return;
-            }
-
-            const previous = this.previousKpiSnapshot;
-            const next = this.kpiSnapshot(stats);
-            this.previousKpiSnapshot = next;
-            if (result.mode !== 'background' || !previous) return;
-
-            const changed = this.changedKpis(previous, next);
-            if (changed.size > 0) {
-                this.flashKpis(changed);
             }
         });
 
@@ -638,47 +636,14 @@ export class Dashboard {
         const filters = this.activeFilters();
         if (!site || !dates) return;
         const effectiveMode = mode === 'background' && this.stats() && !this.isStatsLoading() ? 'background' : 'blocking';
-        this.statsQuery.load({ siteId: site.id, from: dates.from, to: dates.to, filters, mode: effectiveMode });
-    }
-
-    private kpiSnapshot(stats: SiteStats): Record<KpiMetricID, number> {
-        return {
-            live_visitors: stats.live_visitors ?? 0,
-            total_pageviews: stats.total_pageviews ?? 0,
-            unique_sessions: stats.unique_sessions ?? 0,
-            bounce_rate: stats.bounce_rate ?? 0,
-            avg_session_duration: stats.avg_session_duration ?? 0,
-            pages_per_session: stats.pages_per_session ?? 0
-        };
-    }
-
-    private changedKpis(previous: Record<KpiMetricID, number>, next: Record<KpiMetricID, number>): Set<KpiMetricID> {
-        const changed = new Set<KpiMetricID>();
-        for (const id of Object.keys(next) as KpiMetricID[]) {
-            if (previous[id] !== next[id]) {
-                changed.add(id);
-            }
-        }
-        return changed;
-    }
-
-    private flashKpis(ids: Set<KpiMetricID>): void {
-        if (this.kpiHighlightTimer) {
-            clearTimeout(this.kpiHighlightTimer);
-        }
-        this.highlightedKpis.set(new Set(ids));
-        this.kpiHighlightTimer = setTimeout(() => {
-            this.highlightedKpis.set(new Set());
-            this.kpiHighlightTimer = null;
-        }, 1200);
-    }
-
-    private clearKpiHighlights(): void {
-        if (this.kpiHighlightTimer) {
-            clearTimeout(this.kpiHighlightTimer);
-            this.kpiHighlightTimer = null;
-        }
-        this.highlightedKpis.set(new Set());
+        this.statsQuery.load({
+            siteId: site.id,
+            from: dates.from,
+            to: dates.to,
+            filters,
+            mode: effectiveMode,
+            onSuccess: effectiveMode === 'background' ? () => this.kpiUpdateKey.update((key) => key + 1) : undefined
+        });
     }
 
     protected calcDelta(current: number, previous: number): number | null {
@@ -688,16 +653,6 @@ export class Dashboard {
 
     protected getCurrentDateRange() {
         return this.reportRange.currentDateRange();
-    }
-
-    protected formatDuration(seconds: number): string {
-        if (!seconds) return this.transloco.translate('common.durationSeconds', { seconds: 0 });
-        const m = Math.floor(seconds / 60);
-        const s = Math.floor(seconds % 60);
-        if (m > 0) {
-            return this.transloco.translate('common.durationMinutesSeconds', { minutes: m, seconds: s });
-        }
-        return this.transloco.translate('common.durationSeconds', { seconds: s });
     }
 
     protected openFunnelViewer(funnel: Funnel) {
@@ -757,23 +712,41 @@ export class Dashboard {
     private filterLabel(filter: MetricFilter): string {
         switch (filter.type) {
             case 'path':
-                return this.transloco.translate('common.filters.page', { value: filter.value });
+                return this.transloco.translate('common.filters.page', {
+                    value: filter.value
+                });
             case 'referrer':
-                return this.transloco.translate('common.filters.source', { value: filter.value });
+                return this.transloco.translate('common.filters.source', {
+                    value: filter.value
+                });
             case 'device':
-                return this.transloco.translate('common.filters.device', { value: filter.value });
+                return this.transloco.translate('common.filters.device', {
+                    value: filter.value
+                });
             case 'country':
-                return this.transloco.translate('common.filters.country', { value: filter.value });
+                return this.transloco.translate('common.filters.country', {
+                    value: filter.value
+                });
             case 'city':
-                return this.transloco.translate('common.filters.city', { value: filter.value });
+                return this.transloco.translate('common.filters.city', {
+                    value: filter.value
+                });
             case 'provider':
-                return this.transloco.translate('common.filters.provider', { value: filter.value });
+                return this.transloco.translate('common.filters.provider', {
+                    value: filter.value
+                });
             case 'asn':
-                return this.transloco.translate('common.filters.asn', { value: filter.value });
+                return this.transloco.translate('common.filters.asn', {
+                    value: filter.value
+                });
             case 'browser':
-                return this.transloco.translate('common.filters.browser', { value: filter.value });
+                return this.transloco.translate('common.filters.browser', {
+                    value: filter.value
+                });
             case 'language':
-                return this.transloco.translate('common.filters.language', { value: this.displayLanguageLabel(filter.value) });
+                return this.transloco.translate('common.filters.language', {
+                    value: this.displayLanguageLabel(filter.value)
+                });
             default:
                 return `${filter.type}: ${filter.value}`;
         }

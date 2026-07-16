@@ -20,6 +20,7 @@ import { injectActiveLang } from '@core/i18n/active-lang';
 import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
 import { REALTIME_EVENT_KINDS } from '@services/realtime.service';
 import { injectReportRange } from '@services/report-range-preferences.service';
+import { AnimatedNumber } from '@components/animated-number/animated-number';
 
 interface EventFilterChip {
     key: string;
@@ -46,7 +47,7 @@ const AUTOMATIC_EVENT_NAMES = Object.keys(AUTOMATIC_EVENT_META);
 
 @Component({
     selector: 'app-events',
-    imports: [FormsModule, ReactiveFormsModule, TranslocoPipe, SelectModule, CardModule, SkeletonModule, ButtonModule, MessageModule, MetricCardGroup, ReportRangeToolbar, PageHeader, PageHeaderLeft, PageBreadcrumb, SeriesChart],
+    imports: [FormsModule, ReactiveFormsModule, TranslocoPipe, SelectModule, CardModule, SkeletonModule, ButtonModule, MessageModule, MetricCardGroup, ReportRangeToolbar, PageHeader, PageHeaderLeft, PageBreadcrumb, SeriesChart, AnimatedNumber],
     templateUrl: './events.html',
     styleUrl: './events.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -160,8 +161,6 @@ export class Events {
     });
 
     protected readonly hasActiveFilters = computed(() => this.filterChips().length > 0);
-
-    protected readonly totalEventCountDisplay = computed(() => this.totalEventCount().toLocaleString());
 
     protected readonly totalEventDeltaClass = computed(() => {
         const d = this.totalEventDelta();

@@ -33,7 +33,7 @@
     } @else {
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
         @for (card of kpiCards(); track card.label) {
-        <app-kpi-card [label]="card.label" [value]="card.value" [delta]="card.delta" [loading]="isLoadingSeries() || isLoadingComparison()" />
+        <app-kpi-card [label]="card.label" [value]="card.value" [format]="card.format" [suffix]="card.suffix" [delta]="card.delta ?? null" [loading]="isLoadingSeries() || isLoadingComparison()" [updateKey]="card.updateKey ?? 0" />
         }
     </div>
 

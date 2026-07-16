@@ -9,7 +9,7 @@ import { CardModule } from 'primeng/card';
 import { SelectModule } from 'primeng/select';
 import { SiteService } from '@features/sites/services/site.service';
 import { StatsService } from '@features/analytics/services/stats.service';
-import { injectStatsQuery } from '@features/analytics/services/stats-query';
+import { injectStatsQuery, type StatsQueryMode } from '@features/analytics/services/stats-query';
 import { AnalyticsService } from '@services/analytics.service';
 import { GoalList } from '@features/analytics/components/goal-list';
 import { MetricCardGroup, MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
@@ -19,7 +19,7 @@ import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/
 import { PageState } from '@components/page-state/page-state';
 import { SeriesChart, SeriesDefinition, SeriesChartPoint } from '@features/analytics/components/series-chart';
 import { Goal, GoalSeriesPoint, SiteStats } from '@models/analytics.types';
-import { KpiCard } from '@features/analytics/components/kpi-card';
+import { KPI_PERCENT_FORMAT, KpiCard, KpiCardModel } from '@features/analytics/components/kpi-card';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
 import { finalize } from 'rxjs';
 import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
@@ -63,6 +63,7 @@ export class Goals {
     protected stats = this.statsQuery.stats;
     protected isStatsLoading = this.statsQuery.isLoading;
     protected currentComparisonRange = this.statsQuery.comparisonRange;
+    protected readonly kpiUpdateKey = signal(0);
     protected baselineStats = signal<SiteStats | null>(null);
     protected baselineLoading = signal(false);
     protected isRefreshing = computed(() => this.isStatsLoading() || this.isGoalSeriesLoading() || this.baselineLoading());
@@ -102,7 +103,7 @@ export class Goals {
         return `${fmt(r.from)} – ${fmt(r.to)}`;
     });
 
-    protected readonly goalKpis = computed(() => {
+    protected readonly goalKpis = computed<KpiCardModel[]>(() => {
         this.activeLanguage();
         const activeIds = new Set(this.activeGoalFilters().map((filter) => filter.id));
         const goals = this.goals();
@@ -114,13 +115,15 @@ export class Goals {
         const conversionRate = totalSessions > 0 ? (sessionsWithGoals / totalSessions) * 100 : 0;
         const cmpTotalSessions = this.baselineStats()?.comparison?.unique_sessions ?? 0;
         const cmpConversionRate = cmpTotalSessions > 0 ? (cmpTotalConversions / cmpTotalSessions) * 100 : 0;
-        const isLoading = this.isStatsLoading() || this.baselineLoading();
+        const isLoading = this.isStatsLoading() || this.baselineLoading() || this.isGoalSeriesLoading();
+        const updateKey = this.kpiUpdateKey();
 
         return [
             {
                 label: this.transloco.translate('goals.kpis.totalGoals'),
                 value: totalGoals,
                 loading: isLoading,
+                updateKey,
                 valueClass: 'text-2xl xl:text-3xl font-bold',
                 delta: null as number | null
             },
@@ -128,20 +131,25 @@ export class Goals {
                 label: this.transloco.translate('goals.kpis.conversions'),
                 value: totalConversions,
                 loading: isLoading,
+                updateKey,
                 valueClass: 'text-2xl xl:text-3xl font-bold',
                 delta: this.calcDelta(totalConversions, cmpTotalConversions)
             },
             {
                 label: this.transloco.translate('common.kpis.conversionRate'),
-                value: `${this.localeService.localizeNumber(conversionRate, 'decimal', undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`,
+                value: conversionRate,
                 loading: isLoading,
+                updateKey,
                 valueClass: 'text-2xl xl:text-3xl font-bold',
+                format: KPI_PERCENT_FORMAT,
+                suffix: '%',
                 delta: this.calcDelta(conversionRate, cmpConversionRate)
             },
             {
                 label: this.transloco.translate('dashboard.kpis.uniqueSessions'),
                 value: totalSessions,
                 loading: isLoading,
+                updateKey,
                 valueClass: 'text-2xl xl:text-3xl font-bold',
                 delta: this.calcDelta(totalSessions, cmpTotalSessions)
             }
@@ -263,7 +271,16 @@ export class Goals {
                         activeValue: this.activeFilterValue('provider'),
                         filterType: 'provider'
                     },
-                    { id: 'asns', title: this.transloco.translate('common.metrics.asns'), icon: 'pi-sitemap', data: stats?.top_asns ?? [], isLoading: loading, isRowClickable: true, activeValue: this.activeFilterValue('asn'), filterType: 'asn' }
+                    {
+                        id: 'asns',
+                        title: this.transloco.translate('common.metrics.asns'),
+                        icon: 'pi-sitemap',
+                        data: stats?.top_asns ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('asn'),
+                        filterType: 'asn'
+                    }
                 ]
             }
         ];
@@ -309,7 +326,7 @@ export class Goals {
             siteId: () => this.siteService.activeSite()?.id ?? null,
             kinds: REALTIME_GOAL_KINDS,
             enabled: () => !!this.siteService.activeSite() && !!this.getCurrentDateRange(),
-            refresh: () => this.refreshStats(),
+            refresh: () => this.refreshStats('background'),
             debounceMs: 700
         });
     }
@@ -318,30 +335,42 @@ export class Goals {
         this.isGoalManagerVisible.set(true);
     }
 
-    refreshStats() {
+    refreshStats(mode: StatsQueryMode = 'blocking') {
         const site = this.siteService.activeSite();
         const dates = this.getCurrentDateRange();
         if (site && dates) {
             const goalIds = this.getGoalIdsForFilters();
-            this.loadStats(site.id, dates.from, dates.to, this.activeFilters(), goalIds);
-            this.loadBaselineStats(site.id, dates.from, dates.to, this.activeFilters());
-            this.loadGoalSeries(site.id, dates.from, dates.to, goalIds);
+            this.loadStats(site.id, dates.from, dates.to, this.activeFilters(), goalIds, mode);
+            this.loadBaselineStats(site.id, dates.from, dates.to, this.activeFilters(), mode);
+            this.loadGoalSeries(site.id, dates.from, dates.to, goalIds, mode);
             const cmpRange = this.currentComparisonRange();
             if (cmpRange) {
-                this.loadComparisonGoalSeries(site.id, cmpRange.from, cmpRange.to, goalIds);
+                this.loadComparisonGoalSeries(site.id, cmpRange.from, cmpRange.to, goalIds, mode);
             }
         }
     }
 
-    private loadStats(siteId: string, from: string, to: string, filters: MetricFilter[], goalIds: string[]) {
-        this.statsQuery.load({ siteId, from, to, filters, goalIds });
+    private loadStats(siteId: string, from: string, to: string, filters: MetricFilter[], goalIds: string[], mode: StatsQueryMode = 'blocking') {
+        const effectiveMode = mode === 'background' && this.stats() && !this.isStatsLoading() ? 'background' : 'blocking';
+        this.statsQuery.load({
+            siteId,
+            from,
+            to,
+            filters,
+            goalIds,
+            mode: effectiveMode,
+            onSuccess: effectiveMode === 'background' ? () => this.kpiUpdateKey.update((key) => key + 1) : undefined
+        });
     }
 
     protected availableGoalFilters = computed(() => {
         const selected = new Set(this.activeGoalFilters().map((filter) => filter.id));
         return this.goals()
             .filter((goal) => !selected.has(goal.id))
-            .map((goal) => ({ label: goal.name, value: { id: goal.id, name: goal.name } }));
+            .map((goal) => ({
+                label: goal.name,
+                value: { id: goal.id, name: goal.name }
+            }));
     });
 
     protected addGoalFilter(filter: { id: string; name: string } | null) {
@@ -383,14 +412,24 @@ export class Goals {
             });
     }
 
-    private loadBaselineStats(siteId: string, from: string, to: string, filters: { type: MetricFilterType; value: string }[]) {
-        this.baselineLoading.set(true);
+    private loadBaselineStats(siteId: string, from: string, to: string, filters: { type: MetricFilterType; value: string }[], mode: StatsQueryMode = 'blocking') {
+        const blocking = mode === 'blocking' || this.baselineLoading() || !this.baselineStats();
+        if (blocking) this.baselineLoading.set(true);
         this.statsService
             .fetchStats(siteId, from, to, filters, [], [])
-            .pipe(finalize(() => this.baselineLoading.set(false)))
+            .pipe(
+                finalize(() => {
+                    if (blocking) this.baselineLoading.set(false);
+                })
+            )
             .subscribe({
-                next: (data) => this.baselineStats.set(data),
-                error: () => this.baselineStats.set(null)
+                next: (data) => {
+                    this.baselineStats.set(data);
+                    if (!blocking) this.kpiUpdateKey.update((key) => key + 1);
+                },
+                error: () => {
+                    if (blocking) this.baselineStats.set(null);
+                }
             });
     }
 
@@ -430,43 +469,74 @@ export class Goals {
     private filterLabel(filter: MetricFilter): string {
         switch (filter.type) {
             case 'path':
-                return this.transloco.translate('common.filters.page', { value: filter.value });
+                return this.transloco.translate('common.filters.page', {
+                    value: filter.value
+                });
             case 'referrer':
-                return this.transloco.translate('common.filters.source', { value: filter.value });
+                return this.transloco.translate('common.filters.source', {
+                    value: filter.value
+                });
             case 'device':
-                return this.transloco.translate('common.filters.device', { value: filter.value });
+                return this.transloco.translate('common.filters.device', {
+                    value: filter.value
+                });
             case 'country':
-                return this.transloco.translate('common.filters.country', { value: filter.value });
+                return this.transloco.translate('common.filters.country', {
+                    value: filter.value
+                });
             case 'city':
-                return this.transloco.translate('common.filters.city', { value: filter.value });
+                return this.transloco.translate('common.filters.city', {
+                    value: filter.value
+                });
             case 'provider':
-                return this.transloco.translate('common.filters.provider', { value: filter.value });
+                return this.transloco.translate('common.filters.provider', {
+                    value: filter.value
+                });
             case 'asn':
-                return this.transloco.translate('common.filters.asn', { value: filter.value });
+                return this.transloco.translate('common.filters.asn', {
+                    value: filter.value
+                });
             default:
                 return `${filter.type}: ${filter.value}`;
         }
     }
 
-    private loadGoalSeries(siteId: string, from: string, to: string, goalIds: string[]) {
-        this.isGoalSeriesLoading.set(true);
+    private loadGoalSeries(siteId: string, from: string, to: string, goalIds: string[], mode: StatsQueryMode = 'blocking') {
+        const blocking = mode === 'blocking' || this.isGoalSeriesLoading();
+        if (blocking) this.isGoalSeriesLoading.set(true);
         this.analyticsService
             .getGoalTimeseries(siteId, from, to, goalIds)
-            .pipe(finalize(() => this.isGoalSeriesLoading.set(false)))
+            .pipe(
+                finalize(() => {
+                    if (blocking) this.isGoalSeriesLoading.set(false);
+                })
+            )
             .subscribe({
-                next: (data) => this.goalSeries.set(data ?? []),
-                error: () => this.goalSeries.set([])
+                next: (data) => {
+                    this.goalSeries.set(data ?? []);
+                    if (!blocking) this.kpiUpdateKey.update((key) => key + 1);
+                },
+                error: () => {
+                    if (blocking) this.goalSeries.set([]);
+                }
             });
     }
 
-    private loadComparisonGoalSeries(siteId: string, from: string, to: string, goalIds: string[]) {
-        this.isComparisonGoalSeriesLoading.set(true);
+    private loadComparisonGoalSeries(siteId: string, from: string, to: string, goalIds: string[], mode: StatsQueryMode = 'blocking') {
+        const blocking = mode === 'blocking' || this.isComparisonGoalSeriesLoading();
+        if (blocking) this.isComparisonGoalSeriesLoading.set(true);
         this.analyticsService
             .getGoalTimeseries(siteId, from, to, goalIds)
-            .pipe(finalize(() => this.isComparisonGoalSeriesLoading.set(false)))
+            .pipe(
+                finalize(() => {
+                    if (blocking) this.isComparisonGoalSeriesLoading.set(false);
+                })
+            )
             .subscribe({
                 next: (data) => this.comparisonGoalSeries.set(data ?? []),
-                error: () => this.comparisonGoalSeries.set([])
+                error: () => {
+                    if (blocking) this.comparisonGoalSeries.set([]);
+                }
             });
     }
 

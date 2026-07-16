@@ -15,7 +15,7 @@ import { ReportRangeToolbar } from '@components/report-range-toolbar/report-rang
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { SeriesChart, SeriesChartPoint, SeriesDefinition } from '@features/analytics/components/series-chart';
-import { KpiCard } from '@features/analytics/components/kpi-card';
+import { KPI_PERCENT_FORMAT, KpiCard, KpiCardModel } from '@features/analytics/components/kpi-card';
 import { MetricCardGroup, MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
 import { AIFetchCorrelationReport, AIFetchOverview, MetricStat } from '@models/analytics.types';
 import { injectActiveLang } from '@core/i18n/active-lang';
@@ -27,6 +27,7 @@ import { REALTIME_KINDS } from '@services/realtime.service';
 import { injectReportRange } from '@services/report-range-preferences.service';
 
 type FilterKey = 'assistantName' | 'assistantFamily' | 'resourceType' | 'path';
+type DataLoadMode = 'blocking' | 'background';
 
 interface CorrelationSummaryCard {
     label: string;
@@ -62,7 +63,7 @@ export class AIVisibility {
     protected readonly isLoadingOverview = signal(false);
     protected readonly isLoadingSeries = signal(false);
     protected readonly isLoadingCorrelation = signal(false);
-    private readonly realtimeRefreshKey = signal(0);
+    protected readonly kpiUpdateKey = signal(0);
     protected readonly isLoading = computed(() => this.isLoadingOverview() || this.isLoadingSeries() || this.isLoadingCorrelation());
     protected readonly isExporting = signal(false);
     protected readonly exportState = signal<'idle' | 'success' | 'error'>('idle');
@@ -73,10 +74,19 @@ export class AIVisibility {
     protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
         this.activeLanguage();
         const site = this.activeSite();
-        if (!site) return [{ label: this.transloco.translate('aiVisibility.title'), isCurrent: true }];
+        if (!site)
+            return [
+                {
+                    label: this.transloco.translate('aiVisibility.title'),
+                    isCurrent: true
+                }
+            ];
         return [
             { label: site.domain, favicon: site, routerLink: '/dashboard' },
-            { label: this.transloco.translate('aiVisibility.title'), isCurrent: true }
+            {
+                label: this.transloco.translate('aiVisibility.title'),
+                isCurrent: true
+            }
         ];
     });
 
@@ -94,16 +104,28 @@ export class AIVisibility {
         const filters = this.filters();
         const chips: AIFilterChip[] = [];
         if (filters.assistantName) {
-            chips.push({ key: 'assistantName', label: `${this.transloco.translate('aiVisibility.filters.assistant')}: ${filters.assistantName}` });
+            chips.push({
+                key: 'assistantName',
+                label: `${this.transloco.translate('aiVisibility.filters.assistant')}: ${filters.assistantName}`
+            });
         }
         if (filters.assistantFamily) {
-            chips.push({ key: 'assistantFamily', label: `${this.transloco.translate('aiVisibility.filters.family')}: ${filters.assistantFamily}` });
+            chips.push({
+                key: 'assistantFamily',
+                label: `${this.transloco.translate('aiVisibility.filters.family')}: ${filters.assistantFamily}`
+            });
         }
         if (filters.resourceType) {
-            chips.push({ key: 'resourceType', label: `${this.transloco.translate('aiVisibility.filters.resourceType')}: ${filters.resourceType}` });
+            chips.push({
+                key: 'resourceType',
+                label: `${this.transloco.translate('aiVisibility.filters.resourceType')}: ${filters.resourceType}`
+            });
         }
         if (filters.path) {
-            chips.push({ key: 'path', label: `${this.transloco.translate('aiVisibility.columns.path')}: ${filters.path}` });
+            chips.push({
+                key: 'path',
+                label: `${this.transloco.translate('aiVisibility.columns.path')}: ${filters.path}`
+            });
         }
         return chips;
     });
@@ -121,16 +143,39 @@ export class AIVisibility {
         ];
     });
 
-    protected readonly primaryKpiCards = computed(() => {
+    protected readonly primaryKpiCards = computed<KpiCardModel[]>(() => {
         this.activeLanguage();
         const overview = this.overview();
         const summary = this.correlation()?.summary;
         const loading = this.isLoadingOverview();
+        const updateKey = this.kpiUpdateKey();
         return [
-            { label: this.transloco.translate('aiVisibility.kpis.totalFetches'), value: overview?.total_requests ?? 0, loading },
-            { label: this.transloco.translate('aiVisibility.correlation.kpis.aiVisits'), value: summary?.ai_referred_visits ?? 0, loading: this.isLoadingCorrelation() },
-            { label: this.transloco.translate('aiVisibility.kpis.uniqueAssistants'), value: overview?.unique_assistants ?? 0, loading },
-            { label: this.transloco.translate('aiVisibility.columns.errorRate'), value: `${((overview?.error_rate_4xx ?? 0) + (overview?.error_rate_5xx ?? 0)).toFixed(1)}%`, loading }
+            {
+                label: this.transloco.translate('aiVisibility.kpis.totalFetches'),
+                value: overview?.total_requests ?? 0,
+                loading,
+                updateKey
+            },
+            {
+                label: this.transloco.translate('aiVisibility.correlation.kpis.aiVisits'),
+                value: summary?.ai_referred_visits ?? 0,
+                loading: this.isLoadingCorrelation(),
+                updateKey
+            },
+            {
+                label: this.transloco.translate('aiVisibility.kpis.uniqueAssistants'),
+                value: overview?.unique_assistants ?? 0,
+                loading,
+                updateKey
+            },
+            {
+                label: this.transloco.translate('aiVisibility.columns.errorRate'),
+                value: (overview?.error_rate_4xx ?? 0) + (overview?.error_rate_5xx ?? 0),
+                loading,
+                updateKey,
+                format: KPI_PERCENT_FORMAT,
+                suffix: '%'
+            }
         ];
     });
 
@@ -139,11 +184,31 @@ export class AIVisibility {
         const overview = this.overview();
         const loading = this.isLoadingOverview();
         return [
-            { label: this.transloco.translate('aiVisibility.kpis.uniquePaths'), value: overview?.unique_paths ?? 0, loading },
-            { label: this.transloco.translate('aiVisibility.kpis.errorRate4xx'), value: `${(overview?.error_rate_4xx ?? 0).toFixed(1)}%`, loading },
-            { label: this.transloco.translate('aiVisibility.kpis.errorRate5xx'), value: `${(overview?.error_rate_5xx ?? 0).toFixed(1)}%`, loading },
-            { label: this.transloco.translate('aiVisibility.kpis.medianResponse'), value: this.formatResponse(overview?.median_response_ms ?? 0), loading },
-            { label: this.transloco.translate('aiVisibility.kpis.bytesServed'), value: this.formatBytes(overview?.total_bytes ?? 0), loading }
+            {
+                label: this.transloco.translate('aiVisibility.kpis.uniquePaths'),
+                value: overview?.unique_paths ?? 0,
+                loading
+            },
+            {
+                label: this.transloco.translate('aiVisibility.kpis.errorRate4xx'),
+                value: `${(overview?.error_rate_4xx ?? 0).toFixed(1)}%`,
+                loading
+            },
+            {
+                label: this.transloco.translate('aiVisibility.kpis.errorRate5xx'),
+                value: `${(overview?.error_rate_5xx ?? 0).toFixed(1)}%`,
+                loading
+            },
+            {
+                label: this.transloco.translate('aiVisibility.kpis.medianResponse'),
+                value: this.formatResponse(overview?.median_response_ms ?? 0),
+                loading
+            },
+            {
+                label: this.transloco.translate('aiVisibility.kpis.bytesServed'),
+                value: this.formatBytes(overview?.total_bytes ?? 0),
+                loading
+            }
         ];
     });
 
@@ -152,8 +217,16 @@ export class AIVisibility {
         const summary = this.correlation()?.summary;
         const loading = this.isLoadingCorrelation();
         return [
-            { label: this.transloco.translate('aiVisibility.correlation.kpis.correlatedPaths'), value: summary?.correlated_paths ?? 0, loading },
-            { label: this.transloco.translate('aiVisibility.correlation.kpis.uncorrelatedFetches'), value: summary?.uncorrelated_fetches ?? 0, loading }
+            {
+                label: this.transloco.translate('aiVisibility.correlation.kpis.correlatedPaths'),
+                value: summary?.correlated_paths ?? 0,
+                loading
+            },
+            {
+                label: this.transloco.translate('aiVisibility.correlation.kpis.uncorrelatedFetches'),
+                value: summary?.uncorrelated_fetches ?? 0,
+                loading
+            }
         ];
     });
     protected readonly metricCardTabs = computed<MetricCardGroupTab<FilterKey>[]>(() => {
@@ -233,7 +306,10 @@ export class AIVisibility {
                         id: 'citation-yield',
                         title: this.transloco.translate('aiVisibility.tables.citationYield.title'),
                         icon: 'pi-link',
-                        data: (correlation?.citation_yield ?? []).map((row) => ({ name: row.path, value: row.ai_referred_visits })),
+                        data: (correlation?.citation_yield ?? []).map((row) => ({
+                            name: row.path,
+                            value: row.ai_referred_visits
+                        })),
                         isLoading: correlationLoading,
                         linkMode: 'path',
                         siteDomain: this.activeSite()?.domain ?? null,
@@ -245,7 +321,10 @@ export class AIVisibility {
                         id: 'opportunity-pages',
                         title: this.transloco.translate('aiVisibility.tables.opportunityPages.title'),
                         icon: 'pi-bolt',
-                        data: (correlation?.opportunity_pages ?? []).map((row) => ({ name: row.path, value: row.fetch_count })),
+                        data: (correlation?.opportunity_pages ?? []).map((row) => ({
+                            name: row.path,
+                            value: row.fetch_count
+                        })),
                         isLoading: correlationLoading,
                         linkMode: 'path',
                         siteDomain: this.activeSite()?.domain ?? null,
@@ -257,7 +336,10 @@ export class AIVisibility {
                         id: 'failure-hotspots',
                         title: this.transloco.translate('aiVisibility.tables.failureHotspots.title'),
                         icon: 'pi-exclamation-triangle',
-                        data: (correlation?.failure_hotspots ?? []).map((row) => ({ name: row.assistant_name, value: row.error_requests })),
+                        data: (correlation?.failure_hotspots ?? []).map((row) => ({
+                            name: row.assistant_name,
+                            value: row.error_requests
+                        })),
                         isLoading: correlationLoading,
                         isRowClickable: true,
                         activeValue: this.filterValue('assistantName'),
@@ -292,8 +374,6 @@ export class AIVisibility {
             const site = this.activeSite();
             this.reportRange.selectedRange();
             const filters = this.filters();
-            this.realtimeRefreshKey();
-
             if (!site) {
                 this.overview.set(null);
                 this.correlation.set(null);
@@ -305,11 +385,11 @@ export class AIVisibility {
             if (!dates) return;
             this.loadData(site.id, dates.from, dates.to, filters);
         });
-        this.realtimeRefresh.registerSignalUntilDestroyed(this.destroyRef, {
+        this.realtimeRefresh.registerUntilDestroyed(this.destroyRef, {
             siteId: () => this.activeSite()?.id ?? null,
             kinds: [REALTIME_KINDS.aiFetch],
             enabled: () => !!this.activeSite() && !!this.getCurrentDateRange(),
-            signal: this.realtimeRefreshKey,
+            refresh: () => this.refreshData('background'),
             debounceMs: 700
         });
     }
@@ -325,11 +405,11 @@ export class AIVisibility {
         }));
     }
 
-    protected refreshData() {
+    protected refreshData(mode: DataLoadMode = 'blocking') {
         const site = this.activeSite();
         const dates = this.getCurrentDateRange();
         if (!site || !dates) return;
-        this.loadData(site.id, dates.from, dates.to, this.filters());
+        this.loadData(site.id, dates.from, dates.to, this.filters(), mode);
     }
 
     protected filterValue(key: FilterKey): string | null {
@@ -375,22 +455,39 @@ export class AIVisibility {
             });
     }
 
-    private loadData(siteId: string, from: string, to: string, filters: AIFetchFilters) {
-        this.isLoadingOverview.set(true);
-        this.isLoadingSeries.set(true);
-        this.isLoadingCorrelation.set(true);
+    private loadData(siteId: string, from: string, to: string, filters: AIFetchFilters, mode: DataLoadMode = 'blocking') {
+        const blocking = mode === 'blocking' || this.isLoading() || !this.overview();
+        if (blocking) {
+            this.isLoadingOverview.set(true);
+            this.isLoadingSeries.set(true);
+            this.isLoadingCorrelation.set(true);
+        }
 
         forkJoin({
-            overview: this.analyticsService.getAIFetchOverview(siteId, from, to, filters).pipe(finalize(() => this.isLoadingOverview.set(false))),
-            timeseries: this.analyticsService.getAIFetchTimeseries(siteId, from, to, filters).pipe(finalize(() => this.isLoadingSeries.set(false))),
-            correlation: this.analyticsService.getAIFetchCorrelation(siteId, from, to, filters).pipe(finalize(() => this.isLoadingCorrelation.set(false)))
+            overview: this.analyticsService.getAIFetchOverview(siteId, from, to, filters).pipe(
+                finalize(() => {
+                    if (blocking) this.isLoadingOverview.set(false);
+                })
+            ),
+            timeseries: this.analyticsService.getAIFetchTimeseries(siteId, from, to, filters).pipe(
+                finalize(() => {
+                    if (blocking) this.isLoadingSeries.set(false);
+                })
+            ),
+            correlation: this.analyticsService.getAIFetchCorrelation(siteId, from, to, filters).pipe(
+                finalize(() => {
+                    if (blocking) this.isLoadingCorrelation.set(false);
+                })
+            )
         }).subscribe({
             next: ({ overview, timeseries, correlation }) => {
                 this.overview.set(overview);
                 this.series.set(mapAIFetchSeries(timeseries));
                 this.correlation.set(correlation);
+                if (!blocking) this.kpiUpdateKey.update((key) => key + 1);
             },
             error: () => {
+                if (!blocking) return;
                 this.overview.set({
                     total_requests: 0,
                     unique_paths: 0,

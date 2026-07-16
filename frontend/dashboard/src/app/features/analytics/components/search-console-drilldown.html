@@ -39,7 +39,7 @@
     } @else {
     <div class="search-console-drilldown__kpis">
         @for (card of kpiCards(); track card.label) {
-        <app-kpi-card [label]="card.label" [value]="card.value" [loading]="loading()" valueClass="text-2xl font-bold" />
+        <app-kpi-card [label]="card.label" [value]="card.value" [loading]="loading()" [format]="card.format" [suffix]="card.suffix" valueClass="text-2xl font-bold" />
         }
     </div>
 

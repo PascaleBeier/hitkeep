@@ -9,7 +9,7 @@ import { CardModule } from 'primeng/card';
 import { SelectModule } from 'primeng/select';
 import { SiteService } from '@features/sites/services/site.service';
 import { AnalyticsService } from '@services/analytics.service';
-import { injectStatsQuery } from '@features/analytics/services/stats-query';
+import { injectStatsQuery, type StatsQueryMode } from '@features/analytics/services/stats-query';
 import { FunnelList } from '@features/analytics/components/funnel-list';
 import { MetricCardGroup, MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
 import { FunnelManager } from '@features/funnels/components/funnel-manager';
@@ -19,7 +19,7 @@ import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header'
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { SeriesChart, SeriesDefinition, SeriesChartPoint } from '@features/analytics/components/series-chart';
 import { FunnelSeriesPoint } from '@models/analytics.types';
-import { KpiCard } from '@features/analytics/components/kpi-card';
+import { KPI_PERCENT_FORMAT, KpiCard, KpiCardModel } from '@features/analytics/components/kpi-card';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
 import { finalize } from 'rxjs';
 import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
@@ -67,6 +67,7 @@ export class Funnels {
     protected stats = this.statsQuery.stats;
     protected isStatsLoading = this.statsQuery.isLoading;
     protected currentComparisonRange = this.statsQuery.comparisonRange;
+    protected readonly kpiUpdateKey = signal(0);
     protected isRefreshing = computed(() => this.isStatsLoading() || this.isFunnelSeriesLoading() || this.loading());
     protected funnelSeries = signal<FunnelSeriesPoint[]>([]);
     protected funnelSeriesChart = computed<SeriesChartPoint[]>(() =>
@@ -106,7 +107,7 @@ export class Funnels {
         return `${fmt(r.from)} – ${fmt(r.to)}`;
     });
 
-    protected readonly funnelKpis = computed(() => {
+    protected readonly funnelKpis = computed<KpiCardModel[]>(() => {
         this.activeLanguage();
         const activeIds = new Set(this.activeFunnelFilters().map((filter) => filter.id));
         const funnelsCount = activeIds.size > 0 ? this.funnels().filter((funnel) => activeIds.has(funnel.id)).length : this.funnels().length;
@@ -116,12 +117,14 @@ export class Funnels {
         const cmpEntries = this.comparisonFunnelSeries().reduce((sum, point) => sum + point.entries, 0);
         const cmpCompletions = this.comparisonFunnelSeries().reduce((sum, point) => sum + point.completions, 0);
         const cmpCompletionRate = cmpEntries > 0 ? (cmpCompletions / cmpEntries) * 100 : 0;
+        const updateKey = this.kpiUpdateKey();
 
         return [
             {
                 label: this.transloco.translate('funnels.kpis.funnels'),
                 value: funnelsCount,
                 loading: this.loading(),
+                updateKey,
                 valueClass: 'text-2xl xl:text-3xl font-bold',
                 delta: null as number | null
             },
@@ -129,6 +132,7 @@ export class Funnels {
                 label: this.transloco.translate('funnels.kpis.entries'),
                 value: entries,
                 loading: this.isFunnelSeriesLoading(),
+                updateKey,
                 valueClass: 'text-2xl xl:text-3xl font-bold',
                 delta: this.calcDelta(entries, cmpEntries)
             },
@@ -136,14 +140,18 @@ export class Funnels {
                 label: this.transloco.translate('funnels.kpis.completions'),
                 value: completions,
                 loading: this.isFunnelSeriesLoading(),
+                updateKey,
                 valueClass: 'text-2xl xl:text-3xl font-bold',
                 delta: this.calcDelta(completions, cmpCompletions)
             },
             {
                 label: this.transloco.translate('funnels.kpis.completionRate'),
-                value: `${this.localeService.localizeNumber(completionRate, 'decimal', undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`,
+                value: completionRate,
                 loading: this.isFunnelSeriesLoading(),
+                updateKey,
                 valueClass: 'text-2xl xl:text-3xl font-bold',
+                format: KPI_PERCENT_FORMAT,
+                suffix: '%',
                 delta: this.calcDelta(completionRate, cmpCompletionRate)
             }
         ];
@@ -271,7 +279,16 @@ export class Funnels {
                         activeValue: this.activeFilterValue('provider'),
                         filterType: 'provider'
                     },
-                    { id: 'asns', title: this.transloco.translate('common.metrics.asns'), icon: 'pi-sitemap', data: stats?.top_asns ?? [], isLoading: loading, isRowClickable: true, activeValue: this.activeFilterValue('asn'), filterType: 'asn' }
+                    {
+                        id: 'asns',
+                        title: this.transloco.translate('common.metrics.asns'),
+                        icon: 'pi-sitemap',
+                        data: stats?.top_asns ?? [],
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.activeFilterValue('asn'),
+                        filterType: 'asn'
+                    }
                 ]
             }
         ];
@@ -323,7 +340,7 @@ export class Funnels {
             siteId: () => this.siteService.activeSite()?.id ?? null,
             kinds: REALTIME_FUNNEL_KINDS,
             enabled: () => !!this.siteService.activeSite() && !!this.getCurrentDateRange(),
-            refresh: () => this.refreshStats(),
+            refresh: () => this.refreshStats('background'),
             debounceMs: 700
         });
     }
@@ -350,7 +367,10 @@ export class Funnels {
         const selected = new Set(this.activeFunnelFilters().map((filter) => filter.id));
         return this.funnels()
             .filter((funnel) => !selected.has(funnel.id))
-            .map((funnel) => ({ label: funnel.name, value: { id: funnel.id, name: funnel.name } }));
+            .map((funnel) => ({
+                label: funnel.name,
+                value: { id: funnel.id, name: funnel.name }
+            }));
     });
 
     protected addFunnelFilter(filter: { id: string; name: string } | null) {
@@ -417,43 +437,74 @@ export class Funnels {
     private filterLabel(filter: MetricFilter): string {
         switch (filter.type) {
             case 'path':
-                return this.transloco.translate('common.filters.page', { value: filter.value });
+                return this.transloco.translate('common.filters.page', {
+                    value: filter.value
+                });
             case 'referrer':
-                return this.transloco.translate('common.filters.source', { value: filter.value });
+                return this.transloco.translate('common.filters.source', {
+                    value: filter.value
+                });
             case 'device':
-                return this.transloco.translate('common.filters.device', { value: filter.value });
+                return this.transloco.translate('common.filters.device', {
+                    value: filter.value
+                });
             case 'country':
-                return this.transloco.translate('common.filters.country', { value: filter.value });
+                return this.transloco.translate('common.filters.country', {
+                    value: filter.value
+                });
             case 'city':
-                return this.transloco.translate('common.filters.city', { value: filter.value });
+                return this.transloco.translate('common.filters.city', {
+                    value: filter.value
+                });
             case 'provider':
-                return this.transloco.translate('common.filters.provider', { value: filter.value });
+                return this.transloco.translate('common.filters.provider', {
+                    value: filter.value
+                });
             case 'asn':
-                return this.transloco.translate('common.filters.asn', { value: filter.value });
+                return this.transloco.translate('common.filters.asn', {
+                    value: filter.value
+                });
             default:
                 return `${filter.type}: ${filter.value}`;
         }
     }
 
-    private loadFunnelSeries(siteId: string, from: string, to: string, funnelIds: string[]) {
-        this.isFunnelSeriesLoading.set(true);
+    private loadFunnelSeries(siteId: string, from: string, to: string, funnelIds: string[], mode: StatsQueryMode = 'blocking') {
+        const blocking = mode === 'blocking' || this.isFunnelSeriesLoading();
+        if (blocking) this.isFunnelSeriesLoading.set(true);
         this.analyticsService
             .getFunnelTimeseries(siteId, from, to, funnelIds)
-            .pipe(finalize(() => this.isFunnelSeriesLoading.set(false)))
+            .pipe(
+                finalize(() => {
+                    if (blocking) this.isFunnelSeriesLoading.set(false);
+                })
+            )
             .subscribe({
-                next: (data) => this.funnelSeries.set(data ?? []),
-                error: () => this.funnelSeries.set([])
+                next: (data) => {
+                    this.funnelSeries.set(data ?? []);
+                    if (!blocking) this.kpiUpdateKey.update((key) => key + 1);
+                },
+                error: () => {
+                    if (blocking) this.funnelSeries.set([]);
+                }
             });
     }
 
-    private loadComparisonFunnelSeries(siteId: string, from: string, to: string, funnelIds: string[]) {
-        this.isComparisonFunnelSeriesLoading.set(true);
+    private loadComparisonFunnelSeries(siteId: string, from: string, to: string, funnelIds: string[], mode: StatsQueryMode = 'blocking') {
+        const blocking = mode === 'blocking' || this.isComparisonFunnelSeriesLoading();
+        if (blocking) this.isComparisonFunnelSeriesLoading.set(true);
         this.analyticsService
             .getFunnelTimeseries(siteId, from, to, funnelIds)
-            .pipe(finalize(() => this.isComparisonFunnelSeriesLoading.set(false)))
+            .pipe(
+                finalize(() => {
+                    if (blocking) this.isComparisonFunnelSeriesLoading.set(false);
+                })
+            )
             .subscribe({
                 next: (data) => this.comparisonFunnelSeries.set(data ?? []),
-                error: () => this.comparisonFunnelSeries.set([])
+                error: () => {
+                    if (blocking) this.comparisonFunnelSeries.set([]);
+                }
             });
     }
 
@@ -462,7 +513,7 @@ export class Funnels {
         return ((current - previous) / previous) * 100;
     }
 
-    protected refreshStats() {
+    protected refreshStats(mode: StatsQueryMode = 'blocking') {
         const site = this.siteService.activeSite();
         const dates = this.getCurrentDateRange();
         if (!site || !dates) return;
@@ -476,16 +527,24 @@ export class Funnels {
             return;
         }
 
-        this.loadFunnelSeries(site.id, dates.from, dates.to, funnelIds);
-        this.loadStats(site.id, dates.from, dates.to, metricFilters, funnelIds);
+        this.loadFunnelSeries(site.id, dates.from, dates.to, funnelIds, mode);
+        this.loadStats(site.id, dates.from, dates.to, metricFilters, funnelIds, mode);
         const cmpRange = this.currentComparisonRange();
         if (cmpRange) {
-            this.loadComparisonFunnelSeries(site.id, cmpRange.from, cmpRange.to, funnelIds);
+            this.loadComparisonFunnelSeries(site.id, cmpRange.from, cmpRange.to, funnelIds, mode);
         }
     }
 
-    private loadStats(siteId: string, from: string, to: string, filters: MetricFilter[], funnelIds: string[]) {
-        this.statsQuery.load({ siteId, from, to, filters, funnelIds });
+    private loadStats(siteId: string, from: string, to: string, filters: MetricFilter[], funnelIds: string[], mode: StatsQueryMode = 'blocking') {
+        const effectiveMode = mode === 'background' && this.stats() && !this.isStatsLoading() ? 'background' : 'blocking';
+        this.statsQuery.load({
+            siteId,
+            from,
+            to,
+            filters,
+            funnelIds,
+            mode: effectiveMode
+        });
     }
 
     protected getCurrentDateRange() {

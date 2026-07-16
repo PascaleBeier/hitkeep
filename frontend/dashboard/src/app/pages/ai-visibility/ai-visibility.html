@@ -33,7 +33,7 @@
     } @else {
     <div data-testid="ai-visibility-headline-kpis" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         @for (card of primaryKpiCards(); track card.label) {
-        <app-kpi-card [label]="card.label" [value]="card.value" [loading]="card.loading" />
+        <app-kpi-card [label]="card.label" [value]="card.value" [loading]="card.loading" [updateKey]="card.updateKey ?? 0" [format]="card.format" [suffix]="card.suffix" />
         }
     </div>
 

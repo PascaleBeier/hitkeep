@@ -1,12 +1,37 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { KpiCard } from '@features/analytics/components/kpi-card';
+import { vi } from 'vitest';
 
 describe('KpiCard', () => {
     let fixture: ComponentFixture<KpiCard>;
 
     beforeEach(async () => {
         await TestBed.configureTestingModule({
-            imports: [KpiCard]
+            imports: [
+                KpiCard,
+                TranslocoTestingModule.forRoot({
+                    langs: {
+                        en: {
+                            common: {
+                                durationMinutesSeconds: '{{minutes}}m {{seconds}}s',
+                                durationSeconds: '{{seconds}}s'
+                            }
+                        },
+                        de: {
+                            common: {
+                                durationMinutesSeconds: '{{minutes}}m {{seconds}}s',
+                                durationSeconds: '{{seconds}}s'
+                            }
+                        }
+                    },
+                    translocoConfig: {
+                        availableLangs: ['en', 'de'],
+                        defaultLang: 'en'
+                    },
+                    preloadLangs: true
+                })
+            ]
         }).compileComponents();
 
         fixture = TestBed.createComponent(KpiCard);
@@ -15,31 +40,191 @@ describe('KpiCard', () => {
         fixture.componentRef.setInput('loading', false);
     });
 
-    it('marks positive deltas as good by default', () => {
+    it('renders finite numbers with the animated facade and keeps formatted strings static', async () => {
+        fixture.componentRef.setInput('value', 1234.5);
+        fixture.componentRef.setInput('format', {
+            minimumFractionDigits: 1,
+            maximumFractionDigits: 1
+        });
+        fixture.componentRef.setInput('suffix', '%');
+        await fixture.whenStable();
+
+        const animated = fixture.nativeElement.querySelector('app-animated-number');
+        expect(animated).not.toBeNull();
+        expect(animated.querySelector('number-flow')).not.toBeNull();
+
+        fixture.componentRef.setInput('value', '1m 23s');
+        await fixture.whenStable();
+
+        expect(fixture.nativeElement.querySelector('app-animated-number')).toBeNull();
+        expect(fixture.nativeElement.textContent).toContain('1m 23s');
+    });
+
+    it('marks positive deltas as good by default', async () => {
         fixture.componentRef.setInput('delta', 10);
-        fixture.detectChanges();
+        await fixture.whenStable();
 
         const badge = fixture.nativeElement.querySelector('span.text-xs');
-        expect(badge.textContent.trim()).toBe('+10.0%');
+        const flow = badge.querySelector('number-flow-ng') as HTMLElement & { _internals?: ElementInternals };
+        expect(flow._internals?.ariaLabel).toBe('+10.0%');
         expect(badge.className).toContain('bg-green-100');
     });
 
-    it('marks negative deltas as good when invertDelta is true', () => {
+    it('marks negative deltas as good when invertDelta is true', async () => {
         fixture.componentRef.setInput('delta', -10);
         fixture.componentRef.setInput('invertDelta', true);
-        fixture.detectChanges();
+        await fixture.whenStable();
 
         const badge = fixture.nativeElement.querySelector('span.text-xs');
-        expect(badge.textContent.trim()).toBe('+10.0%');
+        const flow = badge.querySelector('number-flow-ng') as HTMLElement & { _internals?: ElementInternals };
+        expect(flow._internals?.ariaLabel).toBe('+10.0%');
         expect(badge.className).toContain('bg-green-100');
     });
 
-    it('highlights the body for live value changes without showing a skeleton', () => {
-        fixture.componentRef.setInput('highlight', true);
-        fixture.detectChanges();
+    it('formats deltas with the active locale', async () => {
+        TestBed.inject(TranslocoService).setActiveLang('de');
+        fixture.componentRef.setInput('delta', 10);
+        await fixture.whenStable();
 
-        const body = fixture.nativeElement.querySelector('.hk-kpi-card__body');
-        expect(body.className).toContain('hk-kpi-card__body--highlight');
-        expect(fixture.nativeElement.querySelector('p-skeleton')).toBeFalsy();
+        const badge = fixture.nativeElement.querySelector('span.text-xs');
+        const flow = badge.querySelector('number-flow-ng') as HTMLElement & { _internals?: ElementInternals };
+        expect(flow._internals?.ariaLabel?.replace(/\s/g, ' ')).toBe('+10,0 %');
+    });
+
+    it('keeps the delta NumberFlow mounted across updates', async () => {
+        fixture.componentRef.setInput('delta', 10);
+        await fixture.whenStable();
+
+        const initialFlow = fixture.nativeElement.querySelector('span.text-xs number-flow-ng') as HTMLElement & { _internals?: ElementInternals };
+        fixture.componentRef.setInput('delta', 12.5);
+        await fixture.whenStable();
+
+        const updatedFlow = fixture.nativeElement.querySelector('span.text-xs number-flow-ng') as HTMLElement & { _internals?: ElementInternals };
+        expect(updatedFlow).toBe(initialFlow);
+        expect(updatedFlow._internals?.ariaLabel).toBe('+12.5%');
+    });
+
+    it('renders numeric durations through the localized animated facade', async () => {
+        fixture.componentRef.setInput('value', 83);
+        fixture.componentRef.setInput('duration', true);
+        await fixture.whenStable();
+
+        const duration = fixture.nativeElement.querySelector('app-animated-duration .hk-animated-duration');
+        expect(duration.getAttribute('aria-label')).toBe('1m 23s');
+        expect(duration.querySelectorAll('number-flow-ng').length).toBe(2);
+    });
+
+    it('keeps the initial loading skeleton instead of mounting an animated value', async () => {
+        fixture.componentRef.setInput('value', 42);
+        fixture.componentRef.setInput('loading', true);
+        await fixture.whenStable();
+
+        expect(fixture.nativeElement.querySelector('p-skeleton')).not.toBeNull();
+        expect(fixture.nativeElement.querySelector('app-animated-number')).toBeNull();
+    });
+
+    it('does not cue the initial value or expose a live region', async () => {
+        fixture.componentRef.setInput('value', 42);
+        fixture.componentRef.setInput('updateKey', 1);
+        await fixture.whenStable();
+
+        expect(fixture.nativeElement.querySelector('.hk-kpi-card__update-cue')).toBeNull();
+        expect(fixture.nativeElement.querySelector('[aria-live]')).toBeNull();
+    });
+
+    it('cues only when a mounted value changes with an advancing update key', async () => {
+        fixture.componentRef.setInput('value', 42);
+        fixture.componentRef.setInput('updateKey', 1);
+        await fixture.whenStable();
+
+        fixture.componentRef.setInput('value', 43);
+        fixture.componentRef.setInput('updateKey', 2);
+        await fixture.whenStable();
+
+        expect(fixture.nativeElement.querySelector('.hk-kpi-card__update-cue')).not.toBeNull();
+        expect(fixture.nativeElement.querySelector('p-skeleton')).toBeNull();
+    });
+
+    it('suppresses cues for unchanged values, non-advancing keys, and blocking loads', async () => {
+        fixture.componentRef.setInput('value', 42);
+        fixture.componentRef.setInput('updateKey', 2);
+        await fixture.whenStable();
+
+        fixture.componentRef.setInput('updateKey', 3);
+        await fixture.whenStable();
+        expect(fixture.nativeElement.querySelector('.hk-kpi-card__update-cue')).toBeNull();
+
+        fixture.componentRef.setInput('value', 43);
+        await fixture.whenStable();
+        expect(fixture.nativeElement.querySelector('.hk-kpi-card__update-cue')).toBeNull();
+
+        fixture.componentRef.setInput('loading', true);
+        fixture.componentRef.setInput('value', 44);
+        fixture.componentRef.setInput('updateKey', 4);
+        await fixture.whenStable();
+        expect(fixture.nativeElement.querySelector('.hk-kpi-card__update-cue')).toBeNull();
+    });
+
+    it('restarts the keyed cue for rapid updates and removes it 600ms after the latest change', async () => {
+        vi.useFakeTimers();
+        try {
+            fixture.componentRef.setInput('value', 42);
+            fixture.componentRef.setInput('updateKey', 1);
+            fixture.detectChanges();
+
+            fixture.componentRef.setInput('value', 43);
+            fixture.componentRef.setInput('updateKey', 2);
+            fixture.detectChanges();
+            const firstCue = fixture.nativeElement.querySelector('.hk-kpi-card__update-cue')?.getAttribute('data-update-cue');
+
+            vi.advanceTimersByTime(100);
+            fixture.componentRef.setInput('value', 44);
+            fixture.componentRef.setInput('updateKey', 3);
+            fixture.detectChanges();
+            const secondCue = fixture.nativeElement.querySelector('.hk-kpi-card__update-cue')?.getAttribute('data-update-cue');
+
+            expect(secondCue).not.toBe(firstCue);
+
+            vi.advanceTimersByTime(599);
+            fixture.detectChanges();
+            expect(fixture.nativeElement.querySelector('.hk-kpi-card__update-cue')).not.toBeNull();
+
+            vi.advanceTimersByTime(1);
+            fixture.detectChanges();
+            expect(fixture.nativeElement.querySelector('.hk-kpi-card__update-cue')).toBeNull();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('cleans up a pending cue timer when destroyed', async () => {
+        vi.useFakeTimers();
+        try {
+            fixture.componentRef.setInput('value', 42);
+            fixture.componentRef.setInput('updateKey', 1);
+            fixture.detectChanges();
+            fixture.componentRef.setInput('value', 43);
+            fixture.componentRef.setInput('updateKey', 2);
+            fixture.detectChanges();
+
+            fixture.destroy();
+            expect(vi.getTimerCount()).toBe(0);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('keeps the surface cue hidden during normal motion and neutral under reduced motion', () => {
+        const styles = (KpiCard as unknown as { ɵcmp: { styles: string[] } }).ɵcmp.styles.join('\n');
+
+        expect(styles).toContain('background: color-mix(in srgb, var(--p-text-color) 5%, transparent)');
+        expect(styles).toContain('display: none');
+        expect(styles).toContain('@media (prefers-reduced-motion: reduce)');
+        expect(styles).toContain('display: block');
+        expect(styles).not.toContain('var(--p-primary-color)');
+        expect(styles).not.toContain('@keyframes');
+        expect(styles).not.toContain('animation:');
+        expect(styles).not.toContain('box-shadow');
+        expect(styles).not.toContain('transform:');
     });
 });

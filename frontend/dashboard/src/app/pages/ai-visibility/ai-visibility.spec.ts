@@ -98,7 +98,7 @@ describe('AIVisibility', () => {
         const instance = component as AIVisibility & {
             overview: { set(value: unknown): void };
             correlation: { set(value: unknown): void };
-            primaryKpiCards: () => { label: string; value: string | number; loading: boolean }[];
+            primaryKpiCards: () => { label: string; value: string | number; loading: boolean; format?: Intl.NumberFormatOptions; suffix?: string }[];
             healthStats: () => { label: string; value: string | number; loading: boolean }[];
             correlationSummaryStats: () => { label: string; value: string | number; loading: boolean }[];
         };
@@ -130,7 +130,9 @@ describe('AIVisibility', () => {
             failure_hotspots: [{ assistant_name: 'ClaudeBot', path_prefix: '/api', total_requests: 9, error_requests: 2, error_rate_pct: 22.2 }]
         });
 
-        expect(instance.primaryKpiCards().map((card) => card.value)).toEqual([42, 5, 3, '2.0%']);
+        expect(instance.primaryKpiCards().map((card) => card.value)).toEqual([42, 5, 3, 2]);
+        expect(instance.primaryKpiCards()[3]?.format).toEqual({ minimumFractionDigits: 1, maximumFractionDigits: 1 });
+        expect(instance.primaryKpiCards()[3]?.suffix).toBe('%');
         expect(instance.healthStats().map((stat) => stat.value)).toEqual([4, '1.2%', '0.8%', '123 ms', '2 KB']);
         expect(instance.correlationSummaryStats().map((stat) => stat.value)).toEqual([2, 7]);
     });

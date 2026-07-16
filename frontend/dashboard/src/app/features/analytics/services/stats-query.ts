@@ -12,6 +12,7 @@ export interface StatsQueryRequest {
     goalIds?: string[];
     funnelIds?: string[];
     mode?: StatsQueryMode;
+    onSuccess?: (stats: SiteStats, result: StatsQueryResult) => void;
 }
 
 export type StatsQueryMode = 'blocking' | 'background';
@@ -61,8 +62,10 @@ export class StatsQuery {
             )
             .subscribe({
                 next: (stats) => {
+                    const result = { mode, sequence: ++this.resultSequence };
                     this.stats.set(stats);
-                    this.lastResult.set({ mode, sequence: ++this.resultSequence });
+                    this.lastResult.set(result);
+                    request.onSuccess?.(stats, result);
                 },
                 error: (e) => console.error(e)
             });
