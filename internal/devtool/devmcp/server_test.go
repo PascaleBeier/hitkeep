@@ -754,6 +754,9 @@ func TestCentralDeveloperMCPForwardsDevNotifications(t *testing.T) {
 	writeDevEventFixture(t, ctx, app, "generation-forwarded", "forward me")
 
 	var childServers []*mcp.ServerSession
+	childNotificationGate := make(chan struct{})
+	releaseChildNotifications := sync.OnceFunc(func() { close(childNotificationGate) })
+	defer releaseChildNotifications()
 	connector := func(connectContext, _ context.Context, childApp *devtool.App, options *mcp.ClientOptions) (*mcp.ClientSession, error) {
 		serverTransport, clientTransport := mcp.NewInMemoryTransports()
 		serverSession, connectErr := NewServer(childApp, "test-child").Connect(connectContext, serverTransport, nil)
@@ -761,7 +764,13 @@ func TestCentralDeveloperMCPForwardsDevNotifications(t *testing.T) {
 			return nil, connectErr
 		}
 		childServers = append(childServers, serverSession)
-		client := mcp.NewClient(&mcp.Implementation{Name: "test-broker", Version: "test"}, options)
+		clientOptions := *options
+		forwardProgress := clientOptions.ProgressNotificationHandler
+		clientOptions.ProgressNotificationHandler = func(forwardContext context.Context, request *mcp.ProgressNotificationClientRequest) {
+			<-childNotificationGate
+			forwardProgress(forwardContext, request)
+		}
+		client := mcp.NewClient(&mcp.Implementation{Name: "test-broker", Version: "test"}, &clientOptions)
 		clientSession, connectErr := client.Connect(connectContext, clientTransport, nil)
 		if connectErr == nil && options != nil && options.LoggingMessageHandler != nil {
 			connectErr = clientSession.SetLoggingLevel(connectContext, &mcp.SetLoggingLevelParams{Level: mcp.LoggingLevel("debug")})
@@ -804,6 +813,7 @@ func TestCentralDeveloperMCPForwardsDevNotifications(t *testing.T) {
 	params := &mcp.CallToolParams{Name: "hk_dev_logs", Arguments: map[string]any{"limit": 20}}
 	params.SetProgressToken("outer-progress")
 	result, err := clientSession.CallTool(ctx, params)
+	releaseChildNotifications()
 	if err != nil || result.IsError {
 		t.Fatalf("delegated dev logs: result=%#v err=%v", result, err)
 	}

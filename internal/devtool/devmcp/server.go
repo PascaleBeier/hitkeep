@@ -22,12 +22,13 @@ import (
 )
 
 const (
-	maxRequestedLogLines = 200
-	centralAppCacheTTL   = 5 * time.Second
-	centralAppCacheLimit = 128
-	centralMCPConnectTTL = 30 * time.Second
-	centralMCPIdleTTL    = 30 * time.Second
-	centralMCPPoolLimit  = 32
+	maxRequestedLogLines           = 200
+	centralAppCacheTTL             = 5 * time.Second
+	centralAppCacheLimit           = 128
+	centralMCPConnectTTL           = 30 * time.Second
+	centralMCPIdleTTL              = 30 * time.Second
+	centralMCPNotificationDrainTTL = centralMCPIdleTTL
+	centralMCPPoolLimit            = 32
 )
 
 type workspaceInput struct {
@@ -129,6 +130,11 @@ type workspaceMCPKey struct {
 	workspaceID  string
 }
 
+type workspaceMCPProgressRoute struct {
+	outerToken any
+	expiresAt  time.Time
+}
+
 type pooledWorkspaceMCP struct {
 	key            workspaceMCPKey
 	app            *devtool.App
@@ -140,7 +146,7 @@ type pooledWorkspaceMCP struct {
 	activeCalls    int
 	lastUsed       time.Time
 	idleTimer      *time.Timer
-	progressTokens map[string]any
+	progressTokens map[string]workspaceMCPProgressRoute
 	callCancels    map[uint64]context.CancelFunc
 	closed         bool
 }
@@ -296,7 +302,7 @@ func (resolver *centralAppResolver) acquireWorkspaceMCP(ctx context.Context, app
 		if child == nil || child.closed {
 			child = &pooledWorkspaceMCP{
 				key: key, app: app, outerSession: outer, ready: make(chan struct{}),
-				progressTokens: map[string]any{}, callCancels: map[uint64]context.CancelFunc{}, lastUsed: time.Now(),
+				progressTokens: map[string]workspaceMCPProgressRoute{}, callCancels: map[uint64]context.CancelFunc{}, lastUsed: time.Now(),
 			}
 			resolver.children[key] = child
 			evicted := resolver.pruneWorkspaceMCPPoolLocked(child)
@@ -325,8 +331,10 @@ func (resolver *centralAppResolver) acquireWorkspaceMCP(ctx context.Context, app
 			resolver.childMu.Unlock()
 			continue
 		}
+		now := time.Now()
 		child.activeCalls++
-		child.lastUsed = time.Now()
+		child.lastUsed = now
+		pruneWorkspaceMCPProgressLocked(child, now)
 		if child.idleTimer != nil {
 			child.idleTimer.Stop()
 			child.idleTimer = nil
@@ -334,7 +342,7 @@ func (resolver *centralAppResolver) acquireWorkspaceMCP(ctx context.Context, app
 		progressToken := ""
 		if outerProgress != nil {
 			progressToken = fmt.Sprintf("hk-broker-%d", resolver.progressSequence.Add(1))
-			child.progressTokens[progressToken] = outerProgress
+			child.progressTokens[progressToken] = workspaceMCPProgressRoute{outerToken: outerProgress}
 		}
 		callContext, callCancel := context.WithCancel(ctx) //nolint:gosec // the lease owns and releases this cancel function
 		callID := resolver.callSequence.Add(1)
@@ -416,7 +424,11 @@ func (resolver *centralAppResolver) forwardWorkspaceMCPProgress(ctx context.Cont
 		return
 	}
 	resolver.childMu.Lock()
-	outerToken, ok := child.progressTokens[childToken]
+	route, ok := child.progressTokens[childToken]
+	if ok && !route.expiresAt.IsZero() && !time.Now().Before(route.expiresAt) {
+		delete(child.progressTokens, childToken)
+		ok = false
+	}
 	outer := child.outerSession
 	closed := child.closed
 	resolver.childMu.Unlock()
@@ -424,8 +436,16 @@ func (resolver *centralAppResolver) forwardWorkspaceMCPProgress(ctx context.Cont
 		return
 	}
 	params := *request.Params
-	params.ProgressToken = outerToken
+	params.ProgressToken = route.outerToken
 	_ = outer.NotifyProgress(ctx, &params)
+}
+
+func pruneWorkspaceMCPProgressLocked(child *pooledWorkspaceMCP, now time.Time) {
+	for token, route := range child.progressTokens {
+		if !route.expiresAt.IsZero() && !now.Before(route.expiresAt) {
+			delete(child.progressTokens, token)
+		}
+	}
 }
 
 func (resolver *centralAppResolver) forwardWorkspaceMCPLog(ctx context.Context, child *pooledWorkspaceMCP, request *mcp.LoggingMessageRequest) {
@@ -564,8 +584,9 @@ func (lease *workspaceMCPLease) Release() {
 	lease.releaseOnce.Do(func() {
 		resolver := lease.resolver
 		resolver.childMu.Lock()
-		if lease.progressToken != "" {
-			delete(lease.child.progressTokens, lease.progressToken)
+		if route, ok := lease.child.progressTokens[lease.progressToken]; ok {
+			route.expiresAt = time.Now().Add(centralMCPNotificationDrainTTL)
+			lease.child.progressTokens[lease.progressToken] = route
 		}
 		callCancel := lease.child.callCancels[lease.callID]
 		delete(lease.child.callCancels, lease.callID)
