@@ -9,7 +9,7 @@ Treat `AGENTS.md` as repository policy and the live `hk` QA catalog as workflow 
 
 ## Select
 
-Prefer `hk_qa_plan`; when MCP is unavailable, discover the equivalent planning command through `./hk qa --help` and request `--output json`.
+Use `hk_qa_plan` whenever it is callable. If it is absent or fails, report whether registration, startup, root routing, or task reload is blocking MCP and obtain explicit user approval before using an equivalent CLI action. After approval, discover the planning command through `./hk qa --help` and request `--output json`.
 
 - Use the change-aware profile while iterating.
 - Use the PR-parity profile before review.
@@ -22,7 +22,7 @@ Use `hk_run_status` to observe the returned run, `hk_logs_tail` for bounded diag
 ## Run and Observe
 
 1. Inspect workspace status for an equivalent active QA run before starting another.
-2. Start through `hk_qa_start`; otherwise use the structured CLI action discovered from help with `--detach --output json`. Keep the returned workspace ID and run ID.
+2. Start through `hk_qa_start`. Use the structured CLI action discovered from help with `--detach --output json` only after the MCP blocker has been reported and the user has approved fallback. Keep the returned workspace ID and run ID.
 3. Poll status rather than restarting a slow run or assuming client disconnect stopped it.
 4. On failure, read the bounded run tail, then the gate-specific bounded resource. Open the complete local artifact only when the tail is insufficient.
 5. Fix the root cause and rerun the smallest relevant selection from the live catalog before rerunning the required profile.

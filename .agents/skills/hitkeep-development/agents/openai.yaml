@@ -1,4 +1,4 @@
 interface:
   display_name: "Develop HitKeep"
   short_description: "Implement HitKeep contributions through hk"
-  default_prompt: "Use $hitkeep-development to route and implement this HitKeep contribution through the canonical workflow."
+  default_prompt: "Use $hitkeep-development to implement this HitKeep contribution through callable developer MCP tools before any approved structured CLI fallback."

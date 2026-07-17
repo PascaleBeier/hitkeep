@@ -7,8 +7,8 @@ This file is public guidance for AI-assisted contributions to HitKeep. It is wri
 ## Start Here
 
 - Treat the current repository as the source of truth. If an issue, prompt, or older document disagrees with the code, inspect the code first.
-- Use `./hk` as the workflow source of truth. Query its help, `./hk catalog commands --output json`, and structured domain catalogs instead of copying commands, build tags, cloud defaults, ports, tool versions, or QA gates into instructions.
-- Prefer the central local developer MCP when available. Register one long-lived clone's locally built `./hk` launcher once; it routes each request from the MCP client's active roots to the matching worktree MCP and forwards progress, structured logging, and cancellation. Query `./hk mcp manifest --output json` for the live registration contract. Fall back to versioned `./hk --output json` results; reserve human output for people.
+- Use `./hk` as the workflow source of truth, but consume that truth through callable central developer MCP tools and resources whenever they cover the task. Reserve direct CLI discovery for MCP bootstrap or repair, explicitly approved fallback, and workflows intentionally absent from MCP such as source rewrites; never copy commands, build tags, cloud defaults, ports, tool versions, or QA gates into instructions.
+- Treat developer MCP as available only when the relevant `hk_*` tools are exposed and a read-only call succeeds; a configured or enabled host entry is not proof. Register one long-lived clone's locally built `./hk` launcher once, query `./hk mcp manifest --output json` only for the live bootstrap contract, and verify the returned workspace ID against the client's active root. If tools are absent or fail, inspect host MCP health, compare the registration with the manifest, report whether registration, startup, root routing, or task reload is blocking use, and obtain explicit user approval before invoking an equivalent versioned `./hk --output json` action. Existing tasks may require a host reload before newly registered tools appear; reserve human output for people.
 - Inspect the current workspace before setup, services, builds, or QA. Reuse an active run instead of starting duplicate work.
 - Development is one container-only session per workspace. It has status and event cursors, not a run ID. Setup, QA, builds, and smokes remain finite runs.
 - Use the developer CLI's formatter and Go migration surfaces for deliberate source rewrites. QA and MCP checks must remain non-mutating.
@@ -121,7 +121,7 @@ HitKeep has two canonical, non-overlapping Agent Skill packs. `skills/` contains
 - Do not embed tokens, customer data, private URLs, or private screenshots in skills.
 - Keep mutable workflow facts in `hk`. Skills provide routing, judgment, safety rules, and interpretation—not copied command catalogs.
 - Put area-specific implementation guidance in direct references under `hitkeep-development`, not in separately triggerable skills.
-- Contributor skills must prefer developer MCP operations and support structured CLI fallback.
+- Contributor skills must use callable developer MCP operations before equivalent CLI actions. They may support structured CLI fallback only after diagnosing and reporting MCP unavailability and receiving explicit user approval.
 - Contributor skills and external MCP adapter text must never enter Ask AI. Ask AI embeds only the exact transport-neutral `references/procedure.md` files from the five product analytics skills.
 - Keep each product skill's external MCP adapter and shared procedure aligned with the live analytics surface and privacy boundary.
 - Use and update `hitkeep-i18n` when dashboard copy, locale files, language behavior, or localized formatting changes.

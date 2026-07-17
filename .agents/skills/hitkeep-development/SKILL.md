@@ -9,11 +9,16 @@ Treat `AGENTS.md` as policy and `hk` as workflow truth. Never copy commands, bui
 
 ## Connect
 
-Prefer the central local HitKeep developer MCP when configured. It is a root-routed stdio adapter over the same worktree-confined services as the CLI and is separate from the production analytics `/mcp` endpoint.
+Use the central local HitKeep developer MCP for every operation it exposes. It is a root-routed stdio adapter over the same worktree-confined services as the CLI and is separate from the production analytics `/mcp` endpoint. A configured or enabled host entry is not enough; confirm that the relevant callable `hk_*` tools are exposed and make a read-only call before relying on MCP.
 
-Register one long-lived clone's locally built `./hk` launcher in the host, then verify that the returned workspace ID matches the client's active root. Query `./hk mcp manifest --output json` for the live model-agnostic registration. If the client exposes multiple HitKeep roots, pass the intended root name, workspace ID, or path through the tools' optional `workspace` input. Never guess a workspace or silently edit client-owned global configuration.
+Follow this connection order:
 
-When MCP is unavailable, discover the complete command and flag surface through `./hk catalog commands --output json`, then invoke the equivalent command with `--output json`. Consume `schema_version`, `status`, `workspace_id`, `data`, and `error`; do not parse human output. Stop and report an unknown schema version instead of guessing.
+1. Inspect the host's callable tools and select the relevant `hk_*` operation instead of translating it into shell.
+2. Start with a read-only status or planning call and verify that its workspace ID matches the client's active root. If the client exposes multiple HitKeep roots, pass the intended root name, workspace ID, or path through the optional `workspace` input.
+3. If tools are absent or fail, inspect host MCP health and compare the configured server name, executable, and arguments with `./hk mcp manifest --output json`. Report whether registration, startup, root routing, or task reload is blocking MCP. Existing tasks may need a host reload before a corrected registration becomes callable.
+4. Obtain explicit user approval before invoking any equivalent structured CLI action. After approval, discover the command and flags through `./hk catalog commands --output json`, request `--output json`, and consume `schema_version`, `status`, `workspace_id`, `data`, and `error`. Stop on an unknown schema version instead of guessing.
+
+Reserve direct `./hk` use for MCP bootstrap or repair, an explicitly approved fallback, and operations intentionally absent from MCP such as formatter or Go migration rewrites. Never guess a workspace or silently edit client-owned global configuration.
 
 Use the typed MCP surface rather than translating an action into shell yourself:
 

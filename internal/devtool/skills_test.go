@@ -33,9 +33,9 @@ func TestSkillMetadataRejectsUnclosedFrontmatter(t *testing.T) {
 func TestRepositoryContributorSkillContracts(t *testing.T) {
 	root := repositoryRoot(t)
 	required := map[string][]string{
-		"hitkeep-development": {"AGENTS.md", "./hk mcp manifest --output json", "client exposes multiple HitKeep roots", "hk_doctor", "hk_setup_start", "hk_dev_start", "hk_build_start", "hk_smoke_start", "--detach --output json", "$hitkeep-workspace", "$hitkeep-qa"},
-		"hitkeep-workspace":   {"AGENTS.md", "hk_workspace_status", "hk_workspace_handoff", "hk_run_list", "hk_run_status", "hk_logs_tail", "next_cursor", "hk_dev_start", "hk_dev_stop", "hk_run_cancel", "--output json"},
-		"hitkeep-qa":          {"AGENTS.md", "hk_qa_plan", "hk_qa_start", "hk_run_status", "hk_logs_tail", "hk_run_cancel", "--detach --output json"},
+		"hitkeep-development": {"AGENTS.md", "callable `hk_*` tools", "explicit user approval", "registration, startup, root routing, or task reload", "./hk mcp manifest --output json", "client exposes multiple HitKeep roots", "hk_doctor", "hk_setup_start", "hk_dev_start", "hk_build_start", "hk_smoke_start", "--detach --output json", "$hitkeep-workspace", "$hitkeep-qa"},
+		"hitkeep-workspace":   {"AGENTS.md", "whenever they are callable", "explicit user approval", "hk_workspace_status", "hk_workspace_handoff", "hk_run_list", "hk_run_status", "hk_logs_tail", "next_cursor", "hk_dev_start", "hk_dev_stop", "hk_run_cancel", "--output json"},
+		"hitkeep-qa":          {"AGENTS.md", "whenever it is callable", "explicit user approval", "hk_qa_plan", "hk_qa_start", "hk_run_status", "hk_logs_tail", "hk_run_cancel", "--detach --output json"},
 		"hitkeep-i18n":        {"AGENTS.md", "$hitkeep-qa", "frontend/dashboard/public/i18n", "every currently supported locale"},
 	}
 	triggerTerms := map[string][]string{
@@ -131,8 +131,12 @@ func assertSkillContract(t *testing.T, skillPath, name string, required, trigger
 	if len(short) < 25 || len(short) > 64 {
 		t.Errorf("%s short_description length = %d", name, len(short))
 	}
-	if !strings.Contains(yamlQuotedValue(string(openAI), "default_prompt"), "$"+name) {
+	defaultPrompt := yamlQuotedValue(string(openAI), "default_prompt")
+	if !strings.Contains(defaultPrompt, "$"+name) {
 		t.Errorf("%s default_prompt does not invoke the skill", name)
+	}
+	if name == "hitkeep-development" && !strings.Contains(defaultPrompt, "MCP") {
+		t.Errorf("%s default_prompt does not reinforce MCP-first execution", name)
 	}
 }
 

@@ -61,7 +61,7 @@ Choose the cloud variant only for local managed-cloud parity work:
 ./hk dev --variant cloud
 ```
 
-Automation and coding agents should prefer the central MCP session tools. `hk_dev_start`, `hk_dev_stop`, and `hk_dev_logs` stream lifecycle progress and structured component logs; `hk_dev_status` needs only the workspace selector. Development never uses a run ID. When MCP is unavailable, choose an explicit CLI output contract. JSON and NDJSON use the versioned `hk.dev/v2` envelope; `plain` is the uncolored scalar/text mode:
+Automation and coding agents must use callable central MCP session tools for covered operations. A configured or enabled host entry is not proof that MCP is available: verify discovery with an actual read-only call. `hk_dev_start`, `hk_dev_stop`, and `hk_dev_logs` stream lifecycle progress and structured component logs; `hk_dev_status` needs only the workspace selector. Development never uses a run ID. If MCP is unavailable, report the registration, startup, root-routing, or task-reload blocker and obtain explicit user approval before choosing an equivalent CLI output contract. JSON and NDJSON use the versioned `hk.dev/v2` envelope; `plain` is the uncolored scalar/text mode:
 
 ```bash
 ./hk dev --detach --output json
@@ -168,7 +168,7 @@ The live one-time registration comes from:
 
 Human output prints a copyable generic `mcpServers` object. `./hk mcp manifest --output json` returns the same registration in the standard `hk.dev/v2` envelope, with the `hk.dev/mcp-manifest/v3` schema, central scope, client-root routing, workspace-MCP delegation, progress and logging notification support, stable server name, absolute local launcher, transport, and arguments. Treat this output as authoritative instead of copying host-specific config paths into agent instructions.
 
-Add that object to the host's user-level MCP configuration, approve the local binary when the host asks, then restart or reload the host and verify discovery with its MCP status UI or `hk_workspace_status`. Existing conversations generally do not dynamically acquire newly added MCP configuration. This one-time safety decision belongs to the host and is deliberately not bypassed by `hk`.
+Add that object to the host's user-level MCP configuration, approve the local binary when the host asks, then restart or reload the host. Confirm the registered server name, absolute executable, and arguments against the manifest, then verify discovery with an actual read-only call such as `hk_workspace_status`; a configured or enabled status alone is insufficient. Existing conversations generally do not dynamically acquire newly added MCP configuration. This one-time safety decision belongs to the host and is deliberately not bypassed by `hk`.
 
 The generated central registration is equivalent to:
 
@@ -194,7 +194,7 @@ The canonical contributor skills live under [`.agents/skills`](./.agents/skills)
 - `hitkeep-qa` owns live QA planning, execution, and completion evidence.
 - `hitkeep-i18n` owns dashboard localization procedure.
 
-These are normal publishable skill bodies, not generated proxies. Prefer the local developer MCP and use their structured CLI fallback when MCP is unavailable. The separate [`skills/`](./skills/) directory is the end-user analytics pack and supplies transport-neutral procedures to HitKeep Ask AI.
+These are normal publishable skill bodies, not generated proxies. Use callable local developer MCP operations for every covered action. Diagnose and report MCP unavailability, then obtain explicit user approval before using an equivalent structured CLI fallback. The separate [`skills/`](./skills/) directory is the end-user analytics pack and supplies transport-neutral procedures to HitKeep Ask AI.
 
 ## Documentation Authority
 
