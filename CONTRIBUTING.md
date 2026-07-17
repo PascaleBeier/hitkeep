@@ -1,6 +1,6 @@
 # Contributing to HitKeep
 
-Thank you for improving HitKeep. The repository-owned `./hk` developer CLI is the canonical workflow surface for people, automation, and coding agents. It derives current build variants, workspace state, development defaults, and QA gates from one typed catalog.
+Thank you for improving HitKeep. The repository-owned `./hk` developer CLI is the canonical workflow surface for people, automation, and coding agents. The normal human path is deliberately small; isolated workspace and run details remain available for concurrent worktrees and structured tooling.
 
 Repository policy and product invariants live in [`AGENTS.md`](./AGENTS.md). Read it before making a change.
 
@@ -12,32 +12,48 @@ cd hitkeep
 ./hk setup
 ```
 
-`./hk` bootstraps itself with the exact Go version from `go.mod`. When that Go toolchain is unavailable, it can build itself through the pinned Go container image using writable host caches. `setup` prepares Go and frontend dependencies for the selected worktree. Existing mutable `node_modules` directories are safely migrated to content-addressed, read-only snapshots shared by warm worktrees.
+The checked-in `./hk` file is an executable POSIX launcher, not a compiled artifact. It builds the current worktree's CLI and central MCP broker locally, caches the native executable by source content, and selects the host's macOS or Linux and AMD64 or ARM64 target. WSL2 follows the Linux path; WSL1 is not supported. The exact Go version from `go.mod` is used directly when available, with Docker as the first-bootstrap fallback.
 
-Check prerequisites and the current isolated workspace at any time:
+Developer CLI binaries are neither committed nor published as HitKeep release assets. Git keeps the launcher and implementation in lockstep with every branch, while GitHub Releases remain limited to deployable HitKeep product artifacts. `setup` pulls and builds the development containers for the selected worktree. Docker Compose is the only development runtime; host Go and Node installations remain useful for fast QA and source tooling but do not change how the application runs.
+
+Check prerequisites and local development status at any time:
 
 ```bash
 ./hk doctor
 ./hk workspace status
 ```
 
-Use `./hk help` and subcommand help for the current command reference. Use `./hk catalog --output json` when a tool or agent needs the live variant and QA catalogs.
+Use `./hk help` and subcommand help for the current command reference. Use `./hk catalog --output json` when a tool or agent needs the live variant and QA catalogs, and `./hk catalog commands --output json` for the complete command and flag inventory.
 
 ## Develop
 
-Start the fast native workflow:
+Start the development session:
 
 ```bash
 ./hk dev --seed
 ```
 
-The application and dashboard run natively; Docker Compose supplies the isolated Mailpit service. `./hk doctor` reports native development ready only when both the exact host toolchain and that service runtime are available.
+`./hk dev` starts the workspace's Compose stack in the foreground, prints component-labelled colored output, and owns the complete lifecycle. Pressing `Ctrl+C` stops the backend, frontend, Mailpit, log follower, and orphaned Compose services. Running it again while the session is active reports its state and URLs and exits; it never attaches implicitly or starts a duplicate.
 
-Use the reproducible container-backed workflow when host prerequisites are unavailable or container parity matters:
+The everyday lifecycle is:
 
 ```bash
-./hk dev --runtime container --seed
+./hk dev
+./hk dev logs
+./hk dev restart
+./hk dev stop
+./hk dev reset --seed
 ```
+
+`restart` preserves this worktree's local data. `reset` stops development, deletes only this worktree's local HitKeep data, and restarts. Use reset when a genuinely fresh seeded database is required; ordinary `--seed` updates the existing isolated demo data.
+
+Explicitly create a background session when foreground ownership is not appropriate:
+
+```bash
+./hk dev --detach
+```
+
+`--detach` waits until every service is ready before returning. `./hk dev logs` follows the current session for people; pressing `Ctrl+C` detaches only that viewer. `./hk dev stop` requests cooperative shutdown and waits for completion.
 
 Choose the cloud variant only for local managed-cloud parity work:
 
@@ -45,37 +61,49 @@ Choose the cloud variant only for local managed-cloud parity work:
 ./hk dev --variant cloud
 ```
 
-`hk` allocates a stable workspace ID, ports, Compose project, data directory, run logs, and generated runtime configuration for each Git worktree. Always open the URLs returned by `./hk workspace status`; do not assume the conventional ports are available.
-
-Long operations wait by default for humans. Add `--detach` to receive a run ID immediately:
+Automation and coding agents should prefer the central MCP session tools. `hk_dev_start`, `hk_dev_stop`, and `hk_dev_logs` stream lifecycle progress and structured component logs; `hk_dev_status` needs only the workspace selector. Development never uses a run ID. When MCP is unavailable, choose an explicit CLI output contract. JSON and NDJSON use the versioned `hk.dev/v2` envelope; `plain` is the uncolored scalar/text mode:
 
 ```bash
 ./hk dev --detach --output json
+./hk dev status --output json
+./hk dev logs --cursor <next_cursor> --output json
+./hk dev logs --follow --output ndjson
+```
+
+Structured CLI and MCP starts also request machine-readable output from supported child tools. The QA catalog exposes the effective `agent_command` when it differs from the human command; tools without a JSON mode still run without terminal color and remain bounded by the surrounding `hk` envelope and log cursor contract.
+
+Setup, QA, builds, and smoke tests remain finite asynchronous runs:
+
+```bash
 ./hk run status <run_id> --output json
 ./hk run logs <run_id> --limit 80 --output json
 ```
 
 Complete logs and artifacts stay on disk at the paths returned by `hk`, keeping successful terminal and agent output small.
 
-List recent work before starting a duplicate run, and use `next_cursor` when polling logs so an agent does not reload the same context:
+List recent finite work before starting a duplicate run, and use `next_cursor` when polling logs so an agent does not reload the same context:
 
 ```bash
 ./hk run list --output json
 ./hk run logs <run_id> --cursor <next_cursor> --output json
 ```
 
-## Maintain Go Source
+When multiple Git worktrees are in use, `hk` allocates a stable workspace ID, ports, Compose project, data directory, and run state for each one. Inspect those advanced details with `./hk workspace status` or `./hk workspace list`; agents should trust the workspace ID and URLs in structured output rather than assuming ports.
+
+## Maintain Source
 
 Formatting and pinned Go migrations are part of the developer platform rather than ad hoc shell conventions:
 
 ```bash
 ./hk fmt
 ./hk fmt check
+./hk fmt --scope frontend
+./hk fmt check --scope frontend
 ./hk fix check
 ./hk fix
 ```
 
-`fmt` and `fix` deliberately rewrite repository Go files; their `check` modes are non-mutating and are what QA uses. The developer MCP does not expose source-rewrite tools, so an agent must make this mutation explicitly through the confined CLI and review the resulting diff.
+`fmt` owns Go and frontend formatting; Go remains the default scope for compatibility. `fix` owns pinned Go migrations. Their `check` modes are non-mutating and are what QA uses. The developer MCP does not expose source-rewrite tools, so an agent must make this mutation explicitly through the confined CLI and review the resulting diff.
 
 Shared dependency snapshots and workspace state are inspectable. Pruning is always a dry run unless `--apply` is supplied, and it can remove only hk-managed entries:
 
@@ -124,13 +152,13 @@ Git worktree creation and deletion remain your responsibility. `hk` never create
 ./hk workspace handoff --output json
 ```
 
-Workspace state, application data, mutable frontend tool caches, services, logs, and generated configuration remain isolated. Immutable dependency snapshots and safe download/compiler caches are shared. This allows development and QA to run concurrently without fixed-port, dependency-cache, or Compose-project collisions.
+Workspace state, application data, host frontend dependencies, services, logs, and generated configuration remain isolated. Container images, safe download/compiler caches, and explicitly shared package caches are reused. This allows development and QA to run concurrently without fixed-port, host-native dependency, or Compose-project collisions.
 
 ## Local Developer MCP
 
 MCP-capable agents can use the same application services without parsing shell output. The developer server is model-agnostic: Claude, Gemini, GPT, or another model receives the same typed tools when its host supports local stdio MCP.
 
-Choose one long-lived HitKeep clone as the central launch point. Its checked-in `./hk` launcher builds the broker locally, caches it by source content, and selects the host's native macOS or Linux and AMD64 or ARM64 target. A compatible Go toolchain is used directly; Docker remains the first-bootstrap fallback. Because the executable is produced locally, macOS distribution signing and quarantine workarounds are not involved. CI still cross-compiles all four targets so portability regressions fail before release, but these verification binaries are not published as release assets.
+Choose one long-lived HitKeep clone as the central launch point. Its checked-in `./hk` launcher keeps that broker aligned with the clone's current source. Because the executable is produced locally instead of downloaded, macOS distribution signing and quarantine workarounds are not involved.
 
 The live one-time registration comes from:
 
@@ -138,7 +166,7 @@ The live one-time registration comes from:
 ./hk mcp manifest
 ```
 
-Human output prints a copyable generic `mcpServers` object. `./hk mcp manifest --output json` returns the same registration in the standard `hk.dev/v1` envelope, with the `hk.dev/mcp-manifest/v2` schema, central scope, client-root routing, workspace-MCP delegation, stable server name, absolute local launcher, transport, and arguments. Treat this output as authoritative instead of copying host-specific config paths into agent instructions.
+Human output prints a copyable generic `mcpServers` object. `./hk mcp manifest --output json` returns the same registration in the standard `hk.dev/v2` envelope, with the `hk.dev/mcp-manifest/v3` schema, central scope, client-root routing, workspace-MCP delegation, progress and logging notification support, stable server name, absolute local launcher, transport, and arguments. Treat this output as authoritative instead of copying host-specific config paths into agent instructions.
 
 Add that object to the host's user-level MCP configuration, approve the local binary when the host asks, then restart or reload the host and verify discovery with its MCP status UI or `hk_workspace_status`. Existing conversations generally do not dynamically acquire newly added MCP configuration. This one-time safety decision belongs to the host and is deliberately not bypassed by `hk`.
 
@@ -157,7 +185,7 @@ The generated central registration is equivalent to:
 
 The central `./hk mcp serve` resolves the active HitKeep worktree from the MCP client's file-based client roots on every request, then forwards the call to that workspace's own `./hk --workspace <path> mcp serve`. This keeps each worktree's checked-in developer implementation authoritative while one long-lived central session follows root changes. When a client exposes multiple HitKeep roots, every tool accepts an optional `workspace` name, workspace ID, or path to disambiguate. Clients without roots support can use an explicit compatibility registration with `/absolute/path/to/hitkeep/hk --workspace /absolute/path/to/worktree mcp serve`.
 
-The central MCP uses local stdio only. Use `hk_run_list` before starting work and pass the returned log cursor to incremental log reads. It is separate from HitKeep's production analytics `/mcp` endpoint and exposes only bounded workspace, setup, development, build, smoke, QA, run-status, cancellation, and log operations. It cannot execute arbitrary commands, rewrite source, mutate Git, publish artifacts, manage credentials, delete worktrees, perform cleanup, or deploy infrastructure. Stdout is reserved for JSON-RPC.
+The central MCP uses local stdio only. It forwards the outer progress token, progress notifications, structured component logs, and cancellation to the selected workspace MCP. Use `hk_dev_status` and development event cursors for services; use `hk_run_list` and finite-run log cursors for setup, QA, build, and smoke work. It is separate from HitKeep's production analytics `/mcp` endpoint and exposes only bounded workspace, setup, development, build, smoke, QA, run-status, cancellation, and log operations. It cannot execute arbitrary commands, rewrite source, mutate Git, publish artifacts, manage credentials, delete worktrees, perform cleanup, or deploy infrastructure. Stdout is reserved for JSON-RPC.
 
 The canonical contributor skills live under [`.agents/skills`](./.agents/skills):
 
@@ -188,4 +216,4 @@ Do not copy build tags, cloud defaults, port assignments, tool versions, or QA m
 - Do not include credentials, customer data, private infrastructure details, or private screenshots.
 - Follow the repository's conventional-commit and release guidance.
 
-The Makefile remains a small compatibility adapter for familiar entry points; new workflows belong in `internal/devtool` and must be exposed consistently through CLI JSON and MCP adapters.
+New developer workflows belong in `internal/devtool` and must be exposed consistently through the human CLI, structured CLI output, and MCP adapters. Do not add parallel Make or shell-script entry points.

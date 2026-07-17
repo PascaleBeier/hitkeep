@@ -7,9 +7,10 @@ This file is public guidance for AI-assisted contributions to HitKeep. It is wri
 ## Start Here
 
 - Treat the current repository as the source of truth. If an issue, prompt, or older document disagrees with the code, inspect the code first.
-- Use `./hk` as the workflow source of truth. Query its help and structured catalogs instead of copying commands, build tags, cloud defaults, ports, tool versions, or QA gates into instructions.
-- Prefer the central local developer MCP when available. Register one long-lived clone's locally built `./hk` launcher once; it routes each request from the MCP client's active roots to the matching worktree MCP. Query `./hk mcp manifest --output json` for the live registration contract. Fall back to versioned `./hk --output json` results; reserve human output for people.
+- Use `./hk` as the workflow source of truth. Query its help, `./hk catalog commands --output json`, and structured domain catalogs instead of copying commands, build tags, cloud defaults, ports, tool versions, or QA gates into instructions.
+- Prefer the central local developer MCP when available. Register one long-lived clone's locally built `./hk` launcher once; it routes each request from the MCP client's active roots to the matching worktree MCP and forwards progress, structured logging, and cancellation. Query `./hk mcp manifest --output json` for the live registration contract. Fall back to versioned `./hk --output json` results; reserve human output for people.
 - Inspect the current workspace before setup, services, builds, or QA. Reuse an active run instead of starting duplicate work.
+- Development is one container-only session per workspace. It has status and event cursors, not a run ID. Setup, QA, builds, and smokes remain finite runs.
 - Use the developer CLI's formatter and Go migration surfaces for deliberate source rewrites. QA and MCP checks must remain non-mutating.
 - Keep changes small and tied to the user-visible behavior or maintenance task being requested.
 - Do not include credentials, customer data, private deployment details, local machine paths, or screenshots that reveal private analytics.
@@ -50,7 +51,7 @@ The rendered product documentation is public, but its source lives in the privat
 ## Contributor Workflow
 
 1. Use `$hitkeep-development` to inspect prerequisites and route setup, development, variants, and builds.
-2. Use `$hitkeep-workspace` before starting services, browser work, e2e, or concurrent QA. Trust returned workspace IDs, URLs, paths, and run IDs.
+2. Use `$hitkeep-workspace` before starting services, browser work, e2e, or concurrent QA. Trust returned workspace IDs, URLs, paths, development event cursors, and finite-operation run IDs.
 3. Load the relevant backend, frontend, product, or delivery reference from `$hitkeep-development`; do not layer area-specific HitKeep skills over it.
 4. Use `$hitkeep-qa` while iterating and before reporting completion. Preserve run IDs, inspect bounded failure logs, and report stable gate IDs rather than pasting successful logs.
 

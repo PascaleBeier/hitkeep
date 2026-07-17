@@ -20,8 +20,13 @@ import (
 const doctorCommandTimeout = 2 * time.Second
 
 type App struct {
-	workspace  Workspace
-	executable string
+	workspace        Workspace
+	executable       string
+	devProbe         func(context.Context) []DevService
+	devDetachedStart func(context.Context, devSessionRecord, DevRequest) error
+	devReadyTimeout  time.Duration
+	devProbeInterval time.Duration
+	devGracePeriod   time.Duration
 }
 
 func NewApp(workspacePath string) (*App, error) {
@@ -33,13 +38,15 @@ func NewApp(workspacePath string) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve hk executable: %w", err)
 	}
-	return &App{workspace: workspace, executable: executable}, nil
+	return &App{
+		workspace: workspace, executable: executable,
+		devReadyTimeout: devReadyTimeout, devProbeInterval: devProbeInterval, devGracePeriod: devGracePeriod,
+	}, nil
 }
 
 func (a *App) Workspace(context.Context) (Workspace, error) {
 	workspace, err := ResolveWorkspace(a.workspace.Root)
 	if err == nil {
-		a.workspace = workspace
 		workspace.Services = probeWorkspaceServices(workspace)
 		runs, _ := a.ListRuns(100)
 		for _, run := range runs {
@@ -47,18 +54,27 @@ func (a *App) Workspace(context.Context) (Workspace, error) {
 				workspace.ActiveRuns = append(workspace.ActiveRuns, summarizeRun(run))
 			}
 		}
+		if status, statusErr := a.DevStatus(context.Background()); statusErr == nil {
+			workspace.Dev = &status
+		}
 	}
 	return workspace, err
 }
 
 func (a *App) RecentRuns(limit int) ([]RunSummary, error) {
-	runs, err := a.ListRuns(limit)
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	runs, err := a.ListRuns(100)
 	if err != nil {
 		return nil, err
 	}
-	summaries := make([]RunSummary, 0, len(runs))
+	summaries := make([]RunSummary, 0, min(limit, len(runs)))
 	for _, run := range runs {
 		summaries = append(summaries, summarizeRun(run))
+		if len(summaries) >= limit {
+			break
+		}
 	}
 	return summaries, nil
 }
@@ -130,26 +146,10 @@ func (a *App) Doctor(ctx context.Context) DoctorReport {
 	}
 	nativeToolchainReady := statuses["go"] && statuses["node"] && statuses["npm"] && statuses["c-compiler"]
 	containerReady := statuses["docker"] && statuses["compose"]
-	nativeDevelopmentReady := nativeToolchainReady && containerReady
 	prQA := nativeToolchainReady && statuses["golangci"] && statuses["zizmor"]
 	fullQA := prQA && statuses["docker"] && statuses["buildx"]
-	ready := statuses["git"] && (nativeToolchainReady || containerReady)
-	return DoctorReport{Ready: ready, Capabilities: DoctorCapabilities{NativeDevelopment: nativeDevelopmentReady, ContainerDevelopment: containerReady, PRQA: prQA, FullQA: fullQA}, Checks: checks}
-}
-
-func nativeToolchainReady(report DoctorReport) bool {
-	required := map[string]bool{"go": false, "node": false, "npm": false, "c-compiler": false}
-	for _, check := range report.Checks {
-		if _, ok := required[check.Name]; ok {
-			required[check.Name] = check.Status == "ok"
-		}
-	}
-	for _, ready := range required {
-		if !ready {
-			return false
-		}
-	}
-	return true
+	ready := statuses["git"] && containerReady
+	return DoctorReport{Ready: ready, Capabilities: DoctorCapabilities{ContainerDevelopment: containerReady, PRQA: prQA, FullQA: fullQA}, Checks: checks}
 }
 
 func (a *App) QAPlan(ctx context.Context, profile, baseRef string) (QAPlan, error) {
@@ -184,7 +184,7 @@ func (a *App) QAPlan(ctx context.Context, profile, baseRef string) (QAPlan, erro
 				matched = true
 			}
 		}
-		if strings.HasPrefix(path, "scripts/") || strings.HasPrefix(path, ".github/") || path == "Makefile" || path == "Dockerfile" || path == "compose.dev.yaml" || path == "compose.dev-cloud.yaml" {
+		if strings.HasPrefix(path, "scripts/") || strings.HasPrefix(path, ".github/") || path == "Dockerfile" || path == "compose.dev.yaml" || path == "compose.dev-cloud.yaml" {
 			unknown = true
 			matched = true
 		}
@@ -258,6 +258,9 @@ func (a *App) ComposeEnvironment(variant Variant) []string {
 		"HITKEEP_MAIL_DRIVER":        "smtp",
 		"HITKEEP_MAIL_ENCRYPTION":    "none",
 		"HITKEEP_MCP_ENABLED":        "true",
+		// Worktree data is disposable local state. Retained recovery bundles
+		// still preserve the pre-recovery database and WAL for inspection.
+		"HITKEEP_DB_AUTO_RECOVER_WAL": "true",
 		// Provider discovery and button rendering require complete client pairs.
 		// These values are confined to hk-managed local development processes;
 		// real provider credentials are used only in staging and production.

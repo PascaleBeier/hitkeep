@@ -61,8 +61,22 @@ NSQ_HTTP="${HITKEEP_E2E_NSQ_HTTP:-127.0.0.1:$((PORT + 51))}"
 GOSSIP="${HITKEEP_E2E_GOSSIP:-127.0.0.1:$((PORT + 52))}"
 
 HK_PID=""
+OWNER_PID="${HITKEEP_E2E_OWNER_PID:-${PPID}}"
+OWNER_WATCH_PID=""
+
+watch_owner() {
+  while kill -0 "${OWNER_PID}" 2>/dev/null; do
+    sleep 0.5
+  done
+  kill -TERM "$$" 2>/dev/null || true
+}
 
 cleanup() {
+  trap - EXIT INT TERM
+  if [[ -n "${OWNER_WATCH_PID}" ]] && kill -0 "${OWNER_WATCH_PID}" 2>/dev/null; then
+    kill "${OWNER_WATCH_PID}" 2>/dev/null || true
+    wait "${OWNER_WATCH_PID}" 2>/dev/null || true
+  fi
   if [[ -n "${HK_PID}" ]] && kill -0 "${HK_PID}" 2>/dev/null; then
     kill "${HK_PID}" 2>/dev/null || true
     wait "${HK_PID}" 2>/dev/null || true
@@ -72,6 +86,13 @@ cleanup() {
   fi
 }
 trap cleanup EXIT INT TERM
+
+# Playwright starts web servers in their own process groups. If a parent QA
+# process is force-cancelled it cannot run Playwright's normal teardown, so
+# stop this server when its owning process disappears instead of leaving a
+# reusable, mutated fixture on the workspace's e2e port.
+watch_owner &
+OWNER_WATCH_PID=$!
 
 mkdir -p "${DATA_PATH}"
 rm -f "${DB_PATH}" "${DB_PATH}.wal"

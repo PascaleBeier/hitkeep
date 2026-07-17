@@ -29,6 +29,9 @@ func TestMCPManifestUsesOneCentralLocallyBuiltLauncher(t *testing.T) {
 	if manifest.ServerName != "hitkeep-dev" || manifest.Scope != "central" || manifest.WorkspaceRouting != "client-roots" || manifest.Delegation != "workspace-mcp" {
 		t.Fatalf("manifest is not central, root-routed, and delegated: %+v", manifest)
 	}
+	if !reflect.DeepEqual(manifest.Notifications, []string{"progress", "logging"}) {
+		t.Fatalf("manifest does not advertise streaming notifications: %+v", manifest)
+	}
 	wantArgs := []string{"mcp", "serve"}
 	if manifest.Command != launcher || !reflect.DeepEqual(manifest.Args, wantArgs) {
 		t.Fatalf("unexpected central launcher: command=%q args=%v", manifest.Command, manifest.Args)

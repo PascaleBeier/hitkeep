@@ -16,20 +16,20 @@ Prefer these local developer MCP operations:
 - `hk_workspace_handoff` for compact continuation context.
 - `hk_run_status` and `hk_logs_tail` for asynchronous work.
 - `hk_run_list` to reuse or inspect bounded recent work before starting another run.
-- `hk_dev_start` and `hk_dev_stop` for this worktree's services.
+- `hk_dev_start`, `hk_dev_status`, `hk_dev_logs`, and `hk_dev_stop` for this worktree's container-only development session.
 - `hk_run_cancel` for one validated active run.
 
-When MCP is unavailable, discover the equivalent workspace and run commands through `./hk help` and request `--output json`; add `--detach` for action parity. Do not parse terminal prose.
+When MCP is unavailable, discover the equivalent workspace and run commands through `./hk catalog commands --output json` and request `--output json`; add `--detach` for action parity. Do not parse terminal prose.
 
-Always use the workspace ID, Compose project, paths, ports, URLs, and run IDs returned by `hk`. Verify an envelope's workspace ID before using a run ID. Never assume conventional ports are free or share mutable state between worktrees.
+Always use the workspace ID, Compose project, paths, ports, URLs, development event cursors, and finite-operation run IDs returned by `hk`. Verify an envelope's workspace ID before using a cursor or run ID. Never assume conventional ports are free or share mutable state between worktrees.
 
 ## Operate
 
-1. Inspect status and active runs before setup, development, browser work, e2e, or QA. Reuse an equivalent active run rather than duplicating it.
-2. Query the live variant catalog, then start development only when the task needs runtime services.
-3. Record the returned run ID and poll status with reasonable intervals. Do not treat client disconnect or a slow call as failure.
-4. Read bounded log tails for diagnosis. Carry `next_cursor` into subsequent reads so repeated polling does not reload old output. Use returned artifact paths for complete local diagnostics instead of loading full logs into context.
-5. Stop only services owned by the selected workspace. Cancellation targets one validated run ID; it is not workspace cleanup.
+1. Inspect status, the development session, and active finite runs before setup, browser work, e2e, or QA. Reuse equivalent active work rather than duplicating it.
+2. Query the live variant catalog, then start the container-only development session only when the task needs services.
+3. Development start streams until ready or failed and requires no session ID. Finite operations return run IDs and are polled with reasonable intervals. Do not treat client disconnect or a slow call as failure.
+4. Read bounded log tails for diagnosis. Carry `next_cursor` into subsequent development or run reads so repeated polling does not reload old output. Use returned artifact paths for complete local diagnostics instead of loading full logs into context.
+5. Stop development with the workspace-scoped stop operation. Cancelling a development log observer never stops services; finite run cancellation still targets one validated run ID.
 6. Before handoff, refresh status and request handoff context. Report workspace ID, active runs, usable URLs, changed-path summary, failures, and the next safe action.
 
 Do not run `git clean`, remove unmanaged files, delete worktrees, expose secrets, copy mutable state between workspaces, or manually reserve ports. Reject paths that resolve outside the selected worktree, including symlink escapes.

@@ -26,13 +26,6 @@ type ReleaseBuildResult struct {
 	Artifacts []string `json:"artifacts"`
 }
 
-func developerReleaseArtifact(root, goos, goarch string) (string, error) {
-	if !slices.Contains([]string{"darwin", "linux"}, goos) || !slices.Contains([]string{"amd64", "arm64"}, goarch) {
-		return "", fmt.Errorf("unsupported developer release target %q", goos+"/"+goarch)
-	}
-	return filepath.Join(root, "hk-"+goos+"-"+goarch), nil
-}
-
 type GoBuildConfig struct {
 	Variant      string   `json:"variant"`
 	Tags         []string `json:"tags"`
@@ -229,28 +222,4 @@ func (a *App) BuildReleaseBinaries(ctx context.Context, request ReleaseBuildRequ
 		}
 	}
 	return ReleaseBuildResult{Artifacts: artifacts}, nil
-}
-
-// BuildDeveloperBinary cross-compiles the standalone hk developer CLI and its
-// central MCP broker without CGO for the supported macOS and Linux targets.
-func (a *App) BuildDeveloperBinary(ctx context.Context, request ReleaseBuildRequest, writer io.Writer) (ReleaseBuildResult, error) {
-	if !releaseValuePattern.MatchString(request.Version) {
-		return ReleaseBuildResult{}, fmt.Errorf("invalid release version %q", request.Version)
-	}
-	artifact, err := developerReleaseArtifact(a.workspace.Root, request.GOOS, request.GOARCH)
-	if err != nil {
-		return ReleaseBuildResult{}, err
-	}
-	args := []string{
-		"go", "build",
-		"-trimpath",
-		"-ldflags", "-w -s -X main.version=" + request.Version,
-		"-o", artifact,
-		"./cmd/hk",
-	}
-	environment := []string{"CGO_ENABLED=0", "GOOS=" + request.GOOS, "GOARCH=" + request.GOARCH}
-	if err := a.runCommand(ctx, writer, commandSpec{Args: args, Env: environment}); err != nil {
-		return ReleaseBuildResult{}, err
-	}
-	return ReleaseBuildResult{Artifacts: []string{artifact}}, nil
 }

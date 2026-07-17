@@ -162,16 +162,20 @@ If you want the same product without running it yourself, start here:
 
 ## Development
 
-The repository-owned developer CLI provides reproducible setup, isolated worktrees, native or container-backed development, cloud-parity builds, and the same QA contract used by automation:
+The repository-owned developer CLI provides a small default development workflow, with isolated worktrees, cloud-parity builds, and the same QA contract available when needed.
+
+The checked-in `./hk` file is a POSIX launcher, not a compiled binary. It builds the current worktree's developer CLI into a content-addressed host cache; developer CLI binaries are neither committed nor attached to HitKeep releases.
+
+Start with:
 
 ```bash
 ./hk setup
 ./hk dev --seed
 ```
 
-Use the URLs printed by `hk`; ports and state are isolated per Git worktree. Add `--runtime container` for container-backed development or `--variant cloud` for local managed-cloud parity.
+`./hk dev` runs the workspace's Compose stack in the foreground, prints URLs, and streams component logs; `Ctrl+C` stops the complete stack. Use `./hk dev --detach` for an explicit background session, `./hk dev logs` to follow it, `./hk dev restart` to preserve data while restarting, `./hk dev stop` to stop it, and `./hk dev reset --seed` for a fresh seeded data volume. Add `--variant cloud` for local managed-cloud parity. Concurrent Git worktrees remain isolated automatically.
 
-Run `./hk help` for current commands, `./hk doctor` for prerequisites, and `./hk qa pr` before review. The Makefile contains compatibility aliases only.
+Run `./hk help` for human guidance, `./hk catalog commands --output json` for the complete machine-readable command surface, `./hk doctor` for prerequisites, and `./hk qa pr` before review. `hk` is the sole supported developer workflow entry point.
 
 Contributor docs and local development guides:
 

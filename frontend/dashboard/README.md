@@ -4,15 +4,15 @@ HitKeep's dashboard is an Angular 21 application that also builds the lightweigh
 
 ## Development server
 
-To start a local development server, run:
+From the repository root, start the complete container-only development session:
 
 ```bash
-ng serve
+./hk dev --seed
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+`hk` prints this workspace's URLs and streams the backend, frontend, and Mailpit logs. The dashboard automatically reloads when frontend sources change, and `Ctrl+C` stops the complete stack. Use `./hk dev --detach` for a background session and `./hk dev status --output json` to discover its workspace-scoped URLs.
 
-From the repo root, `make dev` starts both the Go backend and this dashboard together. `make dev-seed` does the same with seeded demo data.
+Format frontend sources with `./hk fmt --scope frontend`; use `./hk fmt check --scope frontend` for the non-mutating check.
 
 ## Code scaffolding
 
@@ -30,19 +30,13 @@ ng generate --help
 
 ## Building
 
-To build the dashboard only, run:
+Build the production application, including the embedded dashboard, through the repository workflow:
 
 ```bash
-ng build
+./hk build binary
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-To build the production dashboard bundle, optimize translations, rebuild `hk.js`, and sync the result into the Go app's embedded `public/` directory, run:
-
-```bash
-npm run build:prod
-```
+The build compiles the production dashboard bundle, optimizes translations, rebuilds `hk.js`, syncs the result into the Go app's embedded `public/` directory, and produces the self-hosted binary.
 
 The Scalar API Reference runtime (`vendor/scalar/standalone.js`) is copied into the build output from `node_modules/@scalar/api-reference/dist/browser/standalone.js` via Angular assets configuration, so it always matches the installed npm package version.
 
@@ -51,17 +45,17 @@ The Scalar API Reference runtime (`vendor/scalar/standalone.js`) is copied into 
 To execute unit tests, use:
 
 ```bash
-npm run test:ci
+./hk qa changed --gate frontend-unit
 ```
 
-This runs Angular's Vitest-backed unit tests in non-watch headless mode. For a focused spec, use `npm run test -- --watch=false --no-progress --include <spec>`. Avoid bare `ng test` unless you intentionally want watch-mode debugging.
+This runs Angular's Vitest-backed unit tests in non-watch headless mode. Use the command catalog's `agent_command` when invoking the gate from automation.
 
 ## Running end-to-end tests
 
 For the real seeded end-to-end suite, run:
 
 ```bash
-npm run e2e
+./hk qa changed --gate frontend-e2e
 ```
 
 This is the same browser contract CI runs. The launcher:
@@ -73,19 +67,9 @@ This is the same browser contract CI runs. The launcher:
 - runs the browser journeys against the real app
 - runs the deployment smoke under `/hitkeep`
 
-Angular 22 still supports `ng e2e`, but HitKeep uses Playwright directly so there is only one maintained E2E entrypoint. For a focused spec while iterating, pass Playwright arguments through `npm run e2e`:
-
-```bash
-npm run e2e -- e2e/auth.seeded.spec.js --workers=1
-```
-
 The full command includes a subdirectory smoke run with `HITKEEP_E2E_PUBLIC_PATH=/hitkeep` and verifies the dashboard, authenticated route refreshes, app-owned API/resource/static image paths, the API reference iframe, tracker bundles, and ingest preflight under that prefix.
 
-On a fresh machine, install the browser dependency first:
-
-```bash
-npx playwright install --with-deps chromium
-```
+`./hk setup` prepares the pinned browser dependency on a fresh machine.
 
 ## Additional Resources
 

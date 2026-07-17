@@ -52,7 +52,8 @@ export default defineConfig({
               cwd: repoRoot,
               url: `${baseURL}/healthz`,
               timeout: 300_000,
-              reuseExistingServer: !process.env.CI,
+              reuseExistingServer: process.env.HITKEEP_E2E_REUSE_SERVER === '1',
+              gracefulShutdown: { signal: 'SIGTERM', timeout: 5_000 },
               stdout: 'pipe',
               stderr: 'pipe'
           }

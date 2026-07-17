@@ -149,6 +149,27 @@ func TestGitWorktreesReceiveIsolatedWorkspaceState(t *testing.T) {
 	if len(workspaces) != 2 {
 		t.Fatalf("workspaces: got %d, want 2", len(workspaces))
 	}
+	if err := os.WriteFile(filepath.Join(root, "CONTRIBUTING.md"), []byte("changed\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	workspaces, err = ListWorkspaces(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolvedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mainWorkspace Workspace
+	for _, workspace := range workspaces {
+		if workspace.Root == resolvedRoot {
+			mainWorkspace = workspace
+			break
+		}
+	}
+	if mainWorkspace.DirtyCount != 1 || len(mainWorkspace.ChangedPaths) != 1 || mainWorkspace.ChangedPaths[0] != "CONTRIBUTING.md" {
+		t.Fatalf("workspace list lost working-tree state: %+v", mainWorkspace)
+	}
 	if workspaces[0].ID == workspaces[1].ID || workspaces[0].ComposeProject == workspaces[1].ComposeProject || workspaces[0].StateDir == workspaces[1].StateDir {
 		t.Fatalf("worktree state collided: %+v %+v", workspaces[0], workspaces[1])
 	}
@@ -158,6 +179,20 @@ func TestGitWorktreesReceiveIsolatedWorkspaceState(t *testing.T) {
 	stateEntries, err := os.ReadDir(filepath.Join(os.Getenv("HK_STATE_DIR"), "workspaces"))
 	if err == nil && len(stateEntries) != 0 {
 		t.Fatalf("read-only discovery created workspace state: %+v", stateEntries)
+	}
+}
+
+func TestWorkingTreeChangedPathsPreservesPorcelainPrefixes(t *testing.T) {
+	root := initTestRepository(t)
+	if err := os.WriteFile(filepath.Join(root, "CONTRIBUTING.md"), []byte("changed\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	paths, err := workingTreeChangedPaths(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) != 1 || paths[0] != "CONTRIBUTING.md" {
+		t.Fatalf("changed paths = %v, want CONTRIBUTING.md", paths)
 	}
 }
 

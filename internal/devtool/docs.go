@@ -11,9 +11,10 @@ import (
 
 func ValidateDevelopmentDocs(root string) error {
 	files := map[string][]string{
-		"README.md":       {"./hk setup", "./hk dev --seed", "./hk qa pr", "CONTRIBUTING.md"},
-		"CONTRIBUTING.md": {"./hk help", "./hk catalog --output json", "model-agnostic", "central MCP", "client roots", "macOS or Linux", "AMD64 or ARM64", "builds the broker locally", "./hk mcp manifest", "./hk mcp serve", "./hk skills check", "./hk fmt", "./hk fix check", "./hk cache status", "./hk run list", "next_cursor", "AGENTS.md", "source repository is private"},
-		"AGENTS.md":       {"Use `./hk` as the workflow source of truth", "$hitkeep-development", "$hitkeep-workspace", "$hitkeep-qa", "private `PascaleBeier/hitkeep-docs`"},
+		"README.md":                    {"./hk setup", "./hk dev --seed", "./hk dev --detach", "./hk catalog commands --output json", "Compose stack", "./hk qa pr", "CONTRIBUTING.md"},
+		"CONTRIBUTING.md":              {"./hk help", "./hk catalog --output json", "./hk catalog commands --output json", "agent_command", "model-agnostic", "central MCP", "client roots", "macOS or Linux", "AMD64 or ARM64", "executable POSIX launcher", "./hk mcp manifest", "./hk mcp serve", "./hk skills check", "./hk fmt", "./hk fmt --scope frontend", "./hk fix check", "./hk cache status", "./hk run list", "hk.dev/v2", "hk_dev_status", "next_cursor", "AGENTS.md", "source repository is private"},
+		"AGENTS.md":                    {"Use `./hk` as the workflow source of truth", "container-only session", "$hitkeep-development", "$hitkeep-workspace", "$hitkeep-qa", "private `PascaleBeier/hitkeep-docs`"},
+		"frontend/dashboard/README.md": {"./hk dev --seed", "./hk fmt --scope frontend", "./hk qa changed --gate frontend-unit", "./hk qa changed --gate frontend-e2e"},
 		".agents/skills/hitkeep-development/references/delivery.md": {
 			"private source for the public documentation website",
 			"separate from HitKeep's public MIT-licensed source",
@@ -36,13 +37,6 @@ func ValidateDevelopmentDocs(root string) error {
 	}
 	if err := validateCIWorkflowContract(root); err != nil {
 		return err
-	}
-	makefile, err := os.ReadFile(filepath.Join(root, "Makefile"))
-	if err != nil {
-		return err
-	}
-	if lines := strings.Count(string(makefile), "\n"); lines > 100 {
-		return fmt.Errorf("make compatibility adapter grew to %d lines", lines)
 	}
 	return ValidateSkillLayout(root)
 }

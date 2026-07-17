@@ -62,10 +62,11 @@ func TestDetachedCLIActionOutlivesLauncher(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, script := range map[string]string{
-		"go":   "#!/bin/sh\nif [ \"${1:-}\" = version ]; then echo 'go version go1.26.5 test'; fi\nexit 0\n",
-		"npm":  "#!/bin/sh\nif [ \"${1:-}\" = --version ]; then echo '11.14.1'; exit 0; fi\nmkdir -p node_modules\nexit 0\n",
-		"node": "#!/bin/sh\necho v24.15.0\n",
-		"npx":  "#!/bin/sh\nmkdir -p node_modules\nexit 0\n",
+		"docker": "#!/bin/sh\necho 1.0.0\nexit 0\n",
+		"go":     "#!/bin/sh\nif [ \"${1:-}\" = version ]; then echo 'go version go1.26.5 test'; fi\nexit 0\n",
+		"npm":    "#!/bin/sh\nif [ \"${1:-}\" = --version ]; then echo '11.14.1'; exit 0; fi\nmkdir -p node_modules\nexit 0\n",
+		"node":   "#!/bin/sh\necho v24.15.0\n",
+		"npx":    "#!/bin/sh\nmkdir -p node_modules\nexit 0\n",
 	} {
 		if err := os.WriteFile(filepath.Join(fakeBin, name), []byte(script), 0o755); err != nil {
 			t.Fatal(err)
@@ -248,8 +249,9 @@ func TestMCPStdioActionRunLifecycle(t *testing.T) {
 	}
 	slowFile := filepath.Join(t.TempDir(), "slow")
 	goScript := "#!/bin/sh\nif [ \"${1:-}\" = version ]; then echo 'go version go1.26.5 test'; exit 0; fi\nif [ -f \"" + slowFile + "\" ]; then sleep 30; fi\nexit 0\n"
+	dockerScript := "#!/bin/sh\ncase \"$*\" in *version*) echo 1.0.0; exit 0;; esac\nif [ -f \"" + slowFile + "\" ]; then sleep 30; fi\nexit 0\n"
 	for name, script := range map[string]string{
-		"go": goScript, "npm": "#!/bin/sh\nif [ \"${1:-}\" = --version ]; then echo '11.14.1'; exit 0; fi\nmkdir -p node_modules\nexit 0\n", "node": "#!/bin/sh\necho v24.15.0\n", "npx": "#!/bin/sh\nmkdir -p node_modules\nexit 0\n",
+		"docker": dockerScript, "go": goScript, "npm": "#!/bin/sh\nif [ \"${1:-}\" = --version ]; then echo '11.14.1'; exit 0; fi\nmkdir -p node_modules\nexit 0\n", "node": "#!/bin/sh\necho v24.15.0\n", "npx": "#!/bin/sh\nmkdir -p node_modules\nexit 0\n",
 	} {
 		if err := os.WriteFile(filepath.Join(fakeBin, name), []byte(script), 0o755); err != nil {
 			t.Fatal(err)

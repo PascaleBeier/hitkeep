@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func TestDoctorDoesNotClaimNativeDevelopmentWithoutCompose(t *testing.T) {
+func TestDoctorRequiresDockerComposeForDevelopment(t *testing.T) {
 	root := initTestRepository(t)
 	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
 	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.test\n\ngo 1.26.5\n"), 0o600); err != nil {
@@ -45,14 +45,11 @@ func TestDoctorDoesNotClaimNativeDevelopmentWithoutCompose(t *testing.T) {
 	}
 	t.Setenv("PATH", fakeBin)
 	report := app.Doctor(context.Background())
-	if !report.Ready {
-		t.Fatalf("exact native toolchain should make setup ready: %+v", report)
+	if report.Ready {
+		t.Fatalf("doctor reported development ready without Docker Compose: %+v", report)
 	}
-	if report.Capabilities.NativeDevelopment || report.Capabilities.ContainerDevelopment {
-		t.Fatalf("native development requires Docker Compose for Mailpit: %+v", report.Capabilities)
-	}
-	if !nativeToolchainReady(report) {
-		t.Fatalf("exact native toolchain was not recognized: %+v", report.Checks)
+	if report.Capabilities.ContainerDevelopment {
+		t.Fatalf("container development was reported without Docker Compose: %+v", report.Capabilities)
 	}
 }
 
@@ -145,6 +142,9 @@ func TestComposeEnvironmentExposesSocialProvidersInLocalDevelopment(t *testing.T
 		if value := environmentValue(environment, name); value == "" {
 			t.Fatalf("local development environment does not configure %s", name)
 		}
+	}
+	if value := environmentValue(environment, "HITKEEP_DB_AUTO_RECOVER_WAL"); value != "true" {
+		t.Fatalf("local development environment does not enable controlled WAL recovery: %q", value)
 	}
 }
 

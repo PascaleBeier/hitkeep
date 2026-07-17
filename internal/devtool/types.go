@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-const SchemaVersion = "hk.dev/v1"
+const SchemaVersion = "hk.dev/v2"
 
 type Variant struct {
 	ID                  string            `json:"id"`
@@ -18,15 +18,16 @@ type Variant struct {
 }
 
 type Gate struct {
-	ID          string   `json:"id"`
-	Description string   `json:"description"`
-	CIGroup     string   `json:"ci_group,omitempty"`
-	Command     []string `json:"command"`
-	WorkingDir  string   `json:"working_dir,omitempty"`
-	Profiles    []string `json:"profiles"`
-	Paths       []string `json:"paths,omitempty"`
-	Weight      int      `json:"weight"`
-	Timeout     string   `json:"timeout"`
+	ID           string   `json:"id"`
+	Description  string   `json:"description"`
+	CIGroup      string   `json:"ci_group,omitempty"`
+	Command      []string `json:"command"`
+	AgentCommand []string `json:"agent_command,omitempty"`
+	WorkingDir   string   `json:"working_dir,omitempty"`
+	Profiles     []string `json:"profiles"`
+	Paths        []string `json:"paths,omitempty"`
+	Weight       int      `json:"weight"`
+	Timeout      string   `json:"timeout"`
 }
 
 type QAPlan struct {
@@ -63,6 +64,7 @@ type Workspace struct {
 	StateDir              string       `json:"state_dir"`
 	Services              []Service    `json:"services,omitempty"`
 	ActiveRuns            []RunSummary `json:"active_runs,omitempty"`
+	Dev                   *DevStatus   `json:"dev,omitempty"`
 	UpdatedAt             time.Time    `json:"updated_at"`
 }
 
@@ -76,6 +78,77 @@ type URLs struct {
 	API     string `json:"api"`
 	Web     string `json:"web"`
 	Mailpit string `json:"mailpit"`
+}
+
+type DevState string
+
+const (
+	DevStateStarting DevState = "starting"
+	DevStateReady    DevState = "ready"
+	DevStateDegraded DevState = "degraded"
+	DevStateStopping DevState = "stopping"
+	DevStateStopped  DevState = "stopped"
+	DevStateFailed   DevState = "failed"
+)
+
+type DevOwner string
+
+const (
+	DevOwnerForeground DevOwner = "foreground"
+	DevOwnerDetached   DevOwner = "detached"
+)
+
+type DevRequest struct {
+	Variant string `json:"variant,omitempty"`
+	Seed    bool   `json:"seed,omitempty"`
+}
+
+type DevService struct {
+	Name      string    `json:"name"`
+	Address   string    `json:"address"`
+	Reachable bool      `json:"reachable"`
+	CheckedAt time.Time `json:"checked_at"`
+}
+
+type DevStatus struct {
+	State           DevState     `json:"state"`
+	GenerationID    string       `json:"generation_id,omitempty"`
+	Variant         string       `json:"variant,omitempty"`
+	Owner           DevOwner     `json:"owner,omitempty"`
+	StartedAt       *time.Time   `json:"started_at,omitempty"`
+	ReadyAt         *time.Time   `json:"ready_at,omitempty"`
+	StoppingAt      *time.Time   `json:"stopping_at,omitempty"`
+	StoppedAt       *time.Time   `json:"stopped_at,omitempty"`
+	UpdatedAt       time.Time    `json:"updated_at"`
+	URLs            URLs         `json:"urls"`
+	Services        []DevService `json:"services,omitempty"`
+	NextEventCursor int64        `json:"next_event_cursor"`
+	Error           string       `json:"error,omitempty"`
+}
+
+type DevEvent struct {
+	Cursor    int64     `json:"cursor"`
+	Timestamp time.Time `json:"timestamp"`
+	Type      string    `json:"type"`
+	Component string    `json:"component,omitempty"`
+	Level     string    `json:"level,omitempty"`
+	Phase     string    `json:"phase,omitempty"`
+	Message   string    `json:"message"`
+}
+
+type DevStartResult struct {
+	Status       DevStatus  `json:"status"`
+	Reused       bool       `json:"reused"`
+	RecentEvents []DevEvent `json:"recent_events,omitempty"`
+	NextCursor   int64      `json:"next_cursor"`
+}
+
+type DevLogBatch struct {
+	Status     DevStatus  `json:"status"`
+	Events     []DevEvent `json:"events"`
+	NextCursor int64      `json:"next_cursor"`
+	Truncated  bool       `json:"truncated"`
+	Complete   bool       `json:"complete"`
 }
 
 type Handoff struct {
@@ -101,7 +174,6 @@ type DoctorReport struct {
 }
 
 type DoctorCapabilities struct {
-	NativeDevelopment    bool `json:"native_development"`
 	ContainerDevelopment bool `json:"container_development"`
 	PRQA                 bool `json:"pr_qa"`
 	FullQA               bool `json:"full_qa"`
@@ -110,8 +182,6 @@ type DoctorCapabilities struct {
 type RunRequest struct {
 	Kind    string   `json:"kind"`
 	Variant string   `json:"variant,omitempty"`
-	Runtime string   `json:"runtime,omitempty"`
-	Seed    bool     `json:"seed,omitempty"`
 	Profile string   `json:"profile,omitempty"`
 	Target  string   `json:"target,omitempty"`
 	GateIDs []string `json:"gate_ids,omitempty"`
@@ -157,6 +227,7 @@ type RunStart struct {
 	Status    string `json:"status"`
 	StatusURI string `json:"status_uri"`
 	LogURI    string `json:"log_uri"`
+	Reused    bool   `json:"reused,omitempty"`
 }
 
 type LogTail struct {

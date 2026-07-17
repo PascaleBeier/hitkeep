@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"hitkeep/internal/devtool"
 	"hitkeep/internal/devtool/devmcp"
@@ -34,6 +36,22 @@ func IsReported(err error) bool {
 	return errors.As(err, &reported)
 }
 
+type exitError struct {
+	cause error
+	code  int
+}
+
+func (e exitError) Error() string { return e.cause.Error() }
+func (e exitError) Unwrap() error { return e.cause }
+
+func ExitCode(err error) int {
+	var coded exitError
+	if errors.As(err, &coded) {
+		return coded.code
+	}
+	return 1
+}
+
 func Execute(ctx context.Context, version string, args []string, stdout, stderr io.Writer) error {
 	options := &options{version: version, output: "human", stdout: stdout, stderr: stderr}
 	root := newRoot(options)
@@ -50,13 +68,16 @@ func newRoot(options *options) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Version:       options.version,
+		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
+			return validateOutputFormat(options.output)
+		},
 	}
 	root.PersistentFlags().StringVar(&options.workspace, "workspace", ".", "Git worktree to operate on")
-	root.PersistentFlags().StringVar(&options.output, "output", "human", "output format: human, plain, json, or ndjson")
+	root.PersistentFlags().StringVar(&options.output, "output", "human", "output format: human (default), plain, json, or ndjson")
 	root.AddCommand(
 		catalogCommand(options), doctorCommand(options), workspaceCommand(options), setupCommand(options),
 		devCommand(options), qaCommand(options), formatCommand(options), fixCommand(options), buildCommand(options), smokeCommand(options), runCommand(options),
-		cacheCommand(options), ciCommand(options), docsCommand(options), skillsCommand(options), mcpCommand(options), workerCommand(options),
+		cacheCommand(options), ciCommand(options), docsCommand(options), skillsCommand(options), mcpCommand(options), runWorkerCommand(options), devWorkerCommand(options),
 	)
 	return root
 }
@@ -78,9 +99,19 @@ func cacheCommand(options *options) *cobra.Command {
 }
 
 func formatCommand(options *options) *cobra.Command {
-	return sourceChangeCommand(options, "fmt [check|write]", "fmt", "Format repository Go sources", "write", func(_ context.Context, app *devtool.App, write bool) (any, error) {
-		return app.FormatGo(write)
+	var scope string
+	command := sourceChangeCommand(options, "fmt [check|write]", "fmt", "Format repository sources", "write", func(ctx context.Context, app *devtool.App, write bool) (any, error) {
+		switch scope {
+		case "go":
+			return app.FormatGo(write)
+		case "frontend":
+			return app.FormatFrontend(ctx, write)
+		default:
+			return nil, errors.New("scope must be go or frontend")
+		}
 	})
+	command.Flags().StringVar(&scope, "scope", "go", "source scope: go or frontend")
+	return command
 }
 
 func fixCommand(options *options) *cobra.Command {
@@ -117,7 +148,11 @@ func withApp(options *options, command string, handler func(context.Context, *de
 			}
 			return reportedError{cause: err}
 		}
-		data, runErr := handler(cmd.Context(), app)
+		ctx := cmd.Context()
+		if options.output == "json" || options.output == "ndjson" {
+			ctx = devtool.WithAgentOutput(ctx)
+		}
+		data, runErr := handler(ctx, app)
 		if runErr != nil {
 			if renderErr := render(options, devtool.ErrorEnvelope(command, app.WorkspaceID(), runErr)); renderErr != nil {
 				return renderErr
@@ -129,7 +164,79 @@ func withApp(options *options, command string, handler func(context.Context, *de
 }
 
 func catalogCommand(options *options) *cobra.Command {
-	return &cobra.Command{Use: "catalog", Short: "Show canonical variants, QA profiles, and gates", Args: cobra.NoArgs, RunE: withApp(options, "catalog", func(_ context.Context, app *devtool.App) (any, error) { return app.Catalog(), nil })}
+	command := &cobra.Command{Use: "catalog", Short: "Show canonical variants, QA profiles, and gates", Args: cobra.NoArgs, RunE: withApp(options, "catalog", func(_ context.Context, app *devtool.App) (any, error) { return app.Catalog(), nil })}
+	commands := &cobra.Command{Use: "commands", Short: "List the complete machine-readable hk command surface", Args: cobra.NoArgs}
+	commands.RunE = withApp(options, "catalog commands", func(_ context.Context, _ *devtool.App) (any, error) {
+		return buildCommandCatalog(commands.Root()), nil
+	})
+	command.AddCommand(commands)
+	return command
+}
+
+type commandCatalog struct {
+	SchemaVersion string               `json:"schema_version"`
+	OutputFormats []string             `json:"output_formats"`
+	GlobalFlags   []commandCatalogFlag `json:"global_flags"`
+	Commands      []commandCatalogItem `json:"commands"`
+}
+
+type commandCatalogItem struct {
+	Path             string               `json:"path"`
+	Use              string               `json:"use"`
+	Description      string               `json:"description"`
+	Flags            []commandCatalogFlag `json:"flags,omitempty"`
+	StructuredOutput bool                 `json:"structured_output"`
+}
+
+type commandCatalogFlag struct {
+	Name      string `json:"name"`
+	Shorthand string `json:"shorthand,omitempty"`
+	Type      string `json:"type"`
+	Default   string `json:"default,omitempty"`
+	Usage     string `json:"usage"`
+}
+
+func buildCommandCatalog(root *cobra.Command) commandCatalog {
+	catalog := commandCatalog{
+		SchemaVersion: devtool.SchemaVersion,
+		OutputFormats: []string{"human", "plain", "json", "ndjson"},
+		GlobalFlags:   commandFlags(root.PersistentFlags()),
+	}
+	var visit func(*cobra.Command)
+	visit = func(command *cobra.Command) {
+		if command.Hidden {
+			return
+		}
+		if command != root && (command.Run != nil || command.RunE != nil) {
+			catalog.Commands = append(catalog.Commands, commandCatalogItem{
+				Path:             command.CommandPath(),
+				Use:              command.Use,
+				Description:      command.Short,
+				Flags:            commandFlags(command.NonInheritedFlags()),
+				StructuredOutput: true,
+			})
+		}
+		for _, child := range command.Commands() {
+			visit(child)
+		}
+	}
+	visit(root)
+	sort.Slice(catalog.Commands, func(left, right int) bool { return catalog.Commands[left].Path < catalog.Commands[right].Path })
+	return catalog
+}
+
+func commandFlags(flags *pflag.FlagSet) []commandCatalogFlag {
+	var result []commandCatalogFlag
+	flags.VisitAll(func(flag *pflag.Flag) {
+		if flag.Name == "help" {
+			return
+		}
+		result = append(result, commandCatalogFlag{
+			Name: flag.Name, Shorthand: flag.Shorthand, Type: flag.Value.Type(), Default: flag.DefValue, Usage: flag.Usage,
+		})
+	})
+	sort.Slice(result, func(left, right int) bool { return result[left].Name < result[right].Name })
+	return result
 }
 
 func doctorCommand(options *options) *cobra.Command {
@@ -147,14 +254,225 @@ func workspaceCommand(options *options) *cobra.Command {
 }
 
 func setupCommand(options *options) *cobra.Command {
-	return startCommand(options, "setup", "setup", "Prepare exact dependencies for this worktree", func(*cobra.Command, []string) devtool.RunRequest { return devtool.RunRequest{Kind: "setup"} })
+	return startCommand(options, "setup", "setup", "Prepare pinned development containers for this worktree", func(*cobra.Command, []string) devtool.RunRequest { return devtool.RunRequest{Kind: "setup"} })
 }
 
 func devCommand(options *options) *cobra.Command {
-	command := startCommand(options, "dev", "dev start", "Run the isolated development stack", variantRequest("dev-start"))
-	command.AddCommand(startCommand(options, "start", "dev start", "Start native/container development services", variantRequest("dev-start")))
-	command.AddCommand(startCommand(options, "stop", "dev stop", "Stop this worktree's development services", variantRequest("dev-stop")))
+	var variant string
+	var seed bool
+	var detach bool
+	command := &cobra.Command{
+		Use: "dev", Short: "Run a workspace-scoped HitKeep development session", Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runDevStart(cmd, options, "dev", devtool.DevRequest{Variant: variant, Seed: seed}, detach)
+		},
+	}
+	command.Flags().StringVar(&variant, "variant", "self-hosted", "self-hosted or cloud")
+	command.Flags().BoolVar(&seed, "seed", false, "seed isolated demo data before starting")
+	command.Flags().BoolVar(&detach, "detach", false, "run in the background and wait until ready")
+	command.AddCommand(
+		&cobra.Command{Use: "status", Short: "Inspect the current development session", Args: cobra.NoArgs, RunE: withApp(options, "dev status", func(ctx context.Context, app *devtool.App) (any, error) {
+			return app.DevStatus(ctx)
+		})},
+		devStopCommand(options),
+		devRestartCommand(options),
+		devResetCommand(options),
+		devLogsCommand(options),
+	)
 	return command
+}
+
+func devRestartCommand(options *options) *cobra.Command {
+	var variant string
+	var detach bool
+	command := &cobra.Command{
+		Use: "restart", Short: "Restart development without deleting workspace data", Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			app, err := devtool.NewApp(options.workspace)
+			if err != nil {
+				return renderDevError(options, "dev restart", "", err)
+			}
+			status, err := app.DevStatus(cmd.Context())
+			if err != nil {
+				return renderDevError(options, "dev restart", app.WorkspaceID(), err)
+			}
+			if variant == "" {
+				variant = status.Variant
+				if variant == "" {
+					variant = "self-hosted"
+				}
+			}
+			if _, err := app.StopDev(cmd.Context()); err != nil {
+				return renderDevError(options, "dev restart", app.WorkspaceID(), err)
+			}
+			return runDevStartWithApp(cmd, options, app, "dev restart", devtool.DevRequest{Variant: variant}, detach)
+		},
+	}
+	command.Flags().StringVar(&variant, "variant", "", "variant override; defaults to the current session")
+	command.Flags().BoolVar(&detach, "detach", false, "run in the background and wait until ready")
+	return command
+}
+
+func devStopCommand(options *options) *cobra.Command {
+	return &cobra.Command{Use: "stop", Short: "Stop the selected workspace's development session", Args: cobra.NoArgs, RunE: withApp(options, "dev stop", func(ctx context.Context, app *devtool.App) (any, error) {
+		return app.StopDev(ctx)
+	})}
+}
+
+func devResetCommand(options *options) *cobra.Command {
+	var variant string
+	var seed bool
+	var detach bool
+	command := &cobra.Command{
+		Use: "reset", Short: "Delete isolated development data and start a fresh session", Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if options.output == "json" && !detach {
+				return renderDevError(options, "dev reset", "", errors.New("--output json requires --detach for development sessions"))
+			}
+			app, err := devtool.NewApp(options.workspace)
+			if err != nil {
+				return renderDevError(options, "dev reset", "", err)
+			}
+			if _, err := app.StopDev(cmd.Context()); err != nil {
+				return renderDevError(options, "dev reset", app.WorkspaceID(), err)
+			}
+			if err := app.ResetDevData(cmd.Context()); err != nil {
+				return renderDevError(options, "dev reset", app.WorkspaceID(), err)
+			}
+			return runDevStartWithApp(cmd, options, app, "dev reset", devtool.DevRequest{Variant: variant, Seed: seed}, detach)
+		},
+	}
+	command.Flags().StringVar(&variant, "variant", "self-hosted", "self-hosted or cloud")
+	command.Flags().BoolVar(&seed, "seed", false, "seed isolated demo data after reset")
+	command.Flags().BoolVar(&detach, "detach", false, "run the fresh session in the background and wait until ready")
+	return command
+}
+
+func devLogsCommand(options *options) *cobra.Command {
+	var limit int
+	var cursor int64
+	var follow bool
+	logs := &cobra.Command{Use: "logs", Short: "Read or follow the current development events", Args: cobra.NoArgs}
+	logs.RunE = func(cmd *cobra.Command, _ []string) error {
+		app, err := devtool.NewApp(options.workspace)
+		if err != nil {
+			return renderDevError(options, "dev logs", "", err)
+		}
+		followLogs := options.output == "human"
+		if cmd.Flags().Changed("follow") {
+			followLogs = follow
+		}
+		if followLogs && options.output == "json" {
+			return renderDevError(options, "dev logs", app.WorkspaceID(), errors.New("--follow requires --output ndjson, plain, or human"))
+		}
+		batch, err := app.DevLogs(cursor, limit)
+		if err != nil {
+			return renderDevError(options, "dev logs", app.WorkspaceID(), err)
+		}
+		if !followLogs {
+			return render(options, devtool.SuccessEnvelope("dev logs", app.WorkspaceID(), batch))
+		}
+		for _, event := range batch.Events {
+			renderDevStreamEvent(options, app.WorkspaceID(), event)
+		}
+		final, followErr := app.FollowDevEvents(cmd.Context(), batch.NextCursor, limit, func(event devtool.DevEvent) {
+			renderDevStreamEvent(options, app.WorkspaceID(), event)
+		})
+		if followErr != nil && errors.Is(followErr, context.Canceled) {
+			return nil
+		}
+		if followErr != nil {
+			return renderDevError(options, "dev logs", app.WorkspaceID(), followErr)
+		}
+		return render(options, devtool.SuccessEnvelope("dev logs", app.WorkspaceID(), final))
+	}
+	logs.Flags().IntVar(&limit, "limit", 40, "maximum recent events (up to 200)")
+	logs.Flags().Int64Var(&cursor, "cursor", 0, "next event cursor for incremental reads")
+	logs.Flags().BoolVar(&follow, "follow", true, "continue streaming new events")
+	return logs
+}
+
+func runDevStart(cmd *cobra.Command, options *options, command string, request devtool.DevRequest, detach bool) error {
+	app, err := devtool.NewApp(options.workspace)
+	if err != nil {
+		return renderDevError(options, command, "", err)
+	}
+	return runDevStartWithApp(cmd, options, app, command, request, detach)
+}
+
+func runDevStartWithApp(cmd *cobra.Command, options *options, app *devtool.App, command string, request devtool.DevRequest, detach bool) error {
+	if options.output == "json" && !detach {
+		return renderDevError(options, command, app.WorkspaceID(), errors.New("--output json requires --detach for development sessions"))
+	}
+	var result devtool.DevStartResult
+	var err error
+	ctx := cmd.Context()
+	if options.output == "json" || options.output == "ndjson" {
+		ctx = devtool.WithAgentOutput(ctx)
+	}
+	if detach {
+		result, err = app.StartDevDetached(ctx, request)
+	} else {
+		result, err = app.StartDevForeground(ctx, request, func(event devtool.DevEvent) {
+			renderDevStreamEvent(options, app.WorkspaceID(), event)
+		})
+	}
+	if err != nil && errors.Is(err, context.Canceled) && !detach {
+		_ = render(options, devtool.SuccessEnvelope(command, app.WorkspaceID(), result))
+		return reportedError{cause: exitError{cause: err, code: 130}}
+	}
+	if err != nil {
+		return renderDevErrorWithData(options, command, app.WorkspaceID(), err, result)
+	}
+	return render(options, devtool.SuccessEnvelope(command, app.WorkspaceID(), result))
+}
+
+func renderDevStreamEvent(options *options, workspaceID string, event devtool.DevEvent) {
+	switch options.output {
+	case "ndjson":
+		_ = render(options, devtool.SuccessEnvelope("dev event", workspaceID, event))
+	case "human":
+		renderHumanDevEvent(options.stdout, humanStyle{color: colorEnabled(options.stdout)}, event)
+	default:
+		_, _ = fmt.Fprintln(options.stdout, plainDevEvent(event))
+	}
+}
+
+func renderDevError(options *options, command, workspaceID string, err error) error {
+	return renderDevErrorWithData(options, command, workspaceID, err, nil)
+}
+
+func renderDevErrorWithData(options *options, command, workspaceID string, err error, data any) error {
+	wrapped := err
+	if data != nil {
+		wrapped = devtool.WithErrorData(err, data)
+	}
+	if renderErr := render(options, devtool.ErrorEnvelope(command, workspaceID, wrapped)); renderErr != nil {
+		return renderErr
+	}
+	return reportedError{cause: err}
+}
+
+func attachRunLog(ctx context.Context, options *options, app *devtool.App, runID string, limit, cursor int) (any, error) {
+	tail, err := app.TailLogAfter(runID, limit, cursor)
+	if err != nil || options.output != "human" {
+		return tail, err
+	}
+	live := newLiveRunOutput(options.stdout, colorEnabled(options.stdout))
+	for _, line := range tail.Lines {
+		live.LogLine(line)
+	}
+	if tail.Complete {
+		return humanFollowedLog{RunID: runID}, nil
+	}
+	live.Follow(runID)
+	if err := followRunLog(ctx, runID, app.GetRun, tail.NextCursor, live.LogLine); err != nil {
+		if ctx.Err() != nil {
+			return humanFollowedLog{RunID: runID, Detached: true}, nil
+		}
+		return nil, err
+	}
+	return humanFollowedLog{RunID: runID}, nil
 }
 
 func qaCommand(options *options) *cobra.Command {
@@ -237,12 +555,15 @@ func runCommand(options *options) *cobra.Command {
 	var limit int
 	var cursor int
 	var gateID string
-	logs := &cobra.Command{Use: "logs RUN_ID", Args: cobra.ExactArgs(1), RunE: withArgsApp(options, "run logs", func(_ context.Context, app *devtool.App, args []string) (any, error) {
-		if gateID != "" {
-			return app.TailGateLogAfter(args[0], gateID, limit, cursor)
-		}
-		return app.TailLogAfter(args[0], limit, cursor)
-	})}
+	logs := &cobra.Command{Use: "logs RUN_ID", Args: cobra.ExactArgs(1)}
+	logs.RunE = func(cmd *cobra.Command, args []string) error {
+		return withApp(options, "run logs", func(ctx context.Context, app *devtool.App) (any, error) {
+			if gateID != "" {
+				return app.TailGateLogAfter(args[0], gateID, limit, cursor)
+			}
+			return attachRunLog(ctx, options, app, args[0], limit, cursor)
+		})(cmd, args)
+	}
 	logs.Flags().IntVar(&limit, "limit", 40, "maximum log lines (up to 200)")
 	logs.Flags().IntVar(&cursor, "cursor", 0, "previous next_cursor for incremental reads")
 	logs.Flags().StringVar(&gateID, "gate", "", "canonical gate ID for gate-specific logs")
@@ -326,16 +647,6 @@ func ciCommand(options *options) *cobra.Command {
 	build.Flags().StringVar(&request.GOARCH, "goarch", "", "release architecture: amd64 or arm64")
 	_ = build.MarkFlagRequired("version")
 	_ = build.MarkFlagRequired("goarch")
-	var developerRequest devtool.ReleaseBuildRequest
-	buildDeveloper := &cobra.Command{Use: "build-developer", Args: cobra.NoArgs, RunE: withApp(options, "ci build-developer", func(ctx context.Context, app *devtool.App) (any, error) {
-		return app.BuildDeveloperBinary(ctx, developerRequest, options.stderr)
-	})}
-	buildDeveloper.Flags().StringVar(&developerRequest.Version, "version", "", "release version embedded in hk")
-	buildDeveloper.Flags().StringVar(&developerRequest.GOOS, "goos", "", "developer release operating system: darwin or linux")
-	buildDeveloper.Flags().StringVar(&developerRequest.GOARCH, "goarch", "", "developer release architecture: amd64 or arm64")
-	_ = buildDeveloper.MarkFlagRequired("version")
-	_ = buildDeveloper.MarkFlagRequired("goos")
-	_ = buildDeveloper.MarkFlagRequired("goarch")
 	var shard string
 	race := &cobra.Command{Use: "race", Short: "Run one canonical Go race shard", Args: cobra.NoArgs, RunE: withApp(options, "ci race", func(ctx context.Context, app *devtool.App) (any, error) {
 		return app.RunRaceShard(ctx, shard, options.stderr)
@@ -361,7 +672,6 @@ func ciCommand(options *options) *cobra.Command {
 		goConfig,
 		toolchain,
 		build,
-		buildDeveloper,
 		race,
 		cloudTest,
 		verifyBuild,
@@ -397,7 +707,7 @@ func mcpCommand(options *options) *cobra.Command {
 	return command
 }
 
-func workerCommand(options *options) *cobra.Command {
+func runWorkerCommand(options *options) *cobra.Command {
 	var runID string
 	command := &cobra.Command{Use: "__run", Hidden: true, Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		if os.Getenv("HK_CHILD_RUN") != "1" {
@@ -414,12 +724,31 @@ func workerCommand(options *options) *cobra.Command {
 	return command
 }
 
+func devWorkerCommand(options *options) *cobra.Command {
+	var generationID string
+	var variant string
+	var seed bool
+	command := &cobra.Command{Use: "__dev", Hidden: true, Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		if os.Getenv("HK_CHILD_DEV") != "1" {
+			return errors.New("development worker is internal")
+		}
+		app, err := devtool.NewApp(options.workspace)
+		if err != nil {
+			return err
+		}
+		return app.ExecuteDevSession(cmd.Context(), generationID, devtool.DevRequest{Variant: variant, Seed: seed})
+	}}
+	command.Flags().StringVar(&generationID, "generation-id", "", "internal development generation")
+	command.Flags().StringVar(&variant, "variant", "self-hosted", "internal development variant")
+	command.Flags().BoolVar(&seed, "seed", false, "internal development seed request")
+	_ = command.MarkFlagRequired("generation-id")
+	return command
+}
+
 func variantRequest(kind string) func(*cobra.Command, []string) devtool.RunRequest {
 	return func(cmd *cobra.Command, _ []string) devtool.RunRequest {
 		variant, _ := cmd.Flags().GetString("variant")
-		runtimeID, _ := cmd.Flags().GetString("runtime")
-		seed, _ := cmd.Flags().GetBool("seed")
-		return devtool.RunRequest{Kind: kind, Variant: variant, Runtime: runtimeID, Seed: seed}
+		return devtool.RunRequest{Kind: kind, Variant: variant}
 	}
 }
 
@@ -429,82 +758,64 @@ func startCommand(options *options, use, command, short string, request func(*co
 	var detach bool
 	cmd := &cobra.Command{Use: use, Short: short, Args: cobra.NoArgs}
 	cmd.Flags().BoolVar(&detach, "detach", false, "return immediately with a run ID")
-	if strings.Contains(command, "dev") || strings.Contains(command, "smoke") {
+	if strings.Contains(command, "smoke") {
 		cmd.Flags().String("variant", "self-hosted", "self-hosted or cloud")
-	}
-	if strings.Contains(command, "dev") {
-		cmd.Flags().String("runtime", "native", "native or container")
-		if strings.Contains(command, "start") {
-			cmd.Flags().Bool("seed", false, "seed isolated demo data before starting")
-		}
 	}
 	for _, configure := range configs {
 		configure(cmd)
 	}
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		return withApp(options, command, func(ctx context.Context, app *devtool.App) (any, error) {
-			start, err := app.StartRun(ctx, request(cmd, args))
+			runRequest := request(cmd, args)
+			start, err := app.StartRun(ctx, runRequest)
 			if err != nil || detach {
 				return start, err
 			}
-			previous := map[string]string{}
+			if options.output == "human" {
+				live := newLiveRunOutput(options.stderr, colorEnabled(options.stderr))
+				workspace, _ := app.Workspace(ctx)
+				live.Start(start.RunID, runRequest, workspace, start.Reused)
+				skipLines := 0
+				if start.Reused {
+					tail, tailErr := app.TailLogAfter(start.RunID, 40, 0)
+					if tailErr == nil {
+						for _, line := range tail.Lines {
+							live.LogLine(line)
+						}
+						skipLines = tail.NextCursor
+					}
+				}
+				streamDone := make(chan error, 1)
+				go func() {
+					streamDone <- followRunLog(ctx, start.RunID, app.GetRun, skipLines, live.LogLine)
+				}()
+				run, waitErr := app.WaitRunObserved(ctx, start.RunID, live.Observe)
+				streamErr := <-streamDone
+				if waitErr != nil && ctx.Err() != nil && !terminalRunStatus(run.Status) {
+					return humanDetachedRun{Run: run}, nil
+				}
+				if waitErr != nil {
+					return run, devtool.WithErrorData(waitErr, run)
+				}
+				if streamErr != nil && !errors.Is(streamErr, context.Canceled) {
+					return run, devtool.WithErrorData(streamErr, run)
+				}
+				return run, nil
+			}
 			observer := func(run devtool.Run) {
 				switch options.output {
-				case "human":
-					if len(run.GateResults) == 0 {
-						if previous["run"] != run.Status {
-							_, _ = fmt.Fprintf(options.stderr, "%s  %s\n", run.ID, run.Status)
-							previous["run"] = run.Status
-						}
-						return
-					}
-					for _, gate := range run.GateResults {
-						if previous[gate.GateID] == gate.Status || gate.Status == "queued" || gate.Status == "waiting" {
-							continue
-						}
-						_, _ = fmt.Fprintf(options.stderr, "%-24s %s\n", gate.GateID, gate.Status)
-						previous[gate.GateID] = gate.Status
-					}
 				case "ndjson":
 					_ = render(options, devtool.SuccessEnvelope("run progress", app.WorkspaceID(), map[string]any{"run_id": run.ID, "status": run.Status, "gates": run.GateResults}))
 				}
 			}
 			run, waitErr := app.WaitRunObserved(ctx, start.RunID, observer)
 			if waitErr != nil {
-				if options.output == "human" {
-					renderFailedRunLogs(options.stderr, app, run)
-				}
 				return run, devtool.WithErrorData(waitErr, run)
 			}
 			return run, nil
 		})(cmd, args)
 	}
 	return cmd
-}
-
-func renderFailedRunLogs(writer io.Writer, app *devtool.App, run devtool.Run) {
-	printed := 0
-	for _, gate := range run.GateResults {
-		if gate.Status != "failed" || printed >= 3 {
-			continue
-		}
-		_, _ = fmt.Fprintf(writer, "\n--- %s (last 40 lines; full log: %s) ---\n", gate.GateID, gate.LogPath)
-		if tail, err := app.TailGateLog(run.ID, gate.GateID, 40); err == nil {
-			for _, line := range tail.Lines {
-				_, _ = fmt.Fprintln(writer, line)
-			}
-		}
-		printed++
-	}
-	if printed > 0 {
-		return
-	}
-	_, _ = fmt.Fprintf(writer, "\n--- run log (last 60 lines; full log: %s) ---\n", run.LogPath)
-	if tail, err := app.TailLog(run.ID, 60); err == nil {
-		for _, line := range tail.Lines {
-			_, _ = fmt.Fprintln(writer, line)
-		}
-	}
 }
 
 func withArgsApp(options *options, command string, handler func(context.Context, *devtool.App, []string) (any, error)) func(*cobra.Command, []string) error {
@@ -521,23 +832,34 @@ func render(options *options, envelope devtool.Envelope) error {
 		return encoder.Encode(envelope)
 	case "ndjson":
 		return json.NewEncoder(options.stdout).Encode(envelope)
-	case "plain", "human":
+	case "plain":
 		if envelope.Status == "error" {
 			if envelope.Data != nil {
-				if err := renderHuman(options.stdout, envelope); err != nil {
+				if err := renderPlain(options.stdout, envelope); err != nil {
 					return err
 				}
 			}
 			_, _ = fmt.Fprintln(options.stderr, "error:", envelope.Error)
 			return nil
 		}
-		return renderHuman(options.stdout, envelope)
+		return renderPlain(options.stdout, envelope)
+	case "human":
+		if envelope.Status == "error" {
+			if envelope.Data != nil {
+				if err := renderHuman(options.stdout, envelope, colorEnabled(options.stdout)); err != nil {
+					return err
+				}
+			}
+			renderHumanError(options.stderr, envelope.Error, colorEnabled(options.stderr))
+			return nil
+		}
+		return renderHuman(options.stdout, envelope, colorEnabled(options.stdout))
 	default:
 		return fmt.Errorf("unknown output format %q", options.output)
 	}
 }
 
-func renderHuman(writer io.Writer, envelope devtool.Envelope) error {
+func renderPlain(writer io.Writer, envelope devtool.Envelope) error {
 	switch value := envelope.Data.(type) {
 	case devtool.Workspace:
 		_, _ = fmt.Fprintf(writer, "%s  %s\nweb %s  api %s\n", value.ID, value.Root, value.URLs.Web, value.URLs.API)
@@ -567,6 +889,14 @@ func renderHuman(writer io.Writer, envelope devtool.Envelope) error {
 		}
 	case devtool.RunStart:
 		_, _ = fmt.Fprintf(writer, "%s  %s\n", value.RunID, value.Status)
+	case devtool.DevStatus:
+		renderPlainDevStatus(writer, value)
+	case devtool.DevStartResult:
+		renderPlainDevStatus(writer, value.Status)
+	case devtool.DevLogBatch:
+		for _, event := range value.Events {
+			_, _ = fmt.Fprintln(writer, plainDevEvent(event))
+		}
 	case devtool.Run:
 		_, _ = fmt.Fprintf(writer, "%s  %s  %s\n", value.ID, value.Status, value.Request.Kind)
 		for _, gate := range value.GateResults {
@@ -590,7 +920,7 @@ func renderHuman(writer io.Writer, envelope devtool.Envelope) error {
 		for _, check := range value.Checks {
 			_, _ = fmt.Fprintf(writer, "%-10s %s  %s\n", check.Name, check.Status, check.Detected)
 		}
-		_, _ = fmt.Fprintf(writer, "native %t  container %t  pr-qa %t  full-qa %t\n", value.Capabilities.NativeDevelopment, value.Capabilities.ContainerDevelopment, value.Capabilities.PRQA, value.Capabilities.FullQA)
+		_, _ = fmt.Fprintf(writer, "development %t  pr-qa %t  full-qa %t\n", value.Capabilities.ContainerDevelopment, value.Capabilities.PRQA, value.Capabilities.FullQA)
 	case devtool.Catalog:
 		_, _ = fmt.Fprintln(writer, "variants")
 		for _, variant := range value.Variants {
@@ -669,6 +999,34 @@ func renderHuman(writer io.Writer, envelope devtool.Envelope) error {
 		return err
 	}
 	return nil
+}
+
+func renderPlainDevStatus(writer io.Writer, status devtool.DevStatus) {
+	_, _ = fmt.Fprintf(writer, "%s  %s  %s\n", status.State, status.Variant, status.Owner)
+	if status.URLs.Web != "" {
+		_, _ = fmt.Fprintf(writer, "web %s  api %s  mail %s\n", status.URLs.Web, status.URLs.API, status.URLs.Mailpit)
+	}
+	for _, service := range status.Services {
+		state := "unavailable"
+		if service.Reachable {
+			state = "ready"
+		}
+		_, _ = fmt.Fprintf(writer, "%-10s %-11s %s\n", service.Name, state, service.Address)
+	}
+	if status.Error != "" {
+		_, _ = fmt.Fprintln(writer, "error", status.Error)
+	}
+}
+
+func plainDevEvent(event devtool.DevEvent) string {
+	label := event.Component
+	if label == "" {
+		label = event.Type
+	}
+	if event.Phase != "" {
+		return fmt.Sprintf("[%s] %s: %s", label, event.Phase, event.Message)
+	}
+	return fmt.Sprintf("[%s] %s", label, event.Message)
 }
 
 func humanBytes(bytes int64) string {

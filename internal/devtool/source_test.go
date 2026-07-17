@@ -1,6 +1,7 @@
 package devtool
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -59,6 +60,54 @@ func TestFormatGoChecksAndWritesWorkspaceSources(t *testing.T) {
 	}
 	if raw, readErr := os.ReadFile(external); readErr != nil || string(raw) != "not valid Go" {
 		t.Fatalf("format followed workspace symlink: %v: %q", readErr, raw)
+	}
+}
+
+func TestFormatFrontendChecksAndWritesWithPinnedFormatter(t *testing.T) {
+	workspace := t.TempDir()
+	if output, err := exec.Command("git", "init", "--quiet", workspace).CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, output)
+	}
+	frontend := filepath.Join(workspace, "frontend", "dashboard")
+	formatterDir := filepath.Join(frontend, "node_modules", ".bin")
+	if err := os.MkdirAll(filepath.Join(frontend, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(formatterDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sourcePath := filepath.Join(frontend, "src", "example.ts")
+	if err := os.WriteFile(sourcePath, []byte("unformatted\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	formatter := filepath.Join(formatterDir, "oxfmt")
+	script := "#!/bin/sh\nif [ \"$1\" = \"--list-different\" ]; then\n  if [ ! -f .formatted ]; then printf 'src/example.ts\\n../outside.ts\\n'; fi\n  exit 0\nfi\ntouch .formatted\n"
+	if err := os.WriteFile(formatter, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	app, err := NewApp(workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checked, err := app.FormatFrontend(context.Background(), false)
+	if err == nil {
+		t.Fatal("frontend format check unexpectedly passed")
+	}
+	want := []string{"frontend/dashboard/src/example.ts"}
+	if checked.Current || checked.ChangedFileCount != 1 || !reflect.DeepEqual(checked.ChangedFiles, want) {
+		t.Fatalf("unexpected frontend check: %+v", checked)
+	}
+	written, err := app.FormatFrontend(context.Background(), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !written.Current || written.ChangedFileCount != 1 || !reflect.DeepEqual(written.ChangedFiles, want) {
+		t.Fatalf("unexpected frontend write: %+v", written)
+	}
+	current, err := app.FormatFrontend(context.Background(), false)
+	if err != nil || !current.Current || current.ChangedFileCount != 0 {
+		t.Fatalf("formatted frontend is not current: %+v, %v", current, err)
 	}
 }
 

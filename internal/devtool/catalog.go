@@ -48,7 +48,7 @@ var gates = []Gate{
 	{ID: "mcp-audit", Description: "Audit the production MCP protocol surface", CIGroup: "production-mcp", Command: []string{"go", "test", "./internal/mcpserver", "-run", "TestMCP.*Audit"}, Profiles: []string{"pr", "full"}, Paths: []string{"internal/mcpserver/", "internal/analyticstools/", "skills/", "server.json"}, Weight: 2, Timeout: "10m"},
 	{ID: "mcp-schema", Description: "Validate MCP registry metadata", CIGroup: "production-mcp", Command: []string{"tests/scripts/mcp-audit.sh", "--schema-only"}, Profiles: []string{"pr", "full"}, Paths: []string{"internal/mcpserver/", "tests/scripts/mcp-audit.sh", "server.json"}, Weight: 1, Timeout: "5m"},
 	{ID: "developer-mcp", Description: "Validate the developer CLI/MCP contract and production binary boundary", CIGroup: "go-checks", Command: []string{"go", "test", "./cmd/hk", "./internal/devtool/devmcp"}, Profiles: []string{"pr", "full"}, Paths: []string{"cmd/hk/", "cmd/hitkeep/", "internal/devtool/", "hk", "go.mod", "go.sum"}, Weight: 1, Timeout: "5m"},
-	{ID: "developer-docs", Description: "Check CLI, canonical skill packs, analytics procedures, and development documentation drift", CIGroup: "go-checks", Command: []string{"go", "test", "./internal/devtool", "./skills"}, Profiles: []string{"pr", "full"}, Paths: []string{"AGENTS.md", "CONTRIBUTING.md", "README.md", "Makefile", ".agents/", ".codex/", "skills/", "internal/devtool/"}, Weight: 1, Timeout: "5m"},
+	{ID: "developer-docs", Description: "Check CLI, canonical skill packs, analytics procedures, and development documentation drift", CIGroup: "go-checks", Command: []string{"go", "test", "./internal/devtool", "./skills"}, Profiles: []string{"pr", "full"}, Paths: []string{"AGENTS.md", "CONTRIBUTING.md", "README.md", ".agents/", ".codex/", "skills/", "internal/devtool/"}, Weight: 1, Timeout: "5m"},
 	{ID: "frontend-format", Description: "Check dashboard formatting", CIGroup: "frontend-static", Command: []string{"npm", "run", "fmt:check"}, WorkingDir: "frontend/dashboard", Profiles: []string{"pr", "full"}, Paths: []string{"frontend/dashboard/"}, Weight: 1, Timeout: "5m"},
 	{ID: "frontend-lint", Description: "Lint the Angular dashboard", CIGroup: "frontend-static", Command: []string{"npm", "run", "lint"}, WorkingDir: "frontend/dashboard", Profiles: []string{"pr", "full"}, Paths: []string{"frontend/dashboard/"}, Weight: 2, Timeout: "10m"},
 	{ID: "frontend-i18n", Description: "Validate all dashboard locales", CIGroup: "frontend-static", Command: []string{"npm", "run", "i18n:check"}, WorkingDir: "frontend/dashboard", Profiles: []string{"pr", "full"}, Paths: []string{"frontend/dashboard/public/i18n/", "frontend/dashboard/src/"}, Weight: 1, Timeout: "5m"},
@@ -63,7 +63,14 @@ var gates = []Gate{
 }
 
 func CatalogSnapshot() Catalog {
-	return Catalog{SchemaVersion: SchemaVersion, Variants: cloneVariants(), Gates: cloneGates(), Profiles: []string{"changed", "pr", "full"}}
+	catalog := Catalog{SchemaVersion: SchemaVersion, Variants: cloneVariants(), Gates: cloneGates(), Profiles: []string{"changed", "pr", "full"}}
+	for index := range catalog.Gates {
+		agentCommand := agentOptimizedCommand(catalog.Gates[index].Command)
+		if !slices.Equal(agentCommand, catalog.Gates[index].Command) {
+			catalog.Gates[index].AgentCommand = agentCommand
+		}
+	}
+	return catalog
 }
 
 func VariantByID(id string) (Variant, error) {
@@ -88,15 +95,12 @@ func ValidateRunRequest(request RunRequest) error {
 	switch request.Kind {
 	case "setup":
 		return nil
-	case "dev-start", "dev-stop", "build", "smoke":
+	case "build", "smoke":
 		if request.Variant == "" {
 			request.Variant = "self-hosted"
 		}
 		if _, err := VariantByID(request.Variant); err != nil {
 			return err
-		}
-		if (request.Kind == "dev-start" || request.Kind == "dev-stop") && request.Runtime != "native" && request.Runtime != "container" {
-			return errors.New("development runtime must be native or container")
 		}
 		if request.Kind == "build" && request.Target != "binary" && request.Target != "image" {
 			return errors.New("build target must be binary or image")
@@ -114,6 +118,15 @@ func ValidateRunRequest(request RunRequest) error {
 		return nil
 	default:
 		return fmt.Errorf("unsupported run kind %q", request.Kind)
+	}
+}
+
+func finiteRunKind(kind string) bool {
+	switch kind {
+	case "setup", "qa", "build", "smoke":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -166,6 +179,7 @@ func cloneGates() []Gate {
 
 func cloneGate(gate Gate) Gate {
 	gate.Command = slices.Clone(gate.Command)
+	gate.AgentCommand = slices.Clone(gate.AgentCommand)
 	gate.Profiles = slices.Clone(gate.Profiles)
 	gate.Paths = slices.Clone(gate.Paths)
 	return gate

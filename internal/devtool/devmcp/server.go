@@ -11,6 +11,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -18,7 +21,14 @@ import (
 	"hitkeep/internal/devtool"
 )
 
-const maxRequestedLogLines = 200
+const (
+	maxRequestedLogLines = 200
+	centralAppCacheTTL   = 5 * time.Second
+	centralAppCacheLimit = 128
+	centralMCPConnectTTL = 30 * time.Second
+	centralMCPIdleTTL    = 30 * time.Second
+	centralMCPPoolLimit  = 32
+)
 
 type workspaceInput struct {
 	Workspace string `json:"workspace,omitempty" jsonschema:"Optional client-root name, workspace ID, or workspace path; required only when more than one HitKeep workspace root is active"`
@@ -47,8 +57,18 @@ type runListInput struct {
 type variantInput struct {
 	workspaceInput
 	Variant string `json:"variant,omitempty" jsonschema:"Build variant: self-hosted or cloud"`
-	Runtime string `json:"runtime,omitempty" jsonschema:"Development runtime: native or container"`
+}
+type devInput struct{ workspaceInput }
+type devStartInput struct {
+	workspaceInput
+	Variant string `json:"variant,omitempty" jsonschema:"Build variant: self-hosted or cloud"`
 	Seed    bool   `json:"seed,omitempty" jsonschema:"Seed isolated demo data before starting"`
+}
+type devLogsInput struct {
+	workspaceInput
+	Cursor int64 `json:"cursor,omitempty" jsonschema:"Next event cursor for incremental reads"`
+	Limit  int   `json:"limit,omitempty" jsonschema:"Maximum events to return, from 1 through 200"`
+	Follow bool  `json:"follow,omitempty" jsonschema:"Continue streaming events until cancellation or session termination"`
 }
 type qaStartInput struct {
 	workspaceInput
@@ -97,15 +117,92 @@ type rootedApp struct {
 	name string
 }
 
-type centralAppResolver struct{ fallback string }
+type workspaceMCPConnector func(context.Context, context.Context, *devtool.App, *mcp.ClientOptions) (*mcp.ClientSession, error)
 
-func (resolver centralAppResolver) Resolve(ctx context.Context, session *mcp.ServerSession, selector string) (*devtool.App, error) {
-	apps, rootsErr := appsFromClientRoots(ctx, session)
+type cachedWorkspaceApp struct {
+	app       *devtool.App
+	expiresAt time.Time
+}
+
+type workspaceMCPKey struct {
+	outerSession *mcp.ServerSession
+	workspaceID  string
+}
+
+type pooledWorkspaceMCP struct {
+	key            workspaceMCPKey
+	app            *devtool.App
+	outerSession   *mcp.ServerSession
+	ready          chan struct{}
+	session        *mcp.ClientSession
+	lifetimeCancel context.CancelFunc
+	connectErr     error
+	activeCalls    int
+	lastUsed       time.Time
+	idleTimer      *time.Timer
+	progressTokens map[string]any
+	callCancels    map[uint64]context.CancelFunc
+	closed         bool
+}
+
+type workspaceMCPLease struct {
+	resolver      *centralAppResolver
+	child         *pooledWorkspaceMCP
+	callContext   context.Context
+	callID        uint64
+	progressToken string
+	releaseOnce   sync.Once
+}
+
+type centralAppResolver struct {
+	fallback         string
+	connect          workspaceMCPConnector
+	loadApp          func(string) (*devtool.App, error)
+	now              func() time.Time
+	cacheMu          sync.Mutex
+	apps             map[string]cachedWorkspaceApp
+	childMu          sync.Mutex
+	children         map[workspaceMCPKey]*pooledWorkspaceMCP
+	childIdleTTL     time.Duration
+	childPoolClosed  bool
+	callSequence     atomic.Uint64
+	progressSequence atomic.Uint64
+}
+
+func newCentralAppResolver(fallback string, connect workspaceMCPConnector) *centralAppResolver {
+	return &centralAppResolver{
+		fallback: fallback, connect: connect, apps: map[string]cachedWorkspaceApp{},
+		children: map[workspaceMCPKey]*pooledWorkspaceMCP{}, childIdleTTL: centralMCPIdleTTL,
+	}
+}
+
+func (resolver *centralAppResolver) connector() workspaceMCPConnector {
+	if resolver.connect != nil {
+		return resolver.connect
+	}
+	return connectWorkspaceMCP
+}
+
+func (resolver *centralAppResolver) Resolve(ctx context.Context, session *mcp.ServerSession, selector string) (*devtool.App, error) {
+	apps, rootsErr := appsFromClientRoots(ctx, session, resolver.appForPath)
 	if selector != "" {
+		cleanSelector := filepath.Clean(selector)
 		for _, candidate := range apps {
-			if selector == candidate.name || selector == candidate.app.WorkspaceID() || filepath.Clean(selector) == filepath.Clean(candidate.app.Root()) {
+			if selector == candidate.app.WorkspaceID() || cleanSelector == filepath.Clean(candidate.app.Root()) {
 				return candidate.app, nil
 			}
+		}
+		var namedMatches []*devtool.App
+		for _, candidate := range apps {
+			if selector == candidate.name {
+				namedMatches = append(namedMatches, candidate.app)
+			}
+		}
+		if len(namedMatches) == 1 {
+			return namedMatches[0], nil
+		}
+		if len(namedMatches) > 1 {
+			return nil, fmt.Errorf("workspace name %q is ambiguous; pass a workspace ID or path", selector)
 		}
 		if rootsErr != nil {
 			return nil, fmt.Errorf("read MCP client roots: %w", rootsErr)
@@ -123,7 +220,7 @@ func (resolver centralAppResolver) Resolve(ctx context.Context, session *mcp.Ser
 		return nil, fmt.Errorf("multiple HitKeep workspaces are active; pass workspace as one of: %s", strings.Join(identifiers, ", "))
 	}
 	if resolver.fallback != "" {
-		if app, err := newHitKeepApp(resolver.fallback); err == nil {
+		if app, err := resolver.appForPath(resolver.fallback); err == nil {
 			return app, nil
 		}
 	}
@@ -133,51 +230,412 @@ func (resolver centralAppResolver) Resolve(ctx context.Context, session *mcp.Ser
 	return nil, errors.New("no HitKeep workspace root is active; open a HitKeep workspace or pass workspace explicitly")
 }
 
-func (resolver centralAppResolver) DelegateTool(ctx context.Context, request *mcp.CallToolRequest, command string, input workspaceScoped) (*mcp.CallToolResult, envelopeOutput, error) {
+func (resolver *centralAppResolver) appForPath(path string) (*devtool.App, error) {
+	key := filepath.Clean(path)
+	if absolute, err := filepath.Abs(key); err == nil {
+		key = absolute
+	}
+	now := time.Now()
+	if resolver.now != nil {
+		now = resolver.now()
+	}
+	resolver.cacheMu.Lock()
+	if cached, ok := resolver.apps[key]; ok && now.Before(cached.expiresAt) {
+		resolver.cacheMu.Unlock()
+		return cached.app, nil
+	}
+	delete(resolver.apps, key)
+
+	loader := newHitKeepApp
+	if resolver.loadApp != nil {
+		loader = resolver.loadApp
+	}
+	app, err := loader(path)
+	if err != nil {
+		resolver.cacheMu.Unlock()
+		return nil, err
+	}
+	entry := cachedWorkspaceApp{app: app, expiresAt: now.Add(centralAppCacheTTL)}
+	if resolver.apps == nil {
+		resolver.apps = map[string]cachedWorkspaceApp{}
+	}
+	if len(resolver.apps) >= centralAppCacheLimit {
+		for cachedKey, cached := range resolver.apps {
+			if !now.Before(cached.expiresAt) {
+				delete(resolver.apps, cachedKey)
+			}
+		}
+	}
+	if len(resolver.apps) >= centralAppCacheLimit {
+		var oldestKey string
+		var oldestExpiry time.Time
+		for cachedKey, cached := range resolver.apps {
+			if oldestKey == "" || cached.expiresAt.Before(oldestExpiry) {
+				oldestKey, oldestExpiry = cachedKey, cached.expiresAt
+			}
+		}
+		delete(resolver.apps, oldestKey)
+	}
+	resolver.apps[key] = entry
+	resolver.cacheMu.Unlock()
+	return app, nil
+}
+
+func (resolver *centralAppResolver) acquireWorkspaceMCP(ctx context.Context, app *devtool.App, outer *mcp.ServerSession, outerProgress any) (*workspaceMCPLease, error) {
+	if outer == nil {
+		return nil, errors.New("MCP session is unavailable")
+	}
+	key := workspaceMCPKey{outerSession: outer, workspaceID: app.WorkspaceID()}
+	for {
+		resolver.childMu.Lock()
+		if resolver.childPoolClosed {
+			resolver.childMu.Unlock()
+			return nil, errors.New("workspace MCP pool is closed")
+		}
+		child := resolver.children[key]
+		if child == nil || child.closed {
+			child = &pooledWorkspaceMCP{
+				key: key, app: app, outerSession: outer, ready: make(chan struct{}),
+				progressTokens: map[string]any{}, callCancels: map[uint64]context.CancelFunc{}, lastUsed: time.Now(),
+			}
+			resolver.children[key] = child
+			evicted := resolver.pruneWorkspaceMCPPoolLocked(child)
+			resolver.childMu.Unlock()
+			for _, stale := range evicted {
+				go resolver.closePooledWorkspaceMCP(stale)
+			}
+			go resolver.connectPooledWorkspaceMCP(child) //nolint:gosec // pooled connection intentionally outlives the initiating request
+		} else {
+			resolver.childMu.Unlock()
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-child.ready:
+		}
+
+		resolver.childMu.Lock()
+		if child.connectErr != nil {
+			err := child.connectErr
+			resolver.childMu.Unlock()
+			return nil, err
+		}
+		if resolver.children[key] != child || child.closed || child.session == nil {
+			resolver.childMu.Unlock()
+			continue
+		}
+		child.activeCalls++
+		child.lastUsed = time.Now()
+		if child.idleTimer != nil {
+			child.idleTimer.Stop()
+			child.idleTimer = nil
+		}
+		progressToken := ""
+		if outerProgress != nil {
+			progressToken = fmt.Sprintf("hk-broker-%d", resolver.progressSequence.Add(1))
+			child.progressTokens[progressToken] = outerProgress
+		}
+		callContext, callCancel := context.WithCancel(ctx) //nolint:gosec // the lease owns and releases this cancel function
+		callID := resolver.callSequence.Add(1)
+		child.callCancels[callID] = callCancel
+		resolver.childMu.Unlock()
+		return &workspaceMCPLease{
+			resolver: resolver, child: child, callContext: callContext, callID: callID, progressToken: progressToken,
+		}, nil
+	}
+}
+
+func (resolver *centralAppResolver) connectPooledWorkspaceMCP(child *pooledWorkspaceMCP) {
+	lifetimeContext, lifetimeCancel := context.WithCancel(context.Background())
+	resolver.childMu.Lock()
+	if child.closed || resolver.children[child.key] != child {
+		child.connectErr = errors.New("workspace MCP connection closed before startup")
+		close(child.ready)
+		resolver.childMu.Unlock()
+		lifetimeCancel()
+		return
+	}
+	child.lifetimeCancel = lifetimeCancel
+	resolver.childMu.Unlock()
+
+	connectContext, connectCancel := context.WithTimeout(context.Background(), centralMCPConnectTTL)
+	defer connectCancel()
+	options := &mcp.ClientOptions{
+		KeepAlive: centralMCPIdleTTL,
+		ProgressNotificationHandler: func(forwardContext context.Context, request *mcp.ProgressNotificationClientRequest) {
+			resolver.forwardWorkspaceMCPProgress(forwardContext, child, request)
+		},
+		LoggingMessageHandler: func(forwardContext context.Context, request *mcp.LoggingMessageRequest) {
+			resolver.forwardWorkspaceMCPLog(forwardContext, child, request)
+		},
+	}
+	session, err := resolver.connector()(connectContext, lifetimeContext, child.app, options)
+
+	resolver.childMu.Lock()
+	if err != nil {
+		child.connectErr = err
+		child.closed = true
+		if resolver.children[child.key] == child {
+			delete(resolver.children, child.key)
+		}
+		close(child.ready)
+		resolver.childMu.Unlock()
+		lifetimeCancel()
+		if session != nil {
+			_ = session.Close()
+		}
+		return
+	}
+	if child.closed || resolver.children[child.key] != child {
+		child.connectErr = errors.New("workspace MCP connection closed during startup")
+		close(child.ready)
+		resolver.childMu.Unlock()
+		_ = session.Close()
+		lifetimeCancel()
+		return
+	}
+	child.session = session
+	child.lastUsed = time.Now()
+	close(child.ready)
+	resolver.scheduleWorkspaceMCPIdleLocked(child)
+	resolver.childMu.Unlock()
+
+	go func() {
+		_ = session.Wait()
+		resolver.workspaceMCPExited(child)
+	}()
+}
+
+func (resolver *centralAppResolver) forwardWorkspaceMCPProgress(ctx context.Context, child *pooledWorkspaceMCP, request *mcp.ProgressNotificationClientRequest) {
+	if request == nil || request.Params == nil {
+		return
+	}
+	childToken, ok := request.Params.ProgressToken.(string)
+	if !ok {
+		return
+	}
+	resolver.childMu.Lock()
+	outerToken, ok := child.progressTokens[childToken]
+	outer := child.outerSession
+	closed := child.closed
+	resolver.childMu.Unlock()
+	if !ok || closed || outer == nil {
+		return
+	}
+	params := *request.Params
+	params.ProgressToken = outerToken
+	_ = outer.NotifyProgress(ctx, &params)
+}
+
+func (resolver *centralAppResolver) forwardWorkspaceMCPLog(ctx context.Context, child *pooledWorkspaceMCP, request *mcp.LoggingMessageRequest) {
+	if request == nil || request.Params == nil {
+		return
+	}
+	resolver.childMu.Lock()
+	outer := child.outerSession
+	closed := child.closed
+	resolver.childMu.Unlock()
+	if closed || outer == nil {
+		return
+	}
+	_ = outer.Log(ctx, request.Params)
+}
+
+func (resolver *centralAppResolver) scheduleWorkspaceMCPIdleLocked(child *pooledWorkspaceMCP) {
+	if child.closed || child.activeCalls != 0 || resolver.children[child.key] != child {
+		return
+	}
+	if child.idleTimer != nil {
+		child.idleTimer.Stop()
+	}
+	ttl := resolver.childIdleTTL
+	if ttl <= 0 {
+		ttl = centralMCPIdleTTL
+	}
+	child.idleTimer = time.AfterFunc(ttl, func() { resolver.expireWorkspaceMCP(child) })
+}
+
+func (resolver *centralAppResolver) expireWorkspaceMCP(child *pooledWorkspaceMCP) {
+	resolver.childMu.Lock()
+	if child.closed || child.activeCalls != 0 || resolver.children[child.key] != child {
+		resolver.childMu.Unlock()
+		return
+	}
+	resolver.detachWorkspaceMCPLocked(child)
+	resolver.childMu.Unlock()
+	resolver.closePooledWorkspaceMCP(child)
+}
+
+func (resolver *centralAppResolver) invalidateWorkspaceMCP(child *pooledWorkspaceMCP) {
+	resolver.childMu.Lock()
+	if resolver.children[child.key] != child || child.closed {
+		resolver.childMu.Unlock()
+		return
+	}
+	resolver.detachWorkspaceMCPLocked(child)
+	resolver.childMu.Unlock()
+	go resolver.closePooledWorkspaceMCP(child)
+}
+
+func (resolver *centralAppResolver) workspaceMCPExited(child *pooledWorkspaceMCP) {
+	resolver.childMu.Lock()
+	if resolver.children[child.key] != child || child.closed {
+		resolver.childMu.Unlock()
+		return
+	}
+	resolver.detachWorkspaceMCPLocked(child)
+	cancel := child.lifetimeCancel
+	resolver.childMu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+}
+
+func (resolver *centralAppResolver) detachWorkspaceMCPLocked(child *pooledWorkspaceMCP) {
+	if resolver.children[child.key] == child {
+		delete(resolver.children, child.key)
+	}
+	child.closed = true
+	if child.idleTimer != nil {
+		child.idleTimer.Stop()
+		child.idleTimer = nil
+	}
+	clear(child.progressTokens)
+	for _, cancel := range child.callCancels {
+		cancel()
+	}
+	clear(child.callCancels)
+}
+
+func (resolver *centralAppResolver) pruneWorkspaceMCPPoolLocked(keep *pooledWorkspaceMCP) []*pooledWorkspaceMCP {
+	var evicted []*pooledWorkspaceMCP
+	for len(resolver.children) > centralMCPPoolLimit {
+		var oldest *pooledWorkspaceMCP
+		for _, candidate := range resolver.children {
+			if candidate == keep || candidate.closed || candidate.session == nil || candidate.activeCalls != 0 {
+				continue
+			}
+			if oldest == nil || candidate.lastUsed.Before(oldest.lastUsed) {
+				oldest = candidate
+			}
+		}
+		if oldest == nil {
+			break
+		}
+		resolver.detachWorkspaceMCPLocked(oldest)
+		evicted = append(evicted, oldest)
+	}
+	return evicted
+}
+
+func (resolver *centralAppResolver) closePooledWorkspaceMCP(child *pooledWorkspaceMCP) {
+	if child.lifetimeCancel != nil {
+		child.lifetimeCancel()
+	}
+	if child.session != nil {
+		_ = child.session.Close()
+	}
+}
+
+func (resolver *centralAppResolver) Close() {
+	resolver.childMu.Lock()
+	resolver.childPoolClosed = true
+	children := make([]*pooledWorkspaceMCP, 0, len(resolver.children))
+	for _, child := range resolver.children {
+		resolver.detachWorkspaceMCPLocked(child)
+		children = append(children, child)
+	}
+	resolver.childMu.Unlock()
+	for _, child := range children {
+		if child.lifetimeCancel != nil {
+			child.lifetimeCancel()
+		}
+		if child.session != nil {
+			_ = child.session.Close()
+		}
+	}
+}
+
+func (lease *workspaceMCPLease) Release() {
+	if lease == nil {
+		return
+	}
+	lease.releaseOnce.Do(func() {
+		resolver := lease.resolver
+		resolver.childMu.Lock()
+		if lease.progressToken != "" {
+			delete(lease.child.progressTokens, lease.progressToken)
+		}
+		callCancel := lease.child.callCancels[lease.callID]
+		delete(lease.child.callCancels, lease.callID)
+		if lease.child.activeCalls > 0 {
+			lease.child.activeCalls--
+		}
+		lease.child.lastUsed = time.Now()
+		resolver.scheduleWorkspaceMCPIdleLocked(lease.child)
+		resolver.childMu.Unlock()
+		if callCancel != nil {
+			callCancel()
+		}
+	})
+}
+
+func (resolver *centralAppResolver) DelegateTool(ctx context.Context, request *mcp.CallToolRequest, command string, input workspaceScoped) (*mcp.CallToolResult, envelopeOutput, error) {
 	app, err := resolver.Resolve(ctx, request.Session, input.workspaceSelector())
 	if err != nil {
 		return output(nil, command, nil, err)
 	}
-	session, err := connectWorkspaceMCP(ctx, app)
+	arguments := map[string]any{}
+	if len(request.Params.Arguments) > 0 {
+		if err := json.Unmarshal(request.Params.Arguments, &arguments); err != nil {
+			return output(app, command, nil, fmt.Errorf("decode delegated tool input: %w", err))
+		}
+	}
+	delete(arguments, "workspace")
+	progressToken := request.Params.GetProgressToken()
+	lease, err := resolver.acquireWorkspaceMCP(ctx, app, request.Session, progressToken)
 	if err != nil {
 		return output(app, command, nil, err)
 	}
-	defer session.Close()
-
-	raw, err := json.Marshal(input)
-	if err != nil {
-		return output(app, command, nil, fmt.Errorf("encode delegated tool input: %w", err))
+	defer lease.Release()
+	callParams := &mcp.CallToolParams{Name: request.Params.Name, Arguments: arguments}
+	if lease.progressToken != "" {
+		callParams.SetProgressToken(lease.progressToken)
 	}
-	arguments := map[string]any{}
-	if err := json.Unmarshal(raw, &arguments); err != nil {
-		return output(app, command, nil, fmt.Errorf("decode delegated tool input: %w", err))
-	}
-	delete(arguments, "workspace")
-	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: request.Params.Name, Arguments: arguments})
+	result, err := lease.child.session.CallTool(lease.callContext, callParams)
 	if err != nil {
+		if ctx.Err() == nil {
+			resolver.invalidateWorkspaceMCP(lease.child)
+		}
 		return output(app, command, nil, fmt.Errorf("workspace MCP tool %s: %w", request.Params.Name, err))
 	}
-	envelope, err := delegatedEnvelope(result.StructuredContent)
+	envelope, err := delegatedEnvelope(result.StructuredContent, command, app.WorkspaceID(), result.IsError)
 	if err != nil {
+		resolver.invalidateWorkspaceMCP(lease.child)
 		return output(app, command, nil, err)
 	}
 	return result, envelopeOutput{Envelope: envelope}, nil
 }
 
-func (resolver centralAppResolver) DelegateResource(ctx context.Context, request *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+func (resolver *centralAppResolver) DelegateResource(ctx context.Context, request *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
 	app, err := resolver.Resolve(ctx, request.Session, "")
 	if err != nil {
 		return nil, err
 	}
-	session, err := connectWorkspaceMCP(ctx, app)
+	lease, err := resolver.acquireWorkspaceMCP(ctx, app, request.Session, nil)
 	if err != nil {
 		return nil, err
 	}
-	defer session.Close()
-	return session.ReadResource(ctx, &mcp.ReadResourceParams{URI: request.Params.URI})
+	defer lease.Release()
+	result, err := lease.child.session.ReadResource(lease.callContext, &mcp.ReadResourceParams{URI: request.Params.URI})
+	if err != nil && ctx.Err() == nil {
+		resolver.invalidateWorkspaceMCP(lease.child)
+	}
+	return result, err
 }
 
-func connectWorkspaceMCP(ctx context.Context, app *devtool.App) (*mcp.ClientSession, error) {
+func connectWorkspaceMCP(connectContext, lifetimeContext context.Context, app *devtool.App, options *mcp.ClientOptions) (*mcp.ClientSession, error) {
 	launcher := filepath.Join(app.Root(), "hk")
 	info, err := os.Lstat(launcher)
 	if err != nil {
@@ -186,16 +644,22 @@ func connectWorkspaceMCP(ctx context.Context, app *devtool.App) (*mcp.ClientSess
 	if !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
 		return nil, fmt.Errorf("workspace hk launcher must be a regular executable file: %s", launcher)
 	}
-	command := exec.CommandContext(ctx, launcher, "--workspace", app.Root(), "mcp", "serve") //nolint:gosec // launcher is confined to the selected HitKeep root
-	client := mcp.NewClient(&mcp.Implementation{Name: "hitkeep-developer-broker", Version: "1"}, nil)
-	session, err := client.Connect(ctx, &mcp.CommandTransport{Command: command}, nil)
+	command := exec.CommandContext(lifetimeContext, launcher, "--workspace", app.Root(), "mcp", "serve") //nolint:gosec // launcher is confined to the selected HitKeep root
+	client := mcp.NewClient(&mcp.Implementation{Name: "hitkeep-developer-broker", Version: "1"}, options)
+	session, err := client.Connect(connectContext, &mcp.CommandTransport{Command: command}, nil)
 	if err != nil {
 		return nil, fmt.Errorf("connect workspace MCP: %w", err)
+	}
+	if options != nil && options.LoggingMessageHandler != nil {
+		if err := session.SetLoggingLevel(connectContext, &mcp.SetLoggingLevelParams{Level: mcp.LoggingLevel("debug")}); err != nil {
+			_ = session.Close()
+			return nil, fmt.Errorf("enable workspace MCP logging: %w", err)
+		}
 	}
 	return session, nil
 }
 
-func delegatedEnvelope(value any) (devtool.Envelope, error) {
+func delegatedEnvelope(value any, command, workspaceID string, isError bool) (devtool.Envelope, error) {
 	raw, err := json.Marshal(value)
 	if err != nil {
 		return devtool.Envelope{}, fmt.Errorf("encode workspace MCP result: %w", err)
@@ -204,13 +668,26 @@ func delegatedEnvelope(value any) (devtool.Envelope, error) {
 	if err := json.Unmarshal(raw, &envelope); err != nil {
 		return devtool.Envelope{}, fmt.Errorf("decode workspace MCP result: %w", err)
 	}
-	if envelope.SchemaVersion == "" || envelope.Command == "" || envelope.Status == "" {
-		return devtool.Envelope{}, errors.New("workspace MCP returned an invalid structured envelope")
+	if envelope.SchemaVersion != devtool.SchemaVersion {
+		return devtool.Envelope{}, fmt.Errorf("workspace MCP returned schema %q, want %q", envelope.SchemaVersion, devtool.SchemaVersion)
+	}
+	if envelope.Command != command {
+		return devtool.Envelope{}, fmt.Errorf("workspace MCP returned command %q, want %q", envelope.Command, command)
+	}
+	if envelope.WorkspaceID != workspaceID {
+		return devtool.Envelope{}, fmt.Errorf("workspace MCP returned workspace %q, want %q", envelope.WorkspaceID, workspaceID)
+	}
+	wantStatus := "ok"
+	if isError {
+		wantStatus = "error"
+	}
+	if envelope.Status != wantStatus || isError && envelope.Error == "" {
+		return devtool.Envelope{}, errors.New("workspace MCP returned an inconsistent structured envelope")
 	}
 	return envelope, nil
 }
 
-func appsFromClientRoots(ctx context.Context, session *mcp.ServerSession) ([]rootedApp, error) {
+func appsFromClientRoots(ctx context.Context, session *mcp.ServerSession, loadApp func(string) (*devtool.App, error)) ([]rootedApp, error) {
 	if session == nil {
 		return nil, errors.New("MCP session is unavailable")
 	}
@@ -225,7 +702,7 @@ func appsFromClientRoots(ctx context.Context, session *mcp.ServerSession) ([]roo
 		if pathErr != nil {
 			continue
 		}
-		app, appErr := newHitKeepApp(path)
+		app, appErr := loadApp(path)
 		if appErr != nil || seen[app.WorkspaceID()] {
 			continue
 		}
@@ -274,13 +751,13 @@ func NewServer(app *devtool.App, version string) *mcp.Server {
 // NewCentralServer returns one root-aware MCP server that delegates every
 // operation to the worktree selected by the connected client's MCP roots.
 func NewCentralServer(fallbackWorkspace, version string) *mcp.Server {
-	return newServer(centralAppResolver{fallback: fallbackWorkspace}, version)
+	return newServer(newCentralAppResolver(fallbackWorkspace, nil), version)
 }
 
 func newServer(resolver appResolver, version string) *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{Name: "hitkeep-developer", Version: version}, &mcp.ServerOptions{
-		Instructions: "Local, root-routed and worktree-confined HitKeep development operations. Pass workspace only when the client exposes multiple HitKeep roots. Mutable workflow facts come from hk catalogs; no arbitrary command execution is available.",
-		Capabilities: &mcp.ServerCapabilities{},
+		Instructions: "Local, root-routed and worktree-confined HitKeep development operations. Development is one container-only session per workspace and uses status plus event cursors, never run IDs. Dev start, stop, and follow tools stream progress and structured component logs. Finite setup, QA, build, and smoke operations use run IDs. Pass workspace only when the client exposes multiple HitKeep roots. Mutable workflow facts come from hk catalogs; no arbitrary command execution is available.",
+		Capabilities: &mcp.ServerCapabilities{Logging: &mcp.LoggingCapabilities{}},
 	})
 	registerTools(server, resolver)
 	registerResources(server, resolver)
@@ -290,6 +767,7 @@ func newServer(resolver appResolver, version string) *mcp.Server {
 func registerTools(server *mcp.Server, resolver appResolver) {
 	readOnly := annotations(true, true, false, false)
 	action := annotations(false, false, false, false)
+	idempotentAction := annotations(false, true, false, false)
 	destructiveAction := annotations(false, true, false, true)
 
 	mcp.AddTool(server, tool("hk_workspace_status", "Inspect the selected Git worktree, allocated ports, URLs, and change count.", readOnly), routedHandler(resolver, "workspace status", func(ctx context.Context, app *devtool.App, _ emptyInput) (any, error) {
@@ -335,11 +813,66 @@ func registerTools(server *mcp.Server, resolver appResolver) {
 	mcp.AddTool(server, tool("hk_setup_start", "Start reproducible dependency setup and return a run ID immediately.", action), startHandler(resolver, "setup start", func(emptyInput) devtool.RunRequest {
 		return devtool.RunRequest{Kind: "setup"}
 	}))
-	mcp.AddTool(server, tool("hk_dev_start", "Start the isolated development stack and return a run ID immediately.", action), startHandler(resolver, "dev start", func(input variantInput) devtool.RunRequest {
-		return devtool.RunRequest{Kind: "dev-start", Variant: input.Variant, Runtime: input.Runtime, Seed: input.Seed}
+	mcp.AddTool(server, tool("hk_dev_start", "Start or reuse the selected workspace's development session and stream progress until ready.", idempotentAction), routedRequestHandler(resolver, "dev start", func(ctx context.Context, request *mcp.CallToolRequest, app *devtool.App, input devStartInput) (any, error) {
+		return app.StartDevDetachedObserved(devtool.WithAgentOutput(ctx), devtool.DevRequest{Variant: input.Variant, Seed: input.Seed}, devEventNotifier(ctx, request))
 	}))
-	mcp.AddTool(server, tool("hk_dev_stop", "Stop only the selected worktree's development stack.", destructiveAction), startHandler(resolver, "dev stop", func(input variantInput) devtool.RunRequest {
-		return devtool.RunRequest{Kind: "dev-stop", Variant: input.Variant, Runtime: input.Runtime}
+	mcp.AddTool(server, tool("hk_dev_status", "Inspect the selected workspace's development session.", readOnly), routedHandler(resolver, "dev status", func(ctx context.Context, app *devtool.App, _ devInput) (any, error) {
+		return app.DevStatus(ctx)
+	}))
+	mcp.AddTool(server, tool("hk_dev_logs", "Read or follow cursor-addressed development events without changing the session.", readOnly), routedRequestHandler(resolver, "dev logs", func(ctx context.Context, request *mcp.CallToolRequest, app *devtool.App, input devLogsInput) (any, error) {
+		if input.Cursor < 0 || input.Limit < 0 || input.Limit > maxRequestedLogLines {
+			return nil, errors.New("cursor must be non-negative and limit must be between 1 and 200")
+		}
+		notify := devEventNotifier(ctx, request)
+		if input.Follow {
+			return app.FollowDevEvents(ctx, input.Cursor, input.Limit, notify)
+		}
+		batch, err := app.DevLogs(input.Cursor, input.Limit)
+		if err != nil {
+			return batch, err
+		}
+		for _, event := range batch.Events {
+			notify(event)
+		}
+		return batch, nil
+	}))
+	mcp.AddTool(server, tool("hk_dev_stop", "Stop only the selected workspace's development session and stream shutdown progress.", destructiveAction), routedRequestHandler(resolver, "dev stop", func(ctx context.Context, request *mcp.CallToolRequest, app *devtool.App, _ devInput) (any, error) {
+		before, _ := app.DevStatus(context.Background())
+		cursor := before.NextEventCursor
+		type stopResult struct {
+			status devtool.DevStatus
+			err    error
+		}
+		done := make(chan stopResult, 1)
+		stopContext := context.WithoutCancel(ctx)
+		go func() {
+			status, err := app.StopDev(stopContext)
+			done <- stopResult{status: status, err: err}
+		}()
+		notify := devEventNotifier(ctx, request)
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case result := <-done:
+				batch, _ := app.DevLogs(cursor, maxRequestedLogLines)
+				for _, event := range batch.Events {
+					notify(event)
+				}
+				return result.status, result.err
+			case <-ctx.Done():
+				return app.DevStatus(context.Background())
+			case <-ticker.C:
+				batch, batchErr := app.DevLogs(cursor, maxRequestedLogLines)
+				if batchErr != nil {
+					continue
+				}
+				for _, event := range batch.Events {
+					notify(event)
+				}
+				cursor = batch.NextCursor
+			}
+		}
 	}))
 	mcp.AddTool(server, tool("hk_qa_start", "Start canonical QA gates asynchronously and return a run ID.", action), startHandler(resolver, "qa start", func(input qaStartInput) devtool.RunRequest {
 		return devtool.RunRequest{Kind: "qa", Profile: input.Profile, GateIDs: input.GateIDs}
@@ -369,9 +902,55 @@ func routedHandler[In workspaceScoped](resolver appResolver, command string, han
 	}
 }
 
+func routedRequestHandler[In workspaceScoped](resolver appResolver, command string, handler func(context.Context, *mcp.CallToolRequest, *devtool.App, In) (any, error)) func(context.Context, *mcp.CallToolRequest, In) (*mcp.CallToolResult, envelopeOutput, error) {
+	return func(ctx context.Context, request *mcp.CallToolRequest, input In) (*mcp.CallToolResult, envelopeOutput, error) {
+		if delegate, ok := resolver.(toolDelegatingResolver); ok {
+			return delegate.DelegateTool(ctx, request, command, input)
+		}
+		app, err := resolver.Resolve(ctx, request.Session, input.workspaceSelector())
+		if err != nil {
+			return output(nil, command, nil, err)
+		}
+		value, err := handler(ctx, request, app, input)
+		return output(app, command, value, err)
+	}
+}
+
+func devEventNotifier(ctx context.Context, request *mcp.CallToolRequest) func(devtool.DevEvent) {
+	return func(event devtool.DevEvent) {
+		if request.Session == nil {
+			return
+		}
+		if progressToken := request.Params.GetProgressToken(); progressToken != nil {
+			_ = request.Session.NotifyProgress(ctx, &mcp.ProgressNotificationParams{
+				ProgressToken: progressToken,
+				Progress:      float64(event.Cursor),
+				Message:       event.Message,
+			})
+		}
+		if event.Type != "log" {
+			return
+		}
+		level := mcp.LoggingLevel("info")
+		switch event.Level {
+		case "debug", "error", "critical", "alert", "emergency", "notice":
+			level = mcp.LoggingLevel(event.Level)
+		case "warn", "warning":
+			level = "warning"
+		}
+		logger := event.Component
+		if logger == "" {
+			logger = "supervisor"
+		}
+		_ = request.Session.Log(ctx, &mcp.LoggingMessageParams{
+			Level: level, Logger: "hitkeep.dev." + logger, Data: event,
+		})
+	}
+}
+
 func startHandler[In workspaceScoped](resolver appResolver, command string, request func(In) devtool.RunRequest) func(context.Context, *mcp.CallToolRequest, In) (*mcp.CallToolResult, envelopeOutput, error) {
 	return routedHandler(resolver, command, func(ctx context.Context, app *devtool.App, input In) (any, error) {
-		return app.StartRun(ctx, request(input))
+		return app.StartRun(devtool.WithAgentOutput(ctx), request(input))
 	})
 }
 
@@ -413,14 +992,15 @@ func inputSchema(name string) *jsonschema.Schema {
 		required = []string{"run_id"}
 	case "hk_run_list":
 		properties["limit"] = &jsonschema.Schema{Type: "integer", Minimum: new(1.0), Maximum: new(100.0)}
-	case "hk_dev_start", "hk_dev_stop", "hk_smoke_start":
+	case "hk_dev_start":
 		properties["variant"] = enum("self-hosted", "cloud")
-		if name == "hk_dev_start" || name == "hk_dev_stop" {
-			properties["runtime"] = enum("native", "container")
-		}
-		if name == "hk_dev_start" {
-			properties["seed"] = &jsonschema.Schema{Type: "boolean"}
-		}
+		properties["seed"] = &jsonschema.Schema{Type: "boolean"}
+	case "hk_dev_logs":
+		properties["cursor"] = &jsonschema.Schema{Type: "integer", Minimum: new(0.0)}
+		properties["limit"] = &jsonschema.Schema{Type: "integer", Minimum: new(1.0), Maximum: new(float64(maxRequestedLogLines))}
+		properties["follow"] = &jsonschema.Schema{Type: "boolean"}
+	case "hk_smoke_start":
+		properties["variant"] = enum("self-hosted", "cloud")
 	case "hk_qa_start":
 		properties["profile"] = enum("changed", "pr", "full")
 		properties["gate_ids"] = &jsonschema.Schema{Type: "array", Items: gateEnum(), UniqueItems: true, MaxItems: new(len(devtool.CatalogSnapshot().Gates))}
@@ -541,7 +1121,9 @@ func RunStdio(ctx context.Context, app *devtool.App, version string) error {
 }
 
 func RunCentralStdio(ctx context.Context, fallbackWorkspace, version string) error {
-	return NewCentralServer(fallbackWorkspace, version).Run(ctx, &mcp.StdioTransport{})
+	resolver := newCentralAppResolver(fallbackWorkspace, nil)
+	defer resolver.Close()
+	return newServer(resolver, version).Run(ctx, &mcp.StdioTransport{})
 }
 
 func ParseLimit(value string) (int, error) {

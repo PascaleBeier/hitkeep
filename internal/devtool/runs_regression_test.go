@@ -1,7 +1,6 @@
 package devtool
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"os"
@@ -62,28 +61,20 @@ func TestStartRunDeduplicatesAtomicallyAcrossAppInstances(t *testing.T) {
 	}
 }
 
-func TestPrepareFrontendDependenciesMigratesMutableNodeModules(t *testing.T) {
+func TestContainerDevResetRemovesOnlyWorkspaceVolume(t *testing.T) {
 	root := initTestRepository(t)
-	stateRoot := filepath.Join(t.TempDir(), "state")
-	t.Setenv("HK_STATE_DIR", stateRoot)
-	defer func() { _ = makeTreeOwnerWritable(stateRoot) }()
-	dashboard := filepath.Join(root, "frontend", "dashboard")
-	if err := os.MkdirAll(filepath.Join(dashboard, "node_modules", "stale"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	files := map[string]string{
-		"package.json":      `{"packageManager":"npm@11.14.1"}`,
-		"package-lock.json": `{}`,
-		".npmrc":            "legacy-peer-deps=true\n",
-		".nvmrc":            "24.15.0\n",
-	}
-	for name, content := range files {
-		if err := os.WriteFile(filepath.Join(dashboard, name), []byte(content), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
+	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	home := t.TempDir()
+	t.Setenv("HOME", home)
 	fakeBin := t.TempDir()
-	if err := os.WriteFile(filepath.Join(fakeBin, "npx"), []byte("#!/bin/sh\nmkdir -p node_modules/package\ntouch node_modules/package/index.js\n"), 0o700); err != nil {
+	script := `#!/bin/sh
+if [ "${1:-}" = volume ] && [ "${2:-}" = ls ]; then
+  echo hitkeep-workspace-data
+  exit 0
+fi
+printf '%s\n' "$@" > "$HOME/docker-args"
+`
+	if err := os.WriteFile(filepath.Join(fakeBin, "docker"), []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
@@ -91,30 +82,25 @@ func TestPrepareFrontendDependenciesMigratesMutableNodeModules(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var output bytes.Buffer
-	if err := app.prepareFrontendDependencies(context.Background(), &output); err != nil {
+	runFile := filepath.Join(app.workspace.StateDir, "runs", "keep.log")
+	if err := os.MkdirAll(filepath.Dir(runFile), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	target := filepath.Join(dashboard, "node_modules")
-	info, err := os.Lstat(target)
+	if err := os.WriteFile(runFile, []byte("log"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.resetDevData(context.Background(), io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	arguments, err := os.ReadFile(filepath.Join(home, "docker-args"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode()&os.ModeSymlink == 0 {
-		t.Fatalf("node_modules is not a shared snapshot symlink: %s", target)
+	if !strings.Contains(string(arguments), "volume\nrm\nhitkeep-workspace-data") {
+		t.Fatalf("workspace volume was not removed: %s", arguments)
 	}
-	link, err := os.Readlink(target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(link, filepath.Join("shared", "frontend")) {
-		t.Fatalf("node_modules target is outside shared frontend snapshots: %s", link)
-	}
-	if _, err := os.Stat(filepath.Join(target, "stale")); !os.IsNotExist(err) {
-		t.Fatalf("mutable node_modules content survived migration: %v", err)
-	}
-	if !strings.Contains(output.String(), "migrated mutable node_modules") {
-		t.Fatalf("migration was not reported: %q", output.String())
+	if _, err := os.Stat(runFile); err != nil {
+		t.Fatalf("reset removed non-data workspace state: %v", err)
 	}
 }
 

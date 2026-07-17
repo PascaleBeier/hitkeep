@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 )
 
-const DeveloperMCPManifestSchemaVersion = "hk.dev/mcp-manifest/v2"
+const DeveloperMCPManifestSchemaVersion = "hk.dev/mcp-manifest/v3"
 
 const developerMCPServerName = "hitkeep-dev"
 
@@ -26,6 +26,7 @@ type DeveloperMCPManifest struct {
 	Scope            string                 `json:"scope"`
 	WorkspaceRouting string                 `json:"workspace_routing"`
 	Delegation       string                 `json:"delegation"`
+	Notifications    []string               `json:"notifications"`
 	Command          string                 `json:"command"`
 	Args             []string               `json:"args"`
 	ClientConfig     MCPClientConfiguration `json:"client_config"`
@@ -52,6 +53,7 @@ func (a *App) MCPManifest() (DeveloperMCPManifest, error) {
 		Scope:            "central",
 		WorkspaceRouting: "client-roots",
 		Delegation:       "workspace-mcp",
+		Notifications:    []string{"progress", "logging"},
 		Command:          definition.Command,
 		Args:             arguments,
 		ClientConfig: MCPClientConfiguration{MCPServers: map[string]MCPServerDefinition{

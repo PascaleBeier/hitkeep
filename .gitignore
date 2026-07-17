@@ -1,22 +1,18 @@
-tmp
-node_modules
-hitkeep
-main
+# Local build and runtime artifacts.
+/tmp/
+/hitkeep
+/main
 *.test
-hitkeep.db
-hitkeep.db.wal
-hitkeep.db.zst
-hitkeep.db.zstd
+/hitkeep.db*
 /*-local-*.png
-/archive
-/public
+/archive/
+/public/*
 !/public/embed.go
-!/charts/
-!/charts/hitkeep/
-!/charts/hitkeep/**
-frontend/dashboard/test-results
-frontend/dashboard/playwright-report
-data
+/data/
+
+# Frontend test artifacts.
+/frontend/dashboard/test-results/
+/frontend/dashboard/playwright-report/
 
 # Canonical contributor skills are versioned source, even with a global ignore.
 !/.agents/

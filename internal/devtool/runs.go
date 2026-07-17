@@ -4,8 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,7 +13,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -45,11 +42,18 @@ func (a *App) StartRun(ctx context.Context, request RunRequest) (RunStart, error
 		return RunStart{}, fmt.Errorf("lock run creation: %w", err)
 	}
 	defer unlockStateRoot(startLock)
-	if runs, err := a.ListRuns(100); err == nil {
-		for _, existing := range runs {
-			if !isTerminal(existing.Status) && runRequestsEqual(existing.Request, request) {
-				return runStart(existing), nil
-			}
+	runs, err := a.ListRuns(100)
+	if err != nil {
+		return RunStart{}, fmt.Errorf("inspect active runs: %w", err)
+	}
+	for _, existing := range runs {
+		if isTerminal(existing.Status) {
+			continue
+		}
+		if runRequestsEqual(existing.Request, request) {
+			start := runStart(existing)
+			start.Reused = true
+			return start, nil
 		}
 	}
 	id := time.Now().UTC().Format("20060102T150405") + "-" + uuid.NewString()[:8]
@@ -71,6 +75,9 @@ func (a *App) StartRun(ctx context.Context, request RunRequest) (RunStart, error
 	command.Dir = a.workspace.Root
 	stateRoot := filepath.Dir(filepath.Dir(a.workspace.StateDir))
 	childEnvironment := []string{"HK_CHILD_RUN=1", "HK_STATE_DIR=" + stateRoot}
+	if agentOutputEnabled(ctx) {
+		childEnvironment = append(childEnvironment, "HK_CHILD_OUTPUT=json")
+	}
 	if slots := validatedQASlotOverride(); slots != "" {
 		childEnvironment = append(childEnvironment, "HK_QA_SLOTS="+slots)
 	}
@@ -121,6 +128,9 @@ func runStart(run Run) RunStart {
 }
 
 func (a *App) ExecuteRun(ctx context.Context, runID string) error {
+	if os.Getenv("HK_CHILD_OUTPUT") == "json" {
+		ctx = WithAgentOutput(ctx)
+	}
 	if err := a.waitUntilRunReady(ctx, runID); err != nil {
 		return err
 	}
@@ -188,6 +198,9 @@ func (a *App) GetRun(runID string) (Run, error) {
 	if err := json.Unmarshal(raw, &run); err != nil {
 		return run, fmt.Errorf("decode run: %w", err)
 	}
+	if !finiteRunKind(run.Request.Kind) {
+		return Run{}, fmt.Errorf("run %q is not a finite operation", runID)
+	}
 	run = a.reconcileExitedWorker(run)
 	return run, nil
 }
@@ -202,16 +215,16 @@ func (a *App) ListRuns(limit int) ([]Run, error) {
 	}
 	slices.Sort(paths)
 	slices.Reverse(paths)
-	if len(paths) > limit {
-		paths = paths[:limit]
-	}
-	runs := make([]Run, 0, len(paths))
+	runs := make([]Run, 0, min(limit, len(paths)))
 	for _, path := range paths {
 		var run Run
 		raw, readErr := os.ReadFile(path)
-		if readErr == nil && json.Unmarshal(raw, &run) == nil {
+		if readErr == nil && json.Unmarshal(raw, &run) == nil && finiteRunKind(run.Request.Kind) {
 			run = a.reconcileExitedWorker(run)
 			runs = append(runs, run)
+			if len(runs) >= limit {
+				break
+			}
 		}
 	}
 	return runs, nil
@@ -473,10 +486,6 @@ func (a *App) executeRequest(ctx context.Context, runID string, request RunReque
 	switch request.Kind {
 	case "setup":
 		return nil, a.executeSetup(ctx, logWriter)
-	case "dev-start":
-		return nil, a.executeDev(ctx, request.Variant, request.Runtime, request.Seed, true, logWriter)
-	case "dev-stop":
-		return nil, a.executeDev(ctx, request.Variant, request.Runtime, false, false, logWriter)
 	case "qa":
 		return a.executeQA(ctx, runID, request, logWriter)
 	case "build":
@@ -493,24 +502,23 @@ func (a *App) executeSetup(ctx context.Context, writer io.Writer) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if !nativeToolchainReady(doctor) {
-		if doctor.Capabilities.ContainerDevelopment {
-			_, _ = fmt.Fprintln(writer, "native toolchain is not exact; preparing pinned container development dependencies")
-			return a.executeContainerSetup(ctx, writer)
-		}
-		var missing []string
-		for _, check := range doctor.Checks {
-			if check.Status != "ok" && (check.Name == "go" || check.Name == "node" || check.Name == "npm" || check.Name == "c-compiler" || check.Name == "docker" || check.Name == "compose") {
-				missing = append(missing, check.Name+"="+check.Status)
-			}
-		}
-		return fmt.Errorf("neither exact native nor container setup is available (%s); run ./hk doctor", strings.Join(missing, ", "))
+	if !doctor.Capabilities.ContainerDevelopment {
+		return errors.New("container development is unavailable; run ./hk doctor and fix Docker Compose")
 	}
-	_, _ = fmt.Fprintln(writer, "preparing exact native development dependencies")
-	if err := a.runCommand(ctx, writer, commandSpec{Args: []string{"go", "mod", "download"}}); err != nil {
+	_, _ = fmt.Fprintln(writer, "preparing pinned container development dependencies")
+	if err := a.executeContainerSetup(ctx, writer); err != nil {
 		return err
 	}
-	if err := a.prepareFrontendDependencies(ctx, writer); err != nil {
+	statuses := map[string]bool{}
+	for _, check := range doctor.Checks {
+		statuses[check.Name] = check.Status == "ok"
+	}
+	if !statuses["node"] || !statuses["npm"] {
+		_, _ = fmt.Fprintln(writer, "host frontend QA dependencies: skipped (exact Node and npm are not available)")
+		return nil
+	}
+	_, _ = fmt.Fprintln(writer, "preparing host frontend QA dependencies")
+	if err := a.prepareHostFrontendDependencies(ctx, writer); err != nil {
 		return err
 	}
 	return a.runCommand(ctx, writer, commandSpec{Args: []string{"npx", "playwright", "install", "chromium"}, Dir: "frontend/dashboard", Display: "npx playwright install chromium [shared browser cache]"})
@@ -518,244 +526,53 @@ func (a *App) executeSetup(ctx context.Context, writer io.Writer) error {
 
 func (a *App) executeContainerSetup(ctx context.Context, writer io.Writer) error {
 	variant, _ := VariantByID("self-hosted")
-	base := []string{"docker", "compose", "-p", a.workspace.ComposeProject, "-f", "compose.dev.yaml"}
 	for _, suffix := range [][]string{
 		{"pull", "backend", "mailpit"},
 		{"build", "frontend"},
 		{"run", "--rm", "--no-deps", "backend", "go", "mod", "download"},
 		{"run", "--rm", "--no-deps", "frontend", "npm", "ci", "--no-audit", "--no-fund"},
 	} {
-		if err := a.runCommand(ctx, writer, commandSpec{Args: append(slices.Clone(base), suffix...), Env: a.ComposeEnvironment(variant)}); err != nil {
+		if err := a.runCommand(ctx, writer, commandSpec{Args: a.composeArgs(suffix...), Env: a.ComposeEnvironment(variant)}); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (a *App) prepareFrontendDependencies(ctx context.Context, writer io.Writer) error {
-	dashboard := filepath.Join(a.workspace.Root, "frontend", "dashboard")
-	inputs := []string{"package.json", "package-lock.json", ".npmrc", ".nvmrc"}
-	hasher := sha256.New()
-	for _, name := range inputs {
-		data, err := os.ReadFile(filepath.Join(dashboard, name))
-		if err != nil {
-			return err
-		}
-		_, _ = hasher.Write(data)
-	}
-	_, _ = hasher.Write([]byte(runtime.GOOS + "\x00" + runtime.GOARCH + "\x00"))
-	key := hex.EncodeToString(hasher.Sum(nil))[:20]
-	stateRoot := filepath.Dir(filepath.Dir(a.workspace.StateDir))
-	snapshot := filepath.Join(stateRoot, "shared", "frontend", key)
-	target := filepath.Join(dashboard, "node_modules")
-	completePath := filepath.Join(snapshot, ".complete")
-	if link, err := os.Readlink(target); err == nil && link == filepath.Join(snapshot, "node_modules") {
-		if marker, markerErr := os.ReadFile(completePath); markerErr == nil && strings.TrimSpace(string(marker)) == key {
-			_, _ = fmt.Fprintln(writer, "frontend dependencies: shared snapshot "+key+" already linked")
-			return nil
-		}
-	}
-	if err := os.MkdirAll(filepath.Dir(snapshot), 0o700); err != nil {
-		return err
-	}
-	lock, err := os.OpenFile(snapshot+".lock", os.O_CREATE|os.O_RDWR, 0o600)
-	if err != nil {
-		return err
-	}
-	defer lock.Close()
-	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
-		return err
-	}
-	defer func() { _ = syscall.Flock(int(lock.Fd()), syscall.LOCK_UN) }()
-	marker, markerErr := os.ReadFile(completePath)
-	if markerErr != nil || strings.TrimSpace(string(marker)) != key {
-		if err := os.RemoveAll(snapshot); err != nil {
-			return err
-		}
-		if err := os.MkdirAll(snapshot, 0o700); err != nil {
-			return err
-		}
-		for _, name := range inputs[:3] {
-			data, readErr := os.ReadFile(filepath.Join(dashboard, name))
-			if readErr != nil {
-				return readErr
-			}
-			// name comes from the fixed package manifest allowlist above.
-			if writeErr := os.WriteFile(filepath.Join(snapshot, name), data, 0o600); writeErr != nil { //nolint:gosec
-				return writeErr
-			}
-		}
-		packageManager := requiredPackageManagerVersion(a.workspace.Root)
-		_, _ = fmt.Fprintln(writer, "$ npx --yes npm@"+packageManager+" ci --no-audit --no-fund [shared immutable snapshot "+key+"]")
-		// packageManager is a validated exact version from package.json; arguments are never shell-expanded.
-		command := exec.CommandContext(ctx, "npx", "--yes", "npm@"+packageManager, "ci", "--no-audit", "--no-fund") //nolint:gosec
-		command.Dir = snapshot
-		command.Env = a.commandEnvironment(nil)
-		redacted := &redactingWriter{writer: writer}
-		command.Stdout = redacted
-		command.Stderr = redacted
-		if err := command.Run(); err != nil {
-			_ = redacted.Flush()
-			return fmt.Errorf("prepare frontend dependency snapshot: %w", err)
-		}
-		if err := redacted.Flush(); err != nil {
-			return fmt.Errorf("write frontend dependency log: %w", err)
-		}
-		if err := os.WriteFile(completePath, []byte(key+"\n"), 0o400); err != nil {
-			return err
-		}
-		if err := makeTreeReadOnly(filepath.Join(snapshot, "node_modules")); err != nil {
-			return err
-		}
-	}
-	migrated, err := replaceWithDependencySnapshot(target, filepath.Join(snapshot, "node_modules"))
-	if err != nil {
-		return err
-	}
-	if migrated {
-		_, _ = fmt.Fprintln(writer, "frontend dependencies: migrated mutable node_modules to shared snapshot "+key)
-	} else {
-		_, _ = fmt.Fprintln(writer, "frontend dependencies: linked shared snapshot "+key)
-	}
-	return nil
+func (a *App) prepareHostFrontendDependencies(ctx context.Context, writer io.Writer) error {
+	return a.runCommand(ctx, writer, commandSpec{Args: []string{"npm", "ci", "--no-audit", "--no-fund"}, Dir: "frontend/dashboard"})
 }
 
-func replaceWithDependencySnapshot(target, snapshot string) (bool, error) {
-	info, err := os.Lstat(target)
-	if os.IsNotExist(err) {
-		return false, os.Symlink(snapshot, target)
-	}
-	if err != nil {
-		return false, err
-	}
-	if info.Mode()&os.ModeSymlink != 0 {
-		if err := os.Remove(target); err != nil {
-			return false, err
-		}
-		return false, os.Symlink(snapshot, target)
-	}
-	if !info.IsDir() {
-		return false, fmt.Errorf("frontend dependency path is neither a directory nor symlink: %s", target)
-	}
-	backup := target + ".hk-migrate-" + uuid.NewString()
-	if err := os.Rename(target, backup); err != nil {
-		return false, fmt.Errorf("stage existing frontend dependencies for migration: %w", err)
-	}
-	if err := os.Symlink(snapshot, target); err != nil {
-		if restoreErr := os.Rename(backup, target); restoreErr != nil {
-			return false, fmt.Errorf("link shared frontend dependencies: %w (restore failed: %v)", err, restoreErr)
-		}
-		return false, fmt.Errorf("link shared frontend dependencies: %w", err)
-	}
-	if err := os.RemoveAll(backup); err != nil {
-		return true, fmt.Errorf("remove migrated frontend dependencies: %w", err)
-	}
-	return true, nil
-}
-
-func makeTreeReadOnly(root string) error {
-	rooted, err := os.OpenRoot(root)
+func (a *App) resetDevData(ctx context.Context, writer io.Writer) error {
+	volumeNames, err := a.containerDevDataVolumes(ctx)
 	if err != nil {
 		return err
 	}
-	defer rooted.Close()
-	return fs.WalkDir(rooted.FS(), ".", func(path string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		info, err := entry.Info()
-		if err != nil {
-			return err
-		}
-		return rooted.Chmod(path, info.Mode().Perm()&^0o222)
-	})
+	if len(volumeNames) == 0 {
+		_, _ = fmt.Fprintln(writer, "$ isolated development data is already empty")
+		return nil
+	}
+	args := append([]string{"docker", "volume", "rm"}, volumeNames...)
+	return a.runCommand(ctx, writer, commandSpec{Args: args, Env: a.ComposeEnvironment(variants[0]), Display: "docker volume rm [isolated development data]"})
 }
 
-func (a *App) executeDev(ctx context.Context, variantID, runtimeID string, seed, start bool, writer io.Writer) error {
-	variant, err := VariantByID(variantID)
-	if err != nil {
-		return err
-	}
-	if runtimeID == "native" {
-		if !start {
-			return a.stopNativeDev(ctx, writer)
-		}
-		return a.executeNativeDev(ctx, variant, seed, writer)
-	}
-	args := []string{"docker", "compose", "-p", a.workspace.ComposeProject, "-f", "compose.dev.yaml"}
-	if start {
-		if seed {
-			seedArgs := append(slices.Clone(args), "run", "--rm", "seed")
-			if err := a.runCommand(ctx, writer, commandSpec{Args: seedArgs, Env: a.ComposeEnvironment(variant)}); err != nil {
-				return err
-			}
-		}
-		args = append(args, "up", "--build", "-d", "backend", "frontend", "mailpit")
-	} else {
-		args = append(args, "down", "--remove-orphans")
-	}
-	return a.runCommand(ctx, writer, commandSpec{Args: args, Env: a.ComposeEnvironment(variant)})
-}
-
-func (a *App) executeNativeDev(ctx context.Context, variant Variant, seed bool, writer io.Writer) error {
-	if err := a.runCommand(ctx, writer, commandSpec{Args: []string{"docker", "compose", "-p", a.workspace.ComposeProject, "-f", "compose.dev.yaml", "up", "-d", "mailpit"}, Env: a.ComposeEnvironment(variant)}); err != nil {
-		return err
-	}
-	proxyPath := filepath.Join(a.workspace.StateDir, "proxy.json")
-	target := "http://127.0.0.1:" + strconv.Itoa(a.workspace.Ports.Backend)
-	proxy := map[string]any{}
-	for _, route := range []string{"/api", "/ingest", "/q/"} {
-		proxy[route] = map[string]any{"target": target, "secure": false, "changeOrigin": true, "logLevel": "warn"}
-	}
-	if err := writeJSONAtomic(proxyPath, proxy); err != nil {
-		return err
-	}
-	environment := a.ComposeEnvironment(variant)
-	environment = append(environment,
-		"HITKEEP_GO_BUILD_TAGS="+strings.Join(variant.BuildTags, " "),
-		"HITKEEP_HTTP_ADDR=127.0.0.1:"+strconv.Itoa(a.workspace.Ports.Backend),
-		"HITKEEP_DB_PATH="+filepath.Join(a.workspace.StateDir, "data", "hitkeep.db"),
-		"HITKEEP_DATA_PATH="+filepath.Join(a.workspace.StateDir, "data"),
-		"HITKEEP_MAIL_HOST=127.0.0.1",
-		"HITKEEP_MAIL_PORT="+strconv.Itoa(a.workspace.Ports.SMTP),
+func (a *App) containerDevDataVolumes(ctx context.Context) ([]string, error) {
+	command := exec.CommandContext( //nolint:gosec
+		ctx,
+		"docker",
+		"volume",
+		"ls",
+		"--quiet",
+		"--filter", "label=com.docker.compose.project="+a.workspace.ComposeProject,
+		"--filter", "label=com.docker.compose.volume=hitkeep-dev-data",
 	)
-	if seed {
-		dataPath := filepath.Join(a.workspace.StateDir, "data")
-		if err := os.MkdirAll(dataPath, 0o700); err != nil {
-			return err
-		}
-		seedCommand := []string{"go", "run", "./cmd/seed", "-db", filepath.Join(dataPath, "hitkeep.db"), "-data-path", dataPath, "-email", "demo@example.com", "-password", "demo1234", "-domain", "acme-analytics.io", "-days", "90"}
-		if err := a.runCommand(ctx, writer, commandSpec{Args: seedCommand, Env: environment, Display: "go run ./cmd/seed [isolated demo defaults]"}); err != nil {
-			return err
-		}
+	command.Dir = a.workspace.Root
+	command.Env = a.commandEnvironment(a.ComposeEnvironment(variants[0]))
+	output, err := command.Output()
+	if err != nil {
+		return nil, fmt.Errorf("find container development data: %w", err)
 	}
-	specs := []commandSpec{
-		{Args: []string{"go", "tool", "air", "-c", ".air.toml"}, Env: environment},
-		{Args: []string{"npm", "start", "--", "--host", "127.0.0.1", "--port", strconv.Itoa(a.workspace.Ports.Frontend), "--proxy-config", proxyPath}, Dir: "frontend/dashboard", Env: []string{"NG_CLI_ANALYTICS=false"}},
-	}
-	results := make(chan error, len(specs))
-	devContext, cancel := context.WithCancel(ctx)
-	defer cancel()
-	for _, spec := range specs {
-		go func() { results <- a.runCommand(devContext, writer, spec) }()
-	}
-	first := <-results
-	cancel()
-	second := <-results
-	if first != nil && !errors.Is(first, context.Canceled) {
-		return first
-	}
-	return second
-}
-
-func (a *App) stopNativeDev(ctx context.Context, writer io.Writer) error {
-	runs, _ := a.ListRuns(100)
-	for _, run := range runs {
-		if run.Request.Kind == "dev-start" && run.Request.Runtime == "native" && !isTerminal(run.Status) && run.PID > 0 {
-			_, _ = a.CancelRun(run.ID)
-		}
-	}
-	return a.runCommand(ctx, writer, commandSpec{Args: []string{"docker", "compose", "-p", a.workspace.ComposeProject, "-f", "compose.dev.yaml", "stop", "mailpit"}, Env: a.ComposeEnvironment(variants[0])})
+	return compactSorted(strings.Split(string(output), "\n")), nil
 }
 
 func (a *App) executeBuild(ctx context.Context, request RunRequest, writer io.Writer) error {
@@ -768,13 +585,8 @@ func (a *App) executeBuild(ctx context.Context, request RunRequest, writer io.Wr
 	}
 	tags := strings.Join(variant.BuildTags, " ")
 	if request.Target == "binary" {
-		if info, err := os.Lstat(filepath.Join(a.workspace.Root, "frontend", "dashboard", "node_modules")); err != nil || info.Mode()&os.ModeSymlink == 0 {
-			packageManager := requiredPackageManagerVersion(a.workspace.Root)
-			if err := a.runCommand(ctx, writer, commandSpec{Args: []string{"npx", "--yes", "npm@" + packageManager, "ci", "--no-audit", "--no-fund"}, Dir: "frontend/dashboard"}); err != nil {
-				return err
-			}
-		} else {
-			_, _ = fmt.Fprintln(writer, "frontend dependencies: using shared immutable snapshot")
+		if err := a.prepareHostFrontendDependencies(ctx, writer); err != nil {
+			return err
 		}
 		if err := a.runCommand(ctx, writer, commandSpec{Args: []string{"npm", "run", "build:prod"}, Dir: "frontend/dashboard"}); err != nil {
 			return err
@@ -1178,13 +990,21 @@ func (a *App) runCommand(ctx context.Context, writer io.Writer, spec commandSpec
 	if len(spec.Args) == 0 {
 		return errors.New("empty command")
 	}
+	args := spec.Args
+	environment := spec.Env
+	if agentOutputEnabled(ctx) {
+		args = agentOptimizedCommand(args)
+		environment = append(slices.Clone(environment), "HK_AGENT_OUTPUT=json", "NO_COLOR=1", "TERM=dumb")
+	}
 	display := spec.Display
 	if display == "" {
-		display = strings.Join(spec.Args, " ")
+		display = strings.Join(args, " ")
+	} else if agentOutputEnabled(ctx) && !slices.Equal(args, spec.Args) {
+		display += " [agent-json]"
 	}
 	_, _ = fmt.Fprintln(writer, "$ "+display)
 	// Commands are selected from the closed catalog; user-controlled fields are enum or pattern validated.
-	command := exec.CommandContext(ctx, spec.Args[0], spec.Args[1:]...) //nolint:gosec
+	command := exec.CommandContext(ctx, args[0], args[1:]...) //nolint:gosec
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	command.Cancel = func() error {
 		if command.Process == nil {
@@ -1205,7 +1025,7 @@ func (a *App) runCommand(ctx context.Context, writer io.Writer, spec commandSpec
 		}
 		command.Dir = resolved
 	}
-	command.Env = a.commandEnvironment(spec.Env)
+	command.Env = a.commandEnvironment(environment)
 	redacted := &redactingWriter{writer: writer}
 	command.Stdout = redacted
 	command.Stderr = redacted
@@ -1255,11 +1075,8 @@ func (w *lockedWriter) Write(data []byte) (int, error) {
 }
 
 func normalizeRunRequest(request RunRequest) RunRequest {
-	if request.Variant == "" && slices.Contains([]string{"dev-start", "dev-stop", "build", "smoke"}, request.Kind) {
+	if request.Variant == "" && slices.Contains([]string{"build", "smoke"}, request.Kind) {
 		request.Variant = "self-hosted"
-	}
-	if request.Runtime == "" && slices.Contains([]string{"dev-start", "dev-stop"}, request.Kind) {
-		request.Runtime = "native"
 	}
 	if request.Profile == "" && request.Kind == "qa" {
 		request.Profile = "changed"
@@ -1272,7 +1089,7 @@ func normalizeRunRequest(request RunRequest) RunRequest {
 }
 
 func runRequestsEqual(left, right RunRequest) bool {
-	return left.Kind == right.Kind && left.Variant == right.Variant && left.Runtime == right.Runtime && left.Seed == right.Seed && left.Profile == right.Profile && left.Target == right.Target && slices.Equal(left.GateIDs, right.GateIDs)
+	return left.Kind == right.Kind && left.Variant == right.Variant && left.Profile == right.Profile && left.Target == right.Target && slices.Equal(left.GateIDs, right.GateIDs)
 }
 
 func summarizeRun(run Run) RunSummary {
@@ -1296,7 +1113,7 @@ func runSummariesFromState(stateDir string, activeOnly bool, limit int) []RunSum
 	for _, path := range paths {
 		var run Run
 		raw, err := os.ReadFile(path)
-		if err != nil || json.Unmarshal(raw, &run) != nil || activeOnly && isTerminal(run.Status) {
+		if err != nil || json.Unmarshal(raw, &run) != nil || !finiteRunKind(run.Request.Kind) || activeOnly && isTerminal(run.Status) {
 			continue
 		}
 		summaries = append(summaries, summarizeRun(run))

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"go/format"
 	"io"
@@ -26,7 +27,7 @@ type sourceChangesPendingError struct {
 }
 
 func (e sourceChangesPendingError) Error() string {
-	return fmt.Sprintf("%d Go source file(s) require %s", e.result.ChangedFileCount, e.result.Tool)
+	return fmt.Sprintf("%d source file(s) require %s", e.result.ChangedFileCount, e.result.Tool)
 }
 
 func (e sourceChangesPendingError) ErrorData() any { return e.result }
@@ -124,6 +125,94 @@ func (a *App) FormatGo(write bool) (SourceChangeResult, error) {
 	return result, nil
 }
 
+// FormatFrontend checks or rewrites the dashboard with the repository-pinned
+// oxfmt binary. Paths returned to callers are always workspace-relative.
+func (a *App) FormatFrontend(ctx context.Context, write bool) (SourceChangeResult, error) {
+	mode := "check"
+	if write {
+		mode = "write"
+	}
+	result := SourceChangeResult{Tool: "oxfmt", Mode: mode, Current: true}
+	frontendDir, err := ValidateWorkspacePath(a.workspace, filepath.Join(a.workspace.Root, "frontend", "dashboard"))
+	if err != nil {
+		return result, err
+	}
+	formatter := filepath.Join(frontendDir, "node_modules", ".bin", "oxfmt")
+	if info, statErr := os.Stat(formatter); statErr != nil || info.IsDir() {
+		return result, errors.New("frontend formatter is unavailable; run ./hk setup first")
+	}
+
+	output, commandErr := a.runFrontendFormatter(ctx, formatter, frontendDir, "--list-different")
+	if ctx.Err() != nil {
+		return result, ctx.Err()
+	}
+	changed := frontendChangedFiles(output, a.workspace.Root, frontendDir)
+	if commandErr != nil && len(changed) == 0 {
+		return result, fmt.Errorf("check frontend formatting: %w: %s", commandErr, boundedFixOutput(output))
+	}
+	result.ChangedFileCount = len(changed)
+	result.ChangedFiles, result.Truncated = boundedStrings(changed, maxSourceResultFiles)
+	if len(changed) == 0 {
+		return result, nil
+	}
+	if !write {
+		result.Current = false
+		return result, sourceChangesPendingError{result: result}
+	}
+	writeOutput, err := a.runFrontendFormatter(ctx, formatter, frontendDir, "--write")
+	if err != nil {
+		if ctx.Err() != nil {
+			return result, ctx.Err()
+		}
+		return result, fmt.Errorf("write frontend formatting: %w: %s", err, boundedFixOutput(writeOutput))
+	}
+	return result, nil
+}
+
+func (a *App) runFrontendFormatter(ctx context.Context, formatter, directory, mode string) ([]byte, error) {
+	command := exec.CommandContext(ctx, formatter, mode) //nolint:gosec // executable is workspace-pinned and arguments are closed
+	command.Dir = directory
+	command.Env = a.commandEnvironment([]string{"NO_COLOR=1", "TERM=dumb"})
+	buffer := &boundedBuffer{limit: maxFixOutputBytes}
+	command.Stdout = buffer
+	command.Stderr = buffer
+	err := command.Run()
+	return buffer.Bytes(), err
+}
+
+func frontendChangedFiles(output []byte, workspaceRoot, frontendDir string) []string {
+	seen := map[string]bool{}
+	var paths []string
+	scanner := bufio.NewScanner(bytes.NewReader(output))
+	for scanner.Scan() {
+		value := strings.TrimSpace(scanner.Text())
+		if value == "" {
+			continue
+		}
+		path := value
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(frontendDir, filepath.FromSlash(path))
+		}
+		path = filepath.Clean(path)
+		relative, err := filepath.Rel(workspaceRoot, path)
+		if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			continue
+		}
+		info, err := os.Lstat(path)
+		if err != nil || !info.Mode().IsRegular() {
+			continue
+		}
+		relative = filepath.ToSlash(relative)
+		if seen[relative] {
+			continue
+		}
+		seen[relative] = true
+		paths = append(paths, relative)
+	}
+	slices.Sort(paths)
+	return paths
+}
+
 // FixGo uses the pinned Go toolchain's own fix analyzers. Check mode relies on
 // go fix -diff, so it reports drift without modifying the workspace.
 func (a *App) FixGo(ctx context.Context, apply bool) (SourceChangeResult, error) {
@@ -165,16 +254,20 @@ func (a *App) runGoFix(ctx context.Context, diff bool) ([]byte, error) {
 	if diff {
 		args = append(args, "-diff")
 	}
-	args = append(args, "./...")
+	variant, _ := VariantByID("self-hosted")
+	packages, err := a.listGoPackages(ctx, variant)
+	if err != nil {
+		return nil, err
+	}
+	args = append(args, packages...)
 	command := exec.CommandContext(ctx, "go", args...) //nolint:gosec // fixed executable and closed arguments
 	command.Dir = a.workspace.Root
-	variant, _ := VariantByID("self-hosted")
 	command.Env = a.commandEnvironment([]string{"GOFLAGS=-tags=" + strings.Join(variant.BuildTags, ",")})
 	buffer := &boundedBuffer{limit: maxFixOutputBytes}
 	command.Stdout = buffer
 	command.Stderr = buffer
-	err := command.Run()
-	return buffer.Bytes(), err
+	runErr := command.Run()
+	return buffer.Bytes(), runErr
 }
 
 func goFixChangedFiles(output []byte, workspaceRoot string) []string {

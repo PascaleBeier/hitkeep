@@ -142,7 +142,15 @@ func ListWorkspaces(path string) ([]Workspace, error) {
 		}
 		workspace.Branch, _ = gitOutput(root, "branch", "--show-current")
 		workspace.Head, _ = gitOutput(root, "rev-parse", "HEAD")
+		changedPaths, _ := workingTreeChangedPaths(root)
+		workspace.DirtyCount = len(changedPaths)
+		workspace.ChangedPaths, workspace.ChangedPathsTruncated = boundedStrings(changedPaths, maxStructuredPaths)
 		workspace.ActiveRuns = runSummariesFromState(workspace.StateDir, true, 10)
+		var devRecord devSessionRecord
+		if raw, readErr := os.ReadFile(filepath.Join(workspace.StateDir, "dev", "session.json")); readErr == nil && json.Unmarshal(raw, &devRecord) == nil {
+			status := devRecord.DevStatus
+			workspace.Dev = &status
+		}
 		workspaces = append(workspaces, workspace)
 	}
 	slices.SortFunc(workspaces, func(a, b Workspace) int { return strings.Compare(a.Root, b.Root) })
@@ -375,7 +383,10 @@ func gitOutput(dir string, args ...string) (string, error) {
 }
 
 func gitLines(dir string, args ...string) ([]string, error) {
-	output, err := gitOutput(dir, args...)
+	command := exec.CommandContext(context.Background(), "git", args...)
+	command.Dir = dir
+	raw, err := command.Output()
+	output := strings.TrimRight(string(raw), "\r\n")
 	if err != nil || output == "" {
 		return nil, err
 	}
