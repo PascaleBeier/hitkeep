@@ -227,8 +227,8 @@ func startSearchConsoleSyncWorker(ctx context.Context, conf *config.Config, tena
 func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.Logger, logLevel slog.Level, realtimeBroker *realtime.Broker) (*database.Store, *database.TenantStoreManager, *nsq.Producer, func(), error) {
 	slog.Debug("(Leader) Starting stateful services...")
 
-	newStore := func() *database.Store {
-		return database.NewStore(conf.DBPath,
+	openStore := func() (*database.Store, error) {
+		return database.OpenMigratedStore(ctx, conf.DBPath,
 			database.WithMemoryLimit(conf.DuckDBMemoryLimit),
 			database.WithThreads(conf.DuckDBThreads),
 			database.WithCheckpointInterval(time.Duration(conf.DBCheckpointIntervalMinutes)*time.Minute),
@@ -237,12 +237,8 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 		)
 	}
 
-	store := newStore()
-	if err := store.Connect(); err != nil {
-		return nil, nil, nil, nil, err
-	}
-	if err := store.Migrate(ctx); err != nil {
-		store.Close()
+	store, err := openStore()
+	if err != nil {
 		return nil, nil, nil, nil, err
 	}
 
@@ -260,8 +256,8 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 		} else if result.Compacted {
 			slog.Info("Compacted database at startup", "path", conf.DBPath, "bytes_before", result.BytesBefore, "bytes_after", result.BytesAfter)
 		}
-		store = newStore()
-		if err := store.Connect(); err != nil {
+		store, err = openStore()
+		if err != nil {
 			return nil, nil, nil, nil, err
 		}
 	}

@@ -84,17 +84,12 @@ func main() {
 
 	ctx := context.Background()
 
-	store := database.NewStore(*dbPath)
-	if err := store.Connect(); err != nil {
+	store, err := database.OpenMigratedStore(ctx, *dbPath)
+	if err != nil {
 		slog.Error("Failed to connect to database", "error", err)
 		os.Exit(1)
 	}
 	defer store.Close()
-
-	if err := store.Migrate(ctx); err != nil {
-		slog.Error("Failed to run migrations", "error", err)
-		os.Exit(1)
-	}
 	tenantBasePath := strings.TrimSpace(*dataPath)
 
 	tenantMgr := database.NewTenantStoreManager(store, tenantBasePath)

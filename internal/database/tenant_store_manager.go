@@ -525,8 +525,7 @@ func (m *TenantStoreManager) openTenantStore(ctx context.Context, tenantID uuid.
 		}
 		return nil, fmt.Errorf("could not connect to tenant database %s: %w", dbPath, err)
 	}
-
-	if err := store.MigrateTenant(ctx); err != nil {
+	if err := store.migrateTenant(ctx, migrationRunOptions{guarded: true}); err != nil {
 		store.Close()
 		return nil, fmt.Errorf("could not migrate tenant database %s: %w", dbPath, err)
 	}

@@ -125,14 +125,11 @@ func runSmoke(ctx context.Context, conf smokeConfig) (smokegate.Report, error) {
 	}
 	defer cleanup()
 
-	store := database.NewStore(workingDB)
-	if err := store.Connect(); err != nil {
+	store, err := database.OpenMigratedStore(ctx, workingDB)
+	if err != nil {
 		return smokegate.Report{}, fmt.Errorf("connect restored db: %w", err)
 	}
 	defer store.Close()
-	if err := store.Migrate(ctx); err != nil {
-		return smokegate.Report{}, fmt.Errorf("migrate restored db: %w", err)
-	}
 	workingDataPath, cleanupDataPath, err := prepareWorkingDataPath(conf.DataPath)
 	if err != nil {
 		return smokegate.Report{}, err
@@ -253,13 +250,9 @@ func tenantAnalyticsStore(ctx context.Context, shared *database.Store, cache map
 	if err := copyFile(sourcePath, targetPath); err != nil {
 		return nil, fmt.Errorf("copy tenant db %s: %w", tenantID, err)
 	}
-	store := database.NewStore(targetPath)
-	if err := store.Connect(); err != nil {
+	store, err := database.OpenMigratedTenantStore(ctx, targetPath)
+	if err != nil {
 		return nil, fmt.Errorf("connect tenant db %s: %w", tenantID, err)
-	}
-	if err := store.MigrateTenant(ctx); err != nil {
-		_ = store.Close()
-		return nil, fmt.Errorf("migrate tenant db %s: %w", tenantID, err)
 	}
 	cache[tenantID] = store
 	return store, nil

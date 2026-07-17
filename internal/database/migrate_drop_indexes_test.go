@@ -299,7 +299,7 @@ func TestDropMutableControlIndexesMigrationPreservesActivityAndCleanup(t *testin
 		t.Fatalf("expected activity secondary indexes to be removed, got %d", afterIndexes)
 	}
 
-	lastHitAt := time.Now().UTC()
+	lastHitAt := time.Now().UTC().Truncate(time.Microsecond)
 	if err := store.RecordHitActivity(ctx, []*api.Hit{{
 		ID: uuid.New(), SiteID: site.ID, SessionID: uuid.New(), PageID: uuid.New(),
 		Timestamp: lastHitAt, Path: "/after-upgrade",

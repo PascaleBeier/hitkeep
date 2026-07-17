@@ -29,6 +29,7 @@ type Store struct {
 	threads             int
 	checkpointInterval  time.Duration
 	checkpointMu        sync.Mutex
+	migrationMu         sync.Mutex
 	status              *databaseStatusTracker
 	recovery            *databaseRecovery
 	recoveryOptions     recoveryOptions
@@ -159,6 +160,10 @@ func (s *Store) Connect() error {
 	ctx := context.Background()
 	s.recovery.loadRecoveryHistory()
 	recoveryBeforeConnect := s.DatabaseStatus().LastRecoveryAt
+	migrationGuard, err := s.recovery.loadMigrationGuard()
+	if err != nil {
+		return fmt.Errorf("load migration WAL guard: %w", err)
+	}
 	if err := s.recovery.recoverStartup(ctx); err != nil {
 		return fmt.Errorf("resume database recovery: %w", err)
 	}
@@ -166,13 +171,23 @@ func (s *Store) Connect() error {
 	slog.Info("Connecting to database...", "path", s.path)
 	db, err := s.openReconnectingDB(ctx)
 	if err != nil && isKnownWALReplayError(err) && s.recovery.available() {
-		if recoveryErr := s.recovery.recoverWAL(ctx, err); recoveryErr != nil {
+		var recoveryErr error
+		if migrationGuard != nil {
+			recoveryErr = s.recovery.recoverMigrationWAL(ctx, err, migrationGuard)
+		} else {
+			recoveryErr = s.recovery.recoverWAL(ctx, err)
+		}
+		if recoveryErr != nil {
 			return fmt.Errorf("recover database WAL: %w", recoveryErr)
 		}
 		db, err = s.openReconnectingDB(ctx)
 	}
 	if err != nil {
 		return fmt.Errorf("could not connect to database: %w", err)
+	}
+	if err := s.recovery.checkpointAndClearMigrationGuard(ctx, db, migrationGuard); err != nil {
+		_ = db.Close()
+		return fmt.Errorf("complete interrupted database migration: %w", err)
 	}
 
 	s.db = db

@@ -75,17 +75,12 @@ async function selectRange(page, label) {
 
 async function revealMetricCard(page, title) {
     const tab = page.getByRole("tab", { name: title, exact: true }).first();
-    if (await tab.isVisible().catch(() => false)) {
-        await tab.click();
-        const panel = page.getByRole("tabpanel", { name: title, exact: true }).first();
-        await expect(panel).toBeVisible();
-        return panel;
-    }
+    await expect(tab).toBeVisible();
+    await tab.click();
 
-    await expect(page.getByText(title, { exact: true }).first()).toBeVisible();
-    const card = page.locator(".metric-card-group__card").filter({ hasText: title }).first();
-    await expect(card).toBeVisible();
-    return card;
+    const panel = page.getByRole("tabpanel", { name: title, exact: true }).first();
+    await expect(panel).toBeVisible();
+    return panel;
 }
 
 async function expectSeededMetricValue(page, title, valuePattern) {

@@ -54,6 +54,8 @@ type recoveryMarker struct {
 	Phase                string    `json:"phase"`
 	BundleDir            string    `json:"bundle_dir"`
 	WALAsidePath         string    `json:"wal_aside_path,omitempty"`
+	MigrationWAL         bool      `json:"migration_wal,omitempty"`
+	MigrationCheckpoint  string    `json:"migration_checkpoint,omitempty"`
 	RepairTable          string    `json:"repair_table,omitempty"`
 	RepairIndexes        []string  `json:"repair_indexes,omitempty"`
 	RemovedUnsafeIndexes int       `json:"removed_unsafe_indexes,omitempty"`
@@ -285,10 +287,25 @@ func listRepairableIndexes(ctx context.Context, db *sql.DB, targetTable string) 
 }
 
 func (r *databaseRecovery) recoverWAL(ctx context.Context, trigger error) error {
+	return r.recoverWALWithPolicy(ctx, trigger, nil)
+}
+
+func (r *databaseRecovery) recoverMigrationWAL(ctx context.Context, trigger error, guard *migrationWALGuard) error {
+	if guard == nil {
+		return errors.New("missing migration WAL guard")
+	}
+	return r.recoverWALWithPolicy(ctx, trigger, guard)
+}
+
+func (r *databaseRecovery) recoverWALWithPolicy(ctx context.Context, trigger error, migrationGuard *migrationWALGuard) error {
 	if !r.available() || !isKnownWALReplayError(trigger) {
 		return trigger
 	}
+	migrationWAL := migrationGuard != nil
 	triggerName := "wal_replay_default_binding"
+	if migrationWAL {
+		triggerName = "migration_wal_replay_default_binding"
+	}
 	r.status.recovering("bundle_wal", triggerName)
 
 	walPath := r.store.path + ".wal"
@@ -310,7 +327,11 @@ func (r *databaseRecovery) recoverWAL(ctx context.Context, trigger error) error 
 		Phase:        "awaiting_operator",
 		BundleDir:    bundleDir,
 		WALAsidePath: asidePath,
+		MigrationWAL: migrationWAL,
 		CreatedAt:    time.Now().UTC(),
+	}
+	if migrationGuard != nil {
+		marker.MigrationCheckpoint = migrationGuard.CheckpointToken
 	}
 	if err := r.writeMarker(marker); err != nil {
 		r.status.recoveryFailed(triggerName, "write_marker")
@@ -342,7 +363,7 @@ func (r *databaseRecovery) applyWALRecovery(ctx context.Context, marker *recover
 			slog.Info("DuckDB WAL recovery completed after operator removed the replay-failing WAL", "database_id", marker.DatabaseID)
 			return nil
 		}
-		if !r.opts.automaticWALRecovery {
+		if !marker.MigrationWAL && !r.opts.automaticWALRecovery {
 			marker.Phase = "operator_action_required"
 			return fmt.Errorf(
 				"%w after retaining recovery bundle; set HITKEEP_DB_AUTO_RECOVER_WAL=true only if accepting loss of WAL-only changes",
@@ -386,6 +407,26 @@ func (r *databaseRecovery) applyWALRecovery(ctx context.Context, marker *recover
 		if err != nil {
 			return fmt.Errorf("open database without replay-failing WAL: %w", err)
 		}
+		if marker.MigrationWAL {
+			if verifyErr := r.verifyMigrationCheckpoint(ctx, db, marker.MigrationCheckpoint); verifyErr != nil {
+				_ = db.Close()
+				if !r.opts.automaticWALRecovery {
+					return r.restoreUnverifiedMigrationWAL(marker, walPath, asidePath, verifyErr)
+				}
+				slog.Warn("Migration WAL checkpoint verification failed; continuing because broad WAL recovery is explicitly enabled",
+					"database_id", marker.DatabaseID,
+					"error", verifyErr)
+				marker.MigrationWAL = false
+				marker.MigrationCheckpoint = ""
+				if err := r.writeMarker(marker); err != nil {
+					return err
+				}
+				db, err = r.store.openRawDB(ctx)
+				if err != nil {
+					return fmt.Errorf("reopen database after migration checkpoint verification: %w", err)
+				}
+			}
+		}
 		if _, err := db.ExecContext(ctx, "CHECKPOINT;"); err != nil {
 			_ = db.Close()
 			return fmt.Errorf("checkpoint database after WAL bypass: %w", err)
@@ -415,6 +456,29 @@ func (r *databaseRecovery) applyWALRecovery(ctx context.Context, marker *recover
 	r.status.recovered(0)
 	slog.Info("DuckDB WAL recovery completed", "database_id", marker.DatabaseID, "trigger", marker.Trigger)
 	return nil
+}
+
+func (r *databaseRecovery) restoreUnverifiedMigrationWAL(marker *recoveryMarker, walPath, asidePath string, verifyErr error) error {
+	if fileExists(walPath) {
+		return fmt.Errorf("migration checkpoint verification failed and live WAL already exists: %w", verifyErr)
+	}
+	if err := os.Rename(asidePath, walPath); err != nil {
+		return fmt.Errorf("restore unverified migration WAL: %w", errors.Join(verifyErr, err))
+	}
+	if err := syncParentDirectory(walPath); err != nil {
+		return fmt.Errorf("sync restored unverified migration WAL: %w", errors.Join(verifyErr, err))
+	}
+	marker.MigrationWAL = false
+	marker.MigrationCheckpoint = ""
+	marker.Phase = "awaiting_operator"
+	if err := r.writeMarker(marker); err != nil {
+		return fmt.Errorf("record rejected migration WAL guard: %w", errors.Join(verifyErr, err))
+	}
+	return fmt.Errorf(
+		"%w because the migration checkpoint identity did not match; the live WAL was restored unchanged: %v",
+		errAutomaticWALRecoveryDisabled,
+		verifyErr,
+	)
 }
 
 func (r *databaseRecovery) createBundle(trigger string) (string, error) {

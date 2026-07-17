@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -590,4 +591,252 @@ func knownWALReplayTestError() error {
 			`duckdb::Binder::BindDefaultValues ` +
 			`duckdb::DatabaseManager::GetDefaultDatabase`,
 	)
+}
+
+func TestGuardedTenantMigrationSurvivesAbruptRestart(t *testing.T) {
+	const (
+		helperDBEnv       = "HITKEEP_TEST_ABRUPT_TENANT_MIGRATION_DB"
+		helperRecoveryEnv = "HITKEEP_TEST_ABRUPT_TENANT_MIGRATION_RECOVERY"
+		migrationFile     = "0013_drop_analytics_art_indexes.sql"
+	)
+	if dbPath := os.Getenv(helperDBEnv); dbPath != "" {
+		store := NewStore(dbPath,
+			WithCheckpointInterval(0),
+			WithAutomaticRecovery(false, os.Getenv(helperRecoveryEnv)),
+		)
+		if err := store.Connect(); err != nil {
+			t.Fatalf("connect abrupt migration helper: %v", err)
+		}
+		if err := store.migrateTenant(context.Background(), migrationRunOptions{
+			guarded: true,
+			afterCommit: func() {
+				// Deliberately skip the post-migration checkpoint and clean close so
+				// the committed migration remains in the WAL.
+				os.Exit(0)
+			},
+		}); err != nil {
+			t.Fatalf("run abrupt tenant migration: %v", err)
+		}
+		t.Fatal("abrupt migration hook did not exit")
+	}
+
+	ctx := context.Background()
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "tenant-migration-replay.db")
+	recoveryRoot := filepath.Join(dir, "recovery")
+
+	seed := NewStore(dbPath, WithCheckpointInterval(0))
+	if err := seed.Connect(); err != nil {
+		t.Fatalf("connect migration seed: %v", err)
+	}
+	if _, err := seed.DB().ExecContext(ctx, `
+		CREATE TABLE migrations (migration VARCHAR NOT NULL, applied_at TIMESTAMPTZ NOT NULL);
+		INSERT INTO migrations (migration, applied_at) VALUES (?, now())`, migrationFile); err != nil {
+		t.Fatalf("hold back replay migration: %v", err)
+	}
+	if err := seed.MigrateTenant(ctx); err != nil {
+		t.Fatalf("prepare pre-migration tenant schema: %v", err)
+	}
+	if _, err := seed.DB().ExecContext(ctx, `
+		INSERT INTO sites (id, domain, data_retention_days) VALUES (uuid(), 'migration.test', 365);
+		INSERT INTO hits (id, site_id, session_id, page_id, timestamp, path)
+		SELECT uuid(), id, uuid(), uuid(), now(), '/before-migration' FROM sites;
+		DELETE FROM migrations WHERE migration = ?`, migrationFile); err != nil {
+		t.Fatalf("seed checkpointed tenant data: %v", err)
+	}
+	if err := seed.Close(); err != nil {
+		t.Fatalf("close migration seed: %v", err)
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=^TestGuardedTenantMigrationSurvivesAbruptRestart$")
+	cmd.Env = append(os.Environ(), helperDBEnv+"="+dbPath, helperRecoveryEnv+"="+recoveryRoot)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("create replay-failing WAL: %v\n%s", err, output)
+	}
+	if _, err := os.Stat(dbPath + ".wal"); err != nil {
+		t.Fatalf("expected replay-failing WAL: %v", err)
+	}
+
+	store, err := OpenMigratedTenantStore(ctx, dbPath,
+		WithCheckpointInterval(0),
+		WithAutomaticRecovery(false, recoveryRoot),
+	)
+	if err != nil {
+		t.Fatalf("recover and reapply guarded migration WAL without global opt-in: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	var rows, appliedMigrations, remainingIndexes int
+	if err := store.DB().QueryRowContext(ctx, "SELECT count(*) FROM hits WHERE path = '/before-migration'").Scan(&rows); err != nil {
+		t.Fatalf("read base data after migration WAL recovery: %v", err)
+	}
+	if err := store.DB().QueryRowContext(ctx,
+		"SELECT count(*) FROM migrations WHERE migration = ?", migrationFile).Scan(&appliedMigrations); err != nil {
+		t.Fatalf("count reapplied migration: %v", err)
+	}
+	if err := store.DB().QueryRowContext(ctx, `
+		SELECT count(*) FROM duckdb_indexes()
+		WHERE table_name IN ('hits', 'events', 'web_vitals') AND NOT is_unique`).Scan(&remainingIndexes); err != nil {
+		t.Fatalf("inspect migrated tenant indexes: %v", err)
+	}
+	if rows != 1 || appliedMigrations != 1 || remainingIndexes != 0 {
+		t.Fatalf("unexpected recovered migration state: rows=%d migrations=%d indexes=%d", rows, appliedMigrations, remainingIndexes)
+	}
+	if _, err := os.Stat(store.recovery.migrationGuardPath()); !os.IsNotExist(err) {
+		t.Fatalf("expected completed migration guard to be cleared, got %v", err)
+	}
+	status := store.DatabaseStatus()
+	if status.State != DatabaseStateHealthy {
+		t.Fatalf("unexpected guarded migration status: %+v", status)
+	}
+	if status.RecoveryBundleAvailable != store.RecoveredDuringConnect() {
+		t.Fatalf("migration recovery bundle and connect status disagree: %+v", status)
+	}
+}
+
+func TestConnectCheckpointsAndClearsStaleMigrationGuard(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := createRecoveryTestDatabase(t, dir)
+	store := NewStore(dbPath,
+		WithCheckpointInterval(0),
+		WithAutomaticRecovery(false, filepath.Join(dir, "recovery")),
+	)
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect guard seed: %v", err)
+	}
+	if err := store.ensureMigrationCheckpointTable(context.Background()); err != nil {
+		t.Fatalf("create guard checkpoint table: %v", err)
+	}
+	if err := store.prepareGuardedMigration(context.Background(), "shared", []string{"already_replayed.sql"}); err != nil {
+		t.Fatalf("prepare stale migration guard: %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("close guard seed: %v", err)
+	}
+
+	reopened := NewStore(dbPath,
+		WithCheckpointInterval(0),
+		WithAutomaticRecovery(false, filepath.Join(dir, "recovery")),
+	)
+	if err := reopened.Connect(); err != nil {
+		t.Fatalf("connect with replayable migration guard: %v", err)
+	}
+	t.Cleanup(func() { _ = reopened.Close() })
+	if _, err := os.Stat(reopened.recovery.migrationGuardPath()); !os.IsNotExist(err) {
+		t.Fatalf("expected replayed migration guard to be cleared, got %v", err)
+	}
+	if reopened.DatabaseStatus().RecoveryBundleAvailable {
+		t.Fatal("successful WAL replay must not create a recovery bundle")
+	}
+}
+
+func TestConnectRejectsInvalidMigrationGuard(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := createRecoveryTestDatabase(t, dir)
+	store := NewStore(dbPath,
+		WithCheckpointInterval(0),
+		WithAutomaticRecovery(false, filepath.Join(dir, "recovery")),
+	)
+	if err := os.MkdirAll(store.recovery.root(), 0o700); err != nil {
+		t.Fatalf("create recovery directory: %v", err)
+	}
+	if err := os.WriteFile(store.recovery.migrationGuardPath(), []byte(`{"version":1,"database_id":"wrong"}`), 0o600); err != nil {
+		t.Fatalf("write invalid migration guard: %v", err)
+	}
+
+	err := store.Connect()
+	if err == nil || !strings.Contains(err.Error(), "migration WAL guard does not match this database") {
+		t.Fatalf("expected invalid migration guard to fail closed, got %v", err)
+	}
+}
+
+func TestMigrationCheckpointMismatchRestoresApplicationWAL(t *testing.T) {
+	const helperEnv = "HITKEEP_TEST_CREATE_APPLICATION_WAL"
+	if dbPath := os.Getenv(helperEnv); dbPath != "" {
+		db, err := openDuckDBFile(dbPath)
+		if err != nil {
+			t.Fatalf("open application WAL helper: %v", err)
+		}
+		if _, err := db.Exec("INSERT INTO application_writes VALUES (1)"); err != nil {
+			t.Fatalf("write application WAL row: %v", err)
+		}
+		os.Exit(0)
+	}
+
+	ctx := context.Background()
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "checkpoint-mismatch.db")
+	recoveryRoot := filepath.Join(dir, "recovery")
+
+	seed := NewStore(dbPath,
+		WithCheckpointInterval(0),
+		WithAutomaticRecovery(false, recoveryRoot),
+	)
+	if err := seed.Connect(); err != nil {
+		t.Fatalf("connect checkpoint mismatch seed: %v", err)
+	}
+	if _, err := seed.DB().ExecContext(ctx, "CREATE TABLE application_writes (id BIGINT)"); err != nil {
+		t.Fatalf("create application write table: %v", err)
+	}
+	if err := seed.ensureMigrationCheckpointTable(ctx); err != nil {
+		t.Fatalf("create migration checkpoint table: %v", err)
+	}
+	if err := seed.prepareGuardedMigration(ctx, "shared", []string{"stale.sql"}); err != nil {
+		t.Fatalf("prepare migration checkpoint: %v", err)
+	}
+	if err := seed.Close(); err != nil {
+		t.Fatalf("close checkpoint mismatch seed: %v", err)
+	}
+
+	guard, err := seed.recovery.loadMigrationGuard()
+	if err != nil {
+		t.Fatalf("load migration guard: %v", err)
+	}
+	guard.CheckpointToken = "restored-database-token"
+	if err := writeJSONFile(seed.recovery.migrationGuardPath(), guard); err != nil {
+		t.Fatalf("replace migration checkpoint identity: %v", err)
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=^TestMigrationCheckpointMismatchRestoresApplicationWAL$")
+	cmd.Env = append(os.Environ(), helperEnv+"="+dbPath)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("create application WAL: %v\n%s", err, output)
+	}
+
+	recovering := NewStore(dbPath,
+		WithCheckpointInterval(0),
+		WithAutomaticRecovery(false, recoveryRoot),
+	)
+	err = recovering.recovery.recoverMigrationWAL(ctx, knownWALReplayTestError(), guard)
+	if err == nil || !strings.Contains(err.Error(), "migration checkpoint identity did not match") {
+		t.Fatalf("expected checkpoint mismatch to fail closed, got %v", err)
+	}
+	if _, err := os.Stat(dbPath + ".wal"); err != nil {
+		t.Fatalf("expected application WAL to be restored unchanged: %v", err)
+	}
+	marker, err := recovering.recovery.loadMarker()
+	if err != nil {
+		t.Fatalf("load rejected recovery marker: %v", err)
+	}
+	if marker == nil || marker.MigrationWAL || marker.Phase != "awaiting_operator" {
+		t.Fatalf("unexpected rejected migration recovery marker: %+v", marker)
+	}
+
+	if err := os.Remove(recovering.recovery.markerPath()); err != nil {
+		t.Fatalf("clear rejected recovery marker for WAL verification: %v", err)
+	}
+	if err := recovering.recovery.clearMigrationGuard(); err != nil {
+		t.Fatalf("clear stale migration guard for WAL verification: %v", err)
+	}
+	if err := recovering.Connect(); err != nil {
+		t.Fatalf("replay restored application WAL: %v", err)
+	}
+	t.Cleanup(func() { _ = recovering.Close() })
+	var rows int
+	if err := recovering.DB().QueryRowContext(ctx, "SELECT count(*) FROM application_writes").Scan(&rows); err != nil {
+		t.Fatalf("read restored application WAL row: %v", err)
+	}
+	if rows != 1 {
+		t.Fatalf("expected application WAL row to survive, got %d", rows)
+	}
 }

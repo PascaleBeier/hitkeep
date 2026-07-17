@@ -121,18 +121,13 @@ func recoverDisable2FA(args []string) {
 	fmt.Printf("DB:    %s\n", *dbPath)
 	fmt.Printf("User:  %s\n\n", *email)
 
-	store := database.NewStore(*dbPath)
-	if err := store.Connect(); err != nil {
+	store, err := database.OpenMigratedStore(ctx, *dbPath)
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: could not open database: %v\n", err)
 		fmt.Fprintln(os.Stderr, "Make sure HitKeep is stopped before running recovery commands.")
 		os.Exit(1)
 	}
 	defer store.Close()
-
-	if err := store.Migrate(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: migration failed: %v\n", err)
-		os.Exit(1)
-	}
 
 	// ---- Look up user ---------------------------------------------------
 	user, err := store.GetUserByEmail(ctx, *email)
