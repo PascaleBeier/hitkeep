@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -22,6 +23,36 @@ const invalidatedDatabaseMarker = "database has been invalidated"
 // ErrDatabaseRecovering is returned to callers that hit the short window in
 // which the invalidated instance is still draining its open connections.
 var ErrDatabaseRecovering = errors.New("database is recovering from a fatal error, retry shortly")
+
+var mutationTablePattern = regexp.MustCompile(`(?i)\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+(?:(?:"?[a-z_][a-z0-9_]*"?)\s*\.\s*)?("?[a-z_][a-z0-9_]*"?)`)
+
+type databaseOperationError struct {
+	err   error
+	table string
+}
+
+func (e *databaseOperationError) Error() string { return e.err.Error() }
+func (e *databaseOperationError) Unwrap() error { return e.err }
+
+func repairTableFromError(err error) string {
+	var targeted *databaseOperationError
+	if !errors.As(err, &targeted) || targeted == nil {
+		return ""
+	}
+	return targeted.table
+}
+
+func mutationTable(query string) string {
+	match := mutationTablePattern.FindStringSubmatch(query)
+	if len(match) != 2 {
+		return ""
+	}
+	table := strings.Trim(match[1], `"`)
+	if table == "" {
+		return ""
+	}
+	return table
+}
 
 func isInvalidatedDatabaseError(err error) bool {
 	return err != nil && strings.Contains(strings.ToLower(err.Error()), invalidatedDatabaseMarker)
@@ -134,7 +165,7 @@ func (c *reconnectingConnector) Close() error {
 func (c *reconnectingConnector) markDead(trigger error) {
 	c.mu.Lock()
 	if c.dead {
-		if c.trigger == nil {
+		if c.trigger == nil || (repairTableFromError(c.trigger) == "" && repairTableFromError(trigger) != "") {
 			c.trigger = trigger
 		}
 		c.mu.Unlock()
@@ -221,7 +252,14 @@ func (c *reconnectingConnector) closeInnerLocked() {
 }
 
 // observe inspects an operation error and flags the instance on invalidation.
-func (c *reconnectingConnector) observe(err error) {
+// The first index-mutation fatal does not always include DuckDB's generic
+// invalidation marker, so retain its mutation target before later operations
+// can replace it with a context-free "previous fatal error" message.
+func (c *reconnectingConnector) observe(err error, query string) {
+	if isIndexMutationCorruption(err) {
+		c.markDead(&databaseOperationError{err: err, table: mutationTable(query)})
+		return
+	}
 	if isInvalidatedDatabaseError(err) {
 		c.markDead(err)
 	}
@@ -243,11 +281,11 @@ func (c *reconnectingConn) Prepare(query string) (driver.Stmt, error) {
 		return nil, driver.ErrBadConn
 	}
 	stmt, err := c.inner.Prepare(query)
-	c.connector.observe(err)
+	c.connector.observe(err, query)
 	if err != nil {
 		return nil, err
 	}
-	return &reconnectingStmt{inner: stmt, connector: c.connector}, nil
+	return &reconnectingStmt{inner: stmt, connector: c.connector, query: query}, nil
 }
 
 func (c *reconnectingConn) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
@@ -259,11 +297,11 @@ func (c *reconnectingConn) PrepareContext(ctx context.Context, query string) (dr
 		return c.Prepare(query)
 	}
 	stmt, err := preparer.PrepareContext(ctx, query)
-	c.connector.observe(err)
+	c.connector.observe(err, query)
 	if err != nil {
 		return nil, err
 	}
-	return &reconnectingStmt{inner: stmt, connector: c.connector}, nil
+	return &reconnectingStmt{inner: stmt, connector: c.connector, query: query}, nil
 }
 
 func (c *reconnectingConn) Close() error {
@@ -282,7 +320,7 @@ func (c *reconnectingConn) Begin() (driver.Tx, error) {
 	}
 	//lint:ignore SA1019 driver.Conn interface compliance; BeginTx is preferred below.
 	tx, err := c.inner.Begin() //nolint:staticcheck // driver.Conn interface compliance; BeginTx is preferred below.
-	c.connector.observe(err)
+	c.connector.observe(err, "")
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +336,7 @@ func (c *reconnectingConn) BeginTx(ctx context.Context, opts driver.TxOptions) (
 		return c.Begin()
 	}
 	tx, err := beginner.BeginTx(ctx, opts)
-	c.connector.observe(err)
+	c.connector.observe(err, "")
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +352,7 @@ func (c *reconnectingConn) ExecContext(ctx context.Context, query string, args [
 		return nil, driver.ErrSkip
 	}
 	result, err := execer.ExecContext(ctx, query, args)
-	c.connector.observe(err)
+	c.connector.observe(err, query)
 	return result, err
 }
 
@@ -327,7 +365,7 @@ func (c *reconnectingConn) QueryContext(ctx context.Context, query string, args 
 		return nil, driver.ErrSkip
 	}
 	rows, err := queryer.QueryContext(ctx, query, args)
-	c.connector.observe(err)
+	c.connector.observe(err, query)
 	return rows, err
 }
 
@@ -363,6 +401,7 @@ func (c *reconnectingConn) ResetSession(ctx context.Context) error {
 type reconnectingStmt struct {
 	inner     driver.Stmt
 	connector *reconnectingConnector
+	query     string
 }
 
 func (s *reconnectingStmt) Close() error  { return s.inner.Close() }
@@ -371,14 +410,14 @@ func (s *reconnectingStmt) NumInput() int { return s.inner.NumInput() }
 func (s *reconnectingStmt) Exec(args []driver.Value) (driver.Result, error) {
 	//lint:ignore SA1019 driver.Stmt interface compliance.
 	result, err := s.inner.Exec(args) //nolint:staticcheck // driver.Stmt interface compliance.
-	s.connector.observe(err)
+	s.connector.observe(err, s.query)
 	return result, err
 }
 
 func (s *reconnectingStmt) Query(args []driver.Value) (driver.Rows, error) {
 	//lint:ignore SA1019 driver.Stmt interface compliance.
 	rows, err := s.inner.Query(args) //nolint:staticcheck // driver.Stmt interface compliance.
-	s.connector.observe(err)
+	s.connector.observe(err, s.query)
 	return rows, err
 }
 
@@ -388,7 +427,7 @@ func (s *reconnectingStmt) ExecContext(ctx context.Context, args []driver.NamedV
 		return nil, driver.ErrSkip
 	}
 	result, err := execer.ExecContext(ctx, args)
-	s.connector.observe(err)
+	s.connector.observe(err, s.query)
 	return result, err
 }
 
@@ -398,7 +437,7 @@ func (s *reconnectingStmt) QueryContext(ctx context.Context, args []driver.Named
 		return nil, driver.ErrSkip
 	}
 	rows, err := queryer.QueryContext(ctx, args)
-	s.connector.observe(err)
+	s.connector.observe(err, s.query)
 	return rows, err
 }
 
@@ -416,12 +455,12 @@ type reconnectingTx struct {
 
 func (t *reconnectingTx) Commit() error {
 	err := t.inner.Commit()
-	t.connector.observe(err)
+	t.connector.observe(err, "")
 	return err
 }
 
 func (t *reconnectingTx) Rollback() error {
 	err := t.inner.Rollback()
-	t.connector.observe(err)
+	t.connector.observe(err, "")
 	return err
 }

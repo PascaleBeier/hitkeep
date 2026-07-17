@@ -82,7 +82,7 @@ func WithCheckpointInterval(interval time.Duration) StoreOption {
 	}
 }
 
-// WithAutomaticRecovery enables the allowlisted DuckDB recovery procedures
+// WithAutomaticRecovery enables narrowly classified DuckDB recovery procedures
 // and configures where their permission-restricted bundles are retained.
 func WithAutomaticRecovery(enabled bool, recoveryPath string) StoreOption {
 	return func(s *Store) {

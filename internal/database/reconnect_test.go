@@ -17,6 +17,7 @@ const fakeInvalidationMessage = "FATAL Error: Failed: database has been invalida
 type fakeInstance struct {
 	id          int
 	invalidated atomic.Bool
+	indexFatal  atomic.Bool
 	closed      atomic.Bool
 	execs       atomic.Int64
 }
@@ -47,6 +48,9 @@ func (c *fakeConn) Begin() (driver.Tx, error) {
 }
 
 func (c *fakeConn) ExecContext(context.Context, string, []driver.NamedValue) (driver.Result, error) {
+	if c.instance.indexFatal.Swap(false) {
+		return nil, errors.New("FATAL Error: Invalid Input Error: Failed to delete all rows from index. Only deleted 0 out of 1 rows")
+	}
 	if c.instance.invalidated.Load() {
 		return nil, errors.New(fakeInvalidationMessage)
 	}
@@ -136,6 +140,50 @@ func TestReconnectingConnectorRunsRecoveryAfterConnectionsDrain(t *testing.T) {
 	}
 	if recoveryCalls.Load() != 1 {
 		t.Fatalf("expected one recovery callback, got %d", recoveryCalls.Load())
+	}
+}
+
+func TestReconnectingConnectorRecoversInitialIndexFatalWithMutationTable(t *testing.T) {
+	ctx := context.Background()
+	factory := &fakeFactory{}
+	var recoveryCalls atomic.Int64
+	var repairTable string
+	db := sql.OpenDB(newReconnectingConnector("fake.db", factory.new, func(_ context.Context, trigger error) error {
+		recoveryCalls.Add(1)
+		repairTable = repairTableFromError(trigger)
+		return nil
+	}))
+	t.Cleanup(func() { _ = db.Close() })
+
+	if _, err := db.ExecContext(ctx, "SELECT 1"); err != nil {
+		t.Fatalf("healthy exec: %v", err)
+	}
+	factory.instance(0).indexFatal.Store(true)
+	if _, err := db.ExecContext(ctx, "INSERT INTO site_activity_summary (site_id) VALUES (?) ON CONFLICT (site_id) DO UPDATE SET updated_at = now()", "site-id"); err == nil || !strings.Contains(strings.ToLower(err.Error()), "failed to delete all rows from index") {
+		t.Fatalf("expected original index failure to surface, got %v", err)
+	}
+
+	if _, err := db.ExecContext(ctx, "SELECT 1"); err != nil {
+		t.Fatalf("expected recovery followed by a fresh connection, got %v", err)
+	}
+	if recoveryCalls.Load() != 1 {
+		t.Fatalf("expected one recovery callback, got %d", recoveryCalls.Load())
+	}
+	if repairTable != "site_activity_summary" {
+		t.Fatalf("expected site_activity_summary repair target, got %q", repairTable)
+	}
+}
+
+func TestReconnectingConnectorPrefersTargetedTriggerAfterGenericInvalidation(t *testing.T) {
+	connector := newReconnectingConnector("fake.db", nil, nil)
+	connector.markDead(errors.New(fakeInvalidationMessage))
+	connector.markDead(&databaseOperationError{
+		err:   errors.New("FATAL Error: Invalid Input Error: Failed to delete all rows from index. Only deleted 0 out of 1 rows"),
+		table: "site_activity_summary",
+	})
+
+	if got := repairTableFromError(connector.trigger); got != "site_activity_summary" {
+		t.Fatalf("expected richer mutation target to replace generic trigger, got %q", got)
 	}
 }
 
@@ -240,5 +288,53 @@ func TestIsInvalidatedDatabaseError(t *testing.T) {
 	}
 	if isInvalidatedDatabaseError(nil) {
 		t.Fatal("expected nil not to match")
+	}
+}
+
+func TestMutationTableExtraction(t *testing.T) {
+	tests := []struct {
+		name  string
+		query string
+		want  string
+	}{
+		{
+			name:  "upsert keeps insert target rather than conflict keyword",
+			query: "INSERT INTO site_activity_summary (site_id) VALUES (?) ON CONFLICT (site_id) DO UPDATE SET updated_at = now()",
+			want:  "site_activity_summary",
+		},
+		{
+			name:  "quoted schema-qualified insert",
+			query: `INSERT INTO "main"."site_activity_summary" (site_id) VALUES (?)`,
+			want:  "site_activity_summary",
+		},
+		{
+			name:  "update",
+			query: "UPDATE webhook_deliveries SET status = ? WHERE id = ?",
+			want:  "webhook_deliveries",
+		},
+		{
+			name:  "delete",
+			query: "DELETE FROM rollup_dirty_buckets WHERE site_id = ?",
+			want:  "rollup_dirty_buckets",
+		},
+		{
+			name:  "read-only query",
+			query: "SELECT * FROM site_activity_summary",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mutationTable(tt.query)
+			if tt.want == "" {
+				if got != "" {
+					t.Fatalf("expected no mutation target, got %q", got)
+				}
+				return
+			}
+			if got != tt.want {
+				t.Fatalf("expected mutation target %q, got %q", tt.want, got)
+			}
+		})
 	}
 }

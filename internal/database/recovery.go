@@ -20,14 +20,6 @@ import (
 
 const recoveryMarkerVersion = 1
 
-var unsafeGoogleSearchConsoleIndexes = [...]string{
-	"idx_gsc_connections_connected",
-	"idx_gsc_properties_team",
-	"idx_gsc_site_mappings_team",
-	"idx_gsc_sync_state_next_retry",
-	"idx_gsc_sync_state_team_state",
-}
-
 type recoveryOptions struct {
 	enabled              bool
 	automaticWALRecovery bool
@@ -62,6 +54,8 @@ type recoveryMarker struct {
 	Phase                string    `json:"phase"`
 	BundleDir            string    `json:"bundle_dir"`
 	WALAsidePath         string    `json:"wal_aside_path,omitempty"`
+	RepairTable          string    `json:"repair_table,omitempty"`
+	RepairIndexes        []string  `json:"repair_indexes,omitempty"`
 	RemovedUnsafeIndexes int       `json:"removed_unsafe_indexes,omitempty"`
 	CreatedAt            time.Time `json:"created_at"`
 }
@@ -74,7 +68,10 @@ type recoveryResult struct {
 	RemovedUnsafeIndexes int       `json:"removed_unsafe_indexes"`
 }
 
-var errAutomaticWALRecoveryDisabled = errors.New("automatic WAL bypass is disabled")
+var (
+	errAutomaticWALRecoveryDisabled = errors.New("automatic WAL bypass is disabled")
+	errNoRepairableIndexes          = errors.New("no non-unique secondary indexes matched the failed mutation")
+)
 
 func newDatabaseRecovery(store *Store, opts recoveryOptions, status *databaseStatusTracker) *databaseRecovery {
 	return &databaseRecovery{store: store, opts: opts, status: status}
@@ -128,7 +125,7 @@ func (r *databaseRecovery) recoverInvalidation(ctx context.Context, trigger erro
 		r.status.recoveryFailed("index_mutation_corruption", "automatic_recovery_disabled")
 		return fmt.Errorf("automatic database recovery is disabled")
 	}
-	return r.repairIndexes(ctx, "index_mutation_corruption")
+	return r.repairIndexes(ctx, "index_mutation_corruption", repairTableFromError(trigger))
 }
 
 func isIndexMutationCorruption(err error) bool {
@@ -150,7 +147,7 @@ func isKnownWALReplayError(err error) bool {
 		strings.Contains(message, "getdefaultdatabase")
 }
 
-func (r *databaseRecovery) repairIndexes(ctx context.Context, trigger string) (retErr error) {
+func (r *databaseRecovery) repairIndexes(ctx context.Context, trigger, repairTable string) (retErr error) {
 	if !r.enabled() {
 		return nil
 	}
@@ -166,13 +163,14 @@ func (r *databaseRecovery) repairIndexes(ctx context.Context, trigger string) (r
 		return err
 	}
 	marker := &recoveryMarker{
-		Version:    recoveryMarkerVersion,
-		DatabaseID: r.databaseID(),
-		Kind:       "remove_unsafe_indexes",
-		Trigger:    trigger,
-		Phase:      "drop_unsafe_indexes",
-		BundleDir:  bundleDir,
-		CreatedAt:  time.Now().UTC(),
+		Version:     recoveryMarkerVersion,
+		DatabaseID:  r.databaseID(),
+		Kind:        "remove_unsafe_indexes",
+		Trigger:     trigger,
+		Phase:       "drop_unsafe_indexes",
+		BundleDir:   bundleDir,
+		RepairTable: repairTable,
+		CreatedAt:   time.Now().UTC(),
 	}
 	if err := r.writeMarker(marker); err != nil {
 		return err
@@ -201,17 +199,23 @@ func (r *databaseRecovery) applyIndexRepair(ctx context.Context, marker *recover
 	switch marker.Phase {
 	case "", "drop_unsafe_indexes":
 		marker.Phase = "drop_unsafe_indexes"
-		if marker.RemovedUnsafeIndexes == 0 {
-			count, err := countUnsafeIndexes(ctx, db)
+		if len(marker.RepairIndexes) == 0 {
+			indexes, err := listRepairableIndexes(ctx, db, marker.RepairTable)
 			if err != nil {
 				return err
 			}
-			marker.RemovedUnsafeIndexes = count
+			if len(indexes) == 0 && marker.RemovedUnsafeIndexes == 0 {
+				return errNoRepairableIndexes
+			}
+			if len(indexes) > 0 {
+				marker.RepairIndexes = indexes
+				marker.RemovedUnsafeIndexes = max(marker.RemovedUnsafeIndexes, len(indexes))
+			}
 		}
 		if err := r.writeMarker(marker); err != nil {
 			return err
 		}
-		for _, name := range unsafeGoogleSearchConsoleIndexes {
+		for _, name := range marker.RepairIndexes {
 			if _, err := db.ExecContext(ctx, "DROP INDEX IF EXISTS "+quoteDuckDBIdentifier(name)); err != nil {
 				return fmt.Errorf("drop unsafe database index: %w", err)
 			}
@@ -223,6 +227,9 @@ func (r *databaseRecovery) applyIndexRepair(ctx context.Context, marker *recover
 	case "checkpoint":
 	default:
 		return fmt.Errorf("unsupported index recovery phase %q", marker.Phase)
+	}
+	if marker.RemovedUnsafeIndexes == 0 {
+		return errNoRepairableIndexes
 	}
 
 	r.status.recovering("checkpoint", trigger)
@@ -245,21 +252,36 @@ func (r *databaseRecovery) applyIndexRepair(ctx context.Context, marker *recover
 	return nil
 }
 
-func countUnsafeIndexes(ctx context.Context, db *sql.DB) (int, error) {
-	var count int
-	if err := db.QueryRowContext(ctx, `
-		SELECT count(*)
+func listRepairableIndexes(ctx context.Context, db *sql.DB, targetTable string) ([]string, error) {
+	targetTable = strings.TrimSpace(targetTable)
+
+	rows, err := db.QueryContext(ctx, `
+		SELECT table_name, index_name
 		FROM duckdb_indexes()
-		WHERE index_name IN (?, ?, ?, ?, ?)`,
-		unsafeGoogleSearchConsoleIndexes[0],
-		unsafeGoogleSearchConsoleIndexes[1],
-		unsafeGoogleSearchConsoleIndexes[2],
-		unsafeGoogleSearchConsoleIndexes[3],
-		unsafeGoogleSearchConsoleIndexes[4],
-	).Scan(&count); err != nil {
-		return 0, fmt.Errorf("count unsafe database indexes: %w", err)
+		WHERE database_name = current_database()
+			AND schema_name = 'main'
+			AND NOT is_unique
+		ORDER BY index_name`)
+	if err != nil {
+		return nil, fmt.Errorf("list repairable database indexes: %w", err)
 	}
-	return count, nil
+	defer rows.Close()
+
+	indexes := make([]string, 0)
+	for rows.Next() {
+		var table, index string
+		if err := rows.Scan(&table, &index); err != nil {
+			return nil, fmt.Errorf("scan repairable database index: %w", err)
+		}
+		if targetTable != "" && !strings.EqualFold(table, targetTable) {
+			continue
+		}
+		indexes = append(indexes, index)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read repairable database indexes: %w", err)
+	}
+	return indexes, nil
 }
 
 func (r *databaseRecovery) recoverWAL(ctx context.Context, trigger error) error {

@@ -26,7 +26,7 @@ func TestRecordHitActivityAggregatesBatchPerSite(t *testing.T) {
 		t.Fatalf("create site: %v", err)
 	}
 
-	base := time.Date(2026, 7, 9, 10, 15, 0, 0, time.UTC)
+	base := time.Now().UTC().Truncate(time.Hour).Add(-2 * time.Hour)
 	hits := []*api.Hit{
 		{SiteID: site.ID, Timestamp: base.Add(2 * time.Minute), Hostname: new("late.activity-batch.test"), TrackerVersion: "2.0"},
 		{SiteID: site.ID, Timestamp: base, Hostname: new("early.activity-batch.test"), TrackerVersion: "1.0"},
@@ -97,7 +97,7 @@ func TestRecordEventActivityAggregatesBatchPerSite(t *testing.T) {
 		t.Fatalf("create site: %v", err)
 	}
 
-	base := time.Date(2026, 7, 9, 11, 0, 0, 0, time.UTC)
+	base := time.Now().UTC().Truncate(time.Hour).Add(-2 * time.Hour)
 	events := []*api.Event{
 		{SiteID: site.ID, Timestamp: base.Add(time.Minute), Name: "signup"},
 		{SiteID: site.ID, Timestamp: base, Name: "outbound_click"}, // automatic event
