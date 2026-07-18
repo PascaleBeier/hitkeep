@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	runtimeconfig "hitkeep/internal/config"
 	"hitkeep/internal/devtool"
 	"hitkeep/internal/devtool/devmcp"
 )
@@ -169,7 +170,11 @@ func catalogCommand(options *options) *cobra.Command {
 	commands.RunE = withApp(options, "catalog commands", func(_ context.Context, _ *devtool.App) (any, error) {
 		return buildCommandCatalog(commands.Root()), nil
 	})
-	command.AddCommand(commands)
+	configuration := &cobra.Command{Use: "configuration", Aliases: []string{"config"}, Short: "Export the runtime configuration documentation contract", Args: cobra.NoArgs}
+	configuration.RunE = withApp(options, "catalog configuration", func(_ context.Context, _ *devtool.App) (any, error) {
+		return runtimeconfig.Catalog(), nil
+	})
+	command.AddCommand(commands, configuration)
 	return command
 }
 

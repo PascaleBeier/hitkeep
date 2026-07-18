@@ -177,7 +177,7 @@ Start with:
 
 Capture one or several local routes for visual QA with `./hk screenshot /dashboard /admin/status`. The routes share one browser and authenticated seeded session, and the PNGs stay in the workspace's managed artifact state instead of entering the repository.
 
-Run `./hk help` for human guidance, `./hk catalog commands --output json` for the complete machine-readable command surface, `./hk doctor` for prerequisites, and `./hk qa pr` before review. `hk` is the sole supported developer workflow entry point.
+Run `./hk help` for human guidance, `./hk catalog commands --output json` for the complete machine-readable command surface, `./hk catalog configuration --output json` for the runtime configuration documentation contract, `./hk doctor` for prerequisites, and `./hk qa pr` before review. `hk` is the sole supported developer workflow entry point.
 
 Contributor docs and local development guides:
 

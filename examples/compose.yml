@@ -18,7 +18,7 @@ services:
       # Required for stable sessions. Generate with: openssl rand -hex 32
       HITKEEP_JWT_SECRET: ${HITKEEP_JWT_SECRET:?set HITKEEP_JWT_SECRET in .env}
       # Behind a reverse proxy, set to the proxy network CIDR so real client IPs are used.
-      HITKEEP_TRUSTED_PROXIES: ${HITKEEP_TRUSTED_PROXIES:-}
+      HITKEEP_TRUSTED_PROXIES: ${HITKEEP_TRUSTED_PROXIES:-} # config-default-override: do not trust forwarded headers without an explicit proxy
       # Keep live data, retention archives, and backup snapshots on persistent volumes.
       HITKEEP_DB_PATH: /var/lib/hitkeep/data/hitkeep.db
       HITKEEP_DATA_PATH: /var/lib/hitkeep/data

@@ -20,6 +20,7 @@ jobs:
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
     steps:
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
@@ -66,10 +67,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GHT }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.release-please.outputs.tag_name }}
+          VERSION: ${{ needs.release-please.outputs.version }}
         run: |
           set -euo pipefail
-
-          VERSION="${TAG#v}"
 
           if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             PATCH="${VERSION##*.}"
@@ -83,7 +83,8 @@ jobs:
           BLOG_URL="https://hitkeep.com/blog/${BLOG_SLUG}/"
 
           if ! curl -fsSLI "$BLOG_URL" >/dev/null; then
-            echo "::warning::Release blog URL did not respond successfully yet: $BLOG_URL"
+            echo "Release blog is not published yet; leaving GitHub Release notes unchanged: $BLOG_URL"
+            exit 0
           fi
 
           release_found=false
@@ -134,24 +135,52 @@ jobs:
 
       - name: Package chart
         env:
-          TAG: ${{ needs.release-please.outputs.tag_name }}
+          VERSION: ${{ needs.release-please.outputs.version }}
         run: |
-          CHART_VERSION="${TAG#v}"
-          helm package charts/hitkeep --version "$CHART_VERSION" --app-version "$CHART_VERSION"
+          helm package charts/hitkeep --version "$VERSION" --app-version "$VERSION"
 
       - name: Push chart
         env:
+          VERSION: ${{ needs.release-please.outputs.version }}
+        run: |
+          helm push "hitkeep-${VERSION}.tgz" "oci://ghcr.io/pascalebeier/charts"
+
+  sync-docs-release:
+    name: Publish release and configuration metadata to docs
+    needs:
+      - release-please
+      - build-release
+      - publish-helm
+    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' && needs.publish-helm.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Dispatch hitkeep-docs release synchronization
+        env:
+          GH_TOKEN: ${{ secrets.HITKEEP_DOCS_DISPATCH_TOKEN }}
           TAG: ${{ needs.release-please.outputs.tag_name }}
         run: |
-          CHART_VERSION="${TAG#v}"
-          helm push "hitkeep-${CHART_VERSION}.tgz" "oci://ghcr.io/pascalebeier/charts"
+          set -euo pipefail
+
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::error::HITKEEP_DOCS_DISPATCH_TOKEN must grant Actions write access to PascaleBeier/hitkeep-docs"
+            exit 1
+          fi
+
+          gh workflow run sync-hitkeep-release.yml \
+            --repo PascaleBeier/hitkeep-docs \
+            --ref main \
+            -f tag="${TAG}" \
+            -f dry_run=false
+
+          echo "Triggered hitkeep-docs release synchronization for ${TAG}"
 
   deploy-cloud:
     name: Trigger cloud deploy
     needs:
       - release-please
       - build-release
-      - link-release-blog
       - publish-helm
     if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' && needs.publish-helm.result == 'success' }}
     runs-on: ubuntu-latest
