@@ -52,7 +52,7 @@
     "devDependencies": {
         "@angular-eslint/builder": "^22.0.0",
         "@angular/build": "^22.0.5",
-        "@angular/cli": "^22.0.5",
+        "@angular/cli": "^22.0.6",
         "@angular/compiler-cli": "^22.0.5",
         "@eslint/js": "^10.0.1",
         "@jsverse/transloco": "^8.4.0",
