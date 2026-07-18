@@ -28,7 +28,7 @@
         "@angular/compiler": "^22.0.5",
         "@angular/core": "^22.0.5",
         "@angular/forms": "^22.0.5",
-        "@angular/platform-browser": "^22.0.5",
+        "@angular/platform-browser": "^22.0.6",
         "@angular/router": "^22.0.5",
         "@fontsource-variable/lexend": "^5.2.11",
         "@jsverse/transloco-locale": "^8.4.0",
