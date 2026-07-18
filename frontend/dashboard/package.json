@@ -63,7 +63,7 @@
         "@vitest/coverage-v8": "^4.1.10",
         "angular-eslint": "22.0.0",
         "baseline-browser-mapping": "^2.10.42",
-        "eslint": "^10.6.0",
+        "eslint": "^10.7.0",
         "jasmine-core": "~6.3.0",
         "jsdom": "^29.1.1",
         "oxfmt": "^0.58.0",
