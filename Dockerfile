@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
-ARG GOLANG_VERSION
-ARG NODE_VERSION
+ARG GOLANG_VERSION=required-by-hk
+ARG NODE_VERSION=required-by-hk
 ARG NPM_VERSION
 
 FROM node:${NODE_VERSION}-bookworm AS frontend-dev
