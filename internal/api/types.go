@@ -1615,13 +1615,18 @@ type AdminDisableUserMFAResponse struct {
 
 type IPExclusion struct {
 	ID          uuid.UUID  `json:"id"`
+	Scope       string     `json:"scope,omitempty"`
+	TeamID      *uuid.UUID `json:"team_id,omitempty"`
 	SiteID      *uuid.UUID `json:"site_id,omitempty"`
 	Type        string     `json:"type"`
 	CIDR        string     `json:"cidr,omitempty"`
 	CountryCode string     `json:"country_code,omitempty"`
+	UserAgent   string     `json:"user_agent,omitempty"`
+	Path        string     `json:"path,omitempty"`
 	Description string     `json:"description,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
 	CreatedBy   *uuid.UUID `json:"created_by,omitempty"`
+	Inherited   bool       `json:"inherited"`
 }
 
 // ReportFrequency is the cadence for scheduled analytics emails.

@@ -26,6 +26,19 @@
     color: var(--p-red-300);
 }
 
+.site-exclusions__inherited-hint {
+    color: var(--p-text-muted-color);
+    font-size: 0.82rem;
+    margin: 0 0 0.85rem;
+}
+
+.site-exclusions__type-cell {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
 @media (max-width: 720px) {
     .site-exclusions__field-grid {
         grid-template-columns: 1fr;

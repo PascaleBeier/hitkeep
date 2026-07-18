@@ -3,10 +3,12 @@ import { HttpClient } from '@angular/common/http';
 
 import { CurrentIP, IPExclusion } from '@models/analytics.types';
 
-interface CreateExclusionPayload {
-    type?: 'cidr' | 'country';
+export interface CreateExclusionPayload {
+    type?: IPExclusion['type'];
     cidr?: string;
     country_code?: string;
+    user_agent?: string;
+    path?: string;
     description?: string;
 }
 
@@ -14,8 +16,8 @@ interface CreateExclusionPayload {
 export class ExclusionsService {
     private http = inject(HttpClient);
 
-    listSiteExclusions(siteID: string) {
-        return this.http.get<IPExclusion[]>(`/api/sites/${siteID}/exclusions`);
+    listSiteExclusions(siteID: string, effective = false) {
+        return this.http.get<IPExclusion[]>(`/api/sites/${siteID}/exclusions`, { params: effective ? { effective: true } : {} });
     }
 
     createSiteExclusion(siteID: string, payload: CreateExclusionPayload) {
@@ -24,6 +26,18 @@ export class ExclusionsService {
 
     deleteSiteExclusion(siteID: string, ruleID: string) {
         return this.http.delete<void>(`/api/sites/${siteID}/exclusions/${ruleID}`);
+    }
+
+    listTeamExclusions(teamID: string, effective = false) {
+        return this.http.get<IPExclusion[]>(`/api/user/teams/${teamID}/exclusions`, { params: effective ? { effective: true } : {} });
+    }
+
+    createTeamExclusion(teamID: string, payload: CreateExclusionPayload) {
+        return this.http.post<IPExclusion>(`/api/user/teams/${teamID}/exclusions`, payload);
+    }
+
+    deleteTeamExclusion(teamID: string, ruleID: string) {
+        return this.http.delete<void>(`/api/user/teams/${teamID}/exclusions/${ruleID}`);
     }
 
     listInstanceExclusions() {

@@ -1,27 +1,8 @@
 <p-confirmdialog />
 
 <app-admin-page-frame [breadcrumbItems]="breadcrumbItems()">
-    <div class="admin-status">
+    <div class="grid gap-4">
         @if (isSettingsPage()) {
-        <div class="mb-4 grid overflow-hidden rounded-lg border border-surface-100 bg-[var(--p-content-background)] dark:border-surface-800 md:grid-cols-4">
-            <div class="flex min-w-0 items-baseline gap-2 border-b border-surface-100 px-4 py-3 dark:border-surface-800 md:border-r md:border-b-0">
-                <span class="text-lg leading-none font-bold text-[var(--p-text-color)]">{{ users().length | number }}</span>
-                <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.tabs.users" | transloco }}</span>
-            </div>
-            <div class="flex min-w-0 items-baseline gap-2 border-b border-surface-100 px-4 py-3 dark:border-surface-800 md:border-r md:border-b-0">
-                <span class="text-lg leading-none font-bold text-[var(--p-text-color)]">{{ instanceAdmins() | number }}</span>
-                <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.roles.instanceAdmin" | transloco }}</span>
-            </div>
-            <div class="flex min-w-0 items-baseline gap-2 border-b border-surface-100 px-4 py-3 dark:border-surface-800 md:border-r md:border-b-0">
-                <span class="text-lg leading-none font-bold text-[var(--p-text-color)]">{{ totalSites() | number }}</span>
-                <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.tabs.sites" | transloco }}</span>
-            </div>
-            <div class="flex min-w-0 items-baseline gap-2 px-4 py-3">
-                <span class="text-lg leading-none font-bold text-[var(--p-text-color)]">{{ activeTeams() | number }}</span>
-                <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.tabs.teams" | transloco }}</span>
-            </div>
-        </div>
-
         <p-tabs [(value)]="activeSettingsTab" class="hk-admin-tabs">
             <p-tablist>
                 <p-tab value="users">{{ "admin.tabs.users" | transloco }}</p-tab>
@@ -32,20 +13,14 @@
 
             <p-tabpanels>
                 <p-tabpanel value="users">
-                    <section class="admin-panel admin-panel--wide admin-panel--table" aria-labelledby="settings-users-title">
-                        <div class="admin-panel__header">
-                            <div class="admin-panel__title-block">
-                                <h2 id="settings-users-title">{{ "admin.users.title" | transloco }}</h2>
-                                <span class="admin-panel__meta">{{ users().length | number }} {{ "admin.tabs.users" | transloco }}</span>
-                            </div>
-                            <p-iconfield class="admin-search">
-                                <p-inputicon class="pi pi-search" />
-                                <input pInputText #settingsUsersSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="settingsUsersTable.filterGlobal($any($event.target).value, 'contains')" />
-                            </p-iconfield>
-                        </div>
+                    <app-admin-panel titleId="settings-users-title" [title]="'admin.users.title' | transloco" [subtitle]="users().length + ' ' + ('admin.tabs.users' | transloco)" [padded]="false">
+                        <p-iconfield admin-panel-header class="admin-search">
+                            <p-inputicon class="pi pi-search" />
+                            <input pInputText #settingsUsersSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="settingsUsersTable.filterGlobal($any($event.target).value, 'contains')" />
+                        </p-iconfield>
 
                         @if (deleteUserBlock() || userMfaStatus() || userActionStatus()) {
-                        <div class="admin-panel__messages">
+                        <div admin-panel-messages class="grid gap-3">
                             @if (deleteUserBlock()) {
                             <p-message severity="warn" styleClass="w-full" [text]="deleteUserBlockMessage()" />
                             } @if (userMfaStatus(); as status) {
@@ -113,23 +88,17 @@
                                 </ng-template>
                             </p-table>
                         </div>
-                    </section>
+                    </app-admin-panel>
                 </p-tabpanel>
 
                 <p-tabpanel value="sites">
-                    <section class="admin-panel admin-panel--wide admin-panel--table" aria-labelledby="settings-sites-title">
-                        <div class="admin-panel__header">
-                            <div class="admin-panel__title-block">
-                                <h2 id="settings-sites-title">{{ "admin.sites.title" | transloco }}</h2>
-                                <span class="admin-panel__meta">{{ sites().length | number }} {{ "admin.tabs.sites" | transloco }}</span>
-                            </div>
-                            <p-iconfield class="admin-search">
-                                <p-inputicon class="pi pi-search" />
-                                <input pInputText #settingsSitesSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="settingsSitesTable.filterGlobal($any($event.target).value, 'contains')" />
-                            </p-iconfield>
-                        </div>
+                    <app-admin-panel titleId="settings-sites-title" [title]="'admin.sites.title' | transloco" [subtitle]="sites().length + ' ' + ('admin.tabs.sites' | transloco)" [padded]="false">
+                        <p-iconfield admin-panel-header class="admin-search">
+                            <p-inputicon class="pi pi-search" />
+                            <input pInputText #settingsSitesSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="settingsSitesTable.filterGlobal($any($event.target).value, 'contains')" />
+                        </p-iconfield>
                         @if (siteActionStatus(); as status) {
-                        <div class="admin-panel__messages">
+                        <div admin-panel-messages>
                             <p-message [severity]="status.severity" styleClass="w-full" [text]="siteActionStatusMessage()" />
                         </div>
                         }
@@ -169,23 +138,17 @@
                                 </ng-template>
                             </p-table>
                         </div>
-                    </section>
+                    </app-admin-panel>
                 </p-tabpanel>
 
                 <p-tabpanel value="teams">
-                    <section class="admin-panel admin-panel--wide admin-panel--table" aria-labelledby="settings-teams-title">
-                        <div class="admin-panel__header">
-                            <div class="admin-panel__title-block">
-                                <h2 id="settings-teams-title">{{ "admin.teams.title" | transloco }}</h2>
-                                <span class="admin-panel__meta">{{ teams().length | number }} {{ "admin.tabs.teams" | transloco }}</span>
-                            </div>
-                            <p-iconfield class="admin-search">
-                                <p-inputicon class="pi pi-search" />
-                                <input pInputText #settingsTeamsSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="settingsTeamsTable.filterGlobal($any($event.target).value, 'contains')" />
-                            </p-iconfield>
-                        </div>
+                    <app-admin-panel titleId="settings-teams-title" [title]="'admin.teams.title' | transloco" [subtitle]="teams().length + ' ' + ('admin.tabs.teams' | transloco)" [padded]="false">
+                        <p-iconfield admin-panel-header class="admin-search">
+                            <p-inputicon class="pi pi-search" />
+                            <input pInputText #settingsTeamsSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="settingsTeamsTable.filterGlobal($any($event.target).value, 'contains')" />
+                        </p-iconfield>
                         @if (teamActionStatus(); as status) {
-                        <div class="admin-panel__messages">
+                        <div admin-panel-messages>
                             <p-message [severity]="status.severity" styleClass="w-full" [text]="teamActionStatusMessage()" />
                         </div>
                         }
@@ -235,55 +198,49 @@
                                 </ng-template>
                             </p-table>
                         </div>
-                    </section>
+                    </app-admin-panel>
                 </p-tabpanel>
 
                 <p-tabpanel value="globalFilters">
                     @if (activeSettingsTab() === "globalFilters") {
-                    <section class="admin-panel admin-panel--wide admin-panel--form" aria-labelledby="settings-filters-title">
-                        <div class="admin-panel__header">
-                            <div class="admin-panel__title-block">
-                                <h2 id="settings-filters-title">{{ "admin.exclusions.title" | transloco }}</h2>
-                            </div>
-                        </div>
-                        <div class="admin-panel__content">
-                            <app-admin-global-exclusion-settings />
-                        </div>
-                    </section>
+                    <app-admin-global-exclusion-settings />
                     }
                 </p-tabpanel>
             </p-tabpanels>
         </p-tabs>
         } @else {
-        <div class="mb-4 overflow-hidden rounded-lg border border-surface-100 bg-[var(--p-content-background)] dark:border-surface-800">
-            <div class="grid lg:grid-cols-[minmax(0,1.15fr)_repeat(3,minmax(0,0.95fr))]">
-                <div class="flex min-w-0 items-center justify-between gap-3 border-b border-surface-100 px-4 py-3 dark:border-surface-800 lg:border-r lg:border-b-0">
-                    <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.system.health.title" | transloco }}</span>
+        <section class="mb-4 overflow-hidden rounded-lg border border-[var(--p-content-border-color)] bg-[var(--p-content-background)]" [attr.aria-label]="'admin.system.console.summaryAria' | transloco">
+            <div class="grid divide-y divide-[var(--p-content-border-color)] lg:grid-cols-[minmax(16rem,1.25fr)_repeat(3,minmax(0,1fr))] lg:divide-x lg:divide-y-0">
+                <div class="flex min-w-0 items-center justify-between gap-4 p-4">
+                    <div class="grid min-w-0 gap-1">
+                        <span class="text-sm font-semibold text-[var(--p-text-color)]">{{ "admin.system.console.runtimePosture" | transloco }}</span>
+                        <span class="text-xs leading-4 text-[var(--p-text-muted-color)]">{{ "admin.system.console.healthHint" | transloco }}</span>
+                    </div>
                     <p-tag [value]="runtimeStatusKey() | transloco" [severity]="runtimeStatusSeverity()" />
                 </div>
-                <div class="flex min-w-0 items-center justify-between gap-3 border-b border-surface-100 px-4 py-3 dark:border-surface-800 lg:border-r lg:border-b-0">
-                    <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.system.overview.version" | transloco }}</span>
-                    <span class="truncate font-bold text-[var(--p-text-color)]">{{ systemInfo()?.version || "-" }}</span>
+                <div class="grid min-w-0 content-center gap-1 p-4">
+                    <span class="text-sm text-[var(--p-text-muted-color)]">{{ "admin.system.overview.version" | transloco }}</span>
+                    <strong class="truncate text-base font-semibold text-[var(--p-text-color)]">{{ systemInfo()?.version || "-" }}</strong>
                 </div>
-                <div class="flex min-w-0 items-center justify-between gap-3 border-b border-surface-100 px-4 py-3 dark:border-surface-800 lg:border-r lg:border-b-0">
-                    <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.system.ingest.hits" | transloco }}</span>
-                    <span class="truncate font-bold text-[var(--p-text-color)]">{{ recentHits() | number }}</span>
+                <div class="grid min-w-0 content-center gap-1 p-4">
+                    <span class="text-sm text-[var(--p-text-muted-color)]">{{ "admin.system.ingest.hits" | transloco }}</span>
+                    <strong class="truncate text-base font-semibold text-[var(--p-text-color)]"> @if (systemIngest()) { {{ recentHits() | number }} } @else { - } </strong>
                 </div>
-                <div class="grid min-w-0 content-center gap-1.5 px-4 py-3">
+                <div class="grid min-w-0 content-center gap-2 p-4">
                     <div class="flex min-w-0 items-center justify-between gap-3">
-                        <span class="truncate text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.system.storage.diskUsage" | transloco }}</span>
-                        <span class="truncate font-bold text-[var(--p-text-color)]">{{ diskUsedPercent() }}%</span>
+                        <span class="text-sm text-[var(--p-text-muted-color)]">{{ "admin.system.storage.diskUsage" | transloco }}</span>
+                        <strong class="truncate text-base font-semibold text-[var(--p-text-color)]"> @if (systemStorage()) { {{ diskUsedPercent() }}% } @else { - } </strong>
                     </div>
-                    <div class="h-1.5 overflow-hidden rounded-full bg-surface-100 dark:bg-surface-700" aria-hidden="true">
-                        <span class="block h-full rounded-full" [class]="diskUsedPercent() > 90 ? 'bg-red-500' : 'bg-primary'" [style.width.%]="diskUsedPercent()"></span>
+                    <div class="h-1.5 overflow-hidden rounded-full bg-[var(--p-content-border-color)]" aria-hidden="true">
+                        <span class="block h-full rounded-full" [class]="diskUsedPercent() > 90 ? 'bg-[var(--p-red-500)]' : 'bg-[var(--p-primary-color)]'" [style.width.%]="diskUsedPercent()"></span>
                     </div>
                 </div>
             </div>
-            <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-surface-100 px-4 py-2 dark:border-surface-800">
+            <footer class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-[var(--p-content-border-color)] px-4 py-2">
                 <span class="min-w-0 text-xs font-semibold text-[var(--p-text-muted-color)]">{{ "admin.system.console.reportHint" | transloco }}</span>
                 <app-copy-control [value]="systemReport()" [labelKey]="'admin.system.console.copyReport'" [ariaLabelKey]="'admin.system.console.copyReportAria'" size="small" [text]="true" />
-            </div>
-        </div>
+            </footer>
+        </section>
 
         <p-tabs [(value)]="activeAdminTab" class="hk-admin-tabs">
             <p-tablist>
@@ -301,6 +258,7 @@
                         <app-system-status-card
                             titleId="runtime-health-title"
                             [title]="'admin.system.health.title' | transloco"
+                            [description]="'admin.system.console.healthDescription' | transloco"
                             [wide]="true"
                             [loading]="isLoadingHealth()"
                             [refreshLabel]="'admin.system.console.refreshCard' | transloco"
@@ -336,7 +294,7 @@
                             } @else {
                             <p-message severity="error" [text]="'admin.system.console.loadFailed' | transloco" styleClass="w-full" />
                             }
-                            <p system-status-card-footer class="m-0 border-t border-surface-100 px-4 py-3 text-xs text-muted-color dark:border-surface-800">
+                            <p system-status-card-footer class="m-0 border-t border-[var(--p-content-border-color)] px-4 py-3 text-xs text-muted-color">
                                 {{ "admin.system.health.ip2locationAttribution" | transloco }}
                                 <a class="admin-link" href="https://www.ip2location.com" target="_blank" rel="noopener">IP2Location</a>
                             </p>
@@ -345,10 +303,9 @@
                         <app-system-status-card
                             titleId="runtime-search-console-title"
                             [title]="'admin.system.searchConsole.title' | transloco"
+                            [description]="'admin.system.console.searchConsoleDescription' | transloco"
                             [loading]="isLoadingSearchConsole()"
                             [refreshLabel]="'admin.system.console.refreshCard' | transloco"
-                            [metricLabel]="'admin.system.searchConsole.issues' | transloco"
-                            [metricValue]="searchConsoleSyncIssueMetric()"
                             (refreshClicked)="loadSearchConsoleStatus()"
                         >
                             @if (systemSearchConsole(); as searchConsole) {
@@ -414,51 +371,46 @@
                         <app-system-status-card
                             titleId="runtime-ai-title"
                             [title]="'admin.system.ai.title' | transloco"
+                            [description]="'admin.system.console.aiDescription' | transloco"
                             [loading]="isLoadingAIStatus()"
                             [refreshLabel]="'admin.system.console.refreshCard' | transloco"
-                            [metricLabel]="'admin.system.ai.tokens' | transloco"
-                            [metricValue]="aiTokenUsageMetric()"
                             (refreshClicked)="loadSystemAIStatus()"
                         >
                             @if (systemAIStatus(); as ai) {
                             <p-tag system-status-card-status [value]="'admin.system.ai.status.' + ai.status | transloco" [severity]="statusSeverity(ai.status)" />
                             } @if (systemAIStatus(); as ai) {
-                            <div
-                                class="grid min-w-0 items-center gap-3 rounded-lg border border-surface-100 bg-surface-50 p-3 dark:border-surface-800 dark:bg-surface-800 md:grid-cols-[minmax(0,1fr)_auto]"
-                                [class.border-red-300]="ai.budget_exhausted || ai.status === 'needs_attention'"
-                                [class.dark:border-red-700]="ai.budget_exhausted || ai.status === 'needs_attention'"
-                            >
+                            <div class="flex min-w-0 flex-wrap items-start justify-between gap-3 border-b border-[var(--p-content-border-color)] pb-4">
                                 <div class="grid min-w-0 gap-1">
-                                    <span class="text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.system.ai.configuration" | transloco }}</span>
-                                    <strong class="truncate text-base font-bold text-[var(--p-text-color)]">{{ aiProviderModelLabel() }}</strong>
-                                    <small class="text-sm font-semibold text-[var(--p-text-muted-color)]">{{ "admin.system.ai.summary." + aiSummaryKey() | transloco }}</small>
+                                    <span class="text-sm text-[var(--p-text-muted-color)]">{{ "admin.system.ai.configuration" | transloco }}</span>
+                                    <strong class="truncate text-base font-semibold text-[var(--p-text-color)]">{{ aiProviderModelLabel() }}</strong>
+                                    <small class="text-sm text-[var(--p-text-muted-color)]">{{ "admin.system.ai.summary." + aiSummaryKey() | transloco }}</small>
                                 </div>
-                                <div class="flex flex-wrap justify-start gap-2 md:justify-end" [attr.aria-label]="'admin.system.ai.readiness' | transloco">
+                                <div class="flex flex-wrap justify-start gap-2 sm:justify-end" [attr.aria-label]="'admin.system.ai.readiness' | transloco">
                                     <p-tag [value]="ai.enabled ? ('admin.system.ai.enabled' | transloco) : ('admin.system.ai.disabled' | transloco)" [severity]="ai.enabled ? 'success' : 'secondary'" />
                                     <p-tag [value]="ai.configured ? ('admin.system.ai.configured' | transloco) : ('admin.system.ai.notConfigured' | transloco)" [severity]="ai.configured ? 'success' : 'warn'" />
                                 </div>
                             </div>
 
-                            <div class="mt-3 grid gap-3 md:grid-cols-2">
-                                <div class="grid min-w-0 gap-2 rounded-lg border border-surface-100 p-3 dark:border-surface-800">
+                            <div class="grid divide-y divide-[var(--p-content-border-color)] border-b border-[var(--p-content-border-color)] md:grid-cols-2 md:divide-x md:divide-y-0">
+                                <div class="grid min-w-0 gap-2 py-4 md:pr-4">
                                     <div class="flex min-w-0 items-baseline justify-between gap-3">
-                                        <span class="text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.system.ai.requests" | transloco }}</span>
-                                        <strong class="truncate text-base font-bold text-[var(--p-text-color)]">{{ aiRequestUsageMetric() }}</strong>
+                                        <span class="text-sm text-[var(--p-text-muted-color)]">{{ "admin.system.ai.requests" | transloco }}</span>
+                                        <strong class="truncate text-sm font-semibold text-[var(--p-text-color)]">{{ aiRequestUsageMetric() }}</strong>
                                     </div>
-                                    <div class="h-2 overflow-hidden rounded-full bg-surface-100 dark:bg-surface-700" aria-hidden="true">
-                                        <span class="block h-full rounded-full bg-primary" [style.width.%]="aiRequestBudgetPercent()"></span>
+                                    <div class="h-1.5 overflow-hidden rounded-full bg-[var(--p-content-border-color)]" aria-hidden="true">
+                                        <span class="block h-full rounded-full bg-[var(--p-primary-color)]" [style.width.%]="aiRequestBudgetPercent()"></span>
                                     </div>
-                                    <small class="truncate text-xs font-semibold text-[var(--p-text-muted-color)]">{{ "admin.system.ai.budgetWindow" | transloco }}: {{ formatMinutes(ai.budget_window_minutes) }}</small>
+                                    <small class="truncate text-xs text-[var(--p-text-muted-color)]">{{ "admin.system.ai.budgetWindow" | transloco }}: {{ formatMinutes(ai.budget_window_minutes) }}</small>
                                 </div>
-                                <div class="grid min-w-0 gap-2 rounded-lg border border-surface-100 p-3 dark:border-surface-800">
+                                <div class="grid min-w-0 gap-2 py-4 md:pl-4">
                                     <div class="flex min-w-0 items-baseline justify-between gap-3">
-                                        <span class="text-xs font-bold uppercase text-[var(--p-text-muted-color)]">{{ "admin.system.ai.tokens" | transloco }}</span>
-                                        <strong class="truncate text-base font-bold text-[var(--p-text-color)]">{{ aiTokenUsageMetric() }}</strong>
+                                        <span class="text-sm text-[var(--p-text-muted-color)]">{{ "admin.system.ai.tokens" | transloco }}</span>
+                                        <strong class="truncate text-sm font-semibold text-[var(--p-text-color)]">{{ aiTokenUsageMetric() }}</strong>
                                     </div>
-                                    <div class="h-2 overflow-hidden rounded-full bg-surface-100 dark:bg-surface-700" aria-hidden="true">
-                                        <span class="block h-full rounded-full bg-primary" [style.width.%]="aiTokenBudgetPercent()"></span>
+                                    <div class="h-1.5 overflow-hidden rounded-full bg-[var(--p-content-border-color)]" aria-hidden="true">
+                                        <span class="block h-full rounded-full bg-[var(--p-primary-color)]" [style.width.%]="aiTokenBudgetPercent()"></span>
                                     </div>
-                                    <small class="truncate text-xs font-semibold text-[var(--p-text-muted-color)]">{{ "admin.system.ai.budgetWindow" | transloco }}: {{ formatMinutes(ai.budget_window_minutes) }}</small>
+                                    <small class="truncate text-xs text-[var(--p-text-muted-color)]">{{ "admin.system.ai.budgetWindow" | transloco }}: {{ formatMinutes(ai.budget_window_minutes) }}</small>
                                 </div>
                             </div>
 
@@ -502,6 +454,7 @@
                         <app-system-status-card
                             titleId="runtime-overview-title"
                             [title]="'admin.system.overview.title' | transloco"
+                            [description]="'admin.system.console.overviewDescription' | transloco"
                             [loading]="isLoadingSystem()"
                             [refreshLabel]="'admin.system.console.refreshCard' | transloco"
                             (refreshClicked)="loadSystemInfo()"
@@ -535,6 +488,7 @@
                         <app-system-status-card
                             titleId="runtime-features-title"
                             [title]="'admin.system.overview.enabledFeatures' | transloco"
+                            [description]="'admin.system.console.featuresDescription' | transloco"
                             [loading]="isLoadingSystem()"
                             [refreshLabel]="'admin.system.console.refreshCard' | transloco"
                             (refreshClicked)="loadSystemInfo()"
@@ -560,6 +514,7 @@
                         <app-system-status-card
                             titleId="runtime-mcp-title"
                             [title]="'admin.system.mcp.title' | transloco"
+                            [description]="'admin.system.console.mcpDescription' | transloco"
                             [loading]="isLoadingSystem()"
                             [refreshLabel]="'admin.system.console.refreshCard' | transloco"
                             (refreshClicked)="loadSystemInfo()"
@@ -567,14 +522,13 @@
                             @if (mcpServerFeature(); as mcp) {
                             <p-tag system-status-card-status [value]="mcp.enabled ? ('common.enabled' | transloco) : ('common.disabled' | transloco)" [severity]="mcp.enabled ? 'success' : 'secondary'" />
                             } @if (systemInfo()) {
-                            <div class="admin-mcp-summary">
-                                <span class="admin-mcp-summary__icon"><i class="pi pi-code" aria-hidden="true"></i></span>
-                                <div class="admin-mcp-summary__body">
-                                    <span>{{ "admin.system.mcp.connection" | transloco }}</span>
-                                    <strong>{{ mcpEndpoint() || "-" }}</strong>
-                                    <small>{{ mcpSummaryKey() | transloco }}</small>
+                            <div class="mb-4 flex min-w-0 flex-wrap items-start justify-between gap-3 border-b border-[var(--p-content-border-color)] pb-4">
+                                <div class="grid min-w-0 gap-1">
+                                    <span class="text-sm text-[var(--p-text-muted-color)]">{{ "admin.system.mcp.connection" | transloco }}</span>
+                                    <strong class="truncate text-sm font-semibold text-[var(--p-text-color)]">{{ mcpEndpoint() || "-" }}</strong>
+                                    <small class="text-sm text-[var(--p-text-muted-color)]">{{ mcpSummaryKey() | transloco }}</small>
                                 </div>
-                                <div class="admin-mcp-summary__chips" [attr.aria-label]="'admin.system.mcp.readiness' | transloco">
+                                <div class="flex flex-wrap justify-start gap-2 sm:justify-end" [attr.aria-label]="'admin.system.mcp.readiness' | transloco">
                                     @if (mcpServerFeature(); as mcp) {
                                     <p-tag [value]="'admin.system.mcp.server' | transloco" [severity]="mcp.enabled ? 'success' : 'secondary'" />
                                     } @if (mcpDocsFeature(); as docs) {
@@ -583,7 +537,7 @@
                                 </div>
                             </div>
 
-                            <dl class="admin-definition-list admin-definition-list--compact admin-mcp-details">
+                            <dl class="admin-definition-list admin-definition-list--compact">
                                 <div>
                                     <dt>{{ "admin.system.mcp.endpoint" | transloco }}</dt>
                                     <dd>
@@ -623,92 +577,9 @@
                         </app-system-status-card>
 
                         <app-system-status-card
-                            titleId="runtime-storage-title"
-                            [title]="'admin.system.storage.title' | transloco"
-                            [wide]="true"
-                            [loading]="isLoadingStorage()"
-                            [refreshLabel]="'admin.system.console.refreshCard' | transloco"
-                            [metricLabel]="'admin.system.storage.diskUsage' | transloco"
-                            [metricValue]="diskUsedPercent() + '%'"
-                            (refreshClicked)="loadSystemStorage()"
-                        >
-                            @if (systemStorage(); as storage) {
-                            <div class="grid gap-4 min-[1181px]:grid-cols-[minmax(18rem,0.8fr)_minmax(0,1.2fr)]">
-                                <dl class="admin-definition-list admin-definition-list--compact">
-                                    <div>
-                                        <dt>{{ "admin.system.storage.sharedDb" | transloco }}</dt>
-                                        <dd class="admin-mono" [pTooltip]="storage.shared_db_path" tooltipPosition="top">{{ storage.shared_db_path }}</dd>
-                                    </div>
-                                    <div>
-                                        <dt>{{ "admin.system.storage.sharedDbSize" | transloco }}</dt>
-                                        <dd>{{ formatBytesValue(storage.shared_db_bytes) }}</dd>
-                                    </div>
-                                    <div>
-                                        <dt>{{ "admin.system.storage.dataPath" | transloco }}</dt>
-                                        <dd class="admin-mono" [pTooltip]="storage.data_path" tooltipPosition="top">{{ storage.data_path }}</dd>
-                                    </div>
-                                    <div>
-                                        <dt>{{ "admin.system.storage.diskAvailable" | transloco }}</dt>
-                                        <dd>{{ formatBytesValue(storage.disk_available_bytes) }} / {{ formatBytesValue(storage.disk_total_bytes) }}</dd>
-                                    </div>
-                                </dl>
-
-                                <div class="admin-table-wrap">
-                                    <p-table [value]="storage.tenant_dbs ?? []" [rowHover]="true" styleClass="p-datatable-sm admin-data-table">
-                                        <ng-template pTemplate="header">
-                                            <tr>
-                                                <th>{{ "admin.system.storage.columns.tenant" | transloco }}</th>
-                                                <th>{{ "admin.system.storage.columns.size" | transloco }}</th>
-                                                <th>{{ "admin.system.storage.columns.path" | transloco }}</th>
-                                            </tr>
-                                        </ng-template>
-                                        <ng-template pTemplate="body" let-db>
-                                            <tr>
-                                                <td>{{ db.name }}</td>
-                                                <td>{{ formatBytesValue(db.bytes) }}</td>
-                                                <td class="admin-mono admin-path-cell" [pTooltip]="db.path" tooltipPosition="top">{{ db.path }}</td>
-                                            </tr>
-                                        </ng-template>
-                                        <ng-template pTemplate="emptymessage">
-                                            <tr>
-                                                <td colspan="3" class="admin-empty-cell">{{ "admin.system.console.noTenantDbs" | transloco }}</td>
-                                            </tr>
-                                        </ng-template>
-                                    </p-table>
-                                </div>
-                            </div>
-
-                            @if (duckdbMemoryRows().length > 0) {
-                            <div class="admin-memory">
-                                <div class="admin-memory__header">
-                                    <span>{{ "admin.system.storage.memory" | transloco }}</span>
-                                    <strong>{{ formatBytesValue(duckdbMemoryTotalBytes()) }}</strong>
-                                </div>
-                                <div class="admin-memory__bar" aria-hidden="true">
-                                    @for (row of duckdbMemoryRows(); track row.tag) {
-                                    <span class="admin-memory__segment" [style.background]="memorySwatchColor(row.swatch)" [style.width.%]="row.percent"></span>
-                                    }
-                                </div>
-                                <ul class="admin-memory__legend">
-                                    @for (row of duckdbMemoryRows(); track row.tag) {
-                                    <li>
-                                        <span class="admin-memory__swatch" [style.background]="memorySwatchColor(row.swatch)" aria-hidden="true"></span>
-                                        <span class="admin-memory__tag admin-mono">{{ row.tag }}</span>
-                                        <span class="admin-memory__bytes">{{ formatBytesValue(row.bytes) }}</span>
-                                    </li>
-                                    }
-                                </ul>
-                            </div>
-                            } } @else if (isLoadingStorage()) {
-                            <div class="admin-loading"><i class="pi pi-spin pi-spinner" aria-hidden="true"></i>{{ "common.loading" | transloco }}</div>
-                            } @else {
-                            <p-message severity="error" [text]="'admin.system.console.loadFailed' | transloco" styleClass="w-full" />
-                            }
-                        </app-system-status-card>
-
-                        <app-system-status-card
                             titleId="runtime-ingest-title"
                             [title]="'admin.system.ingest.title' | transloco"
+                            [description]="'admin.system.console.ingestDescription' | transloco"
                             [loading]="isLoadingIngest()"
                             [refreshLabel]="'admin.system.console.refreshCard' | transloco"
                             (refreshClicked)="loadSystemIngest()"
@@ -742,6 +613,8 @@
                         <app-system-status-card
                             titleId="runtime-caches-title"
                             [title]="'admin.system.caches.title' | transloco"
+                            [description]="'admin.system.console.cachesDescription' | transloco"
+                            [wide]="true"
                             [loading]="isLoadingCaches()"
                             [refreshLabel]="'admin.system.console.refreshCard' | transloco"
                             (refreshClicked)="loadSystemCaches()"
@@ -784,58 +657,127 @@
                         <app-system-status-card
                             titleId="operations-database-title"
                             [title]="'admin.system.database.title' | transloco"
-                            [loading]="isLoadingDatabase()"
+                            [description]="'admin.system.console.databaseDescription' | transloco"
+                            [wide]="true"
+                            [loading]="isLoadingDatabaseOverview()"
                             [refreshLabel]="'admin.system.console.refreshCard' | transloco"
                             [actionLabel]="canRunMaintenance() ? ('admin.system.database.actions.checkpoint' | transloco) : ''"
                             actionIcon="pi pi-save"
                             [actionLoading]="isCheckpointingDatabase()"
                             [actionDisabled]="!systemDatabase()"
-                            (refreshClicked)="loadSystemDatabase()"
+                            (refreshClicked)="loadSystemDatabaseOverview()"
                             (actionClicked)="checkpointDatabase()"
                         >
-                            @if (systemDatabase(); as database) {
-                            <dl class="admin-definition-list">
-                                <div>
-                                    <dt>{{ "admin.system.database.autoRecovery" | transloco }}</dt>
-                                    <dd><p-tag [value]="database.recovery_enabled ? ('common.enabled' | transloco) : ('common.disabled' | transloco)" [severity]="database.recovery_enabled ? 'success' : 'warn'" /></dd>
+                            @if (systemDatabase() || systemStorage()) {
+                            <div class="grid min-w-0 gap-5 xl:grid-cols-2 xl:gap-0 xl:divide-x xl:divide-[var(--p-content-border-color)]">
+                                <section class="min-w-0 xl:pr-6" aria-labelledby="operations-database-recovery-title">
+                                    <h3 id="operations-database-recovery-title" class="mt-0 mb-4 text-sm leading-5 font-semibold text-[var(--p-text-color)]">{{ "admin.system.database.recoverySection" | transloco }}</h3>
+                                    @if (systemDatabase(); as database) {
+                                    <dl class="admin-definition-list admin-definition-list--compact">
+                                        <div>
+                                            <dt>{{ "admin.system.database.autoRecovery" | transloco }}</dt>
+                                            <dd><p-tag [value]="database.recovery_enabled ? ('common.enabled' | transloco) : ('common.disabled' | transloco)" [severity]="database.recovery_enabled ? 'success' : 'warn'" /></dd>
+                                        </div>
+                                        <div>
+                                            <dt>{{ "admin.system.database.automaticWalRecovery" | transloco }}</dt>
+                                            <dd>
+                                                <p-tag [value]="database.automatic_wal_recovery_enabled ? ('common.enabled' | transloco) : ('common.disabled' | transloco)" [severity]="database.automatic_wal_recovery_enabled ? 'warn' : 'success'" />
+                                            </dd>
+                                        </div>
+                                        <div>
+                                            <dt>{{ "admin.system.database.checkpointInterval" | transloco }}</dt>
+                                            <dd>{{ formatMinutes(database.checkpoint_interval_min) }}</dd>
+                                        </div>
+                                        <div>
+                                            <dt>{{ "admin.system.database.lastCheckpoint" | transloco }}</dt>
+                                            <dd>
+                                                @if (database.last_checkpoint_at) {
+                                                <app-relative-date-time [value]="database.last_checkpoint_at" />
+                                                } @else { - }
+                                            </dd>
+                                        </div>
+                                        <div>
+                                            <dt>{{ "admin.system.database.lastRecovery" | transloco }}</dt>
+                                            <dd>
+                                                @if (database.last_recovery_at) {
+                                                <app-relative-date-time [value]="database.last_recovery_at" />
+                                                } @else { - }
+                                            </dd>
+                                        </div>
+                                        <div>
+                                            <dt>{{ "admin.system.database.removedUnsafeIndexes" | transloco }}</dt>
+                                            <dd>{{ database.removed_unsafe_indexes | number }}</dd>
+                                        </div>
+                                        <div>
+                                            <dt>{{ "admin.system.database.recoveryBundle" | transloco }}</dt>
+                                            <dd>{{ (database.recovery_bundle_available ? "common.yes" : "common.no") | transloco }}</dd>
+                                        </div>
+                                    </dl>
+                                    @if (database.last_checkpoint_error) {
+                                    <p-message severity="error" styleClass="w-full mt-3" [text]="'admin.system.database.checkpointFailed' | transloco" />
+                                    } } @else {
+                                    <p-message severity="error" styleClass="w-full" [text]="'admin.system.console.loadFailed' | transloco" />
+                                    }
+                                </section>
+
+                                <section class="min-w-0 xl:pl-6" aria-labelledby="operations-database-files-title">
+                                    <h3 id="operations-database-files-title" class="mt-0 mb-4 text-sm leading-5 font-semibold text-[var(--p-text-color)]">{{ "admin.system.database.filesSection" | transloco }}</h3>
+                                    @if (systemStorage(); as storage) {
+                                    <dl class="admin-definition-list admin-definition-list--compact">
+                                        <div>
+                                            <dt>{{ "admin.system.storage.sharedDb" | transloco }}</dt>
+                                            <dd class="admin-mono" [pTooltip]="storage.shared_db_path" tooltipPosition="top">{{ storage.shared_db_path }}</dd>
+                                        </div>
+                                        <div>
+                                            <dt>{{ "admin.system.storage.sharedDbSize" | transloco }}</dt>
+                                            <dd>{{ formatBytesValue(storage.shared_db_bytes) }}</dd>
+                                        </div>
+                                        <div>
+                                            <dt>{{ "admin.system.storage.dataPath" | transloco }}</dt>
+                                            <dd class="admin-mono" [pTooltip]="storage.data_path" tooltipPosition="top">{{ storage.data_path }}</dd>
+                                        </div>
+                                        <div>
+                                            <dt>{{ "admin.system.storage.diskAvailable" | transloco }}</dt>
+                                            <dd>{{ formatBytesValue(storage.disk_available_bytes) }} / {{ formatBytesValue(storage.disk_total_bytes) }}</dd>
+                                        </div>
+                                    </dl>
+
+                                    <div class="mt-5 mb-3 flex items-center justify-between gap-3 border-t border-[var(--p-content-border-color)] pt-4">
+                                        <h4 class="m-0 text-sm leading-5 font-semibold text-[var(--p-text-color)]">{{ "admin.system.storage.tenantDbs" | transloco }}</h4>
+                                        <span class="text-xs leading-5 font-semibold text-[var(--p-text-muted-color)] tabular-nums">{{ storage.tenant_db_count | number }}</span>
+                                    </div>
+                                    <app-admin-item-list [items]="tenantDatabaseItems()" [ariaLabel]="'admin.system.storage.tenantDbs' | transloco" [emptyMessage]="'admin.system.console.noTenantDbs' | transloco" />
+                                    } @else {
+                                    <p-message severity="error" styleClass="w-full" [text]="'admin.system.console.loadFailed' | transloco" />
+                                    }
+                                </section>
+                            </div>
+
+                            @if (systemStorage(); as storage) { @if (duckdbMemoryRows().length > 0) {
+                            <section class="admin-memory" aria-labelledby="operations-database-memory-title">
+                                <div class="admin-memory__header">
+                                    <h3 id="operations-database-memory-title">{{ "admin.system.storage.memory" | transloco }}</h3>
+                                    <strong>{{ formatBytesValue(duckdbMemoryTotalBytes()) }}</strong>
                                 </div>
-                                <div>
-                                    <dt>{{ "admin.system.database.automaticWalRecovery" | transloco }}</dt>
-                                    <dd><p-tag [value]="database.automatic_wal_recovery_enabled ? ('common.enabled' | transloco) : ('common.disabled' | transloco)" [severity]="database.automatic_wal_recovery_enabled ? 'warn' : 'success'" /></dd>
+                                <div class="admin-memory__bar" aria-hidden="true">
+                                    @for (row of duckdbMemoryRows(); track row.tag) {
+                                    <span class="admin-memory__segment" [style.background]="memorySwatchColor(row.swatch)" [style.width.%]="row.percent"></span>
+                                    }
                                 </div>
-                                <div>
-                                    <dt>{{ "admin.system.database.checkpointInterval" | transloco }}</dt>
-                                    <dd>{{ formatMinutes(database.checkpoint_interval_min) }}</dd>
-                                </div>
-                                <div>
-                                    <dt>{{ "admin.system.database.lastCheckpoint" | transloco }}</dt>
-                                    <dd>
-                                        @if (database.last_checkpoint_at) {
-                                        <app-relative-date-time [value]="database.last_checkpoint_at" />
-                                        } @else { - }
-                                    </dd>
-                                </div>
-                                <div>
-                                    <dt>{{ "admin.system.database.lastRecovery" | transloco }}</dt>
-                                    <dd>
-                                        @if (database.last_recovery_at) {
-                                        <app-relative-date-time [value]="database.last_recovery_at" />
-                                        } @else { - }
-                                    </dd>
-                                </div>
-                                <div>
-                                    <dt>{{ "admin.system.database.removedUnsafeIndexes" | transloco }}</dt>
-                                    <dd>{{ database.removed_unsafe_indexes | number }}</dd>
-                                </div>
-                                <div>
-                                    <dt>{{ "admin.system.database.recoveryBundle" | transloco }}</dt>
-                                    <dd>{{ (database.recovery_bundle_available ? "common.yes" : "common.no") | transloco }}</dd>
-                                </div>
-                            </dl>
-                            @if (database.last_checkpoint_error) {
-                            <p-message severity="error" styleClass="w-full mt-3" [text]="'admin.system.database.checkpointFailed' | transloco" />
-                            } } @else if (isLoadingDatabase()) {
+                                <ul class="admin-memory__legend">
+                                    @for (row of duckdbMemoryRows(); track row.tag) {
+                                    <li>
+                                        <span class="admin-memory__swatch" [style.background]="memorySwatchColor(row.swatch)" aria-hidden="true"></span>
+                                        <span class="admin-memory__tag admin-mono">{{ row.tag }}</span>
+                                        <span class="admin-memory__bytes">{{ formatBytesValue(row.bytes) }}</span>
+                                    </li>
+                                    }
+                                </ul>
+                            </section>
+                            } } } @else if (isLoadingDatabaseOverview()) {
                             <div class="admin-loading"><i class="pi pi-spin pi-spinner" aria-hidden="true"></i>{{ "common.loading" | transloco }}</div>
+                            } @else {
+                            <p-message severity="error" [text]="'admin.system.console.loadFailed' | transloco" styleClass="w-full" />
                             } @if (databaseActionStatus(); as status) {
                             <p-message [severity]="status.severity" styleClass="w-full mt-3" [text]="databaseActionStatusMessage()" />
                             }
@@ -844,6 +786,7 @@
                         <app-system-status-card
                             titleId="operations-backups-title"
                             [title]="'admin.system.backups.title' | transloco"
+                            [description]="'admin.system.console.backupsDescription' | transloco"
                             [loading]="isLoadingBackups()"
                             [refreshLabel]="'admin.system.console.refreshCard' | transloco"
                             (refreshClicked)="loadSystemBackups()"
@@ -889,6 +832,7 @@
                         <app-system-status-card
                             titleId="operations-spam-title"
                             [title]="'admin.system.spam.title' | transloco"
+                            [description]="'admin.system.console.spamDescription' | transloco"
                             [loading]="isLoadingSpam()"
                             [refreshLabel]="'admin.system.console.refreshCard' | transloco"
                             [actionLabel]="canRunMaintenance() ? ('admin.system.spam.actions.refresh' | transloco) : ''"
@@ -932,10 +876,9 @@
                         <app-system-status-card
                             titleId="operations-import-cleanup-title"
                             [title]="'admin.system.importCleanup.title' | transloco"
+                            [description]="'admin.system.console.importCleanupDescription' | transloco"
                             [loading]="isLoadingImportCleanup()"
                             [refreshLabel]="'admin.system.console.refreshCard' | transloco"
-                            [metricLabel]="'admin.system.importCleanup.staleBytes' | transloco"
-                            [metricValue]="formatBytesValue(systemImportCleanup()?.stale_bytes ?? 0)"
                             [actionLabel]="canRunMaintenance() ? ('admin.system.importCleanup.actions.run' | transloco) : ''"
                             actionIcon="pi pi-eraser"
                             actionSeverity="warn"
@@ -963,6 +906,10 @@
                                     <dd>{{ cleanup.stale_files | number }}</dd>
                                 </div>
                                 <div>
+                                    <dt>{{ "admin.system.importCleanup.staleBytes" | transloco }}</dt>
+                                    <dd>{{ formatBytesValue(cleanup.stale_bytes) }}</dd>
+                                </div>
+                                <div>
                                     <dt>{{ "admin.system.importCleanup.lastRun" | transloco }}</dt>
                                     <dd>
                                         @if (cleanup.last_run) {
@@ -987,7 +934,7 @@
                         <app-system-status-card
                             titleId="operations-mail-title"
                             [title]="'admin.system.mail.title' | transloco"
-                            [wide]="true"
+                            [description]="'admin.system.console.mailDescription' | transloco"
                             [loading]="isLoadingMail()"
                             [refreshLabel]="'admin.system.console.refreshCard' | transloco"
                             (refreshClicked)="loadSystemMail()"
@@ -1061,6 +1008,7 @@
                                     [label]="'admin.system.mail.actions.test' | transloco"
                                     severity="secondary"
                                     size="small"
+                                    styleClass="min-h-11 sm:min-h-8"
                                     (onClick)="testMail()"
                                     [loading]="isTestingMail()"
                                     [disabled]="mailTestRecipient.invalid || isTestingMail()"
@@ -1076,62 +1024,56 @@
 
                 <p-tabpanel value="activation">
                     @if (activeAdminTab() === "activation" && canViewActivation()) {
-                    <section class="admin-panel admin-panel--wide admin-panel--table" aria-labelledby="activation-title">
-                        <div class="admin-panel__header admin-panel__header--stacked">
-                            <div class="admin-panel__title-block">
-                                <h2 id="activation-title">{{ "admin.system.activation.title" | transloco }}</h2>
-                                <span class="admin-panel__meta">{{ "admin.system.activation.subtitle" | transloco }}</span>
-                            </div>
-                            <div class="flex min-w-0 flex-wrap justify-end gap-2">
-                                <p-select [options]="activationStatusOptions()" [formControl]="activationStatusControl" optionLabel="label" optionValue="value" size="small" appendTo="body" />
-                                <p-iconfield class="admin-search">
-                                    <p-inputicon class="pi pi-users" />
-                                    <input
-                                        pInputText
-                                        [placeholder]="'admin.system.activation.filters.team' | transloco"
-                                        [value]="activationTeamFilter()"
-                                        (input)="activationTeamFilter.set($any($event.target).value)"
-                                        (keydown.enter)="applyActivationFilters()"
-                                    />
-                                </p-iconfield>
-                                <p-iconfield class="admin-search">
-                                    <p-inputicon class="pi pi-globe" />
-                                    <input
-                                        pInputText
-                                        [placeholder]="'admin.system.activation.filters.domain' | transloco"
-                                        [value]="activationDomainFilter()"
-                                        (input)="activationDomainFilter.set($any($event.target).value)"
-                                        (keydown.enter)="applyActivationFilters()"
-                                    />
-                                </p-iconfield>
-                                <p-button icon="pi pi-filter" [label]="'common.actions.apply' | transloco" size="small" (onClick)="applyActivationFilters()" [loading]="isLoadingActivation()" />
-                                <p-button icon="pi pi-times" [label]="'common.actions.clearAll' | transloco" size="small" severity="secondary" [outlined]="true" (onClick)="clearActivationFilters()" />
-                                <p-button
-                                    icon="pi pi-refresh"
-                                    [ariaLabel]="'admin.system.console.refreshCard' | transloco"
-                                    size="small"
-                                    severity="secondary"
-                                    [outlined]="true"
-                                    (onClick)="loadSystemActivation(systemActivation()?.offset ?? 0)"
-                                    [loading]="isLoadingActivation()"
+                    <app-admin-panel titleId="activation-title" [title]="'admin.system.activation.title' | transloco" [subtitle]="'admin.system.activation.subtitle' | transloco" [padded]="false" [stackedHeader]="true">
+                        <div admin-panel-header class="flex min-w-0 flex-wrap justify-end gap-2">
+                            <p-select [options]="activationStatusOptions()" [formControl]="activationStatusControl" optionLabel="label" optionValue="value" size="small" appendTo="body" />
+                            <p-iconfield class="admin-search">
+                                <p-inputicon class="pi pi-users" />
+                                <input
+                                    pInputText
+                                    [placeholder]="'admin.system.activation.filters.team' | transloco"
+                                    [value]="activationTeamFilter()"
+                                    (input)="activationTeamFilter.set($any($event.target).value)"
+                                    (keydown.enter)="applyActivationFilters()"
                                 />
-                            </div>
+                            </p-iconfield>
+                            <p-iconfield class="admin-search">
+                                <p-inputicon class="pi pi-globe" />
+                                <input
+                                    pInputText
+                                    [placeholder]="'admin.system.activation.filters.domain' | transloco"
+                                    [value]="activationDomainFilter()"
+                                    (input)="activationDomainFilter.set($any($event.target).value)"
+                                    (keydown.enter)="applyActivationFilters()"
+                                />
+                            </p-iconfield>
+                            <p-button icon="pi pi-filter" [label]="'common.actions.apply' | transloco" size="small" (onClick)="applyActivationFilters()" [loading]="isLoadingActivation()" />
+                            <p-button icon="pi pi-times" [label]="'common.actions.clearAll' | transloco" size="small" severity="secondary" [outlined]="true" (onClick)="clearActivationFilters()" />
+                            <p-button
+                                icon="pi pi-refresh"
+                                [ariaLabel]="'admin.system.console.refreshCard' | transloco"
+                                size="small"
+                                severity="secondary"
+                                [outlined]="true"
+                                (onClick)="loadSystemActivation(systemActivation()?.offset ?? 0)"
+                                [loading]="isLoadingActivation()"
+                            />
                         </div>
                         @if (activationCopyStatus() === "success") {
-                        <div class="admin-panel__messages">
+                        <div admin-panel-messages>
                             <p-message severity="success" styleClass="w-full" [text]="'admin.system.activation.copySuccess' | transloco" />
                         </div>
                         } @else if (activationCopyStatus() === "error") {
-                        <div class="admin-panel__messages">
+                        <div admin-panel-messages>
                             <p-message severity="error" styleClass="w-full" [text]="'admin.system.activation.copyError' | transloco" />
                         </div>
                         }
-                        <div class="grid border-b border-surface-100 bg-surface-50 dark:border-surface-800 dark:bg-surface-800 md:grid-cols-3">
-                            <div class="flex min-w-0 items-center justify-between gap-3 border-b border-surface-100 px-4 py-3 dark:border-surface-800 md:border-b-0 md:border-r">
+                        <div class="grid border-b border-[var(--p-content-border-color)] bg-[var(--p-content-hover-background)] md:grid-cols-3">
+                            <div class="flex min-w-0 items-center justify-between gap-3 border-b border-[var(--p-content-border-color)] px-4 py-3 md:border-r md:border-b-0">
                                 <span class="text-xs font-semibold text-[var(--p-text-muted-color)]">{{ "admin.system.activation.metrics.liveSites" | transloco }}</span>
                                 <strong class="truncate font-bold text-[var(--p-text-color)]">{{ activationLiveSites() | number }}</strong>
                             </div>
-                            <div class="flex min-w-0 items-center justify-between gap-3 border-b border-surface-100 px-4 py-3 dark:border-surface-800 md:border-b-0 md:border-r">
+                            <div class="flex min-w-0 items-center justify-between gap-3 border-b border-[var(--p-content-border-color)] px-4 py-3 md:border-r md:border-b-0">
                                 <span class="text-xs font-semibold text-[var(--p-text-muted-color)]">{{ "admin.system.activation.metrics.loadedRows" | transloco }}</span>
                                 <strong class="truncate font-bold text-[var(--p-text-color)]">{{ activationRows().length | number }}</strong>
                             </div>
@@ -1210,7 +1152,7 @@
                                 </ng-template>
                             </p-table>
                         </div>
-                        <div class="flex items-center justify-between gap-4 border-t border-surface-100 px-4 py-3 text-sm text-[var(--p-text-muted-color)] dark:border-surface-800">
+                        <div admin-panel-footer class="flex min-w-0 flex-1 items-center justify-between gap-4 text-sm text-[var(--p-text-muted-color)] max-sm:flex-col max-sm:items-stretch">
                             <span>{{ "admin.system.activation.pagination" | transloco: { loaded: activationRows().length, total: systemActivation()?.total ?? 0 } }}</span>
                             <div class="flex gap-2">
                                 <p-button
@@ -1234,20 +1176,15 @@
                                 />
                             </div>
                         </div>
-                    </section>
+                    </app-admin-panel>
                     }
                 </p-tabpanel>
 
                 <p-tabpanel value="audit">
                     @if (activeAdminTab() === "audit") {
-                    <section class="admin-panel admin-panel--wide" aria-labelledby="audit-title">
-                        <div class="admin-panel__header">
-                            <div>
-                                <h2 id="audit-title">{{ "admin.system.audit.title" | transloco }}</h2>
-                            </div>
-                        </div>
+                    <app-admin-panel titleId="audit-title" [title]="'admin.system.audit.title' | transloco" [padded]="false">
                         <app-system-audit />
-                    </section>
+                    </app-admin-panel>
                     }
                 </p-tabpanel>
             </p-tabpanels>

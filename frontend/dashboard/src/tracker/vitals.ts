@@ -10,6 +10,7 @@ interface WebVitalsPayload {
     pid: string;
     tsrc: string;
     tv: string;
+    ua?: string;
 }
 
 interface WebVitalsTrackerContext {
@@ -19,6 +20,7 @@ interface WebVitalsTrackerContext {
     pageId: () => string;
     trackerSource: string;
     trackerVersion: string;
+    userAgent: string;
 }
 
 type HitKeepVitalsWindow = Window &
@@ -43,7 +45,8 @@ function emitMetric(context: WebVitalsTrackerContext, metric: Metric): void {
         sid: context.sessionId,
         pid: context.pageId(),
         tsrc: context.trackerSource,
-        tv: context.trackerVersion
+        tv: context.trackerVersion,
+        ua: context.userAgent
     });
 }
 

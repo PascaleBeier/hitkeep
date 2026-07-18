@@ -76,7 +76,7 @@ func newRoot(options *options) *cobra.Command {
 	root.PersistentFlags().StringVar(&options.output, "output", "human", "output format: human (default), plain, json, or ndjson")
 	root.AddCommand(
 		catalogCommand(options), doctorCommand(options), workspaceCommand(options), setupCommand(options),
-		devCommand(options), qaCommand(options), formatCommand(options), fixCommand(options), buildCommand(options), smokeCommand(options), runCommand(options),
+		devCommand(options), screenshotCommand(options), qaCommand(options), formatCommand(options), fixCommand(options), buildCommand(options), smokeCommand(options), runCommand(options),
 		cacheCommand(options), ciCommand(options), docsCommand(options), skillsCommand(options), mcpCommand(options), runWorkerCommand(options), devWorkerCommand(options),
 	)
 	return root
@@ -255,6 +255,27 @@ func workspaceCommand(options *options) *cobra.Command {
 
 func setupCommand(options *options) *cobra.Command {
 	return startCommand(options, "setup", "setup", "Prepare pinned development containers for this worktree", func(*cobra.Command, []string) devtool.RunRequest { return devtool.RunRequest{Kind: "setup"} })
+}
+
+func screenshotCommand(options *options) *cobra.Command {
+	var request devtool.ScreenshotRequest
+	command := &cobra.Command{
+		Use:   "screenshot [ROUTE...]",
+		Short: "Capture local dashboard routes for visual QA",
+		Args:  cobra.MaximumNArgs(devtool.MaxScreenshotRoutes),
+		RunE: withArgsApp(options, "screenshot", func(ctx context.Context, app *devtool.App, args []string) (any, error) {
+			request.Routes = args
+			return app.CaptureScreenshots(ctx, request)
+		}),
+	}
+	command.Flags().StringVar(&request.Viewport, "viewport", "desktop", "viewport preset: desktop or mobile")
+	command.Flags().StringVar(&request.Theme, "theme", "light", "color scheme: light or dark")
+	command.Flags().IntVar(&request.Scale, "scale", 1, "device pixel ratio: 1 or 2")
+	command.Flags().IntVar(&request.WaitMS, "wait-ms", 200, "bounded visual settle time after route readiness")
+	command.Flags().BoolVar(&request.FullPage, "full-page", false, "capture the complete document instead of the viewport")
+	command.Flags().StringVar(&request.Selector, "selector", "", "capture one visible CSS selector on a single route")
+	command.Flags().BoolVar(&request.Anonymous, "anonymous", false, "capture without signing in to the seeded development account")
+	return command
 }
 
 func devCommand(options *options) *cobra.Command {

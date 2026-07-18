@@ -33,6 +33,8 @@ import { TeamService } from '@services/team.service';
 import { UserProfileService } from '@services/user-profile.service';
 import { AdminPageFrame } from './components/admin-page-frame';
 import { AdminGlobalExclusionSettings } from './components/admin-global-exclusion-settings';
+import { AdminItemList, type AdminItemListEntry } from './components/admin-item-list';
+import { AdminPanel } from './components/admin-panel';
 import { SystemStatusCard } from './components/system-status-card';
 import { SystemAudit } from './components/system-audit';
 import {
@@ -131,6 +133,8 @@ interface StatusState {
         TooltipModule,
         AdminPageFrame,
         AdminGlobalExclusionSettings,
+        AdminItemList,
+        AdminPanel,
         SystemStatusCard,
         SystemAudit,
         CopyControl,
@@ -269,15 +273,6 @@ export class AdminSettings implements OnInit {
         const features = this.systemInfo()?.enabled_features ?? [];
         return features.some((feature) => feature.key === 'managed_cloud' && feature.enabled);
     });
-    protected readonly instanceOwners = computed(() => this.users().filter((user) => user.instance_role === 'owner').length);
-    protected readonly instanceAdmins = computed(() => this.users().filter((user) => user.instance_role === 'admin').length);
-    protected readonly activeTeams = computed(() => this.teams().filter((team) => !team.is_archived).length);
-    protected readonly totalSites = computed(() => this.sites().length);
-    protected readonly totalStorageBytes = computed(() => {
-        const storage = this.systemStorage();
-        if (!storage) return 0;
-        return storage.shared_db_bytes + (storage.tenant_dbs ?? []).reduce((total, db) => total + db.bytes, 0);
-    });
     protected readonly diskUsedPercent = computed(() => {
         const storage = this.systemStorage();
         if (!storage || storage.disk_total_bytes <= 0) return 0;
@@ -285,6 +280,19 @@ export class AdminSettings implements OnInit {
         return Math.round((used / storage.disk_total_bytes) * 100);
     });
     protected readonly recentHits = computed(() => this.systemIngest()?.recent_hits ?? 0);
+    protected readonly tenantDatabaseItems = computed<readonly AdminItemListEntry[]>(() => {
+        this.activeLanguage();
+        const sizeLabel = this.transloco.translate('admin.system.storage.columns.size');
+        return (this.systemStorage()?.tenant_dbs ?? []).map((database) => ({
+            id: database.tenant_id,
+            label: database.name,
+            description: database.path,
+            descriptionMonospace: true,
+            copyValue: database.path,
+            meta: this.formatBytesValue(database.bytes),
+            metaLabel: sizeLabel
+        }));
+    });
     protected readonly duckdbMemoryRows = computed(() => {
         this.activeLanguage();
         const stats = (this.systemStorage()?.duckdb_memory ?? []).filter((stat) => stat.memory_bytes > 0);
@@ -303,6 +311,7 @@ export class AdminSettings implements OnInit {
         return top;
     });
     protected readonly duckdbMemoryTotalBytes = computed(() => (this.systemStorage()?.duckdb_memory ?? []).reduce((sum, stat) => sum + stat.memory_bytes, 0));
+    protected readonly isLoadingDatabaseOverview = computed(() => this.isLoadingDatabase() || this.isLoadingStorage());
     private static readonly memorySwatchColors = [
         'var(--p-primary-color)',
         'color-mix(in srgb, var(--p-primary-color) 72%, transparent)',
@@ -354,7 +363,6 @@ export class AdminSettings implements OnInit {
         if (!status) return 0;
         return status.failed_syncs + status.needs_attention_syncs;
     });
-    protected readonly searchConsoleSyncIssueMetric = computed(() => `${this.searchConsoleSyncIssueCount()}`);
     protected readonly aiTokenUsageMetric = computed(() => {
         const status = this.systemAIStatus();
         if (!status) return '-';
@@ -653,6 +661,11 @@ export class AdminSettings implements OnInit {
             });
     }
 
+    protected loadSystemDatabaseOverview() {
+        this.loadSystemDatabase();
+        this.loadSystemStorage();
+    }
+
     protected checkpointDatabase() {
         if (!this.canRunMaintenance() || !this.systemDatabase()) {
             return;
@@ -668,7 +681,7 @@ export class AdminSettings implements OnInit {
                         severity: 'success',
                         key: 'admin.system.database.checkpointSuccess'
                     });
-                    this.loadSystemDatabase();
+                    this.loadSystemDatabaseOverview();
                 },
                 error: () => {
                     this.databaseActionStatus.set({
@@ -823,7 +836,7 @@ export class AdminSettings implements OnInit {
     }
 
     protected refreshOperations() {
-        this.loadSystemDatabase();
+        this.loadSystemDatabaseOverview();
         this.loadSystemBackups();
         this.loadSystemSpam();
         this.loadImportStageCleanup();

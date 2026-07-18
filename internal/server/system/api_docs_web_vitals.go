@@ -82,6 +82,7 @@ func openAPIV1WebVitalSchemas() map[string]any {
 				"pid":  map[string]any{"type": "string", "format": "uuid"},
 				"tsrc": map[string]any{"type": "string"},
 				"tv":   map[string]any{"type": "string"},
+				"ua":   map[string]any{"type": "string", "description": "Optional browser user agent used transiently for traffic exclusions. The request header is the compatibility fallback."},
 			},
 			"required": []string{"n", "v", "p", "sid", "pid"},
 		},

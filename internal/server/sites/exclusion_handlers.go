@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
 
+	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
 )
 
@@ -26,7 +28,24 @@ func (h *handler) handleListSiteExclusions() http.HandlerFunc {
 			return
 		}
 
-		rules, err := h.ctx.Store.ListSiteExclusions(r.Context(), siteID)
+		effective, err := parseEffectiveExclusionsQuery(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		var rules any
+		if effective {
+			teamID, resolveErr := h.ctx.Store.GetSiteTenantID(r.Context(), siteID)
+			if resolveErr != nil {
+				slog.Error("Failed to resolve site team for exclusions", "error", resolveErr, "site_id", siteID)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			rules, err = h.ctx.Store.ListEffectiveSiteExclusions(r.Context(), teamID, siteID)
+		} else {
+			rules, err = h.ctx.Store.ListSiteExclusions(r.Context(), siteID)
+		}
 		if err != nil {
 			slog.Error("Failed to list site exclusions", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -64,9 +83,16 @@ func (h *handler) handleCreateSiteExclusion() http.HandlerFunc {
 			http.Error(w, message, status)
 			return
 		}
-		ruleID, createdRule, createErr := h.createSiteTrafficExclusion(r.Context(), siteID, userID, input)
+		createdRule, createErr := h.ctx.Store.CreateSiteTrafficExclusion(r.Context(), siteID, database.TrafficExclusionValues{
+			Type:        input.Type,
+			CIDR:        input.CIDR,
+			CountryCode: input.CountryCode,
+			UserAgent:   input.UserAgent,
+			Path:        input.Path,
+			Description: input.Description,
+		}, userID)
 		if createErr != nil {
-			slog.Error("Failed to create site exclusion", "error", createErr, "site_id", siteID, "type", input.Type, "label", input.Label)
+			slog.Error("Failed to create site exclusion", "error", createErr, "site_id", siteID, "type", input.Type)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -78,10 +104,10 @@ func (h *handler) handleCreateSiteExclusion() http.HandlerFunc {
 				TeamID:      teamID,
 				Action:      "site.exclusion_created",
 				TargetType:  "site_exclusion",
-				TargetID:    ruleID,
+				TargetID:    createdRule.ID.String(),
 				TargetLabel: input.Label,
 				Outcome:     "success",
-				Details:     fmt.Sprintf("Site exclusion %s created", input.Label),
+				Details:     fmt.Sprintf("Traffic exclusion created (scope=site, type=%s, value=%s)", input.Type, input.Label),
 			})
 		}
 
@@ -90,25 +116,6 @@ func (h *handler) handleCreateSiteExclusion() http.HandlerFunc {
 		if err := json.NewEncoder(w).Encode(createdRule); err != nil {
 			slog.Error("Failed to encode site exclusion response", "error", err, "site_id", siteID)
 		}
-	}
-}
-
-func (h *handler) createSiteTrafficExclusion(ctx context.Context, siteID uuid.UUID, userID uuid.UUID, input shared.TrafficExclusionInput) (string, any, error) {
-	switch input.Type {
-	case shared.ExclusionRuleTypeCIDR:
-		rule, err := h.ctx.Store.CreateSiteExclusion(ctx, siteID, input.CIDR, input.Description, userID)
-		if err != nil {
-			return "", nil, err
-		}
-		return rule.ID.String(), rule, nil
-	case shared.ExclusionRuleTypeCountry:
-		rule, err := h.ctx.Store.CreateSiteCountryExclusion(ctx, siteID, input.CountryCode, input.Description, userID)
-		if err != nil {
-			return "", nil, err
-		}
-		return rule.ID.String(), rule, nil
-	default:
-		return "", nil, fmt.Errorf("unsupported exclusion type %q", input.Type)
 	}
 }
 
@@ -152,12 +159,24 @@ func (h *handler) handleDeleteSiteExclusion() http.HandlerFunc {
 				TargetID:    ruleID.String(),
 				TargetLabel: ruleID.String(),
 				Outcome:     "success",
-				Details:     fmt.Sprintf("Site exclusion %s deleted", ruleID),
+				Details:     fmt.Sprintf("Traffic exclusion deleted (scope=site, rule_id=%s)", ruleID),
 			})
 		}
 
 		w.WriteHeader(http.StatusNoContent)
 	}
+}
+
+func parseEffectiveExclusionsQuery(r *http.Request) (bool, error) {
+	raw := strings.TrimSpace(r.URL.Query().Get("effective"))
+	if raw == "" {
+		return false, nil
+	}
+	effective, err := strconv.ParseBool(raw)
+	if err != nil {
+		return false, fmt.Errorf("invalid effective value")
+	}
+	return effective, nil
 }
 
 func (h *handler) refreshIPFilter(ctx context.Context) {

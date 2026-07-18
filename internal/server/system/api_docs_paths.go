@@ -72,9 +72,10 @@ func openAPIV1CorePaths() map[string]any {
 		},
 		"/ingest/event": map[string]any{
 			"options": op([]string{"Ingest"}, "Preflight event ingest", "CORS preflight for custom event ingest.", nil, nil, nil, map[string]any{"200": desc("Preflight response")}),
-			"post": op([]string{"Ingest"}, "Ingest custom event", "Ingests a custom event from the browser tracker.", nil, nil,
+			"post": op([]string{"Ingest"}, "Ingest custom event", "Ingests a custom event from the browser tracker. Current trackers include transient path and user-agent context for exclusion matching; older trackers remain supported.", nil, nil,
 				map[string]any{"required": true, "content": map[string]any{"application/json": map[string]any{"schema": map[string]any{"type": "object", "properties": map[string]any{
 					"n": map[string]any{"type": "string"}, "p": map[string]any{"type": "object", "additionalProperties": true}, "sid": map[string]any{"type": "string", "format": "uuid"},
+					"path": map[string]any{"type": "string", "description": "Optional browser path used transiently for traffic exclusions."}, "ua": map[string]any{"type": "string", "description": "Optional browser user agent used transiently for traffic exclusions."},
 				}, "required": []string{"n", "sid"}}}}},
 				map[string]any{"202": desc("Accepted"), "400": errResp("Invalid request")}),
 		},
@@ -400,6 +401,22 @@ func openAPIV1CorePaths() map[string]any {
 					"400": errResp("Invalid request"),
 					"403": errResp("Access denied"),
 				}),
+		},
+		"/api/user/teams/{id}/exclusions": map[string]any{
+			"get": op([]string{"Teams"}, "List team traffic exclusions", "Lists traffic exclusions owned by the team. Set effective=true to include inherited instance rules before team rules, newest-first within each scope. Inherited rows are read-only and omit cross-scope creator IDs. Requires team.manage_settings.", secCookie(), []any{
+				paramRef("#/components/parameters/teamID"),
+				map[string]any{"name": "effective", "in": "query", "description": "Include inherited instance rules.", "schema": map[string]any{"type": "boolean", "default": false}},
+			}, nil, map[string]any{
+				"200": jsonSchemaResp("Team traffic exclusions", map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/IPExclusion"}}),
+				"403": errResp("Access denied"),
+			}),
+			"post": op([]string{"Teams"}, "Create team traffic exclusion", "Creates a forward-only CIDR, country, user-agent, or path exclusion for every site currently owned by the team. Requires team.manage_settings.", secCookie(), []any{paramRef("#/components/parameters/teamID")},
+				jsonBody(map[string]any{"$ref": "#/components/schemas/IPExclusionCreateRequest"}),
+				map[string]any{"201": jsonRefResp("Created team exclusion", "#/components/schemas/IPExclusion"), "400": errResp("Invalid exclusion rule"), "403": errResp("Access denied")}),
+		},
+		"/api/user/teams/{id}/exclusions/{ruleID}": map[string]any{
+			"delete": op([]string{"Teams"}, "Delete team traffic exclusion", "Deletes a rule owned by this team. Instance rules returned by effective reads cannot be deleted through this route. Requires team.manage_settings.", secCookie(), []any{paramRef("#/components/parameters/teamID"), paramRef("#/components/parameters/ruleID")}, nil,
+				map[string]any{"204": desc("Deleted"), "403": errResp("Access denied"), "404": errResp("Not found")}),
 		},
 		"/api/user/teams/{id}/tracking-domains": map[string]any{
 			"get": op([]string{"Teams"}, "List tracking domains", "Lists custom tracking domains configured for the team, including DNS instructions and verification state. Requires team.manage_settings.", secCookie(), []any{paramRef("#/components/parameters/teamID")}, nil,

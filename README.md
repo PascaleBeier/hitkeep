@@ -175,6 +175,8 @@ Start with:
 
 `./hk dev` runs the workspace's Compose stack in the foreground, prints URLs, and streams component logs; `Ctrl+C` stops the complete stack. Use `./hk dev --detach` for an explicit background session, `./hk dev logs` to follow it, `./hk dev restart` to preserve data while restarting, `./hk dev stop` to stop it, and `./hk dev reset --seed` for a fresh seeded data volume. Add `--variant cloud` for local managed-cloud parity. Concurrent Git worktrees remain isolated automatically.
 
+Capture one or several local routes for visual QA with `./hk screenshot /dashboard /admin/status`. The routes share one browser and authenticated seeded session, and the PNGs stay in the workspace's managed artifact state instead of entering the repository.
+
 Run `./hk help` for human guidance, `./hk catalog commands --output json` for the complete machine-readable command surface, `./hk doctor` for prerequisites, and `./hk qa pr` before review. `hk` is the sole supported developer workflow entry point.
 
 Contributor docs and local development guides:

@@ -41,7 +41,9 @@ const EMPTY_SSO_FORM: TeamSSOFormModel = {
     selector: 'app-team-sso',
     imports: [TranslocoPipe, FormsModule, FormField, InputTextModule, ButtonModule, MessageModule, TagModule, TextareaModule, ToggleSwitchModule, SettingsCard, CopyControl],
     templateUrl: './team-sso.html',
-    styleUrl: './team-sso.css',
+    host: {
+        class: 'block'
+    },
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class TeamSSOPage {

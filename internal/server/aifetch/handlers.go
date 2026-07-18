@@ -17,6 +17,7 @@ import (
 	"hitkeep/internal/aianalytics"
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
+	"hitkeep/internal/blocking"
 	"hitkeep/internal/exportfmt"
 	"hitkeep/internal/realtime"
 	"hitkeep/internal/server/shared"
@@ -173,6 +174,16 @@ func (h *handler) handleCreateAIFetch() http.HandlerFunc {
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			h.recordRejection()
 			http.Error(w, "Bad request body", http.StatusBadRequest)
+			return
+		}
+		if h.ctx.IPFilter != nil && h.ctx.IPFilter.EvaluateTraffic(site.ID, blocking.TrafficExclusionContext{
+			IP:          userIP,
+			CountryCode: countryCode,
+			UserAgent:   payload.UserAgent,
+			Path:        payload.Path,
+		}).Blocked {
+			h.recordRejection()
+			w.WriteHeader(http.StatusAccepted)
 			return
 		}
 		if payload.StatusCode < 100 || payload.StatusCode > 599 {

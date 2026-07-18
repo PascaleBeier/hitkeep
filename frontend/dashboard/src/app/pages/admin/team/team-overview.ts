@@ -1,12 +1,14 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, resource, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormsModule } from '@angular/forms';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { TranslocoLocaleService } from '@jsverse/transloco-locale';
 import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
 import { ProgressBarModule } from 'primeng/progressbar';
+import { SelectButtonModule } from 'primeng/selectbutton';
 import { TagModule } from 'primeng/tag';
-import { CopyControl } from '@components/copy-control/copy-control';
+import { SettingsCard } from '@features/settings/components/settings-card';
 import { TeamService } from '@services/team.service';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { AnalyticsService } from '@services/analytics.service';
@@ -14,6 +16,7 @@ import { BillingInterval, CloudService } from '@services/cloud.service';
 import { firstValueFrom } from 'rxjs';
 
 import { CloudPlanTier, TeamPlan, TeamRole } from '@models/analytics.types';
+import { AdminItemList, type AdminItemListEntry } from '../components/admin-item-list';
 
 /** Canonical regional list-price amounts; EUR and USD use the same numeric tiers. */
 const PLAN_PRICES: Record<BillingInterval, Record<string, number>> = {
@@ -24,7 +27,7 @@ const PLAN_RANK: Record<string, number> = { free: 0, pro: 1, business: 2 };
 
 @Component({
     selector: 'app-team-overview',
-    imports: [ButtonModule, CardModule, ProgressBarModule, TagModule, CopyControl, TranslocoPipe],
+    imports: [AdminItemList, ButtonModule, CardModule, FormsModule, ProgressBarModule, SelectButtonModule, SettingsCard, TagModule, TranslocoPipe],
     templateUrl: './team-overview.html',
     styleUrl: './team-overview.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -47,7 +50,39 @@ export class TeamOverviewPage {
     protected readonly portalPending = signal(false);
     protected readonly checkoutPending = signal(false);
     protected readonly billingInterval = signal<BillingInterval>('annual');
+    protected readonly billingOptions = computed(() => {
+        this.activeLanguage();
+        return [
+            { label: this.transloco.translate('admin.team.overview.plans.monthly'), value: 'monthly' as const },
+            { label: this.transloco.translate('admin.team.overview.plans.annual'), value: 'annual' as const }
+        ];
+    });
+    protected readonly teamDetailItems = computed<readonly AdminItemListEntry[]>(() => {
+        this.activeLanguage();
+        const team = this.team();
+        if (!team) return [];
+        return [
+            {
+                id: 'team-id',
+                label: this.transloco.translate('admin.team.overview.teamIdLabel'),
+                description: team.id,
+                descriptionMonospace: true,
+                copyValue: team.id
+            },
+            {
+                id: 'role',
+                label: this.transloco.translate('common.columns.role'),
+                meta: this.roleLabel(team.role)
+            },
+            {
+                id: 'members',
+                label: this.transloco.translate('admin.team.overview.memberCount'),
+                meta: this.localeService.localizeNumber(team.usage?.current_members ?? 0, 'decimal')
+            }
+        ];
+    });
     protected readonly usageCards = computed(() => {
+        this.activeLanguage();
         const team = this.team();
         const cloud = this.systemStatus()?.cloud;
         if (!cloud?.hosted || !team?.usage || !team.entitlements) {
@@ -68,6 +103,26 @@ export class TeamOverviewPage {
             cloud,
             retentionDays: team.entitlements.max_retention_days
         };
+    });
+    protected readonly cloudPlanItems = computed<readonly AdminItemListEntry[]>(() => {
+        this.activeLanguage();
+        const plan = this.cloudPlan();
+        if (!plan) return [];
+        const items: AdminItemListEntry[] = [
+            {
+                id: 'plan',
+                label: this.transloco.translate('admin.team.overview.plans.currentPlan'),
+                meta: this.planName(plan.plan)
+            }
+        ];
+        if (plan.cloud.jurisdiction) {
+            items.push({ id: 'jurisdiction', label: this.transloco.translate('admin.team.overview.cloud.jurisdiction'), meta: plan.cloud.jurisdiction });
+        }
+        if (plan.cloud.region) {
+            items.push({ id: 'region', label: this.transloco.translate('admin.team.overview.cloud.region'), meta: plan.cloud.region });
+        }
+        items.push({ id: 'retention', label: this.transloco.translate('admin.team.overview.cloud.retention'), meta: this.retentionLabel(plan.retentionDays) });
+        return items;
     });
     protected readonly showUsageSection = computed(() => this.usageCards().length > 0);
     protected readonly canManageBilling = computed(() => {
@@ -145,15 +200,15 @@ export class TeamOverviewPage {
 
     protected usageStateClass(percentage: number, limit: number): string {
         if (limit <= 0) {
-            return 'team-overview__usage-card--unlimited';
+            return 'team-overview__usage-progress team-overview__usage-progress--unlimited';
         }
         if (percentage >= 95) {
-            return 'team-overview__usage-card--critical';
+            return 'team-overview__usage-progress team-overview__usage-progress--critical';
         }
         if (percentage >= 80) {
-            return 'team-overview__usage-card--warning';
+            return 'team-overview__usage-progress team-overview__usage-progress--warning';
         }
-        return 'team-overview__usage-card--healthy';
+        return 'team-overview__usage-progress team-overview__usage-progress--healthy';
     }
 
     protected pendingInviteLabel(count: number): string {
@@ -267,7 +322,7 @@ export class TeamOverviewPage {
             key,
             current,
             limit,
-            displayValue: current.toLocaleString(),
+            displayValue: this.localeService.localizeNumber(current, 'decimal'),
             percentage,
             className: this.usageStateClass(percentage, limit),
             hasFiniteLimit: limit > 0,

@@ -17,6 +17,7 @@ Use these local developer MCP operations whenever they are callable:
 - `hk_run_status` and `hk_logs_tail` for asynchronous work.
 - `hk_run_list` to reuse or inspect bounded recent work before starting another run.
 - `hk_dev_start`, `hk_dev_status`, `hk_dev_logs`, and `hk_dev_stop` for this worktree's container-only development session.
+- `hk_screenshot` for batched, workspace-managed visual-QA artifacts from the active local session.
 - `hk_run_cancel` for one validated active run.
 
 Do not invoke equivalent workspace or run CLI commands unless the relevant MCP tool is not callable, the registration, startup, root-routing, or task-reload blocker has been reported, and the user has given explicit user approval. After approval, discover the equivalent command through `./hk catalog commands --output json`, request `--output json`, and add `--detach` for action parity. Do not parse terminal prose.

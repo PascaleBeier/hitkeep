@@ -20,6 +20,9 @@
  *   HITKEEP_PASSWORD Admin account password (required)
  *   OUTPUT_DIR       Output directory (default: ../hitkeep-docs/src/assets/screenshots)
  *   SCALE            Device pixel ratio (default: 2)
+ *
+ * For fast agent visual QA against an active seeded workspace, use
+ * `./hk screenshot /route` instead. This script remains the curated docs set.
  */
 
 import { existsSync, mkdirSync } from "fs";
@@ -77,11 +80,8 @@ async function login(page) {
 
 async function nav(page, path, settle = TABLE_SETTLE) {
   await page.goto(`${BASE_URL}${path}`, { waitUntil: "domcontentloaded", timeout: 20_000 });
-  try {
-    await page.waitForLoadState("networkidle", { timeout: 7_000 });
-  } catch {
-    // Keep moving when background polling prevents networkidle.
-  }
+  await page.waitForFunction(() => !document.fonts || document.fonts.status === "loaded", null, { timeout: 3_000 }).catch(() => {});
+  await page.evaluate(() => new Promise((resolveFrame) => requestAnimationFrame(() => requestAnimationFrame(resolveFrame))));
   await page.waitForTimeout(settle);
 }
 

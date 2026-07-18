@@ -28,6 +28,7 @@ import (
 	"hitkeep/internal/appurl"
 	"hitkeep/internal/assetstore"
 	authcore "hitkeep/internal/auth"
+	"hitkeep/internal/blocking"
 	"hitkeep/internal/exportfmt"
 	"hitkeep/internal/ipmeta"
 	"hitkeep/internal/server/shared"
@@ -804,7 +805,7 @@ func (h *handler) recordOpenBestEffort(ctx context.Context, r *http.Request, qr 
 	}
 	userIP, countryCode, metadata := h.qrOpenRequestContext(r)
 	referrer := stringPtrIfNotEmpty(r.Referer())
-	if h.shouldSuppressQROpen(qr, userIP, countryCode, referrer) {
+	if h.shouldSuppressQROpen(qr, userIP, countryCode, r.UserAgent(), referrer) {
 		return
 	}
 	if err := store.CreateQRCodeOpen(ctx, &api.QRCodeOpen{
@@ -844,8 +845,13 @@ func (h *handler) qrOpenRequestContext(r *http.Request) (string, string, ipmeta.
 	return userIP, countryCode, metadata
 }
 
-func (h *handler) shouldSuppressQROpen(qr *api.QRCode, userIP, countryCode string, referrer *string) bool {
-	if h.ctx.IPFilter != nil && h.ctx.IPFilter.Evaluate(qr.SiteID, userIP, countryCode).Blocked {
+func (h *handler) shouldSuppressQROpen(qr *api.QRCode, userIP, countryCode, userAgent string, referrer *string) bool {
+	if h.ctx.IPFilter != nil && h.ctx.IPFilter.EvaluateTraffic(qr.SiteID, blocking.TrafficExclusionContext{
+		IP:          userIP,
+		CountryCode: countryCode,
+		UserAgent:   userAgent,
+		Path:        qr.DestinationURL,
+	}).Blocked {
 		return true
 	}
 	if h.ctx.SpamFilter == nil {

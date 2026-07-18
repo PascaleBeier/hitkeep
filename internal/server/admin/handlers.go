@@ -229,29 +229,16 @@ func (h *handler) handleCreateInstanceExclusion() http.HandlerFunc {
 			http.Error(w, message, status)
 			return
 		}
-		var createdRule any
-		var ruleID string
-		var err error
-		switch input.Type {
-		case shared.ExclusionRuleTypeCIDR:
-			rule, createErr := h.ctx.Store.CreateInstanceExclusion(r.Context(), input.CIDR, input.Description, userID)
-			if createErr != nil {
-				err = createErr
-				break
-			}
-			createdRule = rule
-			ruleID = rule.ID.String()
-		case shared.ExclusionRuleTypeCountry:
-			rule, createErr := h.ctx.Store.CreateInstanceCountryExclusion(r.Context(), input.CountryCode, input.Description, userID)
-			if createErr != nil {
-				err = createErr
-				break
-			}
-			createdRule = rule
-			ruleID = rule.ID.String()
-		}
+		createdRule, err := h.ctx.Store.CreateInstanceTrafficExclusion(r.Context(), database.TrafficExclusionValues{
+			Type:        input.Type,
+			CIDR:        input.CIDR,
+			CountryCode: input.CountryCode,
+			UserAgent:   input.UserAgent,
+			Path:        input.Path,
+			Description: input.Description,
+		}, userID)
 		if err != nil {
-			slog.Error("Failed to create instance exclusion", "error", err, "type", input.Type, "label", input.Label)
+			slog.Error("Failed to create instance exclusion", "error", err, "type", input.Type)
 			http.Error(w, "Internal error", http.StatusInternalServerError)
 			return
 		}
@@ -261,10 +248,10 @@ func (h *handler) handleCreateInstanceExclusion() http.HandlerFunc {
 			ActorID:     userID,
 			Action:      "site.exclusion_created",
 			TargetType:  "site_exclusion",
-			TargetID:    ruleID,
+			TargetID:    createdRule.ID.String(),
 			TargetLabel: input.Label,
 			Outcome:     "success",
-			Details:     fmt.Sprintf("Global exclusion %s created", input.Label),
+			Details:     fmt.Sprintf("Traffic exclusion created (scope=instance, type=%s, value=%s)", input.Type, input.Label),
 		})
 
 		w.Header().Set("Content-Type", "application/json")
@@ -307,7 +294,7 @@ func (h *handler) handleDeleteInstanceExclusion() http.HandlerFunc {
 			TargetID:    ruleID.String(),
 			TargetLabel: ruleID.String(),
 			Outcome:     "success",
-			Details:     fmt.Sprintf("Global exclusion %s deleted", ruleID),
+			Details:     fmt.Sprintf("Traffic exclusion deleted (scope=instance, rule_id=%s)", ruleID),
 		})
 
 		w.WriteHeader(http.StatusNoContent)

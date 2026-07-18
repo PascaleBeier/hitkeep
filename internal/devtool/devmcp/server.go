@@ -81,6 +81,17 @@ type buildInput struct {
 	Variant string `json:"variant,omitempty" jsonschema:"Build variant: self-hosted or cloud"`
 	Target  string `json:"target,omitempty" jsonschema:"Build target: binary or image"`
 }
+type screenshotInput struct {
+	workspaceInput
+	Routes    []string `json:"routes,omitempty" jsonschema:"Local dashboard routes captured in one browser session"`
+	Viewport  string   `json:"viewport,omitempty" jsonschema:"Viewport preset: desktop or mobile"`
+	Theme     string   `json:"theme,omitempty" jsonschema:"Color scheme: light or dark"`
+	Scale     int      `json:"scale,omitempty" jsonschema:"Device pixel ratio: 1 or 2"`
+	WaitMS    int      `json:"wait_ms,omitempty" jsonschema:"Bounded visual settle time after route readiness"`
+	FullPage  bool     `json:"full_page,omitempty" jsonschema:"Capture the complete document instead of the viewport"`
+	Selector  string   `json:"selector,omitempty" jsonschema:"Optional visible CSS selector for a single-route component capture"`
+	Anonymous bool     `json:"anonymous,omitempty" jsonschema:"Capture without seeded development authentication"`
+}
 
 type envelopeOutput struct {
 	devtool.Envelope
@@ -777,7 +788,7 @@ func NewCentralServer(fallbackWorkspace, version string) *mcp.Server {
 
 func newServer(resolver appResolver, version string) *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{Name: "hitkeep-developer", Version: version}, &mcp.ServerOptions{
-		Instructions: "Local, root-routed and worktree-confined HitKeep development operations. Development is one container-only session per workspace and uses status plus event cursors, never run IDs. Dev start, stop, and follow tools stream progress and structured component logs. Finite setup, QA, build, and smoke operations use run IDs. Pass workspace only when the client exposes multiple HitKeep roots. Mutable workflow facts come from hk catalogs; no arbitrary command execution is available.",
+		Instructions: "Local, root-routed and worktree-confined HitKeep development operations. Development is one container-only session per workspace and uses status plus event cursors, never run IDs. Dev start, stop, and follow tools stream progress and structured component logs. Screenshot capture is a bounded synchronous visual-QA operation; finite setup, QA, build, and smoke operations use run IDs. Pass workspace only when the client exposes multiple HitKeep roots. Mutable workflow facts come from hk catalogs; no arbitrary command execution is available.",
 		Capabilities: &mcp.ServerCapabilities{Logging: &mcp.LoggingCapabilities{}},
 	})
 	registerTools(server, resolver)
@@ -895,6 +906,7 @@ func registerTools(server *mcp.Server, resolver appResolver) {
 			}
 		}
 	}))
+	mcp.AddTool(server, tool("hk_screenshot", "Capture up to eight local dashboard routes in one browser session and return managed PNG resource links.", action), screenshotHandler(resolver))
 	mcp.AddTool(server, tool("hk_qa_start", "Start canonical QA gates asynchronously and return a run ID.", action), startHandler(resolver, "qa start", func(input qaStartInput) devtool.RunRequest {
 		return devtool.RunRequest{Kind: "qa", Profile: input.Profile, GateIDs: input.GateIDs}
 	}))
@@ -935,6 +947,46 @@ func routedRequestHandler[In workspaceScoped](resolver appResolver, command stri
 		value, err := handler(ctx, request, app, input)
 		return output(app, command, value, err)
 	}
+}
+
+func screenshotHandler(resolver appResolver) func(context.Context, *mcp.CallToolRequest, screenshotInput) (*mcp.CallToolResult, envelopeOutput, error) {
+	return func(ctx context.Context, request *mcp.CallToolRequest, input screenshotInput) (*mcp.CallToolResult, envelopeOutput, error) {
+		if delegate, ok := resolver.(toolDelegatingResolver); ok {
+			return delegate.DelegateTool(ctx, request, "screenshot", input)
+		}
+		app, err := resolver.Resolve(ctx, request.Session, input.workspaceSelector())
+		if err != nil {
+			return output(nil, "screenshot", nil, err)
+		}
+		result, captureErr := app.CaptureScreenshots(ctx, devtool.ScreenshotRequest{
+			Routes: input.Routes, Viewport: input.Viewport, Theme: input.Theme, Scale: input.Scale,
+			WaitMS: input.WaitMS, FullPage: input.FullPage, Selector: input.Selector, Anonymous: input.Anonymous,
+		})
+		toolResult, envelope, _ := output(app, "screenshot", result, captureErr)
+		if captureErr != nil {
+			return toolResult, envelope, nil
+		}
+		appendScreenshotResourceLinks(toolResult, result)
+		return toolResult, envelope, nil
+	}
+}
+
+func appendScreenshotResourceLinks(toolResult *mcp.CallToolResult, result devtool.ScreenshotResult) {
+	for _, artifact := range result.Artifacts {
+		size := artifact.Bytes
+		toolResult.Content = append(toolResult.Content, &mcp.ResourceLink{
+			URI:         localFileURI(artifact.Path),
+			Name:        filepath.Base(artifact.Path),
+			Title:       "HitKeep " + artifact.Route,
+			Description: fmt.Sprintf("%dx%d local visual-QA screenshot", artifact.Width, artifact.Height),
+			MIMEType:    artifact.MIMEType,
+			Size:        &size,
+		})
+	}
+}
+
+func localFileURI(path string) string {
+	return (&url.URL{Scheme: "file", Path: filepath.ToSlash(path)}).String()
 }
 
 func devEventNotifier(ctx context.Context, request *mcp.CallToolRequest) func(devtool.DevEvent) {
@@ -1020,6 +1072,18 @@ func inputSchema(name string) *jsonschema.Schema {
 		properties["cursor"] = &jsonschema.Schema{Type: "integer", Minimum: new(0.0)}
 		properties["limit"] = &jsonschema.Schema{Type: "integer", Minimum: new(1.0), Maximum: new(float64(maxRequestedLogLines))}
 		properties["follow"] = &jsonschema.Schema{Type: "boolean"}
+	case "hk_screenshot":
+		properties["routes"] = &jsonschema.Schema{
+			Type: "array", MinItems: new(1), MaxItems: new(devtool.MaxScreenshotRoutes), UniqueItems: true,
+			Items: &jsonschema.Schema{Type: "string", MinLength: new(1), MaxLength: new(2048), Pattern: `^/(?:[^/]|$)`},
+		}
+		properties["viewport"] = enum("desktop", "mobile")
+		properties["theme"] = enum("light", "dark")
+		properties["scale"] = &jsonschema.Schema{Type: "integer", Enum: []any{1, 2}}
+		properties["wait_ms"] = &jsonschema.Schema{Type: "integer", Minimum: new(0.0), Maximum: new(5000.0)}
+		properties["full_page"] = &jsonschema.Schema{Type: "boolean"}
+		properties["selector"] = &jsonschema.Schema{Type: "string", MaxLength: new(500)}
+		properties["anonymous"] = &jsonschema.Schema{Type: "boolean"}
 	case "hk_smoke_start":
 		properties["variant"] = enum("self-hosted", "cloud")
 	case "hk_qa_start":

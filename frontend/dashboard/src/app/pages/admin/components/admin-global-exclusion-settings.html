@@ -1,4 +1,5 @@
 <p-confirmdialog />
+
 <app-crud-dialog
     [title]="'admin.exclusions.addAction' | transloco"
     [visible]="isAddDialogVisible()"
@@ -8,15 +9,15 @@
     [saving]="isSaving()"
     (submitted)="addRule()"
 >
-    <form [formGroup]="form" class="admin-exclusions__form" (ngSubmit)="addRule()">
-        <div class="admin-exclusions__composer">
-            <div class="admin-exclusions__field">
+    <form [formGroup]="form" class="site-settings-dialog-form" (ngSubmit)="addRule()">
+        <div class="grid gap-3 md:grid-cols-2">
+            <div class="site-settings-field">
                 <label for="instance-exclusion-type">{{ "admin.exclusions.typeLabel" | transloco }}</label>
                 <p-select inputId="instance-exclusion-type" [options]="ruleTypeOptions()" formControlName="type" optionLabel="label" optionValue="value" appendTo="body" class="w-full" (onChange)="onRuleTypeChange()" />
             </div>
 
-            @if (form.controls.type.value === "country") {
-            <div class="admin-exclusions__field">
+            @switch (form.controls.type.value) { @case ("country") {
+            <div class="site-settings-field">
                 <label for="instance-exclusion-country">{{ "admin.exclusions.countryLabel" | transloco }}</label>
                 <p-select
                     inputId="instance-exclusion-country"
@@ -32,150 +33,156 @@
                 >
                     <ng-template #selectedItem let-selectedOption>
                         @if (selectedOption) {
-                        <div class="flex items-center gap-2">
+                        <span class="flex items-center gap-2">
                             <img [ngSrc]="selectedOption.flagUrl" class="size-4 shrink-0 rounded-full" width="16" height="16" alt="" />
                             <span>{{ selectedOption.label }} ({{ selectedOption.code }})</span>
-                        </div>
+                        </span>
                         }
                     </ng-template>
                     <ng-template #item let-option>
-                        <div class="flex items-center gap-3">
+                        <span class="flex items-center gap-2">
                             <img [ngSrc]="option.flagUrl" class="size-4 shrink-0 rounded-full" width="16" height="16" alt="" />
-                            <div class="flex flex-col">
-                                <span>{{ option.label }}</span>
-                                <span class="text-xs text-[var(--p-text-muted-color)]">{{ option.code }}</span>
-                            </div>
-                        </div>
+                            <span>{{ option.label }} ({{ option.code }})</span>
+                        </span>
                     </ng-template>
                 </p-select>
                 @if (form.controls.countryCode.touched && form.controls.countryCode.invalid) {
-                <small>{{ "admin.exclusions.errors.invalidCountry" | transloco }}</small>
+                <p-message severity="error" variant="simple" size="small">{{ "admin.exclusions.errors.invalidCountry" | transloco }}</p-message>
                 }
             </div>
-            } @else {
-            <div class="admin-exclusions__field">
+            } @case ("user_agent") {
+            <div class="site-settings-field">
+                <label for="instance-exclusion-user-agent">{{ "admin.exclusions.userAgentLabel" | transloco }}</label>
+                <input id="instance-exclusion-user-agent" pInputText formControlName="userAgent" [placeholder]="'admin.exclusions.userAgentPlaceholder' | transloco" />
+                @if (form.controls.userAgent.touched && form.controls.userAgent.invalid) {
+                <p-message severity="error" variant="simple" size="small">{{ "admin.exclusions.errors.invalidUserAgent" | transloco }}</p-message>
+                }
+            </div>
+            } @case ("path") {
+            <div class="site-settings-field">
+                <label for="instance-exclusion-path">{{ "admin.exclusions.pathLabel" | transloco }}</label>
+                <input id="instance-exclusion-path" pInputText formControlName="path" [placeholder]="'admin.exclusions.pathPlaceholder' | transloco" />
+                @if (form.controls.path.touched && form.controls.path.invalid) {
+                <p-message severity="error" variant="simple" size="small">{{ "admin.exclusions.errors.invalidPath" | transloco }}</p-message>
+                }
+            </div>
+            } @default {
+            <div class="site-settings-field">
                 <label for="instance-exclusion-cidr">{{ "admin.exclusions.cidrLabel" | transloco }}</label>
                 <input id="instance-exclusion-cidr" pInputText formControlName="cidr" [placeholder]="'admin.exclusions.cidrPlaceholder' | transloco" />
                 @if (form.controls.cidr.touched && form.controls.cidr.invalid) {
-                <small>{{ "admin.exclusions.errors.invalidCidr" | transloco }}</small>
+                <p-message severity="error" variant="simple" size="small">{{ "admin.exclusions.errors.invalidCidr" | transloco }}</p-message>
                 }
             </div>
-            }
+            } }
 
-            <div class="admin-exclusions__field">
+            <div class="site-settings-field md:col-span-2">
                 <label for="instance-exclusion-description">{{ "admin.exclusions.descriptionLabel" | transloco }}</label>
                 <input id="instance-exclusion-description" pInputText formControlName="description" [placeholder]="'admin.exclusions.descriptionPlaceholder' | transloco" />
                 @if (form.controls.description.touched && form.controls.description.invalid) {
-                <small>{{ "admin.exclusions.errors.descriptionTooLong" | transloco }}</small>
+                <p-message severity="error" variant="simple" size="small">{{ "admin.exclusions.errors.descriptionTooLong" | transloco }}</p-message>
                 }
             </div>
         </div>
 
         @if (createError(); as errorKey) {
-        <div class="hk-feedback-message hk-feedback-message--error">{{ errorKey | transloco }}</div>
+        <p-message severity="error">{{ errorKey | transloco }}</p-message>
         }
     </form>
 </app-crud-dialog>
 
-<div class="admin-exclusions">
-    @if (actionStatus(); as status) {
-    <p-message [severity]="status.severity" styleClass="w-full" [text]="actionStatusMessage()" />
-    } @if (error(); as errorKey) {
-    <p-message severity="error" styleClass="w-full" [text]="errorKey | transloco" />
-    }
-
-    <div class="admin-exclusions__current-ip">
-        <div class="admin-exclusions__current-ip-copy">
-            <div>
-                <span class="admin-exclusions__eyebrow">{{ "admin.exclusions.suggestionsTitle" | transloco }}</span>
-                <code>
-                    @if (isCurrentIPLoading()) { {{ "admin.exclusions.currentIpLoading" | transloco }} } @else if (currentIPCIDR(); as currentIPCIDR) { {{ currentIPCIDR }} } @else { {{ "admin.exclusions.currentIpUnavailable" | transloco }} }
-                </code>
-            </div>
-            <app-copy-control [value]="currentIPCIDR()" [text]="true" size="small" [disabled]="isCurrentIPLoading() || !currentIPCIDR()" />
-        </div>
-    </div>
-
-    <div class="admin-exclusions__actions">
+<app-settings-card [title]="'admin.exclusions.title' | transloco" icon="pi pi-filter">
+    <div settings-card-header class="flex flex-wrap items-center justify-end gap-2">
         <p-button [label]="'admin.exclusions.addAction' | transloco" icon="pi pi-plus" size="small" [type]="'button'" (onClick)="openAddDialog()" />
         <p-button [label]="'settings.apiClients.actions.refresh' | transloco" icon="pi pi-refresh" [text]="true" size="small" [type]="'button'" [disabled]="isLoading()" (onClick)="reload()" />
     </div>
-    @if (isLoading()) {
-    <p class="admin-exclusions__state">{{ "admin.exclusions.loading" | transloco }}</p>
-    } @else if (exclusions().length === 0) {
-    <div class="admin-exclusions__empty">
-        <p class="admin-exclusions__state">{{ "admin.exclusions.empty" | transloco }}</p>
-        <p-button [label]="'admin.exclusions.addAction' | transloco" icon="pi pi-plus" [outlined]="true" size="small" [type]="'button'" (onClick)="openAddDialog()" />
+
+    <div settings-card-body class="grid gap-4">
+        @if (actionStatus(); as status) {
+        <p-message [severity]="status.severity" styleClass="w-full" [text]="actionStatusMessage()" />
+        } @if (error(); as errorKey) {
+        <p-message severity="error" styleClass="w-full" [text]="errorKey | transloco" />
+        }
+
+        <div class="flex items-center justify-between gap-3 border-y border-[var(--p-content-border-color)] py-3 max-sm:flex-col max-sm:items-stretch">
+            <div class="grid min-w-0 gap-1">
+                <span class="text-sm leading-5 text-[var(--p-text-muted-color)]">{{ "admin.exclusions.suggestionsTitle" | transloco }}</span>
+                <code class="break-all text-sm leading-5 text-[var(--p-text-color)]">
+                    @if (isCurrentIPLoading()) { {{ "admin.exclusions.currentIpLoading" | transloco }} } @else if (currentIPCIDR(); as currentIPCIDR) { {{ currentIPCIDR }} } @else { {{ "admin.exclusions.currentIpUnavailable" | transloco }} }
+                </code>
+            </div>
+            <app-copy-control [value]="currentIPCIDR()" [text]="true" [rounded]="true" size="small" [disabled]="isCurrentIPLoading() || !currentIPCIDR()" />
+        </div>
+
+        @if (isLoading()) {
+        <div class="flex min-h-28 items-center justify-center gap-2 text-sm text-[var(--p-text-muted-color)]" role="status">
+            <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
+            <span>{{ "admin.exclusions.loading" | transloco }}</span>
+        </div>
+        } @else if (exclusions().length === 0) {
+        <div class="flex min-h-32 flex-col items-center justify-center gap-3 rounded-lg border border-[var(--p-content-border-color)] p-4 text-center">
+            <p class="m-0 max-w-[60ch] text-sm text-[var(--p-text-muted-color)]">{{ "admin.exclusions.empty" | transloco }}</p>
+            <p-button [label]="'admin.exclusions.addAction' | transloco" icon="pi pi-plus" [outlined]="true" size="small" [type]="'button'" (onClick)="openAddDialog()" />
+        </div>
+        } @else {
+        <div class="flex justify-end">
+            <p-iconfield class="hk-crud-search">
+                <p-inputicon class="pi pi-search" />
+                <input pInputText #exclusionsSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="exclusionsTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
+            </p-iconfield>
+        </div>
+
+        <div class="hk-crud-table-wrap">
+            <p-table
+                #exclusionsTable
+                [value]="exclusionRows()"
+                [globalFilterFields]="['type_label', 'value_label', 'country_name', 'search_value', 'description', 'created_at']"
+                [sortField]="'created_at'"
+                [sortOrder]="-1"
+                [paginator]="true"
+                [rows]="10"
+                [rowsPerPageOptions]="[10, 25, 50]"
+                [rowHover]="true"
+                responsiveLayout="scroll"
+                styleClass="hk-crud-table p-datatable-sm"
+                [tableStyle]="{ 'min-width': '680px' }"
+            >
+                <ng-template pTemplate="header">
+                    <tr>
+                        <th pSortableColumn="type_label">{{ "admin.exclusions.columns.type" | transloco }}<p-sortIcon field="type_label" /></th>
+                        <th pSortableColumn="value_label">{{ "admin.exclusions.columns.value" | transloco }}<p-sortIcon field="value_label" /></th>
+                        <th pSortableColumn="description">{{ "admin.exclusions.columns.description" | transloco }}<p-sortIcon field="description" /></th>
+                        <th pSortableColumn="created_at">{{ "admin.exclusions.columns.created" | transloco }}<p-sortIcon field="created_at" /></th>
+                        <th class="hk-actions-column">{{ "common.columns.actions" | transloco }}</th>
+                    </tr>
+                </ng-template>
+                <ng-template pTemplate="body" let-rule>
+                    <tr>
+                        <td>{{ rule.type_label }}</td>
+                        <td>
+                            @if (rule.type === "country" && rule.country_code) {
+                            <span class="inline-flex items-center gap-2">
+                                <img [ngSrc]="countryFlagUrl(rule.country_code)" class="size-4 shrink-0 rounded-full" width="16" height="16" alt="" />
+                                <span>{{ rule.value_label }}</span>
+                            </span>
+                            } @else {
+                            <code class="break-all">{{ rule.value_label }}</code>
+                            }
+                        </td>
+                        <td>{{ rule.description || "-" }}</td>
+                        <td><app-relative-date-time [value]="rule.created_at" /></td>
+                        <td class="hk-actions-cell">
+                            <app-table-row-actions [items]="ruleActions(rule)" [loading]="deletingRuleID() === rule.id" />
+                        </td>
+                    </tr>
+                </ng-template>
+                <ng-template pTemplate="emptymessage">
+                    <tr>
+                        <td colspan="5" class="py-4 text-center text-[var(--p-text-muted-color)]">{{ "admin.exclusions.empty" | transloco }}</td>
+                    </tr>
+                </ng-template>
+            </p-table>
+        </div>
+        }
     </div>
-    } @else {
-    <div class="flex justify-end mb-3">
-        <p-iconfield class="hk-crud-search">
-            <p-inputicon class="pi pi-search" />
-            <input pInputText #exclusionsSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="exclusionsTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
-        </p-iconfield>
-    </div>
-    <div class="hk-crud-table-wrap">
-        <p-table
-            #exclusionsTable
-            [value]="exclusionRows()"
-            [globalFilterFields]="['type_label', 'value_label', 'country_name', 'search_value', 'description', 'created_at']"
-            [sortField]="'created_at'"
-            [sortOrder]="-1"
-            [paginator]="true"
-            [rows]="10"
-            [rowsPerPageOptions]="[10, 25, 50]"
-            [rowHover]="true"
-            responsiveLayout="scroll"
-            styleClass="hk-crud-table p-datatable-sm"
-            [tableStyle]="{ 'min-width': '680px' }"
-        >
-            <ng-template pTemplate="header">
-                <tr>
-                    <th pSortableColumn="type_label">
-                        {{ "admin.exclusions.columns.type" | transloco }}
-                        <p-sortIcon field="type_label" />
-                    </th>
-                    <th pSortableColumn="value_label">
-                        {{ "admin.exclusions.columns.value" | transloco }}
-                        <p-sortIcon field="value_label" />
-                    </th>
-                    <th pSortableColumn="description">
-                        {{ "admin.exclusions.columns.description" | transloco }}
-                        <p-sortIcon field="description" />
-                    </th>
-                    <th pSortableColumn="created_at">
-                        {{ "admin.exclusions.columns.created" | transloco }}
-                        <p-sortIcon field="created_at" />
-                    </th>
-                    <th>{{ "common.columns.actions" | transloco }}</th>
-                </tr>
-            </ng-template>
-            <ng-template pTemplate="body" let-rule>
-                <tr>
-                    <td>{{ rule.type_label }}</td>
-                    <td>
-                        @if (rule.type === "country" && rule.country_code) {
-                        <span class="inline-flex items-center gap-2">
-                            <img [ngSrc]="countryFlagUrl(rule.country_code)" class="size-4 shrink-0 rounded-full" width="16" height="16" alt="" />
-                            <span>{{ rule.value_label }}</span>
-                        </span>
-                        } @else {
-                        <code>{{ rule.cidr }}</code>
-                        }
-                    </td>
-                    <td>{{ rule.description || "-" }}</td>
-                    <td><app-relative-date-time [value]="rule.created_at" /></td>
-                    <td>
-                        <app-table-row-actions [items]="ruleActions(rule)" [loading]="deletingRuleID() === rule.id" />
-                    </td>
-                </tr>
-            </ng-template>
-            <ng-template pTemplate="emptymessage">
-                <tr>
-                    <td colspan="5" class="text-center text-muted-color py-4">{{ "admin.exclusions.empty" | transloco }}</td>
-                </tr>
-            </ng-template>
-        </p-table>
-    </div>
-    }
-</div>
+</app-settings-card>

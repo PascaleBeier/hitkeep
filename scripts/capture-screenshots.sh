@@ -5,7 +5,7 @@
 #   2. Start a local HitKeep instance pointing at that database
 #   3. Wait for it to become healthy
 #   4. Run screenshot.mjs to capture all dashboard views
-#   5. Sync refreshed screenshots into README assets
+#   5. Sync the selected README screenshots into GitHub assets
 #   6. Run preview-emails to deliver all report types to Mailpit
 #   7. Clean up
 #
@@ -68,6 +68,14 @@ SKIP_SEED="${SKIP_SEED:-}"
 SKIP_BUILD="${SKIP_BUILD:-}"
 SKIP_EMAILS="${SKIP_EMAILS:-}"
 BIN_PATH="${REPO_DIR}/.screenshot-hitkeep"   # temp binary; deleted on exit
+README_SCREENSHOTS=(
+  "dashboard-overview.png"
+  "analytics-ecommerce.png"
+  "analytics-search-console.png"
+  "analytics-ai-visibility.png"
+  "feature-ask-ai-answer.png"
+  "mcp.png"
+)
 
 # ─── Parse flags ─────────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
@@ -218,8 +226,15 @@ if [[ -n "${SCREENSHOT_TARGET:-}" ]]; then
   echo "  Skipped for targeted screenshot run (${SCREENSHOT_TARGET})"
 else
   mkdir -p "$REPO_DIR/.github/assets"
-  find "$OUTPUT_DIR" -maxdepth 1 -type f -name '*.png' -exec cp {} "$REPO_DIR/.github/assets/" \;
-  echo "  ✓ Synced app screenshots to $REPO_DIR/.github/assets"
+  for screenshot in "${README_SCREENSHOTS[@]}"; do
+    source_path="$OUTPUT_DIR/$screenshot"
+    if [[ ! -f "$source_path" ]]; then
+      echo "  ✗ Missing README screenshot: $source_path" >&2
+      exit 1
+    fi
+    cp "$source_path" "$REPO_DIR/.github/assets/$screenshot"
+  done
+  echo "  ✓ Synced ${#README_SCREENSHOTS[@]} README screenshots to $REPO_DIR/.github/assets"
 fi
 
 # ─── Step 6: Preview emails ───────────────────────────────────────────────────

@@ -9,14 +9,18 @@ import (
 )
 
 const (
-	ExclusionRuleTypeCIDR    = "cidr"
-	ExclusionRuleTypeCountry = "country"
+	ExclusionRuleTypeCIDR      = "cidr"
+	ExclusionRuleTypeCountry   = "country"
+	ExclusionRuleTypeUserAgent = "user_agent"
+	ExclusionRuleTypePath      = "path"
 )
 
 type TrafficExclusionInput struct {
 	Type        string
 	CIDR        string
 	CountryCode string
+	UserAgent   string
+	Path        string
 	Description string
 	Label       string
 }
@@ -25,6 +29,8 @@ type trafficExclusionRequest struct {
 	CIDR        string `json:"cidr"`
 	Type        string `json:"type"`
 	CountryCode string `json:"country_code"`
+	UserAgent   string `json:"user_agent"`
+	Path        string `json:"path"`
 	Description string `json:"description"`
 }
 
@@ -83,7 +89,33 @@ func normalizeExclusionRuleValue(input TrafficExclusionInput, req trafficExclusi
 	if input.Type == ExclusionRuleTypeCountry {
 		return normalizeCountryExclusionInput(input, req.CountryCode)
 	}
+	if input.Type == ExclusionRuleTypeUserAgent {
+		return normalizeUserAgentExclusionInput(input, req.UserAgent)
+	}
+	if input.Type == ExclusionRuleTypePath {
+		return normalizePathExclusionInput(input, req.Path)
+	}
 	return TrafficExclusionInput{}, "Invalid exclusion type", http.StatusBadRequest, false
+}
+
+func normalizeUserAgentExclusionInput(input TrafficExclusionInput, value string) (TrafficExclusionInput, string, int, bool) {
+	userAgent := strings.TrimSpace(value)
+	if userAgent == "" {
+		return TrafficExclusionInput{}, "User agent must not be empty", http.StatusBadRequest, false
+	}
+	input.UserAgent = userAgent
+	input.Label = userAgent
+	return input, "", 0, true
+}
+
+func normalizePathExclusionInput(input TrafficExclusionInput, value string) (TrafficExclusionInput, string, int, bool) {
+	normalizedPath, ok := blocking.NormalizeExclusionPath(value)
+	if !ok {
+		return TrafficExclusionInput{}, "Path must not be empty", http.StatusBadRequest, false
+	}
+	input.Path = normalizedPath
+	input.Label = normalizedPath
+	return input, "", 0, true
 }
 
 func normalizeCIDRExclusionInput(input TrafficExclusionInput, cidrValue string) (TrafficExclusionInput, string, int, bool) {

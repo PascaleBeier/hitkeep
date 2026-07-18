@@ -170,6 +170,18 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		TeamCap:     authcore.CapTeamManageSettings,
 		RateLimiter: ctx.ApiLimiter,
 	}, h.handleUpdateTeam()))
+	mux.HandleFunc("GET /api/user/teams/{id}/exclusions", ctx.Handler(shared.HandlerConfig{
+		TeamCap:     authcore.CapTeamManageSettings,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleListTeamExclusions()))
+	mux.HandleFunc("POST /api/user/teams/{id}/exclusions", ctx.Handler(shared.HandlerConfig{
+		TeamCap:     authcore.CapTeamManageSettings,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleCreateTeamExclusion()))
+	mux.HandleFunc("DELETE /api/user/teams/{id}/exclusions/{ruleID}", ctx.Handler(shared.HandlerConfig{
+		TeamCap:     authcore.CapTeamManageSettings,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleDeleteTeamExclusion()))
 	mux.HandleFunc("GET /api/user/teams/{id}/sso", ctx.Handler(shared.HandlerConfig{
 		TeamCap:     authcore.CapTeamManageSettings,
 		RateLimiter: ctx.ApiLimiter,

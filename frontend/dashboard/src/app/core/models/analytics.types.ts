@@ -166,13 +166,18 @@ export interface TeamAuditListResponse {
 
 export interface IPExclusion {
     id: string;
+    scope?: 'instance' | 'team' | 'site';
+    team_id?: string;
     site_id?: string;
-    type: 'cidr' | 'country';
+    type: 'cidr' | 'country' | 'user_agent' | 'path';
     cidr?: string;
     country_code?: string;
+    user_agent?: string;
+    path?: string;
     description?: string;
     created_at: string;
     created_by?: string;
+    inherited?: boolean;
 }
 
 export interface CurrentIP {

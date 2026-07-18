@@ -296,6 +296,64 @@ func TestHandleCreateAIFetchDropsCountryExclusion(t *testing.T) {
 	}
 }
 
+func TestHandleCreateAIFetchDropsPathAndUserAgentExclusions(t *testing.T) {
+	tests := []struct {
+		name      string
+		rule      database.TrafficExclusionValues
+		path      string
+		userAgent string
+	}{
+		{
+			name:      "path",
+			rule:      database.TrafficExclusionValues{Type: "path", Path: "/private-ai"},
+			path:      "https://docs.example.com/private-ai/report?from=bot#fragment",
+			userAgent: "Mozilla/5.0 (compatible; GPTBot/1.0; +https://openai.com/gptbot)",
+		},
+		{
+			name:      "user agent",
+			rule:      database.TrafficExclusionValues{Type: "user_agent", UserAgent: "GPTBOT/1.0"},
+			path:      "/public",
+			userAgent: "Mozilla/5.0 (compatible; gptbot/1.0; +https://openai.com/gptbot)",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			store, ctx, userID, siteID, token := setupAIFetchTestEnv(t)
+			if _, err := store.CreateSiteTrafficExclusion(context.Background(), siteID, test.rule, userID); err != nil {
+				t.Fatalf("create contextual exclusion: %v", err)
+			}
+			filter := blocking.NewIPFilter(store)
+			if err := filter.Refresh(context.Background()); err != nil {
+				t.Fatalf("refresh traffic exclusions: %v", err)
+			}
+			ctx.IPFilter = filter
+			mux := http.NewServeMux()
+			Register(mux, ctx)
+
+			payload, _ := json.Marshal(map[string]any{
+				"path": test.path, "status_code": 200, "user_agent": test.userAgent,
+			})
+			req := httptest.NewRequest(http.MethodPost, "/api/sites/"+siteID.String()+"/ingest/ai-fetch", bytes.NewReader(payload))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("X-API-Key", token)
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+			if rec.Code != http.StatusAccepted {
+				t.Fatalf("expected accepted suppression, got %d: %s", rec.Code, rec.Body.String())
+			}
+			overview, err := store.GetAIFetchOverview(context.Background(), api.AIFetchQueryParams{
+				SiteID: siteID, Start: time.Now().UTC().Add(-time.Hour), End: time.Now().UTC().Add(time.Hour),
+			})
+			if err != nil {
+				t.Fatalf("get AI fetch overview: %v", err)
+			}
+			if overview.TotalRequests != 0 {
+				t.Fatalf("expected contextual exclusion to store no fetches, got %d", overview.TotalRequests)
+			}
+		})
+	}
+}
+
 func TestHandleCreateAIFetchDropsSpamNetwork(t *testing.T) {
 	store, ctx, _, siteID, token := setupAIFetchTestEnv(t)
 

@@ -72,6 +72,15 @@ Automation and coding agents must use callable central MCP session tools for cov
 
 Structured CLI and MCP starts also request machine-readable output from supported child tools. The QA catalog exposes the effective `agent_command` when it differs from the human command; tools without a JSON mode still run without terminal color and remain bounded by the surrounding `hk` envelope and log cursor contract.
 
+For fast visual checks, batch up to eight local routes through the active seeded development session:
+
+```bash
+./hk screenshot /dashboard /admin/status
+./hk screenshot /admin/status --viewport mobile --theme dark --output json
+```
+
+One browser launch and login serve the complete batch. Output is confined to managed workspace artifacts, includes timing and image metadata, and never syncs into tracked screenshots. MCP-capable agents use `hk_screenshot`, which returns the same structured result plus PNG resource links. It accepts local routes and presentation options only; it cannot browse arbitrary URLs, select an output directory, or receive credentials.
+
 Setup, QA, builds, and smoke tests remain finite asynchronous runs:
 
 ```bash
@@ -185,7 +194,7 @@ The generated central registration is equivalent to:
 
 The central `./hk mcp serve` resolves the active HitKeep worktree from the MCP client's file-based client roots on every request, then forwards the call to that workspace's own `./hk --workspace <path> mcp serve`. This keeps each worktree's checked-in developer implementation authoritative while one long-lived central session follows root changes. When a client exposes multiple HitKeep roots, every tool accepts an optional `workspace` name, workspace ID, or path to disambiguate. Clients without roots support can use an explicit compatibility registration with `/absolute/path/to/hitkeep/hk --workspace /absolute/path/to/worktree mcp serve`.
 
-The central MCP uses local stdio only. It forwards the outer progress token, progress notifications, structured component logs, and cancellation to the selected workspace MCP. Use `hk_dev_status` and development event cursors for services; use `hk_run_list` and finite-run log cursors for setup, QA, build, and smoke work. It is separate from HitKeep's production analytics `/mcp` endpoint and exposes only bounded workspace, setup, development, build, smoke, QA, run-status, cancellation, and log operations. It cannot execute arbitrary commands, rewrite source, mutate Git, publish artifacts, manage credentials, delete worktrees, perform cleanup, or deploy infrastructure. Stdout is reserved for JSON-RPC.
+The central MCP uses local stdio only. It forwards the outer progress token, progress notifications, structured component logs, and cancellation to the selected workspace MCP. Use `hk_dev_status` and development event cursors for services; use `hk_run_list` and finite-run log cursors for setup, QA, build, and smoke work. Visual QA uses the bounded synchronous `hk_screenshot` operation against the selected workspace's active local session. It is separate from HitKeep's production analytics `/mcp` endpoint and exposes only bounded workspace, setup, development, screenshot, build, smoke, QA, run-status, cancellation, and log operations. It cannot execute arbitrary commands, rewrite source, mutate Git, publish artifacts, manage credentials, delete worktrees, perform cleanup, or deploy infrastructure. Stdout is reserved for JSON-RPC.
 
 The canonical contributor skills live under [`.agents/skills`](./.agents/skills):
 

@@ -356,6 +356,19 @@ describe('tracker core', () => {
         expect(harness.appendedScripts[0]?.src).toBe('https://www.example.net/hitkeep/hk-vitals.js');
     });
 
+    it('adds transient path and user-agent context to browser events', async () => {
+        const harness = trackerHarness('/signup?plan=pro');
+
+        bootstrapTracker(harness.win);
+        const win = harness.win as TrackerTestWindow;
+        win.hk?.event?.('signup_clicked');
+
+        const eventBody = harness.sendBeacon.mock.calls[1]?.[1] as unknown as Blob;
+        const payload = JSON.parse(await eventBody.text()) as Record<string, unknown>;
+        expect(payload['path']).toBe('/signup');
+        expect(payload['ua']).toBe('Mozilla/5.0');
+    });
+
     it('queues failed requests in memory and flushes them on pagehide', async () => {
         const fetchMock = fetchMockOk();
         fetchMock.mockRejectedValueOnce(new Error('offline'));

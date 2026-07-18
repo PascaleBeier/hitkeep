@@ -52,7 +52,9 @@ interface AdminSettingsTestAccess {
         set(value: { recovery_enabled: boolean; automatic_wal_recovery_enabled: boolean; recovery_bundle_available: boolean; removed_unsafe_indexes: number; checkpoint_interval_min: number }): void;
     };
     isCheckpointingDatabase(): boolean;
+    isLoadingDatabaseOverview(): boolean;
     loadSystemDatabase(): void;
+    loadSystemDatabaseOverview(): void;
     checkpointDatabase(): void;
     databaseActionStatus(): {
         severity: 'success' | 'error';
@@ -358,7 +360,37 @@ describe('AdminSettings', () => {
         expect(component.spamActionStatusMessage()).toBe('Spam filter refreshed.');
     });
 
-    it('runs a manual database checkpoint and refreshes its status', () => {
+    it('loads recovery and storage status as one database overview', () => {
+        component.loadSystemDatabaseOverview();
+
+        expect(component.isLoadingDatabaseOverview()).toBe(true);
+
+        const statusRequest = httpMock.expectOne('/api/admin/system/database');
+        const storageRequest = httpMock.expectOne('/api/admin/system/storage');
+        statusRequest.flush({
+            recovery_enabled: true,
+            automatic_wal_recovery_enabled: false,
+            recovery_bundle_available: false,
+            removed_unsafe_indexes: 0,
+            checkpoint_interval_min: 5
+        });
+        storageRequest.flush({
+            shared_db_path: '/data/hitkeep.db',
+            shared_db_bytes: 1024,
+            data_path: '/data',
+            tenant_db_count: 1,
+            tenant_dbs: [{ tenant_id: 'team-1', name: 'Example team', bytes: 2048, path: '/data/tenants/team-1.db' }],
+            spam_cache_path: '/data/spam.db',
+            backup_path: '/data/backups',
+            disk_available_bytes: 4096,
+            disk_total_bytes: 8192,
+            duckdb_memory: []
+        });
+
+        expect(component.isLoadingDatabaseOverview()).toBe(false);
+    });
+
+    it('runs a manual database checkpoint and refreshes the database overview', () => {
         component.systemDatabase.set({
             recovery_enabled: true,
             automatic_wal_recovery_enabled: false,
@@ -375,6 +407,7 @@ describe('AdminSettings', () => {
         checkpointRequest.flush({ status: 'ok', message: 'completed' });
 
         const reloadRequest = httpMock.expectOne('/api/admin/system/database');
+        const storageRequest = httpMock.expectOne('/api/admin/system/storage');
         reloadRequest.flush({
             recovery_enabled: true,
             automatic_wal_recovery_enabled: false,
@@ -382,6 +415,18 @@ describe('AdminSettings', () => {
             removed_unsafe_indexes: 0,
             checkpoint_interval_min: 5,
             last_checkpoint_at: '2026-07-16T12:00:00Z'
+        });
+        storageRequest.flush({
+            shared_db_path: '/data/hitkeep.db',
+            shared_db_bytes: 1024,
+            data_path: '/data',
+            tenant_db_count: 0,
+            tenant_dbs: [],
+            spam_cache_path: '/data/spam.db',
+            backup_path: '/data/backups',
+            disk_available_bytes: 4096,
+            disk_total_bytes: 8192,
+            duckdb_memory: []
         });
 
         expect(component.isCheckpointingDatabase()).toBe(false);

@@ -13,7 +13,11 @@ describe('SiteExclusionSettings', () => {
 
     const exclusionsService = {
         getCurrentIP: vi.fn(() => of({ ip: '203.0.113.10', cidr: '203.0.113.10/32' })),
-        listSiteExclusions: vi.fn(() => of([])),
+        listSiteExclusions: vi.fn((siteID: string, effective: boolean) => {
+            void siteID;
+            void effective;
+            return of([]);
+        }),
         createSiteExclusion: vi.fn(() =>
             of<IPExclusion>({
                 id: 'rule-1',
@@ -68,12 +72,19 @@ describe('SiteExclusionSettings', () => {
                                     cidrPlaceholder: '203.0.113.10/32',
                                     countryLabel: 'Country',
                                     countryPlaceholder: 'Select a country',
+                                    userAgentLabel: 'User-agent contains',
+                                    userAgentPlaceholder: 'monitoring-bot',
+                                    pathLabel: 'Path',
+                                    pathPlaceholder: '/admin',
                                     descriptionLabel: 'Description',
                                     descriptionPlaceholder: 'Office',
                                     loading: 'Loading',
                                     empty: 'No exclusions',
                                     confirmDelete: 'Delete {{value}}?',
-                                    ruleTypes: { cidr: 'IP/CIDR', country: 'Country' },
+                                    inheritedHint: 'Inherited filters apply.',
+                                    inheritedReadOnly: 'Inherited',
+                                    ruleTypes: { cidr: 'IP/CIDR', country: 'Country', userAgent: 'User agent', path: 'Path' },
+                                    scopes: { instance: 'Instance', team: 'Team', site: 'Site' },
                                     columns: {
                                         type: 'Type',
                                         value: 'Value',
@@ -83,6 +94,8 @@ describe('SiteExclusionSettings', () => {
                                     errors: {
                                         invalidCidr: 'Invalid CIDR',
                                         invalidCountry: 'Select a country',
+                                        invalidUserAgent: 'Enter a user agent',
+                                        invalidPath: 'Enter a path',
                                         descriptionTooLong: 'Too long',
                                         loadFailed: 'Load failed',
                                         createFailed: 'Create failed',
@@ -132,6 +145,26 @@ describe('SiteExclusionSettings', () => {
         expect(copyButton?.disabled).toBe(false);
     });
 
+    it('requests effective rules and keeps inherited rows read-only', () => {
+        const inherited: IPExclusion = {
+            id: 'instance-rule',
+            scope: 'instance',
+            type: 'path',
+            path: '/internal',
+            inherited: true,
+            created_at: '2026-05-01T00:00:00Z'
+        };
+        fixture.componentInstance['exclusions'].set([inherited]);
+        fixture.detectChanges();
+
+        expect(exclusionsService.listSiteExclusions).toHaveBeenCalledWith('site-1', true);
+        expect(fixture.nativeElement.textContent).toContain('/internal');
+        expect(fixture.nativeElement.textContent).toContain('Instance');
+        expect(fixture.nativeElement.textContent).toContain('Inherited');
+        expect(fixture.nativeElement.querySelector('app-table-row-actions')).toBeNull();
+        expect(fixture.componentInstance['ruleActions'](inherited)).toEqual([]);
+    });
+
     it('shows the exclusions table surface first and opens add form in a dialog', async () => {
         expect(fixture.nativeElement.querySelector('.site-exclusions__form')).toBeNull();
         expect(fixture.nativeElement.textContent).toContain('Add exclusion');
@@ -164,6 +197,8 @@ describe('SiteExclusionSettings', () => {
                 type: 'cidr',
                 cidr: '203.0.113.10/32',
                 country_code: undefined,
+                user_agent: undefined,
+                path: undefined,
                 description: 'Office'
             }
         ]);
@@ -250,6 +285,8 @@ describe('SiteExclusionSettings', () => {
                 type: 'country',
                 cidr: undefined,
                 country_code: 'DE',
+                user_agent: undefined,
+                path: undefined,
                 description: 'Germany'
             }
         ]);

@@ -46,6 +46,7 @@ export interface WebVitalsPayload {
     pid: string;
     tsrc: string;
     tv: string;
+    ua?: string;
 }
 
 export interface WebVitalsTrackerContext {
@@ -55,6 +56,7 @@ export interface WebVitalsTrackerContext {
     pageId: () => string;
     trackerSource: string;
     trackerVersion: string;
+    userAgent: string;
 }
 
 const SESSION_KEY = 'hk_session';
@@ -434,6 +436,8 @@ export function bootstrapTracker(win: HitKeepWindow = window): void {
             p: properties,
             r: currentReferrer(),
             sid: sessionId,
+            path: sanitizeTrackedPath(new URL(location.href)),
+            ua: navigator.userAgent,
             tsrc: options.trackerSource,
             tv: options.trackerVersion
         });
@@ -446,7 +450,8 @@ export function bootstrapTracker(win: HitKeepWindow = window): void {
             sessionId,
             pageId: () => currentPageId,
             trackerSource: options.trackerSource,
-            trackerVersion: options.trackerVersion
+            trackerVersion: options.trackerVersion,
+            userAgent: navigator.userAgent
         };
         loadWebVitalsBundle(win, scriptUrl);
     }

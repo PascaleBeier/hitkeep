@@ -103,17 +103,17 @@ const trackingHostnamePattern = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-
                     <div class="grid gap-2.5">
                         <div class="grid items-center gap-2.5 sm:grid-cols-[minmax(7rem,10rem)_minmax(0,1fr)_auto]">
                             <span class="site-settings-field-label">{{ 'admin.team.settings.trackingDomains.dns.txtName' | transloco }}</span>
-                            <code class="rounded-md border border-surface-200 bg-surface-50 px-2 py-1 text-xs break-all dark:border-surface-700 dark:bg-surface-800">{{ domain.dns_txt_name }}</code>
+                            <code class="rounded-md border border-[var(--p-content-border-color)] bg-[var(--p-content-hover-background)] px-2 py-1 text-xs break-all">{{ domain.dns_txt_name }}</code>
                             <app-copy-control [value]="domain.dns_txt_name" [text]="true" size="small" />
                         </div>
                         <div class="grid items-center gap-2.5 sm:grid-cols-[minmax(7rem,10rem)_minmax(0,1fr)_auto]">
                             <span class="site-settings-field-label">{{ 'admin.team.settings.trackingDomains.dns.txtValue' | transloco }}</span>
-                            <code class="rounded-md border border-surface-200 bg-surface-50 px-2 py-1 text-xs break-all dark:border-surface-700 dark:bg-surface-800">{{ domain.dns_txt_value }}</code>
+                            <code class="rounded-md border border-[var(--p-content-border-color)] bg-[var(--p-content-hover-background)] px-2 py-1 text-xs break-all">{{ domain.dns_txt_value }}</code>
                             <app-copy-control [value]="domain.dns_txt_value" [text]="true" size="small" />
                         </div>
                         <div class="grid items-center gap-2.5 sm:grid-cols-[minmax(7rem,10rem)_minmax(0,1fr)_auto]">
                             <span class="site-settings-field-label">{{ 'admin.team.settings.trackingDomains.dns.target' | transloco }}</span>
-                            <code class="rounded-md border border-surface-200 bg-surface-50 px-2 py-1 text-xs break-all dark:border-surface-700 dark:bg-surface-800">{{ domain.dns_target || '-' }}</code>
+                            <code class="rounded-md border border-[var(--p-content-border-color)] bg-[var(--p-content-hover-background)] px-2 py-1 text-xs break-all">{{ domain.dns_target || '-' }}</code>
                             <app-copy-control [value]="domain.dns_target" [text]="true" size="small" />
                         </div>
                     </div>

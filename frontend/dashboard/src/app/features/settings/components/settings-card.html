@@ -1,11 +1,11 @@
-<article class="settings-card">
+<article class="settings-card" [class.settings-card--danger]="tone() === 'danger'" [attr.aria-labelledby]="titleId() || null">
     <header class="settings-card-header">
         <div class="settings-card-title-row">
             @if (icon()) {
             <i [class]="icon() + ' settings-card-icon'" aria-hidden="true"></i>
             }
             <div class="settings-card-title-copy">
-                <h2 class="settings-card-title">{{ title() }}</h2>
+                <h2 class="settings-card-title" [id]="titleId() || null">{{ title() }}</h2>
                 @if (subtitle()) {
                 <p class="settings-card-subtitle">{{ subtitle() }}</p>
                 }

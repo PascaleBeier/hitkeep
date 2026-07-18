@@ -773,6 +773,72 @@ func TestOpenAPISpecV1IncludesWebVitalsEndpointsAndSchemas(t *testing.T) {
 	}
 }
 
+func TestOpenAPISpecV1DocumentsScopedTrafficExclusions(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	for _, path := range []string{
+		"/api/admin/exclusions",
+		"/api/user/teams/{id}/exclusions",
+		"/api/user/teams/{id}/exclusions/{ruleID}",
+		"/api/sites/{id}/exclusions",
+		"/api/sites/{id}/exclusions/{ruleID}",
+	} {
+		if _, ok := paths[path]; !ok {
+			t.Fatalf("expected traffic exclusion path %s", path)
+		}
+	}
+
+	for _, path := range []string{"/api/user/teams/{id}/exclusions", "/api/sites/{id}/exclusions"} {
+		pathItem := requireMap(t, paths, path)
+		getOp := requireMap(t, pathItem, "get")
+		params, ok := getOp["parameters"].([]any)
+		if !ok || !hasNamedParam(params, "effective") {
+			t.Fatalf("expected %s to document the effective query parameter", path)
+		}
+	}
+
+	exclusion := requireMap(t, schemas, "IPExclusion")
+	exclusionProps := requireMap(t, exclusion, "properties")
+	for _, field := range []string{"scope", "team_id", "site_id", "user_agent", "path", "inherited"} {
+		if _, ok := exclusionProps[field]; !ok {
+			t.Fatalf("expected IPExclusion to document %s", field)
+		}
+	}
+	typeSchema := requireMap(t, exclusionProps, "type")
+	if got := asStringSlice(t, typeSchema["enum"]); !reflect.DeepEqual(got, []string{"cidr", "country", "user_agent", "path"}) {
+		t.Fatalf("unexpected IPExclusion type enum: %v", got)
+	}
+
+	create := requireMap(t, schemas, "IPExclusionCreateRequest")
+	createProps := requireMap(t, create, "properties")
+	for _, field := range []string{"cidr", "country_code", "user_agent", "path", "description"} {
+		if _, ok := createProps[field]; !ok {
+			t.Fatalf("expected IPExclusionCreateRequest to document %s", field)
+		}
+	}
+
+	webVital := requireMap(t, schemas, "WebVitalIngestPayload")
+	if _, ok := requireMap(t, webVital, "properties")["ua"]; !ok {
+		t.Fatal("expected WebVitalIngestPayload to document transient ua context")
+	}
+
+	eventPath := requireMap(t, paths, "/ingest/event")
+	eventPost := requireMap(t, eventPath, "post")
+	eventRequest := requireMap(t, eventPost, "requestBody")
+	eventContent := requireMap(t, eventRequest, "content")
+	eventJSON := requireMap(t, eventContent, "application/json")
+	eventSchema := requireMap(t, eventJSON, "schema")
+	eventProps := requireMap(t, eventSchema, "properties")
+	for _, field := range []string{"path", "ua"} {
+		if _, ok := eventProps[field]; !ok {
+			t.Fatalf("expected browser event payload to document transient %s context", field)
+		}
+	}
+}
+
 func TestOpenAPISpecV1IncludesAIChatbotExportPath(t *testing.T) {
 	spec := openAPISpecV1("http://localhost:8080")
 	paths := requireMap(t, spec, "paths")

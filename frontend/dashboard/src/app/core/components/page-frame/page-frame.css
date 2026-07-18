@@ -18,12 +18,7 @@
 :host ::ng-deep .hk-admin-tabs > .p-tablist {
     overflow-x: auto;
     background: transparent;
-    border-bottom: 1px solid var(--p-surface-200);
-}
-
-:host-context(.p-dark) ::ng-deep .hk-page-tabs > .p-tablist,
-:host-context(.p-dark) ::ng-deep .hk-admin-tabs > .p-tablist {
-    border-bottom-color: var(--p-surface-700);
+    border-bottom: 1px solid var(--p-content-border-color);
 }
 
 :host ::ng-deep .hk-page-tabs .p-tab,

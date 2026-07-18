@@ -23,7 +23,7 @@
                 <input id="team-branding-logo" type="url" pInputText class="w-full" [formControl]="form.controls.logo_url" [placeholder]="'admin.team.settings.logoPlaceholder' | transloco" />
                 @if (form.controls.logo_url.value || t.logo_url; as logoUrl) {
                 <div class="mt-2">
-                    <img [ngSrc]="logoUrl" [width]="48" [height]="48" class="size-12 rounded-lg border border-surface-200 object-cover dark:border-surface-700" [alt]="'admin.team.settings.logoPreviewAlt' | transloco" />
+                    <img [ngSrc]="logoUrl" [width]="48" [height]="48" class="size-12 rounded-lg border border-[var(--p-content-border-color)] object-cover" [alt]="'admin.team.settings.logoPreviewAlt' | transloco" />
                 </div>
                 }
             </div>

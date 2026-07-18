@@ -1474,12 +1474,16 @@
       "savePolicy": "Guardar política"
     },
     "exclusions": {
-      "description": "Excluye tráfico interno, de monitoreo, bots o países para que nunca llegue al almacenamiento analítico.",
+      "description": "Excluye tráfico interno, de monitoreo, bots, países, agentes de usuario o rutas para que nunca llegue al almacenamiento analítico.",
       "typeLabel": "Tipo de regla",
       "cidrLabel": "IP o CIDR",
       "cidrPlaceholder": "203.0.113.5 o 192.168.0.0/24",
       "countryLabel": "País",
       "countryPlaceholder": "Selecciona un país",
+      "userAgentLabel": "El agente de usuario contiene",
+      "userAgentPlaceholder": "monitoring-bot",
+      "pathLabel": "Ruta",
+      "pathPlaceholder": "/admin",
       "descriptionLabel": "Descripción",
       "descriptionPlaceholder": "VPN de oficina, monitor sintético, etc.",
       "addAction": "Agregar exclusión",
@@ -1490,9 +1494,18 @@
       "suggestionsHint": "Copia este CIDR y pegalo en el campo IP o CIDR.",
       "currentIpLoading": "Resolviendo tu IP...",
       "currentIpUnavailable": "No se pudo resolver tu IP actual.",
+      "inheritedHint": "Los filtros de instancia y equipo también se aplican a este sitio. Los filtros heredados son de solo lectura aquí.",
+      "inheritedReadOnly": "Heredado",
       "ruleTypes": {
         "cidr": "IP/CIDR",
-        "country": "País"
+        "country": "País",
+        "userAgent": "Agente de usuario",
+        "path": "Ruta"
+      },
+      "scopes": {
+        "instance": "Instancia",
+        "team": "Equipo",
+        "site": "Sitio"
       },
       "columns": {
         "type": "Tipo",
@@ -1503,6 +1516,8 @@
       "errors": {
         "invalidCidr": "Ingresa un valor IP o CIDR válido.",
         "invalidCountry": "Selecciona un país.",
+        "invalidUserAgent": "Ingresa una subcadena de agente de usuario.",
+        "invalidPath": "Ingresa una ruta.",
         "descriptionTooLong": "La descripción debe tener 255 caracteres o menos.",
         "loadFailed": "No se pudieron cargar las exclusiones.",
         "createFailed": "No se pudo crear la exclusión.",
@@ -1667,12 +1682,16 @@
     },
     "exclusions": {
       "title": "Filtros globales de tráfico",
-      "description": "Descarta tráfico de redes o países seleccionados para todos los sitios de esta instancia de HitKeep.",
+      "description": "Descarta tráfico de redes, países, agentes de usuario o rutas seleccionados para todos los sitios de esta instancia de HitKeep.",
       "typeLabel": "Tipo de regla",
       "cidrLabel": "IP o CIDR",
       "cidrPlaceholder": "203.0.113.5 o 192.168.0.0/24",
       "countryLabel": "País",
       "countryPlaceholder": "Selecciona un país",
+      "userAgentLabel": "El agente de usuario contiene",
+      "userAgentPlaceholder": "monitoring-bot",
+      "pathLabel": "Ruta",
+      "pathPlaceholder": "/admin",
       "descriptionLabel": "Descripción",
       "descriptionPlaceholder": "Monitor de uptime, rango de oficina, etc.",
       "addAction": "Agregar filtro global",
@@ -1685,7 +1704,9 @@
       "currentIpUnavailable": "No se pudo resolver tu IP actual.",
       "ruleTypes": {
         "cidr": "IP/CIDR",
-        "country": "País"
+        "country": "País",
+        "userAgent": "Agente de usuario",
+        "path": "Ruta"
       },
       "columns": {
         "type": "Tipo",
@@ -1696,6 +1717,8 @@
       "errors": {
         "invalidCidr": "Ingresa un valor IP o CIDR válido.",
         "invalidCountry": "Selecciona un país.",
+        "invalidUserAgent": "Ingresa una subcadena de agente de usuario.",
+        "invalidPath": "Ingresa una ruta.",
         "descriptionTooLong": "La descripción debe tener 255 caracteres o menos.",
         "loadFailed": "No se pudieron cargar los filtros globales.",
         "createFailed": "No se pudo crear el filtro global.",
@@ -1749,10 +1772,49 @@
         "members": "Miembros",
         "sso": "SSO",
         "apiClients": "Clientes API",
+        "exclusions": "Filtros de tráfico",
         "customDomains": "Dominios personalizados",
         "branding": "Marca",
         "dangerZone": "Zona de peligro",
         "activity": "Actividad"
+      },
+      "exclusions": {
+        "title": "Filtros de tráfico del equipo",
+        "description": "Descarta el tráfico coincidente de todos los sitios que pertenecen actualmente a este equipo.",
+        "typeLabel": "Tipo de regla",
+        "cidrLabel": "IP o CIDR",
+        "cidrPlaceholder": "203.0.113.5 o 192.168.0.0/24",
+        "countryLabel": "País",
+        "countryPlaceholder": "Selecciona un país",
+        "userAgentLabel": "El agente de usuario contiene",
+        "userAgentPlaceholder": "monitoring-bot",
+        "pathLabel": "Ruta",
+        "pathPlaceholder": "/admin",
+        "descriptionLabel": "Descripción",
+        "descriptionPlaceholder": "VPN de oficina, monitor sintético, etc.",
+        "addAction": "Agregar filtro de equipo",
+        "loading": "Cargando filtros del equipo...",
+        "empty": "No hay filtros de tráfico configurados para este equipo.",
+        "confirmDelete": "¿Eliminar el filtro del equipo {{value}}?",
+        "suggestionsTitle": "Tu IP actual",
+        "currentIpLoading": "Resolviendo tu IP...",
+        "currentIpUnavailable": "No se pudo resolver tu IP actual.",
+        "inheritedHint": "Los filtros de instancia también se aplican a este equipo. Los filtros heredados son de solo lectura aquí.",
+        "inheritedReadOnly": "Heredado",
+        "ruleTypes": { "cidr": "IP/CIDR", "country": "País", "userAgent": "Agente de usuario", "path": "Ruta" },
+        "scopes": { "instance": "Instancia", "team": "Equipo", "site": "Sitio" },
+        "columns": { "type": "Tipo", "value": "Valor", "description": "Descripción", "created": "Creado" },
+        "errors": {
+          "invalidCidr": "Ingresa un valor IP o CIDR válido.",
+          "invalidCountry": "Selecciona un país.",
+          "invalidUserAgent": "Ingresa una subcadena de agente de usuario.",
+          "invalidPath": "Ingresa una ruta.",
+          "descriptionTooLong": "La descripción debe tener 255 caracteres o menos.",
+          "loadFailed": "No se pudieron cargar los filtros del equipo.",
+          "createFailed": "No se pudo crear el filtro del equipo.",
+          "deleteFailed": "No se pudo eliminar el filtro del equipo."
+        },
+        "status": { "createSuccess": "Se creó el filtro del equipo {{value}}.", "deleteSuccess": "Se eliminó el filtro del equipo {{value}}." }
       },
       "overview": {
         "breadcrumb": "Resumen del equipo",
@@ -2245,7 +2307,9 @@
         "hitsPerSecond": "Hits/s"
       },
       "database": {
-        "title": "Resiliencia de la base de datos",
+        "title": "Base de datos",
+        "recoverySection": "Recuperación y checkpoints",
+        "filesSection": "Archivos de base de datos",
         "autoRecovery": "Recuperación automática de índices",
         "automaticWalRecovery": "Omisión automática del WAL",
         "checkpointInterval": "Intervalo de puntos de control",
@@ -2478,13 +2542,18 @@
           "unknown": "Desconocido"
         },
         "healthDescription": "Señales de preparación del nodo actual y del almacén embebido.",
+        "searchConsoleDescription": "Estado de credenciales, worker y sincronización en los equipos conectados.",
+        "aiDescription": "Preparación del proveedor y presupuestos locales de solicitudes y tokens.",
         "overviewDescription": "Build, versión, URL pública y modo de ejecución.",
         "featuresDescription": "Interruptores de funciones de operador y capacidades de runtime reportadas por la instancia.",
+        "mcpDescription": "Acceso de solo lectura para asistentes, endpoint y herramientas de documentación.",
         "storageDescription": "Archivos DuckDB, almacenamiento de tenants y disponibilidad de disco.",
+        "databaseDescription": "Recuperación, checkpoints, archivos, memoria y espacio en disco de DuckDB.",
         "ingestDescription": "Volumen reciente de tracking y tráfico bloqueado en la instancia.",
         "cachesDescription": "Ocupación de cachés LRU para auth, clientes API y rate limiting.",
         "backupsDescription": "Destino de copias, retención y salud de ejecuciones recientes.",
         "spamDescription": "Frescura de la caché antispam y control de actualización manual.",
+        "importCleanupDescription": "Retención de importaciones preparadas, limpieza pendiente y resultados de la última ejecución.",
         "mailDescription": "Configuración de transporte de correo redactada y envío de prueba seguro.",
         "usersDescription": "Roles de instancia, recuperación y acceso de administradores.",
         "sitesDescription": "Todos los sitios visibles para administradores de instancia.",

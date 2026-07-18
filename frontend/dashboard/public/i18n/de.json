@@ -1478,12 +1478,16 @@
       "savePolicy": "Richtlinie speichern"
     },
     "exclusions": {
-      "description": "Schließe internen, Monitoring-, Bot- oder Länder-Traffic aus, damit er nicht in der Analytics-Speicherung landet.",
+      "description": "Schließe internen, Monitoring-, Bot-, Länder-, User-Agent- oder Pfad-Traffic aus, damit er nicht in der Analytics-Speicherung landet.",
       "typeLabel": "Regeltyp",
       "cidrLabel": "IP oder CIDR",
       "cidrPlaceholder": "203.0.113.5 oder 192.168.0.0/24",
       "countryLabel": "Land",
       "countryPlaceholder": "Land auswählen",
+      "userAgentLabel": "User-Agent enthält",
+      "userAgentPlaceholder": "monitoring-bot",
+      "pathLabel": "Pfad",
+      "pathPlaceholder": "/admin",
       "descriptionLabel": "Beschreibung",
       "descriptionPlaceholder": "Office VPN, synthetischer Monitor, usw.",
       "addAction": "Ausschluss hinzufügen",
@@ -1494,9 +1498,18 @@
       "suggestionsHint": "Kopiere dieses CIDR und füge es in das Feld IP oder CIDR ein.",
       "currentIpLoading": "Deine IP wird ermittelt...",
       "currentIpUnavailable": "Deine aktuelle IP konnte nicht ermittelt werden.",
+      "inheritedHint": "Instanz- und Team-Filter gelten ebenfalls für diese Seite. Geerbte Filter sind hier schreibgeschützt.",
+      "inheritedReadOnly": "Geerbt",
       "ruleTypes": {
         "cidr": "IP/CIDR",
-        "country": "Land"
+        "country": "Land",
+        "userAgent": "User-Agent",
+        "path": "Pfad"
+      },
+      "scopes": {
+        "instance": "Instanz",
+        "team": "Team",
+        "site": "Seite"
       },
       "columns": {
         "type": "Typ",
@@ -1507,6 +1520,8 @@
       "errors": {
         "invalidCidr": "Gib eine gültige IP- oder CIDR-Angabe ein.",
         "invalidCountry": "Wähle ein Land aus.",
+        "invalidUserAgent": "Gib einen User-Agent-Teilstring ein.",
+        "invalidPath": "Gib einen Pfad ein.",
         "descriptionTooLong": "Die Beschreibung darf maximal 255 Zeichen lang sein.",
         "loadFailed": "Ausschlüsse konnten nicht geladen werden.",
         "createFailed": "Ausschluss konnte nicht erstellt werden.",
@@ -1671,12 +1686,16 @@
     },
     "exclusions": {
       "title": "Globale Traffic-Filter",
-      "description": "Verwerfe Traffic aus ausgewählten Netzwerken oder Ländern für jede Seite in dieser HitKeep-Instanz.",
+      "description": "Verwerfe Traffic aus ausgewählten Netzwerken, Ländern, User-Agents oder Pfaden für jede Seite in dieser HitKeep-Instanz.",
       "typeLabel": "Regeltyp",
       "cidrLabel": "IP oder CIDR",
       "cidrPlaceholder": "203.0.113.5 oder 192.168.0.0/24",
       "countryLabel": "Land",
       "countryPlaceholder": "Land auswählen",
+      "userAgentLabel": "User-Agent enthält",
+      "userAgentPlaceholder": "monitoring-bot",
+      "pathLabel": "Pfad",
+      "pathPlaceholder": "/admin",
       "descriptionLabel": "Beschreibung",
       "descriptionPlaceholder": "Uptime-Monitor, Office-Bereich, usw.",
       "addAction": "Globalen Filter hinzufügen",
@@ -1689,7 +1708,9 @@
       "currentIpUnavailable": "Deine aktuelle IP konnte nicht ermittelt werden.",
       "ruleTypes": {
         "cidr": "IP/CIDR",
-        "country": "Land"
+        "country": "Land",
+        "userAgent": "User-Agent",
+        "path": "Pfad"
       },
       "columns": {
         "type": "Typ",
@@ -1700,6 +1721,8 @@
       "errors": {
         "invalidCidr": "Gib eine gültige IP- oder CIDR-Angabe ein.",
         "invalidCountry": "Wähle ein Land aus.",
+        "invalidUserAgent": "Gib einen User-Agent-Teilstring ein.",
+        "invalidPath": "Gib einen Pfad ein.",
         "descriptionTooLong": "Die Beschreibung darf maximal 255 Zeichen lang sein.",
         "loadFailed": "Globale Filter konnten nicht geladen werden.",
         "createFailed": "Globaler Filter konnte nicht erstellt werden.",
@@ -1753,10 +1776,49 @@
         "members": "Mitglieder",
         "sso": "SSO",
         "apiClients": "API-Clients",
+        "exclusions": "Traffic-Filter",
         "customDomains": "Eigene Domains",
         "branding": "Branding",
         "dangerZone": "Gefahrenbereich",
         "activity": "Aktivität"
+      },
+      "exclusions": {
+        "title": "Team-Traffic-Filter",
+        "description": "Verwerfe passenden Traffic für alle Seiten, die derzeit diesem Team gehören.",
+        "typeLabel": "Regeltyp",
+        "cidrLabel": "IP oder CIDR",
+        "cidrPlaceholder": "203.0.113.5 oder 192.168.0.0/24",
+        "countryLabel": "Land",
+        "countryPlaceholder": "Land auswählen",
+        "userAgentLabel": "User-Agent enthält",
+        "userAgentPlaceholder": "monitoring-bot",
+        "pathLabel": "Pfad",
+        "pathPlaceholder": "/admin",
+        "descriptionLabel": "Beschreibung",
+        "descriptionPlaceholder": "Office VPN, synthetischer Monitor, usw.",
+        "addAction": "Team-Filter hinzufügen",
+        "loading": "Team-Filter werden geladen...",
+        "empty": "Für dieses Team sind keine Traffic-Filter konfiguriert.",
+        "confirmDelete": "Team-Filter {{value}} löschen?",
+        "suggestionsTitle": "Deine aktuelle IP",
+        "currentIpLoading": "Deine IP wird ermittelt...",
+        "currentIpUnavailable": "Deine aktuelle IP konnte nicht ermittelt werden.",
+        "inheritedHint": "Instanzfilter gelten ebenfalls für dieses Team. Geerbte Filter sind hier schreibgeschützt.",
+        "inheritedReadOnly": "Geerbt",
+        "ruleTypes": { "cidr": "IP/CIDR", "country": "Land", "userAgent": "User-Agent", "path": "Pfad" },
+        "scopes": { "instance": "Instanz", "team": "Team", "site": "Seite" },
+        "columns": { "type": "Typ", "value": "Wert", "description": "Beschreibung", "created": "Erstellt" },
+        "errors": {
+          "invalidCidr": "Gib eine gültige IP- oder CIDR-Angabe ein.",
+          "invalidCountry": "Wähle ein Land aus.",
+          "invalidUserAgent": "Gib einen User-Agent-Teilstring ein.",
+          "invalidPath": "Gib einen Pfad ein.",
+          "descriptionTooLong": "Die Beschreibung darf maximal 255 Zeichen lang sein.",
+          "loadFailed": "Team-Filter konnten nicht geladen werden.",
+          "createFailed": "Team-Filter konnte nicht erstellt werden.",
+          "deleteFailed": "Team-Filter konnte nicht gelöscht werden."
+        },
+        "status": { "createSuccess": "Team-Filter {{value}} wurde erstellt.", "deleteSuccess": "Team-Filter {{value}} wurde gelöscht." }
       },
       "overview": {
         "breadcrumb": "Team-Übersicht",
@@ -2249,7 +2311,9 @@
         "hitsPerSecond": "Hits/s"
       },
       "database": {
-        "title": "Datenbank-Widerstandsfähigkeit",
+        "title": "Datenbank",
+        "recoverySection": "Wiederherstellung und Checkpoints",
+        "filesSection": "Datenbankdateien",
         "autoRecovery": "Automatische Indexwiederherstellung",
         "automaticWalRecovery": "Automatische WAL-Umgehung",
         "checkpointInterval": "Checkpoint-Intervall",
@@ -2482,13 +2546,18 @@
           "unknown": "Unbekannt"
         },
         "healthDescription": "Bereitschaftssignale für den aktuellen Knoten und den eingebetteten Datenspeicher.",
+        "searchConsoleDescription": "Status von Zugangsdaten, Worker und Synchronisierung für verbundene Teams.",
+        "aiDescription": "Bereitschaft des Anbieters sowie lokale Anfrage- und Token-Budgets.",
         "overviewDescription": "Build, Version, öffentliche URL und Laufzeitmodus.",
         "featuresDescription": "Operator-Feature-Schalter und Laufzeitfunktionen der Instanz.",
+        "mcpDescription": "Schreibgeschützter Assistentenzugriff, Endpunkt und Dokumentationswerkzeuge.",
         "storageDescription": "DuckDB-Dateien, Mandantenspeicher und freier Speicherplatz.",
+        "databaseDescription": "DuckDB-Wiederherstellung, Checkpoints, Dateien, Speicher und freier Festplattenspeicher.",
         "ingestDescription": "Aktuelles Trackingvolumen und blockierter Traffic der Instanz.",
         "cachesDescription": "LRU-Cache-Belegung für Auth, API-Clients und Ratenbegrenzung.",
         "backupsDescription": "Konfiguriertes Backup-Ziel, Aufbewahrung und Ausführungszustand.",
         "spamDescription": "Aktualität des Spamfilter-Caches und manuelle Aktualisierung.",
+        "importCleanupDescription": "Aufbewahrung von Import-Staging-Dateien, ausstehende Bereinigung und Ergebnisse des letzten Laufs.",
         "mailDescription": "Redigierte E-Mail-Transportkonfiguration und sicherer Testversand.",
         "usersDescription": "Instanzrollen, Wiederherstellungsaktionen und Admin-Zugriff.",
         "sitesDescription": "Alle Websites, die für Instanz-Admins sichtbar sind.",

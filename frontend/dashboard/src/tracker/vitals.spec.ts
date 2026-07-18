@@ -42,7 +42,8 @@ describe('web vitals tracker bundle', () => {
                     sessionId: '10000000-0000-4000-8000-000000000001',
                     pageId: () => '10000000-0000-4000-8000-000000000002',
                     trackerSource: 'hk.js',
-                    trackerVersion: '2.6.0'
+                    trackerVersion: '2.6.0',
+                    userAgent: 'Mozilla/5.0 Test'
                 }
             }
         } as unknown as Window & typeof globalThis;
@@ -67,7 +68,8 @@ describe('web vitals tracker bundle', () => {
             sid: '10000000-0000-4000-8000-000000000001',
             pid: '10000000-0000-4000-8000-000000000002',
             tsrc: 'hk.js',
-            tv: '2.6.0'
+            tv: '2.6.0',
+            ua: 'Mozilla/5.0 Test'
         });
         expect(emit.mock.calls[0]?.[0]).not.toHaveProperty('rating');
     });

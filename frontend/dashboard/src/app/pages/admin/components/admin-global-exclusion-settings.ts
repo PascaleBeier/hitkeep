@@ -25,6 +25,7 @@ import { CrudDialog } from '@components/crud-dialog/crud-dialog';
 import { dialogCancelButton, dialogDangerButton } from '@components/dialog-actions/dialog-actions';
 import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
 import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
+import { SettingsCard } from '@features/settings/components/settings-card';
 
 const ipOrCIDRPattern = /^(([0-9]{1,3}\.){3}[0-9]{1,3}(\/(3[0-2]|[12]?[0-9]))?|([0-9A-Fa-f:]+)(\/(12[0-8]|1[01][0-9]|[1-9]?[0-9]))?)$/;
 
@@ -34,7 +35,7 @@ interface ActionStatus {
     params?: Record<string, string | number>;
 }
 
-type ExclusionRuleType = 'cidr' | 'country';
+type ExclusionRuleType = IPExclusion['type'];
 type ExclusionRow = IPExclusion & {
     type_label: string;
     value_label: string;
@@ -59,11 +60,11 @@ type ExclusionRow = IPExclusion & {
         CopyControl,
         CrudDialog,
         RelativeDateTime,
+        SettingsCard,
         TableRowActions,
         TranslocoPipe
     ],
     templateUrl: './admin-global-exclusion-settings.html',
-    styleUrl: './admin-global-exclusion-settings.css',
     changeDetection: ChangeDetectionStrategy.OnPush,
     providers: [ConfirmationService]
 })
@@ -87,14 +88,16 @@ export class AdminGlobalExclusionSettings {
         this.activeLanguage();
         return [
             { label: this.transloco.translate('admin.exclusions.ruleTypes.cidr'), value: 'cidr' },
-            { label: this.transloco.translate('admin.exclusions.ruleTypes.country'), value: 'country' }
+            { label: this.transloco.translate('admin.exclusions.ruleTypes.country'), value: 'country' },
+            { label: this.transloco.translate('admin.exclusions.ruleTypes.userAgent'), value: 'user_agent' },
+            { label: this.transloco.translate('admin.exclusions.ruleTypes.path'), value: 'path' }
         ];
     });
     protected readonly countryOptions = computed<CountryOption[]>(() => countryOptions(this.activeLanguage()));
     protected readonly exclusionRows = computed<ExclusionRow[]>(() =>
         this.exclusions().map((rule) => {
             const countryName = rule.country_code ? countryDisplayName(rule.country_code, this.activeLanguage()) : '';
-            const valueLabel = rule.type === 'country' ? `${countryName} (${rule.country_code ?? ''})` : (rule.cidr ?? '');
+            const valueLabel = this.ruleValue(rule, countryName);
             const typeLabel = this.ruleTypeLabel(rule.type);
             return {
                 ...rule,
@@ -119,6 +122,8 @@ export class AdminGlobalExclusionSettings {
         type: new FormControl<ExclusionRuleType>('cidr', { nonNullable: true }),
         cidr: new FormControl('', { nonNullable: true, validators: [Validators.pattern(ipOrCIDRPattern)] }),
         countryCode: new FormControl('', { nonNullable: true }),
+        userAgent: new FormControl('', { nonNullable: true }),
+        path: new FormControl('', { nonNullable: true }),
         description: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(255)] })
     });
 
@@ -145,6 +150,8 @@ export class AdminGlobalExclusionSettings {
                 type: this.form.controls.type.value,
                 cidr: this.form.controls.type.value === 'cidr' ? this.form.controls.cidr.value.trim() : undefined,
                 country_code: this.form.controls.type.value === 'country' ? this.form.controls.countryCode.value.trim() : undefined,
+                user_agent: this.form.controls.type.value === 'user_agent' ? this.form.controls.userAgent.value.trim() : undefined,
+                path: this.form.controls.type.value === 'path' ? this.form.controls.path.value.trim() : undefined,
                 description: this.form.controls.description.value.trim()
             })
             .pipe(finalize(() => this.isSaving.set(false)))
@@ -166,7 +173,7 @@ export class AdminGlobalExclusionSettings {
     }
 
     protected openAddDialog(): void {
-        this.form.reset({ type: 'cidr', cidr: '', countryCode: '', description: '' });
+        this.form.reset({ type: 'cidr', cidr: '', countryCode: '', userAgent: '', path: '', description: '' });
         this.createError.set(null);
         this.isAddDialogVisible.set(true);
     }
@@ -174,6 +181,8 @@ export class AdminGlobalExclusionSettings {
     protected onRuleTypeChange(): void {
         this.form.controls.cidr.setErrors(null);
         this.form.controls.countryCode.setErrors(null);
+        this.form.controls.userAgent.setErrors(null);
+        this.form.controls.path.setErrors(null);
     }
 
     protected onAddDialogVisibleChange(visible: boolean): void {
@@ -273,18 +282,30 @@ export class AdminGlobalExclusionSettings {
 
     private closeAddDialog(): void {
         this.isAddDialogVisible.set(false);
-        this.form.reset({ type: 'cidr', cidr: '', countryCode: '', description: '' });
+        this.form.reset({ type: 'cidr', cidr: '', countryCode: '', userAgent: '', path: '', description: '' });
         this.createError.set(null);
     }
 
     protected ruleTypeLabel(type: IPExclusion['type']): string {
         this.activeLanguage();
-        return this.transloco.translate(type === 'country' ? 'admin.exclusions.ruleTypes.country' : 'admin.exclusions.ruleTypes.cidr');
+        const keys: Record<IPExclusion['type'], string> = {
+            cidr: 'admin.exclusions.ruleTypes.cidr',
+            country: 'admin.exclusions.ruleTypes.country',
+            user_agent: 'admin.exclusions.ruleTypes.userAgent',
+            path: 'admin.exclusions.ruleTypes.path'
+        };
+        return this.transloco.translate(keys[type]);
     }
 
-    protected ruleValue(rule: IPExclusion): string {
+    protected ruleValue(rule: IPExclusion, countryName?: string): string {
         if (rule.type === 'country' && rule.country_code) {
-            return `${countryDisplayName(rule.country_code, this.activeLanguage())} (${rule.country_code})`;
+            return `${countryName ?? countryDisplayName(rule.country_code, this.activeLanguage())} (${rule.country_code})`;
+        }
+        if (rule.type === 'user_agent') {
+            return rule.user_agent ?? '';
+        }
+        if (rule.type === 'path') {
+            return rule.path ?? '';
         }
         return rule.cidr ?? '';
     }
@@ -296,12 +317,28 @@ export class AdminGlobalExclusionSettings {
     private validateRuleForm(): boolean {
         this.form.controls.cidr.setErrors(null);
         this.form.controls.countryCode.setErrors(null);
+        this.form.controls.userAgent.setErrors(null);
+        this.form.controls.path.setErrors(null);
         if (this.form.controls.description.invalid) {
             return false;
         }
         if (this.form.controls.type.value === 'country') {
             if (!this.form.controls.countryCode.value.trim()) {
                 this.form.controls.countryCode.setErrors({ required: true });
+                return false;
+            }
+            return true;
+        }
+        if (this.form.controls.type.value === 'user_agent') {
+            if (!this.form.controls.userAgent.value.trim()) {
+                this.form.controls.userAgent.setErrors({ required: true });
+                return false;
+            }
+            return true;
+        }
+        if (this.form.controls.type.value === 'path') {
+            if (!this.form.controls.path.value.trim()) {
+                this.form.controls.path.setErrors({ required: true });
                 return false;
             }
             return true;

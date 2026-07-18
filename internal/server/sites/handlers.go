@@ -276,6 +276,7 @@ func (h *handler) handleCreateSite() http.HandlerFunc {
 				return
 			}
 		}
+		h.refreshIPFilter(r.Context())
 
 		if teamID, err := h.ctx.Store.GetSiteTenantID(r.Context(), site.ID); err == nil {
 			if _, conversionErr := h.ctx.Store.RecordCloudConversionEvent(r.Context(), database.CloudConversionEvent{
@@ -696,6 +697,7 @@ func (h *handler) handleTransferSiteTeam() http.HandlerFunc {
 			http.Error(w, "Failed to transfer site", http.StatusInternalServerError)
 			return
 		}
+		h.refreshIPFilter(r.Context())
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(map[string]any{

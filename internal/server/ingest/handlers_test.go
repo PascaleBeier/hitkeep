@@ -214,6 +214,68 @@ func TestHandleIngestLeaderDropsCountryExclusionBeforePublish(t *testing.T) {
 	}
 }
 
+func TestBrowserIngestContextExclusionsDropPageviewsEventsAndWebVitals(t *testing.T) {
+	producer := &capturingProducer{}
+	h, cleanup := setupIngestHandler(t, func(ctx *shared.Context) {
+		ctx.Producer = producer
+		site, err := ctx.Store.FindSiteByDomain(context.Background(), "example.com")
+		if err != nil || site == nil {
+			t.Fatalf("find ingest site: site=%v err=%v", site, err)
+		}
+		if _, err := ctx.Store.CreateSiteTrafficExclusion(context.Background(), site.ID, database.TrafficExclusionValues{Type: "path", Path: "/blocked-path"}, uuid.Nil); err != nil {
+			t.Fatalf("create path exclusion: %v", err)
+		}
+		if _, err := ctx.Store.CreateSiteTrafficExclusion(context.Background(), site.ID, database.TrafficExclusionValues{Type: "user_agent", UserAgent: "blocked-agent"}, uuid.Nil); err != nil {
+			t.Fatalf("create user-agent exclusion: %v", err)
+		}
+		filter := blocking.NewIPFilter(ctx.Store)
+		if err := filter.Refresh(context.Background()); err != nil {
+			t.Fatalf("refresh traffic exclusions: %v", err)
+		}
+		ctx.IPFilter = filter
+	})
+	defer cleanup()
+
+	pageReq := newIngestRequest(t, "https://example.com", "198.51.100.22:1234", map[string]any{
+		"path":       "/blocked-path?query=ignored",
+		"ua":         "Mozilla/5.0",
+		"session_id": uuid.New(),
+		"page_id":    uuid.New(),
+	})
+	pageRec := httptest.NewRecorder()
+	h.handleIngestLeader(pageRec, pageReq)
+	if pageRec.Code != http.StatusAccepted || producer.messageCount("hits") != 0 {
+		t.Fatalf("expected path-blocked pageview to be accepted without publish, status=%d messages=%d", pageRec.Code, producer.messageCount("hits"))
+	}
+
+	eventReq := newIngestEventRequest(t, "https://example.com", "198.51.100.23:1234", map[string]any{
+		"n":    "signup",
+		"p":    map[string]any{"plan": "pro"},
+		"sid":  uuid.New(),
+		"path": "/allowed",
+		"ua":   "Mozilla BLOCKED-AGENT/1.0",
+	})
+	eventRec := httptest.NewRecorder()
+	h.handleIngestEventLeader(eventRec, eventReq)
+	if eventRec.Code != http.StatusAccepted || producer.messageCount("events") != 0 {
+		t.Fatalf("expected user-agent-blocked event to be accepted without publish, status=%d messages=%d", eventRec.Code, producer.messageCount("events"))
+	}
+
+	vitalReq := newIngestWebVitalsRequest(t, "https://example.com", "198.51.100.24:1234", map[string]any{
+		"n":   "LCP",
+		"v":   1800,
+		"p":   "/allowed",
+		"sid": uuid.New(),
+		"pid": uuid.New(),
+	})
+	vitalReq.Header.Set("User-Agent", "Older Tracker Blocked-Agent/1.0")
+	vitalRec := httptest.NewRecorder()
+	h.handleIngestWebVitalsLeader(vitalRec, vitalReq)
+	if vitalRec.Code != http.StatusAccepted || producer.messageCount("web_vitals") != 0 {
+		t.Fatalf("expected header-fallback user-agent-blocked vital to be accepted without publish, status=%d messages=%d", vitalRec.Code, producer.messageCount("web_vitals"))
+	}
+}
+
 func TestHandleIngestLeaderCountsUnknownSiteRejection(t *testing.T) {
 	h, cleanup := setupIngestHandler(t, nil)
 	defer cleanup()
@@ -818,6 +880,60 @@ func TestHandleServerEventIngestPublishesCanonicalTimestamp(t *testing.T) {
 	}
 	if got.Properties["plan"] != "pro" {
 		t.Fatalf("expected properties to include plan, got %+v", got.Properties)
+	}
+}
+
+func TestTrustedServerIngestContextExclusionsDropPageviewsAndEvents(t *testing.T) {
+	producer := &capturingProducer{}
+	store, ctx, userID, siteID, token := setupServerIngestTestEnv(t, auth.SiteOwner, func(ctx *shared.Context) {
+		ctx.Producer = producer
+	})
+	if _, err := store.CreateSiteTrafficExclusion(context.Background(), siteID, database.TrafficExclusionValues{Type: "path", Path: "/blocked-server"}, userID); err != nil {
+		t.Fatalf("create server path exclusion: %v", err)
+	}
+	if _, err := store.CreateSiteTrafficExclusion(context.Background(), siteID, database.TrafficExclusionValues{Type: "user_agent", UserAgent: "server-blocked-agent"}, userID); err != nil {
+		t.Fatalf("create server user-agent exclusion: %v", err)
+	}
+	filter := blocking.NewIPFilter(store)
+	if err := filter.Refresh(context.Background()); err != nil {
+		t.Fatalf("refresh traffic exclusions: %v", err)
+	}
+	ctx.IPFilter = filter
+	mux := http.NewServeMux()
+	Register(mux, ctx)
+
+	requests := []struct {
+		path string
+		body map[string]any
+	}{
+		{
+			path: "/api/ingest/server/pageview",
+			body: map[string]any{
+				"url": "https://example.com/blocked-server?query=ignored", "timestamp": "2026-04-03T12:30:45Z",
+				"visitor_ip": "198.51.100.22", "user_agent": "Mozilla/5.0",
+			},
+		},
+		{
+			path: "/api/ingest/server/event",
+			body: map[string]any{
+				"url": "https://example.com/allowed", "timestamp": "2026-04-03T12:30:45Z",
+				"visitor_ip": "198.51.100.23", "user_agent": "SERVER-BLOCKED-AGENT/2.0", "name": "signup",
+			},
+		},
+	}
+	for _, test := range requests {
+		payload, _ := json.Marshal(test.body)
+		req := httptest.NewRequest(http.MethodPost, test.path, bytes.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-API-Key", token)
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		if rec.Code != http.StatusAccepted {
+			t.Fatalf("expected %s to return accepted, got %d: %s", test.path, rec.Code, rec.Body.String())
+		}
+	}
+	if producer.messageCount("hits") != 0 || producer.messageCount("events") != 0 {
+		t.Fatalf("expected trusted context exclusions to suppress publish, messages=%+v", producer.messages)
 	}
 }
 

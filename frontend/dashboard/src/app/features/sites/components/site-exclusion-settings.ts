@@ -34,9 +34,10 @@ interface ActionStatus {
     params?: Record<string, string | number>;
 }
 
-type ExclusionRuleType = 'cidr' | 'country';
+type ExclusionRuleType = IPExclusion['type'];
 type ExclusionRow = IPExclusion & {
     type_label: string;
+    scope_label: string;
     value_label: string;
     country_name: string;
     search_value: string;
@@ -85,25 +86,30 @@ export class SiteExclusionSettings {
     protected readonly isAddDialogVisible = signal(false);
     protected readonly isCurrentIPLoading = signal(false);
     protected readonly currentIPCIDR = signal('');
+    protected readonly hasInheritedExclusions = computed(() => this.exclusions().some((rule) => rule.inherited));
     protected readonly ruleTypeOptions = computed(() => {
         this.activeLanguage();
         return [
             { label: this.transloco.translate('sites.exclusions.ruleTypes.cidr'), value: 'cidr' },
-            { label: this.transloco.translate('sites.exclusions.ruleTypes.country'), value: 'country' }
+            { label: this.transloco.translate('sites.exclusions.ruleTypes.country'), value: 'country' },
+            { label: this.transloco.translate('sites.exclusions.ruleTypes.userAgent'), value: 'user_agent' },
+            { label: this.transloco.translate('sites.exclusions.ruleTypes.path'), value: 'path' }
         ];
     });
     protected readonly countryOptions = computed<CountryOption[]>(() => countryOptions(this.activeLanguage()));
     protected readonly exclusionRows = computed<ExclusionRow[]>(() =>
         this.exclusions().map((rule) => {
             const countryName = rule.country_code ? countryDisplayName(rule.country_code, this.activeLanguage()) : '';
-            const valueLabel = rule.type === 'country' ? `${countryName} (${rule.country_code ?? ''})` : (rule.cidr ?? '');
+            const valueLabel = this.ruleValue(rule, countryName);
             const typeLabel = this.ruleTypeLabel(rule.type);
+            const scopeLabel = this.scopeLabel(rule.scope ?? 'site');
             return {
                 ...rule,
                 type_label: typeLabel,
+                scope_label: scopeLabel,
                 value_label: valueLabel,
                 country_name: countryName,
-                search_value: `${typeLabel} ${valueLabel} ${rule.description ?? ''} ${rule.created_at}`
+                search_value: `${typeLabel} ${scopeLabel} ${valueLabel} ${rule.description ?? ''} ${rule.created_at}`
             };
         })
     );
@@ -121,6 +127,8 @@ export class SiteExclusionSettings {
         type: new FormControl<ExclusionRuleType>('cidr', { nonNullable: true }),
         cidr: new FormControl('', { nonNullable: true, validators: [Validators.pattern(ipOrCIDRPattern)] }),
         countryCode: new FormControl('', { nonNullable: true }),
+        userAgent: new FormControl('', { nonNullable: true }),
+        path: new FormControl('', { nonNullable: true }),
         description: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(255)] })
     });
 
@@ -160,12 +168,18 @@ export class SiteExclusionSettings {
                 type: this.form.controls.type.value,
                 cidr: this.form.controls.type.value === 'cidr' ? this.form.controls.cidr.value.trim() : undefined,
                 country_code: this.form.controls.type.value === 'country' ? this.form.controls.countryCode.value.trim() : undefined,
+                user_agent: this.form.controls.type.value === 'user_agent' ? this.form.controls.userAgent.value.trim() : undefined,
+                path: this.form.controls.type.value === 'path' ? this.form.controls.path.value.trim() : undefined,
                 description: this.form.controls.description.value.trim()
             })
             .pipe(finalize(() => this.isSaving.set(false)))
             .subscribe({
                 next: (rule) => {
-                    this.exclusions.update((current) => [rule, ...current]);
+                    this.exclusions.update((current) => {
+                        const firstSiteRule = current.findIndex((entry) => (entry.scope ?? 'site') === 'site');
+                        const insertAt = firstSiteRule < 0 ? current.length : firstSiteRule;
+                        return [...current.slice(0, insertAt), rule, ...current.slice(insertAt)];
+                    });
                     this.actionStatus.set({
                         severity: 'success',
                         key: 'sites.exclusions.status.createSuccess',
@@ -180,7 +194,7 @@ export class SiteExclusionSettings {
     }
 
     protected openAddDialog(): void {
-        this.form.reset({ type: 'cidr', cidr: '', countryCode: '', description: '' });
+        this.form.reset({ type: 'cidr', cidr: '', countryCode: '', userAgent: '', path: '', description: '' });
         this.createError.set(null);
         this.isAddDialogVisible.set(true);
     }
@@ -188,6 +202,8 @@ export class SiteExclusionSettings {
     protected onRuleTypeChange(): void {
         this.form.controls.cidr.setErrors(null);
         this.form.controls.countryCode.setErrors(null);
+        this.form.controls.userAgent.setErrors(null);
+        this.form.controls.path.setErrors(null);
     }
 
     protected onAddDialogVisibleChange(visible: boolean): void {
@@ -202,6 +218,9 @@ export class SiteExclusionSettings {
     }
 
     protected ruleActions(rule: IPExclusion): TableRowActionItem[] {
+        if (rule.inherited) {
+            return [];
+        }
         return [
             {
                 label: this.transloco.translate('share.dialog.deleteAction'),
@@ -213,6 +232,9 @@ export class SiteExclusionSettings {
     }
 
     protected confirmDeleteRule(rule: IPExclusion): void {
+        if (rule.inherited) {
+            return;
+        }
         const site = this.site();
         if (!site) {
             return;
@@ -273,7 +295,7 @@ export class SiteExclusionSettings {
         this.actionStatus.set(null);
 
         this.exclusionsService
-            .listSiteExclusions(siteID)
+            .listSiteExclusions(siteID, true)
             .pipe(finalize(() => this.isLoading.set(false)))
             .subscribe({
                 next: (rules) => {
@@ -287,18 +309,35 @@ export class SiteExclusionSettings {
 
     private closeAddDialog(): void {
         this.isAddDialogVisible.set(false);
-        this.form.reset({ type: 'cidr', cidr: '', countryCode: '', description: '' });
+        this.form.reset({ type: 'cidr', cidr: '', countryCode: '', userAgent: '', path: '', description: '' });
         this.createError.set(null);
     }
 
     protected ruleTypeLabel(type: IPExclusion['type']): string {
         this.activeLanguage();
-        return this.transloco.translate(type === 'country' ? 'sites.exclusions.ruleTypes.country' : 'sites.exclusions.ruleTypes.cidr');
+        const keys: Record<IPExclusion['type'], string> = {
+            cidr: 'sites.exclusions.ruleTypes.cidr',
+            country: 'sites.exclusions.ruleTypes.country',
+            user_agent: 'sites.exclusions.ruleTypes.userAgent',
+            path: 'sites.exclusions.ruleTypes.path'
+        };
+        return this.transloco.translate(keys[type]);
     }
 
-    protected ruleValue(rule: IPExclusion): string {
+    protected scopeLabel(scope: NonNullable<IPExclusion['scope']>): string {
+        this.activeLanguage();
+        return this.transloco.translate(`sites.exclusions.scopes.${scope}`);
+    }
+
+    protected ruleValue(rule: IPExclusion, countryName?: string): string {
         if (rule.type === 'country' && rule.country_code) {
-            return `${countryDisplayName(rule.country_code, this.activeLanguage())} (${rule.country_code})`;
+            return `${countryName ?? countryDisplayName(rule.country_code, this.activeLanguage())} (${rule.country_code})`;
+        }
+        if (rule.type === 'user_agent') {
+            return rule.user_agent ?? '';
+        }
+        if (rule.type === 'path') {
+            return rule.path ?? '';
         }
         return rule.cidr ?? '';
     }
@@ -310,12 +349,28 @@ export class SiteExclusionSettings {
     private validateRuleForm(): boolean {
         this.form.controls.cidr.setErrors(null);
         this.form.controls.countryCode.setErrors(null);
+        this.form.controls.userAgent.setErrors(null);
+        this.form.controls.path.setErrors(null);
         if (this.form.controls.description.invalid) {
             return false;
         }
         if (this.form.controls.type.value === 'country') {
             if (!this.form.controls.countryCode.value.trim()) {
                 this.form.controls.countryCode.setErrors({ required: true });
+                return false;
+            }
+            return true;
+        }
+        if (this.form.controls.type.value === 'user_agent') {
+            if (!this.form.controls.userAgent.value.trim()) {
+                this.form.controls.userAgent.setErrors({ required: true });
+                return false;
+            }
+            return true;
+        }
+        if (this.form.controls.type.value === 'path') {
+            if (!this.form.controls.path.value.trim()) {
+                this.form.controls.path.setErrors({ required: true });
                 return false;
             }
             return true;

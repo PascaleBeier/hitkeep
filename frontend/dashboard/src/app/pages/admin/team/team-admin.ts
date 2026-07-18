@@ -67,6 +67,7 @@ export class TeamAdminPage {
                 badge: ssoLocked ? 'BUSINESS' : undefined
             },
             { label: this.transloco.translate('admin.team.tabs.apiClients'), route: 'api-clients', link: '/admin/team/api-clients', visible: this.canManageSettings() },
+            { label: this.transloco.translate('admin.team.tabs.exclusions'), route: 'exclusions', link: '/admin/team/exclusions', visible: this.canManageSettings() },
             {
                 label: this.transloco.translate('admin.team.tabs.customDomains'),
                 route: 'custom-domains',

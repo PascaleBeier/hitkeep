@@ -10,4 +10,6 @@ export class SettingsCard {
     readonly title = input.required<string>();
     readonly subtitle = input('');
     readonly icon = input('');
+    readonly titleId = input('');
+    readonly tone = input<'default' | 'danger'>('default');
 }

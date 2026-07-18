@@ -589,7 +589,7 @@ func TestDeveloperMCPContract(t *testing.T) {
 	}
 	want := []string{
 		"hk_build_start", "hk_dev_logs", "hk_dev_start", "hk_dev_status", "hk_dev_stop", "hk_doctor", "hk_logs_tail", "hk_qa_plan", "hk_qa_start",
-		"hk_run_cancel", "hk_run_list", "hk_run_status", "hk_setup_start", "hk_smoke_start", "hk_workspace_handoff", "hk_workspace_list", "hk_workspace_status",
+		"hk_run_cancel", "hk_run_list", "hk_run_status", "hk_screenshot", "hk_setup_start", "hk_smoke_start", "hk_workspace_handoff", "hk_workspace_list", "hk_workspace_status",
 	}
 	var got []string
 	for _, tool := range listed.Tools {
@@ -649,6 +649,23 @@ func TestDeveloperMCPContract(t *testing.T) {
 	}
 	if len(prompts.Prompts) != 0 {
 		t.Fatalf("developer MCP unexpectedly exposes prompts: %d", len(prompts.Prompts))
+	}
+}
+
+func TestScreenshotResultUsesFileResourceLinks(t *testing.T) {
+	result := &mcp.CallToolResult{}
+	appendScreenshotResourceLinks(result, devtool.ScreenshotResult{Artifacts: []devtool.ScreenshotArtifact{{
+		Route: "/admin/status", Path: "/tmp/hitkeep visual/status.png", MIMEType: "image/png", Width: 1440, Height: 1024, Bytes: 42,
+	}}})
+	if len(result.Content) != 1 {
+		t.Fatalf("screenshot content count = %d, want 1", len(result.Content))
+	}
+	link, ok := result.Content[0].(*mcp.ResourceLink)
+	if !ok {
+		t.Fatalf("screenshot content type = %T, want resource link", result.Content[0])
+	}
+	if link.URI != "file:///tmp/hitkeep%20visual/status.png" || link.MIMEType != "image/png" || link.Size == nil || *link.Size != 42 {
+		t.Fatalf("unexpected screenshot resource link: %+v", link)
 	}
 }
 

@@ -24,6 +24,7 @@ Use the typed MCP surface rather than translating an action into shell yourself:
 
 - Diagnose with `hk_doctor`; start setup with `hk_setup_start` only when needed.
 - Start, inspect, observe, or stop the workspace development session with `hk_dev_start`, `hk_dev_status`, `hk_dev_logs`, and `hk_dev_stop`.
+- Capture local visual-QA routes with `hk_screenshot`; batch related routes so they share one browser session, and use returned resource links rather than copying images into the repository.
 - Start deterministic builds and image smokes with `hk_build_start` and `hk_smoke_start`.
 - Observe or cancel finite returned runs with `hk_run_status`, `hk_logs_tail`, and `hk_run_cancel`.
 
@@ -49,7 +50,7 @@ Development start and stop stream progress and component logging until they reac
 2. Diagnose prerequisites. Development is container-only. Run setup only when diagnostics or missing container dependencies require it; warm worktrees should reuse images and caches.
 3. Read the variant resource/catalog once per task before development, build, or smoke work. Refresh it after pulling or rebuilding `hk`.
 4. Start development only when the task needs services. Use the catalog-provided variant and returned URLs; never infer tags, defaults, or ports.
-5. Treat development as a workspace session with cursor-addressed events. Treat setup, QA, build, and smoke results as finite run handles. Preserve the workspace ID and the appropriate cursor or run ID, and read bounded logs only when progress or failure requires it.
+5. Treat development as a workspace session with cursor-addressed events. Treat screenshot capture as a bounded synchronous operation against that active local session. Treat setup, QA, build, and smoke results as finite run handles. Preserve the workspace ID and the appropriate cursor or run ID, and read bounded logs only when progress or failure requires it.
 6. Build and smoke through typed actions. Cloud images are local-only; never add or invoke publication behavior.
 7. For Go or frontend source, discover formatter scopes and migration modes from the structured command catalog. Checks are non-mutating; rewriting is a deliberate confined CLI action and is not exposed through MCP. Review changed paths before continuing.
 8. Finish through `$hitkeep-qa`. Report the profile, stable gate IDs, result, and concrete blockers without copying successful logs.

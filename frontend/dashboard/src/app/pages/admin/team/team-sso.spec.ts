@@ -81,7 +81,7 @@ describe('TeamSSOPage', () => {
         expect(docsLink?.href).toBe('https://hitkeep.com/guides/security/single-sign-on/');
         expect(docsLink?.target).toBe('_blank');
         expect(docsLink?.rel).toContain('noopener');
-        expect(docsLink.closest('.sso-header-actions')).toBeTruthy();
+        expect(docsLink.closest('[settings-card-header]')).toBeTruthy();
     });
 
     it('uses PrimeNG status, textarea, and toggle surfaces', () => {

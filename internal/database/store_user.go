@@ -234,8 +234,6 @@ type userFKReference struct {
 
 var userFKReferences = []userFKReference{
 	{table: "api_clients", column: "user_id", query: "UPDATE api_clients SET user_id = ? WHERE user_id = ?"},
-	{table: "instance_exclusions", column: "created_by", query: "UPDATE instance_exclusions SET created_by = ? WHERE created_by = ?"},
-	{table: "instance_country_exclusions", column: "created_by", query: "UPDATE instance_country_exclusions SET created_by = ? WHERE created_by = ?"},
 	{table: "instance_roles", column: "granted_by", query: "UPDATE instance_roles SET granted_by = ? WHERE granted_by = ?"},
 	{table: "instance_roles", column: "user_id", query: "UPDATE instance_roles SET user_id = ? WHERE user_id = ?"},
 	{table: "remember_me_tokens", column: "user_id", query: "UPDATE remember_me_tokens SET user_id = ? WHERE user_id = ?"},
@@ -243,8 +241,6 @@ var userFKReferences = []userFKReference{
 	{table: "social_identities", column: "user_id", query: "UPDATE social_identities SET user_id = ? WHERE user_id = ?"},
 	{table: "pending_social_confirmations", column: "target_user_id", query: "UPDATE pending_social_confirmations SET target_user_id = ? WHERE target_user_id = ?"},
 	{table: "sso_identities", column: "user_id", query: "UPDATE sso_identities SET user_id = ? WHERE user_id = ?"},
-	{table: "site_exclusions", column: "created_by", query: "UPDATE site_exclusions SET created_by = ? WHERE created_by = ?"},
-	{table: "site_country_exclusions", column: "created_by", query: "UPDATE site_country_exclusions SET created_by = ? WHERE created_by = ?"},
 	{table: "site_members", column: "added_by", query: "UPDATE site_members SET added_by = ? WHERE added_by = ?"},
 	{table: "site_members", column: "user_id", query: "UPDATE site_members SET user_id = ? WHERE user_id = ?"},
 	{table: "sites", column: "user_id", query: "UPDATE sites SET user_id = ? WHERE user_id = ?"},
@@ -252,6 +248,7 @@ var userFKReferences = []userFKReference{
 	{table: "team_invites", column: "invited_user_id", query: "UPDATE team_invites SET invited_user_id = ? WHERE invited_user_id = ?"},
 	{table: "tenant_members", column: "added_by", query: "UPDATE tenant_members SET added_by = ? WHERE added_by = ?"},
 	{table: "tenant_members", column: "user_id", query: "UPDATE tenant_members SET user_id = ? WHERE user_id = ?"},
+	{table: "traffic_exclusions", column: "created_by", query: "UPDATE traffic_exclusions SET created_by = ? WHERE created_by = ?"},
 	{table: "user_passkeys", column: "user_id", query: "UPDATE user_passkeys SET user_id = ? WHERE user_id = ?"},
 	{table: "user_preferences", column: "user_id", query: "UPDATE user_preferences SET user_id = ? WHERE user_id = ?"},
 	{table: "user_totp_factors", column: "user_id", query: "UPDATE user_totp_factors SET user_id = ? WHERE user_id = ?"},
@@ -465,6 +462,9 @@ func cleanupUserRows(ctx context.Context, tx *sql.Tx, userID uuid.UUID) error {
 
 	if err := execIfTableExists("share_links", "UPDATE share_links SET created_by = NULL WHERE created_by = ?", userID); err != nil {
 		return fmt.Errorf("could not null share link owner: %w", err)
+	}
+	if err := execIfTableExists("traffic_exclusions", "UPDATE traffic_exclusions SET created_by = NULL WHERE created_by = ?", userID); err != nil {
+		return fmt.Errorf("could not null traffic exclusion created_by: %w", err)
 	}
 	if err := execIfTableExists("team_invites", "UPDATE team_invites SET created_by = NULL WHERE created_by = ?", userID); err != nil {
 		return fmt.Errorf("could not null team invite created_by: %w", err)

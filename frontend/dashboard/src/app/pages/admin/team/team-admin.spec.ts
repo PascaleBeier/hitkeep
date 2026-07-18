@@ -144,6 +144,7 @@ describe('TeamAdminPage', () => {
 
     it('shows dedicated infrastructure, branding, and danger-zone tabs for team admins and owners', () => {
         expect(fixture.nativeElement.textContent).toContain('admin.team.tabs.apiClients');
+        expect(fixture.nativeElement.textContent).toContain('admin.team.tabs.exclusions');
         expect(fixture.nativeElement.textContent).toContain('admin.team.tabs.sso');
         expect(fixture.nativeElement.textContent).toContain('admin.team.tabs.customDomains');
         expect(fixture.nativeElement.textContent).toContain('admin.team.tabs.branding');
@@ -153,7 +154,7 @@ describe('TeamAdminPage', () => {
 
     it('renders danger zone as the last visible team tab with danger styling', () => {
         const tabs = component['tabs']();
-        expect(tabs.map((tab) => tab.route)).toEqual(['overview', 'members', 'sso', 'api-clients', 'custom-domains', 'branding', 'activity', 'danger-zone']);
+        expect(tabs.map((tab) => tab.route)).toEqual(['overview', 'members', 'sso', 'api-clients', 'exclusions', 'custom-domains', 'branding', 'activity', 'danger-zone']);
         const dangerTab = tabs[tabs.length - 1];
         expect(dangerTab?.route).toBe('danger-zone');
         expect(dangerTab?.icon).toBe('pi pi-exclamation-triangle');
@@ -240,6 +241,7 @@ describe('TeamAdminPage', () => {
         fixture.detectChanges();
 
         expect(fixture.nativeElement.textContent).not.toContain('admin.team.tabs.apiClients');
+        expect(fixture.nativeElement.textContent).not.toContain('admin.team.tabs.exclusions');
         expect(fixture.nativeElement.textContent).not.toContain('admin.team.tabs.sso');
         expect(fixture.nativeElement.textContent).not.toContain('admin.team.tabs.customDomains');
         expect(fixture.nativeElement.textContent).not.toContain('admin.team.tabs.activity');

@@ -2,12 +2,16 @@ package database
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
 )
+
+const unifyTrafficExclusionsMigrationFile = "2026_07_18_000000_unify_traffic_exclusions.sql"
 
 func setupExclusionStore(t *testing.T) (*Store, uuid.UUID, uuid.UUID) {
 	t.Helper()
@@ -221,6 +225,138 @@ func TestCountryExclusionsDeleteThroughSharedDeletionMethods(t *testing.T) {
 	}
 	if !deleted {
 		t.Fatal("expected instance cidr exclusion to be deleted")
+	}
+}
+
+func TestTrafficExclusionMigrationPreservesLegacyRules(t *testing.T) {
+	ctx := context.Background()
+	store := NewStore(filepath.Join(t.TempDir(), "traffic-exclusions-upgrade.db"))
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	if _, err := store.DB().ExecContext(ctx, "CREATE TABLE IF NOT EXISTS migrations (migration VARCHAR PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL)"); err != nil {
+		t.Fatalf("create migrations table: %v", err)
+	}
+	if _, err := store.DB().ExecContext(ctx, "INSERT INTO migrations (migration, applied_at) VALUES (?, ?)", unifyTrafficExclusionsMigrationFile, time.Now().UTC()); err != nil {
+		t.Fatalf("hold back migration: %v", err)
+	}
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("migrate to legacy schema: %v", err)
+	}
+
+	userID, err := store.CreateUser(ctx, "legacy-exclusions@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	site, err := store.CreateSite(ctx, userID, "legacy-exclusions.test")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	legacyIDs := []uuid.UUID{uuid.New(), uuid.New(), uuid.New(), uuid.New()}
+	legacyInserts := []struct {
+		query string
+		args  []any
+	}{
+		{"INSERT INTO instance_exclusions (id, cidr, description, created_at, created_by) VALUES (?, ?, ?, ?, ?)", []any{legacyIDs[0], "203.0.113.4/32", "instance cidr", now, userID}},
+		{"INSERT INTO site_exclusions (id, site_id, cidr, description, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?)", []any{legacyIDs[1], site.ID, "10.0.0.0/8", "site cidr", now, userID}},
+		{"INSERT INTO instance_country_exclusions (id, country_code, description, created_at, created_by) VALUES (?, ?, ?, ?, ?)", []any{legacyIDs[2], "DE", "instance country", now, userID}},
+		{"INSERT INTO site_country_exclusions (id, site_id, country_code, description, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?)", []any{legacyIDs[3], site.ID, "US", "site country", now, userID}},
+	}
+	for _, insert := range legacyInserts {
+		if _, err := store.DB().ExecContext(ctx, insert.query, insert.args...); err != nil {
+			t.Fatalf("insert legacy exclusion: %v", err)
+		}
+	}
+
+	if _, err := store.DB().ExecContext(ctx, "DELETE FROM migrations WHERE migration = ?", unifyTrafficExclusionsMigrationFile); err != nil {
+		t.Fatalf("release migration: %v", err)
+	}
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("apply unified exclusion migration: %v", err)
+	}
+
+	rules, err := store.ListAllTrafficExclusions(ctx)
+	if err != nil {
+		t.Fatalf("list migrated exclusions: %v", err)
+	}
+	if len(rules) != 4 {
+		t.Fatalf("expected four migrated rules, got %d", len(rules))
+	}
+	byID := make(map[uuid.UUID]api.IPExclusion, len(rules))
+	for _, rule := range rules {
+		byID[rule.ID] = rule
+	}
+	for _, id := range legacyIDs {
+		rule, ok := byID[id]
+		if !ok {
+			t.Fatalf("missing migrated rule %s", id)
+		}
+		if rule.CreatedBy == nil || *rule.CreatedBy != userID || !rule.CreatedAt.Equal(now) {
+			t.Fatalf("legacy metadata was not preserved for %s: %#v", id, rule)
+		}
+	}
+
+	for _, legacyTable := range []string{"instance_exclusions", "site_exclusions", "instance_country_exclusions", "site_country_exclusions"} {
+		var count int
+		if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?", legacyTable).Scan(&count); err != nil {
+			t.Fatalf("inspect legacy table %s: %v", legacyTable, err)
+		}
+		if count != 0 {
+			t.Fatalf("expected legacy table %s to be removed", legacyTable)
+		}
+	}
+}
+
+func TestTrafficExclusionScopesTypesAndEffectiveOrdering(t *testing.T) {
+	store, userID, siteID := setupExclusionStore(t)
+	defer store.Close()
+	ctx := context.Background()
+	teamID, err := store.GetSiteTenantID(ctx, siteID)
+	if err != nil {
+		t.Fatalf("resolve site team: %v", err)
+	}
+
+	instanceRule, err := store.CreateInstanceTrafficExclusion(ctx, TrafficExclusionValues{Type: "user_agent", UserAgent: "HealthCheck", Description: "global monitor"}, userID)
+	if err != nil {
+		t.Fatalf("create instance user-agent rule: %v", err)
+	}
+	teamRule, err := store.CreateTeamTrafficExclusion(ctx, teamID, TrafficExclusionValues{Type: "path", Path: "/admin", Description: "team admin area"}, userID)
+	if err != nil {
+		t.Fatalf("create team path rule: %v", err)
+	}
+	siteRule, err := store.CreateSiteTrafficExclusion(ctx, siteID, TrafficExclusionValues{Type: "country", CountryCode: "de", Description: "site country"}, userID)
+	if err != nil {
+		t.Fatalf("create site country rule: %v", err)
+	}
+
+	effective, err := store.ListEffectiveSiteExclusions(ctx, teamID, siteID)
+	if err != nil {
+		t.Fatalf("list effective site exclusions: %v", err)
+	}
+	if len(effective) != 3 {
+		t.Fatalf("expected three effective rules, got %#v", effective)
+	}
+	if effective[0].ID != instanceRule.ID || effective[1].ID != teamRule.ID || effective[2].ID != siteRule.ID {
+		t.Fatalf("unexpected effective scope ordering: %#v", effective)
+	}
+	if !effective[0].Inherited || !effective[1].Inherited || effective[2].Inherited {
+		t.Fatalf("unexpected inherited metadata: %#v", effective)
+	}
+	if effective[0].CreatedBy != nil || effective[1].CreatedBy != nil || effective[2].CreatedBy == nil {
+		t.Fatalf("cross-scope creator metadata was not hidden: %#v", effective)
+	}
+	if effective[1].TeamID == nil || *effective[1].TeamID != teamID || effective[2].SiteID == nil || *effective[2].SiteID != siteID {
+		t.Fatalf("scope owner metadata missing: %#v", effective)
+	}
+
+	if deleted, err := store.DeleteSiteExclusion(ctx, siteID, teamRule.ID); err != nil || deleted {
+		t.Fatalf("child scope deleted inherited team rule: deleted=%v err=%v", deleted, err)
+	}
+	if deleted, err := store.DeleteTeamExclusion(ctx, teamID, teamRule.ID); err != nil || !deleted {
+		t.Fatalf("team owner could not delete team rule: deleted=%v err=%v", deleted, err)
 	}
 }
 

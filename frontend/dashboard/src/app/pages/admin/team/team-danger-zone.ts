@@ -10,6 +10,7 @@ import { MessageModule } from 'primeng/message';
 
 import { DialogShell } from '@components/dialog-shell/dialog-shell';
 import { TEAM_CAPABILITIES } from '@core/access/capabilities';
+import { SettingsCard } from '@features/settings/components/settings-card';
 import { SiteService } from '@features/sites/services/site.service';
 import { AccessService } from '@services/access.service';
 import { PermissionService } from '@services/permission.service';
@@ -19,7 +20,7 @@ type TeamDangerAction = 'leave' | 'archive';
 
 @Component({
     selector: 'app-team-danger-zone',
-    imports: [ButtonModule, DialogShell, FormsModule, InputTextModule, MessageModule, TranslocoPipe],
+    imports: [ButtonModule, DialogShell, FormsModule, InputTextModule, MessageModule, SettingsCard, TranslocoPipe],
     templateUrl: './team-danger-zone.html',
     changeDetection: ChangeDetectionStrategy.OnPush
 })

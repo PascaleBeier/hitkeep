@@ -7,7 +7,7 @@
     }
 
     <app-settings-card [title]="'admin.team.sso.title' | transloco" [subtitle]="'admin.team.sso.description' | transloco" icon="pi pi-shield">
-        <div settings-card-header class="sso-header-actions flex flex-wrap items-center justify-end gap-2 max-sm:w-full max-sm:justify-between">
+        <div settings-card-header class="flex flex-wrap items-center justify-end gap-2 max-sm:w-full max-sm:justify-between">
             <a
                 pButton
                 data-testid="sso-docs-link"
@@ -25,28 +25,28 @@
             <p-tag [severity]="persistedEnabled() ? 'success' : 'secondary'" [value]="(persistedEnabled() ? 'admin.team.sso.status.enabled' : 'admin.team.sso.status.disabled') | transloco" />
         </div>
 
-        <form settings-card-body id="team-sso-form" class="sso-form" (submit)="$event.preventDefault(); saveSettings()" novalidate>
-            <section class="sso-provider" aria-labelledby="sso-provider-title">
+        <form settings-card-body id="team-sso-form" class="grid gap-5" (submit)="$event.preventDefault(); saveSettings()" novalidate>
+            <section class="flex items-center justify-between gap-4" aria-labelledby="sso-provider-title">
                 <div>
-                    <p id="sso-provider-title" class="sso-section-title">{{ "admin.team.sso.provider.title" | transloco }}</p>
-                    <p class="sso-section-hint">{{ "admin.team.sso.provider.description" | transloco }}</p>
+                    <p id="sso-provider-title" class="m-0 text-sm font-semibold text-[var(--p-text-color)]">{{ "admin.team.sso.provider.title" | transloco }}</p>
+                    <p class="mt-1 mb-0 text-xs leading-5 text-[var(--p-text-muted-color)]">{{ "admin.team.sso.provider.description" | transloco }}</p>
                 </div>
                 <p-tag severity="secondary" value="OIDC" />
             </section>
 
-            <div class="sso-field sso-field--full">
-                <label for="sso-callback-url">{{ "admin.team.sso.callbackURL.label" | transloco }}</label>
-                <span class="sso-field-hint">{{ "admin.team.sso.callbackURL.hint" | transloco }}</span>
-                <div class="sso-copy-row">
-                    <input id="sso-callback-url" type="url" pInputText class="w-full" [value]="callbackURL()" readonly />
+            <div class="grid min-w-0 gap-2">
+                <label for="sso-callback-url" class="text-sm font-semibold text-[var(--p-text-color)]">{{ "admin.team.sso.callbackURL.label" | transloco }}</label>
+                <span class="text-xs leading-5 text-[var(--p-text-muted-color)]">{{ "admin.team.sso.callbackURL.hint" | transloco }}</span>
+                <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                    <input id="sso-callback-url" type="url" pInputText class="w-full text-[var(--p-text-muted-color)]" [value]="callbackURL()" readonly />
                     <app-copy-control [value]="callbackURL()" [labelKey]="'admin.team.sso.callbackURL.copy'" />
                 </div>
             </div>
 
-            <div class="sso-fields-grid">
-                <div class="sso-field sso-field--full">
-                    <label for="sso-issuer-url">{{ "admin.team.sso.issuerURL.label" | transloco }}</label>
-                    <span class="sso-field-hint">{{ "admin.team.sso.issuerURL.hint" | transloco }}</span>
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div class="grid min-w-0 gap-2 sm:col-span-2">
+                    <label for="sso-issuer-url" class="text-sm font-semibold text-[var(--p-text-color)]">{{ "admin.team.sso.issuerURL.label" | transloco }}</label>
+                    <span class="text-xs leading-5 text-[var(--p-text-muted-color)]">{{ "admin.team.sso.issuerURL.hint" | transloco }}</span>
                     <input
                         id="sso-issuer-url"
                         type="url"
@@ -63,9 +63,9 @@
                     }
                 </div>
 
-                <div class="sso-field">
-                    <label for="sso-client-id">{{ "admin.team.sso.clientID.label" | transloco }}</label>
-                    <span class="sso-field-hint">{{ "admin.team.sso.clientID.hint" | transloco }}</span>
+                <div class="grid min-w-0 gap-2">
+                    <label for="sso-client-id" class="text-sm font-semibold text-[var(--p-text-color)]">{{ "admin.team.sso.clientID.label" | transloco }}</label>
+                    <span class="text-xs leading-5 text-[var(--p-text-muted-color)]">{{ "admin.team.sso.clientID.hint" | transloco }}</span>
                     <input
                         id="sso-client-id"
                         type="text"
@@ -81,9 +81,9 @@
                     }
                 </div>
 
-                <div class="sso-field">
-                    <label for="sso-client-secret">{{ "admin.team.sso.clientSecret.label" | transloco }}</label>
-                    <span class="sso-field-hint">{{ (clientSecretConfigured() ? "admin.team.sso.clientSecret.configuredHint" : "admin.team.sso.clientSecret.requiredHint") | transloco }}</span>
+                <div class="grid min-w-0 gap-2">
+                    <label for="sso-client-secret" class="text-sm font-semibold text-[var(--p-text-color)]">{{ "admin.team.sso.clientSecret.label" | transloco }}</label>
+                    <span class="text-xs leading-5 text-[var(--p-text-muted-color)]">{{ (clientSecretConfigured() ? "admin.team.sso.clientSecret.configuredHint" : "admin.team.sso.clientSecret.requiredHint") | transloco }}</span>
                     <input
                         id="sso-client-secret"
                         type="password"
@@ -95,9 +95,9 @@
                     />
                 </div>
 
-                <div class="sso-field sso-field--full">
-                    <label for="sso-allowed-domains">{{ "admin.team.sso.allowedDomains.label" | transloco }}</label>
-                    <span class="sso-field-hint">{{ "admin.team.sso.allowedDomains.hint" | transloco }}</span>
+                <div class="grid min-w-0 gap-2 sm:col-span-2">
+                    <label for="sso-allowed-domains" class="text-sm font-semibold text-[var(--p-text-color)]">{{ "admin.team.sso.allowedDomains.label" | transloco }}</label>
+                    <span class="text-xs leading-5 text-[var(--p-text-muted-color)]">{{ "admin.team.sso.allowedDomains.hint" | transloco }}</span>
                     <textarea
                         id="sso-allowed-domains"
                         pTextarea
@@ -117,44 +117,44 @@
                 </div>
             </div>
 
-            <details class="sso-advanced">
-                <summary>{{ "admin.team.sso.claimMapping.title" | transloco }}</summary>
-                <p class="sso-section-hint">{{ "admin.team.sso.claimMapping.description" | transloco }}</p>
-                <div class="sso-fields-grid">
-                    <div class="sso-field">
-                        <label for="sso-email-claim">{{ "admin.team.sso.claimMapping.email" | transloco }}</label>
+            <details class="border-t border-[var(--p-content-border-color)] pt-4">
+                <summary class="cursor-pointer text-sm font-semibold text-[var(--p-text-color)]">{{ "admin.team.sso.claimMapping.title" | transloco }}</summary>
+                <p class="mt-1 mb-3 text-xs leading-5 text-[var(--p-text-muted-color)]">{{ "admin.team.sso.claimMapping.description" | transloco }}</p>
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div class="grid min-w-0 gap-2">
+                        <label for="sso-email-claim" class="text-sm font-semibold text-[var(--p-text-color)]">{{ "admin.team.sso.claimMapping.email" | transloco }}</label>
                         <input id="sso-email-claim" type="text" pInputText [formField]="ssoForm.emailClaim" class="w-full" autocomplete="off" />
                     </div>
-                    <div class="sso-field">
-                        <label for="sso-name-claim">{{ "admin.team.sso.claimMapping.name" | transloco }}</label>
+                    <div class="grid min-w-0 gap-2">
+                        <label for="sso-name-claim" class="text-sm font-semibold text-[var(--p-text-color)]">{{ "admin.team.sso.claimMapping.name" | transloco }}</label>
                         <input id="sso-name-claim" type="text" pInputText [formField]="ssoForm.displayNameClaim" class="w-full" autocomplete="off" />
                     </div>
                 </div>
             </details>
 
-            <aside class="sso-security-note">
-                <i class="pi pi-lock" aria-hidden="true"></i>
-                <p>{{ "admin.team.sso.securityNote" | transloco }}</p>
+            <aside class="grid grid-cols-[auto_1fr] items-start gap-3 rounded-md border border-[var(--p-content-border-color)] bg-[var(--p-content-hover-background)] p-3 text-[var(--p-text-muted-color)]">
+                <i class="pi pi-lock mt-0.5 text-[var(--p-primary-color)]" aria-hidden="true"></i>
+                <p class="m-0 text-xs leading-5">{{ "admin.team.sso.securityNote" | transloco }}</p>
             </aside>
 
-            <div class="sso-enable-row">
-                <span>
-                    <label id="sso-auto-provision-label" class="sso-enable-title" for="sso-auto-provision">{{ "admin.team.sso.autoProvision.label" | transloco }}</label>
-                    <span class="sso-field-hint">{{ "admin.team.sso.autoProvision.hint" | transloco }}</span>
+            <div class="flex items-center justify-between gap-4 border-t border-[var(--p-content-border-color)] pt-4">
+                <span class="grid min-w-0 gap-1">
+                    <label id="sso-auto-provision-label" class="text-sm font-semibold text-[var(--p-text-color)]" for="sso-auto-provision">{{ "admin.team.sso.autoProvision.label" | transloco }}</label>
+                    <span class="text-xs leading-5 text-[var(--p-text-muted-color)]">{{ "admin.team.sso.autoProvision.hint" | transloco }}</span>
                 </span>
                 <p-toggleswitch inputId="sso-auto-provision" ariaLabelledBy="sso-auto-provision-label" [ngModel]="model().autoProvision" [ngModelOptions]="{ standalone: true }" (ngModelChange)="setAutoProvision($event)" />
             </div>
 
-            <div class="sso-enable-row">
-                <span>
-                    <label id="sso-enabled-label" class="sso-enable-title" for="sso-enabled">{{ "admin.team.sso.enable.label" | transloco }}</label>
-                    <span class="sso-field-hint">{{ "admin.team.sso.enable.hint" | transloco }}</span>
+            <div class="flex items-center justify-between gap-4 border-t border-[var(--p-content-border-color)] pt-4">
+                <span class="grid min-w-0 gap-1">
+                    <label id="sso-enabled-label" class="text-sm font-semibold text-[var(--p-text-color)]" for="sso-enabled">{{ "admin.team.sso.enable.label" | transloco }}</label>
+                    <span class="text-xs leading-5 text-[var(--p-text-muted-color)]">{{ "admin.team.sso.enable.hint" | transloco }}</span>
                 </span>
                 <p-toggleswitch inputId="sso-enabled" ariaLabelledBy="sso-enabled-label" [ngModel]="model().enabled" [ngModelOptions]="{ standalone: true }" (ngModelChange)="setEnabled($event)" />
             </div>
         </form>
 
-        <div settings-card-footer class="sso-actions">
+        <div settings-card-footer class="flex justify-end gap-3 max-sm:grid max-sm:gap-2">
             <p-button
                 [label]="'admin.team.sso.testAction' | transloco"
                 icon="pi pi-bolt"

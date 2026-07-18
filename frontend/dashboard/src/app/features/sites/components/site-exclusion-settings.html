@@ -15,7 +15,7 @@
                 <p-select inputId="site-exclusion-type" [options]="ruleTypeOptions()" formControlName="type" optionLabel="label" optionValue="value" appendTo="body" class="w-full" (onChange)="onRuleTypeChange()" />
             </div>
 
-            @if (form.controls.type.value === "country") {
+            @switch (form.controls.type.value) { @case ("country") {
             <div class="site-settings-field">
                 <label for="site-exclusion-country">{{ "sites.exclusions.countryLabel" | transloco }}</label>
                 <p-select
@@ -52,7 +52,23 @@
                 <small class="site-exclusions__error-text">{{ "sites.exclusions.errors.invalidCountry" | transloco }}</small>
                 }
             </div>
-            } @else {
+            } @case ("user_agent") {
+            <div class="site-settings-field">
+                <label for="site-exclusion-user-agent">{{ "sites.exclusions.userAgentLabel" | transloco }}</label>
+                <input id="site-exclusion-user-agent" pInputText formControlName="userAgent" [placeholder]="'sites.exclusions.userAgentPlaceholder' | transloco" />
+                @if (form.controls.userAgent.touched && form.controls.userAgent.invalid) {
+                <small class="site-exclusions__error-text">{{ "sites.exclusions.errors.invalidUserAgent" | transloco }}</small>
+                }
+            </div>
+            } @case ("path") {
+            <div class="site-settings-field">
+                <label for="site-exclusion-path">{{ "sites.exclusions.pathLabel" | transloco }}</label>
+                <input id="site-exclusion-path" pInputText formControlName="path" [placeholder]="'sites.exclusions.pathPlaceholder' | transloco" />
+                @if (form.controls.path.touched && form.controls.path.invalid) {
+                <small class="site-exclusions__error-text">{{ "sites.exclusions.errors.invalidPath" | transloco }}</small>
+                }
+            </div>
+            } @default {
             <div class="site-settings-field">
                 <label for="site-exclusion-cidr">{{ "sites.exclusions.cidrLabel" | transloco }}</label>
                 <input id="site-exclusion-cidr" pInputText formControlName="cidr" [placeholder]="'sites.exclusions.cidrPlaceholder' | transloco" />
@@ -60,7 +76,7 @@
                 <small class="site-exclusions__error-text">{{ "sites.exclusions.errors.invalidCidr" | transloco }}</small>
                 }
             </div>
-            }
+            } }
 
             <div class="site-settings-field">
                 <label for="site-exclusion-description">{{ "sites.exclusions.descriptionLabel" | transloco }}</label>
@@ -112,7 +128,9 @@
             <p-button styleClass="site-settings-action-btn" [label]="'sites.exclusions.addAction' | transloco" icon="pi pi-plus" [type]="'button'" (onClick)="openAddDialog()" />
         </header>
         <div class="site-settings-card__body">
-            @if (actionStatus(); as status) {
+            @if (hasInheritedExclusions()) {
+            <p class="site-exclusions__inherited-hint">{{ "sites.exclusions.inheritedHint" | transloco }}</p>
+            } @if (actionStatus(); as status) {
             <p-message [severity]="status.severity" styleClass="w-full" [text]="actionStatusMessage()" />
             } @if (isLoading()) {
             <div class="site-settings-empty">
@@ -138,9 +156,7 @@
                     <p-table
                         #siteExclusionsTable
                         [value]="exclusionRows()"
-                        [globalFilterFields]="['type_label', 'value_label', 'country_name', 'search_value', 'description', 'created_at']"
-                        [sortField]="'created_at'"
-                        [sortOrder]="-1"
+                        [globalFilterFields]="['type_label', 'scope_label', 'value_label', 'country_name', 'search_value', 'description', 'created_at']"
                         [paginator]="true"
                         [rows]="10"
                         [rowsPerPageOptions]="[10, 25, 50]"
@@ -172,7 +188,12 @@
                         </ng-template>
                         <ng-template pTemplate="body" let-rule>
                             <tr>
-                                <td>{{ rule.type_label }}</td>
+                                <td>
+                                    <div class="site-exclusions__type-cell">
+                                        <span>{{ rule.type_label }}</span>
+                                        <span class="site-settings-chip">{{ rule.scope_label }}</span>
+                                    </div>
+                                </td>
                                 <td>
                                     @if (rule.type === "country" && rule.country_code) {
                                     <span class="inline-flex items-center gap-2">
@@ -180,13 +201,17 @@
                                         <span>{{ rule.value_label }}</span>
                                     </span>
                                     } @else {
-                                    <code>{{ rule.cidr }}</code>
+                                    <code>{{ rule.value_label }}</code>
                                     }
                                 </td>
                                 <td>{{ rule.description || "-" }}</td>
                                 <td><app-relative-date-time [value]="rule.created_at" /></td>
                                 <td>
+                                    @if (rule.inherited) {
+                                    <span class="text-xs text-[var(--p-text-muted-color)]">{{ "sites.exclusions.inheritedReadOnly" | transloco }}</span>
+                                    } @else {
                                     <app-table-row-actions [items]="ruleActions(rule)" [loading]="deletingRuleID() === rule.id" />
+                                    }
                                 </td>
                             </tr>
                         </ng-template>

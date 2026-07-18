@@ -1399,12 +1399,16 @@
       "savePolicy": "Save policy"
     },
     "exclusions": {
-      "description": "Exclude internal, monitoring, bot, or country traffic so it never reaches analytics storage.",
+      "description": "Exclude internal, monitoring, bot, country, user-agent, or path traffic so it never reaches analytics storage.",
       "typeLabel": "Rule type",
       "cidrLabel": "IP or CIDR",
       "cidrPlaceholder": "203.0.113.5 or 192.168.0.0/24",
       "countryLabel": "Country",
       "countryPlaceholder": "Select a country",
+      "userAgentLabel": "User-agent contains",
+      "userAgentPlaceholder": "monitoring-bot",
+      "pathLabel": "Path",
+      "pathPlaceholder": "/admin",
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "Office VPN, synthetic monitor, etc.",
       "addAction": "Add exclusion",
@@ -1415,9 +1419,18 @@
       "suggestionsHint": "Copy this CIDR and paste it into the IP or CIDR field.",
       "currentIpLoading": "Resolving your IP...",
       "currentIpUnavailable": "Unable to resolve your current IP.",
+      "inheritedHint": "Instance and team filters also apply to this site. Inherited filters are read-only here.",
+      "inheritedReadOnly": "Inherited",
       "ruleTypes": {
         "cidr": "IP/CIDR",
-        "country": "Country"
+        "country": "Country",
+        "userAgent": "User agent",
+        "path": "Path"
+      },
+      "scopes": {
+        "instance": "Instance",
+        "team": "Team",
+        "site": "Site"
       },
       "columns": {
         "type": "Type",
@@ -1428,6 +1441,8 @@
       "errors": {
         "invalidCidr": "Enter a valid IP or CIDR value.",
         "invalidCountry": "Select a country.",
+        "invalidUserAgent": "Enter a user-agent substring.",
+        "invalidPath": "Enter a path.",
         "descriptionTooLong": "Description must be 255 characters or fewer.",
         "loadFailed": "Failed to load exclusions.",
         "createFailed": "Failed to create exclusion.",
@@ -1592,12 +1607,16 @@
     },
     "exclusions": {
       "title": "Global traffic filters",
-      "description": "Drop traffic from selected networks or countries for every site in this HitKeep instance.",
+      "description": "Drop traffic from selected networks, countries, user agents, or paths for every site in this HitKeep instance.",
       "typeLabel": "Rule type",
       "cidrLabel": "IP or CIDR",
       "cidrPlaceholder": "203.0.113.5 or 192.168.0.0/24",
       "countryLabel": "Country",
       "countryPlaceholder": "Select a country",
+      "userAgentLabel": "User-agent contains",
+      "userAgentPlaceholder": "monitoring-bot",
+      "pathLabel": "Path",
+      "pathPlaceholder": "/admin",
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "Uptime monitor, office range, etc.",
       "addAction": "Add global filter",
@@ -1610,7 +1629,9 @@
       "currentIpUnavailable": "Unable to resolve your current IP.",
       "ruleTypes": {
         "cidr": "IP/CIDR",
-        "country": "Country"
+        "country": "Country",
+        "userAgent": "User agent",
+        "path": "Path"
       },
       "columns": {
         "type": "Type",
@@ -1621,6 +1642,8 @@
       "errors": {
         "invalidCidr": "Enter a valid IP or CIDR value.",
         "invalidCountry": "Select a country.",
+        "invalidUserAgent": "Enter a user-agent substring.",
+        "invalidPath": "Enter a path.",
         "descriptionTooLong": "Description must be 255 characters or fewer.",
         "loadFailed": "Failed to load global filters.",
         "createFailed": "Failed to create global filter.",
@@ -1674,10 +1697,66 @@
         "members": "Members",
         "sso": "SSO",
         "apiClients": "API Clients",
+        "exclusions": "Traffic Filters",
         "customDomains": "Custom Domains",
         "branding": "Branding",
         "dangerZone": "Danger Zone",
         "activity": "Activity"
+      },
+      "exclusions": {
+        "title": "Team traffic filters",
+        "description": "Drop matching traffic for every site currently owned by this team.",
+        "typeLabel": "Rule type",
+        "cidrLabel": "IP or CIDR",
+        "cidrPlaceholder": "203.0.113.5 or 192.168.0.0/24",
+        "countryLabel": "Country",
+        "countryPlaceholder": "Select a country",
+        "userAgentLabel": "User-agent contains",
+        "userAgentPlaceholder": "monitoring-bot",
+        "pathLabel": "Path",
+        "pathPlaceholder": "/admin",
+        "descriptionLabel": "Description",
+        "descriptionPlaceholder": "Office VPN, synthetic monitor, etc.",
+        "addAction": "Add team filter",
+        "loading": "Loading team filters...",
+        "empty": "No traffic filters configured for this team.",
+        "confirmDelete": "Delete team filter {{value}}?",
+        "suggestionsTitle": "Your current IP",
+        "currentIpLoading": "Resolving your IP...",
+        "currentIpUnavailable": "Unable to resolve your current IP.",
+        "inheritedHint": "Instance filters also apply to this team. Inherited filters are read-only here.",
+        "inheritedReadOnly": "Inherited",
+        "ruleTypes": {
+          "cidr": "IP/CIDR",
+          "country": "Country",
+          "userAgent": "User agent",
+          "path": "Path"
+        },
+        "scopes": {
+          "instance": "Instance",
+          "team": "Team",
+          "site": "Site"
+        },
+        "columns": {
+          "type": "Type",
+          "value": "Value",
+          "description": "Description",
+          "created": "Created"
+        },
+        "errors": {
+          "invalidCidr": "Enter a valid IP or CIDR value.",
+          "invalidCountry": "Select a country.",
+          "invalidUserAgent": "Enter a user-agent substring.",
+          "invalidPath": "Enter a path.",
+          "descriptionTooLong": "Description must be 255 characters or fewer.",
+          "loadFailed": "Failed to load team filters.",
+          "createFailed": "Failed to create team filter.",
+          "deleteFailed": "Failed to delete team filter."
+        },
+        "status": {
+          "createSuccess": "Created team filter {{value}}.",
+          "deleteSuccess": "Deleted team filter {{value}}."
+        }
       },
       "overview": {
         "breadcrumb": "Team Overview",
@@ -2181,7 +2260,9 @@
         "hitsPerSecond": "Hits/sec"
       },
       "database": {
-        "title": "Database resilience",
+        "title": "Database",
+        "recoverySection": "Recovery and checkpoints",
+        "filesSection": "Database files",
         "autoRecovery": "Automatic index recovery",
         "automaticWalRecovery": "Automatic WAL bypass",
         "checkpointInterval": "Checkpoint interval",
@@ -2414,13 +2495,18 @@
           "unknown": "Unknown"
         },
         "healthDescription": "Readiness signals for the current node and embedded data store.",
+        "searchConsoleDescription": "Credential, worker, and sync readiness across connected teams.",
+        "aiDescription": "Provider readiness and local request and token budgets.",
         "overviewDescription": "Build, version, public URL, and runtime mode.",
         "featuresDescription": "Operator feature switches and runtime capabilities reported by the instance.",
+        "mcpDescription": "Read-only assistant access, endpoint, and documentation tools.",
         "storageDescription": "DuckDB files, tenant storage, and disk availability.",
+        "databaseDescription": "DuckDB recovery, checkpoints, files, memory, and disk availability.",
         "ingestDescription": "Recent tracking volume and blocked traffic across the instance.",
         "cachesDescription": "LRU cache occupancy for auth, API clients, and rate limiting.",
         "backupsDescription": "Configured backup target, retention, and recent execution health.",
         "spamDescription": "Spam filter cache freshness and manual refresh control.",
+        "importCleanupDescription": "Staged import retention, pending cleanup, and last-run results.",
         "mailDescription": "Redacted mail transport configuration and a safe test-send action.",
         "usersDescription": "Instance roles, recovery actions, and administrator access.",
         "sitesDescription": "All sites visible to instance administrators.",

@@ -369,6 +369,11 @@ export const routes: Routes = [
                                 data: titleData('admin.team.tabs.apiClients', 'team')
                             },
                             {
+                                path: 'exclusions',
+                                loadComponent: () => import('@pages/admin/team/team-exclusions').then((m) => m.TeamExclusionsPage),
+                                data: titleData('admin.team.tabs.exclusions', 'team')
+                            },
+                            {
                                 path: 'sso',
                                 loadComponent: () => import('@pages/admin/team/team-sso').then((m) => m.TeamSSOPage),
                                 data: titleData('admin.team.tabs.sso', 'team')

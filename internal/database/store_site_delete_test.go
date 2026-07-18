@@ -114,7 +114,7 @@ func TestResetSiteStatsClearsMeasuredDataOnly(t *testing.T) {
 	for _, table := range []string{
 		"site_members",
 		"site_tenants",
-		"site_exclusions",
+		"traffic_exclusions",
 		"share_links",
 		"goals",
 		"funnels",
@@ -211,7 +211,7 @@ func seedSiteStatsResetData(t *testing.T, ctx context.Context, store *Store, sit
 	exec("INSERT INTO site_tenants (site_id, tenant_id, created_at) VALUES (?, ?, ?)", siteID, tenantID, now)
 	exec("INSERT INTO tenant_members (tenant_id, user_id, role, added_at, added_by) VALUES (?, ?, ?, ?, ?)", tenantID, userID, "owner", now, userID)
 	exec("UPDATE sites SET data_retention_days = ? WHERE id = ?", 90, siteID)
-	exec("INSERT INTO site_exclusions (id, site_id, cidr, description, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?)", uuid.New(), siteID, "203.0.113.0/24", "office", now, userID)
+	exec("INSERT INTO traffic_exclusions (id, scope, site_id, rule_type, cidr, description, created_at, created_by) VALUES (?, 'site', ?, 'cidr', ?, ?, ?, ?)", uuid.New(), siteID, "203.0.113.0/24", "office", now, userID)
 
 	exec("INSERT INTO api_clients (id, user_id, name, secret_hash, instance_role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)", apiClientID, userID, "Site API", "secret-hash", "user", now, now)
 	exec("INSERT INTO api_client_site_roles (id, api_client_id, site_id, role, created_at) VALUES (?, ?, ?, ?, ?)", uuid.New(), apiClientID, siteID, "viewer", now)

@@ -2,71 +2,22 @@
     display: block;
 }
 
-/* Page-specific semantics on top of the global .hk-card chrome. */
-:host ::ng-deep .plan-comparison__card--current.p-card {
-    opacity: 0.7;
-}
-
 :host ::ng-deep .plan-comparison__card--recommended.p-card {
     border-color: var(--p-primary-color);
-    box-shadow:
-        0 0 0 1px var(--p-primary-color),
-        0 10px 28px -14px color-mix(in srgb, var(--p-primary-color) 55%, transparent);
-    background: linear-gradient(180deg, color-mix(in srgb, var(--p-primary-color) 5%, var(--p-content-background)) 0%, var(--p-content-background) 40%);
 }
 
-.plan-comparison__billing {
-    display: inline-flex;
-    align-self: flex-start;
-    gap: 0.25rem;
-    padding: 0.25rem;
-    border: 1px solid var(--p-content-border-color);
-    border-radius: 0.75rem;
-    background: var(--p-content-background);
+:host ::ng-deep .team-overview__usage-progress.p-progressbar {
+    height: 0.5rem;
 }
 
-.plan-comparison__billing button {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    min-height: 2.25rem;
-    padding: 0.45rem 0.75rem;
-    border: 0;
-    border-radius: 0.55rem;
-    background: transparent;
-    color: var(--p-text-muted-color);
-    font: inherit;
-    font-size: 0.875rem;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.plan-comparison__billing button[aria-pressed="true"] {
-    background: color-mix(in srgb, var(--p-primary-color) 12%, var(--p-content-background));
-    color: var(--p-text-color);
-}
-
-.plan-comparison__billing button span {
-    color: var(--p-primary-color);
-    font-size: 0.75rem;
-}
-
-:host ::ng-deep .team-overview__usage-card .p-progressbar {
-    height: 0.65rem;
-}
-
-:host ::ng-deep .team-overview__usage-card--healthy .p-progressbar-value {
+:host ::ng-deep .team-overview__usage-progress--healthy .p-progressbar-value {
     background: var(--p-primary-color);
 }
 
-:host ::ng-deep .team-overview__usage-card--warning .p-progressbar-value {
+:host ::ng-deep .team-overview__usage-progress--warning .p-progressbar-value {
     background: var(--p-amber-500);
 }
 
-:host ::ng-deep .team-overview__usage-card--critical .p-progressbar-value {
+:host ::ng-deep .team-overview__usage-progress--critical .p-progressbar-value {
     background: var(--p-red-600);
-}
-
-:host ::ng-deep .team-overview__usage-card--unlimited.p-card {
-    border-color: color-mix(in srgb, var(--p-primary-color) 20%, transparent);
 }

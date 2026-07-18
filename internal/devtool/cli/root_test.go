@@ -184,7 +184,7 @@ func TestCommandCatalogCoversHumanAndAgentConveniences(t *testing.T) {
 		}
 	}
 	for _, expected := range []string{
-		"hk catalog commands", "hk dev restart", "hk dev logs", "hk fmt", "hk qa plan", "hk qa start", "hk run logs", "hk workspace handoff",
+		"hk catalog commands", "hk dev restart", "hk dev logs", "hk fmt", "hk qa plan", "hk qa start", "hk run logs", "hk screenshot", "hk workspace handoff",
 	} {
 		if !paths[expected] {
 			t.Errorf("command catalog is missing %s", expected)

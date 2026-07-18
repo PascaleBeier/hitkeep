@@ -71,6 +71,17 @@ The full command includes a subdirectory smoke run with `HITKEEP_E2E_PUBLIC_PATH
 
 `./hk setup` prepares the pinned browser dependency on a fresh machine.
 
+## Visual QA screenshots
+
+Capture related local routes in one fast browser session:
+
+```bash
+./hk screenshot /dashboard /admin/status
+./hk screenshot /admin/status --viewport mobile --theme dark
+```
+
+The command uses the active seeded development session and returns PNG paths in workspace-managed state. Use `--selector` for a single component or `--full-page` for a complete route; neither mode writes tracked dashboard or README assets.
+
 ## Additional Resources
 
 For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.

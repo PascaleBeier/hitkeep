@@ -18,6 +18,7 @@ import (
 
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
+	"hitkeep/internal/blocking"
 	"hitkeep/internal/database"
 	"hitkeep/internal/ipmeta"
 	"hitkeep/internal/server/shared"
@@ -110,6 +111,7 @@ type webVitalPayload struct {
 	MetricID       string    `json:"mid"`
 	SessionID      uuid.UUID `json:"sid"`
 	PageID         uuid.UUID `json:"pid"`
+	UserAgent      *string   `json:"ua"`
 	TrackerSource  string    `json:"tsrc"`
 	TrackerVersion string    `json:"tv"`
 }
@@ -146,7 +148,12 @@ func (h *handler) handleServerPageviewIngestLeader() http.HandlerFunc {
 		}
 
 		countryCodePtr, metadata := geoNetworkFromVisitorIP(ingestCtx.visitorIP, h.ctx.Config.GetTrustedProxyNetworks(), ipmeta.Lookup)
-		if h.ctx.IPFilter != nil && h.ctx.IPFilter.Evaluate(ingestCtx.site.ID, ingestCtx.visitorIP, stringValue(countryCodePtr)).Blocked {
+		if h.ctx.IPFilter != nil && h.ctx.IPFilter.EvaluateTraffic(ingestCtx.site.ID, blocking.TrafficExclusionContext{
+			IP:          ingestCtx.visitorIP,
+			CountryCode: stringValue(countryCodePtr),
+			UserAgent:   ingestCtx.userAgent,
+			Path:        ingestCtx.path,
+		}).Blocked {
 			h.recordRejection()
 			w.WriteHeader(http.StatusAccepted)
 			return
@@ -247,7 +254,12 @@ func (h *handler) handleServerEventIngestLeader() http.HandlerFunc {
 		}
 
 		countryCode := countryCodeFromVisitorIP(ingestCtx.visitorIP, h.ctx.Config.GetTrustedProxyNetworks())
-		if h.ctx.IPFilter != nil && h.ctx.IPFilter.Evaluate(ingestCtx.site.ID, ingestCtx.visitorIP, countryCode).Blocked {
+		if h.ctx.IPFilter != nil && h.ctx.IPFilter.EvaluateTraffic(ingestCtx.site.ID, blocking.TrafficExclusionContext{
+			IP:          ingestCtx.visitorIP,
+			CountryCode: countryCode,
+			UserAgent:   ingestCtx.userAgent,
+			Path:        ingestCtx.path,
+		}).Blocked {
 			h.recordRejection()
 			w.WriteHeader(http.StatusAccepted)
 			return
@@ -554,6 +566,16 @@ func (h *handler) handleIngestLeader(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Bad request body", http.StatusBadRequest)
 		return
 	}
+	if h.ctx.IPFilter != nil && h.ctx.IPFilter.EvaluateTraffic(site.ID, blocking.TrafficExclusionContext{
+		IP:          userIP,
+		CountryCode: countryCode,
+		UserAgent:   trafficUserAgent(payload.UserAgent, r.UserAgent()),
+		Path:        payload.Path,
+	}).Blocked {
+		h.recordRejection()
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
 
 	if h.ctx.SpamFilter != nil {
 		decision := h.ctx.SpamFilter.Evaluate(site.Domain, userIP, payload.Referrer)
@@ -719,6 +741,16 @@ func (h *handler) handleIngestWebVitalsLeader(w http.ResponseWriter, r *http.Req
 		http.Error(w, "Bad request body", http.StatusBadRequest)
 		return
 	}
+	if h.ctx.IPFilter != nil && h.ctx.IPFilter.EvaluateTraffic(site.ID, blocking.TrafficExclusionContext{
+		IP:          userIP,
+		CountryCode: countryCode,
+		UserAgent:   trafficUserAgent(payload.UserAgent, r.UserAgent()),
+		Path:        payload.Path,
+	}).Blocked {
+		h.recordRejection()
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
 
 	vital, validationMessage, ok := webVitalFromPayload(site.ID, payload, time.Now().UTC())
 	if !ok {
@@ -864,6 +896,8 @@ func (h *handler) handleIngestEventLeader(w http.ResponseWriter, r *http.Request
 		Properties     map[string]any `json:"p"`
 		Referrer       *string        `json:"r"`
 		SessionID      uuid.UUID      `json:"sid"`
+		Path           string         `json:"path"`
+		UserAgent      *string        `json:"ua"`
 		TrackerSource  string         `json:"tsrc"`
 		TrackerVersion string         `json:"tv"`
 	}
@@ -872,6 +906,16 @@ func (h *handler) handleIngestEventLeader(w http.ResponseWriter, r *http.Request
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		h.recordRejection()
 		http.Error(w, "Bad request body", http.StatusBadRequest)
+		return
+	}
+	if h.ctx.IPFilter != nil && h.ctx.IPFilter.EvaluateTraffic(site.ID, blocking.TrafficExclusionContext{
+		IP:          userIP,
+		CountryCode: countryCode,
+		UserAgent:   trafficUserAgent(payload.UserAgent, r.UserAgent()),
+		Path:        payload.Path,
+	}).Blocked {
+		h.recordRejection()
+		w.WriteHeader(http.StatusAccepted)
 		return
 	}
 
@@ -908,6 +952,15 @@ func (h *handler) handleIngestEventLeader(w http.ResponseWriter, r *http.Request
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func trafficUserAgent(payloadUserAgent *string, fallback string) string {
+	if payloadUserAgent != nil {
+		if userAgent := strings.TrimSpace(*payloadUserAgent); userAgent != "" {
+			return userAgent
+		}
+	}
+	return strings.TrimSpace(fallback)
 }
 
 func (h *handler) handleIngestEventFollower(w http.ResponseWriter, r *http.Request) {

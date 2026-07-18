@@ -59,12 +59,16 @@ describe('AdminGlobalExclusionSettings', () => {
                                     cidrPlaceholder: '203.0.113.10/32',
                                     countryLabel: 'Country',
                                     countryPlaceholder: 'Select a country',
+                                    userAgentLabel: 'User-agent contains',
+                                    userAgentPlaceholder: 'monitoring-bot',
+                                    pathLabel: 'Path',
+                                    pathPlaceholder: '/admin',
                                     descriptionLabel: 'Description',
                                     descriptionPlaceholder: 'Office',
                                     loading: 'Loading',
                                     empty: 'No filters',
                                     confirmDelete: 'Delete {{value}}?',
-                                    ruleTypes: { cidr: 'IP/CIDR', country: 'Country' },
+                                    ruleTypes: { cidr: 'IP/CIDR', country: 'Country', userAgent: 'User agent', path: 'Path' },
                                     columns: {
                                         type: 'Type',
                                         value: 'Value',
@@ -78,6 +82,8 @@ describe('AdminGlobalExclusionSettings', () => {
                                     errors: {
                                         invalidCidr: 'Invalid CIDR',
                                         invalidCountry: 'Select a country',
+                                        invalidUserAgent: 'Enter a user agent',
+                                        invalidPath: 'Enter a path',
                                         descriptionTooLong: 'Too long',
                                         loadFailed: 'Load failed',
                                         createFailed: 'Create failed',
@@ -123,14 +129,14 @@ describe('AdminGlobalExclusionSettings', () => {
     });
 
     it('shows the exclusions table surface first and opens add form in a dialog', async () => {
-        expect(fixture.nativeElement.querySelector('.admin-exclusions__form')).toBeNull();
+        expect(fixture.nativeElement.querySelector('.site-settings-dialog-form')).toBeNull();
         expect(fixture.nativeElement.textContent).toContain('Add filter');
 
         clickButton('Add filter');
         fixture.detectChanges();
         await fixture.whenStable();
 
-        expect(document.body.querySelector('.admin-exclusions__form')).not.toBeNull();
+        expect(document.body.querySelector('.site-settings-dialog-form')).not.toBeNull();
         expect(document.body.textContent).toContain('CIDR');
     });
 
@@ -152,6 +158,8 @@ describe('AdminGlobalExclusionSettings', () => {
             type: 'cidr',
             cidr: '203.0.113.10/32',
             country_code: undefined,
+            user_agent: undefined,
+            path: undefined,
             description: 'Office'
         });
         expect(fixture.componentInstance['isAddDialogVisible']()).toBe(false);
@@ -235,6 +243,8 @@ describe('AdminGlobalExclusionSettings', () => {
             type: 'country',
             cidr: undefined,
             country_code: 'DE',
+            user_agent: undefined,
+            path: undefined,
             description: 'Germany'
         });
         expect(fixture.nativeElement.textContent).toContain('Germany (DE)');
