@@ -16,6 +16,7 @@ func TestReleaseArtifactChecksumsAndPublicImageBoundary(t *testing.T) {
 	for _, name := range []string{
 		"hitkeep-cloud-linux-amd64", "hitkeep-cloud-linux-arm64",
 		"hitkeep-linux-amd64", "hitkeep-linux-arm64",
+		"hitkeep-configuration.json",
 	} {
 		if err := os.WriteFile(filepath.Join(root, name), []byte(name+"\n"), 0o755); err != nil {
 			t.Fatal(err)
@@ -25,8 +26,8 @@ func TestReleaseArtifactChecksumsAndPublicImageBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if generated.Count != 5 {
-		t.Fatalf("generated artifact count = %d, want 5", generated.Count)
+	if generated.Count != 6 {
+		t.Fatalf("generated artifact count = %d, want 6", generated.Count)
 	}
 	if _, err := app.VerifyReleaseArtifacts(); err != nil {
 		t.Fatal(err)

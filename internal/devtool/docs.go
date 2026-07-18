@@ -2,18 +2,38 @@ package devtool
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
+
+	runtimeconfig "hitkeep/internal/config"
 )
+
+var releaseVersionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
+var configurationEnvironmentPattern = regexp.MustCompile(`\bHITKEEP_[A-Z0-9_]+\b`)
+var composeConfigurationDefaultPattern = regexp.MustCompile(`\$\{(HITKEEP_[A-Z0-9_]+):-([^}]*)\}`)
+
+type releasePleaseConfig struct {
+	Packages map[string]struct {
+		ExtraFiles []releasePleaseExtraFile `json:"extra-files"`
+	} `json:"packages"`
+}
+
+type releasePleaseExtraFile struct {
+	Type     string `json:"type"`
+	Path     string `json:"path"`
+	JSONPath string `json:"jsonpath"`
+}
 
 func ValidateDevelopmentDocs(root string) error {
 	files := map[string][]string{
-		"README.md":                    {"./hk setup", "./hk dev --seed", "./hk dev --detach", "./hk screenshot", "./hk catalog commands --output json", "Compose stack", "./hk qa pr", "CONTRIBUTING.md"},
+		"README.md":                    {"./hk setup", "./hk dev --seed", "./hk dev --detach", "./hk screenshot", "./hk catalog commands --output json", "./hk catalog configuration --output json", "Compose stack", "./hk qa pr", "CONTRIBUTING.md"},
 		"CONTRIBUTING.md":              {"./hk help", "./hk catalog --output json", "./hk catalog commands --output json", "agent_command", "model-agnostic", "central MCP", "configured or enabled", "explicit user approval", "client roots", "macOS or Linux", "AMD64 or ARM64", "executable POSIX launcher", "./hk mcp manifest", "./hk mcp serve", "./hk skills check", "./hk screenshot", "hk_screenshot", "./hk fmt", "./hk fmt --scope frontend", "./hk fix check", "./hk cache status", "./hk run list", "hk.dev/v2", "hk_dev_status", "next_cursor", "AGENTS.md", "source repository is private"},
-		"AGENTS.md":                    {"Use `./hk` as the workflow source of truth", "callable central developer MCP", "configured or enabled", "explicit user approval", "container-only session", "$hitkeep-development", "$hitkeep-workspace", "$hitkeep-qa", "private `PascaleBeier/hitkeep-docs`"},
+		"AGENTS.md":                    {"Use `./hk` as the workflow source of truth", "callable central developer MCP", "configured or enabled", "explicit user approval", "./hk catalog configuration --output json", "container-only session", "$hitkeep-development", "$hitkeep-workspace", "$hitkeep-qa", "private `PascaleBeier/hitkeep-docs`"},
 		"frontend/dashboard/README.md": {"./hk dev --seed", "./hk screenshot", "./hk fmt --scope frontend", "./hk qa changed --gate frontend-unit", "./hk qa changed --gate frontend-e2e"},
 		".agents/skills/hitkeep-development/references/delivery.md": {
 			"private source for the public documentation website",
@@ -38,7 +58,257 @@ func ValidateDevelopmentDocs(root string) error {
 	if err := validateCIWorkflowContract(root); err != nil {
 		return err
 	}
+	if err := validateReleaseMetadata(root); err != nil {
+		return err
+	}
+	if err := validateConfigurationDocumentation(root); err != nil {
+		return err
+	}
 	return ValidateSkillLayout(root)
+}
+
+func validateConfigurationDocumentation(root string) error {
+	catalog := runtimeconfig.Catalog()
+	known := make(map[string]runtimeconfig.ConfigurationSetting, len(catalog.Settings))
+	for _, setting := range catalog.Settings {
+		if setting.Environment != "" {
+			known[setting.Environment] = setting
+		}
+	}
+	nonRuntime := map[string]bool{
+		"HITKEEP_GO_BUILD_TAGS": true,
+		"HITKEEP_HOSTNAME":      true,
+		"HITKEEP_SEED_DAYS":     true,
+		"HITKEEP_SEED_DOMAIN":   true,
+		"HITKEEP_SEED_EMAIL":    true,
+		"HITKEEP_SEED_PASSWORD": true,
+		"HITKEEP_VARIANT":       true,
+		"HITKEEP_VERSION":       true,
+	}
+
+	paths := []string{
+		filepath.Join(root, "README.md"),
+		filepath.Join(root, "Dockerfile"),
+	}
+	composePaths, err := filepath.Glob(filepath.Join(root, "compose*.yaml"))
+	if err != nil {
+		return err
+	}
+	paths = append(paths, composePaths...)
+	for _, directory := range []string{"charts", "examples"} {
+		err = filepath.WalkDir(filepath.Join(root, directory), func(path string, entry os.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if entry.IsDir() {
+				return nil
+			}
+			extension := strings.ToLower(filepath.Ext(path))
+			if slices.Contains([]string{".md", ".yaml", ".yml"}, extension) || entry.Name() == "Dockerfile" || entry.Name() == "Caddyfile.custom-tracking" {
+				paths = append(paths, path)
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+	slices.Sort(paths)
+	paths = slices.Compact(paths)
+	for _, path := range paths {
+		raw, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+		relative, _ := filepath.Rel(root, path)
+		checkDefaults := filepath.Base(path) != "compose.dev.yaml"
+		if err := validateConfigurationDocument(filepath.ToSlash(relative), string(raw), known, nonRuntime, checkDefaults); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateConfigurationDocument(path, contents string, known map[string]runtimeconfig.ConfigurationSetting, nonRuntime map[string]bool, checkDefaults bool) error {
+	for lineNumber, line := range strings.Split(contents, "\n") {
+		for _, environment := range configurationEnvironmentPattern.FindAllString(line, -1) {
+			if _, ok := known[environment]; !ok && !nonRuntime[environment] {
+				return fmt.Errorf("%s:%d documents unknown HitKeep configuration variable %s", path, lineNumber+1, environment)
+			}
+		}
+		if !checkDefaults {
+			continue
+		}
+		for _, match := range composeConfigurationDefaultPattern.FindAllStringSubmatch(line, -1) {
+			setting, ok := known[match[1]]
+			if !ok || match[2] == setting.Default {
+				continue
+			}
+			if !strings.Contains(line, "config-default-override:") {
+				return fmt.Errorf("%s:%d gives %s a Compose default %q; runtime default is %q (add config-default-override: with a reason when intentional)", path, lineNumber+1, match[1], match[2], setting.Default)
+			}
+		}
+	}
+	return nil
+}
+
+func validateReleaseMetadata(root string) error {
+	manifest := map[string]string{}
+	if err := readJSONFile(filepath.Join(root, ".release-please-manifest.json"), &manifest); err != nil {
+		return err
+	}
+	version := strings.TrimSpace(manifest["."])
+	if !releaseVersionPattern.MatchString(version) {
+		return fmt.Errorf(".release-please-manifest.json has invalid root version %q", version)
+	}
+
+	var registry struct {
+		Version string `json:"version"`
+	}
+	if err := readJSONFile(filepath.Join(root, "server.json"), &registry); err != nil {
+		return err
+	}
+	if err := requireReleaseVersion("server.json $.version", registry.Version, version); err != nil {
+		return err
+	}
+
+	var dashboardPackage struct {
+		Version string `json:"version"`
+	}
+	if err := readJSONFile(filepath.Join(root, "frontend", "dashboard", "package.json"), &dashboardPackage); err != nil {
+		return err
+	}
+	if err := requireReleaseVersion("frontend/dashboard/package.json $.version", dashboardPackage.Version, version); err != nil {
+		return err
+	}
+
+	var dashboardLock struct {
+		Version  string `json:"version"`
+		Packages map[string]struct {
+			Version string `json:"version"`
+		} `json:"packages"`
+	}
+	if err := readJSONFile(filepath.Join(root, "frontend", "dashboard", "package-lock.json"), &dashboardLock); err != nil {
+		return err
+	}
+	if err := requireReleaseVersion("frontend/dashboard/package-lock.json $.version", dashboardLock.Version, version); err != nil {
+		return err
+	}
+	rootPackage, ok := dashboardLock.Packages[""]
+	if !ok {
+		return fmt.Errorf("frontend/dashboard/package-lock.json is missing packages['']")
+	}
+	if err := requireReleaseVersion("frontend/dashboard/package-lock.json $.packages[''].version", rootPackage.Version, version); err != nil {
+		return err
+	}
+
+	chartPath := filepath.Join(root, "charts", "hitkeep", "Chart.yaml")
+	chartRaw, err := os.ReadFile(chartPath)
+	if err != nil {
+		return err
+	}
+	chartVersions := map[string]string{}
+	for line := range strings.SplitSeq(string(chartRaw), "\n") {
+		key, value, found := strings.Cut(line, ":")
+		if !found {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		if key == "version" || key == "appVersion" {
+			chartVersions[key] = strings.Trim(strings.TrimSpace(value), `"'`)
+		}
+	}
+	for _, key := range []string{"version", "appVersion"} {
+		if err := requireReleaseVersion("charts/hitkeep/Chart.yaml $."+key, chartVersions[key], version); err != nil {
+			return err
+		}
+	}
+
+	chartREADMEPath := filepath.Join(root, "charts", "hitkeep", "README.md")
+	chartREADME, err := os.ReadFile(chartREADMEPath)
+	if err != nil {
+		return err
+	}
+	annotatedLines := 0
+	for lineNumber, line := range strings.Split(string(chartREADME), "\n") {
+		if !strings.Contains(line, "x-release-please-version") {
+			continue
+		}
+		annotatedLines++
+		if !strings.Contains(line, version) {
+			return fmt.Errorf("charts/hitkeep/README.md:%d release annotation does not contain %s", lineNumber+1, version)
+		}
+	}
+	if annotatedLines == 0 {
+		return fmt.Errorf("charts/hitkeep/README.md has no x-release-please-version annotations")
+	}
+
+	var config releasePleaseConfig
+	if err := readJSONFile(filepath.Join(root, "release-please-config.json"), &config); err != nil {
+		return err
+	}
+	rootPackageConfig, ok := config.Packages["."]
+	if !ok {
+		return fmt.Errorf("release-please-config.json is missing packages['.']")
+	}
+	expectedFiles := []releasePleaseExtraFile{
+		{Type: "json", Path: "server.json", JSONPath: "$.version"},
+		{Type: "json", Path: "frontend/dashboard/package.json", JSONPath: "$.version"},
+		{Type: "json", Path: "frontend/dashboard/package-lock.json", JSONPath: "$.version"},
+		{Type: "json", Path: "frontend/dashboard/package-lock.json", JSONPath: "$['packages']['']['version']"},
+		{Type: "yaml", Path: "charts/hitkeep/Chart.yaml", JSONPath: "$.version"},
+		{Type: "yaml", Path: "charts/hitkeep/Chart.yaml", JSONPath: "$.appVersion"},
+		{Type: "generic", Path: "charts/hitkeep/README.md"},
+	}
+	for _, expected := range expectedFiles {
+		if !slices.Contains(rootPackageConfig.ExtraFiles, expected) {
+			return fmt.Errorf("release-please-config.json does not manage %s %s", expected.Path, expected.JSONPath)
+		}
+	}
+	workflowContracts := map[string][]string{
+		".github/workflows/pipeline.yml": {
+			"./hk catalog configuration --output json",
+			"hitkeep-configuration.json",
+			"release_tag: $tag",
+			"release_version: $version",
+		},
+		".github/workflows/release.yml": {
+			"sync-docs-release:",
+			"needs.build-release.result == 'success'",
+			"sync-hitkeep-release.yml",
+		},
+	}
+	for name, fragments := range workflowContracts {
+		raw, err := os.ReadFile(filepath.Join(root, name))
+		if err != nil {
+			return err
+		}
+		for _, fragment := range fragments {
+			if !bytes.Contains(raw, []byte(fragment)) {
+				return fmt.Errorf("%s is missing release metadata contract %q", name, fragment)
+			}
+		}
+	}
+	return nil
+}
+
+func readJSONFile(path string, target any) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(raw, target); err != nil {
+		return fmt.Errorf("decode %s: %w", path, err)
+	}
+	return nil
+}
+
+func requireReleaseVersion(source, actual, expected string) error {
+	actual = strings.TrimSpace(actual)
+	if actual != expected {
+		return fmt.Errorf("%s has version %q; want %q", source, actual, expected)
+	}
+	return nil
 }
 
 func validateCIWorkflowContract(root string) error {

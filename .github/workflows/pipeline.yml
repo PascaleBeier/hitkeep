@@ -211,6 +211,18 @@ jobs:
           go-version-file: go.mod
           cache: false
 
+      - name: Generate runtime configuration catalog
+        env:
+          RELEASE_TAG_NAME: ${{ inputs.release_tag_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_version="${RELEASE_TAG_NAME#v}"
+          ./hk catalog configuration --output json \
+            | jq --arg tag "$RELEASE_TAG_NAME" --arg version "$release_version" \
+              '.data + {release_tag: $tag, release_version: $version}' \
+            > hitkeep-configuration.json
+
       - name: Generate and verify release checksums
         run: |
           ./hk ci release-checksums
