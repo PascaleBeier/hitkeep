@@ -32,10 +32,10 @@ type CIArtifactResult struct {
 
 func (a *App) BuildDashboardArchive(ctx context.Context, writer io.Writer) (CIArtifactResult, error) {
 	packageManager := requiredPackageManagerVersion(a.workspace.Root)
-	if err := a.runCommand(ctx, writer, commandSpec{Args: []string{"npx", "--yes", "npm@" + packageManager, "ci", "--no-audit", "--no-fund"}, Dir: "frontend/dashboard"}); err != nil {
+	if err := a.runCommand(ctx, writer, commandSpec{Args: exactNPMCommand(packageManager, "ci", "--no-audit", "--no-fund"), Dir: "frontend/dashboard"}); err != nil {
 		return CIArtifactResult{}, err
 	}
-	if err := a.runCommand(ctx, writer, commandSpec{Args: []string{"npm", "run", "build:prod"}, Dir: "frontend/dashboard"}); err != nil {
+	if err := a.runCommand(ctx, writer, commandSpec{Args: exactNPMCommand(packageManager, "run", "build:prod"), Dir: "frontend/dashboard"}); err != nil {
 		return CIArtifactResult{}, err
 	}
 	source := filepath.Join(a.workspace.Root, "frontend", "dashboard", "dist", "dashboard", "browser")
@@ -45,6 +45,12 @@ func (a *App) BuildDashboardArchive(ctx context.Context, writer io.Writer) (CIAr
 		return CIArtifactResult{}, err
 	}
 	return CIArtifactResult{Artifacts: []string{archivePath}, Count: count, Bytes: size}, nil
+}
+
+func exactNPMCommand(version string, arguments ...string) []string {
+	command := make([]string, 0, 3+len(arguments))
+	command = append(command, "npx", "--yes", "npm@"+version)
+	return append(command, arguments...)
 }
 
 func (a *App) RestoreDashboardArchive(archivePath string) (CIArtifactResult, error) {

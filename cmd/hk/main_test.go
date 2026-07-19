@@ -44,10 +44,10 @@ func TestDetachedCLIActionOutlivesLauncher(t *testing.T) {
 	for name, body := range map[string]string{
 		"go.mod":                               "module example.test/hk\n\ngo 1.26.5\n",
 		"CONTRIBUTING.md":                      "# Contributing\n",
-		"frontend/dashboard/package.json":      "{}\n",
+		"frontend/dashboard/package.json":      "{\"packageManager\":\"npm@12.0.1\"}\n",
 		"frontend/dashboard/package-lock.json": "{}\n",
 		"frontend/dashboard/.npmrc":            "legacy-peer-deps=true\n",
-		"frontend/dashboard/.nvmrc":            "24.15.0\n",
+		"frontend/dashboard/.nvmrc":            "24.18.0\n",
 	} {
 		path := filepath.Join(workspace, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -64,8 +64,8 @@ func TestDetachedCLIActionOutlivesLauncher(t *testing.T) {
 	for name, script := range map[string]string{
 		"docker": "#!/bin/sh\necho 1.0.0\nexit 0\n",
 		"go":     "#!/bin/sh\nif [ \"${1:-}\" = version ]; then echo 'go version go1.26.5 test'; fi\nexit 0\n",
-		"npm":    "#!/bin/sh\nif [ \"${1:-}\" = --version ]; then echo '11.14.1'; exit 0; fi\nmkdir -p node_modules\nexit 0\n",
-		"node":   "#!/bin/sh\necho v24.15.0\n",
+		"npm":    "#!/bin/sh\nif [ \"${1:-}\" = --version ]; then echo '12.0.1'; exit 0; fi\nmkdir -p node_modules\nexit 0\n",
+		"node":   "#!/bin/sh\necho v24.18.0\n",
 		"npx":    "#!/bin/sh\nmkdir -p node_modules\nexit 0\n",
 	} {
 		if err := os.WriteFile(filepath.Join(fakeBin, name), []byte(script), 0o755); err != nil {
@@ -230,10 +230,10 @@ func TestMCPStdioActionRunLifecycle(t *testing.T) {
 	for name, body := range map[string]string{
 		"go.mod":                               "module example.test/hk\n\ngo 1.26.5\n",
 		"CONTRIBUTING.md":                      "# Contributing\n",
-		"frontend/dashboard/package.json":      "{}\n",
+		"frontend/dashboard/package.json":      "{\"packageManager\":\"npm@12.0.1\"}\n",
 		"frontend/dashboard/package-lock.json": "{}\n",
 		"frontend/dashboard/.npmrc":            "legacy-peer-deps=true\n",
-		"frontend/dashboard/.nvmrc":            "24.15.0\n",
+		"frontend/dashboard/.nvmrc":            "24.18.0\n",
 	} {
 		path := filepath.Join(workspace, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -251,7 +251,7 @@ func TestMCPStdioActionRunLifecycle(t *testing.T) {
 	goScript := "#!/bin/sh\nif [ \"${1:-}\" = version ]; then echo 'go version go1.26.5 test'; exit 0; fi\nif [ -f \"" + slowFile + "\" ]; then sleep 30; fi\nexit 0\n"
 	dockerScript := "#!/bin/sh\ncase \"$*\" in *version*) echo 1.0.0; exit 0;; esac\nif [ -f \"" + slowFile + "\" ]; then sleep 30; fi\nexit 0\n"
 	for name, script := range map[string]string{
-		"docker": dockerScript, "go": goScript, "npm": "#!/bin/sh\nif [ \"${1:-}\" = --version ]; then echo '11.14.1'; exit 0; fi\nmkdir -p node_modules\nexit 0\n", "node": "#!/bin/sh\necho v24.15.0\n", "npx": "#!/bin/sh\nmkdir -p node_modules\nexit 0\n",
+		"docker": dockerScript, "go": goScript, "npm": "#!/bin/sh\nif [ \"${1:-}\" = --version ]; then echo '12.0.1'; exit 0; fi\nmkdir -p node_modules\nexit 0\n", "node": "#!/bin/sh\necho v24.18.0\n", "npx": "#!/bin/sh\nmkdir -p node_modules\nexit 0\n",
 	} {
 		if err := os.WriteFile(filepath.Join(fakeBin, name), []byte(script), 0o755); err != nil {
 			t.Fatal(err)

@@ -3,10 +3,50 @@ package devtool
 import (
 	"context"
 	"io"
+	"os"
 	"path/filepath"
 	"slices"
 	"testing"
 )
+
+func TestToolchainConfigUsesCanonicalVersionFiles(t *testing.T) {
+	root := initTestRepository(t)
+	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	dashboard := filepath.Join(root, "frontend", "dashboard")
+	if err := os.MkdirAll(dashboard, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{
+		"go.mod":                          "module example.test\n\ngo 1.26.5\n",
+		"frontend/dashboard/.nvmrc":       "24.18.0\n",
+		"frontend/dashboard/package.json": `{"packageManager":"npm@12.0.1"}`,
+	} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	app, err := NewApp(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config, err := app.ToolchainConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.Go != "1.26.5" || config.Node != "24.18.0" || config.NPM != "12.0.1" {
+		t.Fatalf("unexpected toolchain: %+v", config)
+	}
+}
+
+func TestFrontendAuditGateIsCanonicalStaticCheck(t *testing.T) {
+	gate, err := GateByID("frontend-audit")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gate.CIGroup != "frontend-static" || !slices.Equal(gate.Command, []string{"npm", "audit", "--audit-level=high", "--no-fund"}) {
+		t.Fatalf("unexpected frontend audit gate: %+v", gate)
+	}
+}
 
 func TestReleaseBuildRejectsUnboundedInputs(t *testing.T) {
 	root := initTestRepository(t)

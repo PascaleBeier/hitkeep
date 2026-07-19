@@ -3,8 +3,16 @@ package devtool
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
+
+func TestExactNPMCommandPinsEveryInvocation(t *testing.T) {
+	want := []string{"npx", "--yes", "npm@12.0.1", "run", "build:prod"}
+	if got := exactNPMCommand("12.0.1", "run", "build:prod"); !slices.Equal(got, want) {
+		t.Fatalf("exact npm command = %v, want %v", got, want)
+	}
+}
 
 func TestReleaseArtifactChecksumsAndPublicImageBoundary(t *testing.T) {
 	root := initTestRepository(t)

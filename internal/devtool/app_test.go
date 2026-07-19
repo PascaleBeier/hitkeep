@@ -19,10 +19,10 @@ func TestDoctorRequiresDockerComposeForDevelopment(t *testing.T) {
 	if err := os.MkdirAll(dashboard, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dashboard, ".nvmrc"), []byte("24.15.0\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dashboard, ".nvmrc"), []byte("24.18.0\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dashboard, "package.json"), []byte(`{"packageManager":"npm@11.14.1"}`), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dashboard, "package.json"), []byte(`{"packageManager":"npm@12.0.1"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	app, err := NewApp(root)
@@ -33,8 +33,8 @@ func TestDoctorRequiresDockerComposeForDevelopment(t *testing.T) {
 	commands := map[string]string{
 		"git":  "git version 2.50.0",
 		"go":   "go version go1.26.5 test/arch",
-		"node": "v24.15.0",
-		"npm":  "11.14.1",
+		"node": "v24.18.0",
+		"npm":  "12.0.1",
 		"cc":   "cc 1.0",
 	}
 	for name, output := range commands {

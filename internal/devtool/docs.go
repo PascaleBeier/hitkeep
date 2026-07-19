@@ -335,8 +335,23 @@ func validateCIWorkflowContract(root string) error {
 		if readErr != nil {
 			return readErr
 		}
+		if bytes.Contains(raw, []byte("actions/setup-node@")) {
+			return fmt.Errorf(".github/workflows/%s bypasses the canonical Node and npm setup action", entry.Name())
+		}
+		if bytes.Contains(raw, []byte("npm ")) && !bytes.Contains(raw, []byte("./.github/actions/setup-node-npm")) {
+			return fmt.Errorf(".github/workflows/%s runs npm without the canonical Node and npm setup action", entry.Name())
+		}
 		workflows = append(workflows, raw...)
 		workflows = append(workflows, '\n')
+	}
+	action, err := os.ReadFile(filepath.Join(root, ".github", "actions", "setup-node-npm", "action.yml"))
+	if err != nil {
+		return err
+	}
+	for _, fragment := range []string{"frontend/dashboard/.nvmrc", "frontend/dashboard/package-lock.json", "./hk ci toolchain --output json", "npm install --global"} {
+		if !bytes.Contains(action, []byte(fragment)) {
+			return fmt.Errorf("canonical Node and npm setup action is missing %q", fragment)
+		}
 	}
 	for group, gateIDs := range groups {
 		if !bytes.Contains(workflows, []byte("--group "+group)) {

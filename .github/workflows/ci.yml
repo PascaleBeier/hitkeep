@@ -8,8 +8,6 @@ on:
       - .release-please-manifest.json
       - CHANGELOG.md
       - server.json
-      - frontend/dashboard/package.json
-      - frontend/dashboard/package-lock.json
       - charts/hitkeep/Chart.yaml
       - charts/hitkeep/README.md
   pull_request:
@@ -108,10 +106,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      - name: Setup Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version-file: frontend/dashboard/.nvmrc
+      - uses: ./.github/actions/setup-node-npm
       - name: Run canonical MCP contract gates
         run: |
           gates="$(./hk ci qa-matrix --profile pr --group production-mcp --output json | jq -r '.data.gate_ids | join(",")')"
@@ -129,12 +124,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - name: Setup Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version-file: frontend/dashboard/.nvmrc
-          cache: npm
-          cache-dependency-path: frontend/dashboard/package-lock.json
+      - uses: ./.github/actions/setup-node-npm
       - name: Install dependencies
         working-directory: frontend/dashboard
         run: npm ci --no-audit --no-fund
@@ -155,12 +145,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - name: Setup Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version-file: frontend/dashboard/.nvmrc
-          cache: npm
-          cache-dependency-path: frontend/dashboard/package-lock.json
+      - uses: ./.github/actions/setup-node-npm
       - name: Restore Playwright browser cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -189,12 +174,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      - name: Setup Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version-file: frontend/dashboard/.nvmrc
-          cache: npm
-          cache-dependency-path: frontend/dashboard/package-lock.json
+      - uses: ./.github/actions/setup-node-npm
       - name: Restore Playwright browser cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:

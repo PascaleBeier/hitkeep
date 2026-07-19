@@ -2,7 +2,7 @@
     "name": "@hitkeep/dashboard",
     "license": "MIT",
     "version": "2.12.0",
-    "packageManager": "npm@11.14.1",
+    "packageManager": "npm@12.0.1",
     "scripts": {
         "ng": "ng",
         "start": "ng serve",
@@ -22,19 +22,19 @@
     },
     "private": true,
     "dependencies": {
-        "@angular/animations": "^22.0.5",
+        "@angular/animations": "^22.0.7",
         "@angular/cdk": "~22.0.4",
-        "@angular/common": "^22.0.5",
-        "@angular/compiler": "^22.0.5",
-        "@angular/core": "^22.0.5",
-        "@angular/forms": "^22.0.5",
-        "@angular/platform-browser": "^22.0.5",
-        "@angular/router": "^22.0.5",
+        "@angular/common": "^22.0.7",
+        "@angular/compiler": "^22.0.7",
+        "@angular/core": "^22.0.7",
+        "@angular/forms": "^22.0.7",
+        "@angular/platform-browser": "^22.0.7",
+        "@angular/router": "^22.0.7",
         "@fontsource-variable/lexend": "^5.2.11",
         "@jsverse/transloco-locale": "^8.4.0",
         "@primeuix/themes": "^2.0.3",
-        "@scalar/api-reference": "^1.62.5",
-        "@tailwindcss/postcss": "^4.3.2",
+        "@scalar/api-reference": "^1.62.9",
+        "@tailwindcss/postcss": "^4.3.3",
         "circle-flags": "^2.8.3",
         "echarts": "^6.1.0",
         "ng-number-flow": "0.2.0",
@@ -44,16 +44,16 @@
         "primeng": "^21.1.9",
         "qr-code-styling": "^1.9.2",
         "rxjs": "~7.8.2",
-        "tailwindcss": "^4.3.2",
+        "tailwindcss": "^4.3.3",
         "tailwindcss-primeui": "^0.6.1",
         "tslib": "^2.8.1",
         "web-vitals": "^5.3.0"
     },
     "devDependencies": {
-        "@angular-eslint/builder": "^22.0.0",
-        "@angular/build": "^22.0.5",
-        "@angular/cli": "^22.0.5",
-        "@angular/compiler-cli": "^22.0.5",
+        "@angular-eslint/builder": "^22.1.0",
+        "@angular/build": "^22.0.7",
+        "@angular/cli": "^22.0.7",
+        "@angular/compiler-cli": "^22.0.7",
         "@eslint/js": "^10.0.1",
         "@jsverse/transloco": "^8.4.0",
         "@jsverse/transloco-optimize": "^8.4.0",
@@ -61,22 +61,53 @@
         "@types/jasmine": "~6.0.0",
         "@vitest/browser-playwright": "^4.1.10",
         "@vitest/coverage-v8": "^4.1.10",
-        "angular-eslint": "22.0.0",
-        "baseline-browser-mapping": "^2.10.42",
-        "eslint": "^10.6.0",
+        "angular-eslint": "22.1.0",
+        "baseline-browser-mapping": "^2.10.43",
+        "eslint": "^10.7.0",
+        "esbuild": "0.28.1",
         "jasmine-core": "~6.3.0",
         "jsdom": "^29.1.1",
-        "oxfmt": "^0.58.0",
+        "oxfmt": "^0.59.0",
         "playwright": "^1.61.1",
-        "postcss": "^8.5.16",
+        "postcss": "^8.5.19",
         "typescript": "~6.0.3",
-        "typescript-eslint": "8.63.0",
+        "typescript-eslint": "8.64.0",
         "vitest": "^4.1.10"
     },
     "engines": {
-        "node": "24"
+        "node": "24.18.0",
+        "npm": "12.0.1"
+    },
+    "devEngines": {
+        "runtime": {
+            "name": "node",
+            "version": "24.18.0",
+            "onFail": "error"
+        },
+        "packageManager": {
+            "name": "npm",
+            "version": "12.0.1",
+            "onFail": "error"
+        }
     },
     "overrides": {
         "dompurify": "3.4.2"
+    },
+    "packageExtensions": {
+        "@jsverse/transloco-locale@8.4.0": {
+            "dependencies": {
+                "@jsverse/utils": "1.0.0-beta.5"
+            }
+        }
+    },
+    "allowScripts": {
+        "@parcel/watcher@2.5.6": true,
+        "esbuild@0.27.7": true,
+        "esbuild@0.28.1": true,
+        "fsevents@2.3.2": true,
+        "fsevents@2.3.3": true,
+        "lmdb@3.5.4": true,
+        "msgpackr-extract@3.0.4": true,
+        "vue-demi@0.14.10": true
     }
 }
