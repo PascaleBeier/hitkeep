@@ -348,7 +348,10 @@ func validateCIWorkflowContract(root string) error {
 	if err != nil {
 		return err
 	}
-	for _, fragment := range []string{"frontend/dashboard/.nvmrc", "frontend/dashboard/package-lock.json", "./hk ci toolchain --output json", "npm install --global"} {
+	if bytes.Contains(action, []byte("cache: npm")) {
+		return fmt.Errorf("canonical Node and npm setup action invokes npm through setup-node before installing the canonical npm version")
+	}
+	for _, fragment := range []string{"frontend/dashboard/.nvmrc", "frontend/dashboard/package-lock.json", "package-manager-cache: false", "actions/cache@", "path: ~/.npm", "./hk ci toolchain --output json", "npm install --global"} {
 		if !bytes.Contains(action, []byte(fragment)) {
 			return fmt.Errorf("canonical Node and npm setup action is missing %q", fragment)
 		}
