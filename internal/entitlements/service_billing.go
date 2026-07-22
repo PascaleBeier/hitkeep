@@ -43,17 +43,19 @@ func CloudPlanEntitlements(code string) *Entitlements {
 	switch code {
 	case database.CloudPlanBusiness:
 		return &Entitlements{
-			MaxSitesPerTeam:     50,
-			MaxTeamMembers:      20,
-			MaxRetentionDays:    1095,
-			AllowSSO:            true,
-			AllowCustomBranding: true,
+			MaxSitesPerTeam:               50,
+			MaxTeamMembers:                20,
+			MaxRetentionDays:              1095,
+			AllowSSO:                      true,
+			AllowCustomBranding:           true,
+			AllowExternalReportRecipients: true,
 		}
 	case database.CloudPlanPro:
 		return &Entitlements{
-			MaxSitesPerTeam:  10,
-			MaxTeamMembers:   5,
-			MaxRetentionDays: 365,
+			MaxSitesPerTeam:               10,
+			MaxTeamMembers:                5,
+			MaxRetentionDays:              365,
+			AllowExternalReportRecipients: true,
 		}
 	case database.CloudPlanFree:
 		return &Entitlements{

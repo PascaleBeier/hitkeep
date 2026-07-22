@@ -60,11 +60,19 @@ func (c *Context) SystemStatusResponse(ctx context.Context) (api.SystemStatus, e
 		return api.SystemStatus{}, fmt.Errorf("get user count: %w", err)
 	}
 
+	mailStatus := "unavailable"
+	if c.Mailer != nil {
+		mailStatus = "available"
+	}
 	return api.SystemStatus{
 		NeedsSetup: userCount == 0 && !c.Config.CloudHosted,
 		Version:    c.Config.Version,
 		Cloud:      c.CloudStatus(),
 		AskAI:      c.askAIStatus(ctx),
+		MailDelivery: &api.MailDeliveryStatus{
+			Available: c.Mailer != nil,
+			Status:    mailStatus,
+		},
 	}, nil
 }
 

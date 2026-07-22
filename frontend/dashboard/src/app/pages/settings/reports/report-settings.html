@@ -1,3 +1,5 @@
+<p-confirmdialog />
+
 <div class="flex flex-col w-full">
     <app-page-header>
         <ng-template appPageHeaderLeft>
@@ -6,105 +8,449 @@
                 <p class="text-sm text-[var(--p-text-muted-color)]">{{ "settings.reports.subtitle" | transloco }}</p>
             </div>
         </ng-template>
+        <ng-template appPageHeaderRight>
+            <p-button data-testid="new-report" [label]="'settings.reports.newReport' | transloco" icon="pi pi-plus" (onClick)="openCreate()" />
+        </ng-template>
     </app-page-header>
 
-    <div class="settings-content max-w-3xl mx-auto w-full">
-        <div class="settings-grid">
-            <!-- Consolidated Digest -->
-            <app-settings-card [title]="'settings.reports.digest.title' | transloco" [subtitle]="'settings.reports.digest.description' | transloco" icon="pi pi-envelope">
-                <div settings-card-body class="flex flex-col gap-4">
-                    @if (digestSaveState() === "saved") {
-                    <div class="settings-status settings-status--success">{{ "common.saved" | transloco }}</div>
-                    } @if (digestSaveState() === "error") {
-                    <div class="settings-status settings-status--error">{{ "common.saveFailed" | transloco }}</div>
-                    } @if (isLoading()) {
-                    <div class="text-sm text-[var(--p-text-muted-color)]">{{ "common.loading" | transloco }}</div>
-                    } @else {
-                    <div class="frequency-list">
-                        <div class="frequency-row">
-                            <div class="frequency-copy">
-                                <div class="font-medium">{{ "settings.reports.frequency.daily.label" | transloco }}</div>
-                                <div class="text-sm text-[var(--p-text-muted-color)]">{{ "settings.reports.frequency.daily.hint" | transloco }}</div>
-                            </div>
-                            <p-toggleswitch [ngModel]="digestPrefs().daily" (ngModelChange)="setDigestFreq('daily', $event)" [disabled]="isDigestSaving()" />
-                        </div>
-                        <div class="frequency-row">
-                            <div class="frequency-copy">
-                                <div class="font-medium">{{ "settings.reports.frequency.weekly.label" | transloco }}</div>
-                                <div class="text-sm text-[var(--p-text-muted-color)]">{{ "settings.reports.frequency.weekly.hint" | transloco }}</div>
-                            </div>
-                            <p-toggleswitch [ngModel]="digestPrefs().weekly" (ngModelChange)="setDigestFreq('weekly', $event)" [disabled]="isDigestSaving()" />
-                        </div>
-                        <div class="frequency-row">
-                            <div class="frequency-copy">
-                                <div class="font-medium">{{ "settings.reports.frequency.monthly.label" | transloco }}</div>
-                                <div class="text-sm text-[var(--p-text-muted-color)]">{{ "settings.reports.frequency.monthly.hint" | transloco }}</div>
-                            </div>
-                            <p-toggleswitch [ngModel]="digestPrefs().monthly" (ngModelChange)="setDigestFreq('monthly', $event)" [disabled]="isDigestSaving()" />
-                        </div>
+    <div class="reporting-content max-w-6xl mx-auto w-full">
+        @if (!mailAvailable()) {
+        <p-message severity="warn" styleClass="w-full mb-5">{{ "settings.reports.mailUnavailable" | transloco }}</p-message>
+        } @if (!isLoading() && reports().length > 0) {
+        <div class="mobile-report-action">
+            <p-button [label]="'settings.reports.newReport' | transloco" icon="pi pi-plus" (onClick)="openCreate()" />
+        </div>
+        } @if (listFeedback(); as feedback) {
+        <div
+            class="hk-feedback-message"
+            [class.hk-feedback-message--success]="feedback.severity === 'success'"
+            [class.hk-feedback-message--error]="feedback.severity === 'error'"
+            [attr.role]="feedback.severity === 'error' ? 'alert' : 'status'"
+            [attr.aria-live]="feedback.severity === 'error' ? 'assertive' : 'polite'"
+            data-testid="report-list-feedback"
+        >
+            {{ feedback.key | transloco }}
+        </div>
+        } @if (isLoading() && reports().length === 0) {
+        <div class="empty-state">{{ "common.loading" | transloco }}</div>
+        } @else if (reports().length === 0) {
+        <div class="empty-state">
+            <i class="pi pi-send" aria-hidden="true"></i>
+            <h2>{{ "settings.reports.empty.title" | transloco }}</h2>
+            <p>{{ "settings.reports.empty.description" | transloco }}</p>
+            <p-button [label]="'settings.reports.empty.action' | transloco" icon="pi pi-plus" (onClick)="openCreate()" />
+        </div>
+        } @else {
+        <div class="hk-crud-table-wrap">
+            <p-table
+                #reportsTable
+                data-testid="report-table"
+                [value]="reportTableRows()"
+                [globalFilterFields]="['name', 'preset', 'scope', 'sites', 'recipients', 'schedule', 'status', 'nextRun', 'lastOutcome']"
+                [sortField]="'name'"
+                [sortOrder]="1"
+                [paginator]="true"
+                [rows]="10"
+                [rowsPerPageOptions]="[10, 25, 50]"
+                [rowHover]="true"
+                [loading]="isLoading()"
+                responsiveLayout="scroll"
+                styleClass="hk-crud-table p-datatable-sm"
+                [tableStyle]="{ 'min-width': '1280px' }"
+            >
+                <ng-template pTemplate="caption">
+                    <div class="report-table-caption">
+                        <p-iconfield class="hk-crud-search">
+                            <p-inputicon class="pi pi-search" />
+                            <input pInputText data-testid="report-search" [placeholder]="'common.searchPlaceholder' | transloco" (input)="reportsTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
+                        </p-iconfield>
+                        <p-button icon="pi pi-refresh" [text]="true" [rounded]="true" [type]="'button'" [ariaLabel]="'common.actions.refresh' | transloco" [disabled]="isLoading()" (onClick)="refresh()" />
                     </div>
-                    }
-                </div>
-                <div settings-card-footer>
-                    <div class="settings-card-action">
-                        <p-button [label]="'common.actions.save' | transloco" icon="pi pi-save" [loading]="isDigestSaving()" [disabled]="isLoading() || isDigestSaving()" styleClass="settings-action-btn" (onClick)="saveDigest()" />
-                    </div>
-                </div>
-            </app-settings-card>
+                </ng-template>
 
-            <!-- Per-site Reports -->
-            <app-settings-card [title]="'settings.reports.perSite.title' | transloco" [subtitle]="'settings.reports.perSite.description' | transloco" icon="pi pi-chart-bar">
-                <div settings-card-body class="flex flex-col gap-4">
-                    @if (sitesSaveState() === "saved") {
-                    <div class="settings-status settings-status--success">{{ "common.saved" | transloco }}</div>
-                    } @if (sitesSaveState() === "error") {
-                    <div class="settings-status settings-status--error">{{ "common.saveFailed" | transloco }}</div>
-                    } @if (isLoading()) {
-                    <div class="text-sm text-[var(--p-text-muted-color)]">{{ "common.loading" | transloco }}</div>
-                    } @else if (sitePrefs().length === 0) {
-                    <div class="text-sm text-[var(--p-text-muted-color)]">{{ "settings.reports.perSite.empty" | transloco }}</div>
-                    } @else {
-                    <div>
-                        @for (site of sitePrefs(); track site.site_id; let i = $index; let last = $last) {
-                        <div class="site-row">
-                            <div class="site-domain">
-                                <i class="pi pi-globe"></i>
-                                <span>{{ site.domain }}</span>
+                <ng-template pTemplate="header">
+                    <tr>
+                        <th pSortableColumn="name">{{ "common.columns.name" | transloco }} <p-sortIcon field="name" /></th>
+                        <th pSortableColumn="scope">{{ "settings.reports.scope.label" | transloco }} <p-sortIcon field="scope" /></th>
+                        <th pSortableColumn="sites">{{ "common.columns.sites" | transloco }} <p-sortIcon field="sites" /></th>
+                        <th pSortableColumn="recipients">{{ "settings.reports.recipients.label" | transloco }} <p-sortIcon field="recipients" /></th>
+                        <th pSortableColumn="schedule">{{ "settings.reports.schedule.label" | transloco }} <p-sortIcon field="schedule" /></th>
+                        <th pSortableColumn="status">{{ "common.columns.status" | transloco }} <p-sortIcon field="status" /></th>
+                        <th pSortableColumn="nextRun">{{ "settings.reports.nextRun" | transloco }} <p-sortIcon field="nextRun" /></th>
+                        <th pSortableColumn="lastOutcome">{{ "settings.reports.lastOutcome" | transloco }} <p-sortIcon field="lastOutcome" /></th>
+                        <th class="hk-actions-column">{{ "common.columns.actions" | transloco }}</th>
+                    </tr>
+                </ng-template>
+
+                <ng-template pTemplate="body" let-row>
+                    <tr [attr.data-report-id]="row.report.id" [class.report-row--focused]="focusedReportID() === row.report.id">
+                        <td>
+                            <div class="report-name-cell">
+                                <strong [title]="row.report.name">{{ row.report.name }}</strong>
+                                <span>{{ presetLabel(row.report.preset) }}</span>
+                                @if (row.report.source === "legacy") { <p-tag [value]="'settings.reports.legacy' | transloco" severity="secondary" /> }
                             </div>
-                            <div class="site-toggles">
-                                <div class="site-toggle-item">
-                                    <span class="site-toggle-label">{{ "settings.reports.frequency.daily.label" | transloco }}</span>
-                                    <p-toggleswitch [ngModel]="site.daily" (ngModelChange)="setSiteFreq(i, 'daily', $event)" [disabled]="isSitesSaving()" />
+                        </td>
+                        <td>{{ ("settings.reports.scope." + row.report.scope) | transloco }}</td>
+                        <td><span class="report-cell-ellipsis" [title]="siteLabel(row.report)">{{ siteLabel(row.report) }}</span></td>
+                        <td>
+                            <div class="report-recipient-summary">
+                                @for (recipient of visibleRecipients(row.report); track recipient.id) {
+                                <div class="report-recipient">
+                                    <span [title]="recipient.email"><i class="pi" [class.pi-user]="recipient.kind === 'member'" [class.pi-envelope]="recipient.kind === 'external'" aria-hidden="true"></i>{{ recipient.email }}</span>
+                                    <p-tag
+                                        [value]="('settings.reports.recipientStatus.' + recipientState(recipient)) | transloco"
+                                        [severity]="recipientState(recipient) === 'confirmed' ? 'success' : recipientState(recipient) === 'invitation_failed' ? 'danger' : 'secondary'"
+                                    />
                                 </div>
-                                <div class="site-toggle-item">
-                                    <span class="site-toggle-label">{{ "settings.reports.frequency.weekly.label" | transloco }}</span>
-                                    <p-toggleswitch [ngModel]="site.weekly" (ngModelChange)="setSiteFreq(i, 'weekly', $event)" [disabled]="isSitesSaving()" />
-                                </div>
-                                <div class="site-toggle-item">
-                                    <span class="site-toggle-label">{{ "settings.reports.frequency.monthly.label" | transloco }}</span>
-                                    <p-toggleswitch [ngModel]="site.monthly" (ngModelChange)="setSiteFreq(i, 'monthly', $event)" [disabled]="isSitesSaving()" />
-                                </div>
+                                } @if (row.report.recipients.length > 2) {
+                                <span class="report-cell-secondary">+{{ row.report.recipients.length - 2 }}</span>
+                                }
                             </div>
-                        </div>
-                        @if (!last) {
-                        <p-divider />
-                        } }
-                    </div>
+                        </td>
+                        <td>
+                            <div class="report-stacked-cell"><span>{{ cadenceLabel(row.report) }} · {{ row.report.schedule.local_time }}</span><span>{{ row.report.schedule.timezone }}</span></div>
+                        </td>
+                        <td><p-tag [value]="('settings.reports.status.' + row.report.status) | transloco" [severity]="statusSeverity(row.report.status)" /></td>
+                        <td>{{ formatDate(row.report.next_run_at) }}</td>
+                        <td>
+                            @if (row.report.last_outcome) {
+                            <p-tag [value]="('settings.reports.runStatus.' + row.report.last_outcome.status) | transloco" [severity]="statusSeverity(row.report.last_outcome.status)" />
+                            } @else {
+                            <span class="report-cell-secondary">{{ "settings.reports.notAvailable" | transloco }}</span>
+                            }
+                        </td>
+                        <td class="hk-actions-cell">
+                            <app-table-row-actions [items]="reportActions(row.report)" [loading]="reportActionID() === row.report.id" />
+                        </td>
+                    </tr>
+                </ng-template>
+
+                <ng-template pTemplate="emptymessage">
+                    <tr>
+                        <td colspan="9" class="report-table-empty">{{ "settings.reports.emptyFiltered" | transloco }}</td>
+                    </tr>
+                </ng-template>
+            </p-table>
+        </div>
+        }
+    </div>
+</div>
+
+<app-crud-dialog
+    [title]="(editingReportID() ? 'settings.reports.editor.editTitle' : 'settings.reports.editor.createTitle') | transloco"
+    [visible]="editorVisible()"
+    (visibleChange)="onEditorVisibleChange($event)"
+    [submitLabel]="'common.actions.save' | transloco"
+    [cancelLabel]="'common.actions.cancel' | transloco"
+    submitIcon="pi pi-save"
+    [submitDisabled]="!formValid() || (draft().status === 'active' && !mailAvailable())"
+    [saving]="saveState() === 'saving'"
+    width="54rem"
+    (submitted)="save()"
+    (cancelled)="closeEditor()"
+>
+    <div class="editor-flow">
+        @if (!mailAvailable()) { <p-message severity="warn">{{ "settings.reports.mailUnavailableDraft" | transloco }}</p-message> }
+
+        <section class="editor-step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+                <h3>{{ "settings.reports.editor.presetStep" | transloco }}</h3>
+                <label for="report-name">{{ "settings.reports.name" | transloco }}</label>
+                <input id="report-name" data-testid="report-name" pInputText class="w-full" [ngModel]="draft().name" (ngModelChange)="setField('name', $event)" [placeholder]="'settings.reports.namePlaceholder' | transloco" />
+                <div class="preset-grid">
+                    @for (preset of ['site_summary', 'portfolio_digest', 'opportunity_brief']; track preset) {
+                    <button type="button" class="preset-option" [attr.data-testid]="'preset-' + preset" [attr.aria-pressed]="draft().preset === preset" [class.preset-option--selected]="draft().preset === preset" (click)="setPreset($any(preset))">
+                        <strong>{{ ("settings.reports.presets." + preset + ".title") | transloco }}</strong>
+                        <span>{{ ("settings.reports.presets." + preset + ".description") | transloco }}</span>
+                    </button>
                     }
                 </div>
-                <div settings-card-footer>
-                    <div class="settings-card-action">
-                        <p-button
-                            [label]="'common.actions.save' | transloco"
-                            icon="pi pi-save"
-                            [loading]="isSitesSaving()"
-                            [disabled]="isLoading() || isSitesSaving() || sitePrefs().length === 0"
-                            styleClass="settings-action-btn"
-                            (onClick)="saveSites()"
+            </div>
+        </section>
+
+        <section class="editor-step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+                <h3>{{ "settings.reports.editor.sitesStep" | transloco }}</h3>
+                @if (draft().preset === 'portfolio_digest') {
+                <label for="report-site-mode">{{ "settings.reports.sites.label" | transloco }}</label>
+                <p-select
+                    inputId="report-site-mode"
+                    [options]="[{ label: ('settings.reports.selectedSites' | transloco), value: 'selected' }, { label: ('settings.reports.allAccessibleSites' | transloco), value: 'all_accessible' }]"
+                    [ngModel]="draft().site_mode"
+                    (ngModelChange)="setField('site_mode', $event)"
+                    appendTo="body"
+                />
+                } @if (draft().site_mode === 'selected') {
+                <label for="report-sites">{{ "settings.reports.sites.label" | transloco }}</label>
+                @if (draft().preset === 'portfolio_digest') {
+                <p-multiselect
+                    inputId="report-sites"
+                    data-testid="report-sites"
+                    class="w-full"
+                    [options]="sites()"
+                    optionLabel="domain"
+                    optionValue="id"
+                    dataKey="id"
+                    [filter]="true"
+                    filterBy="domain"
+                    display="chip"
+                    [ngModel]="draft().site_ids"
+                    (ngModelChange)="setField('site_ids', $event)"
+                    [placeholder]="'settings.reports.sites.placeholder' | transloco"
+                    appendTo="body"
+                >
+                    <ng-template pTemplate="item" let-site><app-site-select-option [site]="site" /></ng-template>
+                </p-multiselect>
+                } @else {
+                <p-select
+                    inputId="report-sites"
+                    data-testid="report-sites"
+                    class="w-full"
+                    [options]="sites()"
+                    optionLabel="domain"
+                    optionValue="id"
+                    dataKey="id"
+                    [filter]="true"
+                    filterBy="domain"
+                    [ngModel]="selectedSiteID()"
+                    (ngModelChange)="setSelectedSite($event)"
+                    [placeholder]="'settings.reports.sites.placeholder' | transloco"
+                    appendTo="body"
+                >
+                    <ng-template pTemplate="selectedItem" let-site><app-site-select-option [site]="site" [selected]="true" /></ng-template>
+                    <ng-template pTemplate="item" let-site><app-site-select-option [site]="site" /></ng-template>
+                </p-select>
+                } }
+            </div>
+        </section>
+
+        <section class="editor-step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+                <h3>{{ "settings.reports.editor.recipientsStep" | transloco }}</h3>
+                @if (canCreateTeamReport()) {
+                <label for="report-scope">{{ "settings.reports.scope.label" | transloco }}</label>
+                <p-select
+                    inputId="report-scope"
+                    data-testid="report-scope"
+                    [options]="[{ label: ('settings.reports.scope.personal' | transloco), value: 'personal' }, { label: ('settings.reports.scope.team' | transloco), value: 'team' }]"
+                    [ngModel]="draft().scope"
+                    (ngModelChange)="setScope($event)"
+                    appendTo="body"
+                />
+                } @if (draft().scope === 'personal') {
+                <p>{{ "settings.reports.personalRecipient" | transloco }}</p>
+                } @else {
+                <label for="report-recipients">{{ "settings.reports.recipients.label" | transloco }}</label>
+                <p-multiselect
+                    inputId="report-recipients"
+                    class="w-full"
+                    [options]="memberOptions()"
+                    optionLabel="label"
+                    optionValue="value"
+                    [filter]="true"
+                    filterBy="label"
+                    [ngModel]="draft().recipient_user_ids"
+                    (ngModelChange)="setField('recipient_user_ids', $event)"
+                    [placeholder]="'settings.reports.recipients.placeholder' | transloco"
+                    appendTo="body"
+                />
+                <label for="report-external-recipient">{{ "settings.reports.recipients.externalLabel" | transloco }}</label>
+                @if (externalRecipientsLocked()) {
+                <p-message severity="info" data-testid="external-recipient-pro-nudge">
+                    <span>
+                        {{ "settings.reports.recipients.proNudge" | transloco }}
+                        <a routerLink="/admin/team/overview" class="font-semibold text-primary underline">{{ "settings.reports.recipients.upgradeToPro" | transloco }}</a>
+                    </span>
+                </p-message>
+                } @else {
+                <div class="external-recipient-input">
+                    <input
+                        id="report-external-recipient"
+                        data-testid="report-external-recipient"
+                        pInputText
+                        type="email"
+                        inputmode="email"
+                        autocapitalize="none"
+                        spellcheck="false"
+                        class="w-full"
+                        [ngModel]="externalEmailInput()"
+                        (ngModelChange)="externalEmailInput.set($event); externalEmailError.set('')"
+                        (keydown.enter)="$event.preventDefault(); addExternalRecipient()"
+                        [placeholder]="'settings.reports.recipients.externalPlaceholder' | transloco"
+                    />
+                    <p-button [label]="'settings.reports.recipients.add' | transloco" icon="pi pi-plus" [outlined]="true" (onClick)="addExternalRecipient()" />
+                </div>
+                <p class="field-hint">{{ "settings.reports.recipients.externalHint" | transloco }}</p>
+                } @if (externalEmailError()) { <p-message severity="error" variant="simple" size="small">{{ externalEmailError() }}</p-message> } @if (draft().external_recipient_emails.length) {
+                <div class="external-recipient-chips">
+                    @for (email of draft().external_recipient_emails; track email) {
+                    <span class="external-recipient-chip">
+                        <i class="pi pi-envelope" aria-hidden="true"></i>{{ email }}
+                        <button type="button" (click)="removeExternalDraft(email)" [attr.aria-label]="('settings.reports.recipients.removeEmail' | transloco: { email })"><i class="pi pi-times" aria-hidden="true"></i></button>
+                    </span>
+                    }
+                </div>
+                } }
+            </div>
+        </section>
+
+        <section class="editor-step">
+            <div class="step-number">4</div>
+            <div class="step-content">
+                <h3>{{ "settings.reports.editor.scheduleStep" | transloco }}</h3>
+                <div class="schedule-grid">
+                    <div>
+                        <label for="report-frequency">{{ "settings.reports.frequency.label" | transloco }}</label>
+                        <p-select
+                            inputId="report-frequency"
+                            class="w-full"
+                            [options]="draft().preset === 'opportunity_brief' ? [{label: ('settings.reports.frequency.daily.label' | transloco), value: 'daily'}, {label: ('settings.reports.frequency.weekly.label' | transloco), value: 'weekly'}] : [{label: ('settings.reports.frequency.daily.label' | transloco), value: 'daily'}, {label: ('settings.reports.frequency.weekly.label' | transloco), value: 'weekly'}, {label: ('settings.reports.frequency.monthly.label' | transloco), value: 'monthly'}]"
+                            [ngModel]="draft().schedule.frequency"
+                            (ngModelChange)="setFrequency($event)"
+                            appendTo="body"
+                        />
+                    </div>
+                    @if (draft().schedule.frequency === 'weekly') {
+                    <div>
+                        <label for="report-weekday">{{ "settings.reports.weekday" | transloco }}</label>
+                        <p-select inputId="report-weekday" class="w-full" [options]="weekdayOptions()" [ngModel]="draft().schedule.weekly_day" (ngModelChange)="setScheduleField('weekly_day', $event)" appendTo="body" />
+                    </div>
+                    } @if (draft().schedule.frequency === 'monthly') {
+                    <div>
+                        <label for="report-month-day">{{ "settings.reports.monthDay" | transloco }}</label>
+                        <p-select inputId="report-month-day" class="w-full" [options]="monthDayOptions" [ngModel]="draft().schedule.monthly_day" (ngModelChange)="setScheduleField('monthly_day', $event)" appendTo="body" />
+                    </div>
+                    }
+                    <div>
+                        <label for="report-delivery-time">{{ "settings.reports.deliveryTime" | transloco }}</label>
+                        <p-select
+                            inputId="report-delivery-time"
+                            data-testid="report-delivery-time"
+                            class="w-full"
+                            [options]="timeOptions"
+                            [ngModel]="draft().schedule.local_time"
+                            (ngModelChange)="setScheduleField('local_time', $event)"
+                            appendTo="body"
+                        />
+                    </div>
+                    <div>
+                        <label for="report-timezone">{{ "settings.reports.timezone" | transloco }}</label>
+                        <p-select
+                            inputId="report-timezone"
+                            data-testid="report-timezone"
+                            class="w-full"
+                            [options]="timezoneOptions"
+                            [filter]="true"
+                            [ngModel]="draft().schedule.timezone"
+                            (ngModelChange)="setScheduleField('timezone', $event)"
+                            appendTo="body"
+                        />
+                    </div>
+                    <div>
+                        <label for="report-status">{{ "common.columns.status" | transloco }}</label>
+                        <p-select
+                            inputId="report-status"
+                            data-testid="report-status"
+                            class="w-full"
+                            [options]="reportStatusOptions()"
+                            optionLabel="label"
+                            optionValue="value"
+                            [ngModel]="draft().status"
+                            (ngModelChange)="setField('status', $event)"
+                            appendTo="body"
                         />
                     </div>
                 </div>
-            </app-settings-card>
+                <p class="field-hint">{{ "settings.reports.scheduleHint" | transloco }}</p>
+            </div>
+        </section>
+
+        <section class="editor-step">
+            <div class="step-number">5</div>
+            <div class="step-content">
+                <h3>{{ "settings.reports.editor.previewStep" | transloco }}</h3>
+                <p-button [label]="'settings.reports.actions.preview' | transloco" icon="pi pi-eye" [outlined]="true" [disabled]="!formValid()" (onClick)="previewReport()" />
+                @if (preview()) {
+                <div class="preview-card">
+                    <strong>{{ preview()!.subject }}</strong>
+                    <span>{{ presetLabel(preview()!.preset) }}</span>
+                    <span>{{ preview()!.schedule.local_time }} · {{ preview()!.schedule.timezone }}</span>
+                    <span>{{ formatDate(preview()!.period_start) }} – {{ formatDate(preview()!.period_end) }}</span>
+                    <span>{{ "settings.reports.previewDeliverable" | transloco: { count: preview()!.recipient_count } }}</span>
+                    <span>{{ "settings.reports.previewPending" | transloco: { count: preview()!.pending_recipient_count } }}</span>
+                    @if (preview()!.suppressed) { <p-message severity="info">{{ "settings.reports.previewSuppressed" | transloco }}</p-message> }
+                </div>
+                }
+            </div>
+        </section>
+
+        @if (dialogFeedback(); as feedback) {
+        <div
+            class="hk-feedback-message"
+            [class.hk-feedback-message--success]="feedback.severity === 'success'"
+            [class.hk-feedback-message--error]="feedback.severity === 'error'"
+            [attr.role]="feedback.severity === 'error' ? 'alert' : 'status'"
+            [attr.aria-live]="feedback.severity === 'error' ? 'assertive' : 'polite'"
+            data-testid="report-dialog-feedback"
+        >
+            {{ feedback.key | transloco }}
         </div>
+        }
     </div>
-</div>
+</app-crud-dialog>
+
+<app-dialog-shell
+    [title]="'settings.reports.history.title' | transloco"
+    [visible]="historyVisible()"
+    (visibleChange)="onHistoryVisibleChange($event)"
+    [secondaryLabel]="'common.actions.close' | transloco"
+    [showPrimary]="false"
+    [busy]="historyActionID() !== null"
+    width="48rem"
+>
+    @if (historyFeedback(); as feedback) {
+    <div
+        class="hk-feedback-message"
+        [class.hk-feedback-message--success]="feedback.severity === 'success'"
+        [class.hk-feedback-message--error]="feedback.severity === 'error'"
+        [attr.role]="feedback.severity === 'error' ? 'alert' : 'status'"
+        [attr.aria-live]="feedback.severity === 'error' ? 'assertive' : 'polite'"
+        data-testid="report-history-feedback"
+    >
+        {{ feedback.key | transloco }}
+    </div>
+    } @if (historyLoading()) {
+    <div class="empty-history">{{ "common.loading" | transloco }}</div>
+    } @else if (runs().length === 0) {
+    <div class="empty-history">{{ "settings.reports.history.empty" | transloco }}</div>
+    } @else {
+    <div class="history-list">
+        @for (run of runs(); track run.id) {
+        <div class="history-row">
+            <div><strong>{{ formatDate(run.scheduled_for) }}</strong><span>{{ formatDate(run.period_start) }} – {{ formatDate(run.period_end) }}</span></div>
+            <p-tag [value]="('settings.reports.runStatus.' + run.status) | transloco" [severity]="statusSeverity(run.status)" />
+            <span>{{ run.deliveries.length }} {{ "settings.reports.history.deliveries" | transloco }}</span>
+            @if (run.status === 'failed' || run.status === 'partial') {
+            <p-button [label]="'settings.reports.actions.retry' | transloco" icon="pi pi-refresh" [text]="true" size="small" [loading]="historyActionID() === run.id" [disabled]="!mailAvailable()" (onClick)="retry(run)" />
+            } @if (run.deliveries.length) {
+            <div class="history-deliveries">
+                @for (delivery of run.deliveries; track delivery.id) {
+                <div class="history-delivery">
+                    <span>{{ deliveryRecipientLabel(delivery) }}</span>
+                    <p-tag [value]="('settings.reports.runStatus.' + delivery.status) | transloco" [severity]="statusSeverity(delivery.status)" />
+                    <span>{{ delivery.attempt_count }} {{ "settings.reports.history.attempts" | transloco }}</span>
+                    @if (delivery.smtp_accepted_at) { <span>{{ "settings.reports.history.acceptedAt" | transloco }} {{ formatDate(delivery.smtp_accepted_at) }}</span> } @else if (delivery.next_attempt_at) {
+                    <span>{{ "settings.reports.history.retryAt" | transloco }} {{ formatDate(delivery.next_attempt_at) }}</span> }
+                </div>
+                }
+            </div>
+            }
+        </div>
+        }
+    </div>
+    }
+</app-dialog-shell>

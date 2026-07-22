@@ -8,9 +8,74 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/config"
 	"hitkeep/internal/mailer"
 	opportunitysvc "hitkeep/internal/opportunities"
 )
+
+type renderedReportDriver struct {
+	html string
+	text string
+}
+
+func (d *renderedReportDriver) Send(_ []string, _ string, htmlBody, textBody string) error {
+	d.html = htmlBody
+	d.text = textBody
+	return nil
+}
+
+func (d *renderedReportDriver) Close() error { return nil }
+
+func TestSelfContainedReportTemplatesRetainContentWithoutAuthenticatedLinks(t *testing.T) {
+	preview := opportunitysvc.DigestPreview{ShouldSend: true, Items: []opportunitysvc.DigestItem{{
+		ID: "opportunity-1", TitleKey: "opportunities.catalog.checkout_conversion.title",
+		DigestKey: "opportunities.catalog.checkout_conversion.digest", ActionKey: "opportunities.catalog.checkout_conversion.action",
+		CopyParams: map[string]any{"conversion_rate": "42%"}, Evidence: []api.OpportunityEvidence{{ID: "conversion_rate", LabelKey: "opportunities.evidence.checkout_conversion_rate", Value: "42%"}},
+		CitedEvidenceIDs: []string{"conversion_rate"},
+	}}}
+	tests := []struct {
+		name  string
+		email mailer.Mailable
+		want  []string
+	}{
+		{
+			name: "site summary",
+			email: NewSiteAnalyticsReport("en", "client.example", "July 18, 2026", "Daily", "", "",
+				ReportStats{Pageviews: 123, Visitors: 45, Goals: []api.GoalStats{{Name: "Signup", Conversions: 7}}}, ReportStats{Pageviews: 100, Visitors: 40}, []int{20, 30, 73}),
+			want: []string{"client.example", "123", "45", "Signup"},
+		},
+		{
+			name:  "portfolio digest",
+			email: NewAnalyticsDigestWithSubjectLabel("en", "July 12–18, 2026", "Weekly", "weekly", "", "", []DigestSiteEntry{{Domain: "client.example", Pageviews: 123, Visitors: 45, Goals: 7}}),
+			want:  []string{"client.example", "123", "45"},
+		},
+		{
+			name:  "opportunity brief",
+			email: NewOpportunityDigestWithSubjectLabel("en", "client.example", "July 12–18, 2026", "Weekly", "weekly", "", "", preview),
+			want:  []string{"client.example", "42%", "Checkout conversion rate"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			driver := &renderedReportDriver{}
+			manager := mailer.NewWithDriver(driver, &config.Config{PublicURL: "https://hitkeep.example"})
+			if err := manager.Send("external@example.test", tt.email); err != nil {
+				t.Fatalf("render self-contained email: %v", err)
+			}
+			combined := driver.html + "\n" + driver.text
+			for _, forbidden := range []string{"/dashboard", "/settings/reports", "/opportunities", "/share/"} {
+				if strings.Contains(combined, forbidden) {
+					t.Fatalf("self-contained report leaked %q", forbidden)
+				}
+			}
+			for _, want := range tt.want {
+				if !strings.Contains(combined, want) {
+					t.Fatalf("self-contained report lost %q", want)
+				}
+			}
+		})
+	}
+}
 
 func TestLocalizedFrequencyLabelsUseMailContext(t *testing.T) {
 	tests := []struct {

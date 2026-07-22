@@ -660,10 +660,11 @@ type PermissionContext struct {
 }
 
 type SystemStatus struct {
-	NeedsSetup bool         `json:"needs_setup"`
-	Version    string       `json:"version"`
-	Cloud      *CloudStatus `json:"cloud,omitempty"`
-	AskAI      *AskAIStatus `json:"ask_ai,omitempty"`
+	NeedsSetup   bool                `json:"needs_setup"`
+	Version      string              `json:"version"`
+	Cloud        *CloudStatus        `json:"cloud,omitempty"`
+	AskAI        *AskAIStatus        `json:"ask_ai,omitempty"`
+	MailDelivery *MailDeliveryStatus `json:"mail_delivery,omitempty"`
 }
 
 type AskAIStatus struct {
@@ -1468,11 +1469,12 @@ type TeamUsageSummary struct {
 }
 
 type TeamEntitlements struct {
-	MaxSitesPerTeam     int  `json:"max_sites_per_team"`
-	MaxTeamMembers      int  `json:"max_team_members"`
-	MaxRetentionDays    int  `json:"max_retention_days"`
-	AllowSSO            bool `json:"allow_sso"`
-	AllowCustomBranding bool `json:"allow_custom_branding"`
+	MaxSitesPerTeam               int  `json:"max_sites_per_team"`
+	MaxTeamMembers                int  `json:"max_team_members"`
+	MaxRetentionDays              int  `json:"max_retention_days"`
+	AllowSSO                      bool `json:"allow_sso"`
+	AllowCustomBranding           bool `json:"allow_custom_branding"`
+	AllowExternalReportRecipients bool `json:"allow_external_report_recipients"`
 }
 
 type TeamPlan struct {

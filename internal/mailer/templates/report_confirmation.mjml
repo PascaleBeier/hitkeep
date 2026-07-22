@@ -1,0 +1,31 @@
+{{ define "content" }}
+<mj-text font-size="20px" font-weight="600" padding-bottom="10px">
+  {{ t "reports.confirmation.heading" }}
+</mj-text>
+
+<mj-text>
+  {{ tf "reports.confirmation.body" .TeamName .ReportName }}
+</mj-text>
+
+<mj-text>
+  <strong>{{ t "reports.confirmation.schedule" }}:</strong> {{ .Frequency }}<br />
+  <strong>{{ t "reports.confirmation.sites" }}:</strong> {{ .SiteDomains }}
+</mj-text>
+
+<mj-button href="{{ .Link }}" padding-top="20px" padding-bottom="20px">
+  {{ t "reports.confirmation.button" }}
+</mj-button>
+
+<mj-text font-size="13px" color="#64748b">
+  {{ t "common.copy_link" }}
+  <a href="{{ .Link }}" style="color: #33d399">{{ .Link }}</a>
+</mj-text>
+
+<mj-text font-size="13px" color="#64748b" padding-top="10px">
+  {{ tf "reports.confirmation.expires" .ExpiresInDays }}
+</mj-text>
+
+<mj-text font-size="13px" color="#64748b" padding-top="4px">
+  {{ t "reports.confirmation.disclaimer" }}
+</mj-text>
+{{ end }}

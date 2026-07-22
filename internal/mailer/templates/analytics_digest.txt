@@ -1,14 +1,19 @@
 {{ define "content" }}{{ tf "reports.digest_title" .FreqLabel }}
 {{ .PeriodLabel }}
+{{ t "digest.change" }}: {{ t "digest.pageviews" }} · {{ t "reports.visitors" }} · {{ t "reports.goal_completions" }}
 
 {{ t "digest.site" }}
 ----------
-{{ range .Sites }}{{ .Domain }}: {{ .Pageviews }} {{ t "digest.pageviews" }} ({{ percentChange .Pageviews .PrevPageviews }})
-  {{ t "digest.dashboard" }}: {{ .DashURL }}
+{{ range .Sites }}{{ .Domain }}: {{ formatInt .Pageviews }} {{ t "digest.pageviews" }} ({{ percentChange .Pageviews .PrevPageviews }}), {{ formatInt .Visitors }} {{ t "reports.visitors" }} ({{ percentChange .Visitors .PrevVisitors }}), {{ formatInt .Goals }} {{ t "reports.goal_completions" }} ({{ percentChange .Goals .PrevGoals }})
+  {{ if .DashURL }}{{ t "digest.dashboard" }}: {{ .DashURL }}{{ end }}
 {{ end }}
-{{ t "reports.view_dashboard" }}: {{ .DashURL }}
+{{ if .DashURL }}{{ t "reports.view_dashboard" }}: {{ .DashURL }}
+{{ end }}
 
 ---
 {{ t "reports.received_because" }}
-{{ t "reports.manage_preferences" }}: {{ .SettingsURL }}
+{{ if .SettingsURL }}{{ t "reports.manage_preferences" }}: {{ .SettingsURL }}
+{{ end }}
+{{ if .UnsubscribeURL }}{{ t "reports.unsubscribe" }}: {{ .UnsubscribeURL }}
+{{ end }}
 {{ end }}

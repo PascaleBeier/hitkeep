@@ -264,7 +264,12 @@
       "googleSearchConsoleSyncFailed": "Sincronização do Search Console falhou",
       "askAIRequested": "Ask AI solicitado",
       "askAIResponded": "Ask AI respondeu",
-      "askAIHistoryViewed": "Histórico do Ask AI visualizado"
+      "askAIHistoryViewed": "Histórico do Ask AI visualizado",
+      "reportCreated": "Relatório criado",
+      "reportUpdated": "Relatório atualizado",
+      "reportDeleted": "Relatório eliminado",
+      "reportTestSent": "Teste do relatório enviado",
+      "reportRetryRequested": "Nova tentativa do relatório solicitada"
     },
     "columns": {
       "evidence": "Evidência",
@@ -299,7 +304,8 @@
       "permission": "Permissão",
       "googleSearchConsoleConnection": "Conexão do Search Console",
       "googleSearchConsoleProperty": "Propriedade do Search Console",
-      "googleSearchConsoleSync": "Sincronização do Search Console"
+      "googleSearchConsoleSync": "Sincronização do Search Console",
+      "report": "Relatório"
     },
     "roles": {
       "owner": "Proprietário",
@@ -1134,31 +1140,74 @@
       }
     },
     "reports": {
-      "breadcrumb": "Relatórios por E-mail",
-      "subtitle": "Configure o agendamento de envio de e-mails de análises dos seus sites.",
-      "digest": {
-        "title": "Resumo Consolidado",
-        "description": "Receba um e-mail de resumo para todos os seus sites."
+      "breadcrumb": "Relatórios",
+      "subtitle": "Crie relatórios de análises confiáveis e agendados para você ou sua equipe.",
+      "newReport": "Novo relatório",
+      "mailUnavailable": "O SMTP não está disponível. Você pode editar rascunhos, mas não ativar, testar ou tentar novamente os relatórios.",
+      "mailUnavailableDraft": "A entrega de e-mail não está disponível. Salve este relatório como rascunho até configurar o SMTP.",
+            "saved": "Relatório salvo.",
+            "deleted": "Relatório eliminado.",
+            "emptyFiltered": "Nenhum relatório corresponde à sua pesquisa.",
+      "previewSuppressed": "Nenhum email seria enviado porque este relatório não tem conteúdo elegível para o período selecionado.",
+      "previewDeliverable": "{{count}} destinatário(s) confirmado(s) receberiam este relatório.",
+      "previewPending": "{{count}} destinatário(s) externo(s) aguardam confirmação.",
+      "testAccepted": "O servidor de e-mail aceitou a mensagem de teste.",
+      "retryQueued": "Nova tentativa de entrega agendada.",
+      "resubscribed": "Você voltou a assinar este relatório.",
+      "copyName": "Cópia de {{name}}",
+      "legacy": "Migrado",
+      "name": "Nome do relatório",
+      "namePlaceholder": "ex.: revisão de crescimento de segunda-feira",
+      "nextRun": "Próximo envio",
+      "lastOutcome": "Último resultado",
+      "notAvailable": "Ainda não",
+      "allAccessibleSites": "Todos os sites acessíveis",
+      "selectedSites": "Sites selecionados",
+      "personalRecipient": "Relatórios pessoais são enviados apenas para sua conta HitKeep.",
+      "deliveryTime": "Hora de entrega",
+      "timezone": "Fuso horário",
+      "weekday": "Dia da semana",
+      "monthDay": "Dia do mês",
+      "scheduleHint": "Os horários avançam em intervalos de 15 minutos. Novos relatórios usam 08:00 no fuso do navegador.",
+      "deleteConfirm": "Excluir o relatório “{{name}}”? O histórico de entregas também será removido.",
+      "optedOut": "Você cancelou este relatório.",
+      "resubscribe": "Assinar novamente",
+      "empty": { "title": "Nenhum relatório", "description": "Crie um relatório com os sites, destinatários e horário adequados ao seu fluxo.", "action": "Criar relatório" },
+      "presets": {
+        "site_summary": { "title": "Resumo do site", "description": "Métricas, metas, tendência, páginas e referências de um site." },
+        "portfolio_digest": { "title": "Resumo do portfólio", "description": "Comparação compacta dos sites selecionados ou acessíveis." },
+        "opportunity_brief": { "title": "Resumo de oportunidades", "description": "Oportunidades validadas com evidências citadas; e-mails vazios são suprimidos." }
       },
-      "perSite": {
-        "title": "Relatórios por Site",
-        "description": "E-mails individuais para cada site.",
-        "empty": "Nenhum site encontrado. Adicione um site para configure relatórios por site."
+      "scope": { "label": "Escopo", "personal": "Pessoal", "team": "Equipe" },
+      "sites": { "label": "Sites", "placeholder": "Selecione sites" },
+      "recipients": {
+        "label": "Destinatários", "placeholder": "Selecione usuários do HitKeep",
+        "externalLabel": "Destinatários de email externos", "externalPlaceholder": "cliente@exemplo.com",
+        "externalHint": "Destinatários externos devem confirmar antes de receber relatórios. Máximo de 25 por relatório.",
+        "proNudge": "Destinatários externos de relatórios agendados estão disponíveis nos planos Pro e Business. No Free, remova os endereços externos existentes antes de salvar alterações.",
+        "proRequired": "Destinatários externos exigem o plano Pro ou superior.",
+        "upgradeToPro": "Fazer upgrade para Pro",
+        "add": "Adicionar email", "invalidEmail": "Insira um endereço de email válido.", "limit": "Um relatório pode ter no máximo 25 destinatários externos.",
+        "removeEmail": "Remover {{email}}", "resend": "Reenviar", "resent": "Email de confirmação reenviado.",
+        "resendFailed": "O email de confirmação ainda não pode ser reenviado.", "removeConfirm": "Remover {{email}} deste relatório?", "removed": "Destinatário externo removido."
       },
+      "recipientStatus": { "confirmed": "Confirmado", "pending_confirmation": "Confirmação pendente", "opted_out": "Cancelado", "expired": "Confirmação expirada", "invitation_failed": "Falha no convite" },
+      "schedule": { "label": "Agendamento" },
       "frequency": {
-        "daily": {
-          "label": "Diário",
-          "hint": "Estatísticas do dia anterior"
-        },
-        "weekly": {
-          "label": "Semanal",
-          "hint": "Toda segunda-feira, cobre os últimos 7 dias"
-        },
-        "monthly": {
-          "label": "Mensal",
-          "hint": "1º dia de cada mês, cobre o mês passado"
-        }
-      }
+        "label": "Frequência",
+        "daily": { "label": "Diário", "hint": "Dia anterior" },
+        "weekly": { "label": "Semanal", "hint": "Sete dias anteriores" },
+        "monthly": { "label": "Mensal", "hint": "Mês anterior" }
+      },
+      "weekdays": { "0": "Domingo", "1": "Segunda-feira", "2": "Terça-feira", "3": "Quarta-feira", "4": "Quinta-feira", "5": "Sexta-feira", "6": "Sábado" },
+      "status": { "draft": "Rascunho", "active": "Ativo", "paused": "Pausado" },
+      "runStatus": { "queued": "Na fila", "running": "Enviando", "sending": "Enviando", "completed": "Aceito pelo servidor de e-mail", "accepted": "Aceito pelo servidor de e-mail", "partial": "Parcialmente aceito pelo servidor de e-mail", "failed": "Falhou", "skipped": "Ignorado" },
+      "actions": { "preview": "Gerar prévia", "test": "Enviar teste", "history": "Histórico", "duplicate": "Duplicar", "pause": "Pausar", "resume": "Retomar", "retry": "Tentar novamente" },
+      "editor": { "createTitle": "Criar relatório", "editTitle": "Editar relatório", "presetStep": "Escolha um modelo", "sitesStep": "Escolha os sites", "recipientsStep": "Escolha os destinatários", "scheduleStep": "Defina o agendamento", "previewStep": "Prévia" },
+      "saveDraft": "Salvar rascunho",
+      "activate": "Salvar e ativar",
+      "history": { "title": "Histórico de entregas", "empty": "Nenhuma execução agendada.", "deliveries": "entregas", "attempts": "tentativas", "acceptedAt": "Aceito", "retryAt": "Próxima tentativa" },
+      "errors": { "load": "Não foi possível carregar os relatórios.", "save": "Não foi possível salvar o relatório.", "preview": "Não foi possível gerar a prévia.", "test": "O servidor não aceitou a mensagem de teste.", "action": "A ação do relatório falhou." }
     },
     "apiClients": {
       "title": "Clientes de API",
@@ -1858,6 +1907,7 @@
             "members": "Até {{count}} membros na equipe",
             "retention": "{{count}} anos de retenção de dados",
             "retentionDays": "{{count}} dias de retenção de dados",
+            "externalReportRecipients": "Destinatários externos de relatórios agendados",
             "customDomains": "Domínios de rastreamento personalizados",
             "sso": "Login único (SSO)"
           }
@@ -3545,5 +3595,14 @@
       "free": "Plano gratuito",
       "aria": "Você está no plano gratuito – veja os planos e faça upgrade"
     }
+  },
+  "reportConfirmation": {
+    "title": "Confirmar relatório agendado", "subtitle": "Revise exatamente o que você concorda em receber.",
+    "team": "Equipe", "report": "Relatório", "cadence": "Frequência", "sites": "Sites",
+    "disclaimer": "A confirmação não cria uma conta nem concede acesso ao HitKeep, à equipe ou aos painéis. Você pode cancelar em qualquer email do relatório.",
+    "confirm": "Confirmar relatórios", "decline": "Recusar",
+    "invalid": { "title": "Este link de confirmação não está disponível", "description": "Ele pode ser inválido, expirado, já usado ou substituído. Peça ao responsável pelo relatório para reenviá-lo." },
+    "confirmed": { "title": "Entrega do relatório confirmada", "description": "Você receberá os próximos relatórios agendados. Relatórios anteriores à confirmação não serão reenviados." },
+    "declined": { "title": "Entrega do relatório recusada", "description": "Você não receberá este relatório, a menos que aceite uma nova confirmação depois." }
   }
 }

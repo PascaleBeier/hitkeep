@@ -44,8 +44,8 @@
     "supportAria": "Ouvrir le support HitKeep dans un nouvel onglet",
     "settings": "Paramètres",
     "settingsAria": "Aller aux paramètres",
-    "emailReports": "Rapports par email",
-    "emailReportsAria": "Aller aux rapports par email",
+    "emailReports": "Rapports",
+    "emailReportsAria": "Aller aux rapports",
     "administration": "Administration",
     "systemSettings": "Paramètres système",
     "systemSettingsAria": "Aller aux paramètres système",
@@ -264,7 +264,12 @@
       "googleSearchConsoleSyncFailed": "Synchronisation Search Console échouée",
       "askAIRequested": "Ask AI demandé",
       "askAIResponded": "Réponse Ask AI",
-      "askAIHistoryViewed": "Historique Ask AI consulté"
+      "askAIHistoryViewed": "Historique Ask AI consulté",
+      "reportCreated": "Rapport créé",
+      "reportUpdated": "Rapport mis à jour",
+      "reportDeleted": "Rapport supprimé",
+      "reportTestSent": "Test du rapport envoyé",
+      "reportRetryRequested": "Nouvelle tentative du rapport demandée"
     },
     "columns": {
       "evidence": "Preuves",
@@ -299,7 +304,8 @@
       "permission": "Permission",
       "googleSearchConsoleConnection": "Connexion Search Console",
       "googleSearchConsoleProperty": "Propriété Search Console",
-      "googleSearchConsoleSync": "Synchronisation Search Console"
+      "googleSearchConsoleSync": "Synchronisation Search Console",
+      "report": "Rapport"
     },
     "roles": {
       "owner": "Propriétaire",
@@ -1144,31 +1150,74 @@
       }
     },
     "reports": {
-      "breadcrumb": "Rapports par email",
-      "subtitle": "Configurez des emails d'analyse planifiés pour vos sites.",
-      "digest": {
-        "title": "Résumé consolidé",
-        "description": "Recevez un email récapitulatif pour tous vos sites."
+      "breadcrumb": "Rapports",
+      "subtitle": "Créez des rapports d’analyse fiables et planifiés pour vous ou votre équipe.",
+      "newReport": "Nouveau rapport",
+      "mailUnavailable": "SMTP est indisponible. Vous pouvez modifier les brouillons, mais pas activer, tester ou relancer les rapports.",
+      "mailUnavailableDraft": "L’envoi d’e-mails est indisponible. Enregistrez ce rapport comme brouillon jusqu’à la configuration de SMTP.",
+            "saved": "Rapport enregistré.",
+            "deleted": "Rapport supprimé.",
+            "emptyFiltered": "Aucun rapport ne correspond à votre recherche.",
+      "previewSuppressed": "Aucun e-mail ne serait envoyé, car ce rapport ne contient aucun contenu éligible pour la période sélectionnée.",
+      "previewDeliverable": "{{count}} destinataire(s) confirmé(s) recevraient ce rapport.",
+      "previewPending": "{{count}} destinataire(s) externe(s) sont en attente de confirmation.",
+      "testAccepted": "Le serveur de messagerie a accepté le message de test.",
+      "retryQueued": "Nouvelle tentative mise en file.",
+      "resubscribed": "Vous êtes de nouveau abonné à ce rapport.",
+      "copyName": "Copie de {{name}}",
+      "legacy": "Migré",
+      "name": "Nom du rapport",
+      "namePlaceholder": "p. ex. revue de croissance du lundi",
+      "nextRun": "Prochain envoi",
+      "lastOutcome": "Dernier résultat",
+      "notAvailable": "Pas encore",
+      "allAccessibleSites": "Tous les sites accessibles",
+      "selectedSites": "Sites sélectionnés",
+      "personalRecipient": "Les rapports personnels sont envoyés uniquement à votre compte HitKeep.",
+      "deliveryTime": "Heure d’envoi",
+      "timezone": "Fuseau horaire",
+      "weekday": "Jour de la semaine",
+      "monthDay": "Jour du mois",
+      "scheduleHint": "Les heures sont proposées par pas de 15 minutes. Les nouveaux rapports utilisent 08:00 dans le fuseau du navigateur.",
+      "deleteConfirm": "Supprimer le rapport « {{name}} » ? L’historique d’envoi sera également supprimé.",
+      "optedOut": "Vous vous êtes désabonné de ce rapport.",
+      "resubscribe": "Se réabonner",
+      "empty": { "title": "Aucun rapport", "description": "Créez un rapport nommé avec les sites, destinataires et horaires adaptés à votre activité.", "action": "Créer un rapport" },
+      "presets": {
+        "site_summary": { "title": "Résumé du site", "description": "Indicateurs, objectifs, tendance, pages et référents d’un site." },
+        "portfolio_digest": { "title": "Synthèse du portefeuille", "description": "Comparaison compacte des sites sélectionnés ou accessibles." },
+        "opportunity_brief": { "title": "Synthèse des opportunités", "description": "Opportunités validées avec preuves citées ; les e-mails vides sont supprimés." }
       },
-      "perSite": {
-        "title": "Rapports par site",
-        "description": "Emails individuels pour chaque site.",
-        "empty": "Aucun site trouvé. Ajoutez un site pour configurer des rapports."
+      "scope": { "label": "Portée", "personal": "Personnel", "team": "Équipe" },
+      "sites": { "label": "Sites", "placeholder": "Sélectionner des sites" },
+      "recipients": {
+        "label": "Destinataires", "placeholder": "Sélectionner des utilisateurs HitKeep",
+        "externalLabel": "Destinataires e-mail externes", "externalPlaceholder": "client@exemple.fr",
+        "externalHint": "Les destinataires externes doivent confirmer avant de recevoir les rapports. Maximum 25 par rapport.",
+        "proNudge": "Les destinataires externes de rapports programmés sont disponibles avec Pro et Business. Sur Free, supprimez les adresses externes existantes avant d’enregistrer des modifications.",
+        "proRequired": "Les destinataires externes nécessitent l’offre Pro ou supérieure.",
+        "upgradeToPro": "Passer à Pro",
+        "add": "Ajouter l’e-mail", "invalidEmail": "Saisissez une adresse e-mail valide.", "limit": "Un rapport peut avoir au maximum 25 destinataires externes.",
+        "removeEmail": "Supprimer {{email}}", "resend": "Renvoyer", "resent": "E-mail de confirmation renvoyé.",
+        "resendFailed": "L’e-mail de confirmation ne peut pas encore être renvoyé.", "removeConfirm": "Retirer {{email}} de ce rapport ?", "removed": "Destinataire externe supprimé."
       },
+      "recipientStatus": { "confirmed": "Confirmé", "pending_confirmation": "Confirmation en attente", "opted_out": "Désabonné", "expired": "Confirmation expirée", "invitation_failed": "Échec de l’invitation" },
+      "schedule": { "label": "Planification" },
       "frequency": {
-        "daily": {
-          "label": "Quotidien",
-          "hint": "Statistiques du jour précédent"
-        },
-        "weekly": {
-          "label": "Hebdomadaire",
-          "hint": "Chaque lundi, les 7 derniers jours"
-        },
-        "monthly": {
-          "label": "Mensuel",
-          "hint": "Le 1er du mois, mois précédent"
-        }
-      }
+        "label": "Fréquence",
+        "daily": { "label": "Quotidien", "hint": "Jour précédent" },
+        "weekly": { "label": "Hebdomadaire", "hint": "Sept jours précédents" },
+        "monthly": { "label": "Mensuel", "hint": "Mois civil précédent" }
+      },
+      "weekdays": { "0": "Dimanche", "1": "Lundi", "2": "Mardi", "3": "Mercredi", "4": "Jeudi", "5": "Vendredi", "6": "Samedi" },
+      "status": { "draft": "Brouillon", "active": "Actif", "paused": "En pause" },
+      "runStatus": { "queued": "En attente", "running": "Envoi", "sending": "Envoi", "completed": "Accepté par le serveur de messagerie", "accepted": "Accepté par le serveur de messagerie", "partial": "Partiellement accepté par le serveur de messagerie", "failed": "Échec", "skipped": "Ignoré" },
+      "actions": { "preview": "Générer l’aperçu", "test": "Envoi test", "history": "Historique", "duplicate": "Dupliquer", "pause": "Mettre en pause", "resume": "Reprendre", "retry": "Réessayer" },
+      "editor": { "createTitle": "Créer un rapport", "editTitle": "Modifier le rapport", "presetStep": "Choisir un modèle", "sitesStep": "Choisir les sites", "recipientsStep": "Choisir les destinataires", "scheduleStep": "Définir la planification", "previewStep": "Aperçu" },
+      "saveDraft": "Enregistrer le brouillon",
+      "activate": "Enregistrer et activer",
+      "history": { "title": "Historique d’envoi", "empty": "Aucune exécution planifiée.", "deliveries": "livraisons", "attempts": "tentatives", "acceptedAt": "Accepté", "retryAt": "Prochaine tentative" },
+      "errors": { "load": "Impossible de charger les rapports.", "save": "Impossible d’enregistrer le rapport.", "preview": "Impossible de générer l’aperçu.", "test": "Le serveur n’a pas accepté le message de test.", "action": "L’action sur le rapport a échoué." }
     },
     "apiClients": {
       "title": "Clients API",
@@ -1868,6 +1917,7 @@
             "members": "Jusqu'à {{count}} membres d'équipe",
             "retention": "{{count}} ans de rétention des données",
             "retentionDays": "{{count}} jours de rétention des données",
+            "externalReportRecipients": "Destinataires externes de rapports programmés",
             "customDomains": "Domaines de suivi personnalisés",
             "sso": "Authentification unique (SSO)"
           }
@@ -3572,5 +3622,14 @@
       "free": "Offre gratuite",
       "aria": "Vous utilisez l'offre gratuite – voir les offres et mettre à niveau"
     }
+  },
+  "reportConfirmation": {
+    "title": "Confirmer le rapport planifié", "subtitle": "Vérifiez précisément ce que vous acceptez de recevoir.",
+    "team": "Équipe", "report": "Rapport", "cadence": "Fréquence", "sites": "Sites",
+    "disclaimer": "La confirmation ne crée aucun compte et ne donne accès ni à HitKeep, ni à l’équipe, ni à ses tableaux de bord. Vous pouvez vous désabonner depuis chaque e-mail de rapport.",
+    "confirm": "Confirmer les rapports", "decline": "Refuser",
+    "invalid": { "title": "Ce lien de confirmation n’est pas disponible", "description": "Il peut être invalide, expiré, déjà utilisé ou remplacé. Demandez au gestionnaire du rapport de le renvoyer." },
+    "confirmed": { "title": "Envoi du rapport confirmé", "description": "Vous recevrez les prochains rapports planifiés. Les rapports antérieurs à la confirmation ne sont pas renvoyés." },
+    "declined": { "title": "Envoi du rapport refusé", "description": "Vous ne recevrez pas ce rapport, sauf si vous acceptez une nouvelle confirmation ultérieurement." }
   }
 }

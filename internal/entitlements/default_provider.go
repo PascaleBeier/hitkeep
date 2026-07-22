@@ -18,7 +18,8 @@ func NewDefaultProvider() *DefaultProvider {
 // ForTenant returns unlimited entitlements (all zeros = unlimited, all bools = true).
 func (p *DefaultProvider) ForTenant(_ context.Context, _ uuid.UUID) (*Entitlements, error) {
 	return &Entitlements{
-		AllowSSO:            true,
-		AllowCustomBranding: true,
+		AllowSSO:                      true,
+		AllowCustomBranding:           true,
+		AllowExternalReportRecipients: true,
 	}, nil
 }

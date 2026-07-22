@@ -78,7 +78,12 @@ func openAPIV1Parameters() map[string]any {
 			"description": "Export format. Supported values: xlsx, csv, parquet, json, ndjson. Defaults: xlsx for takeout endpoints, csv for hits export endpoints.",
 			"schema":      map[string]any{"type": "string", "enum": exportfmt.SupportedFormats()},
 		},
-		"avatarSize":   map[string]any{"name": "s", "in": "query", "schema": map[string]any{"type": "integer", "minimum": 32, "maximum": 256}},
-		"reportSiteID": map[string]any{"name": "site_id", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}, "description": "Site UUID."},
+		"avatarSize":              map[string]any{"name": "s", "in": "query", "schema": map[string]any{"type": "integer", "minimum": 32, "maximum": 256}},
+		"reportSiteID":            map[string]any{"name": "site_id", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}, "description": "Site UUID."},
+		"reportID":                map[string]any{"name": "report_id", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}, "description": "Report definition UUID."},
+		"reportRunID":             map[string]any{"name": "run_id", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}, "description": "Report run UUID."},
+		"reportRecipientID":       map[string]any{"name": "recipient_id", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}, "description": "Stable report recipient UUID."},
+		"reportConfirmationToken": map[string]any{"name": "opaque_token", "in": "path", "required": true, "schema": map[string]any{"type": "string"}, "description": "Single-use opaque report-recipient confirmation token."},
+		"unsubscribeToken":        map[string]any{"name": "opaque_token", "in": "path", "required": true, "schema": map[string]any{"type": "string"}, "description": "Opaque signed unsubscribe token."},
 	}
 }

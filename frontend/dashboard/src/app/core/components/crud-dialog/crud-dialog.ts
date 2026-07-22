@@ -14,6 +14,7 @@ export class CrudDialog {
     readonly submitLabel = input('');
     readonly cancelLabel = input('');
     readonly submitIcon = input('pi pi-check');
+    readonly submitDisabled = input(false);
     readonly saving = input(false);
     readonly width = input('42rem');
 

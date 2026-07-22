@@ -599,6 +599,59 @@ func openAPIV1AdminSitePaths() map[string]any {
 				jsonBody(map[string]any{"$ref": "#/components/schemas/DigestSubscription"}),
 				map[string]any{"204": desc("Updated"), "400": errResp("Invalid site ID or request")}),
 		},
+		"/api/reports": map[string]any{
+			"get": op([]string{"Reports"}, "List named reports", "Lists personal and team report definitions visible to the authenticated user, including schedule, recipients, next run, and last outcome.", secCookie(), nil, nil,
+				map[string]any{"200": jsonSchemaResp("Reports", map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/ReportDefinition"}})}),
+			"post": op([]string{"Reports"}, "Create report", "Creates a personal or authorized team report. Active reports require configured mail delivery.", secCookie(), nil,
+				jsonBody(map[string]any{"$ref": "#/components/schemas/ReportDefinitionInput"}),
+				map[string]any{"201": jsonRefResp("Created report", "#/components/schemas/ReportDefinition"), "400": errResp("Invalid report"), "409": errResp("Mail unavailable")}),
+		},
+		"/api/reports/preview": map[string]any{
+			"post": op([]string{"Reports"}, "Preview report", "Validates a draft report and returns its resolved schedule and reporting period without persisting rendered email content.", secCookie(), nil,
+				jsonBody(map[string]any{"type": "object", "properties": map[string]any{"definition": map[string]any{"$ref": "#/components/schemas/ReportDefinitionInput"}, "report_id": map[string]any{"type": "string", "format": "uuid"}}, "required": []string{"definition"}}),
+				map[string]any{"200": jsonRefResp("Report preview", "#/components/schemas/ReportPreview"), "400": errResp("Invalid report")}),
+		},
+		"/api/reports/{report_id}": map[string]any{
+			"get": op([]string{"Reports"}, "Get report", "Returns one report visible to the authenticated user.", secCookie(), []any{paramRef("#/components/parameters/reportID")}, nil,
+				map[string]any{"200": jsonRefResp("Report", "#/components/schemas/ReportDefinition"), "404": errResp("Not found")}),
+			"patch": op([]string{"Reports"}, "Update report", "Updates an owned personal report or an authorized team report and recalculates its next UTC run.", secCookie(), []any{paramRef("#/components/parameters/reportID")},
+				jsonBody(map[string]any{"$ref": "#/components/schemas/ReportDefinitionUpdate"}), map[string]any{"200": jsonRefResp("Updated report", "#/components/schemas/ReportDefinition"), "400": errResp("Invalid report"), "409": errResp("Mail unavailable")}),
+			"delete": op([]string{"Reports"}, "Delete report", "Deletes a manageable report and its delivery ledger.", secCookie(), []any{paramRef("#/components/parameters/reportID")}, nil,
+				map[string]any{"204": desc("Deleted"), "404": errResp("Not found")}),
+		},
+		"/api/reports/{report_id}/test-send": map[string]any{
+			"post": op([]string{"Reports"}, "Test report delivery", "Builds the current report content for its latest completed period and sends it only to the current user. Team tests are audited.", secCookie(), []any{paramRef("#/components/parameters/reportID")}, nil,
+				map[string]any{"200": jsonRefResp("Accepted by mail server", "#/components/schemas/ReportTestSendResponse"), "409": errResp("Mail unavailable"), "422": errResp("Report content unavailable or suppressed"), "502": errResp("Mail server did not accept message")}),
+		},
+		"/api/reports/{report_id}/runs": map[string]any{
+			"get": op([]string{"Reports"}, "List report runs", "Lists recent runs and recipient delivery outcomes without rendered bodies or raw SMTP errors.", secCookie(), []any{paramRef("#/components/parameters/reportID")}, nil,
+				map[string]any{"200": jsonSchemaResp("Report runs", map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/ReportRun"}})}),
+		},
+		"/api/reports/{report_id}/resubscribe": map[string]any{
+			"post": op([]string{"Reports"}, "Resubscribe to report", "Clears the current user's opt-out for this report. Team managers cannot resubscribe another recipient.", secCookie(), []any{paramRef("#/components/parameters/reportID")}, nil,
+				map[string]any{"204": desc("Resubscribed"), "404": errResp("Not found")}),
+		},
+		"/api/reports/{report_id}/recipients/{recipient_id}/confirmation": map[string]any{
+			"post": op([]string{"Reports"}, "Resend external recipient confirmation", "Rotates and resends an external recipient's confirmation token. Requires team owner or admin access and enforces a 15-minute cooldown.", secCookie(), []any{paramRef("#/components/parameters/reportID"), paramRef("#/components/parameters/reportRecipientID")}, nil,
+				map[string]any{"202": desc("Confirmation accepted by mail server"), "404": errResp("Not found"), "409": errResp("Mail unavailable"), "429": errResp("Confirmation sent recently"), "502": errResp("Mail server did not accept message")}),
+		},
+		"/api/report-recipient-confirmations/{opaque_token}": map[string]any{
+			"get": op([]string{"Reports"}, "Inspect report recipient confirmation", "Returns non-sensitive team, report, cadence, site-domain, and expiry metadata without changing consent.", nil, []any{paramRef("#/components/parameters/reportConfirmationToken")}, nil,
+				map[string]any{"200": jsonRefResp("Confirmation metadata", "#/components/schemas/ReportRecipientConfirmation"), "400": errResp("Invalid confirmation"), "410": errResp("Expired confirmation")}),
+			"post": op([]string{"Reports"}, "Decide report recipient confirmation", "Confirms or declines external report delivery by explicit POST. The token is single-use.", nil, []any{paramRef("#/components/parameters/reportConfirmationToken")},
+				jsonBody(map[string]any{"type": "object", "properties": map[string]any{"action": map[string]any{"type": "string", "enum": []string{"confirm", "decline"}}}, "required": []string{"action"}}),
+				map[string]any{"204": desc("Consent decision recorded"), "400": errResp("Invalid confirmation"), "410": errResp("Expired confirmation")}),
+		},
+		"/api/report-runs/{run_id}/retry": map[string]any{
+			"post": op([]string{"Reports"}, "Retry failed report run", "Queues failed deliveries from a manageable report run for retry with the stable message ID.", secCookie(), []any{paramRef("#/components/parameters/reportRunID")}, nil,
+				map[string]any{"202": desc("Retry queued"), "409": errResp("Mail unavailable"), "404": errResp("Not found")}),
+		},
+		"/api/reports/unsubscribe/{opaque_token}": map[string]any{
+			"get": op([]string{"Reports"}, "Unsubscribe from report", "Visible unsubscribe target that opts the signed recipient out of one report.", nil, []any{paramRef("#/components/parameters/unsubscribeToken")}, nil,
+				map[string]any{"200": desc("Unsubscribed"), "400": errResp("Invalid token")}),
+			"post": op([]string{"Reports"}, "One-click unsubscribe", "RFC 8058 one-click unsubscribe endpoint. The opaque token is signed and only its hash is stored.", nil, []any{paramRef("#/components/parameters/unsubscribeToken")}, nil,
+				map[string]any{"204": desc("Unsubscribed"), "400": errResp("Invalid token")}),
+		},
 
 		"/api/sites/{id}/share": map[string]any{
 			"get": op([]string{"Share"}, "List share links", "Lists share links for site.", secCookie(), []any{paramRef("#/components/parameters/siteID")}, nil, map[string]any{"200": jsonSchemaResp("Share links", map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/ShareLink"}})}),

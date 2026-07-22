@@ -12,13 +12,13 @@
 {{ range .Items }}
 <mj-divider padding-top="8px" padding-bottom="12px" />
 <mj-text css-class="dark-text" font-size="16px" font-weight="700" color="#18181a" padding-bottom="2px">
-  <a href="{{ .URL }}" style="color: #18181a; text-decoration: none;">{{ .Title }}</a>
+  {{ if .URL }}<a href="{{ .URL }}" style="color: #18181a; text-decoration: none;">{{ .Title }}</a>{{ else }}{{ .Title }}{{ end }}
 </mj-text>
 <mj-text css-class="muted" color="#475569" padding-top="0" padding-bottom="8px">
   {{ .Digest }}
 </mj-text>
 <mj-text css-class="muted" color="#64748b" font-size="13px" padding-top="0" padding-bottom="8px">
-  {{ t "opportunities.digest.impact" }}: {{ .ImpactValue }} · {{ t "opportunities.digest.score" }}: {{ .Score }} · {{ t "opportunities.digest.confidence" }}: {{ .Confidence }}
+  {{ t "opportunities.digest.impact" }}: {{ .ImpactValue }} · {{ t "opportunities.digest.score" }}: {{ formatInt .Score }} · {{ t "opportunities.digest.confidence" }}: {{ .Confidence }}
 </mj-text>
 <mj-text css-class="dark-text" color="#334155" padding-top="0" padding-bottom="6px">
   <strong>{{ t "opportunities.digest.next_action" }}:</strong> {{ .Action }}
@@ -31,13 +31,14 @@
 {{ end }}
 {{ end }}
 
-<mj-button href="{{ .OpportunitiesURL }}" padding-top="24px" padding-bottom="8px">
+{{ if .OpportunitiesURL }}<mj-button href="{{ .OpportunitiesURL }}" padding-top="24px" padding-bottom="8px">
   {{ t "opportunities.digest.view_opportunities" }}
-</mj-button>
+</mj-button>{{ end }}
 
 <mj-divider padding-top="12px" padding-bottom="8px" />
 <mj-text css-class="info-text" font-size="11px" color="#94a3b8" align="center" padding-top="0">
   {{ t "opportunities.digest.received_because" }}
-  <a href="{{ .SettingsURL }}" style="color: #33d399; text-decoration: none;">{{ t "reports.manage_preferences" }}</a>
+  {{ if .SettingsURL }}<a href="{{ .SettingsURL }}" style="color: #33d399; text-decoration: none;">{{ t "reports.manage_preferences" }}</a>{{ end }}
+  {{ if .UnsubscribeURL }}{{ if .SettingsURL }} · {{ end }}<a href="{{ .UnsubscribeURL }}" style="color: #33d399; text-decoration: none;">{{ t "reports.unsubscribe" }}</a>{{ end }}
 </mj-text>
 {{ end }}

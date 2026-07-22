@@ -1,6 +1,6 @@
 import { Component, effect, inject, signal, computed, ChangeDetectionStrategy, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { DOCUMENT, NgOptimizedImage } from '@angular/common';
 import { ReactiveFormsModule } from '@angular/forms';
@@ -116,10 +116,12 @@ export class Dashboard {
     private transloco = inject(TranslocoService);
     private destroyRef = inject(DestroyRef);
     private router = inject(Router);
+    private route = inject(ActivatedRoute);
     private onboarding = inject(OnboardingService);
     private document = inject(DOCUMENT);
     private realtimeRefresh = inject(RealtimeRefreshCoordinator);
     protected readonly reportRange = injectReportRange();
+    private reportLinkApplied = false;
     private readonly activeLanguage = injectActiveLang();
     private statsQuery = injectStatsQuery();
     protected isShareMode = computed(() => this.shareService.isShareMode());
@@ -502,6 +504,28 @@ export class Dashboard {
         });
 
         this.refreshOnboarding();
+
+        effect(() => {
+            if (this.reportLinkApplied) return;
+            const siteID = this.route.snapshot.queryParamMap.get('site');
+            const from = this.route.snapshot.queryParamMap.get('from');
+            const to = this.route.snapshot.queryParamMap.get('to');
+            const sites = this.siteService.sites();
+            if (siteID && sites.length > 0) {
+                const site = sites.find((candidate) => candidate.id === siteID);
+                if (site) this.siteService.selectSite(site);
+            }
+            if (from && to) {
+                const start = new Date(`${from}T00:00:00`);
+                const end = new Date(`${to}T23:59:59.999`);
+                if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && start <= end) {
+                    this.reportRange.selectRange({ value: { value: 'custom' }, customRange: [start, end] });
+                }
+            }
+            if ((!siteID || sites.length > 0) && (!from || !to || this.reportRange.selectedRange().value === 'custom')) {
+                this.reportLinkApplied = true;
+            }
+        });
 
         effect(() => {
             const site = this.siteService.activeSite();

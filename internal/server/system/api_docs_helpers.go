@@ -25,6 +25,7 @@ func cloudOp(summary string, description string, security []any, parameters []an
 	out := op([]string{"Cloud"}, summary, description, security, parameters, requestBody, responses)
 	out["x-hitkeep-availability"] = "cloud"
 	out["x-hitkeep-build-tags"] = []string{"billing"}
+	out["x-internal"] = true
 	return out
 }
 

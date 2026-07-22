@@ -47,7 +47,8 @@ describe('TeamOverviewPage', () => {
             max_team_members: 8,
             max_retention_days: 365,
             allow_sso: true,
-            allow_custom_branding: true
+            allow_custom_branding: true,
+            allow_external_report_recipients: false
         },
         plan: {
             code: 'free',
@@ -127,6 +128,7 @@ describe('TeamOverviewPage', () => {
                                                 members: 'Up to {{count}} team members',
                                                 retention: '{{count}}-year data retention',
                                                 retentionDays: '{{count}}-day data retention',
+                                                externalReportRecipients: 'External scheduled-report recipients',
                                                 customDomains: 'Custom tracking domains',
                                                 sso: 'Single sign-on (SSO)'
                                             }
@@ -197,7 +199,8 @@ describe('TeamOverviewPage', () => {
                                         max_team_members: 3,
                                         max_retention_days: 60,
                                         allow_sso: false,
-                                        allow_custom_branding: false
+                                        allow_custom_branding: false,
+                                        allow_external_report_recipients: false
                                     }
                                 },
                                 {
@@ -208,7 +211,8 @@ describe('TeamOverviewPage', () => {
                                         max_team_members: 5,
                                         max_retention_days: 365,
                                         allow_sso: false,
-                                        allow_custom_branding: false
+                                        allow_custom_branding: false,
+                                        allow_external_report_recipients: true
                                     }
                                 },
                                 {
@@ -219,7 +223,8 @@ describe('TeamOverviewPage', () => {
                                         max_team_members: 20,
                                         max_retention_days: 1095,
                                         allow_sso: true,
-                                        allow_custom_branding: true
+                                        allow_custom_branding: true,
+                                        allow_external_report_recipients: true
                                     }
                                 }
                             ])
@@ -277,6 +282,7 @@ describe('TeamOverviewPage', () => {
         expect(text).toContain('Upgrade to Pro');
         expect(text).toContain('Upgrade to Business');
         expect(text).toContain('Single sign-on (SSO)');
+        expect(text).toContain('External scheduled-report recipients');
         expect(text).toContain('€150');
         expect(text).toContain('€390');
     });
@@ -332,7 +338,8 @@ describe('TeamOverviewPage', () => {
                 max_team_members: 0,
                 max_retention_days: 0,
                 allow_sso: true,
-                allow_custom_branding: true
+                allow_custom_branding: true,
+                allow_external_report_recipients: true
             },
             plan: {
                 code: 'operator',

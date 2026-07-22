@@ -1209,6 +1209,78 @@ func TestExportSiteDataJSONIncludesSafeOpportunitiesAndAIRunMetadata(t *testing.
 	}
 }
 
+func TestExportUserDataIncludesSafeReportMetadataWithoutDeliverySecrets(t *testing.T) {
+	ctx, store, service, userID, siteID := setupTakeoutFixture(t)
+	t.Cleanup(func() { _ = store.Close() })
+
+	report, err := store.CreateReportDefinition(ctx, userID, api.CreateReportRequest{
+		Name: "Takeout report", Scope: api.ReportScopePersonal,
+		Preset: api.ReportPresetSiteSummary, SiteMode: api.ReportSiteModeSelected,
+		SiteIDs: []uuid.UUID{siteID}, RecipientUserIDs: []uuid.UUID{userID},
+		Schedule: api.ReportSchedule{Frequency: api.ReportFrequencyDaily, Timezone: "Europe/Berlin", LocalTime: "08:15"},
+		Status:   api.ReportStatusDraft,
+	}, "takeout-secret")
+	if err != nil {
+		t.Fatalf("create report: %v", err)
+	}
+	if _, err := store.DB().ExecContext(ctx, `
+		UPDATE report_recipients SET unsubscribe_token_hash = 'do-not-export-unsubscribe-hash'
+		WHERE report_id = ? AND user_id = ?
+	`, report.ID, userID); err != nil {
+		t.Fatalf("set report token hash: %v", err)
+	}
+
+	now := time.Now().UTC()
+	runID := uuid.New()
+	if _, err := store.DB().ExecContext(ctx, `
+		INSERT INTO report_runs (
+			id, report_id, scheduled_for, period_start, period_end, status,
+			started_at, completed_at, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, 'completed', ?, ?, ?, ?)
+	`, runID, report.ID, now, now.Add(-24*time.Hour), now, now, now, now, now); err != nil {
+		t.Fatalf("insert report run: %v", err)
+	}
+	if _, err := store.DB().ExecContext(ctx, `
+		INSERT INTO report_deliveries (
+			id, report_id, run_id, recipient_id, recipient_kind, status, message_id,
+			attempt_count, smtp_accepted_at, created_at, updated_at
+		) SELECT ?, ?, ?, id, 'member', 'accepted', '<do-not-export-message-id>', 1, ?, ?, ?
+		  FROM report_recipients WHERE report_id = ? AND user_id = ?
+	`, uuid.New(), report.ID, runID, now, now, now, report.ID, userID); err != nil {
+		t.Fatalf("insert report delivery: %v", err)
+	}
+
+	filename, err := service.ExportUserData(ctx, userID, "json")
+	if err != nil {
+		t.Fatalf("export user json: %v", err)
+	}
+	rows := readJSONTakeoutRows(t, filename)
+	definition := findTakeoutRow(t, rows, "report_definition")
+	if takeoutString(definition["timezone"]) != "Europe/Berlin" || takeoutString(definition["local_time"]) != "08:15" {
+		t.Fatalf("report schedule missing from takeout: %#v", definition)
+	}
+	recipient := findTakeoutRow(t, rows, "report_recipient")
+	if _, ok := recipient["unsubscribe_token_hash"]; ok {
+		t.Fatalf("takeout exposed unsubscribe token hash: %#v", recipient)
+	}
+	delivery := findTakeoutRow(t, rows, "report_delivery")
+	if takeoutString(delivery["status"]) != "accepted" || takeoutString(delivery["attempt_count"]) != "1" {
+		t.Fatalf("safe delivery metadata missing from takeout: %#v", delivery)
+	}
+	if _, ok := delivery["message_id"]; ok {
+		t.Fatalf("takeout exposed report Message-ID: %#v", delivery)
+	}
+	encodedRows, err := json.Marshal(rows)
+	if err != nil {
+		t.Fatalf("marshal rows: %v", err)
+	}
+	for _, forbidden := range []string{"do-not-export-unsubscribe-hash", "do-not-export-message-id"} {
+		if strings.Contains(string(encodedRows), forbidden) {
+			t.Fatalf("takeout leaked report delivery secret %q", forbidden)
+		}
+	}
+}
+
 func requireTakeoutAIRunRejectsRawProviderPayload(t *testing.T, ctx context.Context, store *database.Store, teamID, siteID uuid.UUID) {
 	t.Helper()
 	_, err := store.AppendAIRun(ctx, database.AIRunParams{

@@ -120,6 +120,13 @@ describe('routes', () => {
         expect(route?.canActivate).toBeUndefined();
     });
 
+    it('exposes report confirmation as a public scanner-safe route', () => {
+        const route = routes.find((candidate) => candidate.path === 'report-confirmation');
+
+        expect(route?.loadComponent).toBeTruthy();
+        expect(route?.canActivate).toBeUndefined();
+    });
+
     it('exposes the social signup completion as a guarded public cloud route', () => {
         const route = routes.find((entry) => entry.path === 'signup/social/complete');
         expect(route?.loadComponent).toBeTruthy();

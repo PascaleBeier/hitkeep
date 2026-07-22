@@ -44,8 +44,8 @@
     "supportAria": "Apri il supporto di HitKeep in una nuova scheda",
     "settings": "Impostazioni",
     "settingsAria": "Vai alle impostazioni",
-    "emailReports": "Report email",
-    "emailReportsAria": "Vai ai report email",
+    "emailReports": "Report",
+    "emailReportsAria": "Vai ai report",
     "administration": "Amministrazione",
     "systemSettings": "Impostazioni di sistema",
     "systemSettingsAria": "Vai alle impostazioni di sistema",
@@ -264,7 +264,12 @@
       "googleSearchConsoleSyncFailed": "Sincronizzazione Search Console non riuscita",
       "askAIRequested": "Ask AI richiesto",
       "askAIResponded": "Risposta Ask AI",
-      "askAIHistoryViewed": "Cronologia Ask AI visualizzata"
+      "askAIHistoryViewed": "Cronologia Ask AI visualizzata",
+      "reportCreated": "Report creato",
+      "reportUpdated": "Report aggiornato",
+      "reportDeleted": "Report eliminato",
+      "reportTestSent": "Test del report inviato",
+      "reportRetryRequested": "Nuovo tentativo del report richiesto"
     },
     "columns": {
       "evidence": "Prove",
@@ -299,7 +304,8 @@
       "permission": "Permesso",
       "googleSearchConsoleConnection": "Connessione Search Console",
       "googleSearchConsoleProperty": "Proprietà Search Console",
-      "googleSearchConsoleSync": "Sincronizzazione Search Console"
+      "googleSearchConsoleSync": "Sincronizzazione Search Console",
+      "report": "Report"
     },
     "roles": {
       "owner": "Proprietario",
@@ -1141,31 +1147,74 @@
       }
     },
     "reports": {
-      "breadcrumb": "Report email",
-      "subtitle": "Configura email di analisi pianificate per i tuoi siti.",
-      "digest": {
-        "title": "Riepilogo consolidato",
-        "description": "Ricevi un'email riepilogativa per tutti i tuoi siti."
+      "breadcrumb": "Report",
+      "subtitle": "Crea report di analisi affidabili e pianificati per te o il tuo team.",
+      "newReport": "Nuovo report",
+      "mailUnavailable": "SMTP non è disponibile. Puoi modificare le bozze, ma non attivare, testare o riprovare i report.",
+      "mailUnavailableDraft": "L’invio email non è disponibile. Salva il report come bozza finché SMTP non è configurato.",
+            "saved": "Report salvato.",
+            "deleted": "Report eliminato.",
+            "emptyFiltered": "Nessun report corrisponde alla ricerca.",
+      "previewSuppressed": "Non verrebbe inviata alcuna email perché il report non contiene contenuti idonei per il periodo selezionato.",
+      "previewDeliverable": "{{count}} destinatari confermati riceverebbero questo report.",
+      "previewPending": "{{count}} destinatari esterni sono in attesa di conferma.",
+      "testAccepted": "Il server di posta ha accettato il messaggio di prova.",
+      "retryQueued": "Nuovo tentativo accodato.",
+      "resubscribed": "Sei nuovamente iscritto a questo report.",
+      "copyName": "Copia di {{name}}",
+      "legacy": "Migrato",
+      "name": "Nome del report",
+      "namePlaceholder": "es. revisione crescita del lunedì",
+      "nextRun": "Prossimo invio",
+      "lastOutcome": "Ultimo risultato",
+      "notAvailable": "Non ancora",
+      "allAccessibleSites": "Tutti i siti accessibili",
+      "selectedSites": "Siti selezionati",
+      "personalRecipient": "I report personali vengono inviati solo al tuo account HitKeep.",
+      "deliveryTime": "Ora di invio",
+      "timezone": "Fuso orario",
+      "weekday": "Giorno della settimana",
+      "monthDay": "Giorno del mese",
+      "scheduleHint": "Gli orari avanzano di 15 minuti. I nuovi report usano le 08:00 nel fuso del browser.",
+      "deleteConfirm": "Eliminare il report “{{name}}”? Verrà eliminata anche la cronologia.",
+      "optedOut": "Hai annullato l’iscrizione a questo report.",
+      "resubscribe": "Iscriviti di nuovo",
+      "empty": { "title": "Nessun report", "description": "Crea un report con siti, destinatari e orari adatti al tuo flusso.", "action": "Crea report" },
+      "presets": {
+        "site_summary": { "title": "Riepilogo sito", "description": "Metriche, obiettivi, andamento, pagine e referrer di un sito." },
+        "portfolio_digest": { "title": "Riepilogo portfolio", "description": "Confronto compatto dei siti selezionati o accessibili." },
+        "opportunity_brief": { "title": "Sintesi opportunità", "description": "Opportunità validate con prove citate; le email vuote vengono soppresse." }
       },
-      "perSite": {
-        "title": "Report per sito",
-        "description": "Email individuali per ogni sito.",
-        "empty": "Nessun sito trovato. Aggiungi un sito per configurare i report."
+      "scope": { "label": "Ambito", "personal": "Personale", "team": "Team" },
+      "sites": { "label": "Siti", "placeholder": "Seleziona siti" },
+      "recipients": {
+        "label": "Destinatari", "placeholder": "Seleziona utenti HitKeep",
+        "externalLabel": "Destinatari email esterni", "externalPlaceholder": "cliente@esempio.it",
+        "externalHint": "I destinatari esterni devono confermare prima di ricevere i report. Massimo 25 per report.",
+        "proNudge": "I destinatari esterni dei report programmati sono disponibili nei piani Pro e Business. Con Free, rimuovi gli indirizzi esterni esistenti prima di salvare le modifiche.",
+        "proRequired": "I destinatari esterni richiedono il piano Pro o superiore.",
+        "upgradeToPro": "Passa a Pro",
+        "add": "Aggiungi email", "invalidEmail": "Inserisci un indirizzo email valido.", "limit": "Un report può avere al massimo 25 destinatari esterni.",
+        "removeEmail": "Rimuovi {{email}}", "resend": "Invia di nuovo", "resent": "Email di conferma inviata di nuovo.",
+        "resendFailed": "L’email di conferma non può ancora essere inviata di nuovo.", "removeConfirm": "Rimuovere {{email}} da questo report?", "removed": "Destinatario esterno rimosso."
       },
+      "recipientStatus": { "confirmed": "Confermato", "pending_confirmation": "Conferma in attesa", "opted_out": "Disiscritto", "expired": "Conferma scaduta", "invitation_failed": "Invito non riuscito" },
+      "schedule": { "label": "Pianificazione" },
       "frequency": {
-        "daily": {
-          "label": "Giornaliero",
-          "hint": "Statistiche del giorno precedente"
-        },
-        "weekly": {
-          "label": "Settimanale",
-          "hint": "Ogni lunedì, ultimi 7 giorni"
-        },
-        "monthly": {
-          "label": "Mensile",
-          "hint": "Il 1° del mese, mese precedente"
-        }
-      }
+        "label": "Frequenza",
+        "daily": { "label": "Giornaliero", "hint": "Giorno precedente" },
+        "weekly": { "label": "Settimanale", "hint": "Sette giorni precedenti" },
+        "monthly": { "label": "Mensile", "hint": "Mese solare precedente" }
+      },
+      "weekdays": { "0": "Domenica", "1": "Lunedì", "2": "Martedì", "3": "Mercoledì", "4": "Giovedì", "5": "Venerdì", "6": "Sabato" },
+      "status": { "draft": "Bozza", "active": "Attivo", "paused": "In pausa" },
+      "runStatus": { "queued": "In coda", "running": "Invio", "sending": "Invio", "completed": "Accettato dal server di posta", "accepted": "Accettato dal server di posta", "partial": "Accettato in parte dal server di posta", "failed": "Non riuscito", "skipped": "Ignorato" },
+      "actions": { "preview": "Genera anteprima", "test": "Invio di prova", "history": "Cronologia", "duplicate": "Duplica", "pause": "Pausa", "resume": "Riprendi", "retry": "Riprova" },
+      "editor": { "createTitle": "Crea report", "editTitle": "Modifica report", "presetStep": "Scegli un modello", "sitesStep": "Scegli i siti", "recipientsStep": "Scegli i destinatari", "scheduleStep": "Imposta la pianificazione", "previewStep": "Anteprima" },
+      "saveDraft": "Salva bozza",
+      "activate": "Salva e attiva",
+      "history": { "title": "Cronologia invii", "empty": "Nessuna esecuzione pianificata.", "deliveries": "consegne", "attempts": "tentativi", "acceptedAt": "Accettato", "retryAt": "Prossimo tentativo" },
+      "errors": { "load": "Impossibile caricare i report.", "save": "Impossibile salvare il report.", "preview": "Impossibile generare l’anteprima.", "test": "Il server non ha accettato il messaggio di prova.", "action": "L’azione sul report non è riuscita." }
     },
     "apiClients": {
       "title": "Client API",
@@ -1865,6 +1914,7 @@
             "members": "Fino a {{count}} membri del team",
             "retention": "{{count}} anni di retention dei dati",
             "retentionDays": "{{count}} giorni di retention dei dati",
+            "externalReportRecipients": "Destinatari esterni dei report programmati",
             "customDomains": "Domini di tracciamento personalizzati",
             "sso": "Single sign-on (SSO)"
           }
@@ -3569,5 +3619,14 @@
       "free": "Piano gratuito",
       "aria": "Stai usando il piano gratuito: vedi i piani e fai l'upgrade"
     }
+  },
+  "reportConfirmation": {
+    "title": "Conferma il report programmato", "subtitle": "Controlla esattamente cosa accetti di ricevere.",
+    "team": "Team", "report": "Report", "cadence": "Frequenza", "sites": "Siti",
+    "disclaimer": "La conferma non crea un account e non concede accesso a HitKeep, al team o alle dashboard. Puoi annullare l’iscrizione da qualsiasi email del report.",
+    "confirm": "Conferma i report", "decline": "Rifiuta",
+    "invalid": { "title": "Questo link di conferma non è disponibile", "description": "Potrebbe essere non valido, scaduto, già usato o sostituito. Chiedi al responsabile del report di inviarlo di nuovo." },
+    "confirmed": { "title": "Invio del report confermato", "description": "Riceverai i prossimi report programmati. I report precedenti alla conferma non vengono inviati di nuovo." },
+    "declined": { "title": "Invio del report rifiutato", "description": "Non riceverai questo report finché non accetterai una nuova conferma." }
   }
 }

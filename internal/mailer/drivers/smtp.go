@@ -87,6 +87,10 @@ func heloNameFromPublicURL(publicURL string) string {
 }
 
 func (s *SMTPDriver) Send(to []string, subject string, htmlBody string, textBody string) error {
+	return s.SendWithHeaders(to, subject, htmlBody, textBody, "", nil)
+}
+
+func (s *SMTPDriver) SendWithHeaders(to []string, subject string, htmlBody string, textBody string, messageID string, headers map[string]string) error {
 	msg := mail.NewMsg()
 	if err := msg.FromFormat(s.name, s.from); err != nil {
 		return err
@@ -96,6 +100,15 @@ func (s *SMTPDriver) Send(to []string, subject string, htmlBody string, textBody
 	}
 
 	msg.Subject(subject)
+	if strings.TrimSpace(messageID) != "" {
+		msg.SetGenHeaderPreformatted(mail.HeaderMessageID, strings.TrimSpace(messageID))
+	}
+	for key, value := range headers {
+		if strings.TrimSpace(key) == "" || strings.TrimSpace(value) == "" {
+			continue
+		}
+		msg.SetGenHeader(mail.Header(key), value)
+	}
 	msg.SetBodyString(mail.TypeTextPlain, textBody)
 	msg.AddAlternativeString(mail.TypeTextHTML, htmlBody)
 

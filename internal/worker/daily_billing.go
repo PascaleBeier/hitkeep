@@ -1,3 +1,5 @@
+//go:build billing
+
 package worker
 
 import (
@@ -11,8 +13,8 @@ import (
 // name.
 func runDailyAtUTC(ctx context.Context, name string, hour int, run func(context.Context)) {
 	defer func() {
-		if r := recover(); r != nil {
-			slog.Error(name+" panicked", "error", r)
+		if recovered := recover(); recovered != nil {
+			slog.Error(name+" panicked", "error", recovered)
 		}
 	}()
 

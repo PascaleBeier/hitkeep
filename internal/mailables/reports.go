@@ -30,6 +30,7 @@ type SiteAnalyticsReport struct {
 	FreqLabel      string // e.g. "Weekly"
 	DashURL        string
 	SettingsURL    string
+	UnsubscribeURL string
 	Current        ReportStats
 	Previous       ReportStats
 	DailyPageviews []int // one value per day in the current period, for the sparkline
@@ -71,6 +72,8 @@ type DigestSiteEntry struct {
 	PrevPageviews int
 	Visitors      int
 	PrevVisitors  int
+	Goals         int
+	PrevGoals     int
 }
 
 // AnalyticsDigest implements mailer.Mailable for consolidated multi-site digests.
@@ -81,6 +84,7 @@ type AnalyticsDigest struct {
 	SubjectFreqLabel string
 	DashURL          string
 	SettingsURL      string
+	UnsubscribeURL   string
 	Sites            []DigestSiteEntry
 }
 
@@ -139,6 +143,7 @@ type OpportunityDigest struct {
 	SubjectFreqLabel string
 	OpportunitiesURL string
 	SettingsURL      string
+	UnsubscribeURL   string
 	Items            []OpportunityDigestItem
 }
 
@@ -179,6 +184,19 @@ func (m *OpportunityDigest) Template() string { return "opportunity_digest.mjml"
 func (m *OpportunityDigest) Data() any { return m }
 
 func (m *OpportunityDigest) Locale() string { return m.LocaleCode }
+
+// WithReportUnsubscribe adds the visible opt-out target to any report mailable.
+func WithReportUnsubscribe(email mailer.Mailable, unsubscribeURL string) mailer.Mailable {
+	switch value := email.(type) {
+	case *SiteAnalyticsReport:
+		value.UnsubscribeURL = unsubscribeURL
+	case *AnalyticsDigest:
+		value.UnsubscribeURL = unsubscribeURL
+	case *OpportunityDigest:
+		value.UnsubscribeURL = unsubscribeURL
+	}
+	return email
+}
 
 func opportunityDigestItem(locale, opportunitiesURL string, item opportunitysvc.DigestItem) OpportunityDigestItem {
 	return OpportunityDigestItem{

@@ -44,8 +44,8 @@
     "supportAria": "Open HitKeep-support in een nieuw tabblad",
     "settings": "Instellingen",
     "settingsAria": "Ga naar instellingen",
-    "emailReports": "E-mailrapporten",
-    "emailReportsAria": "Ga naar e-mailrapporten",
+    "emailReports": "Rapportage",
+    "emailReportsAria": "Ga naar rapportage",
     "administration": "Administratie",
     "systemSettings": "Systeeminstellingen",
     "systemSettingsAria": "Ga naar systeeminstellingen",
@@ -264,7 +264,12 @@
       "googleSearchConsoleSyncFailed": "Search Console-synchronisatie mislukt",
       "askAIRequested": "Ask AI aangevraagd",
       "askAIResponded": "Ask AI beantwoord",
-      "askAIHistoryViewed": "Ask AI-historie bekeken"
+      "askAIHistoryViewed": "Ask AI-historie bekeken",
+      "reportCreated": "Rapport aangemaakt",
+      "reportUpdated": "Rapport bijgewerkt",
+      "reportDeleted": "Rapport verwijderd",
+      "reportTestSent": "Rapporttest verzonden",
+      "reportRetryRequested": "Nieuwe rapportpoging aangevraagd"
     },
     "columns": {
       "evidence": "Bewijs",
@@ -299,7 +304,8 @@
       "permission": "Toestemming",
       "googleSearchConsoleConnection": "Search Console-verbinding",
       "googleSearchConsoleProperty": "Search Console-eigenschap",
-      "googleSearchConsoleSync": "Search Console-synchronisatie"
+      "googleSearchConsoleSync": "Search Console-synchronisatie",
+      "report": "Rapport"
     },
     "roles": {
       "owner": "Eigenaar",
@@ -1141,31 +1147,74 @@
       }
     },
     "reports": {
-      "breadcrumb": "E-mailrapporten",
-      "subtitle": "Configureer geplande analyse-e-mails voor je sites.",
-      "digest": {
-        "title": "Geconsolideerde samenvatting",
-        "description": "Ontvang één samenvattende e-mail voor al je sites."
+      "breadcrumb": "Rapportage",
+      "subtitle": "Maak betrouwbare, geplande analyserapporten voor jezelf of je team.",
+      "newReport": "Nieuw rapport",
+      "mailUnavailable": "SMTP is niet beschikbaar. Je kunt concepten bewerken, maar rapporten niet activeren, testen of opnieuw proberen.",
+      "mailUnavailableDraft": "E-mailbezorging is niet beschikbaar. Sla dit rapport op als concept totdat SMTP is ingesteld.",
+            "saved": "Rapport opgeslagen.",
+            "deleted": "Rapport verwijderd.",
+            "emptyFiltered": "Geen rapporten gevonden voor je zoekopdracht.",
+      "previewSuppressed": "Er zou geen e-mail worden verzonden omdat dit rapport geen geschikte inhoud voor de geselecteerde periode bevat.",
+      "previewDeliverable": "{{count}} bevestigde ontvanger(s) zouden dit rapport ontvangen.",
+      "previewPending": "{{count}} externe ontvanger(s) wachten op bevestiging.",
+      "testAccepted": "Het testbericht is door de mailserver geaccepteerd.",
+      "retryQueued": "Nieuwe bezorgpoging ingepland.",
+      "resubscribed": "Je bent opnieuw geabonneerd op dit rapport.",
+      "copyName": "Kopie van {{name}}",
+      "legacy": "Gemigreerd",
+      "name": "Rapportnaam",
+      "namePlaceholder": "bijv. groeibeoordeling op maandag",
+      "nextRun": "Volgende verzending",
+      "lastOutcome": "Laatste resultaat",
+      "notAvailable": "Nog niet",
+      "allAccessibleSites": "Alle toegankelijke sites",
+      "selectedSites": "Geselecteerde sites",
+      "personalRecipient": "Persoonlijke rapporten worden alleen naar je HitKeep-account gestuurd.",
+      "deliveryTime": "Bezorgtijd",
+      "timezone": "Tijdzone",
+      "weekday": "Weekdag",
+      "monthDay": "Dag van de maand",
+      "scheduleHint": "Tijden zijn beschikbaar per 15 minuten. Nieuwe rapporten gebruiken 08:00 in de tijdzone van je browser.",
+      "deleteConfirm": "Rapport ‘{{name}}’ verwijderen? De bezorggeschiedenis wordt ook verwijderd.",
+      "optedOut": "Je hebt je afgemeld voor dit rapport.",
+      "resubscribe": "Opnieuw abonneren",
+      "empty": { "title": "Nog geen rapporten", "description": "Maak een rapport met de sites, ontvangers en bezorgtijd die bij je workflow passen.", "action": "Rapport maken" },
+      "presets": {
+        "site_summary": { "title": "Sitesamenvatting", "description": "Kerncijfers, doelen, trend, toppagina’s en verwijzers voor één site." },
+        "portfolio_digest": { "title": "Portfolio-overzicht", "description": "Een compacte vergelijking van geselecteerde of toegankelijke sites." },
+        "opportunity_brief": { "title": "Kansenoverzicht", "description": "Gevalideerde opgeslagen kansen met bewijs; lege e-mails worden overgeslagen." }
       },
-      "perSite": {
-        "title": "Rapporten per site",
-        "description": "Individuele e-mails voor elke site.",
-        "empty": "Geen sites gevonden. Voeg een site toe om rapporten per site te configureren."
+      "scope": { "label": "Bereik", "personal": "Persoonlijk", "team": "Team" },
+      "sites": { "label": "Sites", "placeholder": "Selecteer sites" },
+      "recipients": {
+        "label": "Ontvangers", "placeholder": "Selecteer HitKeep-gebruikers",
+        "externalLabel": "Externe e-mailontvangers", "externalPlaceholder": "klant@voorbeeld.nl",
+        "externalHint": "Externe ontvangers moeten bevestigen voordat zij rapporten ontvangen. Maximaal 25 per rapport.",
+        "proNudge": "Externe ontvangers van geplande rapporten zijn beschikbaar in Pro en Business. Verwijder op Free bestaande externe adressen voordat je wijzigingen opslaat.",
+        "proRequired": "Externe rapportontvangers vereisen Pro of hoger.",
+        "upgradeToPro": "Upgraden naar Pro",
+        "add": "E-mail toevoegen", "invalidEmail": "Voer een geldig e-mailadres in.", "limit": "Een rapport kan maximaal 25 externe ontvangers hebben.",
+        "removeEmail": "{{email}} verwijderen", "resend": "Opnieuw verzenden", "resent": "Bevestigingsmail opnieuw verzonden.",
+        "resendFailed": "De bevestigingsmail kan nog niet opnieuw worden verzonden.", "removeConfirm": "{{email}} uit dit rapport verwijderen?", "removed": "Externe ontvanger verwijderd."
       },
+      "recipientStatus": { "confirmed": "Bevestigd", "pending_confirmation": "Wacht op bevestiging", "opted_out": "Afgemeld", "expired": "Bevestiging verlopen", "invitation_failed": "Uitnodiging mislukt" },
+      "schedule": { "label": "Planning" },
       "frequency": {
-        "daily": {
-          "label": "Dagelijks",
-          "hint": "Statistieken van de vorige dag"
-        },
-        "weekly": {
-          "label": "Wekelijks",
-          "hint": "Elke maandag, bestrijkt de afgelopen 7 dagen"
-        },
-        "monthly": {
-          "label": "Maandelijks",
-          "hint": "1e van elke maand, heeft betrekking op de afgelopen maand"
-        }
-      }
+        "label": "Frequentie",
+        "daily": { "label": "Dagelijks", "hint": "Vorige dag" },
+        "weekly": { "label": "Wekelijks", "hint": "Vorige zeven dagen" },
+        "monthly": { "label": "Maandelijks", "hint": "Vorige kalendermaand" }
+      },
+      "weekdays": { "0": "Zondag", "1": "Maandag", "2": "Dinsdag", "3": "Woensdag", "4": "Donderdag", "5": "Vrijdag", "6": "Zaterdag" },
+      "status": { "draft": "Concept", "active": "Actief", "paused": "Gepauzeerd" },
+      "runStatus": { "queued": "In wachtrij", "running": "Wordt verzonden", "sending": "Wordt verzonden", "completed": "Geaccepteerd door de mailserver", "accepted": "Geaccepteerd door de mailserver", "partial": "Deels geaccepteerd door de mailserver", "failed": "Mislukt", "skipped": "Overgeslagen" },
+      "actions": { "preview": "Voorbeeld maken", "test": "Test verzenden", "history": "Geschiedenis", "duplicate": "Dupliceren", "pause": "Pauzeren", "resume": "Hervatten", "retry": "Opnieuw proberen" },
+      "editor": { "createTitle": "Rapport maken", "editTitle": "Rapport bewerken", "presetStep": "Kies een sjabloon", "sitesStep": "Kies sites", "recipientsStep": "Kies ontvangers", "scheduleStep": "Stel de planning in", "previewStep": "Voorbeeld" },
+      "saveDraft": "Concept opslaan",
+      "activate": "Opslaan en activeren",
+      "history": { "title": "Bezorggeschiedenis", "empty": "Nog geen geplande uitvoeringen.", "deliveries": "bezorgingen", "attempts": "pogingen", "acceptedAt": "Geaccepteerd", "retryAt": "Volgende poging" },
+      "errors": { "load": "Rapporten konden niet worden geladen.", "save": "Het rapport kon niet worden opgeslagen.", "preview": "Het voorbeeld kon niet worden gemaakt.", "test": "De mailserver accepteerde het testbericht niet.", "action": "De rapportactie is mislukt." }
     },
     "apiClients": {
       "title": "API-clients",
@@ -1851,6 +1900,7 @@
             "members": "Maximaal {{count}}-teamleden",
             "retention": "{{count}} jaar gegevensretentie",
             "retentionDays": "{{count}}-dag gegevensretentie",
+            "externalReportRecipients": "Externe ontvangers van geplande rapporten",
             "customDomains": "Aangepaste trackingdomeinen",
             "sso": "Single sign-on (SSO)"
           }
@@ -3555,5 +3605,14 @@
       "free": "Gratis abonnement",
       "aria": "Je gebruikt het gratis abonnement – bekijk abonnementen en upgrade"
     }
+  },
+  "reportConfirmation": {
+    "title": "Gepland rapport bevestigen", "subtitle": "Controleer precies wat je toestaat te ontvangen.",
+    "team": "Team", "report": "Rapport", "cadence": "Frequentie", "sites": "Sites",
+    "disclaimer": "Bevestigen maakt geen account aan en geeft geen toegang tot HitKeep, het team of dashboards. Je kunt je via elke rapportmail afmelden.",
+    "confirm": "Rapporten bevestigen", "decline": "Weigeren",
+    "invalid": { "title": "Deze bevestigingslink is niet beschikbaar", "description": "De link kan ongeldig, verlopen, al gebruikt of vervangen zijn. Vraag de rapportbeheerder om hem opnieuw te verzenden." },
+    "confirmed": { "title": "Rapportbezorging bevestigd", "description": "Je ontvangt toekomstige geplande rapporten. Rapporten van vóór de bevestiging worden niet opnieuw verzonden." },
+    "declined": { "title": "Rapportbezorging geweigerd", "description": "Je ontvangt dit rapport niet, tenzij je later een nieuwe bevestiging accepteert." }
   }
 }

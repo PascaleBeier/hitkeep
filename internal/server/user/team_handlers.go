@@ -105,8 +105,9 @@ func writeTeamActionError(w http.ResponseWriter, statusCode int, code string, me
 
 func operatorTeamEntitlements() *api.TeamEntitlements {
 	return &api.TeamEntitlements{
-		AllowSSO:            true,
-		AllowCustomBranding: true,
+		AllowSSO:                      true,
+		AllowCustomBranding:           true,
+		AllowExternalReportRecipients: true,
 	}
 }
 
@@ -122,11 +123,12 @@ func teamEntitlementsResponse(ent *entitlements.Entitlements) *api.TeamEntitleme
 		return nil
 	}
 	return &api.TeamEntitlements{
-		MaxSitesPerTeam:     ent.MaxSitesPerTeam,
-		MaxTeamMembers:      ent.MaxTeamMembers,
-		MaxRetentionDays:    ent.MaxRetentionDays,
-		AllowSSO:            ent.AllowSSO,
-		AllowCustomBranding: ent.AllowCustomBranding,
+		MaxSitesPerTeam:               ent.MaxSitesPerTeam,
+		MaxTeamMembers:                ent.MaxTeamMembers,
+		MaxRetentionDays:              ent.MaxRetentionDays,
+		AllowSSO:                      ent.AllowSSO,
+		AllowCustomBranding:           ent.AllowCustomBranding,
+		AllowExternalReportRecipients: ent.AllowExternalReportRecipients,
 	}
 }
 

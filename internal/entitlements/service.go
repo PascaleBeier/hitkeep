@@ -95,8 +95,9 @@ func (s *Service) TeamEntitlements(ctx context.Context, teamID uuid.UUID) *Entit
 		}
 	}
 	return &Entitlements{
-		AllowSSO:            true,
-		AllowCustomBranding: true,
+		AllowSSO:                      true,
+		AllowCustomBranding:           true,
+		AllowExternalReportRecipients: true,
 	}
 }
 
@@ -127,6 +128,22 @@ func (s *Service) AllowsSSO(ctx context.Context, actorID, teamID uuid.UUID) bool
 	}
 	ent := s.TeamEntitlements(ctx, teamID)
 	return ent != nil && ent.AllowSSO
+}
+
+// AllowsExternalReportRecipients reports whether the actor may invite and
+// deliver scheduled reports to addresses outside the team. Managed Cloud
+// exposes this entitlement on Pro and Business; self-hosted deployments are
+// never gated. Passing uuid.Nil enforces the team entitlement without an
+// instance-role bypass, as required by the background delivery worker.
+func (s *Service) AllowsExternalReportRecipients(ctx context.Context, actorID, teamID uuid.UUID) bool {
+	if !s.cloudHosted() {
+		return true
+	}
+	if s.BypassesCloudLimits(ctx, actorID) {
+		return true
+	}
+	ent := s.TeamEntitlements(ctx, teamID)
+	return ent != nil && ent.AllowExternalReportRecipients
 }
 
 // RequireTeamMemberCapacity returns ErrTeamMemberLimitReached when the team's

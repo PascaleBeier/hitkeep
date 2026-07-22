@@ -73,6 +73,34 @@ func (s *Store) GetUserOnboarding(ctx context.Context, userID uuid.UUID) (*api.U
 			}
 		}
 	}
+	if !reportScheduled {
+		if err := s.db.QueryRowContext(ctx, `
+			SELECT EXISTS (
+				SELECT 1
+				FROM report_definitions rd
+				WHERE rd.status = 'active'
+				  AND (
+				      rd.owner_user_id = ?
+				      OR EXISTS (
+				          SELECT 1 FROM tenant_members tm
+				          WHERE tm.tenant_id = rd.tenant_id AND tm.user_id = ?
+				            AND lower(tm.role) IN ('owner', 'admin')
+				      )
+				  )
+				  AND EXISTS (
+				      SELECT 1 FROM report_recipients rr
+				      WHERE rr.report_id = rd.id AND rr.opted_out_at IS NULL
+				        AND (
+				            rr.user_id IS NOT NULL
+				            OR (rr.external_email IS NOT NULL AND rr.confirmed_at IS NOT NULL
+				                AND rr.consent_version = rd.consent_version)
+				        )
+				  )
+			)
+		`, userID, userID).Scan(&reportScheduled); err != nil {
+			return nil, fmt.Errorf("check named report onboarding: %w", err)
+		}
+	}
 
 	steps := []api.OnboardingStep{
 		{Key: "create_site", Complete: len(sites) > 0, Current: len(sites), Target: 1, SiteID: firstSiteID, SiteDomain: firstSiteDomain},

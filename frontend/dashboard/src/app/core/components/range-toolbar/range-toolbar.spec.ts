@@ -213,7 +213,8 @@ describe('RangeToolbar', () => {
                     max_team_members: 3,
                     max_retention_days: retentionDays,
                     allow_sso: false,
-                    allow_custom_branding: false
+                    allow_custom_branding: false,
+                    allow_external_report_recipients: false
                 }
             }
         ]);

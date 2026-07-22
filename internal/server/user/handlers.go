@@ -150,6 +150,18 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		RequireAuth: true,
 		RateLimiter: ctx.ApiLimiter,
 	}, h.handleUpdateDigestSubscription()))
+	mux.HandleFunc("GET /api/reports", ctx.Handler(shared.HandlerConfig{RequireAuth: true, RateLimiter: ctx.ApiLimiter}, h.handleListReports()))
+	mux.HandleFunc("POST /api/reports", ctx.Handler(shared.HandlerConfig{RequireAuth: true, HumanOnly: true, RateLimiter: ctx.ApiLimiter}, h.handleCreateReport()))
+	mux.HandleFunc("POST /api/reports/preview", ctx.Handler(shared.HandlerConfig{RequireAuth: true, HumanOnly: true, RateLimiter: ctx.ApiLimiter}, h.handlePreviewReport()))
+	mux.HandleFunc("GET /api/report-recipient-confirmations/{opaque_token}", ctx.Handler(shared.HandlerConfig{RateLimiter: ctx.ApiLimiter}, h.handleGetReportRecipientConfirmation()))
+	mux.HandleFunc("POST /api/report-recipient-confirmations/{opaque_token}", ctx.Handler(shared.HandlerConfig{RateLimiter: ctx.ApiLimiter}, h.handleConfirmReportRecipient()))
+	mux.HandleFunc("GET /api/reports/{report_id}", ctx.Handler(shared.HandlerConfig{RequireAuth: true, RateLimiter: ctx.ApiLimiter}, h.handleGetReport()))
+	mux.HandleFunc("PATCH /api/reports/{report_id}", ctx.Handler(shared.HandlerConfig{RequireAuth: true, HumanOnly: true, RateLimiter: ctx.ApiLimiter}, h.handleUpdateReport()))
+	mux.HandleFunc("DELETE /api/reports/{report_id}", ctx.Handler(shared.HandlerConfig{RequireAuth: true, HumanOnly: true, RateLimiter: ctx.ApiLimiter}, h.handleDeleteReport()))
+	mux.HandleFunc("POST /api/reports/{report_id}/recipients/{recipient_id}/confirmation", ctx.Handler(shared.HandlerConfig{RequireAuth: true, HumanOnly: true, RateLimiter: ctx.ApiLimiter}, h.handleResendReportRecipientConfirmation()))
+	mux.HandleFunc("GET /api/reports/{report_id}/{action}", h.handleReportGetAction())
+	mux.HandleFunc("POST /api/reports/{report_id}/{action}", h.handleReportPostAction())
+	mux.HandleFunc("POST /api/report-runs/{run_id}/retry", ctx.Handler(shared.HandlerConfig{RequireAuth: true, HumanOnly: true, RateLimiter: ctx.ApiLimiter}, h.handleRetryReportRun()))
 	mux.HandleFunc("POST /api/user/teams", ctx.Handler(shared.HandlerConfig{
 		RequireAuth: true,
 		RateLimiter: ctx.ApiLimiter,

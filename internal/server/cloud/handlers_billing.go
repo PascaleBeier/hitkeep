@@ -374,11 +374,12 @@ func (h *handler) handleListCloudPlans() http.HandlerFunc {
 			Code: code,
 			Name: entitlements.CloudPlanName(code),
 			Entitlements: api.TeamEntitlements{
-				MaxSitesPerTeam:     ent.MaxSitesPerTeam,
-				MaxTeamMembers:      ent.MaxTeamMembers,
-				MaxRetentionDays:    ent.MaxRetentionDays,
-				AllowSSO:            ent.AllowSSO,
-				AllowCustomBranding: ent.AllowCustomBranding,
+				MaxSitesPerTeam:               ent.MaxSitesPerTeam,
+				MaxTeamMembers:                ent.MaxTeamMembers,
+				MaxRetentionDays:              ent.MaxRetentionDays,
+				AllowSSO:                      ent.AllowSSO,
+				AllowCustomBranding:           ent.AllowCustomBranding,
+				AllowExternalReportRecipients: ent.AllowExternalReportRecipients,
 			},
 		})
 	}

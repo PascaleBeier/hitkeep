@@ -32,6 +32,9 @@ func TestDefaultProviderReturnsUnlimited(t *testing.T) {
 	if !ent.AllowCustomBranding {
 		t.Fatal("expected AllowCustomBranding=true")
 	}
+	if !ent.AllowExternalReportRecipients {
+		t.Fatal("expected AllowExternalReportRecipients=true")
+	}
 }
 
 func TestDefaultProviderImplementsInterface(t *testing.T) {

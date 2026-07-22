@@ -44,8 +44,8 @@
     "supportAria": "Abrir el soporte de HitKeep en una pestaña nueva",
     "settings": "Configuración",
     "settingsAria": "Ir a configuración",
-    "emailReports": "Informes por email",
-    "emailReportsAria": "Ir a informes por email",
+    "emailReports": "Informes",
+    "emailReportsAria": "Ir a informes",
     "administration": "Administración",
     "systemSettings": "Configuración del sistema",
     "systemSettingsAria": "Ir a configuración del sistema",
@@ -264,7 +264,12 @@
       "googleSearchConsoleSyncFailed": "Sincronización de Search Console fallida",
       "askAIRequested": "Ask AI solicitado",
       "askAIResponded": "Ask AI respondió",
-      "askAIHistoryViewed": "Historial de Ask AI visto"
+      "askAIHistoryViewed": "Historial de Ask AI visto",
+      "reportCreated": "Informe creado",
+      "reportUpdated": "Informe actualizado",
+      "reportDeleted": "Informe eliminado",
+      "reportTestSent": "Prueba de informe enviada",
+      "reportRetryRequested": "Reintento de informe solicitado"
     },
     "columns": {
       "evidence": "Evidencia",
@@ -299,7 +304,8 @@
       "permission": "Permiso",
       "googleSearchConsoleConnection": "Conexión de Search Console",
       "googleSearchConsoleProperty": "Propiedad de Search Console",
-      "googleSearchConsoleSync": "Sincronización de Search Console"
+      "googleSearchConsoleSync": "Sincronización de Search Console",
+      "report": "Informe"
     },
     "roles": {
       "owner": "Propietario",
@@ -1153,31 +1159,74 @@
       }
     },
     "reports": {
-      "breadcrumb": "Informes por email",
-      "subtitle": "Configura emails de analíticas programados para tus sitios.",
-      "digest": {
-        "title": "Resumen consolidado",
-        "description": "Recibe un email de resumen de todos tus sitios."
+      "breadcrumb": "Informes",
+      "subtitle": "Crea informes de analíticas fiables y programados para ti o tu equipo.",
+      "newReport": "Nuevo informe",
+      "mailUnavailable": "SMTP no está disponible. Puedes editar borradores, pero no activar, probar ni reintentar informes.",
+      "mailUnavailableDraft": "El envío de correo no está disponible. Guarda el informe como borrador hasta configurar SMTP.",
+            "saved": "Informe guardado.",
+            "deleted": "Informe eliminado.",
+            "emptyFiltered": "Ningún informe coincide con tu búsqueda.",
+      "previewSuppressed": "No se enviaría ningún correo porque este informe no tiene contenido válido para el periodo seleccionado.",
+      "previewDeliverable": "{{count}} destinatario(s) confirmado(s) recibirían este informe.",
+      "previewPending": "{{count}} destinatario(s) externo(s) están pendientes de confirmación.",
+      "testAccepted": "El servidor de correo aceptó el mensaje de prueba.",
+      "retryQueued": "Reintento de entrega en cola.",
+      "resubscribed": "Te has vuelto a suscribir a este informe.",
+      "copyName": "Copia de {{name}}",
+      "legacy": "Migrado",
+      "name": "Nombre del informe",
+      "namePlaceholder": "p. ej., revisión de crecimiento del lunes",
+      "nextRun": "Próximo envío",
+      "lastOutcome": "Último resultado",
+      "notAvailable": "Todavía no",
+      "allAccessibleSites": "Todos los sitios accesibles",
+      "selectedSites": "Sitios seleccionados",
+      "personalRecipient": "Los informes personales solo se envían a tu cuenta de HitKeep.",
+      "deliveryTime": "Hora de envío",
+      "timezone": "Zona horaria",
+      "weekday": "Día de la semana",
+      "monthDay": "Día del mes",
+      "scheduleHint": "Las horas avanzan en intervalos de 15 minutos. Los informes nuevos usan las 08:00 en la zona del navegador.",
+      "deleteConfirm": "¿Eliminar el informe «{{name}}»? También se eliminará el historial de entregas.",
+      "optedOut": "Has cancelado este informe.",
+      "resubscribe": "Volver a suscribirse",
+      "empty": { "title": "Aún no hay informes", "description": "Crea un informe con los sitios, destinatarios y hora que encajen con tu flujo.", "action": "Crear informe" },
+      "presets": {
+        "site_summary": { "title": "Resumen del sitio", "description": "Métricas, objetivos, tendencia, páginas y referencias de un sitio." },
+        "portfolio_digest": { "title": "Resumen de cartera", "description": "Comparación compacta de los sitios seleccionados o accesibles." },
+        "opportunity_brief": { "title": "Resumen de oportunidades", "description": "Oportunidades guardadas y validadas con evidencias; se omiten los emails vacíos." }
       },
-      "perSite": {
-        "title": "Informes por sitio",
-        "description": "Emails individuales por cada sitio.",
-        "empty": "No hay sitios. Añade un sitio para configurar informes."
+      "scope": { "label": "Ámbito", "personal": "Personal", "team": "Equipo" },
+      "sites": { "label": "Sitios", "placeholder": "Selecciona sitios" },
+      "recipients": {
+        "label": "Destinatarios", "placeholder": "Selecciona usuarios de HitKeep",
+        "externalLabel": "Destinatarios de correo externos", "externalPlaceholder": "cliente@ejemplo.com",
+        "externalHint": "Los destinatarios externos deben confirmar antes de recibir informes. Máximo 25 por informe.",
+        "proNudge": "Los destinatarios externos de informes programados están disponibles en Pro y Business. En Free, elimina las direcciones externas existentes antes de guardar cambios.",
+        "proRequired": "Los destinatarios externos requieren el plan Pro o superior.",
+        "upgradeToPro": "Mejorar a Pro",
+        "add": "Añadir correo", "invalidEmail": "Introduce una dirección de correo válida.", "limit": "Un informe puede tener como máximo 25 destinatarios externos.",
+        "removeEmail": "Eliminar {{email}}", "resend": "Reenviar", "resent": "Correo de confirmación reenviado.",
+        "resendFailed": "Todavía no se pudo reenviar el correo de confirmación.", "removeConfirm": "¿Eliminar {{email}} de este informe?", "removed": "Destinatario externo eliminado."
       },
+      "recipientStatus": { "confirmed": "Confirmado", "pending_confirmation": "Confirmación pendiente", "opted_out": "Dado de baja", "expired": "Confirmación caducada", "invitation_failed": "Invitación fallida" },
+      "schedule": { "label": "Programación" },
       "frequency": {
-        "daily": {
-          "label": "Diario",
-          "hint": "Estadísticas del día anterior"
-        },
-        "weekly": {
-          "label": "Semanal",
-          "hint": "Cada lunes, últimos 7 días"
-        },
-        "monthly": {
-          "label": "Mensual",
-          "hint": "El 1 de cada mes, mes anterior"
-        }
-      }
+        "label": "Frecuencia",
+        "daily": { "label": "Diario", "hint": "Día anterior" },
+        "weekly": { "label": "Semanal", "hint": "Siete días anteriores" },
+        "monthly": { "label": "Mensual", "hint": "Mes natural anterior" }
+      },
+      "weekdays": { "0": "Domingo", "1": "Lunes", "2": "Martes", "3": "Miércoles", "4": "Jueves", "5": "Viernes", "6": "Sábado" },
+      "status": { "draft": "Borrador", "active": "Activo", "paused": "Pausado" },
+      "runStatus": { "queued": "En cola", "running": "Enviando", "sending": "Enviando", "completed": "Aceptado por el servidor de correo", "accepted": "Aceptado por el servidor de correo", "partial": "Aceptado parcialmente por el servidor de correo", "failed": "Fallido", "skipped": "Omitido" },
+      "actions": { "preview": "Generar vista previa", "test": "Enviar prueba", "history": "Historial", "duplicate": "Duplicar", "pause": "Pausar", "resume": "Reanudar", "retry": "Reintentar" },
+      "editor": { "createTitle": "Crear informe", "editTitle": "Editar informe", "presetStep": "Elige una plantilla", "sitesStep": "Elige sitios", "recipientsStep": "Elige destinatarios", "scheduleStep": "Define la programación", "previewStep": "Vista previa" },
+      "saveDraft": "Guardar borrador",
+      "activate": "Guardar y activar",
+      "history": { "title": "Historial de entregas", "empty": "Aún no hay ejecuciones programadas.", "deliveries": "entregas", "attempts": "intentos", "acceptedAt": "Aceptado", "retryAt": "Próximo intento" },
+      "errors": { "load": "No se pudieron cargar los informes.", "save": "No se pudo guardar el informe.", "preview": "No se pudo generar la vista previa.", "test": "El servidor no aceptó el mensaje de prueba.", "action": "La acción del informe ha fallado." }
     },
     "apiClients": {
       "title": "Clientes de API",
@@ -1877,6 +1926,7 @@
             "members": "Hasta {{count}} miembros del equipo",
             "retention": "{{count}} años de retención de datos",
             "retentionDays": "{{count}} días de retención de datos",
+            "externalReportRecipients": "Destinatarios externos de informes programados",
             "customDomains": "Dominios de seguimiento personalizados",
             "sso": "Inicio de sesión único (SSO)"
           }
@@ -3581,5 +3631,14 @@
       "free": "Plan gratuito",
       "aria": "Estás en el plan gratuito: ver planes y mejorar"
     }
+  },
+  "reportConfirmation": {
+    "title": "Confirmar informe programado", "subtitle": "Revisa exactamente qué aceptas recibir.",
+    "team": "Equipo", "report": "Informe", "cadence": "Frecuencia", "sites": "Sitios",
+    "disclaimer": "Confirmar no crea una cuenta ni da acceso a HitKeep, al equipo o a sus paneles. Puedes darte de baja desde cualquier correo del informe.",
+    "confirm": "Confirmar informes", "decline": "Rechazar",
+    "invalid": { "title": "Este enlace de confirmación no está disponible", "description": "Puede ser inválido, haber caducado, haberse usado o haber sido sustituido. Pide al responsable que lo reenvíe." },
+    "confirmed": { "title": "Entrega del informe confirmada", "description": "Recibirás los próximos informes programados. Los informes anteriores a la confirmación no se reenvían." },
+    "declined": { "title": "Entrega del informe rechazada", "description": "No recibirás este informe salvo que aceptes una nueva confirmación más adelante." }
   }
 }

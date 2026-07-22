@@ -53,6 +53,11 @@ export const routes: Routes = [
         data: titleData('password.reset.title')
     },
     {
+        path: 'report-confirmation',
+        loadComponent: () => import('@pages/report-confirmation/report-confirmation').then((m) => m.ReportConfirmation),
+        data: titleData('reportConfirmation.title')
+    },
+    {
         path: 'accept-invite',
         loadComponent: () => import('@pages/invite/accept-invite').then((m) => m.AcceptInvite),
         data: titleData('invite.accept.title')

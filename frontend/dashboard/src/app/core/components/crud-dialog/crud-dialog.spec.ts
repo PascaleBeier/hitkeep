@@ -61,6 +61,19 @@ describe('CrudDialog', () => {
         expect(buttons.every((button) => button.disabled)).toBe(true);
     });
 
+    it('disables submit independently of the cancel action', async () => {
+        fixture.componentRef.setInput('submitDisabled', true);
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        const buttons = Array.from(document.body.querySelectorAll('.dialog-shell-footer button')) as HTMLButtonElement[];
+        const submit = buttons.find((button) => button.textContent?.includes('Save'));
+        const cancel = buttons.find((button) => button.textContent?.includes('Cancel'));
+
+        expect(submit?.disabled).toBe(true);
+        expect(cancel?.disabled).toBe(false);
+    });
+
     it('removes dismiss actions while saving', async () => {
         fixture.componentRef.setInput('saving', true);
         fixture.detectChanges();

@@ -177,7 +177,8 @@ function freeTeam(id: string): Team {
             max_team_members: 3,
             max_retention_days: 60,
             allow_sso: false,
-            allow_custom_branding: false
+            allow_custom_branding: false,
+            allow_external_report_recipients: false
         },
         plan: {
             code: 'free',

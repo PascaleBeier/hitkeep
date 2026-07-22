@@ -36,11 +36,12 @@ func openAPIV1AccountSchemas() map[string]any {
 		"TeamEntitlements": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"max_sites_per_team":    map[string]any{"type": "integer"},
-				"max_team_members":      map[string]any{"type": "integer"},
-				"max_retention_days":    map[string]any{"type": "integer"},
-				"allow_sso":             map[string]any{"type": "boolean"},
-				"allow_custom_branding": map[string]any{"type": "boolean"},
+				"max_sites_per_team":               map[string]any{"type": "integer"},
+				"max_team_members":                 map[string]any{"type": "integer"},
+				"max_retention_days":               map[string]any{"type": "integer"},
+				"allow_sso":                        map[string]any{"type": "boolean"},
+				"allow_custom_branding":            map[string]any{"type": "boolean"},
+				"allow_external_report_recipients": map[string]any{"type": "boolean", "description": "Whether scheduled reports may be sent to confirmed addresses outside the team."},
 			},
 		},
 		"SSOAvailability": map[string]any{
@@ -714,11 +715,20 @@ func openAPIV1AccountSchemas() map[string]any {
 		"SystemStatus": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"needs_setup": map[string]any{"type": "boolean"},
-				"version":     map[string]any{"type": "string"},
-				"cloud":       map[string]any{"$ref": "#/components/schemas/CloudStatus"},
-				"ask_ai":      map[string]any{"$ref": "#/components/schemas/AskAIStatus"},
+				"needs_setup":   map[string]any{"type": "boolean"},
+				"version":       map[string]any{"type": "string"},
+				"cloud":         map[string]any{"$ref": "#/components/schemas/CloudStatus"},
+				"ask_ai":        map[string]any{"$ref": "#/components/schemas/AskAIStatus"},
+				"mail_delivery": map[string]any{"$ref": "#/components/schemas/MailDeliveryStatus"},
 			},
+		},
+		"MailDeliveryStatus": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"available": map[string]any{"type": "boolean"},
+				"status":    map[string]any{"type": "string", "enum": []string{"available", "unavailable"}},
+			},
+			"required": []string{"available", "status"},
 		},
 		"AskAIFilter": map[string]any{
 			"type": "object",
@@ -1051,6 +1061,116 @@ func openAPIV1AccountSchemas() map[string]any {
 					"items": map[string]any{"$ref": "#/components/schemas/SiteReportSubscription"},
 				},
 			},
+		},
+		"ReportSchedule": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"frequency":   map[string]any{"type": "string", "enum": []string{"daily", "weekly", "monthly"}},
+				"timezone":    map[string]any{"type": "string", "description": "IANA timezone name."},
+				"local_time":  map[string]any{"type": "string", "pattern": "^([01][0-9]|2[0-3]):(00|15|30|45)$"},
+				"weekly_day":  map[string]any{"type": "integer", "minimum": 0, "maximum": 6},
+				"monthly_day": map[string]any{"type": "integer", "minimum": 1, "maximum": 28},
+			},
+			"required": []string{"frequency", "timezone", "local_time"},
+		},
+		"ReportDefinitionInput": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"name":                      map[string]any{"type": "string", "maxLength": 120},
+				"scope":                     map[string]any{"type": "string", "enum": []string{"personal", "team"}},
+				"tenant_id":                 map[string]any{"type": "string", "format": "uuid"},
+				"preset":                    map[string]any{"type": "string", "enum": []string{"site_summary", "portfolio_digest", "opportunity_brief"}},
+				"site_mode":                 map[string]any{"type": "string", "enum": []string{"selected", "all_accessible"}},
+				"site_ids":                  map[string]any{"type": "array", "items": map[string]any{"type": "string", "format": "uuid"}},
+				"recipient_user_ids":        map[string]any{"type": "array", "items": map[string]any{"type": "string", "format": "uuid"}},
+				"external_recipient_emails": map[string]any{"type": "array", "maxItems": 25, "uniqueItems": true, "items": map[string]any{"type": "string", "format": "email"}},
+				"schedule":                  map[string]any{"$ref": "#/components/schemas/ReportSchedule"},
+				"status":                    map[string]any{"type": "string", "enum": []string{"draft", "active", "paused"}},
+			},
+			"required": []string{"name", "scope", "preset", "site_mode", "site_ids", "recipient_user_ids", "external_recipient_emails", "schedule", "status"},
+		},
+		"ReportDefinitionUpdate": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"name":                      map[string]any{"type": "string", "maxLength": 120},
+				"preset":                    map[string]any{"type": "string", "enum": []string{"site_summary", "portfolio_digest", "opportunity_brief"}},
+				"site_mode":                 map[string]any{"type": "string", "enum": []string{"selected", "all_accessible"}},
+				"site_ids":                  map[string]any{"type": "array", "items": map[string]any{"type": "string", "format": "uuid"}},
+				"recipient_user_ids":        map[string]any{"type": "array", "items": map[string]any{"type": "string", "format": "uuid"}},
+				"external_recipient_emails": map[string]any{"type": "array", "maxItems": 25, "uniqueItems": true, "items": map[string]any{"type": "string", "format": "email"}},
+				"schedule":                  map[string]any{"$ref": "#/components/schemas/ReportSchedule"},
+				"status":                    map[string]any{"type": "string", "enum": []string{"draft", "active", "paused"}},
+			},
+		},
+		"ReportDefinition": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"id":              map[string]any{"type": "string", "format": "uuid"},
+				"tenant_id":       map[string]any{"type": "string", "format": "uuid"},
+				"owner_user_id":   map[string]any{"type": "string", "format": "uuid"},
+				"created_by":      map[string]any{"type": "string", "format": "uuid"},
+				"name":            map[string]any{"type": "string"},
+				"scope":           map[string]any{"type": "string", "enum": []string{"personal", "team"}},
+				"preset":          map[string]any{"type": "string", "enum": []string{"site_summary", "portfolio_digest", "opportunity_brief"}},
+				"site_mode":       map[string]any{"type": "string", "enum": []string{"selected", "all_accessible"}},
+				"sites":           map[string]any{"type": "array", "items": map[string]any{"type": "object", "properties": map[string]any{"id": map[string]any{"type": "string", "format": "uuid"}, "domain": map[string]any{"type": "string"}}}},
+				"recipients":      map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/ReportRecipient"}},
+				"schedule":        map[string]any{"$ref": "#/components/schemas/ReportSchedule"},
+				"status":          map[string]any{"type": "string", "enum": []string{"draft", "active", "paused"}},
+				"source":          map[string]any{"type": "string", "enum": []string{"v2", "legacy"}},
+				"consent_version": map[string]any{"type": "integer", "minimum": 1},
+				"next_run_at":     map[string]any{"type": "string", "format": "date-time"},
+				"last_outcome":    map[string]any{"type": "object", "additionalProperties": true},
+				"created_at":      map[string]any{"type": "string", "format": "date-time"},
+				"updated_at":      map[string]any{"type": "string", "format": "date-time"},
+			},
+			"required": []string{"id", "name", "scope", "preset", "site_mode", "sites", "recipients", "schedule", "status", "source", "created_at", "updated_at"},
+		},
+		"ReportPreview": map[string]any{
+			"type": "object", "properties": map[string]any{
+				"subject": map[string]any{"type": "string"}, "preset": map[string]any{"type": "string"},
+				"schedule":   map[string]any{"$ref": "#/components/schemas/ReportSchedule"},
+				"site_count": map[string]any{"type": "integer"}, "recipient_count": map[string]any{"type": "integer"}, "pending_recipient_count": map[string]any{"type": "integer"},
+				"period_start": map[string]any{"type": "string", "format": "date-time"}, "period_end": map[string]any{"type": "string", "format": "date-time"},
+				"suppressed": map[string]any{"type": "boolean"},
+			},
+		},
+		"ReportDelivery": map[string]any{
+			"type": "object", "properties": map[string]any{
+				"id": map[string]any{"type": "string", "format": "uuid"}, "recipient_id": map[string]any{"type": "string", "format": "uuid"}, "recipient_kind": map[string]any{"type": "string", "enum": []string{"member", "external"}}, "recipient_user_id": map[string]any{"type": "string", "format": "uuid"}, "recipient_email": map[string]any{"type": "string", "format": "email"},
+				"status": map[string]any{"type": "string"}, "attempt_count": map[string]any{"type": "integer"},
+				"next_attempt_at": map[string]any{"type": "string", "format": "date-time"}, "safe_error_code": map[string]any{"type": "string"},
+				"smtp_accepted_at": map[string]any{"type": "string", "format": "date-time"},
+			},
+		},
+		"ReportRecipient": map[string]any{
+			"type": "object", "properties": map[string]any{
+				"id": map[string]any{"type": "string", "format": "uuid"}, "kind": map[string]any{"type": "string", "enum": []string{"member", "external"}},
+				"user_id": map[string]any{"type": "string", "format": "uuid"}, "email": map[string]any{"type": "string", "format": "email"},
+				"status":       map[string]any{"type": "string", "enum": []string{"pending_confirmation", "confirmed", "opted_out"}},
+				"confirmed_at": map[string]any{"type": "string", "format": "date-time"}, "confirmation_expires_at": map[string]any{"type": "string", "format": "date-time"},
+				"invitation_state": map[string]any{"type": "string", "enum": []string{"pending", "sent", "failed"}}, "opted_out_at": map[string]any{"type": "string", "format": "date-time"},
+			}, "required": []string{"id", "kind", "email", "status"},
+		},
+		"ReportRecipientConfirmation": map[string]any{
+			"type": "object", "properties": map[string]any{
+				"report_name": map[string]any{"type": "string"}, "team_name": map[string]any{"type": "string"}, "preset": map[string]any{"type": "string"},
+				"schedule": map[string]any{"$ref": "#/components/schemas/ReportSchedule"}, "sites": map[string]any{"type": "array", "items": map[string]any{"type": "object", "properties": map[string]any{"id": map[string]any{"type": "string", "format": "uuid"}, "domain": map[string]any{"type": "string"}}}},
+				"expires_at": map[string]any{"type": "string", "format": "date-time"},
+			}, "required": []string{"report_name", "team_name", "preset", "schedule", "sites", "expires_at"},
+		},
+		"ReportRun": map[string]any{
+			"type": "object", "properties": map[string]any{
+				"id": map[string]any{"type": "string", "format": "uuid"}, "report_id": map[string]any{"type": "string", "format": "uuid"},
+				"scheduled_for": map[string]any{"type": "string", "format": "date-time"}, "period_start": map[string]any{"type": "string", "format": "date-time"}, "period_end": map[string]any{"type": "string", "format": "date-time"},
+				"status": map[string]any{"type": "string"}, "safe_error_code": map[string]any{"type": "string"},
+				"deliveries": map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/ReportDelivery"}},
+			},
+		},
+		"ReportTestSendResponse": map[string]any{
+			"type": "object", "properties": map[string]any{
+				"status": map[string]any{"type": "string", "enum": []string{"accepted"}}, "message_id": map[string]any{"type": "string"}, "sent_at": map[string]any{"type": "string", "format": "date-time"},
+			}, "required": []string{"status", "message_id", "sent_at"},
 		},
 		"LoginResponse": map[string]any{
 			"type": "object",

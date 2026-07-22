@@ -107,7 +107,7 @@ func TestServiceTeamEntitlements(t *testing.T) {
 
 	// Without a provider, teams get the permissive defaults.
 	ent := env.service(nil).TeamEntitlements(ctx, env.teamID)
-	if ent == nil || !ent.AllowSSO || !ent.AllowCustomBranding || ent.MaxTeamMembers != 0 {
+	if ent == nil || !ent.AllowSSO || !ent.AllowCustomBranding || !ent.AllowExternalReportRecipients || ent.MaxTeamMembers != 0 {
 		t.Fatalf("expected permissive default entitlements, got %+v", ent)
 	}
 
@@ -180,6 +180,33 @@ func TestServiceAllowsSSO(t *testing.T) {
 	env.cfg.CloudHosted = false
 	if !env.service(withoutSSO).AllowsSSO(ctx, memberID, env.teamID) {
 		t.Fatal("expected self-hosted deployments to allow SSO")
+	}
+}
+
+func TestServiceAllowsExternalReportRecipients(t *testing.T) {
+	env := newServiceEnv(t)
+	ctx := context.Background()
+	memberID := env.createMember(t, "report-manager@example.test")
+
+	free := entitlements.NewStaticProvider(entitlements.Entitlements{}, entitlements.PlanInfo{Code: entitlements.PlanCodeFree, Name: "Free"})
+	if env.service(free).AllowsExternalReportRecipients(ctx, memberID, env.teamID) {
+		t.Fatal("expected Free Cloud teams to be blocked from external report recipients")
+	}
+
+	pro := entitlements.NewStaticProvider(
+		entitlements.Entitlements{AllowExternalReportRecipients: true},
+		entitlements.PlanInfo{Code: "pro", Name: "Pro"},
+	)
+	if !env.service(pro).AllowsExternalReportRecipients(ctx, memberID, env.teamID) {
+		t.Fatal("expected Pro Cloud teams to allow external report recipients")
+	}
+	if !env.service(free).AllowsExternalReportRecipients(ctx, env.ownerID, env.teamID) {
+		t.Fatal("expected the instance owner to bypass the external-recipient plan gate")
+	}
+
+	env.cfg.CloudHosted = false
+	if !env.service(free).AllowsExternalReportRecipients(ctx, memberID, env.teamID) {
+		t.Fatal("expected self-hosted deployments to allow external report recipients")
 	}
 }
 

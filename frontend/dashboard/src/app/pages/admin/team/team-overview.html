@@ -79,6 +79,14 @@
                         <i class="pi pi-check text-sm font-bold text-primary" aria-hidden="true"></i>
                         <span>{{ retentionYears(current.entitlements.max_retention_days) }}</span>
                     </div>
+                    <div class="flex items-center gap-2 text-sm">
+                        @if (current.entitlements.allow_external_report_recipients) {
+                        <i class="pi pi-check text-sm font-bold text-primary" aria-hidden="true"></i>
+                        } @else {
+                        <i class="pi pi-times text-sm font-bold text-[var(--p-text-muted-color)]" aria-hidden="true"></i>
+                        }
+                        <span>{{ "admin.team.overview.plans.features.externalReportRecipients" | transloco }}</span>
+                    </div>
                 </div>
             </p-card>
             } @for (tier of upgradeTiers(); track tier.code) {
@@ -105,6 +113,14 @@
                         <i class="pi pi-check text-sm font-bold text-primary" aria-hidden="true"></i><span>{{ "admin.team.overview.plans.features.members" | transloco: { count: tier.entitlements.max_team_members } }}</span>
                     </div>
                     <div class="flex items-center gap-2 text-sm"><i class="pi pi-check text-sm font-bold text-primary" aria-hidden="true"></i><span>{{ retentionYears(tier.entitlements.max_retention_days) }}</span></div>
+                    <div class="flex items-center gap-2 text-sm">
+                        @if (tier.entitlements.allow_external_report_recipients) {
+                        <i class="pi pi-check text-sm font-bold text-primary" aria-hidden="true"></i>
+                        } @else {
+                        <i class="pi pi-times text-sm font-bold text-[var(--p-text-muted-color)]" aria-hidden="true"></i>
+                        }
+                        <span>{{ "admin.team.overview.plans.features.externalReportRecipients" | transloco }}</span>
+                    </div>
                     <div class="flex items-center gap-2 text-sm"><i class="pi pi-check text-sm font-bold text-primary" aria-hidden="true"></i><span>{{ "admin.team.overview.plans.features.customDomains" | transloco }}</span></div>
                     @if (tier.entitlements.allow_sso) {
                     <div class="flex items-center gap-2 text-sm"><i class="pi pi-check text-sm font-bold text-primary" aria-hidden="true"></i><span>{{ "admin.team.overview.plans.features.sso" | transloco }}</span></div>

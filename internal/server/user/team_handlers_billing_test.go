@@ -95,7 +95,7 @@ func TestHandleGetTeamsIncludesPlanMetadata(t *testing.T) {
 	if resp.Teams[0].Plan.Code != "pro" || resp.Teams[0].Plan.Name != "Pro" {
 		t.Fatalf("unexpected plan metadata: %+v", resp.Teams[0].Plan)
 	}
-	if resp.Teams[0].Entitlements == nil || resp.Teams[0].Entitlements.MaxRetentionDays != 365 {
+	if resp.Teams[0].Entitlements == nil || resp.Teams[0].Entitlements.MaxRetentionDays != 365 || !resp.Teams[0].Entitlements.AllowExternalReportRecipients {
 		t.Fatalf("expected cloud entitlements on team payload")
 	}
 }
@@ -180,7 +180,7 @@ func TestHandleGetTeamsTreatsPendingCheckoutAsFreePlan(t *testing.T) {
 	if resp.Teams[0].Plan.Code != "free" || resp.Teams[0].Plan.Name != "Free" {
 		t.Fatalf("unexpected plan metadata: %+v", resp.Teams[0].Plan)
 	}
-	if resp.Teams[0].Entitlements == nil || resp.Teams[0].Entitlements.MaxRetentionDays != 60 {
+	if resp.Teams[0].Entitlements == nil || resp.Teams[0].Entitlements.MaxRetentionDays != 60 || resp.Teams[0].Entitlements.AllowExternalReportRecipients {
 		t.Fatalf("expected free entitlements on pending checkout payload")
 	}
 }

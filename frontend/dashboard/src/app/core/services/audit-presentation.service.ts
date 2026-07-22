@@ -72,7 +72,12 @@ const SHARED_ACTIONS = [
     'google_search_console.sync_failed',
     'ask_ai.requested',
     'ask_ai.responded',
-    'ask_ai.history_viewed'
+    'ask_ai.history_viewed',
+    'report.created',
+    'report.updated',
+    'report.deleted',
+    'report.test_sent',
+    'report.retry_requested'
 ];
 
 const ACTION_KEYS: Record<string, string> = {
@@ -149,7 +154,12 @@ const ACTION_KEYS: Record<string, string> = {
     'google_search_console.sync_failed': 'auditTable.actions.googleSearchConsoleSyncFailed',
     'ask_ai.requested': 'auditTable.actions.askAIRequested',
     'ask_ai.responded': 'auditTable.actions.askAIResponded',
-    'ask_ai.history_viewed': 'auditTable.actions.askAIHistoryViewed'
+    'ask_ai.history_viewed': 'auditTable.actions.askAIHistoryViewed',
+    'report.created': 'auditTable.actions.reportCreated',
+    'report.updated': 'auditTable.actions.reportUpdated',
+    'report.deleted': 'auditTable.actions.reportDeleted',
+    'report.test_sent': 'auditTable.actions.reportTestSent',
+    'report.retry_requested': 'auditTable.actions.reportRetryRequested'
 };
 
 const TARGET_TYPE_KEYS: Record<string, string> = {
@@ -168,7 +178,8 @@ const TARGET_TYPE_KEYS: Record<string, string> = {
     google_search_console_connection: 'auditTable.targetTypes.googleSearchConsoleConnection',
     google_search_console_property: 'auditTable.targetTypes.googleSearchConsoleProperty',
     google_search_console_sync: 'auditTable.targetTypes.googleSearchConsoleSync',
-    sso_configuration: 'auditTable.targetTypes.ssoConfiguration'
+    sso_configuration: 'auditTable.targetTypes.ssoConfiguration',
+    report: 'auditTable.targetTypes.report'
 };
 
 const TARGET_TYPES = Object.keys(TARGET_TYPE_KEYS);

@@ -44,8 +44,8 @@
     "supportAria": "HitKeep-Support in neuem Tab öffnen",
     "settings": "Einstellungen",
     "settingsAria": "Zu den Einstellungen",
-    "emailReports": "E-Mail-Berichte",
-    "emailReportsAria": "Zu den E-Mail-Berichten",
+    "emailReports": "Berichte",
+    "emailReportsAria": "Zu den Berichten",
     "administration": "Verwaltung",
     "systemSettings": "Systemeinstellungen",
     "systemSettingsAria": "Zu den Systemeinstellungen",
@@ -264,7 +264,12 @@
       "googleSearchConsoleSyncFailed": "Search-Console-Sync fehlgeschlagen",
       "askAIRequested": "Ask AI angefragt",
       "askAIResponded": "Ask AI beantwortet",
-      "askAIHistoryViewed": "Ask-AI-Verlauf angesehen"
+      "askAIHistoryViewed": "Ask-AI-Verlauf angesehen",
+      "reportCreated": "Bericht erstellt",
+      "reportUpdated": "Bericht aktualisiert",
+      "reportDeleted": "Bericht gelöscht",
+      "reportTestSent": "Berichtstest gesendet",
+      "reportRetryRequested": "Bericht erneut angefordert"
     },
     "columns": {
       "evidence": "Nachweise",
@@ -299,7 +304,8 @@
       "permission": "Berechtigung",
       "googleSearchConsoleConnection": "Search-Console-Verbindung",
       "googleSearchConsoleProperty": "Search-Console-Property",
-      "googleSearchConsoleSync": "Search-Console-Sync"
+      "googleSearchConsoleSync": "Search-Console-Sync",
+      "report": "Bericht"
     },
     "roles": {
       "owner": "Owner",
@@ -1157,31 +1163,82 @@
       }
     },
     "reports": {
-      "breadcrumb": "E-Mail-Berichte",
-      "subtitle": "Konfiguriere geplante Analyse-E-Mails für deine Websites.",
-      "digest": {
-        "title": "Konsolidierter Digest",
-        "description": "Erhalte eine Zusammenfassungs-E-Mail für alle deine Websites."
+      "breadcrumb": "Berichte",
+      "subtitle": "Erstelle zuverlässige, geplante Analyseberichte für dich oder dein Team.",
+      "newReport": "Neuer Bericht",
+      "mailUnavailable": "SMTP ist nicht verfügbar. Entwürfe können bearbeitet werden, Berichte aber nicht aktiviert, getestet oder erneut gesendet werden.",
+      "mailUnavailableDraft": "Der E-Mail-Versand ist nicht verfügbar. Speichere den Bericht als Entwurf, bis SMTP eingerichtet ist.",
+            "saved": "Bericht gespeichert.",
+            "deleted": "Bericht gelöscht.",
+            "emptyFiltered": "Keine Berichte entsprechen deiner Suche.",
+      "previewSuppressed": "Es würde keine E-Mail gesendet, da dieser Bericht für den ausgewählten Zeitraum keine geeigneten Inhalte enthält.",
+      "previewDeliverable": "{{count}} bestätigte Empfänger erhalten diesen Bericht.",
+      "previewPending": "Bei {{count}} externen Empfängern steht die Bestätigung aus.",
+      "testAccepted": "Die Testnachricht wurde vom Mailserver angenommen.",
+      "retryQueued": "Erneuter Versand wurde eingeplant.",
+      "resubscribed": "Du erhältst diesen Bericht wieder.",
+      "copyName": "{{name}} – Kopie",
+      "legacy": "Migriert",
+      "name": "Berichtsname",
+      "namePlaceholder": "z. B. Wachstumsrunde am Montag",
+      "nextRun": "Nächster Versand",
+      "lastOutcome": "Letztes Ergebnis",
+      "notAvailable": "Noch nicht",
+      "allAccessibleSites": "Alle zugänglichen Websites",
+      "selectedSites": "Ausgewählte Websites",
+      "personalRecipient": "Persönliche Berichte werden nur an dein HitKeep-Konto gesendet.",
+      "deliveryTime": "Versandzeit",
+      "timezone": "Zeitzone",
+      "weekday": "Wochentag",
+      "monthDay": "Tag im Monat",
+      "scheduleHint": "Zeiten sind in 15-Minuten-Schritten verfügbar. Neue Berichte starten um 08:00 Uhr in deiner Browser-Zeitzone.",
+      "deleteConfirm": "Bericht „{{name}}“ löschen? Der Versandverlauf wird ebenfalls entfernt.",
+      "optedOut": "Du hast diesen Bericht abbestellt.",
+      "resubscribe": "Wieder abonnieren",
+      "empty": { "title": "Noch keine Berichte", "description": "Erstelle einen benannten Bericht mit passenden Websites, Empfängern und Versandzeiten.", "action": "Bericht erstellen" },
+      "presets": {
+        "site_summary": { "title": "Website-Zusammenfassung", "description": "Kennzahlen, Ziele, Trend, Top-Seiten und Verweise für eine Website." },
+        "portfolio_digest": { "title": "Portfolio-Übersicht", "description": "Kompakter Vergleich ausgewählter oder aller zugänglichen Websites." },
+        "opportunity_brief": { "title": "Chancen-Überblick", "description": "Validierte gespeicherte Chancen mit Belegen; leere E-Mails werden unterdrückt." }
       },
-      "perSite": {
-        "title": "Website-spezifische Berichte",
-        "description": "Einzelne E-Mails für jede Website.",
-        "empty": "Keine Websites gefunden. Füge eine Website hinzu."
+      "scope": { "label": "Bereich", "personal": "Persönlich", "team": "Team" },
+      "sites": { "label": "Websites", "placeholder": "Websites auswählen" },
+      "recipients": {
+        "label": "Empfänger",
+        "placeholder": "HitKeep-Benutzer auswählen",
+        "externalLabel": "Externe E-Mail-Empfänger",
+        "externalPlaceholder": "kunde@beispiel.de",
+        "externalHint": "Externe Empfänger müssen den Empfang bestätigen. Maximal 25 pro Bericht.",
+        "proNudge": "Externe Empfänger für geplante Berichte sind in Pro und Business verfügbar. Entferne unter Free bestehende externe Adressen, bevor du Änderungen speicherst.",
+        "proRequired": "Externe Berichtsempfänger erfordern den Pro-Tarif oder höher.",
+        "upgradeToPro": "Auf Pro upgraden",
+        "add": "E-Mail hinzufügen",
+        "invalidEmail": "Gib eine gültige E-Mail-Adresse ein.",
+        "limit": "Ein Bericht kann höchstens 25 externe Empfänger haben.",
+        "removeEmail": "{{email}} entfernen",
+        "resend": "Erneut senden",
+        "resent": "Bestätigungs-E-Mail erneut gesendet.",
+        "resendFailed": "Die Bestätigungs-E-Mail konnte noch nicht erneut gesendet werden.",
+        "removeConfirm": "{{email}} aus diesem Bericht entfernen?",
+        "removed": "Externer Empfänger entfernt."
       },
+      "recipientStatus": { "confirmed": "Bestätigt", "pending_confirmation": "Bestätigung ausstehend", "opted_out": "Abgemeldet", "expired": "Bestätigung abgelaufen", "invitation_failed": "Einladung fehlgeschlagen" },
+      "schedule": { "label": "Zeitplan" },
       "frequency": {
-        "daily": {
-          "label": "Täglich",
-          "hint": "Statistiken des Vortages"
-        },
-        "weekly": {
-          "label": "Wöchentlich",
-          "hint": "Jeden Montag, die letzten 7 Tage"
-        },
-        "monthly": {
-          "label": "Monatlich",
-          "hint": "Am 1. des Monats, letzter Monat"
-        }
-      }
+        "label": "Rhythmus",
+        "daily": { "label": "Täglich", "hint": "Vorheriger Tag" },
+        "weekly": { "label": "Wöchentlich", "hint": "Vorherige sieben Tage" },
+        "monthly": { "label": "Monatlich", "hint": "Vorheriger Kalendermonat" }
+      },
+      "weekdays": { "0": "Sonntag", "1": "Montag", "2": "Dienstag", "3": "Mittwoch", "4": "Donnerstag", "5": "Freitag", "6": "Samstag" },
+      "status": { "draft": "Entwurf", "active": "Aktiv", "paused": "Pausiert" },
+      "runStatus": { "queued": "Eingeplant", "running": "Wird gesendet", "sending": "Wird gesendet", "completed": "Vom Mailserver angenommen", "accepted": "Vom Mailserver angenommen", "partial": "Vom Mailserver teilweise angenommen", "failed": "Fehlgeschlagen", "skipped": "Übersprungen" },
+      "actions": { "preview": "Vorschau erzeugen", "test": "Test senden", "history": "Verlauf", "duplicate": "Duplizieren", "pause": "Pausieren", "resume": "Fortsetzen", "retry": "Erneut senden" },
+      "editor": { "createTitle": "Bericht erstellen", "editTitle": "Bericht bearbeiten", "presetStep": "Vorlage wählen", "sitesStep": "Websites wählen", "recipientsStep": "Empfänger wählen", "scheduleStep": "Zeitplan festlegen", "previewStep": "Vorschau" },
+      "saveDraft": "Entwurf speichern",
+      "activate": "Speichern & aktivieren",
+      "history": { "title": "Versandverlauf", "empty": "Noch keine geplanten Läufe.", "deliveries": "Zustellungen", "attempts": "Versuche", "acceptedAt": "Angenommen", "retryAt": "Nächster Versuch" },
+      "errors": { "load": "Berichte konnten nicht geladen werden.", "save": "Der Bericht konnte nicht gespeichert werden.", "preview": "Die Vorschau konnte nicht erzeugt werden.", "test": "Der Mailserver hat die Testnachricht nicht angenommen.", "action": "Die Berichtsaktion ist fehlgeschlagen." }
     },
     "apiClients": {
       "title": "API-Clients",
@@ -1881,6 +1938,7 @@
             "members": "Bis zu {{count}} Teammitglieder",
             "retention": "{{count}} Jahre Datenaufbewahrung",
             "retentionDays": "{{count}} Tage Datenaufbewahrung",
+            "externalReportRecipients": "Externe Empfänger für geplante Berichte",
             "customDomains": "Eigene Tracking-Domains",
             "sso": "Single Sign-on (SSO)"
           }
@@ -3585,5 +3643,19 @@
       "free": "Free-Tarif",
       "aria": "Du nutzt den kostenlosen Tarif – Tarife ansehen und upgraden"
     }
+  },
+  "reportConfirmation": {
+    "title": "Geplanten Bericht bestätigen",
+    "subtitle": "Prüfe genau, welchem Empfang du zustimmst.",
+    "team": "Team",
+    "report": "Bericht",
+    "cadence": "Rhythmus",
+    "sites": "Websites",
+    "disclaimer": "Die Bestätigung erstellt kein Konto und gewährt keinen Zugriff auf HitKeep, das Team oder seine Dashboards. Du kannst dich in jeder Berichts-E-Mail abmelden.",
+    "confirm": "Berichte bestätigen",
+    "decline": "Ablehnen",
+    "invalid": { "title": "Dieser Bestätigungslink ist nicht verfügbar", "description": "Er ist möglicherweise ungültig, abgelaufen, bereits verwendet oder durch eine neue Einladung ersetzt. Bitte die Berichtsverwaltung um erneutes Senden." },
+    "confirmed": { "title": "Berichtsversand bestätigt", "description": "Du erhältst zukünftige geplante Berichte. Berichte vor der Bestätigung werden nicht nachgesendet." },
+    "declined": { "title": "Berichtsversand abgelehnt", "description": "Du erhältst diesen Bericht nicht, bis du später eine neue Bestätigung annimmst." }
   }
 }

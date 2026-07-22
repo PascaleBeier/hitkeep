@@ -63,6 +63,7 @@ export interface TeamEntitlements {
     max_retention_days: number;
     allow_sso: boolean;
     allow_custom_branding: boolean;
+    allow_external_report_recipients: boolean;
 }
 
 export interface TeamPlan {
@@ -626,6 +627,10 @@ export interface SystemStatus {
     version: string;
     cloud?: CloudStatus;
     ask_ai?: AskAIStatus;
+    mail_delivery?: {
+        available: boolean;
+        status: 'available' | 'unavailable';
+    };
 }
 
 export interface AskAIStatus {
@@ -728,4 +733,120 @@ export interface SiteReportSubscription {
 export interface ReportSubscriptions {
     sites: SiteReportSubscription[];
     digest: FrequencyPrefs;
+}
+
+export type ReportScope = 'personal' | 'team';
+export type ReportPreset = 'site_summary' | 'portfolio_digest' | 'opportunity_brief';
+export type ReportStatus = 'draft' | 'active' | 'paused';
+export type ReportSiteMode = 'selected' | 'all_accessible';
+
+export interface ReportSchedule {
+    frequency: ReportFrequency;
+    timezone: string;
+    local_time: string;
+    weekly_day?: number;
+    monthly_day?: number;
+}
+
+export interface ReportSite {
+    id: string;
+    domain: string;
+}
+
+export interface ReportRecipient {
+    id: string;
+    kind: 'member' | 'external';
+    user_id?: string;
+    email: string;
+    status: 'pending_confirmation' | 'confirmed' | 'opted_out';
+    confirmed_at?: string;
+    confirmation_expires_at?: string;
+    invitation_state?: 'pending' | 'sent' | 'failed';
+    opted_out_at?: string;
+}
+
+export interface ReportDefinition {
+    id: string;
+    tenant_id?: string;
+    owner_user_id?: string;
+    created_by?: string;
+    name: string;
+    scope: ReportScope;
+    preset: ReportPreset;
+    site_mode: ReportSiteMode;
+    sites: ReportSite[];
+    recipients: ReportRecipient[];
+    schedule: ReportSchedule;
+    status: ReportStatus;
+    source: 'v2' | 'legacy';
+    consent_version: number;
+    next_run_at?: string;
+    last_outcome?: {
+        run_id: string;
+        status: string;
+        scheduled_at: string;
+        completed_at?: string;
+    };
+    created_at: string;
+    updated_at: string;
+}
+
+export interface ReportDefinitionInput {
+    name: string;
+    scope: ReportScope;
+    tenant_id?: string;
+    preset: ReportPreset;
+    site_mode: ReportSiteMode;
+    site_ids: string[];
+    recipient_user_ids: string[];
+    external_recipient_emails: string[];
+    schedule: ReportSchedule;
+    status: ReportStatus;
+}
+
+export interface ReportPreview {
+    subject: string;
+    preset: ReportPreset;
+    schedule: ReportSchedule;
+    site_count: number;
+    recipient_count: number;
+    pending_recipient_count: number;
+    period_start: string;
+    period_end: string;
+    suppressed: boolean;
+}
+
+export interface ReportDelivery {
+    id: string;
+    recipient_id: string;
+    recipient_kind: 'member' | 'external';
+    recipient_user_id?: string;
+    recipient_email?: string;
+    status: string;
+    attempt_count: number;
+    next_attempt_at?: string;
+    safe_error_code?: string;
+    smtp_accepted_at?: string;
+}
+
+export interface ReportRecipientConfirmation {
+    report_name: string;
+    team_name: string;
+    preset: ReportPreset;
+    schedule: ReportSchedule;
+    sites: ReportSite[];
+    expires_at: string;
+}
+
+export interface ReportRun {
+    id: string;
+    report_id: string;
+    scheduled_for: string;
+    period_start: string;
+    period_end: string;
+    status: string;
+    safe_error_code?: string;
+    started_at?: string;
+    completed_at?: string;
+    deliveries: ReportDelivery[];
 }

@@ -82,6 +82,23 @@ func removeUserTenantScopedSiteAccessTx(ctx context.Context, tx *sql.Tx, tenantI
 		return fmt.Errorf("could not remove tenant-scoped report subscriptions: %w", err)
 	}
 
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM report_deliveries
+		WHERE recipient_id IN (
+			SELECT id FROM report_recipients WHERE user_id = ?
+		)
+		  AND report_id IN (SELECT id FROM report_definitions WHERE tenant_id = ?)
+	`, userID, tenantID); err != nil {
+		return fmt.Errorf("could not remove tenant-scoped report deliveries: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM report_recipients
+		WHERE user_id = ?
+		  AND report_id IN (SELECT id FROM report_definitions WHERE tenant_id = ?)
+	`, userID, tenantID); err != nil {
+		return fmt.Errorf("could not remove tenant-scoped report recipients: %w", err)
+	}
+
 	return nil
 }
 

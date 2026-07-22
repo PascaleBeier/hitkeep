@@ -1,0 +1,14 @@
+{{ define "content" -}}
+{{ t "reports.confirmation.heading" }}
+==================
+
+{{ tf "reports.confirmation.body" .TeamName .ReportName }}
+
+{{ t "reports.confirmation.schedule" }}: {{ .Frequency }}
+{{ t "reports.confirmation.sites" }}: {{ .SiteDomains }}
+
+{{ t "reports.confirmation.button" }}: {{ .Link }}
+
+{{ tf "reports.confirmation.expires" .ExpiresInDays }}
+{{ t "reports.confirmation.disclaimer" }}
+{{- end }}

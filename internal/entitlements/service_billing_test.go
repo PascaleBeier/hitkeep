@@ -69,3 +69,19 @@ func TestCloudPlanEntitlementsGateSSOToBusiness(t *testing.T) {
 		t.Fatalf("expected Business to include SSO, got %+v", business)
 	}
 }
+
+func TestCloudPlanEntitlementsGateExternalReportRecipientsToPaidPlans(t *testing.T) {
+	free := CloudPlanEntitlements(database.CloudPlanFree)
+	pro := CloudPlanEntitlements(database.CloudPlanPro)
+	business := CloudPlanEntitlements(database.CloudPlanBusiness)
+
+	if free == nil || free.AllowExternalReportRecipients {
+		t.Fatalf("expected Free to exclude external report recipients, got %+v", free)
+	}
+	if pro == nil || !pro.AllowExternalReportRecipients {
+		t.Fatalf("expected Pro to include external report recipients, got %+v", pro)
+	}
+	if business == nil || !business.AllowExternalReportRecipients {
+		t.Fatalf("expected Business to include external report recipients, got %+v", business)
+	}
+}

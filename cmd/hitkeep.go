@@ -131,7 +131,8 @@ func Run() {
 		go rollupWorker.Start(gCtx)
 
 		// Start Report Worker
-		reportWorker := worker.NewReportWorker(tenantMgr, mailSvc, conf.PublicURL)
+		reportWorker := worker.NewReportWorker(tenantMgr, mailSvc, conf.PublicURL, conf.JWTSecret).
+			WithEntitlements(entitlements.NewService(store, ent, conf))
 		go reportWorker.Start(gCtx)
 
 		// Start cloud lifecycle email worker. The worker is a no-op in non-billing builds.

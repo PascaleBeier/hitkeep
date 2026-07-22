@@ -1,0 +1,64 @@
+<main class="hk-auth-page">
+    <section class="hk-auth-shell" aria-labelledby="report-confirmation-title">
+        <app-auth-card>
+            <header class="hk-auth-header">
+                <app-brand size="large" />
+                <h1 id="report-confirmation-title" class="hk-auth-title">{{ "reportConfirmation.title" | transloco }}</h1>
+                <p class="hk-auth-subtitle">{{ "reportConfirmation.subtitle" | transloco }}</p>
+            </header>
+
+            @if (state() === 'loading') {
+            <p-message severity="secondary" role="status">{{ "common.loading" | transloco }}</p-message>
+            } @else if (state() === 'invalid') {
+            <p-message severity="warn" icon="pi pi-clock" role="alert">
+                <div>
+                    <p class="font-semibold">{{ "reportConfirmation.invalid.title" | transloco }}</p>
+                    <p class="text-sm mt-1">{{ "reportConfirmation.invalid.description" | transloco }}</p>
+                </div>
+            </p-message>
+            } @else if (state() === 'confirmed') {
+            <p-message severity="success" icon="pi pi-check-circle" role="status">
+                <div>
+                    <p class="font-semibold">{{ "reportConfirmation.confirmed.title" | transloco }}</p>
+                    <p class="text-sm mt-1">{{ "reportConfirmation.confirmed.description" | transloco }}</p>
+                </div>
+            </p-message>
+            } @else if (state() === 'declined') {
+            <p-message severity="info" icon="pi pi-ban" role="status">
+                <div>
+                    <p class="font-semibold">{{ "reportConfirmation.declined.title" | transloco }}</p>
+                    <p class="text-sm mt-1">{{ "reportConfirmation.declined.description" | transloco }}</p>
+                </div>
+            </p-message>
+            } @else if (confirmation(); as details) {
+            <div class="confirmation-details">
+                <div>
+                    <span>{{ "reportConfirmation.team" | transloco }}</span>
+                    <strong>{{ details.team_name }}</strong>
+                </div>
+                <div>
+                    <span>{{ "reportConfirmation.report" | transloco }}</span>
+                    <strong>{{ details.report_name }}</strong>
+                </div>
+                <div>
+                    <span>{{ "reportConfirmation.cadence" | transloco }}</span>
+                    <strong>{{ ("settings.reports.frequency." + details.schedule.frequency + ".label") | transloco }} · {{ details.schedule.local_time }} · {{ details.schedule.timezone }}</strong>
+                </div>
+                <div>
+                    <span>{{ "reportConfirmation.sites" | transloco }}</span>
+                    <ul>
+                        @for (site of details.sites; track site.id) {
+                        <li>{{ site.domain }}</li>
+                        }
+                    </ul>
+                </div>
+            </div>
+            <p class="confirmation-disclaimer">{{ "reportConfirmation.disclaimer" | transloco }}</p>
+            <div class="confirmation-actions">
+                <p-button [label]="'reportConfirmation.decline' | transloco" severity="secondary" [outlined]="true" [disabled]="state() === 'submitting'" (onClick)="decide('decline')" />
+                <p-button [label]="'reportConfirmation.confirm' | transloco" icon="pi pi-check" [loading]="state() === 'submitting'" (onClick)="decide('confirm')" />
+            </div>
+            }
+        </app-auth-card>
+    </section>
+</main>

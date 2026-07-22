@@ -26,6 +26,18 @@ func (d *mockDriver) Send(to []string, subject string, htmlBody string, textBody
 
 func (d *mockDriver) Close() error { return nil }
 
+type headerMockDriver struct {
+	mockDriver
+	messageID string
+	headers   map[string]string
+}
+
+func (d *headerMockDriver) SendWithHeaders(to []string, subject, htmlBody, textBody, messageID string, headers map[string]string) error {
+	d.messageID = messageID
+	d.headers = headers
+	return d.Send(to, subject, htmlBody, textBody)
+}
+
 // stubMailable is a minimal Mailable for tests.
 type stubMailable struct {
 	subject  string
@@ -86,6 +98,7 @@ func newLocalizedSiteReportMailable(locale string) *stubMailable {
 			FreqLabel      string
 			DashURL        string
 			SettingsURL    string
+			UnsubscribeURL string
 			Current        reportStats
 			Previous       reportStats
 			DailyPageviews []int
@@ -116,6 +129,10 @@ func newLocalizedDigestMailable(locale string) *stubMailable {
 		DashURL       string
 		Pageviews     int
 		PrevPageviews int
+		Visitors      int
+		PrevVisitors  int
+		Goals         int
+		PrevGoals     int
 	}
 
 	return &stubMailable{
@@ -123,11 +140,12 @@ func newLocalizedDigestMailable(locale string) *stubMailable {
 		template: "analytics_digest.mjml",
 		locale:   locale,
 		data: struct {
-			PeriodLabel string
-			FreqLabel   string
-			DashURL     string
-			SettingsURL string
-			Sites       []digestSite
+			PeriodLabel    string
+			FreqLabel      string
+			DashURL        string
+			SettingsURL    string
+			UnsubscribeURL string
+			Sites          []digestSite
 		}{
 			PeriodLabel: "23–29 mars 2026",
 			FreqLabel:   Translate(locale, "freq.digest.weekly"),
@@ -172,6 +190,7 @@ func newLocalizedOpportunityDigestMailable(locale string) *stubMailable {
 			FreqLabel        string
 			OpportunitiesURL string
 			SettingsURL      string
+			UnsubscribeURL   string
 			Items            []item
 		}{
 			SiteDomain:       "shop.example",
@@ -913,5 +932,29 @@ func TestSendHTMLContainsSubjectInTitle(t *testing.T) {
 
 	if !strings.Contains(drv.htmlBody, "<title>Reset your HitKeep Password</title>") {
 		t.Fatalf("expected <title> to contain subject line")
+	}
+}
+
+func TestSendWithOptionsPreservesStableMessageIDAndUnsubscribeHeaders(t *testing.T) {
+	driver := &headerMockDriver{}
+	m := NewWithDriver(driver, nil)
+	messageID := "<report.run.recipient@hitkeep>"
+	headers := map[string]string{
+		"List-Unsubscribe":      "<https://example.com/api/reports/unsubscribe/token>",
+		"List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+	}
+	if err := m.SendWithOptions("user@example.com", newPasswordResetMailable("https://example.com/reset"), SendOptions{
+		MessageID: messageID,
+		Headers:   headers,
+	}); err != nil {
+		t.Fatalf("SendWithOptions() error = %v", err)
+	}
+	if driver.messageID != messageID {
+		t.Fatalf("message ID = %q, want %q", driver.messageID, messageID)
+	}
+	for key, value := range headers {
+		if driver.headers[key] != value {
+			t.Fatalf("header %s = %q, want %q", key, driver.headers[key], value)
+		}
 	}
 }

@@ -44,8 +44,8 @@
     "supportAria": "Open HitKeep support in a new tab",
     "settings": "Settings",
     "settingsAria": "Go to settings",
-    "emailReports": "Email Reports",
-    "emailReportsAria": "Go to email reports",
+    "emailReports": "Reporting",
+    "emailReportsAria": "Go to reporting",
     "administration": "Administration",
     "systemSettings": "System Settings",
     "systemSettingsAria": "Go to system settings",
@@ -264,7 +264,12 @@
       "googleSearchConsoleSyncFailed": "Search Console sync failed",
       "askAIRequested": "Ask AI requested",
       "askAIResponded": "Ask AI responded",
-      "askAIHistoryViewed": "Ask AI history viewed"
+      "askAIHistoryViewed": "Ask AI history viewed",
+      "reportCreated": "Report created",
+      "reportUpdated": "Report updated",
+      "reportDeleted": "Report deleted",
+      "reportTestSent": "Report test sent",
+      "reportRetryRequested": "Report retry requested"
     },
     "columns": {
       "evidence": "Evidence",
@@ -299,7 +304,8 @@
       "permission": "Permission",
       "googleSearchConsoleConnection": "Search Console connection",
       "googleSearchConsoleProperty": "Search Console property",
-      "googleSearchConsoleSync": "Search Console sync"
+      "googleSearchConsoleSync": "Search Console sync",
+      "report": "Report"
     },
     "roles": {
       "owner": "Owner",
@@ -1165,31 +1171,95 @@
       }
     },
     "reports": {
-      "breadcrumb": "Email Reports",
-      "subtitle": "Configure scheduled analytics emails for your sites.",
-      "digest": {
-        "title": "Consolidated Digest",
-        "description": "Receive one summary email across all your sites."
+      "breadcrumb": "Reporting",
+      "subtitle": "Create reliable, scheduled analytics reports for yourself or your team.",
+      "newReport": "New report",
+      "mailUnavailable": "SMTP is unavailable. You can create and edit drafts, but reports cannot be activated, tested, or retried.",
+      "mailUnavailableDraft": "Mail delivery is unavailable. Save this report as a draft until SMTP is configured.",
+            "saved": "Report saved.",
+            "deleted": "Report deleted.",
+            "emptyFiltered": "No reports match your search.",
+      "previewSuppressed": "No email would be sent because this report has no eligible content for the selected period.",
+      "previewDeliverable": "{{count}} confirmed recipient(s) would receive this report.",
+      "previewPending": "{{count}} external recipient(s) are pending confirmation.",
+      "testAccepted": "Test message accepted by the mail server.",
+      "retryQueued": "Delivery retry queued.",
+      "resubscribed": "You are subscribed to this report again.",
+      "copyName": "{{name}} copy",
+      "legacy": "Migrated",
+      "name": "Report name",
+      "namePlaceholder": "e.g. Monday growth review",
+      "nextRun": "Next run",
+      "lastOutcome": "Last outcome",
+      "notAvailable": "Not yet",
+      "allAccessibleSites": "All accessible sites",
+      "selectedSites": "Selected sites",
+      "personalRecipient": "Personal reports are sent only to your HitKeep account.",
+      "deliveryTime": "Delivery time",
+      "timezone": "Timezone",
+      "weekday": "Weekday",
+      "monthDay": "Day of month",
+      "scheduleHint": "Times use 15-minute increments. New reports default to 08:00 in your browser timezone.",
+      "deleteConfirm": "Delete report “{{name}}”? Delivery history will also be removed.",
+      "optedOut": "You opted out of this report.",
+      "resubscribe": "Resubscribe",
+      "empty": {
+        "title": "No reports yet",
+        "description": "Create a named report with the sites, recipients, and delivery time that fit your workflow.",
+        "action": "Create report"
       },
-      "perSite": {
-        "title": "Per-site Reports",
-        "description": "Individual emails for each site.",
-        "empty": "No sites found. Add a site to configure per-site reports."
+      "presets": {
+        "site_summary": { "title": "Site Summary", "description": "KPIs, goals, trend, top pages, and referrers for one site." },
+        "portfolio_digest": { "title": "Portfolio Digest", "description": "A compact comparison across selected or all accessible sites." },
+        "opportunity_brief": { "title": "Opportunity Brief", "description": "Validated saved opportunities with cited evidence; empty emails are suppressed." }
       },
+      "scope": { "label": "Scope", "personal": "Personal", "team": "Team" },
+      "sites": { "label": "Sites", "placeholder": "Select sites" },
+      "recipients": {
+        "label": "Recipients",
+        "placeholder": "Select HitKeep users",
+        "externalLabel": "External email recipients",
+        "externalPlaceholder": "client@example.com",
+        "externalHint": "External recipients must confirm before receiving reports. Up to 25 per report.",
+        "proNudge": "External scheduled-report recipients are available on Pro and Business. On Free, remove existing external addresses before saving changes.",
+        "proRequired": "External report recipients require the Pro plan or higher.",
+        "upgradeToPro": "Upgrade to Pro",
+        "add": "Add email",
+        "invalidEmail": "Enter a valid email address.",
+        "limit": "A report can have at most 25 external recipients.",
+        "removeEmail": "Remove {{email}}",
+        "resend": "Resend",
+        "resent": "Confirmation email resent.",
+        "resendFailed": "The confirmation email could not be resent yet.",
+        "removeConfirm": "Remove {{email}} from this report?",
+        "removed": "External recipient removed."
+      },
+      "recipientStatus": { "confirmed": "Confirmed", "pending_confirmation": "Pending confirmation", "opted_out": "Opted out", "expired": "Confirmation expired", "invitation_failed": "Invitation failed" },
+      "schedule": { "label": "Schedule" },
       "frequency": {
+        "label": "Cadence",
         "daily": {
           "label": "Daily",
-          "hint": "Previous day's stats"
+          "hint": "Previous day"
         },
         "weekly": {
           "label": "Weekly",
-          "hint": "Every Monday, covers past 7 days"
+          "hint": "Previous seven days"
         },
         "monthly": {
           "label": "Monthly",
-          "hint": "1st of each month, covers last month"
+          "hint": "Previous calendar month"
         }
-      }
+      },
+      "weekdays": { "0": "Sunday", "1": "Monday", "2": "Tuesday", "3": "Wednesday", "4": "Thursday", "5": "Friday", "6": "Saturday" },
+      "status": { "draft": "Draft", "active": "Active", "paused": "Paused" },
+      "runStatus": { "queued": "Queued", "running": "Sending", "sending": "Sending", "completed": "Accepted by mail server", "accepted": "Accepted by mail server", "partial": "Partly accepted by mail server", "failed": "Failed", "skipped": "Skipped" },
+      "actions": { "preview": "Generate preview", "test": "Test send", "history": "History", "duplicate": "Duplicate", "pause": "Pause", "resume": "Resume", "retry": "Retry" },
+      "editor": { "createTitle": "Create report", "editTitle": "Edit report", "presetStep": "Choose a preset", "sitesStep": "Choose sites", "recipientsStep": "Choose recipients", "scheduleStep": "Set the schedule", "previewStep": "Preview" },
+      "saveDraft": "Save draft",
+      "activate": "Save & activate",
+      "history": { "title": "Delivery history", "empty": "No scheduled runs yet.", "deliveries": "deliveries", "attempts": "attempts", "acceptedAt": "Accepted", "retryAt": "Next retry" },
+      "errors": { "load": "Reports could not be loaded.", "save": "The report could not be saved.", "preview": "The preview could not be generated.", "test": "The mail server did not accept the test message.", "action": "The report action failed." }
     },
     "apiClients": {
       "title": "API clients",
@@ -1819,6 +1889,7 @@
             "members": "Up to {{count}} team members",
             "retention": "{{count}}-year data retention",
             "retentionDays": "{{count}}-day data retention",
+            "externalReportRecipients": "External scheduled-report recipients",
             "customDomains": "Custom tracking domains",
             "sso": "Single sign-on (SSO)"
           }
@@ -3621,5 +3692,19 @@
       "free": "Free plan",
       "aria": "You are on the Free plan — view plans and upgrade"
     }
+  },
+  "reportConfirmation": {
+    "title": "Confirm scheduled report",
+    "subtitle": "Review exactly what you are agreeing to receive.",
+    "team": "Team",
+    "report": "Report",
+    "cadence": "Cadence",
+    "sites": "Sites",
+    "disclaimer": "Confirming does not create an account or grant access to HitKeep, the team, or its dashboards. You can unsubscribe from any report email.",
+    "confirm": "Confirm reports",
+    "decline": "Decline",
+    "invalid": { "title": "This confirmation link is unavailable", "description": "It may be invalid, expired, already used, or replaced by a newer invitation. Ask the report manager to resend it." },
+    "confirmed": { "title": "Report delivery confirmed", "description": "You will receive future scheduled reports. Reports sent before confirmation are not resent." },
+    "declined": { "title": "Report delivery declined", "description": "You will not receive this report unless you accept a fresh confirmation later." }
   }
 }

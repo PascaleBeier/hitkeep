@@ -5,33 +5,37 @@
 <mj-text css-class="muted" color="#64748b" padding-top="0" padding-bottom="20px">
   {{ .PeriodLabel }}
 </mj-text>
+<mj-text css-class="muted" color="#64748b" font-size="12px" padding-top="0" padding-bottom="8px">
+  {{ t "digest.change" }}: {{ t "digest.pageviews" }} · {{ t "reports.visitors" }} · {{ t "reports.goal_completions" }}
+</mj-text>
 
 <mj-table css-class="dark-table">
   <tr class="tbl-header" style="border-bottom: 1px solid #e2e8f0;">
     <th style="padding: 8px 12px 8px 0; text-align: left; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">{{ t "digest.site" }}</th>
     <th style="padding: 8px 12px; text-align: right; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">{{ t "digest.pageviews" }}</th>
-    <th style="padding: 8px 0 8px 12px; text-align: right; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">{{ t "digest.change" }}</th>
+    <th style="padding: 8px 8px; text-align: right; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">{{ t "reports.visitors" }}</th>
+    <th style="padding: 8px 0 8px 8px; text-align: right; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">{{ t "reports.goal_completions" }}</th>
   </tr>
   {{ range $i, $s := .Sites }}
   <tr{{ if eq (mod2 $i) 0 }} class="alt-row" style="background-color: #f8fafc;"{{ end }}>
     <td style="padding: 10px 12px 10px 0;">
-      <a href="{{ $s.DashURL }}" style="color: #33d399; text-decoration: none; font-weight: 600;">{{ $s.Domain }}</a>
+      {{ if $s.DashURL }}<a href="{{ $s.DashURL }}" style="color: #33d399; text-decoration: none; font-weight: 600;">{{ $s.Domain }}</a>{{ else }}<strong>{{ $s.Domain }}</strong>{{ end }}
     </td>
-    <td style="padding: 10px 12px; text-align: right; font-weight: 700;">{{ $s.Pageviews }}</td>
-    <td class="{{ if gt $s.Pageviews $s.PrevPageviews }}change-up{{ else if lt $s.Pageviews $s.PrevPageviews }}change-down{{ else }}change-neutral{{ end }}" style="padding: 10px 0 10px 12px; text-align: right; color: {{ if gt $s.Pageviews $s.PrevPageviews }}#22c55e{{ else if lt $s.Pageviews $s.PrevPageviews }}#ef4444{{ else }}#64748b{{ end }};">
-      {{ percentChange $s.Pageviews $s.PrevPageviews }}
-    </td>
+    <td style="padding: 10px 12px; text-align: right; font-weight: 700;">{{ formatInt $s.Pageviews }} <span style="color:#64748b;font-size:11px">{{ percentChange $s.Pageviews $s.PrevPageviews }}</span></td>
+    <td style="padding: 10px 8px; text-align: right; font-weight: 700;">{{ formatInt $s.Visitors }} <span style="color:#64748b;font-size:11px">{{ percentChange $s.Visitors $s.PrevVisitors }}</span></td>
+    <td style="padding: 10px 0 10px 8px; text-align: right; font-weight: 700;">{{ formatInt $s.Goals }} <span style="color:#64748b;font-size:11px">{{ percentChange $s.Goals $s.PrevGoals }}</span></td>
   </tr>
   {{ end }}
 </mj-table>
 
-<mj-button href="{{ .DashURL }}" padding-top="24px" padding-bottom="8px">
+{{ if .DashURL }}<mj-button href="{{ .DashURL }}" padding-top="24px" padding-bottom="8px">
   {{ t "reports.view_dashboard" }}
-</mj-button>
+</mj-button>{{ end }}
 
 <mj-divider padding-top="12px" padding-bottom="8px" />
 <mj-text css-class="info-text" font-size="11px" color="#94a3b8" align="center" padding-top="0">
   {{ t "reports.received_because" }}
-  <a href="{{ .SettingsURL }}" style="color: #33d399; text-decoration: none;">{{ t "reports.manage_preferences" }}</a>
+  {{ if .SettingsURL }}<a href="{{ .SettingsURL }}" style="color: #33d399; text-decoration: none;">{{ t "reports.manage_preferences" }}</a>{{ end }}
+  {{ if .UnsubscribeURL }}{{ if .SettingsURL }} · {{ end }}<a href="{{ .UnsubscribeURL }}" style="color: #33d399; text-decoration: none;">{{ t "reports.unsubscribe" }}</a>{{ end }}
 </mj-text>
 {{ end }}

@@ -294,6 +294,42 @@ func TestOpenAPISpecV1IncludesCloudSignupPaths(t *testing.T) {
 	assertCloudOperation(t, requireMap(t, webhookPath.(map[string]any), "post"))
 }
 
+func TestOpenAPISpecV1MarksEveryCloudOperationInternal(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	cloudOperations := 0
+
+	for path, rawPathItem := range paths {
+		pathItem, ok := rawPathItem.(map[string]any)
+		if !ok {
+			continue
+		}
+		for method, rawOperation := range pathItem {
+			operation, ok := rawOperation.(map[string]any)
+			if !ok {
+				continue
+			}
+			rawTags, ok := operation["tags"]
+			if !ok {
+				continue
+			}
+			for _, tag := range asStringSlice(t, rawTags) {
+				if tag != "Cloud" {
+					continue
+				}
+				cloudOperations++
+				t.Run(method+" "+path, func(t *testing.T) {
+					assertCloudOperation(t, operation)
+				})
+			}
+		}
+	}
+
+	if cloudOperations == 0 {
+		t.Fatal("expected at least one Cloud operation")
+	}
+}
+
 func TestOpenAPISpecV1IncludesAdminSystemPaths(t *testing.T) {
 	spec := openAPISpecV1("http://localhost:8080")
 	paths := requireMap(t, spec, "paths")
@@ -1380,5 +1416,10 @@ func assertCloudOperation(t *testing.T, op map[string]any) {
 	buildTags := asStringSlice(t, op["x-hitkeep-build-tags"])
 	if !reflect.DeepEqual(buildTags, []string{"billing"}) {
 		t.Fatalf("unexpected cloud build tags, got %v", buildTags)
+	}
+
+	internal, ok := op["x-internal"].(bool)
+	if !ok || !internal {
+		t.Fatalf("expected x-internal=true, got %#v", op["x-internal"])
 	}
 }

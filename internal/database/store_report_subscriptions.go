@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/reporting"
 )
 
 var ErrSiteAccessRequired = errors.New("site access required")
@@ -105,11 +107,15 @@ func (s *Store) GetReportSubscriptions(ctx context.Context, userID uuid.UUID) (*
 		return nil, err
 	}
 
-	// Fetch all site_report_subscriptions for this user in one query.
+	// Read legacy-managed definitions so this endpoint remains a compatibility
+	// façade over the named-report model.
 	subRows, err := s.db.QueryContext(ctx, `
-		SELECT site_id, frequency, enabled
-		FROM site_report_subscriptions
-		WHERE user_id = ?
+		SELECT rds.site_id, rd.frequency, rd.status = 'active'
+		FROM report_definitions rd
+		JOIN report_definition_sites rds ON rds.report_id = rd.id
+		WHERE rd.owner_user_id = ?
+		  AND rd.source = 'legacy'
+		  AND rd.preset = 'site_summary'
 	`, userID)
 	if err != nil {
 		return nil, err
@@ -146,11 +152,13 @@ func (s *Store) GetReportSubscriptions(ctx context.Context, userID uuid.UUID) (*
 		})
 	}
 
-	// Fetch digest subscriptions.
+	// Fetch legacy-managed digest definitions.
 	digestRows, err := s.db.QueryContext(ctx, `
-		SELECT frequency, enabled
-		FROM digest_subscriptions
-		WHERE user_id = ?
+		SELECT frequency, status = 'active'
+		FROM report_definitions
+		WHERE owner_user_id = ?
+		  AND source = 'legacy'
+		  AND preset = 'portfolio_digest'
 	`, userID)
 	if err != nil {
 		return nil, err
@@ -190,26 +198,138 @@ func (s *Store) UpsertSiteReportSubscription(ctx context.Context, userID, siteID
 		return ErrSiteAccessRequired
 	}
 
-	now := time.Now().UTC()
-	return s.Exec(ctx, `
-		INSERT INTO site_report_subscriptions (id, user_id, site_id, frequency, enabled, created_at, updated_at)
-		VALUES (uuidv7(), ?, ?, ?, ?, ?, ?)
-		ON CONFLICT (user_id, site_id, frequency) DO UPDATE SET
-			enabled = excluded.enabled,
-			updated_at = excluded.updated_at
-	`, userID, siteID, string(freq), enabled, now, now)
+	return s.upsertLegacyReportDefinition(ctx, userID, &siteID, freq, enabled)
 }
 
 // UpsertDigestSubscription inserts or updates a digest subscription for the given frequency.
 func (s *Store) UpsertDigestSubscription(ctx context.Context, userID uuid.UUID, freq api.ReportFrequency, enabled bool) error {
+	return s.upsertLegacyReportDefinition(ctx, userID, nil, freq, enabled)
+}
+
+func (s *Store) upsertLegacyReportDefinition(ctx context.Context, userID uuid.UUID, siteID *uuid.UUID, freq api.ReportFrequency, enabled bool) error {
+	schedule := api.ReportSchedule{Frequency: freq, Timezone: "UTC", LocalTime: "08:00"}
+	if freq == api.ReportFrequencyWeekly {
+		monday := int(time.Monday)
+		schedule.WeeklyDay = &monday
+	}
+	if freq == api.ReportFrequencyMonthly {
+		first := 1
+		schedule.MonthlyDay = &first
+	}
+	if err := reporting.ValidateSchedule(schedule); err != nil {
+		return err
+	}
 	now := time.Now().UTC()
-	return s.Exec(ctx, `
-		INSERT INTO digest_subscriptions (id, user_id, frequency, enabled, created_at, updated_at)
-		VALUES (uuidv7(), ?, ?, ?, ?, ?)
-		ON CONFLICT (user_id, frequency) DO UPDATE SET
-			enabled = excluded.enabled,
-			updated_at = excluded.updated_at
-	`, userID, string(freq), enabled, now, now)
+	nextRun, err := reporting.NextOccurrence(schedule, now)
+	if err != nil {
+		return err
+	}
+	legacyKey := fmt.Sprintf("digest:%s:%s", userID, freq)
+	preset := api.ReportPresetPortfolioDigest
+	siteMode := api.ReportSiteModeAllAccessible
+	name := fmt.Sprintf("Portfolio Digest · %s", freq)
+	var siteTenantID uuid.UUID
+	if siteID != nil {
+		legacyKey = fmt.Sprintf("site:%s:%s:%s", userID, *siteID, freq)
+		preset = api.ReportPresetSiteSummary
+		siteMode = api.ReportSiteModeSelected
+		var domain string
+		if err := s.db.QueryRowContext(ctx, "SELECT domain FROM sites WHERE id = ?", *siteID).Scan(&domain); err != nil {
+			return err
+		}
+		name = "Site Summary · " + domain
+		siteTenantID, err = s.GetSiteTenantID(ctx, *siteID)
+		if err != nil {
+			return err
+		}
+	}
+	status := api.ReportStatusPaused
+	var defaultNextRun any
+	if enabled {
+		status = api.ReportStatusActive
+		defaultNextRun = nextRun
+	}
+
+	return s.Transact(ctx, func(tx *sql.Tx) error {
+		if siteID == nil {
+			if _, err := tx.ExecContext(ctx, `
+				INSERT INTO digest_subscriptions (id, user_id, frequency, enabled, created_at, updated_at)
+				VALUES (uuidv7(), ?, ?, ?, ?, ?)
+				ON CONFLICT (user_id, frequency) DO UPDATE SET enabled = excluded.enabled, updated_at = excluded.updated_at
+			`, userID, freq, enabled, now, now); err != nil {
+				return err
+			}
+		} else if _, err := tx.ExecContext(ctx, `
+			INSERT INTO site_report_subscriptions (id, user_id, site_id, frequency, enabled, created_at, updated_at)
+			VALUES (uuidv7(), ?, ?, ?, ?, ?, ?)
+			ON CONFLICT (user_id, site_id, frequency) DO UPDATE SET enabled = excluded.enabled, updated_at = excluded.updated_at
+		`, userID, *siteID, freq, enabled, now, now); err != nil {
+			return err
+		}
+
+		var reportID uuid.UUID
+		var storedFrequency, storedTimezone, storedLocalTime string
+		var storedWeeklyDay, storedMonthlyDay sql.NullInt64
+		err := tx.QueryRowContext(ctx, `
+			SELECT id, frequency, timezone, local_time, weekly_day, monthly_day
+			FROM report_definitions WHERE legacy_key = ?
+		`, legacyKey).Scan(&reportID, &storedFrequency, &storedTimezone, &storedLocalTime, &storedWeeklyDay, &storedMonthlyDay)
+		if err == nil {
+			var storedNextRun any
+			if enabled {
+				storedSchedule := api.ReportSchedule{
+					Frequency: api.ReportFrequency(storedFrequency), Timezone: storedTimezone, LocalTime: storedLocalTime,
+				}
+				if storedWeeklyDay.Valid {
+					value := int(storedWeeklyDay.Int64)
+					storedSchedule.WeeklyDay = &value
+				}
+				if storedMonthlyDay.Valid {
+					value := int(storedMonthlyDay.Int64)
+					storedSchedule.MonthlyDay = &value
+				}
+				value, nextErr := reporting.NextOccurrence(storedSchedule, now)
+				if nextErr != nil {
+					return nextErr
+				}
+				storedNextRun = value
+			}
+			_, err = tx.ExecContext(ctx, `
+				UPDATE report_definitions SET status = ?, next_run_at = ?, updated_at = ? WHERE id = ?
+			`, status, storedNextRun, now, reportID)
+			return err
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		if !enabled {
+			return nil
+		}
+		reportID = uuid.New()
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO report_definitions (
+				id, owner_user_id, created_by, name, scope, preset, site_mode, frequency,
+				timezone, local_time, weekly_day, monthly_day, status, source, legacy_key,
+				next_run_at, created_at, updated_at
+			) VALUES (?, ?, ?, ?, 'personal', ?, ?, ?, 'UTC', '08:00', ?, ?, ?, 'legacy', ?, ?, ?, ?)
+		`, reportID, userID, userID, name, preset, siteMode, freq, nullableInt(schedule.WeeklyDay),
+			nullableInt(schedule.MonthlyDay), status, legacyKey, defaultNextRun, now, now); err != nil {
+			return err
+		}
+		if siteID != nil {
+			if _, err := tx.ExecContext(ctx, `
+				INSERT INTO report_definition_sites (id, report_id, site_id, tenant_id, created_at)
+				VALUES (?, ?, ?, ?, ?)
+			`, uuid.New(), reportID, *siteID, siteTenantID, now); err != nil {
+				return err
+			}
+		}
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO report_recipients (id, report_id, user_id, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?)
+		`, uuid.New(), reportID, userID, now, now)
+		return err
+	})
 }
 
 // GetPendingSiteReports returns all active per-site report subscriptions for the given frequency,

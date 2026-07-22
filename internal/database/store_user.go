@@ -240,6 +240,7 @@ var userFKReferences = []userFKReference{
 	{table: "share_links", column: "created_by", query: "UPDATE share_links SET created_by = ? WHERE created_by = ?"},
 	{table: "social_identities", column: "user_id", query: "UPDATE social_identities SET user_id = ? WHERE user_id = ?"},
 	{table: "pending_social_confirmations", column: "target_user_id", query: "UPDATE pending_social_confirmations SET target_user_id = ? WHERE target_user_id = ?"},
+	{table: "report_recipients", column: "user_id", query: "UPDATE report_recipients SET user_id = ? WHERE user_id = ?"},
 	{table: "sso_identities", column: "user_id", query: "UPDATE sso_identities SET user_id = ? WHERE user_id = ?"},
 	{table: "site_members", column: "added_by", query: "UPDATE site_members SET added_by = ? WHERE added_by = ?"},
 	{table: "site_members", column: "user_id", query: "UPDATE site_members SET user_id = ? WHERE user_id = ?"},
@@ -477,6 +478,24 @@ func cleanupUserRows(ctx context.Context, tx *sql.Tx, userID uuid.UUID) error {
 	}
 	if err := execIfTableExists("instance_audit_log", "UPDATE instance_audit_log SET target_user_id = NULL WHERE target_user_id = ?", userID); err != nil {
 		return fmt.Errorf("could not null audit target_user_id: %w", err)
+	}
+	if err := execIfTableExists("report_deliveries", "DELETE FROM report_deliveries WHERE recipient_id IN (SELECT id FROM report_recipients WHERE user_id = ?) OR report_id IN (SELECT id FROM report_definitions WHERE owner_user_id = ?)", userID, userID); err != nil {
+		return fmt.Errorf("could not delete user report deliveries: %w", err)
+	}
+	if err := execIfTableExists("report_runs", "DELETE FROM report_runs WHERE report_id IN (SELECT id FROM report_definitions WHERE owner_user_id = ?)", userID); err != nil {
+		return fmt.Errorf("could not delete user report runs: %w", err)
+	}
+	if err := execIfTableExists("report_recipients", "DELETE FROM report_recipients WHERE user_id = ? OR report_id IN (SELECT id FROM report_definitions WHERE owner_user_id = ?)", userID, userID); err != nil {
+		return fmt.Errorf("could not delete user report recipients: %w", err)
+	}
+	if err := execIfTableExists("report_definition_sites", "DELETE FROM report_definition_sites WHERE report_id IN (SELECT id FROM report_definitions WHERE owner_user_id = ?)", userID); err != nil {
+		return fmt.Errorf("could not delete user report sites: %w", err)
+	}
+	if err := execIfTableExists("report_definitions", "UPDATE report_definitions SET created_by = NULL WHERE created_by = ?", userID); err != nil {
+		return fmt.Errorf("could not null report creator: %w", err)
+	}
+	if err := execIfTableExists("report_definitions", "DELETE FROM report_definitions WHERE owner_user_id = ?", userID); err != nil {
+		return fmt.Errorf("could not delete personal reports: %w", err)
 	}
 	if err := execIfTableExists("site_members", "DELETE FROM site_members WHERE user_id = ?", userID); err != nil {
 		return fmt.Errorf("could not delete user site memberships: %w", err)

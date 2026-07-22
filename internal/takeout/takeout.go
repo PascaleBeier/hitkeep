@@ -366,7 +366,14 @@ func buildTakeoutQuery(sources []takeoutQuerySource, filename, format string) st
 				webhookDeliveryAttemptTakeoutSelect(whereClause),
 			)
 			if source.UserID != nil && *source.UserID != uuid.Nil {
-				selects = append(selects, socialIdentityTakeoutSelect(*source.UserID))
+				selects = append(selects,
+					socialIdentityTakeoutSelect(*source.UserID),
+					reportDefinitionTakeoutSelect(*source.UserID),
+					reportSiteTakeoutSelect(*source.UserID),
+					reportRecipientTakeoutSelect(*source.UserID),
+					reportRunTakeoutSelect(*source.UserID),
+					reportDeliveryTakeoutSelect(*source.UserID),
+				)
 			}
 		}
 	}
@@ -394,6 +401,62 @@ func socialIdentityTakeoutSelect(userID uuid.UUID) string {
 			last_used_at
 		FROM social_identities
 		WHERE user_id = '%s'
+	`, userID)
+}
+
+func reportDefinitionTakeoutSelect(userID uuid.UUID) string {
+	return fmt.Sprintf(`
+		SELECT 'report_definition' AS record_type,
+			rd.id, rd.tenant_id, rd.owner_user_id, rd.name, rd.scope, rd.preset,
+			rd.site_mode, rd.frequency, rd.timezone, rd.local_time, rd.weekly_day,
+			rd.monthly_day, rd.status, rd.source, rd.consent_version, rd.next_run_at, rd.created_at, rd.updated_at
+		FROM report_definitions rd
+		WHERE rd.owner_user_id = '%[1]s'
+		   OR EXISTS (SELECT 1 FROM report_recipients rr WHERE rr.report_id = rd.id AND rr.user_id = '%[1]s')
+	`, userID)
+}
+
+func reportSiteTakeoutSelect(userID uuid.UUID) string {
+	return fmt.Sprintf(`
+		SELECT 'report_site' AS record_type, rds.report_id, rds.site_id, rds.created_at
+		FROM report_definition_sites rds
+		WHERE rds.report_id IN (
+			SELECT rd.id FROM report_definitions rd
+			WHERE rd.owner_user_id = '%[1]s'
+			   OR EXISTS (SELECT 1 FROM report_recipients rr WHERE rr.report_id = rd.id AND rr.user_id = '%[1]s')
+		)
+	`, userID)
+}
+
+func reportRecipientTakeoutSelect(userID uuid.UUID) string {
+	return fmt.Sprintf(`
+		SELECT 'report_recipient' AS record_type, report_id, user_id, opted_out_at, created_at, updated_at
+		FROM report_recipients WHERE user_id = '%s'
+	`, userID)
+}
+
+func reportRunTakeoutSelect(userID uuid.UUID) string {
+	return fmt.Sprintf(`
+		SELECT 'report_run' AS record_type, rr.id, rr.report_id, rr.scheduled_for,
+			rr.period_start, rr.period_end, rr.status, rr.safe_error_code,
+			rr.started_at, rr.completed_at, rr.created_at, rr.updated_at
+		FROM report_runs rr
+		WHERE rr.report_id IN (
+			SELECT rd.id FROM report_definitions rd
+			WHERE rd.owner_user_id = '%[1]s'
+			   OR EXISTS (SELECT 1 FROM report_recipients rc WHERE rc.report_id = rd.id AND rc.user_id = '%[1]s')
+		)
+	`, userID)
+}
+
+func reportDeliveryTakeoutSelect(userID uuid.UUID) string {
+	return fmt.Sprintf(`
+		SELECT 'report_delivery' AS record_type, d.id, d.report_id, d.run_id, d.recipient_id,
+			d.recipient_kind, d.status, d.attempt_count, d.next_attempt_at,
+			d.safe_error_code, d.smtp_accepted_at, d.created_at, d.updated_at
+		FROM report_deliveries d
+		JOIN report_recipients rr ON rr.id = d.recipient_id
+		WHERE rr.user_id = '%s'
 	`, userID)
 }
 

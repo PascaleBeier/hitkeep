@@ -76,6 +76,9 @@ func (s *Store) migrate(ctx context.Context, opts migrationRunOptions) error {
 
 	if len(pendingMigrations) == 0 {
 		slog.Info("Database schema is up to date. No migrations to apply.")
+		if err := s.EnsureReportNextRuns(ctx, time.Now().UTC()); err != nil {
+			return fmt.Errorf("initialize report schedules: %w", err)
+		}
 		return validateCleanupPlans(ctx, s.db, siteDeleteSpec, tenantPurgeSpec)
 	}
 
@@ -127,6 +130,9 @@ func (s *Store) migrate(ctx context.Context, opts migrationRunOptions) error {
 	}
 	if err := validateCleanupPlans(ctx, s.db, siteDeleteSpec, tenantPurgeSpec); err != nil {
 		return err
+	}
+	if err := s.EnsureReportNextRuns(ctx, time.Now().UTC()); err != nil {
+		return fmt.Errorf("initialize report schedules: %w", err)
 	}
 	return nil
 }

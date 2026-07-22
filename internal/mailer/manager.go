@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"embed"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	htmltpl "html/template"
@@ -14,6 +13,8 @@ import (
 	"time"
 
 	"github.com/Boostport/mjml-go"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 
 	"hitkeep/internal/config"
 	"hitkeep/internal/mailer/drivers"
@@ -32,6 +33,7 @@ var ErrMailerDisabled = errors.New("mailer not configured")
 
 // templateFuncs contains helpers available to all email templates.
 func templateFuncsForLocale(locale string) htmltpl.FuncMap {
+	printer := message.NewPrinter(language.Make(NormalizeLocale(locale)))
 	return htmltpl.FuncMap{
 		// percentChange returns a formatted change label like "+12%" or "−3%" or "—".
 		"percentChange": func(current, prev int) string {
@@ -54,12 +56,29 @@ func templateFuncsForLocale(locale string) htmltpl.FuncMap {
 		"formatDuration": func(seconds float64) string {
 			s := int(seconds)
 			if s >= 60 {
-				return fmt.Sprintf("%dm %ds", s/60, s%60)
+				return Translatef(locale, "reports.duration_minutes_seconds", printer.Sprintf("%d", s/60), printer.Sprintf("%d", s%60))
 			}
-			return fmt.Sprintf("%ds", s)
+			return Translatef(locale, "reports.duration_seconds", printer.Sprintf("%d", s))
 		},
+		"formatInt":     func(value int) string { return printer.Sprintf("%d", value) },
+		"formatPercent": func(value float64) string { return printer.Sprintf("%.1f%%", value) },
 		// mod2 returns i % 2 for alternating row shading.
 		"mod2": func(i int) int { return i % 2 },
+		"trendBarWidth": func(values []int, index int) int {
+			if index < 0 || index >= len(values) {
+				return 0
+			}
+			maxValue := 0
+			for _, value := range values {
+				if value > maxValue {
+					maxValue = value
+				}
+			}
+			if maxValue <= 0 {
+				return 0
+			}
+			return max(2, int(math.Round(float64(values[index])/float64(maxValue)*100)))
+		},
 		"t": func(key string) string {
 			return Translate(locale, key)
 		},
@@ -69,47 +88,6 @@ func templateFuncsForLocale(locale string) htmltpl.FuncMap {
 		"roleLabel": func(role string) string {
 			return RoleLabel(locale, role)
 		},
-		// svgBarChart renders a simple bar chart from a slice of pageview counts and
-		// returns an mj-image tag embedding the SVG as a base64 data URI.
-		"svgBarChart": func(values []int) htmltpl.HTML {
-			const (
-				svgW   = 500
-				svgH   = 64
-				gap    = 2
-				radius = 2
-				color  = "#3b82f6"
-			)
-			n := len(values)
-			if n == 0 {
-				return ""
-			}
-			maxV := 0
-			for _, v := range values {
-				if v > maxV {
-					maxV = v
-				}
-			}
-			if maxV == 0 {
-				return ""
-			}
-			barW := max((svgW-gap*(n-1))/n, 1)
-			var sb strings.Builder
-			fmt.Fprintf(&sb, `<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d">`, svgW, svgH)
-			for i, v := range values {
-				barH := int(math.Round(float64(v) / float64(maxV) * float64(svgH)))
-				if barH < 1 && v > 0 {
-					barH = 1
-				}
-				x := i * (barW + gap)
-				y := svgH - barH
-				fmt.Fprintf(&sb, `<rect x="%d" y="%d" width="%d" height="%d" fill="%s" rx="%d"/>`,
-					x, y, barW, barH, color, radius)
-			}
-			sb.WriteString(`</svg>`)
-			encoded := base64.StdEncoding.EncodeToString([]byte(sb.String()))
-			//nolint:gosec // G203: encoded is pure base64 of an SVG built from integer math and constants; no user input enters the string.
-			return htmltpl.HTML(`<mj-image src="data:image/svg+xml;base64,` + encoded + `" padding-bottom="20px" width="500px" />`)
-		},
 	}
 }
 
@@ -118,6 +96,8 @@ func textTemplateFuncsForLocale(locale string) texttpl.FuncMap {
 	return texttpl.FuncMap{
 		"percentChange":  htmlFuncs["percentChange"],
 		"formatDuration": htmlFuncs["formatDuration"],
+		"formatInt":      htmlFuncs["formatInt"],
+		"formatPercent":  htmlFuncs["formatPercent"],
 		"mod2":           htmlFuncs["mod2"],
 		"t":              htmlFuncs["t"],
 		"tf":             htmlFuncs["tf"],
@@ -165,6 +145,12 @@ func NewWithDriver(driver Driver, conf *config.Config) *Mailer {
 // Send processes a Mailable (renders MJML) and dispatches via the driver.
 // Usage: mailer.Send(user.Email, mailables.NewWelcomeEmail(user))
 func (m *Mailer) Send(to string, email Mailable) error {
+	return m.SendWithOptions(to, email, SendOptions{})
+}
+
+// SendWithOptions renders and sends a mailable with a stable message ID and
+// optional RFC headers. Drivers without header support retain legacy behavior.
+func (m *Mailer) SendWithOptions(to string, email Mailable, options SendOptions) error {
 	if m == nil || m.driver == nil {
 		return ErrMailerDisabled
 	}
@@ -208,5 +194,8 @@ func (m *Mailer) Send(to string, email Mailable) error {
 		return fmt.Errorf("failed to execute text template: %w", err)
 	}
 
+	if driver, ok := m.driver.(HeaderDriver); ok && (options.MessageID != "" || len(options.Headers) > 0) {
+		return driver.SendWithHeaders([]string{to}, email.Subject(), htmlContent, textBuffer.String(), options.MessageID, options.Headers)
+	}
 	return m.driver.Send([]string{to}, email.Subject(), htmlContent, textBuffer.String())
 }
