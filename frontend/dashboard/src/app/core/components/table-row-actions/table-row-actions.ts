@@ -13,6 +13,7 @@ export type TableRowActionItem = Omit<MenuItem, 'items'> & {
     selector: 'app-table-row-actions',
     imports: [ButtonModule, MenuModule, TranslocoPipe],
     templateUrl: './table-row-actions.html',
+    styleUrl: './table-row-actions.css',
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class TableRowActions {

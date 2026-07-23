@@ -96,7 +96,6 @@ type ReportDefinition struct {
 	Recipients     []ReportRecipient  `json:"recipients"`
 	Schedule       ReportSchedule     `json:"schedule"`
 	Status         ReportStatus       `json:"status"`
-	Source         string             `json:"source"`
 	ConsentVersion int                `json:"consent_version"`
 	NextRunAt      *time.Time         `json:"next_run_at,omitempty"`
 	LastOutcome    *ReportLastOutcome `json:"last_outcome,omitempty"`

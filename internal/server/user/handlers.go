@@ -138,18 +138,6 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		TeamCap:     authcore.CapTeamManageAPIClients,
 		RateLimiter: ctx.ApiLimiter,
 	}, h.handleDeleteTeamAPIClient()))
-	mux.HandleFunc("GET /api/user/report-subscriptions", ctx.Handler(shared.HandlerConfig{
-		RequireAuth: true,
-		RateLimiter: ctx.ApiLimiter,
-	}, h.handleGetReportSubscriptions()))
-	mux.HandleFunc("PUT /api/user/report-subscriptions/sites/{site_id}", ctx.Handler(shared.HandlerConfig{
-		RequireAuth: true,
-		RateLimiter: ctx.ApiLimiter,
-	}, h.handleUpdateSiteReportSubscription()))
-	mux.HandleFunc("PUT /api/user/report-subscriptions/digest", ctx.Handler(shared.HandlerConfig{
-		RequireAuth: true,
-		RateLimiter: ctx.ApiLimiter,
-	}, h.handleUpdateDigestSubscription()))
 	mux.HandleFunc("GET /api/reports", ctx.Handler(shared.HandlerConfig{RequireAuth: true, RateLimiter: ctx.ApiLimiter}, h.handleListReports()))
 	mux.HandleFunc("POST /api/reports", ctx.Handler(shared.HandlerConfig{RequireAuth: true, HumanOnly: true, RateLimiter: ctx.ApiLimiter}, h.handleCreateReport()))
 	mux.HandleFunc("POST /api/reports/preview", ctx.Handler(shared.HandlerConfig{RequireAuth: true, HumanOnly: true, RateLimiter: ctx.ApiLimiter}, h.handlePreviewReport()))

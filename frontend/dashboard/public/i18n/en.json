@@ -1186,13 +1186,13 @@
       "retryQueued": "Delivery retry queued.",
       "resubscribed": "You are subscribed to this report again.",
       "copyName": "{{name}} copy",
-      "legacy": "Migrated",
       "name": "Report name",
       "namePlaceholder": "e.g. Monday growth review",
       "nextRun": "Next run",
       "lastOutcome": "Last outcome",
       "notAvailable": "Not yet",
       "allAccessibleSites": "All accessible sites",
+      "siteCount": "{{count}} sites",
       "selectedSites": "Selected sites",
       "personalRecipient": "Personal reports are sent only to your HitKeep account.",
       "deliveryTime": "Delivery time",
@@ -1208,12 +1208,15 @@
         "description": "Create a named report with the sites, recipients, and delivery time that fit your workflow.",
         "action": "Create report"
       },
+      "filteredEmpty": { "title": "No matching reports" },
       "presets": {
         "site_summary": { "title": "Site Summary", "description": "KPIs, goals, trend, top pages, and referrers for one site." },
         "portfolio_digest": { "title": "Portfolio Digest", "description": "A compact comparison across selected or all accessible sites." },
         "opportunity_brief": { "title": "Opportunity Brief", "description": "Validated saved opportunities with cited evidence; empty emails are suppressed." }
       },
       "scope": { "label": "Scope", "personal": "Personal", "team": "Team" },
+      "scopeSites": "Scope and sites",
+      "sort": { "label": "Sort by", "ascending": "Sort ascending", "descending": "Sort descending" },
       "sites": { "label": "Sites", "placeholder": "Select sites" },
       "recipients": {
         "label": "Recipients",
@@ -1259,7 +1262,7 @@
       "saveDraft": "Save draft",
       "activate": "Save & activate",
       "history": { "title": "Delivery history", "empty": "No scheduled runs yet.", "deliveries": "deliveries", "attempts": "attempts", "acceptedAt": "Accepted", "retryAt": "Next retry" },
-      "errors": { "load": "Reports could not be loaded.", "save": "The report could not be saved.", "preview": "The preview could not be generated.", "test": "The mail server did not accept the test message.", "action": "The report action failed." }
+      "errors": { "loadTitle": "Reports are unavailable", "load": "Reports could not be loaded.", "save": "The report could not be saved.", "preview": "The preview could not be generated.", "members": "Team members could not be loaded. Try again before choosing recipients.", "history": "Delivery history could not be loaded.", "test": "The mail server did not accept the test message.", "action": "The report action failed." }
     },
     "apiClients": {
       "title": "API clients",

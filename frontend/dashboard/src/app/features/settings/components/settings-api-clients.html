@@ -178,13 +178,13 @@
                     [tableStyle]="{ 'min-width': '1040px' }"
                 >
                     <ng-template pTemplate="caption">
-                        <div class="api-client-table-caption">
+                        <app-crud-table-toolbar>
                             <p-iconfield class="hk-crud-search">
                                 <p-inputicon class="pi pi-search" />
                                 <input pInputText #apiClientsSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="apiClientsTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
                             </p-iconfield>
                             <p-button icon="pi pi-refresh" [text]="true" [rounded]="true" [type]="'button'" [ariaLabel]="'settings.apiClients.actions.refresh' | transloco" [disabled]="isLoading()" (onClick)="reload()" />
-                        </div>
+                        </app-crud-table-toolbar>
                     </ng-template>
 
                     <ng-template pTemplate="header">
@@ -240,52 +240,12 @@
                                 } @else { - }
                             </td>
                             <td>
-                                @if (client.site_roles.length === 1) {
-                                <div class="api-client-site-grant-list">
-                                    @for (scope of client.site_roles; track scope.site_id) {
-                                    <p-tag
-                                        class="api-client-site-grant-tag"
-                                        styleClass="api-client-site-grant-tag"
-                                        icon="pi pi-globe"
-                                        [value]="siteGrantLabel(scope)"
-                                        [severity]="siteGrantSeverity(scope.role)"
-                                        [rounded]="true"
-                                        [attr.title]="siteGrantLabel(scope)"
-                                    />
-                                    }
-                                </div>
-                                } @else if (client.site_roles.length > 1) {
-                                <div class="api-client-site-grant-summary">
-                                    <p-button
-                                        class="api-client-site-grant-count"
-                                        styleClass="api-client-site-grant-count-button"
-                                        icon="pi pi-sitemap"
-                                        [label]="siteGrantCountLabel(client.site_roles.length)"
-                                        severity="info"
-                                        [outlined]="true"
-                                        [rounded]="true"
-                                        size="small"
-                                        [type]="'button'"
-                                        [ariaLabel]="siteGrantCountLabel(client.site_roles.length)"
-                                        (onClick)="siteGrantsPopover.toggle($event)"
-                                    />
-                                    <p-popover #siteGrantsPopover appendTo="body" styleClass="api-client-site-grants-popover" [ariaLabel]="'settings.apiClients.siteGrantPopoverTitle' | transloco">
-                                        <div class="api-client-site-grants-popover-content">
-                                            <div class="api-client-site-grants-popover-title">{{ "settings.apiClients.siteGrantPopoverTitle" | transloco }}</div>
-                                            <div class="api-client-site-grants-popover-list">
-                                                @for (scope of client.site_roles; track scope.site_id) {
-                                                <div class="api-client-site-grants-popover-row">
-                                                    <span class="api-client-site-grants-popover-domain">{{ siteDomain(scope.site_id) }}</span>
-                                                    <p-tag [value]="'roles.' + scope.role | transloco" [severity]="siteGrantSeverity(scope.role)" [rounded]="true" />
-                                                </div>
-                                                }
-                                            </div>
-                                        </div>
-                                    </p-popover>
-                                </div>
-                                } @else {
-                                <p-tag class="api-client-no-site-access-tag" styleClass="api-client-no-site-access-tag" icon="pi pi-ban" [value]="emptyGrantLabelKey(client) | transloco" severity="secondary" [rounded]="true" />
-                                }
+                                <app-site-scope-summary
+                                    [items]="siteGrantSummaryItems(client)"
+                                    [countLabel]="siteGrantCountLabel(client.site_roles.length)"
+                                    [popoverTitle]="'settings.apiClients.siteGrantPopoverTitle' | transloco"
+                                    [emptyLabel]="emptyGrantLabelKey(client) | transloco"
+                                />
                             </td>
                             <td class="hk-actions-cell">
                                 <app-table-row-actions [items]="apiClientActions(client)" [disabled]="isSaving()" />

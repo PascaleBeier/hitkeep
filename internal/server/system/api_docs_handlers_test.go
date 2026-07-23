@@ -32,6 +32,34 @@ func TestOpenAPISpecV1FormatParameterIncludesAllExportFormats(t *testing.T) {
 	}
 }
 
+func TestOpenAPISpecV1ExposesOnlyCurrentReportsContract(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	for _, path := range []string{
+		"/api/user/report-subscriptions",
+		"/api/user/report-subscriptions/digest",
+		"/api/user/report-subscriptions/sites/{site_id}",
+	} {
+		if _, ok := paths[path]; ok {
+			t.Fatalf("obsolete report subscription path %s remains documented", path)
+		}
+	}
+	for _, schema := range []string{"DigestSubscription", "SiteReportSubscription", "ReportSubscriptions"} {
+		if _, ok := schemas[schema]; ok {
+			t.Fatalf("obsolete report subscription schema %s remains documented", schema)
+		}
+	}
+
+	reportDefinition := requireMap(t, schemas, "ReportDefinition")
+	properties := requireMap(t, reportDefinition, "properties")
+	if _, ok := properties["source"]; ok {
+		t.Fatal("migration-only report source remains in the public contract")
+	}
+}
+
 func TestOpenAPISpecV1DocumentsReadinessRecoveryResponse(t *testing.T) {
 	spec := openAPISpecV1("http://localhost:8080")
 	paths := requireMap(t, spec, "paths")

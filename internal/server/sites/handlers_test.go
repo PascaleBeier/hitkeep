@@ -122,6 +122,37 @@ func TestHandleGetFaviconUsesDuckDuckGoIconPath(t *testing.T) {
 	}
 }
 
+func TestHandleGetFaviconGracefullyFallsBackWhenUpstreamHasNoIcon(t *testing.T) {
+	h, store, _ := setupTestEnv(t)
+	defer store.Close()
+
+	originalTransport := faviconProxyTransport
+	defer func() {
+		faviconProxyTransport = originalTransport
+	}()
+
+	faviconProxyTransport = roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusNotFound,
+			Header:     http.Header{"Content-Type": []string{"text/plain"}},
+			Body:       io.NopCloser(strings.NewReader("not found")),
+		}, nil
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/favicon/missing.example", nil)
+	req.SetPathValue("domain", "missing.example")
+	w := httptest.NewRecorder()
+
+	h.handleGetFavicon().ServeHTTP(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d", http.StatusNoContent, w.Code)
+	}
+	if w.Body.Len() != 0 {
+		t.Fatalf("expected empty fallback response, got %q", w.Body.String())
+	}
+}
+
 func TestHandleCreateSite(t *testing.T) {
 	h, store, userID := setupTestEnv(t)
 	defer store.Close()

@@ -1,25 +1,12 @@
 <p-confirmdialog />
 
-<div class="flex flex-col w-full">
-    <app-page-header>
-        <ng-template appPageHeaderLeft>
-            <div>
-                <app-page-breadcrumb [items]="breadcrumbItems()" />
-                <p class="text-sm text-[var(--p-text-muted-color)]">{{ "settings.reports.subtitle" | transloco }}</p>
-            </div>
-        </ng-template>
-        <ng-template appPageHeaderRight>
+<app-page-frame [breadcrumbItems]="breadcrumbItems()" [subtitle]="'settings.reports.subtitle' | transloco">
+    <div class="reporting-content">
+        <div class="reporting-actions">
             <p-button data-testid="new-report" [label]="'settings.reports.newReport' | transloco" icon="pi pi-plus" (onClick)="openCreate()" />
-        </ng-template>
-    </app-page-header>
-
-    <div class="reporting-content max-w-6xl mx-auto w-full">
+        </div>
         @if (!mailAvailable()) {
         <p-message severity="warn" styleClass="w-full mb-5">{{ "settings.reports.mailUnavailable" | transloco }}</p-message>
-        } @if (!isLoading() && reports().length > 0) {
-        <div class="mobile-report-action">
-            <p-button [label]="'settings.reports.newReport' | transloco" icon="pi pi-plus" (onClick)="openCreate()" />
-        </div>
         } @if (listFeedback(); as feedback) {
         <div
             class="hk-feedback-message"
@@ -32,21 +19,40 @@
             {{ feedback.key | transloco }}
         </div>
         } @if (isLoading() && reports().length === 0) {
-        <div class="empty-state">{{ "common.loading" | transloco }}</div>
-        } @else if (reports().length === 0) {
-        <div class="empty-state">
-            <i class="pi pi-send" aria-hidden="true"></i>
-            <h2>{{ "settings.reports.empty.title" | transloco }}</h2>
-            <p>{{ "settings.reports.empty.description" | transloco }}</p>
-            <p-button [label]="'settings.reports.empty.action' | transloco" icon="pi pi-plus" (onClick)="openCreate()" />
+        <div class="report-skeleton-list" data-testid="report-loading" aria-busy="true" [attr.aria-label]="'common.loading' | transloco">
+            @for (item of [1, 2, 3, 4, 5]; track item) {
+            <div class="report-skeleton-row">
+                <p-skeleton width="min(15rem, 70%)" height="1rem" />
+                <p-skeleton width="min(22rem, 90%)" height="0.75rem" />
+                <p-skeleton width="min(11rem, 55%)" height="0.75rem" />
+            </div>
+            }
         </div>
+        } @else if (initialLoadError()) {
+        <app-page-state titleKey="settings.reports.errors.loadTitle" messageKey="settings.reports.errors.load" icon="pi pi-cloud-off" actionLabelKey="common.actions.refresh" actionIcon="pi pi-refresh" (actionClicked)="refresh()" />
+        } @else if (reports().length === 0) {
+        <app-page-state titleKey="settings.reports.empty.title" messageKey="settings.reports.empty.description" icon="pi pi-send" actionLabelKey="settings.reports.empty.action" actionIcon="pi pi-plus" (actionClicked)="openCreate()" />
         } @else {
-        <div class="hk-crud-table-wrap">
+        <app-crud-table-toolbar class="report-list-toolbar">
+            <p-iconfield class="hk-crud-search">
+                <p-inputicon class="pi pi-search" />
+                <input
+                    pInputText
+                    data-testid="report-search"
+                    [ngModel]="searchQuery()"
+                    (ngModelChange)="setSearch($event)"
+                    [placeholder]="'common.searchPlaceholder' | transloco"
+                    [attr.aria-label]="'common.searchPlaceholder' | transloco"
+                    class="w-full"
+                />
+            </p-iconfield>
+            <p-button icon="pi pi-refresh" [text]="true" [rounded]="true" type="button" [ariaLabel]="'common.actions.refresh' | transloco" [loading]="isLoading()" [disabled]="isLoading()" (onClick)="refresh()" />
+        </app-crud-table-toolbar>
+
+        <div class="report-desktop-table hk-crud-table-wrap">
             <p-table
-                #reportsTable
                 data-testid="report-table"
-                [value]="reportTableRows()"
-                [globalFilterFields]="['name', 'preset', 'scope', 'sites', 'recipients', 'schedule', 'status', 'nextRun', 'lastOutcome']"
+                [value]="filteredReportRows()"
                 [sortField]="'name'"
                 [sortOrder]="1"
                 [paginator]="true"
@@ -56,52 +62,55 @@
                 [loading]="isLoading()"
                 responsiveLayout="scroll"
                 styleClass="hk-crud-table p-datatable-sm"
-                [tableStyle]="{ 'min-width': '1280px' }"
+                [tableStyle]="{ 'min-width': '64rem' }"
             >
-                <ng-template pTemplate="caption">
-                    <div class="report-table-caption">
-                        <p-iconfield class="hk-crud-search">
-                            <p-inputicon class="pi pi-search" />
-                            <input pInputText data-testid="report-search" [placeholder]="'common.searchPlaceholder' | transloco" (input)="reportsTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
-                        </p-iconfield>
-                        <p-button icon="pi pi-refresh" [text]="true" [rounded]="true" [type]="'button'" [ariaLabel]="'common.actions.refresh' | transloco" [disabled]="isLoading()" (onClick)="refresh()" />
-                    </div>
-                </ng-template>
-
                 <ng-template pTemplate="header">
                     <tr>
-                        <th pSortableColumn="name">{{ "common.columns.name" | transloco }} <p-sortIcon field="name" /></th>
-                        <th pSortableColumn="scope">{{ "settings.reports.scope.label" | transloco }} <p-sortIcon field="scope" /></th>
-                        <th pSortableColumn="sites">{{ "common.columns.sites" | transloco }} <p-sortIcon field="sites" /></th>
+                        <th class="report-sticky-identity" pSortableColumn="name">{{ "common.columns.name" | transloco }} <p-sortIcon field="name" /></th>
+                        <th pSortableColumn="scope">{{ "settings.reports.scopeSites" | transloco }} <p-sortIcon field="scope" /></th>
                         <th pSortableColumn="recipients">{{ "settings.reports.recipients.label" | transloco }} <p-sortIcon field="recipients" /></th>
                         <th pSortableColumn="schedule">{{ "settings.reports.schedule.label" | transloco }} <p-sortIcon field="schedule" /></th>
-                        <th pSortableColumn="status">{{ "common.columns.status" | transloco }} <p-sortIcon field="status" /></th>
                         <th pSortableColumn="nextRun">{{ "settings.reports.nextRun" | transloco }} <p-sortIcon field="nextRun" /></th>
-                        <th pSortableColumn="lastOutcome">{{ "settings.reports.lastOutcome" | transloco }} <p-sortIcon field="lastOutcome" /></th>
-                        <th class="hk-actions-column">{{ "common.columns.actions" | transloco }}</th>
+                        <th class="report-outcome-heading" pSortableColumn="lastOutcome">{{ "settings.reports.lastOutcome" | transloco }} <p-sortIcon field="lastOutcome" /></th>
+                        <th class="hk-actions-column report-sticky-actions">{{ "common.columns.actions" | transloco }}</th>
                     </tr>
                 </ng-template>
 
                 <ng-template pTemplate="body" let-row>
                     <tr [attr.data-report-id]="row.report.id" [class.report-row--focused]="focusedReportID() === row.report.id">
-                        <td>
+                        <td class="report-sticky-identity">
                             <div class="report-name-cell">
-                                <strong [title]="row.report.name">{{ row.report.name }}</strong>
+                                <span class="report-name-row">
+                                    <i
+                                        [class]="reportStatusIconClass(row.report.status)"
+                                        role="img"
+                                        data-testid="report-status-indicator"
+                                        [attr.aria-label]="('settings.reports.status.' + row.report.status) | transloco"
+                                        [attr.title]="('settings.reports.status.' + row.report.status) | transloco"
+                                    ></i>
+                                    <strong [title]="row.report.name">{{ row.report.name }}</strong>
+                                </span>
                                 <span>{{ presetLabel(row.report.preset) }}</span>
-                                @if (row.report.source === "legacy") { <p-tag [value]="'settings.reports.legacy' | transloco" severity="secondary" /> }
                             </div>
                         </td>
-                        <td>{{ ("settings.reports.scope." + row.report.scope) | transloco }}</td>
-                        <td><span class="report-cell-ellipsis" [title]="siteLabel(row.report)">{{ siteLabel(row.report) }}</span></td>
+                        <td>
+                            <div class="report-stacked-cell">
+                                <span>{{ ("settings.reports.scope." + row.report.scope) | transloco }}</span>
+                                <app-site-scope-summary [items]="siteScopeSummaryItems(row.report)" [countLabel]="siteScopeCountLabel(row.report)" [popoverTitle]="'settings.reports.sites.label' | transloco" />
+                            </div>
+                        </td>
                         <td>
                             <div class="report-recipient-summary">
                                 @for (recipient of visibleRecipients(row.report); track recipient.id) {
                                 <div class="report-recipient">
                                     <span [title]="recipient.email"><i class="pi" [class.pi-user]="recipient.kind === 'member'" [class.pi-envelope]="recipient.kind === 'external'" aria-hidden="true"></i>{{ recipient.email }}</span>
-                                    <p-tag
-                                        [value]="('settings.reports.recipientStatus.' + recipientState(recipient)) | transloco"
-                                        [severity]="recipientState(recipient) === 'confirmed' ? 'success' : recipientState(recipient) === 'invitation_failed' ? 'danger' : 'secondary'"
-                                    />
+                                    <i
+                                        [class]="recipientStateIconClass(recipient)"
+                                        role="img"
+                                        data-testid="report-recipient-status-indicator"
+                                        [attr.aria-label]="('settings.reports.recipientStatus.' + recipientState(recipient)) | transloco"
+                                        [attr.title]="('settings.reports.recipientStatus.' + recipientState(recipient)) | transloco"
+                                    ></i>
                                 </div>
                                 } @if (row.report.recipients.length > 2) {
                                 <span class="report-cell-secondary">+{{ row.report.recipients.length - 2 }}</span>
@@ -111,16 +120,17 @@
                         <td>
                             <div class="report-stacked-cell"><span>{{ cadenceLabel(row.report) }} · {{ row.report.schedule.local_time }}</span><span>{{ row.report.schedule.timezone }}</span></div>
                         </td>
-                        <td><p-tag [value]="('settings.reports.status.' + row.report.status) | transloco" [severity]="statusSeverity(row.report.status)" /></td>
                         <td>{{ formatDate(row.report.next_run_at) }}</td>
-                        <td>
-                            @if (row.report.last_outcome) {
-                            <p-tag [value]="('settings.reports.runStatus.' + row.report.last_outcome.status) | transloco" [severity]="statusSeverity(row.report.last_outcome.status)" />
-                            } @else {
-                            <span class="report-cell-secondary">{{ "settings.reports.notAvailable" | transloco }}</span>
-                            }
+                        <td class="report-outcome-cell">
+                            <i
+                                [class]="lastOutcomeIconClass(row.report.last_outcome?.status)"
+                                role="img"
+                                data-testid="report-outcome-indicator"
+                                [attr.aria-label]="(row.report.last_outcome ? 'settings.reports.runStatus.' + row.report.last_outcome.status : 'settings.reports.notAvailable') | transloco"
+                                [attr.title]="(row.report.last_outcome ? 'settings.reports.runStatus.' + row.report.last_outcome.status : 'settings.reports.notAvailable') | transloco"
+                            ></i>
                         </td>
-                        <td class="hk-actions-cell">
+                        <td class="hk-actions-cell report-sticky-actions">
                             <app-table-row-actions [items]="reportActions(row.report)" [loading]="reportActionID() === row.report.id" />
                         </td>
                     </tr>
@@ -128,14 +138,88 @@
 
                 <ng-template pTemplate="emptymessage">
                     <tr>
-                        <td colspan="9" class="report-table-empty">{{ "settings.reports.emptyFiltered" | transloco }}</td>
+                        <td colspan="7" class="report-table-empty">{{ "settings.reports.emptyFiltered" | transloco }}</td>
                     </tr>
                 </ng-template>
             </p-table>
         </div>
+
+        <div class="report-mobile-view" data-testid="report-mobile-list">
+            <div class="report-mobile-sort">
+                <label for="report-mobile-sort">{{ "settings.reports.sort.label" | transloco }}</label>
+                <div>
+                    <p-select inputId="report-mobile-sort" [options]="mobileSortOptions()" optionLabel="label" optionValue="value" [ngModel]="mobileSortField()" (ngModelChange)="setMobileSortField($event)" appendTo="body" />
+                    <p-button
+                        [icon]="mobileSortOrder() === 1 ? 'pi pi-sort-amount-up-alt' : 'pi pi-sort-amount-down'"
+                        [outlined]="true"
+                        [ariaLabel]="(mobileSortOrder() === 1 ? 'settings.reports.sort.ascending' : 'settings.reports.sort.descending') | transloco"
+                        (onClick)="toggleMobileSortOrder()"
+                    />
+                </div>
+            </div>
+            @if (mobileSortedRows().length === 0) {
+            <app-page-state titleKey="settings.reports.filteredEmpty.title" messageKey="settings.reports.emptyFiltered" icon="pi pi-search" />
+            } @else {
+            <div class="report-mobile-list">
+                @for (row of mobilePageRows(); track row.report.id) {
+                <article class="report-mobile-row" data-testid="report-mobile-row" [attr.data-report-id]="row.report.id" [class.report-row--focused]="focusedReportID() === row.report.id">
+                    <header>
+                        <div class="report-name-cell">
+                            <strong>{{ row.report.name }}</strong>
+                            <span>{{ presetLabel(row.report.preset) }}</span>
+                        </div>
+                        <app-table-row-actions [items]="reportActions(row.report)" [loading]="reportActionID() === row.report.id" />
+                    </header>
+                    <dl>
+                        <div>
+                            <dt>{{ "common.columns.status" | transloco }}</dt>
+                            <dd><p-tag [value]="('settings.reports.status.' + row.report.status) | transloco" [severity]="statusSeverity(row.report.status)" /></dd>
+                        </div>
+                        <div>
+                            <dt>{{ "settings.reports.scopeSites" | transloco }}</dt>
+                            <dd>
+                                <strong>{{ ("settings.reports.scope." + row.report.scope) | transloco }}</strong
+                                ><app-site-scope-summary [items]="siteScopeSummaryItems(row.report)" [countLabel]="siteScopeCountLabel(row.report)" [popoverTitle]="'settings.reports.sites.label' | transloco" />
+                            </dd>
+                        </div>
+                        <div class="report-mobile-wide">
+                            <dt>{{ "settings.reports.recipients.label" | transloco }}</dt>
+                            <dd class="report-mobile-recipients">
+                                @for (recipient of row.report.recipients; track recipient.id) {
+                                <span
+                                    ><span>{{ recipient.email }}</span
+                                    ><p-tag
+                                        [value]="('settings.reports.recipientStatus.' + recipientState(recipient)) | transloco"
+                                        [severity]="recipientState(recipient) === 'confirmed' ? 'success' : recipientState(recipient) === 'invitation_failed' ? 'danger' : 'secondary'"
+                                /></span>
+                                }
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>{{ "settings.reports.schedule.label" | transloco }}</dt>
+                            <dd><strong>{{ cadenceLabel(row.report) }} · {{ row.report.schedule.local_time }}</strong><span>{{ row.report.schedule.timezone }}</span></dd>
+                        </div>
+                        <div>
+                            <dt>{{ "settings.reports.nextRun" | transloco }}</dt>
+                            <dd>{{ formatDate(row.report.next_run_at) }}</dd>
+                        </div>
+                        <div>
+                            <dt>{{ "settings.reports.lastOutcome" | transloco }}</dt>
+                            <dd>
+                                @if (row.report.last_outcome) { <p-tag [value]="('settings.reports.runStatus.' + row.report.last_outcome.status) | transloco" [severity]="statusSeverity(row.report.last_outcome.status)" /> } @else {
+                                <span>{{ "settings.reports.notAvailable" | transloco }}</span> }
+                            </dd>
+                        </div>
+                    </dl>
+                </article>
+                }
+            </div>
+            <p-paginator [first]="mobileFirst()" [rows]="mobileRows()" [totalRecords]="mobileSortedRows().length" [rowsPerPageOptions]="[10, 25, 50]" (onPageChange)="onMobilePage($event)" />
+            }
+        </div>
         }
     </div>
-</div>
+</app-page-frame>
 
 <app-crud-dialog
     [title]="(editingReportID() ? 'settings.reports.editor.editTitle' : 'settings.reports.editor.createTitle') | transloco"
@@ -258,6 +342,11 @@
                     [placeholder]="'settings.reports.recipients.placeholder' | transloco"
                     appendTo="body"
                 />
+                @if (membersLoading()) {
+                <div class="member-loading" data-testid="report-members-loading" aria-busy="true"><p-skeleton width="12rem" height="0.75rem" /></div>
+                } @else if (membersError()) {
+                <p-message severity="error" variant="simple" size="small" data-testid="report-members-error">{{ "settings.reports.errors.members" | transloco }}</p-message>
+                }
                 <label for="report-external-recipient">{{ "settings.reports.recipients.externalLabel" | transloco }}</label>
                 @if (externalRecipientsLocked()) {
                 <p-message severity="info" data-testid="external-recipient-pro-nudge">
@@ -288,10 +377,14 @@
                 } @if (externalEmailError()) { <p-message severity="error" variant="simple" size="small">{{ externalEmailError() }}</p-message> } @if (draft().external_recipient_emails.length) {
                 <div class="external-recipient-chips">
                     @for (email of draft().external_recipient_emails; track email) {
-                    <span class="external-recipient-chip">
-                        <i class="pi pi-envelope" aria-hidden="true"></i>{{ email }}
-                        <button type="button" (click)="removeExternalDraft(email)" [attr.aria-label]="('settings.reports.recipients.removeEmail' | transloco: { email })"><i class="pi pi-times" aria-hidden="true"></i></button>
-                    </span>
+                    <p-chip
+                        class="external-recipient-chip"
+                        [label]="email"
+                        icon="pi pi-envelope"
+                        [removable]="true"
+                        [pt]="{ removeIcon: { 'aria-label': ('settings.reports.recipients.removeEmail' | transloco: { email }) } }"
+                        (onRemove)="removeExternalDraft(email)"
+                    />
                     }
                 </div>
                 } }
@@ -373,7 +466,7 @@
             <div class="step-number">5</div>
             <div class="step-content">
                 <h3>{{ "settings.reports.editor.previewStep" | transloco }}</h3>
-                <p-button [label]="'settings.reports.actions.preview' | transloco" icon="pi pi-eye" [outlined]="true" [disabled]="!formValid()" (onClick)="previewReport()" />
+                <p-button [label]="'settings.reports.actions.preview' | transloco" icon="pi pi-eye" [outlined]="true" [loading]="previewLoading()" [disabled]="!formValid() || previewLoading()" (onClick)="previewReport()" />
                 @if (preview()) {
                 <div class="preview-card">
                     <strong>{{ preview()!.subject }}</strong>
@@ -424,7 +517,13 @@
         {{ feedback.key | transloco }}
     </div>
     } @if (historyLoading()) {
-    <div class="empty-history">{{ "common.loading" | transloco }}</div>
+    <div class="history-skeleton" data-testid="report-history-loading" aria-busy="true">
+        @for (item of [1, 2, 3]; track item) {
+        <div><p-skeleton width="11rem" height="0.9rem" /><p-skeleton width="17rem" height="0.7rem" /></div>
+        }
+    </div>
+    } @else if (historyFeedback()?.key === 'settings.reports.errors.history') {
+    <div class="history-error-action"><p-button [label]="'common.actions.refresh' | transloco" icon="pi pi-refresh" [outlined]="true" (onClick)="reloadHistory()" /></div>
     } @else if (runs().length === 0) {
     <div class="empty-history">{{ "settings.reports.history.empty" | transloco }}</div>
     } @else {

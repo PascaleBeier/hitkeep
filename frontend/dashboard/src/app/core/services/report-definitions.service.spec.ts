@@ -31,7 +31,6 @@ describe('ReportDefinitionsService', () => {
         recipients: [{ id: 'recipient-1', kind: 'member', user_id: 'user-1', email: 'owner@example.test', status: 'confirmed' }],
         schedule: definition.schedule,
         status: definition.status,
-        source: 'v2',
         consent_version: 1,
         next_run_at: '2026-07-19T06:15:00Z',
         created_at: '2026-07-18T04:00:00Z',

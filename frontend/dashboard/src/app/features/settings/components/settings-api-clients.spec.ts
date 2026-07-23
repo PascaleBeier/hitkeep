@@ -280,7 +280,7 @@ describe('SettingsAPIClients', () => {
 
         expect(fixture.nativeElement.textContent).toContain('Site grants');
         expect(fixture.nativeElement.textContent).toContain('Instance/admin only; no site access');
-        expect(fixture.nativeElement.querySelector('.api-client-no-site-access-tag .pi-ban')).not.toBeNull();
+        expect(fixture.nativeElement.querySelector('app-site-scope-summary .pi-ban')).not.toBeNull();
     });
 
     it('renders client status as a color-coded icon next to the name', () => {
@@ -321,7 +321,7 @@ describe('SettingsAPIClients', () => {
         ]);
         fixture.detectChanges();
 
-        const grantTag = fixture.nativeElement.querySelector('.api-client-site-grant-tag') as HTMLElement | null;
+        const grantTag = fixture.nativeElement.querySelector('app-site-scope-summary .hk-site-scope-tag') as HTMLElement | null;
         expect(grantTag?.textContent).toContain('shop.example.com');
         expect(grantTag?.textContent).toContain('Viewer');
         expect(grantTag?.querySelector('.pi-globe')).not.toBeNull();
@@ -341,9 +341,9 @@ describe('SettingsAPIClients', () => {
         ]);
         fixture.detectChanges();
 
-        expect(fixture.nativeElement.querySelector('.api-client-site-grant-count')?.textContent).toContain('3 site grants');
+        expect(fixture.nativeElement.querySelector('app-site-scope-summary')?.textContent).toContain('3 site grants');
 
-        const trigger = fixture.nativeElement.querySelector('.api-client-site-grant-count button') as HTMLButtonElement;
+        const trigger = fixture.nativeElement.querySelector('app-site-scope-summary button') as HTMLButtonElement;
         expect(trigger.textContent).toContain('3 site grants');
         trigger.click();
         fixture.detectChanges();

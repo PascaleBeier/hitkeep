@@ -56,13 +56,13 @@
                 [tableStyle]="{ 'min-width': '900px' }"
             >
                 <ng-template pTemplate="caption">
-                    <div class="webhooks-table-caption">
+                    <app-crud-table-toolbar>
                         <p-iconfield class="hk-crud-search">
                             <p-inputicon class="pi pi-search" />
                             <input pInputText [placeholder]="'common.searchPlaceholder' | transloco" (input)="webhooksTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
                         </p-iconfield>
                         <p-button icon="pi pi-refresh" [text]="true" [rounded]="true" type="button" [ariaLabel]="'integration.webhooks.actions.refresh' | transloco" [disabled]="loading()" (onClick)="load()" />
-                    </div>
+                    </app-crud-table-toolbar>
                 </ng-template>
                 <ng-template pTemplate="header">
                     <tr>

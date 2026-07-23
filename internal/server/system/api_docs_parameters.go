@@ -79,7 +79,6 @@ func openAPIV1Parameters() map[string]any {
 			"schema":      map[string]any{"type": "string", "enum": exportfmt.SupportedFormats()},
 		},
 		"avatarSize":              map[string]any{"name": "s", "in": "query", "schema": map[string]any{"type": "integer", "minimum": 32, "maximum": 256}},
-		"reportSiteID":            map[string]any{"name": "site_id", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}, "description": "Site UUID."},
 		"reportID":                map[string]any{"name": "report_id", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}, "description": "Report definition UUID."},
 		"reportRunID":             map[string]any{"name": "run_id", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}, "description": "Report run UUID."},
 		"reportRecipientID":       map[string]any{"name": "recipient_id", "in": "path", "required": true, "schema": map[string]any{"type": "string", "format": "uuid"}, "description": "Stable report recipient UUID."},

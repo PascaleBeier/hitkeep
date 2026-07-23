@@ -30,14 +30,15 @@ test("reporting creates a browser-timezone schedule and supports its delivery co
         const row = page.locator("tr[data-report-id]", { hasText: name });
         await expect(row).toBeVisible();
         await expect(row).toContainText("08:15");
-        await expect(row).toContainText("Active");
+        const statusIndicator = row.getByTestId("report-status-indicator");
+        await expect(statusIndicator).toHaveAttribute("aria-label", "Active");
 
         await runReportRowAction(page, row, "Test send");
         await expect(page.getByText("Test message accepted by the mail server.")).toBeVisible();
         await runReportRowAction(page, row, "Pause");
-        await expect(row).toContainText("Paused");
+        await expect(statusIndicator).toHaveAttribute("aria-label", "Paused");
         await runReportRowAction(page, row, "Resume");
-        await expect(row).toContainText("Active");
+        await expect(statusIndicator).toHaveAttribute("aria-label", "Active");
 
         await runReportRowAction(page, row, "History");
         await expect(page.getByRole("dialog", { name: "Delivery history" }).getByText("No scheduled runs yet.")).toBeVisible();
@@ -47,8 +48,12 @@ test("reporting creates a browser-timezone schedule and supports its delivery co
         await page.goto(`/settings/reports?report=${reportID}`);
         const linkedRow = page.locator(`tr[data-report-id="${reportID}"]`);
         await expect(linkedRow).toHaveClass(/report-row--focused/);
-        await expect(page.getByRole("dialog", { name: "Edit report" })).toBeVisible();
-        await page.keyboard.press("Escape");
+        const linkedEditor = page.getByRole("dialog", { name: "Edit report" });
+        await expect(linkedEditor).toBeVisible();
+        const updatedName = `${name} updated`;
+        await linkedEditor.getByTestId("report-name").fill(updatedName);
+        await linkedEditor.getByRole("button", { name: /Save$/ }).click();
+        await expect(linkedRow).toContainText(updatedName);
 
         await runReportRowAction(page, linkedRow, "Delete");
         await page.getByRole("alertdialog").getByRole("button", { name: "Delete" }).click();
@@ -110,7 +115,8 @@ test("team reporting validates and tracks a pending external recipient", async (
         const row = page.locator("tr[data-report-id]", { hasText: name });
         await expect(row).toBeVisible();
         await expect(row).toContainText(externalEmail);
-        await expect(row).toContainText("Pending confirmation");
+        const externalRecipient = row.locator(".report-recipient", { hasText: externalEmail });
+        await expect(externalRecipient.getByTestId("report-recipient-status-indicator")).toHaveAttribute("aria-label", "Pending confirmation");
 
         await runReportRowAction(page, row, `Remove · ${externalEmail}`);
         await page.getByRole("alertdialog").getByRole("button", { name: "Remove" }).click();
@@ -122,6 +128,76 @@ test("team reporting validates and tracks a pending external recipient", async (
     } finally {
         await smtp.close();
     }
+});
+
+test("mobile reporting keeps every report field and action reachable without overflow", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const browserErrors = [];
+    page.on("console", (message) => {
+        if (message.type() === "error") {
+            const location = message.location();
+            browserErrors.push(`console: ${message.text()}${location.url ? ` (${location.url})` : ""}`);
+        }
+    });
+    page.on("response", (response) => {
+        if (response.status() >= 400) browserErrors.push(`response: ${response.status()} ${response.url()}`);
+    });
+    page.on("pageerror", (error) => browserErrors.push(`pageerror: ${error.message}`));
+
+    const name = `E2E mobile report ${Date.now()}`;
+    await login(page, "/settings/reports");
+    await page.getByTestId("new-report").click();
+    const editor = page.getByRole("dialog", { name: "Create report" });
+    await editor.getByTestId("report-name").fill(name);
+    await editor.getByRole("button", { name: /Save$/ }).click();
+
+    const search = page.getByTestId("report-search");
+    await search.fill(name);
+    const row = page.getByTestId("report-mobile-row").filter({ hasText: name });
+    await expect(row).toBeVisible();
+    for (const label of ["Site Summary", "Status", "Scope and sites", "Recipients", "Schedule", "Next run", "Last outcome"]) {
+        await expect(row).toContainText(label);
+    }
+    await expect(row).toContainText("acme-analytics.io");
+    await expect(row).toContainText("Confirmed");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(await page.evaluate(() => window.innerWidth));
+
+    await runReportRowAction(page, row, "Edit");
+    await expect(page.getByRole("dialog", { name: "Edit report" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await runReportRowAction(page, row, "Delete");
+    await page.getByRole("alertdialog").getByRole("button", { name: "Delete" }).click();
+    await expect(row).toHaveCount(0);
+    expect(browserErrors).toEqual([]);
+});
+
+test("report confirmation renders consent details without browser errors or overflow", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const browserErrors = [];
+    page.on("console", (message) => {
+        if (message.type() === "error") browserErrors.push(`console: ${message.text()}`);
+    });
+    page.on("pageerror", (error) => browserErrors.push(`pageerror: ${error.message}`));
+
+    await page.route("**/api/report-recipient-confirmations/**", (route) =>
+        route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+                report_name: "Client pulse",
+                team_name: "Acme Analytics",
+                preset: "site_summary",
+                schedule: { frequency: "daily", timezone: "Europe/Berlin", local_time: "08:00" },
+                sites: [{ id: "site-1", domain: "client-with-a-long-domain-name.example.test" }],
+                expires_at: "2026-07-30T08:00:00Z"
+            })
+        })
+    );
+    await page.goto("/report-confirmation?token=valid-looking-e2e-token", { waitUntil: "domcontentloaded" });
+    await expect(page.getByText("Client pulse")).toBeVisible();
+    await expect(page.getByText("client-with-a-long-domain-name.example.test")).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(await page.evaluate(() => window.innerWidth));
+    expect(browserErrors).toEqual([]);
 });
 
 async function runReportRowAction(page, row, name) {

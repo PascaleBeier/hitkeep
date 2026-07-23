@@ -1,0 +1,30 @@
+:host {
+    display: inline-flex;
+    max-width: 18rem;
+    min-width: 0;
+    align-items: center;
+}
+
+:host ::ng-deep .hk-site-scope-tag {
+    max-width: 100%;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+:host ::ng-deep .hk-site-scope-tag .p-tag-label {
+    max-width: 13rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+:host ::ng-deep .hk-site-scope-count-button.p-button {
+    flex: none;
+    padding: 0.22rem 0.55rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+:host ::ng-deep .hk-site-scope-count-button .p-button-label {
+    line-height: 1;
+}

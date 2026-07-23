@@ -1,0 +1,29 @@
+:host {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+:host ::ng-deep .hk-crud-search {
+    flex: 1 1 14rem;
+}
+
+@media (max-width: 640px) {
+    :host {
+        align-items: stretch;
+    }
+
+    :host ::ng-deep .hk-crud-search {
+        flex-basis: 100%;
+        max-width: none;
+        width: 100%;
+    }
+
+    :host ::ng-deep .p-button {
+        min-width: 2.75rem;
+        min-height: 2.75rem;
+    }
+}

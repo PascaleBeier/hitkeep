@@ -1174,13 +1174,13 @@
       "retryQueued": "Reintento de entrega en cola.",
       "resubscribed": "Te has vuelto a suscribir a este informe.",
       "copyName": "Copia de {{name}}",
-      "legacy": "Migrado",
       "name": "Nombre del informe",
       "namePlaceholder": "p. ej., revisión de crecimiento del lunes",
       "nextRun": "Próximo envío",
       "lastOutcome": "Último resultado",
       "notAvailable": "Todavía no",
       "allAccessibleSites": "Todos los sitios accesibles",
+      "siteCount": "{{count}} sitios",
       "selectedSites": "Sitios seleccionados",
       "personalRecipient": "Los informes personales solo se envían a tu cuenta de HitKeep.",
       "deliveryTime": "Hora de envío",
@@ -1192,12 +1192,15 @@
       "optedOut": "Has cancelado este informe.",
       "resubscribe": "Volver a suscribirse",
       "empty": { "title": "Aún no hay informes", "description": "Crea un informe con los sitios, destinatarios y hora que encajen con tu flujo.", "action": "Crear informe" },
+      "filteredEmpty": { "title": "No hay informes coincidentes" },
       "presets": {
         "site_summary": { "title": "Resumen del sitio", "description": "Métricas, objetivos, tendencia, páginas y referencias de un sitio." },
         "portfolio_digest": { "title": "Resumen de cartera", "description": "Comparación compacta de los sitios seleccionados o accesibles." },
         "opportunity_brief": { "title": "Resumen de oportunidades", "description": "Oportunidades guardadas y validadas con evidencias; se omiten los emails vacíos." }
       },
       "scope": { "label": "Ámbito", "personal": "Personal", "team": "Equipo" },
+      "scopeSites": "Ámbito y sitios",
+      "sort": { "label": "Ordenar por", "ascending": "Orden ascendente", "descending": "Orden descendente" },
       "sites": { "label": "Sitios", "placeholder": "Selecciona sitios" },
       "recipients": {
         "label": "Destinatarios", "placeholder": "Selecciona usuarios de HitKeep",
@@ -1226,7 +1229,7 @@
       "saveDraft": "Guardar borrador",
       "activate": "Guardar y activar",
       "history": { "title": "Historial de entregas", "empty": "Aún no hay ejecuciones programadas.", "deliveries": "entregas", "attempts": "intentos", "acceptedAt": "Aceptado", "retryAt": "Próximo intento" },
-      "errors": { "load": "No se pudieron cargar los informes.", "save": "No se pudo guardar el informe.", "preview": "No se pudo generar la vista previa.", "test": "El servidor no aceptó el mensaje de prueba.", "action": "La acción del informe ha fallado." }
+      "errors": { "loadTitle": "Los informes no están disponibles", "load": "No se pudieron cargar los informes.", "save": "No se pudo guardar el informe.", "preview": "No se pudo generar la vista previa.", "members": "No se pudieron cargar los miembros del equipo. Inténtalo de nuevo antes de elegir destinatarios.", "history": "No se pudo cargar el historial de entregas.", "test": "El servidor no aceptó el mensaje de prueba.", "action": "La acción del informe ha fallado." }
     },
     "apiClients": {
       "title": "Clientes de API",
@@ -1335,93 +1338,6 @@
       "backToSignIn": "Volver a iniciar sesión",
       "errors": {
         "unexpected": "Algo salio mal. Inténtalo de nuevo más tarde."
-      }
-    },
-    "webhooks": {
-      "subtitle": "Envía eventos operativos firmados sin retrasar las acciones del producto.",
-      "listLabel": "Webhooks configurados",
-      "scopes": {
-        "label": "Ámbito del webhook",
-        "site": "Sitio",
-        "instance": "Instancia"
-      },
-      "actions": {
-        "create": "Crear webhook",
-        "refresh": "Actualizar",
-        "deliveries": "Entregas",
-        "test": "Enviar prueba",
-        "edit": "Editar",
-        "rotate": "Rotar secreto",
-        "delete": "Eliminar",
-        "cancel": "Cancelar",
-        "save": "Guardar webhook"
-      },
-      "empty": {
-        "title": "Aún no hay webhooks",
-        "message": "Crea un webhook para empezar a entregar eventos operativos.",
-        "noSiteTitle": "Selecciona un sitio",
-        "noSiteMessage": "Elige un sitio para gestionar sus webhooks.",
-        "forbiddenTitle": "Se requiere acceso a webhooks",
-        "forbiddenMessage": "Solo propietarios y administradores de instancia o sitio pueden gestionarlos."
-      },
-      "status": { "enabled": "Activo", "disabled": "Desactivado" },
-      "events": {
-        "count": "{{count}} eventos",
-        "none": "Sin eventos",
-        "popoverTitle": "Eventos suscritos"
-      },
-      "secret": {
-        "title": "Guarda ahora este secreto de firma",
-        "message": "Solo se muestra una vez. Úsalo para verificar la marca de tiempo y el cuerpo exacto.",
-        "copy": "Copiar secreto"
-      },
-      "form": {
-        "createTitle": "Crear webhook",
-        "editTitle": "Editar webhook",
-        "name": "Nombre",
-        "url": "URL de destino",
-        "urlHint": "Se requiere HTTPS salvo que los destinos de desarrollo estén habilitados.",
-        "description": "Descripción",
-        "enabled": "Entregar eventos",
-        "events": "Eventos",
-        "eventsHint": "Elige los eventos operativos que recibirá este endpoint.",
-        "eventsRequired": "Selecciona al menos un evento."
-      },
-      "deliveries": {
-        "title": "Entregas de {{name}}",
-        "subtitle": "Los intentos automáticos son al menos una vez y pueden llegar desordenados.",
-        "event": "Evento",
-        "status": "Estado",
-        "attempts": "Intentos",
-        "response": "Respuesta",
-        "created": "Creado",
-        "empty": "Aún no hay entregas."
-      },
-      "deliveryStatus": {
-        "pending": "Pendiente",
-        "processing": "Entregando",
-        "retrying": "Reintentando",
-        "succeeded": "Correcto",
-        "failed": "Fallido"
-      },
-      "feedback": {
-        "loadError": "No se pudieron cargar los webhooks.",
-        "created": "Webhook creado. Guarda ahora el secreto de firma.",
-        "updated": "Webhook actualizado.",
-        "saveError": "No se pudo guardar el webhook.",
-        "rotated": "Secreto rotado. Guarda ahora el nuevo secreto.",
-        "rotateError": "No se pudo rotar el secreto.",
-        "testQueued": "Entrega de prueba en cola.",
-        "testError": "No se pudo poner en cola la prueba.",
-        "deliveryError": "No se pudo cargar el historial.",
-        "deleted": "Webhook eliminado.",
-        "deleteError": "No se pudo eliminar el webhook."
-      },
-      "confirm": {
-        "rotateTitle": "Rotar secreto de firma",
-        "rotateMessage": "¿Rotar el secreto de {{name}}? Las entregas pendientes usarán el nuevo secreto; una solicitud ya en curso aún puede usar el actual.",
-        "deleteTitle": "Eliminar webhook",
-        "deleteMessage": "¿Eliminar {{name}}? Las entregas pendientes conservan su endpoint actual."
       }
     },
     "reset": {
@@ -2993,6 +2909,93 @@
     }
   },
   "integration": {
+    "webhooks": {
+      "subtitle": "Envía eventos operativos firmados sin retrasar las acciones del producto.",
+      "listLabel": "Webhooks configurados",
+      "scopes": {
+        "label": "Ámbito del webhook",
+        "site": "Sitio",
+        "instance": "Instancia"
+      },
+      "actions": {
+        "create": "Crear webhook",
+        "refresh": "Actualizar",
+        "deliveries": "Entregas",
+        "test": "Enviar prueba",
+        "edit": "Editar",
+        "rotate": "Rotar secreto",
+        "delete": "Eliminar",
+        "cancel": "Cancelar",
+        "save": "Guardar webhook"
+      },
+      "empty": {
+        "title": "Aún no hay webhooks",
+        "message": "Crea un webhook para empezar a entregar eventos operativos.",
+        "noSiteTitle": "Selecciona un sitio",
+        "noSiteMessage": "Elige un sitio para gestionar sus webhooks.",
+        "forbiddenTitle": "Se requiere acceso a webhooks",
+        "forbiddenMessage": "Solo propietarios y administradores de instancia o sitio pueden gestionarlos."
+      },
+      "status": { "enabled": "Activo", "disabled": "Desactivado" },
+      "events": {
+        "count": "{{count}} eventos",
+        "none": "Sin eventos",
+        "popoverTitle": "Eventos suscritos"
+      },
+      "secret": {
+        "title": "Guarda ahora este secreto de firma",
+        "message": "Solo se muestra una vez. Úsalo para verificar la marca de tiempo y el cuerpo exacto.",
+        "copy": "Copiar secreto"
+      },
+      "form": {
+        "createTitle": "Crear webhook",
+        "editTitle": "Editar webhook",
+        "name": "Nombre",
+        "url": "URL de destino",
+        "urlHint": "Se requiere HTTPS salvo que los destinos de desarrollo estén habilitados.",
+        "description": "Descripción",
+        "enabled": "Entregar eventos",
+        "events": "Eventos",
+        "eventsHint": "Elige los eventos operativos que recibirá este endpoint.",
+        "eventsRequired": "Selecciona al menos un evento."
+      },
+      "deliveries": {
+        "title": "Entregas de {{name}}",
+        "subtitle": "Los intentos automáticos son al menos una vez y pueden llegar desordenados.",
+        "event": "Evento",
+        "status": "Estado",
+        "attempts": "Intentos",
+        "response": "Respuesta",
+        "created": "Creado",
+        "empty": "Aún no hay entregas."
+      },
+      "deliveryStatus": {
+        "pending": "Pendiente",
+        "processing": "Entregando",
+        "retrying": "Reintentando",
+        "succeeded": "Correcto",
+        "failed": "Fallido"
+      },
+      "feedback": {
+        "loadError": "No se pudieron cargar los webhooks.",
+        "created": "Webhook creado. Guarda ahora el secreto de firma.",
+        "updated": "Webhook actualizado.",
+        "saveError": "No se pudo guardar el webhook.",
+        "rotated": "Secreto rotado. Guarda ahora el nuevo secreto.",
+        "rotateError": "No se pudo rotar el secreto.",
+        "testQueued": "Entrega de prueba en cola.",
+        "testError": "No se pudo poner en cola la prueba.",
+        "deliveryError": "No se pudo cargar el historial.",
+        "deleted": "Webhook eliminado.",
+        "deleteError": "No se pudo eliminar el webhook."
+      },
+      "confirm": {
+        "rotateTitle": "Rotar secreto de firma",
+        "rotateMessage": "¿Rotar el secreto de {{name}}? Las entregas pendientes usarán el nuevo secreto; una solicitud ya en curso aún puede usar el actual.",
+        "deleteTitle": "Eliminar webhook",
+        "deleteMessage": "¿Eliminar {{name}}? Las entregas pendientes conservan su endpoint actual."
+      }
+    },
     "apiClients": {
       "subtitle": "Crea y administra clientes API para integraciones.",
       "manageTeamClients": "Administrar clientes API del equipo"

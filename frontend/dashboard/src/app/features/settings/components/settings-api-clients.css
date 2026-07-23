@@ -77,13 +77,6 @@
     gap: 0.75rem;
 }
 
-.api-client-table-caption {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.5rem;
-}
-
 .api-client-name-row {
     display: inline-flex;
     min-width: 0;
@@ -95,46 +88,6 @@
     white-space: nowrap;
 }
 
-.api-client-site-grant-list {
-    display: flex;
-    max-width: 18rem;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-}
-
-.api-client-site-grant-summary {
-    display: inline-flex;
-    max-width: 18rem;
-    align-items: center;
-    gap: 0.35rem;
-}
-
-:host ::ng-deep .api-client-site-grant-tag,
-:host ::ng-deep .api-client-no-site-access-tag {
-    max-width: 100%;
-    font-size: 0.72rem;
-    font-weight: 600;
-}
-
-:host ::ng-deep .api-client-site-grant-tag .p-tag-label,
-:host ::ng-deep .api-client-no-site-access-tag .p-tag-label {
-    max-width: 13rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-:host ::ng-deep .api-client-site-grant-count-button.p-button {
-    flex: none;
-    padding: 0.22rem 0.55rem;
-    font-size: 0.75rem;
-    font-weight: 700;
-}
-
-:host ::ng-deep .api-client-site-grant-count-button .p-button-label {
-    line-height: 1;
-}
-
 :host-context(.p-dark) .api-client-required-asterisk,
 :host-context(.p-dark) .api-client-field-error {
     color: var(--p-red-300);
@@ -143,11 +96,6 @@
 @media (max-width: 768px) {
     .api-client-scope-row {
         grid-template-columns: minmax(0, 1fr);
-    }
-
-    .api-client-table-caption .hk-crud-search {
-        flex: 1 1 auto;
-        width: 100%;
     }
 
     .api-client-card-actions {

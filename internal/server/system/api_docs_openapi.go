@@ -29,7 +29,7 @@ func openAPISpecV1(publicURL string) map[string]any {
 			{"name": "QR Campaigns", "description": "Dynamic QR campaign assets, print exports, redirects, attribution, and QR-scoped analytics."},
 			{"name": "Share", "description": "Share-link management and public shared analytics endpoints."},
 			{"name": "Takeout", "description": "Data export endpoints for user and site data."},
-			{"name": "Reports", "description": "Named scheduled email reports, delivery history, unsubscribe, and legacy subscription compatibility endpoints."},
+			{"name": "Reports", "description": "Scheduled email reports, delivery history, recipient confirmation, and unsubscribe controls."},
 			{"name": "Teams", "description": "Tenant team membership and active-team context endpoints."},
 			{"name": "Webhooks", "description": "Human-administered instance and site operational webhook endpoints."},
 		},

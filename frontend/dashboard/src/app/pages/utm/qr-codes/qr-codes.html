@@ -75,12 +75,12 @@
                 [tableStyle]="{ 'min-width': '980px' }"
             >
                 <ng-template pTemplate="caption">
-                    <div class="qr-codes-table-caption">
+                    <app-crud-table-toolbar>
                         <p-iconfield class="hk-crud-search">
                             <p-inputicon class="pi pi-search" />
                             <input pInputText #qrSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="qrCodesTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
                         </p-iconfield>
-                    </div>
+                    </app-crud-table-toolbar>
                 </ng-template>
                 <ng-template pTemplate="header">
                     <tr>
@@ -431,12 +431,12 @@
             </div>
             }
 
-            <div class="qr-codes-table-caption">
+            <app-crud-table-toolbar>
                 <p-iconfield class="hk-crud-search">
                     <p-inputicon class="pi pi-search" />
                     <input pInputText #qrShareSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="qrShareLinksTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
                 </p-iconfield>
-            </div>
+            </app-crud-table-toolbar>
 
             <div class="hk-crud-table-wrap">
                 <p-table

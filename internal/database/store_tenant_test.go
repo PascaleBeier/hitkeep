@@ -613,8 +613,15 @@ func TestLeaveTeamReassignsActiveTenant(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create custom tenant site: %v", err)
 	}
-	if err := store.UpsertSiteReportSubscription(ctx, userID, site.ID, api.ReportFrequencyDaily, true); err != nil {
-		t.Fatalf("upsert site report subscription: %v", err)
+	report, err := store.CreateReportDefinition(ctx, userID, api.CreateReportRequest{
+		Name: "Leave team report", Scope: api.ReportScopeTeam, TenantID: &customTenantID,
+		Preset: api.ReportPresetSiteSummary, SiteMode: api.ReportSiteModeSelected,
+		SiteIDs: []uuid.UUID{site.ID}, RecipientUserIDs: []uuid.UUID{userID},
+		Schedule: api.ReportSchedule{Frequency: api.ReportFrequencyDaily, Timezone: "UTC", LocalTime: "08:00"},
+		Status:   api.ReportStatusActive,
+	}, "test-token-secret")
+	if err != nil {
+		t.Fatalf("create team report: %v", err)
 	}
 
 	defaultTenantID, err := store.GetDefaultTenantID(ctx)
@@ -649,19 +656,19 @@ func TestLeaveTeamReassignsActiveTenant(t *testing.T) {
 		t.Fatalf("expected tenant-scoped site memberships to be removed, got %d", siteMemberCount)
 	}
 
-	var siteSubCount int
+	var recipientCount int
 	if err := store.DB().QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM site_report_subscriptions WHERE site_id = ? AND user_id = ?",
-		site.ID, userID,
-	).Scan(&siteSubCount); err != nil {
-		t.Fatalf("count remaining site report subscriptions: %v", err)
+		"SELECT COUNT(*) FROM report_recipients WHERE report_id = ? AND user_id = ?",
+		report.ID, userID,
+	).Scan(&recipientCount); err != nil {
+		t.Fatalf("count remaining report recipients: %v", err)
 	}
-	if siteSubCount != 0 {
-		t.Fatalf("expected tenant-scoped report subscriptions to be removed, got %d", siteSubCount)
+	if recipientCount != 0 {
+		t.Fatalf("expected tenant-scoped report recipient to be removed, got %d", recipientCount)
 	}
 }
 
-func TestRemoveTeamMemberRemovesTenantScopedSiteAccessAndSubscriptions(t *testing.T) {
+func TestRemoveTeamMemberRemovesTenantScopedSiteAccessAndReportRecipients(t *testing.T) {
 	store := setupTenantStore(t)
 	ctx := context.Background()
 
@@ -692,8 +699,16 @@ func TestRemoveTeamMemberRemovesTenantScopedSiteAccessAndSubscriptions(t *testin
 	if err := store.AddSiteMember(ctx, site.ID, memberID, auth.SiteViewer, ownerID); err != nil {
 		t.Fatalf("add site member: %v", err)
 	}
-	if err := store.UpsertSiteReportSubscription(ctx, memberID, site.ID, api.ReportFrequencyWeekly, true); err != nil {
-		t.Fatalf("upsert site report subscription: %v", err)
+	monday := 1
+	report, err := store.CreateReportDefinition(ctx, ownerID, api.CreateReportRequest{
+		Name: "Member cleanup report", Scope: api.ReportScopeTeam, TenantID: &team.ID,
+		Preset: api.ReportPresetSiteSummary, SiteMode: api.ReportSiteModeSelected,
+		SiteIDs: []uuid.UUID{site.ID}, RecipientUserIDs: []uuid.UUID{ownerID, memberID},
+		Schedule: api.ReportSchedule{Frequency: api.ReportFrequencyWeekly, Timezone: "UTC", LocalTime: "08:00", WeeklyDay: &monday},
+		Status:   api.ReportStatusActive,
+	}, "test-token-secret")
+	if err != nil {
+		t.Fatalf("create team report: %v", err)
 	}
 
 	if err := store.RemoveTeamMember(ctx, team.ID, memberID); err != nil {
@@ -711,15 +726,15 @@ func TestRemoveTeamMemberRemovesTenantScopedSiteAccessAndSubscriptions(t *testin
 		t.Fatalf("expected tenant-scoped site memberships to be removed, got %d", siteMemberCount)
 	}
 
-	var siteSubCount int
+	var recipientCount int
 	if err := store.DB().QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM site_report_subscriptions WHERE site_id = ? AND user_id = ?",
-		site.ID, memberID,
-	).Scan(&siteSubCount); err != nil {
-		t.Fatalf("count remaining site report subscriptions: %v", err)
+		"SELECT COUNT(*) FROM report_recipients WHERE report_id = ? AND user_id = ?",
+		report.ID, memberID,
+	).Scan(&recipientCount); err != nil {
+		t.Fatalf("count remaining report recipients: %v", err)
 	}
-	if siteSubCount != 0 {
-		t.Fatalf("expected tenant-scoped report subscriptions to be removed, got %d", siteSubCount)
+	if recipientCount != 0 {
+		t.Fatalf("expected tenant-scoped report recipient to be removed, got %d", recipientCount)
 	}
 }
 

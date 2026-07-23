@@ -148,11 +148,6 @@
     top: 1rem;
 }
 
-.qr-codes-table-caption {
-    display: flex;
-    justify-content: flex-end;
-}
-
 .qr-codes-link-button {
     color: var(--p-primary-color);
     font-weight: 700;
@@ -329,12 +324,10 @@
         width: 100%;
     }
 
-    .qr-codes-table-caption,
     .qr-codes-share-dialog__header {
         align-items: stretch;
     }
 
-    .qr-codes-table-caption .hk-crud-search,
     .qr-codes-share-dialog__header p-button,
     .qr-codes-share-dialog__header .p-button {
         width: 100%;

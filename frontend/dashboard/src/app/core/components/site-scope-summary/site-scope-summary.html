@@ -1,0 +1,22 @@
+@if (singleItem(); as item) {
+<p-tag styleClass="hk-site-scope-tag" icon="pi pi-globe" [value]="itemLabel(item)" [severity]="item.severity ?? 'secondary'" [rounded]="true" [attr.title]="itemLabel(item)" />
+} @else if (items().length > 1) {
+<p-button styleClass="hk-site-scope-count-button" icon="pi pi-sitemap" [label]="countLabel()" severity="info" [outlined]="true" [rounded]="true" size="small" type="button" [ariaLabel]="countLabel()" (onClick)="siteScopePopover.toggle($event)" />
+<p-popover #siteScopePopover appendTo="body" styleClass="hk-site-scope-popover" [ariaLabel]="popoverTitle()">
+    <div class="grid min-w-64 gap-3">
+        <strong class="text-sm">{{ popoverTitle() }}</strong>
+        <div class="grid gap-2">
+            @for (item of items(); track item.id) {
+            <div class="flex min-w-0 items-center justify-between gap-3">
+                <span class="min-w-0 break-all text-sm">{{ item.label }}</span>
+                @if (item.detail) {
+                <p-tag [value]="item.detail" [severity]="item.severity ?? 'secondary'" [rounded]="true" />
+                }
+            </div>
+            }
+        </div>
+    </div>
+</p-popover>
+} @else if (emptyLabel()) {
+<p-tag styleClass="hk-site-scope-tag" [icon]="emptyIcon()" [value]="emptyLabel()" severity="secondary" [rounded]="true" />
+}

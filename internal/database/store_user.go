@@ -521,12 +521,6 @@ func cleanupUserRows(ctx context.Context, tx *sql.Tx, userID uuid.UUID) error {
 	if err := execIfTableExists("api_clients", "DELETE FROM api_clients WHERE user_id = ?", userID); err != nil {
 		return fmt.Errorf("could not delete user api clients: %w", err)
 	}
-	if err := execIfTableExists("site_report_subscriptions", "DELETE FROM site_report_subscriptions WHERE user_id = ?", userID); err != nil {
-		return fmt.Errorf("could not delete user site report subscriptions: %w", err)
-	}
-	if err := execIfTableExists("digest_subscriptions", "DELETE FROM digest_subscriptions WHERE user_id = ?", userID); err != nil {
-		return fmt.Errorf("could not delete user digest subscriptions: %w", err)
-	}
 	if err := execIfTableExists("remember_me_tokens", "DELETE FROM remember_me_tokens WHERE user_id = ?", userID); err != nil {
 		return fmt.Errorf("could not delete remember tokens: %w", err)
 	}

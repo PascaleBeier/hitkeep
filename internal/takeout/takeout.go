@@ -409,7 +409,7 @@ func reportDefinitionTakeoutSelect(userID uuid.UUID) string {
 		SELECT 'report_definition' AS record_type,
 			rd.id, rd.tenant_id, rd.owner_user_id, rd.name, rd.scope, rd.preset,
 			rd.site_mode, rd.frequency, rd.timezone, rd.local_time, rd.weekly_day,
-			rd.monthly_day, rd.status, rd.source, rd.consent_version, rd.next_run_at, rd.created_at, rd.updated_at
+			rd.monthly_day, rd.status, rd.consent_version, rd.next_run_at, rd.created_at, rd.updated_at
 		FROM report_definitions rd
 		WHERE rd.owner_user_id = '%[1]s'
 		   OR EXISTS (SELECT 1 FROM report_recipients rr WHERE rr.report_id = rd.id AND rr.user_id = '%[1]s')

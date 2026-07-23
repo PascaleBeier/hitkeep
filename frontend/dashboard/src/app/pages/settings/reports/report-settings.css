@@ -6,15 +6,41 @@
     margin-bottom: 1rem;
 }
 
-.mobile-report-action {
+.reporting-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 1rem;
+}
+
+.report-list-toolbar {
+    justify-content: space-between;
+    border: 1px solid var(--p-content-border-color);
+    border-bottom: 0;
+    border-radius: 0.75rem 0.75rem 0 0;
+    background: var(--p-content-background);
+    padding: 0.65rem 0.75rem;
+}
+
+.report-list-toolbar .hk-crud-search {
+    width: min(24rem, 100%);
+}
+
+.report-mobile-view {
     display: none;
 }
 
-.report-table-caption {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
+.report-skeleton-list {
+    overflow: hidden;
+    border: 1px solid var(--p-content-border-color);
+    border-radius: 0.5rem;
+    background: var(--p-content-background);
+}
+
+.report-skeleton-row {
+    display: grid;
+    gap: 0.55rem;
+    border-bottom: 1px solid var(--p-content-border-color);
+    padding: 1rem;
 }
 
 .report-name-cell,
@@ -25,7 +51,6 @@
 }
 
 .report-name-cell strong,
-.report-cell-ellipsis,
 .report-recipient > span:first-child {
     display: block;
     min-width: 0;
@@ -38,19 +63,22 @@
     max-width: 16rem;
 }
 
+.report-name-row {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.report-name-row strong {
+    min-width: 0;
+}
+
 .report-name-cell > span,
 .report-stacked-cell > span:last-child,
 .report-cell-secondary {
     color: var(--p-text-muted-color);
     font-size: 0.75rem;
-}
-
-.report-name-cell p-tag {
-    justify-self: start;
-}
-
-.report-cell-ellipsis {
-    max-width: 13rem;
 }
 
 .report-recipient-summary {
@@ -68,12 +96,18 @@
 
 .report-recipient > span:first-child {
     max-width: 12rem;
-    font-size: 0.78rem;
+    font-size: 0.75rem;
 }
 
-.report-recipient i {
+.report-recipient > span i {
     margin-right: 0.35rem;
     color: var(--p-text-muted-color);
+}
+
+.report-outcome-heading,
+.report-outcome-cell {
+    width: 8rem;
+    text-align: center;
 }
 
 .report-row--focused > td {
@@ -88,27 +122,6 @@
     padding: 2.5rem 1rem;
     color: var(--p-text-muted-color);
     text-align: center;
-}
-
-.empty-state {
-    display: grid;
-    justify-items: center;
-    gap: 0.75rem;
-    border: 1px dashed var(--p-content-border-color);
-    border-radius: 1rem;
-    padding: 4rem 1rem;
-    color: var(--p-text-muted-color);
-    text-align: center;
-}
-
-.empty-state i {
-    color: var(--p-primary-color);
-    font-size: 2rem;
-}
-
-.empty-state h2,
-.empty-state p {
-    margin: 0;
 }
 
 .editor-flow {
@@ -136,7 +149,7 @@
     border-radius: 50%;
     background: var(--p-primary-color);
     color: var(--p-primary-contrast-color);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     font-weight: 700;
 }
 
@@ -155,7 +168,7 @@
     display: block;
     margin-bottom: -0.4rem;
     color: var(--p-text-muted-color);
-    font-size: 0.78rem;
+    font-size: 0.875rem;
     font-weight: 600;
 }
 
@@ -175,19 +188,12 @@
     color: inherit;
     text-align: left;
     cursor: pointer;
-    transition:
-        border-color 200ms ease-out,
-        background-color 200ms ease-out;
 }
 
 .preset-option span {
     color: var(--p-text-muted-color);
     font-size: 0.75rem;
     line-height: 1.35;
-}
-
-.preset-option:hover {
-    background: var(--p-content-hover-background);
 }
 
 .preset-option:focus-visible {
@@ -214,7 +220,7 @@
 .field-hint {
     margin: 0;
     color: var(--p-text-muted-color);
-    font-size: 0.78rem;
+    font-size: 0.75rem;
 }
 
 .external-recipient-input {
@@ -229,35 +235,14 @@
     gap: 0.4rem;
 }
 
-.external-recipient-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
+:host ::ng-deep .external-recipient-chip .p-chip {
     max-width: 100%;
-    border: 1px solid var(--p-content-border-color);
-    border-radius: 999px;
-    background: var(--p-content-hover-background);
-    padding: 0.3rem 0.45rem 0.3rem 0.6rem;
+    height: auto;
+}
+
+:host ::ng-deep .external-recipient-chip .p-chip-label {
+    min-width: 0;
     overflow-wrap: anywhere;
-    font-size: 0.78rem;
-}
-
-.external-recipient-chip button {
-    display: grid;
-    place-items: center;
-    width: 1.35rem;
-    height: 1.35rem;
-    border: 0;
-    border-radius: 50%;
-    background: transparent;
-    color: var(--p-text-muted-color);
-    cursor: pointer;
-}
-
-.external-recipient-chip button:hover,
-.external-recipient-chip button:focus-visible {
-    background: var(--p-content-background);
-    color: var(--p-text-color);
 }
 
 .preview-card {
@@ -267,20 +252,12 @@
     border-radius: 0.5rem;
     background: var(--p-content-hover-background);
     padding: 0.8rem 1rem;
-    font-size: 0.82rem;
-}
-
-.preview-card span {
-    color: var(--p-text-muted-color);
+    font-size: 0.875rem;
 }
 
 .history-list {
     display: grid;
     gap: 0.6rem;
-}
-
-.history-list > .history-row:last-child {
-    border-bottom: 0;
 }
 
 .history-row {
@@ -290,7 +267,7 @@
     gap: 0.75rem;
     border-bottom: 1px solid var(--p-content-border-color);
     padding: 0.75rem 0;
-    font-size: 0.82rem;
+    font-size: 0.875rem;
 }
 
 .history-row > div {
@@ -316,17 +293,163 @@
     gap: 0.6rem;
 }
 
+.history-delivery > span:first-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.history-error-action {
+    display: flex;
+    justify-content: center;
+    padding: 1rem 0 2rem;
+}
+
 .empty-history {
     padding: 2rem;
     color: var(--p-text-muted-color);
     text-align: center;
 }
 
-@media (max-width: 700px) {
-    .mobile-report-action {
-        display: flex;
-        justify-content: flex-end;
-        margin-bottom: 1rem;
+@media (min-width: 768px) {
+    .report-desktop-table {
+        border-radius: 0 0 0.75rem 0.75rem;
+    }
+
+    :host ::ng-deep .report-desktop-table .report-sticky-identity {
+        position: sticky;
+        left: 0;
+        z-index: 2;
+        background: var(--p-content-background);
+        box-shadow: 1px 0 0 var(--p-content-border-color);
+    }
+
+    :host ::ng-deep .report-desktop-table th.report-sticky-identity,
+    :host ::ng-deep .report-desktop-table th.report-sticky-actions {
+        z-index: 3;
+    }
+
+    :host ::ng-deep .report-desktop-table .report-sticky-actions {
+        position: sticky;
+        right: 0;
+        z-index: 2;
+        background: var(--p-content-background);
+        box-shadow: -1px 0 0 var(--p-content-border-color);
+    }
+}
+
+@media (max-width: 767px) {
+    .reporting-content {
+        padding-inline: 0.75rem;
+    }
+
+    .reporting-actions {
+        align-items: stretch;
+    }
+
+    :host ::ng-deep .reporting-actions p-button,
+    :host ::ng-deep .reporting-actions .p-button {
+        width: 100%;
+    }
+
+    .report-desktop-table {
+        display: none;
+    }
+
+    .report-mobile-view {
+        display: block;
+        border: 1px solid var(--p-content-border-color);
+        border-radius: 0 0 0.75rem 0.75rem;
+        background: var(--p-content-background);
+    }
+
+    .report-list-toolbar {
+        border-radius: 0.75rem 0.75rem 0 0;
+    }
+
+    .report-mobile-sort {
+        display: grid;
+        gap: 0.4rem;
+        border-bottom: 1px solid var(--p-content-border-color);
+        padding: 0.75rem;
+    }
+
+    .report-mobile-sort > label,
+    .report-mobile-row dt {
+        color: var(--p-text-muted-color);
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .report-mobile-sort > div {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.5rem;
+    }
+
+    .report-mobile-row {
+        min-width: 0;
+        border-bottom: 1px solid var(--p-content-border-color);
+        padding: 1rem 0.75rem;
+    }
+
+    .report-mobile-row > header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+        gap: 0.75rem;
+    }
+
+    .report-mobile-row .report-name-cell strong {
+        max-width: none;
+        overflow-wrap: anywhere;
+        white-space: normal;
+    }
+
+    .report-mobile-row dl {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.9rem 1rem;
+        margin: 1rem 0 0;
+    }
+
+    .report-mobile-row dl > div {
+        display: grid;
+        align-content: start;
+        gap: 0.3rem;
+        min-width: 0;
+    }
+
+    .report-mobile-row dt,
+    .report-mobile-row dd {
+        margin: 0;
+    }
+
+    .report-mobile-row dd {
+        display: grid;
+        gap: 0.2rem;
+        min-width: 0;
+        overflow-wrap: anywhere;
+        font-size: 0.875rem;
+    }
+
+    .report-mobile-row .report-mobile-wide {
+        grid-column: 1 / -1;
+    }
+
+    .report-mobile-recipients > span {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .report-mobile-recipients > span > span {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    :host ::ng-deep .report-mobile-view .p-paginator {
+        border-top: 1px solid var(--p-content-border-color);
     }
 
     .schedule-grid,
@@ -335,16 +458,39 @@
     }
 
     .history-row {
-        grid-template-columns: 1fr auto;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+    }
+
+    .history-row > span,
+    .history-row > p-button {
+        grid-column: 1 / -1;
+    }
+
+    .history-delivery {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+        border-bottom: 1px solid var(--p-content-border-color);
+        padding: 0.55rem 0;
+    }
+
+    .history-delivery > span:nth-child(n + 3) {
+        grid-column: 1 / -1;
     }
 
     .external-recipient-input {
         grid-template-columns: 1fr;
     }
-}
 
-@media (prefers-reduced-motion: reduce) {
-    .preset-option {
-        transition: none;
+    :host ::ng-deep .external-recipient-chip .p-chip-remove-icon {
+        display: grid;
+        place-items: center;
+        min-width: 2.75rem;
+        min-height: 2.75rem;
+    }
+
+    .editor-step {
+        grid-template-columns: 1.75rem minmax(0, 1fr);
+        gap: 0.65rem;
     }
 }

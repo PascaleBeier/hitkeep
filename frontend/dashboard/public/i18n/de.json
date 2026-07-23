@@ -1178,13 +1178,13 @@
       "retryQueued": "Erneuter Versand wurde eingeplant.",
       "resubscribed": "Du erhältst diesen Bericht wieder.",
       "copyName": "{{name}} – Kopie",
-      "legacy": "Migriert",
       "name": "Berichtsname",
       "namePlaceholder": "z. B. Wachstumsrunde am Montag",
       "nextRun": "Nächster Versand",
       "lastOutcome": "Letztes Ergebnis",
       "notAvailable": "Noch nicht",
       "allAccessibleSites": "Alle zugänglichen Websites",
+      "siteCount": "{{count}} Websites",
       "selectedSites": "Ausgewählte Websites",
       "personalRecipient": "Persönliche Berichte werden nur an dein HitKeep-Konto gesendet.",
       "deliveryTime": "Versandzeit",
@@ -1196,12 +1196,15 @@
       "optedOut": "Du hast diesen Bericht abbestellt.",
       "resubscribe": "Wieder abonnieren",
       "empty": { "title": "Noch keine Berichte", "description": "Erstelle einen benannten Bericht mit passenden Websites, Empfängern und Versandzeiten.", "action": "Bericht erstellen" },
+      "filteredEmpty": { "title": "Keine passenden Berichte" },
       "presets": {
         "site_summary": { "title": "Website-Zusammenfassung", "description": "Kennzahlen, Ziele, Trend, Top-Seiten und Verweise für eine Website." },
         "portfolio_digest": { "title": "Portfolio-Übersicht", "description": "Kompakter Vergleich ausgewählter oder aller zugänglichen Websites." },
         "opportunity_brief": { "title": "Chancen-Überblick", "description": "Validierte gespeicherte Chancen mit Belegen; leere E-Mails werden unterdrückt." }
       },
       "scope": { "label": "Bereich", "personal": "Persönlich", "team": "Team" },
+      "scopeSites": "Bereich und Websites",
+      "sort": { "label": "Sortieren nach", "ascending": "Aufsteigend sortieren", "descending": "Absteigend sortieren" },
       "sites": { "label": "Websites", "placeholder": "Websites auswählen" },
       "recipients": {
         "label": "Empfänger",
@@ -1238,7 +1241,7 @@
       "saveDraft": "Entwurf speichern",
       "activate": "Speichern & aktivieren",
       "history": { "title": "Versandverlauf", "empty": "Noch keine geplanten Läufe.", "deliveries": "Zustellungen", "attempts": "Versuche", "acceptedAt": "Angenommen", "retryAt": "Nächster Versuch" },
-      "errors": { "load": "Berichte konnten nicht geladen werden.", "save": "Der Bericht konnte nicht gespeichert werden.", "preview": "Die Vorschau konnte nicht erzeugt werden.", "test": "Der Mailserver hat die Testnachricht nicht angenommen.", "action": "Die Berichtsaktion ist fehlgeschlagen." }
+      "errors": { "loadTitle": "Berichte sind nicht verfügbar", "load": "Berichte konnten nicht geladen werden.", "save": "Der Bericht konnte nicht gespeichert werden.", "preview": "Die Vorschau konnte nicht erzeugt werden.", "members": "Teammitglieder konnten nicht geladen werden. Versuche es erneut, bevor du Empfänger auswählst.", "history": "Der Zustellverlauf konnte nicht geladen werden.", "test": "Der Mailserver hat die Testnachricht nicht angenommen.", "action": "Die Berichtsaktion ist fehlgeschlagen." }
     },
     "apiClients": {
       "title": "API-Clients",
@@ -1347,93 +1350,6 @@
       "backToSignIn": "Zurück zur Anmeldung",
       "errors": {
         "unexpected": "Etwas ist schiefgelaufen. Bitte versuche es später erneut."
-      }
-    },
-    "webhooks": {
-      "subtitle": "Sende signierte Betriebsereignisse, ohne Produktaktionen zu verzögern.",
-      "listLabel": "Konfigurierte Webhooks",
-      "scopes": {
-        "label": "Webhook-Bereich",
-        "site": "Website",
-        "instance": "Instanz"
-      },
-      "actions": {
-        "create": "Webhook erstellen",
-        "refresh": "Aktualisieren",
-        "deliveries": "Zustellungen",
-        "test": "Test senden",
-        "edit": "Bearbeiten",
-        "rotate": "Secret rotieren",
-        "delete": "Löschen",
-        "cancel": "Abbrechen",
-        "save": "Webhook speichern"
-      },
-      "empty": {
-        "title": "Noch keine Webhooks",
-        "message": "Erstelle einen Webhook, um Betriebsereignisse zuzustellen.",
-        "noSiteTitle": "Website auswählen",
-        "noSiteMessage": "Wähle eine Website, um ihre Webhooks zu verwalten.",
-        "forbiddenTitle": "Webhook-Zugriff erforderlich",
-        "forbiddenMessage": "Nur Instanz-, Website-Eigentümer und Website-Admins können Webhooks verwalten."
-      },
-      "status": { "enabled": "Aktiv", "disabled": "Deaktiviert" },
-      "events": {
-        "count": "{{count}} Ereignisse",
-        "none": "Keine Ereignisse",
-        "popoverTitle": "Abonnierte Ereignisse"
-      },
-      "secret": {
-        "title": "Signatur-Secret jetzt speichern",
-        "message": "Es wird nur einmal angezeigt. Prüfe damit Zeitstempel und exakten Request-Body.",
-        "copy": "Secret kopieren"
-      },
-      "form": {
-        "createTitle": "Webhook erstellen",
-        "editTitle": "Webhook bearbeiten",
-        "name": "Name",
-        "url": "Ziel-URL",
-        "urlHint": "HTTPS ist erforderlich, außer Entwicklungsziele sind ausdrücklich aktiviert.",
-        "description": "Beschreibung",
-        "enabled": "Ereignisse zustellen",
-        "events": "Ereignisse",
-        "eventsHint": "Wähle die Betriebsereignisse für diesen Endpunkt.",
-        "eventsRequired": "Wähle mindestens ein Ereignis."
-      },
-      "deliveries": {
-        "title": "Zustellungen für {{name}}",
-        "subtitle": "Automatische Versuche erfolgen mindestens einmal und ohne Reihenfolgegarantie.",
-        "event": "Ereignis",
-        "status": "Status",
-        "attempts": "Versuche",
-        "response": "Antwort",
-        "created": "Erstellt",
-        "empty": "Noch keine Zustellungen."
-      },
-      "deliveryStatus": {
-        "pending": "Ausstehend",
-        "processing": "Wird zugestellt",
-        "retrying": "Wiederholung",
-        "succeeded": "Erfolgreich",
-        "failed": "Fehlgeschlagen"
-      },
-      "feedback": {
-        "loadError": "Webhooks konnten nicht geladen werden.",
-        "created": "Webhook erstellt. Speichere jetzt das Signatur-Secret.",
-        "updated": "Webhook aktualisiert.",
-        "saveError": "Webhook konnte nicht gespeichert werden.",
-        "rotated": "Signatur-Secret rotiert. Speichere das neue Secret.",
-        "rotateError": "Secret konnte nicht rotiert werden.",
-        "testQueued": "Testzustellung eingeplant.",
-        "testError": "Testzustellung konnte nicht eingeplant werden.",
-        "deliveryError": "Zustellverlauf konnte nicht geladen werden.",
-        "deleted": "Webhook gelöscht.",
-        "deleteError": "Webhook konnte nicht gelöscht werden."
-      },
-      "confirm": {
-        "rotateTitle": "Signaturgeheimnis rotieren",
-        "rotateMessage": "Das Geheimnis für {{name}} rotieren? Ausstehende Zustellungen verwenden das neue Geheimnis; eine bereits laufende Anfrage kann noch das aktuelle verwenden.",
-        "deleteTitle": "Webhook löschen",
-        "deleteMessage": "{{name}} löschen? Ausstehende Zustellungen behalten ihren Endpunkt-Snapshot."
       }
     },
     "reset": {
@@ -3005,6 +2921,93 @@
     }
   },
   "integration": {
+    "webhooks": {
+      "subtitle": "Sende signierte Betriebsereignisse, ohne Produktaktionen zu verzögern.",
+      "listLabel": "Konfigurierte Webhooks",
+      "scopes": {
+        "label": "Webhook-Bereich",
+        "site": "Website",
+        "instance": "Instanz"
+      },
+      "actions": {
+        "create": "Webhook erstellen",
+        "refresh": "Aktualisieren",
+        "deliveries": "Zustellungen",
+        "test": "Test senden",
+        "edit": "Bearbeiten",
+        "rotate": "Secret rotieren",
+        "delete": "Löschen",
+        "cancel": "Abbrechen",
+        "save": "Webhook speichern"
+      },
+      "empty": {
+        "title": "Noch keine Webhooks",
+        "message": "Erstelle einen Webhook, um Betriebsereignisse zuzustellen.",
+        "noSiteTitle": "Website auswählen",
+        "noSiteMessage": "Wähle eine Website, um ihre Webhooks zu verwalten.",
+        "forbiddenTitle": "Webhook-Zugriff erforderlich",
+        "forbiddenMessage": "Nur Instanz-, Website-Eigentümer und Website-Admins können Webhooks verwalten."
+      },
+      "status": { "enabled": "Aktiv", "disabled": "Deaktiviert" },
+      "events": {
+        "count": "{{count}} Ereignisse",
+        "none": "Keine Ereignisse",
+        "popoverTitle": "Abonnierte Ereignisse"
+      },
+      "secret": {
+        "title": "Signatur-Secret jetzt speichern",
+        "message": "Es wird nur einmal angezeigt. Prüfe damit Zeitstempel und exakten Request-Body.",
+        "copy": "Secret kopieren"
+      },
+      "form": {
+        "createTitle": "Webhook erstellen",
+        "editTitle": "Webhook bearbeiten",
+        "name": "Name",
+        "url": "Ziel-URL",
+        "urlHint": "HTTPS ist erforderlich, außer Entwicklungsziele sind ausdrücklich aktiviert.",
+        "description": "Beschreibung",
+        "enabled": "Ereignisse zustellen",
+        "events": "Ereignisse",
+        "eventsHint": "Wähle die Betriebsereignisse für diesen Endpunkt.",
+        "eventsRequired": "Wähle mindestens ein Ereignis."
+      },
+      "deliveries": {
+        "title": "Zustellungen für {{name}}",
+        "subtitle": "Automatische Versuche erfolgen mindestens einmal und ohne Reihenfolgegarantie.",
+        "event": "Ereignis",
+        "status": "Status",
+        "attempts": "Versuche",
+        "response": "Antwort",
+        "created": "Erstellt",
+        "empty": "Noch keine Zustellungen."
+      },
+      "deliveryStatus": {
+        "pending": "Ausstehend",
+        "processing": "Wird zugestellt",
+        "retrying": "Wiederholung",
+        "succeeded": "Erfolgreich",
+        "failed": "Fehlgeschlagen"
+      },
+      "feedback": {
+        "loadError": "Webhooks konnten nicht geladen werden.",
+        "created": "Webhook erstellt. Speichere jetzt das Signatur-Secret.",
+        "updated": "Webhook aktualisiert.",
+        "saveError": "Webhook konnte nicht gespeichert werden.",
+        "rotated": "Signatur-Secret rotiert. Speichere das neue Secret.",
+        "rotateError": "Secret konnte nicht rotiert werden.",
+        "testQueued": "Testzustellung eingeplant.",
+        "testError": "Testzustellung konnte nicht eingeplant werden.",
+        "deliveryError": "Zustellverlauf konnte nicht geladen werden.",
+        "deleted": "Webhook gelöscht.",
+        "deleteError": "Webhook konnte nicht gelöscht werden."
+      },
+      "confirm": {
+        "rotateTitle": "Signaturgeheimnis rotieren",
+        "rotateMessage": "Das Geheimnis für {{name}} rotieren? Ausstehende Zustellungen verwenden das neue Geheimnis; eine bereits laufende Anfrage kann noch das aktuelle verwenden.",
+        "deleteTitle": "Webhook löschen",
+        "deleteMessage": "{{name}} löschen? Ausstehende Zustellungen behalten ihren Endpunkt-Snapshot."
+      }
+    },
     "apiClients": {
       "subtitle": "Erstelle und verwalte API-Clients für Integrationen.",
       "manageTeamClients": "Team-API-Clients verwalten"

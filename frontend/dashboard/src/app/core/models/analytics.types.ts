@@ -716,25 +716,6 @@ export interface CloudStatus {
 
 export type ReportFrequency = 'daily' | 'weekly' | 'monthly';
 
-export interface FrequencyPrefs {
-    daily: boolean;
-    weekly: boolean;
-    monthly: boolean;
-}
-
-export interface SiteReportSubscription {
-    site_id: string;
-    domain: string;
-    daily: boolean;
-    weekly: boolean;
-    monthly: boolean;
-}
-
-export interface ReportSubscriptions {
-    sites: SiteReportSubscription[];
-    digest: FrequencyPrefs;
-}
-
 export type ReportScope = 'personal' | 'team';
 export type ReportPreset = 'site_summary' | 'portfolio_digest' | 'opportunity_brief';
 export type ReportStatus = 'draft' | 'active' | 'paused';
@@ -778,7 +759,6 @@ export interface ReportDefinition {
     recipients: ReportRecipient[];
     schedule: ReportSchedule;
     status: ReportStatus;
-    source: 'v2' | 'legacy';
     consent_version: number;
     next_run_at?: string;
     last_outcome?: {

@@ -22,7 +22,7 @@ export class ReportDefinitionsService {
         return this.http.post<ReportDefinition>('/api/reports', definition).pipe(tap((report) => this.reports.update((reports) => [report, ...reports])));
     }
 
-    update(reportID: string, definition: Partial<ReportDefinitionInput>) {
+    update(reportID: string, definition: Partial<Omit<ReportDefinitionInput, 'scope' | 'tenant_id'>>) {
         return this.http.patch<ReportDefinition>(`/api/reports/${encodeURIComponent(reportID)}`, definition).pipe(tap((report) => this.reports.update((reports) => reports.map((item) => (item.id === report.id ? report : item)))));
     }
 

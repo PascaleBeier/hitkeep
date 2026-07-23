@@ -72,8 +72,8 @@ func TestReportDefinitionMigrationPreservesLegacyUTC0800Subscriptions(t *testing
 	digestCount := 0
 	siteCount := 0
 	for _, report := range reports {
-		if report.Source != "legacy" || report.Scope != api.ReportScopePersonal || report.OwnerUserID == nil || *report.OwnerUserID != userID {
-			t.Fatalf("legacy ownership not preserved: %+v", report)
+		if report.Scope != api.ReportScopePersonal || report.OwnerUserID == nil || *report.OwnerUserID != userID {
+			t.Fatalf("migrated ownership not preserved: %+v", report)
 		}
 		if report.Schedule.Timezone != "UTC" || report.Schedule.LocalTime != "08:00" {
 			t.Fatalf("legacy schedule = %s %s, want UTC 08:00", report.Schedule.Timezone, report.Schedule.LocalTime)
@@ -101,6 +101,23 @@ func TestReportDefinitionMigrationPreservesLegacyUTC0800Subscriptions(t *testing
 	}
 	if digestCount != 2 || siteCount != 2 {
 		t.Fatalf("migrated presets digest=%d site=%d, want 2 each", digestCount, siteCount)
+	}
+	for _, table := range []string{"site_report_subscriptions", "digest_subscriptions"} {
+		var count int
+		if err := store.DB().QueryRowContext(ctx, `
+			SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?
+		`, table).Scan(&count); err != nil || count != 0 {
+			t.Fatalf("obsolete table %s remains: count=%d err=%v", table, count, err)
+		}
+	}
+	for _, column := range []string{"source", "legacy_key"} {
+		var count int
+		if err := store.DB().QueryRowContext(ctx, `
+			SELECT COUNT(*) FROM information_schema.columns
+			WHERE table_name = 'report_definitions' AND column_name = ?
+		`, column).Scan(&count); err != nil || count != 0 {
+			t.Fatalf("migration-only report column %s remains: count=%d err=%v", column, count, err)
+		}
 	}
 }
 
@@ -131,7 +148,7 @@ func TestExternalRecipientMigrationPreservesMemberDeliveryIdentity(t *testing.T)
 			id, owner_user_id, created_by, name, scope, preset, site_mode, frequency,
 			timezone, local_time, status, source, next_run_at, created_at, updated_at
 		) VALUES (?, ?, ?, 'Migration history', 'personal', 'site_summary', 'selected',
-		          'daily', 'UTC', '08:00', 'active', 'v2', ?, ?, ?)
+		          'daily', 'UTC', '08:00', 'active', 'legacy', ?, ?, ?)
 	`, reportID, userID, userID, now.Add(24*time.Hour), now, now); err != nil {
 		t.Fatal(err)
 	}

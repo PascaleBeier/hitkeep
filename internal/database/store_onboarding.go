@@ -33,11 +33,6 @@ func (s *Store) GetUserOnboarding(ctx context.Context, userID uuid.UUID) (*api.U
 	if err != nil {
 		return nil, err
 	}
-	subs, err := s.GetReportSubscriptions(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-
 	firstSiteID := ""
 	firstSiteDomain := ""
 	if len(sites) > 0 {
@@ -64,17 +59,7 @@ func (s *Store) GetUserOnboarding(ctx context.Context, userID uuid.UUID) (*api.U
 	}
 
 	reportScheduled := false
-	if subs != nil {
-		reportScheduled = subs.Digest.Daily || subs.Digest.Weekly || subs.Digest.Monthly
-		for _, siteSub := range subs.Sites {
-			if siteSub.Daily || siteSub.Weekly || siteSub.Monthly {
-				reportScheduled = true
-				break
-			}
-		}
-	}
-	if !reportScheduled {
-		if err := s.db.QueryRowContext(ctx, `
+	if err := s.db.QueryRowContext(ctx, `
 			SELECT EXISTS (
 				SELECT 1
 				FROM report_definitions rd
@@ -97,9 +82,8 @@ func (s *Store) GetUserOnboarding(ctx context.Context, userID uuid.UUID) (*api.U
 				        )
 				  )
 			)
-		`, userID, userID).Scan(&reportScheduled); err != nil {
-			return nil, fmt.Errorf("check named report onboarding: %w", err)
-		}
+	`, userID, userID).Scan(&reportScheduled); err != nil {
+		return nil, fmt.Errorf("check scheduled report onboarding: %w", err)
 	}
 
 	steps := []api.OnboardingStep{

@@ -45,11 +45,21 @@ func (h *handler) handleGetFavicon() http.HandlerFunc {
 			Transport: faviconProxyTransport,
 			ModifyResponse: func(resp *http.Response) error {
 				resp.Header.Set("Cache-Control", "public, max-age=86400")
+				if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+					_ = resp.Body.Close()
+					resp.StatusCode = http.StatusNoContent
+					resp.Status = http.StatusText(http.StatusNoContent)
+					resp.Body = http.NoBody
+					resp.ContentLength = 0
+					resp.Header.Del("Content-Length")
+					resp.Header.Del("Content-Type")
+				}
 				return nil
 			},
 			ErrorHandler: func(rw http.ResponseWriter, req *http.Request, proxyErr error) {
 				slog.Warn("Failed to fetch favicon upstream", "domain", domain, "error", proxyErr)
-				http.Error(rw, "Upstream error", http.StatusBadGateway)
+				rw.Header().Set("Cache-Control", "public, max-age=300")
+				rw.WriteHeader(http.StatusNoContent)
 			},
 		}
 

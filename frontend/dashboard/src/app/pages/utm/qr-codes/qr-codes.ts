@@ -23,6 +23,7 @@ import { map } from 'rxjs';
 import { buildTakeoutExportMenuItems, TakeoutExportFormat } from '@core/export/export-formats';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { CopyControl } from '@components/copy-control/copy-control';
+import { CrudTableToolbar } from '@components/crud-table-toolbar/crud-table-toolbar';
 import { dialogCancelButton, dialogDangerButton } from '@components/dialog-actions/dialog-actions';
 import { DialogShell } from '@components/dialog-shell/dialog-shell';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
@@ -82,6 +83,7 @@ const QR_CORNER_OPTIONS = ['square', 'dot', 'extra-rounded'] as const;
         TagModule,
         TextareaModule,
         CopyControl,
+        CrudTableToolbar,
         DialogShell,
         PageBreadcrumb,
         PageHeader,

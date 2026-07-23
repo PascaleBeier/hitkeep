@@ -37,7 +37,7 @@ func scanReportDefinition(scanner reportScanner) (*api.ReportDefinition, error) 
 		&report.ID, &tenantID, &ownerUserID, &createdBy, &report.Name,
 		&scope, &preset, &siteMode, &frequency, &report.Schedule.Timezone,
 		&report.Schedule.LocalTime, &weeklyDay, &monthlyDay, &status,
-		&report.Source, &report.ConsentVersion, &nextRun, &report.CreatedAt, &report.UpdatedAt,
+		&report.ConsentVersion, &nextRun, &report.CreatedAt, &report.UpdatedAt,
 	); err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ const reportDefinitionSelect = `
 	SELECT rd.id, CAST(rd.tenant_id AS VARCHAR), CAST(rd.owner_user_id AS VARCHAR),
 	       CAST(rd.created_by AS VARCHAR), rd.name, rd.scope, rd.preset, rd.site_mode,
 	       rd.frequency, rd.timezone, rd.local_time, rd.weekly_day, rd.monthly_day,
-	       rd.status, rd.source, rd.consent_version, rd.next_run_at, rd.created_at, rd.updated_at
+	       rd.status, rd.consent_version, rd.next_run_at, rd.created_at, rd.updated_at
 	FROM report_definitions rd
 `
 
@@ -410,9 +410,9 @@ func (s *Store) CreateReportDefinition(ctx context.Context, actorID uuid.UUID, r
 		_, err := tx.ExecContext(ctx, `
 			INSERT INTO report_definitions (
 				id, tenant_id, owner_user_id, created_by, name, scope, preset, site_mode,
-				frequency, timezone, local_time, weekly_day, monthly_day, status, source,
+				frequency, timezone, local_time, weekly_day, monthly_day, status,
 				consent_version, next_run_at, created_at, updated_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'v2', 1, ?, ?, ?)
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
 		`, reportID, tenantID, ownerUserID, actorID, req.Name, req.Scope, req.Preset, req.SiteMode,
 			req.Schedule.Frequency, req.Schedule.Timezone, req.Schedule.LocalTime,
 			nullableInt(req.Schedule.WeeklyDay), nullableInt(req.Schedule.MonthlyDay), req.Status,

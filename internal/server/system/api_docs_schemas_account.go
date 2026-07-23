@@ -1034,34 +1034,6 @@ func openAPIV1AccountSchemas() map[string]any {
 				},
 			},
 		},
-		"DigestSubscription": map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"daily":   map[string]any{"type": "boolean"},
-				"weekly":  map[string]any{"type": "boolean"},
-				"monthly": map[string]any{"type": "boolean"},
-			},
-		},
-		"SiteReportSubscription": map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"site_id": map[string]any{"type": "string", "format": "uuid"},
-				"domain":  map[string]any{"type": "string"},
-				"daily":   map[string]any{"type": "boolean"},
-				"weekly":  map[string]any{"type": "boolean"},
-				"monthly": map[string]any{"type": "boolean"},
-			},
-		},
-		"ReportSubscriptions": map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"digest": map[string]any{"$ref": "#/components/schemas/DigestSubscription"},
-				"sites": map[string]any{
-					"type":  "array",
-					"items": map[string]any{"$ref": "#/components/schemas/SiteReportSubscription"},
-				},
-			},
-		},
 		"ReportSchedule": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -1117,14 +1089,13 @@ func openAPIV1AccountSchemas() map[string]any {
 				"recipients":      map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/ReportRecipient"}},
 				"schedule":        map[string]any{"$ref": "#/components/schemas/ReportSchedule"},
 				"status":          map[string]any{"type": "string", "enum": []string{"draft", "active", "paused"}},
-				"source":          map[string]any{"type": "string", "enum": []string{"v2", "legacy"}},
 				"consent_version": map[string]any{"type": "integer", "minimum": 1},
 				"next_run_at":     map[string]any{"type": "string", "format": "date-time"},
 				"last_outcome":    map[string]any{"type": "object", "additionalProperties": true},
 				"created_at":      map[string]any{"type": "string", "format": "date-time"},
 				"updated_at":      map[string]any{"type": "string", "format": "date-time"},
 			},
-			"required": []string{"id", "name", "scope", "preset", "site_mode", "sites", "recipients", "schedule", "status", "source", "created_at", "updated_at"},
+			"required": []string{"id", "name", "scope", "preset", "site_mode", "sites", "recipients", "schedule", "status", "created_at", "updated_at"},
 		},
 		"ReportPreview": map[string]any{
 			"type": "object", "properties": map[string]any{

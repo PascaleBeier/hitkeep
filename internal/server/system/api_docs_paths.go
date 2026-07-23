@@ -333,7 +333,7 @@ func openAPIV1CorePaths() map[string]any {
 				map[string]any{"200": jsonRefResp("Preferences", "#/components/schemas/UserPreferences")}),
 		},
 		"/api/user/onboarding": map[string]any{
-			"get": op([]string{"User"}, "Get onboarding checklist", "Returns an onboarding checklist computed from sites, tracking status, team membership, and report subscription state.", secCookie(), nil, nil,
+			"get": op([]string{"User"}, "Get onboarding checklist", "Returns an onboarding checklist computed from sites, tracking status, team membership, and scheduled report state.", secCookie(), nil, nil,
 				map[string]any{"200": jsonRefResp("Onboarding state", "#/components/schemas/UserOnboarding")}),
 		},
 		"/api/user/onboarding/dismiss": map[string]any{

@@ -11,4 +11,5 @@ import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header'
 })
 export class PageFrame {
     breadcrumbItems = input.required<PageBreadcrumbItem[]>();
+    subtitle = input('');
 }

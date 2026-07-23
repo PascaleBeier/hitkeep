@@ -585,22 +585,8 @@ func openAPIV1AdminSitePaths() map[string]any {
 			"get": op([]string{"Takeout"}, "Site takeout", "Exports site data as xlsx/csv/parquet/json/ndjson.", secCookie(), []any{paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/format")}, nil, map[string]any{"200": desc("Export file stream")}),
 		},
 
-		"/api/user/report-subscriptions": map[string]any{
-			"get": op([]string{"Reports"}, "Get report subscriptions", "Returns all report subscription preferences for the authenticated user, including per-site and digest settings.", secCookie(), nil, nil,
-				map[string]any{"200": jsonRefResp("Report subscriptions", "#/components/schemas/ReportSubscriptions")}),
-		},
-		"/api/user/report-subscriptions/digest": map[string]any{
-			"put": op([]string{"Reports"}, "Update digest subscription", "Updates the consolidated digest subscription frequencies for the authenticated user.", secCookie(), nil,
-				jsonBody(map[string]any{"$ref": "#/components/schemas/DigestSubscription"}),
-				map[string]any{"204": desc("Updated"), "400": errResp("Invalid request")}),
-		},
-		"/api/user/report-subscriptions/sites/{site_id}": map[string]any{
-			"put": op([]string{"Reports"}, "Update site report subscription", "Updates per-site report subscription frequencies for the authenticated user.", secCookie(), []any{paramRef("#/components/parameters/reportSiteID")},
-				jsonBody(map[string]any{"$ref": "#/components/schemas/DigestSubscription"}),
-				map[string]any{"204": desc("Updated"), "400": errResp("Invalid site ID or request")}),
-		},
 		"/api/reports": map[string]any{
-			"get": op([]string{"Reports"}, "List named reports", "Lists personal and team report definitions visible to the authenticated user, including schedule, recipients, next run, and last outcome.", secCookie(), nil, nil,
+			"get": op([]string{"Reports"}, "List reports", "Lists personal and team reports visible to the authenticated user, including schedule, recipients, next run, and last outcome.", secCookie(), nil, nil,
 				map[string]any{"200": jsonSchemaResp("Reports", map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/ReportDefinition"}})}),
 			"post": op([]string{"Reports"}, "Create report", "Creates a personal or authorized team report. Active reports require configured mail delivery.", secCookie(), nil,
 				jsonBody(map[string]any{"$ref": "#/components/schemas/ReportDefinitionInput"}),

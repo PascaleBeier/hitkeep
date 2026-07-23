@@ -14,6 +14,17 @@
     margin: 0 auto;
 }
 
+.page-frame__heading {
+    min-width: 0;
+}
+
+.page-frame__subtitle {
+    margin: 0.25rem 0 0;
+    color: var(--p-text-muted-color);
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
 :host ::ng-deep .hk-page-tabs > .p-tablist,
 :host ::ng-deep .hk-admin-tabs > .p-tablist {
     overflow-x: auto;
@@ -49,7 +60,7 @@
     border-radius: 999px;
     background: var(--p-primary-color);
     color: var(--p-primary-contrast-color);
-    font-size: 0.625rem;
+    font-size: 0.75rem;
     font-weight: 800;
     letter-spacing: 0.06em;
     line-height: 1.2;

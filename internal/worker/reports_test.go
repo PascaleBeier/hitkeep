@@ -2,6 +2,8 @@ package worker
 
 import (
 	"context"
+	"errors"
+	"maps"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,8 +16,37 @@ import (
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailables"
+	"hitkeep/internal/mailer"
 	"hitkeep/internal/reporting"
 )
+
+type capturedScheduledReport struct {
+	to        []string
+	messageID string
+	headers   map[string]string
+}
+
+type scheduledReportDriver struct {
+	messages      []capturedScheduledReport
+	failRemaining int
+}
+
+func (d *scheduledReportDriver) Send(to []string, _ string, _ string, _ string) error {
+	return d.SendWithHeaders(to, "", "", "", "", nil)
+}
+
+func (d *scheduledReportDriver) SendWithHeaders(to []string, _ string, _ string, _ string, messageID string, headers map[string]string) error {
+	copiedHeaders := make(map[string]string, len(headers))
+	maps.Copy(copiedHeaders, headers)
+	d.messages = append(d.messages, capturedScheduledReport{to: append([]string(nil), to...), messageID: messageID, headers: copiedHeaders})
+	if d.failRemaining > 0 {
+		d.failRemaining--
+		return errors.New("smtp unavailable")
+	}
+	return nil
+}
+
+func (d *scheduledReportDriver) Close() error { return nil }
 
 func TestReportPeriodLabelDailyUsesSingleDay(t *testing.T) {
 	start := time.Date(2026, time.March, 30, 0, 0, 0, 0, time.UTC)
@@ -207,6 +238,115 @@ func TestReportContentBuilderSuppressesAnEmptyOpportunityBrief(t *testing.T) {
 	if shouldSend || email != nil {
 		t.Fatalf("empty opportunity content = %T/%v, want suppressed", email, shouldSend)
 	}
+}
+
+func TestReportWorkerDeliversDueReportOnceWithStableDeliveryIdentity(t *testing.T) {
+	store := setupReportContentStore(t)
+	report, now := setupDueReportWorkerFixture(t, store, "scheduled-report@example.test")
+	driver := &scheduledReportDriver{}
+	worker := NewReportWorker(newTestTenantMgr(t, store), mailer.NewWithDriver(driver, nil), "https://hitkeep.example", "worker-test-secret")
+
+	worker.RunAt(context.Background(), now)
+
+	if len(driver.messages) != 1 {
+		t.Fatalf("mail attempts = %d, want exactly one", len(driver.messages))
+	}
+	message := driver.messages[0]
+	if len(message.to) != 1 || message.to[0] != "scheduled-report@example.test" {
+		t.Fatalf("recipients = %v", message.to)
+	}
+	if !strings.HasPrefix(message.messageID, "<report.") || !strings.HasSuffix(message.messageID, "@hitkeep>") {
+		t.Fatalf("message ID = %q", message.messageID)
+	}
+	if message.headers["Auto-Submitted"] != "auto-generated" || message.headers["List-Unsubscribe-Post"] != "List-Unsubscribe=One-Click" || !strings.Contains(message.headers["List-Unsubscribe"], "/api/reports/unsubscribe/") {
+		t.Fatalf("delivery headers = %#v", message.headers)
+	}
+
+	runs, err := store.ListReportRuns(context.Background(), report.ID, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 1 || runs[0].Status != "completed" || len(runs[0].Deliveries) != 1 || runs[0].Deliveries[0].Status != "accepted" || runs[0].Deliveries[0].AttemptCount != 1 || runs[0].Deliveries[0].SMTPAcceptedAt == nil {
+		t.Fatalf("accepted run = %+v", runs)
+	}
+	var storedMessageID string
+	if err := store.DB().QueryRowContext(context.Background(), "SELECT message_id FROM report_deliveries WHERE id = ?", runs[0].Deliveries[0].ID).Scan(&storedMessageID); err != nil {
+		t.Fatal(err)
+	}
+	if storedMessageID != message.messageID {
+		t.Fatalf("stored message ID = %q, sent = %q", storedMessageID, message.messageID)
+	}
+	updated, err := store.GetReportDefinition(context.Background(), report.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.NextRunAt == nil || !updated.NextRunAt.After(now) {
+		t.Fatalf("next run = %v, want after %v", updated.NextRunAt, now)
+	}
+
+	worker.RunAt(context.Background(), now)
+	if len(driver.messages) != 1 {
+		t.Fatalf("repeated occurrence sent %d messages, want one", len(driver.messages))
+	}
+	runs, err = store.ListReportRuns(context.Background(), report.ID, 10)
+	if err != nil || len(runs) != 1 {
+		t.Fatalf("repeated occurrence runs = %+v, err = %v", runs, err)
+	}
+}
+
+func TestReportWorkerReusesMessageIDAfterSMTPFailure(t *testing.T) {
+	store := setupReportContentStore(t)
+	report, now := setupDueReportWorkerFixture(t, store, "retry-report@example.test")
+	driver := &scheduledReportDriver{failRemaining: 1}
+	worker := NewReportWorker(newTestTenantMgr(t, store), mailer.NewWithDriver(driver, nil), "https://hitkeep.example", "worker-test-secret")
+
+	worker.RunAt(context.Background(), now)
+	runs, err := store.ListReportRuns(context.Background(), report.ID, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 1 || runs[0].Status != "running" || len(runs[0].Deliveries) != 1 || runs[0].Deliveries[0].Status != "failed" || runs[0].Deliveries[0].AttemptCount != 1 || runs[0].Deliveries[0].NextAttemptAt == nil {
+		t.Fatalf("failed attempt = %+v", runs)
+	}
+
+	worker.RunAt(context.Background(), now.Add(5*time.Minute))
+	if len(driver.messages) != 2 || driver.messages[0].messageID == "" || driver.messages[1].messageID != driver.messages[0].messageID {
+		t.Fatalf("retry message identities = %+v", driver.messages)
+	}
+	runs, err = store.ListReportRuns(context.Background(), report.ID, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runs[0].Status != "completed" || runs[0].Deliveries[0].Status != "accepted" || runs[0].Deliveries[0].AttemptCount != 2 || runs[0].Deliveries[0].SMTPAcceptedAt == nil {
+		t.Fatalf("successful retry = %+v", runs[0])
+	}
+}
+
+func setupDueReportWorkerFixture(t *testing.T, store *database.Store, email string) (*api.ReportDefinition, time.Time) {
+	t.Helper()
+	ctx := context.Background()
+	userID, err := store.CreateUser(ctx, email, "hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	site, err := store.CreateSite(ctx, userID, "delivery-"+uuid.NewString()+".example.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	report, err := store.CreateReportDefinition(ctx, userID, api.CreateReportRequest{
+		Name: "Daily delivery", Scope: api.ReportScopePersonal, Preset: api.ReportPresetSiteSummary,
+		SiteMode: api.ReportSiteModeSelected, SiteIDs: []uuid.UUID{site.ID}, RecipientUserIDs: []uuid.UUID{userID},
+		Schedule: api.ReportSchedule{Frequency: api.ReportFrequencyDaily, Timezone: "UTC", LocalTime: "08:00"},
+		Status:   api.ReportStatusActive,
+	}, "worker-test-secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 7, 22, 12, 0, 0, 0, time.UTC)
+	if _, err := store.DB().ExecContext(ctx, "UPDATE report_definitions SET next_run_at = ? WHERE id = ?", time.Date(2026, 7, 22, 8, 0, 0, 0, time.UTC), report.ID); err != nil {
+		t.Fatal(err)
+	}
+	return report, now
 }
 
 func setupReportContentStore(t *testing.T) *database.Store {

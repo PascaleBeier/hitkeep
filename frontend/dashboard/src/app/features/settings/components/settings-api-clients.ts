@@ -13,15 +13,16 @@ import { dialogCancelButton, dialogDangerButton, dialogPrimaryButton } from '@co
 import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
 import { InputTextModule } from 'primeng/inputtext';
-import { PopoverModule } from 'primeng/popover';
 import { SelectModule } from 'primeng/select';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 
 import { SettingsCard } from '@features/settings/components/settings-card';
 import { CrudDialog } from '@components/crud-dialog/crud-dialog';
+import { CrudTableToolbar } from '@components/crud-table-toolbar/crud-table-toolbar';
 import { OneTimeCredential } from '@components/one-time-credential/one-time-credential';
 import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
+import { SiteScopeSummary, SiteScopeSummaryItem } from '@components/site-scope-summary/site-scope-summary';
 import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
 import { APIClient, APIClientSiteRole, APIClientsService, CreateAPIClientRequest, InstanceRole, SiteRole } from '@services/api-clients.service';
 import { PermissionService } from '@services/permission.service';
@@ -72,14 +73,15 @@ const expiresAtNotPastValidator = (): ValidatorFn => {
         IconFieldModule,
         InputIconModule,
         InputTextModule,
-        PopoverModule,
         SelectModule,
         TableModule,
         TagModule,
         SettingsCard,
         CrudDialog,
+        CrudTableToolbar,
         OneTimeCredential,
         RelativeDateTime,
+        SiteScopeSummary,
         TableRowActions,
         SiteSelectOption,
         TranslocoPipe
@@ -528,9 +530,14 @@ export class SettingsAPIClients {
         return this.siteService.sites().find((site) => site.id === siteID)?.domain ?? siteID;
     }
 
-    protected siteGrantLabel(scope: APIClientSiteRole): string {
+    protected siteGrantSummaryItems(client: APIClient): SiteScopeSummaryItem[] {
         this.activeLanguage();
-        return `${this.siteDomain(scope.site_id)} · ${this.transloco.translate(`roles.${scope.role}`)}`;
+        return client.site_roles.map((scope) => ({
+            id: scope.site_id,
+            label: this.siteDomain(scope.site_id),
+            detail: this.transloco.translate(`roles.${scope.role}`),
+            severity: this.siteGrantSeverity(scope.role)
+        }));
     }
 
     protected siteGrantCountLabel(count: number): string {

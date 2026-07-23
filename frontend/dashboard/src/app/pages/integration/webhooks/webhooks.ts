@@ -17,6 +17,7 @@ import { catchError, distinctUntilChanged, finalize, forkJoin, map, Observable, 
 
 import { OneTimeCredential } from '@components/one-time-credential/one-time-credential';
 import { CrudDialog } from '@components/crud-dialog/crud-dialog';
+import { CrudTableToolbar } from '@components/crud-table-toolbar/crud-table-toolbar';
 import { dialogCancelButton, dialogDangerButton, dialogPrimaryButton } from '@components/dialog-actions/dialog-actions';
 import { DialogShell } from '@components/dialog-shell/dialog-shell';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
@@ -55,6 +56,7 @@ interface WebhookEndpointDisplay {
         PageState,
         OneTimeCredential,
         CrudDialog,
+        CrudTableToolbar,
         DialogShell,
         RelativeDateTime,
         TableRowActions

@@ -5,20 +5,26 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { finalize } from 'rxjs';
 import { ConfirmationService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
+import { ChipModule } from 'primeng/chip';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
 import { InputTextModule } from 'primeng/inputtext';
 import { MessageModule } from 'primeng/message';
 import { MultiSelectModule } from 'primeng/multiselect';
+import { PaginatorModule, PaginatorState } from 'primeng/paginator';
 import { SelectModule } from 'primeng/select';
+import { SkeletonModule } from 'primeng/skeleton';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { CrudDialog } from '@components/crud-dialog/crud-dialog';
+import { CrudTableToolbar } from '@components/crud-table-toolbar/crud-table-toolbar';
 import { dialogCancelButton, dialogDangerButton } from '@components/dialog-actions/dialog-actions';
 import { DialogShell } from '@components/dialog-shell/dialog-shell';
-import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
-import { PageHeader, PageHeaderLeft, PageHeaderRight } from '@components/page-header/page-header';
+import { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
+import { PageFrame } from '@components/page-frame/page-frame';
+import { PageState } from '@components/page-state/page-state';
+import { SiteScopeSummary, SiteScopeSummaryItem } from '@components/site-scope-summary/site-scope-summary';
 import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
 import { SiteSelectOption } from '@features/sites/components/site-select-option';
 import { SiteService } from '@features/sites/services/site.service';
@@ -47,27 +53,32 @@ interface ReportTableRow {
     lastOutcome: string;
 }
 
+type MobileSortField = 'name' | 'schedule' | 'status' | 'nextRun' | 'lastOutcome';
+
 @Component({
     selector: 'app-report-settings',
     imports: [
         FormsModule,
         RouterLink,
         ButtonModule,
+        ChipModule,
         ConfirmDialogModule,
         IconFieldModule,
         InputIconModule,
         InputTextModule,
         MessageModule,
         MultiSelectModule,
+        PaginatorModule,
         SelectModule,
+        SkeletonModule,
         TableModule,
         TagModule,
         CrudDialog,
+        CrudTableToolbar,
         DialogShell,
-        PageHeader,
-        PageHeaderLeft,
-        PageHeaderRight,
-        PageBreadcrumb,
+        PageFrame,
+        PageState,
+        SiteScopeSummary,
         SiteSelectOption,
         TableRowActions,
         TranslocoPipe
@@ -108,6 +119,10 @@ export class ReportSettings {
     protected readonly reportActionID = signal<string | null>(null);
     protected readonly historyActionID = signal<string | null>(null);
     protected readonly historyLoading = signal(false);
+    protected readonly previewLoading = signal(false);
+    protected readonly membersLoading = signal(false);
+    protected readonly membersError = signal(false);
+    protected readonly initialLoadError = signal(false);
     protected readonly listFeedback = signal<ReportFeedback | null>(null);
     protected readonly dialogFeedback = signal<ReportFeedback | null>(null);
     protected readonly historyFeedback = signal<ReportFeedback | null>(null);
@@ -115,6 +130,12 @@ export class ReportSettings {
     protected readonly externalEmailInput = signal('');
     protected readonly externalEmailError = signal('');
     protected readonly focusedReportID = signal<string | null>(null);
+    protected readonly searchQuery = signal('');
+    protected readonly mobileSortField = signal<MobileSortField>('name');
+    protected readonly mobileSortOrder = signal<1 | -1>(1);
+    protected readonly mobileFirst = signal(0);
+    protected readonly mobileRows = signal(10);
+    private memberRequestID = 0;
 
     protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
         this.activeLanguage();
@@ -134,6 +155,29 @@ export class ReportSettings {
             nextRun: this.formatDate(report.next_run_at),
             lastOutcome: report.last_outcome ? this.transloco.translate(`settings.reports.runStatus.${report.last_outcome.status}`) : this.transloco.translate('settings.reports.notAvailable')
         }));
+    });
+    protected readonly filteredReportRows = computed(() => {
+        const query = this.searchQuery().trim().toLocaleLowerCase(this.activeLanguage());
+        if (!query) return this.reportTableRows();
+        return this.reportTableRows().filter((row) =>
+            [row.name, row.preset, row.scope, row.sites, row.recipients, row.schedule, row.status, row.nextRun, row.lastOutcome].some((value) => value.toLocaleLowerCase(this.activeLanguage()).includes(query))
+        );
+    });
+    protected readonly mobileSortedRows = computed(() => {
+        const field = this.mobileSortField();
+        const order = this.mobileSortOrder();
+        return [...this.filteredReportRows()].sort((left, right) => this.mobileSortValue(left, field).localeCompare(this.mobileSortValue(right, field), this.activeLanguage(), { numeric: true }) * order);
+    });
+    protected readonly mobilePageRows = computed(() => this.mobileSortedRows().slice(this.mobileFirst(), this.mobileFirst() + this.mobileRows()));
+    protected readonly mobileSortOptions = computed(() => {
+        this.activeLanguage();
+        return [
+            { label: this.transloco.translate('common.columns.name'), value: 'name' },
+            { label: this.transloco.translate('settings.reports.schedule.label'), value: 'schedule' },
+            { label: this.transloco.translate('common.columns.status'), value: 'status' },
+            { label: this.transloco.translate('settings.reports.nextRun'), value: 'nextRun' },
+            { label: this.transloco.translate('settings.reports.lastOutcome'), value: 'lastOutcome' }
+        ] as { label: string; value: MobileSortField }[];
     });
     protected readonly reportStatusOptions = computed(() => {
         this.activeLanguage();
@@ -159,7 +203,28 @@ export class ReportSettings {
     }
 
     protected refresh(): void {
+        if (this.isLoading()) return;
         this.loadReports(false);
+    }
+
+    protected setSearch(value: string): void {
+        this.searchQuery.set(value);
+        this.mobileFirst.set(0);
+    }
+
+    protected setMobileSortField(field: MobileSortField): void {
+        this.mobileSortField.set(field);
+        this.mobileFirst.set(0);
+    }
+
+    protected toggleMobileSortOrder(): void {
+        this.mobileSortOrder.update((order) => (order === 1 ? -1 : 1));
+        this.mobileFirst.set(0);
+    }
+
+    protected onMobilePage(event: PaginatorState): void {
+        this.mobileFirst.set(event.first ?? 0);
+        this.mobileRows.set(event.rows ?? 10);
     }
 
     protected openCreate(): void {
@@ -275,20 +340,36 @@ export class ReportSettings {
     }
 
     protected previewReport(): void {
-        if (!this.formValid()) return;
+        if (!this.formValid() || this.previewLoading()) return;
         this.dialogFeedback.set(null);
-        this.service.preview({ ...this.draft(), status: 'draft' }, this.editingReportID() ?? undefined).subscribe({
-            next: (preview) => this.preview.set(preview),
-            error: () => this.dialogFeedback.set({ key: 'settings.reports.errors.preview', severity: 'error' })
-        });
+        this.previewLoading.set(true);
+        this.service
+            .preview({ ...this.draft(), status: 'draft' }, this.editingReportID() ?? undefined)
+            .pipe(finalize(() => this.previewLoading.set(false)))
+            .subscribe({
+                next: (preview) => this.preview.set(preview),
+                error: () => this.dialogFeedback.set({ key: 'settings.reports.errors.preview', severity: 'error' })
+            });
     }
 
     protected save(): void {
-        const status = this.draft().status;
+        const draft = this.draft();
+        const status = draft.status;
         if (!this.formValid() || (status === 'active' && !this.mailAvailable())) return;
         this.saveState.set('saving');
         this.dialogFeedback.set(null);
-        const request = this.editingReportID() ? this.service.update(this.editingReportID()!, this.draft()) : this.service.create(this.draft());
+        const request = this.editingReportID()
+            ? this.service.update(this.editingReportID()!, {
+                  name: draft.name,
+                  preset: draft.preset,
+                  site_mode: draft.site_mode,
+                  site_ids: draft.site_ids,
+                  recipient_user_ids: draft.recipient_user_ids,
+                  external_recipient_emails: draft.external_recipient_emails,
+                  schedule: draft.schedule,
+                  status: draft.status
+              })
+            : this.service.create(draft);
         request.pipe(finalize(() => this.saveState.set('idle'))).subscribe({
             next: () => {
                 this.editorVisible.set(false);
@@ -337,14 +418,21 @@ export class ReportSettings {
         this.historyReport.set(report);
         this.runs.set([]);
         this.historyFeedback.set(null);
-        this.historyLoading.set(true);
         this.historyVisible.set(true);
+        this.reloadHistory();
+    }
+
+    protected reloadHistory(): void {
+        const report = this.historyReport();
+        if (!report || this.historyLoading()) return;
+        this.historyFeedback.set(null);
+        this.historyLoading.set(true);
         this.service
             .runs(report.id)
             .pipe(finalize(() => this.historyLoading.set(false)))
             .subscribe({
                 next: (runs) => this.runs.set(runs),
-                error: () => this.historyFeedback.set({ key: 'settings.reports.errors.action', severity: 'error' })
+                error: () => this.historyFeedback.set({ key: 'settings.reports.errors.history', severity: 'error' })
             });
     }
 
@@ -470,6 +558,28 @@ export class ReportSettings {
         return 'secondary';
     }
 
+    protected reportStatusIconClass(status: ReportStatus): string {
+        if (status === 'active') return 'pi pi-check-circle hk-status-icon hk-status-icon--ok';
+        if (status === 'paused') return 'pi pi-pause-circle hk-status-icon hk-status-icon--warn';
+        return 'pi pi-pencil hk-status-icon hk-status-icon--muted';
+    }
+
+    protected lastOutcomeIconClass(status?: string): string {
+        if (status === 'completed' || status === 'accepted') return 'pi pi-check-circle hk-status-icon hk-status-icon--ok';
+        if (status === 'failed' || status === 'partial') return 'pi pi-times-circle hk-status-icon hk-status-icon--error';
+        if (status === 'queued' || status === 'running' || status === 'sending') return 'pi pi-clock hk-status-icon hk-status-icon--warn';
+        if (status === 'skipped') return 'pi pi-ban hk-status-icon hk-status-icon--muted';
+        return 'pi pi-minus-circle hk-status-icon hk-status-icon--muted';
+    }
+
+    protected recipientStateIconClass(recipient: ReportRecipient): string {
+        const state = this.recipientState(recipient);
+        if (state === 'confirmed') return 'pi pi-check-circle hk-status-icon hk-status-icon--ok';
+        if (state === 'invitation_failed') return 'pi pi-times-circle hk-status-icon hk-status-icon--error';
+        if (state === 'pending_confirmation') return 'pi pi-clock hk-status-icon hk-status-icon--warn';
+        return 'pi pi-ban hk-status-icon hk-status-icon--muted';
+    }
+
     protected formatDate(value?: string): string {
         if (!value) return this.transloco.translate('settings.reports.notAvailable');
         return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
@@ -478,6 +588,17 @@ export class ReportSettings {
     protected siteLabel(report: ReportDefinition): string {
         if (report.site_mode === 'all_accessible') return this.transloco.translate('settings.reports.allAccessibleSites');
         return report.sites.map((site) => site.domain).join(', ');
+    }
+
+    protected siteScopeSummaryItems(report: ReportDefinition): SiteScopeSummaryItem[] {
+        if (report.site_mode === 'all_accessible') {
+            return [{ id: 'all-accessible', label: this.transloco.translate('settings.reports.allAccessibleSites') }];
+        }
+        return report.sites.map((site) => ({ id: site.id, label: site.domain }));
+    }
+
+    protected siteScopeCountLabel(report: ReportDefinition): string {
+        return this.transloco.translate('settings.reports.siteCount', { count: report.sites.length });
     }
 
     protected recipientLabel(report: ReportDefinition): string {
@@ -576,12 +697,18 @@ export class ReportSettings {
     }
 
     private loadReports(openDeepLink: boolean): void {
+        if (this.isLoading()) return;
         this.listFeedback.set(null);
+        this.initialLoadError.set(false);
         this.service.load().subscribe({
             next: () => {
+                this.initialLoadError.set(false);
                 if (openDeepLink) this.openDeepLinkedReport();
             },
-            error: () => this.listFeedback.set({ key: 'settings.reports.errors.load', severity: 'error' })
+            error: () => {
+                if (this.reports().length === 0) this.initialLoadError.set(true);
+                else this.listFeedback.set({ key: 'settings.reports.errors.load', severity: 'error' });
+            }
         });
     }
 
@@ -615,8 +742,10 @@ export class ReportSettings {
 
     private resetEditorState(): void {
         this.preview.set(null);
+        this.previewLoading.set(false);
         this.saveState.set('idle');
         this.dialogFeedback.set(null);
+        this.membersError.set(false);
         this.externalEmailInput.set('');
         this.externalEmailError.set('');
     }
@@ -642,8 +771,27 @@ export class ReportSettings {
     }
 
     private loadMembers(teamID: string): void {
-        if (!teamID) return;
-        this.teamService.listTeamMembers(teamID).subscribe({ next: (members) => this.members.set(members), error: () => this.members.set([]) });
+        if (!teamID || this.membersLoading()) return;
+        const requestID = ++this.memberRequestID;
+        this.membersLoading.set(true);
+        this.membersError.set(false);
+        this.teamService
+            .listTeamMembers(teamID)
+            .pipe(
+                finalize(() => {
+                    if (requestID === this.memberRequestID) this.membersLoading.set(false);
+                })
+            )
+            .subscribe({
+                next: (members) => {
+                    if (requestID === this.memberRequestID) this.members.set(members);
+                },
+                error: () => {
+                    if (requestID !== this.memberRequestID) return;
+                    this.members.set([]);
+                    this.membersError.set(true);
+                }
+            });
     }
 
     private externalRecipientsLockedForTeam(teamID?: string): boolean {
@@ -664,6 +812,12 @@ export class ReportSettings {
 
     private validEmail(email: string): boolean {
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254;
+    }
+
+    private mobileSortValue(row: ReportTableRow, field: MobileSortField): string {
+        if (field === 'nextRun') return row.report.next_run_at ?? '';
+        if (field === 'lastOutcome') return row.report.last_outcome?.status ?? '';
+        return row[field];
     }
 
     private openDeepLinkedReport(): void {

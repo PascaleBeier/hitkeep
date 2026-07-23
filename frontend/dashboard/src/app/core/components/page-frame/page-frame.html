@@ -1,7 +1,12 @@
 <div class="page-frame">
     <app-page-header>
         <ng-template appPageHeaderLeft>
-            <app-page-breadcrumb [items]="breadcrumbItems()" />
+            <div class="page-frame__heading">
+                <app-page-breadcrumb [items]="breadcrumbItems()" />
+                @if (subtitle()) {
+                <p class="page-frame__subtitle">{{ subtitle() }}</p>
+                }
+            </div>
         </ng-template>
     </app-page-header>
 

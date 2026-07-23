@@ -8,3 +8,15 @@
     justify-content: flex-end;
     gap: 0.75rem;
 }
+
+@media (max-width: 767px) {
+    .dialog-shell-footer {
+        flex-direction: column-reverse;
+    }
+
+    :host ::ng-deep .dialog-shell-footer p-button,
+    :host ::ng-deep .dialog-shell-footer .p-button {
+        width: 100%;
+        min-height: 2.75rem;
+    }
+}
