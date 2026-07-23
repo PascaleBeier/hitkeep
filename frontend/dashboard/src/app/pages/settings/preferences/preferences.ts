@@ -4,9 +4,9 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } 
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { compatForm } from '@angular/forms/signals/compat';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { ButtonModule } from 'primeng/button';
-import { CardModule } from 'primeng/card';
-import { SelectModule } from 'primeng/select';
+import { ButtonModule } from '@openng/optimus-ui/button';
+import { CardModule } from '@openng/optimus-ui/card';
+import { SelectModule } from '@openng/optimus-ui/select';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';

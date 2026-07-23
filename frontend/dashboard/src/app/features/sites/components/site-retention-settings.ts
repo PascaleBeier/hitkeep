@@ -3,8 +3,8 @@ import { ChangeDetectionStrategy, Component, inject, signal, effect, input } fro
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { compatForm } from '@angular/forms/signals/compat';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { ButtonModule } from 'primeng/button';
-import { InputNumberModule } from 'primeng/inputnumber';
+import { ButtonModule } from '@openng/optimus-ui/button';
+import { InputNumberModule } from '@openng/optimus-ui/inputnumber';
 import { SiteService } from '@features/sites/services/site.service';
 import { AnalyticsService } from '@services/analytics.service';
 import { Site } from '@models/analytics.types';

@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { CardModule } from 'primeng/card';
+import { CardModule } from '@openng/optimus-ui/card';
 
 import { AUTH_CARD_DESIGN_TOKENS } from '@core/theme/hitkeep-preset';
 

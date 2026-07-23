@@ -5,11 +5,11 @@ import { compatForm } from '@angular/forms/signals/compat';
 import { firstValueFrom, finalize } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 
-// PrimeNG
-import { ButtonModule } from 'primeng/button';
-import { PasswordModule } from 'primeng/password';
-import { MessageModule } from 'primeng/message';
-import { InputOtpModule } from 'primeng/inputotp';
+// OptimusUI
+import { ButtonModule } from '@openng/optimus-ui/button';
+import { PasswordModule } from '@openng/optimus-ui/password';
+import { MessageModule } from '@openng/optimus-ui/message';
+import { InputOtpModule } from '@openng/optimus-ui/inputotp';
 import { SettingsCard } from '@features/settings/components/settings-card';
 import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
 

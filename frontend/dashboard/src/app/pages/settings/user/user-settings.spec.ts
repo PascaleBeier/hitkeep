@@ -3,7 +3,7 @@ import { signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
-import { Select } from 'primeng/select';
+import { Select } from '@openng/optimus-ui/select';
 import { vi } from 'vitest';
 
 import { UserPreferencesService } from '@services/user-preferences.service';

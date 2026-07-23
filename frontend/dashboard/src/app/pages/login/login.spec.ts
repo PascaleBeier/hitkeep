@@ -302,7 +302,7 @@ describe('Login', () => {
         expect(fixture.nativeElement.textContent).toContain('login.mfaTitle');
     });
 
-    it('uses PrimeNG surfaces for the auth card, feedback, and method divider', async () => {
+    it('uses OptimusUI surfaces for the auth card, feedback, and method divider', async () => {
         component['isPasskeySupported'].set(false);
         component['ssoAvailable'].set(true);
         component['errorMessage'].set('login.errors.unexpected');

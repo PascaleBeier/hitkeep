@@ -20,7 +20,7 @@ describe('AuthDivider', () => {
         fixture = TestBed.createComponent(AuthDivider);
     });
 
-    it('renders localized content through PrimeNG divider', async () => {
+    it('renders localized content through OptimusUI divider', async () => {
         fixture.componentRef.setInput('labelKey', 'login.or');
 
         await fixture.whenStable();

@@ -2,10 +2,10 @@ import { Component, input, output, signal, ChangeDetectionStrategy } from '@angu
 
 import { TranslocoPipe } from '@jsverse/transloco';
 import { TranslocoDecimalPipe } from '@jsverse/transloco-locale';
-import { CardModule } from 'primeng/card';
-import { ButtonModule } from 'primeng/button';
-import { SkeletonModule } from 'primeng/skeleton';
-import { TooltipModule } from 'primeng/tooltip';
+import { CardModule } from '@openng/optimus-ui/card';
+import { ButtonModule } from '@openng/optimus-ui/button';
+import { SkeletonModule } from '@openng/optimus-ui/skeleton';
+import { TooltipModule } from '@openng/optimus-ui/tooltip';
 import { GoalStats } from '@models/analytics.types';
 
 // Components

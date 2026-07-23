@@ -10,7 +10,7 @@ describe('AuthCard', () => {
         fixture = TestBed.createComponent(AuthCard);
     });
 
-    it('renders a scoped PrimeNG auth card', async () => {
+    it('renders a scoped OptimusUI auth card', async () => {
         await fixture.whenStable();
 
         const card = fixture.nativeElement.querySelector('p-card.hk-auth-card');

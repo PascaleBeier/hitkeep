@@ -2,10 +2,10 @@ import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, injec
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { ButtonModule } from 'primeng/button';
-import { SplitButtonModule } from 'primeng/splitbutton';
-import { TagModule } from 'primeng/tag';
-import { MenuItem } from 'primeng/api';
+import { ButtonModule } from '@openng/optimus-ui/button';
+import { SplitButtonModule } from '@openng/optimus-ui/splitbutton';
+import { TagModule } from '@openng/optimus-ui/tag';
+import { MenuItem } from '@openng/optimus-ui/api';
 import { buildTakeoutExportMenuItems, TakeoutExportFormat } from '@core/export/export-formats';
 import { CopyControl } from '@components/copy-control/copy-control';
 import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar, resolveDateRange, selectDefaultRange } from '@components/range-toolbar/range-toolbar';

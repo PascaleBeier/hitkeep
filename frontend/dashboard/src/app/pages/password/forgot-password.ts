@@ -6,10 +6,10 @@ import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 
-// PrimeNG
-import { ButtonModule } from 'primeng/button';
-import { InputTextModule } from 'primeng/inputtext';
-import { MessageModule } from 'primeng/message';
+// OptimusUI
+import { ButtonModule } from '@openng/optimus-ui/button';
+import { InputTextModule } from '@openng/optimus-ui/inputtext';
+import { MessageModule } from '@openng/optimus-ui/message';
 
 // Core
 import { AuthCard } from '@core/components/auth-card/auth-card';

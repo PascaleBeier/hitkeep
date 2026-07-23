@@ -10,8 +10,8 @@ import { SITE_CAPABILITIES } from '@core/access/capabilities';
 import { AccessService } from '@services/access.service';
 import { SiteService, SiteStatsResetResponse } from '@features/sites/services/site.service';
 import { NavigationNoticeService } from '@services/navigation-notice.service';
-import { ButtonModule } from 'primeng/button';
-import { InputTextModule } from 'primeng/inputtext';
+import { ButtonModule } from '@openng/optimus-ui/button';
+import { InputTextModule } from '@openng/optimus-ui/inputtext';
 
 type SiteDangerAction = 'reset' | 'delete';
 

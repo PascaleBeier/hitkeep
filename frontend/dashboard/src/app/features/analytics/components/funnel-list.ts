@@ -1,10 +1,10 @@
 import { Component, input, output, ChangeDetectionStrategy } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 
-import { CardModule } from 'primeng/card';
-import { ButtonModule } from 'primeng/button';
-import { SkeletonModule } from 'primeng/skeleton';
-import { TooltipModule } from 'primeng/tooltip';
+import { CardModule } from '@openng/optimus-ui/card';
+import { ButtonModule } from '@openng/optimus-ui/button';
+import { SkeletonModule } from '@openng/optimus-ui/skeleton';
+import { TooltipModule } from '@openng/optimus-ui/tooltip';
 import { Funnel } from '@models/analytics.types';
 import { EmptyState } from '@components/molecules/empty-state';
 

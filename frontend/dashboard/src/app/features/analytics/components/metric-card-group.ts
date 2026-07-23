@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
-import { CardModule } from 'primeng/card';
-import { TabsModule } from 'primeng/tabs';
+import { CardModule } from '@openng/optimus-ui/card';
+import { TabsModule } from '@openng/optimus-ui/tabs';
 import { MetricStat } from '@models/analytics.types';
 import { MetricList } from './metric-list';
 

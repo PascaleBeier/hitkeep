@@ -20,7 +20,7 @@ This file is public guidance for AI-assisted contributions to HitKeep. It is wri
 
 - HitKeep runs as a single Go binary with an embedded Angular dashboard.
 - Toolchain versions come from repository version files and are diagnosed by `hk`; do not restate them here.
-- The dashboard uses Angular, PrimeNG, Tailwind CSS, Transloco, and Angular Signals.
+- The dashboard uses Angular, OptimusUI, Tailwind CSS, Transloco, and Angular Signals.
 - DuckDB is the storage engine. NSQ runs in process for queueing.
 - Do not introduce required PostgreSQL, Redis, Kafka, ClickHouse, hosted analytics, or a separate queue/cache/database service.
 - Tracking is cookieless by default and should collect only what is needed for analytics.
@@ -40,7 +40,7 @@ This file is public guidance for AI-assisted contributions to HitKeep. It is wri
 - `internal/devtool`: developer-only application services used by `cmd/hk`; production builds must not depend on it.
 - `frontend/dashboard`: Angular dashboard and tracker source.
 - `frontend/dashboard/public/i18n`: dashboard translation JSON files.
-- `frontend/dashboard/src/app/core/i18n`: dashboard locale helpers and PrimeNG locale synchronization.
+- `frontend/dashboard/src/app/core/i18n`: dashboard locale helpers and OptimusUI locale synchronization.
 - `skills`: public product analytics skills and transport-neutral Ask AI procedures.
 - `.agents/skills`: canonical contributor skills for changing HitKeep through `hk`.
 - `server.json`: MCP Registry metadata.
@@ -107,7 +107,7 @@ Use focused package tests while iterating and `$hitkeep-qa` for the required com
 - Use `TranslocoPipe` in templates and `TranslocoService` for computed TypeScript labels.
 - When labels depend on language changes, make the computation depend on the active language so it recomputes after a switch.
 - For dates, numbers, percentages, and durations, use existing locale helpers, `@jsverse/transloco-locale`, or browser `Intl` APIs.
-- PrimeNG locale text is synchronized through `PrimeLocaleSyncService`. Do not hardcode PrimeNG component labels unless there is no localizable surface.
+- OptimusUI locale text is synchronized through `PrimeLocaleSyncService`. Do not hardcode OptimusUI component labels unless there is no localizable surface.
 - Keep translation IDs and formatting-locale mappings aligned with the runtime configuration.
 
 Use `$hitkeep-i18n` for localization procedure and `$hitkeep-qa` for the current frontend gates.

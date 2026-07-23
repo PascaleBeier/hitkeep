@@ -1,10 +1,10 @@
-import { definePreset } from '@primeuix/themes';
-import Aura from '@primeuix/themes/aura';
-import type { Preset } from '@primeuix/themes/types';
-import type { CardDesignTokens } from '@primeuix/themes/types/card';
-import type { DividerDesignTokens } from '@primeuix/themes/types/divider';
-import type { FieldsetDesignTokens } from '@primeuix/themes/types/fieldset';
-import type { SelectButtonDesignTokens } from '@primeuix/themes/types/selectbutton';
+import { definePreset } from '@openng/optimus-ui-themes';
+import Aura from '@openng/optimus-ui-themes/aura';
+import type { Preset } from '@openng/optimus-ui-themes/types';
+import type { CardDesignTokens } from '@openng/optimus-ui-themes/types/card';
+import type { DividerDesignTokens } from '@openng/optimus-ui-themes/types/divider';
+import type { FieldsetDesignTokens } from '@openng/optimus-ui-themes/types/fieldset';
+import type { SelectButtonDesignTokens } from '@openng/optimus-ui-themes/types/selectbutton';
 
 const messageWithoutShadow = { shadow: 'none' } as const;
 

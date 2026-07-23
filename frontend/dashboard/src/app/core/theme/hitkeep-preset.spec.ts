@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { AUTH_CARD_DESIGN_TOKENS, AUTH_DIVIDER_DESIGN_TOKENS, AUTH_FIELDSET_DESIGN_TOKENS, AUTH_SELECT_BUTTON_DESIGN_TOKENS, hitKeepThemeOverrides } from './hitkeep-preset';
 
-describe('HitKeep PrimeNG preset', () => {
-    it('keeps shared component styling in PrimeNG design tokens', () => {
+describe('HitKeep OptimusUI preset', () => {
+    it('keeps shared component styling in OptimusUI design tokens', () => {
         expect(hitKeepThemeOverrides.semantic?.formField?.borderRadius).toBe('{border.radius.md}');
         expect(hitKeepThemeOverrides.components?.button?.root?.label?.fontWeight).toBe('600');
         expect(hitKeepThemeOverrides.components?.card?.root?.borderRadius).toBe('{border.radius.lg}');

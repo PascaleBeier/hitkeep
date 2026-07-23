@@ -1,5 +1,5 @@
 @use "./tailwind.css";
-@use "primeicons/primeicons.css";
+@use "@openng/icons/openng-icons.css";
 
 /* Make tables denser in dashboard */
 .p-datatable-sm .p-datatable-tbody > tr > td {
@@ -7,7 +7,7 @@
 }
 
 /* Shared CRUD table styling */
-/* Table search field: always a p-iconfield + p-inputicon — PrimeNG positions the icon via theme tokens. */
+/* Table search field: always a p-iconfield + p-inputicon — OptimusUI positions the icon via theme tokens. */
 .hk-crud-search.p-iconfield {
     display: block;
     min-width: min(100%, 14rem);

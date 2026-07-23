@@ -5,8 +5,8 @@ import { compatForm } from '@angular/forms/signals/compat';
 import { HttpErrorResponse } from '@angular/common/http';
 import { TranslocoPipe } from '@jsverse/transloco';
 
-import { ButtonModule } from 'primeng/button';
-import { InputTextModule } from 'primeng/inputtext';
+import { ButtonModule } from '@openng/optimus-ui/button';
+import { InputTextModule } from '@openng/optimus-ui/inputtext';
 import { CopyControl } from '@components/copy-control/copy-control';
 import { Site } from '@models/analytics.types';
 import { SITE_CAPABILITIES } from '@core/access/capabilities';

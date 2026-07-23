@@ -157,7 +157,7 @@ The system rejects opaque ad-tech dashboards, dependency-heavy enterprise admini
 **Key Characteristics:**
 
 - Calm, restrained surfaces with one emerald action signal.
-- Consistent light and dark modes built from semantic PrimeNG tokens.
+- Consistent light and dark modes built from semantic OptimusUI tokens.
 - Dense but orderly information with stable placement during loading and refresh.
 - Shared controls and interaction harnesses before page-local markup.
 - Explicit, localized feedback close to the action that caused it.
@@ -192,7 +192,7 @@ The palette combines an emerald action signal with slate daylight surfaces and z
 
 **The One Signal Rule.** Emerald is the only general-purpose accent and should occupy no more than roughly 10% of a screen. Additional hues require semantic or data-visualization meaning.
 
-**The Semantic Theme Rule.** New UI must consume PrimeNG semantic variables or a project PrimeNG preset. Never hardcode separate light and dark colors when one semantic token can express both.
+**The Semantic Theme Rule.** New UI must consume OptimusUI semantic variables or a project OptimusUI preset. Never hardcode separate light and dark colors when one semantic token can express both.
 
 **The Comfortable Contrast Rule.** Body and placeholder text must meet WCAG AA. “Easy on the eyes” means controlled contrast and hierarchy, never faint copy or low-contrast controls.
 
@@ -240,40 +240,40 @@ HitKeep is flat by default and layered by structure. Borders and surface tones s
 
 ## 5. Components
 
-**Component philosophy: shared, native, and predictable.** PrimeNG is the control layer; Tailwind and component CSS arrange those controls. New features must first reuse a PrimeNG component, then an existing HitKeep shared component, then extract a shared component when a pattern repeats. Page-local control chrome is the last resort.
+**Component philosophy: shared, native, and predictable.** OptimusUI is the control layer; Tailwind and component CSS arrange those controls. New features must first reuse a OptimusUI component, then an existing HitKeep shared component, then extract a shared component when a pattern repeats. Page-local control chrome is the last resort.
 
-**The PrimeNG-First Rule.** Control sizing, radii, surface colors, borders, focus rings, state colors, dialog spacing, table density, and both color schemes belong in a project preset derived from Aura whenever PrimeNG exposes the token. Do not duplicate this styling across pages.
+**The OptimusUI-First Rule.** Control sizing, radii, surface colors, borders, focus rings, state colors, dialog spacing, table density, and both color schemes belong in a project preset derived from Aura whenever OptimusUI exposes the token. Do not duplicate this styling across pages.
 
 **The Shared-Before-New Rule.** Search the shared component set before authoring markup. If the same interaction or chrome appears twice, extract it instead of copying classes or templates.
 
 ### Buttons
 
 - **Shape:** gently curved Aura controls (`rounded.md`) with compact, stable dimensions.
-- **Primary:** use the contrast-safe deep emerald mapping in light mode with a white label; use the brighter dark-mode emerald with dark zinc ink. Put this scheme-specific mapping in the PrimeNG preset. Preserve width during loading and use an optional leading PrimeIcon only when it improves recognition.
-- **Secondary:** use PrimeNG outlined, text, or secondary severity variants; do not create feature-specific button skins.
+- **Primary:** use the contrast-safe deep emerald mapping in light mode with a white label; use the brighter dark-mode emerald with dark zinc ink. Put this scheme-specific mapping in the OptimusUI preset. Preserve width during loading and use an optional leading PrimeIcon only when it improves recognition.
+- **Secondary:** use OptimusUI outlined, text, or secondary severity variants; do not create feature-specific button skins.
 - **Hover / Focus / Active:** use Aura semantic states. Focus remains clearly visible with the primary ring and offset.
-- **Destructive:** use PrimeNG danger severity and confirmation helpers. Color is reinforced by explicit copy and context.
+- **Destructive:** use OptimusUI danger severity and confirmation helpers. Color is reinforced by explicit copy and context.
 
 ### Chips
 
-- **Style:** reserve pills for compact roles, states, filters, and tags. Use PrimeNG Tag/Chip severities or shared role chips.
+- **Style:** reserve pills for compact roles, states, filters, and tags. Use OptimusUI Tag/Chip severities or shared role chips.
 - **State:** selected and unselected treatments use semantic backgrounds and readable labels; never make an inactive chip look disabled unless it is disabled.
 
 ### Cards / Containers
 
 - **Settings and forms:** use the shared `SettingsCard` with its header, body, and footer slots.
 - **Bounded pages:** use the shared `PageFrame` for breadcrumb, header, and the 72rem content boundary.
-- **General grouped content:** use PrimeNG Card with the shared flat-card treatment. Move reusable card chrome into the PrimeNG preset rather than adding more global overrides.
+- **General grouped content:** use OptimusUI Card with the shared flat-card treatment. Move reusable card chrome into the OptimusUI preset rather than adding more global overrides.
 - **Analytics:** use `KpiCard` and `MetricCardGroup` for their intended analytical patterns.
-- **Corner Style:** use `rounded.lg` for ordinary cards and `rounded.xl` only where the PrimeNG component already calls for it.
+- **Corner Style:** use `rounded.lg` for ordinary cards and `rounded.xl` only where the OptimusUI component already calls for it.
 - **Structure:** cards group related content; they do not wrap every section, and cards are never nested for decoration.
 
 ### Inputs / Fields
 
-- **Style:** use PrimeNG form components and their semantic field tokens. Labels remain visible; placeholder text is supporting copy, not a label substitute.
-- **Search:** use PrimeNG IconField, InputIcon, and InputText with the established shared search sizing.
+- **Style:** use OptimusUI form components and their semantic field tokens. Labels remain visible; placeholder text is supporting copy, not a label substitute.
+- **Search:** use OptimusUI IconField, InputIcon, and InputText with the established shared search sizing.
 - **Focus:** use the Aura primary border/focus treatment; do not create local glows.
-- **Error / Disabled:** use PrimeNG invalid and disabled states. Keep error text adjacent to the field, localized, and connected semantically.
+- **Error / Disabled:** use OptimusUI invalid and disabled states. Keep error text adjacent to the field, localized, and connected semantically.
 
 ### Navigation
 
@@ -283,16 +283,16 @@ HitKeep is flat by default and layered by structure. Borders and surface tones s
 
 ### Inline Feedback and Page States
 
-- **Routine feedback:** use a localized PrimeNG Message adjacent to the affected surface. Form submission errors remain inside the still-open dialog; successful completion appears near the updated list or object.
+- **Routine feedback:** use a localized OptimusUI Message adjacent to the affected surface. Form submission errors remain inside the still-open dialog; successful completion appears near the updated list or object.
 - **Rich credential feedback:** use `OneTimeCredential` and `CopyControl` for generated secrets, copy status, and polite live announcements.
 - **Empty, forbidden, and unavailable pages:** use `PageState` with an icon, title, useful explanation, and an action when one exists. Empty states teach the next step; they never say only “nothing here.”
 - **Persistent notices:** reuse specialized shared notices when their lifecycle and dismissal rules match.
 
 ### Searchable, Sortable, Paginated Tables
 
-- **Ordinary CRUD tables:** compose PrimeNG Table with the existing global CRUD table helpers. The standard includes compact density, responsive horizontal scrolling, row hover, a localized search field, visible sort affordances, and a final shared row-action menu.
+- **Ordinary CRUD tables:** compose OptimusUI Table with the existing global CRUD table helpers. The standard includes compact density, responsive horizontal scrolling, row hover, a localized search field, visible sort affordances, and a final shared row-action menu.
 - **Pagination:** default to 10 rows with 10/25/50 page-size options for client-paginated CRUD tables unless the domain requires a different scale.
-- **Sorting:** every sortable heading uses both PrimeNG's sortable-column directive and matching sort icon; declare an intentional initial sort.
+- **Sorting:** every sortable heading uses both OptimusUI's sortable-column directive and matching sort icon; declare an intentional initial sort.
 - **Search:** declare the actual global-filter fields and use the established search control; never display a search box that filters only some columns without explaining the scope.
 - **Actions:** use `TableRowActions`, including its danger state and row-scoped loading. Do not line a row with competing icon buttons.
 - **Server pagination:** use `AuditTableComponent` for audit-log behavior. Keep its query, debounce, reset-to-first-page, expansion, export, and localized range-summary contract intact.
@@ -300,9 +300,9 @@ HitKeep is flat by default and layered by structure. Borders and surface tones s
 
 ### Dialogs and CRUD Flows
 
-- **General dialogs:** use `DialogShell`. It standardizes the PrimeNG modal, body portal, 42rem default width, 96vw responsive width, action footer, busy state, and dismissal lock.
+- **General dialogs:** use `DialogShell`. It standardizes the OptimusUI modal, body portal, 42rem default width, 96vw responsive width, action footer, busy state, and dismissal lock.
 - **Create and edit forms:** use `CrudDialog`, which wraps `DialogShell` and standardizes cancel, submit, saving, and closure behavior.
-- **Destructive confirmation:** use PrimeNG ConfirmDialog with `ConfirmationService` and the shared cancel/primary/danger/warn button helpers.
+- **Destructive confirmation:** use OptimusUI ConfirmDialog with `ConfirmationService` and the shared cancel/primary/danger/warn button helpers.
 - **CRUD lifecycle:** reset form and dialog errors before opening; validate and mark touched before sending; block duplicate submits; keep failure feedback in the open dialog; on success close/reset and update the list before announcing success; show new secrets through `OneTimeCredential`; reset scoped dialog state when the active site or team changes.
 - **Mobile:** footer actions become full-width when space is constrained. Menus and dialogs must portal outside clipped scrolling containers.
 
@@ -319,9 +319,9 @@ HitKeep is flat by default and layered by structure. Borders and surface tones s
 
 - **Do** make privacy, permissions, scope, destructive consequences, and one-time credentials visible at the point of action.
 - **Do** keep one clear visual lead per region while preserving useful information and stable placement.
-- **Do** use PrimeNG's components, severities, states, templates, accessibility, and theme tokens before custom control markup or CSS.
+- **Do** use OptimusUI's components, severities, states, templates, accessibility, and theme tokens before custom control markup or CSS.
 - **Do** reuse `SettingsCard`, `PageFrame`, `DialogShell`, `CrudDialog`, `TableRowActions`, `PageState`, `CopyControl`, `OneTimeCredential`, `KpiCard`, `MetricCardGroup`, and `AuditTableComponent` when their contracts fit.
-- **Do** make ordinary CRUD tables searchable, intentionally sortable, paginated, responsive, and keyboard accessible using the established PrimeNG composition.
+- **Do** make ordinary CRUD tables searchable, intentionally sortable, paginated, responsive, and keyboard accessible using the established OptimusUI composition.
 - **Do** keep errors near the failed action, keep dialog errors inside the dialog, and announce successful state changes near the updated surface.
 - **Do** test every changed surface in light mode, dark mode, keyboard navigation, narrow layout, and reduced motion.
 - **Do** maintain WCAG AA contrast and reinforce semantic color with text, iconography, or structure.
@@ -332,11 +332,11 @@ HitKeep is flat by default and layered by structure. Borders and surface tones s
 - **Don't** create opaque ad-tech dashboards that conceal data collection, privacy, permission, or security boundaries.
 - **Don't** create dependency-heavy enterprise administration interfaces that make routine operations feel complex.
 - **Don't** create decorative SaaS surfaces that trade information hierarchy and legibility for visual novelty.
-- **Don't** duplicate PrimeNG control chrome in page CSS; extend the shared Aura preset or use semantic variables.
+- **Don't** duplicate OptimusUI control chrome in page CSS; extend the shared Aura preset or use semantic variables.
 - **Don't** copy a repeated interaction or card treatment into another feature; use or extract a shared component.
 - **Don't** interpret “easy on the eyes” as faint text, hidden labels, ambiguous icons, excessive empty space, or missing information.
 - **Don't** use decorative gradients, gradient text, default glassmorphism, diagonal stripes, decorative grid backgrounds, or large ambient glows.
 - **Don't** use colored side-stripe accents, nested cards, or a border plus a wide decorative shadow.
 - **Don't** over-round cards, dialogs, or inputs; ordinary surfaces stop at `rounded.xl`, while full pills are reserved for tags and compact controls.
 - **Don't** rely on color alone, introduce flashing or decorative motion, or animate layout properties during ordinary state changes.
-- **Don't** replace standard PrimeNG affordances with novel controls that make an experienced operator pause.
+- **Don't** replace standard OptimusUI affordances with novel controls that make an experienced operator pause.

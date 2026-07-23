@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { MenuItem } from 'primeng/api';
-import { ButtonModule } from 'primeng/button';
-import { Menu, MenuModule } from 'primeng/menu';
+import { MenuItem } from '@openng/optimus-ui/api';
+import { ButtonModule } from '@openng/optimus-ui/button';
+import { Menu, MenuModule } from '@openng/optimus-ui/menu';
 
 export type TableRowActionItem = Omit<MenuItem, 'items'> & {
     danger?: boolean;

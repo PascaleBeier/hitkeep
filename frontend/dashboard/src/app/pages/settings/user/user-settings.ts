@@ -16,10 +16,10 @@ import { SettingsCard } from '@features/settings/components/settings-card';
 import { SettingsSecurity } from '@features/settings/components/settings-security';
 import { UserPreferences, UserPreferencesService } from '@services/user-preferences.service';
 import { UserProfile, UserProfileService } from '@services/user-profile.service';
-import { ButtonModule } from 'primeng/button';
-import { InputTextModule } from 'primeng/inputtext';
-import { SelectModule } from 'primeng/select';
-import { TabsModule } from 'primeng/tabs';
+import { ButtonModule } from '@openng/optimus-ui/button';
+import { InputTextModule } from '@openng/optimus-ui/inputtext';
+import { SelectModule } from '@openng/optimus-ui/select';
+import { TabsModule } from '@openng/optimus-ui/tabs';
 
 interface LanguageOption {
     label: string;

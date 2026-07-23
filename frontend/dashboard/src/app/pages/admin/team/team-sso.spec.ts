@@ -84,7 +84,7 @@ describe('TeamSSOPage', () => {
         expect(docsLink.closest('[settings-card-header]')).toBeTruthy();
     });
 
-    it('uses PrimeNG status, textarea, and toggle surfaces', () => {
+    it('uses OptimusUI status, textarea, and toggle surfaces', () => {
         const element = fixture.nativeElement as HTMLElement;
 
         expect(element.querySelectorAll('p-tag.p-tag').length).toBe(2);

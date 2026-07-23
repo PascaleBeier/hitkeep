@@ -89,7 +89,7 @@
 
 ### Bug Fixes
 
-* **frontend:** align search icons with PrimeNG fields ([dd0901f](https://github.com/PascaleBeier/hitkeep/commit/dd0901f58d1bf377c69f9680e2e06ac3d25f8db2)), closes [#232](https://github.com/PascaleBeier/hitkeep/issues/232)
+* **frontend:** align search icons with OptimusUI fields ([dd0901f](https://github.com/PascaleBeier/hitkeep/commit/dd0901f58d1bf377c69f9680e2e06ac3d25f8db2)), closes [#232](https://github.com/PascaleBeier/hitkeep/issues/232)
 
 ## [2.9.1](https://github.com/PascaleBeier/hitkeep/compare/v2.9.0...v2.9.1) (2026-07-06)
 

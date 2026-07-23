@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, OnChanges, inject, input, model, ou
 
 import { TranslocoPipe } from '@jsverse/transloco';
 import { TranslocoDecimalPipe } from '@jsverse/transloco-locale';
-import { SkeletonModule } from 'primeng/skeleton';
+import { SkeletonModule } from '@openng/optimus-ui/skeleton';
 import { DialogShell } from '@components/dialog-shell/dialog-shell';
 import { AnalyticsService } from '@services/analytics.service';
 import { FunnelStats } from '@models/analytics.types';

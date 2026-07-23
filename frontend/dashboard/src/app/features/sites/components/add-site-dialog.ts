@@ -3,8 +3,8 @@ import { ChangeDetectionStrategy, Component, inject, model, signal } from '@angu
 import { ReactiveFormsModule, FormControl, Validators } from '@angular/forms';
 import { compatForm } from '@angular/forms/signals/compat';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { InputTextModule } from 'primeng/inputtext';
-import { MessageModule } from 'primeng/message';
+import { InputTextModule } from '@openng/optimus-ui/inputtext';
+import { MessageModule } from '@openng/optimus-ui/message';
 import { DialogShell } from '@components/dialog-shell/dialog-shell';
 import { SiteService } from '@features/sites/services/site.service';
 import { domainValidator, sanitizeDomainInput } from '@features/sites/utils/domain-validator';

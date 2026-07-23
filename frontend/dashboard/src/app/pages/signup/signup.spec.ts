@@ -252,7 +252,7 @@ describe('Signup', () => {
         expect(authServiceMock.getSSOAvailability).not.toHaveBeenCalled();
     });
 
-    it('uses the scoped PrimeNG select-button design tokens', () => {
+    it('uses the scoped OptimusUI select-button design tokens', () => {
         expect(component['jurisdictionFieldsetDesignTokens'].root?.background).toBe('{content.hover.background}');
         expect(component['jurisdictionDesignTokens'].root?.borderRadius).toBe('{border.radius.xl}');
     });

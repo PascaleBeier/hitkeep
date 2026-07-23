@@ -19,7 +19,7 @@ import { AskAIControl } from './ask-ai-control';
 import { LayoutPageBar } from './layout-page-bar';
 import { LayoutSidebar } from './layout-sidebar';
 import { MainLayoutContextService } from './main-layout-context.service';
-import { MenuItem } from 'primeng/api';
+import { MenuItem } from '@openng/optimus-ui/api';
 import { vi } from 'vitest';
 
 interface LayoutSidebarTestAccess {
@@ -1313,7 +1313,7 @@ describe('MainLayout', () => {
         expect(navigate).toHaveBeenCalledWith(['/overview']);
     });
 
-    it('should keep the mobile PrimeNG menu model stable between change detection passes', () => {
+    it('should keep the mobile OptimusUI menu model stable between change detection passes', () => {
         const sidebar = fixture.debugElement.query(By.directive(LayoutSidebar)).componentInstance as LayoutSidebarTestAccess;
 
         const firstItems = sidebar.mobileMenuItems();

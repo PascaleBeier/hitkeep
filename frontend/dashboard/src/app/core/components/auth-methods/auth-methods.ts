@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { ButtonModule } from 'primeng/button';
+import { ButtonModule } from '@openng/optimus-ui/button';
 
 import { SocialProviderIcon } from '@core/components/social-provider-icon/social-provider-icon';
 import type { SocialProviderID } from '@services/auth.service';

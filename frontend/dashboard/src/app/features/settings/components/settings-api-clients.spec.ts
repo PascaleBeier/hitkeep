@@ -4,7 +4,7 @@ import { of, Subject, throwError } from 'rxjs';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { provideTranslocoLocale } from '@jsverse/transloco-locale';
 import { vi } from 'vitest';
-import { ConfirmationService } from 'primeng/api';
+import { ConfirmationService } from '@openng/optimus-ui/api';
 
 import { SettingsAPIClients } from './settings-api-clients';
 import { APIClient, APIClientsService } from '@services/api-clients.service';
@@ -311,7 +311,7 @@ describe('SettingsAPIClients', () => {
         expect(fixture.nativeElement.querySelector('.api-client-status')).toBeNull();
     });
 
-    it('renders site grants as PrimeNG tags', () => {
+    it('renders site grants as OptimusUI tags', () => {
         siteServiceMock.sites.set([site('site-1', 'shop.example.com')]);
         component['clients'].set([
             {
@@ -327,7 +327,7 @@ describe('SettingsAPIClients', () => {
         expect(grantTag?.querySelector('.pi-globe')).not.toBeNull();
     });
 
-    it('summarizes multiple site grants with a PrimeNG popover for the full scope', async () => {
+    it('summarizes multiple site grants with a OptimusUI popover for the full scope', async () => {
         siteServiceMock.sites.set([site('site-1', 'search-reconnect.example.com'), site('site-2', 'search-pending.example.com'), site('site-3', 'search-quota.example.com')]);
         component['clients'].set([
             {

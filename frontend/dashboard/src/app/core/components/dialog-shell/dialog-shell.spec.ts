@@ -23,7 +23,7 @@ describe('DialogShell', () => {
         document.querySelectorAll('.p-dialog-mask, .p-dialog').forEach((element) => element.remove());
     });
 
-    it('renders a modal PrimeNG dialog with standardized footer actions', async () => {
+    it('renders a modal OptimusUI dialog with standardized footer actions', async () => {
         await fixture.whenStable();
 
         const dialog = document.body.querySelector('.p-dialog') as HTMLElement | null;

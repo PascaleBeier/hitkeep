@@ -12,7 +12,7 @@ Read this reference only when the change touches the Angular dashboard, tracker-
 
 1. Follow existing signal, dependency-injection, change-detection, component-file, and native control-flow patterns.
 2. Prefer shared page frames, headers, range controls, state views, tables, dialogs, drawers, metric groups, and services before creating a new primitive.
-3. Use PrimeNG for standard controls and the existing PrimeNG/Tailwind token system for surfaces, text, borders, severity, overlays, inputs, radii, and shadows.
+3. Use OptimusUI for standard controls and the existing OptimusUI/Tailwind token system for surfaces, text, borders, severity, overlays, inputs, radii, and shadows.
 4. Keep authorization visible and exact: route, navigation, tab, and action gating must match backend enforcement.
 5. Give loading, empty, error, filtered, permission-denied, success, and destructive states behavior appropriate to the workflow.
 6. Give every asynchronous or mutating action local pending, success, and failure feedback.
@@ -22,7 +22,7 @@ Read this reference only when the change touches the Angular dashboard, tracker-
 ## Visual quality
 
 - Aim for calm, dense operator software, not a marketing surface.
-- Reject nested decorative cards, random gradients, raw one-off colors, fake data, vague action labels, and custom controls that duplicate PrimeNG.
+- Reject nested decorative cards, random gradients, raw one-off colors, fake data, vague action labels, and custom controls that duplicate OptimusUI.
 - Compare admin/settings work with a mature existing page for frame density, spacing, actions, and feedback.
 - Inspect desktop, mobile, light/dark, and a long-string locale when the change creates those risks.
 

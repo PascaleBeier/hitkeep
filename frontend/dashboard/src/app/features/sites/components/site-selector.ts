@@ -3,8 +3,8 @@ import { Component, input, output, ChangeDetectionStrategy, computed, inject, ef
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { compatForm } from '@angular/forms/signals/compat';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { SelectModule } from 'primeng/select';
-import { SkeletonModule } from 'primeng/skeleton';
+import { SelectModule } from '@openng/optimus-ui/select';
+import { SkeletonModule } from '@openng/optimus-ui/skeleton';
 import { SITE_CAPABILITIES } from '@core/access/capabilities';
 import { Site } from '@models/analytics.types';
 import { SiteSelectOption } from '@features/sites/components/site-select-option';

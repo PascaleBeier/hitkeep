@@ -1,5 +1,5 @@
 import { TranslocoService } from '@jsverse/transloco';
-import { MenuItem } from 'primeng/api';
+import { MenuItem } from '@openng/optimus-ui/api';
 
 export const TAKEOUT_EXPORT_FORMATS = ['csv', 'xlsx', 'parquet', 'json', 'ndjson'] as const;
 export type TakeoutExportFormat = (typeof TAKEOUT_EXPORT_FORMATS)[number];

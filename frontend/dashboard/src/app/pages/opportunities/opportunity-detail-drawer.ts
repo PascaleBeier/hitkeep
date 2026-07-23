@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
-import { ButtonModule } from 'primeng/button';
-import { DrawerModule } from 'primeng/drawer';
-import { MessageModule } from 'primeng/message';
-import { TagModule } from 'primeng/tag';
+import { ButtonModule } from '@openng/optimus-ui/button';
+import { DrawerModule } from '@openng/optimus-ui/drawer';
+import { MessageModule } from '@openng/optimus-ui/message';
+import { TagModule } from '@openng/optimus-ui/tag';
 import { OpportunityView } from './opportunity-view';
 
 @Component({

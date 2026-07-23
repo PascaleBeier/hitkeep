@@ -1,7 +1,7 @@
 import { Injectable, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
-import { MenuItem } from 'primeng/api';
+import { MenuItem } from '@openng/optimus-ui/api';
 import { TranslocoService } from '@jsverse/transloco';
 import { formatDurationInterval } from '@core/i18n/duration-format';
 import { AuthService } from '@services/auth.service';

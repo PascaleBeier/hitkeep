@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
-import { ButtonModule } from 'primeng/button';
-import { DialogModule } from 'primeng/dialog';
-import type { ButtonSeverity } from 'primeng/types/button';
+import { ButtonModule } from '@openng/optimus-ui/button';
+import { DialogModule } from '@openng/optimus-ui/dialog';
+import type { ButtonSeverity } from '@openng/optimus-ui/types/button';
 
 @Component({
     selector: 'app-dialog-shell',

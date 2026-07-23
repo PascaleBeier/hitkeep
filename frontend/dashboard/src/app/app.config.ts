@@ -1,6 +1,6 @@
 import { ApplicationConfig, inject, isDevMode, provideBrowserGlobalErrorListeners, provideEnvironmentInitializer, provideZonelessChangeDetection } from '@angular/core';
 import { PreloadAllModules, provideRouter, withPreloading } from '@angular/router';
-import { providePrimeNG } from 'primeng/config';
+import { provideOptimus } from '@openng/optimus-ui/config';
 
 import { routes } from './app.routes';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
@@ -23,7 +23,7 @@ export const appConfig: ApplicationConfig = {
         provideZonelessChangeDetection(),
         provideHttpClient(withInterceptors([shareInterceptor, authInterceptor, basePathInterceptor])),
         provideRouter(routes, withPreloading(PreloadAllModules)),
-        providePrimeNG({
+        provideOptimus({
             theme: {
                 preset: HitKeepPreset,
                 options: { darkModeSelector: '.p-dark' }

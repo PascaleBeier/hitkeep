@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { ConfirmationService } from 'primeng/api';
-import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { ConfirmationService } from '@openng/optimus-ui/api';
+import { ConfirmDialogModule } from '@openng/optimus-ui/confirmdialog';
 
 import { DashboardBootstrapService } from '@services/dashboard-bootstrap.service';
 import { TeamService } from '@services/team.service';

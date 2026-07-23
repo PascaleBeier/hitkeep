@@ -1,7 +1,7 @@
 import { dialogCancelButton, dialogDangerButton, dialogPrimaryButton, dialogWarnButton } from './dialog-actions';
 
 describe('dialog action helpers', () => {
-    it('uses secondary outlined cancel actions for PrimeNG dialogs', () => {
+    it('uses secondary outlined cancel actions for OptimusUI dialogs', () => {
         expect(dialogCancelButton('Cancel')).toEqual({
             label: 'Cancel',
             severity: 'secondary',

@@ -34,7 +34,7 @@ describe('Setup', () => {
         expect(component).toBeTruthy();
     });
 
-    it('uses shared PrimeNG auth surfaces', async () => {
+    it('uses shared OptimusUI auth surfaces', async () => {
         component['errorMessage'].set('setup.errors.unexpected');
 
         await fixture.whenStable();

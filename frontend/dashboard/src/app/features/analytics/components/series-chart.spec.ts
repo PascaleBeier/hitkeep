@@ -45,7 +45,7 @@ describe('SeriesChart', () => {
         expect(container.nativeElement.getAttribute('aria-label')).toBeTruthy();
     });
 
-    it('renders the ECharts directive instead of the PrimeNG chart element when data exists', () => {
+    it('renders the ECharts directive instead of the OptimusUI chart element when data exists', () => {
         fixture.componentRef.setInput('data', [
             { time: '2026-07-01T00:00:00Z', count: 5 },
             { time: '2026-07-02T00:00:00Z', count: 9 }

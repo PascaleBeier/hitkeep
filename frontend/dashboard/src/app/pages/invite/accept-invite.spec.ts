@@ -80,7 +80,7 @@ describe('AcceptInvite', () => {
         TestBed.inject(HttpTestingController).expectNone('/api/auth/accept-invite');
     });
 
-    it('uses the shared PrimeNG auth card and message surfaces', () => {
+    it('uses the shared OptimusUI auth card and message surfaces', () => {
         fixture = TestBed.createComponent(AcceptInvite);
         fixture.detectChanges();
 

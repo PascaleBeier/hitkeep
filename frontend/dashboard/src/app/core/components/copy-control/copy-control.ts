@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input, signal } from '@angular/core';
 import { CdkCopyToClipboard } from '@angular/cdk/clipboard';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { ButtonModule } from 'primeng/button';
+import { ButtonModule } from '@openng/optimus-ui/button';
 
 type CopyStatus = 'idle' | 'copied' | 'failed';
 type CopyButtonSize = 'small' | 'large';

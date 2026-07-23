@@ -3,10 +3,10 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { ButtonModule } from 'primeng/button';
-import { CardModule } from 'primeng/card';
-import { MessageModule } from 'primeng/message';
-import { TagModule } from 'primeng/tag';
+import { ButtonModule } from '@openng/optimus-ui/button';
+import { CardModule } from '@openng/optimus-ui/card';
+import { MessageModule } from '@openng/optimus-ui/message';
+import { TagModule } from '@openng/optimus-ui/tag';
 
 import { MetricStat } from '@models/analytics.types';
 import { GoogleSearchConsoleService, GoogleSearchConsoleSiteMapping, SearchConsoleDimensionRow, SearchConsoleMetricPoint, SearchConsoleOverview, SearchConsoleReportFilters } from '@services/google-search-console.service';

@@ -13,7 +13,7 @@ const translocoTestingModule = TranslocoTestingModule.forRoot({
 });
 
 describe('Password auth surfaces', () => {
-    it('renders forgot-password feedback with shared PrimeNG components', async () => {
+    it('renders forgot-password feedback with shared OptimusUI components', async () => {
         await TestBed.configureTestingModule({
             imports: [ForgotPassword, translocoTestingModule],
             providers: [provideHttpClient(), provideRouter([])]
@@ -28,7 +28,7 @@ describe('Password auth surfaces', () => {
         expect(element.querySelector('p-message.p-message')).toBeTruthy();
     });
 
-    it('renders reset-password feedback with shared PrimeNG components', async () => {
+    it('renders reset-password feedback with shared OptimusUI components', async () => {
         TestBed.resetTestingModule();
         await TestBed.configureTestingModule({
             imports: [ResetPassword, translocoTestingModule],

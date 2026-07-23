@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { MessageModule } from 'primeng/message';
+import { MessageModule } from '@openng/optimus-ui/message';
 import { FreePlanRetentionNotice } from '@layout/free-plan-retention-notice';
 import { LayoutMobileHeader } from '@layout/layout-mobile-header';
 import { LayoutOverlays } from '@layout/layout-overlays';

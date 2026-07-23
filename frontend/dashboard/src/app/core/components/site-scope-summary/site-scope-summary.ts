@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
-import { ButtonModule } from 'primeng/button';
-import { PopoverModule } from 'primeng/popover';
-import { TagModule } from 'primeng/tag';
+import { ButtonModule } from '@openng/optimus-ui/button';
+import { PopoverModule } from '@openng/optimus-ui/popover';
+import { TagModule } from '@openng/optimus-ui/tag';
 
 export type SiteScopeSummarySeverity = 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast';
 

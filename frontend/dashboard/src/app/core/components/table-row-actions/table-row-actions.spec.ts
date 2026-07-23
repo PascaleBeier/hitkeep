@@ -52,7 +52,7 @@ describe('TableRowActions', () => {
         expect(button.querySelector('.pi-ellipsis-h')).not.toBeNull();
     });
 
-    it('opens a PrimeNG menu and executes item commands', async () => {
+    it('opens a OptimusUI menu and executes item commands', async () => {
         triggerButton().click();
         fixture.detectChanges();
         await fixture.whenStable();

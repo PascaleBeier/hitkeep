@@ -83,7 +83,7 @@ describe('AuthMethods', () => {
         expect(element.querySelector('.hk-social-provider-mark--microsoft')).toBeTruthy();
     });
 
-    it('replaces a loading provider mark with the PrimeNG spinner and exposes the group label', async () => {
+    it('replaces a loading provider mark with the OptimusUI spinner and exposes the group label', async () => {
         fixture.componentRef.setInput('methods', [{ id: 'google', labelKey: 'social.continueWith.google', providerIcon: 'google', loading: true }]);
 
         await fixture.whenStable();

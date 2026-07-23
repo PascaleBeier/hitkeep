@@ -6,11 +6,11 @@ import { compatForm } from '@angular/forms/signals/compat';
 import { finalize } from 'rxjs/operators';
 import { TranslocoPipe } from '@jsverse/transloco';
 
-// PrimeNG Imports
-import { PasswordModule } from 'primeng/password';
-import { ButtonModule } from 'primeng/button';
-import { InputTextModule } from 'primeng/inputtext';
-import { MessageModule } from 'primeng/message';
+// OptimusUI Imports
+import { PasswordModule } from '@openng/optimus-ui/password';
+import { ButtonModule } from '@openng/optimus-ui/button';
+import { InputTextModule } from '@openng/optimus-ui/inputtext';
+import { MessageModule } from '@openng/optimus-ui/message';
 
 // Corrected path to Core
 import { AuthCard } from '@core/components/auth-card/auth-card';

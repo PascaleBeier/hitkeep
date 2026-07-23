@@ -7,10 +7,10 @@ import { buildTakeoutExportMenuItems, DEFAULT_TAKEOUT_EXPORT_FORMAT, TakeoutExpo
 import { Site } from '@models/analytics.types';
 import { TakeoutDownloadService } from '@services/takeout-download.service';
 import { SiteService } from '@features/sites/services/site.service';
-import { MenuItem } from 'primeng/api';
-import { CardModule } from 'primeng/card';
-import { MessageModule } from 'primeng/message';
-import { SplitButtonModule } from 'primeng/splitbutton';
+import { MenuItem } from '@openng/optimus-ui/api';
+import { CardModule } from '@openng/optimus-ui/card';
+import { MessageModule } from '@openng/optimus-ui/message';
+import { SplitButtonModule } from '@openng/optimus-ui/splitbutton';
 
 type ExportState = 'idle' | 'success' | 'error';
 

@@ -267,7 +267,7 @@ async function selectFirstVisibleOption(page, selector) {
         { timeout: 5_000 },
       );
     } catch {
-      // PrimeNG may render the selected label outside the host element.
+      // OptimusUI may render the selected label outside the host element.
     }
   }
 
@@ -302,7 +302,7 @@ async function selectVisibleOptionMatching(page, selector, pattern) {
         { timeout: 5_000 },
       );
     } catch {
-      // PrimeNG may render the selected label outside the host element.
+      // OptimusUI may render the selected label outside the host element.
     }
     return true;
   }

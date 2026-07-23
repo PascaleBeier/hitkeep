@@ -7,13 +7,13 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs/operators';
 import { TranslocoPipe } from '@jsverse/transloco';
 
-import { PasswordModule } from 'primeng/password';
-import { ButtonModule } from 'primeng/button';
-import { InputTextModule } from 'primeng/inputtext';
-import { CheckboxModule } from 'primeng/checkbox';
-import { FieldsetModule } from 'primeng/fieldset';
-import { MessageModule } from 'primeng/message';
-import { SelectButtonModule } from 'primeng/selectbutton';
+import { PasswordModule } from '@openng/optimus-ui/password';
+import { ButtonModule } from '@openng/optimus-ui/button';
+import { InputTextModule } from '@openng/optimus-ui/inputtext';
+import { CheckboxModule } from '@openng/optimus-ui/checkbox';
+import { FieldsetModule } from '@openng/optimus-ui/fieldset';
+import { MessageModule } from '@openng/optimus-ui/message';
+import { SelectButtonModule } from '@openng/optimus-ui/selectbutton';
 
 import { AuthCard } from '@core/components/auth-card/auth-card';
 import { AuthDivider } from '@core/components/auth-divider/auth-divider';

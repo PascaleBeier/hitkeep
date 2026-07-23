@@ -94,7 +94,7 @@ describe('AskAIControl charts', () => {
         fixture.destroy();
     });
 
-    it('renders ECharts for Ask AI line and bar charts instead of the PrimeNG chart element', async () => {
+    it('renders ECharts for Ask AI line and bar charts instead of the OptimusUI chart element', async () => {
         await fixture.whenStable();
         fixture.detectChanges();
 

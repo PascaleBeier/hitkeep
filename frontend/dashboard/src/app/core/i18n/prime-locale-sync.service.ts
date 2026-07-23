@@ -1,7 +1,7 @@
 import { Injectable, effect, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { PrimeNG } from 'primeng/config';
-import { Translation } from 'primeng/api';
+import { Optimus } from '@openng/optimus-ui/config';
+import { Translation } from '@openng/optimus-ui/api';
 import { TranslocoLocaleService } from '@jsverse/transloco-locale';
 import { TranslocoService } from '@jsverse/transloco';
 import { map, switchMap } from 'rxjs';
@@ -10,7 +10,7 @@ type TranslationDictionary = Record<string, unknown>;
 
 @Injectable({ providedIn: 'root' })
 export class PrimeLocaleSyncService {
-    private readonly primeNg = inject(PrimeNG);
+    private readonly OptimusUI = inject(Optimus);
     private readonly transloco = inject(TranslocoService);
     private readonly localeService = inject(TranslocoLocaleService);
     private readonly translationState = toSignal(
@@ -35,7 +35,7 @@ export class PrimeLocaleSyncService {
     constructor() {
         effect(() => {
             const { translation } = this.translationState();
-            this.primeNg.setTranslation(this.buildTranslation(this.localeService.getLocale(), translation));
+            this.OptimusUI.setTranslation(this.buildTranslation(this.localeService.getLocale(), translation));
         });
     }
 

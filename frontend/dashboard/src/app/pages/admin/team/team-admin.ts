@@ -3,7 +3,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { filter, map } from 'rxjs';
-import { TabsModule } from 'primeng/tabs';
+import { TabsModule } from '@openng/optimus-ui/tabs';
 import { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { TEAM_CAPABILITIES } from '@core/access/capabilities';
 import { AccessService } from '@services/access.service';

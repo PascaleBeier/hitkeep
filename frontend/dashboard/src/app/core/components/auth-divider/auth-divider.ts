@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { DividerModule } from 'primeng/divider';
+import { DividerModule } from '@openng/optimus-ui/divider';
 
 import { AUTH_DIVIDER_DESIGN_TOKENS } from '@core/theme/hitkeep-preset';
 

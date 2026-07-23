@@ -66,7 +66,7 @@ describe('TrafficChart', () => {
         expect(options.yAxis.interval).toBeUndefined();
     });
 
-    it('renders the ECharts directive instead of the PrimeNG chart element when traffic exists', () => {
+    it('renders the ECharts directive instead of the OptimusUI chart element when traffic exists', () => {
         fixture.componentRef.setInput('data', [
             { time: '2026-07-01T00:00:00Z', pageviews: 12, visitors: 7 },
             { time: '2026-07-02T00:00:00Z', pageviews: 18, visitors: 10 }

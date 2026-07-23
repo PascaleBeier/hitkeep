@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, input, OnChanges, OnDestroy, signal, SimpleChanges } from '@angular/core';
 import { AnimatedDuration } from '@components/animated-duration/animated-duration';
 import { AnimatedNumber } from '@components/animated-number/animated-number';
-import { CardModule } from 'primeng/card';
-import { SkeletonModule } from 'primeng/skeleton';
+import { CardModule } from '@openng/optimus-ui/card';
+import { SkeletonModule } from '@openng/optimus-ui/skeleton';
 
 export const KPI_PERCENT_FORMAT: Intl.NumberFormatOptions = Object.freeze({
     minimumFractionDigits: 1,

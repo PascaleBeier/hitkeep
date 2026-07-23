@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
-import { AvatarModule } from 'primeng/avatar';
-import { MenuModule } from 'primeng/menu';
+import { AvatarModule } from '@openng/optimus-ui/avatar';
+import { MenuModule } from '@openng/optimus-ui/menu';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { PreferencesService } from '@services/preferences.service';
 import { UserMenuService } from '@services/user-menu.service';

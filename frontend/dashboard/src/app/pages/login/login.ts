@@ -8,13 +8,13 @@ import { firstValueFrom } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 import { TranslocoPipe } from '@jsverse/transloco';
 
-import { PasswordModule } from 'primeng/password';
-import { ButtonModule } from 'primeng/button';
-import { InputTextModule } from 'primeng/inputtext';
-import { CheckboxModule } from 'primeng/checkbox';
-import { InputOtpModule } from 'primeng/inputotp';
-import { MessageModule } from 'primeng/message';
-import { TooltipModule } from 'primeng/tooltip';
+import { PasswordModule } from '@openng/optimus-ui/password';
+import { ButtonModule } from '@openng/optimus-ui/button';
+import { InputTextModule } from '@openng/optimus-ui/inputtext';
+import { CheckboxModule } from '@openng/optimus-ui/checkbox';
+import { InputOtpModule } from '@openng/optimus-ui/inputotp';
+import { MessageModule } from '@openng/optimus-ui/message';
+import { TooltipModule } from '@openng/optimus-ui/tooltip';
 
 import { AuthCard } from '@core/components/auth-card/auth-card';
 import { AuthDivider } from '@core/components/auth-divider/auth-divider';

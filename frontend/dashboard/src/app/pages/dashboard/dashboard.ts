@@ -8,18 +8,18 @@ import { debounceTime, distinctUntilChanged, finalize, Subject } from 'rxjs';
 import { TranslocoService } from '@jsverse/transloco';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { TranslocoLocaleService } from '@jsverse/transloco-locale';
-// PrimeNG
-import { CardModule } from 'primeng/card';
-import { TableModule, TableLazyLoadEvent } from 'primeng/table';
-import { SelectModule } from 'primeng/select';
-import { ButtonModule } from 'primeng/button';
-import { SplitButtonModule } from 'primeng/splitbutton';
-import { IconFieldModule } from 'primeng/iconfield';
-import { InputIconModule } from 'primeng/inputicon';
-import { InputTextModule } from 'primeng/inputtext';
-import { SkeletonModule } from 'primeng/skeleton';
-import { TooltipModule } from 'primeng/tooltip';
-import { MenuItem } from 'primeng/api';
+// OptimusUI
+import { CardModule } from '@openng/optimus-ui/card';
+import { TableModule, TableLazyLoadEvent } from '@openng/optimus-ui/table';
+import { SelectModule } from '@openng/optimus-ui/select';
+import { ButtonModule } from '@openng/optimus-ui/button';
+import { SplitButtonModule } from '@openng/optimus-ui/splitbutton';
+import { IconFieldModule } from '@openng/optimus-ui/iconfield';
+import { InputIconModule } from '@openng/optimus-ui/inputicon';
+import { InputTextModule } from '@openng/optimus-ui/inputtext';
+import { SkeletonModule } from '@openng/optimus-ui/skeleton';
+import { TooltipModule } from '@openng/optimus-ui/tooltip';
+import { MenuItem } from '@openng/optimus-ui/api';
 // Features
 import { SiteService } from '@features/sites/services/site.service';
 import { injectStatsQuery, type StatsQueryMode } from '@features/analytics/services/stats-query';

@@ -2,8 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { MenuItem } from 'primeng/api';
-import { DrawerModule } from 'primeng/drawer';
+import { MenuItem } from '@openng/optimus-ui/api';
+import { DrawerModule } from '@openng/optimus-ui/drawer';
 import { Brand } from '@components/brand/brand';
 import { TeamSwitcher } from '@components/team-switcher/team-switcher';
 import { SiteSelector } from '@features/sites/components/site-selector';

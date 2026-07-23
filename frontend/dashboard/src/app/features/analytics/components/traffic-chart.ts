@@ -1,7 +1,7 @@
 import { Component, input, output, computed, inject, ChangeDetectionStrategy } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 
-import { ButtonModule } from 'primeng/button';
+import { ButtonModule } from '@openng/optimus-ui/button';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import type { HitkeepChartDesign } from '@core/charts/hitkeep-chart-options';
 import { ChartDataPoint } from '@models/analytics.types';

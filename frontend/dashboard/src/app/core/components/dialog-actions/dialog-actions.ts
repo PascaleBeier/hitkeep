@@ -1,4 +1,4 @@
-import { ButtonProps } from 'primeng/button';
+import { ButtonProps } from '@openng/optimus-ui/button';
 
 export function dialogCancelButton(label: string): ButtonProps {
     return {
