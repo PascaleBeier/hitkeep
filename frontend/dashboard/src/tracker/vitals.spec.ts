@@ -56,7 +56,8 @@ describe('web vitals tracker bundle', () => {
             delta: 1842.3,
             id: 'v5-1234567890-1234567890123',
             entries: [],
-            navigationType: 'navigate'
+            navigationType: 'navigate',
+            navigationId: 1
         });
 
         expect(emit).toHaveBeenCalledWith({
