@@ -9,8 +9,8 @@ import { map, switchMap } from 'rxjs';
 type TranslationDictionary = Record<string, unknown>;
 
 @Injectable({ providedIn: 'root' })
-export class PrimeLocaleSyncService {
-    private readonly OptimusUI = inject(Optimus);
+export class OptimusLocaleSyncService {
+    private readonly optimus = inject(Optimus);
     private readonly transloco = inject(TranslocoService);
     private readonly localeService = inject(TranslocoLocaleService);
     private readonly translationState = toSignal(
@@ -35,7 +35,7 @@ export class PrimeLocaleSyncService {
     constructor() {
         effect(() => {
             const { translation } = this.translationState();
-            this.OptimusUI.setTranslation(this.buildTranslation(this.localeService.getLocale(), translation));
+            this.optimus.setTranslation(this.buildTranslation(this.localeService.getLocale(), translation));
         });
     }
 

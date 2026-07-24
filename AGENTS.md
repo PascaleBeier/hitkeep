@@ -107,7 +107,7 @@ Use focused package tests while iterating and `$hitkeep-qa` for the required com
 - Use `TranslocoPipe` in templates and `TranslocoService` for computed TypeScript labels.
 - When labels depend on language changes, make the computation depend on the active language so it recomputes after a switch.
 - For dates, numbers, percentages, and durations, use existing locale helpers, `@jsverse/transloco-locale`, or browser `Intl` APIs.
-- OptimusUI locale text is synchronized through `PrimeLocaleSyncService`. Do not hardcode OptimusUI component labels unless there is no localizable surface.
+- OptimusUI locale text is synchronized through `OptimusLocaleSyncService`. Do not hardcode OptimusUI component labels unless there is no localizable surface.
 - Keep translation IDs and formatting-locale mappings aligned with the runtime configuration.
 
 Use `$hitkeep-i18n` for localization procedure and `$hitkeep-qa` for the current frontend gates.

@@ -249,7 +249,7 @@ HitKeep is flat by default and layered by structure. Borders and surface tones s
 ### Buttons
 
 - **Shape:** gently curved Aura controls (`rounded.md`) with compact, stable dimensions.
-- **Primary:** use the contrast-safe deep emerald mapping in light mode with a white label; use the brighter dark-mode emerald with dark zinc ink. Put this scheme-specific mapping in the OptimusUI preset. Preserve width during loading and use an optional leading PrimeIcon only when it improves recognition.
+- **Primary:** use the contrast-safe deep emerald mapping in light mode with a white label; use the brighter dark-mode emerald with dark zinc ink. Put this scheme-specific mapping in the OptimusUI preset. Preserve width during loading and use an optional leading OpenNG icon only when it improves recognition.
 - **Secondary:** use OptimusUI outlined, text, or secondary severity variants; do not create feature-specific button skins.
 - **Hover / Focus / Active:** use Aura semantic states. Focus remains clearly visible with the primary ring and offset.
 - **Destructive:** use OptimusUI danger severity and confirmation helpers. Color is reinforced by explicit copy and context.

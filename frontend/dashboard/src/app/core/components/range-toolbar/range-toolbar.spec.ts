@@ -10,7 +10,7 @@ import { Optimus } from '@openng/optimus-ui/config';
 import { Select } from '@openng/optimus-ui/select';
 
 import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar } from './range-toolbar';
-import { PrimeLocaleSyncService } from '@core/i18n/prime-locale-sync.service';
+import { OptimusLocaleSyncService } from '@core/i18n/optimus-locale-sync.service';
 import { DashboardBootstrapService } from '@services/dashboard-bootstrap.service';
 import { ShareService } from '@services/share.service';
 import { TeamService } from '@services/team.service';
@@ -166,7 +166,7 @@ describe('RangeToolbar', () => {
                 })
             ],
             providers: [
-                PrimeLocaleSyncService,
+                OptimusLocaleSyncService,
                 provideHttpClient(),
                 provideHttpClientTesting(),
                 provideRouter([]),
@@ -183,7 +183,7 @@ describe('RangeToolbar', () => {
 
         transloco = TestBed.inject(TranslocoService);
         OptimusUI = TestBed.inject(Optimus);
-        TestBed.inject(PrimeLocaleSyncService);
+        TestBed.inject(OptimusLocaleSyncService);
         fixture = TestBed.createComponent(RangeToolbar);
         component = fixture.componentInstance;
         fixture.componentRef.setInput('timeRanges', DEFAULT_RANGE_OPTIONS);

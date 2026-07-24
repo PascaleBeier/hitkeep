@@ -63,7 +63,7 @@ describe('AuthMethods', () => {
         expect(selected).toHaveBeenCalledWith('sso');
     });
 
-    it('renders official provider marks without monochrome PrimeIcons', async () => {
+    it('renders official provider marks without monochrome icon-font glyphs', async () => {
         fixture.componentRef.setInput('methods', [
             { id: 'google', labelKey: 'social.continueWith.google', providerIcon: 'google' },
             { id: 'github', labelKey: 'social.continueWith.github', providerIcon: 'github' },
