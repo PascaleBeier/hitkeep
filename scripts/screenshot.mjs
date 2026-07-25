@@ -196,7 +196,7 @@ async function installAskAIDemoRoutes(page) {
               ],
             },
           ],
-          actions: [{ type: "navigate", label: "Open AI visibility", target: "/ai-visibility" }],
+          actions: [{ type: "navigate", label: "Open AI visibility", target: "/ai-agents" }],
         },
       },
     ];
@@ -740,8 +740,18 @@ async function run() {
     await page.waitForTimeout(TABLE_SETTLE);
     record("analytics-events-audience", await shoot(page, "analytics-events-audience"));
 
-    await nav(page, "/ai-visibility", CHART_SETTLE);
-    await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    // One page now: the hero KPIs and chart at the top, the fetch depth section
+    // stacked below it. Both shots come from /ai-agents, the second one scrolled.
+    await captureRoute(page, record, "analytics-ai-agents-traffic", "/ai-agents", CHART_SETTLE);
+
+    await page.evaluate(() => {
+      const target = document.querySelector('[data-testid="ai-visibility-health-strip"], [data-testid="ai-agents-enrich-callout"]');
+      if (target) {
+        target.scrollIntoView({ behavior: "instant", block: "start" });
+      } else {
+        window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" });
+      }
+    });
     await page.waitForTimeout(TABLE_SETTLE);
     record("analytics-ai-visibility", await shoot(page, "analytics-ai-visibility"));
     const aiVisibilityClip = await prepareAIVisibilityShot(page);

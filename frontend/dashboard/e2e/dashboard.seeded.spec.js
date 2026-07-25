@@ -7,6 +7,21 @@ const SEEDED_EVENT_RANGE = "30d";
 const SEEDED_CITY_RE = /Mountain View|New York|Seattle|Berlin|Munich|London|Paris|Amsterdam/;
 const SEEDED_PROVIDER_RE = /Google LLC|Verizon Business|Comcast Cable|Deutsche Telekom AG|Vodafone GmbH|BT|Orange|KPN/;
 const SEEDED_ASN_RE = /AS15169|AS701|AS7922|AS3320|AS3209|AS2856|AS3215|AS1136/;
+const SEEDED_AI_SOURCE_RE = /ChatGPT|Claude|Perplexity|Gemini|DeepSeek/;
+// Seeded hits carry AI crawler user agents, and GPTBot is the heaviest-weighted
+// one, so it is always present in a 30 day window.
+const SEEDED_AI_AGENT_RE = /GPTBot/;
+// The seeded crawler mix only covers these three categories.
+const SEEDED_AI_CATEGORY_RE = /Training crawlers|AI search crawlers|AI assistants/;
+// Seeded every day by `seedDefaultRangeAIFetch`, and one of the heaviest
+// weighted crawl targets, so it always shows up in the merged pages breakdown.
+const SEEDED_AI_PATH = "/docs/getting-started";
+// `aiAgents.provenance.hint` renders `tracked {{tracked}} · logs {{fetched}}` for
+// rows the merge saw on both sides.
+const SEEDED_AI_PROVENANCE_RE = /tracked [\d,.]+ · logs [\d,.]+/;
+const AI_AGENTS_PAGE_CHIPS = '[data-testid="ai-agents-page-chips"]';
+const AI_AGENTS_TRAFFIC_KPIS = '[data-testid="ai-agent-traffic-kpis"]';
+const AI_VISIBILITY_HEALTH_STRIP = '[data-testid="ai-visibility-health-strip"]';
 
 async function selectComboboxOption(page, name, optionName) {
     const select = page.getByRole("combobox", { name }).first();
@@ -100,7 +115,23 @@ async function clickSeededMetricRow(page, title, valuePattern) {
 
     const row = panel.getByRole("button").filter({ hasText: valuePattern }).first();
     await expect(row).toBeVisible();
-    await row.click();
+    // Path rows carry an "open in new tab" link, so the click has to land on the
+    // label rather than anywhere inside the row.
+    const label = row.locator(".metric-list__label").first();
+    const target = (await label.count()) > 0 ? label : row;
+    await target.click();
+}
+
+/**
+ * Numeric value of one stat-strip entry. KPI cards render their number through
+ * ng-number-flow's custom element, which stays empty under the dashboard's CSP,
+ * so scalar assertions read the plain-text strips instead.
+ */
+async function readStatStripValue(page, containerSelector, label) {
+    const entry = page.locator(containerSelector).locator(".ai-agents__stat").filter({ hasText: label }).first();
+    await expect(entry).toBeVisible();
+    const text = (await entry.innerText()) || "";
+    return Number(text.replace(/^[^\d]*/, "").replace(/[^\d]/g, "") || "0");
 }
 
 async function expectMetricCardGroupPolish(page, expectedCardCount = 5) {
@@ -386,17 +417,124 @@ test("funnels page filters by seeded geography and network metrics", async ({ pa
     await expect(page.getByText(/ASN: (AS15169|AS701|AS7922|AS3320|AS3209|AS2856|AS3215|AS1136)/)).toBeVisible();
 });
 
-test("ai visibility page shows correlation insights", async ({ page }) => {
-    await login(page, "/ai-visibility");
+test("ai agents page shows the fetch depth section with correlation insights", async ({ page }) => {
+    await login(page, "/ai-agents");
     await selectSeededSite(page);
     await selectRange(page, SEEDED_EVENT_RANGE);
 
-    await expect(page.getByRole("heading", { name: "Fetch volume over time" })).toBeVisible();
+    // The fetch depth section lives inside the single AI agents page; its one
+    // stat strip is the wrapper the page exposes for it.
+    await expect(page.locator(AI_VISIBILITY_HEALTH_STRIP)).toBeVisible();
+    await expect(page.locator('[data-testid="ai-visibility-correlation-kpis"]')).toBeVisible();
+    // Exactly one heading per block: the section names the correlation, the card
+    // group below it names its breakdowns.
     await expect(page.getByRole("heading", { name: "Fetch-to-visit correlation" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Correlation breakdowns" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Citation yield" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Opportunity pages" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Failure hotspots" })).toBeVisible();
     await expect(page.getByText("GPTBot").first()).toBeVisible();
+    // There is no tab bar any more: one page, stacked sections.
+    await expect(page.locator('[data-testid="ai-agents-nav-tabs"]')).toHaveCount(0);
+    // The seeded site forwards fetch logs, so the page never pitches the setup.
+    await expect(page.locator('[data-testid="ai-agents-enrich-callout"]')).toHaveCount(0);
+});
+
+test("ai agents page reports merged activity with per-row provenance", async ({ page }) => {
+    await login(page, "/ai-agents");
+    await selectSeededSite(page);
+    await selectRange(page, SEEDED_EVENT_RANGE);
+
+    // Pages crawled counts distinct paths across both feeds, so it can never be
+    // zero for this site, and the merged KPI card is the only place it appears.
+    await expect(page.locator(AI_AGENTS_TRAFFIC_KPIS).getByText("Pages crawled", { exact: true })).toBeVisible();
+    // The fetch-depth strip states fetch-only scalars, headed by the fetch volume.
+    await expect.poll(async () => readStatStripValue(page, AI_VISIBILITY_HEALTH_STRIP, "Total fetches")).toBeGreaterThan(0);
+    await expect(page.locator(AI_VISIBILITY_HEALTH_STRIP).getByText("Unique paths")).toHaveCount(0);
+
+    // GPTBot arrives through both feeds, so its row states where the count came from.
+    const agentsPanel = await expectSeededMetricValue(page, "AI agents", SEEDED_AI_AGENT_RE);
+    await expect(agentsPanel.locator(".metric-list__provenance").filter({ hasText: SEEDED_AI_PROVENANCE_RE }).first()).toBeVisible();
+});
+
+test("ai agents page filters by a crawled page from the merged breakdown", async ({ page }) => {
+    await login(page, "/ai-agents");
+    await selectSeededSite(page);
+    await selectRange(page, SEEDED_EVENT_RANGE);
+
+    await clickSeededMetricRow(page, "Pages crawled", SEEDED_AI_PATH);
+
+    const chips = page.locator(AI_AGENTS_PAGE_CHIPS);
+    await expect(chips.getByText(`Page: ${SEEDED_AI_PATH}`, { exact: true })).toBeVisible();
+    // The page filter narrows both feeds, so the whole report re-renders under it.
+    await expect(page.locator(AI_AGENTS_TRAFFIC_KPIS)).toBeVisible();
+    await expect(page.locator('[data-testid="ai-agents-hero-chart"]')).toBeVisible();
+    await expect(page.locator('[data-testid="ai-visibility-health-strip"]')).toBeVisible();
+
+    await chips.getByRole("button", { name: "Clear all" }).click();
+    await expect(chips.getByText("No active filter")).toBeVisible();
+});
+
+test("legacy ai routes redirect to the single ai agents page", async ({ page }) => {
+    await login(page, "/ai-visibility");
+    await expect(page).toHaveURL(/\/ai-agents$/);
+
+    await page.goto("/ai-agents/crawlers", { waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL(/\/ai-agents$/);
+
+    await selectSeededSite(page);
+    await selectRange(page, SEEDED_EVENT_RANGE);
+
+    await expect(page.getByRole("heading", { name: "Fetch-to-visit correlation" })).toBeVisible();
+});
+
+test("ai agents page shows seeded agent traffic and filters by agent", async ({ page }) => {
+    await login(page, "/ai-agents");
+    await selectSeededSite(page);
+    await selectRange(page, SEEDED_EVENT_RANGE);
+
+    await expect(page.locator('[data-testid="ai-agent-traffic-kpis"]')).toBeVisible();
+    await expect(page.locator('[data-testid="ai-agents-hero-chart"]')).toBeVisible();
+    await expect(page.getByText("AI referral visits", { exact: true }).first()).toBeVisible();
+    await expectSeededMetricValue(page, "AI sources", SEEDED_AI_SOURCE_RE);
+
+    await clickSeededMetricRow(page, "AI agents", SEEDED_AI_AGENT_RE);
+
+    const chips = page.locator(AI_AGENTS_PAGE_CHIPS);
+    // The agent dimension exists on both feeds, so the chip carries no qualifier.
+    await expect(chips.getByText("AI agent: GPTBot", { exact: true })).toBeVisible();
+    // The agent filter reaches the fetch-only side too, so the fetch depth
+    // section and its correlation KPIs stay on screen with the filter applied.
+    await expect(page.locator(AI_VISIBILITY_HEALTH_STRIP)).toBeVisible();
+    await expect(page.locator('[data-testid="ai-visibility-correlation-kpis"]')).toBeVisible();
+
+    await chips.getByRole("button", { name: "Remove filter" }).first().click();
+    await expect(chips.getByText("AI agent: GPTBot", { exact: true })).toHaveCount(0);
+    await expect(chips.getByText("No active filter")).toBeVisible();
+});
+
+test("ai agents page qualifies only the tracked-visit-scoped AI source chip", async ({ page }) => {
+    await login(page, "/ai-agents");
+    await selectSeededSite(page);
+    await selectRange(page, SEEDED_EVENT_RANGE);
+
+    // Categories scope the whole merged report: no qualifier on the chip.
+    await clickSeededMetricRow(page, "AI agent categories", SEEDED_AI_CATEGORY_RE);
+
+    const chips = page.locator(AI_AGENTS_PAGE_CHIPS);
+    await expect(chips.getByText(/^AI category: (Training crawlers|AI search crawlers|AI assistants)$/)).toBeVisible();
+
+    // A crawler-category filter selects hits that carry no referrer at all, so
+    // it has to come off before the referral dimension has rows to click.
+    await chips.getByRole("button", { name: "Clear all" }).click();
+    await expect(chips.getByText("No active filter")).toBeVisible();
+
+    // Referrers only exist on the tracked side, so that one chip says so.
+    await clickSeededMetricRow(page, "AI sources", SEEDED_AI_SOURCE_RE);
+    await expect(chips.getByText(/^AI source: (ChatGPT|Claude|Perplexity|Gemini|DeepSeek) · tracked visits only$/)).toBeVisible();
+
+    await chips.getByRole("button", { name: "Clear all" }).click();
+    await expect(chips.getByText("No active filter")).toBeVisible();
 });
 
 test("ai chatbot page surfaces seeded audience geography and network data", async ({ page }) => {
