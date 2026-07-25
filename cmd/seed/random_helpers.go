@@ -72,13 +72,6 @@ func randomTimeInElapsedDay(rng *mrand.Rand, day, now time.Time) time.Time {
 	return dayStart.Add(time.Duration(rng.Intn(elapsedSeconds+1)) * time.Second)
 }
 
-func max64(a, b int64) int64 {
-	if a > b {
-		return a
-	}
-	return b
-}
-
 func classifySeedResourceType(contentType string) string {
 	normalized := strings.ToLower(strings.TrimSpace(contentType))
 	switch {

@@ -436,6 +436,44 @@ func TestValidateAskAIOutputRequiresPathOnlyNavigationActions(t *testing.T) {
 	}
 }
 
+func TestValidateAskAIOutputAllowsAIAgentsNavigationTargets(t *testing.T) {
+	siteID := uuid.New()
+	valid := AskAIOutput{
+		AnswerMarkdown: "AI agents fetched more pages.",
+		Citations:      []AskAICitation{{Label: "Input context", ToolCallID: "input_context"}},
+		Charts:         []AskAIChart{{Type: "table", Title: "Summary", Rows: []map[string]any{{"metric": "fetches", "value": float64(10)}}}},
+	}
+
+	// The legacy /ai-visibility target stays allowed because the dashboard
+	// redirects it to the single /ai-agents page.
+	for _, target := range []string{"/ai-agents", "/ai-visibility"} {
+		valid.Actions = []AskAIAction{{Type: "navigate", Label: "Open AI agents", Target: target}}
+		output, err := ValidateAskAIOutput(valid, AskAIRequest{SiteID: siteID}, nil)
+		if err != nil {
+			t.Fatalf("expected navigation target %q to pass: %v", target, err)
+		}
+		if got := output.Actions[0].Target; got != target {
+			t.Fatalf("expected navigation target %q to be preserved, got %q", target, got)
+		}
+	}
+
+	// The allowlist matches whole paths, so unlisted look-alikes and child
+	// routes stay rejected.
+	for _, target := range []string{"/ai-agents/unknown-tab", "/ai-agents-secret"} {
+		valid.Actions = []AskAIAction{{Type: "navigate", Label: "Open AI agents", Target: target}}
+		if _, err := ValidateAskAIOutput(valid, AskAIRequest{SiteID: siteID}, nil); !errors.Is(err, ErrInvalidOutput) {
+			t.Fatalf("expected navigation target %q to be rejected, got %v", target, err)
+		}
+	}
+}
+
+func TestNormalizeAskAIRequestPreservesAIAgentsRouteContext(t *testing.T) {
+	req := normalizeAskAIRequest(AskAIRequest{Query: "Which agents crawl most?", Route: "/ai-agents?range=30d#top"})
+	if req.Route != "/ai-agents" {
+		t.Fatalf("expected ai agents route context to be preserved, got %q", req.Route)
+	}
+}
+
 func TestNormalizeAskAIRequestPreservesSafeRoutePathFromRouterURL(t *testing.T) {
 	req := normalizeAskAIRequest(AskAIRequest{Query: "What changed?", Route: "/dashboard?range=7d#top"})
 	if req.Route != "/dashboard" {

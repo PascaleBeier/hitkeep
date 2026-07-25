@@ -59,6 +59,9 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		SitePerm:    authcore.PermSiteView,
 		RateLimiter: ctx.ApiLimiter,
 	}, h.handleExportAIFetch()))
+	mux.HandleFunc("GET /api/ai-agents", ctx.Handler(shared.HandlerConfig{
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleGetAIAgentCatalog()))
 }
 
 func parseSiteAndRange(w http.ResponseWriter, r *http.Request) (api.AIFetchQueryParams, bool) {
@@ -226,18 +229,19 @@ func (h *handler) handleCreateAIFetch() http.HandlerFunc {
 		userAgent := strings.TrimSpace(payload.UserAgent)
 
 		record := &api.AIFetch{
-			SiteID:          siteID,
-			Timestamp:       time.Now().UTC(),
-			AssistantName:   identity.Name,
-			AssistantFamily: identity.Family,
-			Path:            path,
-			Hostname:        hostname,
-			StatusCode:      payload.StatusCode,
-			ContentType:     contentType,
-			ResourceType:    aianalytics.ClassifyResourceType(payload.ContentType),
-			ResponseMs:      responseMs,
-			BytesServed:     bytesServed,
-			UserAgent:       &userAgent,
+			SiteID:            siteID,
+			Timestamp:         time.Now().UTC(),
+			AssistantName:     identity.Name,
+			AssistantFamily:   identity.Family,
+			AssistantCategory: identity.Category,
+			Path:              path,
+			Hostname:          hostname,
+			StatusCode:        payload.StatusCode,
+			ContentType:       contentType,
+			ResourceType:      aianalytics.ClassifyResourceType(payload.ContentType),
+			ResponseMs:        responseMs,
+			BytesServed:       bytesServed,
+			UserAgent:         &userAgent,
 		}
 
 		if err := analyticsStore.CreateAIFetch(r.Context(), record); err != nil {

@@ -154,28 +154,13 @@ func (h *handler) handleGetSiteStats() http.HandlerFunc {
 			return
 		}
 
-		now := time.Now().UTC()
-		end := now.AddDate(0, 0, 1)
-		start := end.AddDate(0, 0, -30)
-
-		q := r.URL.Query()
-		if fromStr := q.Get("from"); fromStr != "" {
-			if parsed, err := time.Parse(time.RFC3339, fromStr); err == nil {
-				start = parsed
-			}
-		}
-		if toStr := q.Get("to"); toStr != "" {
-			if parsed, err := time.Parse(time.RFC3339, toStr); err == nil {
-				end = parsed
-			}
-		}
-
-		filters, err := parseFilters(q)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		window, ok := parseAnalyticsWindow(w, r)
+		if !ok {
 			return
 		}
+		start, end, filters := window.Start, window.End, window.Filters
 
+		q := r.URL.Query()
 		var goalIDs []uuid.UUID
 		for _, rawID := range q["goal_id"] {
 			id, err := uuid.Parse(rawID)
@@ -206,16 +191,7 @@ func (h *handler) handleGetSiteStats() http.HandlerFunc {
 			FunnelIDs: funnelIDs,
 		}
 
-		if compareFromStr := q.Get("compare_from"); compareFromStr != "" {
-			if parsed, err := time.Parse(time.RFC3339, compareFromStr); err == nil {
-				params.CompareStart = parsed
-			}
-		}
-		if compareToStr := q.Get("compare_to"); compareToStr != "" {
-			if parsed, err := time.Parse(time.RFC3339, compareToStr); err == nil {
-				params.CompareEnd = parsed
-			}
-		}
+		params.CompareStart, params.CompareEnd = filterparams.ParseComparisonRange(q.Get("compare_from"), q.Get("compare_to"))
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
 		if err != nil {
@@ -348,6 +324,33 @@ func (h *handler) handleGetSiteEcommerce(load func(context.Context, *database.St
 			slog.Error("Failed to encode response", "error", err)
 		}
 	}
+}
+
+// analyticsWindow holds the from/to/filter triple every hit-backed analytics
+// endpoint accepts.
+type analyticsWindow struct {
+	Start   time.Time
+	End     time.Time
+	Filters []api.Filter
+}
+
+// parseAnalyticsWindow resolves the shared from/to/filter query parameters and
+// writes the error response itself when one is malformed. Site stats and the AI
+// traffic series share it so their defaults and validation cannot drift apart.
+func parseAnalyticsWindow(w http.ResponseWriter, r *http.Request) (analyticsWindow, bool) {
+	q := r.URL.Query()
+	start, end, ok := filterparams.ParseAnalyticsRange(w, q.Get("from"), q.Get("to"))
+	if !ok {
+		return analyticsWindow{}, false
+	}
+
+	filters, err := parseFilters(q)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return analyticsWindow{}, false
+	}
+
+	return analyticsWindow{Start: start, End: end, Filters: filters}, true
 }
 
 func parseFilters(q url.Values) ([]api.Filter, error) {

@@ -334,9 +334,9 @@ func TestSeedAIFetchesCreatesDefaultRangeGPTBotData(t *testing.T) {
 	defer store.Close()
 	defer tenantMgr.Close()
 
-	stats, err := seedAIFetches(ctx, analyticsStore, site.ID, 30, mrand.New(mrand.NewSource(4242))) // #nosec G404 -- deterministic demo fixture test.
+	stats, err := seedAIVisibility(ctx, analyticsStore, site.ID, 30, mrand.New(mrand.NewSource(4242))) // #nosec G404 -- deterministic demo fixture test.
 	if err != nil {
-		t.Fatalf("seedAIFetches: %v", err)
+		t.Fatalf("seedAIVisibility: %v", err)
 	}
 	if stats.fetches == 0 {
 		t.Fatalf("expected seeded AI fetches, got %+v", stats)
@@ -357,6 +357,101 @@ func TestSeedAIFetchesCreatesDefaultRangeGPTBotData(t *testing.T) {
 	}
 	if !hasSeedMetricNamed(overview.TopAssistants, "GPTBot") {
 		t.Fatalf("expected default today range to show GPTBot, got %+v", overview.TopAssistants)
+	}
+}
+
+func TestSeedAIFetchesCreatesTrackedAIBotHits(t *testing.T) {
+	ctx, store, tenantMgr, site, _, analyticsStore := newSeedQRCampaignTestContext(t)
+	defer store.Close()
+	defer tenantMgr.Close()
+
+	if _, err := seedAIVisibility(ctx, analyticsStore, site.ID, 30, mrand.New(mrand.NewSource(4242))); err != nil { // #nosec G404 -- deterministic demo fixture test.
+		t.Fatalf("seedAIVisibility: %v", err)
+	}
+
+	report, err := analyticsStore.GetSiteStats(ctx, api.AnalyticsParams{
+		SiteID: site.ID,
+		Start:  time.Now().UTC().AddDate(0, 0, -30),
+		End:    time.Now().UTC().Add(5 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("GetSiteStats: %v", err)
+	}
+	if report.AIBotHits == 0 {
+		t.Fatalf("expected seeded AI bot hits in tracked stats, got %d", report.AIBotHits)
+	}
+
+	distinct := map[string]struct{}{}
+	for _, row := range report.TopAIBots {
+		if row.Name != "" {
+			distinct[row.Name] = struct{}{}
+		}
+	}
+	if len(distinct) < 3 {
+		t.Fatalf("expected at least 3 distinct seeded AI agent names, got %d: %+v", len(distinct), report.TopAIBots)
+	}
+}
+
+func TestSeedAIVisibilityFeedsTheMergedAIActivityReport(t *testing.T) {
+	ctx, store, tenantMgr, site, _, analyticsStore := newSeedQRCampaignTestContext(t)
+	defer store.Close()
+	defer tenantMgr.Close()
+
+	if _, err := seedAIVisibility(ctx, analyticsStore, site.ID, 30, mrand.New(mrand.NewSource(4242))); err != nil { // #nosec G404 -- deterministic demo fixture test.
+		t.Fatalf("seedAIVisibility: %v", err)
+	}
+
+	report, err := analyticsStore.GetAIActivity(ctx, api.AnalyticsParams{
+		SiteID: site.ID,
+		Start:  time.Now().UTC().AddDate(0, 0, -30),
+		End:    time.Now().UTC().Add(5 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("GetAIActivity: %v", err)
+	}
+	if report.TrackedHits == 0 || report.FetchCount == 0 {
+		t.Fatalf("expected both provenances seeded, got tracked %d fetched %d", report.TrackedHits, report.FetchCount)
+	}
+
+	merged := false
+	for _, row := range report.TopPaths {
+		if row.TrackedHits > 0 && row.FetchCount > 0 {
+			merged = true
+			break
+		}
+	}
+	if !merged {
+		t.Fatalf("expected at least one path with both tracked hits and fetch records, got %+v", report.TopPaths)
+	}
+
+	// Exactly one seeded fetch row is legacy-style: no assistant_category, so
+	// the demo data exercises the query-time COALESCE fallback.
+	legacyRows := 0
+	for _, spec := range pinnedAIFetches {
+		row := seedPinnedAIFetch(site.ID, time.Now().UTC(), time.Now().UTC(), spec)
+		if spec.legacy {
+			legacyRows++
+			if row.AssistantCategory != "" {
+				t.Fatalf("expected the legacy seed row to carry no category, got %q", row.AssistantCategory)
+			}
+			continue
+		}
+		if row.AssistantCategory == "" {
+			t.Fatalf("expected the pinned %s seed row to carry a classified category", spec.name)
+		}
+	}
+	if legacyRows != 1 {
+		t.Fatalf("expected exactly one legacy pinned seed row, got %d", legacyRows)
+	}
+
+	// Every fetch record must land in a category — including the legacy row,
+	// which only gets one through hk_ai_bot_category_from_name.
+	categorizedFetches := 0
+	for _, row := range report.TopCategories {
+		categorizedFetches += row.FetchCount
+	}
+	if categorizedFetches != report.FetchCount {
+		t.Fatalf("categorized fetch records = %d, want all %d: the NULL-category row must fall back to its agent's category", categorizedFetches, report.FetchCount)
 	}
 }
 

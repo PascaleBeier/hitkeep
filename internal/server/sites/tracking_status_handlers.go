@@ -39,3 +39,40 @@ func (h *handler) handleGetSiteTrackingStatus() http.HandlerFunc {
 		}
 	}
 }
+
+func (h *handler) handleGetSiteSetupState() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if h.ctx.Store == nil {
+			http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
+			return
+		}
+
+		siteID, err := uuid.Parse(r.PathValue("id"))
+		if err != nil {
+			http.Error(w, "Invalid site_id", http.StatusBadRequest)
+			return
+		}
+
+		// The flags read hits, events, web_vitals and ai_fetches, which all live
+		// in the tenant database, so this needs the analytics store rather than
+		// the control-plane store the tracking status above is happy with.
+		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
+		if err != nil {
+			slog.Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		state, err := analyticsStore.GetSiteSetupState(r.Context(), siteID)
+		if err != nil {
+			slog.Error("Failed to load site setup state", "error", err, "site_id", siteID)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(state); err != nil {
+			slog.Error("Failed to encode setup state response", "error", err)
+		}
+	}
+}

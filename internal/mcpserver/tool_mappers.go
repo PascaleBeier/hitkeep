@@ -1,9 +1,11 @@
 package mcpserver
 
 import (
+	"slices"
 	"time"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/server/filterparams"
 )
 
 func formatMCPTime(ts time.Time) string {
@@ -34,40 +36,42 @@ func toMCPSiteStats(stats *api.SiteStats) *mcpSiteStats {
 		return nil
 	}
 	return &mcpSiteStats{
-		LiveVisitors:       stats.LiveVisitors,
-		TotalPageviews:     stats.TotalPageviews,
-		UniqueSessions:     stats.UniqueSessions,
-		BounceRate:         stats.BounceRate,
-		AvgSessionDuration: stats.AvgSessionDuration,
-		PagesPerSession:    stats.PagesPerSession,
-		ChartData:          toMCPChartData(stats.ChartData),
-		TopPages:           stats.TopPages,
-		TopLandingPages:    stats.TopLandingPages,
-		TopExitPages:       stats.TopExitPages,
-		TopReferrers:       stats.TopReferrers,
-		TopDevices:         stats.TopDevices,
-		TopCountries:       stats.TopCountries,
-		TopCities:          stats.TopCities,
-		TopProviders:       stats.TopProviders,
-		TopASNs:            stats.TopASNs,
-		TopBrowsers:        stats.TopBrowsers,
-		TopAIBots:          stats.TopAIBots,
-		TopAISources:       stats.TopAISources,
-		TopLanguages:       stats.TopLanguages,
-		TopUTMCampaigns:    stats.TopUTMCampaigns,
-		TopUTMContents:     stats.TopUTMContents,
-		TopUTMMediums:      stats.TopUTMMediums,
-		TopUTMSources:      stats.TopUTMSources,
-		TopUTMTerms:        stats.TopUTMTerms,
-		AIBotHits:          stats.AIBotHits,
-		AISourceVisits:     stats.AISourceVisits,
-		UTMCampaignHits:    stats.UTMCampaignHits,
-		UTMContentHits:     stats.UTMContentHits,
-		UTMMediumHits:      stats.UTMMediumHits,
-		UTMSourceHits:      stats.UTMSourceHits,
-		UTMTermHits:        stats.UTMTermHits,
-		Goals:              toMCPGoals(stats.Goals),
-		Comparison:         toMCPComparisonStats(stats.Comparison),
+		LiveVisitors:        stats.LiveVisitors,
+		TotalPageviews:      stats.TotalPageviews,
+		UniqueSessions:      stats.UniqueSessions,
+		BounceRate:          stats.BounceRate,
+		AvgSessionDuration:  stats.AvgSessionDuration,
+		PagesPerSession:     stats.PagesPerSession,
+		ChartData:           toMCPChartData(stats.ChartData),
+		TopPages:            stats.TopPages,
+		TopLandingPages:     stats.TopLandingPages,
+		TopExitPages:        stats.TopExitPages,
+		TopReferrers:        stats.TopReferrers,
+		TopDevices:          stats.TopDevices,
+		TopCountries:        stats.TopCountries,
+		TopCities:           stats.TopCities,
+		TopProviders:        stats.TopProviders,
+		TopASNs:             stats.TopASNs,
+		TopBrowsers:         stats.TopBrowsers,
+		TopAIBots:           stats.TopAIBots,
+		TopAIBotCategories:  stats.TopAIBotCategories,
+		TopAIBotsByCategory: stats.TopAIBotsByCategory,
+		TopAISources:        stats.TopAISources,
+		TopLanguages:        stats.TopLanguages,
+		TopUTMCampaigns:     stats.TopUTMCampaigns,
+		TopUTMContents:      stats.TopUTMContents,
+		TopUTMMediums:       stats.TopUTMMediums,
+		TopUTMSources:       stats.TopUTMSources,
+		TopUTMTerms:         stats.TopUTMTerms,
+		AIBotHits:           stats.AIBotHits,
+		AISourceVisits:      stats.AISourceVisits,
+		UTMCampaignHits:     stats.UTMCampaignHits,
+		UTMContentHits:      stats.UTMContentHits,
+		UTMMediumHits:       stats.UTMMediumHits,
+		UTMSourceHits:       stats.UTMSourceHits,
+		UTMTermHits:         stats.UTMTermHits,
+		Goals:               toMCPGoals(stats.Goals),
+		Comparison:          toMCPComparisonStats(stats.Comparison),
 	}
 }
 
@@ -82,6 +86,8 @@ func toMCPComparisonStats(stats *api.ComparisonStats) *mcpComparisonStats {
 		AvgSessionDuration: stats.AvgSessionDuration,
 		PagesPerSession:    stats.PagesPerSession,
 		ChartData:          toMCPChartData(stats.ChartData),
+		AIBotHits:          stats.AIBotHits,
+		AISourceVisits:     stats.AISourceVisits,
 		UTMCampaignHits:    stats.UTMCampaignHits,
 		UTMContentHits:     stats.UTMContentHits,
 		UTMMediumHits:      stats.UTMMediumHits,
@@ -145,13 +151,38 @@ func toMCPSearchConsoleSeries(series api.SearchConsoleSeriesResponse) *mcpSearch
 	return out
 }
 
-func isAllowedFilter(filterType string) bool {
-	switch filterType {
-	case "path", "hostname", "referrer", "referrer_host", "device", "country", "city", "provider", "asn", "browser", "language", "utm_campaign", "utm_content", "utm_medium", "utm_source", "utm_term":
-		return true
-	default:
-		return false
+// mcpExcludedFilterTypes names the canonical hit filter types the MCP surface
+// deliberately withholds:
+//
+//   - qr_code_id: a dashboard-only drill-down. The values are opaque QR code
+//     UUIDs an MCP client cannot discover through any exposed aggregate tool, so
+//     accepting them would only invite failed guesses.
+//
+// Everything else in filterparams' canonical set is accepted, which means a new
+// filter type reaches MCP automatically and removing one takes a deliberate edit
+// here.
+var mcpExcludedFilterTypes = map[string]struct{}{
+	"qr_code_id": {},
+}
+
+// mcpFilterTypes is the sorted MCP filter allowlist, derived from the canonical
+// REST set minus mcpExcludedFilterTypes.
+var mcpFilterTypes = deriveMCPFilterTypes()
+
+func deriveMCPFilterTypes() []string {
+	canonical := filterparams.AllowedHitFilterTypes()
+	allowed := make([]string, 0, len(canonical))
+	for _, filterType := range canonical {
+		if _, excluded := mcpExcludedFilterTypes[filterType]; excluded {
+			continue
+		}
+		allowed = append(allowed, filterType)
 	}
+	return allowed
+}
+
+func isAllowedFilter(filterType string) bool {
+	return slices.Contains(mcpFilterTypes, filterType)
 }
 
 func normalizeLimit(limit int) int {
@@ -190,7 +221,7 @@ Team API clients are recommended for shared assistants and automations.
 
 Analytics tools require a ` + "`site_id`" + ` that the API client can view. The server returns aggregate KPIs, event summaries, ecommerce summaries, Web Vitals summaries and visitor-context breakdowns, AI visibility reports, and saved Opportunities recommendations. It does not expose raw hit exports, raw Web Vitals samples, or write/admin actions.
 
-Date inputs use RFC3339 timestamps. If omitted, tools default to the last 30 days. Filters and visitor-context breakdowns support aggregate geo/network dimensions such as city, provider, and ASN where the selected tool supports them.
+Date inputs use RFC3339 timestamps. If omitted, tools default to the last 30 days. Filters and visitor-context breakdowns support aggregate geo/network dimensions such as city, provider, and ASN, plus AI visibility dimensions such as AI bot, AI bot category, and AI source, where the selected tool supports them.
 
 Opportunities are returned as final customer-visible records with localization keys, interpolation params, cited evidence, detector metadata, and status. MCP does not expose raw prompts, raw provider payloads, unrestricted tool calls, or visitor-level rows.
 

@@ -885,7 +885,7 @@ func normalizeDashboardRoutePath(raw string, allowQueryOrFragment bool) string {
 		path = "/" + path
 	}
 	allowed := []string{
-		"/dashboard", "/events", "/ecommerce", "/web-vitals", "/ai-visibility",
+		"/dashboard", "/events", "/ecommerce", "/web-vitals", "/ai-agents", "/ai-visibility",
 		"/opportunities", "/goals", "/funnels", "/utm", "/utm/builder",
 		"/utm/qr-codes", "/import-export", "/integration/google-search-console",
 	}

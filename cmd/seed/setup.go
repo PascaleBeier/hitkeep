@@ -249,9 +249,12 @@ func mergeQRSeedStats(stats, qrStats seedStats) seedStats {
 }
 
 type aiFetchSeedStats struct {
-	fetches  int
+	fetches int
+	// hits and sessions count the human visits that followed an AI referral.
 	hits     int
 	sessions int
+	// botHits counts tracked pageview hits from AI crawler user agents.
+	botHits int
 }
 
 type seedWriteBatch struct {

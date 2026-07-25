@@ -4,12 +4,17 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
 )
+
+// aiBotCategoryDimPrefix namespaces the per-category AI agent top lists inside
+// the shared dim column of the GetSiteStats top-list query.
+const aiBotCategoryDimPrefix = "ai_bot_cat::"
 
 // GetSiteAnalyticsBounds returns the observed timestamp span for a site's hits.
 // Zero values mean the site has no stored hits yet.
@@ -136,29 +141,37 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 	//nolint:gosec // filterSQL is derived from a fixed allowlist
 	topQuery := fmt.Sprintf(`
 		WITH base AS (
+			-- The category derives from the agent name the inner select already
+			-- resolved, so the ~200-branch user-agent pattern walk runs once per
+			-- row instead of once for the name and once for the category.
 			SELECT
-				h.path AS path,
-				hk_referrer(h.referrer) AS referrer,
-				hk_device(h.viewport_width) AS device,
-				hk_country(h.country_code) AS country,
-				COALESCE(NULLIF(TRIM(h.city), ''), '(Unknown)') AS city,
-				COALESCE(NULLIF(TRIM(h.provider), ''), '(Unknown)') AS provider,
-				hk_asn(h.asn, h.asn_org) AS asn,
-				hk_browser(h.user_agent) AS browser,
-				hk_ai_bot(h.user_agent) AS ai_bot,
-				hk_ai_source(h.referrer) AS ai_source,
-				h.session_id AS session_id,
-				CASE
-					WHEN NULLIF(TRIM(h.language), '') IS NULL THEN '(Unspecified)'
-					ELSE lower(split_part(TRIM(h.language), '-', 1))
-				END AS language,
-				COALESCE(NULLIF(TRIM(h.utm_campaign), ''), '(Unspecified)') AS utm_campaign,
-				COALESCE(NULLIF(TRIM(h.utm_content), ''), '(Unspecified)') AS utm_content,
-				COALESCE(NULLIF(TRIM(h.utm_medium), ''), '(Unspecified)') AS utm_medium,
-				COALESCE(NULLIF(TRIM(h.utm_source), ''), '(Unspecified)') AS utm_source,
-				COALESCE(NULLIF(TRIM(h.utm_term), ''), '(Unspecified)') AS utm_term
-			FROM hits h
-			WHERE h.site_id = ? AND h.timestamp >= ? AND h.timestamp <= ?%s
+				classified.*,
+				hk_ai_bot_category_from_name(classified.ai_bot) AS ai_bot_category
+			FROM (
+				SELECT
+					h.path AS path,
+					hk_referrer(h.referrer) AS referrer,
+					hk_device(h.viewport_width) AS device,
+					hk_country(h.country_code) AS country,
+					COALESCE(NULLIF(TRIM(h.city), ''), '(Unknown)') AS city,
+					COALESCE(NULLIF(TRIM(h.provider), ''), '(Unknown)') AS provider,
+					hk_asn(h.asn, h.asn_org) AS asn,
+					hk_browser(h.user_agent) AS browser,
+					hk_ai_bot(h.user_agent) AS ai_bot,
+					hk_ai_source(h.referrer) AS ai_source,
+					h.session_id AS session_id,
+					CASE
+						WHEN NULLIF(TRIM(h.language), '') IS NULL THEN '(Unspecified)'
+						ELSE lower(split_part(TRIM(h.language), '-', 1))
+					END AS language,
+					COALESCE(NULLIF(TRIM(h.utm_campaign), ''), '(Unspecified)') AS utm_campaign,
+					COALESCE(NULLIF(TRIM(h.utm_content), ''), '(Unspecified)') AS utm_content,
+					COALESCE(NULLIF(TRIM(h.utm_medium), ''), '(Unspecified)') AS utm_medium,
+					COALESCE(NULLIF(TRIM(h.utm_source), ''), '(Unspecified)') AS utm_source,
+					COALESCE(NULLIF(TRIM(h.utm_term), ''), '(Unspecified)') AS utm_term
+				FROM hits h
+				WHERE h.site_id = ? AND h.timestamp >= ? AND h.timestamp <= ?%s
+			) classified
 		),
 		agg AS (
 			SELECT
@@ -172,6 +185,7 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 					WHEN GROUPING(asn) = 0 THEN 'asn'
 					WHEN GROUPING(browser) = 0 THEN 'browser'
 					WHEN GROUPING(ai_bot) = 0 THEN 'ai_bot'
+					WHEN GROUPING(ai_bot_category) = 0 THEN 'ai_bot_category'
 					WHEN GROUPING(language) = 0 THEN 'language'
 					WHEN GROUPING(utm_campaign) = 0 THEN 'utm_campaign'
 					WHEN GROUPING(utm_content) = 0 THEN 'utm_content'
@@ -180,7 +194,7 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 					WHEN GROUPING(utm_term) = 0 THEN 'utm_term'
 					ELSE '__summary__'
 				END AS dim,
-				COALESCE(path, referrer, device, country, city, provider, asn, browser, ai_bot, language, utm_campaign, utm_content, utm_medium, utm_source, utm_term) AS name,
+				COALESCE(path, referrer, device, country, city, provider, asn, browser, ai_bot, ai_bot_category, language, utm_campaign, utm_content, utm_medium, utm_source, utm_term) AS name,
 				COUNT(*) AS val,
 				COUNT(*) FILTER (WHERE ai_bot IS NOT NULL) AS ai_bot_hits,
 				COUNT(DISTINCT session_id) FILTER (WHERE ai_source IS NOT NULL) AS ai_source_visits
@@ -195,6 +209,7 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 				(asn),
 				(browser),
 				(ai_bot),
+				(ai_bot_category),
 				(language),
 				(utm_campaign),
 				(utm_content),
@@ -215,6 +230,19 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 			WHERE ai_source IS NOT NULL
 			GROUP BY ai_source
 		),
+		ai_bot_category_breakdown AS (
+			-- One dim per category so the shared per-dim ranking yields a
+			-- top list of agents within each category.
+			SELECT
+				'%s' || ai_bot_category AS dim,
+				ai_bot AS name,
+				COUNT(*) AS val,
+				NULL AS ai_bot_hits,
+				NULL AS ai_source_visits
+			FROM base
+			WHERE ai_bot IS NOT NULL AND ai_bot_category IS NOT NULL
+			GROUP BY ai_bot_category, ai_bot
+		),
 		ranked AS (
 			SELECT
 				dim,
@@ -227,6 +255,8 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 				SELECT dim, name, val, ai_bot_hits, ai_source_visits FROM agg
 				UNION ALL
 				SELECT dim, name, val, ai_bot_hits, ai_source_visits FROM ai_source_agg
+				UNION ALL
+				SELECT dim, name, val, ai_bot_hits, ai_source_visits FROM ai_bot_category_breakdown
 			)
 			WHERE dim = '__summary__' OR name IS NOT NULL
 		)
@@ -234,7 +264,7 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 		FROM ranked
 		WHERE dim = '__summary__' OR rn <= 10
 		ORDER BY CASE WHEN dim = '__summary__' THEN 0 ELSE 1 END, dim, val DESC;
-	`, filterSQL)
+	`, filterSQL, aiBotCategoryDimPrefix)
 
 	topRows, err := s.db.QueryContext(ctx, topQuery, append([]any{params.SiteID, params.Start, params.End}, filterArgs...)...)
 	if err != nil {
@@ -267,6 +297,13 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 			Name:  name.String,
 			Value: int(value.Int64),
 		}
+		if category, ok := strings.CutPrefix(dim, aiBotCategoryDimPrefix); ok {
+			if stats.TopAIBotsByCategory == nil {
+				stats.TopAIBotsByCategory = make(map[string][]api.MetricStat)
+			}
+			stats.TopAIBotsByCategory[category] = append(stats.TopAIBotsByCategory[category], m)
+			continue
+		}
 		switch dim {
 		case "path":
 			stats.TopPages = append(stats.TopPages, m)
@@ -286,6 +323,8 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 			stats.TopBrowsers = append(stats.TopBrowsers, m)
 		case "ai_bot":
 			stats.TopAIBots = append(stats.TopAIBots, m)
+		case "ai_bot_category":
+			stats.TopAIBotCategories = append(stats.TopAIBotCategories, m)
 		case "ai_source":
 			stats.TopAISources = append(stats.TopAISources, m)
 		case "language":
@@ -429,7 +468,10 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 	}
 	stats.Funnels = funnels
 
-	if !params.CompareStart.IsZero() {
+	// Both ends must be present: the compare params are parsed leniently, so a
+	// half-specified window would measure against [start, zero time] and report
+	// an empty baseline as a 100% drop.
+	if !params.CompareStart.IsZero() && !params.CompareEnd.IsZero() {
 		comparison, err := s.GetComparisonStats(ctx, params)
 		if err != nil {
 			return nil, fmt.Errorf("failed to calc comparison stats: %w", err)

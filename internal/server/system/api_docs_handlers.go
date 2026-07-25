@@ -34,17 +34,24 @@ func (h *handler) handleGetAPIDocVersions() http.HandlerFunc {
 	}
 }
 
+// handleGetAPIDocV1 assembles and encodes the v1 specification once, at route
+// registration time: the public URL is process-constant, so the served bytes
+// never change and every request just writes the same buffer.
 func (h *handler) handleGetAPIDocV1() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		publicURL := strings.TrimSpace(h.ctx.Config.PublicURL)
-		if publicURL == "" {
-			publicURL = "http://localhost:8080"
-		}
+	publicURL := strings.TrimSpace(h.ctx.Config.PublicURL)
+	if publicURL == "" {
+		publicURL = "http://localhost:8080"
+	}
 
-		spec := OpenAPISpecV1(publicURL)
+	document, err := json.Marshal(OpenAPISpecV1(publicURL))
+	if err != nil {
+		// The specification is assembled from plain JSON types.
+		panic("system: cannot encode OpenAPI document: " + err.Error())
+	}
 
+	return func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(spec)
+		_, _ = w.Write(document)
 	}
 }
 

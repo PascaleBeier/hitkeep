@@ -102,6 +102,118 @@ func TestHandleCreateAIFetchAcceptsKnownBot(t *testing.T) {
 	}
 }
 
+// TestHandleCreateAIFetchAcceptsUpstreamListedBot covers an agent that is not
+// part of the original hand-curated list and only reaches the classifier
+// through the merged upstream master list.
+func TestHandleCreateAIFetchAcceptsUpstreamListedBot(t *testing.T) {
+	store, ctx, _, siteID, token := setupAIFetchTestEnv(t)
+
+	mux := http.NewServeMux()
+	Register(mux, ctx)
+
+	body := map[string]any{
+		"path":        "/guides/ai",
+		"status_code": 200,
+		"user_agent":  "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; OAI-SearchBot/1.0; +https://openai.com/searchbot)",
+	}
+	payload, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/sites/"+siteID.String()+"/ingest/ai-fetch", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", token)
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected %d, got %d body=%s", http.StatusAccepted, rec.Code, rec.Body.String())
+	}
+
+	overview, err := store.GetAIFetchOverview(context.Background(), api.AIFetchQueryParams{
+		SiteID: siteID,
+		Start:  time.Now().UTC().Add(-time.Hour),
+		End:    time.Now().UTC().Add(time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("GetAIFetchOverview: %v", err)
+	}
+	if !containsMetric(overview.TopAssistants, "OAI-SearchBot", 1) {
+		t.Fatalf("expected OAI-SearchBot in top assistants, got %+v", overview.TopAssistants)
+	}
+}
+
+func TestHandleGetAIAgentCatalog(t *testing.T) {
+	_, ctx, _, _, token := setupAIFetchTestEnv(t)
+
+	mux := http.NewServeMux()
+	Register(mux, ctx)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/ai-agents", nil)
+	req.Header.Set("X-API-Key", token)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected %d, got %d body=%s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+	if cc := rec.Header().Get("Cache-Control"); cc == "" {
+		t.Fatal("catalog response must be cacheable")
+	}
+
+	var catalog api.AIAgentCatalog
+	if err := json.Unmarshal(rec.Body.Bytes(), &catalog); err != nil {
+		t.Fatalf("decode catalog: %v", err)
+	}
+	if len(catalog.Agents) < 100 {
+		t.Fatalf("expected at least 100 agents, got %d", len(catalog.Agents))
+	}
+
+	byName := make(map[string]api.AIAgentCatalogAgent, len(catalog.Agents))
+	for _, agent := range catalog.Agents {
+		byName[agent.Name] = agent
+	}
+	gptbot, ok := byName["GPTBot"]
+	if !ok {
+		t.Fatal("catalog is missing GPTBot")
+	}
+	if gptbot.IconHost == "" || strings.Contains(gptbot.IconHost, "/") {
+		t.Fatalf("GPTBot icon host %q must be a bare hostname", gptbot.IconHost)
+	}
+
+	foundReferrerIcon := false
+	for _, ref := range catalog.AIReferrers {
+		if ref.Name == "ChatGPT" && ref.IconHost != "" {
+			foundReferrerIcon = true
+		}
+	}
+	if !foundReferrerIcon {
+		t.Fatal("ChatGPT referrer must expose an icon host")
+	}
+}
+
+func TestHandleCreateAIFetchRejectsRegularBrowser(t *testing.T) {
+	_, ctx, _, siteID, token := setupAIFetchTestEnv(t)
+
+	mux := http.NewServeMux()
+	Register(mux, ctx)
+
+	body := map[string]any{
+		"path":        "/docs",
+		"status_code": 200,
+		"user_agent":  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+	}
+	payload, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/sites/"+siteID.String()+"/ingest/ai-fetch", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", token)
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+}
+
 func TestHandleCreateAIFetchRejectsUnknownBot(t *testing.T) {
 	_, ctx, _, siteID, token := setupAIFetchTestEnv(t)
 

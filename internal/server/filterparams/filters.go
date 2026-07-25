@@ -3,6 +3,7 @@ package filterparams
 import (
 	"errors"
 	"net/url"
+	"slices"
 	"strings"
 
 	"hitkeep/internal/api"
@@ -16,24 +17,43 @@ type LegacyPair struct {
 	InvalidTypeMessage string
 }
 
+// hitFilterTypes is the canonical set of filter types the hit-backed analytics
+// surfaces accept. Every other allowlist in the codebase must derive from it
+// through AllowedHitFilterTypes instead of hand-copying the entries.
 var hitFilterTypes = map[string]struct{}{
-	"path":          {},
-	"hostname":      {},
-	"referrer":      {},
-	"referrer_host": {},
-	"device":        {},
-	"country":       {},
-	"city":          {},
-	"provider":      {},
-	"asn":           {},
-	"browser":       {},
-	"language":      {},
-	"utm_campaign":  {},
-	"utm_content":   {},
-	"utm_medium":    {},
-	"utm_source":    {},
-	"utm_term":      {},
-	"qr_code_id":    {},
+	"path":            {},
+	"ai_bot":          {},
+	"ai_bot_category": {},
+	"ai_source":       {},
+	"hostname":        {},
+	"referrer":        {},
+	"referrer_host":   {},
+	"device":          {},
+	"country":         {},
+	"city":            {},
+	"provider":        {},
+	"asn":             {},
+	"browser":         {},
+	"language":        {},
+	"utm_campaign":    {},
+	"utm_content":     {},
+	"utm_medium":      {},
+	"utm_source":      {},
+	"utm_term":        {},
+	"qr_code_id":      {},
+}
+
+// AllowedHitFilterTypes returns every accepted hit filter type in sorted order.
+// Callers that need a narrower allowlist (the MCP surface, for one) should derive
+// it from this set and subtract explicit exclusions, so a new filter type never
+// has to be added in two places.
+func AllowedHitFilterTypes() []string {
+	types := make([]string, 0, len(hitFilterTypes))
+	for filterType := range hitFilterTypes {
+		types = append(types, filterType)
+	}
+	slices.Sort(types)
+	return types
 }
 
 // ParseHitFilters parses repeatable filter=type:value params and an optional

@@ -459,6 +459,10 @@ func (s *Store) GetComparisonStats(ctx context.Context, params api.AnalyticsPara
 		return nil, fmt.Errorf("comparison UTM KPI query failed: %w", err)
 	}
 
+	if err := s.queryAIKpis(ctx, cmp, filterSQL, filterArgs, &stats.AIBotHits, &stats.AISourceVisits); err != nil {
+		return nil, fmt.Errorf("comparison AI KPI query failed: %w", err)
+	}
+
 	rows, err := s.queryChartData(ctx, cmp, gridStart, gridEnd, truncUnit, filterSQL, filterArgs, false, rollupHourly)
 	if err != nil {
 		return nil, fmt.Errorf("comparison chart query failed: %w", err)

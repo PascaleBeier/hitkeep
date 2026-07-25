@@ -123,6 +123,10 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		RateLimiter: ctx.ApiLimiter,
 	}, h.handleGetShareEcommerceSources()))
 
+	mux.HandleFunc("GET /api/share/{token}/sites/{id}/ai-activity", ctx.Handler(shared.HandlerConfig{
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleGetShareAIActivity()))
+
 	mux.HandleFunc("GET /api/share/{token}/sites/{id}/web-vitals/summary", ctx.Handler(shared.HandlerConfig{
 		RateLimiter: ctx.ApiLimiter,
 	}, h.handleGetShareWebVitalsSummary()))

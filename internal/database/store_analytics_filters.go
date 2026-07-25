@@ -305,6 +305,32 @@ func (s *Store) queryUTMKpis(
 	)
 }
 
+// queryAIKpis aggregates the AI traffic KPIs for one window. It mirrors the
+// summary row of the GetSiteStats top-list query so comparison windows carry
+// the same numbers without running a second full stats query.
+func (s *Store) queryAIKpis(
+	ctx context.Context,
+	params api.AnalyticsParams,
+	filterSQL string,
+	filterArgs []any,
+	aiBotHits *int,
+	aiSourceVisits *int,
+) error {
+	//nolint:gosec // filterSQL is derived from a fixed allowlist
+	query := fmt.Sprintf(`
+		SELECT
+			COUNT(*) FILTER (WHERE hk_ai_bot(h.user_agent) IS NOT NULL) AS ai_bot_hits,
+			COUNT(DISTINCT h.session_id) FILTER (WHERE hk_ai_source(h.referrer) IS NOT NULL) AS ai_source_visits
+		FROM hits h
+		WHERE h.site_id = ? AND h.timestamp >= ? AND h.timestamp <= ?%s
+	`, filterSQL)
+
+	return s.db.QueryRowContext(ctx, query, append([]any{params.SiteID, params.Start, params.End}, filterArgs...)...).Scan(
+		aiBotHits,
+		aiSourceVisits,
+	)
+}
+
 func buildPlaceholders(count int) string {
 	if count <= 0 {
 		return ""

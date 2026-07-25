@@ -154,14 +154,14 @@ func main() {
 		os.Exit(1)
 	}
 	stats.webVitals = webVitals
-	aiSeedStats, err := seedAIFetches(ctx, analyticsStore, siteID, *days, rng)
+	aiSeedStats, err := seedAIVisibility(ctx, analyticsStore, siteID, *days, rng)
 	if err != nil {
 		slog.Error("Failed to seed AI visibility", "error", err)
 		os.Exit(1)
 	}
 	stats.aiFetches = aiSeedStats.fetches
-	stats.hits += aiSeedStats.hits
-	stats.sessions += aiSeedStats.sessions
+	stats.hits += aiSeedStats.hits + aiSeedStats.botHits
+	stats.sessions += aiSeedStats.sessions + aiSeedStats.botHits
 
 	searchConsoleStats := seedGoogleSearchConsoleFixtures(ctx, store, tenantMgr, userID, siteID, *days)
 	seedActivationFixtures(ctx, store, userID, siteID)
