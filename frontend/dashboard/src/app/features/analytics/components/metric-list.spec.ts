@@ -12,7 +12,7 @@ describe('MetricList', () => {
             imports: [
                 MetricList,
                 TranslocoTestingModule.forRoot({
-                    langs: { en: {} },
+                    langs: { en: { aiAgents: { provenance: { hint: 'tracked {{tracked}} · logs {{fetched}}' } } } },
                     translocoConfig: {
                         availableLangs: ['en'],
                         defaultLang: 'en'
@@ -61,6 +61,23 @@ describe('MetricList', () => {
         expect(rows.length).toBe(2);
         expect(fixture.nativeElement.textContent).toContain('70%');
         expect(fixture.nativeElement.textContent).toContain('30%');
+    });
+
+    describe('share column', () => {
+        it('renders the share of total next to every value by default', () => {
+            const shares = fixture.debugElement.queryAll(By.css('.metric-list__share'));
+            expect(shares.map((share) => share.nativeElement.textContent.trim())).toEqual(['70%', '30%']);
+        });
+
+        it('drops the share column but keeps the values when share is switched off', () => {
+            fixture.componentRef.setInput('showShare', false);
+            fixture.detectChanges();
+
+            expect(fixture.debugElement.queryAll(By.css('.metric-list__share')).length).toBe(0);
+            const values = fixture.debugElement.queryAll(By.css('.metric-list__value'));
+            expect(values.map((value) => value.nativeElement.textContent.trim())).toEqual(['70', '30']);
+            expect(fixture.nativeElement.textContent).not.toContain('%');
+        });
     });
 
     it('should show an empty state instead of a zero-value row when there is no data', () => {
@@ -138,6 +155,56 @@ describe('MetricList', () => {
 
         const flag = fixture.debugElement.query(By.css('.metric-list__flag'));
         expect(flag.nativeElement.getAttribute('ngsrc') ?? flag.nativeElement.getAttribute('src')).toContain('/flags/cz.svg');
+    });
+
+    describe('provenance hint', () => {
+        const mergedRows = [
+            { name: 'GPTBot', value: 50, tracked_hits: 10, fetch_count: 40 },
+            { name: 'ClaudeBot', value: 8, tracked_hits: 8, fetch_count: 0 }
+        ];
+
+        it('stays out of the DOM and out of the title while the input is unset', () => {
+            fixture.componentRef.setInput('data', mergedRows);
+            fixture.detectChanges();
+
+            expect(fixture.debugElement.query(By.css('.metric-list__provenance'))).toBeNull();
+            const labels = fixture.debugElement.queryAll(By.css('.metric-list__label'));
+            expect(labels.map((label) => label.nativeElement.getAttribute('title'))).toEqual(['GPTBot', 'ClaudeBot']);
+        });
+
+        it('appends a muted hint and title suffix only for rows with log-side requests', () => {
+            fixture.componentRef.setInput('showProvenance', true);
+            fixture.componentRef.setInput('data', mergedRows);
+            fixture.detectChanges();
+
+            const hints = fixture.debugElement.queryAll(By.css('.metric-list__provenance'));
+            expect(hints.length).toBe(1);
+            expect(hints[0].nativeElement.textContent.trim()).toBe('tracked 10 · logs 40');
+
+            const labels = fixture.debugElement.queryAll(By.css('.metric-list__label'));
+            expect(labels[0].nativeElement.getAttribute('title')).toBe('GPTBot · tracked 10 · logs 40');
+            expect(labels[1].nativeElement.getAttribute('title')).toBe('ClaudeBot');
+        });
+
+        it('ignores rows that carry no provenance counters at all', () => {
+            fixture.componentRef.setInput('showProvenance', true);
+            fixture.componentRef.setInput('data', [{ name: 'Desktop', value: 70 }]);
+            fixture.detectChanges();
+
+            expect(fixture.debugElement.query(By.css('.metric-list__provenance'))).toBeNull();
+            expect(fixture.debugElement.query(By.css('.metric-list__label')).nativeElement.getAttribute('title')).toBe('Desktop');
+        });
+
+        it('keeps the hint next to the label on linked path rows', () => {
+            fixture.componentRef.setInput('showProvenance', true);
+            fixture.componentRef.setInput('linkMode', 'path');
+            fixture.componentRef.setInput('siteDomain', 'example.com');
+            fixture.componentRef.setInput('data', [{ name: '/docs', value: 10, tracked_hits: 2, fetch_count: 8 }]);
+            fixture.detectChanges();
+
+            expect(fixture.debugElement.query(By.css('.metric-list__provenance')).nativeElement.textContent.trim()).toBe('tracked 2 · logs 8');
+            expect(fixture.debugElement.query(By.css('.metric-list__link'))).not.toBeNull();
+        });
     });
 
     it('should map Norwegian Bokmal to a Norwegian flag', () => {

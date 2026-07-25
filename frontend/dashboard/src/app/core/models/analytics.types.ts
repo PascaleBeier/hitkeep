@@ -362,6 +362,17 @@ export interface AIFetchCitationYieldRow {
     citation_yield_pct: number;
 }
 
+/**
+ * One path of the citation list. Both counters are distinct counts computed over
+ * the whole path server-side, which is why they cannot be derived from the
+ * per-(path, assistant) `AIFetchCitationYieldRow` rows.
+ */
+export interface AIFetchCorrelationPathRow {
+    path: string;
+    fetch_count: number;
+    ai_referred_visits: number;
+}
+
 export interface AIFetchOpportunityRow {
     path: string;
     fetch_count: number;
@@ -378,9 +389,69 @@ export interface AIFetchFailureHotspot {
     error_rate_pct: number;
 }
 
+/**
+ * One row of an AI activity breakdown. `value` is the merged AI request count
+ * the row is ranked by; the two provenance counters say how much of it the
+ * client-side tracker saw versus what only the forwarded logs know about.
+ */
+export interface AIActivityStat extends MetricStat {
+    tracked_hits: number;
+    fetch_count: number;
+}
+
+/** One bucket of the unified AI activity series. */
+export interface AIActivitySeriesPoint {
+    time: string;
+    ai_requests: number;
+    tracked_hits: number;
+    fetch_count: number;
+    referral_visits: number;
+}
+
+/** Headline counters of the AI activity report, tracked and log side merged. */
+export interface AIActivityScalars {
+    ai_requests: number;
+    tracked_hits: number;
+    fetch_count: number;
+    referral_visits: number;
+    paths_crawled: number;
+    unique_agents: number;
+    pageviews: number;
+    error_rate_4xx: number;
+    error_rate_5xx: number;
+    median_response_ms: number;
+    total_bytes: number;
+}
+
+/**
+ * Previous-period baseline; only the counters the deltas are drawn from. The
+ * four omitted scalars describe the fetch side of the current range alone and
+ * are not part of the comparison payload.
+ */
+export type AIActivityComparison = Omit<AIActivityScalars, 'error_rate_4xx' | 'error_rate_5xx' | 'median_response_ms' | 'total_bytes'>;
+
+/**
+ * Everything the AI Agents page needs in one response: merged scalars, the
+ * breakdowns, the chart series and the optional previous-period baseline.
+ * Share links get the same shape, fetch counts included.
+ */
+export interface AIActivityReport extends AIActivityScalars {
+    top_agents: AIActivityStat[];
+    top_categories: AIActivityStat[];
+    top_paths: AIActivityStat[];
+    top_sources: AIActivityStat[];
+    top_families: AIActivityStat[];
+    top_resource_types: AIActivityStat[];
+    top_error_paths: AIActivityStat[];
+    top_agents_by_category: Record<string, AIActivityStat[]>;
+    series: AIActivitySeriesPoint[];
+    comparison?: AIActivityComparison;
+}
+
 export interface AIFetchCorrelationReport {
     summary: AIFetchCorrelationSummary;
     citation_yield: AIFetchCitationYieldRow[];
+    citation_paths: AIFetchCorrelationPathRow[];
     opportunity_pages: AIFetchOpportunityRow[];
     failure_hotspots: AIFetchFailureHotspot[];
 }
@@ -528,6 +599,8 @@ export interface ComparisonStats {
     avg_session_duration: number;
     pages_per_session: number;
     chart_data: ChartDataPoint[];
+    ai_bot_hits: number;
+    ai_source_visits: number;
     utm_campaign_hits: number;
     utm_content_hits: number;
     utm_medium_hits: number;
@@ -556,6 +629,8 @@ export interface SiteStats {
     top_asns?: MetricStat[];
     top_browsers: MetricStat[];
     top_ai_bots: MetricStat[];
+    top_ai_bot_categories?: MetricStat[];
+    top_ai_bots_by_category?: Record<string, MetricStat[]>;
     top_ai_sources: MetricStat[];
     top_languages: MetricStat[];
     top_utm_campaigns: MetricStat[];
@@ -574,6 +649,24 @@ export interface SiteStats {
     funnels: Funnel[];
     comparison?: ComparisonStats;
     imported_excluded?: ImportExclusionReason[];
+}
+
+export interface AIAgentCatalog {
+    generated_at: string;
+    agents: AIAgentCatalogAgent[];
+    ai_referrers: AIAgentCatalogReferrer[];
+}
+
+export interface AIAgentCatalogAgent {
+    name: string;
+    family: string;
+    category: string;
+    icon_host?: string;
+}
+
+export interface AIAgentCatalogReferrer {
+    name: string;
+    icon_host?: string;
 }
 
 export interface GoalStats {

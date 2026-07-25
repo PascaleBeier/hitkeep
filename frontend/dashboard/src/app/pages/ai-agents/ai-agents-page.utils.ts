@@ -1,15 +1,4 @@
-import { SeriesChartPoint } from '@features/analytics/components/series-chart';
-import { AIFetchSeriesPoint } from '@models/analytics.types';
-
-export interface AIFilterChip {
-    key: 'assistantName' | 'assistantFamily' | 'resourceType' | 'path';
-    label: string;
-}
-
-export function mapAIFetchSeries(points: AIFetchSeriesPoint[]): SeriesChartPoint[] {
-    return points.map((point) => ({ time: point.time, count: point.count }));
-}
-
+/** Human-readable byte size, e.g. `1 KB` or `2.4 MB`, formatted for `locale`. */
 export function formatBytes(value: number, locale: string): string {
     if (value <= 0) return '0 B';
     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -25,6 +14,7 @@ export function formatBytes(value: number, locale: string): string {
     return `${new Intl.NumberFormat(locale, { maximumFractionDigits }).format(size)} ${units[unitIndex]}`;
 }
 
+/** Response time in whole milliseconds, formatted for `locale`. */
 export function formatResponseMs(value: number, locale: string): string {
     if (value <= 0) return '0 ms';
     return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(value)} ms`;

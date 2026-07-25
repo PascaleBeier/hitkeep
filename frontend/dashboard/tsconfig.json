@@ -24,7 +24,8 @@
             "@layout/*": ["app/core/layout/*"],
             "@components/*": ["app/core/components/*"],
             "@features/*": ["app/features/*"],
-            "@pages/*": ["app/pages/*"]
+            "@pages/*": ["app/pages/*"],
+            "@testing/*": ["app/testing/*"]
         }
     },
     "angularCompilerOptions": {

@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, signal } from '@angular/core';
 import { injectActiveLang } from '@core/i18n/active-lang';
+import { calcDelta } from '@core/analytics/delta-utils';
 import { ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
@@ -269,10 +270,7 @@ export class UtmDashboard {
         });
     }
 
-    protected calcDelta(current: number, previous: number): number | null {
-        if (previous === 0) return null;
-        return ((current - previous) / previous) * 100;
-    }
+    protected readonly calcDelta = calcDelta;
 
     protected applyMetricFilter(type: MetricFilterType, metric: { name: string }) {
         if (!metric.name) return;

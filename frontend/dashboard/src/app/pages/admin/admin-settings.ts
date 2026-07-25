@@ -56,7 +56,7 @@ import {
     SystemCacheStatus,
     SystemMailStatus
 } from '@services/admin-system.service';
-import { formatBytes } from '@pages/ai-visibility/ai-visibility.utils';
+import { formatBytes } from '@pages/ai-agents/ai-agents-page.utils';
 import { finalize } from 'rxjs';
 
 type AdminStatusTab = 'runtime' | 'operations' | 'activation' | 'audit';

@@ -19,6 +19,12 @@ export interface MetricCardConfig<TFilter extends string = string> {
     showCountryNames?: boolean;
     showLanguageFlags?: boolean;
     showLanguageNames?: boolean;
+    showAICategoryNames?: boolean;
+    aiIconKind?: 'agent' | 'source';
+    /** Annotates AI activity rows with their tracked/log provenance split. */
+    showProvenance?: boolean;
+    /** Share-of-total column; off for rows that are not parts of one whole. */
+    showShare?: boolean;
     filterType?: TFilter;
 }
 

@@ -49,6 +49,8 @@
         <div #scrollFrame class="metric-list__scroll-frame" (scroll)="onScrollFrame()">
             <ul class="metric-list__rows metric-list__rows--compact">
                 @for (item of data(); track item.name + ':' + $index) {
+                <!-- Both branches below render the hint and pass it to the title, so it is resolved once per row. -->
+                @let provenance = provenanceHint(item);
                 <li
                     [class]="rowClass(item)"
                     [attr.role]="isRowClickable() ? 'button' : null"
@@ -66,22 +68,31 @@
                             <img [ngSrc]="flagUrl" class="metric-list__flag" [width]="16" [height]="16" alt="" />
                             } @else if (showLanguageFlags() && languageFlagUrl(item.name); as flagUrl) {
                             <img [ngSrc]="flagUrl" class="metric-list__flag" [width]="16" [height]="16" alt="" />
+                            } @else if (aiIconUrl(item); as iconUrl) {
+                            <img [ngSrc]="iconUrl" class="metric-list__favicon" [width]="16" [height]="16" alt="" />
                             } @if (linkInfo(item); as info) { @if (info.faviconUrl) {
                             <img [ngSrc]="info.faviconUrl" class="metric-list__favicon" [width]="16" [height]="16" alt="" />
                             }
-                            <span class="metric-list__label" [title]="titleForItem(item)">{{ displayLabel(item) }}</span>
+                            <span class="metric-list__label" [title]="titleForItem(item, provenance)">{{ displayLabel(item) }}</span>
+                            @if (provenance) {
+                            <span class="metric-list__provenance">{{ provenance }}</span>
+                            }
                             <a class="metric-list__link" [href]="info.href" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()" [attr.aria-label]="'common.openInNewTabAria' | transloco">
                                 <i class="pi pi-external-link metric-list__link-icon" aria-hidden="true"></i>
                             </a>
                             } @else { @if (isDeviceMetric()) {
                             <i [class]="deviceIconClass(item) + ' metric-list__item-icon'" aria-hidden="true"></i>
                             }
-                            <span class="metric-list__label" [title]="titleForItem(item)">{{ displayLabel(item) }}</span>
-                            }
+                            <span class="metric-list__label" [title]="titleForItem(item, provenance)">{{ displayLabel(item) }}</span>
+                            @if (provenance) {
+                            <span class="metric-list__provenance">{{ provenance }}</span>
+                            } }
                         </div>
 
                         <div class="metric-list__meta">
+                            @if (showShare()) {
                             <span class="metric-list__share">{{ shareForItem(item) | translocoDecimal: { maximumFractionDigits: 0 } }}%</span>
+                            }
                             <span class="metric-list__value">{{ item.value | translocoDecimal }}</span>
                         </div>
                     </div>

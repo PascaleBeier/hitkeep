@@ -29,8 +29,8 @@ describe('SidebarMenuService', () => {
                                 funnels: 'Funnels',
                                 events: 'Events',
                                 webVitals: 'Web Vitals',
-                                aiVisibility: 'AI Visibility',
-                                aiChatbots: 'AI Chatbots',
+                                aiAgents: 'AI Agents',
+                                aiChatbots: 'Chatbots',
                                 ecommerce: 'Ecommerce',
                                 utm: 'UTM',
                                 utmBuilder: 'UTM Builder',
@@ -104,6 +104,7 @@ describe('SidebarMenuService', () => {
         expect(analytics?.expanded).toBe(true);
         expect(integration?.expanded).toBe(true);
         expect(findByLabel(items, 'Overview')?.routerLink).toBe('/overview');
+        expect(findByLabel(items, 'AI Agents')?.routerLink).toBe('/ai-agents');
         expect(utm?.routerLink).toBe('/utm');
         expect(utm?.expanded).toBe(false);
         expect(utmBuilder?.routerLink).toBe('/utm/builder');
@@ -173,6 +174,7 @@ describe('SidebarMenuService', () => {
 
         expect(dashboard?.routerLink).toBe('/share/share-token/dashboard');
         expect(webVitals?.routerLink).toBe('/share/share-token/web-vitals');
+        expect(findByLabel(items, 'AI Agents')?.routerLink).toBe('/share/share-token/ai-agents');
         expect(utm?.routerLink).toBe('/share/share-token/utm');
         expect(utm?.items).toBeUndefined();
         expect(utmBuilder).toBeUndefined();

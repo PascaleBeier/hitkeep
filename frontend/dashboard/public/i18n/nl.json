@@ -13,10 +13,8 @@
     "funnelsAria": "Ga naar funnels",
     "eventsAria": "Ga naar events",
     "events": "Events",
-    "aiVisibility": "AI-zichtbaarheid",
-    "aiVisibilityAria": "Ga naar AI-zichtbaarheidsanalytics",
-    "aiChatbots": "AI-chatbots",
-    "aiChatbotsAria": "Ga naar AI-chatbotanalytics",
+    "aiAgents": "AI Agents",
+    "aiChatbots": "Chatbots",
     "utmAria": "Ga naar UTM-dashboard",
     "utmBuilder": "UTM-builder",
     "utmBuilderAria": "Ga naar UTM-builder",
@@ -578,6 +576,14 @@
     }
   },
   "common": {
+    "aiCategories": {
+      "ai_training_crawler": "Trainingscrawlers",
+      "ai_search_indexer": "AI-zoekcrawlers",
+      "ai_assistant": "AI-assistenten",
+      "ai_agent": "AI-agents",
+      "ai_coding_agent": "AI-codeeragents",
+      "other_ai": "Overige AI"
+    },
     "actions": {
       "apply": "Toepassen",
       "cancel": "Annuleren",
@@ -646,6 +652,9 @@
       "ndjson": "NDJSON"
     },
     "filters": {
+      "aiBot": "AI-agent:{{value}}",
+      "aiBotCategory": "AI-categorie:{{value}}",
+      "aiSource": "AI-bron:{{value}}",
       "country": "Land:{{value}}",
       "city": "Stad:{{value}}",
       "provider": "Provider:{{value}}",
@@ -661,6 +670,8 @@
     },
     "loadingSiteData": "Sitegegevens laden...",
     "metricGroups": {
+      "ai": "AI",
+      "bots": "Bots",
       "content": "Content",
       "acquisition": "Acquisitie",
       "audience": "Audience",
@@ -668,6 +679,9 @@
       "network": "Netwerk"
     },
     "metrics": {
+      "aiBots": "AI-agents",
+      "aiBotCategories": "AI-agentcategorieën",
+      "aiSources": "AI-bronnen",
       "audience": "Audience",
       "browsers": "Browsers",
       "countries": "Landen",
@@ -2716,6 +2730,11 @@
     "visitorsLabel": "Bezoekers (vorige periode)"
   },
   "events": {
+    "setup": {
+      "title": "Stuur je eerste custom event",
+      "description": "Custom events hebben een track-aanroep vanuit je snippet of de events-API nodig. Zodra er events binnenkomen, vult deze pagina zich automatisch.",
+      "docsAction": "Lees de gids voor custom events"
+    },
     "title": "Events",
     "docsAction": "Gids voor automatisch volgen",
     "noSiteDescription": "Selecteer of maak een site om gebeurtenisanalyses te bekijken.",
@@ -2746,9 +2765,93 @@
       "title": "Geïmporteerde geaggregeerde beperkingen"
     }
   },
+  "aiAgents": {
+    "title": "AI Agents",
+    "hero": {
+      "title": "AI-agentverkeer in de tijd",
+      "description": "Hoe AI-agents je pagina’s crawlen en hoeveel bezoeken hun antwoorden terugbrengen.",
+      "series": {
+        "aiRequests": "AI-verzoeken",
+        "referralVisits": "AI-verwijzingsbezoeken",
+        "crawlerFetches": "Crawler-fetches (loginvoer)"
+      }
+    },
+    "kpis": {
+      "aiRequests": "AI-verzoeken",
+      "referralVisits": "AI-verwijzingsbezoeken",
+      "pathsCrawled": "Gecrawlde pagina's",
+      "shareOfPageviews": "Aandeel van paginaweergaven",
+      "note": "AI-verzoeken combineren getrackte hits met doorgestuurde crawlerlogs."
+    },
+    "groups": {
+      "activity": "AI-activiteit",
+      "byCategory": "Per categorie",
+      "fetchDepth": "Fetchdiepte (loginvoer)"
+    },
+    "cards": {
+      "paths": "Gecrawlde pagina's",
+      "families": "Topoperators",
+      "resourceTypes": "Resourcetype gesplitst",
+      "errorPaths": "Belangrijkste foutpaden"
+    },
+    "provenance": {
+      "hint": "getrackt {{tracked}} · logs {{fetched}}"
+    },
+    "filters": {
+      "scopeHits": "alleen getrackte bezoeken"
+    },
+    "enrich": {
+      "title": "Crawler-fetchtracking instellen",
+      "description": "Fetch-analyses hebben doorsturen van CDN-, edge- of serverlogs naar het AI-fetch-endpoint van HitKeep nodig. Zodra er records binnenkomen, laat deze sectie de crawlers zien die je tracking niet kan zien, met statuscodes, responstijden, geleverde bytes en de correlatie tussen fetch en bezoek.",
+      "docsAction": "Lees de installatiegids"
+    },
+    "fetchDepth": {
+      "description": "Wat doorgestuurde CDN-, edge- en serverlogs daar bovenop tonen: crawlers die je tracking nooit ziet, hun statuscodes, responstijden, geleverde bytes en hoe fetches bezoeken worden.",
+      "docsAction": "Installatiegids",
+      "kpis": {
+        "totalFetches": "Totaal aantal opgehaald",
+        "errorRate4xx": "4xx tarief",
+        "errorRate5xx": "5xx tarief",
+        "medianResponse": "Gemiddelde reactie",
+        "bytesServed": "Bytes geserveerd"
+      },
+      "correlation": {
+        "title": "Correlatie tussen ophalen en bezoeken",
+        "description": "Meet welke opgehaalde paden later door AI verwezen menselijke bezoeken aantrekken en welke hoog opgehaalde pagina's nog steeds niet worden omgezet in downstream verkeer.",
+        "note": "Gecorreleerde bezoeken tellen latere door AI verwezen bezoeken op hetzelfde pad binnen het gekozen bereik.",
+        "kpis": {
+          "correlatedPaths": "Gecorreleerde paden",
+          "aiReferredVisits": "Latere AI-verwezen bezoeken",
+          "uncorrelatedFetches": "Niet-gecorreleerde ophaalacties"
+        }
+      },
+      "tables": {
+        "title": "Uitsplitsingen van de correlatie",
+        "citationYield": {
+          "title": "Citaatopbrengst"
+        },
+        "opportunityPages": {
+          "title": "Mogelijkheidspagina's"
+        },
+        "failureHotspots": {
+          "title": "Fout-hotspots"
+        }
+      },
+      "exportStatus": {
+        "success": "Exportdownload gestart.",
+        "error": "Kan AI-ophaalgegevens niet exporteren. Probeer het opnieuw."
+      }
+    },
+    "noSiteDescription": "Selecteer een site om AI-agentverkeer te bekijken."
+  },
   "aiChatbots": {
     "title": "AI-chatbots",
     "docsAction": "Instrumentatie gids",
+    "setup": {
+      "title": "Instrumenteer je chatbot",
+      "description": "Stuur assistant.*-custom events vanuit je chatbot om deze pagina te vullen: gespreksstarts, prompts, reacties, citaties, overdrachten en ondersteunde conversies.",
+      "docsAction": "Lees de instrumentatiegids"
+    },
     "noSiteDescription": "Selecteer of maak een site om AI-chatbotanalyses te bekijken.",
     "header": {
       "title": "On-site AI chatbot-analyse",
@@ -2787,99 +2890,6 @@
     "exportStatus": {
       "success": "Exportdownload gestart.",
       "error": "Kan AI-chatbotgegevens niet exporteren. Probeer het opnieuw."
-    }
-  },
-  "aiVisibility": {
-    "title": "AIZichtbaarheid",
-    "docsAction": "Installatiegids",
-    "noSiteDescription": "Selecteer of maak een site om AI-ophaal- en correlatieanalyses te bekijken.",
-    "header": {
-      "title": "AI zichtbaarheidsanalyses",
-      "description": "Volg ophaalacties van de AI-crawler op de server, waar crawlfouten zich concentreren, en welke opgehaalde pagina's later door AI verwezen bezoeken aantrekken."
-    },
-    "filters": {
-      "assistant": "Assistent",
-      "family": "Exploitant",
-      "resourceType": "Brontype",
-      "allAssistants": "Alle assistenten",
-      "allFamilies": "Alle exploitanten",
-      "allResourceTypes": "Alle resourcetypen",
-      "unfiltered": "Alle AI-ophaalactiviteiten worden weergegeven"
-    },
-    "kpis": {
-      "totalFetches": "Totaal aantal opgehaald",
-      "uniquePaths": "Unieke paden",
-      "uniqueAssistants": "Unieke assistenten",
-      "errorRate4xx": "4xx tarief",
-      "errorRate5xx": "5xx tarief",
-      "medianResponse": "Gemiddelde reactie",
-      "bytesServed": "Bytes geserveerd"
-    },
-    "chart": {
-      "title": "Volume in de loop van de tijd ophalen",
-      "description": "Bekijk wanneer doorgestuurde AI-crawlerophaalacties je inhoud bereiken en hoe de ophaalvraag verandert gedurende de geselecteerde periode.",
-      "fetches": "Haalt op",
-      "emptyTitle": "Geen AI-ophaalactiviteit",
-      "emptyDescription": "Stuur AI-ophaalrecords door naar /api/sites/{id}/ingest/ai-fetch om dit rapport in te vullen. hk.js zelf registreert geen crawler-ophaalacties."
-    },
-    "breakdowns": {
-      "assistants": "Top assistenten",
-      "families": "Topoperators",
-      "paths": "Top opgehaalde paden",
-      "errorPaths": "Belangrijkste foutpaden",
-      "resourceTypes": "Resourcetype gesplitst"
-    },
-    "correlation": {
-      "title": "Correlatie tussen ophalen en bezoeken",
-      "description": "Meet welke opgehaalde paden later door AI verwezen menselijke bezoeken aantrekken en welke hoog opgehaalde pagina's nog steeds niet worden omgezet in downstream verkeer.",
-      "note": "Assistent-, operator- en resourcetypefilters zijn alleen van toepassing op ophaalacties. Gecorreleerde bezoeken omvatten alle latere, door AI verwezen menselijke bezoeken op hetzelfde pad binnen het geselecteerde venster.",
-      "kpis": {
-        "correlatedPaths": "Gecorreleerde paden",
-        "aiVisits": "AI-verwezen bezoeken",
-        "uncorrelatedFetches": "Niet-gecorreleerde ophaalacties"
-      },
-      "helpAria": "Correlatiehulp tonen",
-      "help": {
-        "correlatedPaths": "Opgehaalde paden die later AI-verwezen menselijke bezoeken ontvingen binnen het geselecteerde venster.",
-        "aiVisits": "Menselijke bezoeken via AI-verwijzers op paden die ook door AI-crawlers zijn opgehaald.",
-        "uncorrelatedFetches": "Ophaalacties op paden die in dit venster geen bijpassend AI-verwezen bezoek opleverden.",
-        "citationYieldCard": "Gebruik dit om pagina's te vinden waar AI-crawlervraag leidt tot downstream bezoeken.",
-        "opportunityCard": "Gebruik dit om veel opgehaalde pagina's te vinden die betere content, links of beschikbaarheid nodig hebben.",
-        "failureHotspotCard": "Gebruik dit om assistent- en padvoorvoegselparen te vinden waar crawlertoegang fouten veroorzaakt."
-      }
-    },
-    "tables": {
-      "citationYield": {
-        "title": "Citaatopbrengst",
-        "description": "Paden waar AI het vaakst ophaalt, veranderen in latere AI-verwezen bezoeken.",
-        "empty": "Geen van de opgehaalde paden produceerde gecorreleerde AI-bezoeken in dit bereik."
-      },
-      "opportunityPages": {
-        "title": "Mogelijkheidspagina's",
-        "description": "Pagina's met een hoge ophaalsnelheid, weinig downstream-bezoeken of een verhoogde foutdruk.",
-        "cardSubtitle": "Vraagt aandacht",
-        "empty": "Er zijn geen opportunitypagina's die overeenkomen met de huidige filters."
-      },
-      "failureHotspots": {
-        "title": "Fout-hotspots",
-        "description": "De assistent- en pad-voorvoegselcombinaties met de hoogste ophaalfoutdruk.",
-        "empty": "Er zijn geen storingshotspots die overeenkomen met de huidige filters."
-      }
-    },
-    "columns": {
-      "path": "Pad",
-      "assistant": "Assistent",
-      "pathPrefix": "Padvoorvoegsel",
-      "fetches": "Haalt op",
-      "requests": "Verzoeken",
-      "aiVisits": "AI-bezoeken",
-      "errors": "Fouten",
-      "errorRate": "Foutpercentage",
-      "yield": "Opbrengst"
-    },
-    "exportStatus": {
-      "success": "Exportdownload gestart.",
-      "error": "Kan AI-ophaalgegevens niet exporteren. Probeer het opnieuw."
     }
   },
   "integration": {
@@ -3130,6 +3140,11 @@
     }
   },
   "ecommerce": {
+    "setup": {
+      "title": "E-commerce-tracking instellen",
+      "description": "Omzetanalyse heeft aankoop- en checkout-events uit je webshop nodig. Zodra er events binnenkomen, vult deze pagina zich automatisch.",
+      "docsAction": "Lees de e-commercegids"
+    },
     "docsAction": "E-commerce instellen",
     "kpis": {
       "revenue": "Winst",
@@ -3397,6 +3412,11 @@
     "noSiteDescription": "Selecteer een site om kansaanbevelingen te bekijken."
   },
   "webVitals": {
+    "setup": {
+      "title": "Web Vitals-verzameling aanzetten",
+      "description": "Web Vitals hebben ingeschakelde prestatiemeting in je trackingsnippet nodig. Zodra er metingen binnenkomen, vult deze pagina zich automatisch.",
+      "docsAction": "Lees de Web Vitals-gids"
+    },
     "docsAction": "Installatiegids",
     "error": "Web Vitals-gegevens konden niet worden geladen.",
     "noSiteDescription": "Selecteer of maak een site om Web Vitals door de tijd te inspecteren.",

@@ -32,6 +32,40 @@ describe('routes', () => {
         expect(children.some((route) => route.path === 'imports')).toBe(false);
     });
 
+    it('exposes AI Agents as one single-page leaf route in both subtrees', () => {
+        const mainChildren = routes.find((route) => route.path === '')?.children ?? [];
+        const shareChildren = mainChildren.find((route) => route.path === 'share/:token')?.children ?? [];
+
+        for (const children of [mainChildren, shareChildren]) {
+            const page = children.find((route) => route.path === 'ai-agents');
+
+            expect(page?.loadComponent).toBeTruthy();
+            expect(page?.children).toBeUndefined();
+            expect(page?.data?.['titleKey']).toBe('nav.aiAgents');
+            expect(page?.data?.['titleScope']).toBe('site');
+
+            // AI chatbots stays a separate page.
+            expect(children.some((route) => route.path === 'ai-chatbots')).toBe(true);
+        }
+    });
+
+    it('redirects the retired AI visibility page and crawlers tab onto the single AI Agents route', () => {
+        const mainChildren = routes.find((route) => route.path === '')?.children ?? [];
+        const shareChildren = mainChildren.find((route) => route.path === 'share/:token')?.children ?? [];
+
+        for (const children of [mainChildren, shareChildren]) {
+            for (const legacyPath of ['ai-visibility', 'ai-agents/crawlers']) {
+                const redirect = children.find((route) => route.path === legacyPath);
+
+                // Relative redirect so the share/:token prefix survives.
+                expect(redirect?.redirectTo).toBe('ai-agents');
+                expect(redirect?.pathMatch).toBe('full');
+            }
+        }
+
+        expect(routes.find((route) => route.path === '**')?.redirectTo).toBe('/dashboard');
+    });
+
     it('gates system status and system settings by their backend capabilities', () => {
         const adminChildren = routes.find((route) => route.path === '')?.children?.find((route) => route.path === 'admin')?.children ?? [];
         const statusRoute = adminChildren.find((route) => route.path === 'status');

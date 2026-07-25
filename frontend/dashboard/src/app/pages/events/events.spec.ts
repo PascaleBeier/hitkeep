@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
 import { TranslocoTestingModule } from '@jsverse/transloco';
@@ -11,10 +12,15 @@ import { of } from 'rxjs';
 import { Events } from '@pages/events/events';
 import { AnalyticsService } from '@core/services/analytics.service';
 import { SiteService } from '@features/sites/services/site.service';
+import type { SiteSetupState } from '@services/setup-state.service';
+import { flushSetupState } from '@testing/setup-state';
 
 describe('Events', () => {
     let component: Events;
     let fixture: ComponentFixture<Events>;
+    let httpMock: HttpTestingController;
+    /** Custom event names the site reported for the selected range. */
+    let reportedEventNames: string[];
     const siteServiceStub = {
         activeSite: signal({
             id: 'site-1',
@@ -24,7 +30,7 @@ describe('Events', () => {
         })
     };
     const analyticsServiceStub = {
-        getEventNames: () => of(['outbound_click', 'newsletter_signup']),
+        getEventNames: () => of(reportedEventNames),
         getEventPropertyKeys: () => of(['target_host']),
         getEventPropertyBreakdown: () => of([{ name: 'external.example.com', value: 12 }]),
         getEventTimeseries: () => of([{ time: new Date().toISOString(), count: 12 }]),
@@ -38,6 +44,7 @@ describe('Events', () => {
     };
 
     beforeEach(async () => {
+        reportedEventNames = ['outbound_click', 'newsletter_signup'];
         await TestBed.configureTestingModule({
             imports: [
                 Events,
@@ -68,6 +75,11 @@ describe('Events', () => {
                                 },
                                 kpis: {
                                     totalEvents: 'Total events'
+                                },
+                                setup: {
+                                    title: 'Send your first custom event',
+                                    description: 'Track custom events to fill this page.',
+                                    docsAction: 'Read the custom events guide'
                                 }
                             },
                             dashboard: {
@@ -117,6 +129,7 @@ describe('Events', () => {
             ],
             providers: [
                 provideHttpClient(),
+                provideHttpClientTesting(),
                 provideRouter([]),
                 { provide: SiteService, useValue: siteServiceStub },
                 { provide: AnalyticsService, useValue: analyticsServiceStub },
@@ -130,13 +143,62 @@ describe('Events', () => {
             ]
         }).compileComponents();
 
+        httpMock = TestBed.inject(HttpTestingController);
         fixture = TestBed.createComponent(Events);
         component = fixture.componentInstance;
         fixture.detectChanges();
     });
 
+    afterEach(() => {
+        // Drain the shared setup-state lookup for the tests that do not assert on it.
+        flushSetupState(httpMock, 'site-1');
+        httpMock.verify();
+    });
+
+    /** Recreates the page for a site that reported no custom events in range. */
+    const createWithoutEvents = (): void => {
+        reportedEventNames = [];
+        fixture = TestBed.createComponent(Events);
+        component = fixture.componentInstance;
+        fixture.detectChanges();
+    };
+
+    const answerSetupState = (overrides: Partial<SiteSetupState> = {}) => flushSetupState(httpMock, 'site-1', overrides, fixture);
+
     it('should create', () => {
         expect(component).toBeTruthy();
+    });
+
+    it('renders a setup callout when the site never sent a custom event', () => {
+        createWithoutEvents();
+        answerSetupState({ has_custom_events: false });
+
+        const callout = fixture.nativeElement.querySelector('[data-testid="events-setup-callout"]');
+        expect(callout).not.toBeNull();
+        expect(callout.textContent).toContain('Send your first custom event');
+        expect(callout.textContent).toContain('Track custom events to fill this page.');
+        expect(callout.querySelector('a[href="https://hitkeep.com/guides/tracking/custom-events/"]')).not.toBeNull();
+        expect(fixture.nativeElement.querySelector('#event-name-select')).toBeNull();
+        expect(fixture.nativeElement.querySelector('app-report-range-toolbar')).not.toBeNull();
+    });
+
+    it('keeps the regular empty states when custom events exist outside the selected range', () => {
+        createWithoutEvents();
+        answerSetupState({ has_custom_events: true });
+
+        expect(fixture.nativeElement.querySelector('[data-testid="events-setup-callout"]')).toBeNull();
+        expect(fixture.nativeElement.textContent).toContain('Select an event to view a property breakdown.');
+    });
+
+    it('never shows the callout while the setup state is still unknown', () => {
+        createWithoutEvents();
+
+        httpMock.expectOne('/api/sites/site-1/setup-state');
+        expect(fixture.nativeElement.querySelector('[data-testid="events-setup-callout"]')).toBeNull();
+    });
+
+    it('skips the setup-state lookup while the selected range has custom events', () => {
+        httpMock.expectNone('/api/sites/site-1/setup-state');
     });
 
     it('marks automatic events in the event dropdown', async () => {

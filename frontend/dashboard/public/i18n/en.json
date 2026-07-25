@@ -13,10 +13,8 @@
     "funnelsAria": "Go to funnels",
     "eventsAria": "Go to events",
     "events": "Events",
-    "aiVisibility": "AI Visibility",
-    "aiVisibilityAria": "Go to AI visibility analytics",
-    "aiChatbots": "AI Chatbots",
-    "aiChatbotsAria": "Go to AI chatbot analytics",
+    "aiAgents": "AI Agents",
+    "aiChatbots": "Chatbots",
     "utmAria": "Go to UTM dashboard",
     "utmBuilder": "UTM Builder",
     "utmBuilderAria": "Go to UTM Builder",
@@ -578,6 +576,14 @@
     }
   },
   "common": {
+    "aiCategories": {
+      "ai_training_crawler": "Training crawlers",
+      "ai_search_indexer": "AI search crawlers",
+      "ai_assistant": "AI assistants",
+      "ai_agent": "AI agents",
+      "ai_coding_agent": "AI coding agents",
+      "other_ai": "Other AI"
+    },
     "actions": {
       "apply": "Apply",
       "cancel": "Cancel",
@@ -646,6 +652,9 @@
       "ndjson": "NDJSON"
     },
     "filters": {
+      "aiBot": "AI agent: {{value}}",
+      "aiBotCategory": "AI category: {{value}}",
+      "aiSource": "AI source: {{value}}",
       "country": "Country: {{value}}",
       "city": "City: {{value}}",
       "provider": "Provider: {{value}}",
@@ -661,6 +670,8 @@
     },
     "loadingSiteData": "Loading site data...",
     "metricGroups": {
+      "ai": "AI",
+      "bots": "Bots",
       "content": "Content",
       "acquisition": "Acquisition",
       "audience": "Audience",
@@ -668,6 +679,9 @@
       "network": "Network"
     },
     "metrics": {
+      "aiBots": "AI agents",
+      "aiBotCategories": "AI agent categories",
+      "aiSources": "AI sources",
       "audience": "Audience",
       "browsers": "Browsers",
       "countries": "Countries",
@@ -2803,6 +2817,11 @@
     "visitorsLabel": "Visitors (prev.)"
   },
   "events": {
+    "setup": {
+      "title": "Send your first custom event",
+      "description": "Custom events need a track call from your snippet or the events API. Once events arrive, this page fills automatically.",
+      "docsAction": "Read the custom events guide"
+    },
     "title": "Events",
     "docsAction": "Auto-tracking guide",
     "noSiteDescription": "Select or create a site to view event analytics.",
@@ -2833,9 +2852,93 @@
       "title": "Imported aggregate limitations"
     }
   },
+  "aiAgents": {
+    "title": "AI Agents",
+    "hero": {
+      "title": "AI agent traffic over time",
+      "description": "How AI agents crawl your pages and how many human visits their answers send back.",
+      "series": {
+        "aiRequests": "AI requests",
+        "referralVisits": "AI referral visits",
+        "crawlerFetches": "Crawler fetches (log ingest)"
+      }
+    },
+    "kpis": {
+      "aiRequests": "AI requests",
+      "referralVisits": "AI referral visits",
+      "pathsCrawled": "Pages crawled",
+      "shareOfPageviews": "Share of pageviews",
+      "note": "AI requests merge tracked hits with forwarded crawler logs."
+    },
+    "groups": {
+      "activity": "AI activity",
+      "byCategory": "By category",
+      "fetchDepth": "Fetch depth (log ingest)"
+    },
+    "cards": {
+      "paths": "Pages crawled",
+      "families": "Top operators",
+      "resourceTypes": "Resource type split",
+      "errorPaths": "Top error paths"
+    },
+    "provenance": {
+      "hint": "tracked {{tracked}} · logs {{fetched}}"
+    },
+    "filters": {
+      "scopeHits": "tracked visits only"
+    },
+    "enrich": {
+      "title": "Set up crawler fetch tracking",
+      "description": "Fetch analytics needs CDN, edge, or server log forwarding to HitKeep's AI fetch endpoint. Once records arrive, this section shows the crawlers your tracking cannot see, with status codes, response times, bytes served, and fetch-to-visit correlation.",
+      "docsAction": "Read the setup guide"
+    },
+    "fetchDepth": {
+      "description": "What forwarded CDN, edge and server logs add on top: crawlers your tracking never sees, their status codes, response times, bytes served and how fetches turn into visits.",
+      "docsAction": "Setup guide",
+      "kpis": {
+        "totalFetches": "Total fetches",
+        "errorRate4xx": "4xx rate",
+        "errorRate5xx": "5xx rate",
+        "medianResponse": "Median response",
+        "bytesServed": "Bytes served"
+      },
+      "correlation": {
+        "title": "Fetch-to-visit correlation",
+        "description": "Measure which fetched paths later attract AI-referred human visits and which high-fetch pages still fail to convert into downstream traffic.",
+        "note": "Correlated visits count later AI-referred visits on the same path inside the selected range.",
+        "kpis": {
+          "correlatedPaths": "Correlated paths",
+          "aiReferredVisits": "Later AI-referred visits",
+          "uncorrelatedFetches": "Uncorrelated fetches"
+        }
+      },
+      "tables": {
+        "title": "Correlation breakdowns",
+        "citationYield": {
+          "title": "Citation yield"
+        },
+        "opportunityPages": {
+          "title": "Opportunity pages"
+        },
+        "failureHotspots": {
+          "title": "Failure hotspots"
+        }
+      },
+      "exportStatus": {
+        "success": "Export download started.",
+        "error": "Failed to export AI fetch data. Please try again."
+      }
+    },
+    "noSiteDescription": "Select a site to see AI agent traffic."
+  },
   "aiChatbots": {
     "title": "AI Chatbots",
     "docsAction": "Instrumentation guide",
+    "setup": {
+      "title": "Instrument your chatbot",
+      "description": "Send assistant.* custom events from your chatbot to fill this page — conversation starts, prompts, responses, citations, handoffs, and assisted conversions.",
+      "docsAction": "Read the instrumentation guide"
+    },
     "noSiteDescription": "Select or create a site to view AI chatbot analytics.",
     "header": {
       "title": "On-site AI chatbot analytics",
@@ -2874,99 +2977,6 @@
     "exportStatus": {
       "success": "Export download started.",
       "error": "Failed to export AI chatbot data. Please try again."
-    }
-  },
-  "aiVisibility": {
-    "title": "AI Visibility",
-    "docsAction": "Setup guide",
-    "noSiteDescription": "Select or create a site to view AI fetch and correlation analytics.",
-    "header": {
-      "title": "AI visibility analytics",
-      "description": "Track server-side AI crawler fetches, where crawl errors concentrate, and which fetched pages later attract AI-referred visits."
-    },
-    "filters": {
-      "assistant": "Assistant",
-      "family": "Operator",
-      "resourceType": "Resource type",
-      "allAssistants": "All assistants",
-      "allFamilies": "All operators",
-      "allResourceTypes": "All resource types",
-      "unfiltered": "Showing all AI fetch activity"
-    },
-    "kpis": {
-      "totalFetches": "Total fetches",
-      "uniquePaths": "Unique paths",
-      "uniqueAssistants": "Unique assistants",
-      "errorRate4xx": "4xx rate",
-      "errorRate5xx": "5xx rate",
-      "medianResponse": "Median response",
-      "bytesServed": "Bytes served"
-    },
-    "chart": {
-      "title": "Fetch volume over time",
-      "description": "See when forwarded AI crawler fetches hit your content and how fetch demand changes across the selected period.",
-      "fetches": "Fetches",
-      "emptyTitle": "No AI fetch activity",
-      "emptyDescription": "Forward AI fetch records to /api/sites/{id}/ingest/ai-fetch to populate this report. hk.js by itself will not record crawler fetches."
-    },
-    "breakdowns": {
-      "assistants": "Top assistants",
-      "families": "Top operators",
-      "paths": "Top fetched paths",
-      "errorPaths": "Top error paths",
-      "resourceTypes": "Resource type split"
-    },
-    "correlation": {
-      "title": "Fetch-to-visit correlation",
-      "description": "Measure which fetched paths later attract AI-referred human visits and which high-fetch pages still fail to convert into downstream traffic.",
-      "note": "Assistant, operator, and resource-type filters apply to fetches only. Correlated visits include any later AI-referred human visits on the same path within the selected window.",
-      "kpis": {
-        "correlatedPaths": "Correlated paths",
-        "aiVisits": "AI-referred visits",
-        "uncorrelatedFetches": "Uncorrelated fetches"
-      },
-      "helpAria": "Show correlation help",
-      "help": {
-        "correlatedPaths": "Fetched paths that later received AI-referred human visits in the selected window.",
-        "aiVisits": "Human visits attributed to AI referrers on paths that were also fetched by AI crawlers.",
-        "uncorrelatedFetches": "Fetches on paths that did not produce a matching AI-referred visit in this window.",
-        "citationYieldCard": "Use this to spot pages where AI crawler demand is translating into downstream visits.",
-        "opportunityCard": "Use this to find heavily fetched pages that still need better content, links, or availability.",
-        "failureHotspotCard": "Use this to find assistant and path-prefix pairs where crawler access is running into errors."
-      }
-    },
-    "tables": {
-      "citationYield": {
-        "title": "Citation yield",
-        "description": "Paths where AI fetches most often turn into later AI-referred visits.",
-        "empty": "No fetched paths produced correlated AI visits in this range."
-      },
-      "opportunityPages": {
-        "title": "Opportunity pages",
-        "description": "High-fetch pages with low downstream visits or elevated error pressure.",
-        "cardSubtitle": "Needs attention",
-        "empty": "No opportunity pages matched the current filters."
-      },
-      "failureHotspots": {
-        "title": "Failure hotspots",
-        "description": "The assistant and path-prefix combinations with the highest fetch error pressure.",
-        "empty": "No failure hotspots matched the current filters."
-      }
-    },
-    "columns": {
-      "path": "Path",
-      "assistant": "Assistant",
-      "pathPrefix": "Path prefix",
-      "fetches": "Fetches",
-      "requests": "Requests",
-      "aiVisits": "AI visits",
-      "errors": "Errors",
-      "errorRate": "Error rate",
-      "yield": "Yield"
-    },
-    "exportStatus": {
-      "success": "Export download started.",
-      "error": "Failed to export AI fetch data. Please try again."
     }
   },
   "integration": {
@@ -3217,6 +3227,11 @@
     }
   },
   "ecommerce": {
+    "setup": {
+      "title": "Set up ecommerce tracking",
+      "description": "Revenue analytics needs purchase and checkout events from your shop. Once events arrive, this page fills automatically.",
+      "docsAction": "Read the ecommerce guide"
+    },
     "docsAction": "Set up ecommerce",
     "kpis": {
       "revenue": "Revenue",
@@ -3484,6 +3499,11 @@
     "noSiteDescription": "Select a site to view opportunity recommendations."
   },
   "webVitals": {
+    "setup": {
+      "title": "Turn on Web Vitals collection",
+      "description": "Web Vitals need performance collection enabled in your tracking snippet. Once samples arrive, this page fills automatically.",
+      "docsAction": "Read the Web Vitals guide"
+    },
     "docsAction": "Setup guide",
     "error": "Web Vitals data could not be loaded.",
     "noSiteDescription": "Select or create a site to inspect Web Vitals over time.",

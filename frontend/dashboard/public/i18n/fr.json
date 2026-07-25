@@ -13,10 +13,8 @@
     "funnelsAria": "Aller aux entonnoirs",
     "eventsAria": "Aller aux événements",
     "events": "Événements",
-    "aiVisibility": "Visibilité IA",
-    "aiVisibilityAria": "Aller vers l’analyse de visibilité IA",
-    "aiChatbots": "Chatbots IA",
-    "aiChatbotsAria": "Aller vers l’analyse des chatbots IA",
+    "aiAgents": "AI Agents",
+    "aiChatbots": "Chatbots",
     "utmAria": "Aller au tableau UTM",
     "utmBuilder": "Générateur UTM",
     "utmBuilderAria": "Aller au générateur UTM",
@@ -578,6 +576,14 @@
     }
   },
   "common": {
+    "aiCategories": {
+      "ai_training_crawler": "Robots d'entraînement",
+      "ai_search_indexer": "Robots de recherche IA",
+      "ai_assistant": "Assistants IA",
+      "ai_agent": "Agents IA",
+      "ai_coding_agent": "Agents de codage IA",
+      "other_ai": "Autre IA"
+    },
     "actions": {
       "apply": "Appliquer",
       "cancel": "Annuler",
@@ -641,6 +647,9 @@
       "ndjson": "NDJSON"
     },
     "filters": {
+      "aiBot": "Agent IA : {{value}}",
+      "aiBotCategory": "Catégorie IA : {{value}}",
+      "aiSource": "Source IA : {{value}}",
       "country": "Pays: {{value}}",
       "city": "Ville: {{value}}",
       "provider": "Fournisseur: {{value}}",
@@ -656,6 +665,8 @@
     },
     "loadingSiteData": "Chargement des données du site...",
     "metricGroups": {
+      "ai": "IA",
+      "bots": "Robots",
       "content": "Contenu",
       "acquisition": "Acquisition",
       "audience": "Audience",
@@ -663,6 +674,9 @@
       "network": "Réseau"
     },
     "metrics": {
+      "aiBots": "Agents IA",
+      "aiBotCategories": "Catégories d'agents IA",
+      "aiSources": "Sources IA",
       "audience": "Audience",
       "browsers": "Navigateurs",
       "countries": "Pays",
@@ -2733,6 +2747,11 @@
     "visitorsLabel": "Visiteurs (préc.)"
   },
   "events": {
+    "setup": {
+      "title": "Envoyez votre premier événement personnalisé",
+      "description": "Les événements personnalisés nécessitent un appel de tracking depuis votre snippet ou l’API d’événements. Dès que des événements arrivent, cette page se remplit automatiquement.",
+      "docsAction": "Lire le guide des événements personnalisés"
+    },
     "title": "Événements",
     "docsAction": "Guide du suivi automatique",
     "noSiteDescription": "Sélectionnez ou créez un site pour voir l'analyse des événements.",
@@ -2763,9 +2782,93 @@
       "title": "Limites des agrégats importés"
     }
   },
+  "aiAgents": {
+    "title": "AI Agents",
+    "hero": {
+      "title": "Trafic des agents IA dans le temps",
+      "description": "Comment les agents IA explorent vos pages et combien de visites leurs réponses vous renvoient.",
+      "series": {
+        "aiRequests": "Requêtes IA",
+        "referralVisits": "Visites référentes IA",
+        "crawlerFetches": "Fetchs de crawlers (import de logs)"
+      }
+    },
+    "kpis": {
+      "aiRequests": "Requêtes IA",
+      "referralVisits": "Visites référentes IA",
+      "pathsCrawled": "Pages explorées",
+      "shareOfPageviews": "Part des pages vues",
+      "note": "Les requêtes IA combinent les hits suivis et les logs de crawlers transférés."
+    },
+    "groups": {
+      "activity": "Activité IA",
+      "byCategory": "Par catégorie",
+      "fetchDepth": "Profondeur de fetch (import de logs)"
+    },
+    "cards": {
+      "paths": "Pages explorées",
+      "families": "Opérateurs principaux",
+      "resourceTypes": "Types de ressource",
+      "errorPaths": "Chemins avec erreurs"
+    },
+    "provenance": {
+      "hint": "suivi {{tracked}} · logs {{fetched}}"
+    },
+    "filters": {
+      "scopeHits": "visites suivies uniquement"
+    },
+    "enrich": {
+      "title": "Configurer le suivi des fetchs de crawlers",
+      "description": "L’analyse des fetchs nécessite de transférer les logs de votre CDN, de votre edge ou de votre serveur vers le point de terminaison AI fetch de HitKeep. Dès que des enregistrements arrivent, cette section montre les crawlers que votre suivi ne peut pas voir, avec les codes de statut, les temps de réponse, les octets servis et la corrélation entre fetch et visite.",
+      "docsAction": "Lire le guide de configuration"
+    },
+    "fetchDepth": {
+      "description": "Ce que les logs CDN, edge et serveur transférés ajoutent : les crawlers que votre suivi ne voit jamais, leurs codes de statut, temps de réponse, octets servis et la façon dont les fetchs deviennent des visites.",
+      "docsAction": "Guide de configuration",
+      "kpis": {
+        "totalFetches": "Fetchs totaux",
+        "errorRate4xx": "Taux 4xx",
+        "errorRate5xx": "Taux 5xx",
+        "medianResponse": "Réponse médiane",
+        "bytesServed": "Octets servis"
+      },
+      "correlation": {
+        "title": "Corrélation fetch-visite",
+        "description": "Mesure quels chemins récupérés attirent ensuite des visites humaines référées par l’IA et quelles pages fortement fetchées ne créent toujours pas de trafic aval.",
+        "note": "Les visites corrélées comptent les visites ultérieures référées par l’IA sur le même chemin dans la période sélectionnée.",
+        "kpis": {
+          "correlatedPaths": "Chemins corrélés",
+          "aiReferredVisits": "Visites ultérieures référées par l’IA",
+          "uncorrelatedFetches": "Fetchs non corrélés"
+        }
+      },
+      "tables": {
+        "title": "Ventilations de la corrélation",
+        "citationYield": {
+          "title": "Rendement de citation"
+        },
+        "opportunityPages": {
+          "title": "Pages d’opportunité"
+        },
+        "failureHotspots": {
+          "title": "Points chauds d’échec"
+        }
+      },
+      "exportStatus": {
+        "success": "Téléchargement de l'export lancé.",
+        "error": "Échec de l'export des données AI fetch. Veuillez réessayer."
+      }
+    },
+    "noSiteDescription": "Sélectionnez un site pour voir le trafic des agents IA."
+  },
   "aiChatbots": {
     "title": "Chatbots IA",
     "docsAction": "Guide d’instrumentation",
+    "setup": {
+      "title": "Instrumentez votre chatbot",
+      "description": "Envoyez des événements personnalisés assistant.* depuis votre chatbot pour alimenter cette page : débuts de conversation, prompts, réponses, citations, transferts et conversions assistées.",
+      "docsAction": "Lire le guide d’instrumentation"
+    },
     "noSiteDescription": "Sélectionnez ou créez un site pour afficher l’analyse des chatbots IA.",
     "header": {
       "title": "Analyse des chatbots IA sur le site",
@@ -2804,99 +2907,6 @@
     "exportStatus": {
       "success": "Le téléchargement de l’export a commencé.",
       "error": "Échec de l’export des données des chatbots IA. Veuillez réessayer."
-    }
-  },
-  "aiVisibility": {
-    "title": "Visibilité IA",
-    "docsAction": "Guide de configuration",
-    "noSiteDescription": "Sélectionne ou crée un site pour voir l’analyse des fetchs IA et des corrélations.",
-    "header": {
-      "title": "Analyse de visibilité IA",
-      "description": "Suis les fetchs server-side des crawlers IA, où les erreurs de crawl se concentrent et quelles pages récupérées attirent ensuite des visites référées par l’IA."
-    },
-    "filters": {
-      "assistant": "Assistant",
-      "family": "Opérateur",
-      "resourceType": "Type de ressource",
-      "allAssistants": "Tous les assistants",
-      "allFamilies": "Tous les opérateurs",
-      "allResourceTypes": "Tous les types de ressource",
-      "unfiltered": "Affichage de toute l’activité de fetch IA"
-    },
-    "kpis": {
-      "totalFetches": "Fetchs totaux",
-      "uniquePaths": "Chemins uniques",
-      "uniqueAssistants": "Assistants uniques",
-      "errorRate4xx": "Taux 4xx",
-      "errorRate5xx": "Taux 5xx",
-      "medianResponse": "Réponse médiane",
-      "bytesServed": "Octets servis"
-    },
-    "chart": {
-      "title": "Volume de fetchs dans le temps",
-      "description": "Vois quand les fetchs transférés des crawlers IA touchent ton contenu et comment la demande évolue sur la période sélectionnée.",
-      "fetches": "Fetchs",
-      "emptyTitle": "Aucune activité de fetch IA",
-      "emptyDescription": "Transmets des enregistrements à /api/sites/{id}/ingest/ai-fetch pour alimenter ce rapport. hk.js seul n’enregistre pas les fetchs de crawlers."
-    },
-    "breakdowns": {
-      "assistants": "Assistants principaux",
-      "families": "Opérateurs principaux",
-      "paths": "Chemins les plus récupérés",
-      "errorPaths": "Chemins avec erreurs",
-      "resourceTypes": "Types de ressource"
-    },
-    "correlation": {
-      "title": "Corrélation fetch-visite",
-      "description": "Mesure quels chemins récupérés attirent ensuite des visites humaines référées par l’IA et quelles pages fortement fetchées ne créent toujours pas de trafic aval.",
-      "note": "Les filtres d’assistant, d’opérateur et de type de ressource s’appliquent uniquement au côté fetch. Les visites corrélées incluent toute visite humaine ultérieure référée par l’IA sur le même chemin dans la fenêtre sélectionnée.",
-      "kpis": {
-        "correlatedPaths": "Chemins corrélés",
-        "aiVisits": "Visites référées par l’IA",
-        "uncorrelatedFetches": "Fetchs non corrélés"
-      },
-      "helpAria": "Afficher l’aide de corrélation",
-      "help": {
-        "correlatedPaths": "Chemins récupérés ayant ensuite reçu des visites humaines référées par l’IA dans la fenêtre sélectionnée.",
-        "aiVisits": "Visites humaines attribuées à des référents IA sur des chemins également fetchés par des crawlers IA.",
-        "uncorrelatedFetches": "Fetchs sur des chemins n’ayant produit aucune visite référée par l’IA correspondante dans cette fenêtre.",
-        "citationYieldCard": "Sert à repérer les pages où la demande des crawlers IA se transforme en visites aval.",
-        "opportunityCard": "Sert à trouver les pages très fetchées qui nécessitent encore de meilleurs contenus, liens ou une meilleure disponibilité.",
-        "failureHotspotCard": "Sert à trouver les paires assistant/préfixe de chemin où l’accès des crawlers rencontre des erreurs."
-      }
-    },
-    "tables": {
-      "citationYield": {
-        "title": "Rendement de citation",
-        "description": "Chemins où les fetchs IA se transforment le plus souvent en visites ultérieures référées par l’IA.",
-        "empty": "Aucun chemin récupéré n’a produit de visites IA corrélées sur cette période."
-      },
-      "opportunityPages": {
-        "title": "Pages d’opportunité",
-        "description": "Pages très fetchées avec peu de visites aval ou une forte pression d’erreurs.",
-        "cardSubtitle": "À surveiller",
-        "empty": "Aucune page d’opportunité ne correspond aux filtres actuels."
-      },
-      "failureHotspots": {
-        "title": "Points chauds d’échec",
-        "description": "Les combinaisons assistant/préfixe de chemin avec la plus forte pression d’erreurs de fetch.",
-        "empty": "Aucun point chaud d’échec ne correspond aux filtres actuels."
-      }
-    },
-    "columns": {
-      "path": "Chemin",
-      "assistant": "Assistant",
-      "pathPrefix": "Préfixe de chemin",
-      "fetches": "Fetchs",
-      "requests": "Requêtes",
-      "aiVisits": "Visites IA",
-      "errors": "Erreurs",
-      "errorRate": "Taux d’erreur",
-      "yield": "Rendement"
-    },
-    "exportStatus": {
-      "success": "Téléchargement de l'export lancé.",
-      "error": "Échec de l'export des données AI fetch. Veuillez réessayer."
     }
   },
   "integration": {
@@ -3147,6 +3157,11 @@
     }
   },
   "ecommerce": {
+    "setup": {
+      "title": "Configurer le suivi e-commerce",
+      "description": "L’analyse du chiffre d’affaires nécessite les événements d’achat et de commande de votre boutique. Dès que des événements arrivent, cette page se remplit automatiquement.",
+      "docsAction": "Lire le guide e-commerce"
+    },
     "docsAction": "Configurer l’e-commerce",
     "kpis": {
       "revenue": "Chiffre d’affaires",
@@ -3414,6 +3429,11 @@
     "noSiteDescription": "Sélectionnez un site pour afficher les recommandations d’opportunités."
   },
   "webVitals": {
+    "setup": {
+      "title": "Activer la collecte des Web Vitals",
+      "description": "Les Web Vitals nécessitent l’activation de la collecte des performances dans votre snippet de suivi. Dès que des mesures arrivent, cette page se remplit automatiquement.",
+      "docsAction": "Lire le guide Web Vitals"
+    },
     "docsAction": "Guide de configuration",
     "error": "Impossible de charger les données Web Vitals.",
     "noSiteDescription": "Sélectionnez ou créez un site pour inspecter les Web Vitals dans le temps.",

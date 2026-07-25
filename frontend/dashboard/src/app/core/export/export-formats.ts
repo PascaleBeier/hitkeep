@@ -28,3 +28,24 @@ export function buildTakeoutExportMenuItems(transloco: TranslocoService, onSelec
         command: () => onSelect(option.format)
     }));
 }
+
+/**
+ * Builds a download filename such as `example-com-ai-fetches-2026-05-18.csv`.
+ * The domain is slugified; unusable domains fall back to `site`.
+ */
+export function buildTakeoutExportFilename(domain: string | null | undefined, slug: string, format: TakeoutExportFormat): string {
+    const safeDomain = (domain || 'site')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    return `${safeDomain || 'site'}-${slug}-${dateStamp}.${format}`;
+}
+
+/** Appends (or replaces) the `format` query parameter of an export URL. */
+export function withTakeoutExportFormat(baseUrl: string, format: TakeoutExportFormat): string {
+    if (!baseUrl) return '';
+    const url = new URL(baseUrl, window.location.origin);
+    url.searchParams.set('format', format);
+    return url.pathname + `?${url.searchParams.toString()}`;
+}

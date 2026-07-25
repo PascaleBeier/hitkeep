@@ -12,7 +12,7 @@ describe('MetricCardGroup', () => {
             imports: [
                 MetricCardGroup,
                 TranslocoTestingModule.forRoot({
-                    langs: { en: {} },
+                    langs: { en: { aiAgents: { provenance: { hint: 'tracked {{tracked}} · logs {{fetched}}' } } } },
                     translocoConfig: {
                         availableLangs: ['en'],
                         defaultLang: 'en'
@@ -141,6 +141,59 @@ describe('MetricCardGroup', () => {
 
         expect(fixture.nativeElement.textContent).toContain('Pages');
         expect(fixture.nativeElement.textContent).not.toContain('/pricing');
+    });
+
+    it('passes the provenance flag through to single and tabbed metric lists', () => {
+        fixture.componentRef.setInput('tabs', [
+            {
+                id: 'ai-activity',
+                label: 'AI activity',
+                cards: [
+                    { id: 'agents', title: 'AI agents', data: [{ name: 'GPTBot', value: 50, tracked_hits: 10, fetch_count: 40 }], showProvenance: true },
+                    { id: 'paths', title: 'Pages crawled', data: [{ name: '/docs', value: 10, tracked_hits: 2, fetch_count: 8 }], showProvenance: true }
+                ]
+            },
+            {
+                id: 'plain',
+                label: 'Plain',
+                cards: [{ id: 'devices', title: 'Devices', data: [{ name: 'Desktop', value: 3, tracked_hits: 3, fetch_count: 1 }] }]
+            }
+        ]);
+        fixture.detectChanges();
+
+        const hints = fixture.debugElement.queryAll(By.css('.metric-list__provenance'));
+        expect(hints.length).toBe(1);
+        expect(hints[0].nativeElement.textContent.trim()).toBe('tracked 10 · logs 40');
+
+        const pathsTab = fixture.debugElement.queryAll(By.css('p-tab')).find((tab) => tab.nativeElement.textContent.includes('Pages crawled'));
+        pathsTab?.nativeElement.click();
+        fixture.detectChanges();
+
+        expect(fixture.debugElement.queryAll(By.css('.metric-list__provenance')).map((hint) => hint.nativeElement.textContent.trim())).toContain('tracked 2 · logs 8');
+    });
+
+    it('passes the share-column flag through per card and keeps it on by default', () => {
+        fixture.componentRef.setInput('tabs', [
+            {
+                id: 'correlation',
+                label: 'Correlation breakdowns',
+                cards: [
+                    { id: 'citation-yield', title: 'Citation yield', data: [{ name: '/docs', value: 6 }], showShare: false },
+                    { id: 'opportunity-pages', title: 'Opportunity pages', data: [{ name: '/pricing', value: 30 }], showShare: false }
+                ]
+            },
+            {
+                id: 'plain',
+                label: 'Plain',
+                cards: [{ id: 'devices', title: 'Devices', data: [{ name: 'Desktop', value: 3 }] }]
+            }
+        ]);
+        fixture.detectChanges();
+
+        // Only the plain group keeps a share column; the correlation cards drop it.
+        const shares = fixture.debugElement.queryAll(By.css('.metric-list__share'));
+        expect(shares.length).toBe(1);
+        expect(shares[0].nativeElement.textContent.trim()).toBe('100%');
     });
 
     it('emits normalized row click events', () => {

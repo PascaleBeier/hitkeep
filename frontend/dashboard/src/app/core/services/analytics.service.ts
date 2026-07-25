@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import {
+    AIActivityReport,
     AIFetchCorrelationReport,
     AIFetchOverview,
     AIFetchSeriesPoint,
@@ -282,6 +283,23 @@ export class AnalyticsService {
     getWebVitalsBreakdown(siteId: string, from: string, to: string, metric: WebVitalMetric, dimension: WebVitalDimension, path?: string | null, rating?: WebVitalRating | null, limit = 25): Observable<WebVitalDimensionRow[]> {
         const params = this.buildWebVitalsParams(from, to, metric, path, rating).set('dimension', dimension).set('limit', limit);
         return this.http.get<WebVitalDimensionRow[]>(`/api/sites/${siteId}/web-vitals/breakdown`, { params });
+    }
+
+    /**
+     * The unified AI activity report: tracked hits and forwarded fetch logs
+     * merged server-side into one set of scalars, breakdowns and series. Filters
+     * use the same repeatable `filter=type:value` params as the stats endpoint;
+     * the optional comparison window makes the response carry a baseline.
+     */
+    getAIActivity(siteId: string, from: string, to: string, filters: { type: string; value: string }[] = [], comparison?: { from: string; to: string }): Observable<AIActivityReport> {
+        let params = new HttpParams().set('from', from).set('to', to);
+        for (const filter of filters) {
+            params = params.append('filter', `${filter.type}:${filter.value}`);
+        }
+        if (comparison) {
+            params = params.set('compare_from', comparison.from).set('compare_to', comparison.to);
+        }
+        return this.http.get<AIActivityReport>(`/api/sites/${siteId}/ai-activity`, { params });
     }
 
     getAIFetchOverview(siteId: string, from: string, to: string, filters: AIFetchFilters = {}): Observable<AIFetchOverview> {

@@ -24,11 +24,9 @@
     </app-report-range-toolbar>
 
     @if (noSite()) {
-    <div class="flex flex-col items-center justify-center h-[50vh] gap-4">
-        <i class="pi pi-globe text-6xl text-primary opacity-20"></i>
-        <h2 class="text-2xl font-semibold text-muted-color">{{ "common.noSiteSelected" | transloco }}</h2>
-        <p class="text-muted-color">{{ "events.noSiteDescription" | transloco }}</p>
-    </div>
+    <app-no-site-selected icon="pi pi-globe" descriptionKey="events.noSiteDescription" />
+    } @else if (needsSetup()) {
+    <app-setup-callout testId="events-setup-callout" icon="pi pi-bolt" titleKey="events.setup.title" descriptionKey="events.setup.description" docsActionKey="events.setup.docsAction" [docsUrl]="customEventsDocsUrl" />
     } @else {
     <!-- Selectors — placed first so the user picks context before the chart renders -->
     <p-card class="shadow-sm border border-surface-200 dark:border-surface-700 surface-card mb-6">

@@ -17,10 +17,14 @@ import { SeriesChart, SeriesDefinition, SeriesChartPoint } from '@features/analy
 import { MetricStat, EventSeriesPoint, EventAudience } from '@models/analytics.types';
 import { finalize } from 'rxjs';
 import { injectActiveLang } from '@core/i18n/active-lang';
+import { calcDelta } from '@core/analytics/delta-utils';
 import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
 import { REALTIME_EVENT_KINDS } from '@services/realtime.service';
 import { injectReportRange } from '@services/report-range-preferences.service';
+import { SetupStateService } from '@services/setup-state.service';
 import { AnimatedNumber } from '@components/animated-number/animated-number';
+import { NoSiteSelected } from '@components/no-site-selected/no-site-selected';
+import { SetupCallout } from '@components/setup-callout/setup-callout';
 
 interface EventFilterChip {
     key: string;
@@ -47,25 +51,47 @@ const AUTOMATIC_EVENT_NAMES = Object.keys(AUTOMATIC_EVENT_META);
 
 @Component({
     selector: 'app-events',
-    imports: [FormsModule, ReactiveFormsModule, TranslocoPipe, SelectModule, CardModule, SkeletonModule, ButtonModule, MessageModule, MetricCardGroup, ReportRangeToolbar, PageHeader, PageHeaderLeft, PageBreadcrumb, SeriesChart, AnimatedNumber],
+    imports: [
+        FormsModule,
+        ReactiveFormsModule,
+        TranslocoPipe,
+        SelectModule,
+        CardModule,
+        SkeletonModule,
+        ButtonModule,
+        MessageModule,
+        MetricCardGroup,
+        ReportRangeToolbar,
+        PageHeader,
+        PageHeaderLeft,
+        PageBreadcrumb,
+        SeriesChart,
+        AnimatedNumber,
+        NoSiteSelected,
+        SetupCallout
+    ],
     templateUrl: './events.html',
     styleUrl: './events.css',
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Events {
     protected readonly addEventsDocsUrl = 'https://hitkeep.com/guides/tracking/automatic-events/';
+    protected readonly customEventsDocsUrl = 'https://hitkeep.com/guides/tracking/custom-events/';
     private siteService = inject(SiteService);
     private analyticsService = inject(AnalyticsService);
     private localeService = inject(TranslocoLocaleService);
     private transloco = inject(TranslocoService);
     private destroyRef = inject(DestroyRef);
     private realtimeRefresh = inject(RealtimeRefreshCoordinator);
+    private readonly setupState = inject(SetupStateService);
     private readonly reportRange = injectReportRange();
     private readonly activeLanguage = injectActiveLang();
 
     protected readonly isShortRange = this.reportRange.isShortRange;
 
     protected eventNames = signal<string[]>([]);
+    /** Names the site actually reported, before the automatic ones get merged in; `null` until the first answer. */
+    private readonly reportedEventNames = signal<string[] | null>(null);
     private realtimeRefreshKey = signal(0);
     protected selectedEvent = signal<string | null>(null);
     protected propertyKeys = signal<string[]>([]);
@@ -95,6 +121,16 @@ export class Events {
 
     protected readonly activeSite = computed(() => this.siteService.activeSite());
     protected readonly noSite = computed(() => !this.activeSite());
+
+    /**
+     * True only once the shared setup state confirms the site never sent a
+     * custom event. Empty ranges on an instrumented site keep the regular empty
+     * states, and the automatic events stay reachable there.
+     */
+    protected readonly needsSetup = computed(() => {
+        const reported = this.reportedEventNames();
+        return this.setupState.needsSetup(this.activeSite()?.id, 'has_custom_events', reported ? reported.length : null, this.isLoadingNames());
+    });
     protected eventOptions = computed<EventOption[]>(() =>
         this.eventNames().map((name) => {
             const meta = AUTOMATIC_EVENT_META[name];
@@ -424,10 +460,7 @@ export class Events {
         });
     }
 
-    protected calcDelta(current: number, previous: number): number | null {
-        if (previous === 0) return null;
-        return ((current - previous) / previous) * 100;
-    }
+    protected readonly calcDelta = calcDelta;
 
     protected clearAllFilters() {
         this.selectedPropertyValue.set(null);
@@ -518,6 +551,7 @@ export class Events {
         const currentSelection = this.selectedEvent();
         this.analyticsService.getEventNames(siteId, from, to).subscribe({
             next: (names) => {
+                this.reportedEventNames.set(names);
                 const mergedNames = this.mergeAutomaticEventNames(names);
                 this.eventNames.set(mergedNames);
                 this.selectedEvent.set(currentSelection && mergedNames.includes(currentSelection) ? currentSelection : null);

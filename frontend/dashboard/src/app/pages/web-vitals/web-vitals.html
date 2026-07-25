@@ -26,6 +26,8 @@
         <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
         <span>{{ "common.loadingSiteData" | transloco }}</span>
     </div>
+    } @else if (needsSetup()) {
+    <app-setup-callout testId="web-vitals-setup-callout" icon="pi pi-gauge" titleKey="webVitals.setup.title" descriptionKey="webVitals.setup.description" docsActionKey="webVitals.setup.docsAction" [docsUrl]="docsUrl" />
     } @else if (siteService.activeSite()) { @if (errorKey()) {
     <div class="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">{{ errorKey()! | transloco }}</div>
     }
@@ -358,10 +360,6 @@
         </p-tabs>
     </p-card>
     } @else {
-    <div class="flex flex-col items-center justify-center h-[50vh] gap-4">
-        <i class="pi pi-gauge text-6xl text-primary opacity-20"></i>
-        <h2 class="text-2xl font-semibold text-muted-color">{{ "common.noSiteSelected" | transloco }}</h2>
-        <p class="text-muted-color">{{ "webVitals.noSiteDescription" | transloco }}</p>
-    </div>
+    <app-no-site-selected icon="pi pi-gauge" descriptionKey="webVitals.noSiteDescription" />
     }
 </div>

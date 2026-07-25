@@ -1,6 +1,10 @@
+import { SeriesChartPoint } from '@features/analytics/components/series-chart';
 import { EventSeriesPoint } from '@models/analytics.types';
 
 export type ChatbotMetricKey = 'started' | 'sent' | 'rendered' | 'clicked' | 'handoff' | 'assisted';
+
+/** Metrics plotted on the conversation activity chart, in stacking order. */
+const CHARTED_METRIC_KEYS = ['started', 'rendered', 'handoff', 'assisted'] as const satisfies readonly ChatbotMetricKey[];
 
 export interface ChatbotSeriesState {
     started: EventSeriesPoint[];
@@ -37,12 +41,21 @@ export function totalFor(key: ChatbotMetricKey, state: ChatbotSeriesState): numb
     return state[key].reduce((sum, point) => sum + point.count, 0);
 }
 
-export function safeRate(numerator: number, denominator: number): number {
-    if (denominator === 0) return 0;
-    return (numerator / denominator) * 100;
-}
-
-export function calcDelta(current: number, previous: number): number | null {
-    if (previous === 0) return null;
-    return ((current - previous) / previous) * 100;
+/** Merges the charted chatbot metrics into chronologically sorted chart points. */
+export function mergeChatbotChartSeries(state: ChatbotSeriesState): SeriesChartPoint[] {
+    const byTime = new Map<string, SeriesChartPoint>();
+    for (const key of CHARTED_METRIC_KEYS) {
+        for (const point of state[key]) {
+            const current = byTime.get(point.time) ?? {
+                time: point.time,
+                started: 0,
+                rendered: 0,
+                handoff: 0,
+                assisted: 0
+            };
+            current[key] = point.count;
+            byTime.set(point.time, current);
+        }
+    }
+    return [...byTime.values()].sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
 }
