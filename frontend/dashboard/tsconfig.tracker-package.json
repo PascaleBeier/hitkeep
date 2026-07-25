@@ -1,0 +1,11 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "declaration": true,
+        "emitDeclarationOnly": true,
+        "rootDir": "./src/tracker",
+        "outDir": "../tracker/dist",
+        "types": []
+    },
+    "include": ["src/tracker/package.ts", "src/tracker/core.ts", "src/tracker/version.ts"]
+}

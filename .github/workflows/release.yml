@@ -145,6 +145,49 @@ jobs:
         run: |
           helm push "hitkeep-${VERSION}.tgz" "oci://ghcr.io/pascalebeier/charts"
 
+  publish-npm:
+    name: Publish @hitkeep/tracker to npm
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - uses: ./.github/actions/setup-node-npm
+
+      - name: Install dashboard dependencies
+        working-directory: frontend/dashboard
+        run: npm ci --no-audit --no-fund
+
+      - name: Build and verify package
+        run: ./hk qa pr --gate tracker-package
+
+      - name: Verify release version matches package
+        env:
+          VERSION: ${{ needs.release-please.outputs.version }}
+        run: |
+          set -euo pipefail
+          pkg_version="$(jq -r '.version' frontend/tracker/package.json)"
+          if [[ "$pkg_version" != "$VERSION" ]]; then
+            echo "::error::@hitkeep/tracker version ${pkg_version} does not match release ${VERSION}"
+            exit 1
+          fi
+
+      - name: Publish to npm
+        working-directory: frontend/tracker
+        run: npm publish
+
   sync-docs-release:
     name: Publish release and configuration metadata to docs
     needs:

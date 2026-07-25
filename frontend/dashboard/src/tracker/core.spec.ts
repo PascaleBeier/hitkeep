@@ -1,6 +1,20 @@
 import { vi } from 'vitest';
 
-import { bootstrapTracker, classifyFormSubmit, classifyLinkEvent, hasExplicitTrackingTag, readTrackerOptions, resolveTrackerUrl, resolveWebVitalsBundleUrl, sanitizeTrackedUrl } from './core';
+import {
+    bootstrapTracker,
+    classifyFormSubmit,
+    classifyLinkEvent,
+    createTracker,
+    hasExplicitTrackingTag,
+    isTrackerBlocked,
+    isTrackingOptedOut,
+    readTrackerOptions,
+    resolveTrackerUrl,
+    resolveWebVitalsBundleUrl,
+    sanitizeTrackedUrl,
+    setTrackingOptOut
+} from './core';
+import type { HitKeepWindow, TrackerRuntimeConfig } from './core';
 
 type ListenerMap = Record<string, EventListener[]>;
 type TrackerTestWindow = Window &
@@ -63,6 +77,16 @@ function trackerHarness(path = '/signup?utm_source=launch&utm_medium=email', scr
             stored.set(key, value);
         })
     };
+    const persisted = new Map<string, string>();
+    const localStorage = {
+        getItem: vi.fn((key: string) => persisted.get(key) ?? null),
+        setItem: vi.fn((key: string, value: string) => {
+            persisted.set(key, value);
+        }),
+        removeItem: vi.fn((key: string) => {
+            persisted.delete(key);
+        })
+    };
     const sendBeacon = vi.fn((url: string | URL, data?: BodyInit | null) => {
         void url;
         void data;
@@ -96,6 +120,9 @@ function trackerHarness(path = '/signup?utm_source=launch&utm_medium=email', scr
         querySelector: vi.fn(() => script),
         addEventListener: vi.fn((name: string, listener: EventListener) => {
             documentListeners[name] = [...(documentListeners[name] ?? []), listener];
+        }),
+        removeEventListener: vi.fn((name: string, listener: EventListener) => {
+            documentListeners[name] = (documentListeners[name] ?? []).filter((existing) => existing !== listener);
         })
     };
     const win = {
@@ -110,6 +137,7 @@ function trackerHarness(path = '/signup?utm_source=launch&utm_medium=email', scr
         screen: { width: 1440, height: 900 },
         history,
         sessionStorage,
+        localStorage,
         crypto: {
             randomUUID: vi.fn(() => '10000000-0000-4000-8000-000000000001'),
             getRandomValues: crypto.getRandomValues.bind(crypto)
@@ -119,6 +147,9 @@ function trackerHarness(path = '/signup?utm_source=launch&utm_medium=email', scr
         addEventListener: vi.fn((name: string, listener: EventListener) => {
             windowListeners[name] = [...(windowListeners[name] ?? []), listener];
         }),
+        removeEventListener: vi.fn((name: string, listener: EventListener) => {
+            windowListeners[name] = (windowListeners[name] ?? []).filter((existing) => existing !== listener);
+        }),
         hk: undefined
     } as unknown as Window & typeof globalThis;
 
@@ -127,6 +158,7 @@ function trackerHarness(path = '/signup?utm_source=launch&utm_medium=email', scr
         appendedScripts,
         fakeDocument,
         history,
+        localStorage,
         script,
         sendBeacon,
         sessionStorage,
@@ -466,5 +498,118 @@ describe('tracker core', () => {
             expect(payload['u_med']).toBe('email');
             expect(payload['qr']).toBe('qr-123');
         });
+    });
+
+    function runtimeConfig(overrides: Partial<TrackerRuntimeConfig> = {}): TrackerRuntimeConfig {
+        return {
+            collectDnt: false,
+            disableBeacon: false,
+            disableSpaTracking: false,
+            disableOutboundTracking: false,
+            disableDownloadTracking: false,
+            disableFormTracking: false,
+            enableWebVitals: false,
+            trackerSource: '@hitkeep/tracker',
+            trackerVersion: '2.12.0',
+            pageEndpoint: 'https://stats.example.com/ingest',
+            eventEndpoint: 'https://stats.example.com/ingest/event',
+            webVitalsEndpoint: 'https://stats.example.com/ingest/web-vitals',
+            webVitalsBundleUrl: 'https://stats.example.com/hk-vitals.js',
+            capturePageviews: true,
+            captureOnLocalhost: false,
+            bindToWindow: true,
+            ...overrides
+        };
+    }
+
+    it('creates a tracker from explicit endpoints without a script element', async () => {
+        const harness = trackerHarness('/signup');
+        harness.fakeDocument.currentScript = null as unknown as HTMLScriptElement;
+
+        const handle = createTracker(harness.win as HitKeepWindow, runtimeConfig());
+
+        expect(handle).not.toBeNull();
+        expect(harness.sendBeacon).toHaveBeenCalledTimes(1);
+        expect(harness.sendBeacon.mock.calls[0]?.[0]).toBe('https://stats.example.com/ingest');
+
+        handle?.track('signup_clicked', { plan: 'pro' });
+        expect(harness.sendBeacon.mock.calls[1]?.[0]).toBe('https://stats.example.com/ingest/event');
+        const eventBody = harness.sendBeacon.mock.calls[1]?.[1] as unknown as Blob;
+        const payload = JSON.parse(await eventBody.text()) as Record<string, unknown>;
+        expect(payload['tsrc']).toBe('@hitkeep/tracker');
+        expect(payload['tv']).toBe('2.12.0');
+    });
+
+    it('skips the initial pageview when pageview capture is disabled', () => {
+        const harness = trackerHarness('/signup');
+
+        const handle = createTracker(harness.win as HitKeepWindow, runtimeConfig({ capturePageviews: false }));
+
+        expect(harness.sendBeacon).not.toHaveBeenCalled();
+        handle?.trackPageview();
+        expect(harness.sendBeacon).toHaveBeenCalledTimes(1);
+    });
+
+    it('blocks localhost unless capture on localhost is enabled', () => {
+        expect(isTrackerBlocked('localhost', 'Mozilla/5.0', '0', false)).toBe(true);
+        expect(isTrackerBlocked('localhost', 'Mozilla/5.0', '0', false, true)).toBe(false);
+        expect(isTrackerBlocked('127.0.0.1', 'Mozilla/5.0', '0', false, true)).toBe(false);
+        expect(isTrackerBlocked('localhost', 'Googlebot', '0', false, true)).toBe(true);
+    });
+
+    it('honors the persistent opt-out flag', () => {
+        const harness = trackerHarness('/signup');
+        setTrackingOptOut(harness.win, true);
+
+        expect(isTrackingOptedOut(harness.win)).toBe(true);
+        const handle = createTracker(harness.win as HitKeepWindow, runtimeConfig());
+
+        expect(handle).toBeNull();
+        expect(harness.sendBeacon).not.toHaveBeenCalled();
+        const win = harness.win as TrackerTestWindow;
+        win.hk?.event?.('ignored_event');
+        expect(harness.sendBeacon).not.toHaveBeenCalled();
+
+        setTrackingOptOut(harness.win, false);
+        expect(isTrackingOptedOut(harness.win)).toBe(false);
+    });
+
+    it('cleans up listeners, history patches, and the bootstrap guard', () => {
+        const harness = trackerHarness('/signup');
+        const originalPushState = harness.history.pushState;
+        const originalReplaceState = harness.history.replaceState;
+
+        const handle = createTracker(harness.win as HitKeepWindow, runtimeConfig());
+        expect(harness.history.pushState).not.toBe(originalPushState);
+        expect(harness.windowListeners['pagehide']?.length).toBe(1);
+
+        handle?.cleanup();
+
+        expect(harness.history.pushState).toBe(originalPushState);
+        expect(harness.history.replaceState).toBe(originalReplaceState);
+        expect(harness.windowListeners['pagehide']?.length).toBe(0);
+        expect(harness.windowListeners['popstate']?.length).toBe(0);
+        expect(harness.documentListeners['visibilitychange']?.length).toBe(0);
+        expect(harness.documentListeners['click']?.length).toBe(0);
+        expect(harness.documentListeners['submit']?.length).toBe(0);
+        expect((harness.win as TrackerTestWindow).hk?.event).toBeUndefined();
+
+        const beaconCallsAfterCleanup = harness.sendBeacon.mock.calls.length;
+        handle?.track('after_cleanup');
+        handle?.trackPageview();
+        expect(harness.sendBeacon.mock.calls.length).toBe(beaconCallsAfterCleanup);
+    });
+
+    it('supports re-initialization after cleanup', () => {
+        const harness = trackerHarness('/signup');
+
+        const first = createTracker(harness.win as HitKeepWindow, runtimeConfig());
+        expect(createTracker(harness.win as HitKeepWindow, runtimeConfig())).toBeNull();
+        first?.cleanup();
+
+        const second = createTracker(harness.win as HitKeepWindow, runtimeConfig());
+        expect(second).not.toBeNull();
+        expect(harness.windowListeners['pagehide']?.length).toBe(1);
+        second?.cleanup();
     });
 });

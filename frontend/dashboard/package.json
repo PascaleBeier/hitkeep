@@ -10,6 +10,8 @@
         "sync:public": "node scripts/sync-public.mjs",
         "transloco:optimize": "transloco-optimize dist/dashboard/browser/i18n",
         "build:tracker": "esbuild src/tracker/index.ts --bundle --minify --outfile=dist/dashboard/browser/hk.js && esbuild src/tracker/vitals.ts --bundle --minify --outfile=dist/dashboard/browser/hk-vitals.js",
+        "build:tracker-package": "node scripts/build-tracker-package.mjs",
+        "verify:tracker-package": "node scripts/verify-tracker-package.mjs",
         "build:prod": "ng build --configuration production && npm run transloco:optimize && npm run build:tracker && npm run sync:public",
         "watch": "ng build --watch --configuration development",
         "test": "ng test",
@@ -92,7 +94,10 @@
         }
     },
     "overrides": {
-        "dompurify": "3.4.2"
+        "dompurify": "3.4.2",
+        "@jsverse/transloco-optimize": {
+            "glob": "^11.1.0"
+        }
     },
     "packageExtensions": {
         "@jsverse/transloco-locale@8.4.0": {

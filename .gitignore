@@ -14,6 +14,9 @@
 /frontend/dashboard/test-results/
 /frontend/dashboard/playwright-report/
 
+# @hitkeep/tracker npm package build output.
+/frontend/tracker/dist/
+
 # Canonical contributor skills are versioned source, even with a global ignore.
 !/.agents/
 !/.agents/**
