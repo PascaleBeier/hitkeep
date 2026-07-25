@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, signal, untracked } from '@angular/core';
 import { injectActiveLang } from '@core/i18n/active-lang';
+import { calcDelta } from '@core/analytics/delta-utils';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { compatForm } from '@angular/forms/signals/compat';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
@@ -540,10 +541,7 @@ export class Goals {
             });
     }
 
-    protected calcDelta(current: number, previous: number): number | null {
-        if (previous === 0) return null;
-        return ((current - previous) / previous) * 100;
-    }
+    protected readonly calcDelta = calcDelta;
 
     protected getCurrentDateRange() {
         return this.reportRange.currentDateRange();

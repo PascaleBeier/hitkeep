@@ -7,21 +7,25 @@ import { TranslocoLocaleService } from '@jsverse/transloco-locale';
 import { SelectModule } from '@openng/optimus-ui/select';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { CardModule } from '@openng/optimus-ui/card';
-import { SplitButtonModule } from '@openng/optimus-ui/splitbutton';
-import { MenuItem } from '@openng/optimus-ui/api';
 import { SiteService } from '@features/sites/services/site.service';
 import { AnalyticsService, EventDimensionFilter } from '@core/services/analytics.service';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
+import { ExportSplitButton, ExportStatusBanner } from '@components/export-split-button/export-split-button';
+import { FilterChipItem, FilterChipRow } from '@components/filter-chip-row/filter-chip-row';
+import { NoSiteSelected } from '@components/no-site-selected/no-site-selected';
+import { SetupCallout } from '@components/setup-callout/setup-callout';
 import { SeriesChart, SeriesChartPoint, SeriesDefinition } from '@features/analytics/components/series-chart';
 import { KPI_PERCENT_FORMAT, KpiCard, KpiCardModel } from '@features/analytics/components/kpi-card';
 import { MetricCardGroup, MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
-import { EventAudience, EventSeriesPoint, MetricStat } from '@models/analytics.types';
+import { EventAudience, MetricStat } from '@models/analytics.types';
 import { injectActiveLang } from '@core/i18n/active-lang';
-import { buildTakeoutExportMenuItems, DEFAULT_HITS_EXPORT_FORMAT, TakeoutExportFormat } from '@core/export/export-formats';
+import { calcDelta, safeRate } from '@core/analytics/delta-utils';
+import { buildTakeoutExportFilename, DEFAULT_HITS_EXPORT_FORMAT, TakeoutExportFormat, withTakeoutExportFormat } from '@core/export/export-formats';
+import { SetupStateService } from '@services/setup-state.service';
 import { TakeoutDownloadService } from '@services/takeout-download.service';
-import { calcDelta, ChatbotMetricKey, ChatbotSeriesState, computeComparisonPeriod, createEmptySeries, safeRate, totalFor } from '@pages/ai-chatbots/ai-chatbots.utils';
+import { ChatbotMetricKey, ChatbotSeriesState, computeComparisonPeriod, createEmptySeries, mergeChatbotChartSeries, totalFor } from '@pages/ai-chatbots/ai-chatbots.utils';
 import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
 import { REALTIME_KINDS } from '@services/realtime.service';
 import { injectReportRange } from '@services/report-range-preferences.service';
@@ -30,12 +34,6 @@ type ScopeKey = 'provider' | 'bot_id' | 'surface' | 'model';
 interface ScopeFilter {
     key: ScopeKey;
     value: string;
-}
-
-interface FilterChip {
-    key: string;
-    label: string;
-    remove: () => void;
 }
 
 type AudienceDimensionFilterType = 'path' | 'referrer' | 'device' | 'country' | 'city' | 'provider' | 'asn';
@@ -52,7 +50,25 @@ const CHATBOT_EVENTS: Record<ChatbotMetricKey, string> = {
 
 @Component({
     selector: 'app-ai-chatbots',
-    imports: [FormsModule, TranslocoPipe, SelectModule, ButtonModule, CardModule, SplitButtonModule, ReportRangeToolbar, PageHeader, PageHeaderLeft, PageBreadcrumb, SeriesChart, KpiCard, MetricCardGroup],
+    imports: [
+        FormsModule,
+        TranslocoPipe,
+        SelectModule,
+        ButtonModule,
+        CardModule,
+        ReportRangeToolbar,
+        PageHeader,
+        PageHeaderLeft,
+        PageBreadcrumb,
+        ExportSplitButton,
+        ExportStatusBanner,
+        FilterChipRow,
+        NoSiteSelected,
+        SetupCallout,
+        SeriesChart,
+        KpiCard,
+        MetricCardGroup
+    ],
     templateUrl: './ai-chatbots.html',
     styleUrl: './ai-chatbots.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -64,6 +80,7 @@ export class AIChatbots {
     private readonly localeService = inject(TranslocoLocaleService);
     private readonly transloco = inject(TranslocoService);
     private readonly takeoutDownloadService = inject(TakeoutDownloadService);
+    private readonly setupState = inject(SetupStateService);
     private readonly destroyRef = inject(DestroyRef);
     private readonly realtimeRefresh = inject(RealtimeRefreshCoordinator);
     private readonly reportRange = injectReportRange();
@@ -102,6 +119,13 @@ export class AIChatbots {
     protected readonly activeSite = computed(() => this.siteService.activeSite());
     protected readonly noSite = computed(() => !this.activeSite());
     protected readonly isLoading = computed(() => this.isLoadingSeries() || this.isLoadingComparison() || this.isLoadingBreakdowns() || this.isLoadingAudience());
+
+    /**
+     * True only once the shared setup state confirms the site never sent a
+     * chatbot event. Zeros inside the range with data elsewhere stay on the
+     * regular empty states.
+     */
+    protected readonly needsSetup = computed(() => this.setupState.needsSetup(this.activeSite()?.id, 'has_chatbot_events', this.totalStarted(), this.isLoading()));
 
     protected readonly scopeKeyOptions = computed(() => {
         this.activeLanguage();
@@ -144,51 +168,9 @@ export class AIChatbots {
 
     protected readonly isShortRange = this.reportRange.isShortRange;
 
-    protected readonly chartSeries = computed<SeriesChartPoint[]>(() => {
-        const state = this.series();
-        const byTime = new Map<string, SeriesChartPoint>();
-        const merge = (points: EventSeriesPoint[], key: ChatbotMetricKey) => {
-            for (const point of points) {
-                const current = byTime.get(point.time) ?? {
-                    time: point.time,
-                    started: 0,
-                    rendered: 0,
-                    handoff: 0,
-                    assisted: 0
-                };
-                current[key] = point.count;
-                byTime.set(point.time, current);
-            }
-        };
-        merge(state.started, 'started');
-        merge(state.rendered, 'rendered');
-        merge(state.handoff, 'handoff');
-        merge(state.assisted, 'assisted');
-        return [...byTime.values()].sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
-    });
+    protected readonly chartSeries = computed<SeriesChartPoint[]>(() => mergeChatbotChartSeries(this.series()));
 
-    protected readonly comparisonChartSeries = computed<SeriesChartPoint[]>(() => {
-        const state = this.comparisonSeries();
-        const byTime = new Map<string, SeriesChartPoint>();
-        const merge = (points: EventSeriesPoint[], key: ChatbotMetricKey) => {
-            for (const point of points) {
-                const current = byTime.get(point.time) ?? {
-                    time: point.time,
-                    started: 0,
-                    rendered: 0,
-                    handoff: 0,
-                    assisted: 0
-                };
-                current[key] = point.count;
-                byTime.set(point.time, current);
-            }
-        };
-        merge(state.started, 'started');
-        merge(state.rendered, 'rendered');
-        merge(state.handoff, 'handoff');
-        merge(state.assisted, 'assisted');
-        return [...byTime.values()].sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
-    });
+    protected readonly comparisonChartSeries = computed<SeriesChartPoint[]>(() => mergeChatbotChartSeries(this.comparisonSeries()));
 
     protected readonly chartConfig = computed<SeriesDefinition[]>(() => {
         this.activeLanguage();
@@ -234,9 +216,9 @@ export class AIChatbots {
         return `${format(range.from)} – ${format(range.to)}`;
     });
 
-    protected readonly filterChips = computed<FilterChip[]>(() => {
+    protected readonly filterChips = computed<FilterChipItem[]>(() => {
         this.activeLanguage();
-        const chips: FilterChip[] = [];
+        const chips: FilterChipItem[] = [];
         const value = this.selectedScopeValue();
         if (value) {
             const scopeKey = this.selectedScopeKey();
@@ -273,11 +255,6 @@ export class AIChatbots {
         }
 
         return `/api/sites/${site.id}/ai-chatbots/export?${params.toString()}`;
-    });
-
-    protected readonly exportMenuItems = computed<MenuItem[]>(() => {
-        this.activeLanguage();
-        return buildTakeoutExportMenuItems(this.transloco, (format) => this.exportFiltered(format));
     });
 
     protected readonly totalStarted = computed(() => this.totalFor('started', this.series()));
@@ -501,7 +478,7 @@ export class AIChatbots {
             siteId: () => this.activeSite()?.id ?? null,
             kinds: [REALTIME_KINDS.events],
             enabled: () => !!this.activeSite() && !!this.getCurrentDateRange(),
-            refresh: () => this.refreshRealtimeData(),
+            refresh: () => this.refreshData('background'),
             debounceMs: 700
         });
     }
@@ -537,14 +514,14 @@ export class AIChatbots {
     }
 
     protected exportFiltered(format: TakeoutExportFormat = DEFAULT_HITS_EXPORT_FORMAT) {
-        const url = this.buildExportUrl(format);
+        const url = withTakeoutExportFormat(this.exportUrl(), format);
         if (!url || this.isExporting()) return;
 
         this.isExporting.set(true);
         this.exportState.set('idle');
 
         this.takeoutDownloadService
-            .downloadFromUrl(url, this.buildExportFilename(format))
+            .downloadFromUrl(url, buildTakeoutExportFilename(this.activeSite()?.domain, 'ai-chatbots', format))
             .pipe(
                 takeUntilDestroyed(this.destroyRef),
                 finalize(() => this.isExporting.set(false))
@@ -555,7 +532,8 @@ export class AIChatbots {
             });
     }
 
-    private refreshRealtimeData(): void {
+    /** Re-runs every request behind the page; the toolbar refresh uses the blocking mode, realtime nudges the background one. */
+    protected refreshData(mode: DataLoadMode = 'blocking'): void {
         const site = this.activeSite();
         const dates = this.getCurrentDateRange();
         if (!site || !dates) return;
@@ -563,9 +541,12 @@ export class AIChatbots {
         const scopeFilter = this.activeScopeFilter();
         const dimFilters = this.audienceDimFilters();
         const comparison = computeComparisonPeriod(dates.from, dates.to);
-        this.loadScopeValues(site.id, dates.from, dates.to, this.selectedScopeKey(), 'background');
-        this.loadPrimaryData(site.id, dates.from, dates.to, scopeFilter, dimFilters, 'background', () => this.loadComparisonData(site.id, comparison.from, comparison.to, scopeFilter, dimFilters, 'background'));
-        this.loadAudience(site.id, dates.from, dates.to, scopeFilter, dimFilters, 'background');
+        this.loadScopeValues(site.id, dates.from, dates.to, this.selectedScopeKey(), mode);
+        // The previous-period window only moves when the site, range or filters
+        // change, so background realtime refreshes leave the baseline alone.
+        const reloadComparison = mode === 'blocking' ? () => this.loadComparisonData(site.id, comparison.from, comparison.to, scopeFilter, dimFilters) : undefined;
+        this.loadPrimaryData(site.id, dates.from, dates.to, scopeFilter, dimFilters, mode, reloadComparison);
+        this.loadAudience(site.id, dates.from, dates.to, scopeFilter, dimFilters, mode);
     }
 
     private loadPrimaryData(siteId: string, from: string, to: string, scopeFilter: ScopeFilter | null, filters: EventDimensionFilter[] = [], mode: DataLoadMode = 'blocking', onSettled?: () => void) {
@@ -623,9 +604,9 @@ export class AIChatbots {
             });
     }
 
-    private loadComparisonData(siteId: string, from: string, to: string, scopeFilter: ScopeFilter | null, filters: EventDimensionFilter[] = [], mode: DataLoadMode = 'blocking') {
-        const blocking = mode === 'blocking' || this.isLoadingComparison();
-        if (blocking) this.isLoadingComparison.set(true);
+    /** Previous-period baseline for the KPI deltas; only blocking loads move the window. */
+    private loadComparisonData(siteId: string, from: string, to: string, scopeFilter: ScopeFilter | null, filters: EventDimensionFilter[] = []) {
+        this.isLoadingComparison.set(true);
         const propertyKey = scopeFilter?.key;
         const propertyValue = scopeFilter?.value;
 
@@ -637,11 +618,7 @@ export class AIChatbots {
             handoff: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.handoff, propertyKey, propertyValue, filters),
             assisted: this.analyticsService.getEventTimeseries(siteId, from, to, CHATBOT_EVENTS.assisted, propertyKey, propertyValue, filters)
         })
-            .pipe(
-                finalize(() => {
-                    if (blocking) this.isLoadingComparison.set(false);
-                })
-            )
+            .pipe(finalize(() => this.isLoadingComparison.set(false)))
             .subscribe({
                 next: (data) => {
                     this.comparisonSeries.set({
@@ -653,9 +630,7 @@ export class AIChatbots {
                         assisted: data.assisted ?? []
                     });
                 },
-                error: () => {
-                    if (blocking) this.comparisonSeries.set(createEmptySeries());
-                }
+                error: () => this.comparisonSeries.set(createEmptySeries())
             });
     }
 
@@ -749,23 +724,5 @@ export class AIChatbots {
             loading: false,
             updateKey: this.kpiUpdateKey()
         };
-    }
-
-    private buildExportUrl(format: TakeoutExportFormat): string {
-        const baseUrl = this.exportUrl();
-        if (!baseUrl) return '';
-        const url = new URL(baseUrl, window.location.origin);
-        url.searchParams.set('format', format);
-        return url.pathname + `?${url.searchParams.toString()}`;
-    }
-
-    private buildExportFilename(format: TakeoutExportFormat): string {
-        const siteDomain = this.activeSite()?.domain || 'site';
-        const safeDomain = siteDomain
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/(^-|-$)/g, '');
-        const dateStamp = new Date().toISOString().slice(0, 10);
-        return `${safeDomain || 'site'}-ai-chatbots-${dateStamp}.${format}`;
     }
 }

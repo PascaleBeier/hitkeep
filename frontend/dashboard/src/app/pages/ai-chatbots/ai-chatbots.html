@@ -7,7 +7,7 @@
         </ng-template>
     </app-page-header>
 
-    <app-report-range-toolbar [loading]="isLoading()">
+    <app-report-range-toolbar [loading]="isLoading()" (refresh)="refreshData()">
         <div toolbar-right class="flex items-center gap-2">
             <a
                 pButton
@@ -25,11 +25,9 @@
     </app-report-range-toolbar>
 
     @if (noSite()) {
-    <div class="flex flex-col items-center justify-center h-[50vh] gap-4">
-        <i class="pi pi-comments text-6xl text-primary opacity-20"></i>
-        <h2 class="text-2xl font-semibold text-muted-color">{{ "common.noSiteSelected" | transloco }}</h2>
-        <p class="text-muted-color">{{ "aiChatbots.noSiteDescription" | transloco }}</p>
-    </div>
+    <app-no-site-selected icon="pi pi-comments" descriptionKey="aiChatbots.noSiteDescription" />
+    } @else if (needsSetup()) {
+    <app-setup-callout testId="ai-chatbots-setup-callout" icon="pi pi-comments" titleKey="aiChatbots.setup.title" descriptionKey="aiChatbots.setup.description" docsActionKey="aiChatbots.setup.docsAction" [docsUrl]="docsUrl" />
     } @else {
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
         @for (card of kpiCards(); track card.label) {
@@ -88,36 +86,10 @@
     </div>
 
     <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div class="flex flex-wrap items-center gap-2">
-            @if (filterChips().length > 0) { @for (chip of filterChips(); track chip.key) {
-            <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--p-primary-color)] text-sm">
-                <span class="font-medium text-[var(--p-text-color)]">{{ chip.label }}</span>
-                <button type="button" class="text-muted-color hover:text-[var(--p-text-color)]" (click)="chip.remove()" [attr.aria-label]="'common.removeFilterAria' | transloco">
-                    <i class="pi pi-times" aria-hidden="true"></i>
-                </button>
-            </span>
-            }
-            <button type="button" class="text-xs text-muted-color hover:text-[var(--p-text-color)] underline" (click)="clearFilters()">{{ "common.actions.clearAll" | transloco }}</button>
-            } @else {
-            <span class="text-sm text-[var(--p-text-muted-color)]">{{ "common.noActiveFilter" | transloco }}</span>
-            }
-        </div>
-        <div class="flex items-center gap-2">
-            <p-splitButton
-                icon="pi pi-download"
-                [label]="isExporting() ? ('common.preparing' | transloco) : ('common.actions.exportCsv' | transloco)"
-                [model]="exportMenuItems()"
-                [disabled]="!exportUrl() || isExporting()"
-                styleClass="p-button-outlined p-button-sm"
-                (onClick)="exportFiltered('csv')"
-            />
-        </div>
+        <app-filter-chip-row [chips]="filterChips()" (clearAll)="clearFilters()" />
+        <app-export-split-button [isExporting]="isExporting()" [disabled]="!exportUrl() || isExporting()" (export)="exportFiltered($event)" />
     </div>
-    @if (exportState() === "success") {
-    <div class="mb-6 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{{ "aiChatbots.exportStatus.success" | transloco }}</div>
-    } @if (exportState() === "error") {
-    <div class="mb-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ "aiChatbots.exportStatus.error" | transloco }}</div>
-    }
+    <app-export-status-banner [state]="exportState()" successKey="aiChatbots.exportStatus.success" errorKey="aiChatbots.exportStatus.error" />
 
     <app-metric-card-group [tabs]="metricCardTabs()" (rowClicked)="onMetricCardClick($event)" />
     }

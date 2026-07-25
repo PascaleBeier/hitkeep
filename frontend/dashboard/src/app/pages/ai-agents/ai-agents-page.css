@@ -2,18 +2,14 @@
     display: block;
 }
 
-.ai-visibility__stat-strip {
+.ai-agents__stat-strip {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.5rem;
     width: 100%;
 }
 
-.ai-visibility__stat-strip--wide {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.ai-visibility__stat {
+.ai-agents__stat {
     min-width: 0;
     border: 1px solid var(--p-surface-border);
     border-radius: 0.5rem;
@@ -21,7 +17,7 @@
     padding: 0.625rem 0.75rem;
 }
 
-.ai-visibility__stat dt {
+.ai-agents__stat dt {
     overflow: hidden;
     color: var(--p-text-muted-color);
     font-size: 0.75rem;
@@ -31,7 +27,7 @@
     white-space: nowrap;
 }
 
-.ai-visibility__stat dd {
+.ai-agents__stat dd {
     margin: 0.125rem 0 0;
     color: var(--p-text-color);
     font-size: 0.95rem;
@@ -40,17 +36,17 @@
     overflow-wrap: anywhere;
 }
 
-.ai-visibility__stat-skeleton {
+.ai-agents__stat-skeleton {
     display: block;
     width: 4rem;
     height: 1rem;
     border-radius: 999px;
     background: linear-gradient(90deg, var(--p-surface-100), var(--p-surface-200), var(--p-surface-100));
     background-size: 200% 100%;
-    animation: ai-visibility-stat-pulse 1.2s ease-in-out infinite;
+    animation: ai-agents-stat-pulse 1.2s ease-in-out infinite;
 }
 
-@keyframes ai-visibility-stat-pulse {
+@keyframes ai-agents-stat-pulse {
     from {
         background-position: 100% 0;
     }
@@ -61,20 +57,21 @@
 }
 
 @media (min-width: 1024px) {
-    .ai-visibility__stat-strip {
+    .ai-agents__stat-strip {
         grid-template-columns: repeat(5, minmax(6rem, 1fr));
         max-width: 42rem;
     }
 
-    .ai-visibility__stat-strip--wide {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        max-width: none;
+    /* Three wider columns for the correlation summary: same overall width as the
+       five-column health strip above it, but room for its longer labels. */
+    .ai-agents__stat-strip--wide {
+        grid-template-columns: repeat(3, minmax(6rem, 1fr));
+        max-width: 42rem;
     }
 }
 
 @media (max-width: 340px) {
-    .ai-visibility__stat-strip,
-    .ai-visibility__stat-strip--wide {
+    .ai-agents__stat-strip {
         grid-template-columns: 1fr;
     }
 }

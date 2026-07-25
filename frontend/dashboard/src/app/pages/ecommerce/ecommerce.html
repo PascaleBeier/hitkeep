@@ -28,6 +28,8 @@
         <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
         <span>{{ "common.loadingSiteData" | transloco }}</span>
     </div>
+    } @else if (needsSetup()) {
+    <app-setup-callout testId="ecommerce-setup-callout" icon="pi pi-shopping-bag" titleKey="ecommerce.setup.title" descriptionKey="ecommerce.setup.description" docsActionKey="ecommerce.setup.docsAction" [docsUrl]="ecommerceDocsUrl" />
     } @else if (siteService.activeSite()) {
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         @for (card of kpiCards(); track card.label) {
@@ -254,10 +256,6 @@
         </p-card>
     </div>
     } @else {
-    <div class="flex flex-col items-center justify-center h-[50vh] gap-4">
-        <i class="pi pi-shopping-bag text-6xl text-primary opacity-20"></i>
-        <h2 class="text-2xl font-semibold text-muted-color">{{ "common.noSiteSelected" | transloco }}</h2>
-        <p class="text-muted-color">{{ "ecommerce.noSiteDescription" | transloco }}</p>
-    </div>
+    <app-no-site-selected icon="pi pi-shopping-bag" descriptionKey="ecommerce.noSiteDescription" />
     }
 </div>

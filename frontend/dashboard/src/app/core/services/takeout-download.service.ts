@@ -1,6 +1,6 @@
 import { HttpClient, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { TakeoutExportFormat } from '@core/export/export-formats';
+import { buildTakeoutExportFilename, TakeoutExportFormat } from '@core/export/export-formats';
 import { map, Observable } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
@@ -8,18 +8,13 @@ export class TakeoutDownloadService {
     private http = inject(HttpClient);
 
     downloadUserTakeout(format: TakeoutExportFormat): Observable<string> {
-        const dateStamp = this.currentDateStamp();
-        const fallbackFilename = `user-takeout-${dateStamp}.${format}`;
+        // No domain to slugify here, so `user` takes the slot instead.
+        const fallbackFilename = buildTakeoutExportFilename('user', 'takeout', format);
         return this.downloadFromUrl(`/api/user/takeout?format=${format}`, fallbackFilename);
     }
 
     downloadSiteTakeout(siteID: string, domain: string | undefined, format: TakeoutExportFormat): Observable<string> {
-        const safeDomain = (domain || 'site')
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/(^-|-$)/g, '');
-        const dateStamp = this.currentDateStamp();
-        const fallbackFilename = `${safeDomain || 'site'}-takeout-${dateStamp}.${format}`;
+        const fallbackFilename = buildTakeoutExportFilename(domain, 'takeout', format);
         return this.downloadFromUrl(`/api/sites/${siteID}/takeout?format=${format}`, fallbackFilename);
     }
 
@@ -95,9 +90,5 @@ export class TakeoutDownloadService {
             return '';
         }
         return trimmed.slice(lastDot + 1);
-    }
-
-    private currentDateStamp(): string {
-        return new Date().toISOString().slice(0, 10);
     }
 }

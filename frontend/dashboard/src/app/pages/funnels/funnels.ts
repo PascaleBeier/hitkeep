@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, signal, untracked } from '@angular/core';
 import { injectActiveLang } from '@core/i18n/active-lang';
+import { calcDelta } from '@core/analytics/delta-utils';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { compatForm } from '@angular/forms/signals/compat';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
@@ -17,6 +18,7 @@ import { FunnelViewer } from '@features/funnels/components/funnel-viewer';
 import { Funnel } from '@models/analytics.types';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
+import { NoSiteSelected } from '@components/no-site-selected/no-site-selected';
 import { SeriesChart, SeriesDefinition, SeriesChartPoint } from '@features/analytics/components/series-chart';
 import { FunnelSeriesPoint } from '@models/analytics.types';
 import { KPI_PERCENT_FORMAT, KpiCard, KpiCardModel } from '@features/analytics/components/kpi-card';
@@ -35,7 +37,7 @@ interface MetricFilter {
 @Component({
     selector: 'app-funnels',
     standalone: true,
-    imports: [ReactiveFormsModule, ButtonModule, CardModule, SelectModule, PageHeader, PageHeaderLeft, PageBreadcrumb, ReportRangeToolbar, SeriesChart, KpiCard, MetricCardGroup, FunnelList, FunnelManager, FunnelViewer, TranslocoPipe],
+    imports: [ReactiveFormsModule, ButtonModule, CardModule, SelectModule, PageHeader, PageHeaderLeft, PageBreadcrumb, ReportRangeToolbar, SeriesChart, KpiCard, MetricCardGroup, FunnelList, FunnelManager, FunnelViewer, NoSiteSelected, TranslocoPipe],
     templateUrl: './funnels.html',
     styleUrl: './funnels.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -508,10 +510,7 @@ export class Funnels {
             });
     }
 
-    protected calcDelta(current: number, previous: number): number | null {
-        if (previous === 0) return null;
-        return ((current - previous) / previous) * 100;
-    }
+    protected readonly calcDelta = calcDelta;
 
     protected refreshStats(mode: StatsQueryMode = 'blocking') {
         const site = this.siteService.activeSite();

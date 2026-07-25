@@ -16,6 +16,8 @@ import { SiteService } from '@features/sites/services/site.service';
 import { AnalyticsService } from '@core/services/analytics.service';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
+import { NoSiteSelected } from '@components/no-site-selected/no-site-selected';
+import { SetupCallout } from '@components/setup-callout/setup-callout';
 import { KPI_MONEY_FALLBACK_FORMAT, KPI_PERCENT_FORMAT, KpiCard, KpiCardModel } from '@features/analytics/components/kpi-card';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
 import { MetricCardGroup, MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
@@ -25,6 +27,7 @@ import { browserAppUrl } from '@core/interceptors/base-path.interceptor';
 import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
 import { REALTIME_EVENT_KINDS } from '@services/realtime.service';
 import { injectReportRange } from '@services/report-range-preferences.service';
+import { SetupStateService } from '@services/setup-state.service';
 
 type MetricFilterType = 'referrer' | 'device' | 'country' | 'city' | 'provider' | 'asn' | 'utm_source';
 
@@ -59,7 +62,9 @@ type DataLoadMode = 'blocking' | 'background';
         ReportRangeToolbar,
         KpiCard,
         MetricCardGroup,
-        SeriesChart
+        SeriesChart,
+        NoSiteSelected,
+        SetupCallout
     ],
     templateUrl: './ecommerce.html',
     styleUrl: './ecommerce.css',
@@ -74,6 +79,7 @@ export class EcommercePage {
     private document = inject(DOCUMENT);
     private destroyRef = inject(DestroyRef);
     private realtimeRefresh = inject(RealtimeRefreshCoordinator);
+    private readonly setupState = inject(SetupStateService);
     private readonly reportRange = injectReportRange();
     private readonly activeLanguage = injectActiveLang();
 
@@ -86,6 +92,16 @@ export class EcommercePage {
     protected readonly kpiUpdateKey = signal(0);
 
     protected readonly isShortRange = this.reportRange.isShortRange;
+
+    /**
+     * True only once the shared setup state confirms the site never sent an
+     * ecommerce event. Empty ranges on an instrumented shop keep the regular
+     * empty states.
+     */
+    protected readonly needsSetup = computed(() => {
+        const summary = this.summary();
+        return this.setupState.needsSetup(this.siteService.activeSite()?.id, 'has_ecommerce_events', summary ? summary.orders + summary.checkout_starts : null, this.isLoading());
+    });
 
     protected readonly activeFilters = signal<MetricFilter[]>([]);
     protected readonly selectedProduct = signal<ProductFilter | null>(null);

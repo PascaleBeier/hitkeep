@@ -72,4 +72,38 @@ describe('AnalyticsService Web Vitals', () => {
         expect(correlationReq.request.params.get('path')).toBe('/docs');
         correlationReq.flush({ summary: {}, citation_yield: [], opportunity_pages: [], failure_hotspots: [] });
     });
+
+    it('requests the unified AI activity report with repeatable filters and comparison window', () => {
+        service
+            .getAIActivity(
+                'site-1',
+                '2026-07-01T00:00:00Z',
+                '2026-07-08T00:00:00Z',
+                [
+                    { type: 'ai_bot', value: 'GPTBot' },
+                    { type: 'path', value: '/docs' }
+                ],
+                { from: '2026-06-24T00:00:00Z', to: '2026-07-01T00:00:00Z' }
+            )
+            .subscribe();
+
+        const req = httpMock.expectOne((request) => request.url === '/api/sites/site-1/ai-activity');
+        expect(req.request.method).toBe('GET');
+        expect(req.request.params.get('from')).toBe('2026-07-01T00:00:00Z');
+        expect(req.request.params.get('to')).toBe('2026-07-08T00:00:00Z');
+        expect(req.request.params.getAll('filter')).toEqual(['ai_bot:GPTBot', 'path:/docs']);
+        expect(req.request.params.get('compare_from')).toBe('2026-06-24T00:00:00Z');
+        expect(req.request.params.get('compare_to')).toBe('2026-07-01T00:00:00Z');
+        req.flush({});
+    });
+
+    it('omits filter and comparison params from an unfiltered AI activity request', () => {
+        service.getAIActivity('site-1', 'from', 'to').subscribe();
+
+        const req = httpMock.expectOne((request) => request.url === '/api/sites/site-1/ai-activity');
+        expect(req.request.params.has('filter')).toBe(false);
+        expect(req.request.params.has('compare_from')).toBe(false);
+        expect(req.request.params.has('compare_to')).toBe(false);
+        req.flush({});
+    });
 });

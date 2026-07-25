@@ -7,7 +7,15 @@ import { SkeletonModule } from '@openng/optimus-ui/skeleton';
 import { browserIconUrl } from '@core/i18n/browser-utils';
 import { countryFlagUrl, languageFlagUrl } from '@core/i18n/flag-utils';
 import { browserAppUrl } from '@core/interceptors/base-path.interceptor';
-import { MetricStat } from '@models/analytics.types';
+import { aiCategoryLabel } from '@features/analytics/ai-category-labels';
+import { AIAgentIconsService } from '@services/ai-agent-icons.service';
+import { AIActivityStat, MetricStat } from '@models/analytics.types';
+
+/** True for rows the AI activity report enriched with provenance counters. */
+function hasProvenanceCounters(item: MetricStat): item is AIActivityStat {
+    const candidate = item as Partial<AIActivityStat>;
+    return typeof candidate.tracked_hits === 'number' && typeof candidate.fetch_count === 'number';
+}
 
 @Component({
     selector: 'app-metric-list',
@@ -19,6 +27,7 @@ import { MetricStat } from '@models/analytics.types';
 export class MetricList {
     private readonly transloco = inject(TranslocoService);
     private readonly document = inject(DOCUMENT);
+    private readonly aiAgentIcons = inject(AIAgentIconsService);
     private readonly scrollFrame = viewChild<ElementRef<HTMLElement>>('scrollFrame');
 
     title = input.required<string>();
@@ -34,6 +43,20 @@ export class MetricList {
     showCountryNames = input<boolean>(false);
     showLanguageFlags = input<boolean>(false);
     showLanguageNames = input<boolean>(false);
+    showAICategoryNames = input<boolean>(false);
+    aiIconKind = input<'none' | 'agent' | 'source'>('none');
+    /**
+     * Annotates rows of the AI activity report with where their requests came
+     * from. Only rows the forwarded logs contributed to get the hint; pure
+     * tracked rows stay exactly as they render without this input.
+     */
+    showProvenance = input<boolean>(false);
+    /**
+     * Share of the list total next to every value. Switch it off for lists whose
+     * rows are not parts of one whole — a correlation row's share of the visible
+     * top-N says nothing about the metric the row reports.
+     */
+    showShare = input<boolean>(true);
     framed = input<boolean>(true);
     showHeader = input<boolean>(true);
     rowClicked = output<MetricStat>();
@@ -104,13 +127,26 @@ export class MetricList {
             const name = this.languageDisplayName(item.name);
             return name ?? item.name;
         }
+        if (this.showAICategoryNames()) {
+            return aiCategoryLabel(this.transloco, item.name);
+        }
         return item.name;
     }
 
-    protected titleForItem(item: MetricStat): string {
+    /** `provenance` comes from the template's single `provenanceHint` call per row. */
+    protected titleForItem(item: MetricStat, provenance: string | null): string {
         const display = this.displayLabel(item);
-        if (display === item.name) return item.name;
-        return `${item.name} · ${display}`;
+        const base = display === item.name ? item.name : `${item.name} · ${display}`;
+        return provenance ? `${base} · ${provenance}` : base;
+    }
+
+    /** Translated `tracked … · logs …` hint, or `null` for rows without log-side requests. */
+    protected provenanceHint(item: MetricStat): string | null {
+        if (!this.showProvenance() || !hasProvenanceCounters(item) || item.fetch_count <= 0) return null;
+        return this.transloco.translate('aiAgents.provenance.hint', {
+            tracked: item.tracked_hits,
+            fetched: item.fetch_count
+        });
     }
 
     protected shareForItem(item: MetricStat): number {
@@ -121,6 +157,13 @@ export class MetricList {
 
     protected browserIconUrl(item: MetricStat): string {
         return browserIconUrl(item.name);
+    }
+
+    protected aiIconUrl(item: MetricStat): string | null {
+        const kind = this.aiIconKind();
+        if (kind === 'none') return null;
+        const host = kind === 'agent' ? this.aiAgentIcons.agentIconHost(item.name) : this.aiAgentIcons.referrerIconHost(item.name);
+        return host ? this.buildFaviconUrl(host) : null;
     }
 
     protected isDeviceMetric(): boolean {

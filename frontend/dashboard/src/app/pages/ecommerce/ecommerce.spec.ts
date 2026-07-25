@@ -1,4 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
@@ -11,6 +13,8 @@ import { EcommercePage } from './ecommerce';
 import { SiteService } from '@features/sites/services/site.service';
 import { AnalyticsService } from '@core/services/analytics.service';
 import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
+import type { SiteSetupState } from '@services/setup-state.service';
+import { flushSetupState } from '@testing/setup-state';
 
 type EcommercePageTestAccess = EcommercePage & {
     activeFilters(): { type: string; value: string }[];
@@ -19,6 +23,7 @@ type EcommercePageTestAccess = EcommercePage & {
 
 describe('EcommercePage', () => {
     let fixture: ComponentFixture<EcommercePage>;
+    let httpMock: HttpTestingController;
     let analyticsServiceMock: {
         getEcommerceSummary: ReturnType<typeof vi.fn>;
         getEcommerceTimeseries: ReturnType<typeof vi.fn>;
@@ -219,7 +224,13 @@ describe('EcommercePage', () => {
                                     title: 'No ecommerce data yet',
                                     description: 'Track purchase events.'
                                 },
-                                noSiteDescription: 'Select a site to view ecommerce analytics.'
+                                noSiteDescription: 'Select a site to view ecommerce analytics.',
+                                docsAction: 'Set up ecommerce',
+                                setup: {
+                                    title: 'Send purchase events',
+                                    description: 'Track ecommerce events to fill this page.',
+                                    docsAction: 'Read the ecommerce guide'
+                                }
                             }
                         }
                     },
@@ -230,6 +241,8 @@ describe('EcommercePage', () => {
                 })
             ],
             providers: [
+                provideHttpClient(),
+                provideHttpClientTesting(),
                 provideRouter([]),
                 {
                     provide: SiteService,
@@ -276,8 +289,59 @@ describe('EcommercePage', () => {
             ]
         }).compileComponents();
 
+        httpMock = TestBed.inject(HttpTestingController);
         fixture = TestBed.createComponent(EcommercePage);
         fixture.detectChanges();
+    });
+
+    afterEach(() => {
+        // Drain the shared setup-state lookup for the tests that do not assert on it.
+        flushSetupState(httpMock, 'site-1');
+        httpMock.verify();
+    });
+
+    /** Recreates the page on a range without a single ecommerce event. */
+    const createWithoutRevenue = (): void => {
+        analyticsServiceMock.getEcommerceSummary.mockReturnValue(of({ revenue: 0, orders: 0, average_order_value: 0, checkout_starts: 0, checkout_conversion_rate: 0, currency: 'USD' }));
+        analyticsServiceMock.getEcommerceProducts.mockReturnValue(of([]));
+        analyticsServiceMock.getEcommerceSources.mockReturnValue(of([]));
+        analyticsServiceMock.getEcommerceTimeseries.mockReturnValue(of([]));
+        fixture = TestBed.createComponent(EcommercePage);
+        fixture.detectChanges();
+    };
+
+    const answerSetupState = (overrides: Partial<SiteSetupState> = {}) => flushSetupState(httpMock, 'site-1', overrides, fixture);
+
+    it('renders a setup callout when the site never sent an ecommerce event', () => {
+        createWithoutRevenue();
+        answerSetupState({ has_ecommerce_events: false });
+
+        const callout = fixture.nativeElement.querySelector('[data-testid="ecommerce-setup-callout"]');
+        expect(callout).not.toBeNull();
+        expect(callout.textContent).toContain('Send purchase events');
+        expect(callout.textContent).toContain('Track ecommerce events to fill this page.');
+        expect(callout.querySelector('a[href="https://hitkeep.com/guides/analytics/ecommerce/"]')).not.toBeNull();
+        expect(fixture.nativeElement.querySelector('app-kpi-card')).toBeNull();
+        expect(fixture.nativeElement.querySelector('app-report-range-toolbar')).not.toBeNull();
+    });
+
+    it('keeps the regular empty states when ecommerce events exist outside the selected range', () => {
+        createWithoutRevenue();
+        answerSetupState({ has_ecommerce_events: true });
+
+        expect(fixture.nativeElement.querySelector('[data-testid="ecommerce-setup-callout"]')).toBeNull();
+        expect(fixture.nativeElement.querySelector('app-kpi-card')).not.toBeNull();
+    });
+
+    it('never shows the callout while the setup state is still unknown', () => {
+        createWithoutRevenue();
+
+        httpMock.expectOne('/api/sites/site-1/setup-state');
+        expect(fixture.nativeElement.querySelector('[data-testid="ecommerce-setup-callout"]')).toBeNull();
+    });
+
+    it('skips the setup-state lookup while the selected range has revenue', () => {
+        httpMock.expectNone('/api/sites/site-1/setup-state');
     });
 
     it('renders revenue-focused ecommerce analytics', () => {

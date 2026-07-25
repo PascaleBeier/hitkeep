@@ -37,6 +37,10 @@
                             [showCountryNames]="card.showCountryNames ?? false"
                             [showLanguageFlags]="card.showLanguageFlags ?? false"
                             [showLanguageNames]="card.showLanguageNames ?? false"
+                            [showAICategoryNames]="card.showAICategoryNames ?? false"
+                            [aiIconKind]="card.aiIconKind ?? 'none'"
+                            [showProvenance]="card.showProvenance ?? false"
+                            [showShare]="card.showShare ?? true"
                             (rowClicked)="handleRowClick(group, card, $event)"
                         />
                     </p-tabpanel>
@@ -63,6 +67,10 @@
                 [showCountryNames]="card.showCountryNames ?? false"
                 [showLanguageFlags]="card.showLanguageFlags ?? false"
                 [showLanguageNames]="card.showLanguageNames ?? false"
+                [showAICategoryNames]="card.showAICategoryNames ?? false"
+                [aiIconKind]="card.aiIconKind ?? 'none'"
+                [showProvenance]="card.showProvenance ?? false"
+                [showShare]="card.showShare ?? true"
                 (rowClicked)="handleRowClick(group, card, $event)"
             />
             }

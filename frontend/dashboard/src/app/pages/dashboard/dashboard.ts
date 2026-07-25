@@ -13,13 +13,11 @@ import { CardModule } from '@openng/optimus-ui/card';
 import { TableModule, TableLazyLoadEvent } from '@openng/optimus-ui/table';
 import { SelectModule } from '@openng/optimus-ui/select';
 import { ButtonModule } from '@openng/optimus-ui/button';
-import { SplitButtonModule } from '@openng/optimus-ui/splitbutton';
 import { IconFieldModule } from '@openng/optimus-ui/iconfield';
 import { InputIconModule } from '@openng/optimus-ui/inputicon';
 import { InputTextModule } from '@openng/optimus-ui/inputtext';
 import { SkeletonModule } from '@openng/optimus-ui/skeleton';
 import { TooltipModule } from '@openng/optimus-ui/tooltip';
-import { MenuItem } from '@openng/optimus-ui/api';
 // Features
 import { SiteService } from '@features/sites/services/site.service';
 import { injectStatsQuery, type StatsQueryMode } from '@features/analytics/services/stats-query';
@@ -37,12 +35,17 @@ import type { Funnel, MetricStat } from '@models/analytics.types';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { WorkflowProgress, type WorkflowProgressStep } from '@components/workflow-progress/workflow-progress';
+import { ExportSplitButton, ExportStatusBanner } from '@components/export-split-button/export-split-button';
+import { FilterChipItem, FilterChipRow } from '@components/filter-chip-row/filter-chip-row';
 import { KPI_PERCENT_FORMAT, KPI_SHORT_DECIMAL_FORMAT, KpiCard } from '@features/analytics/components/kpi-card';
 import { ShareService } from '@services/share.service';
 import { translateRangeLabel } from '@components/range-toolbar/range-toolbar';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
 import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
-import { buildTakeoutExportMenuItems, DEFAULT_HITS_EXPORT_FORMAT, TakeoutExportFormat } from '@core/export/export-formats';
+import { buildTakeoutExportFilename, DEFAULT_HITS_EXPORT_FORMAT, TakeoutExportFormat, withTakeoutExportFormat } from '@core/export/export-formats';
+import { calcDelta } from '@core/analytics/delta-utils';
+import { aiFilterChipLabel } from '@features/analytics/ai-category-labels';
+import { buildAIMetricCardTabs } from '@features/analytics/ai-metric-cards';
 import { TakeoutDownloadService } from '@services/takeout-download.service';
 import { AddSiteDialog } from '@features/sites/components/add-site-dialog';
 import { TeamService } from '@services/team.service';
@@ -50,7 +53,7 @@ import { OnboardingService, OnboardingStep } from '@services/onboarding.service'
 import { browserAppUrl } from '@core/interceptors/base-path.interceptor';
 import { injectReportRange } from '@services/report-range-preferences.service';
 
-type MetricFilterType = 'path' | 'referrer' | 'device' | 'country' | 'city' | 'provider' | 'asn' | 'browser' | 'language';
+type MetricFilterType = 'path' | 'referrer' | 'device' | 'country' | 'city' | 'provider' | 'asn' | 'browser' | 'language' | 'ai_bot' | 'ai_bot_category' | 'ai_source';
 interface MetricFilter {
     type: MetricFilterType;
     value: string;
@@ -79,7 +82,6 @@ interface KpiCardData {
         TableModule,
         SelectModule,
         ButtonModule,
-        SplitButtonModule,
         IconFieldModule,
         InputIconModule,
         InputTextModule,
@@ -90,6 +92,9 @@ interface KpiCardData {
         PageBreadcrumb,
         WorkflowProgress,
         ReportRangeToolbar,
+        ExportSplitButton,
+        ExportStatusBanner,
+        FilterChipRow,
         RelativeDateTime,
         KpiCard,
         TrafficChart,
@@ -152,16 +157,14 @@ export class Dashboard {
     protected hasFilters = computed(() => this.activeFilters().length > 0);
     protected isExportingFiltered = signal(false);
     protected filteredExportState = signal<'idle' | 'success' | 'error'>('idle');
-    protected readonly exportMenuItems = computed<MenuItem[]>(() => {
+    protected filterChips = computed<FilterChipItem[]>(() => {
         this.activeLanguage();
-        return buildTakeoutExportMenuItems(this.transloco, (format) => this.exportFiltered(format));
+        return this.activeFilters().map((filter) => ({
+            key: `${filter.type}:${filter.value}`,
+            label: this.filterLabel(filter),
+            remove: () => this.removeFilter(filter.type, filter.value)
+        }));
     });
-    protected filterChips = computed(() =>
-        this.activeFilters().map((filter) => ({
-            ...filter,
-            label: this.filterLabel(filter)
-        }))
-    );
     protected readonly metricCardTabs = computed<MetricCardGroupTab<MetricFilterType>[]>(() => {
         this.activeLanguage();
         const stats = this.stats();
@@ -229,6 +232,7 @@ export class Dashboard {
                     }
                 ]
             },
+            ...buildAIMetricCardTabs(this.transloco, stats, loading, (type) => this.activeFilterValue(type)),
             {
                 id: 'audience',
                 label: this.transloco.translate('common.metricGroups.audience'),
@@ -670,10 +674,7 @@ export class Dashboard {
         });
     }
 
-    protected calcDelta(current: number, previous: number): number | null {
-        if (previous === 0) return null;
-        return ((current - previous) / previous) * 100;
-    }
+    protected readonly calcDelta = calcDelta;
 
     protected getCurrentDateRange() {
         return this.reportRange.currentDateRange();
@@ -771,20 +772,24 @@ export class Dashboard {
                 return this.transloco.translate('common.filters.language', {
                     value: this.displayLanguageLabel(filter.value)
                 });
+            case 'ai_bot':
+            case 'ai_bot_category':
+            case 'ai_source':
+                return aiFilterChipLabel(this.transloco, filter.type, filter.value);
             default:
                 return `${filter.type}: ${filter.value}`;
         }
     }
 
     protected exportFiltered(format: TakeoutExportFormat = DEFAULT_HITS_EXPORT_FORMAT) {
-        const url = this.buildExportUrl(format);
+        const url = withTakeoutExportFormat(this.exportUrl(), format);
         if (!url || this.isExportingFiltered()) return;
 
         this.isExportingFiltered.set(true);
         this.filteredExportState.set('idle');
 
         this.takeoutDownloadService
-            .downloadFromUrl(url, this.buildFilteredExportFilename(format))
+            .downloadFromUrl(url, buildTakeoutExportFilename(this.siteService.activeSite()?.domain, 'hits', format))
             .pipe(
                 takeUntilDestroyed(this.destroyRef),
                 finalize(() => this.isExportingFiltered.set(false))
@@ -821,24 +826,6 @@ export class Dashboard {
 
     protected faviconUrlForDomain(domain: string | null | undefined): string | null {
         return domain ? browserAppUrl(this.document, `/api/favicon/${encodeURIComponent(domain)}`) : null;
-    }
-
-    private buildExportUrl(format: TakeoutExportFormat): string {
-        const baseUrl = this.exportUrl();
-        if (!baseUrl) return '';
-        const url = new URL(baseUrl, window.location.origin);
-        url.searchParams.set('format', format);
-        return url.pathname + `?${url.searchParams.toString()}`;
-    }
-
-    private buildFilteredExportFilename(format: TakeoutExportFormat): string {
-        const siteDomain = this.siteService.activeSite()?.domain || 'site';
-        const safeDomain = siteDomain
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/(^-|-$)/g, '');
-        const dateStamp = new Date().toISOString().slice(0, 10);
-        return `${safeDomain || 'site'}-hits-${dateStamp}.${format}`;
     }
 
     private normalizeUrl(raw: string | null | undefined): URL | null {

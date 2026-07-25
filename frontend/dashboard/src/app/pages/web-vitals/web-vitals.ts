@@ -19,12 +19,15 @@ import { injectActiveLang } from '@core/i18n/active-lang';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
+import { NoSiteSelected } from '@components/no-site-selected/no-site-selected';
+import { SetupCallout } from '@components/setup-callout/setup-callout';
 import { SeriesChart, SeriesChartPoint, SeriesDefinition } from '@features/analytics/components/series-chart';
 import { browserAppUrl } from '@core/interceptors/base-path.interceptor';
 import { WebVitalDimension, WebVitalDimensionRow, WebVitalMetric, WebVitalMetricBreakdown, WebVitalPageRow, WebVitalRating, WebVitalSeriesPoint, WebVitalSummaryMetric } from '@models/analytics.types';
 import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
 import { REALTIME_KINDS } from '@services/realtime.service';
 import { injectReportRange } from '@services/report-range-preferences.service';
+import { SetupStateService } from '@services/setup-state.service';
 
 interface SelectOption<T> {
     label: string;
@@ -87,7 +90,9 @@ const WEB_VITAL_THRESHOLDS: Record<WebVitalMetric, { good: number; poor: number 
         PageHeaderLeft,
         PageBreadcrumb,
         ReportRangeToolbar,
-        SeriesChart
+        SeriesChart,
+        NoSiteSelected,
+        SetupCallout
     ],
     templateUrl: './web-vitals.html',
     styleUrl: './web-vitals.css',
@@ -103,6 +108,7 @@ export class WebVitalsPage {
     private readonly document = inject(DOCUMENT);
     private readonly destroyRef = inject(DestroyRef);
     private readonly realtimeRefresh = inject(RealtimeRefreshCoordinator);
+    private readonly setupState = inject(SetupStateService);
     private readonly reportRange = injectReportRange();
 
     protected readonly summary = signal<WebVitalSummaryMetric[]>([]);
@@ -111,6 +117,16 @@ export class WebVitalsPage {
     protected readonly dimensionRows = signal<WebVitalDimensionRow[]>([]);
     protected readonly isLoading = signal(false);
     protected readonly errorKey = signal<string | null>(null);
+    /** Set once a report arrived so the setup callout never fires on a pristine page. */
+    private readonly reportLoaded = signal(false);
+    private readonly inRangeSamples = computed(() => this.summary().reduce((total, row) => total + row.samples, 0));
+
+    /**
+     * True only once the shared setup state confirms the site never reported a
+     * Web Vital. Empty ranges on an instrumented site keep the regular empty
+     * states.
+     */
+    protected readonly needsSetup = computed(() => this.setupState.needsSetup(this.siteService.activeSite()?.id, 'has_web_vitals', this.reportLoaded() ? this.inRangeSamples() : null, this.isLoading()));
 
     protected readonly selectedMetric = signal<WebVitalMetric>('LCP');
     protected readonly selectedRating = signal<WebVitalRating | null>(null);
@@ -478,6 +494,7 @@ export class WebVitalsPage {
             .pipe(finalize(() => this.isLoading.set(false)))
             .subscribe({
                 next: ({ summary, series, pages, dimensions }) => {
+                    this.reportLoaded.set(true);
                     this.summary.set(summary);
                     this.series.set(series);
                     this.pages.set(pages);

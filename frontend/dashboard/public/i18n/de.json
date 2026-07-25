@@ -13,10 +13,8 @@
     "funnelsAria": "Zu den Funnels",
     "eventsAria": "Zu den Events",
     "events": "Events",
-    "aiVisibility": "AI-Sichtbarkeit",
-    "aiVisibilityAria": "Zur AI-Sichtbarkeitsanalyse",
-    "aiChatbots": "AI-Chatbots",
-    "aiChatbotsAria": "Zur AI-Chatbot-Analyse",
+    "aiAgents": "AI Agents",
+    "aiChatbots": "Chatbots",
     "utmAria": "Zum UTM-Dashboard",
     "utmBuilder": "UTM-Generator",
     "utmBuilderAria": "Zum UTM-Generator",
@@ -578,6 +576,14 @@
     }
   },
   "common": {
+    "aiCategories": {
+      "ai_training_crawler": "Trainings-Crawler",
+      "ai_search_indexer": "KI-Suchcrawler",
+      "ai_assistant": "KI-Assistenten",
+      "ai_agent": "KI-Agenten",
+      "ai_coding_agent": "KI-Coding-Agenten",
+      "other_ai": "Sonstige KI"
+    },
     "actions": {
       "apply": "Anwenden",
       "cancel": "Abbrechen",
@@ -641,6 +647,9 @@
       "ndjson": "NDJSON"
     },
     "filters": {
+      "aiBot": "KI-Agent: {{value}}",
+      "aiBotCategory": "KI-Kategorie: {{value}}",
+      "aiSource": "KI-Quelle: {{value}}",
       "country": "Land: {{value}}",
       "city": "Stadt: {{value}}",
       "provider": "Provider: {{value}}",
@@ -656,6 +665,8 @@
     },
     "loadingSiteData": "Seitendaten werden geladen...",
     "metricGroups": {
+      "ai": "KI",
+      "bots": "Bots",
       "content": "Inhalte",
       "acquisition": "Akquise",
       "audience": "Zielgruppe",
@@ -663,6 +674,9 @@
       "network": "Netzwerk"
     },
     "metrics": {
+      "aiBots": "KI-Agenten",
+      "aiBotCategories": "KI-Agent-Kategorien",
+      "aiSources": "KI-Quellen",
       "audience": "Zielgruppe",
       "browsers": "Browser",
       "countries": "Länder",
@@ -2754,6 +2768,11 @@
     "visitorsLabel": "Besucher (vor.)"
   },
   "events": {
+    "setup": {
+      "title": "Erstes Custom-Event senden",
+      "description": "Custom-Events benötigen einen Track-Aufruf aus deinem Snippet oder über die Events-API. Sobald Events eintreffen, füllt sich diese Seite automatisch.",
+      "docsAction": "Zur Custom-Events-Anleitung"
+    },
     "title": "Events",
     "docsAction": "Leitfaden für Auto-Tracking",
     "noSiteDescription": "Wähle eine Website aus, um Event-Analytics anzuzeigen.",
@@ -2784,9 +2803,93 @@
       "title": "Einschränkungen importierter Aggregatdaten"
     }
   },
+  "aiAgents": {
+    "title": "AI Agents",
+    "hero": {
+      "title": "KI-Agenten-Traffic im Zeitverlauf",
+      "description": "Wie KI-Agenten deine Seiten abrufen und wie viele Besuche ihre Antworten zurückbringen.",
+      "series": {
+        "aiRequests": "KI-Anfragen",
+        "referralVisits": "KI-Verweisbesuche",
+        "crawlerFetches": "Crawler-Fetches (Log-Import)"
+      }
+    },
+    "kpis": {
+      "aiRequests": "KI-Anfragen",
+      "referralVisits": "KI-Verweisbesuche",
+      "pathsCrawled": "Gecrawlte Seiten",
+      "shareOfPageviews": "Anteil an Seitenaufrufen",
+      "note": "KI-Anfragen fassen erfasste Hits und weitergeleitete Crawler-Logs zusammen."
+    },
+    "groups": {
+      "activity": "KI-Aktivität",
+      "byCategory": "Nach Kategorie",
+      "fetchDepth": "Fetch-Tiefe (Log-Import)"
+    },
+    "cards": {
+      "paths": "Gecrawlte Seiten",
+      "families": "Top-Anbieter",
+      "resourceTypes": "Ressourcentypen",
+      "errorPaths": "Top-Fehlerpfade"
+    },
+    "provenance": {
+      "hint": "erfasst {{tracked}} · Logs {{fetched}}"
+    },
+    "filters": {
+      "scopeHits": "nur erfasste Besuche"
+    },
+    "enrich": {
+      "title": "Crawler-Fetch-Tracking einrichten",
+      "description": "Die Fetch-Analyse benötigt CDN-, Edge- oder Server-Log-Weiterleitung an den AI-Fetch-Endpunkt von HitKeep. Sobald Datensätze eintreffen, zeigt dieser Abschnitt die Crawler, die dein Tracking nicht sehen kann – mit Statuscodes, Antwortzeiten, ausgelieferten Bytes und der Korrelation von Fetch zu Besuch.",
+      "docsAction": "Zur Einrichtungsanleitung"
+    },
+    "fetchDepth": {
+      "description": "Was weitergeleitete CDN-, Edge- und Server-Logs zusätzlich zeigen: Crawler, die dein Tracking nie sieht, ihre Statuscodes, Antwortzeiten, ausgelieferten Bytes und wie aus Fetches Besuche werden.",
+      "docsAction": "Setup-Leitfaden",
+      "kpis": {
+        "totalFetches": "Fetches gesamt",
+        "errorRate4xx": "4xx-Rate",
+        "errorRate5xx": "5xx-Rate",
+        "medianResponse": "Median-Antwort",
+        "bytesServed": "Ausgelieferte Bytes"
+      },
+      "correlation": {
+        "title": "Fetch-zu-Besuch-Korrelation",
+        "description": "Miss, welche abgerufenen Pfade später AI-vermittelte Besuche anziehen und welche stark abgerufenen Seiten noch keinen Downstream-Traffic erzeugen.",
+        "note": "Korrelierte Besuche zählen spätere KI-vermittelte Besuche auf demselben Pfad im gewählten Zeitraum.",
+        "kpis": {
+          "correlatedPaths": "Korrelierte Pfade",
+          "aiReferredVisits": "Spätere AI-vermittelte Besuche",
+          "uncorrelatedFetches": "Nicht korrelierte Fetches"
+        }
+      },
+      "tables": {
+        "title": "Korrelationsaufschlüsselungen",
+        "citationYield": {
+          "title": "Zitationsausbeute"
+        },
+        "opportunityPages": {
+          "title": "Chancen-Seiten"
+        },
+        "failureHotspots": {
+          "title": "Fehler-Hotspots"
+        }
+      },
+      "exportStatus": {
+        "success": "Export-Download gestartet.",
+        "error": "Export der AI-Fetch-Daten fehlgeschlagen. Bitte erneut versuchen."
+      }
+    },
+    "noSiteDescription": "Wähle eine Website aus, um KI-Agenten-Traffic zu sehen."
+  },
   "aiChatbots": {
     "title": "AI-Chatbots",
     "docsAction": "Instrumentierungsleitfaden",
+    "setup": {
+      "title": "Chatbot instrumentieren",
+      "description": "Sende assistant.*-Custom-Events aus deinem Chatbot, um diese Seite zu füllen – Gesprächsstarts, Prompts, Antworten, Zitate, Eskalationen und unterstützte Conversions.",
+      "docsAction": "Instrumentierungsleitfaden lesen"
+    },
     "noSiteDescription": "Wähle eine Website aus oder erstelle eine, um AI-Chatbot-Analysen anzuzeigen.",
     "header": {
       "title": "On-site-AI-Chatbot-Analyse",
@@ -2825,99 +2928,6 @@
     "exportStatus": {
       "success": "Export-Download gestartet.",
       "error": "Der Export der AI-Chatbot-Daten ist fehlgeschlagen. Bitte versuche es erneut."
-    }
-  },
-  "aiVisibility": {
-    "title": "AI-Sichtbarkeit",
-    "docsAction": "Setup-Leitfaden",
-    "noSiteDescription": "Wähle eine Website aus oder erstelle eine, um AI-Fetch- und Korrelationsanalysen anzuzeigen.",
-    "header": {
-      "title": "AI-Sichtbarkeitsanalyse",
-      "description": "Verfolge serverseitige AI-Crawler-Fetches, wo sich Crawl-Fehler häufen und welche abgerufenen Seiten später AI-vermittelte Besuche erzeugen."
-    },
-    "filters": {
-      "assistant": "Assistent",
-      "family": "Anbieter",
-      "resourceType": "Ressourcentyp",
-      "allAssistants": "Alle Assistenten",
-      "allFamilies": "Alle Anbieter",
-      "allResourceTypes": "Alle Ressourcentypen",
-      "unfiltered": "Alle AI-Fetch-Aktivitäten werden angezeigt"
-    },
-    "kpis": {
-      "totalFetches": "Fetches gesamt",
-      "uniquePaths": "Eindeutige Pfade",
-      "uniqueAssistants": "Eindeutige Assistenten",
-      "errorRate4xx": "4xx-Rate",
-      "errorRate5xx": "5xx-Rate",
-      "medianResponse": "Median-Antwort",
-      "bytesServed": "Ausgelieferte Bytes"
-    },
-    "chart": {
-      "title": "Fetch-Volumen im Zeitverlauf",
-      "description": "Sieh, wann weitergeleitete AI-Crawler-Fetches deine Inhalte aktiv abrufen und wie sich die Nachfrage im ausgewählten Zeitraum verändert.",
-      "fetches": "Fetches",
-      "emptyTitle": "Keine AI-Fetch-Aktivität",
-      "emptyDescription": "Leite AI-Fetch-Daten an /api/sites/{id}/ingest/ai-fetch weiter, um diesen Bericht zu füllen. hk.js allein erfasst keine Crawler-Fetches."
-    },
-    "breakdowns": {
-      "assistants": "Top-Assistenten",
-      "families": "Top-Anbieter",
-      "paths": "Top-abgerufene Pfade",
-      "errorPaths": "Top-Fehlerpfade",
-      "resourceTypes": "Ressourcentypen"
-    },
-    "correlation": {
-      "title": "Fetch-zu-Besuch-Korrelation",
-      "description": "Miss, welche abgerufenen Pfade später AI-vermittelte Besuche anziehen und welche stark abgerufenen Seiten noch keinen Downstream-Traffic erzeugen.",
-      "note": "Filter für Assistent, Anbieter und Ressourcentyp gelten nur für Fetches. Korrelationen bei Besuchen umfassen alle späteren AI-vermittelten Besuche auf demselben Pfad innerhalb des ausgewählten Fensters.",
-      "kpis": {
-        "correlatedPaths": "Korrelierte Pfade",
-        "aiVisits": "AI-vermittelte Besuche",
-        "uncorrelatedFetches": "Nicht korrelierte Fetches"
-      },
-      "helpAria": "Korrelationshilfe anzeigen",
-      "help": {
-        "correlatedPaths": "Abgerufene Pfade, die im ausgewählten Zeitraum später AI-vermittelte Besuche erhalten haben.",
-        "aiVisits": "Menschliche Besuche über AI-Referrer auf Pfaden, die auch von AI-Crawlern abgerufen wurden.",
-        "uncorrelatedFetches": "Fetches auf Pfaden, die in diesem Zeitraum keinen passenden AI-vermittelten Besuch erzeugt haben.",
-        "citationYieldCard": "Nutze dies, um Seiten zu erkennen, bei denen AI-Crawler-Nachfrage zu nachgelagerten Besuchen führt.",
-        "opportunityCard": "Nutze dies, um stark abgerufene Seiten zu finden, die bessere Inhalte, Links oder Verfügbarkeit brauchen.",
-        "failureHotspotCard": "Nutze dies, um Assistenten- und Pfadpräfix-Paare zu finden, bei denen Crawler-Zugriffe Fehler auslösen."
-      }
-    },
-    "tables": {
-      "citationYield": {
-        "title": "Zitationsausbeute",
-        "description": "Pfade, bei denen AI-Fetches am häufigsten zu späteren AI-vermittelten Besuchen werden.",
-        "empty": "Keine abgerufenen Pfade haben in diesem Zeitraum korrelierte AI-Besuche erzeugt."
-      },
-      "opportunityPages": {
-        "title": "Chancen-Seiten",
-        "description": "Stark abgerufene Seiten mit wenig Downstream-Besuchen oder erhöhtem Fehlerdruck.",
-        "cardSubtitle": "Benötigt Aufmerksamkeit",
-        "empty": "Keine Chancen-Seiten entsprechen den aktuellen Filtern."
-      },
-      "failureHotspots": {
-        "title": "Fehler-Hotspots",
-        "description": "Assistenten- und Pfadpräfix-Kombinationen mit dem höchsten Fehlerdruck bei Fetches.",
-        "empty": "Keine Fehler-Hotspots entsprechen den aktuellen Filtern."
-      }
-    },
-    "columns": {
-      "path": "Pfad",
-      "assistant": "Assistent",
-      "pathPrefix": "Pfadpräfix",
-      "fetches": "Fetches",
-      "requests": "Anfragen",
-      "aiVisits": "AI-Besuche",
-      "errors": "Fehler",
-      "errorRate": "Fehlerrate",
-      "yield": "Ausbeute"
-    },
-    "exportStatus": {
-      "success": "Export-Download gestartet.",
-      "error": "Export der AI-Fetch-Daten fehlgeschlagen. Bitte erneut versuchen."
     }
   },
   "integration": {
@@ -3168,6 +3178,11 @@
     }
   },
   "ecommerce": {
+    "setup": {
+      "title": "E-Commerce-Tracking einrichten",
+      "description": "Die Umsatzanalyse benötigt Kauf- und Checkout-Events aus deinem Shop. Sobald Events eintreffen, füllt sich diese Seite automatisch.",
+      "docsAction": "Zur E-Commerce-Anleitung"
+    },
     "docsAction": "E-Commerce einrichten",
     "kpis": {
       "revenue": "Umsatz",
@@ -3435,6 +3450,11 @@
     "noSiteDescription": "Wähle eine Website aus, um Opportunity-Empfehlungen anzuzeigen."
   },
   "webVitals": {
+    "setup": {
+      "title": "Web-Vitals-Erfassung aktivieren",
+      "description": "Web Vitals benötigen die aktivierte Performance-Erfassung im Tracking-Snippet. Sobald Messwerte eintreffen, füllt sich diese Seite automatisch.",
+      "docsAction": "Zur Web-Vitals-Anleitung"
+    },
     "docsAction": "Einrichtungsleitfaden",
     "error": "Web-Vitals-Daten konnten nicht geladen werden.",
     "noSiteDescription": "Wähle oder erstelle eine Website, um Web Vitals im Zeitverlauf zu prüfen.",

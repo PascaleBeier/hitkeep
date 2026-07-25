@@ -183,6 +183,15 @@
     font-size: 0.875rem;
 }
 
+.metric-list__provenance {
+    flex: 0 0 auto;
+    font-size: 0.625rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    color: var(--p-text-muted-color);
+    white-space: nowrap;
+}
+
 .metric-list__share {
     font-size: 0.58rem;
     font-variant-numeric: tabular-nums;

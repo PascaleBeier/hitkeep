@@ -92,11 +92,7 @@
         <app-funnel-list [funnels]="funnels()" [isLoading]="loading()" (manageClicked)="openFunnelManager()" (funnelClicked)="viewFunnel($event)" />
     </div>
     } @else {
-    <div class="flex flex-col items-center justify-center h-[50vh] gap-4">
-        <i class="pi pi-globe text-6xl text-primary opacity-20"></i>
-        <h2 class="text-2xl font-semibold text-muted-color">{{ "common.noSiteSelected" | transloco }}</h2>
-        <p class="text-muted-color">{{ "funnels.noSiteDescription" | transloco }}</p>
-    </div>
+    <app-no-site-selected icon="pi pi-globe" descriptionKey="funnels.noSiteDescription" />
     }
 
     <app-funnel-manager

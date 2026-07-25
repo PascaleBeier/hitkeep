@@ -1,4 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
@@ -10,9 +12,12 @@ import { TRANSLOCO_LOCALE_CONFIG, TRANSLOCO_LOCALE_LANG_MAPPING, TranslocoLocale
 import { WebVitalsPage } from './web-vitals';
 import { SiteService } from '@features/sites/services/site.service';
 import { AnalyticsService } from '@core/services/analytics.service';
+import type { SiteSetupState } from '@services/setup-state.service';
+import { flushSetupState } from '@testing/setup-state';
 
 describe('WebVitalsPage', () => {
     let fixture: ComponentFixture<WebVitalsPage>;
+    let httpMock: HttpTestingController;
     let analyticsServiceMock: {
         getWebVitalsSummary: ReturnType<typeof vi.fn>;
         getWebVitalsTimeseries: ReturnType<typeof vi.fn>;
@@ -119,7 +124,12 @@ describe('WebVitalsPage', () => {
                                     tabs: { pages: 'Pages', countries: 'Countries', languages: 'Languages', browsers: 'Browsers', devices: 'Devices' }
                                 },
                                 columns: { path: 'Path', p75: 'p75', samples: 'Samples', ratingSamples: '{{rating}} samples', rating: 'Rating' },
-                                empty: { title: 'No Web Vitals yet', description: 'Enable Web Vitals.' }
+                                empty: { title: 'No Web Vitals yet', description: 'Enable Web Vitals.' },
+                                setup: {
+                                    title: 'Turn on Web Vitals collection',
+                                    description: 'Enable Web Vitals in your tracking snippet to fill this page.',
+                                    docsAction: 'Read the Web Vitals guide'
+                                }
                             }
                         }
                     },
@@ -130,6 +140,8 @@ describe('WebVitalsPage', () => {
                 })
             ],
             providers: [
+                provideHttpClient(),
+                provideHttpClientTesting(),
                 provideRouter([]),
                 {
                     provide: SiteService,
@@ -159,8 +171,59 @@ describe('WebVitalsPage', () => {
             ]
         }).compileComponents();
 
+        httpMock = TestBed.inject(HttpTestingController);
         fixture = TestBed.createComponent(WebVitalsPage);
         fixture.detectChanges();
+    });
+
+    afterEach(() => {
+        // Drain the shared setup-state lookup for the tests that do not assert on it.
+        flushSetupState(httpMock, 'site-1');
+        httpMock.verify();
+    });
+
+    /** Recreates the page on a range without a single Web Vitals sample. */
+    const createWithoutSamples = (): void => {
+        analyticsServiceMock.getWebVitalsSummary.mockReturnValue(of([]));
+        analyticsServiceMock.getWebVitalsTimeseries.mockReturnValue(of([]));
+        analyticsServiceMock.getWebVitalsPages.mockReturnValue(of([]));
+        analyticsServiceMock.getWebVitalsBreakdown.mockReturnValue(of([]));
+        fixture = TestBed.createComponent(WebVitalsPage);
+        fixture.detectChanges();
+    };
+
+    const answerSetupState = (overrides: Partial<SiteSetupState> = {}) => flushSetupState(httpMock, 'site-1', overrides, fixture);
+
+    it('renders a setup callout when the site never reported a Web Vital', () => {
+        createWithoutSamples();
+        answerSetupState({ has_web_vitals: false });
+
+        const callout = fixture.nativeElement.querySelector('[data-testid="web-vitals-setup-callout"]');
+        expect(callout).not.toBeNull();
+        expect(callout.textContent).toContain('Turn on Web Vitals collection');
+        expect(callout.textContent).toContain('Enable Web Vitals in your tracking snippet to fill this page.');
+        expect(callout.querySelector('a[href="https://hitkeep.com/guides/analytics/web-vitals/"]')).not.toBeNull();
+        expect(fixture.nativeElement.textContent).not.toContain('Page breakdown');
+        expect(fixture.nativeElement.querySelector('app-report-range-toolbar')).not.toBeNull();
+    });
+
+    it('keeps the regular empty states when samples exist outside the selected range', () => {
+        createWithoutSamples();
+        answerSetupState({ has_web_vitals: true });
+
+        expect(fixture.nativeElement.querySelector('[data-testid="web-vitals-setup-callout"]')).toBeNull();
+        expect(fixture.nativeElement.textContent).toContain('Page breakdown');
+    });
+
+    it('never shows the callout while the setup state is still unknown', () => {
+        createWithoutSamples();
+
+        httpMock.expectOne('/api/sites/site-1/setup-state');
+        expect(fixture.nativeElement.querySelector('[data-testid="web-vitals-setup-callout"]')).toBeNull();
+    });
+
+    it('skips the setup-state lookup while the selected range has samples', () => {
+        httpMock.expectNone('/api/sites/site-1/setup-state');
     });
 
     it('renders populated Web Vitals report sections', () => {

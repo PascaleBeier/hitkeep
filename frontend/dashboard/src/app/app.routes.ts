@@ -98,10 +98,14 @@ export const routes: Routes = [
                         data: titleData('nav.webVitals', 'site')
                     },
                     {
-                        path: 'ai-visibility',
-                        loadComponent: () => import('@pages/ai-visibility/ai-visibility').then((m) => m.AIVisibility),
-                        data: titleData('nav.aiVisibility', 'site')
+                        path: 'ai-agents',
+                        loadComponent: () => import('@pages/ai-agents/ai-agents-page').then((m) => m.AIAgentsPage),
+                        data: titleData('nav.aiAgents', 'site')
                     },
+                    // Legacy deep links from the two-tab era; relative so the
+                    // share/:token prefix survives.
+                    { path: 'ai-visibility', pathMatch: 'full', redirectTo: 'ai-agents' },
+                    { path: 'ai-agents/crawlers', pathMatch: 'full', redirectTo: 'ai-agents' },
                     {
                         path: 'ai-chatbots',
                         loadComponent: () => import('@pages/ai-chatbots/ai-chatbots').then((m) => m.AIChatbots),
@@ -176,10 +180,13 @@ export const routes: Routes = [
                 data: titleData('nav.webVitals', 'site')
             },
             {
-                path: 'ai-visibility',
-                loadComponent: () => import('@pages/ai-visibility/ai-visibility').then((m) => m.AIVisibility),
-                data: titleData('nav.aiVisibility', 'site')
+                path: 'ai-agents',
+                loadComponent: () => import('@pages/ai-agents/ai-agents-page').then((m) => m.AIAgentsPage),
+                data: titleData('nav.aiAgents', 'site')
             },
+            // Legacy deep links from the two-tab era.
+            { path: 'ai-visibility', pathMatch: 'full', redirectTo: 'ai-agents' },
+            { path: 'ai-agents/crawlers', pathMatch: 'full', redirectTo: 'ai-agents' },
             {
                 path: 'ai-chatbots',
                 loadComponent: () => import('@pages/ai-chatbots/ai-chatbots').then((m) => m.AIChatbots),

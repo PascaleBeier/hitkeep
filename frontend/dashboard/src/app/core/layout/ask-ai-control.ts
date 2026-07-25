@@ -15,6 +15,7 @@ import { injectActiveLang } from '@core/i18n/active-lang';
 import { browserAppUrl } from '@core/interceptors/base-path.interceptor';
 import { buildHitkeepChartMergeOptions, buildHitkeepChartOptions, hitkeepChartTheme, withChartAlpha, type HitkeepChartDesign, type HitkeepChartSeries } from '@core/charts/hitkeep-chart-options';
 import { provideHitkeepEcharts } from '@core/charts/hitkeep-echarts.provider';
+import { buildTakeoutExportFilename } from '@core/export/export-formats';
 import { AskAIAction, AskAIChart, AskAIMessage, AskAIRequest, AskAIResponse, AskAIStreamEvent } from '@models/analytics.types';
 import { AskAIService, AskAIStreamStatusError } from '@services/ask-ai.service';
 import { DashboardBootstrapService } from '@services/dashboard-bootstrap.service';
@@ -887,12 +888,6 @@ export class AskAIControl {
     }
 
     private exportFilename(action: AskAIAction): string {
-        const site = this.activeSite();
-        const safeDomain = (site?.domain || 'site')
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/(^-|-$)/g, '');
-        const format = action.format || 'xlsx';
-        return `${safeDomain || 'site'}-ask-ai-${new Date().toISOString().slice(0, 10)}.${format}`;
+        return buildTakeoutExportFilename(this.activeSite()?.domain, 'ask-ai', action.format || 'xlsx');
     }
 }

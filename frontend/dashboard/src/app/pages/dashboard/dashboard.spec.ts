@@ -15,48 +15,14 @@ import { OnboardingService } from '@services/onboarding.service';
 import { RealtimeEvent, RealtimeService } from '@services/realtime.service';
 import { GoogleSearchConsoleService } from '@services/google-search-console.service';
 import { ReportRangePreferencesService } from '@services/report-range-preferences.service';
+import { emptySiteStats } from '@testing/empty-site-stats';
 
 describe('Dashboard', () => {
     let component: Dashboard;
     let fixture: ComponentFixture<Dashboard>;
     let realtimeEvents: Subject<RealtimeEvent>;
 
-    const emptyStats = () => ({
-        live_visitors: 0,
-        total_pageviews: 0,
-        unique_sessions: 0,
-        bounce_rate: 0,
-        avg_session_duration: 0,
-        pages_per_session: 0,
-        chart_data: [],
-        top_pages: [],
-        top_landing_pages: [],
-        top_exit_pages: [],
-        top_referrers: [],
-        top_devices: [],
-        top_countries: [],
-        top_browsers: [],
-        top_ai_bots: [],
-        top_ai_sources: [],
-        top_languages: [],
-        top_cities: [],
-        top_providers: [],
-        top_asns: [],
-        top_utm_campaigns: [],
-        top_utm_contents: [],
-        top_utm_mediums: [],
-        top_utm_sources: [],
-        top_utm_terms: [],
-        ai_bot_hits: 0,
-        ai_source_visits: 0,
-        utm_campaign_hits: 0,
-        utm_content_hits: 0,
-        utm_medium_hits: 0,
-        utm_source_hits: 0,
-        utm_term_hits: 0,
-        goals: [],
-        funnels: []
-    });
+    const emptyStats = () => emptySiteStats();
 
     const setDashboardStats = (value: unknown): void => {
         const dashboard = component as unknown as {
@@ -394,6 +360,7 @@ describe('Dashboard', () => {
             top_countries: [],
             top_browsers: [],
             top_ai_bots: [],
+            top_ai_bot_categories: [],
             top_ai_sources: [],
             top_languages: [{ name: 'de', value: 4 }],
             top_cities: [],
@@ -431,6 +398,59 @@ describe('Dashboard', () => {
         expect(content?.cards.find((card) => card.id === 'exit-pages')?.data).toEqual([{ name: '/signup', value: 2 }]);
     });
 
+    it('should show only AI categories with traffic as tabs of the bots group', () => {
+        const siteService = TestBed.inject(SiteService);
+        const statsService = TestBed.inject(StatsService);
+        const hitService = TestBed.inject(HitService);
+
+        vi.spyOn(statsService, 'loadStats').mockImplementation(() => undefined);
+        vi.spyOn(hitService, 'loadHits').mockImplementation(() => undefined);
+
+        siteService.activeSite.set({
+            id: 'site-1',
+            user_id: 'user-1',
+            domain: 'example.com',
+            created_at: '2026-01-01T00:00:00Z'
+        });
+        fixture.detectChanges();
+
+        setDashboardStats(
+            emptySiteStats({
+                total_pageviews: 10,
+                unique_sessions: 5,
+                bounce_rate: 40,
+                avg_session_duration: 12,
+                pages_per_session: 2,
+                top_ai_bots: [
+                    { name: 'GPTBot', value: 4 },
+                    { name: 'ChatGPT-User', value: 2 }
+                ],
+                top_ai_bot_categories: [
+                    { name: 'ai_training_crawler', value: 4 },
+                    { name: 'ai_assistant', value: 2 }
+                ],
+                top_ai_bots_by_category: {
+                    ai_training_crawler: [{ name: 'GPTBot', value: 4 }],
+                    ai_assistant: [{ name: 'ChatGPT-User', value: 2 }]
+                },
+                ai_bot_hits: 6
+            })
+        );
+
+        const tabs = (
+            component as unknown as {
+                metricCardTabs: () => {
+                    id: string;
+                    cards: { id: string; data: { name: string; value: number }[] }[];
+                }[];
+            }
+        ).metricCardTabs();
+        const bots = tabs.find((tab) => tab.id === 'bots');
+
+        expect(bots?.cards.map((card) => card.id)).toEqual(['bots-ai_training_crawler', 'bots-ai_assistant']);
+        expect(bots?.cards.find((card) => card.id === 'bots-ai_training_crawler')?.data).toEqual([{ name: 'GPTBot', value: 4 }]);
+    });
+
     it('should group countries and cities under location and providers and ASNs under network', () => {
         const siteService = TestBed.inject(SiteService);
         const statsService = TestBed.inject(StatsService);
@@ -463,6 +483,7 @@ describe('Dashboard', () => {
             top_countries: [{ name: 'DE', value: 4 }],
             top_browsers: [],
             top_ai_bots: [],
+            top_ai_bot_categories: [],
             top_ai_sources: [],
             top_languages: [],
             top_cities: [{ name: 'Berlin', value: 3 }],
@@ -525,6 +546,7 @@ describe('Dashboard', () => {
             top_browsers: [],
             top_countries: [{ name: 'DE', value: 4 }],
             top_ai_bots: [],
+            top_ai_bot_categories: [],
             top_ai_sources: [],
             top_languages: [{ name: 'de', value: 3 }],
             top_cities: [],
@@ -556,6 +578,37 @@ describe('Dashboard', () => {
         ).stats();
         expect(dashboardStats?.top_countries).toEqual([{ name: 'DE', value: 4 }]);
         expect(dashboardStats?.top_languages).toEqual([{ name: 'de', value: 3 }]);
+    });
+
+    it('renders active filters and the takeout export through the shared toolbar atoms', () => {
+        const siteService = TestBed.inject(SiteService);
+        const statsService = TestBed.inject(StatsService);
+        const hitService = TestBed.inject(HitService);
+
+        vi.spyOn(statsService, 'loadStats').mockImplementation(() => undefined);
+        vi.spyOn(hitService, 'loadHits').mockImplementation(() => undefined);
+        siteService.activeSite.set({ id: 'site-1', user_id: 'user-1', domain: 'example.com', created_at: '2026-01-01T00:00:00Z' });
+        setDashboardStats(emptyStats());
+
+        const dashboard = component as unknown as {
+            activeFilters: { set: (value: { type: string; value: string }[]) => void };
+            filterChips: () => { key: string; label: string; remove: () => void }[];
+        };
+        dashboard.activeFilters.set([{ type: 'path', value: '/pricing' }]);
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.querySelector('app-filter-chip-row')).not.toBeNull();
+        expect(fixture.nativeElement.querySelector('app-export-split-button')).not.toBeNull();
+        expect(fixture.nativeElement.querySelector('app-export-status-banner')).not.toBeNull();
+        expect(fixture.nativeElement.textContent).toContain('common.actions.clearAll');
+
+        const chips = dashboard.filterChips();
+        expect(chips.map((chip) => chip.key)).toEqual(['path:/pricing']);
+        chips[0]?.remove();
+        fixture.detectChanges();
+
+        expect(dashboard.filterChips()).toEqual([]);
+        expect(fixture.nativeElement.textContent).toContain('common.noActiveFilter');
     });
 
     it('should render configured funnels from dashboard stats', () => {
@@ -590,6 +643,7 @@ describe('Dashboard', () => {
             top_browsers: [],
             top_countries: [],
             top_ai_bots: [],
+            top_ai_bot_categories: [],
             top_ai_sources: [],
             top_languages: [],
             top_cities: [],
@@ -717,6 +771,7 @@ describe('Dashboard', () => {
             top_countries: [],
             top_browsers: [],
             top_ai_bots: [],
+            top_ai_bot_categories: [],
             top_ai_sources: [],
             top_languages: [],
             top_utm_campaigns: [],

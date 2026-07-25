@@ -89,37 +89,10 @@
     </div>
 
     <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
-        @let chips = filterChips();
-        <div class="flex flex-wrap items-center gap-2">
-            @if (chips.length) { @for (filter of chips; track filter.type) {
-            <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--p-primary-color)] text-sm">
-                <span class="font-medium text-[var(--p-text-color)]">{{ filter.label }}</span>
-                <button type="button" class="text-muted-color hover:text-[var(--p-text-color)]" (click)="removeFilter(filter.type, filter.value)" [attr.aria-label]="'common.removeFilterAria' | transloco">
-                    <i class="pi pi-times" aria-hidden="true"></i>
-                </button>
-            </span>
-            }
-            <button type="button" class="text-xs text-muted-color hover:text-[var(--p-text-color)] underline" (click)="clearFilter()">{{ "common.actions.clearAll" | transloco }}</button>
-            } @else {
-            <span class="text-sm text-[var(--p-text-muted-color)]">{{ "common.noActiveFilter" | transloco }}</span>
-            }
-        </div>
-        <div class="flex items-center gap-2">
-            <p-splitButton
-                icon="pi pi-download"
-                [label]="isExportingFiltered() ? ('common.preparing' | transloco) : ('common.actions.exportCsv' | transloco)"
-                [model]="exportMenuItems()"
-                [disabled]="!exportUrl() || isExportingFiltered()"
-                styleClass="p-button-outlined p-button-sm"
-                (onClick)="exportFiltered('csv')"
-            />
-        </div>
+        <app-filter-chip-row [chips]="filterChips()" (clearAll)="clearFilter()" />
+        <app-export-split-button [isExporting]="isExportingFiltered()" [disabled]="!exportUrl() || isExportingFiltered()" (export)="exportFiltered($event)" />
     </div>
-    @if (filteredExportState() === "success") {
-    <div class="mb-6 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{{ "dashboard.exportStatus.success" | transloco }}</div>
-    } @if (filteredExportState() === "error") {
-    <div class="mb-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ "dashboard.exportStatus.error" | transloco }}</div>
-    }
+    <app-export-status-banner [state]="filteredExportState()" successKey="dashboard.exportStatus.success" errorKey="dashboard.exportStatus.error" />
 
     <app-metric-card-group class="mb-6" [tabs]="metricCardTabs()" (rowClicked)="onMetricCardClick($event)" />
 

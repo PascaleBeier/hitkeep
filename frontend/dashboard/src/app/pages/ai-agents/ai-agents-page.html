@@ -1,0 +1,102 @@
+<div class="flex flex-col h-full w-full gap-4">
+    <app-page-header>
+        <ng-template appPageHeaderLeft>
+            <div>
+                <app-page-breadcrumb [items]="breadcrumbItems()" />
+            </div>
+        </ng-template>
+    </app-page-header>
+
+    <app-report-range-toolbar [loading]="isLoading()" (refresh)="refresh('background')" />
+
+    @if (noSite()) {
+    <app-no-site-selected icon="pi pi-sparkles" descriptionKey="aiAgents.noSiteDescription" />
+    } @else {
+    <div>
+        <div data-testid="ai-agent-traffic-kpis" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            @for (card of kpiCards(); track card.id) {
+            <app-kpi-card [label]="card.label" [value]="card.value" [loading]="card.loading" [updateKey]="card.updateKey ?? 0" [format]="card.format" [suffix]="card.suffix" [delta]="card.delta ?? null" />
+            }
+        </div>
+        <p class="mt-2 text-xs text-[var(--p-text-muted-color)]">{{ "aiAgents.kpis.note" | transloco }}</p>
+    </div>
+
+    <p-card class="shadow-sm border border-surface-200 dark:border-surface-700 surface-card">
+        <div class="mb-4">
+            <h2 class="text-lg font-semibold">{{ "aiAgents.hero.title" | transloco }}</h2>
+            <p class="text-sm text-[var(--p-text-muted-color)] mt-1">{{ "aiAgents.hero.description" | transloco }}</p>
+        </div>
+        <app-series-chart data-testid="ai-agents-hero-chart" [data]="heroChartData()" [series]="chartConfig()" [isLoading]="isLoading()" [isShortRange]="isShortRange()" />
+    </p-card>
+
+    <app-filter-chip-row data-testid="ai-agents-page-chips" [chips]="filterChips()" (clearAll)="clearAllFilters()" />
+
+    <app-metric-card-group [tabs]="cardGroups()" (rowClicked)="onCardRowClick($event)" />
+
+    @if (showEnrichCallout()) {
+    <app-setup-callout testId="ai-agents-enrich-callout" icon="pi pi-cloud-upload" titleKey="aiAgents.enrich.title" descriptionKey="aiAgents.enrich.description" docsActionKey="aiAgents.enrich.docsAction" [docsUrl]="docsUrl" />
+    } @if (showHealthStrip()) {
+    <p-card class="shadow-sm border border-surface-200 dark:border-surface-700 surface-card">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+                <h2 class="text-lg font-semibold">{{ "aiAgents.groups.fetchDepth" | transloco }}</h2>
+                <p class="text-sm text-[var(--p-text-muted-color)] mt-1">{{ "aiAgents.fetchDepth.description" | transloco }}</p>
+            </div>
+            <a
+                pButton
+                [href]="docsUrl"
+                target="_blank"
+                rel="noreferrer"
+                size="small"
+                icon="pi pi-external-link"
+                iconPos="right"
+                [label]="'aiAgents.fetchDepth.docsAction' | transloco"
+                [attr.aria-label]="'aiAgents.fetchDepth.docsAction' | transloco"
+                class="p-button-rounded p-button-secondary shrink-0"
+            ></a>
+        </div>
+        <dl data-testid="ai-visibility-health-strip" class="ai-agents__stat-strip mt-4">
+            @for (stat of healthStats(); track stat.label) {
+            <div class="ai-agents__stat">
+                <dt>{{ stat.label }}</dt>
+                <dd>
+                    @if (isLoading()) {
+                    <span class="ai-agents__stat-skeleton" aria-hidden="true"></span>
+                    } @else { {{ stat.value }} }
+                </dd>
+            </div>
+            }
+        </dl>
+    </p-card>
+    } @if (showFetchTools()) {
+    <div class="flex flex-wrap items-center justify-end gap-3">
+        <app-export-split-button [isExporting]="isExporting()" [disabled]="!exportUrl() || isExporting()" (export)="exportFiltered($event)" />
+    </div>
+    <app-export-status-banner [state]="exportState()" successKey="aiAgents.fetchDepth.exportStatus.success" errorKey="aiAgents.fetchDepth.exportStatus.error" />
+
+    <div data-testid="ai-visibility-correlation-shot" class="flex flex-col gap-4">
+        <div data-testid="ai-visibility-correlation-kpis">
+            <div class="mb-3">
+                <h2 class="text-lg font-semibold">{{ "aiAgents.fetchDepth.correlation.title" | transloco }}</h2>
+                <p class="text-sm text-[var(--p-text-muted-color)] mt-1">{{ "aiAgents.fetchDepth.correlation.description" | transloco }}</p>
+            </div>
+            <dl data-testid="ai-visibility-correlation-summary" class="ai-agents__stat-strip ai-agents__stat-strip--wide">
+                @for (stat of correlationSummaryStats(); track stat.label) {
+                <div class="ai-agents__stat">
+                    <dt>{{ stat.label }}</dt>
+                    <dd>
+                        @if (isLoadingCorrelation()) {
+                        <span class="ai-agents__stat-skeleton" aria-hidden="true"></span>
+                        } @else { {{ stat.value }} }
+                    </dd>
+                </div>
+                }
+            </dl>
+            <p class="mt-2 text-xs text-[var(--p-text-muted-color)]">{{ "aiAgents.fetchDepth.correlation.note" | transloco }}</p>
+        </div>
+        <div data-testid="ai-visibility-correlation-tables">
+            <app-metric-card-group [tabs]="correlationTabs()" (rowClicked)="onCardRowClick($event)" />
+        </div>
+    </div>
+    } }
+</div>
