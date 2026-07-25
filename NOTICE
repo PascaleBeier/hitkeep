@@ -1,0 +1,37 @@
+HitKeep
+Copyright (c) Pascale Beier
+
+HitKeep is licensed under the MIT License (see LICENSE).
+
+HitKeep ships with embedded third-party datasets. The datasets below retain
+their own licenses and attribution requirements, separate from HitKeep's
+source license.
+
+## AI agent user-agent master list (internal/aianalytics/default_ai_agents.json)
+
+Assembled from the following sources:
+
+- ai.robots.txt — https://github.com/ai-robots-txt/ai.robots.txt
+  License: MIT
+- Device Detector bot list (bots.yml) — https://github.com/matomo-org/device-detector
+  Copyright (c) Matomo (https://matomo.org)
+  License: GNU Lesser General Public License v3.0 or later (LGPL-3.0-or-later),
+  https://www.gnu.org/licenses/lgpl-3.0.html
+  The embedded master list contains data derived from Device Detector's bot
+  definitions. Device Detector itself is not linked into HitKeep.
+- crawler-user-agents — https://github.com/monperrus/crawler-user-agents
+  License: MIT
+
+## IP geolocation data (internal/ipmeta)
+
+This product includes IP2Location LITE data available from
+https://lite.ip2location.com. HitKeep uses the IP2Location LITE database for
+IP geolocation.
+
+## Spam filter data (internal/blocking/default_spam_filter.json)
+
+- Matomo referrer spam list — https://github.com/matomo-org/referrer-spam-list
+  License: Public Domain
+- Spamhaus DROP lists — https://www.spamhaus.org/drop/
+  Copyright (c) The Spamhaus Project SLU, usage terms:
+  https://www.spamhaus.org/drop/terms/

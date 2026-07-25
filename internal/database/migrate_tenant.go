@@ -64,7 +64,7 @@ func (s *Store) migrateTenant(ctx context.Context, opts migrationRunOptions) err
 
 	if len(pendingMigrations) == 0 {
 		slog.Debug("Tenant database schema is up to date.")
-		return validateCleanupPlans(ctx, s.db, siteDeleteSpec)
+		return s.afterTenantSchemaCurrent(ctx)
 	}
 
 	slog.Info("Applying pending tenant migrations...", "count", len(pendingMigrations), "path", s.path)
@@ -111,10 +111,16 @@ func (s *Store) migrateTenant(ctx context.Context, opts migrationRunOptions) err
 	} else if err := s.Checkpoint(ctx, "tenant_migrations"); err != nil {
 		return fmt.Errorf("checkpoint tenant migrations: %w", err)
 	}
-	if err := validateCleanupPlans(ctx, s.db, siteDeleteSpec); err != nil {
+	return s.afterTenantSchemaCurrent(ctx)
+}
+
+// afterTenantSchemaCurrent runs the steps that must hold once a tenant schema is
+// current, whether this process applied migrations or found none pending.
+func (s *Store) afterTenantSchemaCurrent(ctx context.Context) error {
+	if err := s.ensureAIClassificationMacros(ctx); err != nil {
 		return err
 	}
-	return nil
+	return validateCleanupPlans(ctx, s.db, siteDeleteSpec)
 }
 
 func (s *Store) getTenantAppliedMigrations(ctx context.Context) (map[string]bool, error) {

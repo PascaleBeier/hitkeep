@@ -1,0 +1,45 @@
+###############
+# Device Detector - The Universal Device Detection library for parsing User Agents
+#
+# @license http://www.gnu.org/licenses/lgpl.html LGPL v3 or later
+###############
+
+- regex: 'monitoring360bot'
+  name: '360 Monitoring'
+  category: 'Site Monitor'
+  url: 'https://www.360monitoring.io'
+  producer:
+    name: 'Plesk International GmbH'
+    url: 'https://www.plesk.com'
+
+- regex: 'Google-CloudVertexBot'
+  name: 'Google-CloudVertexBot'
+  category: 'AI Data Scraper'
+  url: 'https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers'
+  producer:
+    name: 'Google Inc.'
+    url: 'https://www.google.com/'
+
+- regex: 'DuckAssistBot'
+  name: 'DuckAssistBot'
+  category: 'AI Assistant'
+  url: ''
+  producer:
+    name: 'DuckDuckGo'
+    url: 'https://duckduckgo.com/'
+
+- regex: '(?:Perplexity(?:Bot)?)'
+  name: 'PerplexityBot'
+  category: 'AI Search Crawler'
+  url: 'https://docs.perplexity.ai/guides/bots'
+  producer:
+    name: 'Perplexity AI, Inc.'
+    url: 'https://www.perplexity.ai/'
+
+- regex: 'Operator-Agent\/'
+  name: 'Operator'
+  category: 'AI Agent'
+  url: ''
+  producer:
+    name: 'OpenAI'
+    url: 'https://openai.com/'

@@ -1,0 +1,26 @@
+[
+  {
+    "pattern": "Googlebot\\/",
+    "url": "http://www.google.com/bot.html",
+    "tags": ["search-engine"],
+    "instances": ["Googlebot/2.1 (+http://www.google.com/bot.html)"]
+  },
+  {
+    "pattern": "MistralAI-User\\/",
+    "url": "https://docs.mistral.ai/robots/",
+    "tags": ["ai-crawler"],
+    "instances": ["Mozilla/5.0 (compatible; MistralAI-User/1.0; +https://docs.mistral.ai/robots)"]
+  },
+  {
+    "pattern": "Ai2Bot\\-Dolma",
+    "url": "https://allenai.org/crawler",
+    "tags": ["ai-crawler"],
+    "instances": []
+  },
+  {
+    "pattern": "anthropic[- ]ai(?:/[0-9])?",
+    "url": "https://www.anthropic.com",
+    "tags": ["ai-crawler"],
+    "instances": []
+  }
+]
