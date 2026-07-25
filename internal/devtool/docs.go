@@ -182,6 +182,35 @@ func validateReleaseMetadata(root string) error {
 		return err
 	}
 
+	var trackerPackage struct {
+		Version string `json:"version"`
+	}
+	if err := readJSONFile(filepath.Join(root, "frontend", "tracker", "package.json"), &trackerPackage); err != nil {
+		return err
+	}
+	if err := requireReleaseVersion("frontend/tracker/package.json $.version", trackerPackage.Version, version); err != nil {
+		return err
+	}
+
+	trackerVersionPath := filepath.Join(root, "frontend", "dashboard", "src", "tracker", "version.ts")
+	trackerVersionRaw, err := os.ReadFile(trackerVersionPath)
+	if err != nil {
+		return err
+	}
+	trackerAnnotatedLines := 0
+	for lineNumber, line := range strings.Split(string(trackerVersionRaw), "\n") {
+		if !strings.Contains(line, "x-release-please-version") {
+			continue
+		}
+		trackerAnnotatedLines++
+		if !strings.Contains(line, version) {
+			return fmt.Errorf("frontend/dashboard/src/tracker/version.ts:%d release annotation does not contain %s", lineNumber+1, version)
+		}
+	}
+	if trackerAnnotatedLines == 0 {
+		return fmt.Errorf("frontend/dashboard/src/tracker/version.ts has no x-release-please-version annotations")
+	}
+
 	var dashboardLock struct {
 		Version  string `json:"version"`
 		Packages map[string]struct {
@@ -256,6 +285,8 @@ func validateReleaseMetadata(root string) error {
 		{Type: "json", Path: "frontend/dashboard/package.json", JSONPath: "$.version"},
 		{Type: "json", Path: "frontend/dashboard/package-lock.json", JSONPath: "$.version"},
 		{Type: "json", Path: "frontend/dashboard/package-lock.json", JSONPath: "$['packages']['']['version']"},
+		{Type: "json", Path: "frontend/tracker/package.json", JSONPath: "$.version"},
+		{Type: "generic", Path: "frontend/dashboard/src/tracker/version.ts"},
 		{Type: "yaml", Path: "charts/hitkeep/Chart.yaml", JSONPath: "$.version"},
 		{Type: "yaml", Path: "charts/hitkeep/Chart.yaml", JSONPath: "$.appVersion"},
 		{Type: "generic", Path: "charts/hitkeep/README.md"},

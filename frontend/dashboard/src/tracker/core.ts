@@ -1,4 +1,4 @@
-type EventProperties = Record<string, unknown>;
+export type EventProperties = Record<string, unknown>;
 
 interface HitKeepEvent {
     name: string;
@@ -21,12 +21,35 @@ export interface TrackerOptions {
     trackerVersion: string;
 }
 
+export interface TrackerEndpoints {
+    pageEndpoint: string;
+    eventEndpoint: string;
+    webVitalsEndpoint: string;
+    /** Resolved only when Web Vitals are enabled; `null` keeps the split bundle unloaded. */
+    webVitalsBundleUrl: string | null;
+}
+
+export interface TrackerRuntimeConfig extends TrackerOptions, TrackerEndpoints {
+    capturePageviews: boolean;
+    captureOnLocalhost: boolean;
+    bindToWindow: boolean;
+}
+
+export interface TrackerHandle {
+    track: EventSender;
+    trackPageview: () => void;
+    cleanup: () => void;
+}
+
 interface PendingRequest {
     endpoint: string;
     body: string;
 }
 
-type HitKeepWindow = Window &
+/** Registers a listener and records its matching teardown on the owning tracker. */
+type ListenerRegistrar = (target: EventTarget, type: string, listener: EventListener, options?: boolean | AddEventListenerOptions) => void;
+
+export type HitKeepWindow = Window &
     typeof globalThis & {
         hk?: {
             event?: EventSender;
@@ -64,6 +87,7 @@ const SESSION_EXPIRY = 30 * 60 * 1000;
 const MAX_PENDING_REQUESTS = 10;
 const RETRY_DELAY_MS = 2000;
 const DUPLICATE_PAGEVIEW_WINDOW_MS = 1500;
+const OPT_OUT_KEY = 'hk_ignore';
 const DOWNLOAD_EXTENSIONS = new Set([
     '7z',
     'avi',
@@ -121,11 +145,31 @@ export function readTrackerOptions(scriptEl: Element): TrackerOptions {
     };
 }
 
-export function isTrackerBlocked(hostname: string, userAgent: string, doNotTrack: string | null | undefined, collectDnt: boolean): boolean {
+export function isTrackerBlocked(hostname: string, userAgent: string, doNotTrack: string | null | undefined, collectDnt: boolean, captureOnLocalhost = false): boolean {
     const isBot = /bot|spider|crawl|slurp|ia_archiver/i.test(userAgent);
-    const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+    const isLocal = !captureOnLocalhost && (hostname === 'localhost' || hostname === '127.0.0.1');
     const dntEnabled = doNotTrack === '1';
     return isLocal || isBot || (dntEnabled && !collectDnt);
+}
+
+export function isTrackingOptedOut(win: Window): boolean {
+    try {
+        return win.localStorage.getItem(OPT_OUT_KEY) === 'true';
+    } catch {
+        return false;
+    }
+}
+
+export function setTrackingOptOut(win: Window, optedOut: boolean): void {
+    try {
+        if (optedOut) {
+            win.localStorage.setItem(OPT_OUT_KEY, 'true');
+        } else {
+            win.localStorage.removeItem(OPT_OUT_KEY);
+        }
+    } catch (error) {
+        ignoreError(error);
+    }
 }
 
 export function sanitizeTrackedUrl(rawUrl: string, baseUrl: string | URL): URL | null {
@@ -156,13 +200,26 @@ export function resolveWebVitalsBundleUrl(scriptUrl: URL, bundleName = 'hk-vital
     return resolveTrackerUrl(scriptUrl, bundleName);
 }
 
-function loadWebVitalsBundle(win: HitKeepWindow, scriptUrl: URL): void {
+/**
+ * Single source of truth for the tracker's wire paths, shared by the `hk.js` snippet
+ * (resolving against its own script URL) and the npm package (resolving against `host`).
+ */
+export function resolveTrackerEndpoints(baseUrl: URL, enableWebVitals: boolean): TrackerEndpoints {
+    return {
+        pageEndpoint: resolveTrackerUrl(baseUrl, 'ingest'),
+        eventEndpoint: resolveTrackerUrl(baseUrl, 'ingest/event'),
+        webVitalsEndpoint: resolveTrackerUrl(baseUrl, 'ingest/web-vitals'),
+        webVitalsBundleUrl: enableWebVitals ? resolveWebVitalsBundleUrl(baseUrl) : null
+    };
+}
+
+function loadWebVitalsBundle(win: HitKeepWindow, bundleUrl: string): void {
     if (win.hk?._webVitalsLoaded) {
         return;
     }
     const script = win.document.createElement('script');
     script.async = true;
-    script.src = resolveWebVitalsBundleUrl(scriptUrl);
+    script.src = bundleUrl;
     win.hk = win.hk || {};
     win.hk._webVitalsLoaded = true;
     win.document.head.appendChild(script);
@@ -259,30 +316,22 @@ export function classifyFormSubmit(form: HTMLFormElement, currentUrl: URL, submi
     };
 }
 
-export function bootstrapTracker(win: HitKeepWindow = window): void {
+export function createTracker(win: HitKeepWindow, config: TrackerRuntimeConfig): TrackerHandle | null {
     const { document, location, navigator, screen, history, sessionStorage, crypto } = win;
-
-    const scriptEl = resolveTrackerScript(document);
-    if (!scriptEl) {
-        return;
-    }
 
     win.hk = win.hk || {};
     if (win.hk._bootstrapped) {
-        return;
+        return null;
     }
     win.hk._bootstrapped = true;
 
-    const options = readTrackerOptions(scriptEl);
-    if (isTrackerBlocked(location.hostname, navigator.userAgent, navigator.doNotTrack, options.collectDnt)) {
-        win.hk.event = noop;
-        return;
+    if (isTrackerBlocked(location.hostname, navigator.userAgent, navigator.doNotTrack, config.collectDnt, config.captureOnLocalhost) || isTrackingOptedOut(win)) {
+        if (config.bindToWindow) {
+            win.hk.event = noop;
+        }
+        return null;
     }
 
-    const scriptUrl = new URL(scriptEl.src, location.href);
-    const pageEndpoint = resolveTrackerUrl(scriptUrl, 'ingest');
-    const eventEndpoint = resolveTrackerUrl(scriptUrl, 'ingest/event');
-    const webVitalsEndpoint = resolveTrackerUrl(scriptUrl, 'ingest/web-vitals');
     const generateUUID = () => {
         if (crypto?.randomUUID) {
             return crypto.randomUUID();
@@ -340,6 +389,12 @@ export function bootstrapTracker(win: HitKeepWindow = window): void {
         qr: readUtmValue(initialSearchParams, 'hk_qr')
     };
     const pendingRequests: PendingRequest[] = [];
+    const removers: (() => void)[] = [];
+    const on = (target: EventTarget, type: string, listener: EventListener, options?: boolean | AddEventListenerOptions) => {
+        target.addEventListener(type, listener, options);
+        removers.push(() => target.removeEventListener(type, listener, options));
+    };
+    let active = true;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let lastPath = location.pathname;
     let lastPageviewPath = '';
@@ -381,9 +436,12 @@ export function bootstrapTracker(win: HitKeepWindow = window): void {
     };
 
     const sendRequest = (request: PendingRequest, fromQueue = false) => {
+        if (!active) {
+            return;
+        }
         const headers = { 'Content-Type': 'application/json' };
 
-        if (navigator.sendBeacon && !options.disableBeacon) {
+        if (navigator.sendBeacon && !config.disableBeacon) {
             const blob = new Blob([request.body], { type: 'application/json' });
             if (navigator.sendBeacon(request.endpoint, blob)) {
                 return;
@@ -431,29 +489,29 @@ export function bootstrapTracker(win: HitKeepWindow = window): void {
     };
 
     const emitEvent = (name: string, properties: EventProperties = {}) => {
-        sendJson(eventEndpoint, {
+        sendJson(config.eventEndpoint, {
             n: name,
             p: properties,
             r: currentReferrer(),
             sid: sessionId,
-            path: sanitizeTrackedPath(new URL(location.href)),
+            path: location.pathname || '/',
             ua: navigator.userAgent,
-            tsrc: options.trackerSource,
-            tv: options.trackerVersion
+            tsrc: config.trackerSource,
+            tv: config.trackerVersion
         });
     };
 
-    if (options.enableWebVitals) {
+    if (config.webVitalsBundleUrl) {
         win.hk._webVitals = {
-            emit: (payload) => sendJson(webVitalsEndpoint, payload),
-            getPath: () => sanitizeTrackedPath(new URL(location.href)),
+            emit: (payload) => sendJson(config.webVitalsEndpoint, payload),
+            getPath: () => location.pathname || '/',
             sessionId,
             pageId: () => currentPageId,
-            trackerSource: options.trackerSource,
-            trackerVersion: options.trackerVersion,
+            trackerSource: config.trackerSource,
+            trackerVersion: config.trackerVersion,
             userAgent: navigator.userAgent
         };
-        loadWebVitalsBundle(win, scriptUrl);
+        loadWebVitalsBundle(win, config.webVitalsBundleUrl);
     }
 
     const sendPageView = () => {
@@ -475,7 +533,7 @@ export function bootstrapTracker(win: HitKeepWindow = window): void {
         const referrer = currentReferrer();
         const isUnique = lastPath === currentPath && referrer ? new URL(referrer, location.href).hostname !== initialHost : false;
 
-        sendJson(pageEndpoint, {
+        sendJson(config.pageEndpoint, {
             path: currentPath,
             referrer: referrer || null,
             ua: navigator.userAgent,
@@ -488,8 +546,8 @@ export function bootstrapTracker(win: HitKeepWindow = window): void {
             unique: Boolean(isUnique),
             session_id: sessionId,
             page_id: currentPageId,
-            tsrc: options.trackerSource,
-            tv: options.trackerVersion
+            tsrc: config.trackerSource,
+            tv: config.trackerVersion
         });
 
         lastPageviewPath = currentPath;
@@ -497,47 +555,99 @@ export function bootstrapTracker(win: HitKeepWindow = window): void {
         lastPath = currentPath;
     };
 
-    const patchHistory = (method: HistoryMethod) => {
+    const patchHistoryMethod = (method: HistoryMethod) => {
         const original = history[method];
-        return function patchedHistory(this: History, ...args: Parameters<History[HistoryMethod]>) {
+        const patched = function patchedHistory(this: History, ...args: Parameters<History[HistoryMethod]>) {
             original.apply(this, args);
             sendPageView();
         };
+        history[method] = patched;
+        removers.push(() => {
+            if (history[method] === patched) {
+                history[method] = original;
+            }
+        });
     };
 
-    if (!options.disableSpaTracking) {
-        history.pushState = patchHistory('pushState');
-        history.replaceState = patchHistory('replaceState');
+    if (!config.disableSpaTracking) {
+        patchHistoryMethod('pushState');
+        patchHistoryMethod('replaceState');
 
-        win.addEventListener('popstate', sendPageView);
-        win.addEventListener('hashchange', sendPageView);
+        on(win, 'popstate', sendPageView);
+        on(win, 'hashchange', sendPageView);
     }
 
-    win.addEventListener('online', flushQueue);
-    win.addEventListener('pagehide', flushQueue);
-    document.addEventListener('visibilitychange', () => {
+    const handleVisibilityFlush = () => {
         if (document.visibilityState === 'hidden') {
             flushQueue();
         }
-    });
+    };
+    on(win, 'online', flushQueue);
+    on(win, 'pagehide', flushQueue);
+    on(document, 'visibilitychange', handleVisibilityFlush);
 
-    if ((document.visibilityState as string) === 'prerender') {
-        document.addEventListener(
-            'visibilitychange',
-            () => {
+    if (config.capturePageviews) {
+        if ((document.visibilityState as string) === 'prerender') {
+            const handlePrerenderVisible = () => {
                 if (document.visibilityState === 'visible') {
                     sendPageView();
                 }
-            },
-            { once: true }
-        );
-    } else {
-        sendPageView();
+            };
+            on(document, 'visibilitychange', handlePrerenderVisible, { once: true });
+        } else {
+            sendPageView();
+        }
     }
 
-    bindAutoTracking(document, () => new URL(location.href), options, emitEvent);
+    bindAutoTracking(document, () => new URL(location.href), config, emitEvent, on);
 
-    win.hk.event = (name, properties) => emitEvent(name, properties ?? {});
+    const track: EventSender = (name, properties) => emitEvent(name, properties ?? {});
+    if (config.bindToWindow) {
+        win.hk.event = track;
+    }
+
+    const cleanup = () => {
+        if (!active) {
+            return;
+        }
+        active = false;
+        if (retryTimer !== null) {
+            clearTimeout(retryTimer);
+            retryTimer = null;
+        }
+        for (const remove of removers.splice(0, removers.length)) {
+            remove();
+        }
+        if (win.hk) {
+            if (win.hk.event === track) {
+                delete win.hk.event;
+            }
+            win.hk._bootstrapped = false;
+        }
+    };
+
+    return {
+        track,
+        trackPageview: sendPageView,
+        cleanup
+    };
+}
+
+export function bootstrapTracker(win: HitKeepWindow = window): void {
+    const scriptEl = resolveTrackerScript(win.document);
+    if (!scriptEl) {
+        return;
+    }
+
+    const options = readTrackerOptions(scriptEl);
+    const scriptUrl = new URL(scriptEl.src, win.location.href);
+    createTracker(win, {
+        ...options,
+        ...resolveTrackerEndpoints(scriptUrl, options.enableWebVitals),
+        capturePageviews: true,
+        captureOnLocalhost: false,
+        bindToWindow: true
+    });
 }
 
 function resolveTrackerScript(document: Document): HTMLScriptElement | null {
@@ -550,7 +660,7 @@ function resolveTrackerScript(document: Document): HTMLScriptElement | null {
     return script instanceof HTMLScriptElement ? script : null;
 }
 
-function bindAutoTracking(document: Document, getCurrentUrl: () => URL, options: TrackerOptions, emitEvent: EventSender): void {
+function bindAutoTracking(document: Document, getCurrentUrl: () => URL, options: TrackerOptions, emitEvent: EventSender, on: ListenerRegistrar): void {
     if (!options.disableOutboundTracking || !options.disableDownloadTracking) {
         const handleLinkInteraction = (event: MouseEvent) => {
             if ((event.type === 'click' && event.button !== 0) || (event.type === 'auxclick' && event.button !== 1)) {
@@ -583,28 +693,26 @@ function bindAutoTracking(document: Document, getCurrentUrl: () => URL, options:
             emitEvent(trackedEvent.name, trackedEvent.properties);
         };
 
-        document.addEventListener('click', handleLinkInteraction, true);
-        document.addEventListener('auxclick', handleLinkInteraction, true);
+        on(document, 'click', handleLinkInteraction as EventListener, true);
+        on(document, 'auxclick', handleLinkInteraction as EventListener, true);
     }
 
     if (!options.disableFormTracking) {
-        document.addEventListener(
-            'submit',
-            (event) => {
-                const target = event.target;
-                if (!(target instanceof HTMLFormElement)) {
-                    return;
-                }
+        const handleFormSubmit = (event: Event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLFormElement)) {
+                return;
+            }
 
-                const submitter = event instanceof SubmitEvent && event.submitter instanceof Element ? event.submitter : null;
-                const trackedEvent = classifyFormSubmit(target, getCurrentUrl(), submitter);
-                if (!trackedEvent) {
-                    return;
-                }
+            const submitter = event instanceof SubmitEvent && event.submitter instanceof Element ? event.submitter : null;
+            const trackedEvent = classifyFormSubmit(target, getCurrentUrl(), submitter);
+            if (!trackedEvent) {
+                return;
+            }
 
-                emitEvent(trackedEvent.name, trackedEvent.properties);
-            },
-            true
-        );
+            emitEvent(trackedEvent.name, trackedEvent.properties);
+        };
+
+        on(document, 'submit', handleFormSubmit, true);
     }
 }

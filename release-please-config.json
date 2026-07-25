@@ -25,6 +25,15 @@
           "jsonpath": "$['packages']['']['version']"
         },
         {
+          "type": "json",
+          "path": "frontend/tracker/package.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "generic",
+          "path": "frontend/dashboard/src/tracker/version.ts"
+        },
+        {
           "type": "yaml",
           "path": "charts/hitkeep/Chart.yaml",
           "jsonpath": "$.version"

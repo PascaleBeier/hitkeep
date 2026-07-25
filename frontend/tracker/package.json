@@ -1,0 +1,67 @@
+{
+    "name": "@hitkeep/tracker",
+    "version": "2.12.0",
+    "description": "Typed, cookieless web analytics tracker for React, Vue, Angular, and Astro. Official browser SDK for HitKeep, a privacy-friendly, self-hostable Google Analytics alternative.",
+    "license": "MIT",
+    "type": "module",
+    "sideEffects": false,
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.js",
+    "types": "./dist/package.d.ts",
+    "exports": {
+        ".": {
+            "import": {
+                "types": "./dist/package.d.ts",
+                "default": "./dist/index.js"
+            },
+            "require": {
+                "types": "./dist/package.d.cts",
+                "default": "./dist/index.cjs"
+            }
+        },
+        "./package.json": "./package.json"
+    },
+    "files": [
+        "dist",
+        "README.md",
+        "LICENSE"
+    ],
+    "scripts": {
+        "prepublishOnly": "npm --prefix ../dashboard run build:tracker-package"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/PascaleBeier/hitkeep.git",
+        "directory": "frontend/tracker"
+    },
+    "homepage": "https://hitkeep.com",
+    "bugs": {
+        "url": "https://github.com/PascaleBeier/hitkeep/issues"
+    },
+    "keywords": [
+        "analytics",
+        "web-analytics",
+        "website-analytics",
+        "privacy",
+        "privacy-friendly-analytics",
+        "cookieless",
+        "gdpr",
+        "google-analytics-alternative",
+        "self-hosted",
+        "tracker",
+        "tracking",
+        "pageviews",
+        "event-tracking",
+        "spa",
+        "react",
+        "vue",
+        "angular",
+        "astro",
+        "typescript",
+        "hitkeep"
+    ],
+    "publishConfig": {
+        "access": "public",
+        "provenance": true
+    }
+}
