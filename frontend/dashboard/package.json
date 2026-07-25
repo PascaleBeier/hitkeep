@@ -94,7 +94,10 @@
         }
     },
     "overrides": {
-        "dompurify": "3.4.2"
+        "dompurify": "3.4.2",
+        "@jsverse/transloco-optimize": {
+            "glob": "^11.1.0"
+        }
     },
     "packageExtensions": {
         "@jsverse/transloco-locale@8.4.0": {
