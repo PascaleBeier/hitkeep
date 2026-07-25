@@ -1,0 +1,51 @@
+{
+  "GPTBot": {
+    "operator": "[OpenAI](https://openai.com)",
+    "respect": "Yes",
+    "function": "AI Data Scrapers",
+    "frequency": "No information provided.",
+    "description": "GPTBot is used to make our generative AI foundation models more useful and safe."
+  },
+  "NovaAct": {
+    "operator": "Unclear at this time.",
+    "respect": "Unclear at this time.",
+    "function": "AI Agents",
+    "frequency": "Unclear at this time.",
+    "description": "Nova Act is an AI agent created by Amazon."
+  },
+  "Devin": {
+    "operator": "[Cognition](https://www.cognition.ai)",
+    "respect": "Yes",
+    "function": "AI Coding Agents",
+    "frequency": "Unclear at this time.",
+    "description": "Devin is a collaborative AI teammate built to help ambitious engineering teams achieve more."
+  },
+  "QuillBot": {
+    "operator": "[Quillbot](https://quillbot.com)",
+    "respect": "Unclear at this time.",
+    "function": "Undocumented AI Agents",
+    "frequency": "Unclear at this time.",
+    "description": "Writing assistant integration checks."
+  },
+  "OAI-SearchBot": {
+    "operator": "[OpenAI](https://openai.com)",
+    "respect": "[Yes](https://platform.openai.com/docs/bots)",
+    "function": "AI Search Crawlers",
+    "frequency": "No information provided.",
+    "description": "OAI-SearchBot is used to link to and surface websites in search results in ChatGPT."
+  },
+  "Kangaroo Bot": {
+    "operator": "Unclear at this time.",
+    "respect": "Unclear at this time.",
+    "function": "AI Data Scrapers",
+    "frequency": "Unclear at this time.",
+    "description": "Kangaroo Bot is used to download data to train AI models."
+  },
+  "bot": {
+    "operator": "Unclear at this time.",
+    "respect": "No",
+    "function": "AI Assistants",
+    "frequency": "Unclear at this time.",
+    "description": "Over-broad token that must be rejected by the denylist."
+  }
+}

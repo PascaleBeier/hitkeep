@@ -1,0 +1,2411 @@
+{
+  "generated_at": "2026-07-25T01:46:38.438583Z",
+  "sources": {
+    "ai_robots_txt": "https://raw.githubusercontent.com/ai-robots-txt/ai.robots.txt/main/robots.json",
+    "crawler_user_agents": "https://raw.githubusercontent.com/monperrus/crawler-user-agents/master/crawler-user-agents.json",
+    "device_detector_bots": "https://raw.githubusercontent.com/matomo-org/device-detector/master/regexes/bots.yml",
+    "hitkeep_curated": "embedded"
+  },
+  "source_metadata": {
+    "ai_robots_txt": {
+      "license": "MIT",
+      "url": "https://github.com/ai-robots-txt/ai.robots.txt"
+    },
+    "crawler_user_agents": {
+      "license": "MIT",
+      "url": "https://github.com/monperrus/crawler-user-agents"
+    },
+    "device_detector_bots": {
+      "license": "LGPL-3.0-or-later",
+      "url": "https://github.com/matomo-org/device-detector",
+      "attribution": "Bot list data derived from Device Detector, (c) Matomo (https://matomo.org)"
+    }
+  },
+  "agents": [
+    {
+      "token": "addsearchbot",
+      "name": "AddSearchBot",
+      "family": "AddSearchBot",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "agenttimes",
+      "name": "AgentTimes",
+      "family": "The Agent Times",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://theagenttimes.com/about",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "ai2bot",
+      "name": "AI2Bot",
+      "family": "AI2",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "yes",
+      "url": "https://allenai.org/crawler",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots",
+        "hitkeep_curated"
+      ]
+    },
+    {
+      "token": "ai2bot-deepresearcheval",
+      "name": "AI2Bot-DeepResearchEval",
+      "family": "Ai2, a non-profit AI research institute",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "url": "https://allenai.org/crawler",
+      "sources": [
+        "ai_robots_txt",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "ai2bot-dolma",
+      "name": "Ai2Bot-Dolma",
+      "family": "Ai2",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "yes",
+      "url": "https://allenai.org/crawler",
+      "sources": [
+        "ai_robots_txt",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "aihitbot",
+      "name": "aiHitBot",
+      "family": "aiHit",
+      "category": "other_ai",
+      "respects_robots_txt": "yes",
+      "url": "https://www.aihitdata.com/about",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "aisearchbot",
+      "name": "AISearchBot",
+      "family": "AISearchBot",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "aiwebindex",
+      "name": "AIWebIndex",
+      "family": "Lyrenth that builds an AI-readable index of web content for AI systems",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "amazon-kendra",
+      "name": "amazon-kendra",
+      "family": "Amazon",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "yes",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "amazon-qbusiness",
+      "name": "amazon-QBusiness",
+      "family": "amazon-QBusiness",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "amazonbot",
+      "name": "Amazonbot",
+      "family": "Amazon",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "yes",
+      "url": "https://developer.amazon.com/amazonbot",
+      "sources": [
+        "ai_robots_txt",
+        "device_detector_bots",
+        "hitkeep_curated"
+      ]
+    },
+    {
+      "token": "amazonbuyforme",
+      "name": "AmazonBuyForMe",
+      "family": "Amazon",
+      "category": "ai_agent",
+      "respects_robots_txt": "unclear",
+      "url": "https://amazon.com",
+      "sources": [
+        "ai_robots_txt",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "amzn-searchbot",
+      "name": "Amzn-SearchBot",
+      "family": "Amzn-SearchBot",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "unclear",
+      "url": "https://developer.amazon.com/amazonbot",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "amzn-user",
+      "name": "Amzn-User",
+      "family": "Amazon, used for fetching web content to answer user queries through Alexa and other Amazon AI services",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "url": "https://developer.amazon.com/amazonbot",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "andibot",
+      "name": "Andibot",
+      "family": "Andi",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "unclear",
+      "url": "https://andisearch.com/",
+      "sources": [
+        "ai_robots_txt",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "anomura",
+      "name": "Anomura",
+      "family": "Direqt",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "yes",
+      "url": "https://direqt.ai",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "anthropic-ai",
+      "name": "anthropic-ai",
+      "family": "Anthropic",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://www.anthropic.com",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "apifybot",
+      "name": "ApifyBot",
+      "family": "ApifyBot",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://knownagents.com/agents/apifybot",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "apifywebsitecontentcrawler",
+      "name": "ApifyWebsiteContentCrawler",
+      "family": "ApifyWebsiteContentCrawler",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://apify.com/apify/website-content-crawler",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "applebot",
+      "name": "Applebot",
+      "family": "Applebot",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "unclear",
+      "url": "https://support.apple.com/en-us/119829",
+      "sources": [
+        "ai_robots_txt",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "applebot-extended",
+      "name": "Applebot-Extended",
+      "family": "Apple",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "yes",
+      "url": "https://support.apple.com/en-us/119829",
+      "sources": [
+        "ai_robots_txt",
+        "device_detector_bots",
+        "hitkeep_curated"
+      ]
+    },
+    {
+      "token": "aranet-searchbot",
+      "name": "Aranet-SearchBot",
+      "family": "Aranet-SearchBot",
+      "category": "ai_agent",
+      "respects_robots_txt": "unclear",
+      "url": "https://aranet.ai/bot",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "atlassian-bot",
+      "name": "atlassian-bot",
+      "family": "Atlassian",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "yes",
+      "url": "https://www.atlassian.com",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "awario",
+      "name": "Awario",
+      "family": "Awario",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "azureai-searchbot",
+      "name": "AzureAI-SearchBot",
+      "family": "AzureAI-SearchBot",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "unclear",
+      "url": "https://azure.microsoft.com/en-us/products/ai-services",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "bard-ai",
+      "name": "Bard-AI",
+      "family": "Google Inc.",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "unclear",
+      "url": "https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "bedrockbot",
+      "name": "bedrockbot",
+      "family": "Amazon",
+      "category": "other_ai",
+      "respects_robots_txt": "yes",
+      "url": "https://amazon.com",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "bigsur.ai",
+      "name": "bigsur.ai",
+      "family": "Big Sur AI that fetches website content to enable AI-powered web agents, sales assistants, and content marketing solutions for busi…",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "url": "https://bigsur.ai/",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "bravebot",
+      "name": "Bravebot",
+      "family": "https://safe.search.brave.com/help/brave-search-crawler",
+      "category": "other_ai",
+      "respects_robots_txt": "yes",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "brightbot",
+      "name": "Brightbot",
+      "family": "Brightbot",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://brightdata.com/brightbot",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "brightbot 1.0",
+      "name": "Brightbot 1.0",
+      "family": "https://brightdata.com/brightbot",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "buddybot",
+      "name": "BuddyBot",
+      "family": "BuddyBotLearning",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://www.buddybotlearning.com",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "bytespider",
+      "name": "Bytespider",
+      "family": "ByteDance",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "no",
+      "url": "https://stackoverflow.com/questions/57908900/what-is-the-bytespider-user-agent",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "hitkeep_curated"
+      ]
+    },
+    {
+      "token": "ccbot",
+      "name": "CCBot",
+      "family": "Common Crawl",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "yes",
+      "url": "https://commoncrawl.org/ccbot",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "hitkeep_curated"
+      ]
+    },
+    {
+      "token": "channel3bot",
+      "name": "Channel3Bot",
+      "family": "Channel3Bot",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "unclear",
+      "url": "https://trychannel3.com/channel3bot",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "character-ai",
+      "name": "Character-AI",
+      "family": "Character Technologies, Inc.",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "url": "https://character.ai/",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "chatglm-spider",
+      "name": "ChatGLM-Spider",
+      "family": "ChatGLM-Spider",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://chatglm.cn/",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "chatgpt agent",
+      "name": "ChatGPT Agent",
+      "family": "OpenAI",
+      "category": "ai_agent",
+      "respects_robots_txt": "yes",
+      "url": "https://openai.com",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "chatgpt-browser",
+      "name": "ChatGPT-Browser",
+      "family": "OpenAI OpCo, LLC",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "url": "https://platform.openai.com/docs/bots",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "chatgpt-user",
+      "name": "ChatGPT-User",
+      "family": "OpenAI",
+      "category": "ai_assistant",
+      "respects_robots_txt": "yes",
+      "url": "https://platform.openai.com/docs/bots",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots",
+        "hitkeep_curated"
+      ]
+    },
+    {
+      "token": "claude-code",
+      "name": "Claude-Code",
+      "family": "Claude-Code",
+      "category": "ai_coding_agent",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "claude-searchbot",
+      "name": "Claude-SearchBot",
+      "family": "Anthropic",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "yes",
+      "url": "https://www.anthropic.com",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "claude-user",
+      "name": "Claude-User",
+      "family": "Anthropic",
+      "category": "ai_assistant",
+      "respects_robots_txt": "yes",
+      "url": "https://www.anthropic.com",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "claude-web",
+      "name": "Claude-Web",
+      "family": "Anthropic",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "url": "https://support.anthropic.com/en/articles/8896518",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots",
+        "hitkeep_curated"
+      ]
+    },
+    {
+      "token": "claudebot",
+      "name": "ClaudeBot",
+      "family": "Anthropic",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "yes",
+      "url": "https://support.anthropic.com/en/articles/8896518",
+      "sources": [
+        "ai_robots_txt",
+        "hitkeep_curated"
+      ]
+    },
+    {
+      "token": "cloudflare-autorag",
+      "name": "Cloudflare-AutoRAG",
+      "family": "Cloudflare",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "yes",
+      "url": "https://developers.cloudflare.com/autorag",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "cloudvertexbot",
+      "name": "CloudVertexBot",
+      "family": "CloudVertexBot",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "cohere-ai",
+      "name": "Cohere",
+      "family": "Cohere",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://cohere.com",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots",
+        "hitkeep_curated"
+      ]
+    },
+    {
+      "token": "cohere-command",
+      "name": "Cohere-Command",
+      "family": "Cohere, Inc.",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://cohere.com/",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "cohere-training",
+      "name": "cohere-training-data-crawler",
+      "family": "Cohere, Inc.",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://cohere.com/",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "cohere-training-data-crawler",
+      "name": "cohere-training-data-crawler",
+      "family": "Cohere to download training data for its LLMs (Large Language Models) that power its enterprise AI products",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://datadome.co/bots/cohere-training-data-crawler/",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "cotoyogi",
+      "name": "Cotoyogi",
+      "family": "ROIS",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "yes",
+      "url": "https://ds.rois.ac.jp/en_center8/en_crawler/",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "cragcrawler",
+      "name": "CragCrawler",
+      "family": "CragSoftware, a Brazil-based software company specializing in data engineering and AI web scraping services",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "crawl4ai",
+      "name": "Crawl4AI",
+      "family": "Crawl4AI",
+      "category": "ai_agent",
+      "respects_robots_txt": "unclear",
+      "url": "https://github.com/unclecode/crawl4ai",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "crawlspace",
+      "name": "Crawlspace",
+      "family": "Crawlspace",
+      "category": "other_ai",
+      "respects_robots_txt": "yes",
+      "url": "https://crawlspace.dev",
+      "sources": [
+        "ai_robots_txt",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "cursor",
+      "name": "Cursor",
+      "family": "Cursor",
+      "category": "ai_coding_agent",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "datenbank crawler",
+      "name": "Datenbank Crawler",
+      "family": "Datenbank",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "deepseekbot",
+      "name": "DeepSeek",
+      "family": "DeepSeek",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://www.deepseek.com/bot",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots",
+        "hitkeep_curated"
+      ]
+    },
+    {
+      "token": "devin",
+      "name": "Devin",
+      "family": "Devin AI",
+      "category": "ai_coding_agent",
+      "respects_robots_txt": "yes",
+      "url": "https://cognition.ai/",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "diffbot",
+      "name": "Diffbot",
+      "family": "Diffbot",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://www.diffbot.com/",
+      "sources": [
+        "ai_robots_txt",
+        "hitkeep_curated"
+      ]
+    },
+    {
+      "token": "doximity-diffbot",
+      "name": "Doximity-Diffbot",
+      "family": "Diffbot Technologies Corp.",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://docs.diffbot.com/docs/getting-started-with-crawl",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "duckassistbot",
+      "name": "DuckAssistBot",
+      "family": "DuckAssistBot",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "url": "https://duckduckgo.com/duckduckgo-help-pages/results/duckassistbot/",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "echobot bot",
+      "name": "Echobot Bot",
+      "family": "Echobox",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "echoboxbot",
+      "name": "EchoboxBot",
+      "family": "Echobox",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://echobox.com",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "exabot",
+      "name": "ExaBot",
+      "family": "ExaBot",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "extecontextcrawl",
+      "name": "ExteContextCrawl",
+      "family": "ExteContextCrawl",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "http://crawl001.exte.ai/",
+      "sources": [
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "facebookbot",
+      "name": "FacebookBot",
+      "family": "Meta/Facebook",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "yes",
+      "url": "https://developers.facebook.com/docs/sharing/bot/",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "factset_spyderbot",
+      "name": "Factset_spyderbot",
+      "family": "Factset",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://www.factset.com/ai",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "firecrawlagent",
+      "name": "FirecrawlAgent",
+      "family": "Firecrawl that extracts web content and converts it into structured data for use in LLM and AI applications",
+      "category": "other_ai",
+      "respects_robots_txt": "yes",
+      "url": "https://www.firecrawl.dev/",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "flyriverbot",
+      "name": "Flyriverbot",
+      "family": "Flyriverbot",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://flyriver.com/crawler",
+      "sources": [
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "friendlycrawler",
+      "name": "FriendlyCrawler",
+      "family": "Unknown",
+      "category": "other_ai",
+      "respects_robots_txt": "yes",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "geisthaus-pagefetcher",
+      "name": "GeistHaus-PageFetcher",
+      "family": "GeistHaus, a company developing AI systems for therapy and psychological assessment",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "gemini-ai",
+      "name": "Gemini-AI",
+      "family": "Google Inc.",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "unclear",
+      "url": "https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "gemini-deep-research",
+      "name": "Gemini-Deep-Research",
+      "family": "Gemini-Deep-Research",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "url": "https://gemini.google/overview/deep-research/",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "githubcopilotchat",
+      "name": "GitHubCopilotChat",
+      "family": "GitHubCopilotChat",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "url": "https://github.com/microsoft/vscode-copilot-chat",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "gochitchat.ai",
+      "name": "Sider",
+      "family": "Sider AI",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://sider.ai/",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "google-agent",
+      "name": "Google-Agent",
+      "family": "Google-Agent",
+      "category": "ai_agent",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "google-cloudvertexbot",
+      "name": "Google-CloudVertexBot",
+      "family": "Google",
+      "category": "other_ai",
+      "respects_robots_txt": "yes",
+      "url": "https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers#google-cloudvertexbot",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "google-extended",
+      "name": "Google-Extended",
+      "family": "Google",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "yes",
+      "url": "https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots",
+        "hitkeep_curated"
+      ]
+    },
+    {
+      "token": "google-firebase",
+      "name": "Google-Firebase",
+      "family": "Google",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "google-gemini-cli",
+      "name": "Google-Gemini-CLI",
+      "family": "Google-Gemini-CLI",
+      "category": "ai_coding_agent",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "google-notebooklm",
+      "name": "Google-NotebookLM",
+      "family": "Google-NotebookLM",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "url": "https://developers.google.com/crawling/docs/crawlers-fetchers/google-user-triggered-fetchers",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "google-pinpoint",
+      "name": "Google-Pinpoint",
+      "family": "Google Inc.",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "url": "https://developers.google.com/crawling/docs/crawlers-fetchers/google-user-triggered-fetchers#google-pinpoint",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "google-safety",
+      "name": "Google-Safety",
+      "family": "Google",
+      "category": "other_ai",
+      "respects_robots_txt": "no",
+      "url": "https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers",
+      "sources": [
+        "hitkeep_curated"
+      ]
+    },
+    {
+      "token": "googleagent-mariner",
+      "name": "GoogleAgent-Mariner",
+      "family": "Google",
+      "category": "ai_agent",
+      "respects_robots_txt": "unclear",
+      "url": "https://developers.google.com/search/docs/crawling-indexing/google-agent-mariner",
+      "sources": [
+        "ai_robots_txt",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "googleagent-search",
+      "name": "GoogleAgent-Search",
+      "family": "Google Inc.",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "url": "https://developers.google.com/search/docs/crawling-indexing/google-agent-search",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "googleagent-urlcontext",
+      "name": "GoogleAgent-URLContext",
+      "family": "Google that retrieves web content on behalf of Gemini API users",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "googleother",
+      "name": "GoogleOther",
+      "family": "Google",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "yes",
+      "url": "https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers",
+      "sources": [
+        "ai_robots_txt",
+        "hitkeep_curated"
+      ]
+    },
+    {
+      "token": "googleother-image",
+      "name": "GoogleOther-Image",
+      "family": "Google",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "yes",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "googleother-video",
+      "name": "GoogleOther-Video",
+      "family": "Google",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "yes",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "gptbot",
+      "name": "GPTBot",
+      "family": "OpenAI",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "yes",
+      "url": "https://platform.openai.com/docs/bots",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots",
+        "hitkeep_curated"
+      ]
+    },
+    {
+      "token": "groq-bot",
+      "name": "Groq-Bot",
+      "family": "Groq, Inc.",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://groq.com/",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "henkbot",
+      "name": "HenkBot",
+      "family": "HenkBot",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://valyu.ai/crawler",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "huggingface-bot",
+      "name": "HuggingFace-Bot",
+      "family": "Hugging Face, Inc",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://huggingface.co/",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "ias_crawler",
+      "name": "IAS Crawler",
+      "family": "Integral Ad Science, Inc.",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://integralads.com/ias-privacy-data-management/policies/site-indexing-policy/",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "ias_wombles",
+      "name": "IAS Wombles",
+      "family": "Integral Ad Science, Inc.",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://integralads.com/ias-privacy-data-management/policies/site-indexing-policy/",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "iaskbot",
+      "name": "iAskBot",
+      "family": "iAskBot",
+      "category": "ai_agent",
+      "respects_robots_txt": "unclear",
+      "url": "https://iask.ai/",
+      "sources": [
+        "ai_robots_txt",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "iaskbot/",
+      "name": "iAskBot",
+      "family": "iAskBot",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://datadome.co/bots/iaskspider/",
+      "sources": [
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "iaskspider",
+      "name": "iaskspider",
+      "family": "iaskspider",
+      "category": "ai_agent",
+      "respects_robots_txt": "unclear",
+      "url": "https://www.iask.com/",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "iaskspider/2.0",
+      "name": "iaskspider/2.0",
+      "family": "iAsk",
+      "category": "other_ai",
+      "respects_robots_txt": "no",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "iboubot",
+      "name": "IbouBot",
+      "family": "Ibou",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "yes",
+      "url": "https://ibou.io/iboubot.html",
+      "sources": [
+        "ai_robots_txt",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "icc-crawler",
+      "name": "ICC-Crawler",
+      "family": "NICT",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "yes",
+      "url": "https://nict.go.jp",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "imagemind",
+      "name": "ImageMind",
+      "family": "ImageMind",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://datadome.co/bots/imagemind/",
+      "sources": [
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "imagesift",
+      "name": "ImageSift",
+      "family": "Castle Global, Inc.",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://imagesift.com/",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "imagesiftbot",
+      "name": "ImagesiftBot",
+      "family": "Imagesift",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "yes",
+      "url": "https://imagesift.com/about",
+      "sources": [
+        "ai_robots_txt",
+        "hitkeep_curated"
+      ]
+    },
+    {
+      "token": "imagespider",
+      "name": "imageSpider",
+      "family": "imageSpider",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://knownagents.com/agents/imagespider",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "img2dataset",
+      "name": "img2dataset",
+      "family": "img2dataset",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://github.com/rom1504/img2dataset",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "isscyberriskcrawler",
+      "name": "ISSCyberRiskCrawler",
+      "family": "ISS-Corporate",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "no",
+      "url": "https://iss-cyber.com",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "kagi-fetcher",
+      "name": "kagi-fetcher",
+      "family": "Kagi that fetches web content to answer user queries through Kagi AI, their suite of AI-powered tools including Assistant, Res…",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "url": "https://help.kagi.com/kagi/ai/kagi-ai.html",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "kangaroo bot",
+      "name": "Kangaroo Bot",
+      "family": "Kangaroo Bot",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://kangaroollm.com.au/kangaroo-bot/",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "kendrabot",
+      "name": "KendraBot",
+      "family": "KendraBot",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://docs.aws.amazon.com/kendra/latest/dg/what-is-kendra.html",
+      "sources": [
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "kimi-user",
+      "name": "Kimi-User",
+      "family": "Moonshot AI that fetches web content on behalf of users interacting with Kimi",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "klaviyoaibot",
+      "name": "KlaviyoAIBot",
+      "family": "Klaviyo",
+      "category": "ai_assistant",
+      "respects_robots_txt": "yes",
+      "url": "https://www.klaviyo.com",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "kunatocrawler",
+      "name": "KunatoCrawler",
+      "family": "KunatoCrawler",
+      "category": "ai_agent",
+      "respects_robots_txt": "unclear",
+      "url": "http://kunato.ai/bot.html",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "laion-huggingface-processor",
+      "name": "laion-huggingface-processor",
+      "family": "laion-huggingface-processor",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://knownagents.com/agents/laion-huggingface-processor",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "laiondownloader",
+      "name": "LAIONDownloader",
+      "family": "Large-scale Artificial Intelligence Open Network",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "no",
+      "url": "https://laion.ai/",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "linerbot",
+      "name": "LinerBot",
+      "family": "LinerBot",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "url": "https://docs.getliner.com/docs/linerbot",
+      "sources": [
+        "ai_robots_txt",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "linerbot/",
+      "name": "LinerBot",
+      "family": "LinerBot",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://docs.getliner.com/docs/linerbot",
+      "sources": [
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "linguee bot",
+      "name": "Linguee Bot",
+      "family": "Linguee",
+      "category": "other_ai",
+      "respects_robots_txt": "no",
+      "url": "https://www.linguee.com",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "linkreader/",
+      "name": "linkReader",
+      "family": "linkReader",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://sider.ai/",
+      "sources": [
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "linkupbot",
+      "name": "LinkupBot",
+      "family": "LinkupBot",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "unclear",
+      "url": "https://linkup.so/bot",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "manus-user",
+      "name": "Manus-User",
+      "family": "Butterfly Effect, a company based in China",
+      "category": "ai_agent",
+      "respects_robots_txt": "unclear",
+      "url": "https://manus.im/help/Manus-user",
+      "sources": [
+        "ai_robots_txt",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "meta-externalagent",
+      "name": "Meta-ExternalAgent",
+      "family": "Meta",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "yes",
+      "url": "https://developers.facebook.com/docs/sharing/webmasters/web-crawlers",
+      "sources": [
+        "ai_robots_txt",
+        "device_detector_bots",
+        "hitkeep_curated"
+      ]
+    },
+    {
+      "token": "meta-externalagent/",
+      "name": "meta-externalagent",
+      "family": "meta-externalagent",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://developers.facebook.com/docs/sharing/webmasters/web-crawlers",
+      "sources": [
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "meta-externalfetcher",
+      "name": "Meta-ExternalFetcher",
+      "family": "Meta",
+      "category": "ai_assistant",
+      "respects_robots_txt": "no",
+      "url": "https://developers.facebook.com/docs/sharing/webmasters/web-crawlers",
+      "sources": [
+        "ai_robots_txt",
+        "hitkeep_curated"
+      ]
+    },
+    {
+      "token": "meta-webindexer",
+      "name": "meta-webindexer",
+      "family": "Meta",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "url": "https://developers.facebook.com/docs/sharing/webmasters/web-crawlers/",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "mistralai-user",
+      "name": "MistralAI-User",
+      "family": "Mistral",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "url": "https://docs.mistral.ai/robots",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "mistralai-user/1.0",
+      "name": "MistralAI-User/1.0",
+      "family": "Mistral AI",
+      "category": "other_ai",
+      "respects_robots_txt": "yes",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "mozilla-tabstack",
+      "name": "Mozilla-Tabstack",
+      "family": "Mozilla",
+      "category": "other_ai",
+      "respects_robots_txt": "yes",
+      "url": "https://docs.tabstack.ai/trust/controlling-access",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "mycentralaiscraperbot",
+      "name": "MyCentralAIScraperBot",
+      "family": "MyCentralAIScraperBot",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "nagetbot",
+      "name": "NagetBot",
+      "family": "Naget Inc (founded by Chris Samarinas, headquarter in Amherst, Massachusetts)",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "netestate imprint crawler",
+      "name": "netEstate Imprint Crawler",
+      "family": "netEstate",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "newsai",
+      "name": "newsai",
+      "family": "newsai",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "newsai/",
+      "name": "newsai",
+      "family": "newsai",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://knownagents.com/agents/newsai",
+      "sources": [
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "notebooklm",
+      "name": "NotebookLM",
+      "family": "NotebookLM",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "novaact",
+      "name": "NovaAct",
+      "family": "NovaAct",
+      "category": "ai_agent",
+      "respects_robots_txt": "unclear",
+      "url": "https://nova.amazon.com/act",
+      "sources": [
+        "ai_robots_txt",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "novellum",
+      "name": "Novellum",
+      "family": "Novellum",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://crawl.corp.novellum.ai/docs",
+      "sources": [
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "oai-searchbot",
+      "name": "OAI-SearchBot",
+      "family": "OpenAI",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "yes",
+      "url": "https://openai.com",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "omgili",
+      "name": "omgili",
+      "family": "Webz.io",
+      "category": "other_ai",
+      "respects_robots_txt": "yes",
+      "url": "https://webz.io/",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "omgilibot",
+      "name": "omgilibot",
+      "family": "Webz.io",
+      "category": "other_ai",
+      "respects_robots_txt": "yes",
+      "url": "https://webz.io/",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "openai",
+      "name": "OpenAI",
+      "family": "OpenAI",
+      "category": "other_ai",
+      "respects_robots_txt": "yes",
+      "url": "https://openai.com",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "opencode",
+      "name": "opencode",
+      "family": "opencode",
+      "category": "ai_coding_agent",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "operator",
+      "name": "Operator",
+      "family": "Operator",
+      "category": "ai_agent",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "pangubot",
+      "name": "PanguBot",
+      "family": "the Chinese company Huawei",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://www.huawei.com/",
+      "sources": [
+        "ai_robots_txt",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "panscient",
+      "name": "Panscient",
+      "family": "Panscient",
+      "category": "other_ai",
+      "respects_robots_txt": "yes",
+      "url": "https://panscient.com",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "panscient.com",
+      "name": "panscient.com",
+      "family": "Panscient",
+      "category": "other_ai",
+      "respects_robots_txt": "yes",
+      "url": "https://panscient.com",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "perplexity-user",
+      "name": "Perplexity-User",
+      "family": "Perplexity",
+      "category": "ai_assistant",
+      "respects_robots_txt": "no",
+      "url": "https://www.perplexity.ai/",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "perplexitybot",
+      "name": "PerplexityBot",
+      "family": "Perplexity",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "yes",
+      "url": "https://docs.perplexity.ai/guides/bots",
+      "sources": [
+        "ai_robots_txt",
+        "device_detector_bots",
+        "hitkeep_curated"
+      ]
+    },
+    {
+      "token": "perplexitybot/",
+      "name": "PerplexityBot",
+      "family": "PerplexityBot",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://docs.perplexity.ai/docs/perplexitybot",
+      "sources": [
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "perplexityuser",
+      "name": "PerplexityUser",
+      "family": "PerplexityUser",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://perplexity.ai",
+      "sources": [
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "petalbot",
+      "name": "PetalBot",
+      "family": "Petal",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "yes",
+      "url": "https://webmaster.petalsearch.com/site/petalbot",
+      "sources": [
+        "ai_robots_txt",
+        "hitkeep_curated"
+      ]
+    },
+    {
+      "token": "phindbot",
+      "name": "PhindBot",
+      "family": "phind",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "url": "https://www.phind.com/",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "poggio-citations",
+      "name": "Poggio-Citations",
+      "family": "Poggio, a company that provides AI sales enablement tools for creating tailored narratives, business cases, and account plan…",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "url": "https://docs.poggio.io/dev-resources/robots",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "poseidon research crawler",
+      "name": "Poseidon Research Crawler",
+      "family": "Poseidon Research",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "unclear",
+      "url": "https://www.poseidonresearch.com",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "prorata",
+      "name": "ProRata",
+      "family": "ProRataAI, Inc.",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "unclear",
+      "url": "https://platform.gist.ai/docs/gcn-overview",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "qualifiedbot",
+      "name": "QualifiedBot",
+      "family": "Qualified",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "url": "https://www.qualified.com",
+      "sources": [
+        "ai_robots_txt",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "querit-searchbot",
+      "name": "Querit-SearchBot",
+      "family": "Querit that indexes web content for their search API service, which is designed to provide real-time search results for larg…",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "queritbot",
+      "name": "QueritBot",
+      "family": "Querit, a company providing a search API for large language model integration",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "quillbot",
+      "name": "QuillBot",
+      "family": "Quillbot",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://quillbot.com",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "quillbot.com",
+      "name": "quillbot.com",
+      "family": "Quillbot",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://quillbot.com",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "replicate-bot",
+      "name": "Replicate-Bot",
+      "family": "Replicate, Inc.",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://replicate.com/",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "runpod-bot",
+      "name": "RunPod-Bot",
+      "family": "RunPod Inc.",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://www.runpod.io/",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "sbintuitionsbot",
+      "name": "SBIntuitionsBot",
+      "family": "SB Intuitions",
+      "category": "other_ai",
+      "respects_robots_txt": "yes",
+      "url": "https://www.sbintuitions.co.jp/en/",
+      "sources": [
+        "ai_robots_txt",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "sbintuitionsbot/",
+      "name": "SBIntuitionsBot",
+      "family": "SBIntuitionsBot",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://www.sbintuitions.co.jp/bot/",
+      "sources": [
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "scrapy",
+      "name": "Scrapy",
+      "family": "Zyte",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://www.zyte.com",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "semantic-visions",
+      "name": "semantic-visions",
+      "family": "semantic-visions",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://semantic-visions.com/",
+      "sources": [
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "semrushbot-ocob",
+      "name": "SemrushBot-OCOB",
+      "family": "Semrush",
+      "category": "other_ai",
+      "respects_robots_txt": "yes",
+      "url": "https://www.semrush.com/",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "semrushbot-swa",
+      "name": "SemrushBot-SWA",
+      "family": "Semrush",
+      "category": "other_ai",
+      "respects_robots_txt": "yes",
+      "url": "https://www.semrush.com/",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "sentibot",
+      "name": "SentiBot",
+      "family": "SentiOne S.A.",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://sites.google.com/senti1.com/sentibot-eu/home/",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "shap-user",
+      "name": "Shap-User",
+      "family": "Shap-User",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "shapbot",
+      "name": "ShapBot",
+      "family": "Parallel",
+      "category": "other_ai",
+      "respects_robots_txt": "yes",
+      "url": "https://parallel.ai",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "sidetrade indexer bot",
+      "name": "Sidetrade indexer bot",
+      "family": "Sidetrade",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://www.sidetrade.com",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "spawning-ai",
+      "name": "Spawning-AI",
+      "family": "Spawning-AI",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://datadome.co/bots/spawning-bot/",
+      "sources": [
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "taragroup intelligent bot",
+      "name": "TaraGroup Intelligent Bot",
+      "family": "TaraGroup Intelligent Bot",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://knownagents.com/agents/taragroup-intelligent-bot",
+      "sources": [
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "tavilybot",
+      "name": "TavilyBot",
+      "family": "TavilyBot",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://knownagents.com/agents/tavilybot",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "terra cotta",
+      "name": "Terra Cotta",
+      "family": "Terra Cotta",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "terracotta",
+      "name": "TerraCotta",
+      "family": "Ceramic AI",
+      "category": "other_ai",
+      "respects_robots_txt": "yes",
+      "url": "https://ceramic.ai/",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "the knowledge ai",
+      "name": "The Knowledge AI",
+      "family": "The Knowledge AI",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://datadome.co/bots/the-knowledge-ai/",
+      "sources": [
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "thinkbot",
+      "name": "Thinkbot",
+      "family": "Thinkbot",
+      "category": "other_ai",
+      "respects_robots_txt": "no",
+      "url": "https://www.thinkbot.agency",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "tiktokspider",
+      "name": "TikTokSpider",
+      "family": "ByteDance",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "timpibot",
+      "name": "Timpibot",
+      "family": "Timpi",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "unclear",
+      "url": "https://timpi.io",
+      "sources": [
+        "ai_robots_txt",
+        "hitkeep_curated"
+      ]
+    },
+    {
+      "token": "together-bot",
+      "name": "Together-Bot",
+      "family": "Together Computer Inc.",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://www.together.ai/",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "tongyibot",
+      "name": "TongyiBot",
+      "family": "Alibaba that fetches web content for the Tongyi Qianwen assistant and related Qwen-generated answers",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "trae",
+      "name": "Trae",
+      "family": "Trae",
+      "category": "ai_coding_agent",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "tsm-turingos",
+      "name": "TSM-turingos",
+      "family": "TSM-turingos",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://knownagents.com/agents/turingos",
+      "sources": [
+        "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "twinagent",
+      "name": "TwinAgent",
+      "family": "Twin, a platform that creates automated workers to perform tasks by integrating with APIs and controlling web applications through browser automa…",
+      "category": "ai_agent",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "udv-ai-research",
+      "name": "UdV-AI-Research",
+      "family": "UdV-AI-Research",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "useai",
+      "name": "UseAI",
+      "family": "UseAI",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "velenpublicwebcrawler",
+      "name": "VelenPublicWebCrawler",
+      "family": "Velen Crawler",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "yes",
+      "url": "https://velen.io",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "wardbot",
+      "name": "WARDBot",
+      "family": "WEBSPARK",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "webzio",
+      "name": "webzio",
+      "family": "Webz.io Ltd",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "unclear",
+      "url": "https://docs.webz.io/reference/how-it-works-video",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "webzio-extended",
+      "name": "Webzio-Extended",
+      "family": "Webzio-Extended",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://docs.webz.io/reference/how-it-works-video",
+      "sources": [
+        "ai_robots_txt",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "wpbot",
+      "name": "wpbot",
+      "family": "QuantumCloud",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://www.quantumcloud.com",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "wrtnbot",
+      "name": "WRTNBot",
+      "family": "WRTNBot",
+      "category": "ai_agent",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "xai-bot",
+      "name": "xAI-Bot",
+      "family": "X.AI LLC",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://x.ai/",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "yandexadditional",
+      "name": "YandexAdditional",
+      "family": "Yandex",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "yes",
+      "url": "https://yandex.ru",
+      "sources": [
+        "ai_robots_txt",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "yandexadditionalbot",
+      "name": "YandexAdditionalBot",
+      "family": "Yandex",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "yes",
+      "url": "https://yandex.ru",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "yiyanbot",
+      "name": "YiyanBot",
+      "family": "Baidu that fetches web content for the yiyan",
+      "category": "ai_assistant",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "youbot",
+      "name": "YouBot",
+      "family": "You.com",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "yes",
+      "url": "https://about.you.com/youbot/",
+      "sources": [
+        "ai_robots_txt",
+        "device_detector_bots",
+        "hitkeep_curated"
+      ]
+    },
+    {
+      "token": "zanistabot",
+      "name": "ZanistaBot",
+      "family": "ZanistaBot",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "unclear",
+      "url": "https://zanista.ai/crawler-info",
+      "sources": [
+        "ai_robots_txt",
+        "crawler_user_agents",
+        "device_detector_bots"
+      ]
+    }
+  ],
+  "ai_referrers": [
+    {
+      "name": "Arc Search",
+      "hosts": [
+        "arc.net"
+      ]
+    },
+    {
+      "name": "ChatGPT",
+      "hosts": [
+        "chat.openai.com",
+        "chatgpt.com"
+      ]
+    },
+    {
+      "name": "Claude",
+      "hosts": [
+        "claude.ai"
+      ]
+    },
+    {
+      "name": "Copilot",
+      "hosts": [
+        "copilot.microsoft.com"
+      ]
+    },
+    {
+      "name": "DeepSeek",
+      "hosts": [
+        "chat.deepseek.com"
+      ]
+    },
+    {
+      "name": "Duck.ai",
+      "hosts": [
+        "duck.ai"
+      ]
+    },
+    {
+      "name": "Gemini",
+      "hosts": [
+        "gemini.google.com"
+      ]
+    },
+    {
+      "name": "Grok",
+      "hosts": [
+        "grok.com",
+        "grok.x.ai"
+      ]
+    },
+    {
+      "name": "HuggingChat",
+      "hosts": [
+        "huggingface.co"
+      ],
+      "path_contains": "/chat"
+    },
+    {
+      "name": "Kagi",
+      "hosts": [
+        "kagi.com"
+      ]
+    },
+    {
+      "name": "Meta AI",
+      "hosts": [
+        "meta.ai"
+      ]
+    },
+    {
+      "name": "Mistral",
+      "hosts": [
+        "chat.mistral.ai"
+      ]
+    },
+    {
+      "name": "Perplexity",
+      "hosts": [
+        "perplexity.ai"
+      ]
+    },
+    {
+      "name": "Phind",
+      "hosts": [
+        "phind.com"
+      ]
+    },
+    {
+      "name": "Poe",
+      "hosts": [
+        "poe.com"
+      ]
+    },
+    {
+      "name": "Qwen",
+      "hosts": [
+        "chat.qwen.ai"
+      ]
+    },
+    {
+      "name": "You.com",
+      "hosts": [
+        "you.com"
+      ]
+    }
+  ]
+}

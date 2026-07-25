@@ -1,0 +1,74 @@
+name: Refresh AI Agent Lists
+
+on:
+  schedule:
+    - cron: "0 20 1,15 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    name: Refresh embedded AI agent lists
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Generate embedded AI agent lists
+        run: ./scripts/update-default-ai-agents.sh
+
+      - name: Test embedded AI agent data
+        run: go test ./internal/aianalytics ./internal/database
+
+      - name: Open refresh pull request
+        env:
+          GH_TOKEN: ${{ secrets.GHT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- internal/aianalytics/default_ai_agents.json; then
+            echo "Embedded AI agent lists are already up to date."
+            exit 0
+          fi
+
+          branch="automation/ai-agent-list-refresh"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          gh auth setup-git
+          git switch -c "$branch"
+          git add internal/aianalytics/default_ai_agents.json
+          git commit -m "chore(analytics): refresh default AI agent list data"
+          git push --force-with-lease origin "$branch"
+
+          body=$(printf '%s\n\n%s\n\n```sh\n%s\n```' \
+            "Refreshes HitKeep's embedded AI agent master list assembled from ai.robots.txt, device-detector, and crawler-user-agents." \
+            "Generated with:" \
+            "./scripts/update-default-ai-agents.sh")
+
+          pr_number="$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')"
+          if [[ -n "$pr_number" ]]; then
+            gh pr edit "$pr_number" \
+              --title "chore(analytics): refresh default AI agent list data" \
+              --body "$body"
+          else
+            gh pr create \
+              --base main \
+              --head "$branch" \
+              --title "chore(analytics): refresh default AI agent list data" \
+              --body "$body"
+          fi

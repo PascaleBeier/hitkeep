@@ -76,10 +76,7 @@ func (s *Store) migrate(ctx context.Context, opts migrationRunOptions) error {
 
 	if len(pendingMigrations) == 0 {
 		slog.Info("Database schema is up to date. No migrations to apply.")
-		if err := s.EnsureReportNextRuns(ctx, time.Now().UTC()); err != nil {
-			return fmt.Errorf("initialize report schedules: %w", err)
-		}
-		return validateCleanupPlans(ctx, s.db, siteDeleteSpec, tenantPurgeSpec)
+		return s.afterSchemaCurrent(ctx)
 	}
 
 	slog.Info("Applying pending database migrations...", "count", len(pendingMigrations))
@@ -127,6 +124,15 @@ func (s *Store) migrate(ctx context.Context, opts migrationRunOptions) error {
 		}
 	} else if err := s.Checkpoint(ctx, "shared_migrations"); err != nil {
 		return fmt.Errorf("checkpoint shared migrations: %w", err)
+	}
+	return s.afterSchemaCurrent(ctx)
+}
+
+// afterSchemaCurrent runs the steps that must hold once the shared schema is
+// current, whether this process applied migrations or found none pending.
+func (s *Store) afterSchemaCurrent(ctx context.Context) error {
+	if err := s.ensureAIClassificationMacros(ctx); err != nil {
+		return err
 	}
 	if err := validateCleanupPlans(ctx, s.db, siteDeleteSpec, tenantPurgeSpec); err != nil {
 		return err
