@@ -77,6 +77,10 @@ type ecommerceSourceAccumulator struct {
 	orders      int
 }
 
+// ecommerceSignalEventNames lists every raw event name the ecommerce reports
+// consume, including the aliases normalizeEcommerceEventName folds in.
+var ecommerceSignalEventNames = []string{"purchase", "order_completed", "begin_checkout", "checkout_started"}
+
 func normalizeEcommerceEventName(name string) string {
 	switch strings.TrimSpace(strings.ToLower(name)) {
 	case "order_completed":

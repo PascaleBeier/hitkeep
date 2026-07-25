@@ -1,12 +1,18 @@
 package system
 
 import (
+	"bytes"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"slices"
 	"strings"
 	"testing"
+	"unsafe"
 
+	"hitkeep/internal/config"
 	"hitkeep/internal/exportfmt"
+	"hitkeep/internal/server/shared"
 )
 
 func TestOpenAPISpecV1FormatParameterIncludesAllExportFormats(t *testing.T) {
@@ -793,6 +799,97 @@ func TestOpenAPISpecV1IncludesAIFetchEndpointsAndSchemas(t *testing.T) {
 	}
 }
 
+func TestOpenAPISpecV1IncludesAIActivityReport(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	stat := requireMap(t, schemas, "AIActivityStat")
+	statProperties := requireMap(t, stat, "properties")
+	for _, property := range []string{"name", "value", "tracked_hits", "fetch_count"} {
+		if _, ok := statProperties[property]; !ok {
+			t.Fatalf("expected AIActivityStat property %q", property)
+		}
+	}
+
+	point := requireMap(t, schemas, "AIActivitySeriesPoint")
+	pointProperties := requireMap(t, point, "properties")
+	for _, property := range []string{"time", "ai_requests", "tracked_hits", "fetch_count", "referral_visits"} {
+		if _, ok := pointProperties[property]; !ok {
+			t.Fatalf("expected AIActivitySeriesPoint property %q", property)
+		}
+	}
+
+	report := requireMap(t, schemas, "AIActivityReport")
+	reportProperties := requireMap(t, report, "properties")
+	for _, property := range []string{
+		"ai_requests", "tracked_hits", "fetch_count", "referral_visits", "paths_crawled", "unique_agents", "pageviews",
+		"error_rate_4xx", "error_rate_5xx", "median_response_ms", "total_bytes",
+		"top_agents", "top_categories", "top_paths", "top_sources", "top_families", "top_resource_types", "top_error_paths",
+		"top_agents_by_category", "series", "comparison",
+	} {
+		if _, ok := reportProperties[property]; !ok {
+			t.Fatalf("expected AIActivityReport property %q", property)
+		}
+	}
+
+	for _, listProperty := range []string{"top_agents", "top_categories", "top_paths", "top_sources", "top_families", "top_resource_types", "top_error_paths"} {
+		list := requireMap(t, reportProperties, listProperty)
+		items := requireMap(t, list, "items")
+		if ref, _ := items["$ref"].(string); ref != "#/components/schemas/AIActivityStat" {
+			t.Fatalf("expected %s items to reference AIActivityStat, got %q", listProperty, ref)
+		}
+	}
+
+	series := requireMap(t, reportProperties, "series")
+	seriesItems := requireMap(t, series, "items")
+	if ref, _ := seriesItems["$ref"].(string); ref != "#/components/schemas/AIActivitySeriesPoint" {
+		t.Fatalf("expected series items to reference AIActivitySeriesPoint, got %q", ref)
+	}
+
+	comparison := requireMap(t, reportProperties, "comparison")
+	if kind, _ := comparison["type"].(string); kind != "object" {
+		t.Fatalf("expected comparison to be an object, got %q", kind)
+	}
+	comparisonProperties := requireMap(t, comparison, "properties")
+	for _, property := range []string{"ai_requests", "tracked_hits", "fetch_count", "referral_visits", "paths_crawled", "unique_agents", "pageviews"} {
+		if _, ok := comparisonProperties[property]; !ok {
+			t.Fatalf("expected comparison property %q", property)
+		}
+	}
+
+	for _, path := range []string{
+		"/api/sites/{id}/ai-activity",
+		"/api/share/{token}/sites/{id}/ai-activity",
+	} {
+		pathItem := requireMap(t, paths, path)
+		operation := requireMap(t, pathItem, "get")
+		responses := requireMap(t, operation, "responses")
+		ok200 := requireMap(t, responses, "200")
+		content := requireMap(t, ok200, "content")
+		jsonContent := requireMap(t, content, "application/json")
+		schema := requireMap(t, jsonContent, "schema")
+		if ref, _ := schema["$ref"].(string); ref != "#/components/schemas/AIActivityReport" {
+			t.Fatalf("expected AI activity report schema ref for %s, got %q", path, ref)
+		}
+	}
+}
+
+func TestOpenAPISpecV1FilterParameterDocumentsAIDimensions(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	components := requireMap(t, spec, "components")
+	parameters := requireMap(t, components, "parameters")
+	filter := requireMap(t, parameters, "filter")
+
+	description, _ := filter["description"].(string)
+	for _, dimension := range []string{"ai_bot", "ai_bot_category", "ai_source"} {
+		if !strings.Contains(description, dimension) {
+			t.Fatalf("expected filter description to document %q, got %q", dimension, description)
+		}
+	}
+}
+
 func TestOpenAPISpecV1IncludesWebVitalsEndpointsAndSchemas(t *testing.T) {
 	spec := openAPISpecV1("http://localhost:8080")
 	paths := requireMap(t, spec, "paths")
@@ -1449,5 +1546,84 @@ func assertCloudOperation(t *testing.T, op map[string]any) {
 	internal, ok := op["x-internal"].(bool)
 	if !ok || !internal {
 		t.Fatalf("expected x-internal=true, got %#v", op["x-internal"])
+	}
+}
+
+func TestHandleGetAPIDocV1ServesMemoizedDocument(t *testing.T) {
+	h := &handler{ctx: &shared.Context{Config: &config.Config{PublicURL: "https://memo.hitkeep.test"}}}
+
+	first := httptest.NewRecorder()
+	h.handleGetAPIDocV1().ServeHTTP(first, httptest.NewRequest(http.MethodGet, "/api/docs/v1/openapi.json", nil))
+	second := httptest.NewRecorder()
+	h.handleGetAPIDocV1().ServeHTTP(second, httptest.NewRequest(http.MethodGet, "/api/docs/v1/openapi.json", nil))
+
+	if first.Code != http.StatusOK || second.Code != http.StatusOK {
+		t.Fatalf("expected both responses to be 200, got %d and %d", first.Code, second.Code)
+	}
+	if !bytes.Equal(first.Body.Bytes(), second.Body.Bytes()) {
+		t.Fatal("expected identical OpenAPI document bytes across requests")
+	}
+	if !bytes.Contains(first.Body.Bytes(), []byte("https://memo.hitkeep.test")) {
+		t.Fatal("expected the configured public URL in the served document")
+	}
+
+	// The document is encoded once, when the handler is built: every request
+	// must write the very same buffer instead of rebuilding the spec.
+	memoized := h.handleGetAPIDocV1()
+	firstWrite := &sliceCapturingResponseWriter{header: http.Header{}}
+	memoized.ServeHTTP(firstWrite, httptest.NewRequest(http.MethodGet, "/api/docs/v1/openapi.json", nil))
+	secondWrite := &sliceCapturingResponseWriter{header: http.Header{}}
+	memoized.ServeHTTP(secondWrite, httptest.NewRequest(http.MethodGet, "/api/docs/v1/openapi.json", nil))
+	if unsafe.SliceData(firstWrite.written) != unsafe.SliceData(secondWrite.written) {
+		t.Fatal("expected the memoized document buffer to be reused")
+	}
+
+	otherHost := &handler{ctx: &shared.Context{Config: &config.Config{PublicURL: "https://other.hitkeep.test"}}}
+	other := httptest.NewRecorder()
+	otherHost.handleGetAPIDocV1().ServeHTTP(other, httptest.NewRequest(http.MethodGet, "/api/docs/v1/openapi.json", nil))
+	if bytes.Contains(other.Body.Bytes(), []byte("https://memo.hitkeep.test")) {
+		t.Fatal("expected a different public URL to produce its own document")
+	}
+	if !bytes.Contains(other.Body.Bytes(), []byte("https://other.hitkeep.test")) {
+		t.Fatal("expected the second public URL in its own document")
+	}
+}
+
+// sliceCapturingResponseWriter keeps the exact slice handed to Write so a test
+// can compare backing buffers across requests.
+type sliceCapturingResponseWriter struct {
+	header  http.Header
+	written []byte
+}
+
+func (w *sliceCapturingResponseWriter) Header() http.Header { return w.header }
+
+func (w *sliceCapturingResponseWriter) Write(p []byte) (int, error) {
+	w.written = p
+	return len(p), nil
+}
+
+func (w *sliceCapturingResponseWriter) WriteHeader(int) {}
+
+func TestOpenAPISpecV1DocumentsSiteSetupState(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	schemas := requireMap(t, requireMap(t, spec, "components"), "schemas")
+
+	setupPath := requireMap(t, paths, "/api/sites/{id}/setup-state")
+	getOp := requireMap(t, setupPath, "get")
+	response := requireMap(t, requireMap(t, getOp, "responses"), "200")
+	content := requireMap(t, requireMap(t, response, "content"), "application/json")
+	schema := requireMap(t, content, "schema")
+	if ref, _ := schema["$ref"].(string); ref != "#/components/schemas/SiteSetupState" {
+		t.Fatalf("expected SiteSetupState response ref, got %q", ref)
+	}
+
+	properties := requireMap(t, requireMap(t, schemas, "SiteSetupState"), "properties")
+	for _, field := range []string{"has_ai_fetches", "has_chatbot_events", "has_custom_events", "has_ecommerce_events", "has_web_vitals"} {
+		flag := requireMap(t, properties, field)
+		if flag["type"] != "boolean" {
+			t.Fatalf("expected %s to be a boolean flag, got %#v", field, flag["type"])
+		}
 	}
 }

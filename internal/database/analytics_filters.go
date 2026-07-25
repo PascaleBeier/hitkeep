@@ -79,6 +79,9 @@ func buildHitFilter(filterType, filterValue, alias string) (string, []any) {
 	case "ai_bot":
 		expr := fmt.Sprintf("hk_ai_bot(%suser_agent)", prefix)
 		return " AND " + expr + " = ?", []any{filterValue}
+	case "ai_bot_category":
+		expr := fmt.Sprintf("hk_ai_bot_category(%suser_agent)", prefix)
+		return " AND " + expr + " = ?", []any{filterValue}
 	case "ai_source":
 		expr := fmt.Sprintf("hk_ai_source(%sreferrer)", prefix)
 		return " AND " + expr + " = ?", []any{filterValue}

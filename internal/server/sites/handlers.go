@@ -56,6 +56,10 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		SitePerm:    authcore.PermSiteDelete,
 		RateLimiter: ctx.ApiLimiter,
 	}, h.handleResetSiteStats()))
+	mux.HandleFunc("GET /api/sites/{id}/setup-state", ctx.Handler(shared.HandlerConfig{
+		SitePerm:    authcore.PermSiteView,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleGetSiteSetupState()))
 	mux.HandleFunc("GET /api/sites/{id}/tracking/status", ctx.Handler(shared.HandlerConfig{
 		SitePerm:    authcore.PermSiteView,
 		RateLimiter: ctx.ApiLimiter,
@@ -92,6 +96,10 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		SitePerm:    authcore.PermSiteView,
 		RateLimiter: ctx.ApiLimiter,
 	}, h.handleGetSiteEcommerceSources()))
+	mux.HandleFunc("GET /api/sites/{id}/ai-activity", ctx.Handler(shared.HandlerConfig{
+		SitePerm:    authcore.PermSiteView,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleGetSiteAIActivity()))
 	mux.HandleFunc("GET /api/sites/{id}/web-vitals/summary", ctx.Handler(shared.HandlerConfig{
 		SitePerm:    authcore.PermSiteView,
 		RateLimiter: ctx.ApiLimiter,

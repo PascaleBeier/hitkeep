@@ -19,7 +19,10 @@ type siteRangeInput struct {
 }
 
 type filterInput struct {
-	Type  string `json:"type" jsonschema:"Filter type: path, hostname, referrer, referrer_host, device, country, city, provider, asn, browser, language, utm_campaign, utm_content, utm_medium, utm_source, or utm_term."`
+	// Keep this list in step with mcpFilterTypes: struct tags are compile-time
+	// constants, so TestFilterInputSchemaDocumentsAllowedFilterTypes is what stops
+	// the two from drifting.
+	Type  string `json:"type" jsonschema:"Filter type: path, ai_bot, ai_bot_category, ai_source, hostname, referrer, referrer_host, device, country, city, provider, asn, browser, language, utm_campaign, utm_content, utm_medium, utm_source, or utm_term."`
 	Value string `json:"value" jsonschema:"Filter value."`
 }
 
@@ -265,39 +268,41 @@ type mcpSite struct {
 type mcpSiteStats struct {
 	LiveVisitors int `json:"live_visitors"`
 
-	TotalPageviews     int                 `json:"total_pageviews"`
-	UniqueSessions     int                 `json:"unique_sessions"`
-	BounceRate         float64             `json:"bounce_rate"`
-	AvgSessionDuration float64             `json:"avg_session_duration"`
-	PagesPerSession    float64             `json:"pages_per_session"`
-	ChartData          []mcpChartDataPoint `json:"chart_data"`
-	TopPages           []api.MetricStat    `json:"top_pages"`
-	TopLandingPages    []api.MetricStat    `json:"top_landing_pages"`
-	TopExitPages       []api.MetricStat    `json:"top_exit_pages"`
-	TopReferrers       []api.MetricStat    `json:"top_referrers"`
-	TopDevices         []api.MetricStat    `json:"top_devices"`
-	TopCountries       []api.MetricStat    `json:"top_countries"`
-	TopCities          []api.MetricStat    `json:"top_cities"`
-	TopProviders       []api.MetricStat    `json:"top_providers"`
-	TopASNs            []api.MetricStat    `json:"top_asns"`
-	TopBrowsers        []api.MetricStat    `json:"top_browsers"`
-	TopAIBots          []api.MetricStat    `json:"top_ai_bots"`
-	TopAISources       []api.MetricStat    `json:"top_ai_sources"`
-	TopLanguages       []api.MetricStat    `json:"top_languages"`
-	TopUTMCampaigns    []api.MetricStat    `json:"top_utm_campaigns"`
-	TopUTMContents     []api.MetricStat    `json:"top_utm_contents"`
-	TopUTMMediums      []api.MetricStat    `json:"top_utm_mediums"`
-	TopUTMSources      []api.MetricStat    `json:"top_utm_sources"`
-	TopUTMTerms        []api.MetricStat    `json:"top_utm_terms"`
-	AIBotHits          int                 `json:"ai_bot_hits"`
-	AISourceVisits     int                 `json:"ai_source_visits"`
-	UTMCampaignHits    int                 `json:"utm_campaign_hits"`
-	UTMContentHits     int                 `json:"utm_content_hits"`
-	UTMMediumHits      int                 `json:"utm_medium_hits"`
-	UTMSourceHits      int                 `json:"utm_source_hits"`
-	UTMTermHits        int                 `json:"utm_term_hits"`
-	Goals              []mcpGoalStats      `json:"goals"`
-	Comparison         *mcpComparisonStats `json:"comparison,omitempty"`
+	TotalPageviews      int                         `json:"total_pageviews"`
+	UniqueSessions      int                         `json:"unique_sessions"`
+	BounceRate          float64                     `json:"bounce_rate"`
+	AvgSessionDuration  float64                     `json:"avg_session_duration"`
+	PagesPerSession     float64                     `json:"pages_per_session"`
+	ChartData           []mcpChartDataPoint         `json:"chart_data"`
+	TopPages            []api.MetricStat            `json:"top_pages"`
+	TopLandingPages     []api.MetricStat            `json:"top_landing_pages"`
+	TopExitPages        []api.MetricStat            `json:"top_exit_pages"`
+	TopReferrers        []api.MetricStat            `json:"top_referrers"`
+	TopDevices          []api.MetricStat            `json:"top_devices"`
+	TopCountries        []api.MetricStat            `json:"top_countries"`
+	TopCities           []api.MetricStat            `json:"top_cities"`
+	TopProviders        []api.MetricStat            `json:"top_providers"`
+	TopASNs             []api.MetricStat            `json:"top_asns"`
+	TopBrowsers         []api.MetricStat            `json:"top_browsers"`
+	TopAIBots           []api.MetricStat            `json:"top_ai_bots"`
+	TopAIBotCategories  []api.MetricStat            `json:"top_ai_bot_categories"`
+	TopAIBotsByCategory map[string][]api.MetricStat `json:"top_ai_bots_by_category,omitempty"`
+	TopAISources        []api.MetricStat            `json:"top_ai_sources"`
+	TopLanguages        []api.MetricStat            `json:"top_languages"`
+	TopUTMCampaigns     []api.MetricStat            `json:"top_utm_campaigns"`
+	TopUTMContents      []api.MetricStat            `json:"top_utm_contents"`
+	TopUTMMediums       []api.MetricStat            `json:"top_utm_mediums"`
+	TopUTMSources       []api.MetricStat            `json:"top_utm_sources"`
+	TopUTMTerms         []api.MetricStat            `json:"top_utm_terms"`
+	AIBotHits           int                         `json:"ai_bot_hits"`
+	AISourceVisits      int                         `json:"ai_source_visits"`
+	UTMCampaignHits     int                         `json:"utm_campaign_hits"`
+	UTMContentHits      int                         `json:"utm_content_hits"`
+	UTMMediumHits       int                         `json:"utm_medium_hits"`
+	UTMSourceHits       int                         `json:"utm_source_hits"`
+	UTMTermHits         int                         `json:"utm_term_hits"`
+	Goals               []mcpGoalStats              `json:"goals"`
+	Comparison          *mcpComparisonStats         `json:"comparison,omitempty"`
 }
 
 type mcpComparisonStats struct {
@@ -307,6 +312,8 @@ type mcpComparisonStats struct {
 	AvgSessionDuration float64             `json:"avg_session_duration"`
 	PagesPerSession    float64             `json:"pages_per_session"`
 	ChartData          []mcpChartDataPoint `json:"chart_data"`
+	AIBotHits          int                 `json:"ai_bot_hits"`
+	AISourceVisits     int                 `json:"ai_source_visits"`
 	UTMCampaignHits    int                 `json:"utm_campaign_hits"`
 	UTMContentHits     int                 `json:"utm_content_hits"`
 	UTMMediumHits      int                 `json:"utm_medium_hits"`

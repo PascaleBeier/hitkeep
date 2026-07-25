@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -1001,6 +1002,31 @@ func TestHandleGetSiteStatsIncludesPageModes(t *testing.T) {
 	}
 }
 
+func TestHandleGetSiteStatsAcceptsAIFilters(t *testing.T) {
+	h, store, userID := setupTestEnv(t)
+	defer store.Close()
+
+	site, err := store.CreateSite(context.Background(), userID, "stats-ai-filter.com")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+
+	for _, filter := range []string{"ai_bot:GPTBot", "ai_bot_category:Training", "ai_source:ChatGPT"} {
+		t.Run(filter, func(t *testing.T) {
+			statsURL := "/api/sites/" + site.ID.String() + "/stats?filter=" + url.QueryEscape(filter)
+			req := httptest.NewRequest(http.MethodGet, statsURL, nil)
+			req.SetPathValue("id", site.ID.String())
+			req = req.WithContext(context.WithValue(req.Context(), shared.UserIDKey, userID))
+
+			w := httptest.NewRecorder()
+			h.handleGetSiteStats().ServeHTTP(w, req)
+			if w.Code != http.StatusOK {
+				t.Fatalf("expected status %d for %s, got %d: %s", http.StatusOK, filter, w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
 func TestHandleGetSiteEcommerceSummary(t *testing.T) {
 	h, store, userID := setupTestEnv(t)
 	defer store.Close()
@@ -1639,5 +1665,61 @@ func TestHandleRenameSiteDomainSuccessUpdatesAndAudits(t *testing.T) {
 	}
 	if _, total, err := store.ListTeamAuditEntries(ctx, teamID, "site.domain_renamed", 5, 0); err != nil || total != 1 {
 		t.Fatalf("expected audit total to stay 1 after no-op, got total=%d err=%v", total, err)
+	}
+}
+
+func TestHandleGetSiteSetupStateReportsRecordedSurfaces(t *testing.T) {
+	ctx := context.Background()
+	h, store, userID := setupTestEnv(t)
+	defer store.Close()
+
+	site, err := store.CreateSite(ctx, userID, "setup-state-handler.test")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	if err := store.CreateWebVital(ctx, &api.WebVital{
+		SiteID:    site.ID,
+		SessionID: uuid.New(),
+		PageID:    uuid.New(),
+		Metric:    api.WebVitalLCP,
+		Value:     1500,
+		Path:      "/",
+		Timestamp: time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("create web vital: %v", err)
+	}
+
+	newRequest := func() *http.Request {
+		req := httptest.NewRequest(http.MethodGet, "/api/sites/"+site.ID.String()+"/setup-state", nil)
+		req.SetPathValue("id", site.ID.String())
+		return req
+	}
+
+	guarded := h.ctx.RequirePermission(auth.PermSiteView)(h.handleGetSiteSetupState())
+	unauthW := httptest.NewRecorder()
+	guarded.ServeHTTP(unauthW, newRequest())
+	if unauthW.Code != http.StatusUnauthorized {
+		t.Fatalf("expected unauthenticated status %d, got %d: %s", http.StatusUnauthorized, unauthW.Code, unauthW.Body.String())
+	}
+
+	w := httptest.NewRecorder()
+	guarded.ServeHTTP(w, newRequest().WithContext(context.WithValue(ctx, shared.UserIDKey, userID)))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
+	}
+
+	var state map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&state); err != nil {
+		t.Fatalf("decode setup state: %v", err)
+	}
+	want := map[string]any{
+		"has_ai_fetches":       false,
+		"has_chatbot_events":   false,
+		"has_custom_events":    false,
+		"has_ecommerce_events": false,
+		"has_web_vitals":       true,
+	}
+	if !reflect.DeepEqual(state, want) {
+		t.Fatalf("unexpected setup state payload: got %+v, want %+v", state, want)
 	}
 }

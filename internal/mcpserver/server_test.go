@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/netip"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -23,6 +24,8 @@ import (
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	"hitkeep/internal/mcptest"
+	"hitkeep/internal/server/filterparams"
 )
 
 func TestMCPServerRequiresBearerToken(t *testing.T) {
@@ -204,6 +207,119 @@ func TestMCPParseFiltersAllowsGeoNetworkDimensions(t *testing.T) {
 	}
 }
 
+func TestMCPParseFiltersAllowsAIVisibilityDimensions(t *testing.T) {
+	filters, err := parseFilters([]filterInput{
+		{Type: "ai_bot", Value: "GPTBot"},
+		{Type: "ai_bot_category", Value: "ai_training_crawler"},
+		{Type: "ai_source", Value: "ChatGPT"},
+	})
+	if err != nil {
+		t.Fatalf("parse filters: %v", err)
+	}
+	if len(filters) != 3 {
+		t.Fatalf("expected 3 filters, got %d", len(filters))
+	}
+	if filters[0].Type != "ai_bot" || filters[1].Type != "ai_bot_category" || filters[2].Type != "ai_source" {
+		t.Fatalf("unexpected filters: %+v", filters)
+	}
+}
+
+func TestMCPSiteOverviewAcceptsAIVisibilityFilters(t *testing.T) {
+	store, site, token := setupMCPStore(t)
+	conf := testMCPConfig(t, "")
+	handler := NewHandler(conf, store, nil, nil, nil)
+	ts := httptest.NewServer(handler)
+	defer ts.Close()
+
+	session := connectMCPClient(t, ts.URL+conf.MCPPath, token)
+	defer session.Close()
+
+	from := time.Now().UTC().Add(-2 * time.Hour).Format(time.RFC3339)
+	to := time.Now().UTC().Add(2 * time.Hour).Format(time.RFC3339)
+	for _, filterType := range []string{"ai_bot", "ai_bot_category", "ai_source"} {
+		res, err := session.CallTool(context.Background(), &mcp.CallToolParams{
+			Name: "hitkeep_get_site_overview",
+			Arguments: map[string]any{
+				"site_id": site.ID.String(),
+				"from":    from,
+				"to":      to,
+				"filters": []map[string]any{{"type": filterType, "value": "GPTBot"}},
+			},
+		})
+		if err != nil {
+			t.Fatalf("CallTool %s: %v", filterType, err)
+		}
+		if res.IsError {
+			t.Fatalf("expected %s filter to be accepted, got %s", filterType, mcpToolErrorText(res))
+		}
+	}
+
+	rejected, err := session.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "hitkeep_get_site_overview",
+		Arguments: map[string]any{
+			"site_id": site.ID.String(),
+			"from":    from,
+			"to":      to,
+			"filters": []map[string]any{{"type": "qr_code_id", "value": site.ID.String()}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CallTool qr_code_id: %v", err)
+	}
+	if !rejected.IsError {
+		t.Fatal("expected the dashboard-only qr_code_id filter to be rejected")
+	}
+}
+
+// TestMCPFilterAllowlistDerivesFromCanonicalSet pins the one deliberate
+// difference between the REST filter set and the MCP one. A new canonical filter
+// type reaches MCP automatically; dropping it needs an explicit exclusion.
+func TestMCPFilterAllowlistDerivesFromCanonicalSet(t *testing.T) {
+	canonical := filterparams.AllowedHitFilterTypes()
+	want := make([]string, 0, len(canonical))
+	for _, filterType := range canonical {
+		if filterType == "qr_code_id" {
+			continue
+		}
+		want = append(want, filterType)
+	}
+
+	if !slices.Equal(mcpFilterTypes, want) {
+		t.Fatalf("MCP filter allowlist drifted\nwant %v\n got %v", want, mcpFilterTypes)
+	}
+	if isAllowedFilter("qr_code_id") {
+		t.Fatal("qr_code_id is a dashboard-only drill-down and must stay off the MCP surface")
+	}
+}
+
+// TestFilterInputSchemaDocumentsAllowedFilterTypes keeps the jsonschema doc
+// string honest: struct tags are compile-time constants, so the only way to stop
+// them drifting from the derived allowlist is to fail CI when they do.
+func TestFilterInputSchemaDocumentsAllowedFilterTypes(t *testing.T) {
+	field, ok := reflect.TypeFor[filterInput]().FieldByName("Type")
+	if !ok {
+		t.Fatal("filterInput has no Type field")
+	}
+
+	const prefix = "Filter type: "
+	doc := field.Tag.Get("jsonschema")
+	if !strings.HasPrefix(doc, prefix) {
+		t.Fatalf("unexpected filter type doc string %q", doc)
+	}
+
+	listed := strings.Split(strings.TrimSuffix(strings.TrimPrefix(doc, prefix), "."), ",")
+	for i, entry := range listed {
+		listed[i] = strings.TrimPrefix(strings.TrimSpace(entry), "or ")
+	}
+	slices.Sort(listed)
+
+	want := slices.Clone(mcpFilterTypes)
+	slices.Sort(want)
+	if !slices.Equal(listed, want) {
+		t.Fatalf("filterInput doc string drifted from the allowlist\nwant %v\n got %v", want, listed)
+	}
+}
+
 func TestMCPHostValidationNormalizesPublicURLAndLoopbackHosts(t *testing.T) {
 	tests := []struct {
 		name              string
@@ -376,6 +492,10 @@ func TestMCPToolsListAndSiteOverview(t *testing.T) {
 	}
 	if !hasTool(tools.Tools, "hitkeep_get_web_vitals") {
 		t.Fatalf("expected hitkeep_get_web_vitals in tool list")
+	}
+	for _, tool := range tools.Tools {
+		mcptest.RequireObjectFormPropertySchemas(t, tool.Name, "input", tool.InputSchema)
+		mcptest.RequireObjectFormPropertySchemas(t, tool.Name, "output", tool.OutputSchema)
 	}
 
 	sites, err := session.CallTool(context.Background(), &mcp.CallToolParams{Name: "hitkeep_list_sites"})

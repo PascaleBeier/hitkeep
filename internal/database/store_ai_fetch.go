@@ -56,6 +56,7 @@ func (s *Store) CreateAIFetchesBulk(ctx context.Context, fetches []*api.AIFetch)
 				nullableIntPtr(fetch.ResponseMs),
 				nullableInt64Ptr(fetch.BytesServed),
 				nullableStringPtr(fetch.UserAgent),
+				nullableString(fetch.AssistantCategory),
 			); err != nil {
 				return fmt.Errorf("append ai fetch row: %w", err)
 			}
@@ -290,6 +291,7 @@ func (s *Store) GetAIFetchTimeseries(ctx context.Context, params api.AIFetchQuer
 func (s *Store) GetAIFetchCorrelation(ctx context.Context, params api.AIFetchCorrelationParams) (*api.AIFetchCorrelationReport, error) {
 	report := &api.AIFetchCorrelationReport{
 		CitationYield:    []api.AIFetchCitationYieldRow{},
+		CitationPaths:    []api.AIFetchCorrelationPathRow{},
 		OpportunityPages: []api.AIFetchOpportunityRow{},
 		FailureHotspots:  []api.AIFetchFailureHotspot{},
 	}
@@ -358,6 +360,18 @@ func (s *Store) GetAIFetchCorrelation(ctx context.Context, params api.AIFetchCor
 			FROM matched
 			GROUP BY path, assistant_name
 		),
+		-- The per-path view of the same join. Both counters are DISTINCT counts:
+		-- one fetch fanned out to several matching visits is still one fetch, and
+		-- a session that several agents' fetches all correlate to is one visit.
+		-- Every base fetch survives the LEFT JOIN, so unmatched ones still count.
+		citation_paths AS (
+			SELECT
+				path,
+				COUNT(DISTINCT id) AS fetch_count,
+				COUNT(DISTINCT session_id) AS ai_referred_visits
+			FROM matched
+			GROUP BY path
+		),
 		opportunity_pages AS (
 			SELECT
 				path,
@@ -384,6 +398,12 @@ func (s *Store) GetAIFetchCorrelation(ctx context.Context, params api.AIFetchCor
 		ranked_citation_yield AS (
 			SELECT *, ROW_NUMBER() OVER (ORDER BY citation_yield_pct DESC, ai_referred_visits DESC, fetch_count DESC, path ASC, assistant_name ASC) AS rn
 			FROM citation_yield
+		),
+		-- Capped only after the per-path aggregation, so a path is ranked by what
+		-- the whole path earned rather than by its best single agent pairing.
+		ranked_citation_paths AS (
+			SELECT *, ROW_NUMBER() OVER (ORDER BY ai_referred_visits DESC, fetch_count DESC, path ASC) AS rn
+			FROM citation_paths
 		),
 		ranked_opportunity_pages AS (
 			SELECT *, ROW_NUMBER() OVER (ORDER BY fetch_count DESC, ai_referred_visits ASC, error_requests DESC, path ASC) AS rn
@@ -414,6 +434,10 @@ func (s *Store) GetAIFetchCorrelation(ctx context.Context, params api.AIFetchCor
 			FROM ranked_citation_yield
 			WHERE rn <= 10
 			UNION ALL
+			SELECT 'citation_paths', path, '', fetch_count, ai_referred_visits, 0, 0, 0
+			FROM ranked_citation_paths
+			WHERE rn <= 10
+			UNION ALL
 			SELECT 'opportunity_pages', path, '', fetch_count, ai_referred_visits, error_requests, CAST(error_rate_pct * 100 AS BIGINT), 0
 			FROM ranked_opportunity_pages
 			WHERE rn <= 10
@@ -427,9 +451,16 @@ func (s *Store) GetAIFetchCorrelation(ctx context.Context, params api.AIFetchCor
 		ORDER BY CASE section
 			WHEN '__summary__' THEN 0
 			WHEN 'citation_yield' THEN 1
-			WHEN 'opportunity_pages' THEN 2
-			ELSE 3
-		END, v1 DESC, name1 ASC, name2 ASC
+			WHEN 'citation_paths' THEN 2
+			WHEN 'opportunity_pages' THEN 3
+			ELSE 4
+		END,
+		-- citation_paths is ranked by AI-referred visits (v2) first; the shared
+		-- v1-first ordering below would otherwise re-sort it by fetch volume. The
+		-- constant 0 leaves every other section's order exactly as it was, and
+		-- v1 DESC, name1 ASC then supply this section's own remaining tiebreaks.
+		CASE WHEN section = 'citation_paths' THEN -v2 ELSE 0 END,
+		v1 DESC, name1 ASC, name2 ASC
 	`, filterSQL, windowDays)
 
 	args := make([]any, 0, 3+len(filterArgs)+4)
@@ -474,6 +505,12 @@ func (s *Store) GetAIFetchCorrelation(ctx context.Context, params api.AIFetchCor
 				FetchCount:       v1,
 				AIReferredVisits: v2,
 				CitationYieldPct: float64(v3) / 100,
+			})
+		case "citation_paths":
+			report.CitationPaths = append(report.CitationPaths, api.AIFetchCorrelationPathRow{
+				Path:             name1,
+				FetchCount:       v1,
+				AIReferredVisits: v2,
 			})
 		case "opportunity_pages":
 			report.OpportunityPages = append(report.OpportunityPages, api.AIFetchOpportunityRow{

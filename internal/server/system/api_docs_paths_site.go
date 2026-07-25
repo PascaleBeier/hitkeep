@@ -215,6 +215,13 @@ func openAPIV1AdminSitePaths() map[string]any {
 		"/api/sites/{id}": map[string]any{
 			"delete": op([]string{"Sites"}, "Delete site", "Deletes a site and associated analytics data.", secCookie(), []any{paramRef("#/components/parameters/siteID")}, nil, map[string]any{"200": jsonRefResp("Status", "#/components/schemas/Status")}),
 		},
+		"/api/sites/{id}/setup-state": map[string]any{
+			"get": op([]string{"Sites"}, "Get setup state", "Reports whether a site has ever recorded AI fetches, chatbot events, custom events, ecommerce events, or web vitals so the dashboard can show setup guidance instead of empty reports. Requires site.view.", secCookie(), []any{paramRef("#/components/parameters/siteID")}, nil,
+				map[string]any{
+					"200": jsonRefResp("Site setup state", "#/components/schemas/SiteSetupState"),
+					"403": errResp("Access denied"),
+				}),
+		},
 		"/api/sites/{id}/tracking/status": map[string]any{
 			"get": op([]string{"Sites"}, "Get tracking status", "Returns privacy-safe operational tracking metadata for a site, including live/waiting/dormant/domain-mismatch status and the latest accepted tracker source.", secCookie(), []any{paramRef("#/components/parameters/siteID")}, nil,
 				map[string]any{
@@ -462,6 +469,14 @@ func openAPIV1AdminSitePaths() map[string]any {
 				map[string]any{"name": "path", "in": "query", "description": "Optional exact fetched path filter.", "schema": map[string]any{"type": "string"}},
 			}, nil, map[string]any{"200": jsonSchemaResp("AI fetch timeseries", map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/AIFetchSeriesPoint"}})}),
 		},
+		"/api/sites/{id}/ai-activity": map[string]any{
+			"get": op([]string{"Sites"}, "Get AI activity report", "Returns the unified AI activity report for a site: one merged view over tracked AI hits (classified at query time from the user agent and referrer) and server-log AI fetch records. Every count is tracked hits plus fetch records, and each row keeps the provenance split. Repeatable filter=type:value params narrow both sides where the dimension exists on both: ai_bot maps to the fetch assistant name, ai_bot_category to the fetch assistant category (falling back to the agent name for records ingested before that column existed), and path to both. An ai_source filter excludes the fetch side outright because fetch records carry no referrer, while hit-only dimensions such as country or device leave the fetch side unrestricted. The pageviews denominator applies the non-AI filters only.", secAnyAuth(), []any{
+				paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/from"), paramRef("#/components/parameters/to"),
+				paramRef("#/components/parameters/filter"), paramRef("#/components/parameters/filterType"), paramRef("#/components/parameters/filterValue"),
+				map[string]any{"name": "compare_from", "in": "query", "description": "Start of an optional comparison window. Malformed values are ignored rather than rejected.", "schema": map[string]any{"type": "string", "format": "date-time"}},
+				map[string]any{"name": "compare_to", "in": "query", "description": "End of an optional comparison window.", "schema": map[string]any{"type": "string", "format": "date-time"}},
+			}, nil, map[string]any{"200": jsonRefResp("AI activity report", "#/components/schemas/AIActivityReport")}),
+		},
 		"/api/sites/{id}/ai-fetch/correlation": map[string]any{
 			"get": op([]string{"Sites"}, "Get AI fetch correlation report", "Returns directional AI fetch correlation metrics for a site by matching AI crawler fetches to later AI-referred visits on the same path within a bounded window. Assistant filters apply to the fetch side only; correlated visit counts include any AI assistant referrer that later drove a human visit to the same path.", secAnyAuth(), []any{
 				paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/from"), paramRef("#/components/parameters/to"),
@@ -497,6 +512,9 @@ func openAPIV1AdminSitePaths() map[string]any {
 		},
 		"/api/favicon/{domain}": map[string]any{
 			"get": op([]string{"Sites"}, "Get favicon", "Proxies favicon by domain.", nil, []any{paramRef("#/components/parameters/domain")}, nil, map[string]any{"200": desc("Favicon image")}),
+		},
+		"/api/ai-agents": map[string]any{
+			"get": op([]string{"Sites"}, "Get AI agent catalog", "Returns the embedded AI agent master list as display metadata including agent names, operator families, categories, and favicon-lookup hosts derived from each agent's documentation URL, plus the known AI referrer surfaces. The catalog is static per release.", secAnyAuth(), nil, nil, map[string]any{"200": jsonRefResp("AI agent catalog", "#/components/schemas/AIAgentCatalog")}),
 		},
 		"/api/sites/{id}/domain": map[string]any{
 			"put": op([]string{"Sites"}, "Rename site domain", "Renames the tracked domain of a site while keeping its analytics history. Requires site.manage_data (site admin or higher). The tracker only matches hits for the new domain after the rename.", secAnyAuth(), []any{paramRef("#/components/parameters/siteID")},
@@ -656,6 +674,14 @@ func openAPIV1AdminSitePaths() map[string]any {
 		"/api/share/{token}/sites/{id}/opportunities": map[string]any{
 			"get": op([]string{"Share"}, "Shared opportunities", "Lists saved opportunity recommendations through a read-only share token. Returns only validated customer-visible outputs with cited evidence.", nil, []any{paramRef("#/components/parameters/token"), paramRef("#/components/parameters/siteID")}, nil,
 				map[string]any{"200": jsonRefResp("Opportunity list", "#/components/schemas/SharedOpportunityListResponse")}),
+		},
+		"/api/share/{token}/sites/{id}/ai-activity": map[string]any{
+			"get": op([]string{"Share"}, "Shared AI activity report", "Returns the unified AI activity report through a read-only share token, including the server-log fetch side: the query runs under the token grant for the shared site.", nil, []any{
+				paramRef("#/components/parameters/token"), paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/from"), paramRef("#/components/parameters/to"),
+				paramRef("#/components/parameters/filter"), paramRef("#/components/parameters/filterType"), paramRef("#/components/parameters/filterValue"),
+				map[string]any{"name": "compare_from", "in": "query", "description": "Start of an optional comparison window. Malformed values are ignored rather than rejected.", "schema": map[string]any{"type": "string", "format": "date-time"}},
+				map[string]any{"name": "compare_to", "in": "query", "description": "End of an optional comparison window.", "schema": map[string]any{"type": "string", "format": "date-time"}},
+			}, nil, map[string]any{"200": jsonRefResp("AI activity report", "#/components/schemas/AIActivityReport")}),
 		},
 		"/api/share/{token}/sites/{id}/hits": map[string]any{
 			"get": op([]string{"Share"}, "Shared hits", "Returns paginated raw hits through share token.", nil, []any{paramRef("#/components/parameters/token"), paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/from"), paramRef("#/components/parameters/to"), paramRef("#/components/parameters/limit"), paramRef("#/components/parameters/offset"), paramRef("#/components/parameters/query"), paramRef("#/components/parameters/sort"), paramRef("#/components/parameters/order"), paramRef("#/components/parameters/filter"), paramRef("#/components/parameters/filterType"), paramRef("#/components/parameters/filterValue")}, nil, map[string]any{"200": jsonRefResp("Paginated hits", "#/components/schemas/PaginatedHits")}),

@@ -235,6 +235,114 @@ func TestAIFetchCorrelation(t *testing.T) {
 	}
 }
 
+// TestAIFetchCorrelationCitationPaths pins the per-path citation list against
+// the two ways a client-side re-aggregation of the per-pair citation_yield rows
+// gets it wrong:
+//
+//   - `/shared` is fetched by two agents and visited by ONE session, which both
+//     per-pair rows report — summing them double-counts that session.
+//   - `/guide` has the most AI-referred visits of any path, yet every one of its
+//     per-pair rows falls outside the global top-10-by-yield cap, so a client
+//     that only ever sees citation_yield cannot show it at all.
+func TestAIFetchCorrelationCitationPaths(t *testing.T) {
+	store, userID := setupComparisonStore(t)
+	ctx := context.Background()
+
+	site, err := store.CreateSite(ctx, userID, "ai-citation-paths.example.com")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+
+	base := time.Date(2026, 3, 19, 12, 0, 0, 0, time.UTC)
+	fetchedAt := base.Add(-48 * time.Hour)
+	visitedAt := base.Add(-24 * time.Hour)
+	aiReferrer := "https://chatgpt.com/c/abc123"
+	isUnique := true
+
+	fetch := func(name, family, path string) *api.AIFetch {
+		return &api.AIFetch{SiteID: site.ID, Timestamp: fetchedAt, AssistantName: name, AssistantFamily: family, Path: path, StatusCode: 200, ResourceType: "html"}
+	}
+
+	var fetches []*api.AIFetch
+	// Eight fetches of /guide split across two agents, two visiting sessions:
+	// a 25% per-pair yield, low enough to lose every top-10 slot below.
+	for range 4 {
+		fetches = append(fetches, fetch("GPTBot", "OpenAI", "/guide"))
+		fetches = append(fetches, fetch("ClaudeBot", "Anthropic", "/guide"))
+	}
+	// One fetch per agent of the same path, and one session that visits it.
+	fetches = append(fetches, fetch("GPTBot", "OpenAI", "/shared"))
+	fetches = append(fetches, fetch("PerplexityBot", "Perplexity", "/shared"))
+	// Eight single-fetch, single-visit paths at a 100% per-pair yield. Together
+	// with the two /shared pairs they fill the per-pair top-10 exactly.
+	fillerPaths := []string{"/p1", "/p2", "/p3", "/p4", "/p5", "/p6", "/p7", "/p8"}
+	for _, path := range fillerPaths {
+		fetches = append(fetches, fetch("GPTBot", "OpenAI", path))
+	}
+	for _, record := range fetches {
+		if err := store.CreateAIFetch(ctx, record); err != nil {
+			t.Fatalf("CreateAIFetch %s: %v", record.Path, err)
+		}
+	}
+
+	visitPaths := []string{"/guide", "/guide", "/shared"}
+	visitPaths = append(visitPaths, fillerPaths...)
+	for _, path := range visitPaths {
+		hit := &api.Hit{SiteID: site.ID, SessionID: mustUUID(t), PageID: mustUUID(t), Timestamp: visitedAt, Path: path, Referrer: &aiReferrer, IsUnique: &isUnique}
+		if err := store.CreateHit(ctx, hit); err != nil {
+			t.Fatalf("CreateHit %s: %v", path, err)
+		}
+	}
+
+	report, err := store.GetAIFetchCorrelation(ctx, api.AIFetchCorrelationParams{
+		SiteID:     site.ID,
+		Start:      base.Add(-72 * time.Hour),
+		End:        base,
+		WindowDays: 30,
+	})
+	if err != nil {
+		t.Fatalf("GetAIFetchCorrelation: %v", err)
+	}
+
+	// The per-pair section is capped globally by yield, so the highest-visit
+	// path is missing from it entirely — the exact reason a per-path section
+	// has to be computed server-side.
+	for _, row := range report.CitationYield {
+		if row.Path == "/guide" {
+			t.Fatalf("expected the global yield cap to drop /guide from citation_yield, got %+v", report.CitationYield)
+		}
+	}
+	// Both /shared pairs claim the same single session; summing them would
+	// report two AI-referred visits for one visitor.
+	sharedPairVisits := int64(0)
+	for _, row := range report.CitationYield {
+		if row.Path == "/shared" {
+			sharedPairVisits += row.AIReferredVisits
+		}
+	}
+	if sharedPairVisits != 2 {
+		t.Fatalf("expected the two /shared per-pair rows to sum to 2 overlapping visits, got %d", sharedPairVisits)
+	}
+
+	if len(report.CitationPaths) != 10 {
+		t.Fatalf("expected 10 per-path citation rows, got %d: %+v", len(report.CitationPaths), report.CitationPaths)
+	}
+	want := []api.AIFetchCorrelationPathRow{
+		{Path: "/guide", FetchCount: 8, AIReferredVisits: 2},
+		{Path: "/shared", FetchCount: 2, AIReferredVisits: 1},
+	}
+	for i, expected := range want {
+		if report.CitationPaths[i] != expected {
+			t.Fatalf("citation path %d: expected %+v, got %+v (all: %+v)", i, expected, report.CitationPaths[i], report.CitationPaths)
+		}
+	}
+	for _, row := range report.CitationPaths[2:] {
+		if row.FetchCount != 1 || row.AIReferredVisits != 1 {
+			t.Fatalf("expected every filler path to report one fetch and one visit, got %+v", row)
+		}
+	}
+}
+
 func containsOpportunity(rows []api.AIFetchOpportunityRow, path string, fetchCount, visits int64) bool {
 	for _, row := range rows {
 		if row.Path == path && row.FetchCount == fetchCount && row.AIReferredVisits == visits {

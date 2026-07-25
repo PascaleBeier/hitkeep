@@ -177,3 +177,100 @@ func TestRecordActivityIgnoresNilAndUnknownSiteIDs(t *testing.T) {
 		t.Fatal("expected unknown site activity to fail")
 	}
 }
+
+func TestGetSiteSetupStateReportsRecordedSignals(t *testing.T) {
+	store := setupTenantStore(t)
+	ctx := context.Background()
+
+	userID, err := store.CreateUser(ctx, "setup-state@example.com", "hashed")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	site, err := store.CreateSite(ctx, userID, "setup-state.test")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+
+	state, err := store.GetSiteSetupState(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("get setup state: %v", err)
+	}
+	if state != (api.SiteSetupState{}) {
+		t.Fatalf("expected every flag to be false for a fresh site, got %+v", state)
+	}
+
+	now := time.Now().UTC()
+	if err := store.CreateAIFetch(ctx, &api.AIFetch{
+		SiteID:          site.ID,
+		Timestamp:       now,
+		AssistantName:   "ChatGPT-User",
+		AssistantFamily: "openai",
+		Path:            "/pricing",
+		StatusCode:      200,
+		ResourceType:    "page",
+	}); err != nil {
+		t.Fatalf("create ai fetch: %v", err)
+	}
+	if err := store.CreateEventsBulk(ctx, []*api.Event{
+		{SiteID: site.ID, SessionID: uuid.New(), Name: "assistant.chat_started", Timestamp: now},
+		{SiteID: site.ID, SessionID: uuid.New(), Name: "purchase", Timestamp: now},
+	}); err != nil {
+		t.Fatalf("create events: %v", err)
+	}
+	if err := store.CreateWebVital(ctx, &api.WebVital{
+		SiteID:    site.ID,
+		SessionID: uuid.New(),
+		PageID:    uuid.New(),
+		Metric:    api.WebVitalLCP,
+		Value:     1800,
+		Path:      "/",
+		Timestamp: now,
+	}); err != nil {
+		t.Fatalf("create web vital: %v", err)
+	}
+
+	state, err = store.GetSiteSetupState(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("get setup state after ingest: %v", err)
+	}
+	want := api.SiteSetupState{
+		HasAIFetches:       true,
+		HasChatbotEvents:   true,
+		HasCustomEvents:    true,
+		HasEcommerceEvents: true,
+		HasWebVitals:       true,
+	}
+	if state != want {
+		t.Fatalf("expected every flag to be true, got %+v", state)
+	}
+}
+
+func TestGetSiteSetupStateSeparatesCustomEventsFromNamedFamilies(t *testing.T) {
+	store := setupTenantStore(t)
+	ctx := context.Background()
+
+	userID, err := store.CreateUser(ctx, "setup-state-custom@example.com", "hashed")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	site, err := store.CreateSite(ctx, userID, "setup-state-custom.test")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	if err := store.CreateEvent(ctx, &api.Event{
+		SiteID:    site.ID,
+		SessionID: uuid.New(),
+		Name:      "newsletter_signup",
+		Timestamp: time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("create event: %v", err)
+	}
+
+	state, err := store.GetSiteSetupState(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("get setup state: %v", err)
+	}
+	if state != (api.SiteSetupState{HasCustomEvents: true}) {
+		t.Fatalf("expected only has_custom_events to be true, got %+v", state)
+	}
+}

@@ -7,15 +7,15 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	"hitkeep/internal/server/filterparams"
 )
 
 func (h *handler) parseShareWebVitalsParams(w http.ResponseWriter, r *http.Request, site *api.Site, requireMetric bool, defaultLimit int) (api.WebVitalsParams, bool) {
 	q := r.URL.Query()
-	start, end, ok := parseShareWebVitalsRange(w, q.Get("from"), q.Get("to"))
+	start, end, ok := filterparams.ParseAnalyticsRange(w, q.Get("from"), q.Get("to"))
 	if !ok {
 		return api.WebVitalsParams{}, false
 	}
@@ -60,31 +60,6 @@ func (h *handler) parseShareWebVitalsParams(w http.ResponseWriter, r *http.Reque
 		Rating: rating,
 		Limit:  limit,
 	}, true
-}
-
-func parseShareWebVitalsRange(w http.ResponseWriter, fromStr, toStr string) (time.Time, time.Time, bool) {
-	now := time.Now().UTC()
-	end := now.AddDate(0, 0, 1)
-	start := end.AddDate(0, 0, -30)
-
-	if fromStr != "" {
-		parsed, err := time.Parse(time.RFC3339, fromStr)
-		if err != nil {
-			http.Error(w, "Invalid from", http.StatusBadRequest)
-			return time.Time{}, time.Time{}, false
-		}
-		start = parsed
-	}
-	if toStr != "" {
-		parsed, err := time.Parse(time.RFC3339, toStr)
-		if err != nil {
-			http.Error(w, "Invalid to", http.StatusBadRequest)
-			return time.Time{}, time.Time{}, false
-		}
-		end = parsed
-	}
-
-	return start, end, true
 }
 
 func (h *handler) handleGetShareWebVitalsSummary() http.HandlerFunc {

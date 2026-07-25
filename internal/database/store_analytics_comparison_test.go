@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/internal/aianalytics"
 	"hitkeep/internal/api"
 )
 
@@ -486,6 +487,8 @@ func TestGetSiteStatsIncludesAIDimensions(t *testing.T) {
 	sessionC := uuid.New()
 	sessionD := uuid.New()
 	sessionE := uuid.New()
+	previousBotSession := uuid.New()
+	previousSourceSession := uuid.New()
 
 	chatGPTRef := "https://chatgpt.com/share/abc"
 	perplexityRef := "https://www.perplexity.ai/page/example"
@@ -574,6 +577,24 @@ func TestGetSiteStatsIncludesAIDimensions(t *testing.T) {
 			Path:      "/deepseek-browser",
 			UserAgent: &falsePositiveDeepSeekUA,
 		},
+		// Comparison window: one AI bot hit and one AI-referred session.
+		{
+			SiteID:    site.ID,
+			SessionID: previousBotSession,
+			PageID:    uuid.New(),
+			Timestamp: base.Add(-30 * time.Hour),
+			Path:      "/docs/ai",
+			UserAgent: &gptBotUA,
+		},
+		{
+			SiteID:    site.ID,
+			SessionID: previousSourceSession,
+			PageID:    uuid.New(),
+			Timestamp: base.Add(-29 * time.Hour),
+			Path:      "/blog/hitkeep-ai",
+			Referrer:  &chatGPTRef,
+			UserAgent: &chromeUA,
+		},
 	} {
 		if err := store.CreateHit(ctx, &hit); err != nil {
 			t.Fatalf("create hit %s: %v", hit.Path, err)
@@ -581,10 +602,12 @@ func TestGetSiteStatsIncludesAIDimensions(t *testing.T) {
 	}
 
 	result, err := store.GetSiteStats(ctx, api.AnalyticsParams{
-		SiteID: site.ID,
-		UserID: userID,
-		Start:  base.Add(-24 * time.Hour),
-		End:    base,
+		SiteID:       site.ID,
+		UserID:       userID,
+		Start:        base.Add(-24 * time.Hour),
+		End:          base,
+		CompareStart: base.Add(-48 * time.Hour),
+		CompareEnd:   base.Add(-24 * time.Hour),
 	})
 	if err != nil {
 		t.Fatalf("GetSiteStats: %v", err)
@@ -607,6 +630,29 @@ func TestGetSiteStatsIncludesAIDimensions(t *testing.T) {
 	}
 	if !containsMetric(result.TopAISources, "Perplexity", 1) {
 		t.Fatalf("expected Perplexity with 1 session, got %+v", result.TopAISources)
+	}
+	// GPTBot and ClaudeBot are both training crawlers in the master list.
+	if !containsMetric(result.TopAIBotCategories, aianalytics.CategoryTrainingCrawler, 3) {
+		t.Fatalf("expected %s with 3 hits, got %+v", aianalytics.CategoryTrainingCrawler, result.TopAIBotCategories)
+	}
+	trainingBots := result.TopAIBotsByCategory[aianalytics.CategoryTrainingCrawler]
+	if !containsMetric(trainingBots, "GPTBot", 2) || !containsMetric(trainingBots, "ClaudeBot", 1) {
+		t.Fatalf("expected GPTBot(2) and ClaudeBot(1) in %s breakdown, got %+v", aianalytics.CategoryTrainingCrawler, trainingBots)
+	}
+	if len(result.TopAIBotsByCategory[aianalytics.CategoryAssistant]) != 0 {
+		t.Fatalf("expected no assistants in breakdown, got %+v", result.TopAIBotsByCategory[aianalytics.CategoryAssistant])
+	}
+
+	// The comparison window carries the same AI aggregates so the dashboard can
+	// render AI deltas without a second full stats query.
+	if result.Comparison == nil {
+		t.Fatal("expected comparison stats, got nil")
+	}
+	if result.Comparison.AIBotHits != 1 {
+		t.Fatalf("expected 1 comparison AI bot hit, got %d", result.Comparison.AIBotHits)
+	}
+	if result.Comparison.AISourceVisits != 1 {
+		t.Fatalf("expected 1 comparison AI source visit, got %d", result.Comparison.AISourceVisits)
 	}
 }
 

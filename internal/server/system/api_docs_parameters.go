@@ -28,7 +28,7 @@ func openAPIV1Parameters() map[string]any {
 		"query":           map[string]any{"name": "q", "in": "query", "schema": map[string]any{"type": "string"}},
 		"sort":            map[string]any{"name": "sort", "in": "query", "schema": map[string]any{"type": "string"}},
 		"order":           map[string]any{"name": "order", "in": "query", "schema": map[string]any{"type": "string", "enum": []string{"asc", "desc"}}},
-		"filter":          map[string]any{"name": "filter", "in": "query", "description": "Filter in form type:value (repeatable). Supported types: path, hostname, referrer, referrer_host, device, country, city, provider, asn, browser, language, utm_campaign, utm_content, utm_medium, utm_source, utm_term, qr_code_id.", "schema": map[string]any{"type": "string"}},
+		"filter":          map[string]any{"name": "filter", "in": "query", "description": "Filter in form type:value (repeatable). Supported types: path, hostname, referrer, referrer_host, device, country, city, provider, asn, browser, language, ai_bot, ai_bot_category, ai_source, utm_campaign, utm_content, utm_medium, utm_source, utm_term, qr_code_id.", "schema": map[string]any{"type": "string"}},
 		"filterType":      map[string]any{"name": "filter_type", "in": "query", "schema": map[string]any{"type": "string"}},
 		"filterValue":     map[string]any{"name": "filter_value", "in": "query", "schema": map[string]any{"type": "string"}},
 		"eventName":       map[string]any{"name": "event_name", "in": "query", "required": true, "schema": map[string]any{"type": "string"}},

@@ -594,6 +594,17 @@ type SiteTrackingStatus struct {
 	UpdatedAt              *time.Time     `json:"updated_at,omitempty"`
 }
 
+// SiteSetupState reports whether a site has ever recorded data for the optional
+// dashboard surfaces, so the UI can show setup guidance instead of empty
+// reports. The flags ignore date ranges.
+type SiteSetupState struct {
+	HasAIFetches       bool `json:"has_ai_fetches"`
+	HasChatbotEvents   bool `json:"has_chatbot_events"`
+	HasCustomEvents    bool `json:"has_custom_events"`
+	HasEcommerceEvents bool `json:"has_ecommerce_events"`
+	HasWebVitals       bool `json:"has_web_vitals"`
+}
+
 type Goal struct {
 	ID        uuid.UUID `json:"id"`
 	SiteID    uuid.UUID `json:"site_id"`
@@ -768,6 +779,8 @@ type ComparisonStats struct {
 	AvgSessionDuration float64          `json:"avg_session_duration"`
 	PagesPerSession    float64          `json:"pages_per_session"`
 	ChartData          []ChartDataPoint `json:"chart_data"`
+	AIBotHits          int              `json:"ai_bot_hits"`
+	AISourceVisits     int              `json:"ai_source_visits"`
 	UTMCampaignHits    int              `json:"utm_campaign_hits"`
 	UTMContentHits     int              `json:"utm_content_hits"`
 	UTMMediumHits      int              `json:"utm_medium_hits"`
@@ -828,41 +841,45 @@ type ImportExclusionReason struct {
 type SiteStats struct {
 	LiveVisitors int `json:"live_visitors"`
 
-	TotalPageviews     int                     `json:"total_pageviews"`
-	UniqueSessions     int                     `json:"unique_sessions"`
-	BounceRate         float64                 `json:"bounce_rate"`
-	AvgSessionDuration float64                 `json:"avg_session_duration"`
-	PagesPerSession    float64                 `json:"pages_per_session"`
-	ChartData          []ChartDataPoint        `json:"chart_data"`
-	TopPages           []MetricStat            `json:"top_pages"`
-	TopLandingPages    []MetricStat            `json:"top_landing_pages"`
-	TopExitPages       []MetricStat            `json:"top_exit_pages"`
-	TopReferrers       []MetricStat            `json:"top_referrers"`
-	TopDevices         []MetricStat            `json:"top_devices"`
-	TopCountries       []MetricStat            `json:"top_countries"`
-	TopCities          []MetricStat            `json:"top_cities"`
-	TopProviders       []MetricStat            `json:"top_providers"`
-	TopASNs            []MetricStat            `json:"top_asns"`
-	TopBrowsers        []MetricStat            `json:"top_browsers"`
-	TopAIBots          []MetricStat            `json:"top_ai_bots"`
-	TopAISources       []MetricStat            `json:"top_ai_sources"`
-	TopLanguages       []MetricStat            `json:"top_languages"`
-	TopUTMCampaigns    []MetricStat            `json:"top_utm_campaigns"`
-	TopUTMContents     []MetricStat            `json:"top_utm_contents"`
-	TopUTMMediums      []MetricStat            `json:"top_utm_mediums"`
-	TopUTMSources      []MetricStat            `json:"top_utm_sources"`
-	TopUTMTerms        []MetricStat            `json:"top_utm_terms"`
-	AIBotHits          int                     `json:"ai_bot_hits"`
-	AISourceVisits     int                     `json:"ai_source_visits"`
-	UTMCampaignHits    int                     `json:"utm_campaign_hits"`
-	UTMContentHits     int                     `json:"utm_content_hits"`
-	UTMMediumHits      int                     `json:"utm_medium_hits"`
-	UTMSourceHits      int                     `json:"utm_source_hits"`
-	UTMTermHits        int                     `json:"utm_term_hits"`
-	Goals              []GoalStats             `json:"goals"`
-	Funnels            []Funnel                `json:"funnels"`
-	Comparison         *ComparisonStats        `json:"comparison,omitempty"`
-	ImportedExcluded   []ImportExclusionReason `json:"imported_excluded,omitempty"`
+	TotalPageviews     int              `json:"total_pageviews"`
+	UniqueSessions     int              `json:"unique_sessions"`
+	BounceRate         float64          `json:"bounce_rate"`
+	AvgSessionDuration float64          `json:"avg_session_duration"`
+	PagesPerSession    float64          `json:"pages_per_session"`
+	ChartData          []ChartDataPoint `json:"chart_data"`
+	TopPages           []MetricStat     `json:"top_pages"`
+	TopLandingPages    []MetricStat     `json:"top_landing_pages"`
+	TopExitPages       []MetricStat     `json:"top_exit_pages"`
+	TopReferrers       []MetricStat     `json:"top_referrers"`
+	TopDevices         []MetricStat     `json:"top_devices"`
+	TopCountries       []MetricStat     `json:"top_countries"`
+	TopCities          []MetricStat     `json:"top_cities"`
+	TopProviders       []MetricStat     `json:"top_providers"`
+	TopASNs            []MetricStat     `json:"top_asns"`
+	TopBrowsers        []MetricStat     `json:"top_browsers"`
+	TopAIBots          []MetricStat     `json:"top_ai_bots"`
+	TopAIBotCategories []MetricStat     `json:"top_ai_bot_categories"`
+	// TopAIBotsByCategory lists the top AI agents within each category
+	// (keys are the ai_bot_category identifiers).
+	TopAIBotsByCategory map[string][]MetricStat `json:"top_ai_bots_by_category,omitempty"`
+	TopAISources        []MetricStat            `json:"top_ai_sources"`
+	TopLanguages        []MetricStat            `json:"top_languages"`
+	TopUTMCampaigns     []MetricStat            `json:"top_utm_campaigns"`
+	TopUTMContents      []MetricStat            `json:"top_utm_contents"`
+	TopUTMMediums       []MetricStat            `json:"top_utm_mediums"`
+	TopUTMSources       []MetricStat            `json:"top_utm_sources"`
+	TopUTMTerms         []MetricStat            `json:"top_utm_terms"`
+	AIBotHits           int                     `json:"ai_bot_hits"`
+	AISourceVisits      int                     `json:"ai_source_visits"`
+	UTMCampaignHits     int                     `json:"utm_campaign_hits"`
+	UTMContentHits      int                     `json:"utm_content_hits"`
+	UTMMediumHits       int                     `json:"utm_medium_hits"`
+	UTMSourceHits       int                     `json:"utm_source_hits"`
+	UTMTermHits         int                     `json:"utm_term_hits"`
+	Goals               []GoalStats             `json:"goals"`
+	Funnels             []Funnel                `json:"funnels"`
+	Comparison          *ComparisonStats        `json:"comparison,omitempty"`
+	ImportedExcluded    []ImportExclusionReason `json:"imported_excluded,omitempty"`
 }
 
 type SiteStatsResetRequest struct {
@@ -1138,14 +1155,38 @@ type AIFetch struct {
 	Timestamp       time.Time `json:"timestamp"`
 	AssistantName   string    `json:"assistant_name"`
 	AssistantFamily string    `json:"assistant_family"`
-	Path            string    `json:"path"`
-	Hostname        *string   `json:"hostname,omitempty"`
-	StatusCode      int       `json:"status_code"`
-	ContentType     *string   `json:"content_type,omitempty"`
-	ResourceType    string    `json:"resource_type"`
-	ResponseMs      *int      `json:"response_ms,omitempty"`
-	BytesServed     *int64    `json:"bytes_served,omitempty"`
-	UserAgent       *string   `json:"user_agent,omitempty"`
+	// AssistantCategory is empty for rows ingested before the category
+	// dimension existed.
+	AssistantCategory string  `json:"assistant_category,omitempty"`
+	Path              string  `json:"path"`
+	Hostname          *string `json:"hostname,omitempty"`
+	StatusCode        int     `json:"status_code"`
+	ContentType       *string `json:"content_type,omitempty"`
+	ResourceType      string  `json:"resource_type"`
+	ResponseMs        *int    `json:"response_ms,omitempty"`
+	BytesServed       *int64  `json:"bytes_served,omitempty"`
+	UserAgent         *string `json:"user_agent,omitempty"`
+}
+
+// AIAgentCatalog is the embedded AI agent master list as served to the
+// dashboard: display metadata plus favicon-lookup hosts derived from each
+// agent's documentation URL.
+type AIAgentCatalog struct {
+	GeneratedAt time.Time                `json:"generated_at"`
+	Agents      []AIAgentCatalogAgent    `json:"agents"`
+	AIReferrers []AIAgentCatalogReferrer `json:"ai_referrers"`
+}
+
+type AIAgentCatalogAgent struct {
+	Name     string `json:"name"`
+	Family   string `json:"family"`
+	Category string `json:"category"`
+	IconHost string `json:"icon_host,omitempty"`
+}
+
+type AIAgentCatalogReferrer struct {
+	Name     string `json:"name"`
+	IconHost string `json:"icon_host,omitempty"`
 }
 
 type AIFetchQueryParams struct {
@@ -1189,6 +1230,70 @@ type AIFetchSeriesPoint struct {
 	Count int       `json:"count"`
 }
 
+// AIActivityStat is one row of a merged AI activity top list. Value is always
+// TrackedHits + FetchCount; the split is kept so the dashboard can show which
+// side of the merge a row came from. Dimensions that only one source carries
+// (families and resource types exist only in ai_fetches, referral sources only
+// in hits) report zero on the side that cannot contribute.
+type AIActivityStat struct {
+	Name        string `json:"name"`
+	Value       int    `json:"value"`
+	TrackedHits int    `json:"tracked_hits"`
+	FetchCount  int    `json:"fetch_count"`
+}
+
+// AIActivitySeriesPoint is one bucket of the merged AI activity series.
+// ReferralVisits counts distinct sessions inside the bucket, so bucket values
+// are intentionally non-additive across the range — the same session spanning
+// two buckets counts in both.
+type AIActivitySeriesPoint struct {
+	Time           time.Time `json:"time"`
+	AIRequests     int       `json:"ai_requests"`
+	TrackedHits    int       `json:"tracked_hits"`
+	FetchCount     int       `json:"fetch_count"`
+	ReferralVisits int       `json:"referral_visits"`
+}
+
+// AIActivityScalars are the merged counters shared by the current range and the
+// optional comparison range of an AI activity report.
+type AIActivityScalars struct {
+	AIRequests     int `json:"ai_requests"`
+	TrackedHits    int `json:"tracked_hits"`
+	FetchCount     int `json:"fetch_count"`
+	ReferralVisits int `json:"referral_visits"`
+	PathsCrawled   int `json:"paths_crawled"`
+	UniqueAgents   int `json:"unique_agents"`
+	Pageviews      int `json:"pageviews"`
+}
+
+// AIActivityReport is the unified AI activity report: one merged view over
+// tracked AI hits (classified at query time from the user agent and referrer)
+// and server-log AI fetch records. Every count follows the same rule —
+// tracked hits plus fetch records.
+type AIActivityReport struct {
+	AIActivityScalars
+
+	// Depth scalars describe the fetch side only: tracked hits carry no status
+	// code, response time, or transferred bytes.
+	ErrorRate4xx     float64 `json:"error_rate_4xx"`
+	ErrorRate5xx     float64 `json:"error_rate_5xx"`
+	MedianResponseMs int     `json:"median_response_ms"`
+	TotalBytes       int64   `json:"total_bytes"`
+
+	TopAgents        []AIActivityStat `json:"top_agents"`
+	TopCategories    []AIActivityStat `json:"top_categories"`
+	TopPaths         []AIActivityStat `json:"top_paths"`
+	TopSources       []AIActivityStat `json:"top_sources"`
+	TopFamilies      []AIActivityStat `json:"top_families"`
+	TopResourceTypes []AIActivityStat `json:"top_resource_types"`
+	TopErrorPaths    []AIActivityStat `json:"top_error_paths"`
+
+	TopAgentsByCategory map[string][]AIActivityStat `json:"top_agents_by_category"`
+
+	Series     []AIActivitySeriesPoint `json:"series"`
+	Comparison *AIActivityScalars      `json:"comparison,omitempty"`
+}
+
 type AIFetchCorrelationSummary struct {
 	TotalFetches        int64 `json:"total_fetches"`
 	FetchedPaths        int64 `json:"fetched_paths"`
@@ -1203,6 +1308,17 @@ type AIFetchCitationYieldRow struct {
 	FetchCount       int64   `json:"fetch_count"`
 	AIReferredVisits int64   `json:"ai_referred_visits"`
 	CitationYieldPct float64 `json:"citation_yield_pct"`
+}
+
+// AIFetchCorrelationPathRow is one path of the citation list: the fetches the
+// range recorded for it and the AI-referred sessions that later landed on it.
+// Both are distinct counts over the fetch-to-visit join, so a path fetched by
+// several agents is one row whose visits count each session once — which is why
+// this cannot be reconstructed from the per-pair CitationYield rows.
+type AIFetchCorrelationPathRow struct {
+	Path             string `json:"path"`
+	FetchCount       int64  `json:"fetch_count"`
+	AIReferredVisits int64  `json:"ai_referred_visits"`
 }
 
 type AIFetchOpportunityRow struct {
@@ -1222,10 +1338,14 @@ type AIFetchFailureHotspot struct {
 }
 
 type AIFetchCorrelationReport struct {
-	Summary          AIFetchCorrelationSummary `json:"summary"`
-	CitationYield    []AIFetchCitationYieldRow `json:"citation_yield"`
-	OpportunityPages []AIFetchOpportunityRow   `json:"opportunity_pages"`
-	FailureHotspots  []AIFetchFailureHotspot   `json:"failure_hotspots"`
+	Summary       AIFetchCorrelationSummary `json:"summary"`
+	CitationYield []AIFetchCitationYieldRow `json:"citation_yield"`
+	// CitationPaths is the per-path view of the same data. CitationYield stays
+	// per (path, assistant) for API compatibility; only this section is safe to
+	// read as a path-keyed list.
+	CitationPaths    []AIFetchCorrelationPathRow `json:"citation_paths"`
+	OpportunityPages []AIFetchOpportunityRow     `json:"opportunity_pages"`
+	FailureHotspots  []AIFetchFailureHotspot     `json:"failure_hotspots"`
 }
 
 type EcommerceParams struct {

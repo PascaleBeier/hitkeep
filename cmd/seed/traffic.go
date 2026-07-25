@@ -9,9 +9,15 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/internal/aianalytics"
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
 )
+
+// seedDemoHostname is the hostname every seeded hit and fetch record carries.
+// It matches the default -domain flag; seedHostname() is the runtime normalizer
+// for a caller-supplied domain and is a different thing entirely.
+const seedDemoHostname = "acme-analytics.io"
 
 func seedTraffic(ctx context.Context, store *database.Store, siteID uuid.UUID, goals goalIDs, numDays int, rng *mrand.Rand) (seedStats, error) {
 	now := time.Now().UTC()
@@ -125,7 +131,9 @@ func seedTraffic(ctx context.Context, store *database.Store, siteID uuid.UUID, g
 	return stats, nil
 }
 
-func seedAIFetches(ctx context.Context, store *database.Store, siteID uuid.UUID, numDays int, rng *mrand.Rand) (aiFetchSeedStats, error) {
+// seedAIVisibility seeds the whole AI visibility surface for a site: server-log
+// AI fetches, the AI-referred visits they drive, and tracked AI bot pageviews.
+func seedAIVisibility(ctx context.Context, store *database.Store, siteID uuid.UUID, numDays int, rng *mrand.Rand) (aiFetchSeedStats, error) {
 	now := time.Now().UTC()
 	if numDays <= 0 {
 		return aiFetchSeedStats{}, nil
@@ -148,24 +156,25 @@ func seedAIFetches(ctx context.Context, store *database.Store, siteID uuid.UUID,
 			bot := pickWeighted(rng, aiFetchBots)
 			target := pickWeighted(rng, aiFetchTargets)
 			responseMs := target.responseMin + rng.Intn(max(target.responseMax-target.responseMin, 1))
-			bytesServed := target.bytesMin + rng.Int63n(max64(target.bytesMax-target.bytesMin, 1))
+			bytesServed := target.bytesMin + rng.Int63n(max(target.bytesMax-target.bytesMin, 1))
 			contentType := target.contentType
 			userAgent := bot.userAgent
-			hostname := "acme-analytics.io"
+			hostname := seedDemoHostname
 
 			fetch := &api.AIFetch{
-				SiteID:          siteID,
-				Timestamp:       randomTimeInElapsedDay(rng, day, now),
-				AssistantName:   bot.name,
-				AssistantFamily: bot.family,
-				Path:            target.path,
-				Hostname:        &hostname,
-				StatusCode:      target.statusCode,
-				ContentType:     &contentType,
-				ResourceType:    classifySeedResourceType(target.contentType),
-				ResponseMs:      &responseMs,
-				BytesServed:     &bytesServed,
-				UserAgent:       &userAgent,
+				SiteID:            siteID,
+				Timestamp:         randomTimeInElapsedDay(rng, day, now),
+				AssistantName:     bot.name,
+				AssistantFamily:   bot.family,
+				AssistantCategory: classifySeedAssistantCategory(userAgent),
+				Path:              target.path,
+				Hostname:          &hostname,
+				StatusCode:        target.statusCode,
+				ContentType:       &contentType,
+				ResourceType:      classifySeedResourceType(target.contentType),
+				ResponseMs:        &responseMs,
+				BytesServed:       &bytesServed,
+				UserAgent:         &userAgent,
 			}
 
 			batch.addAIFetch(fetch)
@@ -175,10 +184,13 @@ func seedAIFetches(ctx context.Context, store *database.Store, siteID uuid.UUID,
 			stats.hits += hitCount
 		}
 
+		stats.botHits += seedAIBotHits(&batch, siteID, day, now, rng)
+
 		if day.UTC().Truncate(24 * time.Hour).Equal(now.Truncate(24 * time.Hour)) {
-			fetch := seedDefaultRangeAIFetch(siteID, day, now)
-			batch.addAIFetch(fetch)
-			stats.fetches++
+			for _, spec := range pinnedAIFetches {
+				batch.addAIFetch(seedPinnedAIFetch(siteID, day, now, spec))
+				stats.fetches++
+			}
 		}
 
 		if err := batch.flush(ctx, store); err != nil {
@@ -186,33 +198,131 @@ func seedAIFetches(ctx context.Context, store *database.Store, siteID uuid.UUID,
 		}
 	}
 
-	slog.Info("AI visibility seeded", "fetches", stats.fetches, "ai_referred_sessions", stats.sessions, "ai_referred_hits", stats.hits)
+	slog.Info("AI visibility seeded", "fetches", stats.fetches, "ai_referred_sessions", stats.sessions, "ai_referred_hits", stats.hits, "ai_bot_hits", stats.botHits)
 	return stats, nil
 }
 
-func seedDefaultRangeAIFetch(siteID uuid.UUID, day, now time.Time) *api.AIFetch {
-	hostname := "acme-analytics.io"
+// seedAIBotHits adds tracked pageview hits from AI crawler user agents for one
+// day. It reuses the aiFetchBots user agents and aiFetchTargets paths so the
+// tracked bot traffic and the server-log fetch records show the same agent mix.
+//
+// Bots get single-hit sessions with no referrer and no viewport: real crawlers
+// never report one, and that absence is what distinguishes them from browser
+// sessions in the tracked stream. hk_device falls through to 'Desktop' for a
+// NULL viewport, which is a property of the macro rather than something the
+// fixture should paper over with a fabricated browser size.
+func seedAIBotHits(batch *seedWriteBatch, siteID uuid.UUID, day, now time.Time, rng *mrand.Rand) int {
+	hitsToday := 8 + rng.Intn(5)
+	if day.Weekday() != time.Saturday && day.Weekday() != time.Sunday {
+		hitsToday += rng.Intn(5)
+	}
+
+	hostname := seedDemoHostname
+	for range hitsToday {
+		bot := pickWeighted(rng, aiFetchBots)
+		target := pickWeighted(rng, aiFetchTargets)
+		userAgent := bot.userAgent
+		country := pickWeighted(rng, countries)
+		region, city, provider, asn, asnOrg := seedGeoNetworkMetadata(country, rng)
+
+		batch.addHit(&api.Hit{
+			SiteID:      siteID,
+			SessionID:   uuid.New(),
+			PageID:      uuid.New(),
+			Timestamp:   randomTimeInElapsedDay(rng, day, now),
+			Path:        target.path,
+			Hostname:    &hostname,
+			UserAgent:   &userAgent,
+			CountryCode: country,
+			Region:      region,
+			City:        city,
+			Provider:    provider,
+			ASN:         asn,
+			ASNOrg:      asnOrg,
+			IsUnique:    new(true),
+		})
+	}
+
+	return hitsToday
+}
+
+// pinnedAIFetch describes one deterministic fetch record pinned to a fixed
+// minute of the current day, so the demo always has same-day rows inside the
+// dashboard's default report range.
+type pinnedAIFetch struct {
+	name        string
+	family      string
+	userAgent   string
+	offset      time.Duration
+	responseMs  int
+	bytesServed int64
+	// legacy leaves assistant_category empty, mimicking a row ingested before
+	// that column existed. The merged AI activity report then has to recover the
+	// category at query time through hk_ai_bot_category_from_name(assistant_name).
+	legacy bool
+}
+
+// pinnedAIFetches keeps exactly one legacy record, so the category fallback
+// stays visible in the demo data instead of only in tests.
+var pinnedAIFetches = []pinnedAIFetch{
+	{
+		name:        "GPTBot",
+		family:      "OpenAI",
+		userAgent:   "Mozilla/5.0 (compatible; GPTBot/1.2; +https://openai.com/gptbot)",
+		offset:      15 * time.Minute,
+		responseMs:  144,
+		bytesServed: 28_640,
+	},
+	{
+		name:        "ClaudeBot",
+		family:      "Anthropic",
+		userAgent:   "Mozilla/5.0 (compatible; ClaudeBot/1.0; +https://www.anthropic.com/bot)",
+		offset:      35 * time.Minute,
+		responseMs:  168,
+		bytesServed: 31_200,
+		legacy:      true,
+	},
+}
+
+func seedPinnedAIFetch(siteID uuid.UUID, day, now time.Time, spec pinnedAIFetch) *api.AIFetch {
+	hostname := seedDemoHostname
 	contentType := "text/html; charset=utf-8"
-	responseMs := 144
-	bytesServed := int64(28_640)
-	userAgent := "Mozilla/5.0 (compatible; GPTBot/1.2; +https://openai.com/gptbot)"
-	timestamp := day.UTC().Truncate(24 * time.Hour).Add(15 * time.Minute)
+	responseMs := spec.responseMs
+	bytesServed := spec.bytesServed
+	userAgent := spec.userAgent
+	timestamp := day.UTC().Truncate(24 * time.Hour).Add(spec.offset)
 	if timestamp.After(now) {
 		timestamp = now
 	}
 
-	return &api.AIFetch{
-		SiteID:          siteID,
-		Timestamp:       timestamp,
-		AssistantName:   "GPTBot",
-		AssistantFamily: "OpenAI",
-		Path:            "/docs/getting-started",
-		Hostname:        &hostname,
-		StatusCode:      200,
-		ContentType:     &contentType,
-		ResourceType:    "html",
-		ResponseMs:      &responseMs,
-		BytesServed:     &bytesServed,
-		UserAgent:       &userAgent,
+	category := ""
+	if !spec.legacy {
+		category = classifySeedAssistantCategory(userAgent)
 	}
+
+	return &api.AIFetch{
+		SiteID:            siteID,
+		Timestamp:         timestamp,
+		AssistantName:     spec.name,
+		AssistantFamily:   spec.family,
+		AssistantCategory: category,
+		Path:              "/docs/getting-started",
+		Hostname:          &hostname,
+		StatusCode:        200,
+		ContentType:       &contentType,
+		ResourceType:      "html",
+		ResponseMs:        &responseMs,
+		BytesServed:       &bytesServed,
+		UserAgent:         &userAgent,
+	}
+}
+
+// classifySeedAssistantCategory derives the AI agent category from the seeded
+// user agent with the same classifier the ingest path uses, so demo rows match
+// what a real deployment would have stored.
+func classifySeedAssistantCategory(userAgent string) string {
+	if identity := aianalytics.ClassifyBot(userAgent); identity != nil {
+		return identity.Category
+	}
+	return ""
 }
