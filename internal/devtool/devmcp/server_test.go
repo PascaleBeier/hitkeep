@@ -19,6 +19,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"hitkeep/internal/devtool"
+	"hitkeep/internal/mcptest"
 )
 
 type directCentralResolver struct{ fallback string }
@@ -600,6 +601,10 @@ func TestDeveloperMCPContract(t *testing.T) {
 		if tool.Name == "hk_dev_start" && !tool.Annotations.IdempotentHint {
 			t.Fatal("development start is not marked idempotent")
 		}
+		// Some MCP clients (Claude Code) reject boolean-form property schemas,
+		// which jsonschema-go emits for `any`-typed fields.
+		mcptest.RequireObjectFormPropertySchemas(t, tool.Name, "input", tool.InputSchema)
+		mcptest.RequireObjectFormPropertySchemas(t, tool.Name, "output", tool.OutputSchema)
 	}
 	slices.Sort(got)
 	if !slices.Equal(got, want) {

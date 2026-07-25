@@ -1042,8 +1042,22 @@ func output(app *devtool.App, command string, data any, err error) (*mcp.CallToo
 }
 
 func tool(name, description string, annotation *mcp.ToolAnnotations) *mcp.Tool {
-	return &mcp.Tool{Name: name, Description: description, Annotations: annotation, InputSchema: inputSchema(name)}
+	return &mcp.Tool{Name: name, Description: description, Annotations: annotation, InputSchema: inputSchema(name), OutputSchema: envelopeOutputSchema()}
 }
+
+// envelopeOutputSchema returns the inferred envelope schema with the
+// `any`-typed data field forced into object form. jsonschema-go marshals the
+// empty schema it infers for `any` as the boolean form `true`, which some MCP
+// clients (Claude Code) reject when validating outputSchema properties. A
+// description-only schema stays permissive but serializes as an object.
+var envelopeOutputSchema = sync.OnceValue(func() *jsonschema.Schema {
+	schema, err := jsonschema.For[envelopeOutput](nil)
+	if err != nil {
+		panic(fmt.Errorf("devmcp: infer envelope output schema: %w", err))
+	}
+	schema.Properties["data"] = &jsonschema.Schema{Description: "Command-specific payload."}
+	return schema
+})
 
 func inputSchema(name string) *jsonschema.Schema {
 	properties := map[string]*jsonschema.Schema{
