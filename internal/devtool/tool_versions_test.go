@@ -13,7 +13,7 @@ func TestDevelopmentToolVersionsAreCanonical(t *testing.T) {
 		"golangci-lint": "2.12.2",
 		"govulncheck":   "1.6.0",
 		"staticcheck":   "0.7.0",
-		"zizmor":        "1.26.1",
+		"zizmor":        "1.28.0",
 	}
 	for name, version := range want {
 		if got := ToolVersion(name); got != version {
