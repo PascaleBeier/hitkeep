@@ -16,7 +16,7 @@
             <h3 class="metric-list__title">{{ title() }}</h3>
         </div>
     </div>
-    } @if (isLoading()) {
+    } @if (showSkeleton()) {
     <div [class]="scrollShellClass()">
         <div #scrollFrame class="metric-list__scroll-frame" (scroll)="onScrollFrame()">
             <div class="metric-list__skeletons">
@@ -30,7 +30,7 @@
         </div>
         <div class="metric-list__scroll-fade" aria-hidden="true"></div>
     </div>
-    } @else if (!data() || data().length === 0) {
+    } @else if (!hasRows()) {
     <div [class]="scrollShellClass()">
         <div #scrollFrame class="metric-list__scroll-frame" (scroll)="onScrollFrame()">
             <ul class="metric-list__rows">

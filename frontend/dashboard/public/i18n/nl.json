@@ -2806,24 +2806,24 @@
       "docsAction": "Lees de installatiegids"
     },
     "fetchDepth": {
+      "title": "Fetchdiepte van crawlers",
       "description": "Wat doorgestuurde CDN-, edge- en serverlogs daar bovenop tonen: crawlers die je tracking nooit ziet, hun statuscodes, responstijden, geleverde bytes en hoe fetches bezoeken worden.",
       "docsAction": "Installatiegids",
+      "note": "Gecorreleerde bezoeken tellen latere door AI verwezen bezoeken op hetzelfde pad binnen het gekozen bereik.",
+      "groups": {
+        "volume": "Fetchvolume",
+        "correlation": "Van fetch naar bezoek",
+        "health": "Leveringskwaliteit"
+      },
       "kpis": {
         "totalFetches": "Totaal aantal opgehaald",
+        "correlatedPaths": "Gecorreleerde paden",
+        "aiReferredVisits": "Latere AI-verwezen bezoeken",
+        "uncorrelatedFetches": "Niet-gecorreleerde ophaalacties",
         "errorRate4xx": "4xx tarief",
         "errorRate5xx": "5xx tarief",
         "medianResponse": "Gemiddelde reactie",
         "bytesServed": "Bytes geserveerd"
-      },
-      "correlation": {
-        "title": "Correlatie tussen ophalen en bezoeken",
-        "description": "Meet welke opgehaalde paden later door AI verwezen menselijke bezoeken aantrekken en welke hoog opgehaalde pagina's nog steeds niet worden omgezet in downstream verkeer.",
-        "note": "Gecorreleerde bezoeken tellen latere door AI verwezen bezoeken op hetzelfde pad binnen het gekozen bereik.",
-        "kpis": {
-          "correlatedPaths": "Gecorreleerde paden",
-          "aiReferredVisits": "Latere AI-verwezen bezoeken",
-          "uncorrelatedFetches": "Niet-gecorreleerde ophaalacties"
-        }
       },
       "tables": {
         "title": "Uitsplitsingen van de correlatie",

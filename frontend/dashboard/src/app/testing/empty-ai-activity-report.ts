@@ -1,4 +1,4 @@
-import type { AIActivityComparison, AIActivityReport, AIActivityStat } from '@models/analytics.types';
+import type { AIActivityComparison, AIActivityReport, AIActivityStat, AIFetchCorrelationReport } from '@models/analytics.types';
 
 /**
  * All-zero `AIActivityReport` for specs, so a test only spells out the fields it
@@ -40,6 +40,24 @@ export function emptyAIActivityComparison(overrides: Partial<AIActivityCompariso
         paths_crawled: 0,
         unique_agents: 0,
         pageviews: 0,
+        ...overrides
+    };
+}
+
+/** All-zero fetch-only correlation report, the twin of `emptyAIActivityReport`. */
+export function emptyAIFetchCorrelation(overrides: Partial<AIFetchCorrelationReport> = {}): AIFetchCorrelationReport {
+    return {
+        summary: {
+            total_fetches: 0,
+            fetched_paths: 0,
+            correlated_paths: 0,
+            ai_referred_visits: 0,
+            uncorrelated_fetches: 0
+        },
+        citation_yield: [],
+        citation_paths: [],
+        opportunity_pages: [],
+        failure_hotspots: [],
         ...overrides
     };
 }

@@ -2823,24 +2823,24 @@
       "docsAction": "Lire le guide de configuration"
     },
     "fetchDepth": {
+      "title": "Profondeur de fetch des crawlers",
       "description": "Ce que les logs CDN, edge et serveur transférés ajoutent : les crawlers que votre suivi ne voit jamais, leurs codes de statut, temps de réponse, octets servis et la façon dont les fetchs deviennent des visites.",
       "docsAction": "Guide de configuration",
+      "note": "Les visites corrélées comptent les visites ultérieures référées par l’IA sur le même chemin dans la période sélectionnée.",
+      "groups": {
+        "volume": "Volume de fetch",
+        "correlation": "Du fetch à la visite",
+        "health": "Qualité de livraison"
+      },
       "kpis": {
         "totalFetches": "Fetchs totaux",
+        "correlatedPaths": "Chemins corrélés",
+        "aiReferredVisits": "Visites ultérieures référées par l’IA",
+        "uncorrelatedFetches": "Fetchs non corrélés",
         "errorRate4xx": "Taux 4xx",
         "errorRate5xx": "Taux 5xx",
         "medianResponse": "Réponse médiane",
         "bytesServed": "Octets servis"
-      },
-      "correlation": {
-        "title": "Corrélation fetch-visite",
-        "description": "Mesure quels chemins récupérés attirent ensuite des visites humaines référées par l’IA et quelles pages fortement fetchées ne créent toujours pas de trafic aval.",
-        "note": "Les visites corrélées comptent les visites ultérieures référées par l’IA sur le même chemin dans la période sélectionnée.",
-        "kpis": {
-          "correlatedPaths": "Chemins corrélés",
-          "aiReferredVisits": "Visites ultérieures référées par l’IA",
-          "uncorrelatedFetches": "Fetchs non corrélés"
-        }
       },
       "tables": {
         "title": "Ventilations de la corrélation",

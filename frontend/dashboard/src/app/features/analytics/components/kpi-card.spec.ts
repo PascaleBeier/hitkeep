@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { KpiCard } from '@features/analytics/components/kpi-card';
+import { ReportSubjectService } from '@services/report-subject.service';
 import { vi } from 'vitest';
 
 describe('KpiCard', () => {
@@ -132,37 +133,77 @@ describe('KpiCard', () => {
         expect(fixture.nativeElement.querySelector('[aria-live]')).toBeNull();
     });
 
-    it('cues only when a mounted value changes with an advancing update key', async () => {
+    it('cues a value that changes without an advancing update key', async () => {
         fixture.componentRef.setInput('value', 42);
-        fixture.componentRef.setInput('updateKey', 1);
         await fixture.whenStable();
 
+        fixture.componentRef.setInput('loading', true);
+        await fixture.whenStable();
+        fixture.componentRef.setInput('loading', false);
         fixture.componentRef.setInput('value', 43);
-        fixture.componentRef.setInput('updateKey', 2);
         await fixture.whenStable();
 
         expect(fixture.nativeElement.querySelector('.hk-kpi-card__update-cue')).not.toBeNull();
-        expect(fixture.nativeElement.querySelector('p-skeleton')).toBeNull();
     });
 
-    it('suppresses cues for unchanged values, non-advancing keys, and blocking loads', async () => {
+    it('cues an advancing update key that lands on the same value', async () => {
         fixture.componentRef.setInput('value', 42);
         fixture.componentRef.setInput('updateKey', 2);
         await fixture.whenStable();
 
         fixture.componentRef.setInput('updateKey', 3);
         await fixture.whenStable();
-        expect(fixture.nativeElement.querySelector('.hk-kpi-card__update-cue')).toBeNull();
 
-        fixture.componentRef.setInput('value', 43);
+        expect(fixture.nativeElement.querySelector('.hk-kpi-card__update-cue')).not.toBeNull();
+    });
+
+    it('suppresses cues when neither the value nor the key moved', async () => {
+        fixture.componentRef.setInput('value', 42);
+        fixture.componentRef.setInput('updateKey', 2);
         await fixture.whenStable();
+
+        fixture.componentRef.setInput('valueClass', 'text-xl');
+        await fixture.whenStable();
+
         expect(fixture.nativeElement.querySelector('.hk-kpi-card__update-cue')).toBeNull();
+    });
+
+    it('suppresses cues while the skeleton is showing', async () => {
+        const loadingFixture = TestBed.createComponent(KpiCard);
+        loadingFixture.componentRef.setInput('label', 'Visitors');
+        loadingFixture.componentRef.setInput('value', 42);
+        loadingFixture.componentRef.setInput('loading', true);
+        await loadingFixture.whenStable();
+
+        loadingFixture.componentRef.setInput('value', 44);
+        loadingFixture.componentRef.setInput('updateKey', 4);
+        await loadingFixture.whenStable();
+
+        expect(loadingFixture.nativeElement.querySelector('.hk-kpi-card__update-cue')).toBeNull();
+        expect(loadingFixture.nativeElement.querySelector('p-skeleton')).not.toBeNull();
+    });
+
+    it('keeps the painted value on screen while a reload for the same subject runs', async () => {
+        fixture.componentRef.setInput('value', 42);
+        await fixture.whenStable();
 
         fixture.componentRef.setInput('loading', true);
-        fixture.componentRef.setInput('value', 44);
-        fixture.componentRef.setInput('updateKey', 4);
         await fixture.whenStable();
-        expect(fixture.nativeElement.querySelector('.hk-kpi-card__update-cue')).toBeNull();
+
+        expect(fixture.nativeElement.querySelector('p-skeleton')).toBeNull();
+        expect(fixture.nativeElement.querySelector('app-animated-number')).not.toBeNull();
+    });
+
+    it('falls back to the skeleton when the reload belongs to a different subject', async () => {
+        fixture.componentRef.setInput('value', 42);
+        await fixture.whenStable();
+
+        TestBed.inject(ReportSubjectService).set('another-site');
+        fixture.componentRef.setInput('loading', true);
+        await fixture.whenStable();
+
+        expect(fixture.nativeElement.querySelector('p-skeleton')).not.toBeNull();
+        expect(fixture.nativeElement.querySelector('app-animated-number')).toBeNull();
     });
 
     it('restarts the keyed cue for rapid updates and removes it 600ms after the latest change', async () => {

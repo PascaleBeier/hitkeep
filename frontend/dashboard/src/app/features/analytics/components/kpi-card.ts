@@ -3,6 +3,7 @@ import { AnimatedDuration } from '@components/animated-duration/animated-duratio
 import { AnimatedNumber } from '@components/animated-number/animated-number';
 import { CardModule } from '@openng/optimus-ui/card';
 import { SkeletonModule } from '@openng/optimus-ui/skeleton';
+import { injectSkeletonGate } from '@services/report-subject.service';
 
 export const KPI_PERCENT_FORMAT: Intl.NumberFormatOptions = Object.freeze({
     minimumFractionDigits: 1,
@@ -58,7 +59,7 @@ export interface KpiCardModel {
                 }
                 <span class="hk-kpi-card__content text-sm font-medium text-muted-color">{{ label() }}</span>
                 <div [class]="displayClass()">
-                    @if (loading()) {
+                    @if (showSkeleton()) {
                         <p-skeleton width="60%" height="2rem" />
                     } @else {
                         @let numeric = numericValue();
@@ -74,7 +75,7 @@ export interface KpiCardModel {
                     }
                 </div>
                 @let deltaValue = normalizedDelta();
-                @if (!loading() && deltaValue !== null) {
+                @if (!showSkeleton() && deltaValue !== null) {
                     <div class="hk-kpi-card__content flex items-center gap-1">
                         <span [class]="deltaClass()"><app-animated-number [value]="deltaValue" [format]="deltaFormat" /></span>
                     </div>
@@ -131,7 +132,10 @@ export class KpiCard implements OnChanges, OnDestroy {
 
     private cueSequence = 0;
     private cueTimer: ReturnType<typeof setTimeout> | null = null;
+    /** Whether a value was on screen before the change currently being handled. */
+    private hasPaintedValue = false;
 
+    protected readonly showSkeleton = injectSkeletonGate(this.loading);
     protected readonly updateCues = signal<readonly number[]>([]);
     protected readonly deltaFormat = KPI_DELTA_FORMAT;
     protected displayClass = computed(() => `hk-kpi-card__content ${this.valueClass() || 'text-2xl xl:text-3xl font-bold'}`);
@@ -155,9 +159,22 @@ export class KpiCard implements OnChanges, OnDestroy {
     });
 
     ngOnChanges(changes: SimpleChanges): void {
-        const updateKey = changes['updateKey'];
+        const skeleton = this.showSkeleton();
+        const wasPainted = this.hasPaintedValue;
+        this.hasPaintedValue = !skeleton;
+        if (skeleton || !wasPainted) {
+            // Nothing was on screen to change: the first value after a skeleton
+            // is an arrival, not an update.
+            return;
+        }
+
         const value = changes['value'];
-        if (!updateKey || updateKey.firstChange || Number(updateKey.currentValue) <= Number(updateKey.previousValue) || !value || value.firstChange || Object.is(value.previousValue, value.currentValue) || this.loading()) {
+        const valueChanged = !!value && !value.firstChange && !Object.is(value.previousValue, value.currentValue);
+        // An advancing key cues a refresh that happened to land on the same
+        // number, which a value comparison alone cannot see.
+        const updateKey = changes['updateKey'];
+        const keyAdvanced = !!updateKey && !updateKey.firstChange && Number(updateKey.currentValue) > Number(updateKey.previousValue);
+        if (!valueChanged && !keyAdvanced) {
             return;
         }
 

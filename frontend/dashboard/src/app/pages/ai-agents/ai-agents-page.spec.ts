@@ -15,7 +15,7 @@ import { SiteService } from '@features/sites/services/site.service';
 import type { AIActivityReport, AIFetchCorrelationReport } from '@models/analytics.types';
 import { RealtimeEvent, RealtimeService } from '@services/realtime.service';
 import { ShareService } from '@services/share.service';
-import { aiActivityStat, emptyAIActivityComparison, emptyAIActivityReport } from '@testing/empty-ai-activity-report';
+import { aiActivityStat, emptyAIActivityComparison, emptyAIActivityReport, emptyAIFetchCorrelation } from '@testing/empty-ai-activity-report';
 import { flushSetupState } from '@testing/setup-state';
 import { AIAgentsPage } from './ai-agents-page';
 
@@ -31,16 +31,21 @@ interface AgentKpiCard {
 interface StatStrip {
     label: string;
     value: string;
+    isLoading: boolean;
+}
+
+interface StatStripGroup {
+    id: string;
+    label: string;
+    stats: StatStrip[];
 }
 
 interface PageInternals {
     breadcrumbItems: () => PageBreadcrumbItem[];
     kpiCards: () => AgentKpiCard[];
     cardGroups: () => MetricCardGroupTab[];
-    correlationTabs: () => MetricCardGroupTab[];
     correlation: () => AIFetchCorrelationReport | null;
-    healthStats: () => StatStrip[];
-    correlationSummaryStats: () => StatStrip[];
+    fetchDepthGroups: () => StatStripGroup[];
     filterChips: () => FilterChipItem[];
     chartConfig: () => SeriesDefinition[];
     heroChartData: () => SeriesChartPoint[];
@@ -60,21 +65,6 @@ const SETUP_STATE_URL = '/api/sites/site-1/setup-state';
 const DOCS_URL = 'https://hitkeep.com/guides/tracking/ai-fetch-ingest/';
 
 const BUCKET = '2026-07-10T00:00:00Z';
-
-const emptyCorrelation = (overrides: Partial<AIFetchCorrelationReport> = {}): AIFetchCorrelationReport => ({
-    summary: {
-        total_fetches: 0,
-        fetched_paths: 0,
-        correlated_paths: 0,
-        ai_referred_visits: 0,
-        uncorrelated_fetches: 0
-    },
-    citation_yield: [],
-    citation_paths: [],
-    opportunity_pages: [],
-    failure_hotspots: [],
-    ...overrides
-});
 
 describe('AIAgentsPage', () => {
     let fixture: ComponentFixture<AIAgentsPage>;
@@ -105,7 +95,7 @@ describe('AIAgentsPage', () => {
         return filters;
     };
 
-    const flushCorrelation = (report: AIFetchCorrelationReport = emptyCorrelation()): number => {
+    const flushCorrelation = (report: AIFetchCorrelationReport = emptyAIFetchCorrelation()): number => {
         const requests = matching(CORRELATION_URL);
         for (const request of requests) request.flush(report);
         fixture.detectChanges();
@@ -158,19 +148,20 @@ describe('AIAgentsPage', () => {
                                 },
                                 filters: { scopeHits: 'tracked visits only' },
                                 fetchDepth: {
+                                    title: 'Crawler fetch depth',
+                                    description: 'What forwarded logs add on top.',
                                     docsAction: 'Setup guide',
+                                    note: 'Correlated visits include later AI-referred visits on the same path.',
+                                    groups: { volume: 'Fetch volume', correlation: 'Fetch-to-visit', health: 'Delivery health' },
                                     kpis: {
                                         totalFetches: 'Total fetches',
+                                        correlatedPaths: 'Correlated paths',
+                                        aiReferredVisits: 'Later AI-referred visits',
+                                        uncorrelatedFetches: 'Uncorrelated fetches',
                                         errorRate4xx: '4xx rate',
                                         errorRate5xx: '5xx rate',
                                         medianResponse: 'Median response',
                                         bytesServed: 'Bytes served'
-                                    },
-                                    correlation: {
-                                        title: 'Fetch-to-visit correlation',
-                                        description: 'Which fetched paths attract AI-referred visits.',
-                                        note: 'Correlated visits include later AI-referred visits on the same path.',
-                                        kpis: { correlatedPaths: 'Correlated paths', aiReferredVisits: 'Later AI-referred visits', uncorrelatedFetches: 'Uncorrelated fetches' }
                                     },
                                     tables: {
                                         title: 'Correlation breakdowns',
@@ -374,7 +365,7 @@ describe('AIAgentsPage', () => {
         flushActivity(report);
 
         const groups = instance().cardGroups();
-        expect(groups.map((group) => group.id)).toEqual(['ai-activity', 'by-category', 'fetch-depth']);
+        expect(groups.map((group) => group.id)).toEqual(['ai-activity', 'by-category', 'fetch-depth', 'correlation']);
         const activity = groups[0].cards;
         expect(activity.map((card) => card.id)).toEqual(['agents', 'categories', 'paths', 'sources']);
         expect(activity[0].data).toBe(report.top_agents);
@@ -489,7 +480,7 @@ describe('AIAgentsPage', () => {
         httpMock.expectNone(CORRELATION_URL);
     });
 
-    it('renders one fetch-only strip and no second stat block over it', () => {
+    it('splits the fetch-depth scalars into volume, correlation and delivery health strips', () => {
         create();
         flushActivity(
             emptyAIActivityReport({
@@ -503,27 +494,82 @@ describe('AIAgentsPage', () => {
             })
         );
         answerSetupState(true);
-        flushCorrelation();
+        flushCorrelation(emptyAIFetchCorrelation({ summary: { total_fetches: 12500, fetched_paths: 14, correlated_paths: 5, ai_referred_visits: 9, uncorrelated_fetches: 40 } }));
 
         expect(instance().showHealthStrip()).toBe(true);
-        // Every entry is a fetch-only scalar: no merged number (paths_crawled,
+        // How much was fetched, what it was worth, how it was served — three
+        // strips a reader can compare within. No merged number (paths_crawled,
         // unique_agents) sneaks in under the log-ingest heading.
-        expect(instance().healthStats()).toEqual([
-            { label: 'Total fetches', value: '12,500' },
-            { label: '4xx rate', value: '2.5%' },
-            { label: '5xx rate', value: '0.5%' },
-            { label: 'Median response', value: '842 ms' },
-            { label: 'Bytes served', value: '1 KB' }
+        expect(instance().fetchDepthGroups()).toEqual([
+            {
+                id: 'volume',
+                label: 'Fetch volume',
+                isLoading: false,
+                stats: [
+                    { label: 'Total fetches', value: '12,500' },
+                    { label: 'Bytes served', value: '1 KB' }
+                ]
+            },
+            {
+                id: 'correlation',
+                label: 'Fetch-to-visit',
+                isLoading: false,
+                stats: [
+                    { label: 'Correlated paths', value: '5' },
+                    { label: 'Later AI-referred visits', value: '9' },
+                    { label: 'Uncorrelated fetches', value: '40' }
+                ]
+            },
+            {
+                id: 'health',
+                label: 'Delivery health',
+                isLoading: false,
+                stats: [
+                    { label: '4xx rate', value: '2.5%' },
+                    { label: '5xx rate', value: '0.5%' },
+                    { label: 'Median response', value: '842 ms' }
+                ]
+            }
         ]);
-        const strips = fixture.nativeElement.querySelectorAll('[data-testid="ai-visibility-health-strip"]');
-        expect(strips.length).toBe(1);
-        // The duplicated KPI row above the strip is gone for good.
+        const strip = fixture.nativeElement.querySelector('[data-testid="ai-visibility-fetch-depth-strips"]');
+        // The duplicated KPI row above the strips is gone for good.
         expect(fixture.nativeElement.querySelector('[data-testid="ai-visibility-headline-kpis"]')).toBeNull();
-        expect(strips[0].textContent).not.toContain('Unique paths');
-        expect(strips[0].textContent).not.toContain('14');
+        expect(strip.textContent).not.toContain('Unique paths');
+        expect(strip.textContent).not.toContain('14');
+        // Three labelled strips, eight tiles, one card — and the export tools ride
+        // in that card's header.
+        expect([...strip.querySelectorAll('h3')].map((heading: HTMLElement) => heading.textContent?.trim())).toEqual(['Fetch volume', 'Fetch-to-visit', 'Delivery health']);
+        expect(strip.querySelectorAll('.stat-groups__tile').length).toBe(8);
+        const card = fixture.nativeElement.querySelector('[data-testid="ai-visibility-fetch-depth"]');
+        expect(card.querySelector('app-export-split-button')).not.toBeNull();
+        expect(card.querySelector('a').getAttribute('href')).toBe(DOCS_URL);
     });
 
-    it('loads the correlation report once logs contribute and renders the screenshot blocks', () => {
+    it('skeletons only the correlation strip while its own request is in flight', () => {
+        create();
+        flushActivity(emptyAIActivityReport({ fetch_count: 120, error_rate_4xx: 1 }));
+        answerSetupState(true);
+
+        // The activity report has landed, the correlation request has not.
+        expect(
+            instance()
+                .fetchDepthGroups()
+                .map((group) => group.isLoading)
+        ).toEqual([false, true, false]);
+        expect(fixture.nativeElement.querySelectorAll('[data-testid="ai-visibility-stat-group-correlation"] p-skeleton').length).toBe(3);
+        expect(fixture.nativeElement.querySelectorAll('[data-testid="ai-visibility-fetch-depth-strips"] p-skeleton').length).toBe(3);
+
+        flushCorrelation();
+
+        expect(
+            instance()
+                .fetchDepthGroups()
+                .every((group) => group.isLoading === false)
+        ).toBe(true);
+        expect(fixture.nativeElement.querySelectorAll('[data-testid="ai-visibility-fetch-depth-strips"] p-skeleton').length).toBe(0);
+    });
+
+    it('loads the correlation report once logs contribute and merges it into the one grid', () => {
         create();
         flushActivity(emptyAIActivityReport({ fetch_count: 120, unique_agents: 3, error_rate_4xx: 1, error_rate_5xx: 1 }));
         answerSetupState(true);
@@ -531,7 +577,7 @@ describe('AIAgentsPage', () => {
         const requests = matching(CORRELATION_URL);
         expect(requests.length).toBe(1);
         requests[0].flush(
-            emptyCorrelation({
+            emptyAIFetchCorrelation({
                 summary: { total_fetches: 120, fetched_paths: 14, correlated_paths: 5, ai_referred_visits: 9, uncorrelated_fetches: 40 },
                 citation_yield: [{ path: '/docs', assistant_name: 'GPTBot', fetch_count: 40, ai_referred_visits: 6, citation_yield_pct: 15 }],
                 citation_paths: [{ path: '/docs', fetch_count: 40, ai_referred_visits: 6 }],
@@ -542,23 +588,24 @@ describe('AIAgentsPage', () => {
         fixture.detectChanges();
 
         expect(instance().showFetchTools()).toBe(true);
-        // The AI-referred visits number lives here, next to what it correlates.
-        expect(instance().correlationSummaryStats()).toEqual([
-            { label: 'Correlated paths', value: '5' },
-            { label: 'Later AI-referred visits', value: '9' },
-            { label: 'Uncorrelated fetches', value: '40' }
-        ]);
-        const groups = instance().correlationTabs();
-        // The card group carries its own label so the section heading is not repeated.
-        expect(groups.map((group) => group.label)).toEqual(['Correlation breakdowns']);
-        expect(groups.flatMap((group) => group.cards).map((card) => card.title)).toEqual(['Citation yield', 'Opportunity pages', 'Failure hotspots']);
+        const correlation = instance()
+            .cardGroups()
+            .find((group) => group.id === 'correlation');
+        expect(correlation?.label).toBe('Correlation breakdowns');
+        expect(correlation?.cards.map((card) => card.title)).toEqual(['Citation yield', 'Opportunity pages', 'Failure hotspots']);
         // Share-of-total is meaningless for correlation rows, so the column is off.
-        expect(groups.flatMap((group) => group.cards).map((card) => card.showShare)).toEqual([false, false, false]);
+        expect(correlation?.cards.map((card) => card.showShare)).toEqual([false, false, false]);
+        // One grid holds every breakdown, and the standalone correlation section is gone.
+        expect(fixture.nativeElement.querySelectorAll('app-metric-card-group').length).toBe(1);
         const headings = [...fixture.nativeElement.querySelectorAll('h2, h3')].map((heading: HTMLElement) => heading.textContent?.trim());
-        expect(headings.filter((heading) => heading === 'Fetch-to-visit correlation').length).toBe(1);
+        expect(headings.filter((heading) => heading === 'Fetch-to-visit correlation').length).toBe(0);
+        expect(headings).toContain('Crawler fetch depth');
         expect(headings).toContain('Correlation breakdowns');
-        for (const testId of ['ai-visibility-correlation-shot', 'ai-visibility-correlation-kpis', 'ai-visibility-correlation-tables']) {
+        for (const testId of ['ai-visibility-fetch-depth', 'ai-visibility-fetch-depth-strips', 'metric-card-group-correlation']) {
             expect(fixture.nativeElement.querySelector(`[data-testid="${testId}"]`)).not.toBeNull();
+        }
+        for (const gone of ['ai-visibility-correlation-shot', 'ai-visibility-correlation-kpis', 'ai-visibility-correlation-summary']) {
+            expect(fixture.nativeElement.querySelector(`[data-testid="${gone}"]`)).toBeNull();
         }
     });
 
@@ -567,7 +614,7 @@ describe('AIAgentsPage', () => {
         flushActivity(emptyAIActivityReport({ fetch_count: 120 }));
         answerSetupState(true);
         flushCorrelation(
-            emptyCorrelation({
+            emptyAIFetchCorrelation({
                 // Per-pair rows are session-overlapping and capped by yield before
                 // aggregation: summing them here would report 5 and 5 visits.
                 citation_yield: [
@@ -588,9 +635,10 @@ describe('AIAgentsPage', () => {
             })
         );
 
-        const cards = instance()
-            .correlationTabs()
-            .flatMap((group) => group.cards);
+        const cards =
+            instance()
+                .cardGroups()
+                .find((group) => group.id === 'correlation')?.cards ?? [];
         // The distinct per-path counts and their server ranking pass through untouched.
         expect(cards[0].data).toEqual([
             { name: '/', value: 4 },
@@ -622,7 +670,7 @@ describe('AIAgentsPage', () => {
         expect(last.params.get('path')).toBe('/docs');
         // Superseded correlation requests are cancelled, so only the live one answers.
         expect(requests.slice(0, -1).every((request) => request.cancelled)).toBe(true);
-        requests[requests.length - 1].flush(emptyCorrelation());
+        requests[requests.length - 1].flush(emptyAIFetchCorrelation());
         fixture.detectChanges();
 
         const exportUrl = instance().exportUrl();
@@ -657,6 +705,27 @@ describe('AIAgentsPage', () => {
         expect(instance().showFetchTools()).toBe(false);
         expect(instance().showEnrichCallout()).toBe(false);
         expect(fixture.nativeElement.querySelector('app-export-split-button')).toBeNull();
+        // No correlation endpoint behind a share token, so the card keeps the two
+        // fetch-only strips and the breakdown grid grows no correlation card.
+        expect(
+            instance()
+                .fetchDepthGroups()
+                .map((group) => group.id)
+        ).toEqual(['volume', 'health']);
+        expect(
+            instance()
+                .fetchDepthGroups()
+                .flatMap((group) => group.stats.map((stat) => stat.label))
+        ).toEqual(['Total fetches', 'Bytes served', '4xx rate', '5xx rate', 'Median response']);
+        expect(fixture.nativeElement.querySelector('[data-testid="ai-visibility-stat-group-correlation"]')).toBeNull();
+        expect(
+            instance()
+                .cardGroups()
+                .find((group) => group.id === 'correlation')?.cards
+        ).toEqual([]);
+        expect(fixture.nativeElement.querySelector('[data-testid="metric-card-group-correlation"]')).toBeNull();
+        // The footnote explains tiles this strip does not have.
+        expect(fixture.nativeElement.querySelector('[data-testid="ai-visibility-fetch-depth"]').textContent).not.toContain('Correlated visits include');
         httpMock.expectNone(SETUP_STATE_URL);
         httpMock.expectNone(CORRELATION_URL);
     });
@@ -700,7 +769,7 @@ describe('AIAgentsPage', () => {
             create();
             flushActivity(emptyAIActivityReport({ fetch_count: 120 }));
             answerSetupState(true);
-            flushCorrelation(emptyCorrelation({ summary: { total_fetches: 120, fetched_paths: 4, correlated_paths: 2, ai_referred_visits: 3, uncorrelated_fetches: 1 } }));
+            flushCorrelation(emptyAIFetchCorrelation({ summary: { total_fetches: 120, fetched_paths: 4, correlated_paths: 2, ai_referred_visits: 3, uncorrelated_fetches: 1 } }));
             expect(instance().correlation()).not.toBeNull();
 
             // A realtime refresh reissues both requests; the correlation one is left open.

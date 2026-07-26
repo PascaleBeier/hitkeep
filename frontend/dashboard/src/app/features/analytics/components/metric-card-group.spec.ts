@@ -48,6 +48,17 @@ describe('MetricCardGroup', () => {
         expect(fixture.nativeElement.textContent).not.toContain('Network');
     });
 
+    it('anchors the grid and every group card on a test id derived from the group', () => {
+        fixture.componentRef.setInput('tabs', [
+            { id: 'content', label: 'Content', cards: [{ id: 'pages', title: 'Pages', data: [{ name: '/', value: 3 }] }] },
+            { id: 'network', label: 'Network', cards: [{ id: 'hosts', title: 'Hosts', data: [{ name: 'cdn', value: 1 }] }] }
+        ]);
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.querySelector('[data-testid="metric-card-group"]')).not.toBeNull();
+        expect(fixture.debugElement.queryAll(By.css('p-card')).map((card) => card.nativeElement.getAttribute('data-testid'))).toEqual(['metric-card-group-content', 'metric-card-group-network']);
+    });
+
     it('renders related metrics as tabs inside one card', () => {
         fixture.componentRef.setInput('tabs', [
             {

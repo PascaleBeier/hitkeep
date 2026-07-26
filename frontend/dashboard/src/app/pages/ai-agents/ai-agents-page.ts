@@ -13,12 +13,13 @@ import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
 import { SetupCallout } from '@components/setup-callout/setup-callout';
+import { StatGroup, StatGroups } from '@components/stat-groups/stat-groups';
 import { calcDelta, safeRate } from '@core/analytics/delta-utils';
 import { buildTakeoutExportFilename, DEFAULT_HITS_EXPORT_FORMAT, TakeoutExportFormat, withTakeoutExportFormat } from '@core/export/export-formats';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { localeForLanguage } from '@core/i18n/duration-format';
 import { AnalyticsService } from '@core/services/analytics.service';
-import { AIActivityFilterType, buildAIActivityCardGroups } from '@features/analytics/ai-activity-cards';
+import { AIActivityFilterType, buildAIActivityCardGroups, type AICorrelationRows } from '@features/analytics/ai-activity-cards';
 import { aiFilterChipLabel } from '@features/analytics/ai-category-labels';
 import { KPI_PERCENT_FORMAT, KpiCard, KpiCardModel } from '@features/analytics/components/kpi-card';
 import { MetricCardGroup, MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
@@ -31,6 +32,7 @@ import { formatBytes, formatResponseMs } from '@pages/ai-agents/ai-agents-page.u
 import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
 import { REALTIME_KINDS } from '@services/realtime.service';
 import { injectReportRange } from '@services/report-range-preferences.service';
+import { injectSkeletonGate } from '@services/report-subject.service';
 import { SetupStateService } from '@services/setup-state.service';
 import { ShareService } from '@services/share.service';
 import { TakeoutDownloadService } from '@services/takeout-download.service';
@@ -47,16 +49,6 @@ interface AIPageFilter {
 }
 
 /**
- * One label/value pair of a stat strip; the block's own loading flag drives the
- * skeleton. Values are pre-formatted for the active locale, so the template
- * renders them verbatim.
- */
-interface StatStripEntry {
-    label: string;
-    value: string;
-}
-
-/**
  * The one AI analytics surface. A single `ai-activity` request per site, range
  * and filter set carries the merged picture — tracked hits plus whatever
  * forwarded crawler logs add — so the KPI band, the hero chart and every
@@ -68,7 +60,24 @@ interface StatStripEntry {
  */
 @Component({
     selector: 'app-ai-agents-page',
-    imports: [TranslocoPipe, ButtonModule, CardModule, PageHeader, PageHeaderLeft, PageBreadcrumb, ReportRangeToolbar, NoSiteSelected, SetupCallout, FilterChipRow, KpiCard, SeriesChart, MetricCardGroup, ExportSplitButton, ExportStatusBanner],
+    imports: [
+        TranslocoPipe,
+        ButtonModule,
+        CardModule,
+        StatGroups,
+        PageHeader,
+        PageHeaderLeft,
+        PageBreadcrumb,
+        ReportRangeToolbar,
+        NoSiteSelected,
+        SetupCallout,
+        FilterChipRow,
+        KpiCard,
+        SeriesChart,
+        MetricCardGroup,
+        ExportSplitButton,
+        ExportStatusBanner
+    ],
     templateUrl: './ai-agents-page.html',
     styleUrl: './ai-agents-page.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -110,6 +119,12 @@ export class AIAgentsPage {
     protected readonly correlation = signal<AIFetchCorrelationReport | null>(null);
     protected readonly isLoadingCorrelation = signal(false);
     private correlationRequest: Subscription | null = null;
+
+    // The fetch-depth strips are plain text, so they cannot tween like the KPI
+    // cards. Gating them on the same rule at least keeps them from pulsing next
+    // to numbers that stayed on screen.
+    private readonly showReportSkeleton = injectSkeletonGate(this.isLoading, () => this.report() !== null);
+    private readonly showCorrelationSkeleton = injectSkeletonGate(this.isLoadingCorrelation, () => this.correlation() !== null);
 
     protected readonly isExporting = signal(false);
     protected readonly exportState = signal<'idle' | 'success' | 'error'>('idle');
@@ -218,94 +233,87 @@ export class AIAgentsPage {
         ];
     });
 
+    /**
+     * Mapped once per correlation report, not once per card rebuild: the metric
+     * list re-observes its scroll frame whenever `data` changes identity, and the
+     * card models are rebuilt on every report, filter and language change.
+     */
+    private readonly correlationRows = computed<AICorrelationRows | null>(() => {
+        const correlation = this.correlation();
+        if (!correlation) return null;
+        return {
+            citationPaths: correlation.citation_paths.map((row) => ({ name: row.path, value: row.ai_referred_visits })),
+            opportunityPages: correlation.opportunity_pages.map((row) => ({ name: row.path, value: row.fetch_count })),
+            failureHotspots: correlation.failure_hotspots.map((row) => ({ name: `${row.assistant_name} · ${row.path_prefix}`, value: row.error_requests }))
+        };
+    });
+
     protected readonly cardGroups = computed<MetricCardGroupTab<AIActivityFilterType>[]>(() => {
         this.activeLanguage();
-        return buildAIActivityCardGroups(this.transloco, this.report(), this.isLoading(), (type) => this.activeFilterValue(type), this.site()?.domain ?? null);
+        // The correlation breakdowns are one group of this same grid, so the page
+        // renders a single card surface. Passing `null` is what withholds the group
+        // wherever its endpoint is out of reach.
+        return buildAIActivityCardGroups({
+            transloco: this.transloco,
+            report: this.report(),
+            isLoading: this.isLoading(),
+            activeValueFor: (type) => this.activeFilterValue(type),
+            siteDomain: this.site()?.domain ?? null,
+            correlation: this.showFetchTools() ? { rows: this.correlationRows(), isLoading: this.isLoadingCorrelation() } : null
+        });
     });
 
     /**
-     * The one stat block of the fetch-depth zone. Every entry is a fetch-only
-     * scalar: the merged counters (paths_crawled, unique_agents) are headline
-     * KPIs of the whole page and would claim to be log-derived down here.
+     * The fetch-depth card's scalars, in themed strips a reader can compare
+     * within: how much was fetched, what those fetches were worth, and how they
+     * were served. The merged counters (paths_crawled, unique_agents) stay
+     * headline KPIs of the whole page and would claim to be log-derived here.
+     *
+     * The middle strip crosses over to the tracked side, so it only exists where
+     * the correlation endpoint is reachable and carries that request's loading
+     * flag: a share token reads two strips, everyone else three.
      */
-    protected readonly healthStats = computed<StatStripEntry[]>(() => {
+    protected readonly fetchDepthGroups = computed<StatGroup[]>(() => {
         this.activeLanguage();
         const report = this.report();
         const locale = this.localeTag();
-        return [
-            { label: this.transloco.translate('aiAgents.fetchDepth.kpis.totalFetches'), value: this.localizeCount(report?.fetch_count ?? 0) },
-            { label: this.transloco.translate('aiAgents.fetchDepth.kpis.errorRate4xx'), value: this.localizeRate(report?.error_rate_4xx ?? 0) },
-            { label: this.transloco.translate('aiAgents.fetchDepth.kpis.errorRate5xx'), value: this.localizeRate(report?.error_rate_5xx ?? 0) },
-            { label: this.transloco.translate('aiAgents.fetchDepth.kpis.medianResponse'), value: formatResponseMs(report?.median_response_ms ?? 0, locale) },
-            { label: this.transloco.translate('aiAgents.fetchDepth.kpis.bytesServed'), value: formatBytes(report?.total_bytes ?? 0, locale) }
-        ];
-    });
-
-    /** The visits the correlation is about belong next to what it correlates. */
-    protected readonly correlationSummaryStats = computed<StatStripEntry[]>(() => {
-        this.activeLanguage();
+        const isLoading = this.showReportSkeleton();
         const summary = this.correlation()?.summary;
-        return [
-            { label: this.transloco.translate('aiAgents.fetchDepth.correlation.kpis.correlatedPaths'), value: this.localizeCount(summary?.correlated_paths ?? 0) },
-            { label: this.transloco.translate('aiAgents.fetchDepth.correlation.kpis.aiReferredVisits'), value: this.localizeCount(summary?.ai_referred_visits ?? 0) },
-            { label: this.transloco.translate('aiAgents.fetchDepth.correlation.kpis.uncorrelatedFetches'), value: this.localizeCount(summary?.uncorrelated_fetches ?? 0) }
-        ];
-    });
+        const kpi = (key: string) => this.transloco.translate(`aiAgents.fetchDepth.kpis.${key}`);
+        const groupLabel = (key: string) => this.transloco.translate(`aiAgents.fetchDepth.groups.${key}`);
 
-    protected readonly correlationTabs = computed<MetricCardGroupTab<AIActivityFilterType>[]>(() => {
-        this.activeLanguage();
-        const correlation = this.correlation();
-        const loading = this.isLoadingCorrelation();
-        const siteDomain = this.site()?.domain ?? null;
-        const activePath = this.pathName();
         return [
             {
-                id: 'correlation',
-                // Its own label: the section heading above already names the correlation.
-                label: this.transloco.translate('aiAgents.fetchDepth.tables.title'),
-                icon: 'pi-sparkles',
-                cards: [
-                    {
-                        // `citation_paths` is the server-side per-path section: distinct
-                        // counts over the whole path, which the per-(path, assistant)
-                        // `citation_yield` rows cannot be re-aggregated into.
-                        id: 'citation-yield',
-                        title: this.transloco.translate('aiAgents.fetchDepth.tables.citationYield.title'),
-                        icon: 'pi-link',
-                        data: (correlation?.citation_paths ?? []).map((row) => ({ name: row.path, value: row.ai_referred_visits })),
-                        isLoading: loading,
-                        linkMode: 'path',
-                        siteDomain,
-                        isRowClickable: true,
-                        activeValue: activePath,
-                        filterType: 'path',
-                        showShare: false
-                    },
-                    {
-                        id: 'opportunity-pages',
-                        title: this.transloco.translate('aiAgents.fetchDepth.tables.opportunityPages.title'),
-                        icon: 'pi-bolt',
-                        data: (correlation?.opportunity_pages ?? []).map((row) => ({ name: row.path, value: row.fetch_count })),
-                        isLoading: loading,
-                        linkMode: 'path',
-                        siteDomain,
-                        isRowClickable: true,
-                        activeValue: activePath,
-                        filterType: 'path',
-                        showShare: false
-                    },
-                    {
-                        // Read-only: the row names an assistant and a path prefix at once,
-                        // so neither page filter would reproduce what the row shows — and
-                        // the label has to say both or two prefixes read as one row twice.
-                        id: 'failure-hotspots',
-                        title: this.transloco.translate('aiAgents.fetchDepth.tables.failureHotspots.title'),
-                        icon: 'pi-exclamation-triangle',
-                        data: (correlation?.failure_hotspots ?? []).map((row) => ({ name: `${row.assistant_name} · ${row.path_prefix}`, value: row.error_requests })),
-                        isLoading: loading,
-                        isRowClickable: false,
-                        showShare: false
-                    }
+                id: 'volume',
+                label: groupLabel('volume'),
+                isLoading,
+                stats: [
+                    { label: kpi('totalFetches'), value: this.localizeCount(report?.fetch_count ?? 0) },
+                    { label: kpi('bytesServed'), value: formatBytes(report?.total_bytes ?? 0, locale) }
+                ]
+            },
+            ...(this.showFetchTools()
+                ? [
+                      {
+                          id: 'correlation',
+                          label: groupLabel('correlation'),
+                          isLoading: this.showCorrelationSkeleton(),
+                          stats: [
+                              { label: kpi('correlatedPaths'), value: this.localizeCount(summary?.correlated_paths ?? 0) },
+                              { label: kpi('aiReferredVisits'), value: this.localizeCount(summary?.ai_referred_visits ?? 0) },
+                              { label: kpi('uncorrelatedFetches'), value: this.localizeCount(summary?.uncorrelated_fetches ?? 0) }
+                          ]
+                      }
+                  ]
+                : []),
+            {
+                id: 'health',
+                label: groupLabel('health'),
+                isLoading,
+                stats: [
+                    { label: kpi('errorRate4xx'), value: this.localizeRate(report?.error_rate_4xx ?? 0) },
+                    { label: kpi('errorRate5xx'), value: this.localizeRate(report?.error_rate_5xx ?? 0) },
+                    { label: kpi('medianResponse'), value: formatResponseMs(report?.median_response_ms ?? 0, locale) }
                 ]
             }
         ];

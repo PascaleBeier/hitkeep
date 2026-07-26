@@ -11,6 +11,18 @@ describe('HitKeep OptimusUI preset', () => {
         expect(hitKeepThemeOverrides.components?.dialog?.header?.padding).toBe('1.25rem 1.5rem 0.5rem');
     });
 
+    it('resolves the tile surface from the preset rather than paired dark selectors', () => {
+        const tile = hitKeepThemeOverrides.semantic?.extend?.tile;
+        expect(tile?.borderColor).toBe('{content.border.color}');
+        // The label is mixed toward the body color because `{text.muted.color}`
+        // alone falls under 4.5:1 on a tinted tile.
+        expect(tile?.labelColor).toBe('color-mix(in srgb, {text.muted.color} 82%, {text.color})');
+        // Each scheme supplies its own background, so no component needs a
+        // `:host-context(.p-dark)` block to flip it.
+        expect(hitKeepThemeOverrides.semantic?.colorScheme?.light?.extend?.tile?.background).toContain('{content.hover.background}');
+        expect(hitKeepThemeOverrides.semantic?.colorScheme?.dark?.extend?.tile?.background).toContain('{surface.950}');
+    });
+
     it('keeps the auth card exception scoped and semantic', () => {
         expect(AUTH_CARD_DESIGN_TOKENS.root.background).toBe('{content.background}');
         expect(AUTH_CARD_DESIGN_TOKENS.root.borderRadius).toBe('{border.radius.xl}');

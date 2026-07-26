@@ -1,8 +1,9 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, effect, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { tap } from 'rxjs';
 import { Site, SiteTrackingDomainOptions } from '@models/analytics.types';
 import { sortSitesByDomain } from '@features/sites/utils/site-sort';
+import { ReportSubjectService } from '@services/report-subject.service';
 
 const LAST_SITE_KEY = 'hk_last_site_id';
 
@@ -35,11 +36,19 @@ export interface SiteStatsResetResponse {
 @Injectable({ providedIn: 'root' })
 export class SiteService {
     private http = inject(HttpClient);
+    private reportSubject = inject(ReportSubjectService);
 
     // Global State for Sites
     readonly sites = signal<Site[]>([]);
     readonly activeSite = signal<Site | null>(null);
     readonly isLoading = signal<boolean>(false);
+
+    constructor() {
+        // Analytics surfaces hold their content across reloads. Publishing the
+        // active site is what tells them the subject itself changed, so they
+        // fall back to skeletons instead of animating another site's numbers.
+        effect(() => this.reportSubject.set(this.activeSite()?.id ?? null));
+    }
 
     loadSites() {
         this.isLoading.set(true);

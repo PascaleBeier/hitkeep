@@ -4,6 +4,8 @@ const { E2E_SHARE_TOKEN, login } = require("./support/auth");
 const PRIMARY_SEEDED_SITE_DOMAIN = "acme-analytics.io";
 const SEEDED_EVENT_NAME = "newsletter_signup";
 const SEEDED_EVENT_RANGE = "30d";
+// Any second range works; the switch itself is what the smooth-reload test checks.
+const ALTERNATE_RANGE = "7d";
 const SEEDED_CITY_RE = /Mountain View|New York|Seattle|Berlin|Munich|London|Paris|Amsterdam/;
 const SEEDED_PROVIDER_RE = /Google LLC|Verizon Business|Comcast Cable|Deutsche Telekom AG|Vodafone GmbH|BT|Orange|KPN/;
 const SEEDED_ASN_RE = /AS15169|AS701|AS7922|AS3320|AS3209|AS2856|AS3215|AS1136/;
@@ -21,7 +23,9 @@ const SEEDED_AI_PATH = "/docs/getting-started";
 const SEEDED_AI_PROVENANCE_RE = /tracked [\d,.]+ · logs [\d,.]+/;
 const AI_AGENTS_PAGE_CHIPS = '[data-testid="ai-agents-page-chips"]';
 const AI_AGENTS_TRAFFIC_KPIS = '[data-testid="ai-agent-traffic-kpis"]';
-const AI_VISIBILITY_HEALTH_STRIP = '[data-testid="ai-visibility-health-strip"]';
+const AI_VISIBILITY_FETCH_DEPTH_STRIPS = '[data-testid="ai-visibility-fetch-depth-strips"]';
+const AI_VISIBILITY_CORRELATION_STRIP = '[data-testid="ai-visibility-stat-group-correlation"]';
+const AI_VISIBILITY_CORRELATION_TABLES = '[data-testid="metric-card-group-correlation"]';
 
 async function selectComboboxOption(page, name, optionName) {
     const select = page.getByRole("combobox", { name }).first();
@@ -195,6 +199,33 @@ function metricCardGroupHasPolish(result, expectedCardCount) {
         result.cards.some((card) => card.scrollableCount > 0 && card.visibleScrollbarCount > 0 && card.visibleFadeCount > 0)
     );
 }
+
+test("dashboard switches date ranges without tearing the KPIs and chart down", async ({ page }) => {
+    await login(page, "/dashboard");
+    await selectSeededSite(page);
+    await selectRange(page, SEEDED_EVENT_RANGE);
+
+    const chartCanvas = page.locator("[echarts] canvas").first();
+    await expect(chartCanvas).toBeVisible();
+    const kpiValue = page.locator("app-kpi-card app-animated-number").first();
+    await expect(kpiValue).toBeAttached();
+
+    // Tag the live nodes, switch range, and check the same nodes are still in
+    // the document: a skeleton or a chart teardown would have replaced them,
+    // which is exactly what stops the numbers and the graph from animating.
+    await chartCanvas.evaluate((node) => (window.__hkChartCanvas = node));
+    await kpiValue.evaluate((node) => (window.__hkKpiValue = node));
+
+    await selectRange(page, ALTERNATE_RANGE);
+    await expect(page.locator("app-kpi-card p-skeleton")).toHaveCount(0);
+    await expect(chartCanvas).toBeVisible();
+
+    const survived = await page.evaluate(() => ({
+        chart: window.__hkChartCanvas?.isConnected === true,
+        kpi: window.__hkKpiValue?.isConnected === true
+    }));
+    expect(survived).toEqual({ chart: true, kpi: true });
+});
 
 test("dashboard renders seeded data and product controls", async ({ page }) => {
     await login(page, "/dashboard");
@@ -422,13 +453,17 @@ test("ai agents page shows the fetch depth section with correlation insights", a
     await selectSeededSite(page);
     await selectRange(page, SEEDED_EVENT_RANGE);
 
-    // The fetch depth section lives inside the single AI agents page; its one
-    // stat strip is the wrapper the page exposes for it.
-    await expect(page.locator(AI_VISIBILITY_HEALTH_STRIP)).toBeVisible();
-    await expect(page.locator('[data-testid="ai-visibility-correlation-kpis"]')).toBeVisible();
-    // Exactly one heading per block: the section names the correlation, the card
-    // group below it names its breakdowns.
-    await expect(page.getByRole("heading", { name: "Fetch-to-visit correlation" })).toBeVisible();
+    // The fetch depth section lives inside the single AI agents page, and its
+    // scalars split into three themed strips once fetch records exist.
+    await expect(page.locator(AI_VISIBILITY_FETCH_DEPTH_STRIPS)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Crawler fetch depth" })).toBeVisible();
+    await expect(page.locator(AI_VISIBILITY_FETCH_DEPTH_STRIPS).getByRole("heading")).toHaveText(["Fetch volume", "Fetch-to-visit", "Delivery health"]);
+    await expect.poll(async () => readStatStripValue(page, AI_VISIBILITY_CORRELATION_STRIP, "Correlated paths")).toBeGreaterThan(0);
+    await expect(page.locator(AI_VISIBILITY_CORRELATION_STRIP).getByText("Later AI-referred visits", { exact: true })).toBeVisible();
+    // The correlation breakdowns are one group of the single card grid, not a
+    // second one stacked below it.
+    await expect(page.locator(AI_VISIBILITY_CORRELATION_TABLES)).toBeVisible();
+    await expect(page.locator("app-metric-card-group")).toHaveCount(1);
     await expect(page.getByRole("heading", { name: "Correlation breakdowns" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Citation yield" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Opportunity pages" })).toBeVisible();
@@ -449,8 +484,8 @@ test("ai agents page reports merged activity with per-row provenance", async ({ 
     // zero for this site, and the merged KPI card is the only place it appears.
     await expect(page.locator(AI_AGENTS_TRAFFIC_KPIS).getByText("Pages crawled", { exact: true })).toBeVisible();
     // The fetch-depth strip states fetch-only scalars, headed by the fetch volume.
-    await expect.poll(async () => readStatStripValue(page, AI_VISIBILITY_HEALTH_STRIP, "Total fetches")).toBeGreaterThan(0);
-    await expect(page.locator(AI_VISIBILITY_HEALTH_STRIP).getByText("Unique paths")).toHaveCount(0);
+    await expect.poll(async () => readStatStripValue(page, AI_VISIBILITY_FETCH_DEPTH_STRIPS, "Total fetches")).toBeGreaterThan(0);
+    await expect(page.locator(AI_VISIBILITY_FETCH_DEPTH_STRIPS).getByText("Unique paths")).toHaveCount(0);
 
     // GPTBot arrives through both feeds, so its row states where the count came from.
     const agentsPanel = await expectSeededMetricValue(page, "AI agents", SEEDED_AI_AGENT_RE);
@@ -469,7 +504,7 @@ test("ai agents page filters by a crawled page from the merged breakdown", async
     // The page filter narrows both feeds, so the whole report re-renders under it.
     await expect(page.locator(AI_AGENTS_TRAFFIC_KPIS)).toBeVisible();
     await expect(page.locator('[data-testid="ai-agents-hero-chart"]')).toBeVisible();
-    await expect(page.locator('[data-testid="ai-visibility-health-strip"]')).toBeVisible();
+    await expect(page.locator(AI_VISIBILITY_FETCH_DEPTH_STRIPS)).toBeVisible();
 
     await chips.getByRole("button", { name: "Clear all" }).click();
     await expect(chips.getByText("No active filter")).toBeVisible();
@@ -485,7 +520,7 @@ test("legacy ai routes redirect to the single ai agents page", async ({ page }) 
     await selectSeededSite(page);
     await selectRange(page, SEEDED_EVENT_RANGE);
 
-    await expect(page.getByRole("heading", { name: "Fetch-to-visit correlation" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Crawler fetch depth" })).toBeVisible();
 });
 
 test("ai agents page shows seeded agent traffic and filters by agent", async ({ page }) => {
@@ -503,10 +538,10 @@ test("ai agents page shows seeded agent traffic and filters by agent", async ({ 
     const chips = page.locator(AI_AGENTS_PAGE_CHIPS);
     // The agent dimension exists on both feeds, so the chip carries no qualifier.
     await expect(chips.getByText("AI agent: GPTBot", { exact: true })).toBeVisible();
-    // The agent filter reaches the fetch-only side too, so the fetch depth
-    // section and its correlation KPIs stay on screen with the filter applied.
-    await expect(page.locator(AI_VISIBILITY_HEALTH_STRIP)).toBeVisible();
-    await expect(page.locator('[data-testid="ai-visibility-correlation-kpis"]')).toBeVisible();
+    // The agent filter reaches the fetch-only side too, so the fetch depth card
+    // and its correlation tiles stay on screen with the filter applied.
+    await expect(page.locator(AI_VISIBILITY_FETCH_DEPTH_STRIPS)).toBeVisible();
+    await expect(page.locator(AI_VISIBILITY_CORRELATION_STRIP).getByText("Correlated paths", { exact: true })).toBeVisible();
 
     await chips.getByRole("button", { name: "Remove filter" }).first().click();
     await expect(chips.getByText("AI agent: GPTBot", { exact: true })).toHaveCount(0);

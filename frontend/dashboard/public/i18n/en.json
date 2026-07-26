@@ -2893,24 +2893,24 @@
       "docsAction": "Read the setup guide"
     },
     "fetchDepth": {
+      "title": "Crawler fetch depth",
       "description": "What forwarded CDN, edge and server logs add on top: crawlers your tracking never sees, their status codes, response times, bytes served and how fetches turn into visits.",
       "docsAction": "Setup guide",
+      "note": "Correlated visits count later AI-referred visits on the same path inside the selected range.",
+      "groups": {
+        "volume": "Fetch volume",
+        "correlation": "Fetch-to-visit",
+        "health": "Delivery health"
+      },
       "kpis": {
         "totalFetches": "Total fetches",
+        "correlatedPaths": "Correlated paths",
+        "aiReferredVisits": "Later AI-referred visits",
+        "uncorrelatedFetches": "Uncorrelated fetches",
         "errorRate4xx": "4xx rate",
         "errorRate5xx": "5xx rate",
         "medianResponse": "Median response",
         "bytesServed": "Bytes served"
-      },
-      "correlation": {
-        "title": "Fetch-to-visit correlation",
-        "description": "Measure which fetched paths later attract AI-referred human visits and which high-fetch pages still fail to convert into downstream traffic.",
-        "note": "Correlated visits count later AI-referred visits on the same path inside the selected range.",
-        "kpis": {
-          "correlatedPaths": "Correlated paths",
-          "aiReferredVisits": "Later AI-referred visits",
-          "uncorrelatedFetches": "Uncorrelated fetches"
-        }
       },
       "tables": {
         "title": "Correlation breakdowns",
