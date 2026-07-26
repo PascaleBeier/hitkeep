@@ -709,7 +709,11 @@ func (h *handler) resolveAskAIRange(ctx context.Context, siteID uuid.UUID, siteC
 		return from, to, false, err
 	}
 
-	boundsFrom, boundsTo, err := h.ctx.Store.GetSiteAnalyticsBounds(ctx, siteID)
+	analyticsStore, err := h.ctx.AnalyticsStore(ctx, siteID)
+	if err != nil {
+		return time.Time{}, time.Time{}, false, err
+	}
+	boundsFrom, boundsTo, err := analyticsStore.GetSiteAnalyticsBounds(ctx, siteID)
 	if err != nil {
 		return time.Time{}, time.Time{}, false, err
 	}

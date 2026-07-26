@@ -10,41 +10,35 @@
 
 DROP INDEX IF EXISTS hits_site_id_timestamp_idx;
 DROP INDEX IF EXISTS hits_qr_code_id_idx;
-CREATE TABLE hits_rebuild AS SELECT * FROM hits;
+CREATE TABLE hits_rebuild (
+    id              UUID        NOT NULL DEFAULT uuidv7(),
+    site_id         UUID        NOT NULL,
+    session_id      UUID        NOT NULL,
+    page_id         UUID        NOT NULL,
+    timestamp       TIMESTAMPTZ NOT NULL,
+    path            VARCHAR     NOT NULL,
+    hostname        VARCHAR,
+    referrer        VARCHAR,
+    user_agent      VARCHAR,
+    viewport_width  INTEGER,
+    viewport_height INTEGER,
+    screen_width    INTEGER,
+    screen_height   INTEGER,
+    language        VARCHAR,
+    is_unique       BOOLEAN,
+    country_code    VARCHAR,
+    utm_source      VARCHAR,
+    utm_medium      VARCHAR,
+    utm_campaign    VARCHAR,
+    utm_term        VARCHAR,
+    utm_content     VARCHAR,
+    region          VARCHAR,
+    city            VARCHAR,
+    provider        VARCHAR,
+    asn             INTEGER,
+    asn_org         VARCHAR,
+    qr_code_id      UUID
+);
+INSERT INTO hits_rebuild SELECT * FROM hits;
 DROP TABLE hits;
 ALTER TABLE hits_rebuild RENAME TO hits;
-ALTER TABLE hits ALTER COLUMN id SET DEFAULT uuidv7();
-ALTER TABLE hits ALTER COLUMN id SET NOT NULL;
-ALTER TABLE hits ALTER COLUMN site_id SET NOT NULL;
-ALTER TABLE hits ALTER COLUMN session_id SET NOT NULL;
-ALTER TABLE hits ALTER COLUMN page_id SET NOT NULL;
-ALTER TABLE hits ALTER COLUMN timestamp SET NOT NULL;
-ALTER TABLE hits ALTER COLUMN path SET NOT NULL;
-
-DROP INDEX IF EXISTS events_site_id_timestamp_idx;
-CREATE TABLE events_rebuild AS SELECT * FROM events;
-DROP TABLE events;
-ALTER TABLE events_rebuild RENAME TO events;
-ALTER TABLE events ALTER COLUMN id SET DEFAULT uuidv7();
-ALTER TABLE events ALTER COLUMN id SET NOT NULL;
-ALTER TABLE events ALTER COLUMN site_id SET NOT NULL;
-ALTER TABLE events ALTER COLUMN session_id SET NOT NULL;
-ALTER TABLE events ALTER COLUMN name SET NOT NULL;
-ALTER TABLE events ALTER COLUMN timestamp SET NOT NULL;
-
-DROP INDEX IF EXISTS web_vitals_site_time_idx;
-DROP INDEX IF EXISTS web_vitals_site_metric_time_idx;
-DROP INDEX IF EXISTS web_vitals_site_path_time_idx;
-CREATE TABLE web_vitals_rebuild AS SELECT * FROM web_vitals;
-DROP TABLE web_vitals;
-ALTER TABLE web_vitals_rebuild RENAME TO web_vitals;
-ALTER TABLE web_vitals ALTER COLUMN id SET DEFAULT uuidv7();
-ALTER TABLE web_vitals ALTER COLUMN id SET NOT NULL;
-ALTER TABLE web_vitals ALTER COLUMN site_id SET NOT NULL;
-ALTER TABLE web_vitals ALTER COLUMN session_id SET NOT NULL;
-ALTER TABLE web_vitals ALTER COLUMN page_id SET NOT NULL;
-ALTER TABLE web_vitals ALTER COLUMN metric SET NOT NULL;
-ALTER TABLE web_vitals ALTER COLUMN value SET NOT NULL;
-ALTER TABLE web_vitals ALTER COLUMN rating SET NOT NULL;
-ALTER TABLE web_vitals ALTER COLUMN path SET NOT NULL;
-ALTER TABLE web_vitals ALTER COLUMN timestamp SET NOT NULL;

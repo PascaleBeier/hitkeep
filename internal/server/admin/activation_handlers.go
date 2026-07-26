@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"hitkeep/internal/api"
 	"hitkeep/internal/database"
 )
 
@@ -26,7 +27,7 @@ func (h *handler) handleGetActivation() http.HandlerFunc {
 			return
 		}
 
-		resp, err := h.ctx.Store.ListSystemActivation(r.Context(), database.ActivationQuery{
+		activationQuery := database.ActivationQuery{
 			Status:       strings.TrimSpace(query.Get("status")),
 			Team:         strings.TrimSpace(query.Get("team")),
 			Domain:       strings.TrimSpace(query.Get("domain")),
@@ -35,7 +36,13 @@ func (h *handler) handleGetActivation() http.HandlerFunc {
 			Limit:        limit,
 			Offset:       offset,
 			Now:          time.Now().UTC(),
-		})
+		}
+		var resp *api.SystemActivationResponse
+		if h.ctx.TenantStores != nil {
+			resp, err = h.ctx.TenantStores.ListSystemActivation(r.Context(), activationQuery)
+		} else {
+			resp, err = h.ctx.Store.ListSystemActivation(r.Context(), activationQuery)
+		}
 		if err != nil {
 			slog.Error("Failed to load activation view", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)

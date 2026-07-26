@@ -439,10 +439,11 @@ func openAPIV1AccountSchemas() map[string]any {
 		"TenantDBInfo": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"tenant_id": map[string]any{"type": "string", "format": "uuid"},
-				"name":      map[string]any{"type": "string"},
-				"bytes":     map[string]any{"type": "integer", "format": "int64"},
-				"path":      map[string]any{"type": "string"},
+				"tenant_id":  map[string]any{"type": "string", "format": "uuid"},
+				"name":       map[string]any{"type": "string"},
+				"is_default": map[string]any{"type": "boolean"},
+				"bytes":      map[string]any{"type": "integer", "format": "int64"},
+				"path":       map[string]any{"type": "string"},
 			},
 		},
 		"SystemStorage": map[string]any{

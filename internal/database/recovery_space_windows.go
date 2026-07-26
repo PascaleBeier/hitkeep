@@ -9,6 +9,10 @@ func ensureRecoverySpace(_, _ string) error {
 	return nil
 }
 
+func ensureAvailableSpace(_ string, _ int64) error {
+	return nil
+}
+
 func syncParentDirectory(string) error {
 	return nil
 }

@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -15,12 +16,156 @@ const dropIndexesMigrationFile = "2026_07_08_000000_drop_analytics_art_indexes.s
 const dropMutableControlIndexesMigrationFile = "2026_07_17_000000_drop_mutable_control_art_indexes.sql"
 
 var rebuiltAnalyticsTables = []string{"hits", "events", "web_vitals"}
+var dropAnalyticsIndexMigrationFiles = []string{
+	dropIndexesMigrationFile,
+	"2026_07_08_000001_drop_events_art_indexes.sql",
+	"2026_07_08_000002_drop_web_vitals_art_indexes.sql",
+}
+
+func TestOpenDefaultSplitControlStoreDefersLegacyEventsRebuildUntilSplitMarker(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	dbPath := filepath.Join(t.TempDir(), "legacy-control.db")
+	eventsMigration := dropAnalyticsIndexMigrationFiles[1]
+
+	seed, err := OpenMigratedStore(ctx, dbPath, WithCheckpointInterval(0))
+	if err != nil {
+		t.Fatalf("create migrated control seed: %v", err)
+	}
+	if _, err := seed.DB().ExecContext(ctx, "DELETE FROM migrations WHERE migration = ?", eventsMigration); err != nil {
+		_ = seed.Close()
+		t.Fatalf("release legacy events rebuild: %v", err)
+	}
+	if err := seed.Close(); err != nil {
+		t.Fatalf("close control seed: %v", err)
+	}
+
+	legacy, err := OpenDefaultSplitControlStore(ctx, dbPath, WithCheckpointInterval(0))
+	if err != nil {
+		t.Fatalf("open pre-split legacy control: %v", err)
+	}
+	if !legacy.skipCheckpointOnClose {
+		t.Fatal("expected pre-split legacy control close to avoid an in-place checkpoint")
+	}
+	var applied int
+	if err := legacy.DB().QueryRowContext(ctx, "SELECT count(*) FROM migrations WHERE migration = ?", eventsMigration).Scan(&applied); err != nil {
+		t.Fatalf("inspect deferred events rebuild: %v", err)
+	}
+	if applied != 0 {
+		t.Fatal("legacy events rebuild ran before the default-tenant split")
+	}
+	if _, err := legacy.DB().ExecContext(ctx, `
+		INSERT INTO data_migrations (name, applied_at)
+		VALUES (?, now()) ON CONFLICT (name) DO NOTHING
+	`, defaultTenantSplitMarker); err != nil {
+		_ = legacy.Close()
+		t.Fatalf("record synthetic split marker: %v", err)
+	}
+	if err := legacy.Close(); err != nil {
+		t.Fatalf("close legacy control: %v", err)
+	}
+
+	migrated, err := OpenDefaultSplitControlStore(ctx, dbPath, WithCheckpointInterval(0))
+	if err != nil {
+		t.Fatalf("open marked control through normal migration path: %v", err)
+	}
+	defer migrated.Close()
+	if migrated.skipCheckpointOnClose {
+		t.Fatal("marked control unexpectedly retained the pre-split close behavior")
+	}
+	if err := migrated.DB().QueryRowContext(ctx, "SELECT count(*) FROM migrations WHERE migration = ?", eventsMigration).Scan(&applied); err != nil {
+		t.Fatalf("inspect resumed events rebuild: %v", err)
+	}
+	if applied != 1 {
+		t.Fatalf("expected marked control to apply the events rebuild, got %d rows", applied)
+	}
+}
+
+func TestOpenMigratedStoreCheckpointsEachHeavySectionAndTerminates(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "heavy-sections.db")
+	recoveryPath := filepath.Join(dir, "recovery")
+
+	seed, err := OpenMigratedStore(ctx, dbPath, WithCheckpointInterval(0))
+	if err != nil {
+		t.Fatalf("create migrated seed: %v", err)
+	}
+	if _, err := seed.DB().ExecContext(ctx,
+		"DELETE FROM migrations WHERE migration IN (?, ?, ?)",
+		dropAnalyticsIndexMigrationFiles[0],
+		dropAnalyticsIndexMigrationFiles[1],
+		dropAnalyticsIndexMigrationFiles[2],
+	); err != nil {
+		_ = seed.Close()
+		t.Fatalf("release heavy migrations: %v", err)
+	}
+	if err := seed.Close(); err != nil {
+		t.Fatalf("close heavy migration seed: %v", err)
+	}
+
+	store, err := OpenMigratedStore(ctx, dbPath,
+		WithCheckpointInterval(0),
+		WithAutomaticRecovery(false, recoveryPath),
+	)
+	if err != nil {
+		t.Fatalf("apply checkpointed heavy migration sections: %v", err)
+	}
+	var applied int
+	if err := store.DB().QueryRowContext(ctx,
+		"SELECT count(*) FROM migrations WHERE migration IN (?, ?, ?)",
+		dropAnalyticsIndexMigrationFiles[0],
+		dropAnalyticsIndexMigrationFiles[1],
+		dropAnalyticsIndexMigrationFiles[2],
+	).Scan(&applied); err != nil {
+		t.Fatalf("count applied heavy migrations: %v", err)
+	}
+	if applied != len(dropAnalyticsIndexMigrationFiles) {
+		t.Fatalf("applied %d heavy migrations, want %d", applied, len(dropAnalyticsIndexMigrationFiles))
+	}
+	if _, err := os.Stat(store.recovery.migrationGuardPath()); !os.IsNotExist(err) {
+		t.Fatalf("completed heavy migration guard still exists: %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("close checkpointed heavy migration store: %v", err)
+	}
+	if _, err := os.Stat(dbPath + ".wal"); !os.IsNotExist(err) {
+		t.Fatalf("checkpointed heavy migration WAL still exists: %v", err)
+	}
+	reopened := NewStore(dbPath, WithCheckpointInterval(0))
+	if err := reopened.Connect(); err != nil {
+		t.Fatalf("reopen checkpointed heavy migration database: %v", err)
+	}
+	defer reopened.Close()
+}
+
 var removedGoogleSearchConsoleIndexes = []string{
 	"idx_gsc_connections_connected",
 	"idx_gsc_properties_team",
 	"idx_gsc_site_mappings_team",
 	"idx_gsc_sync_state_next_retry",
 	"idx_gsc_sync_state_team_state",
+}
+
+func TestMigrationMemoryLimitReservesCheckpointHeadroom(t *testing.T) {
+	tests := map[string]string{
+		"768MiB":  "536870912B",
+		"512MiB":  "357913942B",
+		"64MiB":   "44739243B",
+		"":        "",
+		"invalid": "",
+	}
+	for configured, want := range tests {
+		t.Run(configured, func(t *testing.T) {
+			if got := migrationMemoryLimitWithHeadroom(configured); got != want {
+				t.Fatalf("migration headroom for %q = %q, want %q", configured, got, want)
+			}
+		})
+	}
+	if got := migrationCheckpointMemoryLimit("768MiB"); got != "1073741824B" {
+		t.Fatalf("guarded checkpoint memory limit = %q, want 1073741824B", got)
+	}
 }
 
 func countArtIndexState(t *testing.T, store *Store, table string) (indexes int, keyConstraints int) {
@@ -55,9 +200,11 @@ func TestDropAnalyticsIndexesMigrationPreservesData(t *testing.T) {
 		"CREATE TABLE IF NOT EXISTS migrations (migration VARCHAR PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL)"); err != nil {
 		t.Fatalf("create migrations table: %v", err)
 	}
-	if _, err := store.DB().ExecContext(ctx,
-		"INSERT INTO migrations (migration, applied_at) VALUES (?, ?)", dropIndexesMigrationFile, time.Now().UTC()); err != nil {
-		t.Fatalf("hold back migration: %v", err)
+	for _, migrationFile := range dropAnalyticsIndexMigrationFiles {
+		if _, err := store.DB().ExecContext(ctx,
+			"INSERT INTO migrations (migration, applied_at) VALUES (?, ?)", migrationFile, time.Now().UTC()); err != nil {
+			t.Fatalf("hold back migration %s: %v", migrationFile, err)
+		}
 	}
 	if err := store.Migrate(ctx); err != nil {
 		t.Fatalf("migrate to pre-upgrade state: %v", err)
@@ -102,7 +249,8 @@ func TestDropAnalyticsIndexesMigrationPreservesData(t *testing.T) {
 
 	// Release the held-back migration and apply it against populated tables.
 	if _, err := store.DB().ExecContext(ctx,
-		"DELETE FROM migrations WHERE migration = ?", dropIndexesMigrationFile); err != nil {
+		"DELETE FROM migrations WHERE migration IN (?, ?, ?)",
+		dropAnalyticsIndexMigrationFiles[0], dropAnalyticsIndexMigrationFiles[1], dropAnalyticsIndexMigrationFiles[2]); err != nil {
 		t.Fatalf("release migration: %v", err)
 	}
 	if err := store.Migrate(ctx); err != nil {

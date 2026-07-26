@@ -181,10 +181,10 @@ func (s *Store) GetSiteCount(ctx context.Context) (int, error) {
 
 func (s *Store) GetTenantList(ctx context.Context) ([]api.TenantDBInfo, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT CAST(t.id AS VARCHAR), t.name
+		SELECT CAST(t.id AS VARCHAR), t.name, t.is_default
 		FROM tenants t
 		LEFT JOIN tenant_archives ta ON ta.tenant_id = t.id
-		WHERE t.is_default = FALSE AND ta.tenant_id IS NULL
+		WHERE ta.tenant_id IS NULL
 		ORDER BY t.name
 	`)
 	if err != nil {
@@ -196,7 +196,8 @@ func (s *Store) GetTenantList(ctx context.Context) ([]api.TenantDBInfo, error) {
 	for rows.Next() {
 		var rawID string
 		var name string
-		if err := rows.Scan(&rawID, &name); err != nil {
+		var isDefault bool
+		if err := rows.Scan(&rawID, &name, &isDefault); err != nil {
 			return nil, fmt.Errorf("could not scan tenant: %w", err)
 		}
 		id, err := uuid.Parse(rawID)
@@ -204,8 +205,9 @@ func (s *Store) GetTenantList(ctx context.Context) ([]api.TenantDBInfo, error) {
 			return nil, fmt.Errorf("invalid tenant id: %w", err)
 		}
 		tenants = append(tenants, api.TenantDBInfo{
-			TenantID: id,
-			Name:     name,
+			TenantID:  id,
+			Name:      name,
+			IsDefault: isDefault,
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -278,12 +280,11 @@ func (m *TenantStoreManager) GetRecentIngestCounts(ctx context.Context, since ti
 	if m == nil || m.shared == nil {
 		return RecentIngestCounts{}, fmt.Errorf("tenant store manager is not configured")
 	}
-
-	total, err := m.shared.GetRecentIngestCounts(ctx, since)
-	if err != nil {
-		return RecentIngestCounts{}, fmt.Errorf("count shared ingest: %w", err)
+	if !m.dataPlaneEnabled {
+		return RecentIngestCounts{}, fmt.Errorf("tenant analytics data plane is unavailable")
 	}
 
+	var total RecentIngestCounts
 	tenants, err := m.shared.GetTenantList(ctx)
 	if err != nil {
 		return RecentIngestCounts{}, fmt.Errorf("list tenants for ingest counts: %w", err)

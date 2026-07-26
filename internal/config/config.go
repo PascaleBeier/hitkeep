@@ -36,7 +36,7 @@ type Config struct {
 	DBCheckpointIntervalMinutes int    `env:"HITKEEP_DB_CHECKPOINT_INTERVAL" default:"5" desc:"Minutes between periodic DuckDB checkpoints; 0 disables periodic checkpoints"`
 	DBRecoveryPath              string `env:"HITKEEP_DB_RECOVERY_PATH" default:"" docdefault:"<data-path>/recovery" desc:"Directory for permission-restricted DuckDB recovery bundles; defaults to <data-path>/recovery"`
 
-	DataPath       string `env:"HITKEEP_DATA_PATH"          default:"data"           desc:"Base directory for per-tenant data files"`
+	DataPath       string `env:"HITKEEP_DATA_PATH"          default:"data"           desc:"Local writable base directory for per-tenant database files"`
 	ArchivePath    string `env:"HITKEEP_ARCHIVE_PATH"       default:"archive"        desc:"Data archive path"`
 	PublicURL      string `env:"HITKEEP_PUBLIC_URL"         default:"http://localhost:8080" desc:"Public URL"`
 	LogLevel       string `env:"HITKEEP_LOG_LEVEL"          default:"info"           desc:"Log level (debug/info/warn/error)"`
@@ -95,7 +95,7 @@ type Config struct {
 	GoogleSearchConsoleClientSecret string `env:"HITKEEP_GOOGLE_SEARCH_CONSOLE_CLIENT_SECRET" default:"" desc:"Google Search Console OAuth client secret" sensitive:"redact"`
 	GoogleSearchConsoleRedirectURL  string `env:"HITKEEP_GOOGLE_SEARCH_CONSOLE_REDIRECT_URL"  default:"" desc:"Google Search Console OAuth callback URL override"`
 
-	BackupPath            string `env:"HITKEEP_BACKUP_PATH"      default:""   desc:"Backup destination path (local dir or s3://)"`
+	BackupPath            string `env:"HITKEEP_BACKUP_PATH"      default:""   desc:"Backup snapshot destination (local directory or s3://); live databases remain on the local data path"`
 	BackupIntervalMinutes int    `env:"HITKEEP_BACKUP_INTERVAL"  default:"60" desc:"Minutes between backups"`
 	BackupRetentionCount  int    `env:"HITKEEP_BACKUP_RETENTION" default:"24" desc:"Number of backup snapshots to keep"`
 

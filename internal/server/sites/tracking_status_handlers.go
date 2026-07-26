@@ -22,7 +22,13 @@ func (h *handler) handleGetSiteTrackingStatus() http.HandlerFunc {
 			return
 		}
 
-		status, err := h.ctx.Store.GetSiteTrackingStatus(r.Context(), siteID, time.Now().UTC())
+		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
+		if err != nil {
+			slog.Error("Failed to resolve tracking status analytics store", "error", err, "site_id", siteID)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		status, err := analyticsStore.GetSiteTrackingStatus(r.Context(), siteID, time.Now().UTC())
 		if err != nil {
 			slog.Error("Failed to load site tracking status", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)

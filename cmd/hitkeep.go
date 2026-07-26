@@ -227,9 +227,16 @@ func startSearchConsoleSyncWorker(ctx context.Context, conf *config.Config, tena
 
 func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.Logger, logLevel slog.Level, realtimeBroker *realtime.Broker) (*database.Store, *database.TenantStoreManager, *nsq.Producer, func(), error) {
 	slog.Debug("(Leader) Starting stateful services...")
+	if err := validateLiveDatabasePaths(conf); err != nil {
+		return nil, nil, nil, nil, err
+	}
 
-	openStore := func() (*database.Store, error) {
-		return database.OpenMigratedStore(ctx, conf.DBPath,
+	openStore := func(forMandatorySplit bool) (*database.Store, error) {
+		opener := database.OpenMigratedStore
+		if forMandatorySplit {
+			opener = database.OpenDefaultSplitControlStore
+		}
+		return opener(ctx, conf.DBPath,
 			database.WithMemoryLimit(conf.DuckDBMemoryLimit),
 			database.WithThreads(conf.DuckDBThreads),
 			database.WithCheckpointInterval(time.Duration(conf.DBCheckpointIntervalMinutes)*time.Minute),
@@ -238,7 +245,7 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 		)
 	}
 
-	store, err := openStore()
+	store, err := openStore(true)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -246,18 +253,43 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 	// Recover and migrate before compaction so a problematic database is never
 	// rewritten before its recovery bundle exists.
 	recoveredAtStartup := store.RecoveredDuringConnect()
-	if conf.DBCompactOnStart && recoveredAtStartup {
-		slog.Info("Skipping database compaction immediately after automatic recovery", "path", conf.DBPath)
-	} else if conf.DBCompactOnStart {
+	if recoveredAtStartup {
+		_ = store.Close()
+		return nil, nil, nil, nil, fmt.Errorf("automatic database recovery completed; restart HitKeep to run the mandatory 2.13 default-tenant migration from a clean startup")
+	}
+	complete, markerErr := store.DefaultTenantSplitComplete(ctx)
+	if markerErr != nil {
+		_ = store.Close()
+		return nil, nil, nil, nil, markerErr
+	}
+	if !complete {
+		if err := store.Close(); err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("close database before default tenant split: %w", err)
+		}
+		if err := database.RunDefaultTenantSplit(ctx, conf.DBPath, conf.DataPath,
+			database.WithMemoryLimit(conf.DuckDBMemoryLimit),
+			database.WithThreads(conf.DuckDBThreads),
+		); err != nil {
+			return nil, nil, nil, nil, err
+		}
+		store, err = openStore(false)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("reopen control database after default tenant split: %w", err)
+		}
+	}
+	if conf.DBCompactOnStart {
 		if err := store.Close(); err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("close database before startup compaction: %w", err)
 		}
-		if result, err := database.MaybeCompactDatabase(ctx, conf.DBPath, database.DefaultCompactionOptions(), database.PrepareSharedSchema); err != nil {
+		compaction := database.DefaultCompactionOptions()
+		compaction.MemoryLimit = conf.DuckDBMemoryLimit
+		compaction.Threads = conf.DuckDBThreads
+		if result, err := database.MaybeCompactDatabase(ctx, conf.DBPath, compaction, database.PrepareSharedSchema); err != nil {
 			slog.Warn("Skipping database compaction at startup", "path", conf.DBPath, "error", err)
 		} else if result.Compacted {
 			slog.Info("Compacted database at startup", "path", conf.DBPath, "bytes_before", result.BytesBefore, "bytes_after", result.BytesAfter)
 		}
-		store, err = openStore()
+		store, err = openStore(false)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -266,8 +298,12 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 
 	var tenantOpts []database.TenantStoreManagerOption
 	if conf.DBCompactOnStart {
-		tenantOpts = append(tenantOpts, database.WithTenantCompaction(database.DefaultCompactionOptions()))
+		compaction := database.DefaultCompactionOptions()
+		compaction.MemoryLimit = conf.DuckDBMemoryLimit
+		compaction.Threads = conf.DuckDBThreads
+		tenantOpts = append(tenantOpts, database.WithTenantCompaction(compaction))
 	}
+	tenantOpts = append(tenantOpts, database.WithTenantDataPlane(true))
 	tenantMgr := database.NewTenantStoreManager(store, conf.DataPath, tenantOpts...)
 	closeStores := func() {
 		if err := tenantMgr.Close(); err != nil {
@@ -364,6 +400,16 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 	}
 
 	return store, tenantMgr, producer, shutdownFunc, nil
+}
+
+func validateLiveDatabasePaths(conf *config.Config) error {
+	if worker.IsS3ArchivePath(conf.DBPath) {
+		return fmt.Errorf("HITKEEP_DB_PATH must be a local writable DuckDB path; use HITKEEP_BACKUP_PATH for S3 snapshots")
+	}
+	if worker.IsS3ArchivePath(conf.DataPath) {
+		return fmt.Errorf("HITKEEP_DATA_PATH must be a local writable directory; use HITKEEP_BACKUP_PATH for S3 snapshots")
+	}
+	return nil
 }
 
 func runHealthcheck(conf *config.Config) error {

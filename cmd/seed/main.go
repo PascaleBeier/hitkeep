@@ -84,15 +84,35 @@ func main() {
 
 	ctx := context.Background()
 
-	store, err := database.OpenMigratedStore(ctx, *dbPath)
+	store, err := database.OpenDefaultSplitControlStore(ctx, *dbPath)
 	if err != nil {
 		slog.Error("Failed to connect to database", "error", err)
 		os.Exit(1)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	tenantBasePath := strings.TrimSpace(*dataPath)
+	complete, err := store.DefaultTenantSplitComplete(ctx)
+	if err != nil {
+		slog.Error("Failed to inspect default tenant migration", "error", err)
+		os.Exit(1)
+	}
+	if !complete {
+		if err := store.Close(); err != nil {
+			slog.Error("Failed to close control database before default tenant migration", "error", err)
+			os.Exit(1)
+		}
+		if err := database.RunDefaultTenantSplit(ctx, *dbPath, tenantBasePath); err != nil {
+			slog.Error("Failed to migrate default tenant analytics", "error", err)
+			os.Exit(1)
+		}
+		store, err = database.OpenMigratedStore(ctx, *dbPath)
+		if err != nil {
+			slog.Error("Failed to reopen control database", "error", err)
+			os.Exit(1)
+		}
+	}
 
-	tenantMgr := database.NewTenantStoreManager(store, tenantBasePath)
+	tenantMgr := database.NewTenantStoreManager(store, tenantBasePath, database.WithTenantDataPlane(true))
 	defer tenantMgr.Close()
 
 	rng := mrand.New(mrand.NewSource(*seed)) // #nosec G404 -- demo data seeding uses reproducible randomness.

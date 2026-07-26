@@ -115,7 +115,6 @@ func (h *handler) handleDeleteDefinition(
 	invalidIDMessage string,
 	deleteDefinition func(context.Context, *database.Store, uuid.UUID, uuid.UUID) error,
 	deleteLogMessage string,
-	deleteLegacyLogMessage string,
 	realtimeKind string,
 	onDeleted func(context.Context, uuid.UUID, uuid.UUID),
 ) http.HandlerFunc {
@@ -143,14 +142,6 @@ func (h *handler) handleDeleteDefinition(
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		if analyticsStore != h.ctx.Store {
-			if err := deleteDefinition(r.Context(), h.ctx.Store, definitionID, siteID); err != nil && !database.IsNotFoundError(err) {
-				slog.Error(deleteLegacyLogMessage, "error", err, "site_id", siteID, "definition_id", definitionID)
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-				return
-			}
-		}
-
 		h.publishDefinitionChange(siteID, realtimeKind)
 		if onDeleted != nil {
 			onDeleted(r.Context(), siteID, definitionID)
@@ -210,13 +201,6 @@ func (h *handler) handleCreateGoal() http.HandlerFunc {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		if analyticsStore != h.ctx.Store {
-			if err := h.ctx.Store.UpsertGoal(r.Context(), &req); err != nil {
-				slog.Error("Failed to write legacy shared goal", "error", err, "site_id", siteID, "goal_id", req.ID)
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-				return
-			}
-		}
 		h.publishDefinitionChange(siteID, realtime.KindGoals)
 		h.ctx.EmitWebhookEvent(r.Context(), webhooks.Event{
 			Type:   webhooks.EventGoalCreated,
@@ -241,7 +225,6 @@ func (h *handler) handleDeleteGoal() http.HandlerFunc {
 			return store.DeleteGoal(ctx, definitionID, siteID)
 		},
 		"Failed to delete goal",
-		"Failed to delete legacy shared goal",
 		realtime.KindGoals,
 		func(ctx context.Context, siteID, goalID uuid.UUID) {
 			h.ctx.EmitWebhookEvent(ctx, webhooks.Event{
@@ -300,12 +283,6 @@ func (h *handler) handleUpdateGoal() http.HandlerFunc {
 		if err := analyticsStore.UpsertGoal(r.Context(), &input); err != nil {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
-		}
-		if analyticsStore != h.ctx.Store {
-			if err := h.ctx.Store.UpsertGoal(r.Context(), &input); err != nil {
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-				return
-			}
 		}
 		h.publishDefinitionChange(siteID, realtime.KindGoals)
 		h.ctx.EmitWebhookEvent(r.Context(), webhooks.Event{
@@ -454,13 +431,6 @@ func (h *handler) handleCreateFunnel() http.HandlerFunc {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		if analyticsStore != h.ctx.Store {
-			if err := h.ctx.Store.UpsertFunnel(r.Context(), &req); err != nil {
-				slog.Error("Failed to write legacy shared funnel", "error", err, "site_id", siteID, "funnel_id", req.ID)
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-				return
-			}
-		}
 		h.publishDefinitionChange(siteID, realtime.KindFunnels)
 
 		w.WriteHeader(http.StatusCreated)
@@ -475,7 +445,6 @@ func (h *handler) handleDeleteFunnel() http.HandlerFunc {
 			return store.DeleteFunnel(ctx, definitionID, siteID)
 		},
 		"Failed to delete funnel",
-		"Failed to delete legacy shared funnel",
 		realtime.KindFunnels,
 		nil,
 	)

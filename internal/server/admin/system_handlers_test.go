@@ -28,7 +28,8 @@ func setupSystemTestEnv(t *testing.T) (*handler, *database.Store, *database.Tena
 	t.Helper()
 
 	basePath := t.TempDir()
-	store := database.NewStore(filepath.Join(basePath, "shared.db"))
+	sharedPath := filepath.Join(basePath, "shared.db")
+	store := database.NewStore(sharedPath)
 	if err := store.Connect(); err != nil {
 		t.Fatalf("connect store: %v", err)
 	}
@@ -56,8 +57,18 @@ func setupSystemTestEnv(t *testing.T) (*handler, *database.Store, *database.Tena
 	if err := store.UpdateInstanceRole(context.Background(), adminUserID, auth.InstanceAdmin, ownerUserID); err != nil {
 		t.Fatalf("promote admin: %v", err)
 	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("close control before split: %v", err)
+	}
+	if err := database.RunDefaultTenantSplit(context.Background(), sharedPath, basePath); err != nil {
+		t.Fatalf("split default tenant: %v", err)
+	}
+	store = database.NewStore(sharedPath)
+	if err := store.Connect(); err != nil {
+		t.Fatalf("reopen control after split: %v", err)
+	}
 
-	tenantStores := database.NewTenantStoreManager(store, basePath)
+	tenantStores := database.NewTenantStoreManager(store, basePath, database.WithTenantDataPlane(true))
 	t.Cleanup(func() { _ = tenantStores.Close() })
 
 	systemCounters := &database.SystemCounter{}
@@ -77,7 +88,7 @@ func setupSystemTestEnv(t *testing.T) (*handler, *database.Store, *database.Tena
 		Config: &config.Config{
 			PublicURL:                "http://localhost:8080",
 			JWTSecret:                "test-secret",
-			DBPath:                   filepath.Join(basePath, "shared.db"),
+			DBPath:                   sharedPath,
 			DataPath:                 basePath,
 			ImportStageRetentionDays: 7,
 		},

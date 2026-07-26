@@ -131,6 +131,43 @@ func TestTenantStoreManagerForwardsFatalErrorsAndAvailability(t *testing.T) {
 	}
 }
 
+func TestTenantStoreInvalidationRequestsControlledRestart(t *testing.T) {
+	reported := make(chan error, 1)
+	store := NewStore(":memory:", withFatalReporter(func(err error) {
+		reported <- err
+	}))
+	trigger := errors.New("synthetic database has been invalidated")
+	store.observeInvalidation(trigger)
+
+	select {
+	case err := <-reported:
+		if err == nil || !strings.Contains(err.Error(), "controlled restart required") || !errors.Is(err, trigger) {
+			t.Fatalf("unexpected controlled restart error: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for tenant invalidation restart request")
+	}
+	if status := store.DatabaseStatus(); status.State != DatabaseStateRecovering {
+		t.Fatalf("expected recovering tenant status, got %+v", status)
+	}
+}
+
+func TestTenantStoreInvalidationDefersRecoveryUntilRestart(t *testing.T) {
+	store := NewStore(filepath.Join(t.TempDir(), "tenant.db"),
+		WithAutomaticRecovery(true, t.TempDir()),
+		withFatalReporter(func(error) {}),
+	)
+	trigger := errors.New("synthetic database has been invalidated")
+
+	err := store.recoverAfterInvalidation(context.Background(), trigger)
+	if err == nil || !strings.Contains(err.Error(), "controlled restart") || !errors.Is(err, trigger) {
+		t.Fatalf("expected deferred tenant recovery error, got %v", err)
+	}
+	if _, statErr := os.Stat(store.recovery.markerPath()); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("tenant invalidation created an in-process recovery marker: %v", statErr)
+	}
+}
+
 func TestTenantStoreOpenRecoveryFailureRequestsControlledRestart(t *testing.T) {
 	ctx := context.Background()
 	shared := newSharedTestStore(t)

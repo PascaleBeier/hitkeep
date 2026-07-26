@@ -46,9 +46,12 @@ func setupAIFetchTestEnv(t *testing.T) (*database.Store, *shared.Context, uuid.U
 	if err != nil {
 		t.Fatalf("CreateAPIClient: %v", err)
 	}
+	tenantStores := database.NewTenantStoreManager(store, t.TempDir(), database.WithTenantDataPlane(false))
+	t.Cleanup(func() { _ = tenantStores.Close() })
 
 	ctx := &shared.Context{
 		Store:          store,
+		TenantStores:   tenantStores,
 		Config:         &config.Config{},
 		SystemCounters: &database.SystemCounter{},
 	}

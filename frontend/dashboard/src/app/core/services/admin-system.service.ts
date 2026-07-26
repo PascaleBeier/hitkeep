@@ -62,6 +62,7 @@ export interface SystemAIStatus {
 export interface TenantDBInfo {
     tenant_id: string;
     name: string;
+    is_default: boolean;
     bytes: number;
     path: string;
 }

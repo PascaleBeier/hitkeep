@@ -44,8 +44,14 @@ func NewConsumer(tenantMgr *database.TenantStoreManager, logger *slog.Logger, le
 			return err
 		}
 		if len(created) > 0 {
-			if err := tenantMgr.Shared().RecordHitActivity(ctx, created); err != nil {
+			if err := store.RecordHitActivity(ctx, created); err != nil {
 				logger.Warn("Failed to record hit activity summary after tenant persistence", "count", len(created), "error", err)
+			}
+			if consumer.tenantMgr != nil {
+				control := consumer.tenantMgr.Control()
+				if err := control.RecordFirstHitCloudConversions(ctx, created); err != nil {
+					logger.Warn("Failed to record first-hit conversion on control store", "count", len(created), "error", err)
+				}
 			}
 			consumer.publishHitsChanged(created)
 		}
@@ -57,7 +63,7 @@ func NewConsumer(tenantMgr *database.TenantStoreManager, logger *slog.Logger, le
 			return err
 		}
 		if len(created) > 0 {
-			if err := tenantMgr.Shared().RecordEventActivity(ctx, created); err != nil {
+			if err := store.RecordEventActivity(ctx, created); err != nil {
 				logger.Warn("Failed to record event activity summary after tenant persistence", "count", len(created), "error", err)
 			}
 			consumer.publishEventsChanged(created)

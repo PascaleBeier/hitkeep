@@ -9,6 +9,8 @@ import (
 	"runtime/debug"
 	"strings"
 	"time"
+
+	"hitkeep/internal/database"
 )
 
 // handleGetSystemReport renders the operator-facing system report: a single
@@ -88,8 +90,11 @@ func (h *handler) handleGetSystemReport() http.HandlerFunc {
 		writeLine("## Ingest (24h)")
 		writeLine("")
 		since := time.Now().UTC().Add(-24 * time.Hour)
-		counts, err := h.ctx.Store.GetRecentIngestCounts(ctx, since)
-		if h.ctx.TenantStores != nil {
+		var counts database.RecentIngestCounts
+		var err error
+		if h.ctx.TenantStores == nil {
+			err = fmt.Errorf("tenant analytics data plane is unavailable")
+		} else {
 			counts, err = h.ctx.TenantStores.GetRecentIngestCounts(ctx, since)
 		}
 		if err == nil {

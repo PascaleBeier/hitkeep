@@ -16,6 +16,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/worker"
 )
@@ -308,6 +309,103 @@ func runRecoverTestBackup(t *testing.T, ctx context.Context, sourceStore *databa
 	backupWorker := worker.NewBackupWorker(tenantMgr, dataPath, backupDir, 60, 24, nil, nil)
 	if err := backupWorker.Run(ctx); err != nil {
 		t.Fatalf("backup run: %v", err)
+	}
+}
+
+func TestDiscoverS3TenantBackupsFromRestoredControl(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	controlPath := filepath.Join(t.TempDir(), "hitkeep.db")
+	control := newMigratedRecoverTestStore(t, ctx, controlPath)
+	defaultID, err := control.GetDefaultTenantID(ctx)
+	if err != nil {
+		t.Fatalf("resolve default tenant: %v", err)
+	}
+	otherID := uuid.New()
+	if _, err := control.DB().ExecContext(ctx,
+		"INSERT INTO tenants (id, name, is_default, created_at) VALUES (?, ?, FALSE, ?)",
+		otherID, "Restore Tenant", time.Now().UTC(),
+	); err != nil {
+		t.Fatalf("insert non-default tenant: %v", err)
+	}
+
+	legacyIDs, err := discoverS3TenantBackupsFromControl(ctx, controlPath)
+	if err != nil {
+		t.Fatalf("discover legacy tenant backups: %v", err)
+	}
+	if len(legacyIDs) != 1 || legacyIDs[0] != otherID.String() {
+		t.Fatalf("expected only the legacy non-default tenant, got %v", legacyIDs)
+	}
+
+	if _, err := control.DB().ExecContext(ctx, `
+		INSERT INTO data_migrations (name, applied_at)
+		VALUES ('default_tenant_split_v1', ?)
+	`, time.Now().UTC()); err != nil {
+		t.Fatalf("mark default tenant split: %v", err)
+	}
+
+	splitIDs, err := discoverS3TenantBackupsFromControl(ctx, controlPath)
+	if err != nil {
+		t.Fatalf("discover split tenant backups: %v", err)
+	}
+	if len(splitIDs) != 2 || splitIDs[0] != defaultID.String() || splitIDs[1] != otherID.String() {
+		t.Fatalf("expected default and non-default split tenant backups, got %v", splitIDs)
+	}
+}
+
+func TestDiscoverS3TenantBackupsSupportsPreTenantControlSnapshot(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	controlPath := filepath.Join(t.TempDir(), "hitkeep.db")
+	control := database.NewStore(controlPath)
+	if err := control.Connect(); err != nil {
+		t.Fatalf("connect legacy control store: %v", err)
+	}
+	if _, err := control.DB().ExecContext(ctx, "CREATE TABLE legacy_control (id INTEGER)"); err != nil {
+		t.Fatalf("create legacy control schema: %v", err)
+	}
+	if err := control.Close(); err != nil {
+		t.Fatalf("close legacy control store: %v", err)
+	}
+
+	ids, err := discoverS3TenantBackupsFromControl(ctx, controlPath)
+	if err != nil {
+		t.Fatalf("discover tenants in pre-tenant control snapshot: %v", err)
+	}
+	if len(ids) != 0 {
+		t.Fatalf("expected no tenant backups for pre-tenant snapshot, got %v", ids)
+	}
+}
+
+func TestResolveRestoreS3ConfigPreservesTemporaryCredentialsAndEndpointTLS(t *testing.T) {
+	t.Parallel()
+
+	conf := &config.Config{
+		S3AccessKeyID:     "configured-key",
+		S3SecretAccessKey: "configured-secret",
+		S3SessionToken:    "configured-session-token",
+		S3Region:          "eu-central-1",
+		S3Endpoint:        "minio.internal:9000",
+		S3URLStyle:        "path",
+		S3UseSSL:          false,
+	}
+	got := resolveRestoreS3Config(conf, restoreS3Options{})
+	if got.AccessKeyID != conf.S3AccessKeyID || got.SecretAccessKey != conf.S3SecretAccessKey || got.SessionToken != conf.S3SessionToken {
+		t.Fatal("expected restore to preserve configured temporary S3 credentials")
+	}
+	if got.Region != conf.S3Region || got.Endpoint != conf.S3Endpoint || got.URLStyle != conf.S3URLStyle || got.UseSSL {
+		t.Fatalf("expected restore to preserve configured S3 endpoint settings, got region=%q endpoint=%q url_style=%q use_ssl=%v", got.Region, got.Endpoint, got.URLStyle, got.UseSSL)
+	}
+
+	overridden := resolveRestoreS3Config(conf, restoreS3Options{
+		sessionToken: "flag-session-token",
+		useSSL:       true,
+		useSSLSet:    true,
+	})
+	if overridden.SessionToken != "flag-session-token" || !overridden.UseSSL {
+		t.Fatal("expected explicit restore flags to override S3 configuration")
 	}
 }
 

@@ -28,6 +28,7 @@ type migrationWALGuard struct {
 	Scope             string    `json:"scope"`
 	PendingMigrations []string  `json:"pending_migrations"`
 	CheckpointToken   string    `json:"checkpoint_token"`
+	DatabaseSHA256    string    `json:"database_sha256,omitempty"`
 	CreatedAt         time.Time `json:"created_at"`
 }
 
@@ -35,14 +36,14 @@ func (r *databaseRecovery) migrationGuardPath() string {
 	return r.markerPath() + ".migration"
 }
 
-func (r *databaseRecovery) writeMigrationGuard(scope string, pending []string, checkpointToken string) error {
+func (r *databaseRecovery) writeMigrationGuard(scope string, pending []string, checkpointToken, databaseSHA256 string) error {
 	if !r.available() {
 		return nil
 	}
 	scope = strings.TrimSpace(scope)
 	checkpointToken = strings.TrimSpace(checkpointToken)
-	if scope == "" || len(pending) == 0 || checkpointToken == "" {
-		return errors.New("migration WAL guard requires a scope, pending migrations, and checkpoint token")
+	if scope == "" || len(pending) == 0 || (checkpointToken == "" && databaseSHA256 == "") {
+		return errors.New("migration WAL guard requires a scope, pending migrations, and a checkpoint token or database checksum")
 	}
 	if _, err := r.loadMigrationGuard(); err != nil {
 		return err
@@ -61,6 +62,7 @@ func (r *databaseRecovery) writeMigrationGuard(scope string, pending []string, c
 		Scope:             scope,
 		PendingMigrations: append([]string(nil), pending...),
 		CheckpointToken:   checkpointToken,
+		DatabaseSHA256:    databaseSHA256,
 		CreatedAt:         time.Now().UTC(),
 	}
 	if err := writeJSONFile(r.migrationGuardPath(), guard); err != nil {
@@ -87,7 +89,8 @@ func (r *databaseRecovery) loadMigrationGuard() (*migrationWALGuard, error) {
 	if guard.Version != migrationWALGuardVersion || guard.DatabaseID != r.databaseID() {
 		return nil, errors.New("migration WAL guard does not match this database")
 	}
-	if strings.TrimSpace(guard.Scope) == "" || len(guard.PendingMigrations) == 0 || strings.TrimSpace(guard.CheckpointToken) == "" {
+	if strings.TrimSpace(guard.Scope) == "" || len(guard.PendingMigrations) == 0 ||
+		(strings.TrimSpace(guard.CheckpointToken) == "" && strings.TrimSpace(guard.DatabaseSHA256) == "") {
 		return nil, errors.New("migration WAL guard is incomplete")
 	}
 	return &guard, nil
@@ -106,21 +109,50 @@ func (r *databaseRecovery) clearMigrationGuard() error {
 	return nil
 }
 
-func (r *databaseRecovery) checkpointAndClearMigrationGuard(ctx context.Context, db *sql.DB, guard *migrationWALGuard) error {
+func (r *databaseRecovery) checkpointMigrationGuard(ctx context.Context, db *sql.DB, guard *migrationWALGuard, clear bool) error {
 	if guard == nil {
 		return nil
 	}
 	if db == nil {
 		return errors.New("cannot complete migration WAL guard without a database")
 	}
-	if _, err := db.ExecContext(ctx, "CHECKPOINT;"); err != nil {
-		return fmt.Errorf("checkpoint replayed migration WAL: %w", err)
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("reserve guarded migration checkpoint connection: %w", err)
 	}
-	if err := r.clearMigrationGuard(); err != nil {
-		return err
+	expandedLimit := migrationCheckpointMemoryLimit(r.store.memoryLimit)
+	if expandedLimit != "" {
+		if _, err := conn.ExecContext(ctx, "SET memory_limit='"+expandedLimit+"'"); err != nil {
+			_ = conn.Close()
+			return fmt.Errorf("expand guarded migration checkpoint memory: %w", err)
+		}
+	}
+	_, checkpointErr := conn.ExecContext(ctx, "CHECKPOINT;")
+	var restoreErr error
+	if expandedLimit != "" {
+		_, restoreErr = conn.ExecContext(context.Background(), "SET memory_limit='"+r.store.memoryLimit+"'")
+	}
+	closeErr := conn.Close()
+	if checkpointErr != nil {
+		return fmt.Errorf("checkpoint replayed migration WAL: %w", checkpointErr)
+	}
+	if restoreErr != nil {
+		return fmt.Errorf("restore memory limit after guarded migration checkpoint: %w", restoreErr)
+	}
+	if closeErr != nil {
+		return fmt.Errorf("close guarded migration checkpoint connection: %w", closeErr)
+	}
+	if clear {
+		if err := r.clearMigrationGuard(); err != nil {
+			return err
+		}
 	}
 	r.status.checkpointSucceeded(time.Now().UTC())
-	slog.Info("Completed interrupted DuckDB migration checkpoint",
+	message := "Checkpointed guarded DuckDB migration section"
+	if clear {
+		message = "Completed interrupted DuckDB migration checkpoint"
+	}
+	slog.Info(message,
 		"database_id", guard.DatabaseID,
 		"scope", guard.Scope,
 		"pending_migration_count", len(guard.PendingMigrations))
@@ -137,7 +169,35 @@ func (s *Store) ensureMigrationCheckpointTable(ctx context.Context) error {
 	return nil
 }
 
-func (s *Store) prepareGuardedMigration(ctx context.Context, scope string, pending []string) error {
+func (s *Store) prepareGuardedMigration(ctx context.Context, scope string, pending []string, cleanBase ...bool) error {
+	if existing, err := s.recovery.loadMigrationGuard(); err != nil {
+		return err
+	} else if existing != nil {
+		if existing.Scope != strings.TrimSpace(scope) {
+			return fmt.Errorf("existing migration WAL guard has scope %q, want %q", existing.Scope, scope)
+		}
+		// The unpublished runner checkpoints every migration before reopening
+		// the native instance. Retain the original guard until the complete
+		// pending set succeeds instead of replacing it between heavy sections.
+		return nil
+	}
+	// A clean file-backed database can use its exact pre-migration checksum as
+	// the WAL-bypass proof. This avoids loading a large legacy ART index merely
+	// to checkpoint a token before the migration that removes that index.
+	checksumGuardAllowed := !fileExists(s.path + ".wal")
+	if len(cleanBase) > 0 {
+		checksumGuardAllowed = cleanBase[0]
+	}
+	if s.recovery.available() && checksumGuardAllowed {
+		databaseSHA256, err := databaseFileSHA256(s.path)
+		if err != nil {
+			return fmt.Errorf("checksum database before %s migrations: %w", scope, err)
+		}
+		if err := s.recovery.writeMigrationGuard(scope, pending, "", databaseSHA256); err != nil {
+			return fmt.Errorf("write %s migration checksum guard: %w", scope, err)
+		}
+		return nil
+	}
 	checkpointToken := uuid.NewString()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -160,7 +220,7 @@ func (s *Store) prepareGuardedMigration(ctx context.Context, scope string, pendi
 	if err := s.Checkpoint(ctx, "before_"+scope+"_migrations"); err != nil {
 		return fmt.Errorf("checkpoint before %s migrations: %w", scope, err)
 	}
-	if err := s.recovery.writeMigrationGuard(scope, pending, checkpointToken); err != nil {
+	if err := s.recovery.writeMigrationGuard(scope, pending, checkpointToken, ""); err != nil {
 		return fmt.Errorf("write %s migration WAL guard: %w", scope, err)
 	}
 	return nil
@@ -192,33 +252,4 @@ func (s *Store) completeGuardedMigration(ctx context.Context, scope string) erro
 		return fmt.Errorf("clear %s migration WAL guard: %w", scope, err)
 	}
 	return nil
-}
-
-func (s *Store) rollbackGuardedMigration(tx *sql.Tx, cause error) error {
-	if tx == nil {
-		if err := s.recovery.clearMigrationGuard(); err != nil {
-			return errors.Join(cause, err)
-		}
-		return cause
-	}
-	if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
-		return errors.Join(cause, fmt.Errorf("rollback guarded migration: %w", err))
-	}
-	if err := s.recovery.clearMigrationGuard(); err != nil {
-		return errors.Join(cause, err)
-	}
-	return cause
-}
-
-func (s *Store) rollbackMigration(tx *sql.Tx, cause error, guarded bool) error {
-	if guarded {
-		return s.rollbackGuardedMigration(tx, cause)
-	}
-	if tx == nil {
-		return cause
-	}
-	if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
-		return errors.Join(cause, fmt.Errorf("rollback migration: %w", err))
-	}
-	return cause
 }

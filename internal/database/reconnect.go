@@ -75,17 +75,51 @@ type reconnectingConnector struct {
 	factory func() (driver.Connector, error)
 	recover func(context.Context, error) error
 
-	mu         sync.Mutex
-	inner      driver.Connector
-	openConns  int
-	dead       bool
-	recovering bool
-	trigger    error
-	drainTimer *time.Timer
+	mu             sync.Mutex
+	inner          driver.Connector
+	connectionGate *connectionGate
+	openConns      int
+	dead           bool
+	recovering     bool
+	trigger        error
+	drainTimer     *time.Timer
 
 	drainTimeout   time.Duration
 	onDrainTimeout func(error)
 	onInvalidated  func(error)
+}
+
+type connectionGate struct {
+	sem chan struct{}
+}
+
+func newConnectionGate(limit int) *connectionGate {
+	if limit <= 0 {
+		limit = 16
+	}
+	return &connectionGate{sem: make(chan struct{}, limit)}
+}
+
+func (g *connectionGate) acquire(ctx context.Context) error {
+	if g == nil {
+		return nil
+	}
+	select {
+	case g.sem <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (g *connectionGate) release() {
+	if g == nil {
+		return
+	}
+	select {
+	case <-g.sem:
+	default:
+	}
 }
 
 func newReconnectingConnector(path string, factory func() (driver.Connector, error), recover func(context.Context, error) error) *reconnectingConnector {
@@ -93,6 +127,15 @@ func newReconnectingConnector(path string, factory func() (driver.Connector, err
 }
 
 func (c *reconnectingConnector) Connect(ctx context.Context) (driver.Conn, error) {
+	if err := c.connectionGate.acquire(ctx); err != nil {
+		return nil, err
+	}
+	release := true
+	defer func() {
+		if release {
+			c.connectionGate.release()
+		}
+	}()
 	c.mu.Lock()
 
 	if c.dead {
@@ -136,6 +179,7 @@ func (c *reconnectingConnector) Connect(ctx context.Context) (driver.Conn, error
 	}
 	c.openConns++
 	c.mu.Unlock()
+	release = false
 	return &reconnectingConn{inner: conn, connector: c}, nil
 }
 
@@ -196,6 +240,7 @@ func (c *reconnectingConnector) connClosed() {
 	defer c.mu.Unlock()
 	if c.openConns > 0 {
 		c.openConns--
+		c.connectionGate.release()
 	}
 	if c.dead && c.openConns == 0 {
 		if c.drainTimer != nil {

@@ -9,9 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
-	"hitkeep/internal/server/shared"
 )
 
 func setupShareAIActivityTestEnv(t *testing.T) (*handler, *database.Store, string, uuid.UUID) {
@@ -72,7 +70,7 @@ func setupShareAIActivityTestEnv(t *testing.T) (*handler, *database.Store, strin
 		t.Fatalf("create share link: %v", err)
 	}
 
-	h := &handler{ctx: &shared.Context{Store: store, Config: &config.Config{}}}
+	h := &handler{ctx: newShareTestContext(t, store)}
 	return h, store, token, site.ID
 }
 

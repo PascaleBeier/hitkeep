@@ -90,10 +90,12 @@ type Context struct {
 }
 
 // AnalyticsStore resolves the tenant-specific store that holds analytics data for the given site.
-// It falls back to the shared store if TenantStores is nil (single-tenant / follower node).
+// Analytics must never fall back to the control store: followers are expected to
+// proxy stateful requests to the leader and an unavailable tenant data plane must
+// fail closed.
 func (c *Context) AnalyticsStore(ctx context.Context, siteID uuid.UUID) (*database.Store, error) {
 	if c.TenantStores == nil {
-		return c.Store, nil
+		return nil, fmt.Errorf("tenant analytics data plane is unavailable")
 	}
 
 	store, _, err := c.TenantStores.ResolveSiteStore(ctx, siteID)

@@ -43,10 +43,13 @@ func setupTestEnv(t *testing.T) (*handler, *database.Store, uuid.UUID) {
 	if err != nil {
 		t.Fatalf("failed to create test user: %v", err)
 	}
+	tenantStores := database.NewTenantStoreManager(store, t.TempDir(), database.WithTenantDataPlane(false))
+	t.Cleanup(func() { _ = tenantStores.Close() })
 
 	ctx := &shared.Context{
-		Store:  store,
-		Config: &config.Config{},
+		Store:        store,
+		TenantStores: tenantStores,
+		Config:       &config.Config{},
 	}
 
 	return &handler{ctx: ctx}, store, userID
