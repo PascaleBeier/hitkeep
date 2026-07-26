@@ -21,6 +21,7 @@ import { calcDelta } from '@core/analytics/delta-utils';
 import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
 import { REALTIME_EVENT_KINDS } from '@services/realtime.service';
 import { injectReportRange } from '@services/report-range-preferences.service';
+import { injectSkeletonGate } from '@services/report-subject.service';
 import { SetupStateService } from '@services/setup-state.service';
 import { AnimatedNumber } from '@components/animated-number/animated-number';
 import { NoSiteSelected } from '@components/no-site-selected/no-site-selected';
@@ -118,6 +119,7 @@ export class Events {
     protected readonly comparisonTotalCount = computed(() => this.comparisonEventSeries().reduce((sum, p) => sum + p.count, 0));
     protected readonly totalEventDelta = computed(() => this.calcDelta(this.totalEventCount(), this.comparisonTotalCount()));
     protected readonly isLoading = computed(() => this.isLoadingNames() || this.isLoadingEventSeries() || this.isLoadingComparisonSeries());
+    protected readonly showEventTotalSkeleton = injectSkeletonGate(this.isLoadingEventSeries, () => this.eventSeries().length > 0);
 
     protected readonly activeSite = computed(() => this.siteService.activeSite());
     protected readonly noSite = computed(() => !this.activeSite());

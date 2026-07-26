@@ -1,8 +1,8 @@
 @if (visibleGroups().length) {
 <section class="metric-card-group">
-    <div class="metric-card-group__grid">
+    <div data-testid="metric-card-group" class="metric-card-group__grid">
         @for (group of visibleGroups(); track group.id) {
-        <p-card class="metric-card-group__card surface-card h-full border border-surface-200 shadow-sm dark:border-surface-700">
+        <p-card [attr.data-testid]="'metric-card-group-' + group.id" class="metric-card-group__card surface-card h-full border border-surface-200 shadow-sm dark:border-surface-700">
             <div class="metric-card-group__card-header">
                 <div class="metric-card-group__title-wrap">
                     <h3 class="metric-card-group__title">{{ cardHeading(group) }}</h3>

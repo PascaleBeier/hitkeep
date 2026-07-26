@@ -29,6 +29,21 @@ interface TrackingDomainSelectOption {
             <section class="site-settings-card">
                 <header class="site-settings-card__header">
                     <div class="site-settings-card__title-row">
+                        <span class="site-settings-card__icon"><i class="pi pi-code" aria-hidden="true"></i></span>
+                        <div>
+                            <h3>{{ "sites.tracking.htmlLabel" | transloco }}</h3>
+                            <p>{{ "sites.tracking.trackingCodeConfiguration" | transloco }}</p>
+                        </div>
+                    </div>
+                    <p-button [label]="copyButtonLabel() | transloco" [icon]="copyButtonIcon()" [text]="true" [type]="'button'" size="small" (onClick)="copySnippet()" />
+                </header>
+                <div class="site-settings-card__body">
+                    <pre class="site-settings-code-panel">{{ snippetCode() }}</pre>
+                </div>
+            </section>
+            <section class="site-settings-card">
+                <header class="site-settings-card__header">
+                    <div class="site-settings-card__title-row">
                         <span class="site-settings-card__icon"><i class="pi pi-bolt" aria-hidden="true"></i></span>
                         <div>
                             <h3>{{ "sites.tracking.verifier.title" | transloco }}</h3>
@@ -185,22 +200,6 @@ interface TrackingDomainSelectOption {
                             <p-toggleswitch inputId="form-tracking-switch" ariaLabelledBy="form-tracking-label" styleClass="shrink-0" [formControl]="trackingForm.trackForms().control()"></p-toggleswitch>
                         </div>
                     </div>
-                </div>
-            </section>
-
-            <section class="site-settings-card">
-                <header class="site-settings-card__header">
-                    <div class="site-settings-card__title-row">
-                        <span class="site-settings-card__icon"><i class="pi pi-code" aria-hidden="true"></i></span>
-                        <div>
-                            <h3>{{ "sites.tracking.htmlLabel" | transloco }}</h3>
-                            <p>{{ "sites.tracking.trackingCodeConfiguration" | transloco }}</p>
-                        </div>
-                    </div>
-                    <p-button [label]="copyButtonLabel() | transloco" [icon]="copyButtonIcon()" [text]="true" [type]="'button'" size="small" (onClick)="copySnippet()" />
-                </header>
-                <div class="site-settings-card__body">
-                    <pre class="site-settings-code-panel">{{ snippetCode() }}</pre>
                 </div>
             </section>
         </div>

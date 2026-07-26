@@ -3,6 +3,8 @@ import { By } from '@angular/platform-browser';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { provideTranslocoLocale } from '@jsverse/transloco-locale';
 import { SeriesChart } from '@features/analytics/components/series-chart';
+import { ReportSubjectService } from '@services/report-subject.service';
+import { vi } from 'vitest';
 
 describe('SeriesChart', () => {
     let component: SeriesChart;
@@ -98,5 +100,69 @@ describe('SeriesChart', () => {
         expect(frame.series.find((series) => series.data.length > 0)).toBeUndefined();
         expect(merge.xAxis.data.length).toBe(2);
         expect(merge.series.find((series) => series.name === 'Events')?.data).toEqual([5, 9]);
+    });
+
+    it('patches a live chart with replaceMerge so dropped series cannot linger', async () => {
+        const setOption = vi.fn();
+        const chart = { setOption, isDisposed: () => false };
+        fixture.componentRef.setInput('data', [{ time: '2026-07-01T00:00:00Z', count: 5 }]);
+        fixture.componentRef.setInput('comparisonData', [{ time: '2026-06-30T00:00:00Z', count: 3 }]);
+        fixture.componentRef.setInput('series', [{ key: 'count', label: 'Events', color: '#2563eb' }]);
+        fixture.detectChanges();
+
+        (component as unknown as { onChartInit: (chart: unknown) => void }).onChartInit(chart);
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        const firstPatch = setOption.mock.lastCall as [{ series: { name: string }[] }, { replaceMerge: string[] }];
+        expect(firstPatch[1]).toEqual({ replaceMerge: ['series'] });
+        expect(firstPatch[0].series.map((series) => series.name)).toContain('Events (prev.)');
+
+        fixture.componentRef.setInput('comparisonData', []);
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        const secondPatch = setOption.mock.lastCall as [{ series: { name: string }[] }, { replaceMerge: string[] }];
+        expect(secondPatch[0].series.map((series) => series.name)).toEqual(['Events']);
+    });
+
+    it('leaves a disposed chart alone', async () => {
+        const setOption = vi.fn();
+        fixture.componentRef.setInput('data', [{ time: '2026-07-01T00:00:00Z', count: 5 }]);
+        fixture.componentRef.setInput('series', [{ key: 'count', label: 'Events', color: '#2563eb' }]);
+        fixture.detectChanges();
+
+        (component as unknown as { onChartInit: (chart: unknown) => void }).onChartInit({ setOption, isDisposed: () => true });
+        fixture.componentRef.setInput('data', [{ time: '2026-07-02T00:00:00Z', count: 9 }]);
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        expect(setOption).not.toHaveBeenCalled();
+    });
+
+    it('keeps the rendered chart through a reload of the same subject', async () => {
+        fixture.componentRef.setInput('data', [{ time: '2026-07-01T00:00:00Z', count: 5 }]);
+        fixture.componentRef.setInput('series', [{ key: 'count', label: 'Events', color: '#2563eb' }]);
+        fixture.detectChanges();
+        expect(fixture.debugElement.query(By.css('[echarts]'))).toBeTruthy();
+
+        fixture.componentRef.setInput('isLoading', true);
+        await fixture.whenStable();
+
+        expect(fixture.debugElement.query(By.css('[echarts]'))).toBeTruthy();
+        expect(fixture.debugElement.query(By.css('.pi-spinner'))).toBeNull();
+    });
+
+    it('shows the spinner for a first load and after the subject changes', async () => {
+        fixture.componentRef.setInput('data', [{ time: '2026-07-01T00:00:00Z', count: 5 }]);
+        fixture.componentRef.setInput('series', [{ key: 'count', label: 'Events', color: '#2563eb' }]);
+        fixture.detectChanges();
+
+        TestBed.inject(ReportSubjectService).set('another-site');
+        fixture.componentRef.setInput('isLoading', true);
+        await fixture.whenStable();
+
+        expect(fixture.debugElement.query(By.css('.pi-spinner'))).toBeTruthy();
+        expect(fixture.debugElement.query(By.css('[echarts]'))).toBeNull();
     });
 });

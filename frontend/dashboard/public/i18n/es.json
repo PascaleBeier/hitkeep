@@ -2832,24 +2832,24 @@
       "docsAction": "Leer la guía de configuración"
     },
     "fetchDepth": {
+      "title": "Profundidad de fetch de rastreadores",
       "description": "Lo que añaden los logs reenviados de CDN, edge y servidor: rastreadores que tu seguimiento nunca ve, sus códigos de estado, tiempos de respuesta, bytes servidos y cómo los fetches se convierten en visitas.",
       "docsAction": "Guía de configuración",
+      "note": "Las visitas correlacionadas cuentan visitas posteriores referidas por IA en la misma ruta dentro del rango seleccionado.",
+      "groups": {
+        "volume": "Volumen de fetch",
+        "correlation": "De fetch a visita",
+        "health": "Calidad de entrega"
+      },
       "kpis": {
         "totalFetches": "Fetches totales",
+        "correlatedPaths": "Rutas correlacionadas",
+        "aiReferredVisits": "Visitas posteriores referidas por IA",
+        "uncorrelatedFetches": "Fetches no correlacionados",
         "errorRate4xx": "Tasa 4xx",
         "errorRate5xx": "Tasa 5xx",
         "medianResponse": "Respuesta mediana",
         "bytesServed": "Bytes servidos"
-      },
-      "correlation": {
-        "title": "Correlación fetch-visita",
-        "description": "Mide qué rutas obtenidas luego atraen visitas humanas referidas por IA y qué páginas con mucho fetch todavía no generan tráfico posterior.",
-        "note": "Las visitas correlacionadas cuentan visitas posteriores referidas por IA en la misma ruta dentro del rango seleccionado.",
-        "kpis": {
-          "correlatedPaths": "Rutas correlacionadas",
-          "aiReferredVisits": "Visitas posteriores referidas por IA",
-          "uncorrelatedFetches": "Fetches no correlacionados"
-        }
       },
       "tables": {
         "title": "Desgloses de correlación",

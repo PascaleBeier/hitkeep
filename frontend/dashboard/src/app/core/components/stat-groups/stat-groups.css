@@ -1,0 +1,72 @@
+:host {
+    display: block;
+}
+
+/* One track per strip. `auto-fit` collapses an empty track, so two strips widen
+   instead of leaving a gap where a third would have been. */
+.stat-groups {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 1rem 1.5rem;
+}
+
+.stat-groups__heading {
+    margin-bottom: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+/* Every track is `minmax(0, …)`, here and in the media queries below: that is
+   what keeps a long value from blowing the track out, so the tiles need no
+   `min-width` of their own. */
+.stat-groups__strip {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+
+/* Surface colors come from the shared `tile` tokens in the theme preset, which
+   flip with the color scheme on their own. */
+.stat-groups__tile {
+    border: 1px solid var(--p-tile-border-color);
+    border-radius: 0.5rem;
+    background: var(--p-tile-background);
+    padding: 0.625rem 0.75rem;
+}
+
+.stat-groups__tile dt {
+    overflow: hidden;
+    color: var(--p-tile-label-color);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.stat-groups__tile dd {
+    margin: 0.125rem 0 0;
+    color: var(--p-text-color);
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.25rem;
+    overflow-wrap: anywhere;
+}
+
+@media (min-width: 1024px) {
+    .stat-groups {
+        max-width: 60rem;
+    }
+
+    /* Each strip owns a column, so its tiles stack: reading down one strip
+       compares like with like, reading across compares the themes. */
+    .stat-groups__strip {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 340px) {
+    .stat-groups__strip {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

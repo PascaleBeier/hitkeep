@@ -1,4 +1,4 @@
-import { Component, input, output, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, computed, input, output, signal, ChangeDetectionStrategy } from '@angular/core';
 
 import { TranslocoPipe } from '@jsverse/transloco';
 import { TranslocoDecimalPipe } from '@jsverse/transloco-locale';
@@ -10,6 +10,7 @@ import { GoalStats } from '@models/analytics.types';
 
 // Components
 import { EmptyState } from '@components/molecules/empty-state';
+import { injectSkeletonGate } from '@services/report-subject.service';
 import { GoalManager } from '@features/goals/components/goal-manager';
 
 @Component({
@@ -26,18 +27,18 @@ import { GoalManager } from '@features/goals/components/goal-manager';
                     <h3 class="font-semibold text-lg">{{ 'goals.list.title' | transloco }}</h3>
                 </div>
                 <!-- Only show header add button if we have data (otherwise EmptyState handles it) -->
-                @if (!readOnly() && !isLoading() && data() && data().length > 0) {
+                @if (!readOnly() && !showSkeleton() && hasGoals()) {
                     <p-button icon="pi pi-plus" (onClick)="showManager.set(true)" [rounded]="true" [text]="true" [pTooltip]="'goals.list.manageTooltip' | transloco" styleClass="w-8 h-8" />
                 }
             </div>
 
-            @if (isLoading()) {
+            @if (showSkeleton()) {
                 <div class="flex flex-col gap-3">
                     @for (i of [1, 2, 3]; track i) {
                         <p-skeleton height="3rem" styleClass="w-full" />
                     }
                 </div>
-            } @else if (!data() || data().length === 0) {
+            } @else if (!hasGoals()) {
                 <!-- Reusable Empty State -->
                 <app-empty-state
                     icon="pi-flag"
@@ -76,6 +77,9 @@ export class GoalList {
     siteId = input.required<string | null>(); // Required for the manager
     isLoading = input<boolean>(false);
     readOnly = input<boolean>(false);
+
+    protected readonly hasGoals = computed(() => this.data().length > 0);
+    protected readonly showSkeleton = injectSkeletonGate(this.isLoading, this.hasGoals);
 
     // Emit when data changes so parent can reload stats
     refresh = output<void>();

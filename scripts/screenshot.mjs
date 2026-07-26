@@ -36,6 +36,12 @@ const BASE_URL = (process.env.HITKEEP_URL ?? "http://localhost:8080").replace(/\
 const EMAIL = process.env.HITKEEP_EMAIL;
 const PASSWORD = process.env.HITKEEP_PASSWORD;
 const SCALE = parseFloat(process.env.SCALE ?? "2");
+const DESKTOP_VIEWPORT = { width: 1440, height: 1024 };
+const MOBILE_VIEWPORT = { width: 390, height: 844 };
+// The shared metric card grid is three columns from 1280px up
+// (frontend/dashboard/src/app/features/analytics/components/metric-card-group.css),
+// so two columns keep the AI Agents grid's four groups a gap-free 2x2.
+const AI_CORRELATION_VIEWPORT = { width: 1180, height: 1024 };
 const SCREENSHOT_TARGET = (process.env.SCREENSHOT_TARGET ?? "").trim().toLowerCase();
 const OUTPUT_DIR = resolve(
   process.env.OUTPUT_DIR ?? join(__dir, "../../hitkeep-docs/src/assets/screenshots"),
@@ -332,37 +338,35 @@ async function prepareEventBreakdown(page) {
 }
 
 async function prepareAIVisibilityShot(page) {
-  const shot = page.locator('[data-testid="ai-visibility-correlation-shot"]').first();
-  if (await shot.count()) {
-    const kpis = page.locator('[data-testid="ai-visibility-correlation-kpis"]').first();
-    if (await kpis.count()) {
-      await kpis.scrollIntoViewIfNeeded();
-    } else {
-      await shot.scrollIntoViewIfNeeded();
-    }
+  const tables = page.locator('[data-testid="metric-card-group-correlation"]').first();
+  if (await tables.count()) {
+    // The caller restores the viewport: this clip is measured at this width, so
+    // the shot has to be taken before anything reflows it.
+    await page.setViewportSize(AI_CORRELATION_VIEWPORT);
+    await tables.scrollIntoViewIfNeeded();
     await page.waitForTimeout(TABLE_SETTLE);
 
     const clip = await page.evaluate(() => {
-      const section = document.querySelector('[data-testid="ai-visibility-correlation-shot"]');
-      const kpis = document.querySelector('[data-testid="ai-visibility-correlation-kpis"]');
-      const tables = document.querySelector('[data-testid="ai-visibility-correlation-tables"]');
+      const tables = document.querySelector('[data-testid="metric-card-group-correlation"]');
+      const card = document.querySelector('[data-testid="ai-visibility-fetch-depth"]');
+      const grid = document.querySelector('[data-testid="metric-card-group"]');
 
-      if (!section || !kpis || !tables) {
+      if (!tables || !card || !grid) {
         return null;
       }
 
-      const sectionRect = section.getBoundingClientRect();
-      const kpiRect = kpis.getBoundingClientRect();
+      const gridRect = grid.getBoundingClientRect();
       const tablesRect = tables.getBoundingClientRect();
+      const cardRect = card.getBoundingClientRect();
 
       const horizontalPadding = 18;
       const verticalPadding = 18;
       const scrollX = window.scrollX;
       const scrollY = window.scrollY;
-      const absLeft = sectionRect.left + scrollX;
-      const absRight = sectionRect.right + scrollX;
-      const absTop = kpiRect.top + scrollY;
-      const absBottom = tablesRect.bottom + scrollY;
+      const absLeft = gridRect.left + scrollX;
+      const absRight = gridRect.right + scrollX;
+      const absTop = tablesRect.top + scrollY;
+      const absBottom = cardRect.bottom + scrollY;
       const documentWidth = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
       const documentHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
 
@@ -388,21 +392,7 @@ async function prepareAIVisibilityShot(page) {
     }
   }
 
-  await page.evaluate(() => {
-    const correlationCard =
-      Array.from(document.querySelectorAll("p-card, .p-card"))
-        .find((el) => /fetch-to-visit correlation/i.test(el.textContent || ""));
-    const tablesGrid =
-      Array.from(document.querySelectorAll("p-table, .p-datatable"))
-        .find((el) => /citation yield|opportunity pages|failure hotspots/i.test(el.textContent || ""));
-
-    const target = tablesGrid || correlationCard;
-    if (target) {
-      target.scrollIntoView({ behavior: "instant", block: "start" });
-    } else {
-      window.scrollTo({ top: Math.floor(window.innerHeight * 1.2), behavior: "instant" });
-    }
-  });
+  await page.evaluate(() => window.scrollTo({ top: Math.floor(window.innerHeight * 1.2), behavior: "instant" }));
   await page.waitForTimeout(TABLE_SETTLE);
   return null;
 }
@@ -551,12 +541,12 @@ async function captureAskAI(page, record) {
   await page.waitForTimeout(FORM_SETTLE);
   record("feature-ask-ai-answer", await shoot(page, "feature-ask-ai-answer"));
 
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(MOBILE_VIEWPORT);
   await openAskAIDrawer(page);
   await page.locator(".ai-suggestion-row").waitFor({ state: "visible", timeout: 8_000 });
   await page.waitForTimeout(FORM_SETTLE);
   record("feature-ask-ai-mobile", await shoot(page, "feature-ask-ai-mobile"));
-  await page.setViewportSize({ width: 1440, height: 1024 });
+  await page.setViewportSize(DESKTOP_VIEWPORT);
 }
 
 async function openTeamSwitcher(page) {
@@ -633,7 +623,7 @@ async function run() {
 
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
-    viewport: { width: 1440, height: 1024 },
+    viewport: DESKTOP_VIEWPORT,
     deviceScaleFactor: SCALE,
     colorScheme: "light",
   });
@@ -740,12 +730,13 @@ async function run() {
     await page.waitForTimeout(TABLE_SETTLE);
     record("analytics-events-audience", await shoot(page, "analytics-events-audience"));
 
-    // One page now: the hero KPIs and chart at the top, the fetch depth section
-    // stacked below it. Both shots come from /ai-agents, the second one scrolled.
+    // One page now: the hero KPIs and chart at the top, then the one card grid
+    // holding every breakdown, then the fetch depth card. All three shots come
+    // from /ai-agents, the last two scrolled.
     await captureRoute(page, record, "analytics-ai-agents-traffic", "/ai-agents", CHART_SETTLE);
 
     await page.evaluate(() => {
-      const target = document.querySelector('[data-testid="ai-visibility-health-strip"], [data-testid="ai-agents-enrich-callout"]');
+      const target = document.querySelector('[data-testid="ai-agents-page-chips"], [data-testid="ai-agents-enrich-callout"]');
       if (target) {
         target.scrollIntoView({ behavior: "instant", block: "start" });
       } else {
@@ -756,6 +747,7 @@ async function run() {
     record("analytics-ai-visibility", await shoot(page, "analytics-ai-visibility"));
     const aiVisibilityClip = await prepareAIVisibilityShot(page);
     record("analytics-ai-visibility-correlation", await shoot(page, "analytics-ai-visibility-correlation", { clip: aiVisibilityClip ?? undefined }));
+    await page.setViewportSize(DESKTOP_VIEWPORT);
     await captureRoute(page, record, "analytics-ai-chatbots", "/ai-chatbots", CHART_SETTLE);
     await captureWebVitals(page, record);
     await captureOpportunities(page, record, "analytics-opportunities");
@@ -782,10 +774,10 @@ async function run() {
     await captureGoogleSearchConsoleIntegration(page, record, "integration-google-search-console");
 
     console.log("\n  Mobile spot checks:");
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize(MOBILE_VIEWPORT);
     await captureGoogleSearchConsoleIntegration(page, record, "integration-google-search-console-mobile");
     await captureSearchConsoleDrilldown(page, record, "analytics-search-console-mobile");
-    await page.setViewportSize({ width: 1440, height: 1024 });
+    await page.setViewportSize(DESKTOP_VIEWPORT);
 
     console.log("\n  Admin:");
     await nav(page, "/admin/system", TABLE_SETTLE);

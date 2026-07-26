@@ -1,4 +1,4 @@
-import { Component, input, output, ChangeDetectionStrategy } from '@angular/core';
+import { Component, computed, input, output, ChangeDetectionStrategy } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 
 import { CardModule } from '@openng/optimus-ui/card';
@@ -7,6 +7,7 @@ import { SkeletonModule } from '@openng/optimus-ui/skeleton';
 import { TooltipModule } from '@openng/optimus-ui/tooltip';
 import { Funnel } from '@models/analytics.types';
 import { EmptyState } from '@components/molecules/empty-state';
+import { injectSkeletonGate } from '@services/report-subject.service';
 
 @Component({
     selector: 'app-funnel-list',
@@ -20,18 +21,18 @@ import { EmptyState } from '@components/molecules/empty-state';
                     <i class="pi pi-filter text-[var(--p-primary-color)]" aria-hidden="true"></i>
                     <h3 class="font-semibold text-lg">{{ 'funnels.list.title' | transloco }}</h3>
                 </div>
-                @if (!readOnly() && !isLoading() && funnels() && funnels().length > 0) {
+                @if (!readOnly() && !showSkeleton() && hasFunnels()) {
                     <p-button icon="pi pi-plus" (onClick)="manageClicked.emit()" [rounded]="true" [text]="true" [pTooltip]="'funnels.list.manageTooltip' | transloco" styleClass="w-8 h-8" />
                 }
             </div>
 
-            @if (isLoading()) {
+            @if (showSkeleton()) {
                 <div class="flex flex-col gap-3">
                     @for (i of [1, 2]; track i) {
                         <p-skeleton height="3rem" styleClass="w-full" />
                     }
                 </div>
-            } @else if (!funnels() || funnels().length === 0) {
+            } @else if (!hasFunnels()) {
                 <app-empty-state
                     icon="pi-filter"
                     [title]="'funnels.list.emptyTitle' | transloco"
@@ -67,6 +68,9 @@ export class FunnelList {
     funnels = input.required<Funnel[]>();
     isLoading = input<boolean>(false);
     readOnly = input<boolean>(false);
+
+    protected readonly hasFunnels = computed(() => this.funnels().length > 0);
+    protected readonly showSkeleton = injectSkeletonGate(this.isLoading, this.hasFunnels);
     manageClicked = output<void>();
     funnelClicked = output<Funnel>();
 }

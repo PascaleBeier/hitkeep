@@ -9,6 +9,7 @@ import { countryFlagUrl, languageFlagUrl } from '@core/i18n/flag-utils';
 import { browserAppUrl } from '@core/interceptors/base-path.interceptor';
 import { aiCategoryLabel } from '@features/analytics/ai-category-labels';
 import { AIAgentIconsService } from '@services/ai-agent-icons.service';
+import { injectSkeletonGate } from '@services/report-subject.service';
 import { AIActivityStat, MetricStat } from '@models/analytics.types';
 
 /** True for rows the AI activity report enriched with provenance counters. */
@@ -61,6 +62,8 @@ export class MetricList {
     showHeader = input<boolean>(true);
     rowClicked = output<MetricStat>();
 
+    protected readonly hasRows = computed(() => this.data().length > 0);
+    protected readonly showSkeleton = injectSkeletonGate(this.isLoading, this.hasRows);
     protected readonly isScrollFrameScrollable = signal(false);
     protected readonly isScrollFrameAtBottom = signal(true);
     protected readonly scrollThumbTop = signal(0);
@@ -75,7 +78,7 @@ export class MetricList {
     constructor() {
         effect((onCleanup) => {
             this.data();
-            this.isLoading();
+            this.showSkeleton();
             const frame = this.scrollFrame()?.nativeElement;
             if (!frame) return;
 

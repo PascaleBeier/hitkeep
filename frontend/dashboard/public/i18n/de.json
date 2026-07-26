@@ -2844,24 +2844,24 @@
       "docsAction": "Zur Einrichtungsanleitung"
     },
     "fetchDepth": {
+      "title": "Crawler-Fetch-Tiefe",
       "description": "Was weitergeleitete CDN-, Edge- und Server-Logs zusätzlich zeigen: Crawler, die dein Tracking nie sieht, ihre Statuscodes, Antwortzeiten, ausgelieferten Bytes und wie aus Fetches Besuche werden.",
       "docsAction": "Setup-Leitfaden",
+      "note": "Korrelierte Besuche zählen spätere KI-vermittelte Besuche auf demselben Pfad im gewählten Zeitraum.",
+      "groups": {
+        "volume": "Fetch-Volumen",
+        "correlation": "Fetch zu Besuch",
+        "health": "Auslieferungsqualität"
+      },
       "kpis": {
         "totalFetches": "Fetches gesamt",
+        "correlatedPaths": "Korrelierte Pfade",
+        "aiReferredVisits": "Spätere AI-vermittelte Besuche",
+        "uncorrelatedFetches": "Nicht korrelierte Fetches",
         "errorRate4xx": "4xx-Rate",
         "errorRate5xx": "5xx-Rate",
         "medianResponse": "Median-Antwort",
         "bytesServed": "Ausgelieferte Bytes"
-      },
-      "correlation": {
-        "title": "Fetch-zu-Besuch-Korrelation",
-        "description": "Miss, welche abgerufenen Pfade später AI-vermittelte Besuche anziehen und welche stark abgerufenen Seiten noch keinen Downstream-Traffic erzeugen.",
-        "note": "Korrelierte Besuche zählen spätere KI-vermittelte Besuche auf demselben Pfad im gewählten Zeitraum.",
-        "kpis": {
-          "correlatedPaths": "Korrelierte Pfade",
-          "aiReferredVisits": "Spätere AI-vermittelte Besuche",
-          "uncorrelatedFetches": "Nicht korrelierte Fetches"
-        }
       },
       "tables": {
         "title": "Korrelationsaufschlüsselungen",

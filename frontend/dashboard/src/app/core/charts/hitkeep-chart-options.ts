@@ -54,12 +54,22 @@ export function hitkeepChartTheme(isDark: boolean): HitkeepChartTheme {
     };
 }
 
+/**
+ * Charts morph between date ranges instead of being torn down, which makes the
+ * animation itself the change indicator. Readers who asked for less motion get
+ * the new shape immediately instead.
+ */
+function motionDuration(ms: number): number {
+    const reduced = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    return reduced ? 0 : ms;
+}
+
 export function buildHitkeepChartOptions(input: BuildHitkeepChartOptionsInput): EChartsCoreOption {
     const design = input.design ?? 'area';
     const hasBarSeries = input.series.some((series) => resolveSeriesDesign(series, design) === 'bar');
     const option = {
-        animationDuration: 260,
-        animationDurationUpdate: 240,
+        animationDuration: motionDuration(260),
+        animationDurationUpdate: motionDuration(240),
         animationEasingUpdate: 'cubicOut',
         aria: {
             enabled: true,
@@ -156,7 +166,7 @@ export function buildHitkeepChartMergeOptions(input: BuildHitkeepChartOptionsInp
     const design = input.design ?? 'area';
     const hasBarSeries = input.series.some((series) => resolveSeriesDesign(series, design) === 'bar');
     return {
-        animationDurationUpdate: 240,
+        animationDurationUpdate: motionDuration(240),
         animationEasingUpdate: 'cubicOut',
         aria: {
             label: {

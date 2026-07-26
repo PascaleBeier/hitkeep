@@ -22,6 +22,59 @@ export const hitKeepThemeOverrides = {
             borderRadius: '{border.radius.md}',
             paddingX: '0.75rem',
             paddingY: '0.5rem'
+        },
+        /**
+         * A tile is a small label/value pane sitting inside a card. Aura has no
+         * token for it, and the obvious hand-rolled surface — mixing
+         * `{surface.0}` into the card — is wrong: the surface ramp is a fixed
+         * light palette in both schemes, so it paints a near-white tile in dark
+         * mode under white value text. These live here rather than in component
+         * CSS so the scheme flip comes from the preset instead of a paired
+         * `:host-context(.p-dark)` selector in every page that wants a tile.
+         */
+        extend: {
+            tile: {
+                borderColor: '{content.border.color}',
+                // `{text.muted.color}` alone is only ~4.4:1 on a tinted tile,
+                // under the 4.5:1 floor for a 12px label. Pull it toward the
+                // body color; both schemes stay above 5:1.
+                labelColor: 'color-mix(in srgb, {text.muted.color} 82%, {text.color})'
+            },
+            /**
+             * Aura dropped PrimeNG v3's `surface-border` / `surface-card` /
+             * `surface-ground` names, but the dashboard still references all
+             * three in ~25 files. An undefined var is invalid at computed-value
+             * time, so today those declarations silently do nothing: borders
+             * render at zero width, backgrounds fall back to transparent. These
+             * aliases give the existing call sites their intended value; each
+             * resolves through a semantic token, so both schemes are covered.
+             */
+            surface: {
+                border: '{content.border.color}',
+                card: '{content.background}'
+            }
+        },
+        colorScheme: {
+            // Light lifts the tile off the card, dark recesses it. Either way it
+            // stays within ~1.05:1 of the card, so the theme's own text tokens
+            // keep the contrast they were designed for.
+            //
+            // `surface.ground` is the page backdrop behind the cards. It has to
+            // be declared per scheme rather than as a semantic alias because it
+            // mirrors `index.html`'s `bg-surface-50 dark:bg-surface-950` on
+            // `<body>` — which is what has been masking the dead token.
+            light: {
+                extend: {
+                    tile: { background: 'color-mix(in srgb, {content.hover.background} 55%, {content.background})' },
+                    surface: { ground: '{surface.50}' }
+                }
+            },
+            dark: {
+                extend: {
+                    tile: { background: 'color-mix(in srgb, {content.background} 72%, {surface.950})' },
+                    surface: { ground: '{surface.950}' }
+                }
+            }
         }
     },
     components: {

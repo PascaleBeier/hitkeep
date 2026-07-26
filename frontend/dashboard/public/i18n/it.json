@@ -2820,24 +2820,24 @@
       "docsAction": "Leggi la guida alla configurazione"
     },
     "fetchDepth": {
+      "title": "Profondità dei fetch dei crawler",
       "description": "Ciò che aggiungono i log inoltrati di CDN, edge e server: i crawler che il tuo tracciamento non vede mai, i loro codici di stato, i tempi di risposta, i byte serviti e come i fetch si trasformano in visite.",
       "docsAction": "Guida alla configurazione",
+      "note": "Le visite correlate contano le visite successive riferite dall’AI sullo stesso percorso nell’intervallo selezionato.",
+      "groups": {
+        "volume": "Volume dei fetch",
+        "correlation": "Dal fetch alla visita",
+        "health": "Qualità di consegna"
+      },
       "kpis": {
         "totalFetches": "Fetch totali",
+        "correlatedPaths": "Percorsi correlati",
+        "aiReferredVisits": "Visite successive riferite dall’AI",
+        "uncorrelatedFetches": "Fetch non correlati",
         "errorRate4xx": "Tasso 4xx",
         "errorRate5xx": "Tasso 5xx",
         "medianResponse": "Risposta mediana",
         "bytesServed": "Byte serviti"
-      },
-      "correlation": {
-        "title": "Correlazione fetch-visite",
-        "description": "Misura quali percorsi recuperati attirano poi visite umane riferite dall’AI e quali pagine molto richieste non generano ancora traffico a valle.",
-        "note": "Le visite correlate contano le visite successive riferite dall’AI sullo stesso percorso nell’intervallo selezionato.",
-        "kpis": {
-          "correlatedPaths": "Percorsi correlati",
-          "aiReferredVisits": "Visite successive riferite dall’AI",
-          "uncorrelatedFetches": "Fetch non correlati"
-        }
       },
       "tables": {
         "title": "Suddivisioni della correlazione",
