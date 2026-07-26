@@ -132,7 +132,7 @@ async function clickSeededMetricRow(page, title, valuePattern) {
  * so scalar assertions read the plain-text strips instead.
  */
 async function readStatStripValue(page, containerSelector, label) {
-    const entry = page.locator(containerSelector).locator(".ai-agents__stat").filter({ hasText: label }).first();
+    const entry = page.locator(containerSelector).locator(".stat-groups__tile").filter({ hasText: label }).first();
     await expect(entry).toBeVisible();
     const text = (await entry.innerText()) || "";
     return Number(text.replace(/^[^\d]*/, "").replace(/[^\d]/g, "") || "0");
@@ -252,6 +252,18 @@ test("dashboard renders seeded data and product controls", async ({ page }) => {
     await expect(page.getByRole("tab", { name: /general/i })).toHaveAttribute("aria-selected", "true");
     await page.getByRole("tab", { name: /tracking/i }).click();
     await expect(page).toHaveURL(/\/sites\/[^/]+\/settings\/tracking$/);
+    await expect(page.getByTestId("tracking-snippet")).toContainText("hk.js");
+
+    const installMethods = page.getByTestId("tracking-install-method");
+    await installMethods.getByText("WordPress", { exact: true }).click();
+    await expect(page.getByTestId("tracking-wordpress-directory-link")).toHaveAttribute("href", "https://wordpress.org/plugins/hitkeep/");
+    await installMethods.getByText("Server-side", { exact: true }).click();
+    await expect(page.getByTestId("tracking-server-snippet")).toContainText("/api/ingest/server/pageview");
+    await installMethods.getByText("npm", { exact: true }).click();
+    await expect(page.getByTestId("tracking-npm-install")).toContainText("npm install @hitkeep/tracker");
+    await installMethods.getByText("Script tag", { exact: true }).click();
+
+    await page.getByRole("button", { name: /advanced options/i }).click();
     await expect(page.getByText("Automatic event tracking")).toBeVisible();
     await expect(page.getByText("Track outbound clicks")).toBeVisible();
     await expect(page.getByText("Track file downloads")).toBeVisible();
@@ -259,7 +271,7 @@ test("dashboard renders seeded data and product controls", async ({ page }) => {
 
     await page.reload();
     await expect(page).toHaveURL(/\/sites\/[^/]+\/settings\/tracking$/);
-    await expect(page.getByText("Automatic event tracking")).toBeVisible();
+    await expect(page.getByTestId("tracking-snippet")).toContainText("hk.js");
 
     await page.getByRole("tab", { name: /access/i }).click();
     await expect(page).toHaveURL(/\/sites\/[^/]+\/settings\/access$/);

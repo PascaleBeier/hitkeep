@@ -1564,12 +1564,54 @@
       }
     },
     "tracking": {
-      "description": "Kopieer en plak de onderstaande code in deHTMLvan je website. Automatische tracking is standaard ingeschakeld voor uitgaande klikken, downloads en formulierinzendingen.",
-      "trackingCodeConfiguration": "Configuratie van trackingcode",
+      "install": {
+        "title": "HitKeep installeren op {{ domain }}",
+        "titleFallback": "HitKeep installeren",
+        "subtitle": "Kies hoe deze site gegevens verstuurt. Alle methoden rapporteren aan hetzelfde dashboard.",
+        "methodLabel": "Installatiemethode",
+        "methods": {
+          "script": "Scripttag",
+          "npm": "npm",
+          "wordpress": "WordPress",
+          "server": "Serverzijde"
+        },
+        "script": {
+          "description": "Kopieer en plak de onderstaande code in de HTML van je website. Automatische tracking is standaard ingeschakeld voor uitgaande klikken, downloads en formulierinzendingen.",
+          "docsAction": "Trackerhandleiding"
+        },
+        "npm": {
+          "description": "Bundel de getypeerde tracker in een React-, Vue-, Angular- of Astro-app. Geen scripttag, volledige TypeScript-typen en contentblockers filteren hem niet.",
+          "installStep": "1. Installeer het pakket",
+          "initStep": "2. Initialiseer het één keer bij het opstarten",
+          "docsAction": "Handleiding npm-pakket",
+          "registryAction": "Bekijken op npm"
+        },
+        "wordpress": {
+          "description": "Installeer de plug-in HitKeep Analytics uit de WordPress-plugindirectory en plak deze instantie-URL onder Instellingen → HitKeep. Zonder themabewerking of tagmanager.",
+          "urlLabel": "URL van de HitKeep-instantie",
+          "urlHint": "Voeg geen /hk.js toe: de plug-in doet dat automatisch.",
+          "directoryAction": "Plug-in ophalen",
+          "docsAction": "WordPress-handleiding"
+        },
+        "server": {
+          "description": "Verstuur vertrouwde paginaweergaven en gebeurtenissen vanuit een backend, CMS, reverse proxy of log-replaytaak. De aanroeper levert de oorspronkelijke tijdstempel, het bezoekers-IP en de user-agent.",
+          "tokenHint": "Vereist een API-clienttoken met de rechten site.manage_data voor deze site. Bewaar het token aan serverzijde.",
+          "docsAction": "Handleiding serverzijdig tracken",
+          "tokenAction": "Handleiding API-clients"
+        }
+      },
+      "options": {
+        "title": "Geavanceerde opties",
+        "description": "Deze opties wijzigen alleen de code hierboven. Ze worden niet in HitKeep opgeslagen: de instellingen staan in de scripttag op je eigen pagina's.",
+        "badge": "{{ count }} gewijzigd",
+        "deliveryTitle": "Levering en privacy"
+      },
       "collectDntLabel": "VerzamelDNT",
       "collectDntDescription": "Volg gebruikers, zelfs als \"Do Not Track\" is ingeschakeld in hun browser.",
       "disableBeaconLabel": "Schakel sendBeacon uit",
       "disableBeaconDescription": "Gebruik standaard ophaalverzoeken in plaats van navigator.sendBeacon.",
+      "webVitalsLabel": "Web Vitals",
+      "webVitalsDescription": "Laad de aparte Web Vitals-bundel en stuur LCP-, INP-, CLS-, FCP- en TTFB-samples. Standaard uitgeschakeld.",
       "autoTrackingTitle": "Automatische tracking van gebeurtenissen",
       "autoTrackingDescription": "HitKeep kan automatisch privacyveilige outbound_click-, file_download- en form_submit-gebeurtenissen verzenden vanuit hk.js.",
       "outboundTrackingLabel": "Houd uitgaande klikken bij",
@@ -1578,11 +1620,14 @@
       "downloadTrackingDescription": "Stuur file_download voor links met downloadkenmerken of bekende bestandsextensies.",
       "formTrackingLabel": "Volg formulierinzendingen",
       "formTrackingDescription": "Verzend form_submit voor door de browser waargenomen formulierinzendingen zonder formulierwaarden vast te leggen.",
-      "htmlLabel": "HTML",
-      "copyCode": "Kopieer code",
+      "domains": {
+        "label": "Trackerhost",
+        "description": "Kies welke beschikbare host wordt gebruikt in het gegenereerde browsertrackersnippet.",
+        "defaultOption": "HitKeep-instantie-URL",
+        "selectedHint": "Tracker-URL: https://{{ hostname }}/hk.js"
+      },
       "verifier": {
         "title": "Live tracking-verificateur",
-        "description": "Bevestig dat deze site operationele volgsignalen ontvangt.",
         "status": {
           "waiting": "Wachten",
           "live": "Live",
@@ -1597,18 +1642,11 @@
           "lastEvent": "Laatste event",
           "detectedHostname": "Hostnaam gedetecteerd",
           "automaticEvent": "Laatste automatische gebeurtenis",
-          "tracker": "Volger",
-          "updated": "Bijgewerkt"
+          "tracker": "Volger"
         },
-        "empty": "Nog niet gezien"
-      },
-      "webVitalsLabel": "Web Vitals",
-      "webVitalsDescription": "Laad de aparte Web Vitals-bundel en stuur LCP-, INP-, CLS-, FCP- en TTFB-samples. Standaard uitgeschakeld.",
-      "domains": {
-        "label": "Trackerhost",
-        "description": "Kies welke beschikbare host wordt gebruikt in het gegenereerde browsertrackersnippet.",
-        "defaultOption": "HitKeep-instantie-URL",
-        "selectedHint": "Tracker-URL: https://{{ hostname }}/hk.js"
+        "empty": "Nog niet gezien",
+        "showDetails": "Details",
+        "hideDetails": "Details verbergen"
       }
     }
   },

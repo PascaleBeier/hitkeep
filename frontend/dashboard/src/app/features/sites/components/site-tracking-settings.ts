@@ -2,16 +2,26 @@ import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { compatForm } from '@angular/forms/signals/compat';
 import { Site, SiteTrackingDomainOptions } from '@models/analytics.types';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ButtonModule } from '@openng/optimus-ui/button';
+import { FieldsetModule } from '@openng/optimus-ui/fieldset';
+import { MessageModule } from '@openng/optimus-ui/message';
 import { SelectModule } from '@openng/optimus-ui/select';
+import { SelectButtonModule } from '@openng/optimus-ui/selectbutton';
 import { TagModule } from '@openng/optimus-ui/tag';
 import { ToggleSwitchModule } from '@openng/optimus-ui/toggleswitch';
 import { SiteService, SiteTrackingStatus } from '@features/sites/services/site.service';
+import { CodeBlock } from '@components/code-block/code-block';
+import { CopyControl } from '@components/copy-control/copy-control';
+import { DocsLink, DocsLinkVariant } from '@components/docs-link/docs-link';
 import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
+import { SettingsCard } from '@features/settings/components/settings-card';
+import { DOCS_LINKS, NPM_PACKAGE_NAME, NPM_PACKAGE_URL, WORDPRESS_PLUGIN_URL } from '@core/config/docs-links';
+import { injectActiveLang } from '@core/i18n/active-lang';
+import { DISCLOSURE_FIELDSET_DESIGN_TOKENS } from '@core/theme/hitkeep-preset';
 import { browserAbsoluteAppUrl } from '@core/interceptors/base-path.interceptor';
 import { finalize } from 'rxjs';
 
@@ -20,190 +30,41 @@ interface TrackingDomainSelectOption {
     value: string | null;
 }
 
+const INSTALL_METHODS = ['script', 'npm', 'wordpress', 'server'] as const;
+
+/** The four supported ways to get data into HitKeep. */
+export type InstallMethod = (typeof INSTALL_METHODS)[number];
+
+interface InstallLink {
+    href: string;
+    labelKey: string;
+    testId: string;
+    variant: DocsLinkVariant;
+}
+
+/** Each method's guides, primary first. Rendered as one row below the method body. */
+const INSTALL_LINKS: Record<InstallMethod, readonly InstallLink[]> = {
+    script: [{ href: DOCS_LINKS.trackerArchitecture, labelKey: 'sites.tracking.install.script.docsAction', testId: 'tracking-script-docs-link', variant: 'outlined' }],
+    npm: [
+        { href: DOCS_LINKS.npmPackage, labelKey: 'sites.tracking.install.npm.docsAction', testId: 'tracking-npm-docs-link', variant: 'outlined' },
+        { href: NPM_PACKAGE_URL, labelKey: 'sites.tracking.install.npm.registryAction', testId: 'tracking-npm-registry-link', variant: 'text' }
+    ],
+    wordpress: [
+        { href: WORDPRESS_PLUGIN_URL, labelKey: 'sites.tracking.install.wordpress.directoryAction', testId: 'tracking-wordpress-directory-link', variant: 'outlined' },
+        { href: DOCS_LINKS.wordpress, labelKey: 'sites.tracking.install.wordpress.docsAction', testId: 'tracking-wordpress-docs-link', variant: 'text' }
+    ],
+    server: [
+        { href: DOCS_LINKS.serverSideTracking, labelKey: 'sites.tracking.install.server.docsAction', testId: 'tracking-server-docs-link', variant: 'outlined' },
+        { href: DOCS_LINKS.apiClients, labelKey: 'sites.tracking.install.server.tokenAction', testId: 'tracking-server-token-link', variant: 'text' }
+    ]
+};
+
 @Component({
     selector: 'app-site-tracking-settings',
     standalone: true,
-    imports: [ReactiveFormsModule, ButtonModule, SelectModule, TagModule, ToggleSwitchModule, RelativeDateTime, TranslocoPipe],
-    template: `
-        <div class="site-settings-stack">
-            <section class="site-settings-card">
-                <header class="site-settings-card__header">
-                    <div class="site-settings-card__title-row">
-                        <span class="site-settings-card__icon"><i class="pi pi-code" aria-hidden="true"></i></span>
-                        <div>
-                            <h3>{{ "sites.tracking.htmlLabel" | transloco }}</h3>
-                            <p>{{ "sites.tracking.trackingCodeConfiguration" | transloco }}</p>
-                        </div>
-                    </div>
-                    <p-button [label]="copyButtonLabel() | transloco" [icon]="copyButtonIcon()" [text]="true" [type]="'button'" size="small" (onClick)="copySnippet()" />
-                </header>
-                <div class="site-settings-card__body">
-                    <pre class="site-settings-code-panel">{{ snippetCode() }}</pre>
-                </div>
-            </section>
-            <section class="site-settings-card">
-                <header class="site-settings-card__header">
-                    <div class="site-settings-card__title-row">
-                        <span class="site-settings-card__icon"><i class="pi pi-bolt" aria-hidden="true"></i></span>
-                        <div>
-                            <h3>{{ "sites.tracking.verifier.title" | transloco }}</h3>
-                            <p>{{ "sites.tracking.verifier.description" | transloco }}</p>
-                        </div>
-                    </div>
-                    <div class="site-settings-verifier-actions">
-                        @if (trackingStatus(); as status) {
-                        <p-tag [severity]="statusSeverity()" [value]="statusLabelKey() | transloco" />
-                        }
-                        <p-button [ariaLabel]="'common.actions.refresh' | transloco" icon="pi pi-refresh" [text]="true" [rounded]="true" [loading]="isLoadingStatus()" [type]="'button'" size="small" (onClick)="refreshStatus()" />
-                    </div>
-                </header>
-                <div class="site-settings-card__body">
-                    @if (trackingStatus(); as status) {
-                    <div class="site-settings-status-grid">
-                        <div>
-                            <span>{{ "sites.tracking.verifier.fields.firstHit" | transloco }}</span>
-                            <strong>
-                                @if (status.first_hit_at) {
-                                <app-relative-date-time [value]="status.first_hit_at" />
-                                } @else { - }
-                            </strong>
-                        </div>
-                        <div>
-                            <span>{{ "sites.tracking.verifier.fields.lastHit" | transloco }}</span>
-                            <strong>
-                                @if (status.last_hit_at) {
-                                <app-relative-date-time [value]="status.last_hit_at" />
-                                } @else { - }
-                            </strong>
-                        </div>
-                        <div>
-                            <span>{{ "sites.tracking.verifier.fields.lastEvent" | transloco }}</span>
-                            <strong>
-                                @if (status.last_event_at) {
-                                <app-relative-date-time [value]="status.last_event_at" />
-                                } @else { - }
-                            </strong>
-                        </div>
-                        <div>
-                            <span>{{ "sites.tracking.verifier.fields.detectedHostname" | transloco }}</span>
-                            <strong>{{ status.last_hostname || "-" }}</strong>
-                        </div>
-                        <div>
-                            <span>{{ "sites.tracking.verifier.fields.automaticEvent" | transloco }}</span>
-                            <strong>{{ status.last_automatic_event_name || "-" }}</strong>
-                        </div>
-                        <div>
-                            <span>{{ "sites.tracking.verifier.fields.tracker" | transloco }}</span>
-                            <strong>{{ trackerLabel(status) }}</strong>
-                        </div>
-                    </div>
-                    @if (status.status === "domain_mismatch") {
-                    <div class="site-settings-alert site-settings-alert--warn">
-                        {{ "sites.tracking.verifier.mismatchHint" | transloco }}
-                    </div>
-                    } @else if (status.status === "waiting") {
-                    <div class="site-settings-alert site-settings-alert--info">
-                        {{ "sites.tracking.verifier.waitingHint" | transloco }}
-                    </div>
-                    }
-                    } @else if (isLoadingStatus()) {
-                    <div class="site-settings-empty"><i class="pi pi-spin pi-spinner" aria-hidden="true"></i>{{ "common.loading" | transloco }}</div>
-                    } @else {
-                    <div class="site-settings-empty">{{ "sites.tracking.verifier.empty" | transloco }}</div>
-                    }
-                </div>
-            </section>
-
-            <section class="site-settings-card">
-                <header class="site-settings-card__header">
-                    <div class="site-settings-card__title-row">
-                        <span class="site-settings-card__icon"><i class="pi pi-sliders-h" aria-hidden="true"></i></span>
-                        <div>
-                            <h3>{{ "sites.tracking.trackingCodeConfiguration" | transloco }}</h3>
-                            <p>{{ "sites.tracking.description" | transloco }}</p>
-                        </div>
-                    </div>
-                </header>
-                <div class="site-settings-card__body">
-                    <div class="site-settings-toggle-list">
-                        <div class="site-settings-toggle-row site-settings-toggle-row--domain">
-                            <div class="site-settings-toggle-row__text">
-                                <label id="tracking-domain-label" for="tracking-domain-select" class="site-settings-toggle-row__title">{{ "sites.tracking.domains.label" | transloco }}</label>
-                                <span class="site-settings-field-hint">{{ "sites.tracking.domains.description" | transloco }}</span>
-                            </div>
-                            <div class="site-settings-domain-select">
-                                <p-select
-                                    inputId="tracking-domain-select"
-                                    ariaLabelledBy="tracking-domain-label"
-                                    styleClass="w-full"
-                                    [options]="trackingDomainSelectOptions()"
-                                    optionLabel="label"
-                                    optionValue="value"
-                                    [formControl]="trackingDomainControl"
-                                    [loading]="isLoadingTrackingDomains()"
-                                    appendTo="body"
-                                />
-                                <span class="site-settings-field-hint">{{ selectedTrackingDomainHint() }}</span>
-                            </div>
-                        </div>
-
-                        <div class="site-settings-toggle-row">
-                            <div class="site-settings-toggle-row__text">
-                                <label id="collect-dnt-label" for="collect-dnt-switch" class="site-settings-toggle-row__title">{{ "sites.tracking.collectDntLabel" | transloco }}</label>
-                                <span class="site-settings-field-hint">{{ "sites.tracking.collectDntDescription" | transloco }}</span>
-                            </div>
-                            <p-toggleswitch inputId="collect-dnt-switch" ariaLabelledBy="collect-dnt-label" styleClass="shrink-0" [formControl]="trackingForm.collectDnt().control()"></p-toggleswitch>
-                        </div>
-
-                        <div class="site-settings-toggle-row">
-                            <div class="site-settings-toggle-row__text">
-                                <label id="disable-beacon-label" for="disable-beacon-switch" class="site-settings-toggle-row__title">{{ "sites.tracking.disableBeaconLabel" | transloco }}</label>
-                                <span class="site-settings-field-hint">{{ "sites.tracking.disableBeaconDescription" | transloco }}</span>
-                            </div>
-                            <p-toggleswitch inputId="disable-beacon-switch" ariaLabelledBy="disable-beacon-label" styleClass="shrink-0" [formControl]="trackingForm.disableBeacon().control()"></p-toggleswitch>
-                        </div>
-
-                        <div class="site-settings-toggle-row">
-                            <div class="site-settings-toggle-row__text">
-                                <label id="web-vitals-label" for="web-vitals-switch" class="site-settings-toggle-row__title">{{ "sites.tracking.webVitalsLabel" | transloco }}</label>
-                                <span class="site-settings-field-hint">{{ "sites.tracking.webVitalsDescription" | transloco }}</span>
-                            </div>
-                            <p-toggleswitch inputId="web-vitals-switch" ariaLabelledBy="web-vitals-label" styleClass="shrink-0" [formControl]="trackingForm.enableWebVitals().control()"></p-toggleswitch>
-                        </div>
-
-                        <div class="site-settings-subsection">
-                            <h4>{{ "sites.tracking.autoTrackingTitle" | transloco }}</h4>
-                            <p>{{ "sites.tracking.autoTrackingDescription" | transloco }}</p>
-                        </div>
-
-                        <div class="site-settings-toggle-row">
-                            <div class="site-settings-toggle-row__text">
-                                <label id="outbound-tracking-label" for="outbound-tracking-switch" class="site-settings-toggle-row__title">{{ "sites.tracking.outboundTrackingLabel" | transloco }}</label>
-                                <span class="site-settings-field-hint">{{ "sites.tracking.outboundTrackingDescription" | transloco }}</span>
-                            </div>
-                            <p-toggleswitch inputId="outbound-tracking-switch" ariaLabelledBy="outbound-tracking-label" styleClass="shrink-0" [formControl]="trackingForm.trackOutbound().control()"></p-toggleswitch>
-                        </div>
-
-                        <div class="site-settings-toggle-row">
-                            <div class="site-settings-toggle-row__text">
-                                <label id="download-tracking-label" for="download-tracking-switch" class="site-settings-toggle-row__title">{{ "sites.tracking.downloadTrackingLabel" | transloco }}</label>
-                                <span class="site-settings-field-hint">{{ "sites.tracking.downloadTrackingDescription" | transloco }}</span>
-                            </div>
-                            <p-toggleswitch inputId="download-tracking-switch" ariaLabelledBy="download-tracking-label" styleClass="shrink-0" [formControl]="trackingForm.trackDownloads().control()"></p-toggleswitch>
-                        </div>
-
-                        <div class="site-settings-toggle-row">
-                            <div class="site-settings-toggle-row__text">
-                                <label id="form-tracking-label" for="form-tracking-switch" class="site-settings-toggle-row__title">{{ "sites.tracking.formTrackingLabel" | transloco }}</label>
-                                <span class="site-settings-field-hint">{{ "sites.tracking.formTrackingDescription" | transloco }}</span>
-                            </div>
-                            <p-toggleswitch inputId="form-tracking-switch" ariaLabelledBy="form-tracking-label" styleClass="shrink-0" [formControl]="trackingForm.trackForms().control()"></p-toggleswitch>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        </div>
-    `,
+    imports: [FormsModule, ReactiveFormsModule, ButtonModule, FieldsetModule, MessageModule, SelectModule, SelectButtonModule, TagModule, ToggleSwitchModule, CodeBlock, CopyControl, DocsLink, RelativeDateTime, SettingsCard, TranslocoPipe],
+    templateUrl: './site-tracking-settings.html',
+    styleUrl: './site-tracking-settings.css',
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SiteTrackingSettings {
@@ -216,13 +77,14 @@ export class SiteTrackingSettings {
     protected isLoadingStatus = signal(false);
     protected trackingDomainOptions = signal<SiteTrackingDomainOptions | null>(null);
     protected isLoadingTrackingDomains = signal(false);
-    private copyResetTimer: ReturnType<typeof setTimeout> | null = null;
     private statusRequestID = 0;
     private statusLoadingRequestID = 0;
     private domainOptionsRequestID = 0;
+    /** The instance's own tracker URL. Derived from `<base href>`, which never changes. */
+    private readonly defaultTrackerURL = browserAbsoluteAppUrl(this.document, '/hk.js');
     protected readonly trackingDomainControl = new FormControl<string | null>(null);
     private readonly selectedTrackingDomainID = toSignal(this.trackingDomainControl.valueChanges, { initialValue: this.trackingDomainControl.value });
-    private readonly activeLanguage = toSignal(this.transloco.langChanges$, { initialValue: this.transloco.getActiveLang() });
+    private readonly activeLanguage = injectActiveLang();
     private readonly trackingFormModel = signal({
         collectDnt: new FormControl(false, { nonNullable: true }),
         disableBeacon: new FormControl(false, { nonNullable: true }),
@@ -232,8 +94,13 @@ export class SiteTrackingSettings {
         trackForms: new FormControl(true, { nonNullable: true })
     });
     protected readonly trackingForm = compatForm(this.trackingFormModel);
-    protected copyButtonLabel = signal('sites.tracking.copyCode');
-    protected copyButtonIcon = signal('pi pi-copy');
+
+    protected readonly installLinks = INSTALL_LINKS;
+    protected readonly fieldsetDesignTokens = DISCLOSURE_FIELDSET_DESIGN_TOKENS;
+
+    protected readonly installMethod = signal<InstallMethod>('script');
+    protected readonly verifierExpanded = signal(false);
+
     protected statusLabelKey = computed(() => `sites.tracking.verifier.status.${this.trackingStatus()?.status ?? 'waiting'}`);
     protected activeTrackingDomains = computed(() => (this.trackingDomainOptions()?.domains ?? []).filter((domain) => domain.active));
     protected selectedSnippetTrackingDomain = computed(() => {
@@ -250,7 +117,7 @@ export class SiteTrackingSettings {
         if (selectedDomain) {
             return this.transloco.translate('sites.tracking.domains.selectedHint', { hostname: selectedDomain.hostname });
         }
-        return this.trackingDomainOptions()?.default_url || this.defaultTrackerURL();
+        return this.trackingDomainOptions()?.default_url || this.defaultTrackerURL;
     });
     protected statusSeverity = computed<'success' | 'warn' | 'secondary' | 'danger'>(() => {
         switch (this.trackingStatus()?.status) {
@@ -265,9 +132,31 @@ export class SiteTrackingSettings {
         }
     });
 
-    protected snippetCode = computed(() => {
+    protected readonly installMethodOptions = computed(() => {
+        this.activeLanguage();
+        return INSTALL_METHODS.map((value) => ({ value, label: this.transloco.translate(`sites.tracking.install.methods.${value}`) }));
+    });
+
+    protected readonly installTitle = computed(() => {
+        this.activeLanguage();
+        const domain = this.site()?.domain;
+        return domain ? this.transloco.translate('sites.tracking.install.title', { domain }) : this.transloco.translate('sites.tracking.install.titleFallback');
+    });
+
+    /** URL of the tracker script itself, honoring a selected custom tracking domain. */
+    private readonly snippetScriptURL = computed(() => {
         const selectedDomain = this.selectedSnippetTrackingDomain();
-        const scriptURL = selectedDomain ? `https://${selectedDomain.hostname}/hk.js` : this.defaultTrackerURL();
+        return selectedDomain ? `https://${selectedDomain.hostname}/hk.js` : this.defaultTrackerURL;
+    });
+
+    /**
+     * Base URL of the HitKeep instance serving the tracker. Derived by stripping the
+     * script filename rather than recomputing, so subdirectory installs keep their prefix.
+     */
+    protected readonly trackerHostURL = computed(() => this.snippetScriptURL().replace(/\/hk\.js$/, ''));
+
+    protected readonly snippetCode = computed(() => {
+        const scriptURL = this.snippetScriptURL();
 
         let attrs = '';
         if (this.trackingForm.collectDnt().value()) attrs += ' data-collect-dnt="true"';
@@ -280,37 +169,38 @@ export class SiteTrackingSettings {
         return `<script async src="${scriptURL}"${attrs}></script>`;
     });
 
-    copySnippet() {
-        const clipboard = navigator.clipboard;
-        if (!clipboard) {
-            this.setCopyButtonState('common.saveFailed', 'pi pi-exclamation-triangle');
-            return;
-        }
+    protected readonly npmInstallCommand = `npm install ${NPM_PACKAGE_NAME}`;
 
-        clipboard
-            .writeText(this.snippetCode())
-            .then(() => {
-                this.setCopyButtonState('common.copied', 'pi pi-check');
-            })
-            .catch(() => {
-                this.setCopyButtonState('common.saveFailed', 'pi pi-exclamation-triangle');
-            });
-    }
+    protected readonly npmInitSnippet = computed(() => `import { init } from '${NPM_PACKAGE_NAME}';\n\ninit({ host: '${this.trackerHostURL()}' });`);
 
-    private setCopyButtonState(label: string, icon: string) {
-        this.copyButtonLabel.set(label);
-        this.copyButtonIcon.set(icon);
-        if (this.copyResetTimer) {
-            clearTimeout(this.copyResetTimer);
-        }
-        this.copyResetTimer = setTimeout(() => this.resetCopyButton(), 2000);
-    }
+    protected readonly serverIngestSnippet = computed(() => {
+        const domain = this.site()?.domain || 'example.com';
+        return [
+            `curl -X POST "${this.trackerHostURL()}/api/ingest/server/pageview" \\`,
+            '  -H "Authorization: Bearer $HITKEEP_API_TOKEN" \\',
+            '  -H "Content-Type: application/json" \\',
+            "  -d '{",
+            `    "url": "https://${domain}/pricing",`,
+            '    "timestamp": "2026-04-03T12:30:45Z",',
+            '    "visitor_ip": "203.0.113.42",',
+            '    "user_agent": "Mozilla/5.0"',
+            "  }'"
+        ].join('\n');
+    });
 
-    private resetCopyButton() {
-        this.copyResetTimer = null;
-        this.copyButtonLabel.set('sites.tracking.copyCode');
-        this.copyButtonIcon.set('pi pi-copy');
-    }
+    /** How many snippet options differ from their defaults, shown on the collapsed fieldset. */
+    protected readonly changedOptionCount = computed(
+        () =>
+            [
+                this.trackingForm.collectDnt().value(),
+                this.trackingForm.disableBeacon().value(),
+                this.trackingForm.enableWebVitals().value(),
+                !this.trackingForm.trackOutbound().value(),
+                !this.trackingForm.trackDownloads().value(),
+                !this.trackingForm.trackForms().value(),
+                this.selectedSnippetTrackingDomain() !== null
+            ].filter(Boolean).length
+    );
 
     constructor() {
         effect((onCleanup) => {
@@ -336,22 +226,22 @@ export class SiteTrackingSettings {
             }, 3000);
             onCleanup(() => clearInterval(timer));
         });
+    }
 
-        this.destroyRef.onDestroy(() => {
-            if (this.copyResetTimer) {
-                clearTimeout(this.copyResetTimer);
-            }
-        });
+    protected selectInstallMethod(method: InstallMethod | null) {
+        if (method) {
+            this.installMethod.set(method);
+        }
+    }
+
+    protected toggleVerifierDetails() {
+        this.verifierExpanded.update((expanded) => !expanded);
     }
 
     protected refreshStatus() {
         const site = this.site();
         if (!site) return;
         this.loadStatus(site.id);
-    }
-
-    protected defaultTrackerURL(): string {
-        return browserAbsoluteAppUrl(this.document, '/hk.js');
     }
 
     protected trackerLabel(status: SiteTrackingStatus): string {

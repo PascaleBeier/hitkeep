@@ -1,0 +1,135 @@
+:host {
+    display: block;
+    min-width: 0;
+}
+
+/* Compact "is tracking working?" strip that sits above the install card. Surface
+   chrome comes from the shared .site-settings-card; this only adds the layout. */
+.tracking-verifier {
+    display: grid;
+    gap: 0.75rem;
+    min-width: 0;
+    padding: 0.75rem 1rem;
+}
+
+.tracking-verifier__bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 0;
+}
+
+.tracking-verifier__summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+    align-items: center;
+    min-width: 0;
+}
+
+.tracking-verifier__title {
+    display: inline-flex;
+    gap: 0.375rem;
+    align-items: center;
+    color: var(--p-text-color);
+    font-size: 0.875rem;
+    font-weight: 650;
+    line-height: 1.35;
+}
+
+.tracking-verifier__title i {
+    color: var(--p-primary-color);
+}
+
+.tracking-verifier__meta {
+    display: inline-flex;
+    gap: 0.375rem;
+    align-items: center;
+    color: var(--p-text-muted-color);
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+.tracking-verifier__meta-label::after {
+    content: ":";
+}
+
+.tracking-verifier__actions {
+    display: inline-flex;
+    gap: 0.25rem;
+    align-items: center;
+    flex: 0 0 auto;
+}
+
+.tracking-install {
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.tracking-install__description {
+    margin: 0;
+    color: var(--p-text-muted-color);
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+.tracking-install__label {
+    color: var(--p-text-color);
+    font-size: 0.9rem;
+    font-weight: 650;
+    line-height: 1.35;
+}
+
+.tracking-install__value {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    min-width: 0;
+}
+
+.tracking-install__inline-code {
+    overflow-wrap: anywhere;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--p-code-border-color);
+    border-radius: 6px;
+    background: var(--p-code-background);
+    color: var(--p-code-color);
+    font-family: var(--p-code-font-family);
+    font-size: 0.8125rem;
+}
+
+.tracking-install__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+/* Hairline that separates the disclosure from the snippet it configures. The rule
+   belongs to this slot, not to the fieldset, so it stays on a wrapper. */
+.tracking-install__disclosure {
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--p-content-border-color);
+}
+
+.tracking-options__legend {
+    display: inline-flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+@media (max-width: 640px) {
+    .tracking-verifier__bar {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .tracking-install__links {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { AUTH_CARD_DESIGN_TOKENS, AUTH_DIVIDER_DESIGN_TOKENS, AUTH_FIELDSET_DESIGN_TOKENS, AUTH_SELECT_BUTTON_DESIGN_TOKENS, hitKeepThemeOverrides } from './hitkeep-preset';
+import { AUTH_CARD_DESIGN_TOKENS, AUTH_DIVIDER_DESIGN_TOKENS, AUTH_FIELDSET_DESIGN_TOKENS, AUTH_SELECT_BUTTON_DESIGN_TOKENS, DISCLOSURE_FIELDSET_DESIGN_TOKENS, hitKeepThemeOverrides } from './hitkeep-preset';
 
 describe('HitKeep OptimusUI preset', () => {
     it('keeps shared component styling in OptimusUI design tokens', () => {
@@ -30,5 +30,20 @@ describe('HitKeep OptimusUI preset', () => {
         expect(AUTH_DIVIDER_DESIGN_TOKENS.content.color).toBe('{text.muted.color}');
         expect(AUTH_FIELDSET_DESIGN_TOKENS.root.background).toBe('{content.hover.background}');
         expect(AUTH_SELECT_BUTTON_DESIGN_TOKENS.root.borderRadius).toBe('{border.radius.xl}');
+    });
+
+    it('leaves the disclosure fieldset without standing chrome so a collapsed panel is just its legend', () => {
+        expect(DISCLOSURE_FIELDSET_DESIGN_TOKENS.root.background).toBe('transparent');
+        expect(DISCLOSURE_FIELDSET_DESIGN_TOKENS.root.borderColor).toBe('transparent');
+        expect(DISCLOSURE_FIELDSET_DESIGN_TOKENS.root.padding).toBe('0');
+        expect(DISCLOSURE_FIELDSET_DESIGN_TOKENS.content.padding).toBe('0.75rem 0 0');
+    });
+
+    it('flips the code surface from the preset so components need no dark-scheme selector', () => {
+        const { light, dark } = hitKeepThemeOverrides.semantic.colorScheme;
+        expect(hitKeepThemeOverrides.semantic.extend.code.borderColor).toBe('{content.border.color}');
+        expect(light.extend.code.background).toBe('{surface.900}');
+        expect(dark.extend.code.background).toBe('{surface.800}');
+        expect(light.extend.code.color).not.toBe(dark.extend.code.color);
     });
 });

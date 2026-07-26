@@ -1,0 +1,234 @@
+<div class="site-settings-stack">
+    <section class="site-settings-card tracking-verifier" [attr.aria-label]="'sites.tracking.verifier.title' | transloco" data-testid="tracking-verifier">
+        <div class="tracking-verifier__bar">
+            <div class="tracking-verifier__summary">
+                <span class="tracking-verifier__title"><i class="pi pi-bolt" aria-hidden="true"></i>{{ "sites.tracking.verifier.title" | transloco }}</span>
+                @if (trackingStatus(); as status) {
+                <p-tag [severity]="statusSeverity()" [value]="statusLabelKey() | transloco" />
+                <span class="tracking-verifier__meta">
+                    <span class="tracking-verifier__meta-label">{{ "sites.tracking.verifier.fields.lastHit" | transloco }}</span>
+                    @if (status.last_hit_at) {
+                    <app-relative-date-time [value]="status.last_hit_at" />
+                    } @else {
+                    <span>{{ "sites.tracking.verifier.empty" | transloco }}</span>
+                    }
+                </span>
+                } @else if (isLoadingStatus()) {
+                <span class="tracking-verifier__meta"><i class="pi pi-spin pi-spinner" aria-hidden="true"></i>{{ "common.loading" | transloco }}</span>
+                } @else {
+                <span class="tracking-verifier__meta">{{ "sites.tracking.verifier.empty" | transloco }}</span>
+                }
+            </div>
+            <div class="tracking-verifier__actions">
+                @if (trackingStatus()) {
+                <p-button
+                    [label]="(verifierExpanded() ? 'sites.tracking.verifier.hideDetails' : 'sites.tracking.verifier.showDetails') | transloco"
+                    [icon]="verifierExpanded() ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
+                    iconPos="right"
+                    [text]="true"
+                    type="button"
+                    size="small"
+                    [attr.aria-expanded]="verifierExpanded()"
+                    aria-controls="tracking-verifier-details"
+                    (onClick)="toggleVerifierDetails()"
+                    data-testid="tracking-verifier-toggle"
+                />
+                }
+                <p-button [ariaLabel]="'common.actions.refresh' | transloco" icon="pi pi-refresh" [text]="true" [rounded]="true" [loading]="isLoadingStatus()" type="button" size="small" (onClick)="refreshStatus()" />
+            </div>
+        </div>
+
+        @if (trackingStatus(); as status) { @if (verifierExpanded()) {
+        <div class="site-settings-status-grid" id="tracking-verifier-details" data-testid="tracking-verifier-details">
+            <div>
+                <span>{{ "sites.tracking.verifier.fields.firstHit" | transloco }}</span>
+                <strong>
+                    @if (status.first_hit_at) {
+                    <app-relative-date-time [value]="status.first_hit_at" />
+                    } @else { - }
+                </strong>
+            </div>
+            <div>
+                <span>{{ "sites.tracking.verifier.fields.lastHit" | transloco }}</span>
+                <strong>
+                    @if (status.last_hit_at) {
+                    <app-relative-date-time [value]="status.last_hit_at" />
+                    } @else { - }
+                </strong>
+            </div>
+            <div>
+                <span>{{ "sites.tracking.verifier.fields.lastEvent" | transloco }}</span>
+                <strong>
+                    @if (status.last_event_at) {
+                    <app-relative-date-time [value]="status.last_event_at" />
+                    } @else { - }
+                </strong>
+            </div>
+            <div>
+                <span>{{ "sites.tracking.verifier.fields.detectedHostname" | transloco }}</span>
+                <strong>{{ status.last_hostname || "-" }}</strong>
+            </div>
+            <div>
+                <span>{{ "sites.tracking.verifier.fields.automaticEvent" | transloco }}</span>
+                <strong>{{ status.last_automatic_event_name || "-" }}</strong>
+            </div>
+            <div>
+                <span>{{ "sites.tracking.verifier.fields.tracker" | transloco }}</span>
+                <strong>{{ trackerLabel(status) }}</strong>
+            </div>
+        </div>
+        } @if (status.status === "domain_mismatch") {
+        <p-message severity="warn" styleClass="w-full">{{ "sites.tracking.verifier.mismatchHint" | transloco }}</p-message>
+        } @else if (status.status === "waiting") {
+        <p-message severity="info" styleClass="w-full">{{ "sites.tracking.verifier.waitingHint" | transloco }}</p-message>
+        } }
+    </section>
+
+    <app-settings-card [title]="installTitle()" [subtitle]="'sites.tracking.install.subtitle' | transloco" icon="pi pi-code">
+        <div settings-card-header>
+            <p-selectbutton
+                [options]="installMethodOptions()"
+                [ngModel]="installMethod()"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="selectInstallMethod($event)"
+                optionLabel="label"
+                optionValue="value"
+                [allowEmpty]="false"
+                size="small"
+                [attr.aria-label]="'sites.tracking.install.methodLabel' | transloco"
+                data-testid="tracking-install-method"
+            />
+        </div>
+
+        <div settings-card-body class="tracking-install">
+            @switch (installMethod()) { @case ("script") {
+            <p class="tracking-install__description">{{ "sites.tracking.install.script.description" | transloco }}</p>
+            <app-code-block [code]="snippetCode()" [wrap]="true" data-testid="tracking-snippet" />
+
+            <div class="tracking-install__disclosure">
+                <p-fieldset [dt]="fieldsetDesignTokens" [toggleable]="true" [collapsed]="true" data-testid="tracking-advanced-options">
+                    <ng-template #header>
+                        <span class="tracking-options__legend">
+                            <span>{{ "sites.tracking.options.title" | transloco }}</span>
+                            @if (changedOptionCount() > 0) {
+                            <p-tag severity="secondary" [value]="'sites.tracking.options.badge' | transloco: { count: changedOptionCount() }" data-testid="tracking-options-badge" />
+                            }
+                        </span>
+                    </ng-template>
+
+                    <p class="tracking-install__description">{{ "sites.tracking.options.description" | transloco }}</p>
+
+                    <div class="site-settings-toggle-list">
+                        <div class="site-settings-subsection">
+                            <h4>{{ "sites.tracking.options.deliveryTitle" | transloco }}</h4>
+                        </div>
+
+                        <div class="site-settings-toggle-row site-settings-toggle-row--domain">
+                            <div class="site-settings-toggle-row__text">
+                                <label id="tracking-domain-label" for="tracking-domain-select" class="site-settings-toggle-row__title">{{ "sites.tracking.domains.label" | transloco }}</label>
+                                <span class="site-settings-field-hint">{{ "sites.tracking.domains.description" | transloco }}</span>
+                            </div>
+                            <div class="site-settings-domain-select">
+                                <p-select
+                                    inputId="tracking-domain-select"
+                                    ariaLabelledBy="tracking-domain-label"
+                                    styleClass="w-full"
+                                    [options]="trackingDomainSelectOptions()"
+                                    optionLabel="label"
+                                    optionValue="value"
+                                    [formControl]="trackingDomainControl"
+                                    [loading]="isLoadingTrackingDomains()"
+                                    appendTo="body"
+                                />
+                                <span class="site-settings-field-hint">{{ selectedTrackingDomainHint() }}</span>
+                            </div>
+                        </div>
+
+                        <div class="site-settings-toggle-row">
+                            <div class="site-settings-toggle-row__text">
+                                <label id="collect-dnt-label" for="collect-dnt-switch" class="site-settings-toggle-row__title">{{ "sites.tracking.collectDntLabel" | transloco }}</label>
+                                <span class="site-settings-field-hint">{{ "sites.tracking.collectDntDescription" | transloco }}</span>
+                            </div>
+                            <p-toggleswitch inputId="collect-dnt-switch" ariaLabelledBy="collect-dnt-label" styleClass="shrink-0" [formControl]="trackingForm.collectDnt().control()"></p-toggleswitch>
+                        </div>
+
+                        <div class="site-settings-toggle-row">
+                            <div class="site-settings-toggle-row__text">
+                                <label id="disable-beacon-label" for="disable-beacon-switch" class="site-settings-toggle-row__title">{{ "sites.tracking.disableBeaconLabel" | transloco }}</label>
+                                <span class="site-settings-field-hint">{{ "sites.tracking.disableBeaconDescription" | transloco }}</span>
+                            </div>
+                            <p-toggleswitch inputId="disable-beacon-switch" ariaLabelledBy="disable-beacon-label" styleClass="shrink-0" [formControl]="trackingForm.disableBeacon().control()"></p-toggleswitch>
+                        </div>
+
+                        <div class="site-settings-toggle-row">
+                            <div class="site-settings-toggle-row__text">
+                                <label id="web-vitals-label" for="web-vitals-switch" class="site-settings-toggle-row__title">{{ "sites.tracking.webVitalsLabel" | transloco }}</label>
+                                <span class="site-settings-field-hint">{{ "sites.tracking.webVitalsDescription" | transloco }}</span>
+                            </div>
+                            <p-toggleswitch inputId="web-vitals-switch" ariaLabelledBy="web-vitals-label" styleClass="shrink-0" [formControl]="trackingForm.enableWebVitals().control()"></p-toggleswitch>
+                        </div>
+
+                        <div class="site-settings-subsection">
+                            <h4>{{ "sites.tracking.autoTrackingTitle" | transloco }}</h4>
+                            <p>{{ "sites.tracking.autoTrackingDescription" | transloco }}</p>
+                        </div>
+
+                        <div class="site-settings-toggle-row">
+                            <div class="site-settings-toggle-row__text">
+                                <label id="outbound-tracking-label" for="outbound-tracking-switch" class="site-settings-toggle-row__title">{{ "sites.tracking.outboundTrackingLabel" | transloco }}</label>
+                                <span class="site-settings-field-hint">{{ "sites.tracking.outboundTrackingDescription" | transloco }}</span>
+                            </div>
+                            <p-toggleswitch inputId="outbound-tracking-switch" ariaLabelledBy="outbound-tracking-label" styleClass="shrink-0" [formControl]="trackingForm.trackOutbound().control()"></p-toggleswitch>
+                        </div>
+
+                        <div class="site-settings-toggle-row">
+                            <div class="site-settings-toggle-row__text">
+                                <label id="download-tracking-label" for="download-tracking-switch" class="site-settings-toggle-row__title">{{ "sites.tracking.downloadTrackingLabel" | transloco }}</label>
+                                <span class="site-settings-field-hint">{{ "sites.tracking.downloadTrackingDescription" | transloco }}</span>
+                            </div>
+                            <p-toggleswitch inputId="download-tracking-switch" ariaLabelledBy="download-tracking-label" styleClass="shrink-0" [formControl]="trackingForm.trackDownloads().control()"></p-toggleswitch>
+                        </div>
+
+                        <div class="site-settings-toggle-row">
+                            <div class="site-settings-toggle-row__text">
+                                <label id="form-tracking-label" for="form-tracking-switch" class="site-settings-toggle-row__title">{{ "sites.tracking.formTrackingLabel" | transloco }}</label>
+                                <span class="site-settings-field-hint">{{ "sites.tracking.formTrackingDescription" | transloco }}</span>
+                            </div>
+                            <p-toggleswitch inputId="form-tracking-switch" ariaLabelledBy="form-tracking-label" styleClass="shrink-0" [formControl]="trackingForm.trackForms().control()"></p-toggleswitch>
+                        </div>
+                    </div>
+                </p-fieldset>
+            </div>
+
+            } @case ("npm") {
+            <p class="tracking-install__description">{{ "sites.tracking.install.npm.description" | transloco }}</p>
+            <app-code-block [code]="npmInstallCommand" [label]="'sites.tracking.install.npm.installStep' | transloco" data-testid="tracking-npm-install" />
+            <app-code-block [code]="npmInitSnippet()" [label]="'sites.tracking.install.npm.initStep' | transloco" [wrap]="true" data-testid="tracking-npm-init" />
+
+            } @case ("wordpress") {
+            <p class="tracking-install__description">{{ "sites.tracking.install.wordpress.description" | transloco }}</p>
+
+            <div class="site-settings-field">
+                <span class="tracking-install__label">{{ "sites.tracking.install.wordpress.urlLabel" | transloco }}</span>
+                <div class="tracking-install__value">
+                    <code class="tracking-install__inline-code" data-testid="tracking-wordpress-url">{{ trackerHostURL() }}</code>
+                    <app-copy-control [value]="trackerHostURL()" [text]="true" size="small" />
+                </div>
+                <span class="site-settings-field-hint">{{ "sites.tracking.install.wordpress.urlHint" | transloco }}</span>
+            </div>
+
+            } @case ("server") {
+            <p class="tracking-install__description">{{ "sites.tracking.install.server.description" | transloco }}</p>
+            <app-code-block [code]="serverIngestSnippet()" [wrap]="true" data-testid="tracking-server-snippet" />
+            <p-message severity="info" styleClass="w-full">{{ "sites.tracking.install.server.tokenHint" | transloco }}</p-message>
+
+            } }
+
+            <div class="tracking-install__links">
+                @for (link of installLinks[installMethod()]; track link.testId) {
+                <app-docs-link [href]="link.href" [labelKey]="link.labelKey" [variant]="link.variant" [testId]="link.testId" />
+                }
+            </div>
+        </div>
+    </app-settings-card>
+</div>
