@@ -52,6 +52,17 @@ export const hitKeepThemeOverrides = {
             surface: {
                 border: '{content.border.color}',
                 card: '{content.background}'
+            },
+            /**
+             * Code surfaces (snippet panels, inline command chips). Like `tile`, the
+             * scheme flip lives here rather than in a `:host-context(.p-dark)` block
+             * per component. Light sinks the panel to a dark slab; dark *lifts* it
+             * above the card, because sinking it further leaves near-black on
+             * near-black with only the border separating the two.
+             */
+            code: {
+                borderColor: '{content.border.color}',
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace'
             }
         },
         colorScheme: {
@@ -66,13 +77,15 @@ export const hitKeepThemeOverrides = {
             light: {
                 extend: {
                     tile: { background: 'color-mix(in srgb, {content.hover.background} 55%, {content.background})' },
-                    surface: { ground: '{surface.50}' }
+                    surface: { ground: '{surface.50}' },
+                    code: { background: '{surface.900}', color: '{surface.0}' }
                 }
             },
             dark: {
                 extend: {
                     tile: { background: 'color-mix(in srgb, {content.background} 72%, {surface.950})' },
-                    surface: { ground: '{surface.950}' }
+                    surface: { ground: '{surface.950}' },
+                    code: { background: '{surface.800}', color: '{surface.100}' }
                 }
             }
         }
@@ -188,5 +201,28 @@ export const AUTH_FIELDSET_DESIGN_TOKENS = {
     },
     content: {
         padding: '0.25rem 0 0'
+    }
+} satisfies FieldsetDesignTokens;
+
+/**
+ * Disclosure fieldset: the legend button is the only chrome while collapsed, so an
+ * always-on box does not sit empty under the label.
+ */
+export const DISCLOSURE_FIELDSET_DESIGN_TOKENS = {
+    root: {
+        background: 'transparent',
+        borderColor: 'transparent',
+        color: '{content.color}',
+        padding: '0'
+    },
+    legend: {
+        background: 'transparent',
+        borderWidth: '0',
+        color: '{text.color}',
+        fontWeight: '600',
+        padding: '0'
+    },
+    content: {
+        padding: '0.75rem 0 0'
     }
 } satisfies FieldsetDesignTokens;

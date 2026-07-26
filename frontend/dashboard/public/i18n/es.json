@@ -1585,12 +1585,54 @@
       }
     },
     "tracking": {
-      "description": "Copia y pega el siguiente código en el HTML de tu sitio web. El seguimiento automático de clics salientes, descargas y envíos de formularios está activado por defecto.",
-      "trackingCodeConfiguration": "Configuración del código de seguimiento",
+      "install": {
+        "title": "Instalar HitKeep en {{ domain }}",
+        "titleFallback": "Instalar HitKeep",
+        "subtitle": "Elige cómo envía datos este sitio. Todos los métodos informan al mismo panel.",
+        "methodLabel": "Método de instalación",
+        "methods": {
+          "script": "Etiqueta de script",
+          "npm": "npm",
+          "wordpress": "WordPress",
+          "server": "Lado del servidor"
+        },
+        "script": {
+          "description": "Copia y pega el siguiente código en el HTML de tu sitio web. El seguimiento automático de clics salientes, descargas y envíos de formularios está activado por defecto.",
+          "docsAction": "Guía del tracker"
+        },
+        "npm": {
+          "description": "Incluye el tracker tipado en una app de React, Vue, Angular o Astro. Sin etiqueta de script, con tipos TypeScript completos y sin filtrado por bloqueadores de contenido.",
+          "installStep": "1. Instala el paquete",
+          "initStep": "2. Inicialízalo una vez al arrancar",
+          "docsAction": "Guía del paquete npm",
+          "registryAction": "Ver en npm"
+        },
+        "wordpress": {
+          "description": "Instala el plugin HitKeep Analytics desde el directorio de plugins de WordPress y pega esta URL de instancia en Ajustes → HitKeep. Sin editar el tema ni usar un gestor de etiquetas.",
+          "urlLabel": "URL de la instancia de HitKeep",
+          "urlHint": "No añadas /hk.js: el plugin lo agrega automáticamente.",
+          "directoryAction": "Obtener el plugin",
+          "docsAction": "Guía de WordPress"
+        },
+        "server": {
+          "description": "Envía páginas vistas y eventos de confianza desde un backend, un CMS, un proxy inverso o un trabajo de reproducción de registros. Quien llama aporta la marca de tiempo original, la IP del visitante y el agente de usuario.",
+          "tokenHint": "Requiere un token de cliente de API con el permiso site.manage_data para este sitio. Guarda el token en el servidor.",
+          "docsAction": "Guía de seguimiento del lado del servidor",
+          "tokenAction": "Guía de clientes de API"
+        }
+      },
+      "options": {
+        "title": "Opciones avanzadas",
+        "description": "Estas opciones solo cambian el código de arriba. No se guardan en HitKeep: los ajustes viven en la etiqueta de script de tus propias páginas.",
+        "badge": "{{ count }} cambiadas",
+        "deliveryTitle": "Entrega y privacidad"
+      },
       "collectDntLabel": "Recopilar DNT",
       "collectDntDescription": "Rastrear usuarios incluso si \"Do Not Track\" esta habilitado en su navegador.",
       "disableBeaconLabel": "Desactivar sendBeacon",
       "disableBeaconDescription": "Usar solicitudes fetch estandar en lugar de navigator.sendBeacon.",
+      "webVitalsLabel": "Web Vitals",
+      "webVitalsDescription": "Carga el bundle separado de Web Vitals y envía muestras de LCP, INP, CLS, FCP y TTFB. Desactivado de forma predeterminada.",
       "autoTrackingTitle": "Seguimiento automático de eventos",
       "autoTrackingDescription": "HitKeep puede enviar automáticamente eventos outbound_click, file_download y form_submit con metadatos seguros desde hk.js.",
       "outboundTrackingLabel": "Rastrear clics salientes",
@@ -1599,11 +1641,14 @@
       "downloadTrackingDescription": "Envía file_download para enlaces con atributo download o extensiones de archivo conocidas.",
       "formTrackingLabel": "Rastrear envíos de formularios",
       "formTrackingDescription": "Envía form_submit para envíos de formularios observados por el navegador sin capturar valores del formulario.",
-      "htmlLabel": "HTML",
-      "copyCode": "Copiar código",
+      "domains": {
+        "label": "Host del tracker",
+        "description": "Elige qué host disponible se usará en el snippet generado del tracker del navegador.",
+        "defaultOption": "URL de la instancia de HitKeep",
+        "selectedHint": "URL del tracker: https://{{ hostname }}/hk.js"
+      },
       "verifier": {
         "title": "Verificador de tracking en vivo",
-        "description": "Confirma que este sitio recibe señales operativas de tracking.",
         "status": {
           "waiting": "Esperando",
           "live": "En vivo",
@@ -1618,18 +1663,11 @@
           "lastEvent": "Último evento",
           "detectedHostname": "Hostname detectado",
           "automaticEvent": "Último evento automático",
-          "tracker": "Tracker",
-          "updated": "Actualizado"
+          "tracker": "Tracker"
         },
-        "empty": "Aún no visto"
-      },
-      "webVitalsLabel": "Web Vitals",
-      "webVitalsDescription": "Carga el bundle separado de Web Vitals y envía muestras de LCP, INP, CLS, FCP y TTFB. Desactivado de forma predeterminada.",
-      "domains": {
-        "label": "Host del tracker",
-        "description": "Elige qué host disponible se usará en el snippet generado del tracker del navegador.",
-        "defaultOption": "URL de la instancia de HitKeep",
-        "selectedHint": "URL del tracker: https://{{ hostname }}/hk.js"
+        "empty": "Aún no visto",
+        "showDetails": "Detalles",
+        "hideDetails": "Ocultar detalles"
       }
     }
   },

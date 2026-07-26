@@ -463,8 +463,6 @@
     --site-settings-divider: var(--p-content-border-color);
     --site-settings-footer-bg: var(--p-surface-0);
     --site-settings-muted-bg: var(--p-surface-50);
-    --site-settings-code-bg: var(--p-surface-900);
-    --site-settings-code-text: var(--p-surface-0);
 }
 
 .site-settings-card {
@@ -663,13 +661,6 @@
     color: var(--p-blue-800);
 }
 
-.site-settings-verifier-actions {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex: 0 0 auto;
-}
-
 .site-settings-status-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -780,19 +771,6 @@
     line-height: 1.35;
 }
 
-.site-settings-code-panel {
-    margin: 0;
-    overflow-x: auto;
-    border: 1px solid var(--site-settings-border);
-    border-radius: 8px;
-    background: var(--site-settings-code-bg);
-    color: var(--site-settings-code-text);
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    font-size: 0.8125rem;
-    line-height: 1.55;
-    padding: 1rem;
-}
-
 .site-settings-table-shell {
     overflow: hidden;
     border: 1px solid var(--site-settings-border);
@@ -898,8 +876,6 @@
     --site-settings-divider: var(--p-surface-800);
     --site-settings-footer-bg: color-mix(in srgb, var(--p-surface-950) 68%, var(--p-surface-900) 32%);
     --site-settings-muted-bg: color-mix(in srgb, var(--p-surface-800) 82%, var(--p-surface-900) 18%);
-    --site-settings-code-bg: #020617;
-    --site-settings-code-text: var(--p-surface-100);
 }
 
 .p-dark .site-settings-card {

@@ -1,0 +1,52 @@
+:host {
+    display: block;
+    min-width: 0;
+}
+
+.code-block {
+    display: grid;
+    gap: 0.375rem;
+    min-width: 0;
+}
+
+.code-block-toolbar {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 0;
+}
+
+.code-block-label {
+    color: var(--p-text-muted-color);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    font-weight: 600;
+    min-width: 0;
+}
+
+/* Keeps the copy button on the right when no label is rendered. */
+.code-block-copy {
+    margin-left: auto;
+}
+
+/* Surface colors come from the shared `code` tokens in the theme preset, which flip
+   with the color scheme on their own. */
+.code-block-code {
+    margin: 0;
+    overflow-x: auto;
+    border: 1px solid var(--p-code-border-color);
+    border-radius: 8px;
+    background: var(--p-code-background);
+    color: var(--p-code-color);
+    font-family: var(--p-code-font-family);
+    font-size: 0.8125rem;
+    line-height: 1.55;
+    padding: 1rem;
+}
+
+.code-block-code--wrap {
+    overflow-x: visible;
+    white-space: pre-wrap;
+    word-break: break-word;
+}

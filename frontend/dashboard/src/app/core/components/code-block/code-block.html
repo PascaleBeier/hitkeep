@@ -1,0 +1,9 @@
+<div class="code-block">
+    <div class="code-block-toolbar">
+        @if (label()) {
+        <span class="code-block-label">{{ label() }}</span>
+        }
+        <app-copy-control class="code-block-copy" [value]="code()" [text]="true" size="small" />
+    </div>
+    <pre class="code-block-code" [class.code-block-code--wrap]="wrap()">{{ code() }}</pre>
+</div>
