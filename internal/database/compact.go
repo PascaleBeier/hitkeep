@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -21,6 +22,9 @@ type CompactionOptions struct {
 	MinReclaimableBytes int64
 	// MinFreeRatio is the least share of free blocks (0..1) in the file.
 	MinFreeRatio float64
+	// MemoryLimit and Threads optionally constrain rewrite workers.
+	MemoryLimit string
+	Threads     int
 }
 
 // DefaultCompactionOptions skip small or barely fragmented files: rewriting
@@ -67,6 +71,9 @@ func MaybeCompactDatabase(ctx context.Context, path string, opts CompactionOptio
 	if path == "" || path == ":memory:" {
 		return result, nil
 	}
+	if err := recoverCompactionSwap(path); err != nil {
+		return result, err
+	}
 	info, err := os.Stat(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return result, nil
@@ -84,7 +91,7 @@ func MaybeCompactDatabase(ctx context.Context, path string, opts CompactionOptio
 		}
 	}
 
-	reclaimable, freeRatio, err := measureReclaimableSpace(ctx, path)
+	reclaimable, freeRatio, err := measureReclaimableSpace(ctx, path, opts)
 	if err != nil {
 		return result, err
 	}
@@ -94,7 +101,7 @@ func MaybeCompactDatabase(ctx context.Context, path string, opts CompactionOptio
 		return result, nil
 	}
 
-	if err := rewriteDatabaseFile(ctx, path, workPath, prepare); err != nil {
+	if err := rewriteDatabaseFile(ctx, path, workPath, prepare, opts); err != nil {
 		_ = os.Remove(workPath)
 		_ = os.Remove(workPath + ".wal")
 		return result, err
@@ -104,6 +111,9 @@ func MaybeCompactDatabase(ctx context.Context, path string, opts CompactionOptio
 		_ = os.Remove(workPath)
 		return result, fmt.Errorf("move database aside for compaction swap: %w", err)
 	}
+	if err := syncDirectory(filepath.Dir(path)); err != nil {
+		return result, fmt.Errorf("sync database directory after moving database aside: %w", err)
+	}
 	if err := os.Rename(workPath, path); err != nil {
 		// Best-effort restore: the original file is still intact under backupPath.
 		if restoreErr := os.Rename(backupPath, path); restoreErr != nil {
@@ -111,6 +121,9 @@ func MaybeCompactDatabase(ctx context.Context, path string, opts CompactionOptio
 		}
 		_ = os.Remove(workPath)
 		return result, fmt.Errorf("swap compacted database: %w", err)
+	}
+	if err := syncDirectory(filepath.Dir(path)); err != nil {
+		return result, fmt.Errorf("sync database directory after publishing compacted database: %w", err)
 	}
 	if err := os.Remove(backupPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		slog.Warn("Compaction succeeded but the pre-compaction backup could not be removed", "path", backupPath, "error", err)
@@ -129,14 +142,68 @@ func MaybeCompactDatabase(ctx context.Context, path string, opts CompactionOptio
 	return result, nil
 }
 
+// recoverCompactionSwap repairs the only non-atomic window in the file swap.
+// If a process dies after moving the live file aside but before publishing the
+// replacement, restore the original before any caller can create a new empty
+// database at the live path. A published replacement wins over a leftover
+// backup; the backup is then safe to remove.
+func recoverCompactionSwap(path string) error {
+	backupPath := path + ".pre-compact"
+	workPath := path + ".compacting"
+	_, pathErr := os.Stat(path)
+	_, backupErr := os.Stat(backupPath)
+	pathExists := pathErr == nil
+	backupExists := backupErr == nil
+	if pathErr != nil && !errors.Is(pathErr, os.ErrNotExist) {
+		return fmt.Errorf("stat database during compaction recovery %s: %w", path, pathErr)
+	}
+	if backupErr != nil && !errors.Is(backupErr, os.ErrNotExist) {
+		return fmt.Errorf("stat compaction backup %s: %w", backupPath, backupErr)
+	}
+	if !pathExists && backupExists {
+		if err := os.Rename(backupPath, path); err != nil {
+			return fmt.Errorf("restore database after interrupted compaction: %w", err)
+		}
+		if err := syncDirectory(filepath.Dir(path)); err != nil {
+			return fmt.Errorf("sync database directory after compaction recovery: %w", err)
+		}
+		if err := os.Remove(workPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("remove incomplete compaction work file: %w", err)
+		}
+		_ = os.Remove(workPath + ".wal")
+		return nil
+	}
+	if pathExists && backupExists {
+		if err := os.Remove(backupPath); err != nil {
+			return fmt.Errorf("remove completed compaction backup: %w", err)
+		}
+		if err := syncDirectory(filepath.Dir(path)); err != nil {
+			return fmt.Errorf("sync database directory after compaction cleanup: %w", err)
+		}
+	}
+	return nil
+}
+
+func syncDirectory(path string) error {
+	dir, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
+	return dir.Sync()
+}
+
 // measureReclaimableSpace opens the database briefly (replaying any WAL) and
 // reads the free/total block counts.
-func measureReclaimableSpace(ctx context.Context, path string) (int64, float64, error) {
+func measureReclaimableSpace(ctx context.Context, path string, opts CompactionOptions) (int64, float64, error) {
 	db, err := openDuckDBFile(path)
 	if err != nil {
 		return 0, 0, fmt.Errorf("open database for compaction measurement: %w", err)
 	}
 	defer db.Close()
+	if err := configureCompactionDB(ctx, db, opts); err != nil {
+		return 0, 0, err
+	}
 
 	var blockSize, totalBlocks, freeBlocks int64
 	if err := db.QueryRowContext(ctx, `
@@ -154,8 +221,8 @@ func measureReclaimableSpace(ctx context.Context, path string) (int64, float64, 
 
 // rewriteDatabaseFile creates target with the current embedded schema and
 // copies every table's rows from source in foreign-key order.
-func rewriteDatabaseFile(ctx context.Context, source, target string, prepare SchemaPreparer) error {
-	targetStore := NewStore(target)
+func rewriteDatabaseFile(ctx context.Context, source, target string, prepare SchemaPreparer, opts CompactionOptions) error {
+	targetStore := NewStore(target, compactionStoreOptions(opts)...)
 	if err := targetStore.Connect(); err != nil {
 		return fmt.Errorf("create compaction target: %w", err)
 	}
@@ -172,6 +239,9 @@ func rewriteDatabaseFile(ctx context.Context, source, target string, prepare Sch
 		return fmt.Errorf("open compaction worker: %w", err)
 	}
 	defer worker.Close()
+	if err := configureCompactionDB(ctx, worker, opts); err != nil {
+		return err
+	}
 
 	if _, err := worker.ExecContext(ctx, fmt.Sprintf("ATTACH '%s' AS compact_source (READ_ONLY);", escapeSQLString(source))); err != nil {
 		return fmt.Errorf("attach compaction source: %w", err)
@@ -221,6 +291,14 @@ func rewriteDatabaseFile(ctx context.Context, source, target string, prepare Sch
 	if err != nil {
 		return err
 	}
+	// Freshly migrated schemas may contain bootstrap rows (the default tenant
+	// is one example). Clear every source-backed target table child-first so
+	// the rewrite is an exact physical copy rather than an append over seeds.
+	for _, table := range childrenFirst {
+		if _, err := worker.ExecContext(ctx, fmt.Sprintf("DELETE FROM compact_target.%s", table)); err != nil {
+			return fmt.Errorf("clear compaction target table %s: %w", table, err)
+		}
+	}
 	slices.Reverse(childrenFirst) // parents before their foreign-key children
 
 	for _, table := range childrenFirst {
@@ -254,6 +332,39 @@ func rewriteDatabaseFile(ctx context.Context, source, target string, prepare Sch
 	for _, detach := range []string{"DETACH compact_source;", "DETACH compact_target;"} {
 		if _, err := worker.ExecContext(ctx, detach); err != nil {
 			return fmt.Errorf("detach compaction database: %w", err)
+		}
+	}
+	return nil
+}
+
+func compactionStoreOptions(opts CompactionOptions) []StoreOption {
+	var storeOpts []StoreOption
+	if strings.TrimSpace(opts.MemoryLimit) != "" {
+		storeOpts = append(storeOpts, WithMemoryLimit(opts.MemoryLimit))
+	}
+	if opts.Threads > 0 {
+		storeOpts = append(storeOpts, WithThreads(opts.Threads))
+	}
+	return storeOpts
+}
+
+func configureCompactionDB(ctx context.Context, db *sql.DB, opts CompactionOptions) error {
+	// Compaction workers are opened directly rather than through Store, so
+	// apply the same bounded-result and allocator-flushing settings here. A
+	// rewrite otherwise retains freed native blocks until the worker exits,
+	// which can push a large control-file cleanup well above its configured
+	// memory budget.
+	if _, err := db.ExecContext(ctx, "SET preserve_insertion_order=false; SET allocator_flush_threshold='64MB'; SET allocator_bulk_deallocation_flush_threshold='128MB';"); err != nil {
+		return fmt.Errorf("configure compaction allocator: %w", err)
+	}
+	if strings.TrimSpace(opts.MemoryLimit) != "" {
+		if _, err := db.ExecContext(ctx, fmt.Sprintf("SET memory_limit='%s';", escapeSQLString(opts.MemoryLimit))); err != nil {
+			return fmt.Errorf("set compaction memory limit: %w", err)
+		}
+	}
+	if opts.Threads > 0 {
+		if _, err := db.ExecContext(ctx, fmt.Sprintf("SET threads=%d;", opts.Threads)); err != nil {
+			return fmt.Errorf("set compaction threads: %w", err)
 		}
 	}
 	return nil

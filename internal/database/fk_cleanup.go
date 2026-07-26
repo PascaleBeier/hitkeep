@@ -353,6 +353,16 @@ func listScopedCopyTables(ctx context.Context, source, destination queryer, scop
 			continue
 		}
 		if _, ok := members[edge.referencedTable]; !ok {
+			// Tenant-local schemas intentionally omit the control-plane tenants
+			// table. Its IDs remain valid when rows are copied back to the
+			// control store, so treat that parent as shared identity only when it
+			// is absent from the source catalog. Full shared-to-shared copies
+			// remain rejected below rather than silently crossing tenant scope.
+			if edge.referencedTable == "tenants" {
+				if _, sourceHasTenants := sourceTables[edge.referencedTable]; !sourceHasTenants {
+					continue
+				}
+			}
 			return nil, fmt.Errorf("cannot derive a safe copy plan: %s references %s, which is not copied", edge.table, edge.referencedTable)
 		}
 	}

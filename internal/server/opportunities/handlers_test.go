@@ -42,8 +42,10 @@ func setupOpportunityHandlerTestEnv(t *testing.T) (*database.Store, *shared.Cont
 	if err != nil {
 		t.Fatalf("GetSiteTenantID: %v", err)
 	}
+	tenantStores := database.NewTenantStoreManager(store, t.TempDir(), database.WithTenantDataPlane(false))
+	t.Cleanup(func() { _ = tenantStores.Close() })
 
-	ctx := &shared.Context{Store: store}
+	ctx := &shared.Context{Store: store, TenantStores: tenantStores}
 
 	return store, ctx, site.ID, teamID
 }

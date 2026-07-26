@@ -11,6 +11,17 @@ import (
 )
 
 func (s *Store) GetUserOnboarding(ctx context.Context, userID uuid.UUID) (*api.UserOnboarding, error) {
+	return s.GetUserOnboardingWithResolver(ctx, userID, func(context.Context, uuid.UUID) (*Store, error) {
+		return s, nil
+	})
+}
+
+// GetUserOnboardingWithResolver keeps control-plane onboarding metadata on the
+// control store while resolving site activity from the owning tenant store.
+func (s *Store) GetUserOnboardingWithResolver(ctx context.Context, userID uuid.UUID, resolve func(context.Context, uuid.UUID) (*Store, error)) (*api.UserOnboarding, error) {
+	if resolve == nil {
+		resolve = func(context.Context, uuid.UUID) (*Store, error) { return s, nil }
+	}
 	prefs, err := s.GetUserPreferences(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -42,7 +53,11 @@ func (s *Store) GetUserOnboarding(ctx context.Context, userID uuid.UUID) (*api.U
 
 	receivedFirstHit, automaticEventSeen := false, false
 	for _, site := range sites {
-		status, err := s.GetSiteTrackingStatus(ctx, site.ID, nowUTC())
+		analyticsStore, err := resolve(ctx, site.ID)
+		if err != nil {
+			return nil, fmt.Errorf("resolve onboarding analytics store: %w", err)
+		}
+		status, err := analyticsStore.GetSiteTrackingStatus(ctx, site.ID, nowUTC())
 		if err != nil {
 			return nil, err
 		}

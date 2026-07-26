@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -102,6 +103,37 @@ func (s *Store) RecordHitActivity(ctx context.Context, hits []*api.Hit) error {
 		if err := s.upsertSiteHitActivity(ctx, siteID, agg); err != nil {
 			return err
 		}
+	}
+	if err := s.flushSiteActivityCounts(ctx, counts, true); err != nil {
+		return err
+	}
+	// Legacy shared stores own both analytics and billing tables. Preserve the
+	// direct-call behavior there; tenant-local stores defer this control write
+	// to the ingest coordinator.
+	if s.tenantID == uuid.Nil {
+		if err := s.RecordFirstHitCloudConversions(ctx, hits); err != nil {
+			return err
+		}
+	}
+	return s.maybePruneSiteActivityCounts(ctx)
+}
+
+// RecordFirstHitCloudConversions records control-plane conversion milestones
+// for a batch whose analytics rows were written to a tenant store. Keeping
+// this separate from RecordHitActivity prevents tenant catalogs from trying
+// to read control-only billing tables.
+func (s *Store) RecordFirstHitCloudConversions(ctx context.Context, hits []*api.Hit) error {
+	firstBySite := make(map[uuid.UUID]time.Time)
+	for _, hit := range hits {
+		if hit == nil || hit.SiteID == uuid.Nil {
+			continue
+		}
+		at := hit.Timestamp.UTC()
+		if previous, ok := firstBySite[hit.SiteID]; !ok || at.Before(previous) {
+			firstBySite[hit.SiteID] = at
+		}
+	}
+	for siteID, occurredAt := range firstBySite {
 		tenantID, err := s.GetSiteTenantID(ctx, siteID)
 		if err != nil {
 			return fmt.Errorf("resolve site tenant for first hit conversion: %w", err)
@@ -109,15 +141,12 @@ func (s *Store) RecordHitActivity(ctx context.Context, hits []*api.Hit) error {
 		if _, err := s.RecordCloudConversionEvent(ctx, CloudConversionEvent{
 			TenantID:   tenantID,
 			EventName:  CloudConversionFirstHitReceived,
-			OccurredAt: agg.firstAt,
+			OccurredAt: occurredAt,
 		}); err != nil {
 			return fmt.Errorf("record first hit conversion: %w", err)
 		}
 	}
-	if err := s.flushSiteActivityCounts(ctx, counts, true); err != nil {
-		return err
-	}
-	return s.maybePruneSiteActivityCounts(ctx)
+	return nil
 }
 
 // siteEventActivity accumulates one batch's events for a site; name and
@@ -322,12 +351,13 @@ func (s *Store) maybePruneSiteActivityCounts(ctx context.Context) error {
 }
 
 func (s *Store) GetSiteTrackingStatus(ctx context.Context, siteID uuid.UUID, now time.Time) (*api.SiteTrackingStatus, error) {
-	site, err := s.GetSiteByID(ctx, siteID)
-	if err != nil {
-		return nil, err
-	}
-	if site == nil {
+	var domain string
+	err := s.db.QueryRowContext(ctx, "SELECT domain FROM sites WHERE id = ?", siteID).Scan(&domain)
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("query site metadata for tracking status: %w", err)
 	}
 	tenantID, err := s.GetSiteTenantID(ctx, siteID)
 	if err != nil {
@@ -359,7 +389,7 @@ func (s *Store) GetSiteTrackingStatus(ctx context.Context, siteID uuid.UUID, now
 	status := api.TrackingStatusWaiting
 	if lastHit.Valid {
 		status = api.TrackingStatusLive
-		if lastHostname.Valid && !sameActivationDomain(lastHostname.String, site.Domain) {
+		if lastHostname.Valid && !sameActivationDomain(lastHostname.String, domain) {
 			status = api.TrackingStatusDomainMismatch
 		} else if !now.IsZero() && now.UTC().Sub(lastHit.Time.UTC()) > activityDormantAfter {
 			status = api.TrackingStatusDormant
@@ -379,9 +409,31 @@ func (s *Store) GetSiteTrackingStatus(ctx context.Context, siteID uuid.UUID, now
 		LastAutomaticEventName: nullStringValue(lastAutomaticName),
 		TrackerSource:          nullStringValue(trackerSource),
 		TrackerVersion:         nullStringValue(trackerVersion),
-		ConfiguredDomain:       site.Domain,
+		ConfiguredDomain:       domain,
 		UpdatedAt:              nullTimePtr(updatedAt),
 	}, nil
+}
+
+// SiteActivityCounts returns the bounded hourly aggregates used by operator
+// activation views. The method is intentionally tenant-local: callers must
+// resolve the owning analytics store before reading these tables.
+func (s *Store) SiteActivityCounts(ctx context.Context, siteID uuid.UUID, now time.Time) (hits24h, hits7d, events7d int, err error) {
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	err = s.db.QueryRowContext(ctx, `
+		SELECT
+			COALESCE(SUM(CASE WHEN bucket >= ? THEN hits ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN bucket >= ? THEN hits ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN bucket >= ? THEN events ELSE 0 END), 0)
+		FROM site_activity_hourly_counts
+		WHERE site_id = ?
+	`, now.UTC().Add(-24*time.Hour), now.UTC().Add(-7*24*time.Hour), now.UTC().Add(-7*24*time.Hour), siteID).
+		Scan(&hits24h, &hits7d, &events7d)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("query site activity counts: %w", err)
+	}
+	return hits24h, hits7d, events7d, nil
 }
 
 type ActivationQuery struct {

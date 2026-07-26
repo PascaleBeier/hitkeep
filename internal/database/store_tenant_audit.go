@@ -316,3 +316,35 @@ func (s *Store) ListNonDefaultTenantIDs(ctx context.Context) ([]uuid.UUID, error
 	}
 	return ids, nil
 }
+
+// ListActiveTenantIDs returns every active tenant, including the default
+// tenant. Billing callers should continue using ListNonDefaultTenantIDs.
+func (s *Store) ListActiveTenantIDs(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT CAST(t.id AS VARCHAR)
+		 FROM tenants t
+		 LEFT JOIN tenant_archives ta ON ta.tenant_id = t.id
+		 WHERE ta.tenant_id IS NULL
+		 ORDER BY t.created_at`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not list active tenants: %w", err)
+	}
+	defer rows.Close()
+	ids := make([]uuid.UUID, 0)
+	for rows.Next() {
+		var raw string
+		if err := rows.Scan(&raw); err != nil {
+			return nil, fmt.Errorf("could not scan active tenant id: %w", err)
+		}
+		id, err := uuid.Parse(strings.TrimSpace(raw))
+		if err != nil {
+			return nil, fmt.Errorf("invalid active tenant id %q: %w", raw, err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("could not read active tenant rows: %w", err)
+	}
+	return ids, nil
+}

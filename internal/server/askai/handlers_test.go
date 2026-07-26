@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -286,6 +288,87 @@ func TestAskAIWithoutExplicitRangeUsesObservedSiteDataBounds(t *testing.T) {
 	}
 	if !ai.last.From.Equal(firstHit) || !ai.last.To.Equal(lastHit) {
 		t.Fatalf("expected Ask AI range to use hit bounds %s-%s, got %s-%s", firstHit, lastHit, ai.last.From, ai.last.To)
+	}
+}
+
+func TestAskAINonDefaultSiteUsesTenantAnalyticsBounds(t *testing.T) {
+	ctx := context.Background()
+	control := database.NewStore(":memory:")
+	if err := control.Connect(); err != nil {
+		t.Fatal(err)
+	}
+	if err := control.Migrate(ctx); err != nil {
+		_ = control.Close()
+		t.Fatal(err)
+	}
+	userID, err := control.CreateUser(ctx, "ask-ai-tenant@example.com", "hash")
+	if err != nil {
+		_ = control.Close()
+		t.Fatal(err)
+	}
+	site, err := control.CreateSite(ctx, userID, "ask-ai-tenant.example.test")
+	if err != nil {
+		_ = control.Close()
+		t.Fatal(err)
+	}
+	tenantID := uuid.New()
+	if _, err := control.DB().ExecContext(ctx, "INSERT INTO tenants (id, name, is_default, created_at) VALUES (?, ?, FALSE, ?)", tenantID, "Ask AI Tenant", time.Now().UTC()); err != nil {
+		_ = control.Close()
+		t.Fatal(err)
+	}
+	if _, err := control.DB().ExecContext(ctx, "DELETE FROM site_tenants WHERE site_id = ?", site.ID); err != nil {
+		_ = control.Close()
+		t.Fatal(err)
+	}
+	if _, err := control.DB().ExecContext(ctx, "INSERT INTO site_tenants (site_id, tenant_id, created_at) VALUES (?, ?, ?)", site.ID, tenantID, time.Now().UTC()); err != nil {
+		_ = control.Close()
+		t.Fatal(err)
+	}
+	dataPath := t.TempDir()
+	tenantPath := filepath.Join(dataPath, "tenants", tenantID.String(), "hitkeep.db")
+	if err := os.MkdirAll(filepath.Dir(tenantPath), 0o755); err != nil {
+		_ = control.Close()
+		t.Fatal(err)
+	}
+	tenant := database.NewStore(tenantPath)
+	if err := tenant.Connect(); err != nil {
+		_ = control.Close()
+		t.Fatal(err)
+	}
+	if err := tenant.MigrateTenant(ctx); err != nil {
+		_ = tenant.Close()
+		_ = control.Close()
+		t.Fatal(err)
+	}
+	if err := tenant.UpsertSiteMirror(ctx, site); err != nil {
+		_ = tenant.Close()
+		_ = control.Close()
+		t.Fatal(err)
+	}
+	firstHit := time.Date(2026, 6, 10, 8, 0, 0, 0, time.UTC)
+	lastHit := time.Date(2026, 6, 12, 18, 30, 0, 0, time.UTC)
+	seedAskAIHit(t, tenant, site.ID, firstHit)
+	seedAskAIHit(t, tenant, site.ID, lastHit)
+	if err := tenant.Close(); err != nil {
+		_ = control.Close()
+		t.Fatal(err)
+	}
+	manager := database.NewTenantStoreManager(control, dataPath, database.WithTenantDataPlane(false))
+	ai := &recordingAskAIClient{}
+	cfg := askAITestConfig()
+	appCtx := &shared.Context{Store: control, TenantStores: manager, Config: cfg, AI: ai}
+	mux := http.NewServeMux()
+	Register(mux, appCtx)
+	defer func() {
+		_ = manager.Close()
+		_ = control.Close()
+	}()
+	rec := requestAskAIWithBody(t, mux, site.ID, askAISessionCookie(t, userID), "", `{"query":"What changed in traffic?","route":"/dashboard"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+	if !ai.last.From.Equal(firstHit) || !ai.last.To.Equal(lastHit) {
+		t.Fatalf("expected non-default Ask AI range from tenant hits %s-%s, got %s-%s", firstHit, lastHit, ai.last.From, ai.last.To)
 	}
 }
 
@@ -569,7 +652,9 @@ func setupAskAIHandlerTestEnv(t *testing.T, cfg *config.Config) (*http.ServeMux,
 	}
 
 	ai := &recordingAskAIClient{}
-	appCtx := &shared.Context{Store: store, Config: cfg, AI: ai}
+	tenantStores := database.NewTenantStoreManager(store, t.TempDir(), database.WithTenantDataPlane(false))
+	t.Cleanup(func() { _ = tenantStores.Close() })
+	appCtx := &shared.Context{Store: store, TenantStores: tenantStores, Config: cfg, AI: ai}
 	mux := http.NewServeMux()
 	Register(mux, appCtx)
 	return mux, store, site.ID, userID, ai

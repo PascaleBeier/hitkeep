@@ -115,11 +115,18 @@ func (a *App) RunRaceShard(ctx context.Context, shard string, writer io.Writer) 
 	if len(packages) == 0 {
 		return result, fmt.Errorf("race shard %q selected no packages", shard)
 	}
-	args := append([]string{"go", "test", "-race"}, packages...)
+	args := raceTestArgs(packages)
 	if err := a.runCommand(ctx, writer, commandSpec{Args: args, Env: []string{"GOFLAGS=-tags=" + strings.Join(common.BuildTags, ",")}, Display: fmt.Sprintf("go test -race [%s shard: %d packages]", shard, len(packages))}); err != nil {
 		return result, err
 	}
 	return result, nil
+}
+
+func raceTestArgs(packages []string) []string {
+	// Keep the package timeout below the enclosing 30-minute gate timeout so a
+	// genuine hang still emits a Go stack dump while normal slower race runs are
+	// not constrained by Go's 10-minute default.
+	return append([]string{"go", "test", "-race", "-timeout", "20m"}, packages...)
 }
 
 func (a *App) RunCloudTests(ctx context.Context, writer io.Writer) (GoTestResult, error) {

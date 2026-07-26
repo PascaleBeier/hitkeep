@@ -18,6 +18,13 @@ import (
 	"hitkeep/internal/server/shared"
 )
 
+func newShareTestContext(t *testing.T, store *database.Store) *shared.Context {
+	t.Helper()
+	tenantStores := database.NewTenantStoreManager(store, t.TempDir(), database.WithTenantDataPlane(false))
+	t.Cleanup(func() { _ = tenantStores.Close() })
+	return &shared.Context{Store: store, TenantStores: tenantStores, Config: &config.Config{}}
+}
+
 func TestHandleExportShareHitsSupportsAllFormats(t *testing.T) {
 	h, store, token, siteID := setupShareExportTestEnv(t)
 	t.Cleanup(func() { _ = store.Close() })
@@ -128,7 +135,7 @@ func TestShareOpportunitiesListIsScopedToShareTokenSite(t *testing.T) {
 	}
 
 	mux := http.NewServeMux()
-	Register(mux, &shared.Context{Store: store, Config: &config.Config{}})
+	Register(mux, newShareTestContext(t, store))
 
 	t.Run("valid token and site returns saved opportunities", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/share/"+token+"/sites/"+site.ID.String()+"/opportunities", nil)
@@ -194,7 +201,7 @@ func TestShareOpportunitiesListReturnsEmptyArrayWhenNoRowsExist(t *testing.T) {
 	}
 
 	mux := http.NewServeMux()
-	Register(mux, &shared.Context{Store: store, Config: &config.Config{}})
+	Register(mux, newShareTestContext(t, store))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/share/"+token+"/sites/"+site.ID.String()+"/opportunities", nil)
 	w := httptest.NewRecorder()
@@ -324,7 +331,7 @@ func setupShareEventsTestEnv(t *testing.T) (*handler, *database.Store, string, u
 		t.Fatalf("create share link: %v", err)
 	}
 
-	h := &handler{ctx: &shared.Context{Store: store, Config: &config.Config{}}}
+	h := &handler{ctx: newShareTestContext(t, store)}
 	return h, store, token, site.ID
 }
 
@@ -688,7 +695,7 @@ func setupShareEcommerceTestEnv(t *testing.T) (*handler, *database.Store, string
 		t.Fatalf("create share link: %v", err)
 	}
 
-	h := &handler{ctx: &shared.Context{Store: store, Config: &config.Config{}}}
+	h := &handler{ctx: newShareTestContext(t, store)}
 	return h, store, token, site.ID
 }
 
@@ -891,7 +898,7 @@ func setupShareWebVitalsTestEnv(t *testing.T) (*handler, *database.Store, string
 		t.Fatalf("create share link: %v", err)
 	}
 
-	h := &handler{ctx: &shared.Context{Store: store, Config: &config.Config{}}}
+	h := &handler{ctx: newShareTestContext(t, store)}
 	return h, store, token, site.ID
 }
 
@@ -1035,10 +1042,7 @@ func setupShareExportTestEnv(t *testing.T) (*handler, *database.Store, string, u
 	}
 
 	h := &handler{
-		ctx: &shared.Context{
-			Store:  store,
-			Config: &config.Config{},
-		},
+		ctx: newShareTestContext(t, store),
 	}
 	return h, store, token, site.ID
 }

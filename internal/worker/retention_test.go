@@ -501,6 +501,105 @@ func TestRetentionArchivesAndPrunesWebVitals(t *testing.T) {
 	assertHotWebVitalCount(t, ctx, store, siteID, "/stale-vitals", 0)
 }
 
+func TestRetentionArchivesSearchConsoleAndEveryRollupAndPrunesDirtyBuckets(t *testing.T) {
+	ctx := context.Background()
+	store := newTestStore(t)
+	archiveDir := filepath.Join(t.TempDir(), "archive")
+	siteID := seedSite(t, ctx, store, 7)
+	old := time.Now().UTC().Add(-14 * 24 * time.Hour).Truncate(time.Hour)
+	recent := time.Now().UTC().Add(-24 * time.Hour).Truncate(time.Hour)
+
+	for _, at := range []time.Time{old, recent} {
+		if _, err := store.DB().ExecContext(ctx, `
+			INSERT INTO search_console_facts
+			(site_id, property_uri, date, query, page, country, device, clicks, impressions, ctr, position, aggregation_type, data_state, imported_at)
+			VALUES (?, 'sc-domain:fixture.test', ?, 'fixture-query', '/fixture', 'DE', 'DESKTOP', 1, 2, 0.5, 1.5, 'byProperty', 'final', ?)`,
+			siteID, at, at); err != nil {
+			t.Fatalf("seed Search Console fact: %v", err)
+		}
+		if _, err := store.DB().ExecContext(ctx, `
+			INSERT INTO rollup_dirty_buckets (site_id, rollup_type, bucket_unit, bucket, updated_at)
+			VALUES (?, 'hit', 'hour', ?, ?)`, siteID, at, at); err != nil {
+			t.Fatalf("seed dirty rollup bucket: %v", err)
+		}
+	}
+	goalID, funnelID := uuid.New(), uuid.New()
+	for _, table := range retentionRollupTables {
+		for _, at := range []time.Time{old, recent} {
+			var query string
+			var args []any
+			switch {
+			case strings.HasPrefix(table, "hit_"):
+				query = "INSERT INTO " + table + " (site_id, bucket, pageviews, visitors) VALUES (?, ?, 2, 1)"
+				args = []any{siteID, at}
+			case strings.HasPrefix(table, "session_"):
+				query = "INSERT INTO " + table + " (site_id, bucket, sessions, bounced_sessions, duration_sum_seconds, pageviews) VALUES (?, ?, 1, 0, 30, 2)"
+				args = []any{siteID, at}
+			case strings.HasPrefix(table, "goal_"):
+				query = "INSERT INTO " + table + " (site_id, goal_id, bucket, conversions) VALUES (?, ?, ?, 1)"
+				args = []any{siteID, goalID, at}
+			case strings.HasPrefix(table, "funnel_"):
+				query = "INSERT INTO " + table + " (site_id, funnel_id, bucket, entries, completions) VALUES (?, ?, ?, 2, 1)"
+				args = []any{siteID, funnelID, at}
+			}
+			if _, err := store.DB().ExecContext(ctx, query, args...); err != nil {
+				t.Fatalf("seed %s: %v", table, err)
+			}
+		}
+	}
+	defaultTenantID, err := store.GetDefaultTenantID(ctx)
+	if err != nil {
+		t.Fatalf("resolve default tenant for activity fixture: %v", err)
+	}
+	if _, err := store.DB().ExecContext(ctx, `
+		INSERT INTO site_activity_hourly_counts (site_id, tenant_id, bucket, hits, events, updated_at)
+		VALUES (?, ?, ?, 1, 1, ?)`, siteID, defaultTenantID, old, old); err != nil {
+		t.Fatalf("seed independent activity maintenance row: %v", err)
+	}
+
+	w := NewRetentionWorker(newTestTenantMgr(t, store), archiveDir, 365, nil)
+	if err := w.Run(ctx); err != nil {
+		t.Fatalf("run retention: %v", err)
+	}
+
+	for _, table := range append([]string{"search_console_facts", "rollup_dirty_buckets"}, retentionRollupTables...) {
+		var oldRows, recentRows int
+		column := "bucket"
+		if table == "search_console_facts" {
+			column = "date"
+		}
+		query := fmt.Sprintf("SELECT COUNT(*) FILTER (WHERE %s < ?), COUNT(*) FILTER (WHERE %s >= ?) FROM %s WHERE site_id = ?", column, column, table)
+		cutoff := time.Now().UTC().Add(-7 * 24 * time.Hour)
+		if err := store.DB().QueryRowContext(ctx, query, cutoff, cutoff, siteID).Scan(&oldRows, &recentRows); err != nil {
+			t.Fatalf("verify retained %s: %v", table, err)
+		}
+		if oldRows != 0 || recentRows != 1 {
+			t.Fatalf("unexpected retained rows for %s: old=%d recent=%d", table, oldRows, recentRows)
+		}
+	}
+	var activityRows int
+	if err := store.DB().QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM site_activity_hourly_counts WHERE site_id = ? AND bucket = ?", siteID, old).Scan(&activityRows); err != nil {
+		t.Fatalf("verify activity maintenance independence: %v", err)
+	}
+	if activityRows != 1 {
+		t.Fatalf("analytics retention must not prune activity maintenance rows, got %d", activityRows)
+	}
+	files, err := findParquetFiles(archiveDir)
+	if err != nil || len(files) != 1 {
+		t.Fatalf("find retention archive: files=%v err=%v", files, err)
+	}
+	safePath := strings.ReplaceAll(files[0], "'", "''")
+	var archivedSources int
+	if err := store.DB().QueryRowContext(ctx,
+		fmt.Sprintf("SELECT COUNT(DISTINCT _source) FROM read_parquet('%s')", safePath)).Scan(&archivedSources); err != nil {
+		t.Fatalf("count archived retention families: %v", err)
+	}
+	if archivedSources != 13 {
+		t.Fatalf("expected Search Console plus 12 rollup archive sources, got %d", archivedSources)
+	}
+}
+
 func TestRetentionArchivesAndPrunesImportedEventDimensions(t *testing.T) {
 	ctx := context.Background()
 	store := newTestStore(t)

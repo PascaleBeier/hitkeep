@@ -23,20 +23,38 @@ func (s *Store) MigrateTenant(ctx context.Context) error {
 // OpenMigratedTenantStore opens a tenant database and applies all pending
 // migrations before the Store can be published to other goroutines.
 func OpenMigratedTenantStore(ctx context.Context, path string, opts ...StoreOption) (*Store, error) {
-	store := NewStore(path, opts...)
-	if err := store.Connect(); err != nil {
-		return nil, err
+	recovered := false
+	preserveGuard := false
+	for {
+		storeOpts := append([]StoreOption(nil), opts...)
+		if preserveGuard {
+			storeOpts = append(storeOpts, withPreservedMigrationGuardOnConnect())
+		}
+		store := NewStore(path, storeOpts...)
+		if err := store.Connect(); err != nil {
+			return nil, err
+		}
+		recovered = recovered || store.RecoveredDuringConnect()
+		morePending := false
+		if err := store.migrateTenant(ctx, migrationRunOptions{guarded: true, reopenHeavy: true, morePending: &morePending}); err != nil {
+			_ = store.Close()
+			return nil, err
+		}
+		if !morePending {
+			store.recoveredOnConnect = recovered
+			return store, nil
+		}
+		if err := store.closeForMigrationReopen(); err != nil {
+			return nil, fmt.Errorf("reopen tenant database between migrations: %w", err)
+		}
+		preserveGuard = true
 	}
-	if err := store.migrateTenant(ctx, migrationRunOptions{guarded: true}); err != nil {
-		_ = store.Close()
-		return nil, err
-	}
-	return store, nil
 }
 
 func (s *Store) migrateTenant(ctx context.Context, opts migrationRunOptions) error {
 	s.migrationMu.Lock()
 	defer s.migrationMu.Unlock()
+	cleanBaseForChecksumGuard := !fileExists(s.path + ".wal")
 
 	if err := s.ensureMigrationCheckpointTable(ctx); err != nil {
 		return err
@@ -61,22 +79,50 @@ func (s *Store) migrateTenant(ctx context.Context, opts migrationRunOptions) err
 	}
 
 	sort.Strings(pendingMigrations)
+	if opts.morePending != nil {
+		*opts.morePending = false
+	}
 
 	if len(pendingMigrations) == 0 {
 		slog.Debug("Tenant database schema is up to date.")
+		if opts.guarded {
+			if guard, err := s.recovery.loadMigrationGuard(); err != nil {
+				return err
+			} else if guard != nil {
+				if err := s.completeGuardedMigration(ctx, "tenant"); err != nil {
+					return err
+				}
+			}
+		}
 		return s.afterTenantSchemaCurrent(ctx)
 	}
+	guardPendingMigrations := append([]string(nil), pendingMigrations...)
 
+	batchEnd := len(pendingMigrations)
+	if opts.reopenHeavy {
+		for i, fileName := range pendingMigrations {
+			if migrationNeedsNativeReopen(fileName) {
+				batchEnd = i + 1
+				break
+			}
+		}
+	}
+	morePending := batchEnd < len(pendingMigrations)
+	if morePending {
+		pendingMigrations = pendingMigrations[:batchEnd]
+		if opts.morePending != nil {
+			*opts.morePending = true
+		}
+	}
 	slog.Info("Applying pending tenant migrations...", "count", len(pendingMigrations), "path", s.path)
 	if opts.guarded {
-		if err := s.prepareGuardedMigration(ctx, "tenant", pendingMigrations); err != nil {
+		if err := s.prepareGuardedMigration(ctx, "tenant", guardPendingMigrations, cleanBaseForChecksumGuard); err != nil {
 			return err
 		}
 	}
-
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return s.rollbackMigration(nil, fmt.Errorf("could not begin tenant migration transaction: %w", err), opts.guarded)
+	s.db.SetMaxIdleConns(0)
+	if s.catalog == "" {
+		defer s.db.SetMaxIdleConns(2)
 	}
 
 	for _, fileName := range pendingMigrations {
@@ -84,26 +130,30 @@ func (s *Store) migrateTenant(ctx context.Context, opts migrationRunOptions) err
 
 		fileContent, err := tenant.Fs.ReadFile(fileName)
 		if err != nil {
-			return s.rollbackMigration(tx, fmt.Errorf("could not read tenant migration file %s: %w", fileName, err), opts.guarded)
+			return fmt.Errorf("could not read tenant migration file %s: %w", fileName, err)
 		}
 
-		if _, err := tx.ExecContext(ctx, string(fileContent)); err != nil {
-			return s.rollbackMigration(tx, fmt.Errorf("failed to apply tenant migration %s: %w", fileName, err), opts.guarded)
+		if err := s.runMigrationStep(ctx, fileName, string(fileContent), s.addTenantAppliedMigration); err != nil {
+			return fmt.Errorf("tenant migration: %w", err)
 		}
-
-		if err := s.addTenantAppliedMigration(ctx, tx, fileName); err != nil {
-			return s.rollbackMigration(tx, fmt.Errorf("failed to record tenant migration %s: %w", fileName, err), opts.guarded)
+		if opts.afterCommit != nil {
+			opts.afterCommit()
 		}
-	}
-	if err := tx.Commit(); err != nil {
-		// When guarded, keep the guard because the commit outcome may be uncertain.
-		return fmt.Errorf("could not commit tenant migration transaction: %w", err)
-	}
-	if opts.afterCommit != nil {
-		opts.afterCommit()
+		reopenNative := opts.reopenHeavy && fileName == pendingMigrations[len(pendingMigrations)-1] && migrationNeedsNativeReopen(fileName)
+		if reopenNative {
+			morePending = true
+			if opts.morePending != nil {
+				*opts.morePending = true
+			}
+		} else if err := s.Checkpoint(ctx, "tenant_migration"); err != nil {
+			return fmt.Errorf("checkpoint tenant migration %s: %w", fileName, err)
+		}
 	}
 
 	slog.Info("Successfully applied all tenant migrations.", "path", s.path)
+	if morePending {
+		return nil
+	}
 	if opts.guarded {
 		if err := s.completeGuardedMigration(ctx, "tenant"); err != nil {
 			return err

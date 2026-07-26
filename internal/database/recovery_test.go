@@ -598,6 +598,8 @@ func TestGuardedTenantMigrationSurvivesAbruptRestart(t *testing.T) {
 		helperDBEnv       = "HITKEEP_TEST_ABRUPT_TENANT_MIGRATION_DB"
 		helperRecoveryEnv = "HITKEEP_TEST_ABRUPT_TENANT_MIGRATION_RECOVERY"
 		migrationFile     = "0013_drop_analytics_art_indexes.sql"
+		eventsMigration   = "0013a_drop_events_art_indexes.sql"
+		vitalsMigration   = "0013b_drop_web_vitals_art_indexes.sql"
 	)
 	if dbPath := os.Getenv(helperDBEnv); dbPath != "" {
 		store := NewStore(dbPath,
@@ -631,7 +633,8 @@ func TestGuardedTenantMigrationSurvivesAbruptRestart(t *testing.T) {
 	}
 	if _, err := seed.DB().ExecContext(ctx, `
 		CREATE TABLE migrations (migration VARCHAR NOT NULL, applied_at TIMESTAMPTZ NOT NULL);
-		INSERT INTO migrations (migration, applied_at) VALUES (?, now())`, migrationFile); err != nil {
+		INSERT INTO migrations (migration, applied_at) VALUES (?, now()), (?, now()), (?, now())`,
+		migrationFile, eventsMigration, vitalsMigration); err != nil {
 		t.Fatalf("hold back replay migration: %v", err)
 	}
 	if err := seed.MigrateTenant(ctx); err != nil {
@@ -641,7 +644,7 @@ func TestGuardedTenantMigrationSurvivesAbruptRestart(t *testing.T) {
 		INSERT INTO sites (id, domain, data_retention_days) VALUES (uuid(), 'migration.test', 365);
 		INSERT INTO hits (id, site_id, session_id, page_id, timestamp, path)
 		SELECT uuid(), id, uuid(), uuid(), now(), '/before-migration' FROM sites;
-		DELETE FROM migrations WHERE migration = ?`, migrationFile); err != nil {
+		DELETE FROM migrations WHERE migration IN (?, ?, ?)`, migrationFile, eventsMigration, vitalsMigration); err != nil {
 		t.Fatalf("seed checkpointed tenant data: %v", err)
 	}
 	if err := seed.Close(); err != nil {
@@ -654,7 +657,7 @@ func TestGuardedTenantMigrationSurvivesAbruptRestart(t *testing.T) {
 		t.Fatalf("create replay-failing WAL: %v\n%s", err, output)
 	}
 	if _, err := os.Stat(dbPath + ".wal"); err != nil {
-		t.Fatalf("expected replay-failing WAL: %v", err)
+		t.Fatalf("expected committed migration WAL: %v", err)
 	}
 
 	store, err := OpenMigratedTenantStore(ctx, dbPath,
@@ -662,7 +665,7 @@ func TestGuardedTenantMigrationSurvivesAbruptRestart(t *testing.T) {
 		WithAutomaticRecovery(false, recoveryRoot),
 	)
 	if err != nil {
-		t.Fatalf("recover and reapply guarded migration WAL without global opt-in: %v", err)
+		t.Fatalf("replay and resume guarded migration WAL without global opt-in: %v", err)
 	}
 	t.Cleanup(func() { _ = store.Close() })
 
@@ -689,8 +692,11 @@ func TestGuardedTenantMigrationSurvivesAbruptRestart(t *testing.T) {
 	if status.State != DatabaseStateHealthy {
 		t.Fatalf("unexpected guarded migration status: %+v", status)
 	}
-	if status.RecoveryBundleAvailable != store.RecoveredDuringConnect() {
-		t.Fatalf("migration recovery bundle and connect status disagree: %+v", status)
+	if store.RecoveredDuringConnect() {
+		t.Fatalf("replay-safe guarded migration should checkpoint normally without WAL bypass recovery: %+v", status)
+	}
+	if status.RecoveryBundleAvailable {
+		t.Fatal("checksum-verified migration WAL recovery must not duplicate the database into a recovery bundle")
 	}
 }
 

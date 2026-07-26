@@ -474,13 +474,7 @@ func (h *handler) handleGetIngestStats() http.HandlerFunc {
 				slog.Warn("Failed to read tenant ingest counts", "error", err)
 			}
 		} else {
-			counts, err := h.ctx.Store.GetRecentIngestCounts(ctx, since)
-			if err == nil {
-				stats.RecentHits = counts.Hits
-				stats.RecentEvents = counts.Events
-			} else {
-				slog.Warn("Failed to read ingest counts", "error", err)
-			}
+			slog.Warn("Tenant analytics data plane is unavailable; ingest counts omitted")
 		}
 
 		if h.ctx.SystemCounters != nil {

@@ -319,6 +319,124 @@ func TestBackupHandlesMultipleTenants(t *testing.T) {
 	}
 }
 
+func TestBackupExportsSplitDefaultAndAttachedTenantCatalogs(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	sharedPath := filepath.Join(root, "hitkeep.db")
+	dataPath := filepath.Join(root, "data")
+	backupDir := filepath.Join(root, "backups")
+
+	shared := database.NewStore(sharedPath)
+	if err := shared.Connect(); err != nil {
+		t.Fatalf("connect shared database: %v", err)
+	}
+	if err := shared.Migrate(ctx); err != nil {
+		t.Fatalf("migrate shared database: %v", err)
+	}
+	defaultSiteID := seedSite(t, ctx, shared, 365)
+	isUnique := true
+	if err := shared.CreateHit(ctx, &api.Hit{
+		SiteID: defaultSiteID, SessionID: uuid.New(), PageID: uuid.New(),
+		Timestamp: time.Now().UTC(), Path: "/default-backup", IsUnique: &isUnique,
+	}); err != nil {
+		t.Fatalf("seed default hit: %v", err)
+	}
+	otherTenantID := uuid.New()
+	if _, err := shared.DB().ExecContext(ctx,
+		"INSERT INTO tenants (id, name, is_default, created_at) VALUES (?, ?, FALSE, ?)",
+		otherTenantID, "Attached Backup Tenant", time.Now().UTC(),
+	); err != nil {
+		t.Fatalf("insert attached tenant: %v", err)
+	}
+	if err := shared.Close(); err != nil {
+		t.Fatalf("close shared database before split: %v", err)
+	}
+	if err := database.RunDefaultTenantSplit(ctx, sharedPath, dataPath); err != nil {
+		t.Fatalf("split default tenant: %v", err)
+	}
+
+	control := database.NewStore(sharedPath)
+	if err := control.Connect(); err != nil {
+		t.Fatalf("reopen control database: %v", err)
+	}
+	t.Cleanup(func() { _ = control.Close() })
+	mgr := database.NewTenantStoreManager(control, dataPath, database.WithTenantDataPlane(true))
+	t.Cleanup(func() { _ = mgr.Close() })
+	defaultID, err := mgr.DefaultTenantID(ctx)
+	if err != nil {
+		t.Fatalf("resolve default tenant: %v", err)
+	}
+	otherStore, err := mgr.ForTenant(ctx, otherTenantID)
+	if err != nil {
+		t.Fatalf("open attached tenant store: %v", err)
+	}
+	otherSiteID := uuid.New()
+	if _, err := otherStore.DB().ExecContext(ctx, `
+		INSERT INTO sites (id, domain, data_retention_days) VALUES (?, ?, ?)
+	`, otherSiteID, "attached-backup.test", 365); err != nil {
+		t.Fatalf("seed attached tenant site: %v", err)
+	}
+	if err := otherStore.CreateHit(ctx, &api.Hit{
+		SiteID: otherSiteID, SessionID: uuid.New(), PageID: uuid.New(),
+		Timestamp: time.Now().UTC(), Path: "/attached-backup", IsUnique: &isUnique,
+	}); err != nil {
+		t.Fatalf("seed attached tenant hit: %v", err)
+	}
+
+	w := NewBackupWorker(mgr, dataPath, backupDir, 60, 24, nil, nil)
+	if err := w.Run(ctx); err != nil {
+		t.Fatalf("backup split data plane: %v", err)
+	}
+
+	assertBackupContainsOnlyHitPath(t, ctx, latestTenantSnapshot(t, backupDir, defaultID), "/default-backup")
+	assertBackupContainsOnlyHitPath(t, ctx, latestTenantSnapshot(t, backupDir, otherTenantID), "/attached-backup")
+}
+
+func latestTenantSnapshot(t *testing.T, backupDir string, tenantID uuid.UUID) string {
+	t.Helper()
+	dir := filepath.Join(backupDir, "tenants", tenantID.String())
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("read tenant backup directory %s: %v", tenantID, err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected one backup for tenant %s, got %d", tenantID, len(entries))
+	}
+	return filepath.Join(dir, entries[0].Name())
+}
+
+func assertBackupContainsOnlyHitPath(t *testing.T, ctx context.Context, snapshotPath, wantPath string) {
+	t.Helper()
+	restored := database.NewStore(filepath.Join(t.TempDir(), "restored.db"))
+	if err := restored.Connect(); err != nil {
+		t.Fatalf("connect restored tenant database: %v", err)
+	}
+	defer restored.Close()
+	query := "IMPORT DATABASE '" + strings.ReplaceAll(filepath.ToSlash(snapshotPath), "'", "''") + "';"
+	if _, err := restored.DB().ExecContext(ctx, query); err != nil {
+		t.Fatalf("import tenant backup: %v", err)
+	}
+	var paths []string
+	rows, err := restored.DB().QueryContext(ctx, "SELECT path FROM hits ORDER BY path")
+	if err != nil {
+		t.Fatalf("query restored tenant hits: %v", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var path string
+		if err := rows.Scan(&path); err != nil {
+			t.Fatalf("scan restored tenant hit: %v", err)
+		}
+		paths = append(paths, path)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("read restored tenant hits: %v", err)
+	}
+	if len(paths) != 1 || paths[0] != wantPath {
+		t.Fatalf("expected isolated backup path %q, got %v", wantPath, paths)
+	}
+}
+
 func TestBackupFailsWhenTenantSnapshotFails(t *testing.T) {
 	ctx := context.Background()
 	store := newTestStore(t)

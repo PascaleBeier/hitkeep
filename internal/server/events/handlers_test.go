@@ -47,10 +47,13 @@ func setupEventHandlerTestEnv(t *testing.T) (*database.Store, *shared.Context, u
 	if err != nil {
 		t.Fatalf("CreateAPIClient: %v", err)
 	}
+	tenantStores := database.NewTenantStoreManager(store, t.TempDir(), database.WithTenantDataPlane(false))
+	t.Cleanup(func() { _ = tenantStores.Close() })
 
 	ctx := &shared.Context{
-		Store:  store,
-		Config: &config.Config{},
+		Store:        store,
+		TenantStores: tenantStores,
+		Config:       &config.Config{},
 	}
 
 	return store, ctx, userID, site.ID, token

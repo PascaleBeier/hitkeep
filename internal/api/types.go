@@ -1946,10 +1946,11 @@ type SystemSearchConsoleStatus struct {
 }
 
 type TenantDBInfo struct {
-	TenantID uuid.UUID `json:"tenant_id"`
-	Name     string    `json:"name"`
-	Bytes    int64     `json:"bytes"`
-	Path     string    `json:"path"`
+	TenantID  uuid.UUID `json:"tenant_id"`
+	Name      string    `json:"name"`
+	IsDefault bool      `json:"is_default"`
+	Bytes     int64     `json:"bytes"`
+	Path      string    `json:"path"`
 }
 
 type SystemStorage struct {

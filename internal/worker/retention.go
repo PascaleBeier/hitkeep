@@ -43,6 +43,9 @@ type retentionCounts struct {
 	ImportedEvents          int64
 	ImportedEventDimensions int64
 	ImportedEventProperties int64
+	SearchConsoleFacts      int64
+	DirtyRollupBuckets      int64
+	Rollups                 int64
 }
 
 type retentionCountQuery struct {
@@ -185,6 +188,11 @@ func (w *RetentionWorker) processSitePolicy(ctx context.Context, policy retentio
 		return
 	}
 	if !counts.hasColdData() {
+		if counts.DirtyRollupBuckets > 0 {
+			if _, err := db.ExecContext(ctx, "DELETE FROM rollup_dirty_buckets WHERE site_id = ? AND bucket < ?", policy.ID, cutoff); err != nil {
+				slog.Error("Failed to prune expired dirty rollup buckets", "error", err, "site_id", policy.ID)
+			}
+		}
 		return
 	}
 
@@ -251,6 +259,8 @@ func countRetainedRows(ctx context.Context, db *sql.DB, siteID uuid.UUID, cutoff
 		{name: "imported events", query: "SELECT COUNT(*) FROM imported_event_daily WHERE site_id = ? AND date < ?", assign: func(v int64) { counts.ImportedEvents = v }},
 		{name: "imported event dimensions", query: "SELECT COUNT(*) FROM imported_event_dimensions_daily WHERE site_id = ? AND date < ?", assign: func(v int64) { counts.ImportedEventDimensions = v }},
 		{name: "imported event properties", query: "SELECT COUNT(*) FROM imported_event_properties_daily WHERE site_id = ? AND date < ?", assign: func(v int64) { counts.ImportedEventProperties = v }},
+		{name: "Search Console facts", query: "SELECT COUNT(*) FROM search_console_facts WHERE site_id = ? AND date < ?", assign: func(v int64) { counts.SearchConsoleFacts = v }},
+		{name: "dirty rollup buckets", query: "SELECT COUNT(*) FROM rollup_dirty_buckets WHERE site_id = ? AND bucket < ?", assign: func(v int64) { counts.DirtyRollupBuckets = v }},
 	}
 	for _, q := range queries {
 		var count int64
@@ -258,6 +268,14 @@ func countRetainedRows(ctx context.Context, db *sql.DB, siteID uuid.UUID, cutoff
 			return counts, fmt.Errorf("count %s: %w", q.name, err)
 		}
 		q.assign(count)
+	}
+	for _, table := range retentionRollupTables {
+		var count int64
+		query := "SELECT COUNT(*) FROM " + table + " WHERE site_id = ? AND bucket < ?"
+		if err := db.QueryRowContext(ctx, query, siteID, cutoff).Scan(&count); err != nil {
+			return counts, fmt.Errorf("count %s: %w", table, err)
+		}
+		counts.Rollups += count
 	}
 	return counts, nil
 }
@@ -272,7 +290,9 @@ func (c retentionCounts) hasColdData() bool {
 		c.ImportedDimensions > 0 ||
 		c.ImportedEvents > 0 ||
 		c.ImportedEventDimensions > 0 ||
-		c.ImportedEventProperties > 0
+		c.ImportedEventProperties > 0 ||
+		c.SearchConsoleFacts > 0 ||
+		c.Rollups > 0
 }
 
 func (c retentionCounts) logAttrs(siteID uuid.UUID, cutoff time.Time) []any {
@@ -288,6 +308,9 @@ func (c retentionCounts) logAttrs(siteID uuid.UUID, cutoff time.Time) []any {
 		"imported_events", c.ImportedEvents,
 		"imported_event_dimensions", c.ImportedEventDimensions,
 		"imported_event_properties", c.ImportedEventProperties,
+		"search_console_facts", c.SearchConsoleFacts,
+		"dirty_rollup_buckets", c.DirtyRollupBuckets,
+		"rollups", c.Rollups,
 		"cutoff", cutoff.Format(time.DateOnly),
 	}
 }
@@ -313,31 +336,20 @@ func buildRetentionExportQuery(siteID uuid.UUID, cutoff time.Time, filename stri
 	timestampCutoff := cutoff.Format(time.RFC3339)
 	dateCutoff := cutoff.Format(time.DateOnly)
 	safeFilename := strings.ReplaceAll(filename, "'", "''")
-
-	//nolint:gosec // DuckDB COPY doesn't support parameters; values are internally generated and escaped above.
-	return fmt.Sprintf(`
-				COPY (
-					SELECT 'hits' AS _source, * FROM hits WHERE site_id = '%s' AND timestamp < '%s'
-					UNION BY NAME
-					SELECT 'events' AS _source, * FROM events WHERE site_id = '%s' AND timestamp < '%s'
-					UNION BY NAME
-					SELECT 'web_vitals' AS _source, * FROM web_vitals WHERE site_id = '%s' AND timestamp < '%s'
-					UNION BY NAME
-						SELECT 'ai_fetches' AS _source, * FROM ai_fetches WHERE site_id = '%s' AND timestamp < '%s'
-						UNION BY NAME
-						SELECT 'qr_code_opens' AS _source, * FROM qr_code_opens WHERE site_id = '%s' AND timestamp < '%s'
-						UNION BY NAME
-						SELECT 'imported_traffic_daily' AS _source, * FROM imported_traffic_daily WHERE site_id = '%s' AND date < '%s'
-					UNION BY NAME
-					SELECT 'imported_dimension_daily' AS _source, * FROM imported_dimension_daily WHERE site_id = '%s' AND date < '%s'
-					UNION BY NAME
-					SELECT 'imported_event_daily' AS _source, * FROM imported_event_daily WHERE site_id = '%s' AND date < '%s'
-					UNION BY NAME
-					SELECT 'imported_event_dimensions_daily' AS _source, * FROM imported_event_dimensions_daily WHERE site_id = '%s' AND date < '%s'
-					UNION BY NAME
-					SELECT 'imported_event_properties_daily' AS _source, * FROM imported_event_properties_daily WHERE site_id = '%s' AND date < '%s'
-				) TO '%s' (FORMAT PARQUET, COMPRESSION 'SNAPPY');
-				`, siteID, timestampCutoff, siteID, timestampCutoff, siteID, timestampCutoff, siteID, timestampCutoff, siteID, timestampCutoff, siteID, dateCutoff, siteID, dateCutoff, siteID, dateCutoff, siteID, dateCutoff, siteID, dateCutoff, safeFilename)
+	parts := make([]string, 0, len(retentionArchiveSources))
+	for _, source := range retentionArchiveSources {
+		cutoffValue := timestampCutoff
+		if source.cutoffColumn == "date" {
+			cutoffValue = dateCutoff
+		}
+		//nolint:gosec // source names are a closed internal registry; IDs and dates are generated values.
+		parts = append(parts, fmt.Sprintf(
+			"SELECT '%s' AS _source, * FROM %s WHERE site_id = '%s' AND %s < '%s'",
+			source.table, source.table, siteID, source.cutoffColumn, cutoffValue,
+		))
+	}
+	return fmt.Sprintf("COPY (%s) TO '%s' (FORMAT PARQUET, COMPRESSION 'SNAPPY');",
+		strings.Join(parts, " UNION BY NAME "), safeFilename)
 }
 
 func pruneRetainedRows(ctx context.Context, db *sql.DB, siteID uuid.UUID, cutoff time.Time, counts retentionCounts) error {
@@ -379,19 +391,59 @@ func retentionDeleteQueries(counts retentionCounts) []retentionDeleteQuery {
 		{count: counts.ImportedEvents, label: "imported events", query: "DELETE FROM imported_event_daily WHERE site_id = ? AND date < ?"},
 		{count: counts.ImportedEventDimensions, label: "imported event dimensions", query: "DELETE FROM imported_event_dimensions_daily WHERE site_id = ? AND date < ?"},
 		{count: counts.ImportedEventProperties, label: "imported event properties", query: "DELETE FROM imported_event_properties_daily WHERE site_id = ? AND date < ?"},
-		{count: 1, label: "hourly rollups", query: "DELETE FROM hit_rollups_hourly WHERE site_id = ? AND bucket < ?"},
-		{count: 1, label: "daily rollups", query: "DELETE FROM hit_rollups_daily WHERE site_id = ? AND bucket < ?"},
-		{count: 1, label: "monthly rollups", query: "DELETE FROM hit_rollups_monthly WHERE site_id = ? AND bucket < ?"},
-		{count: 1, label: "hourly goal rollups", query: "DELETE FROM goal_rollups_hourly WHERE site_id = ? AND bucket < ?"},
-		{count: 1, label: "daily goal rollups", query: "DELETE FROM goal_rollups_daily WHERE site_id = ? AND bucket < ?"},
-		{count: 1, label: "monthly goal rollups", query: "DELETE FROM goal_rollups_monthly WHERE site_id = ? AND bucket < ?"},
-		{count: 1, label: "hourly funnel rollups", query: "DELETE FROM funnel_rollups_hourly WHERE site_id = ? AND bucket < ?"},
-		{count: 1, label: "daily funnel rollups", query: "DELETE FROM funnel_rollups_daily WHERE site_id = ? AND bucket < ?"},
-		{count: 1, label: "monthly funnel rollups", query: "DELETE FROM funnel_rollups_monthly WHERE site_id = ? AND bucket < ?"},
-		{count: 1, label: "hourly session rollups", query: "DELETE FROM session_rollups_hourly WHERE site_id = ? AND bucket < ?"},
-		{count: 1, label: "daily session rollups", query: "DELETE FROM session_rollups_daily WHERE site_id = ? AND bucket < ?"},
-		{count: 1, label: "monthly session rollups", query: "DELETE FROM session_rollups_monthly WHERE site_id = ? AND bucket < ?"},
+		{count: counts.SearchConsoleFacts, label: "Search Console facts", query: "DELETE FROM search_console_facts WHERE site_id = ? AND date < ?"},
+		{count: counts.DirtyRollupBuckets, label: "dirty rollup buckets", query: "DELETE FROM rollup_dirty_buckets WHERE site_id = ? AND bucket < ?"},
+		{count: counts.Rollups, label: "hourly rollups", query: "DELETE FROM hit_rollups_hourly WHERE site_id = ? AND bucket < ?"},
+		{count: counts.Rollups, label: "daily rollups", query: "DELETE FROM hit_rollups_daily WHERE site_id = ? AND bucket < ?"},
+		{count: counts.Rollups, label: "monthly rollups", query: "DELETE FROM hit_rollups_monthly WHERE site_id = ? AND bucket < ?"},
+		{count: counts.Rollups, label: "hourly goal rollups", query: "DELETE FROM goal_rollups_hourly WHERE site_id = ? AND bucket < ?"},
+		{count: counts.Rollups, label: "daily goal rollups", query: "DELETE FROM goal_rollups_daily WHERE site_id = ? AND bucket < ?"},
+		{count: counts.Rollups, label: "monthly goal rollups", query: "DELETE FROM goal_rollups_monthly WHERE site_id = ? AND bucket < ?"},
+		{count: counts.Rollups, label: "hourly funnel rollups", query: "DELETE FROM funnel_rollups_hourly WHERE site_id = ? AND bucket < ?"},
+		{count: counts.Rollups, label: "daily funnel rollups", query: "DELETE FROM funnel_rollups_daily WHERE site_id = ? AND bucket < ?"},
+		{count: counts.Rollups, label: "monthly funnel rollups", query: "DELETE FROM funnel_rollups_monthly WHERE site_id = ? AND bucket < ?"},
+		{count: counts.Rollups, label: "hourly session rollups", query: "DELETE FROM session_rollups_hourly WHERE site_id = ? AND bucket < ?"},
+		{count: counts.Rollups, label: "daily session rollups", query: "DELETE FROM session_rollups_daily WHERE site_id = ? AND bucket < ?"},
+		{count: counts.Rollups, label: "monthly session rollups", query: "DELETE FROM session_rollups_monthly WHERE site_id = ? AND bucket < ?"},
 	}
+}
+
+type retentionArchiveSource struct {
+	table        string
+	cutoffColumn string
+}
+
+var retentionRollupTables = []string{
+	"hit_rollups_hourly", "hit_rollups_daily", "hit_rollups_monthly",
+	"session_rollups_hourly", "session_rollups_daily", "session_rollups_monthly",
+	"goal_rollups_hourly", "goal_rollups_daily", "goal_rollups_monthly",
+	"funnel_rollups_hourly", "funnel_rollups_daily", "funnel_rollups_monthly",
+}
+
+var retentionArchiveSources = []retentionArchiveSource{
+	{table: "hits", cutoffColumn: "timestamp"},
+	{table: "events", cutoffColumn: "timestamp"},
+	{table: "web_vitals", cutoffColumn: "timestamp"},
+	{table: "ai_fetches", cutoffColumn: "timestamp"},
+	{table: "qr_code_opens", cutoffColumn: "timestamp"},
+	{table: "imported_traffic_daily", cutoffColumn: "date"},
+	{table: "imported_dimension_daily", cutoffColumn: "date"},
+	{table: "imported_event_daily", cutoffColumn: "date"},
+	{table: "imported_event_dimensions_daily", cutoffColumn: "date"},
+	{table: "imported_event_properties_daily", cutoffColumn: "date"},
+	{table: "search_console_facts", cutoffColumn: "date"},
+	{table: "hit_rollups_hourly", cutoffColumn: "bucket"},
+	{table: "hit_rollups_daily", cutoffColumn: "bucket"},
+	{table: "hit_rollups_monthly", cutoffColumn: "bucket"},
+	{table: "session_rollups_hourly", cutoffColumn: "bucket"},
+	{table: "session_rollups_daily", cutoffColumn: "bucket"},
+	{table: "session_rollups_monthly", cutoffColumn: "bucket"},
+	{table: "goal_rollups_hourly", cutoffColumn: "bucket"},
+	{table: "goal_rollups_daily", cutoffColumn: "bucket"},
+	{table: "goal_rollups_monthly", cutoffColumn: "bucket"},
+	{table: "funnel_rollups_hourly", cutoffColumn: "bucket"},
+	{table: "funnel_rollups_daily", cutoffColumn: "bucket"},
+	{table: "funnel_rollups_monthly", cutoffColumn: "bucket"},
 }
 
 func (w *RetentionWorker) ensureS3Support(ctx context.Context) error {

@@ -43,9 +43,12 @@ func setupImportHandlerTest(t *testing.T) (*handler, *database.Store, *api.Site)
 	if err != nil {
 		t.Fatalf("create site: %v", err)
 	}
+	tenantStores := database.NewTenantStoreManager(store, filepath.Join(tmpDir, "data"), database.WithTenantDataPlane(false))
+	t.Cleanup(func() { _ = tenantStores.Close() })
 
 	ctx := &shared.Context{
-		Store: store,
+		Store:        store,
+		TenantStores: tenantStores,
 		Config: &config.Config{
 			DataPath:            filepath.Join(tmpDir, "data"),
 			ImportMaxStageBytes: 1 << 20,

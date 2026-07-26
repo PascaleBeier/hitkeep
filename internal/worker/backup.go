@@ -110,9 +110,10 @@ func (w *BackupWorker) Run(ctx context.Context) (err error) {
 	}
 	slog.Info("Shared database backed up", "dest", sharedDest)
 
-	// Discover non-default tenants (gracefully skip if tenants table or
-	// is_default column doesn't exist yet — pre-migration state).
-	tenantIDs, err := w.tenantMgr.Shared().ListNonDefaultTenantIDs(ctx)
+	// Discover every active tenant, including the default tenant. The shared
+	// snapshot above remains control-plane-only; tenant snapshots live under
+	// tenants/<tenantID>.
+	tenantIDs, err := w.tenantMgr.Control().ListActiveTenantIDs(ctx)
 	if err != nil {
 		if isMissingRelationError(err, "tenants") || isBinderError(err) {
 			slog.Debug("Tenants schema not ready, skipping tenant backups", "error", err)
@@ -130,6 +131,12 @@ func (w *BackupWorker) Run(ctx context.Context) (err error) {
 		if err != nil {
 			slog.Error("Failed to open tenant store for backup", "tenant_id", tenantID, "error", err)
 			tenantErrors = append(tenantErrors, fmt.Errorf("open tenant %s database for backup: %w", tenantID, err))
+			continue
+		}
+		if tenantStore == w.tenantMgr.Control() {
+			// Pre-split recovery tools and isolated compatibility tests may still
+			// construct a manager over one shared file. Mandatory production
+			// startup completes the split before the backup worker is created.
 			continue
 		}
 

@@ -106,6 +106,16 @@ func (s *Store) GetDefaultTenantID(ctx context.Context) (uuid.UUID, error) {
 // short-TTL cache with singleflight collapsing concurrent misses; writers of
 // the site↔tenant mapping must call invalidateSiteTenantID.
 func (s *Store) GetSiteTenantID(ctx context.Context, siteID uuid.UUID) (uuid.UUID, error) {
+	if s.tenantID != uuid.Nil {
+		var exists bool
+		if err := s.db.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM sites WHERE id = ?)", siteID).Scan(&exists); err != nil {
+			return uuid.Nil, fmt.Errorf("could not query tenant-local site: %w", err)
+		}
+		if !exists {
+			return uuid.Nil, fmt.Errorf("site not found")
+		}
+		return s.tenantID, nil
+	}
 	if tenantID, ok := s.getCachedSiteTenantID(siteID); ok {
 		return tenantID, nil
 	}

@@ -56,6 +56,7 @@ type recoveryMarker struct {
 	WALAsidePath         string    `json:"wal_aside_path,omitempty"`
 	MigrationWAL         bool      `json:"migration_wal,omitempty"`
 	MigrationCheckpoint  string    `json:"migration_checkpoint,omitempty"`
+	MigrationDBSHA256    string    `json:"migration_database_sha256,omitempty"`
 	RepairTable          string    `json:"repair_table,omitempty"`
 	RepairIndexes        []string  `json:"repair_indexes,omitempty"`
 	RemovedUnsafeIndexes int       `json:"removed_unsafe_indexes,omitempty"`
@@ -313,10 +314,27 @@ func (r *databaseRecovery) recoverWALWithPolicy(ctx context.Context, trigger err
 		r.status.recoveryFailed(triggerName, "bundle_wal")
 		return fmt.Errorf("known WAL replay failure has no WAL file: %w", err)
 	}
-	bundleDir, err := r.createBundle(triggerName)
-	if err != nil {
-		r.status.recoveryFailed(triggerName, "bundle_wal")
-		return err
+	bundleDir := ""
+	checksumVerified := false
+	if migrationGuard != nil && migrationGuard.DatabaseSHA256 != "" {
+		actual, err := databaseFileSHA256(r.store.path)
+		if err != nil {
+			r.status.recoveryFailed(triggerName, "verify_database_checksum")
+			return fmt.Errorf("verify checksum-guarded migration WAL: %w", err)
+		}
+		if actual != migrationGuard.DatabaseSHA256 {
+			r.status.recoveryFailed(triggerName, "verify_database_checksum")
+			return errors.New("checksum-guarded migration WAL does not match the durable database file")
+		}
+		checksumVerified = true
+	}
+	if !checksumVerified {
+		var err error
+		bundleDir, err = r.createBundle(triggerName)
+		if err != nil {
+			r.status.recoveryFailed(triggerName, "bundle_wal")
+			return err
+		}
 	}
 	asidePath := walPath + ".recovery-" + time.Now().UTC().Format("20060102T150405.000000000Z")
 	marker := &recoveryMarker{
@@ -332,6 +350,7 @@ func (r *databaseRecovery) recoverWALWithPolicy(ctx context.Context, trigger err
 	}
 	if migrationGuard != nil {
 		marker.MigrationCheckpoint = migrationGuard.CheckpointToken
+		marker.MigrationDBSHA256 = migrationGuard.DatabaseSHA256
 	}
 	if err := r.writeMarker(marker); err != nil {
 		r.status.recoveryFailed(triggerName, "write_marker")
@@ -408,7 +427,17 @@ func (r *databaseRecovery) applyWALRecovery(ctx context.Context, marker *recover
 			return fmt.Errorf("open database without replay-failing WAL: %w", err)
 		}
 		if marker.MigrationWAL {
-			if verifyErr := r.verifyMigrationCheckpoint(ctx, db, marker.MigrationCheckpoint); verifyErr != nil {
+			var verifyErr error
+			if marker.MigrationDBSHA256 != "" {
+				var actual string
+				actual, verifyErr = databaseFileSHA256(r.store.path)
+				if verifyErr == nil && actual != marker.MigrationDBSHA256 {
+					verifyErr = errors.New("migration database checksum mismatch")
+				}
+			} else {
+				verifyErr = r.verifyMigrationCheckpoint(ctx, db, marker.MigrationCheckpoint)
+			}
+			if verifyErr != nil {
 				_ = db.Close()
 				if !r.opts.automaticWALRecovery {
 					return r.restoreUnverifiedMigrationWAL(marker, walPath, asidePath, verifyErr)
@@ -418,6 +447,7 @@ func (r *databaseRecovery) applyWALRecovery(ctx context.Context, marker *recover
 					"error", verifyErr)
 				marker.MigrationWAL = false
 				marker.MigrationCheckpoint = ""
+				marker.MigrationDBSHA256 = ""
 				if err := r.writeMarker(marker); err != nil {
 					return err
 				}
@@ -603,8 +633,10 @@ func (r *databaseRecovery) complete(marker *recoveryMarker, removedUnsafeIndexes
 		Trigger:              marker.Trigger,
 		RemovedUnsafeIndexes: removedUnsafeIndexes,
 	}
-	if err := writeJSONFile(filepath.Join(marker.BundleDir, "result.json"), result); err != nil {
-		return err
+	if marker.BundleDir != "" {
+		if err := writeJSONFile(filepath.Join(marker.BundleDir, "result.json"), result); err != nil {
+			return err
+		}
 	}
 	if err := os.Remove(r.markerPath()); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("clear database recovery marker: %w", err)
@@ -756,4 +788,17 @@ func quoteDuckDBIdentifier(value string) string {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+func databaseFileSHA256(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
 }

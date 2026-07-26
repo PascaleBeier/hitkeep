@@ -551,10 +551,13 @@ func setupSearchConsoleReportsTestEnv(t *testing.T) (*database.Store, *shared.Co
 	if err != nil {
 		t.Fatalf("CreateAPIClient: %v", err)
 	}
+	tenantStores := database.NewTenantStoreManager(store, t.TempDir(), database.WithTenantDataPlane(false))
+	t.Cleanup(func() { _ = tenantStores.Close() })
 
 	appCtx := &shared.Context{
-		Store:  store,
-		Config: &config.Config{},
+		Store:        store,
+		TenantStores: tenantStores,
+		Config:       &config.Config{},
 	}
 	return store, appCtx, userID, site.ID, token
 }

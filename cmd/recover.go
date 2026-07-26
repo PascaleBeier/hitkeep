@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/klauspost/compress/zstd"
 
 	"hitkeep/internal/config"
@@ -69,7 +70,7 @@ Flags for restore-backup:
   -db        string   Target hitkeep.db path (default: same as server config)
   -data-path string   Target data directory (default: same as server config)
   -yes                Skip confirmation prompt
-  -s3-access-key-id, -s3-secret-access-key, -s3-region, -s3-endpoint,
+  -s3-access-key-id, -s3-secret-access-key, -s3-session-token, -s3-region, -s3-endpoint,
   -s3-url-style, -s3-use-ssl   (fall back to HITKEEP_S3_* env vars)
 
 Flags for restore-database-bundle:
@@ -455,6 +456,7 @@ func recoverRestoreBackup(args []string) {
 
 	s3AccessKeyID := fs.String("s3-access-key-id", "", "S3 access key ID")
 	s3SecretAccessKey := fs.String("s3-secret-access-key", "", "S3 secret access key")
+	s3SessionToken := fs.String("s3-session-token", "", "S3 session token")
 	s3Region := fs.String("s3-region", "", "S3 region")
 	s3Endpoint := fs.String("s3-endpoint", "", "S3 custom endpoint")
 	s3URLStyle := fs.String("s3-url-style", "", "S3 URL style: path or vhost")
@@ -463,6 +465,12 @@ func recoverRestoreBackup(args []string) {
 	if err := fs.Parse(args); err != nil {
 		os.Exit(1)
 	}
+	s3UseSSLSet := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "s3-use-ssl" {
+			s3UseSSLSet = true
+		}
+	})
 
 	if *from == "" {
 		fmt.Fprintln(os.Stderr, "Error: -from is required")
@@ -478,23 +486,6 @@ func recoverRestoreBackup(args []string) {
 	}
 	if *dataPath == "" {
 		*dataPath = conf.DataPath
-	}
-
-	// Resolve S3 flags from env vars if not set.
-	if *s3AccessKeyID == "" {
-		*s3AccessKeyID = conf.S3AccessKeyID
-	}
-	if *s3SecretAccessKey == "" {
-		*s3SecretAccessKey = conf.S3SecretAccessKey
-	}
-	if *s3Region == "" {
-		*s3Region = conf.S3Region
-	}
-	if *s3Endpoint == "" {
-		*s3Endpoint = conf.S3Endpoint
-	}
-	if *s3URLStyle == "" {
-		*s3URLStyle = conf.S3URLStyle
 	}
 
 	isS3Source := worker.IsS3ArchivePath(*from)
@@ -532,10 +523,12 @@ func recoverRestoreBackup(args []string) {
 	fmt.Printf("Target DB:  %s\n", *dbPath)
 	fmt.Printf("Data Path:  %s\n", *dataPath)
 	if len(tenantIDs) > 0 {
-		fmt.Printf("Tenants:    %d non-default tenant(s)\n", len(tenantIDs))
+		fmt.Printf("Tenants:    %d tenant database(s)\n", len(tenantIDs))
 		for _, id := range tenantIDs {
 			fmt.Printf("  - %s\n", id)
 		}
+	} else if isS3Source {
+		fmt.Println("Tenants:    discovered from the restored control snapshot")
 	}
 	fmt.Println()
 
@@ -558,23 +551,38 @@ func recoverRestoreBackup(args []string) {
 	// Build S3 config if source is S3.
 	var s3Conf *worker.S3Config
 	if isS3Source {
-		s3Conf = &worker.S3Config{
-			AccessKeyID:     *s3AccessKeyID,
-			SecretAccessKey: *s3SecretAccessKey,
-			Region:          *s3Region,
-			Endpoint:        *s3Endpoint,
-			URLStyle:        *s3URLStyle,
-			UseSSL:          *s3UseSSL,
-		}
+		s3Conf = resolveRestoreS3Config(conf, restoreS3Options{
+			accessKeyID:     *s3AccessKeyID,
+			secretAccessKey: *s3SecretAccessKey,
+			sessionToken:    *s3SessionToken,
+			region:          *s3Region,
+			endpoint:        *s3Endpoint,
+			urlStyle:        *s3URLStyle,
+			useSSL:          *s3UseSSL,
+			useSSLSet:       s3UseSSLSet,
+		})
 	}
 
 	// Restore shared DB.
 	sharedSource := joinRestorePath(*from, "shared", snapshotName)
+	sharedRestored := false
 	if err := restoreDatabase(ctx, *dbPath, sharedSource, isS3Source, s3Conf); err != nil {
 		fmt.Fprintf(os.Stderr, "Error restoring shared database: %v\n", err)
 		exitCode = 1
 	} else {
+		sharedRestored = true
 		fmt.Printf("Shared database restored to %s\n", *dbPath)
+	}
+	if isS3Source && sharedRestored {
+		var err error
+		tenantIDs, err = discoverS3TenantBackupsFromControl(ctx, *dbPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error discovering tenant backups from restored control database: %v\n", err)
+			exitCode = 1
+			tenantIDs = nil
+		} else {
+			fmt.Printf("Discovered %d tenant database(s) from restored control snapshot.\n", len(tenantIDs))
+		}
 	}
 
 	// Restore tenant DBs.
@@ -663,6 +671,50 @@ func s3ConfigForRestore(enabled bool, cfg *worker.S3Config) *database.S3SecretCo
 		return nil
 	}
 	return cfg
+}
+
+type restoreS3Options struct {
+	accessKeyID     string
+	secretAccessKey string
+	sessionToken    string
+	region          string
+	endpoint        string
+	urlStyle        string
+	useSSL          bool
+	useSSLSet       bool
+}
+
+func resolveRestoreS3Config(conf *config.Config, opts restoreS3Options) *worker.S3Config {
+	if opts.accessKeyID == "" {
+		opts.accessKeyID = conf.S3AccessKeyID
+	}
+	if opts.secretAccessKey == "" {
+		opts.secretAccessKey = conf.S3SecretAccessKey
+	}
+	if opts.sessionToken == "" {
+		opts.sessionToken = conf.S3SessionToken
+	}
+	if opts.region == "" {
+		opts.region = conf.S3Region
+	}
+	if opts.endpoint == "" {
+		opts.endpoint = conf.S3Endpoint
+	}
+	if opts.urlStyle == "" {
+		opts.urlStyle = conf.S3URLStyle
+	}
+	if !opts.useSSLSet {
+		opts.useSSL = conf.S3UseSSL
+	}
+	return &worker.S3Config{
+		AccessKeyID:     opts.accessKeyID,
+		SecretAccessKey: opts.secretAccessKey,
+		SessionToken:    opts.sessionToken,
+		Region:          opts.region,
+		Endpoint:        opts.endpoint,
+		URLStyle:        opts.urlStyle,
+		UseSSL:          opts.useSSL,
+	}
 }
 
 func finalizeRestoredDatabase(dbPath string, store *database.Store) error {
@@ -775,6 +827,51 @@ func discoverLocalTenantBackups(fromPath, snapshotName string) ([]string, error)
 	}
 
 	return ids, nil
+}
+
+// discoverS3TenantBackupsFromControl derives S3 object prefixes from the
+// restored control database because restore-backup intentionally does not list
+// buckets. Split snapshots contain every active tenant, including the default;
+// legacy snapshots contain only non-default tenant exports because the default
+// tenant still lived in the shared database.
+func discoverS3TenantBackupsFromControl(ctx context.Context, controlPath string) ([]string, error) {
+	control := database.NewStore(controlPath)
+	if err := control.Connect(); err != nil {
+		return nil, fmt.Errorf("open restored control database: %w", err)
+	}
+	defer control.Close()
+
+	split, err := control.HasDefaultTenantSplit(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var tenantIDs []uuid.UUID
+	if split {
+		tenantIDs, err = control.ListActiveTenantIDs(ctx)
+	} else {
+		tenantIDs, err = control.ListNonDefaultTenantIDs(ctx)
+	}
+	if err != nil {
+		if isMissingTenantBackupSchema(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("list tenants in restored control database: %w", err)
+	}
+
+	ids := make([]string, 0, len(tenantIDs))
+	for _, tenantID := range tenantIDs {
+		ids = append(ids, tenantID.String())
+	}
+	return ids, nil
+}
+
+func isMissingTenantBackupSchema(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "tenants") &&
+		(strings.Contains(message, "does not exist") || strings.Contains(message, "not found"))
 }
 
 // joinRestorePath joins path segments, handling both local and S3 paths.

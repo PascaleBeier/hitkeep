@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -30,17 +31,20 @@ type siteSyncKey struct {
 	tenantID uuid.UUID
 }
 
-// TenantStoreManager provides per-tenant database isolation.
-//
-// The default tenant's analytics data stays in the shared hitkeep.db
-// (backwards compatible for self-hosters). Non-default tenants get their
-// own DuckDB file at {basePath}/tenants/{tenantID}/hitkeep.db.
+// TenantStoreManager provides per-tenant database isolation. During the
+// transition release the control store remains hitkeep.db, while a published
+// default tenant file becomes the root of one shared tenant-data DuckDB
+// instance and non-default files are attached as catalogs.
 type TenantStoreManager struct {
 	shared   *Store
 	basePath string
 
-	mu     sync.RWMutex
-	stores map[uuid.UUID]*Store
+	mu                 sync.RWMutex
+	stores             map[uuid.UUID]*Store
+	attachedAliases    map[uuid.UUID]string
+	dataPlaneRoot      *Store
+	dataPlaneEnabled   bool
+	dataPlaneOptionSet bool
 
 	// recentSyncs suppresses repeated mirror syncs on the ingest path;
 	// explicit SyncSite calls bypass it and force a refresh.
@@ -66,15 +70,27 @@ func WithTenantCompaction(opts CompactionOptions) TenantStoreManagerOption {
 	}
 }
 
+// WithTenantDataPlane controls whether a completed default-tenant split is
+// used for routing. It is deliberately separate from the split marker so a
+// The option remains available to isolated compatibility tests and recovery
+// tooling. Production startup always enables the tenant data plane.
+func WithTenantDataPlane(enabled bool) TenantStoreManagerOption {
+	return func(m *TenantStoreManager) {
+		m.dataPlaneEnabled = enabled
+		m.dataPlaneOptionSet = true
+	}
+}
+
 // NewTenantStoreManager creates a TenantStoreManager that wraps the shared store.
 // It resolves and caches the default tenant ID from the shared database.
 func NewTenantStoreManager(shared *Store, basePath string, opts ...TenantStoreManagerOption) *TenantStoreManager {
 	mgr := &TenantStoreManager{
-		shared:      shared,
-		basePath:    basePath,
-		stores:      make(map[uuid.UUID]*Store),
-		recentSyncs: lru.NewLRU[siteSyncKey, struct{}](siteSyncMemoSize, nil, siteSyncMemoTTL),
-		fatalErrors: make(chan error, 1),
+		shared:          shared,
+		basePath:        basePath,
+		stores:          make(map[uuid.UUID]*Store),
+		attachedAliases: make(map[uuid.UUID]string),
+		recentSyncs:     lru.NewLRU[siteSyncKey, struct{}](siteSyncMemoSize, nil, siteSyncMemoTTL),
+		fatalErrors:     make(chan error, 1),
 	}
 	for _, opt := range opts {
 		opt(mgr)
@@ -87,14 +103,32 @@ func NewTenantStoreManager(shared *Store, basePath string, opts ...TenantStoreMa
 		slog.Debug("TenantStoreManager: could not resolve default tenant ID at init (will resolve lazily)", "error", err)
 	} else {
 		mgr.defaultID = defaultID
+		if !mgr.dataPlaneOptionSet {
+			if applied, markerErr := shared.HasDefaultTenantSplit(context.Background()); markerErr == nil && applied {
+				path := filepath.Join(basePath, "tenants", defaultID.String(), "hitkeep.db")
+				if _, statErr := os.Stat(path); statErr == nil {
+					mgr.dataPlaneEnabled = true
+				}
+			}
+		}
 	}
 
 	return mgr
 }
 
-// Shared returns the main shared store (identity tables, default tenant data).
+// Shared returns the legacy-named control store. New callers should use
+// Control to make the control/data-plane boundary explicit.
 func (m *TenantStoreManager) Shared() *Store {
 	return m.shared
+}
+
+// Control returns the control-plane store (hitkeep.db).
+func (m *TenantStoreManager) Control() *Store { return m.shared }
+
+// TenantDataPlaneEnabled reports whether analytics routing uses the split
+// tenant data plane for this process.
+func (m *TenantStoreManager) TenantDataPlaneEnabled() bool {
+	return m != nil && m.dataPlaneEnabled
 }
 
 // FatalErrors reports tenant database conditions that require a controlled
@@ -149,20 +183,18 @@ func (m *TenantStoreManager) DefaultTenantID(ctx context.Context) (uuid.UUID, er
 	return defaultID, nil
 }
 
-// ForTenant returns the Store for the given tenant.
-//
-// For the default tenant, it returns the shared store directly (no separate DB).
-// For non-default tenants, it lazily opens and migrates a per-tenant DuckDB file.
+// ForTenant returns the Store for the given tenant. uuid.Nil resolves to the
+// default tenant. In split mode the default file is the root catalog and
+// non-default files are attached lazily under deterministic aliases.
 func (m *TenantStoreManager) ForTenant(ctx context.Context, tenantID uuid.UUID) (*Store, error) {
-	if tenantID == uuid.Nil {
-		return m.shared, nil
-	}
-
 	defaultID, err := m.DefaultTenantID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("could not resolve default tenant: %w", err)
 	}
-	if tenantID == defaultID {
+	if tenantID == uuid.Nil {
+		tenantID = defaultID
+	}
+	if tenantID == defaultID && !m.dataPlaneEnabled {
 		return m.shared, nil
 	}
 
@@ -180,6 +212,15 @@ func (m *TenantStoreManager) ForTenant(ctx context.Context, tenantID uuid.UUID) 
 
 	// Double-check after acquiring write lock.
 	if store, ok := m.stores[tenantID]; ok {
+		return store, nil
+	}
+
+	if tenantID == defaultID {
+		store, err := m.openDefaultTenantStore(ctx, defaultID)
+		if err != nil {
+			return nil, err
+		}
+		m.stores[tenantID] = store
 		return store, nil
 	}
 
@@ -231,6 +272,18 @@ func (m *TenantStoreManager) ResolveSiteStore(ctx context.Context, siteID uuid.U
 	}
 
 	return store, tenantID, nil
+}
+
+// GetUserOnboarding keeps account and team progress on the control plane but
+// reads first-hit and automatic-event activity from each owning tenant store.
+func (m *TenantStoreManager) GetUserOnboarding(ctx context.Context, userID uuid.UUID) (*api.UserOnboarding, error) {
+	if m == nil || m.shared == nil {
+		return nil, fmt.Errorf("tenant store manager is not configured")
+	}
+	return m.shared.GetUserOnboardingWithResolver(ctx, userID, func(ctx context.Context, siteID uuid.UUID) (*Store, error) {
+		store, _, err := m.ResolveSiteStore(ctx, siteID)
+		return store, err
+	})
 }
 
 // SyncSite mirrors the site's metadata into the tenant-local store and
@@ -387,14 +440,10 @@ func (m *TenantStoreManager) TransferSite(ctx context.Context, siteID, destinati
 		return fmt.Errorf("search console transfer audit is required")
 	}
 
-	defaultID, err := m.DefaultTenantID(ctx)
-	if err != nil {
-		return fmt.Errorf("resolve default tenant for site transfer: %w", err)
-	}
 	// Mirror the site into the destination before copying analytics: tenant
 	// schemas keep foreign keys on sites (e.g. ai_fetches), so the parent row
 	// must exist first.
-	if destinationTenantID != defaultID {
+	if destinationStore != m.shared {
 		if err := destinationStore.UpsertSiteMirror(ctx, site); err != nil {
 			return fmt.Errorf("upsert destination site mirror: %w", err)
 		}
@@ -477,14 +526,17 @@ func hasSearchConsoleTransferAudit(audits []AuditEntryParams, siteID, teamID uui
 	return false
 }
 
-// Close closes all per-tenant stores. The caller is responsible for
-// closing the shared store separately.
+// Close closes all per-tenant stores and detaches shared data-plane catalogs.
+// The caller is responsible for closing the control store separately.
 func (m *TenantStoreManager) Close() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	var firstErr error
 	for id, store := range m.stores {
+		if id == m.defaultID {
+			continue
+		}
 		if err := store.Close(); err != nil {
 			slog.Error("Failed to close tenant store", "tenant_id", id, "error", err)
 			if firstErr == nil {
@@ -492,12 +544,68 @@ func (m *TenantStoreManager) Close() error {
 			}
 		}
 	}
+	if m.dataPlaneRoot != nil {
+		for id, alias := range m.attachedAliases {
+			if _, err := m.dataPlaneRoot.DB().ExecContext(context.Background(), "DETACH "+safeCatalogIdentifier(alias)); err != nil {
+				slog.Warn("Failed to detach tenant catalog during shutdown", "tenant_id", id, "error", err)
+			}
+		}
+		if err := m.dataPlaneRoot.Close(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+		m.dataPlaneRoot = nil
+	}
 	m.stores = make(map[uuid.UUID]*Store)
+	m.attachedAliases = make(map[uuid.UUID]string)
 	return firstErr
 }
 
-// openTenantStore creates the directory structure and opens a new DuckDB
-// connection for a non-default tenant. Must be called with m.mu held.
+func (m *TenantStoreManager) openDefaultTenantStore(ctx context.Context, tenantID uuid.UUID) (*Store, error) {
+	if m.dataPlaneRoot != nil {
+		return m.dataPlaneRoot, nil
+	}
+	dir := m.tenantDataDir(tenantID)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, fmt.Errorf("could not create default tenant data directory %s: %w", dir, err)
+	}
+	dbPath := filepath.Join(dir, "hitkeep.db")
+	if err := recoverCompactionSwap(dbPath); err != nil {
+		return nil, err
+	}
+	if _, err := os.Stat(dbPath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("default tenant split marker exists but tenant file is missing: %s", dbPath)
+		}
+		return nil, fmt.Errorf("stat default tenant database %s: %w", dbPath, err)
+	}
+	if m.compaction != nil {
+		if result, err := MaybeCompactDatabase(ctx, dbPath, *m.compaction, PrepareTenantSchema); err != nil {
+			slog.Warn("Skipping default tenant database compaction", "path", dbPath, "error", err)
+		} else if result.Compacted {
+			slog.Info("Compacted default tenant database", "path", dbPath, "bytes_before", result.BytesBefore, "bytes_after", result.BytesAfter)
+		}
+	}
+	options := m.tenantStoreOptions(tenantID)
+	store := NewStore(dbPath, options...)
+	if err := store.Connect(); err != nil {
+		return nil, fmt.Errorf("could not connect to default tenant database %s: %w", dbPath, err)
+	}
+	if err := store.migrateTenant(ctx, migrationRunOptions{guarded: true}); err != nil {
+		_ = store.Close()
+		return nil, fmt.Errorf("could not migrate default tenant database %s: %w", dbPath, err)
+	}
+	if m.maintenanceCtx != nil {
+		store.StartMaintenance(m.maintenanceCtx)
+	}
+	m.dataPlaneRoot = store
+	slog.Info("Opened shared tenant data-plane root", "tenant_id", tenantID, "path", dbPath)
+	return store, nil
+}
+
+// openTenantStore creates the directory structure and opens a tenant. In
+// split mode the physical file is prepared standalone, then attached to the
+// default root and exposed through a catalog-specific logical Store.
+// Must be called with m.mu held.
 func (m *TenantStoreManager) openTenantStore(ctx context.Context, tenantID uuid.UUID) (*Store, error) {
 	dir := m.tenantDataDir(tenantID)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -505,6 +613,9 @@ func (m *TenantStoreManager) openTenantStore(ctx context.Context, tenantID uuid.
 	}
 
 	dbPath := filepath.Join(dir, "hitkeep.db")
+	if err := recoverCompactionSwap(dbPath); err != nil {
+		return nil, err
+	}
 
 	// Compaction remains best effort. A replay-failing WAL makes measurement
 	// fail without rewriting the file; the subsequent Store.Connect call then
@@ -517,7 +628,44 @@ func (m *TenantStoreManager) openTenantStore(ctx context.Context, tenantID uuid.
 		}
 	}
 
-	storeOptions := append(m.shared.duckDBOptions(), withFatalReporter(m.tenantFatalReporter(tenantID)))
+	storeOptions := m.tenantStoreOptions(tenantID)
+	if m.dataPlaneEnabled {
+		if _, err := m.openDefaultTenantStore(ctx, m.defaultID); err != nil {
+			return nil, err
+		}
+		standalone := NewStore(dbPath, storeOptions...)
+		if err := standalone.Connect(); err != nil {
+			return nil, fmt.Errorf("could not connect to tenant database %s: %w", dbPath, err)
+		}
+		if err := standalone.migrateTenant(ctx, migrationRunOptions{guarded: true}); err != nil {
+			_ = standalone.Close()
+			return nil, fmt.Errorf("could not migrate tenant database %s: %w", dbPath, err)
+		}
+		if err := standalone.Close(); err != nil {
+			return nil, fmt.Errorf("close tenant database before attach %s: %w", dbPath, err)
+		}
+		alias := "tenant_" + strings.ReplaceAll(tenantID.String(), "-", "")
+		if _, err := m.dataPlaneRoot.DB().ExecContext(ctx, fmt.Sprintf("ATTACH '%s' AS %s;", escapeSQLString(dbPath), safeCatalogIdentifier(alias))); err != nil {
+			return nil, fmt.Errorf("attach tenant database %s: %w", tenantID, err)
+		}
+		store := newAttachedStore(m.dataPlaneRoot.path, dbPath, alias, storeOptions...)
+		// Set the shared gates before Connect builds the reconnecting
+		// connector. Assigning them after Connect would leave the pool using
+		// its private semaphore and defeat the process-wide native connection
+		// cap required by the shared data plane.
+		store.checkpointGate = m.dataPlaneRoot.checkpointGate
+		store.connectionGate = m.dataPlaneRoot.connectionGate
+		if err := store.Connect(); err != nil {
+			_, _ = m.dataPlaneRoot.DB().ExecContext(ctx, "DETACH "+safeCatalogIdentifier(alias))
+			return nil, fmt.Errorf("connect attached tenant database %s: %w", tenantID, err)
+		}
+		if m.maintenanceCtx != nil {
+			store.StartMaintenance(m.maintenanceCtx)
+		}
+		m.attachedAliases[tenantID] = alias
+		slog.Info("Attached tenant database", "tenant_id", tenantID, "catalog", alias, "path", dbPath)
+		return store, nil
+	}
 	store := NewStore(dbPath, storeOptions...)
 	if err := store.Connect(); err != nil {
 		if status := store.DatabaseStatus(); status.State != DatabaseStateHealthy {
@@ -536,6 +684,16 @@ func (m *TenantStoreManager) openTenantStore(ctx context.Context, tenantID uuid.
 
 	slog.Info("Opened per-tenant database", "tenant_id", tenantID, "path", dbPath)
 	return store, nil
+}
+
+// tenantStoreOptions keeps every tenant connection aligned with the shared
+// store's DuckDB settings while adding tenant-specific routing and failure
+// reporting.
+func (m *TenantStoreManager) tenantStoreOptions(tenantID uuid.UUID) []StoreOption {
+	return append(m.shared.duckDBOptions(),
+		withTenantID(tenantID),
+		withFatalReporter(m.tenantFatalReporter(tenantID)),
+	)
 }
 
 func (m *TenantStoreManager) tenantFatalReporter(tenantID uuid.UUID) func(error) {
@@ -562,26 +720,35 @@ func (m *TenantStoreManager) closeTenantStore(tenantID uuid.UUID) error {
 	if !ok {
 		return nil
 	}
-	delete(m.stores, tenantID)
 
 	if err := store.Close(); err != nil {
 		return fmt.Errorf("close tenant store %s: %w", tenantID, err)
 	}
+	if alias, ok := m.attachedAliases[tenantID]; ok && m.dataPlaneRoot != nil {
+		if _, err := m.dataPlaneRoot.DB().ExecContext(context.Background(), "DETACH "+safeCatalogIdentifier(alias)); err != nil {
+			return fmt.Errorf("detach tenant store %s: %w", tenantID, err)
+		}
+		delete(m.attachedAliases, tenantID)
+	}
+	delete(m.stores, tenantID)
 	return nil
 }
 
 func (m *TenantStoreManager) syncSiteTenantData(ctx context.Context, siteID, tenantID uuid.UUID) error {
-	defaultID, err := m.DefaultTenantID(ctx)
-	if err != nil {
-		return fmt.Errorf("resolve default tenant for site sync: %w", err)
-	}
-	if tenantID == uuid.Nil || tenantID == defaultID {
+	if tenantID == uuid.Nil {
 		return nil
 	}
 
 	tenantStore, err := m.ForTenant(ctx, tenantID)
 	if err != nil {
 		return err
+	}
+	// Legacy routing keeps the default tenant's analytics in the control
+	// database, where a tenant-local site mirror would conflict with the
+	// analytics rows' foreign keys. Split mode returns a distinct data-plane
+	// root and therefore continues through the mirror/backfill path.
+	if tenantStore == m.shared {
+		return nil
 	}
 
 	site, err := m.shared.GetSiteByID(ctx, siteID)

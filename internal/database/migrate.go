@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -15,21 +16,78 @@ import (
 type migrationRunOptions struct {
 	guarded     bool
 	afterCommit func()
+	reopenHeavy bool
+	morePending *bool
 }
 
 // OpenMigratedStore opens a shared database, applies all pending migrations
 // before the Store can be published to other goroutines, and closes it again
 // if startup migration fails.
 func OpenMigratedStore(ctx context.Context, path string, opts ...StoreOption) (*Store, error) {
+	if err := recoverCompactionSwap(path); err != nil {
+		return nil, err
+	}
+	recovered := false
+	preserveGuard := false
+	for {
+		storeOpts := append([]StoreOption(nil), opts...)
+		if preserveGuard {
+			storeOpts = append(storeOpts, withPreservedMigrationGuardOnConnect())
+		}
+		store := NewStore(path, storeOpts...)
+		if err := store.Connect(); err != nil {
+			return nil, err
+		}
+		recovered = recovered || store.RecoveredDuringConnect()
+		morePending := false
+		if err := store.migrate(ctx, migrationRunOptions{guarded: true, reopenHeavy: true, morePending: &morePending}); err != nil {
+			_ = store.Close()
+			return nil, err
+		}
+		if !morePending {
+			store.recoveredOnConnect = recovered
+			return store, nil
+		}
+		if err := store.closeForMigrationReopen(); err != nil {
+			return nil, fmt.Errorf("reopen database between migrations: %w", err)
+		}
+		preserveGuard = true
+	}
+}
+
+// OpenDefaultSplitControlStore avoids applying the remaining analytics-table
+// rebuilds in-place on a legacy indexed control file. The mandatory split
+// rewrites that file out of place before the store can be published.
+func OpenDefaultSplitControlStore(ctx context.Context, path string, opts ...StoreOption) (*Store, error) {
 	store := NewStore(path, opts...)
 	if err := store.Connect(); err != nil {
 		return nil, err
 	}
-	if err := store.migrate(ctx, migrationRunOptions{guarded: true}); err != nil {
+	if store.RecoveredDuringConnect() {
+		store.skipCheckpointOnClose = true
+		return store, nil
+	}
+	applied, err := store.getAppliedMigrations(ctx)
+	if err != nil {
 		_ = store.Close()
 		return nil, err
 	}
-	return store, nil
+	splitApplied, err := store.HasDefaultTenantSplit(ctx)
+	if err != nil {
+		_ = store.Close()
+		return nil, err
+	}
+	legacyIndexedControl := applied["2026_07_08_000000_drop_analytics_art_indexes.sql"] &&
+		!applied["2026_07_08_000001_drop_events_art_indexes.sql"] &&
+		!splitApplied
+	if legacyIndexedControl {
+		store.skipCheckpointOnClose = true
+		return store, nil
+	}
+	if err := store.closeForMigrationReopen(); err != nil {
+		return nil, err
+	}
+	return OpenMigratedStore(ctx, path, opts...)
 }
 
 // Migrate applies shared migrations to an already connected Store. It does not
@@ -42,6 +100,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 func (s *Store) migrate(ctx context.Context, opts migrationRunOptions) error {
 	s.migrationMu.Lock()
 	defer s.migrationMu.Unlock()
+	cleanBaseForChecksumGuard := !fileExists(s.path + ".wal")
 
 	migrationTableSQL, err := migrations.Fs.ReadFile("0000_00_00_000000_create_migrations_table.sql")
 	if err != nil {
@@ -73,22 +132,55 @@ func (s *Store) migrate(ctx context.Context, opts migrationRunOptions) error {
 	}
 
 	sort.Strings(pendingMigrations)
+	if opts.morePending != nil {
+		*opts.morePending = false
+	}
 
 	if len(pendingMigrations) == 0 {
 		slog.Info("Database schema is up to date. No migrations to apply.")
+		if opts.guarded {
+			if guard, err := s.recovery.loadMigrationGuard(); err != nil {
+				return err
+			} else if guard != nil {
+				if err := s.completeGuardedMigration(ctx, "shared"); err != nil {
+					return err
+				}
+			}
+		}
 		return s.afterSchemaCurrent(ctx)
 	}
+	guardPendingMigrations := append([]string(nil), pendingMigrations...)
 
+	batchEnd := len(pendingMigrations)
+	if opts.reopenHeavy {
+		for i, fileName := range pendingMigrations {
+			if migrationNeedsNativeReopen(fileName) {
+				batchEnd = i + 1
+				break
+			}
+		}
+	}
+	morePending := batchEnd < len(pendingMigrations)
+	if morePending {
+		pendingMigrations = pendingMigrations[:batchEnd]
+		if opts.morePending != nil {
+			*opts.morePending = true
+		}
+	}
 	slog.Info("Applying pending database migrations...", "count", len(pendingMigrations))
 	if opts.guarded {
-		if err := s.prepareGuardedMigration(ctx, "shared", pendingMigrations); err != nil {
+		if err := s.prepareGuardedMigration(ctx, "shared", guardPendingMigrations, cleanBaseForChecksumGuard); err != nil {
 			return err
 		}
 	}
-
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return s.rollbackMigration(nil, fmt.Errorf("could not begin migration transaction: %w", err), opts.guarded)
+	// Do not retain the native connection that performed a table rebuild. Its
+	// transaction-local allocator can otherwise keep the old and rebuilt ART
+	// state resident until after CHECKPOINT, pushing large upgrades over their
+	// memory limit. The next statement opens a fresh connection to the same
+	// unpublished database instance.
+	s.db.SetMaxIdleConns(0)
+	if s.catalog == "" {
+		defer s.db.SetMaxIdleConns(2)
 	}
 
 	for _, fileName := range pendingMigrations {
@@ -96,28 +188,32 @@ func (s *Store) migrate(ctx context.Context, opts migrationRunOptions) error {
 
 		fileContent, err := migrations.Fs.ReadFile(fileName)
 		if err != nil {
-			return s.rollbackMigration(tx, fmt.Errorf("could not read migration file %s: %w", fileName, err), opts.guarded)
+			return fmt.Errorf("could not read migration file %s: %w", fileName, err)
 		}
 
-		if _, err := tx.ExecContext(ctx, string(fileContent)); err != nil {
-			return s.rollbackMigration(tx, fmt.Errorf("failed to apply migration %s: %w", fileName, err), opts.guarded)
+		if err := s.runMigrationStep(ctx, fileName, string(fileContent), s.addAppliedMigration); err != nil {
+			return err
 		}
-
-		if err := s.addAppliedMigration(ctx, tx, fileName); err != nil {
-			return s.rollbackMigration(tx, fmt.Errorf("failed to record migration %s: %w", fileName, err), opts.guarded)
+		if opts.afterCommit != nil {
+			opts.afterCommit()
 		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		// When guarded, the commit outcome is uncertain. Keep the guard so the
-		// next startup can resolve either a replayed or unreplayable migration WAL.
-		return fmt.Errorf("could not commit migration transaction: %w", err)
-	}
-	if opts.afterCommit != nil {
-		opts.afterCommit()
+		reopenNative := opts.reopenHeavy && fileName == pendingMigrations[len(pendingMigrations)-1] && migrationNeedsNativeReopen(fileName)
+		if reopenNative {
+			morePending = true
+			if opts.morePending != nil {
+				*opts.morePending = true
+			}
+		} else if err := s.checkpointMigrationWithTransientMargin(ctx, "shared_migration"); err != nil {
+			return fmt.Errorf("checkpoint shared migration %s: %w", fileName, err)
+		}
 	}
 
 	slog.Info("Successfully applied all database migrations.")
+	if morePending {
+		// Keep the guard while OpenMigratedStore releases the native allocator and
+		// continues the remaining migrations on a fresh instance.
+		return nil
+	}
 	if opts.guarded {
 		if err := s.completeGuardedMigration(ctx, "shared"); err != nil {
 			return err
@@ -126,6 +222,143 @@ func (s *Store) migrate(ctx context.Context, opts migrationRunOptions) error {
 		return fmt.Errorf("checkpoint shared migrations: %w", err)
 	}
 	return s.afterSchemaCurrent(ctx)
+}
+
+const migrationCheckpointHeadroom = int64(256 << 20)
+const migrationCheckpointTransientMargin = int64(256 << 20)
+
+// runMigrationStep leaves part of the configured DuckDB budget unused by a
+// physical table rebuild, then restores the full configured limit before the
+// mandatory checkpoint. DuckDB otherwise allows a rebuild to consume the last
+// allocator block and cannot allocate even the checkpoint's small working
+// buffer. The process still runs within the operator's configured limit.
+func (s *Store) runMigrationStep(
+	ctx context.Context,
+	fileName string,
+	statement string,
+	record func(context.Context, *sql.Tx, string) error,
+) (retErr error) {
+	conn, err := s.db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("could not reserve migration connection for %s: %w", fileName, err)
+	}
+	reducedLimit := ""
+	if strings.TrimSpace(statement) != "" && migrationNeedsNativeReopen(fileName) {
+		reducedLimit = migrationMemoryLimitWithHeadroom(s.memoryLimit)
+		if reducedLimit != "" {
+			if _, err := conn.ExecContext(ctx, "SET memory_limit='"+reducedLimit+"'"); err != nil {
+				_ = conn.Close()
+				return fmt.Errorf("reserve checkpoint memory for migration %s: %w", fileName, err)
+			}
+		}
+	}
+	defer func() {
+		if reducedLimit != "" {
+			if _, err := conn.ExecContext(context.Background(), "SET memory_limit='"+s.memoryLimit+"'"); err != nil {
+				retErr = errors.Join(retErr, fmt.Errorf("restore memory limit after migration %s: %w", fileName, err))
+			}
+		}
+		if err := conn.Close(); err != nil {
+			retErr = errors.Join(retErr, fmt.Errorf("close migration connection for %s: %w", fileName, err))
+		}
+	}()
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("could not begin migration transaction for %s: %w", fileName, err)
+	}
+	if strings.TrimSpace(statement) != "" {
+		if _, err := tx.ExecContext(ctx, statement); err != nil {
+			return rollbackMigrationStep(tx, fmt.Errorf("failed to apply migration %s: %w", fileName, err))
+		}
+	}
+	if err := record(ctx, tx, fileName); err != nil {
+		return rollbackMigrationStep(tx, fmt.Errorf("failed to record migration %s: %w", fileName, err))
+	}
+	if err := tx.Commit(); err != nil {
+		// The commit outcome can be uncertain. The migration guard remains in
+		// place so the next startup can safely resolve the WAL before resuming.
+		return fmt.Errorf("could not commit migration %s: %w", fileName, err)
+	}
+	return nil
+}
+
+func migrationMemoryLimitWithHeadroom(configured string) string {
+	total, ok := parseMemoryLimitBytes(configured)
+	if !ok || total <= 16<<20 {
+		return ""
+	}
+	reserve := migrationCheckpointHeadroom
+	if fraction := total / 3; fraction < reserve {
+		reserve = fraction
+	}
+	return fmt.Sprintf("%dB", total-reserve)
+}
+
+func migrationCheckpointMemoryLimit(configured string) string {
+	total, ok := parseMemoryLimitBytes(configured)
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("%dB", total+migrationCheckpointTransientMargin)
+}
+
+func (s *Store) checkpointMigrationWithTransientMargin(ctx context.Context, reason string) error {
+	limit := migrationCheckpointMemoryLimit(s.memoryLimit)
+	if limit == "" {
+		return s.Checkpoint(ctx, reason)
+	}
+	conn, err := s.db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("reserve migration checkpoint connection: %w", err)
+	}
+	if _, err := conn.ExecContext(ctx, "SET memory_limit='"+limit+"'"); err != nil {
+		_ = conn.Close()
+		return fmt.Errorf("expand migration checkpoint memory: %w", err)
+	}
+	_, checkpointErr := conn.ExecContext(ctx, "CHECKPOINT;")
+	_, restoreErr := conn.ExecContext(context.Background(), "SET memory_limit='"+s.memoryLimit+"'")
+	closeErr := conn.Close()
+	if checkpointErr != nil {
+		s.status.checkpointFailed()
+		return fmt.Errorf("checkpoint database (%s): %w", strings.TrimSpace(reason), checkpointErr)
+	}
+	if restoreErr != nil {
+		return fmt.Errorf("restore memory limit after migration checkpoint: %w", restoreErr)
+	}
+	if closeErr != nil {
+		return fmt.Errorf("close migration checkpoint connection: %w", closeErr)
+	}
+	s.status.checkpointSucceeded(time.Now().UTC())
+	return nil
+}
+
+func migrationNeedsNativeReopen(fileName string) bool {
+	switch fileName {
+	case "2026_07_08_000000_drop_analytics_art_indexes.sql",
+		"2026_07_08_000001_drop_events_art_indexes.sql",
+		"2026_07_08_000002_drop_web_vitals_art_indexes.sql",
+		"0013_drop_analytics_art_indexes.sql",
+		"0013a_drop_events_art_indexes.sql",
+		"0013b_drop_web_vitals_art_indexes.sql":
+		return true
+	default:
+		return false
+	}
+}
+
+// rollbackMigrationStep rolls back only the active migration. A guarded run
+// deliberately keeps its durable guard until every pending migration has
+// committed and checkpointed; reconnect clears or recovers that guard before
+// the remaining migrations resume.
+func rollbackMigrationStep(tx *sql.Tx, cause error) error {
+	if tx == nil {
+		return cause
+	}
+	if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+		return fmt.Errorf("%w; rollback migration step: %v", cause, err)
+	}
+	return cause
 }
 
 // afterSchemaCurrent runs the steps that must hold once the shared schema is

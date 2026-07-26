@@ -22,7 +22,10 @@ func ensureRecoverySpace(root, databasePath string) error {
 			required += margin - (512 << 20)
 		}
 	}
+	return ensureAvailableSpace(root, required)
+}
 
+func ensureAvailableSpace(root string, required int64) error {
 	probe := root
 	for {
 		if _, err := os.Stat(probe); err == nil {
@@ -49,7 +52,7 @@ func ensureRecoverySpace(root, databasePath string) error {
 		available = int64(availableBlocks * blockSize) //nolint:gosec
 	}
 	if available < required {
-		return fmt.Errorf("insufficient free space for database recovery bundle: need %d bytes, have %d", required, available)
+		return fmt.Errorf("insufficient free space: need %d bytes, have %d", required, available)
 	}
 	return nil
 }

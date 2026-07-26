@@ -125,3 +125,24 @@ func TestCIQAMatrixUsesCanonicalStableGateIDs(t *testing.T) {
 		t.Fatalf("matrix group = %q, want go-race", matrix.Group)
 	}
 }
+
+func TestRaceTestArgsUseGateBoundedPackageTimeout(t *testing.T) {
+	got := raceTestArgs([]string{"hitkeep/internal/database"})
+	want := []string{"go", "test", "-race", "-timeout", "20m", "hitkeep/internal/database"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("race arguments = %v, want %v", got, want)
+	}
+}
+
+func TestDefaultTenantMigrationAcceptanceIsFullProfileOnly(t *testing.T) {
+	gate, err := GateByID("default-tenant-migration-acceptance")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(gate.Profiles, "pr") || !slices.Contains(gate.Profiles, "full") {
+		t.Fatalf("acceptance profiles = %v, want full only", gate.Profiles)
+	}
+	if !slices.Contains(gate.Command, "HITKEEP_DEFAULT_TENANT_MIGRATION_ACCEPTANCE=1") {
+		t.Fatalf("acceptance command does not enable its opt-in tests: %v", gate.Command)
+	}
+}

@@ -114,8 +114,8 @@ func TestHandleGoalCRUDUsesTenantAnalyticsStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("shared GetGoals: %v", err)
 	}
-	if len(sharedGoals) != 1 {
-		t.Fatalf("expected 1 legacy goal in shared store, got %d", len(sharedGoals))
+	if len(sharedGoals) != 0 {
+		t.Fatalf("analytics writes must not reach the control store, got %d shared goals", len(sharedGoals))
 	}
 
 	tenantGoals, err := tenantStore.GetGoals(ctx, siteID)
@@ -182,7 +182,7 @@ func TestHandleGoalCRUDUsesTenantAnalyticsStore(t *testing.T) {
 		t.Fatalf("shared GetGoals after delete: %v", err)
 	}
 	if len(sharedGoals) != 0 {
-		t.Fatalf("expected legacy shared goal to be deleted, got %d remaining", len(sharedGoals))
+		t.Fatalf("analytics delete must not touch the control store, got %d remaining", len(sharedGoals))
 	}
 }
 

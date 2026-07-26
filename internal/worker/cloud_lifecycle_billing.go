@@ -55,8 +55,14 @@ func (w *CloudLifecycleWorker) RunAt(ctx context.Context, now time.Time) {
 }
 
 func (w *CloudLifecycleWorker) processKind(ctx context.Context, kind string, now time.Time) {
-	store := w.tenantMgr.Shared()
-	recipients, err := store.ListEligibleCloudLifecycleRecipients(ctx, kind, now, 100)
+	store := w.tenantMgr.Control()
+	var recipients []database.CloudLifecycleRecipient
+	var err error
+	if w.tenantMgr.TenantDataPlaneEnabled() {
+		recipients, err = w.tenantMgr.ListEligibleCloudLifecycleRecipients(ctx, kind, now, 100)
+	} else {
+		recipients, err = store.ListEligibleCloudLifecycleRecipients(ctx, kind, now, 100)
+	}
 	if err != nil {
 		slog.Error("CloudLifecycleWorker: failed to load recipients", "kind", kind, "error", err)
 		return

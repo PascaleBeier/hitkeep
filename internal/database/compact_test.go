@@ -184,6 +184,35 @@ func TestMaybeCompactDatabaseRemovesStaleArtifacts(t *testing.T) {
 	}
 }
 
+func TestRecoverCompactionSwapRestoresMissingLiveFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "shared.db")
+	backup := path + ".pre-compact"
+	work := path + ".compacting"
+	if err := os.WriteFile(backup, []byte("authoritative"), 0o600); err != nil {
+		t.Fatalf("write backup: %v", err)
+	}
+	if err := os.WriteFile(work, []byte("incomplete"), 0o600); err != nil {
+		t.Fatalf("write work file: %v", err)
+	}
+	if err := recoverCompactionSwap(path); err != nil {
+		t.Fatalf("recover compaction swap: %v", err)
+	}
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read restored database: %v", err)
+	}
+	if string(contents) != "authoritative" {
+		t.Fatalf("restored wrong contents: %q", contents)
+	}
+	if _, err := os.Stat(backup); !os.IsNotExist(err) {
+		t.Fatalf("expected backup to be consumed, got %v", err)
+	}
+	if _, err := os.Stat(work); !os.IsNotExist(err) {
+		t.Fatalf("expected incomplete work file removed, got %v", err)
+	}
+}
+
 func TestTenantStoreManagerCompactsTenantDatabaseOnOpen(t *testing.T) {
 	ctx := context.Background()
 	shared := newSharedTestStore(t)

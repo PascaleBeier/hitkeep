@@ -379,7 +379,7 @@ describe('AdminSettings', () => {
             shared_db_bytes: 1024,
             data_path: '/data',
             tenant_db_count: 1,
-            tenant_dbs: [{ tenant_id: 'team-1', name: 'Example team', bytes: 2048, path: '/data/tenants/team-1.db' }],
+            tenant_dbs: [{ tenant_id: 'team-1', name: 'Example team', is_default: false, bytes: 2048, path: '/data/tenants/team-1.db' }],
             spam_cache_path: '/data/spam.db',
             backup_path: '/data/backups',
             disk_available_bytes: 4096,

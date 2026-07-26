@@ -28,7 +28,8 @@ func setupSystemTestEnv(t *testing.T) (*handler, *database.Store, *database.Tena
 	t.Helper()
 
 	basePath := t.TempDir()
-	store := database.NewStore(filepath.Join(basePath, "shared.db"))
+	sharedPath := filepath.Join(basePath, "shared.db")
+	store := database.NewStore(sharedPath)
 	if err := store.Connect(); err != nil {
 		t.Fatalf("connect store: %v", err)
 	}
@@ -56,8 +57,9 @@ func setupSystemTestEnv(t *testing.T) (*handler, *database.Store, *database.Tena
 	if err := store.UpdateInstanceRole(context.Background(), adminUserID, auth.InstanceAdmin, ownerUserID); err != nil {
 		t.Fatalf("promote admin: %v", err)
 	}
+	prepareEmptySystemTestDataPlane(t, store, basePath)
 
-	tenantStores := database.NewTenantStoreManager(store, basePath)
+	tenantStores := database.NewTenantStoreManager(store, basePath, database.WithTenantDataPlane(true))
 	t.Cleanup(func() { _ = tenantStores.Close() })
 
 	systemCounters := &database.SystemCounter{}
@@ -77,7 +79,7 @@ func setupSystemTestEnv(t *testing.T) (*handler, *database.Store, *database.Tena
 		Config: &config.Config{
 			PublicURL:                "http://localhost:8080",
 			JWTSecret:                "test-secret",
-			DBPath:                   filepath.Join(basePath, "shared.db"),
+			DBPath:                   sharedPath,
 			DataPath:                 basePath,
 			ImportStageRetentionDays: 7,
 		},
@@ -85,6 +87,43 @@ func setupSystemTestEnv(t *testing.T) (*handler, *database.Store, *database.Tena
 	}
 
 	return &handler{ctx: ctx}, store, tenantStores, ownerUserID, adminUserID, regularUserID
+}
+
+// prepareEmptySystemTestDataPlane builds the already-split topology needed by
+// system handler tests. Migration crash/rewrite behavior is covered in the
+// database package; repeating the physical control rewrite for every handler
+// test made the race shard spend minutes rebuilding the same empty catalogs.
+func prepareEmptySystemTestDataPlane(t *testing.T, control *database.Store, dataPath string) {
+	t.Helper()
+	ctx := context.Background()
+	defaultTenantID, err := control.GetDefaultTenantID(ctx)
+	if err != nil {
+		t.Fatalf("resolve default tenant: %v", err)
+	}
+	tenantDir := filepath.Join(dataPath, "tenants", defaultTenantID.String())
+	if err := os.MkdirAll(tenantDir, 0o700); err != nil {
+		t.Fatalf("create default tenant directory: %v", err)
+	}
+	tenant := database.NewStore(filepath.Join(tenantDir, "hitkeep.db"))
+	if err := tenant.Connect(); err != nil {
+		t.Fatalf("connect default tenant test store: %v", err)
+	}
+	if err := tenant.MigrateTenant(ctx); err != nil {
+		_ = tenant.Close()
+		t.Fatalf("migrate default tenant test store: %v", err)
+	}
+	if err := tenant.Close(); err != nil {
+		t.Fatalf("close default tenant test store: %v", err)
+	}
+	if _, err := control.DB().ExecContext(ctx, `
+		INSERT INTO data_migrations (name, applied_at)
+		VALUES
+			('default_tenant_split_v1', now()),
+			('default_tenant_split_compacted_v1', now())
+		ON CONFLICT (name) DO NOTHING
+	`); err != nil {
+		t.Fatalf("mark empty test data plane as split: %v", err)
+	}
 }
 
 func TestHandleGetSystem(t *testing.T) {

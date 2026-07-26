@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/internal/api"
 	"hitkeep/internal/server/shared"
 )
 
@@ -18,7 +19,13 @@ func (h *handler) handleGetUserOnboarding() http.HandlerFunc {
 			return
 		}
 
-		onboarding, err := h.ctx.Store.GetUserOnboarding(r.Context(), userID)
+		var onboarding *api.UserOnboarding
+		var err error
+		if h.ctx.TenantStores != nil {
+			onboarding, err = h.ctx.TenantStores.GetUserOnboarding(r.Context(), userID)
+		} else {
+			onboarding, err = h.ctx.Store.GetUserOnboarding(r.Context(), userID)
+		}
 		if err != nil {
 			slog.Error("Failed to load user onboarding", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
