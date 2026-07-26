@@ -126,6 +126,109 @@ func TestIngestCORSActualRequestEchoesOrigin(t *testing.T) {
 	}
 }
 
+func TestRegisteredBrowserIngestDropsSpeculativeRequests(t *testing.T) {
+	producer := &capturingProducer{}
+	h, cleanup := setupIngestHandler(t, func(ctx *shared.Context) {
+		ctx.Producer = producer
+	})
+	defer cleanup()
+
+	mux := http.NewServeMux()
+	Register(mux, h.ctx)
+
+	headers := []struct {
+		name  string
+		value string
+	}{
+		{name: "Sec-Purpose", value: "prefetch"},
+		{name: "Sec-Purpose", value: "prefetch;prerender"},
+		{name: "Sec-Purpose", value: "PRERENDER"},
+		{name: "Purpose", value: "PREFETCH"},
+	}
+	paths := []string{"/ingest", "/ingest/event", "/ingest/web-vitals"}
+
+	for _, header := range headers {
+		for _, path := range paths {
+			t.Run(header.name+"_"+header.value+"_"+path, func(t *testing.T) {
+				payload := map[string]any{}
+				switch path {
+				case "/ingest":
+					payload = map[string]any{
+						"path":       "/speculative",
+						"session_id": uuid.New(),
+						"page_id":    uuid.New(),
+					}
+				case "/ingest/event":
+					payload = map[string]any{
+						"n":    "speculative_event",
+						"p":    map[string]any{"plan": "pro"},
+						"sid":  uuid.New(),
+						"path": "/speculative",
+					}
+				case "/ingest/web-vitals":
+					payload = map[string]any{
+						"n":   "LCP",
+						"v":   1200,
+						"p":   "/speculative",
+						"sid": uuid.New(),
+						"pid": uuid.New(),
+					}
+				}
+				body, err := json.Marshal(payload)
+				if err != nil {
+					t.Fatalf("marshal payload: %v", err)
+				}
+				req := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(body))
+				req.Header.Set("Origin", "https://example.com")
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set(header.name, header.value)
+				rec := httptest.NewRecorder()
+
+				mux.ServeHTTP(rec, req)
+
+				if rec.Code != http.StatusAccepted {
+					t.Fatalf("expected speculative ingest to return %d, got %d body=%s", http.StatusAccepted, rec.Code, rec.Body.String())
+				}
+				if rec.Body.Len() != 0 {
+					t.Fatalf("expected empty response body, got %q", rec.Body.String())
+				}
+			})
+		}
+	}
+
+	for _, topic := range []string{"hits", "events", "web_vitals"} {
+		if got := producer.messageCount(topic); got != 0 {
+			t.Fatalf("expected speculative requests to publish no %s messages, got %d", topic, got)
+		}
+	}
+	if got := h.ctx.SystemCounters.Rejections.Load(); got != 0 {
+		t.Fatalf("expected speculative requests not to count as rejections, got %d", got)
+	}
+	if got := h.ctx.SystemCounters.Spam.Load(); got != 0 {
+		t.Fatalf("expected speculative requests not to count as spam, got %d", got)
+	}
+}
+
+func TestSpeculativePurposeHeadersDoNotBypassServerIngestAuthentication(t *testing.T) {
+	ctx := &shared.Context{
+		Config:         &config.Config{},
+		SystemCounters: &database.SystemCounter{},
+	}
+	mux := http.NewServeMux()
+	Register(mux, ctx)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/ingest/server/pageview", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Sec-Purpose", "prefetch;prerender")
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected server ingest authentication to remain in force, got %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestHandleIngestLeaderDropsBlockedReferrerBeforePublish(t *testing.T) {
 	h, cleanup := setupIngestHandler(t, func(ctx *shared.Context) {
 		filter := mustNewTestSpamFilter(t, blocking.SpamFeedData{

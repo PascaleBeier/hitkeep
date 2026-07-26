@@ -20,6 +20,10 @@ test.beforeEach(async ({ context }) => {
         });
     });
 
+    await context.route("**/hk-vitals.js", async (route) => {
+        await route.fulfill({ status: 200, body: "", contentType: "application/javascript" });
+    });
+
     await context.route("**/tracker-fixtures/**", async (route) => {
         const url = new URL(route.request().url());
         const relativePath = decodeURIComponent(url.pathname).replace(/^\/tracker-fixtures\/?/, "");
@@ -81,6 +85,22 @@ function collectEventPayloads(page) {
     return payloads;
 }
 
+function collectTrackerRequests(page) {
+    const requests = [];
+
+    page.on("request", (request) => {
+        if (request.method() !== "POST" || !request.url().includes("/ingest")) {
+            return;
+        }
+        requests.push({
+            url: request.url(),
+            payload: JSON.parse(request.postData() || "{}")
+        });
+    });
+
+    return requests;
+}
+
 async function waitForEventRequest(page) {
     const request = await page.waitForRequest((candidate) => candidate.url().includes("/ingest/event") && candidate.method() === "POST");
     return JSON.parse(request.postData() || "{}");
@@ -99,6 +119,50 @@ test("tracks outbound clicks and still navigates", async ({ page, baseURL }) => 
         target_path: "/tracker-fixtures/external-target.html",
         target_protocol: "http"
     });
+});
+
+test("defers pageviews, events, and web vitals until prerender activation", async ({ page, baseURL }) => {
+    await page.addInitScript(() => {
+        let prerendering = true;
+        Object.defineProperty(document, "prerendering", {
+            configurable: true,
+            get: () => prerendering
+        });
+        window.activatePrerenderFixture = () => {
+            prerendering = false;
+            document.dispatchEvent(new Event("prerenderingchange"));
+        };
+    });
+    const requests = collectTrackerRequests(page);
+
+    await gotoTrackerFixture(page, baseURL, "enableVitals=1&disableBeacon=1&utm_source=speculative");
+    await page.evaluate(() => {
+        window.hk.event("prerendered_event", { step: 1 });
+        window.hk._webVitals.emit({
+            n: "LCP",
+            v: 1200,
+            p: "/before-activation",
+            sid: window.hk._webVitals.sessionId,
+            pid: window.hk._webVitals.pageId(),
+            tsrc: window.hk._webVitals.trackerSource,
+            tv: window.hk._webVitals.trackerVersion
+        });
+        window.history.replaceState({}, "", "/tracker-fixtures/activated.html?utm_source=activated");
+    });
+
+    await page.waitForTimeout(200);
+    expect(requests).toHaveLength(0);
+
+    await page.evaluate(() => window.activatePrerenderFixture());
+    await expect.poll(() => requests.length).toBe(3);
+
+    expect(requests.map((request) => new URL(request.url).pathname)).toEqual(["/ingest", "/ingest/event", "/ingest/web-vitals"]);
+    expect(requests[0].payload.path).toBe("/tracker-fixtures/activated.html");
+    expect(requests[0].payload.u_src).toBe("activated");
+    expect(requests[1].payload.n).toBe("prerendered_event");
+    expect(requests[1].payload.path).toBe("/tracker-fixtures/activated.html");
+    expect(requests[2].payload.p).toBe("/tracker-fixtures/activated.html");
+    expect(requests[2].payload.pid).toBe(requests[0].payload.page_id);
 });
 
 test("tracks middle-click outbound links without hijacking the current tab", async ({ page, baseURL, context }) => {

@@ -7,7 +7,7 @@ import type { HitKeepWindow } from './core';
 type ListenerMap = Record<string, EventListener[]>;
 
 function packageHarness(path = '/pricing') {
-    const currentUrl = new URL(path, 'https://app.example.com');
+    let currentUrl = new URL(path, 'https://app.example.com');
     const windowListeners: ListenerMap = {};
     const documentListeners: ListenerMap = {};
     const stored = new Map<string, string>();
@@ -17,12 +17,16 @@ function packageHarness(path = '/pricing') {
         void data;
         return true;
     });
+    let prerendering = false;
 
     const win = {
         document: {
             currentScript: null,
             referrer: '',
             visibilityState: 'visible',
+            get prerendering() {
+                return prerendering;
+            },
             createElement: vi.fn((tagName: string) => document.createElement(tagName)),
             head: { appendChild: vi.fn() },
             querySelector: vi.fn(() => null),
@@ -34,11 +38,24 @@ function packageHarness(path = '/pricing') {
             })
         },
         location: {
-            href: currentUrl.href,
-            hostname: currentUrl.hostname,
-            pathname: currentUrl.pathname,
-            search: currentUrl.search,
-            origin: currentUrl.origin
+            get href() {
+                return currentUrl.href;
+            },
+            get hostname() {
+                return currentUrl.hostname;
+            },
+            set hostname(value: string) {
+                currentUrl.hostname = value;
+            },
+            get pathname() {
+                return currentUrl.pathname;
+            },
+            get search() {
+                return currentUrl.search;
+            },
+            get origin() {
+                return currentUrl.origin;
+            }
         },
         navigator: {
             userAgent: 'Mozilla/5.0',
@@ -48,8 +65,12 @@ function packageHarness(path = '/pricing') {
         },
         screen: { width: 1440, height: 900 },
         history: {
-            pushState: vi.fn(),
-            replaceState: vi.fn()
+            pushState: vi.fn((_state: unknown, _title: string, url?: string | URL | null) => {
+                if (url) currentUrl = new URL(url, currentUrl.href);
+            }),
+            replaceState: vi.fn((_state: unknown, _title: string, url?: string | URL | null) => {
+                if (url) currentUrl = new URL(url, currentUrl.href);
+            })
         },
         sessionStorage: {
             getItem: vi.fn((key: string) => stored.get(key) ?? null),
@@ -81,7 +102,15 @@ function packageHarness(path = '/pricing') {
         hk: undefined
     } as unknown as HitKeepWindow;
 
-    return { sendBeacon, win, windowListeners };
+    return {
+        documentListeners,
+        sendBeacon,
+        setPrerendering: (next: boolean) => {
+            prerendering = next;
+        },
+        win,
+        windowListeners
+    };
 }
 
 async function beaconPayload(sendBeacon: ReturnType<typeof packageHarness>['sendBeacon'], callIndex: number): Promise<Record<string, unknown>> {
@@ -147,6 +176,36 @@ describe('@hitkeep/tracker package entry', () => {
         expect(first['n']).toBe('early_event');
         expect(second['n']).toBe('purchase');
         expect((second['p'] as Record<string, unknown>)['transaction_id']).toBe('tx-1');
+    });
+
+    it('replays pre-init, ecommerce, and live events only after prerender activation', async () => {
+        const harness = packageHarness('/checkout?utm_source=speculative');
+        harness.setPrerendering(true);
+
+        track('early_event', { step: 1 });
+        trackPurchase({ transaction_id: 'tx-1', value: 49.9, currency: 'EUR' });
+        const handle = init({ host: 'https://stats.example.com' }, harness.win);
+        handle.track('live_event', { step: 2 });
+        harness.win.history.replaceState({}, '', '/confirmation?utm_source=activated');
+
+        expect(harness.sendBeacon).not.toHaveBeenCalled();
+
+        harness.setPrerendering(false);
+        harness.documentListeners['prerenderingchange']?.[0]?.(new Event('prerenderingchange'));
+
+        expect(harness.sendBeacon.mock.calls.map(([url]) => url)).toEqual(['https://stats.example.com/ingest', 'https://stats.example.com/ingest/event', 'https://stats.example.com/ingest/event', 'https://stats.example.com/ingest/event']);
+        const pageview = await beaconPayload(harness.sendBeacon, 0);
+        const earlyEvent = await beaconPayload(harness.sendBeacon, 1);
+        const purchase = await beaconPayload(harness.sendBeacon, 2);
+        const liveEvent = await beaconPayload(harness.sendBeacon, 3);
+        expect(pageview['path']).toBe('/confirmation');
+        expect(pageview['u_src']).toBe('activated');
+        expect(earlyEvent['n']).toBe('early_event');
+        expect(earlyEvent['path']).toBe('/confirmation');
+        expect(purchase['n']).toBe('purchase');
+        expect(purchase['path']).toBe('/confirmation');
+        expect(liveEvent['n']).toBe('live_event');
+        expect(liveEvent['path']).toBe('/confirmation');
     });
 
     it('returns the existing handle when initialized twice', () => {

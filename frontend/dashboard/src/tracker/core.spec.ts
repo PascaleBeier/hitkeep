@@ -70,6 +70,7 @@ function trackerHarness(path = '/signup?utm_source=launch&utm_medium=email', scr
     const windowListeners: ListenerMap = {};
     const documentListeners: ListenerMap = {};
     let visibilityState = 'visible';
+    let prerendering = false;
     const stored = new Map<string, string>();
     const sessionStorage = {
         getItem: vi.fn((key: string) => stored.get(key) ?? null),
@@ -109,6 +110,9 @@ function trackerHarness(path = '/signup?utm_source=launch&utm_medium=email', scr
         referrer: 'https://referrer.example.com/article?secret=1',
         get visibilityState() {
             return visibilityState;
+        },
+        get prerendering() {
+            return prerendering;
         },
         createElement: vi.fn((tagName: string) => document.createElement(tagName)),
         head: {
@@ -164,6 +168,9 @@ function trackerHarness(path = '/signup?utm_source=launch&utm_medium=email', scr
         sessionStorage,
         setVisibilityState: (next: string) => {
             visibilityState = next;
+        },
+        setPrerendering: (next: boolean) => {
+            prerendering = next;
         },
         win,
         windowListeners
@@ -468,6 +475,142 @@ describe('tracker core', () => {
 
         bootstrapTracker(harness.win);
         harness.history.pushState({}, '', '/signup');
+
+        expect(harness.sendBeacon).toHaveBeenCalledTimes(1);
+    });
+
+    it('defers pageviews and reads attribution from the activated URL', async () => {
+        const harness = trackerHarness('/prerendered?utm_source=speculative&utm_campaign=old');
+        harness.setPrerendering(true);
+
+        bootstrapTracker(harness.win);
+        harness.history.pushState({}, '', '/activated?utm_source=intermediate');
+        harness.history.replaceState({}, '', '/activated-final?utm_source=activated&utm_campaign=new&hk_qr=10000000-0000-4000-8000-000000000099');
+
+        expect(harness.sendBeacon).not.toHaveBeenCalled();
+
+        harness.setPrerendering(false);
+        harness.documentListeners['prerenderingchange']?.[0]?.(new Event('prerenderingchange'));
+
+        expect(harness.sendBeacon).toHaveBeenCalledTimes(1);
+        const body = harness.sendBeacon.mock.calls[0]?.[1] as unknown as Blob;
+        const payload = JSON.parse(await body.text()) as Record<string, unknown>;
+        expect(payload['path']).toBe('/activated-final');
+        expect(payload['referrer']).toBe('https://referrer.example.com/article?secret=1');
+        expect(payload['u_src']).toBe('activated');
+        expect(payload['u_cmp']).toBe('new');
+        expect(payload['qr']).toBe('10000000-0000-4000-8000-000000000099');
+    });
+
+    it('replays snapshotted events and web vitals after the activated pageview', async () => {
+        const harness = trackerHarness('/prerendered');
+        harness.setPrerendering(true);
+        harness.script.setAttribute('data-enable-web-vitals', 'true');
+
+        bootstrapTracker(harness.win);
+        const win = harness.win as TrackerTestWindow;
+        const properties = { plan: 'starter' };
+        win.hk?.event?.('signup_clicked');
+        (win.hk?.event as ((name: string, properties?: Record<string, unknown>) => void) | undefined)?.('checkout_started', properties);
+        properties.plan = 'mutated';
+        win.hk?._webVitals?.emit({
+            n: 'LCP',
+            v: 1200,
+            p: '/prerendered',
+            sid: 'session-id',
+            pid: 'prerender-page-id',
+            tsrc: 'hk.js',
+            tv: ''
+        });
+        harness.history.replaceState({}, '', '/activated');
+
+        expect(harness.sendBeacon).not.toHaveBeenCalled();
+        harness.windowListeners['pagehide']?.[0]?.(new Event('pagehide'));
+        expect(harness.sendBeacon).not.toHaveBeenCalled();
+
+        harness.setPrerendering(false);
+        harness.documentListeners['prerenderingchange']?.[0]?.(new Event('prerenderingchange'));
+
+        expect(harness.sendBeacon.mock.calls.map(([url]) => url)).toEqual([
+            'https://analytics.example.com/ingest',
+            'https://analytics.example.com/ingest/event',
+            'https://analytics.example.com/ingest/event',
+            'https://analytics.example.com/ingest/web-vitals'
+        ]);
+        const pageview = JSON.parse(await (harness.sendBeacon.mock.calls[0]?.[1] as unknown as Blob).text()) as Record<string, unknown>;
+        const checkout = JSON.parse(await (harness.sendBeacon.mock.calls[2]?.[1] as unknown as Blob).text()) as Record<string, unknown>;
+        const vital = JSON.parse(await (harness.sendBeacon.mock.calls[3]?.[1] as unknown as Blob).text()) as Record<string, unknown>;
+        expect((checkout['p'] as Record<string, unknown>)['plan']).toBe('starter');
+        expect(checkout['path']).toBe('/activated');
+        expect(checkout['r']).toBe('https://referrer.example.com/article?secret=1');
+        expect(pageview['referrer']).toBe('https://referrer.example.com/article?secret=1');
+        expect(vital['p']).toBe('/activated');
+        expect(vital['pid']).toBe(pageview['page_id']);
+    });
+
+    it('keeps the prerender event buffer bounded and retains the newest events', async () => {
+        const harness = trackerHarness('/prerendered');
+        harness.setPrerendering(true);
+
+        bootstrapTracker(harness.win);
+        const win = harness.win as TrackerTestWindow;
+        for (let index = 0; index < 35; index += 1) {
+            win.hk?.event?.(`queued_${index}`);
+        }
+
+        harness.setPrerendering(false);
+        harness.documentListeners['prerenderingchange']?.[0]?.(new Event('prerenderingchange'));
+
+        expect(harness.sendBeacon).toHaveBeenCalledTimes(33);
+        const firstEvent = JSON.parse(await (harness.sendBeacon.mock.calls[1]?.[1] as unknown as Blob).text()) as Record<string, unknown>;
+        const lastEvent = JSON.parse(await (harness.sendBeacon.mock.calls[32]?.[1] as unknown as Blob).text()) as Record<string, unknown>;
+        expect(firstEvent['n']).toBe('queued_3');
+        expect(lastEvent['n']).toBe('queued_34');
+    });
+
+    it('discards prerendered analytics on cleanup without activation', () => {
+        const harness = trackerHarness('/discarded');
+        harness.setPrerendering(true);
+        const handle = createTracker(harness.win as HitKeepWindow, runtimeConfig({ enableWebVitals: true }));
+        handle?.track('discarded_event');
+        (harness.win as TrackerTestWindow).hk?._webVitals?.emit({
+            n: 'CLS',
+            v: 0.1,
+            p: '/discarded',
+            sid: 'session-id',
+            pid: 'prerender-page-id',
+            tsrc: 'hk.js',
+            tv: ''
+        });
+        handle?.cleanup();
+        harness.setPrerendering(false);
+        for (const listener of harness.documentListeners['prerenderingchange'] ?? []) {
+            listener(new Event('prerenderingchange'));
+        }
+
+        expect(harness.sendBeacon).not.toHaveBeenCalled();
+    });
+
+    it('defers the initial pageview for legacy prerender visibility state', () => {
+        const harness = trackerHarness('/legacy-prerender');
+        harness.setVisibilityState('prerender');
+
+        bootstrapTracker(harness.win);
+        expect(harness.sendBeacon).not.toHaveBeenCalled();
+
+        harness.setVisibilityState('visible');
+        for (const listener of harness.documentListeners['visibilitychange'] ?? []) {
+            listener(new Event('visibilitychange'));
+        }
+
+        expect(harness.sendBeacon).toHaveBeenCalledTimes(1);
+    });
+
+    it('tracks an ordinary hidden background tab immediately', () => {
+        const harness = trackerHarness('/background-tab');
+        harness.setVisibilityState('hidden');
+
+        bootstrapTracker(harness.win);
 
         expect(harness.sendBeacon).toHaveBeenCalledTimes(1);
     });

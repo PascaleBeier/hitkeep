@@ -43,20 +43,42 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 	}, h.handleServerEventIngest()))
 
 	ingestRoutes := http.NewServeMux()
-	ingestRoutes.HandleFunc("POST /ingest", ctx.Handler(shared.HandlerConfig{
+	ingestRoutes.HandleFunc("POST /ingest", dropSpeculativeBrowserIngest(ctx.Handler(shared.HandlerConfig{
 		RateLimiter: ctx.IngestLimiter,
-	}, h.handleIngest()))
-	ingestRoutes.HandleFunc("POST /ingest/event", ctx.Handler(shared.HandlerConfig{
+	}, h.handleIngest())))
+	ingestRoutes.HandleFunc("POST /ingest/event", dropSpeculativeBrowserIngest(ctx.Handler(shared.HandlerConfig{
 		RateLimiter: ctx.IngestLimiter,
-	}, h.handleIngestEvent()))
-	ingestRoutes.HandleFunc("POST /ingest/web-vitals", ctx.Handler(shared.HandlerConfig{
+	}, h.handleIngestEvent())))
+	ingestRoutes.HandleFunc("POST /ingest/web-vitals", dropSpeculativeBrowserIngest(ctx.Handler(shared.HandlerConfig{
 		RateLimiter: ctx.IngestLimiter,
-	}, h.handleIngestWebVitals()))
+	}, h.handleIngestWebVitals())))
 
 	corsHandler := newIngestCORS().Handler(ingestRoutes)
 	mux.Handle("/ingest", corsHandler)
 	mux.Handle("/ingest/event", corsHandler)
 	mux.Handle("/ingest/web-vitals", corsHandler)
+}
+
+func dropSpeculativeBrowserIngest(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if hasSpeculativePurpose(r.Header.Get("Sec-Purpose")) || hasSpeculativePurpose(r.Header.Get("Purpose")) {
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+		next(w, r)
+	}
+}
+
+func hasSpeculativePurpose(value string) bool {
+	for _, token := range strings.FieldsFunc(value, func(r rune) bool {
+		return r == ';' || r == ','
+	}) {
+		switch strings.ToLower(strings.TrimSpace(token)) {
+		case "prefetch", "prerender":
+			return true
+		}
+	}
+	return false
 }
 
 func newIngestCORS() *cors.Cors {

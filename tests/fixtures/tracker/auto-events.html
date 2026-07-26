@@ -69,6 +69,7 @@
                 if (params.get("disableOutbound") === "1") tracker.setAttribute("data-disable-outbound-tracking", "true");
                 if (params.get("disableDownload") === "1") tracker.setAttribute("data-disable-download-tracking", "true");
                 if (params.get("disableForm") === "1") tracker.setAttribute("data-disable-form-tracking", "true");
+                if (params.get("enableVitals") === "1") tracker.setAttribute("data-enable-web-vitals", "true");
                 document.head.appendChild(tracker);
             })();
         </script>

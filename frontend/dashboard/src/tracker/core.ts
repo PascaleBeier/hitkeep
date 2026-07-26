@@ -46,6 +46,19 @@ interface PendingRequest {
     body: string;
 }
 
+interface EventPayload {
+    n: string;
+    p: EventProperties;
+    r: string | null;
+    sid: string;
+    path: string;
+    ua: string;
+    tsrc: string;
+    tv: string;
+}
+
+type PendingActivationRequest = { kind: 'event'; endpoint: string; payload: EventPayload } | { kind: 'web-vital'; endpoint: string; payload: WebVitalsPayload };
+
 /** Registers a listener and records its matching teardown on the owning tracker. */
 type ListenerRegistrar = (target: EventTarget, type: string, listener: EventListener, options?: boolean | AddEventListenerOptions) => void;
 
@@ -82,9 +95,14 @@ export interface WebVitalsTrackerContext {
     userAgent: string;
 }
 
+type PrerenderDocument = Document & {
+    readonly prerendering?: boolean;
+};
+
 const SESSION_KEY = 'hk_session';
 const SESSION_EXPIRY = 30 * 60 * 1000;
 const MAX_PENDING_REQUESTS = 10;
+const MAX_PENDING_ACTIVATION_REQUESTS = 32;
 const RETRY_DELAY_MS = 2000;
 const DUPLICATE_PAGEVIEW_WINDOW_MS = 1500;
 const OPT_OUT_KEY = 'hk_ignore';
@@ -318,6 +336,7 @@ export function classifyFormSubmit(form: HTMLFormElement, currentUrl: URL, submi
 
 export function createTracker(win: HitKeepWindow, config: TrackerRuntimeConfig): TrackerHandle | null {
     const { document, location, navigator, screen, history, sessionStorage, crypto } = win;
+    const prerenderDocument = document as PrerenderDocument;
 
     win.hk = win.hk || {};
     if (win.hk._bootstrapped) {
@@ -371,6 +390,7 @@ export function createTracker(win: HitKeepWindow, config: TrackerRuntimeConfig):
     const sessionId = getSessionId();
     const initialReferrer = document.referrer;
     const initialHost = location.hostname;
+    let awaitingActivation = prerenderDocument.prerendering === true || (document.visibilityState as string) === 'prerender';
     const readUtmValue = (params: URLSearchParams, key: string) => {
         const value = params.get(key);
         if (!value) {
@@ -379,16 +399,20 @@ export function createTracker(win: HitKeepWindow, config: TrackerRuntimeConfig):
         const trimmed = value.trim();
         return trimmed.length > 0 ? trimmed : null;
     };
-    const initialSearchParams = new URLSearchParams(location.search);
-    const initialAttribution = {
-        u_src: readUtmValue(initialSearchParams, 'utm_source'),
-        u_med: readUtmValue(initialSearchParams, 'utm_medium'),
-        u_cmp: readUtmValue(initialSearchParams, 'utm_campaign'),
-        u_trm: readUtmValue(initialSearchParams, 'utm_term'),
-        u_cnt: readUtmValue(initialSearchParams, 'utm_content'),
-        qr: readUtmValue(initialSearchParams, 'hk_qr')
+    const readAttribution = () => {
+        const params = new URLSearchParams(location.search);
+        return {
+            u_src: readUtmValue(params, 'utm_source'),
+            u_med: readUtmValue(params, 'utm_medium'),
+            u_cmp: readUtmValue(params, 'utm_campaign'),
+            u_trm: readUtmValue(params, 'utm_term'),
+            u_cnt: readUtmValue(params, 'utm_content'),
+            qr: readUtmValue(params, 'hk_qr')
+        };
     };
+    let initialAttribution = awaitingActivation ? null : readAttribution();
     const pendingRequests: PendingRequest[] = [];
+    const pendingActivationRequests: PendingActivationRequest[] = [];
     const removers: (() => void)[] = [];
     const on = (target: EventTarget, type: string, listener: EventListener, options?: boolean | AddEventListenerOptions) => {
         target.addEventListener(type, listener, options);
@@ -400,6 +424,14 @@ export function createTracker(win: HitKeepWindow, config: TrackerRuntimeConfig):
     let lastPageviewPath = '';
     let lastPageviewAt = 0;
     let currentPageId = generateUUID();
+    let pendingPageview = false;
+
+    const queueActivationRequest = (request: PendingActivationRequest) => {
+        pendingActivationRequests.push(request);
+        if (pendingActivationRequests.length > MAX_PENDING_ACTIVATION_REQUESTS) {
+            pendingActivationRequests.splice(0, pendingActivationRequests.length - MAX_PENDING_ACTIVATION_REQUESTS);
+        }
+    };
 
     const queueRequest = (request: PendingRequest) => {
         pendingRequests.push(request);
@@ -489,7 +521,7 @@ export function createTracker(win: HitKeepWindow, config: TrackerRuntimeConfig):
     };
 
     const emitEvent = (name: string, properties: EventProperties = {}) => {
-        sendJson(config.eventEndpoint, {
+        const payload: EventPayload = {
             n: name,
             p: properties,
             r: currentReferrer(),
@@ -498,12 +530,23 @@ export function createTracker(win: HitKeepWindow, config: TrackerRuntimeConfig):
             ua: navigator.userAgent,
             tsrc: config.trackerSource,
             tv: config.trackerVersion
-        });
+        };
+        if (awaitingActivation) {
+            queueActivationRequest({ kind: 'event', endpoint: config.eventEndpoint, payload: JSON.parse(JSON.stringify(payload)) as EventPayload });
+            return;
+        }
+        sendJson(config.eventEndpoint, payload);
     };
 
     if (config.webVitalsBundleUrl) {
         win.hk._webVitals = {
-            emit: (payload) => sendJson(config.webVitalsEndpoint, payload),
+            emit: (payload) => {
+                if (awaitingActivation) {
+                    queueActivationRequest({ kind: 'web-vital', endpoint: config.webVitalsEndpoint, payload: { ...payload } });
+                    return;
+                }
+                sendJson(config.webVitalsEndpoint, payload);
+            },
             getPath: () => location.pathname || '/',
             sessionId,
             pageId: () => currentPageId,
@@ -514,7 +557,7 @@ export function createTracker(win: HitKeepWindow, config: TrackerRuntimeConfig):
         loadWebVitalsBundle(win, config.webVitalsBundleUrl);
     }
 
-    const sendPageView = () => {
+    const sendPageViewNow = () => {
         const currentPath = location.pathname;
         const now = Date.now();
         currentPageId = generateUUID();
@@ -532,6 +575,9 @@ export function createTracker(win: HitKeepWindow, config: TrackerRuntimeConfig):
 
         const referrer = currentReferrer();
         const isUnique = lastPath === currentPath && referrer ? new URL(referrer, location.href).hostname !== initialHost : false;
+        if (initialAttribution === null) {
+            initialAttribution = readAttribution();
+        }
 
         sendJson(config.pageEndpoint, {
             path: currentPath,
@@ -554,6 +600,61 @@ export function createTracker(win: HitKeepWindow, config: TrackerRuntimeConfig):
         lastPageviewAt = now;
         lastPath = currentPath;
     };
+
+    const sendPageView = () => {
+        if (awaitingActivation) {
+            pendingPageview = true;
+            return;
+        }
+        sendPageViewNow();
+    };
+
+    const activate = () => {
+        if (!awaitingActivation) {
+            return;
+        }
+        awaitingActivation = false;
+        initialAttribution = readAttribution();
+        lastPath = location.pathname;
+        if (pendingPageview) {
+            pendingPageview = false;
+            sendPageViewNow();
+        }
+        const requests = pendingActivationRequests.splice(0, pendingActivationRequests.length);
+        for (const request of requests) {
+            if (request.kind === 'event') {
+                sendJson(request.endpoint, {
+                    ...request.payload,
+                    r: currentReferrer(),
+                    path: location.pathname || '/'
+                });
+                continue;
+            }
+            sendJson(request.endpoint, {
+                ...request.payload,
+                p: location.pathname || '/',
+                pid: currentPageId
+            });
+        }
+    };
+
+    if (prerenderDocument.prerendering === true) {
+        const handlePrerenderActivation = () => {
+            if (!awaitingActivation || prerenderDocument.prerendering === true) {
+                return;
+            }
+            activate();
+        };
+        on(document, 'prerenderingchange', handlePrerenderActivation, { once: true });
+    } else if ((document.visibilityState as string) === 'prerender') {
+        const handleLegacyPrerenderActivation = () => {
+            if (!awaitingActivation || document.visibilityState !== 'visible') {
+                return;
+            }
+            activate();
+        };
+        on(document, 'visibilitychange', handleLegacyPrerenderActivation);
+    }
 
     const patchHistoryMethod = (method: HistoryMethod) => {
         const original = history[method];
@@ -587,16 +688,7 @@ export function createTracker(win: HitKeepWindow, config: TrackerRuntimeConfig):
     on(document, 'visibilitychange', handleVisibilityFlush);
 
     if (config.capturePageviews) {
-        if ((document.visibilityState as string) === 'prerender') {
-            const handlePrerenderVisible = () => {
-                if (document.visibilityState === 'visible') {
-                    sendPageView();
-                }
-            };
-            on(document, 'visibilitychange', handlePrerenderVisible, { once: true });
-        } else {
-            sendPageView();
-        }
+        sendPageView();
     }
 
     bindAutoTracking(document, () => new URL(location.href), config, emitEvent, on);
@@ -611,6 +703,8 @@ export function createTracker(win: HitKeepWindow, config: TrackerRuntimeConfig):
             return;
         }
         active = false;
+        pendingPageview = false;
+        pendingActivationRequests.length = 0;
         if (retryTimer !== null) {
             clearTimeout(retryTimer);
             retryTimer = null;
