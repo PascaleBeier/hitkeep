@@ -23,7 +23,6 @@ const (
 )
 
 type setupEvidenceSnapshotInput struct {
-	SharedStore    *database.Store
 	AnalyticsStore *database.Store
 	SiteID         uuid.UUID
 	From           time.Time
@@ -89,9 +88,6 @@ type SetupStateEvidence struct {
 }
 
 func buildSetupEvidenceSnapshot(ctx context.Context, input setupEvidenceSnapshotInput) (*SetupEvidenceSnapshot, error) {
-	if input.SharedStore == nil {
-		return nil, fmt.Errorf("shared store is required")
-	}
 	if input.AnalyticsStore == nil {
 		return nil, fmt.Errorf("analytics store is required")
 	}
@@ -99,11 +95,11 @@ func buildSetupEvidenceSnapshot(ctx context.Context, input setupEvidenceSnapshot
 		return nil, fmt.Errorf("site id is required")
 	}
 
-	goals, err := input.SharedStore.GetGoals(ctx, input.SiteID)
+	goals, err := input.AnalyticsStore.GetGoals(ctx, input.SiteID)
 	if err != nil {
 		return nil, fmt.Errorf("load setup goals: %w", err)
 	}
-	funnels, err := input.SharedStore.GetFunnels(ctx, input.SiteID)
+	funnels, err := input.AnalyticsStore.GetFunnels(ctx, input.SiteID)
 	if err != nil {
 		return nil, fmt.Errorf("load setup funnels: %w", err)
 	}

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -27,8 +28,11 @@ func (s *Server) databaseAvailabilityStatus() database.DatabaseStatus {
 	if s == nil || s.store == nil {
 		return database.DatabaseStatus{State: database.DatabaseStateFailed}
 	}
-	status := s.store.DatabaseStatus()
-	if status.State != database.DatabaseStateHealthy || s.ctx == nil || s.ctx.TenantStores == nil {
+	if err := s.store.Ping(context.Background()); err != nil {
+		return database.DatabaseStatus{State: database.DatabaseStateFailed}
+	}
+	status := database.DatabaseStatus{State: database.DatabaseStateHealthy}
+	if s.ctx == nil || s.ctx.TenantStores == nil {
 		return status
 	}
 	if tenantStatus, unavailable := s.ctx.TenantStores.UnavailableDatabaseStatus(); unavailable {

@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"hitkeep/internal/controlstore"
 )
 
 const (
@@ -60,13 +62,7 @@ type CloudLifecycleMessage struct {
 	UpdatedAt       time.Time
 }
 
-type CloudLifecycleMessageUpdate struct {
-	TenantID uuid.UUID
-	UserID   uuid.UUID
-	Kind     string
-	Error    string
-	Now      time.Time
-}
+type CloudLifecycleMessageUpdate = controlstore.CloudLifecycleMessageUpdate
 
 func (s *Store) ListEligibleCloudLifecycleRecipients(ctx context.Context, kind string, now time.Time, limit int) ([]CloudLifecycleRecipient, error) {
 	kind = strings.TrimSpace(kind)

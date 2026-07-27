@@ -5,7 +5,10 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,6 +20,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/worker"
 )
@@ -232,6 +236,133 @@ func TestRestoreDatabaseDoesNotLeaveWal(t *testing.T) {
 	}
 }
 
+func TestRestoreSQLiteControlRejectsIncompleteAndChecksumMismatch(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	root := t.TempDir()
+	control, err := controlstore.Open(ctx, filepath.Join(root, "source.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := control.CreateUser(ctx, "restore-check@example.invalid", "disabled"); err != nil {
+		_ = control.Close()
+		t.Fatal(err)
+	}
+	snapshotDir := filepath.Join(root, "snapshot")
+	if err := os.MkdirAll(snapshotDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	rawPath := filepath.Join(root, "raw-control.db")
+	info, err := control.Backup(ctx, rawPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := control.Close(); err != nil {
+		t.Fatal(err)
+	}
+	input, err := os.Open(rawPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	compressed, err := os.OpenFile(filepath.Join(snapshotDir, "control.db.zst"), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoder, err := zstd.NewWriter(compressed, zstd.WithEncoderConcurrency(1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.Copy(encoder, input); err != nil {
+		t.Fatal(err)
+	}
+	if err := encoder.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := errors.Join(input.Close(), compressed.Close()); err != nil {
+		t.Fatal(err)
+	}
+	manifest := sqliteControlBackupManifest{Version: 1, Engine: "sqlite", File: "control.db.zst", Bytes: info.Bytes, SHA256: info.SHA256}
+	payload, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(snapshotDir, "manifest.json"), payload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(root, "restored.db")
+	if err := restoreSQLiteControlDatabase(ctx, target, snapshotDir, false, nil); err == nil || !strings.Contains(err.Error(), "incomplete") {
+		t.Fatalf("expected incomplete snapshot rejection, got %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(snapshotDir, "_COMPLETE"), []byte("ok\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	manifest.SHA256 = strings.Repeat("0", 64)
+	payload, _ = json.Marshal(manifest)
+	if err := os.WriteFile(filepath.Join(snapshotDir, "manifest.json"), payload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := restoreSQLiteControlDatabase(ctx, target, snapshotDir, false, nil); err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
+		t.Fatalf("expected checksum rejection, got %v", err)
+	}
+}
+
+func TestFindLatestLocalSnapshotSkipsIncompleteSQLiteCycle(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	completed := filepath.Join(root, "2026-07-26T010000Z")
+	incomplete := filepath.Join(root, "2026-07-27T010000Z")
+	legacy := filepath.Join(root, "2026-07-25T010000Z")
+	for _, path := range []string{completed, incomplete, legacy} {
+		if err := os.MkdirAll(path, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(completed, "_COMPLETE"), []byte("ok\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(incomplete, "control.db.zst"), []byte("partial"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"load.sql", "schema.sql"} {
+		if err := os.WriteFile(filepath.Join(legacy, name), []byte("-- legacy\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	got, err := findLatestLocalSnapshot(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != filepath.Base(completed) {
+		t.Fatalf("latest completed snapshot=%q", got)
+	}
+}
+
+func TestValidateLocalTenantSnapshotsRequiresEveryActiveTenant(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	snapshot := "2026-07-27T010000Z"
+	presentID := uuid.New().String()
+	missingID := uuid.New().String()
+	present := filepath.Join(root, "tenants", presentID, snapshot)
+	if err := os.MkdirAll(present, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"load.sql", "schema.sql"} {
+		if err := os.WriteFile(filepath.Join(present, name), []byte("-- tenant export\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := validateLocalTenantSnapshots(root, snapshot, []string{presentID}); err != nil {
+		t.Fatalf("complete tenant set rejected: %v", err)
+	}
+	err := validateLocalTenantSnapshots(root, snapshot, []string{presentID, missingID})
+	if err == nil || !strings.Contains(err.Error(), missingID) {
+		t.Fatalf("missing active tenant was accepted: %v", err)
+	}
+}
+
 func TestBackupRestorePreservesHitGeoNetworkMetadata(t *testing.T) {
 	ctx := context.Background()
 	tmpDir := t.TempDir()
@@ -246,12 +377,56 @@ func TestBackupRestorePreservesHitGeoNetworkMetadata(t *testing.T) {
 		asnOrg:   "Google LLC",
 	}
 
-	sourceStore := newMigratedRecoverTestStore(t, ctx, sourceDBPath)
-	siteID := seedGeoNetworkHitForBackup(t, ctx, sourceStore, expected)
-	runRecoverTestBackup(t, ctx, sourceStore, dataPath, backupDir)
-	targetPath := filepath.Join(tmpDir, "restored.db")
-	restoreLatestSharedSnapshot(t, ctx, backupDir, targetPath)
-	assertRestoredGeoNetworkHit(t, ctx, targetPath, siteID, expected)
+	control, err := controlstore.Open(ctx, sourceDBPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = control.Close() })
+	userID, err := control.CreateUser(ctx, "backup-geo@example.com", "hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	site, err := control.CreateSite(ctx, userID, "backup-geo.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tenantID, err := control.GetSiteTenantID(ctx, site.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := database.NewTenantStoreManager(control, dataPath, nil)
+	t.Cleanup(func() { _ = manager.Close() })
+	analytics, _, err := manager.ResolveSiteStore(ctx, site.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := analytics.CreateHit(ctx, &api.Hit{
+		SiteID: site.ID, SessionID: uuid.New(), PageID: uuid.New(), Timestamp: time.Now().UTC(), Path: "/geo-backup",
+		Region: &expected.region, City: &expected.city, Provider: &expected.provider, ASN: &expected.asn, ASNOrg: &expected.asnOrg,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	backupWorker := worker.NewBackupWorker(manager, dataPath, backupDir, 60, 24, nil, nil)
+	if err := backupWorker.Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(filepath.Join(backupDir, "shared"))
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("control snapshots=%d err=%v", len(entries), err)
+	}
+	snapshot := entries[0].Name()
+	restoredControl := filepath.Join(tmpDir, "restored-control.db")
+	if err := restoreSQLiteControlDatabase(ctx, restoredControl, filepath.Join(backupDir, "shared", snapshot), false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := controlstore.ValidateSnapshot(ctx, restoredControl); err != nil {
+		t.Fatal(err)
+	}
+	restoredTenant := filepath.Join(tmpDir, "restored-tenant.db")
+	if err := restoreDatabase(ctx, restoredTenant, filepath.Join(backupDir, "tenants", tenantID.String(), snapshot), false, nil); err != nil {
+		t.Fatal(err)
+	}
+	assertRestoredGeoNetworkHit(t, ctx, restoredTenant, site.ID, expected)
 }
 
 type geoNetworkBackupFixture struct {
@@ -273,43 +448,6 @@ func newMigratedRecoverTestStore(t *testing.T, ctx context.Context, dbPath strin
 		t.Fatalf("migrate source: %v", err)
 	}
 	return store
-}
-
-func seedGeoNetworkHitForBackup(t *testing.T, ctx context.Context, store *database.Store, fixture geoNetworkBackupFixture) uuid.UUID {
-	t.Helper()
-	userID, err := store.CreateUser(ctx, "backup-geo@example.com", "hash")
-	if err != nil {
-		t.Fatalf("create user: %v", err)
-	}
-	site, err := store.CreateSite(ctx, userID, "backup-geo.test")
-	if err != nil {
-		t.Fatalf("create site: %v", err)
-	}
-	if err := store.CreateHit(ctx, &api.Hit{
-		SiteID:    site.ID,
-		SessionID: uuid.New(),
-		PageID:    uuid.New(),
-		Timestamp: time.Now().UTC(),
-		Path:      "/geo-backup",
-		Region:    &fixture.region,
-		City:      &fixture.city,
-		Provider:  &fixture.provider,
-		ASN:       &fixture.asn,
-		ASNOrg:    &fixture.asnOrg,
-	}); err != nil {
-		t.Fatalf("create geo hit: %v", err)
-	}
-	return site.ID
-}
-
-func runRecoverTestBackup(t *testing.T, ctx context.Context, sourceStore *database.Store, dataPath string, backupDir string) {
-	t.Helper()
-	tenantMgr := database.NewTenantStoreManager(sourceStore, dataPath)
-	t.Cleanup(func() { _ = tenantMgr.Close() })
-	backupWorker := worker.NewBackupWorker(tenantMgr, dataPath, backupDir, 60, 24, nil, nil)
-	if err := backupWorker.Run(ctx); err != nil {
-		t.Fatalf("backup run: %v", err)
-	}
 }
 
 func TestDiscoverS3TenantBackupsFromRestoredControl(t *testing.T) {
@@ -406,21 +544,6 @@ func TestResolveRestoreS3ConfigPreservesTemporaryCredentialsAndEndpointTLS(t *te
 	})
 	if overridden.SessionToken != "flag-session-token" || !overridden.UseSSL {
 		t.Fatal("expected explicit restore flags to override S3 configuration")
-	}
-}
-
-func restoreLatestSharedSnapshot(t *testing.T, ctx context.Context, backupDir string, targetPath string) {
-	t.Helper()
-	entries, err := os.ReadDir(filepath.Join(backupDir, "shared"))
-	if err != nil {
-		t.Fatalf("read shared backup dir: %v", err)
-	}
-	if len(entries) == 0 {
-		t.Fatal("expected shared backup snapshot")
-	}
-	snapshotPath := filepath.Join(backupDir, "shared", entries[0].Name())
-	if err := restoreDatabase(ctx, targetPath, snapshotPath, false, nil); err != nil {
-		t.Fatalf("restoreDatabase: %v", err)
 	}
 }
 

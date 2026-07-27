@@ -6,19 +6,13 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/internal/database"
+	"hitkeep/internal/controlstore"
+	"hitkeep/internal/testutil"
 )
 
-func setupFilterStore(t *testing.T) (*database.Store, uuid.UUID, uuid.UUID, uuid.UUID) {
+func setupFilterStore(t *testing.T) (*controlstore.Store, uuid.UUID, uuid.UUID, uuid.UUID) {
 	t.Helper()
-
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
+	store := testutil.NewControlStore(t)
 
 	userID, err := store.CreateUser(context.Background(), "owner@example.com", "hashed-secret")
 	if err != nil {
@@ -114,13 +108,13 @@ func TestTrafficExclusionFilterMatchesContextAcrossScopes(t *testing.T) {
 		t.Fatalf("resolve team: %v", err)
 	}
 
-	if _, err := store.CreateInstanceTrafficExclusion(ctx, database.TrafficExclusionValues{Type: "user_agent", UserAgent: "HealthCheck"}, userID); err != nil {
+	if _, err := store.CreateInstanceTrafficExclusion(ctx, controlstore.TrafficExclusionValues{Type: "user_agent", UserAgent: "HealthCheck"}, userID); err != nil {
 		t.Fatalf("create instance user-agent exclusion: %v", err)
 	}
-	if _, err := store.CreateTeamTrafficExclusion(ctx, teamID, database.TrafficExclusionValues{Type: "path", Path: "/admin"}, userID); err != nil {
+	if _, err := store.CreateTeamTrafficExclusion(ctx, teamID, controlstore.TrafficExclusionValues{Type: "path", Path: "/admin"}, userID); err != nil {
 		t.Fatalf("create team path exclusion: %v", err)
 	}
-	if _, err := store.CreateSiteTrafficExclusion(ctx, siteID, database.TrafficExclusionValues{Type: "path", Path: "/private"}, userID); err != nil {
+	if _, err := store.CreateSiteTrafficExclusion(ctx, siteID, controlstore.TrafficExclusionValues{Type: "path", Path: "/private"}, userID); err != nil {
 		t.Fatalf("create site path exclusion: %v", err)
 	}
 
@@ -161,7 +155,7 @@ func TestTrafficExclusionFilterRefreshesNewRulesAndRootMatchesAllPaths(t *testin
 	if decision := filter.EvaluateTraffic(siteID, TrafficExclusionContext{Path: "/anything"}); decision.Blocked {
 		t.Fatalf("unexpected initial block: %#v", decision)
 	}
-	if _, err := store.CreateSiteTrafficExclusion(ctx, siteID, database.TrafficExclusionValues{Type: "path", Path: "/"}, userID); err != nil {
+	if _, err := store.CreateSiteTrafficExclusion(ctx, siteID, controlstore.TrafficExclusionValues{Type: "path", Path: "/"}, userID); err != nil {
 		t.Fatalf("create root path rule: %v", err)
 	}
 	if err := filter.Refresh(ctx); err != nil {

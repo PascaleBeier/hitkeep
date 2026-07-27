@@ -3,26 +3,19 @@
 package system
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"hitkeep/internal/config"
-	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/testutil"
 )
 
 func TestHandleGetStatusIncludesCloudMetadata(t *testing.T) {
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
+	store := testutil.NewControlStore(t)
 	defer store.Close()
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
 
 	h := &handler{
 		ctx: &shared.Context{

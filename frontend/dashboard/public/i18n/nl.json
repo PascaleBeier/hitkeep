@@ -2276,7 +2276,7 @@
       },
       "storage": {
         "title": "Opslag",
-        "sharedDb": "Gedeelde database",
+        "sharedDb": "Controledatabase",
         "sharedDbSize": "Maat",
         "dataPath": "Gegevenspad",
         "tenantDbs": "Databases van huurders",
@@ -2287,7 +2287,7 @@
           "size": "Maat",
           "path": "Pad"
         },
-        "memory": "DuckDB-geheugen",
+        "memory": "DuckDB-geheugen van tenants",
         "memoryOther": "Overig"
       },
       "ingest": {

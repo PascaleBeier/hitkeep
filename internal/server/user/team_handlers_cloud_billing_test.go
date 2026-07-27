@@ -9,9 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
-
-	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
@@ -224,17 +221,10 @@ func TestHandleUpsertTeamMemberRejectsExistingHostedCloudUserFromOtherTeam(t *te
 		t.Fatalf("create hosted user: %v", err)
 	}
 
-	otherTeamID := uuid.New()
-	if _, err := store.DB().ExecContext(context.Background(),
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		otherTeamID, "Existing Hosted Team", time.Now().UTC(),
-	); err != nil {
-		t.Fatalf("insert hosted team: %v", err)
+	_, err = store.CreateTenant(context.Background(), existingUserID, "Existing Hosted Team", "")
+	if err != nil {
+		t.Fatalf("create hosted team: %v", err)
 	}
-	if err := store.AddTeamMember(context.Background(), otherTeamID, existingUserID, database.TenantRoleOwner, existingUserID); err != nil {
-		t.Fatalf("add hosted member: %v", err)
-	}
-
 	body, err := json.Marshal(map[string]string{
 		"email": "member@cloud.test",
 		"role":  database.TenantRoleMember,

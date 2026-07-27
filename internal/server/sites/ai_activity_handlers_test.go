@@ -38,14 +38,14 @@ func setupAIActivityHandlerEnv(t *testing.T) (*handler, uuid.UUID, uuid.UUID, ti
 		{SessionID: uuid.New(), PageID: uuid.New(), Path: "/docs", Timestamp: base.Add(-26 * time.Hour), UserAgent: &uaGPT},
 	} {
 		hit.SiteID = site.ID
-		if err := store.CreateHit(ctx, hit); err != nil {
+		if err := mustSiteAnalyticsStore(t, h, site.ID).CreateHit(ctx, hit); err != nil {
 			t.Fatalf("create hit %s: %v", hit.Path, err)
 		}
 	}
 
 	responseMs := 120
 	bytesServed := int64(2048)
-	if err := store.CreateAIFetch(ctx, &api.AIFetch{
+	if err := mustSiteAnalyticsStore(t, h, site.ID).CreateAIFetch(ctx, &api.AIFetch{
 		SiteID:            site.ID,
 		Timestamp:         base.Add(-3 * time.Hour),
 		AssistantName:     "GPTBot",

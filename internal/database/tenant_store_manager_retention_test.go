@@ -3,53 +3,41 @@ package database
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 )
 
-func seedRetentionTestTeam(t *testing.T, ctx context.Context, store *Store) uuid.UUID {
+func seedRetentionTestTeam(t *testing.T, ctx context.Context, store *controlstore.Store) uuid.UUID {
 	t.Helper()
-	tenantID := uuid.New()
-	if _, err := store.DB().ExecContext(ctx,
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		tenantID, "Retention Test Team", time.Now().UTC(),
-	); err != nil {
-		t.Fatalf("insert tenant: %v", err)
-	}
-	return tenantID
+	return newManagerTestTenant(t, store, "Retention Test Team")
 }
 
-func seedRetentionTestSite(t *testing.T, ctx context.Context, store *Store, tenantID uuid.UUID, days int, syncedFromPlan bool) uuid.UUID {
+func seedRetentionTestSite(t *testing.T, ctx context.Context, store *controlstore.Store, tenantID uuid.UUID, days int, syncedFromPlan bool) uuid.UUID {
 	t.Helper()
-	userID := uuid.New()
-	siteID := uuid.New()
-	now := time.Now().UTC()
-
-	if _, err := store.DB().ExecContext(ctx,
-		"INSERT INTO users (id, email, password, created_at) VALUES (?, ?, ?, ?)",
-		userID, siteID.String()+"@example.com", "hash", now,
-	); err != nil {
-		t.Fatalf("insert user: %v", err)
+	userID, err := store.CreateUser(ctx, uuid.NewString()+"@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
 	}
-	if _, err := store.DB().ExecContext(ctx,
-		"INSERT INTO sites (id, user_id, domain, data_retention_days, retention_synced_from_plan, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-		siteID, userID, siteID.String()+".example.com", days, syncedFromPlan, now,
-	); err != nil {
-		t.Fatalf("insert site: %v", err)
+	if err := store.AddTeamMember(ctx, tenantID, userID, controlstore.TenantRoleMember, userID); err != nil {
+		t.Fatalf("add team member: %v", err)
 	}
-	if _, err := store.DB().ExecContext(ctx,
-		"INSERT INTO site_tenants (site_id, tenant_id, created_at) VALUES (?, ?, ?)",
-		siteID, tenantID, now,
-	); err != nil {
-		t.Fatalf("insert site_tenants: %v", err)
+	if err := store.SetActiveTenantID(ctx, userID, tenantID); err != nil {
+		t.Fatalf("set active tenant: %v", err)
 	}
-	return siteID
+	site, err := store.CreateSite(ctx, userID, uuid.NewString()+".example.com")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	if err := store.UpdateSiteRetention(ctx, site.ID, userID, days, syncedFromPlan); err != nil {
+		t.Fatalf("update site retention: %v", err)
+	}
+	return site.ID
 }
 
-func getRetentionTestSite(t *testing.T, ctx context.Context, store *Store, tenantID, siteID uuid.UUID) api.Site {
+func getRetentionTestSite(t *testing.T, ctx context.Context, store *controlstore.Store, tenantID, siteID uuid.UUID) api.Site {
 	t.Helper()
 	sites, err := store.ListSitesForTenant(ctx, tenantID)
 	if err != nil {
@@ -66,8 +54,8 @@ func getRetentionTestSite(t *testing.T, ctx context.Context, store *Store, tenan
 
 func TestSyncTeamRetentionClampsPlanManagedSiteAboveCap(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(store, t.TempDir())
+	store := newControlTestStore(t)
+	mgr := NewTenantStoreManager(store, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	tenantID := seedRetentionTestTeam(t, ctx, store)
@@ -89,8 +77,8 @@ func TestSyncTeamRetentionClampsPlanManagedSiteAboveCap(t *testing.T) {
 
 func TestSyncTeamRetentionLeavesPlanManagedSiteAtCapUnchanged(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(store, t.TempDir())
+	store := newControlTestStore(t)
+	mgr := NewTenantStoreManager(store, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	tenantID := seedRetentionTestTeam(t, ctx, store)
@@ -107,8 +95,8 @@ func TestSyncTeamRetentionLeavesPlanManagedSiteAtCapUnchanged(t *testing.T) {
 
 func TestSyncTeamRetentionRaisesPlanManagedSiteOnUpgrade(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(store, t.TempDir())
+	store := newControlTestStore(t)
+	mgr := NewTenantStoreManager(store, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	tenantID := seedRetentionTestTeam(t, ctx, store)
@@ -130,8 +118,8 @@ func TestSyncTeamRetentionRaisesPlanManagedSiteOnUpgrade(t *testing.T) {
 
 func TestSyncTeamRetentionClampsManuallyCustomizedSiteAboveCap(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(store, t.TempDir())
+	store := newControlTestStore(t)
+	mgr := NewTenantStoreManager(store, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	tenantID := seedRetentionTestTeam(t, ctx, store)
@@ -156,8 +144,8 @@ func TestSyncTeamRetentionClampsManuallyCustomizedSiteAboveCap(t *testing.T) {
 
 func TestSyncTeamRetentionLeavesManuallyCustomizedSiteUnchangedOnUpgrade(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(store, t.TempDir())
+	store := newControlTestStore(t)
+	mgr := NewTenantStoreManager(store, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	tenantID := seedRetentionTestTeam(t, ctx, store)
@@ -179,8 +167,8 @@ func TestSyncTeamRetentionLeavesManuallyCustomizedSiteUnchangedOnUpgrade(t *test
 
 func TestSyncTeamRetentionUnlimitedCapSetsPlanManagedSiteUnlimited(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(store, t.TempDir())
+	store := newControlTestStore(t)
+	mgr := NewTenantStoreManager(store, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	tenantID := seedRetentionTestTeam(t, ctx, store)
@@ -202,8 +190,8 @@ func TestSyncTeamRetentionUnlimitedCapSetsPlanManagedSiteUnlimited(t *testing.T)
 
 func TestSyncTeamRetentionUnlimitedCapLeavesManuallyCustomizedSiteUnchanged(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(store, t.TempDir())
+	store := newControlTestStore(t)
+	mgr := NewTenantStoreManager(store, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	tenantID := seedRetentionTestTeam(t, ctx, store)
@@ -220,8 +208,8 @@ func TestSyncTeamRetentionUnlimitedCapLeavesManuallyCustomizedSiteUnchanged(t *t
 
 func TestSyncTeamRetentionIdempotentReRun(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(store, t.TempDir())
+	store := newControlTestStore(t)
+	mgr := NewTenantStoreManager(store, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	tenantID := seedRetentionTestTeam(t, ctx, store)
@@ -241,8 +229,8 @@ func TestSyncTeamRetentionIdempotentReRun(t *testing.T) {
 
 func TestSyncTeamRetentionUnknownTeamReturnsZero(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(store, t.TempDir())
+	store := newControlTestStore(t)
+	mgr := NewTenantStoreManager(store, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	updated, err := mgr.SyncTeamRetention(ctx, uuid.New(), 60)
@@ -256,8 +244,8 @@ func TestSyncTeamRetentionUnknownTeamReturnsZero(t *testing.T) {
 
 func TestSyncTeamRetentionMultiSiteTeamOnlyTouchesSitesAboveCap(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(store, t.TempDir())
+	store := newControlTestStore(t)
+	mgr := NewTenantStoreManager(store, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	tenantID := seedRetentionTestTeam(t, ctx, store)

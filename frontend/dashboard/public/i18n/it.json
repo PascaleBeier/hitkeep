@@ -2290,7 +2290,7 @@
       },
       "storage": {
         "title": "Storage",
-        "sharedDb": "Database condiviso",
+        "sharedDb": "Database di controllo",
         "sharedDbSize": "Dimensione",
         "dataPath": "Percorso dati",
         "tenantDbs": "Database tenant",
@@ -2301,7 +2301,7 @@
           "size": "Dimensione",
           "path": "Percorso"
         },
-        "memory": "Memoria DuckDB",
+        "memory": "Memoria DuckDB dei tenant",
         "memoryOther": "Altro"
       },
       "ingest": {

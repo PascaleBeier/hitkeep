@@ -2314,7 +2314,7 @@
       },
       "storage": {
         "title": "Speicher",
-        "sharedDb": "Geteilte Datenbank",
+        "sharedDb": "Steuerungsdatenbank",
         "sharedDbSize": "Größe",
         "dataPath": "Datenpfad",
         "tenantDbs": "Mandanten-Datenbanken",
@@ -2325,7 +2325,7 @@
           "size": "Größe",
           "path": "Pfad"
         },
-        "memory": "DuckDB-Speicher",
+        "memory": "DuckDB-Speicher der Mandanten",
         "memoryOther": "Sonstige"
       },
       "ingest": {

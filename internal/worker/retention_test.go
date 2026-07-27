@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,46 +16,88 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/assetstore"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/importables"
+	"hitkeep/internal/testutil"
 )
 
-// newTestStore creates a file-backed DuckDB store for testing.
+type workerTestStoreEnvironment struct {
+	control  *controlstore.Store
+	dataPath string
+	manager  *database.TenantStoreManager
+}
+
+var workerTestStoreEnvironments sync.Map
+
+// newTestStore creates the default tenant's file-backed DuckDB store and an
+// independent SQLite control plane for testing.
 func newTestStore(t *testing.T) *database.Store {
 	t.Helper()
-	tmpDir := t.TempDir()
-	store := database.NewStore(filepath.Join(tmpDir, "test.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
+	control := testutil.NewControlStore(t)
+	dataPath := t.TempDir()
+	manager := database.NewTenantStoreManager(control, dataPath, nil)
+	store, err := manager.ForTenant(context.Background(), uuid.Nil)
+	if err != nil {
+		t.Fatalf("open default tenant store: %v", err)
 	}
-	t.Cleanup(func() { _ = store.Close() })
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	workerTestStoreEnvironments.Store(store, workerTestStoreEnvironment{control: control, dataPath: dataPath, manager: manager})
+	t.Cleanup(func() {
+		workerTestStoreEnvironments.Delete(store)
+		_ = manager.Close()
+		_ = control.Close()
+	})
 	return store
 }
 
-// newTestTenantMgr creates a TenantStoreManager backed by the given shared store.
+// newTestTenantMgr opens the manager for the SQLite control plane paired with
+// the supplied default-tenant analytics store.
 func newTestTenantMgr(t *testing.T, store *database.Store) *database.TenantStoreManager {
 	t.Helper()
-	mgr := database.NewTenantStoreManager(store, t.TempDir())
-	t.Cleanup(func() { _ = mgr.Close() })
-	return mgr
+	value, ok := workerTestStoreEnvironments.Load(store)
+	if !ok {
+		t.Fatal("test analytics store has no paired control plane")
+	}
+	env := value.(workerTestStoreEnvironment)
+	return env.manager
+}
+
+func testControlStore(t *testing.T, store *database.Store) *controlstore.Store {
+	t.Helper()
+	value, ok := workerTestStoreEnvironments.Load(store)
+	if !ok {
+		t.Fatal("test analytics store has no paired control plane")
+	}
+	return value.(workerTestStoreEnvironment).control
+}
+
+func testDataPath(t *testing.T, store *database.Store) string {
+	t.Helper()
+	value, ok := workerTestStoreEnvironments.Load(store)
+	if !ok {
+		t.Fatal("test analytics store has no paired control plane")
+	}
+	return value.(workerTestStoreEnvironment).dataPath
 }
 
 // seedSite creates a user and site with the given retention policy in days.
 func seedSite(t *testing.T, ctx context.Context, store *database.Store, retentionDays int) (siteID uuid.UUID) {
 	t.Helper()
-	userID, err := store.CreateUser(ctx, fmt.Sprintf("user-%s@example.com", uuid.New()), "hash")
+	control := testControlStore(t, store)
+	userID, err := control.CreateUser(ctx, fmt.Sprintf("user-%s@example.com", uuid.New()), "hash")
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
-	site, err := store.CreateSite(ctx, userID, "test.example.com")
+	site, err := control.CreateSite(ctx, userID, "test.example.com")
 	if err != nil {
 		t.Fatalf("create site: %v", err)
 	}
-	if _, err := store.DB().ExecContext(ctx, "UPDATE sites SET data_retention_days = ? WHERE id = ?", retentionDays, site.ID); err != nil {
+	if err := control.SetSiteRetentionDaysSystem(ctx, site.ID, retentionDays, false); err != nil {
 		t.Fatalf("set retention policy: %v", err)
+	}
+	site.DataRetentionDays = retentionDays
+	if err := store.UpsertSiteMirror(ctx, site); err != nil {
+		t.Fatalf("mirror site: %v", err)
 	}
 	return site.ID
 }
@@ -208,11 +251,12 @@ func TestRetentionPrunesQROpensAndArchivedAssets(t *testing.T) {
 	archiveDir := filepath.Join(t.TempDir(), "archive")
 	dataPath := t.TempDir()
 	siteID := seedSite(t, ctx, store, 1)
-	userID, err := store.CreateUser(ctx, fmt.Sprintf("qr-%s@example.com", uuid.New()), "hash")
+	control := testControlStore(t, store)
+	userID, err := control.CreateUser(ctx, fmt.Sprintf("qr-%s@example.com", uuid.New()), "hash")
 	if err != nil {
 		t.Fatalf("create qr user: %v", err)
 	}
-	qr, _, err := store.CreateQRCode(ctx, siteID, userID, api.QRCodeCreateRequest{
+	qr, _, err := control.CreateQRCode(ctx, siteID, userID, api.QRCodeCreateRequest{
 		Name:           "Window poster",
 		DestinationURL: "https://example.com/signup",
 		UTMSource:      "print",
@@ -223,7 +267,12 @@ func TestRetentionPrunesQROpensAndArchivedAssets(t *testing.T) {
 		t.Fatalf("create qr code: %v", err)
 	}
 	old := time.Now().UTC().Add(-72 * time.Hour)
-	if _, err := store.DB().ExecContext(ctx, "UPDATE qr_codes SET archived_at = ? WHERE id = ?", old, qr.ID); err != nil {
+	controlDB, err := sql.Open("sqlite", control.Path())
+	if err != nil {
+		t.Fatalf("open control fixture: %v", err)
+	}
+	defer controlDB.Close()
+	if _, err := controlDB.ExecContext(ctx, "UPDATE qr_codes SET archived_at = ? WHERE id = ?", old, qr.ID); err != nil {
 		t.Fatalf("age archived qr code: %v", err)
 	}
 	body := []byte{0x89, 'P', 'N', 'G'}
@@ -231,7 +280,7 @@ func TestRetentionPrunesQROpensAndArchivedAssets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("store qr asset file: %v", err)
 	}
-	if _, err := store.UpsertQRCodeAsset(ctx, api.QRCodeAsset{
+	if _, err := control.UpsertQRCodeAsset(ctx, api.QRCodeAsset{
 		QRCodeID:    qr.ID,
 		SiteID:      siteID,
 		Filename:    "logo.png",
@@ -256,7 +305,7 @@ func TestRetentionPrunesQROpensAndArchivedAssets(t *testing.T) {
 		t.Fatal("expected archived QR asset file to be deleted")
 	}
 	var remaining int
-	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM qr_code_assets WHERE site_id = ?", siteID).Scan(&remaining); err != nil {
+	if err := controlDB.QueryRowContext(ctx, "SELECT COUNT(*) FROM qr_code_assets WHERE site_id = ?", siteID).Scan(&remaining); err != nil {
 		t.Fatalf("count remaining qr assets: %v", err)
 	}
 	if remaining != 0 {
@@ -547,7 +596,7 @@ func TestRetentionArchivesSearchConsoleAndEveryRollupAndPrunesDirtyBuckets(t *te
 			}
 		}
 	}
-	defaultTenantID, err := store.GetDefaultTenantID(ctx)
+	defaultTenantID, err := testControlStore(t, store).GetDefaultTenantID(ctx)
 	if err != nil {
 		t.Fatalf("resolve default tenant for activity fixture: %v", err)
 	}
@@ -759,20 +808,24 @@ func TestRetentionArchivesToTenantScopedPathForNonDefaultTenant(t *testing.T) {
 	archiveDir := filepath.Join(t.TempDir(), "archive")
 	siteID := seedSite(t, ctx, store, 1)
 
-	customTenantID := uuid.New()
-	if _, err := store.DB().ExecContext(ctx,
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		customTenantID,
-		"Custom Tenant",
-		time.Now().UTC(),
-	); err != nil {
-		t.Fatalf("insert custom tenant: %v", err)
+	control := testControlStore(t, store)
+	ownerID, err := control.CreateUser(ctx, "custom-retention@example.test", "hash")
+	if err != nil {
+		t.Fatalf("create custom tenant owner: %v", err)
 	}
-	if _, err := store.DB().ExecContext(ctx, "UPDATE site_tenants SET tenant_id = ? WHERE site_id = ?", customTenantID, siteID); err != nil {
+	customTenant, err := control.CreateTenant(ctx, ownerID, "Custom Tenant", "")
+	if err != nil {
+		t.Fatalf("create custom tenant: %v", err)
+	}
+	customTenantID := customTenant.ID
+	if err := control.UpdateSiteTenant(ctx, siteID, customTenantID); err != nil {
 		t.Fatalf("update site tenant mapping: %v", err)
 	}
 
 	mgr := newTestTenantMgr(t, store)
+	if err := mgr.SyncSite(ctx, siteID); err != nil {
+		t.Fatalf("sync transferred site: %v", err)
+	}
 
 	// Insert hit into the non-default tenant's store (where retention now looks).
 	tenantStore, err := mgr.ForTenant(ctx, customTenantID)

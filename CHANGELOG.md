@@ -5,6 +5,8 @@
 ### Database migration
 
 * Split default-tenant analytics into `data/tenants/<tenant-id>/hitkeep.db` and run tenant files through one attached DuckDB data plane. This migration is mandatory in 2.13.0. Downgrading a split installation to 2.12 or older is unsupported because those releases do not understand the tenant file or split markers; restore a complete pre-upgrade backup instead.
+* Convert the compact control plane from DuckDB to pure-Go SQLite at the configured `HITKEEP_DB_PATH`. The verified former DuckDB control file is retained as `<db-path>.pre-sqlite-2.13.0`; it is migration evidence, not a downgrade database. Restore a complete pre-upgrade backup to downgrade.
+* Control backups now contain a validated `control.db.zst` SQLite snapshot plus checksum manifest, while tenant snapshots remain catalog-scoped DuckDB exports. Mutable `main` and `snapshot` image aliases are no longer published; `latest` remains on 2.12 until the gated 2.13 release.
 * Restore every tenant database from S3 backup snapshots by deriving tenant object prefixes from the restored control snapshot, including temporary STS credentials and non-TLS S3-compatible endpoints.
 
 ## [2.12.0](https://github.com/PascaleBeier/hitkeep/compare/v2.11.0...v2.12.0) (2026-07-14)

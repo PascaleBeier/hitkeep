@@ -16,9 +16,11 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/testutil"
 	"hitkeep/internal/webhooks"
 )
 
@@ -48,18 +50,14 @@ func (d *adminTestMailDriver) Send(recipients []string, subject, htmlBody, textB
 
 func (d *adminTestMailDriver) Close() error { return nil }
 
-func setupAdminTestEnv(t *testing.T) (*handler, *database.Store, *database.TenantStoreManager, string, uuid.UUID, uuid.UUID) {
+func setupAdminTestEnv(t *testing.T) (*handler, *controlstore.Store, *database.TenantStoreManager, string, uuid.UUID, uuid.UUID) {
 	t.Helper()
 
 	basePath := t.TempDir()
-	store := database.NewStore(filepath.Join(basePath, "shared.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
+	store := testutil.NewControlStore(t)
+	tenantStores := database.NewTenantStoreManager(store, basePath, nil)
 	t.Cleanup(func() { _ = store.Close() })
+	t.Cleanup(func() { _ = tenantStores.Close() })
 
 	targetUserID, err := store.CreateUser(context.Background(), "target-owner@example.com", "hash")
 	if err != nil {
@@ -69,9 +67,6 @@ func setupAdminTestEnv(t *testing.T) (*handler, *database.Store, *database.Tenan
 	if err != nil {
 		t.Fatalf("create actor user: %v", err)
 	}
-
-	tenantStores := database.NewTenantStoreManager(store, basePath)
-	t.Cleanup(func() { _ = tenantStores.Close() })
 
 	ctx := &shared.Context{
 		Store:        store,
@@ -539,12 +534,13 @@ func TestHandleAdminForceDeletePurgesEmptyActiveHostedCloudTeam(t *testing.T) {
 	h.ctx.Config.CloudHosted = true
 	ctx := context.Background()
 
-	teamID := uuid.New()
-	if _, err := store.DB().ExecContext(ctx,
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		teamID, "Empty Cloud Team", time.Now().UTC(),
-	); err != nil {
-		t.Fatalf("create empty team: %v", err)
+	team, err := store.CreateTenant(ctx, actorUserID, "Empty Cloud Team", "")
+	if err != nil {
+		t.Fatalf("create empty team fixture: %v", err)
+	}
+	teamID := team.ID
+	if err := store.RemoveTeamMember(ctx, teamID, actorUserID); err != nil {
+		t.Fatalf("remove empty team fixture owner: %v", err)
 	}
 
 	req := withAdminTestUser(httptest.NewRequest(http.MethodDelete, "/api/admin/teams/"+teamID.String()+"?force=true", nil), actorUserID)
@@ -578,8 +574,8 @@ func TestHandleAdminForceDeletePurgesAlreadyArchivedHostedCloudTeam(t *testing.T
 	if err != nil {
 		t.Fatalf("create customer team: %v", err)
 	}
-	if _, err := store.DB().ExecContext(ctx, "INSERT INTO tenant_archives (tenant_id, archived_at, archived_by) VALUES (?, ?, ?)", team.ID, time.Now().UTC(), actorUserID); err != nil {
-		t.Fatalf("archive team directly: %v", err)
+	if err := store.AdminArchiveTenant(ctx, team.ID, actorUserID); err != nil {
+		t.Fatalf("archive team: %v", err)
 	}
 
 	req := withAdminTestUser(httptest.NewRequest(http.MethodDelete, "/api/admin/teams/"+team.ID.String()+"?force=true", nil), actorUserID)
@@ -937,7 +933,7 @@ func TestHandleSiteMemberPermissionMutationsAppendCentralAudit(t *testing.T) {
 	assertPermissionAuditEntry(t, store, "permission.site_member_revoked", teamID, targetUserID, site.ID, "", "", "")
 }
 
-func createAdminTestTeamSite(t *testing.T, store *database.Store, actorUserID uuid.UUID, teamName string, domain string) (*api.Team, *api.Site) {
+func createAdminTestTeamSite(t *testing.T, store *controlstore.Store, actorUserID uuid.UUID, teamName string, domain string) (*api.Team, *api.Site) {
 	t.Helper()
 
 	ctx := context.Background()
@@ -955,7 +951,7 @@ func createAdminTestTeamSite(t *testing.T, store *database.Store, actorUserID uu
 	return team, site
 }
 
-func siteMemberRole(t *testing.T, store *database.Store, siteID, userID uuid.UUID) string {
+func siteMemberRole(t *testing.T, store *controlstore.Store, siteID, userID uuid.UUID) string {
 	t.Helper()
 
 	members, err := store.GetSiteMembers(context.Background(), siteID)
@@ -971,7 +967,7 @@ func siteMemberRole(t *testing.T, store *database.Store, siteID, userID uuid.UUI
 	return ""
 }
 
-func assertPermissionAuditEntry(t *testing.T, store *database.Store, action string, teamID, targetUserID, siteID uuid.UUID, expectedIP, expectedUserAgent, expectedRequestID string) {
+func assertPermissionAuditEntry(t *testing.T, store *controlstore.Store, action string, teamID, targetUserID, siteID uuid.UUID, expectedIP, expectedUserAgent, expectedRequestID string) {
 	t.Helper()
 
 	entries, total, err := store.ListInstanceAuditEntries(context.Background(), database.InstanceAuditFilter{
@@ -1006,7 +1002,7 @@ func assertPermissionAuditEntry(t *testing.T, store *database.Store, action stri
 	}
 }
 
-func assertGlobalExclusionAuditEntry(t *testing.T, store *database.Store, action string, targetID string, targetLabel string, expectedIP string, expectedUserAgent string, expectedRequestID string) {
+func assertGlobalExclusionAuditEntry(t *testing.T, store *controlstore.Store, action string, targetID string, targetLabel string, expectedIP string, expectedUserAgent string, expectedRequestID string) {
 	t.Helper()
 
 	entries, total, err := store.ListInstanceAuditEntries(context.Background(), database.InstanceAuditFilter{

@@ -16,6 +16,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/appurl"
 	authcore "hitkeep/internal/auth"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailables"
@@ -63,9 +64,9 @@ func (h *handler) handleAdminArchiveTeam() http.HandlerFunc {
 		err = h.archiveTeam(r.Context(), teamID, actorID)
 		if err != nil {
 			switch {
-			case errors.Is(err, database.ErrTeamArchiveDefaultTenant):
+			case errors.Is(err, controlstore.ErrTeamArchiveDefaultTenant):
 				http.Error(w, "The default team cannot be archived", http.StatusBadRequest)
-			case errors.Is(err, database.ErrTenantMembershipRequired):
+			case errors.Is(err, controlstore.ErrTenantMembershipRequired):
 				http.Error(w, "Team not found or already archived", http.StatusBadRequest)
 			default:
 				slog.Error("Failed to archive team", "error", err, "team_id", teamID)
@@ -99,11 +100,11 @@ func (h *handler) handleAdminDeleteTeam() http.HandlerFunc {
 			if h.ctx.Config.CloudHosted {
 				purgeable, purgeableErr := h.ctx.Store.GetPurgeableTenant(r.Context(), teamID)
 				if purgeableErr != nil {
-					if errors.Is(purgeableErr, database.ErrTeamPurgeNotArchived) {
+					if errors.Is(purgeableErr, controlstore.ErrTeamPurgeNotArchived) {
 						actorID := shared.GetUserIDFromContext(r)
 						archived, archiveErr := h.archiveEmptyHostedCloudTeamForForceDelete(r.Context(), teamID, actorID)
 						if archiveErr != nil {
-							if errors.Is(archiveErr, database.ErrTeamArchiveDefaultTenant) {
+							if errors.Is(archiveErr, controlstore.ErrTeamArchiveDefaultTenant) {
 								http.Error(w, "The default team cannot be deleted", http.StatusBadRequest)
 								return
 							}
@@ -115,7 +116,7 @@ func (h *handler) handleAdminDeleteTeam() http.HandlerFunc {
 							http.Error(w, "Managed cloud teams cannot be force deleted", http.StatusForbidden)
 							return
 						}
-					} else if errors.Is(purgeableErr, database.ErrTeamPurgeDefaultTenant) {
+					} else if errors.Is(purgeableErr, controlstore.ErrTeamPurgeDefaultTenant) {
 						http.Error(w, "The default team cannot be deleted", http.StatusBadRequest)
 						return
 					} else {
@@ -147,8 +148,8 @@ func (h *handler) handleAdminDeleteTeam() http.HandlerFunc {
 				}
 
 				archiveErr := h.archiveTeam(r.Context(), teamID, actorID)
-				if archiveErr != nil && !errors.Is(archiveErr, database.ErrTenantMembershipRequired) {
-					if errors.Is(archiveErr, database.ErrTeamArchiveDefaultTenant) {
+				if archiveErr != nil && !errors.Is(archiveErr, controlstore.ErrTenantMembershipRequired) {
+					if errors.Is(archiveErr, controlstore.ErrTeamArchiveDefaultTenant) {
 						http.Error(w, "The default team cannot be deleted", http.StatusBadRequest)
 						return
 					}
@@ -162,11 +163,11 @@ func (h *handler) handleAdminDeleteTeam() http.HandlerFunc {
 		deleted, err := h.ctx.TenantStores.PurgeArchivedTenant(r.Context(), teamID)
 		if err != nil {
 			switch {
-			case errors.Is(err, database.ErrTeamPurgeDefaultTenant):
+			case errors.Is(err, controlstore.ErrTeamPurgeDefaultTenant):
 				http.Error(w, "The default team cannot be deleted", http.StatusBadRequest)
-			case errors.Is(err, database.ErrTeamPurgeNotArchived):
+			case errors.Is(err, controlstore.ErrTeamPurgeNotArchived):
 				http.Error(w, "Archive the team before deleting it", http.StatusBadRequest)
-			case errors.Is(err, database.ErrTeamPurgeHasSites):
+			case errors.Is(err, controlstore.ErrTeamPurgeHasSites):
 				http.Error(w, "Transfer or delete all sites before deleting the team", http.StatusBadRequest)
 			default:
 				slog.Error("Failed to purge archived team", "error", err, "team_id", teamID)
@@ -471,7 +472,7 @@ func (h *handler) createSiteTeamInvite(ctx context.Context, teamID, actorID, use
 	if err == nil {
 		return invite, nil
 	}
-	if !errors.Is(err, database.ErrTeamInviteAlreadyPending) {
+	if !errors.Is(err, controlstore.ErrTeamInviteAlreadyPending) {
 		return nil, err
 	}
 	invite, err = h.findPendingTeamInviteForSite(ctx, teamID, email)
@@ -479,7 +480,7 @@ func (h *handler) createSiteTeamInvite(ctx context.Context, teamID, actorID, use
 		return nil, err
 	}
 	if invite == nil {
-		return nil, database.ErrTeamInviteAlreadyPending
+		return nil, controlstore.ErrTeamInviteAlreadyPending
 	}
 	return invite, nil
 }

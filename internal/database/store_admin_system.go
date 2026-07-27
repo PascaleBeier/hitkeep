@@ -277,15 +277,11 @@ func (s *Store) GetRecentIngestCounts(ctx context.Context, since time.Time) (Rec
 }
 
 func (m *TenantStoreManager) GetRecentIngestCounts(ctx context.Context, since time.Time) (RecentIngestCounts, error) {
-	if m == nil || m.shared == nil {
+	if m == nil || m.control == nil {
 		return RecentIngestCounts{}, fmt.Errorf("tenant store manager is not configured")
 	}
-	if !m.dataPlaneEnabled {
-		return RecentIngestCounts{}, fmt.Errorf("tenant analytics data plane is unavailable")
-	}
-
 	var total RecentIngestCounts
-	tenants, err := m.shared.GetTenantList(ctx)
+	tenants, err := m.control.GetTenantList(ctx)
 	if err != nil {
 		return RecentIngestCounts{}, fmt.Errorf("list tenants for ingest counts: %w", err)
 	}
@@ -295,10 +291,6 @@ func (m *TenantStoreManager) GetRecentIngestCounts(ctx context.Context, since ti
 		if err != nil {
 			return RecentIngestCounts{}, fmt.Errorf("open tenant store %s: %w", tenant.TenantID, err)
 		}
-		if store == m.shared {
-			continue
-		}
-
 		counts, err := store.GetRecentIngestCounts(ctx, since)
 		if err != nil {
 			return RecentIngestCounts{}, fmt.Errorf("count tenant ingest %s: %w", tenant.TenantID, err)

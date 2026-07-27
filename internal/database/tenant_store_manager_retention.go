@@ -32,7 +32,7 @@ func (m *TenantStoreManager) SyncTeamRetention(ctx context.Context, teamID uuid.
 		maxRetentionDays = 0
 	}
 
-	sites, err := m.shared.ListSitesForTenant(ctx, teamID)
+	sites, err := m.control.ListSitesForTenant(ctx, teamID)
 	if err != nil {
 		return 0, err
 	}
@@ -45,7 +45,7 @@ func (m *TenantStoreManager) SyncTeamRetention(ctx context.Context, teamID uuid.
 			continue
 		}
 
-		if err := m.shared.SetSiteRetentionDaysSystem(ctx, site.ID, newDays, site.RetentionSyncedFromPlan); err != nil {
+		if err := m.control.SetSiteRetentionDaysSystem(ctx, site.ID, newDays, site.RetentionSyncedFromPlan); err != nil {
 			if firstErr == nil {
 				firstErr = err
 			}

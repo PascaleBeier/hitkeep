@@ -2302,7 +2302,7 @@
       },
       "storage": {
         "title": "Almacenamiento",
-        "sharedDb": "Base compartida",
+        "sharedDb": "Base de datos de control",
         "sharedDbSize": "Tamaño",
         "dataPath": "Ruta de datos",
         "tenantDbs": "Bases de tenants",
@@ -2313,7 +2313,7 @@
           "size": "Tamaño",
           "path": "Ruta"
         },
-        "memory": "Memoria de DuckDB",
+        "memory": "Memoria de DuckDB de los inquilinos",
         "memoryOther": "Otros"
       },
       "ingest": {

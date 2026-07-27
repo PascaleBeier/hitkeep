@@ -5,9 +5,6 @@ import (
 	"database/sql"
 	"path/filepath"
 	"testing"
-	"time"
-
-	"github.com/google/uuid"
 )
 
 func querySetting(t *testing.T, store *Store, name string) string {
@@ -66,26 +63,11 @@ func TestConnectRejectsNegativeThreads(t *testing.T) {
 
 func TestTenantStoreInheritsDuckDBSettings(t *testing.T) {
 	ctx := context.Background()
-	tmpDir := t.TempDir()
-	shared := NewStore(filepath.Join(tmpDir, "shared.db"), WithMemoryLimit("1GiB"))
-	if err := shared.Connect(); err != nil {
-		t.Fatalf("connect shared: %v", err)
-	}
-	t.Cleanup(func() { _ = shared.Close() })
-	if err := shared.Migrate(ctx); err != nil {
-		t.Fatalf("migrate shared: %v", err)
-	}
-
-	mgr := NewTenantStoreManager(shared, t.TempDir())
+	control := newControlTestStore(t)
+	mgr := NewTenantStoreManager(control, t.TempDir(), []StoreOption{WithMemoryLimit("1GiB")})
 	t.Cleanup(func() { _ = mgr.Close() })
 
-	tenantID := uuid.New()
-	if _, err := shared.DB().ExecContext(ctx,
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		tenantID, "Settings Tenant", time.Now().UTC(),
-	); err != nil {
-		t.Fatalf("insert tenant: %v", err)
-	}
+	tenantID := newManagerTestTenant(t, control, "Settings Tenant")
 
 	tenantStore, err := mgr.ForTenant(ctx, tenantID)
 	if err != nil {

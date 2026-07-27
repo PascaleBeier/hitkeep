@@ -15,19 +15,14 @@ import (
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/testutil"
 	"hitkeep/internal/webhookdispatcher"
 	webhookcore "hitkeep/internal/webhooks"
 )
 
 func TestSiteWebhookHandlerLifecycleAndAudit(t *testing.T) {
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
+	store := testutil.NewControlStore(t)
 	defer store.Close()
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
 	ownerID, err := store.CreateUser(context.Background(), "webhook-owner@example.test", "hash")
 	if err != nil {
 		t.Fatalf("create owner: %v", err)
@@ -127,14 +122,8 @@ type failingTestProducer struct{}
 func (*failingTestProducer) Publish(string, []byte) error { return context.DeadlineExceeded }
 
 func TestWebhookHandlerRejectsInvalidDestinationAndEventScope(t *testing.T) {
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
+	store := testutil.NewControlStore(t)
 	defer store.Close()
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
 	ownerID, _ := store.CreateUser(context.Background(), "invalid-webhook@example.test", "hash")
 	site, _ := store.CreateSite(context.Background(), ownerID, "invalid-webhook.example.test")
 	h := &handler{ctx: &shared.Context{Store: store, Config: &config.Config{}}}

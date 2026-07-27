@@ -9,12 +9,13 @@ import (
 
 	"hitkeep/internal/auth"
 	"hitkeep/internal/config"
-	"hitkeep/internal/database"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/entitlements"
+	"hitkeep/internal/testutil"
 )
 
 type serviceEnv struct {
-	store   *database.Store
+	store   *controlstore.Store
 	cfg     *config.Config
 	ownerID uuid.UUID
 	teamID  uuid.UUID
@@ -23,14 +24,8 @@ type serviceEnv struct {
 func newServiceEnv(t *testing.T) serviceEnv {
 	t.Helper()
 
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect test db: %v", err)
-	}
+	store := testutil.NewControlStore(t)
 	t.Cleanup(func() { _ = store.Close() })
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate test db: %v", err)
-	}
 
 	ownerID, err := store.CreateUser(context.Background(), "owner@example.test", "hash")
 	if err != nil {

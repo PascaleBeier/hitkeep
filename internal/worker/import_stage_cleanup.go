@@ -14,25 +14,26 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 )
 
 const importStageCleanupInterval = 24 * time.Hour
 
 type ImportStageCleanupWorker struct {
-	store         *database.Store
+	store         *controlstore.Store
 	dataPath      string
 	retentionDays int
 	status        *database.ImportStageCleanupStatusTracker
 }
 
 type ImportStageCleaner struct {
-	store         *database.Store
+	store         *controlstore.Store
 	dataPath      string
 	retentionDays int
 }
 
-func NewImportStageCleanupWorker(store *database.Store, dataPath string, retentionDays int, status *database.ImportStageCleanupStatusTracker) *ImportStageCleanupWorker {
+func NewImportStageCleanupWorker(store *controlstore.Store, dataPath string, retentionDays int, status *database.ImportStageCleanupStatusTracker) *ImportStageCleanupWorker {
 	return &ImportStageCleanupWorker{
 		store:         store,
 		dataPath:      dataPath,
@@ -41,7 +42,7 @@ func NewImportStageCleanupWorker(store *database.Store, dataPath string, retenti
 	}
 }
 
-func NewImportStageCleaner(store *database.Store, dataPath string, retentionDays int) *ImportStageCleaner {
+func NewImportStageCleaner(store *controlstore.Store, dataPath string, retentionDays int) *ImportStageCleaner {
 	return &ImportStageCleaner{
 		store:         store,
 		dataPath:      normalizeImportStageDataPath(dataPath),
@@ -82,7 +83,7 @@ func (w *ImportStageCleanupWorker) Start(ctx context.Context) {
 	}
 }
 
-func RunImportStageCleanup(ctx context.Context, store *database.Store, dataPath string, retentionDays int, status *database.ImportStageCleanupStatusTracker) (api.ImportStageCleanupRunResult, error) {
+func RunImportStageCleanup(ctx context.Context, store *controlstore.Store, dataPath string, retentionDays int, status *database.ImportStageCleanupStatusTracker) (api.ImportStageCleanupRunResult, error) {
 	cleaner := NewImportStageCleaner(store, dataPath, retentionDays)
 	result, err := cleaner.Run(ctx)
 	finishedAt := time.Now().UTC()

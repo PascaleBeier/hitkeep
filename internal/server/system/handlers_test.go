@@ -6,14 +6,16 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/testutil"
 )
 
 func TestHealthzIsLivenessOnly(t *testing.T) {
+	store := testutil.NewControlStore(t)
+	defer store.Close()
 	h := &handler{
 		ctx: &shared.Context{
-			Store: database.NewStore(":memory:"),
+			Store: store,
 		},
 	}
 

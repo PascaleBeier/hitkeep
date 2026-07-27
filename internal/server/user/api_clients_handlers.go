@@ -14,6 +14,7 @@ import (
 
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
 )
@@ -271,11 +272,11 @@ func (h *handler) handleRotateAPIClient() http.HandlerFunc {
 
 		client, token, err := h.ctx.Store.RotateAPIClient(r.Context(), userID, clientID)
 		if err != nil {
-			if errors.Is(err, database.ErrAPIClientNotFound) {
+			if errors.Is(err, controlstore.ErrAPIClientNotFound) {
 				http.Error(w, "API client not found", http.StatusNotFound)
 				return
 			}
-			if errors.Is(err, database.ErrAPIClientInactive) {
+			if errors.Is(err, controlstore.ErrAPIClientInactive) {
 				http.Error(w, "API client is revoked or expired", http.StatusConflict)
 				return
 			}
@@ -328,7 +329,7 @@ func (h *handler) handleDeleteAPIClient() http.HandlerFunc {
 
 		err = h.ctx.Store.DeleteAPIClient(r.Context(), userID, clientID)
 		if err != nil {
-			if errors.Is(err, database.ErrAPIClientNotFound) {
+			if errors.Is(err, controlstore.ErrAPIClientNotFound) {
 				http.Error(w, "API client not found", http.StatusNotFound)
 				return
 			}
@@ -529,11 +530,11 @@ func (h *handler) handleRotateTeamAPIClient() http.HandlerFunc {
 
 		client, token, err := h.ctx.Store.RotateTeamAPIClient(r.Context(), teamID, clientID)
 		if err != nil {
-			if errors.Is(err, database.ErrAPIClientNotFound) {
+			if errors.Is(err, controlstore.ErrAPIClientNotFound) {
 				http.Error(w, "API client not found", http.StatusNotFound)
 				return
 			}
-			if errors.Is(err, database.ErrAPIClientInactive) {
+			if errors.Is(err, controlstore.ErrAPIClientInactive) {
 				http.Error(w, "API client is revoked or expired", http.StatusConflict)
 				return
 			}
@@ -585,7 +586,7 @@ func (h *handler) handleDeleteTeamAPIClient() http.HandlerFunc {
 
 		err = h.ctx.Store.DeleteTeamAPIClient(r.Context(), teamID, clientID)
 		if err != nil {
-			if errors.Is(err, database.ErrAPIClientNotFound) {
+			if errors.Is(err, controlstore.ErrAPIClientNotFound) {
 				http.Error(w, "API client not found", http.StatusNotFound)
 				return
 			}

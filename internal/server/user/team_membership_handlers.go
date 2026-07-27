@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	serverauth "hitkeep/internal/server/auth"
@@ -141,7 +142,7 @@ func (h *handler) updateExistingTeamMember(w http.ResponseWriter, r *http.Reques
 func (h *handler) createPendingTeamInvite(w http.ResponseWriter, r *http.Request, teamID, actorID, targetUserID uuid.UUID, email, role string, requiresPasswordSetup bool) {
 	invite, err := h.ctx.Store.CreateTeamInvite(r.Context(), teamID, email, role, &targetUserID, actorID, requiresPasswordSetup)
 	if err != nil {
-		if errors.Is(err, database.ErrTeamInviteAlreadyPending) {
+		if errors.Is(err, controlstore.ErrTeamInviteAlreadyPending) {
 			http.Error(w, "Invite already pending", http.StatusConflict)
 			return
 		}
@@ -298,7 +299,7 @@ func (h *handler) handleResendTeamInvite() http.HandlerFunc {
 		invite, err := h.ctx.Store.ResendTeamInvite(r.Context(), teamID, inviteID)
 		if err != nil {
 			switch {
-			case errors.Is(err, database.ErrTeamInviteNotFound):
+			case errors.Is(err, controlstore.ErrTeamInviteNotFound):
 				http.Error(w, "Invite not found", http.StatusNotFound)
 				return
 			default:
@@ -346,7 +347,7 @@ func (h *handler) handleRevokeTeamInvite() http.HandlerFunc {
 		invite, err := h.ctx.Store.GetTeamInvite(r.Context(), teamID, inviteID)
 		if err != nil {
 			switch {
-			case errors.Is(err, database.ErrTeamInviteNotFound):
+			case errors.Is(err, controlstore.ErrTeamInviteNotFound):
 				http.Error(w, "Invite not found", http.StatusNotFound)
 				return
 			default:
@@ -358,7 +359,7 @@ func (h *handler) handleRevokeTeamInvite() http.HandlerFunc {
 
 		if err := h.ctx.Store.RevokeTeamInvite(r.Context(), teamID, inviteID); err != nil {
 			switch {
-			case errors.Is(err, database.ErrTeamInviteNotFound):
+			case errors.Is(err, controlstore.ErrTeamInviteNotFound):
 				http.Error(w, "Invite not found", http.StatusNotFound)
 				return
 			default:
@@ -488,16 +489,16 @@ func (h *handler) handleTransferTeamOwnership() http.HandlerFunc {
 
 		if err := h.ctx.Store.TransferTeamOwnership(r.Context(), teamID, actorID, targetUserID); err != nil {
 			switch {
-			case errors.Is(err, database.ErrTenantMembershipRequired), errors.Is(err, database.ErrTeamTransferRequiresOwner):
+			case errors.Is(err, controlstore.ErrTenantMembershipRequired), errors.Is(err, controlstore.ErrTeamTransferRequiresOwner):
 				writeTeamActionError(w, http.StatusForbidden, "ownership_transfer_forbidden", "Only team owners can transfer ownership")
 				return
-			case errors.Is(err, database.ErrTeamTransferTargetNotMember):
+			case errors.Is(err, controlstore.ErrTeamTransferTargetNotMember):
 				writeTeamActionError(w, http.StatusBadRequest, "ownership_transfer_target_invalid", "The selected user must already be a team member")
 				return
-			case errors.Is(err, database.ErrTeamTransferSelf):
+			case errors.Is(err, controlstore.ErrTeamTransferSelf):
 				writeTeamActionError(w, http.StatusConflict, "ownership_transfer_self", "Ownership transfer requires a different team member")
 				return
-			case errors.Is(err, database.ErrTeamTransferTargetAlreadyOwner):
+			case errors.Is(err, controlstore.ErrTeamTransferTargetAlreadyOwner):
 				writeTeamActionError(w, http.StatusConflict, "ownership_transfer_already_owner", "The selected member is already an owner")
 				return
 			default:
@@ -537,13 +538,13 @@ func (h *handler) handleArchiveTeam() http.HandlerFunc {
 
 		if err := h.ctx.Store.ArchiveTenant(r.Context(), teamID, actorID); err != nil {
 			switch {
-			case errors.Is(err, database.ErrTenantMembershipRequired), errors.Is(err, database.ErrTeamArchiveRequiresOwner):
+			case errors.Is(err, controlstore.ErrTenantMembershipRequired), errors.Is(err, controlstore.ErrTeamArchiveRequiresOwner):
 				writeTeamActionError(w, http.StatusForbidden, "team_archive_forbidden", "Only team owners can archive this team")
 				return
-			case errors.Is(err, database.ErrTeamArchiveDefaultTenant):
+			case errors.Is(err, controlstore.ErrTeamArchiveDefaultTenant):
 				writeTeamActionError(w, http.StatusBadRequest, "team_archive_default_forbidden", "The default team cannot be archived")
 				return
-			case errors.Is(err, database.ErrTeamArchiveHasSites):
+			case errors.Is(err, controlstore.ErrTeamArchiveHasSites):
 				writeTeamActionError(w, http.StatusBadRequest, "team_archive_has_sites", "Transfer or delete all sites before archiving this team")
 				return
 			default:
@@ -655,13 +656,13 @@ func (h *handler) handleLeaveTeam() http.HandlerFunc {
 		nextActiveTeamID, err := h.ctx.Store.LeaveTeam(r.Context(), teamID, userID)
 		if err != nil {
 			switch {
-			case errors.Is(err, database.ErrTenantMembershipRequired):
+			case errors.Is(err, controlstore.ErrTenantMembershipRequired):
 				writeTeamActionError(w, http.StatusForbidden, "team_membership_required", "Access denied")
 				return
-			case errors.Is(err, database.ErrTeamLastOwner):
+			case errors.Is(err, controlstore.ErrTeamLastOwner):
 				writeTeamActionError(w, http.StatusBadRequest, "team_last_owner", "Cannot leave as the last owner")
 				return
-			case errors.Is(err, database.ErrUserOnlyTeam):
+			case errors.Is(err, controlstore.ErrUserOnlyTeam):
 				writeTeamActionError(w, http.StatusBadRequest, "user_only_team", "Cannot leave your only team")
 				return
 			default:

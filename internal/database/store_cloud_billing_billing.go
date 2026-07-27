@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"hitkeep/internal/controlstore"
 )
 
 const (
@@ -76,45 +78,16 @@ func CloudSubscriptionStatusIsFree(status string) bool {
 	return false
 }
 
-type CreateManagedCloudAccountInput struct {
-	Email          string
-	HashedPassword string
-	GivenName      string
-	LastName       string
-	TeamName       string
-	Locale         string
-}
+type CreateManagedCloudAccountInput = controlstore.CreateManagedCloudAccountInput
 
 type ManagedCloudAccount struct {
 	UserID   uuid.UUID
 	TenantID uuid.UUID
 }
 
-type CloudBillingAccount struct {
-	TenantID             uuid.UUID
-	PlanCode             string
-	PlanName             string
-	BillingInterval      string
-	SubscriptionStatus   string
-	StripeCustomerID     string
-	StripeSubscriptionID string
-	StripePriceID        string
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
-}
+type CloudBillingAccount = controlstore.CloudBillingAccount
 
-type CloudBillingEvent struct {
-	StripeEventID    string
-	TenantID         uuid.UUID
-	EventType        string
-	Livemode         bool
-	Payload          string
-	ProcessingStatus string
-	ProcessingError  string
-	ProcessedAt      *time.Time
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-}
+type CloudBillingEvent = controlstore.CloudBillingEvent
 
 func (s *Store) CreateManagedCloudAccount(ctx context.Context, input CreateManagedCloudAccountInput) (*ManagedCloudAccount, error) {
 	email := strings.TrimSpace(strings.ToLower(input.Email))

@@ -568,9 +568,10 @@ func TestFreshSchemasCarryNoAnalyticsArtIndexes(t *testing.T) {
 		}
 	}
 
-	mgr := NewTenantStoreManager(shared, t.TempDir())
+	control := newControlTestStore(t)
+	mgr := NewTenantStoreManager(control, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
-	tenantStore, err := mgr.ForTenant(ctx, insertTestTenant(t, shared))
+	tenantStore, err := mgr.ForTenant(ctx, insertTestTenant(t, control))
 	if err != nil {
 		t.Fatalf("ForTenant: %v", err)
 	}

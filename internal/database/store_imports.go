@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 )
 
 const (
@@ -30,13 +31,7 @@ const (
 	ImportStageExpiredMessage = "staged import files expired before the import was started"
 )
 
-type ImportFileCreate struct {
-	ID           uuid.UUID
-	Filename     string
-	RelativePath string
-	SizeBytes    int64
-	SHA256       string
-}
+type ImportFileCreate = controlstore.ImportFileCreate
 
 type StagedImportFile struct {
 	api.ImportUploadFile

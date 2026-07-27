@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/internal/database"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/webhooks"
 )
 
@@ -20,12 +20,12 @@ type Producer interface {
 }
 
 type Emitter struct {
-	store      *database.Store
+	store      *controlstore.Store
 	producer   Producer
 	apiVersion string
 }
 
-func NewEmitter(store *database.Store, producer Producer, runtimeVersion string) *Emitter {
+func NewEmitter(store *controlstore.Store, producer Producer, runtimeVersion string) *Emitter {
 	return &Emitter{store: store, producer: producer, apiVersion: webhooks.MinorAPIVersion(runtimeVersion)}
 }
 
@@ -49,7 +49,7 @@ func (e *Emitter) EmitBatch(ctx context.Context, events []webhooks.Event) ([]web
 	if e == nil || e.store == nil {
 		return emissions, nil
 	}
-	inputs := make([]database.WebhookEventInput, len(events))
+	inputs := make([]controlstore.WebhookEventInput, len(events))
 	for index, event := range events {
 		eventID := event.ID
 		deduplicate := eventID != uuid.Nil
@@ -57,7 +57,7 @@ func (e *Emitter) EmitBatch(ctx context.Context, events []webhooks.Event) ([]web
 			eventID = uuid.New()
 		}
 		emissions[index] = webhooks.Emission{EventID: eventID}
-		inputs[index] = database.WebhookEventInput{
+		inputs[index] = controlstore.WebhookEventInput{
 			ID:                        eventID,
 			SiteID:                    event.SiteID,
 			TargetWebhookID:           event.TargetWebhookID,

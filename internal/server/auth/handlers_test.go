@@ -16,6 +16,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailer"
@@ -62,16 +63,10 @@ func extractMagicLinkToken(t *testing.T, body string) string {
 	return token
 }
 
-func setupAuthTestEnv(t *testing.T) (*handler, *database.Store) {
+func setupAuthTestEnv(t *testing.T) (*handler, *controlstore.Store) {
 	t.Helper()
 
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("failed to connect to test db: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("failed to migrate test db: %v", err)
-	}
+	store := testutil.NewControlStore(t)
 
 	conf := &config.Config{
 		PublicURL: "http://localhost:8080",
@@ -1449,16 +1444,11 @@ func TestHandleAcceptInviteActivatesPendingTeamInvite(t *testing.T) {
 		t.Fatalf("failed to create invitee user: %v", err)
 	}
 
-	teamID := uuid.New()
-	if _, err := store.DB().ExecContext(context.Background(),
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		teamID, "Accept Invite", time.Now().UTC(),
-	); err != nil {
-		t.Fatalf("failed to insert team: %v", err)
+	team, err := store.CreateTenant(context.Background(), ownerID, "Accept Invite", "")
+	if err != nil {
+		t.Fatalf("failed to create team: %v", err)
 	}
-	if err := store.AddTeamMember(context.Background(), teamID, ownerID, database.TenantRoleOwner, ownerID); err != nil {
-		t.Fatalf("failed to add owner to team: %v", err)
-	}
+	teamID := team.ID
 	if _, err := store.CreateTeamInvite(context.Background(), teamID, "accept-invite@example.com", database.TenantRoleAdmin, &inviteeID, ownerID, true); err != nil {
 		t.Fatalf("failed to create team invite: %v", err)
 	}
@@ -1558,16 +1548,11 @@ func TestHandleAcceptInviteLetsExistingAuthenticatedUserAcceptWithoutPassword(t 
 		t.Fatalf("failed to create existing user: %v", err)
 	}
 
-	teamID := uuid.New()
-	if _, err := store.DB().ExecContext(context.Background(),
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		teamID, "Existing Invite", time.Now().UTC(),
-	); err != nil {
-		t.Fatalf("failed to insert team: %v", err)
+	team, err := store.CreateTenant(context.Background(), ownerID, "Existing Invite", "")
+	if err != nil {
+		t.Fatalf("failed to create team: %v", err)
 	}
-	if err := store.AddTeamMember(context.Background(), teamID, ownerID, database.TenantRoleOwner, ownerID); err != nil {
-		t.Fatalf("failed to add owner to team: %v", err)
-	}
+	teamID := team.ID
 	if _, err := store.CreateTeamInvite(context.Background(), teamID, "existing-invite@example.com", database.TenantRoleAdmin, &existingID, ownerID, false); err != nil {
 		t.Fatalf("failed to create team invite: %v", err)
 	}
@@ -1644,16 +1629,11 @@ func TestHandleAcceptInviteRequiresLoginForExistingUserInvite(t *testing.T) {
 		t.Fatalf("failed to create existing user: %v", err)
 	}
 
-	teamID := uuid.New()
-	if _, err := store.DB().ExecContext(context.Background(),
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		teamID, "Login Required Invite", time.Now().UTC(),
-	); err != nil {
-		t.Fatalf("failed to insert team: %v", err)
+	team, err := store.CreateTenant(context.Background(), ownerID, "Login Required Invite", "")
+	if err != nil {
+		t.Fatalf("failed to create team: %v", err)
 	}
-	if err := store.AddTeamMember(context.Background(), teamID, ownerID, database.TenantRoleOwner, ownerID); err != nil {
-		t.Fatalf("failed to add owner to team: %v", err)
-	}
+	teamID := team.ID
 	if _, err := store.CreateTeamInvite(context.Background(), teamID, "login-required-invite@example.com", database.TenantRoleAdmin, &existingID, ownerID, false); err != nil {
 		t.Fatalf("failed to create team invite: %v", err)
 	}
@@ -1729,16 +1709,11 @@ func TestHandleAcceptInviteRejectsAuthenticatedEmailMismatch(t *testing.T) {
 		t.Fatalf("failed to create other user: %v", err)
 	}
 
-	teamID := uuid.New()
-	if _, err := store.DB().ExecContext(context.Background(),
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		teamID, "Mismatch Invite", time.Now().UTC(),
-	); err != nil {
-		t.Fatalf("failed to insert team: %v", err)
+	team, err := store.CreateTenant(context.Background(), ownerID, "Mismatch Invite", "")
+	if err != nil {
+		t.Fatalf("failed to create team: %v", err)
 	}
-	if err := store.AddTeamMember(context.Background(), teamID, ownerID, database.TenantRoleOwner, ownerID); err != nil {
-		t.Fatalf("failed to add owner to team: %v", err)
-	}
+	teamID := team.ID
 	if _, err := store.CreateTeamInvite(context.Background(), teamID, "mismatch-invite@example.com", database.TenantRoleAdmin, &inviteeID, ownerID, false); err != nil {
 		t.Fatalf("failed to create team invite: %v", err)
 	}

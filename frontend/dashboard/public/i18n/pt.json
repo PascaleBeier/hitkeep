@@ -2266,7 +2266,7 @@
       },
       "storage": {
         "title": "Armazenamento",
-        "sharedDb": "Banco de dados compartilhado",
+        "sharedDb": "Banco de dados de controle",
         "sharedDbSize": "Tamanho",
         "dataPath": "Caminho dos dados",
         "tenantDbs": "Bancos de dados de inquilinos",
@@ -2277,7 +2277,7 @@
           "size": "Tamanho",
           "path": "Caminho"
         },
-        "memory": "Memória do DuckDB",
+        "memory": "Memória do DuckDB dos tenants",
         "memoryOther": "Outros"
       },
       "ingest": {

@@ -3,6 +3,7 @@ package user
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -405,13 +406,18 @@ func TestExternalReportInvitationFailureIsSafeAndResendable(t *testing.T) {
 		t.Fatalf("safe invitation failure = %+v", external)
 	}
 	var safeErrorCode, externalLocale string
-	if err := store.DB().QueryRowContext(ctx,
+	inspectionDB, err := sql.Open("sqlite", store.Path())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer inspectionDB.Close()
+	if err := inspectionDB.QueryRowContext(ctx,
 		"SELECT confirmation_error_code, external_locale FROM report_recipients WHERE id = ?",
 		external.ID,
 	).Scan(&safeErrorCode, &externalLocale); err != nil || safeErrorCode != "smtp_send_failed" || externalLocale != "de" {
 		t.Fatalf("safe invitation state code=%q locale=%q err=%v", safeErrorCode, externalLocale, err)
 	}
-	if _, err := store.DB().ExecContext(ctx,
+	if _, err := inspectionDB.ExecContext(ctx,
 		"UPDATE report_recipients SET confirmation_sent_at = ? WHERE id = ?",
 		time.Now().UTC().Add(-16*time.Minute), external.ID,
 	); err != nil {

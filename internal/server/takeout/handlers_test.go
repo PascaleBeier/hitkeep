@@ -25,6 +25,7 @@ import (
 	"hitkeep/internal/exportfmt"
 	"hitkeep/internal/server/shared"
 	takeoutsvc "hitkeep/internal/takeout"
+	"hitkeep/internal/testutil"
 )
 
 type takeoutSentinel struct {
@@ -233,13 +234,9 @@ func setupTakeoutRouteTestEnv(t *testing.T) (*http.ServeMux, *database.Store, st
 	t.Helper()
 
 	ctx := context.Background()
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("failed to connect to test db: %v", err)
-	}
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("failed to migrate test db: %v", err)
-	}
+	store, tenantStores := testutil.NewControlAndTenantStores(t)
+	t.Cleanup(func() { _ = store.Close() })
+	t.Cleanup(func() { _ = tenantStores.Close() })
 
 	userID, err := store.CreateUser(ctx, "takeout-route-owner@example.com", "hash")
 	if err != nil {
@@ -249,10 +246,17 @@ func setupTakeoutRouteTestEnv(t *testing.T) (*http.ServeMux, *database.Store, st
 	if err != nil {
 		t.Fatalf("failed to create test site: %v", err)
 	}
+	if err := tenantStores.SyncSite(ctx, site.ID); err != nil {
+		t.Fatalf("sync test site: %v", err)
+	}
+	analytics, _, err := tenantStores.ResolveSiteStore(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("resolve test analytics store: %v", err)
+	}
 
 	now := time.Now().UTC()
 	isUnique := true
-	if err := store.CreateHit(ctx, &api.Hit{
+	if err := analytics.CreateHit(ctx, &api.Hit{
 		SiteID:    site.ID,
 		SessionID: uuid.New(),
 		PageID:    uuid.New(),
@@ -276,14 +280,15 @@ func setupTakeoutRouteTestEnv(t *testing.T) (*http.ServeMux, *database.Store, st
 	}
 
 	appCtx := &shared.Context{
-		Store:   store,
-		Config:  &config.Config{},
-		Takeout: takeoutsvc.NewTakeoutService(store, filepath.Join(t.TempDir(), "exports")),
+		Store:        store,
+		TenantStores: tenantStores,
+		Config:       &config.Config{},
+		Takeout:      takeoutsvc.NewTakeoutServiceWithTenantStores(store, tenantStores, filepath.Join(t.TempDir(), "exports")),
 	}
 
 	mux := http.NewServeMux()
 	Register(mux, appCtx)
-	return mux, store, viewerToken, noSiteAccessToken, site.ID
+	return mux, analytics, viewerToken, noSiteAccessToken, site.ID
 }
 
 func requestSiteTakeout(t *testing.T, mux *http.ServeMux, siteID uuid.UUID, token string) *httptest.ResponseRecorder {

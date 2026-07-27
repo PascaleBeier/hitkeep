@@ -16,23 +16,7 @@ func setupShareAIActivityTestEnv(t *testing.T) (*handler, *database.Store, strin
 	t.Helper()
 
 	ctx := context.Background()
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-
-	userID, err := store.CreateUser(ctx, "share-ai-activity@example.com", "hash")
-	if err != nil {
-		t.Fatalf("create user: %v", err)
-	}
-
-	site, err := store.CreateSite(ctx, userID, "share-ai-activity.test")
-	if err != nil {
-		t.Fatalf("create site: %v", err)
-	}
+	control, store, appCtx, userID, site := setupShareDataPlane(t, "share-ai-activity@example.com", "share-ai-activity.test")
 
 	now := time.Now().UTC()
 	uaGPT := "Mozilla/5.0 (compatible; GPTBot/1.0; +https://openai.com/gptbot)"
@@ -65,12 +49,12 @@ func setupShareAIActivityTestEnv(t *testing.T) (*handler, *database.Store, strin
 		t.Fatalf("create ai fetch: %v", err)
 	}
 
-	_, token, err := store.CreateShareLink(ctx, site.ID, userID)
+	_, token, err := control.CreateShareLink(ctx, site.ID, userID)
 	if err != nil {
 		t.Fatalf("create share link: %v", err)
 	}
 
-	h := &handler{ctx: newShareTestContext(t, store)}
+	h := &handler{ctx: appCtx}
 	return h, store, token, site.ID
 }
 

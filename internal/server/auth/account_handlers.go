@@ -14,7 +14,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/appurl"
 	authcore "hitkeep/internal/auth"
-	"hitkeep/internal/database"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/server/shared"
@@ -102,7 +102,7 @@ func (h *handler) handleResetPassword() http.HandlerFunc {
 
 		err = h.ctx.Store.CompletePasswordReset(r.Context(), req.Token, hashedPassword)
 		if err != nil {
-			if errors.Is(err, database.ErrPasswordResetInvalid) || errors.Is(err, database.ErrPasswordResetExpired) {
+			if errors.Is(err, controlstore.ErrPasswordResetInvalid) || errors.Is(err, controlstore.ErrPasswordResetExpired) {
 				http.Error(w, "Invalid or expired link", http.StatusBadRequest)
 				return
 			}
@@ -144,7 +144,7 @@ func (h *handler) handleAcceptInvite() http.HandlerFunc {
 
 		email, err := h.ctx.Store.ResolvePasswordResetEmail(r.Context(), req.Token)
 		if err != nil {
-			if errors.Is(err, database.ErrPasswordResetInvalid) || errors.Is(err, database.ErrPasswordResetExpired) {
+			if errors.Is(err, controlstore.ErrPasswordResetInvalid) || errors.Is(err, controlstore.ErrPasswordResetExpired) {
 				http.Error(w, "Invalid or expired link", http.StatusBadRequest)
 				return
 			}
@@ -290,11 +290,11 @@ func (h *handler) validateCloudInviteAcceptance(ctx context.Context, email strin
 
 func (h *handler) writeInviteAcceptanceError(w http.ResponseWriter, err error, email string, userID uuid.UUID) {
 	switch {
-	case errors.Is(err, database.ErrPasswordResetInvalid), errors.Is(err, database.ErrPasswordResetExpired), errors.Is(err, database.ErrTeamInviteNotFound):
+	case errors.Is(err, controlstore.ErrPasswordResetInvalid), errors.Is(err, controlstore.ErrPasswordResetExpired), errors.Is(err, controlstore.ErrTeamInviteNotFound):
 		http.Error(w, "Invalid or expired link", http.StatusBadRequest)
-	case errors.Is(err, database.ErrTeamInviteLoginRequired):
+	case errors.Is(err, controlstore.ErrTeamInviteLoginRequired):
 		http.Error(w, "Sign in to accept this invitation", http.StatusUnauthorized)
-	case errors.Is(err, database.ErrTeamInviteEmailMismatch):
+	case errors.Is(err, controlstore.ErrTeamInviteEmailMismatch):
 		http.Error(w, "Invite does not match signed-in user", http.StatusForbidden)
 	case errors.Is(err, entitlements.ErrTeamMembershipLimitReached):
 		http.Error(w, "Managed cloud accounts are limited to one team", http.StatusForbidden)

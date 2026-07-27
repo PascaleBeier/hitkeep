@@ -16,6 +16,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/appurl"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/sso"
@@ -125,7 +126,7 @@ func (h *handler) handleUpsertTeamSSO() http.HandlerFunc {
 			Enabled:               normalized.Enabled,
 		}
 		if err := h.ctx.Store.UpsertTeamSSOConfig(r.Context(), config); err != nil {
-			if errors.Is(err, database.ErrTeamSSODomainConflict) {
+			if errors.Is(err, controlstore.ErrTeamSSODomainConflict) {
 				writeTeamActionError(w, http.StatusConflict, "domain_conflict", "One of these email domains is already assigned to another team's SSO provider")
 				return
 			}
@@ -185,7 +186,7 @@ func (h *handler) handleDeleteTeamSSO() http.HandlerFunc {
 			return
 		}
 		if err := h.ctx.Store.DeleteTeamSSOConfig(r.Context(), teamID); err != nil {
-			if errors.Is(err, database.ErrTeamSSONotFound) {
+			if errors.Is(err, controlstore.ErrTeamSSONotFound) {
 				writeTeamActionError(w, http.StatusNotFound, "not_configured", "SSO is not configured for this team")
 				return
 			}

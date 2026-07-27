@@ -726,11 +726,11 @@
                                     <dl class="admin-definition-list admin-definition-list--compact">
                                         <div>
                                             <dt>{{ "admin.system.storage.sharedDb" | transloco }}</dt>
-                                            <dd class="admin-mono" [pTooltip]="storage.shared_db_path" tooltipPosition="top">{{ storage.shared_db_path }}</dd>
+                                            <dd class="admin-mono" [pTooltip]="storage.control_db_path" tooltipPosition="top">{{ storage.control_db_path }}</dd>
                                         </div>
                                         <div>
                                             <dt>{{ "admin.system.storage.sharedDbSize" | transloco }}</dt>
-                                            <dd>{{ formatBytesValue(storage.shared_db_bytes) }}</dd>
+                                            <dd>{{ formatBytesValue(storage.control_db_bytes) }}</dd>
                                         </div>
                                         <div>
                                             <dt>{{ "admin.system.storage.dataPath" | transloco }}</dt>

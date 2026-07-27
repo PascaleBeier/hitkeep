@@ -9,11 +9,11 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/mailer"
 	serverauth "hitkeep/internal/server/auth"
@@ -131,13 +131,7 @@ func TestHandleSetActiveTeam(t *testing.T) {
 	h, store, userID := setupUserSecurityTestEnv(t)
 	defer store.Close()
 
-	customTenantID := uuid.New()
-	if _, err := store.DB().ExecContext(context.Background(),
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		customTenantID, "Custom Active", time.Now().UTC(),
-	); err != nil {
-		t.Fatalf("insert custom tenant: %v", err)
-	}
+	customTenantID := createOtherTestTeam(t, store, "Custom Active")
 
 	body, _ := json.Marshal(map[string]string{"team_id": customTenantID.String()})
 	req := withTestUser(httptest.NewRequest(http.MethodPut, "/api/user/teams/active", bytes.NewReader(body)), userID)
@@ -477,16 +471,11 @@ func TestHandleAddTeamMemberCreatesPendingInvite(t *testing.T) {
 	h, store, ownerID := setupUserSecurityTestEnv(t)
 	defer store.Close()
 
-	customTenantID := uuid.New()
-	if _, err := store.DB().ExecContext(context.Background(),
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		customTenantID, "Invites", time.Now().UTC(),
-	); err != nil {
-		t.Fatalf("insert custom tenant: %v", err)
+	customTenant, err := store.CreateTenant(context.Background(), ownerID, "Invites", "")
+	if err != nil {
+		t.Fatalf("create custom tenant: %v", err)
 	}
-	if err := store.AddTeamMember(context.Background(), customTenantID, ownerID, database.TenantRoleOwner, ownerID); err != nil {
-		t.Fatalf("add owner to custom tenant: %v", err)
-	}
+	customTenantID := customTenant.ID
 
 	body, _ := json.Marshal(map[string]string{
 		"email": "pending-invite@team.test",
@@ -541,16 +530,11 @@ func TestHandleGetAndRevokeTeamInvites(t *testing.T) {
 	h, store, ownerID := setupUserSecurityTestEnv(t)
 	defer store.Close()
 
-	customTenantID := uuid.New()
-	if _, err := store.DB().ExecContext(context.Background(),
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		customTenantID, "Invite Admin", time.Now().UTC(),
-	); err != nil {
-		t.Fatalf("insert custom tenant: %v", err)
+	customTenant, err := store.CreateTenant(context.Background(), ownerID, "Invite Admin", "")
+	if err != nil {
+		t.Fatalf("create custom tenant: %v", err)
 	}
-	if err := store.AddTeamMember(context.Background(), customTenantID, ownerID, database.TenantRoleOwner, ownerID); err != nil {
-		t.Fatalf("add owner to custom tenant: %v", err)
-	}
+	customTenantID := customTenant.ID
 
 	invite, err := store.CreateTeamInvite(context.Background(), customTenantID, "revoke-invite@team.test", database.TenantRoleMember, nil, ownerID, false)
 	if err != nil {
@@ -677,13 +661,7 @@ func TestHandleLeaveTeamSuccess(t *testing.T) {
 	h, store, userID := setupUserSecurityTestEnv(t)
 	defer store.Close()
 
-	customTenantID := uuid.New()
-	if _, err := store.DB().ExecContext(context.Background(),
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		customTenantID, "Leave Team", time.Now().UTC(),
-	); err != nil {
-		t.Fatalf("insert custom tenant: %v", err)
-	}
+	customTenantID := createOtherTestTeam(t, store, "Leave Team")
 	if err := store.AddTeamMember(context.Background(), customTenantID, userID, database.TenantRoleAdmin, userID); err != nil {
 		t.Fatalf("add team member: %v", err)
 	}
@@ -1169,10 +1147,12 @@ func TestHandlePersonalAPIClientCreateFailsWhenAuditCannotBeWritten(t *testing.T
 	h, store, userID := setupUserSecurityTestEnv(t)
 	defer store.Close()
 
-	if err := store.Transact(context.Background(), func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(context.Background(), "DROP TABLE instance_audit_log")
-		return err
-	}); err != nil {
+	faultDB, err := sql.Open("sqlite", store.Path())
+	if err != nil {
+		t.Fatalf("open fault-injection connection: %v", err)
+	}
+	defer faultDB.Close()
+	if _, err := faultDB.ExecContext(context.Background(), "DROP TABLE instance_audit_log"); err != nil {
 		t.Fatalf("drop audit table: %v", err)
 	}
 
@@ -1312,7 +1292,7 @@ func TestHandleTeamAPIClientRequiresTeamAdmin(t *testing.T) {
 	}
 }
 
-func assertAPIClientAuditEntry(t *testing.T, store *database.Store, action string, actorID uuid.UUID, targetID, targetLabel, teamID string) {
+func assertAPIClientAuditEntry(t *testing.T, store *controlstore.Store, action string, actorID uuid.UUID, targetID, targetLabel, teamID string) {
 	t.Helper()
 
 	entry := findAPIClientAuditEntry(t, store, action, actorID, targetID)
@@ -1327,7 +1307,7 @@ func assertAPIClientAuditEntry(t *testing.T, store *database.Store, action strin
 	}
 }
 
-func findAPIClientAuditEntry(t *testing.T, store *database.Store, action string, actorID uuid.UUID, targetID string) api.InstanceAuditEntry {
+func findAPIClientAuditEntry(t *testing.T, store *controlstore.Store, action string, actorID uuid.UUID, targetID string) api.InstanceAuditEntry {
 	t.Helper()
 
 	entries, total, err := store.ListInstanceAuditEntries(context.Background(), database.InstanceAuditFilter{

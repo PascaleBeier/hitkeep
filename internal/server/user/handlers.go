@@ -20,7 +20,7 @@ import (
 
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
-	"hitkeep/internal/database"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/server/shared"
 )
 
@@ -374,9 +374,9 @@ func (h *handler) handleUpdateUserProfile() http.HandlerFunc {
 
 		if err := h.ctx.Store.UpdateUserProfile(r.Context(), userID, email, givenName, lastName); err != nil {
 			switch {
-			case errors.Is(err, database.ErrUserEmailAlreadyExists):
+			case errors.Is(err, controlstore.ErrUserEmailAlreadyExists):
 				http.Error(w, "Email already exists", http.StatusConflict)
-			case errors.Is(err, database.ErrUserNotFound):
+			case errors.Is(err, controlstore.ErrUserNotFound):
 				http.Error(w, "User not found", http.StatusNotFound)
 			default:
 				slog.Error("Failed to update user profile", "error", err, "user_id", userID)

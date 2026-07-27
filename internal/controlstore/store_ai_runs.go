@@ -1,0 +1,515 @@
+package controlstore
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+)
+
+var ErrAIBudgetExhausted = errors.New("ai budget exhausted")
+
+type AILifecycleEvent struct {
+	Type          string    `json:"type"`
+	Provider      string    `json:"provider,omitempty"`
+	Model         string    `json:"model,omitempty"`
+	ToolName      string    `json:"tool_name,omitempty"`
+	Step          int       `json:"step,omitempty"`
+	Status        string    `json:"status,omitempty"`
+	StatusCode    int       `json:"status_code,omitempty"`
+	ErrorCategory string    `json:"error_category,omitempty"`
+	LatencyMS     int64     `json:"latency_ms,omitempty"`
+	MessageCount  int       `json:"message_count,omitempty"`
+	ToolCount     int       `json:"tool_count,omitempty"`
+	Timestamp     time.Time `json:"timestamp"`
+}
+
+type AIRunParams struct {
+	ID              uuid.UUID
+	TeamID          uuid.UUID
+	SiteID          uuid.UUID
+	ActorID         uuid.UUID
+	ActorType       string
+	Feature         string
+	Provider        string
+	Model           string
+	TemplateVersion string
+	EvidenceIDs     []string
+	InputHash       string
+	OutputHash      string
+	OutputJSON      string
+	InputTokens     int
+	OutputTokens    int
+	TotalTokens     int
+	ToolCallCount   int
+	LifecycleEvents []AILifecycleEvent
+	Status          string
+	ErrorCategory   string
+	LatencyMS       int64
+	CreatedAt       time.Time
+}
+
+type AIUsageSummary struct {
+	Requests int
+	Tokens   int
+}
+
+type AIRunSummary struct {
+	LastSuccessAt     *time.Time
+	LastAttemptAt     *time.Time
+	LastErrorCategory string
+}
+
+type AskAIHistoryEntry struct {
+	RunID               uuid.UUID
+	CreatedAt           time.Time
+	Status              string
+	ErrorCategory       string
+	Provider            string
+	Model               string
+	TemplateVersion     string
+	InputHash           string
+	OutputHash          string
+	AnswerChars         int
+	CitationCount       int
+	ChartCount          int
+	ActionCount         int
+	ChartTypes          []string
+	ActionTypes         []string
+	InputTokens         int
+	OutputTokens        int
+	TotalTokens         int
+	ToolCallCount       int
+	LifecycleEventCount int
+	ToolNames           []string
+}
+
+type preparedAIRun struct {
+	ID                  uuid.UUID
+	CreatedAt           time.Time
+	EvidenceJSON        string
+	OutputJSON          string
+	LifecycleEventsJSON string
+	Status              string
+	ErrorCategory       string
+}
+
+func (s *Store) AppendAIRun(ctx context.Context, params AIRunParams) (uuid.UUID, error) {
+	return appendAIRun(ctx, s.db, params)
+}
+
+func appendAIRun(ctx context.Context, exec sqlExecContext, params AIRunParams) (uuid.UUID, error) {
+	prepared, err := prepareAIRun(params)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	_, err = exec.ExecContext(ctx, `
+			INSERT INTO ai_runs (
+				id, team_id, site_id, actor_id, actor_type, feature, provider, model,
+				template_version, evidence_ids_json, input_hash, output_hash, output_json,
+			input_tokens, output_tokens, total_tokens, tool_call_count, lifecycle_events_json, status, error_category,
+				latency_ms, created_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT(id) DO UPDATE SET
+				team_id = excluded.team_id,
+				site_id = excluded.site_id,
+				actor_id = excluded.actor_id,
+				actor_type = excluded.actor_type,
+				feature = excluded.feature,
+				provider = excluded.provider,
+				model = excluded.model,
+				template_version = excluded.template_version,
+				evidence_ids_json = excluded.evidence_ids_json,
+				input_hash = excluded.input_hash,
+				output_hash = excluded.output_hash,
+				output_json = excluded.output_json,
+				input_tokens = excluded.input_tokens,
+				output_tokens = excluded.output_tokens,
+				total_tokens = excluded.total_tokens,
+				tool_call_count = excluded.tool_call_count,
+				lifecycle_events_json = excluded.lifecycle_events_json,
+				status = excluded.status,
+				error_category = excluded.error_category,
+				latency_ms = excluded.latency_ms
+		`,
+		prepared.ID,
+		nullableUUID(params.TeamID),
+		nullableUUID(params.SiteID),
+		nullableUUID(params.ActorID),
+		strings.TrimSpace(params.ActorType),
+		strings.TrimSpace(params.Feature),
+		strings.TrimSpace(params.Provider),
+		strings.TrimSpace(params.Model),
+		strings.TrimSpace(params.TemplateVersion),
+		prepared.EvidenceJSON,
+		strings.TrimSpace(params.InputHash),
+		strings.TrimSpace(params.OutputHash),
+		prepared.OutputJSON,
+		params.InputTokens,
+		params.OutputTokens,
+		params.TotalTokens,
+		params.ToolCallCount,
+		prepared.LifecycleEventsJSON,
+		prepared.Status,
+		prepared.ErrorCategory,
+		params.LatencyMS,
+		prepared.CreatedAt,
+	)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("append ai run: %w", err)
+	}
+	return prepared.ID, nil
+}
+
+func prepareAIRun(params AIRunParams) (preparedAIRun, error) {
+	id, err := prepareAIRunID(params.ID)
+	if err != nil {
+		return preparedAIRun{}, err
+	}
+	createdAt := params.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = time.Now().UTC()
+	}
+	evidenceJSON, err := json.Marshal(params.EvidenceIDs)
+	if err != nil {
+		return preparedAIRun{}, fmt.Errorf("encode ai run evidence ids: %w", err)
+	}
+	outputJSON, err := prepareAIRunOutputJSON(params.Feature, params.OutputJSON, params.EvidenceIDs)
+	if err != nil {
+		return preparedAIRun{}, err
+	}
+	lifecycleEventsJSON, err := prepareAIRunLifecycleEventsJSON(params.LifecycleEvents)
+	if err != nil {
+		return preparedAIRun{}, fmt.Errorf("encode ai run lifecycle events: %w", err)
+	}
+	status, err := prepareAIRunStatus(params.Status)
+	if err != nil {
+		return preparedAIRun{}, err
+	}
+	errorCategory, err := prepareAIRunErrorCategory(params.ErrorCategory)
+	if err != nil {
+		return preparedAIRun{}, err
+	}
+	return preparedAIRun{
+		ID:                  id,
+		CreatedAt:           createdAt,
+		EvidenceJSON:        string(evidenceJSON),
+		OutputJSON:          outputJSON,
+		LifecycleEventsJSON: string(lifecycleEventsJSON),
+		Status:              status,
+		ErrorCategory:       errorCategory,
+	}, nil
+}
+
+func prepareAIRunID(id uuid.UUID) (uuid.UUID, error) {
+	if id != uuid.Nil {
+		return id, nil
+	}
+	generatedID, err := uuid.NewV7()
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("generate ai run id: %w", err)
+	}
+	return generatedID, nil
+}
+
+func (s *Store) ReserveAIRun(ctx context.Context, params AIRunParams, since time.Time, requestLimit, tokenLimit int) (uuid.UUID, error) {
+	s.aiBudgetMu.Lock()
+	defer s.aiBudgetMu.Unlock()
+
+	var id uuid.UUID
+	exhausted := false
+	err := s.transact(ctx, func(tx *sql.Tx) error {
+		usage, err := queryAIUsageSinceForBudget(ctx, tx, since)
+		if err != nil {
+			return err
+		}
+		if aiBudgetExhausted(usage, requestLimit, tokenLimit) {
+			exhausted = true
+			id, err = appendAIBudgetExhaustedRun(ctx, tx, params)
+			return err
+		}
+		id, err = appendAIReservedRun(ctx, tx, params)
+		return err
+	})
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if exhausted {
+		return id, ErrAIBudgetExhausted
+	}
+	return id, nil
+}
+
+func (s *Store) GetAIUsageSince(ctx context.Context, since time.Time) (AIUsageSummary, error) {
+	return queryAIUsageSince(ctx, s.db, since)
+}
+
+func (s *Store) ListAskAIHistory(ctx context.Context, siteID uuid.UUID, limit, offset int) ([]AskAIHistoryEntry, int, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	var total int
+	if err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM ai_runs
+		WHERE feature = 'ask_ai' AND site_id = ?
+	`, siteID).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count ask ai history: %w", err)
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, created_at, status, error_category, provider, model, template_version,
+			input_hash, output_hash, output_json, input_tokens, output_tokens, total_tokens,
+			tool_call_count, lifecycle_events_json
+		FROM ai_runs
+		WHERE feature = 'ask_ai' AND site_id = ?
+		ORDER BY created_at DESC, id DESC
+		LIMIT ? OFFSET ?
+	`, siteID, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list ask ai history: %w", err)
+	}
+	defer rows.Close()
+
+	entries := []AskAIHistoryEntry{}
+	for rows.Next() {
+		entry, err := scanAskAIHistoryEntry(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		entries = append(entries, entry)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("read ask ai history: %w", err)
+	}
+	return entries, total, nil
+}
+
+type aiUsageQuerier interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+func queryAIUsageSince(ctx context.Context, db aiUsageQuerier, since time.Time) (AIUsageSummary, error) {
+	var usage AIUsageSummary
+	err := db.QueryRowContext(ctx, `
+		SELECT COUNT(*), COALESCE(SUM(total_tokens), 0)
+		FROM ai_runs
+		WHERE created_at >= ?
+			AND error_category NOT IN ('budget_exhausted', 'disabled', 'not_configured')
+	`, since).Scan(&usage.Requests, &usage.Tokens)
+	if err != nil {
+		return AIUsageSummary{}, fmt.Errorf("query ai usage: %w", err)
+	}
+	return usage, nil
+}
+
+func queryAIUsageSinceForBudget(ctx context.Context, db aiUsageQuerier, since time.Time) (AIUsageSummary, error) {
+	return queryAIUsageSince(ctx, db, since)
+}
+
+type askAIHistoryScanner interface {
+	Scan(dest ...any) error
+}
+
+type askAIHistoryOutputSummary struct {
+	Version   string `json:"version"`
+	Answer    int    `json:"answer_chars"`
+	Citations []struct {
+		ToolCallID string `json:"tool_call_id"`
+	} `json:"citations"`
+	Charts []struct {
+		Type string `json:"type"`
+	} `json:"charts"`
+	Actions []struct {
+		Type string `json:"type"`
+	} `json:"actions"`
+}
+
+func scanAskAIHistoryEntry(row askAIHistoryScanner) (AskAIHistoryEntry, error) {
+	var entry AskAIHistoryEntry
+	var outputJSON any
+	var lifecycleEventsJSON any
+	if err := row.Scan(
+		&entry.RunID,
+		&entry.CreatedAt,
+		&entry.Status,
+		&entry.ErrorCategory,
+		&entry.Provider,
+		&entry.Model,
+		&entry.TemplateVersion,
+		&entry.InputHash,
+		&entry.OutputHash,
+		&outputJSON,
+		&entry.InputTokens,
+		&entry.OutputTokens,
+		&entry.TotalTokens,
+		&entry.ToolCallCount,
+		&lifecycleEventsJSON,
+	); err != nil {
+		return AskAIHistoryEntry{}, err
+	}
+	if err := applyAskAIHistoryOutputSummary(&entry, outputJSON); err != nil {
+		return AskAIHistoryEntry{}, err
+	}
+	if err := applyAskAIHistoryLifecycleSummary(&entry, lifecycleEventsJSON); err != nil {
+		return AskAIHistoryEntry{}, err
+	}
+	return entry, nil
+}
+
+func applyAskAIHistoryOutputSummary(entry *AskAIHistoryEntry, raw any) error {
+	value := jsonScanString(raw)
+	if value == "" || value == "{}" {
+		entry.ChartTypes = []string{}
+		entry.ActionTypes = []string{}
+		return nil
+	}
+	var summary askAIHistoryOutputSummary
+	if err := json.Unmarshal([]byte(value), &summary); err != nil {
+		return fmt.Errorf("decode ask ai history output summary: %w", err)
+	}
+	if summary.Version == "" {
+		entry.ChartTypes = []string{}
+		entry.ActionTypes = []string{}
+		return nil
+	}
+	entry.AnswerChars = summary.Answer
+	entry.CitationCount = len(summary.Citations)
+	entry.ChartCount = len(summary.Charts)
+	entry.ActionCount = len(summary.Actions)
+	chartTypes := make([]string, 0, len(summary.Charts))
+	for _, chart := range summary.Charts {
+		chartTypes = append(chartTypes, chart.Type)
+	}
+	actionTypes := make([]string, 0, len(summary.Actions))
+	for _, action := range summary.Actions {
+		actionTypes = append(actionTypes, action.Type)
+	}
+	entry.ChartTypes = sortedUniqueTrimmedStrings(chartTypes)
+	entry.ActionTypes = sortedUniqueTrimmedStrings(actionTypes)
+	return nil
+}
+
+func applyAskAIHistoryLifecycleSummary(entry *AskAIHistoryEntry, raw any) error {
+	value := jsonScanString(raw)
+	if value == "" || value == "[]" {
+		entry.ToolNames = []string{}
+		return nil
+	}
+	var events []AILifecycleEvent
+	if err := json.Unmarshal([]byte(value), &events); err != nil {
+		return fmt.Errorf("decode ask ai history lifecycle events: %w", err)
+	}
+	entry.LifecycleEventCount = len(events)
+	toolNames := make([]string, 0, len(events))
+	for _, event := range events {
+		toolNames = append(toolNames, event.ToolName)
+	}
+	entry.ToolNames = sortedUniqueTrimmedStrings(toolNames)
+	return nil
+}
+
+func sortedUniqueTrimmedStrings(values []string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func aiBudgetExhausted(usage AIUsageSummary, requestLimit, tokenLimit int) bool {
+	return (requestLimit > 0 && usage.Requests >= requestLimit) ||
+		(tokenLimit > 0 && usage.Tokens >= tokenLimit)
+}
+
+func appendAIBudgetExhaustedRun(ctx context.Context, exec sqlExecContext, params AIRunParams) (uuid.UUID, error) {
+	params.Status = "failure"
+	params.ErrorCategory = "budget_exhausted"
+	return appendAIRun(ctx, exec, params)
+}
+
+func appendAIReservedRun(ctx context.Context, exec sqlExecContext, params AIRunParams) (uuid.UUID, error) {
+	params.Status = strings.TrimSpace(params.Status)
+	if params.Status == "" {
+		params.Status = "reserved"
+	}
+	return appendAIRun(ctx, exec, params)
+}
+
+func (s *Store) GetAIRunSummary(ctx context.Context) (AIRunSummary, error) {
+	return s.getAIRunSummary(ctx, time.Time{})
+}
+
+func (s *Store) GetAIRunSummarySince(ctx context.Context, since time.Time) (AIRunSummary, error) {
+	return s.getAIRunSummary(ctx, since)
+}
+
+func (s *Store) getAIRunSummary(ctx context.Context, since time.Time) (AIRunSummary, error) {
+	var summary AIRunSummary
+	var lastSuccessRaw, lastAttemptRaw any
+	args := []any{}
+	where := ""
+	if !since.IsZero() {
+		where = "WHERE created_at >= ?"
+		args = append(args, since)
+	}
+	err := s.db.QueryRowContext(ctx, fmt.Sprintf(`
+		SELECT
+			MAX(created_at) FILTER (WHERE status = 'success'),
+			MAX(created_at)
+		FROM ai_runs
+		%s
+	`, where), args...).Scan(&lastSuccessRaw, &lastAttemptRaw)
+	if err != nil {
+		return AIRunSummary{}, fmt.Errorf("query ai run summary: %w", err)
+	}
+	lastSuccess, err := parseSQLiteTime(lastSuccessRaw)
+	if err != nil {
+		return AIRunSummary{}, fmt.Errorf("parse last successful ai run: %w", err)
+	}
+	if !lastSuccess.IsZero() {
+		summary.LastSuccessAt = &lastSuccess
+	}
+	lastAttempt, err := parseSQLiteTime(lastAttemptRaw)
+	if err != nil {
+		return AIRunSummary{}, fmt.Errorf("parse last attempted ai run: %w", err)
+	}
+	if !lastAttempt.IsZero() {
+		summary.LastAttemptAt = &lastAttempt
+	}
+	errorWhere := "WHERE status <> 'success' AND error_category <> ''"
+	errorArgs := []any{}
+	if !since.IsZero() {
+		errorWhere += " AND created_at >= ?"
+		errorArgs = append(errorArgs, since)
+	}
+	err = s.db.QueryRowContext(ctx, `
+		SELECT error_category
+		FROM ai_runs
+		`+errorWhere+`
+		ORDER BY created_at DESC, id DESC
+		LIMIT 1
+	`, errorArgs...).Scan(&summary.LastErrorCategory)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return AIRunSummary{}, fmt.Errorf("query latest ai run error: %w", err)
+	}
+	return summary, nil
+}

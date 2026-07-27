@@ -14,7 +14,7 @@ import (
 	"hitkeep/internal/api"
 	appauth "hitkeep/internal/auth"
 	"hitkeep/internal/config"
-	"hitkeep/internal/database"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/security"
 	serverauth "hitkeep/internal/server/auth"
@@ -22,16 +22,11 @@ import (
 	"hitkeep/internal/testutil"
 )
 
-func setupUserSecurityTestEnv(t *testing.T) (*handler, *database.Store, uuid.UUID) {
+func setupUserSecurityTestEnv(t *testing.T) (*handler, *controlstore.Store, uuid.UUID) {
 	t.Helper()
 
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("failed to connect to test db: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("failed to migrate test db: %v", err)
-	}
+	store, tenantStores := testutil.NewControlAndTenantStores(t)
+	t.Cleanup(func() { _ = tenantStores.Close() })
 
 	hashed, err := serverauth.HashPassword("password123")
 	if err != nil {
@@ -49,7 +44,7 @@ func setupUserSecurityTestEnv(t *testing.T) (*handler, *database.Store, uuid.UUI
 
 	ctx := &shared.Context{
 		Store:        store,
-		TenantStores: database.NewTenantStoreManager(store, t.TempDir()),
+		TenantStores: tenantStores,
 		Config:       conf,
 		Entitlements: entitlements.NewDefaultProvider(),
 		AuthState:    shared.NewAuthStateStore(),

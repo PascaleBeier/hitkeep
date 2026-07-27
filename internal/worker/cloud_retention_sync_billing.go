@@ -42,11 +42,11 @@ func (w *CloudRetentionSyncWorker) Run(ctx context.Context) {
 }
 
 func (w *CloudRetentionSyncWorker) RunAt(ctx context.Context, now time.Time) {
-	if w == nil || w.tenantMgr == nil || w.tenantMgr.Shared() == nil || w.ent == nil || w.conf == nil || !w.conf.CloudHosted {
+	if w == nil || w.tenantMgr == nil || w.tenantMgr.Control() == nil || w.ent == nil || w.conf == nil || !w.conf.CloudHosted {
 		return
 	}
 
-	teamIDs, err := w.tenantMgr.Shared().ListNonDefaultTenantIDs(ctx)
+	teamIDs, err := w.tenantMgr.Control().ListNonDefaultTenantIDs(ctx)
 	if err != nil {
 		slog.Error("CloudRetentionSyncWorker: failed to list teams", "error", err)
 		return

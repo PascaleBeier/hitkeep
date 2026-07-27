@@ -52,6 +52,7 @@ func listFKEdges(ctx context.Context, q queryer) ([]fkEdge, error) {
 		SELECT table_name, constraint_column_names, referenced_table, referenced_column_names
 		FROM duckdb_constraints()
 		WHERE constraint_type = 'FOREIGN KEY'
+			AND database_name = current_database()
 			AND schema_name NOT IN ('information_schema', 'pg_catalog')
 	`)
 	if err != nil {
@@ -119,6 +120,7 @@ func listScopedTables(ctx context.Context, q queryer, scopeColumns []string) (ma
 		SELECT table_name, column_name
 		FROM information_schema.columns
 		WHERE column_name IN (%s)
+			AND table_catalog = current_database()
 			AND table_schema NOT IN ('information_schema', 'pg_catalog')
 	`, placeholders), args...)
 	if err != nil {

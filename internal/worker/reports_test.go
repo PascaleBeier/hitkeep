@@ -2,9 +2,9 @@ package worker
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"maps"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -13,11 +13,13 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/reporting"
+	"hitkeep/internal/testutil"
 )
 
 type capturedScheduledReport struct {
@@ -87,7 +89,7 @@ func TestInclusivePeriodEndUsesExclusiveBoundary(t *testing.T) {
 }
 
 func TestReportContentBuilderBuildsTheScheduledSiteSummaryContent(t *testing.T) {
-	store := setupReportContentStore(t)
+	store, manager := setupReportContentStore(t)
 	ctx := context.Background()
 	userID, err := store.CreateUser(ctx, "report-content@example.test", "hash")
 	if err != nil {
@@ -108,7 +110,7 @@ func TestReportContentBuilderBuildsTheScheduledSiteSummaryContent(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	builder := NewReportContentBuilder(store, func(context.Context, uuid.UUID) (*database.Store, error) { return store, nil }, "https://hitkeep.example")
+	builder := NewReportContentBuilder(store, reportAnalyticsResolver(manager), "https://hitkeep.example")
 	email, shouldSend, err := builder.Build(ctx, ReportContentRequest{
 		Report: report, RecipientUserID: userID, RecipientLocale: "en",
 		ScheduledFor: scheduledFor, PeriodStart: start, PeriodEnd: end,
@@ -134,7 +136,7 @@ func TestReportContentBuilderBuildsTheScheduledSiteSummaryContent(t *testing.T) 
 }
 
 func TestReportContentBuilderMakesExternalSiteSummarySelfContained(t *testing.T) {
-	store := setupReportContentStore(t)
+	store, manager := setupReportContentStore(t)
 	ctx := context.Background()
 	userID, err := store.CreateUser(ctx, "external-content@example.test", "hash")
 	if err != nil {
@@ -155,7 +157,7 @@ func TestReportContentBuilderMakesExternalSiteSummarySelfContained(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	builder := NewReportContentBuilder(store, func(context.Context, uuid.UUID) (*database.Store, error) { return store, nil }, "https://private.example")
+	builder := NewReportContentBuilder(store, reportAnalyticsResolver(manager), "https://private.example")
 	email, shouldSend, err := builder.Build(ctx, ReportContentRequest{
 		Report: report, RecipientLocale: "en", SelfContained: true,
 		ScheduledFor: scheduledFor, PeriodStart: start, PeriodEnd: end,
@@ -207,7 +209,7 @@ func TestReportWorkerExternalDeliveryRequiresPaidCloudPlan(t *testing.T) {
 }
 
 func TestReportContentBuilderSuppressesAnEmptyOpportunityBrief(t *testing.T) {
-	store := setupReportContentStore(t)
+	store, manager := setupReportContentStore(t)
 	ctx := context.Background()
 	userID, err := store.CreateUser(ctx, "empty-opportunity-report@example.test", "hash")
 	if err != nil {
@@ -227,7 +229,7 @@ func TestReportContentBuilderSuppressesAnEmptyOpportunityBrief(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	builder := NewReportContentBuilder(store, func(context.Context, uuid.UUID) (*database.Store, error) { return store, nil }, "https://hitkeep.example")
+	builder := NewReportContentBuilder(store, reportAnalyticsResolver(manager), "https://hitkeep.example")
 	email, shouldSend, err := builder.Build(ctx, ReportContentRequest{
 		Report: report, RecipientUserID: userID, RecipientLocale: "en",
 		ScheduledFor: scheduledFor, PeriodStart: start, PeriodEnd: end,
@@ -241,10 +243,10 @@ func TestReportContentBuilderSuppressesAnEmptyOpportunityBrief(t *testing.T) {
 }
 
 func TestReportWorkerDeliversDueReportOnceWithStableDeliveryIdentity(t *testing.T) {
-	store := setupReportContentStore(t)
+	store, manager := setupReportContentStore(t)
 	report, now := setupDueReportWorkerFixture(t, store, "scheduled-report@example.test")
 	driver := &scheduledReportDriver{}
-	worker := NewReportWorker(newTestTenantMgr(t, store), mailer.NewWithDriver(driver, nil), "https://hitkeep.example", "worker-test-secret")
+	worker := NewReportWorker(manager, mailer.NewWithDriver(driver, nil), "https://hitkeep.example", "worker-test-secret")
 
 	worker.RunAt(context.Background(), now)
 
@@ -270,7 +272,7 @@ func TestReportWorkerDeliversDueReportOnceWithStableDeliveryIdentity(t *testing.
 		t.Fatalf("accepted run = %+v", runs)
 	}
 	var storedMessageID string
-	if err := store.DB().QueryRowContext(context.Background(), "SELECT message_id FROM report_deliveries WHERE id = ?", runs[0].Deliveries[0].ID).Scan(&storedMessageID); err != nil {
+	if err := queryReportControl(t, store, "SELECT message_id FROM report_deliveries WHERE id = ?", runs[0].Deliveries[0].ID).Scan(&storedMessageID); err != nil {
 		t.Fatal(err)
 	}
 	if storedMessageID != message.messageID {
@@ -295,10 +297,10 @@ func TestReportWorkerDeliversDueReportOnceWithStableDeliveryIdentity(t *testing.
 }
 
 func TestReportWorkerReusesMessageIDAfterSMTPFailure(t *testing.T) {
-	store := setupReportContentStore(t)
+	store, manager := setupReportContentStore(t)
 	report, now := setupDueReportWorkerFixture(t, store, "retry-report@example.test")
 	driver := &scheduledReportDriver{failRemaining: 1}
-	worker := NewReportWorker(newTestTenantMgr(t, store), mailer.NewWithDriver(driver, nil), "https://hitkeep.example", "worker-test-secret")
+	worker := NewReportWorker(manager, mailer.NewWithDriver(driver, nil), "https://hitkeep.example", "worker-test-secret")
 
 	worker.RunAt(context.Background(), now)
 	runs, err := store.ListReportRuns(context.Background(), report.ID, 10)
@@ -322,7 +324,7 @@ func TestReportWorkerReusesMessageIDAfterSMTPFailure(t *testing.T) {
 	}
 }
 
-func setupDueReportWorkerFixture(t *testing.T, store *database.Store, email string) (*api.ReportDefinition, time.Time) {
+func setupDueReportWorkerFixture(t *testing.T, store *controlstore.Store, email string) (*api.ReportDefinition, time.Time) {
 	t.Helper()
 	ctx := context.Background()
 	userID, err := store.CreateUser(ctx, email, "hash")
@@ -343,23 +345,40 @@ func setupDueReportWorkerFixture(t *testing.T, store *database.Store, email stri
 		t.Fatal(err)
 	}
 	now := time.Date(2026, 7, 22, 12, 0, 0, 0, time.UTC)
-	if _, err := store.DB().ExecContext(ctx, "UPDATE report_definitions SET next_run_at = ? WHERE id = ?", time.Date(2026, 7, 22, 8, 0, 0, 0, time.UTC), report.ID); err != nil {
+	db, err := sql.Open("sqlite", store.Path())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.ExecContext(ctx, "UPDATE report_definitions SET next_run_at = ? WHERE id = ?", time.Date(2026, 7, 22, 8, 0, 0, 0, time.UTC), report.ID); err != nil {
 		t.Fatal(err)
 	}
 	return report, now
 }
 
-func setupReportContentStore(t *testing.T) *database.Store {
+func setupReportContentStore(t *testing.T) (*controlstore.Store, *database.TenantStoreManager) {
 	t.Helper()
-	store := database.NewStore(filepath.Join(t.TempDir(), "report-content.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatal(err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	store, manager := testutil.NewControlAndTenantStores(t)
+	t.Cleanup(func() { _ = manager.Close() })
 	t.Cleanup(func() { _ = store.Close() })
-	return store
+	return store, manager
+}
+
+func reportAnalyticsResolver(manager *database.TenantStoreManager) func(context.Context, uuid.UUID) (*database.Store, error) {
+	return func(ctx context.Context, siteID uuid.UUID) (*database.Store, error) {
+		store, _, err := manager.ResolveSiteStore(ctx, siteID)
+		return store, err
+	}
+}
+
+func queryReportControl(t *testing.T, store *controlstore.Store, query string, args ...any) *sql.Row {
+	t.Helper()
+	db, err := sql.Open("sqlite", store.Path())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	return db.QueryRowContext(context.Background(), query, args...)
 }
 
 func reportingPeriod(schedule api.ReportSchedule, scheduledFor time.Time) (time.Time, time.Time, time.Time, time.Time, error) {

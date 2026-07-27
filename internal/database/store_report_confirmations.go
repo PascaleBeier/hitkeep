@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/reporting"
 )
 
@@ -25,13 +26,7 @@ var (
 	ErrReportConfirmationCooldown = errors.New("report recipient confirmation was sent recently")
 )
 
-type PreparedReportConfirmation struct {
-	RecipientID uuid.UUID
-	Email       string
-	Locale      string
-	Token       string
-	Metadata    api.ReportRecipientConfirmation
-}
+type PreparedReportConfirmation = controlstore.PreparedReportConfirmation
 
 type ReportConfirmationAuditTarget struct {
 	ReportID    uuid.UUID

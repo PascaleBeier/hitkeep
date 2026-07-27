@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/config"
-	"hitkeep/internal/database"
+	"hitkeep/internal/controlstore"
 )
 
 // PlanCodeFree is the managed-cloud free plan code. It mirrors
@@ -27,14 +27,14 @@ var (
 // the questions their gates need answered instead of re-deriving plan rules.
 // Instance admins and owners bypass every limit it enforces.
 type Service struct {
-	store    *database.Store
+	store    *controlstore.Store
 	provider Provider
 	cfg      *config.Config
 }
 
 // NewService assembles the limits policy service. All dependencies are read
 // lazily, so callers may construct it per request from live configuration.
-func NewService(store *database.Store, provider Provider, cfg *config.Config) *Service {
+func NewService(store *controlstore.Store, provider Provider, cfg *config.Config) *Service {
 	return &Service{store: store, provider: provider, cfg: cfg}
 }
 

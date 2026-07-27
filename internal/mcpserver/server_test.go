@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
-	"path/filepath"
 	"reflect"
 	"slices"
 	"strconv"
@@ -23,15 +22,17 @@ import (
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/mcptest"
 	"hitkeep/internal/server/filterparams"
+	"hitkeep/internal/testutil"
 )
 
 func TestMCPServerRequiresBearerToken(t *testing.T) {
-	store, _, _ := setupMCPStore(t)
+	store, tenantStores, _, _ := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -48,10 +49,10 @@ func TestMCPServerRequiresBearerToken(t *testing.T) {
 }
 
 func TestMCPServerInitializesWithConfiguredPublicHostBehindLoopback(t *testing.T) {
-	store, _, token := setupMCPStore(t)
+	store, tenantStores, _, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
 	conf.PublicURL = "https://analytics.example.com"
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -70,10 +71,10 @@ func TestMCPServerInitializesWithConfiguredPublicHostBehindLoopback(t *testing.T
 }
 
 func TestMCPServerReturnsUnauthorizedForValidPublicHostWithoutBearer(t *testing.T) {
-	store, _, _ := setupMCPStore(t)
+	store, tenantStores, _, _ := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
 	conf.PublicURL = "https://analytics.example.com"
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -92,10 +93,10 @@ func TestMCPServerReturnsUnauthorizedForValidPublicHostWithoutBearer(t *testing.
 }
 
 func TestMCPServerRejectsUnexpectedHostBeforeAuth(t *testing.T) {
-	store, _, token := setupMCPStore(t)
+	store, tenantStores, _, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
 	conf.PublicURL = "https://analytics.example.com"
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -225,9 +226,9 @@ func TestMCPParseFiltersAllowsAIVisibilityDimensions(t *testing.T) {
 }
 
 func TestMCPSiteOverviewAcceptsAIVisibilityFilters(t *testing.T) {
-	store, site, token := setupMCPStore(t)
+	store, tenantStores, site, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -433,9 +434,9 @@ func TestMCPHostValidationNormalizesPublicURLAndLoopbackHosts(t *testing.T) {
 }
 
 func TestMCPServerRejectsMalformedAndRevokedBearerToken(t *testing.T) {
-	store, _, token := setupMCPStore(t)
+	store, tenantStores, _, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -474,9 +475,9 @@ func TestMCPServerRejectsMalformedAndRevokedBearerToken(t *testing.T) {
 }
 
 func TestMCPToolsListAndSiteOverview(t *testing.T) {
-	store, site, token := setupMCPStore(t)
+	store, tenantStores, site, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -550,8 +551,9 @@ func TestMCPToolsListAndSiteOverview(t *testing.T) {
 }
 
 func TestMCPEcommerceReturnsGeoNetworkAggregatesOnly(t *testing.T) {
-	store, site, token := setupMCPStore(t)
+	store, tenantStores, site, token := setupMCPStore(t)
 	ctx := context.Background()
+	analytics := mustMCPAnalytics(t, tenantStores, site.ID)
 	eventTime := time.Now().UTC().Add(-30 * time.Minute)
 	sessionID := uuid.New()
 	city := "Berlin"
@@ -559,7 +561,7 @@ func TestMCPEcommerceReturnsGeoNetworkAggregatesOnly(t *testing.T) {
 	asn := 24940
 	asnOrg := "Hetzner Online GmbH"
 	userAgent := "RawBot/1.0"
-	if err := store.CreateHit(ctx, &api.Hit{
+	if err := analytics.CreateHit(ctx, &api.Hit{
 		SiteID:    site.ID,
 		SessionID: sessionID,
 		PageID:    uuid.New(),
@@ -573,7 +575,7 @@ func TestMCPEcommerceReturnsGeoNetworkAggregatesOnly(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("CreateHit: %v", err)
 	}
-	if err := store.CreateEvent(ctx, &api.Event{
+	if err := analytics.CreateEvent(ctx, &api.Event{
 		SiteID:    site.ID,
 		SessionID: sessionID,
 		Name:      "begin_checkout",
@@ -588,7 +590,7 @@ func TestMCPEcommerceReturnsGeoNetworkAggregatesOnly(t *testing.T) {
 	}
 
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -629,9 +631,9 @@ func TestMCPEcommerceReturnsGeoNetworkAggregatesOnly(t *testing.T) {
 }
 
 func TestMCPWebVitalsReturnsAggregateOnly(t *testing.T) {
-	store, site, token := setupMCPStore(t)
+	store, tenantStores, site, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -670,9 +672,9 @@ func TestMCPWebVitalsReturnsAggregateOnly(t *testing.T) {
 }
 
 func TestMCPWebVitalsReturnsGeoNetworkBreakdown(t *testing.T) {
-	store, site, token := setupMCPStore(t)
+	store, tenantStores, site, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -701,7 +703,7 @@ func TestMCPWebVitalsReturnsGeoNetworkBreakdown(t *testing.T) {
 }
 
 func TestMCPToolDeniesUnscopedSite(t *testing.T) {
-	store, _, token := setupMCPStore(t)
+	store, tenantStores, _, token := setupMCPStore(t)
 	ctx := context.Background()
 	otherUserID, err := store.CreateUser(ctx, "other@mcp.test", "hash")
 	if err != nil {
@@ -713,7 +715,7 @@ func TestMCPToolDeniesUnscopedSite(t *testing.T) {
 	}
 
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -735,7 +737,7 @@ func TestMCPToolDeniesUnscopedSite(t *testing.T) {
 }
 
 func TestMCPToolRequiresExplicitSiteGrantEvenForOwnerAPIClient(t *testing.T) {
-	store, site, _ := setupMCPStore(t)
+	store, tenantStores, site, _ := setupMCPStore(t)
 	ctx := context.Background()
 	userID, err := store.CreateUser(ctx, "mcp-owner-token@example.test", "hash")
 	if err != nil {
@@ -747,7 +749,7 @@ func TestMCPToolRequiresExplicitSiteGrantEvenForOwnerAPIClient(t *testing.T) {
 	}
 
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -771,12 +773,12 @@ func TestMCPToolRequiresExplicitSiteGrantEvenForOwnerAPIClient(t *testing.T) {
 }
 
 func TestMCPOpportunitiesReturnsSafeFinalData(t *testing.T) {
-	store, site, token := setupMCPStore(t)
+	store, tenantStores, site, token := setupMCPStore(t)
 	ctx := context.Background()
 	seedMCPOpportunity(t, ctx, store, site)
 
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -798,9 +800,9 @@ func TestMCPOpportunitiesReturnsSafeFinalData(t *testing.T) {
 }
 
 func TestMCPOpportunitiesReturnsEmptyArrayWhenNoRowsExist(t *testing.T) {
-	store, site, token := setupMCPStore(t)
+	store, tenantStores, site, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -831,13 +833,13 @@ func TestMCPOpportunitiesReturnsEmptyArrayWhenNoRowsExist(t *testing.T) {
 }
 
 func TestMCPOpportunitiesExposeOnlyCitedEvidence(t *testing.T) {
-	store, site, token := setupMCPStore(t)
+	store, tenantStores, site, token := setupMCPStore(t)
 	ctx := context.Background()
 	teamID, err := store.GetSiteTenantID(ctx, site.ID)
 	if err != nil {
 		t.Fatalf("GetSiteTenantID: %v", err)
 	}
-	input := mcpOpportunityInput(teamID, site.ID, uuid.New())
+	input := mcpOpportunityInput(teamID, site.ID, seedMCPAIRun(t, ctx, store, teamID, site.ID))
 	input.Evidence = append(input.Evidence, api.OpportunityEvidence{
 		ID:       "uncited_internal_signal",
 		LabelKey: "opportunities.evidence.fixture",
@@ -849,7 +851,7 @@ func TestMCPOpportunitiesExposeOnlyCitedEvidence(t *testing.T) {
 	}
 
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -881,13 +883,13 @@ func TestMCPOpportunitiesExposeOnlyCitedEvidence(t *testing.T) {
 }
 
 func TestMCPOpportunitiesReturnsRankedFinalData(t *testing.T) {
-	store, site, token := setupMCPStore(t)
+	store, tenantStores, site, token := setupMCPStore(t)
 	ctx := context.Background()
 	teamID, err := store.GetSiteTenantID(ctx, site.ID)
 	if err != nil {
 		t.Fatalf("GetSiteTenantID: %v", err)
 	}
-	runID := uuid.New()
+	runID := seedMCPAIRun(t, ctx, store, teamID, site.ID)
 	lowActive := mcpOpportunityInput(teamID, site.ID, runID)
 	lowActive.ID = uuid.New()
 	lowActive.Status = "new"
@@ -908,7 +910,7 @@ func TestMCPOpportunitiesReturnsRankedFinalData(t *testing.T) {
 	}
 
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -936,7 +938,7 @@ func TestMCPOpportunitiesReturnsRankedFinalData(t *testing.T) {
 	}
 }
 
-func seedMCPOpportunity(t *testing.T, ctx context.Context, store *database.Store, site *api.Site) {
+func seedMCPOpportunity(t *testing.T, ctx context.Context, store *controlstore.Store, site *api.Site) {
 	t.Helper()
 	teamID, err := store.GetSiteTenantID(ctx, site.ID)
 	if err != nil {
@@ -944,9 +946,18 @@ func seedMCPOpportunity(t *testing.T, ctx context.Context, store *database.Store
 	}
 	requireMCPAIRunRejectsRawPayload(t, ctx, store, teamID, site.ID)
 
-	runID, err := store.AppendAIRun(ctx, database.AIRunParams{
+	runID := seedMCPAIRun(t, ctx, store, teamID, site.ID)
+	_, err = store.UpsertOpportunities(ctx, []controlstore.OpportunityInput{mcpOpportunityInput(teamID, site.ID, runID)})
+	if err != nil {
+		t.Fatalf("UpsertOpportunities: %v", err)
+	}
+}
+
+func seedMCPAIRun(t *testing.T, ctx context.Context, store *controlstore.Store, teamID, siteID uuid.UUID) uuid.UUID {
+	t.Helper()
+	runID, err := store.AppendAIRun(ctx, controlstore.AIRunParams{
 		TeamID:          teamID,
-		SiteID:          site.ID,
+		SiteID:          siteID,
 		Feature:         "opportunities",
 		Provider:        "openai",
 		Model:           "gpt-test",
@@ -961,15 +972,12 @@ func seedMCPOpportunity(t *testing.T, ctx context.Context, store *database.Store
 	if err != nil {
 		t.Fatalf("AppendAIRun: %v", err)
 	}
-	_, err = store.UpsertOpportunities(ctx, []database.OpportunityInput{mcpOpportunityInput(teamID, site.ID, runID)})
-	if err != nil {
-		t.Fatalf("UpsertOpportunities: %v", err)
-	}
+	return runID
 }
 
-func requireMCPAIRunRejectsRawPayload(t *testing.T, ctx context.Context, store *database.Store, teamID, siteID uuid.UUID) {
+func requireMCPAIRunRejectsRawPayload(t *testing.T, ctx context.Context, store *controlstore.Store, teamID, siteID uuid.UUID) {
 	t.Helper()
-	_, err := store.AppendAIRun(ctx, database.AIRunParams{
+	_, err := store.AppendAIRun(ctx, controlstore.AIRunParams{
 		TeamID:          teamID,
 		SiteID:          siteID,
 		Feature:         "opportunities",
@@ -985,8 +993,8 @@ func requireMCPAIRunRejectsRawPayload(t *testing.T, ctx context.Context, store *
 	}
 }
 
-func mcpOpportunityInput(teamID, siteID, runID uuid.UUID) database.OpportunityInput {
-	return database.OpportunityInput{
+func mcpOpportunityInput(teamID, siteID, runID uuid.UUID) controlstore.OpportunityInput {
+	return controlstore.OpportunityInput{
 		TeamID:          teamID,
 		SiteID:          siteID,
 		Kind:            "conversion",
@@ -1064,10 +1072,10 @@ func mcpOpportunityIDs(opportunities []mcpOpportunity) []string {
 }
 
 func TestMCPToolRejectsRangeBeyondConfiguredLimit(t *testing.T) {
-	store, site, token := setupMCPStore(t)
+	store, tenantStores, site, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
 	conf.MCPMaxRangeDays = 1
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -1091,10 +1099,10 @@ func TestMCPToolRejectsRangeBeyondConfiguredLimit(t *testing.T) {
 }
 
 func TestMCPToolRejectsComparisonRangeBeyondConfiguredLimit(t *testing.T) {
-	store, site, token := setupMCPStore(t)
+	store, tenantStores, site, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
 	conf.MCPMaxRangeDays = 1
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -1121,12 +1129,12 @@ func TestMCPToolRejectsComparisonRangeBeyondConfiguredLimit(t *testing.T) {
 }
 
 func TestMCPSearchConsoleStatusReportsMappedSite(t *testing.T) {
-	store, site, token := setupMCPStore(t)
+	store, tenantStores, site, token := setupMCPStore(t)
 	teamID := seedSearchConsoleMapping(t, store, site)
 	seedSearchConsoleSyncState(t, store, site.ID, teamID, "succeeded")
 
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -1140,12 +1148,8 @@ func TestMCPSearchConsoleStatusReportsMappedSite(t *testing.T) {
 
 func TestMCPSearchConsoleReturnsOverviewAndSeriesFromImportedFacts(t *testing.T) {
 	store, tenantStores, site, token := setupMCPTenantSearchConsoleStore(t)
-	defer tenantStores.Close()
 	seedSearchConsoleMapping(t, store, site)
 	sharedFact := searchConsoleFact(site, 99, 990)
-	if err := store.UpsertSearchConsoleFact(context.Background(), sharedFact); err != nil {
-		t.Fatalf("seed shared Search Console fact: %v", err)
-	}
 	tenantStore, _, err := tenantStores.ResolveSiteStore(context.Background(), site.ID)
 	if err != nil {
 		t.Fatalf("ResolveSiteStore: %v", err)
@@ -1216,7 +1220,7 @@ func TestMCPSearchConsoleReturnsExplicitSectionsWithFiltersAndCappedLimit(t *tes
 }
 
 func TestMCPSearchConsoleDeniesUnscopedSite(t *testing.T) {
-	store, _, token := setupMCPStore(t)
+	store, tenantStores, _, token := setupMCPStore(t)
 	ctx := context.Background()
 	otherUserID, err := store.CreateUser(ctx, "other-gsc@mcp.test", "hash")
 	if err != nil {
@@ -1229,7 +1233,7 @@ func TestMCPSearchConsoleDeniesUnscopedSite(t *testing.T) {
 	seedSearchConsoleMapping(t, store, otherSite)
 
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -1251,9 +1255,9 @@ func TestMCPSearchConsoleDeniesUnscopedSite(t *testing.T) {
 }
 
 func TestMCPSearchConsoleReportRequiresMappedSite(t *testing.T) {
-	store, site, token := setupMCPStore(t)
+	store, tenantStores, site, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -1276,11 +1280,11 @@ func TestMCPSearchConsoleReportRequiresMappedSite(t *testing.T) {
 }
 
 func TestMCPSearchConsoleRejectsRangeBeyondConfiguredLimit(t *testing.T) {
-	store, site, token := setupMCPStore(t)
+	store, tenantStores, site, token := setupMCPStore(t)
 	seedSearchConsoleMapping(t, store, site)
 	conf := testMCPConfig(t, "")
 	conf.MCPMaxRangeDays = 1
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -1438,9 +1442,9 @@ func TestMCPSearchConsoleReturnsEmptyWarningsArrayWhenHealthy(t *testing.T) {
 }
 
 func TestMCPResourcesListAndReadHelp(t *testing.T) {
-	store, _, token := setupMCPStore(t)
+	store, tenantStores, _, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -1500,9 +1504,9 @@ func TestMCPDocsToolsFetchMarkdown(t *testing.T) {
 	}))
 	defer docsTS.Close()
 
-	store, _, token := setupMCPStore(t)
+	store, tenantStores, _, token := setupMCPStore(t)
 	conf := testMCPConfig(t, docsTS.URL)
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -1632,17 +1636,12 @@ func TestDocsClientCapsCachedPages(t *testing.T) {
 	}
 }
 
-func setupMCPStore(t *testing.T) (*database.Store, *api.Site, string) {
+func setupMCPStore(t *testing.T) (*controlstore.Store, *database.TenantStoreManager, *api.Site, string) {
 	t.Helper()
 	ctx := context.Background()
-	store := database.NewStore(filepath.Join(t.TempDir(), "hitkeep.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("Connect: %v", err)
-	}
-	t.Cleanup(func() { store.Close() })
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("Migrate: %v", err)
-	}
+	store, tenantStores := testutil.NewControlAndTenantStores(t)
+	t.Cleanup(func() { _ = tenantStores.Close() })
+	t.Cleanup(func() { _ = store.Close() })
 	userID, err := store.CreateUser(ctx, "mcp@example.com", "hash")
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
@@ -1651,13 +1650,17 @@ func setupMCPStore(t *testing.T) (*database.Store, *api.Site, string) {
 	if err != nil {
 		t.Fatalf("CreateSite: %v", err)
 	}
+	if err := tenantStores.SyncSite(ctx, site.ID); err != nil {
+		t.Fatalf("SyncSite: %v", err)
+	}
+	analytics := mustMCPAnalytics(t, tenantStores, site.ID)
 	sessionID := uuid.New()
 	pageID := uuid.New()
 	city := "Mountain View"
 	provider := "Google LLC"
 	asn := 15169
 	asnOrg := "Google LLC"
-	if err := store.CreateHit(ctx, &api.Hit{
+	if err := analytics.CreateHit(ctx, &api.Hit{
 		SiteID:    site.ID,
 		SessionID: sessionID,
 		PageID:    pageID,
@@ -1670,7 +1673,7 @@ func setupMCPStore(t *testing.T) (*database.Store, *api.Site, string) {
 	}); err != nil {
 		t.Fatalf("CreateHit: %v", err)
 	}
-	if err := store.CreateWebVitalsBulk(ctx, []*api.WebVital{
+	if err := analytics.CreateWebVitalsBulk(ctx, []*api.WebVital{
 		{
 			SiteID:    site.ID,
 			SessionID: uuid.New(),
@@ -1692,7 +1695,7 @@ func setupMCPStore(t *testing.T) (*database.Store, *api.Site, string) {
 	}); err != nil {
 		t.Fatalf("CreateWebVitalsBulk: %v", err)
 	}
-	if err := store.CreateGoal(ctx, &api.Goal{
+	if err := analytics.CreateGoal(ctx, &api.Goal{
 		SiteID: site.ID,
 		Name:   "Homepage Visit",
 		Type:   "path",
@@ -1706,20 +1709,15 @@ func setupMCPStore(t *testing.T) (*database.Store, *api.Site, string) {
 	if err != nil {
 		t.Fatalf("CreateAPIClient: %v", err)
 	}
-	return store, site, token
+	return store, tenantStores, site, token
 }
 
-func setupMCPTenantSearchConsoleStore(t *testing.T) (*database.Store, *database.TenantStoreManager, *api.Site, string) {
+func setupMCPTenantSearchConsoleStore(t *testing.T) (*controlstore.Store, *database.TenantStoreManager, *api.Site, string) {
 	t.Helper()
 	ctx := context.Background()
-	store := database.NewStore(filepath.Join(t.TempDir(), "hitkeep.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("Connect: %v", err)
-	}
-	t.Cleanup(func() { store.Close() })
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("Migrate: %v", err)
-	}
+	store, tenantStores := testutil.NewControlAndTenantStores(t)
+	t.Cleanup(func() { _ = tenantStores.Close() })
+	t.Cleanup(func() { _ = store.Close() })
 	userID, err := store.CreateUser(ctx, "tenant-mcp@example.com", "hash")
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
@@ -1735,13 +1733,25 @@ func setupMCPTenantSearchConsoleStore(t *testing.T) (*database.Store, *database.
 	if err != nil {
 		t.Fatalf("CreateSite: %v", err)
 	}
+	if err := tenantStores.SyncSite(ctx, site.ID); err != nil {
+		t.Fatalf("SyncSite: %v", err)
+	}
 	_, token, err := store.CreateAPIClient(ctx, userID, "mcp-tenant-reader", "", authcore.InstanceUser, map[uuid.UUID]authcore.SiteRole{
 		site.ID: authcore.SiteViewer,
 	}, nil)
 	if err != nil {
 		t.Fatalf("CreateAPIClient: %v", err)
 	}
-	return store, database.NewTenantStoreManager(store, t.TempDir()), site, token
+	return store, tenantStores, site, token
+}
+
+func mustMCPAnalytics(t *testing.T, tenantStores *database.TenantStoreManager, siteID uuid.UUID) *database.Store {
+	t.Helper()
+	store, _, err := tenantStores.ResolveSiteStore(context.Background(), siteID)
+	if err != nil {
+		t.Fatalf("ResolveSiteStore: %v", err)
+	}
+	return store
 }
 
 func callSearchConsoleStatus(t *testing.T, session *mcp.ClientSession, siteID uuid.UUID) (string, searchConsoleStatusOutput) {
@@ -1915,7 +1925,7 @@ func requireSearchConsoleSyncWarnings(t *testing.T, output searchConsoleOutput) 
 	}
 }
 
-func seedSearchConsoleMapping(t *testing.T, store *database.Store, site *api.Site) uuid.UUID {
+func seedSearchConsoleMapping(t *testing.T, store *controlstore.Store, site *api.Site) uuid.UUID {
 	t.Helper()
 	ctx := context.Background()
 	teamID, err := store.GetSiteTenantID(ctx, site.ID)
@@ -1943,7 +1953,7 @@ func seedSearchConsoleMapping(t *testing.T, store *database.Store, site *api.Sit
 	return teamID
 }
 
-func seedSearchConsoleSyncState(t *testing.T, store *database.Store, siteID, teamID uuid.UUID, state string) {
+func seedSearchConsoleSyncState(t *testing.T, store *controlstore.Store, siteID, teamID uuid.UUID, state string) {
 	t.Helper()
 	importedStart := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	importedEnd := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)

@@ -156,7 +156,7 @@ func (w *RetentionWorker) prepareArchiveDestination(ctx context.Context) error {
 }
 
 func (w *RetentionWorker) resolveDefaultTenantID(ctx context.Context) uuid.UUID {
-	defaultTenantID, err := w.tenantMgr.Shared().GetDefaultTenantID(ctx)
+	defaultTenantID, err := w.tenantMgr.Control().GetDefaultTenantID(ctx)
 	if err == nil {
 		return defaultTenantID
 	}
@@ -218,10 +218,10 @@ func (w *RetentionWorker) processSitePolicy(ctx context.Context, policy retentio
 }
 
 func (w *RetentionWorker) pruneArchivedQRAssets(ctx context.Context, siteID uuid.UUID, cutoff time.Time) error {
-	if w.tenantMgr == nil || w.tenantMgr.Shared() == nil {
+	if w.tenantMgr == nil || w.tenantMgr.Control() == nil {
 		return nil
 	}
-	assets, err := w.tenantMgr.Shared().ListArchivedQRCodeAssetsForRetention(ctx, siteID, cutoff)
+	assets, err := w.tenantMgr.Control().ListArchivedQRCodeAssetsForRetention(ctx, siteID, cutoff)
 	if err != nil {
 		if isMissingRelationError(err, "qr_code_assets") || isMissingRelationError(err, "qr_codes") || isBinderError(err) {
 			return nil
@@ -239,7 +239,7 @@ func (w *RetentionWorker) pruneArchivedQRAssets(ctx context.Context, siteID uuid
 				slog.Warn("Failed to delete retained QR asset directory", "error", err, "site_id", asset.SiteID, "qr_code_id", asset.QRCodeID)
 			}
 		}
-		if _, err := w.tenantMgr.Shared().DeleteQRCodeAsset(ctx, asset.SiteID, asset.QRCodeID); err != nil {
+		if _, err := w.tenantMgr.Control().DeleteQRCodeAsset(ctx, asset.SiteID, asset.QRCodeID); err != nil {
 			return err
 		}
 	}
@@ -447,7 +447,11 @@ var retentionArchiveSources = []retentionArchiveSource{
 }
 
 func (w *RetentionWorker) ensureS3Support(ctx context.Context) error {
-	return database.WithDuckDBSession(ctx, w.tenantMgr.Shared().DB(), database.DuckDBSessionOptions{
+	root, err := w.tenantMgr.ForTenant(ctx, uuid.Nil)
+	if err != nil {
+		return fmt.Errorf("open default tenant data-plane root: %w", err)
+	}
+	return database.WithDuckDBSession(ctx, root.DB(), database.DuckDBSessionOptions{
 		S3: s3ConfigForSession(true, w.s3Config),
 	}, func(conn *sql.Conn) error {
 		return nil
@@ -462,73 +466,23 @@ func s3ConfigForSession(enabled bool, cfg *S3Config) *database.S3SecretConfig {
 }
 
 func (w *RetentionWorker) loadRetentionPolicies(ctx context.Context, defaultTenantID uuid.UUID) ([]retentionSitePolicy, error) {
-	const tenantAwareQuery = `
-		SELECT s.id, s.data_retention_days, CAST(st.tenant_id AS VARCHAR)
-		FROM sites s
-		LEFT JOIN site_tenants st ON st.site_id = s.id
-		WHERE s.data_retention_days IS NOT NULL AND s.data_retention_days > 0
-	`
-
-	rows, err := w.tenantMgr.Shared().DB().QueryContext(ctx, tenantAwareQuery)
+	sites, err := w.tenantMgr.Control().ListAllSites(ctx)
 	if err != nil {
-		if !isMissingRelationError(err, "site_tenants") {
-			return nil, fmt.Errorf("failed to query retention policies: %w", err)
-		}
-
-		slog.Warn("Tenant mapping table not available; falling back to legacy retention layout", "error", err)
-		return w.loadLegacyRetentionPolicies(ctx, defaultTenantID)
+		return nil, fmt.Errorf("list retention sites: %w", err)
 	}
-	defer rows.Close()
-
-	policies := make([]retentionSitePolicy, 0)
-	for rows.Next() {
-		var (
-			policy      retentionSitePolicy
-			tenantIDRaw sql.NullString
-		)
-		if err := rows.Scan(&policy.ID, &policy.Days, &tenantIDRaw); err != nil {
-			slog.Error("Failed to scan tenant-aware site policy", "error", err)
+	policies := make([]retentionSitePolicy, 0, len(sites))
+	for _, site := range sites {
+		if site.DataRetentionDays <= 0 {
 			continue
 		}
-
-		policy.TenantID = defaultTenantID
-		if tenantIDRaw.Valid && strings.TrimSpace(tenantIDRaw.String) != "" {
-			tenantID, parseErr := uuid.Parse(strings.TrimSpace(tenantIDRaw.String))
-			if parseErr != nil {
-				slog.Error("Invalid tenant ID in site_tenants mapping", "error", parseErr, "site_id", policy.ID, "raw_tenant_id", tenantIDRaw.String)
-				continue
+		tenantID, resolveErr := w.tenantMgr.Control().GetSiteTenantID(ctx, site.ID)
+		if resolveErr != nil {
+			if defaultTenantID == uuid.Nil {
+				return nil, fmt.Errorf("resolve tenant for retention site: %w", resolveErr)
 			}
-			policy.TenantID = tenantID
+			tenantID = defaultTenantID
 		}
-
-		policies = append(policies, policy)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed to read retention policies: %w", err)
-	}
-
-	return policies, nil
-}
-
-func (w *RetentionWorker) loadLegacyRetentionPolicies(ctx context.Context, defaultTenantID uuid.UUID) ([]retentionSitePolicy, error) {
-	rows, err := w.tenantMgr.Shared().DB().QueryContext(ctx, "SELECT id, data_retention_days FROM sites WHERE data_retention_days IS NOT NULL AND data_retention_days > 0")
-	if err != nil {
-		return nil, fmt.Errorf("failed to query legacy retention policies: %w", err)
-	}
-	defer rows.Close()
-
-	policies := make([]retentionSitePolicy, 0)
-	for rows.Next() {
-		var policy retentionSitePolicy
-		if err := rows.Scan(&policy.ID, &policy.Days); err != nil {
-			slog.Error("Failed to scan legacy site policy", "error", err)
-			continue
-		}
-		policy.TenantID = defaultTenantID
-		policies = append(policies, policy)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed to read legacy retention policies: %w", err)
+		policies = append(policies, retentionSitePolicy{ID: site.ID, Days: site.DataRetentionDays, TenantID: tenantID})
 	}
 	return policies, nil
 }

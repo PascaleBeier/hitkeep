@@ -18,22 +18,18 @@ import (
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/importables"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/testutil"
 )
 
-func setupImportHandlerTest(t *testing.T) (*handler, *database.Store, *api.Site) {
+func setupImportHandlerTest(t *testing.T) (*handler, *controlstore.Store, *api.Site) {
 	t.Helper()
 
 	tmpDir := t.TempDir()
-	store := database.NewStore(filepath.Join(tmpDir, "hitkeep.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
+	store := testutil.NewControlStore(t)
 
 	userID, err := store.CreateUser(context.Background(), "import-api@example.com", "hashed_secret")
 	if err != nil {
@@ -43,8 +39,11 @@ func setupImportHandlerTest(t *testing.T) (*handler, *database.Store, *api.Site)
 	if err != nil {
 		t.Fatalf("create site: %v", err)
 	}
-	tenantStores := database.NewTenantStoreManager(store, filepath.Join(tmpDir, "data"), database.WithTenantDataPlane(false))
+	tenantStores := database.NewTenantStoreManager(store, filepath.Join(tmpDir, "data"), nil)
 	t.Cleanup(func() { _ = tenantStores.Close() })
+	if err := tenantStores.SyncSite(context.Background(), site.ID); err != nil {
+		t.Fatalf("sync site: %v", err)
+	}
 
 	ctx := &shared.Context{
 		Store:        store,
@@ -195,7 +194,11 @@ func TestImportUploadValidateRunAndDeleteLifecycle(t *testing.T) {
 
 	start := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	end := start.Add(24*time.Hour - time.Nanosecond)
-	names, err := store.GetEventNames(context.Background(), api.EventNamesParams{SiteID: site.ID, Start: start, End: end})
+	analytics, err := h.ctx.AnalyticsStore(context.Background(), site.ID)
+	if err != nil {
+		t.Fatalf("resolve analytics: %v", err)
+	}
+	names, err := analytics.GetEventNames(context.Background(), api.EventNamesParams{SiteID: site.ID, Start: start, End: end})
 	if err != nil {
 		t.Fatalf("event names before import: %v", err)
 	}
@@ -212,7 +215,7 @@ func TestImportUploadValidateRunAndDeleteLifecycle(t *testing.T) {
 		t.Fatalf("expected completed import with imported rows, got %+v", completed)
 	}
 
-	names, err = store.GetEventNames(context.Background(), api.EventNamesParams{SiteID: site.ID, Start: start, End: end})
+	names, err = analytics.GetEventNames(context.Background(), api.EventNamesParams{SiteID: site.ID, Start: start, End: end})
 	if err != nil {
 		t.Fatalf("event names after import: %v", err)
 	}
@@ -229,7 +232,7 @@ func TestImportUploadValidateRunAndDeleteLifecycle(t *testing.T) {
 		t.Fatalf("delete status = %d, body = %s", deleteW.Code, deleteW.Body.String())
 	}
 
-	names, err = store.GetEventNames(context.Background(), api.EventNamesParams{SiteID: site.ID, Start: start, End: end})
+	names, err = analytics.GetEventNames(context.Background(), api.EventNamesParams{SiteID: site.ID, Start: start, End: end})
 	if err != nil {
 		t.Fatalf("event names after delete: %v", err)
 	}
@@ -267,7 +270,11 @@ func TestSimpleAnalyticsUploadValidateRunLifecycle(t *testing.T) {
 	}
 
 	start := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
-	stats, err := store.GetSiteStats(context.Background(), api.AnalyticsParams{SiteID: site.ID, Start: start, End: start.AddDate(0, 0, 7)})
+	analytics, err := h.ctx.AnalyticsStore(context.Background(), site.ID)
+	if err != nil {
+		t.Fatalf("resolve analytics: %v", err)
+	}
+	stats, err := analytics.GetSiteStats(context.Background(), api.AnalyticsParams{SiteID: site.ID, Start: start, End: start.AddDate(0, 0, 7)})
 	if err != nil {
 		t.Fatalf("get site stats: %v", err)
 	}
@@ -399,7 +406,7 @@ func TestUploadChunkRejectsSparseOutOfOrderProgress(t *testing.T) {
 	}
 }
 
-func waitForImportStatus(t *testing.T, store *database.Store, siteID, importID uuid.UUID, want string) *api.ImportJob {
+func waitForImportStatus(t *testing.T, store *controlstore.Store, siteID, importID uuid.UUID, want string) *api.ImportJob {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
 	var last *api.ImportJob
@@ -629,7 +636,11 @@ func TestRunImportSkipsOverlappingAggregateRows(t *testing.T) {
 
 	var count int64
 	var pageviews int64
-	if err := store.DB().QueryRowContext(context.Background(), `
+	analytics, err := h.ctx.AnalyticsStore(context.Background(), site.ID)
+	if err != nil {
+		t.Fatalf("resolve analytics: %v", err)
+	}
+	if err := analytics.DB().QueryRowContext(context.Background(), `
 		SELECT COUNT(*), COALESCE(SUM(pageviews), 0)
 		FROM imported_traffic_daily
 		WHERE site_id = ?

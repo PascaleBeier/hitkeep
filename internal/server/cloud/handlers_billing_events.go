@@ -19,6 +19,7 @@ import (
 	"hitkeep/internal/appurl"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 )
@@ -332,7 +333,7 @@ func (h *handler) handleInvoicePaymentFailed(ctx context.Context, event stripe.E
 
 	account, err := h.resolveCloudBillingAccount(ctx, invoice.TenantID(), invoice.Customer.ID, invoice.Subscription.ID)
 	if err != nil {
-		if errors.Is(err, database.ErrCloudBillingAccountNotFound) {
+		if errors.Is(err, controlstore.ErrCloudBillingAccountNotFound) {
 			return uuid.Nil, nil
 		}
 		return uuid.Nil, err
@@ -365,7 +366,7 @@ func (h *handler) handleChargeDisputeEvent(ctx context.Context, event stripe.Eve
 
 	account, err := h.resolveCloudBillingAccount(ctx, uuid.Nil, charge.CustomerID, "")
 	if err != nil {
-		if errors.Is(err, database.ErrCloudBillingAccountNotFound) {
+		if errors.Is(err, controlstore.ErrCloudBillingAccountNotFound) {
 			return uuid.Nil, nil
 		}
 		return uuid.Nil, err
@@ -381,7 +382,7 @@ func (h *handler) resolveCloudBillingAccount(ctx context.Context, tenantID uuid.
 		if err == nil {
 			return account, nil
 		}
-		if !errors.Is(err, database.ErrCloudBillingAccountNotFound) {
+		if !errors.Is(err, controlstore.ErrCloudBillingAccountNotFound) {
 			return nil, err
 		}
 	}
@@ -391,7 +392,7 @@ func (h *handler) resolveCloudBillingAccount(ctx context.Context, tenantID uuid.
 		if err == nil {
 			return account, nil
 		}
-		if !errors.Is(err, database.ErrCloudBillingAccountNotFound) {
+		if !errors.Is(err, controlstore.ErrCloudBillingAccountNotFound) {
 			return nil, err
 		}
 	}
@@ -401,12 +402,12 @@ func (h *handler) resolveCloudBillingAccount(ctx context.Context, tenantID uuid.
 		if err == nil {
 			return account, nil
 		}
-		if !errors.Is(err, database.ErrCloudBillingAccountNotFound) {
+		if !errors.Is(err, controlstore.ErrCloudBillingAccountNotFound) {
 			return nil, err
 		}
 	}
 
-	return nil, database.ErrCloudBillingAccountNotFound
+	return nil, controlstore.ErrCloudBillingAccountNotFound
 }
 
 func tenantIDFromStripeEvent(event stripe.Event) (uuid.UUID, error) {

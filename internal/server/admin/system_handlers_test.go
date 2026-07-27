@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,22 +20,35 @@ import (
 	"hitkeep/internal/auth"
 	"hitkeep/internal/blocking"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
 )
 
-func setupSystemTestEnv(t *testing.T) (*handler, *database.Store, *database.TenantStoreManager, uuid.UUID, uuid.UUID, uuid.UUID) {
+func execSystemControlSQL(t *testing.T, store *controlstore.Store, query string, args ...any) {
+	t.Helper()
+	db, err := sql.Open("sqlite", store.Path())
+	if err != nil {
+		t.Fatalf("open independent test control connection: %v", err)
+	}
+	defer db.Close()
+	if _, err := db.ExecContext(context.Background(), query, args...); err != nil {
+		t.Fatalf("execute test control fixture SQL: %v", err)
+	}
+}
+
+func setupSystemTestEnv(t *testing.T) (*handler, *controlstore.Store, *database.TenantStoreManager, uuid.UUID, uuid.UUID, uuid.UUID) {
 	t.Helper()
 
 	basePath := t.TempDir()
 	sharedPath := filepath.Join(basePath, "shared.db")
-	store := database.NewStore(sharedPath)
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
+	store, err := controlstore.Open(context.Background(), sharedPath)
+	if err != nil {
+		t.Fatalf("open control store: %v", err)
 	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
+	if _, err := store.EnsureDefaultTenant(context.Background()); err != nil {
+		t.Fatalf("ensure default tenant: %v", err)
 	}
 	t.Cleanup(func() { _ = store.Close() })
 
@@ -57,9 +71,7 @@ func setupSystemTestEnv(t *testing.T) (*handler, *database.Store, *database.Tena
 	if err := store.UpdateInstanceRole(context.Background(), adminUserID, auth.InstanceAdmin, ownerUserID); err != nil {
 		t.Fatalf("promote admin: %v", err)
 	}
-	prepareEmptySystemTestDataPlane(t, store, basePath)
-
-	tenantStores := database.NewTenantStoreManager(store, basePath, database.WithTenantDataPlane(true))
+	tenantStores := database.NewTenantStoreManager(store, basePath, nil)
 	t.Cleanup(func() { _ = tenantStores.Close() })
 
 	systemCounters := &database.SystemCounter{}
@@ -87,43 +99,6 @@ func setupSystemTestEnv(t *testing.T) (*handler, *database.Store, *database.Tena
 	}
 
 	return &handler{ctx: ctx}, store, tenantStores, ownerUserID, adminUserID, regularUserID
-}
-
-// prepareEmptySystemTestDataPlane builds the already-split topology needed by
-// system handler tests. Migration crash/rewrite behavior is covered in the
-// database package; repeating the physical control rewrite for every handler
-// test made the race shard spend minutes rebuilding the same empty catalogs.
-func prepareEmptySystemTestDataPlane(t *testing.T, control *database.Store, dataPath string) {
-	t.Helper()
-	ctx := context.Background()
-	defaultTenantID, err := control.GetDefaultTenantID(ctx)
-	if err != nil {
-		t.Fatalf("resolve default tenant: %v", err)
-	}
-	tenantDir := filepath.Join(dataPath, "tenants", defaultTenantID.String())
-	if err := os.MkdirAll(tenantDir, 0o700); err != nil {
-		t.Fatalf("create default tenant directory: %v", err)
-	}
-	tenant := database.NewStore(filepath.Join(tenantDir, "hitkeep.db"))
-	if err := tenant.Connect(); err != nil {
-		t.Fatalf("connect default tenant test store: %v", err)
-	}
-	if err := tenant.MigrateTenant(ctx); err != nil {
-		_ = tenant.Close()
-		t.Fatalf("migrate default tenant test store: %v", err)
-	}
-	if err := tenant.Close(); err != nil {
-		t.Fatalf("close default tenant test store: %v", err)
-	}
-	if _, err := control.DB().ExecContext(ctx, `
-		INSERT INTO data_migrations (name, applied_at)
-		VALUES
-			('default_tenant_split_v1', now()),
-			('default_tenant_split_compacted_v1', now())
-		ON CONFLICT (name) DO NOTHING
-	`); err != nil {
-		t.Fatalf("mark empty test data plane as split: %v", err)
-	}
 }
 
 func TestHandleGetSystem(t *testing.T) {
@@ -229,7 +204,7 @@ func TestHandleGetAIStatusIsNonSecret(t *testing.T) {
 	h.ctx.Config.AITokenLimit = 100
 	h.ctx.Config.AIBudgetWindowMinutes = 60
 
-	_, err := store.AppendAIRun(context.Background(), database.AIRunParams{
+	_, err := store.AppendAIRun(context.Background(), controlstore.AIRunParams{
 		Feature:       "opportunities",
 		Provider:      "openai-compatible",
 		Model:         "gpt-test",
@@ -281,7 +256,7 @@ func TestHandleGetAIStatusIgnoresStaleProviderErrorsOutsideBudgetWindow(t *testi
 	h.ctx.Config.AIRegion = "eu-central-1"
 	h.ctx.Config.AIBudgetWindowMinutes = 60
 
-	_, err := store.AppendAIRun(context.Background(), database.AIRunParams{
+	_, err := store.AppendAIRun(context.Background(), controlstore.AIRunParams{
 		Feature:       "opportunities",
 		Provider:      "bedrock",
 		Model:         "eu.amazon.nova-2-lite-v1:0",
@@ -569,7 +544,7 @@ func TestHandleGetSearchConsoleReportsCredentialAndSyncHealth(t *testing.T) {
 	}
 }
 
-func seedSearchConsoleNeedsAttentionSystemStatus(t *testing.T, store *database.Store, ownerID uuid.UUID) {
+func seedSearchConsoleNeedsAttentionSystemStatus(t *testing.T, store *controlstore.Store, ownerID uuid.UUID) {
 	t.Helper()
 
 	ctx := context.Background()
@@ -585,7 +560,7 @@ func seedSearchConsoleNeedsAttentionSystemStatus(t *testing.T, store *database.S
 	upsertSearchConsoleSystemFixtures(t, store, team.ID, site.ID, ownerID, now)
 }
 
-func upsertSearchConsoleSystemFixtures(t *testing.T, store *database.Store, teamID, siteID, ownerID uuid.UUID, now time.Time) {
+func upsertSearchConsoleSystemFixtures(t *testing.T, store *controlstore.Store, teamID, siteID, ownerID uuid.UUID, now time.Time) {
 	t.Helper()
 
 	ctx := context.Background()
@@ -813,7 +788,7 @@ func TestHandleGetBackups(t *testing.T) {
 }
 
 func TestHandleGetDatabaseAndRunCheckpoint(t *testing.T) {
-	h, store, _, ownerID, _, _ := setupSystemTestEnv(t)
+	h, _, _, ownerID, _, _ := setupSystemTestEnv(t)
 
 	getReq := withAdminTestUser(httptest.NewRequest(http.MethodGet, "/api/admin/system/database", nil), ownerID)
 	getRecorder := httptest.NewRecorder()
@@ -835,7 +810,11 @@ func TestHandleGetDatabaseAndRunCheckpoint(t *testing.T) {
 	if checkpointRecorder.Code != http.StatusOK {
 		t.Fatalf("expected checkpoint 200, got %d: %s", checkpointRecorder.Code, checkpointRecorder.Body.String())
 	}
-	if status := store.DatabaseStatus(); status.LastCheckpointAt == nil {
+	defaultStore, err := h.ctx.TenantStores.ForTenant(context.Background(), uuid.Nil)
+	if err != nil {
+		t.Fatalf("resolve default tenant after checkpoint: %v", err)
+	}
+	if status := defaultStore.DatabaseStatus(); status.LastCheckpointAt == nil {
 		t.Fatal("expected manual checkpoint to update database status")
 	}
 }
@@ -955,13 +934,11 @@ func TestHandleGetImportStageCleanup(t *testing.T) {
 		t.Fatalf("create import upload: %v", err)
 	}
 	old := time.Now().UTC().AddDate(0, 0, -8)
-	if _, err := store.DB().ExecContext(ctx, `
+	execSystemControlSQL(t, store, `
 		UPDATE site_imports
 		SET status = ?, created_at = ?, updated_at = ?, validated_at = ?, finished_at = ?
 		WHERE id = ?
-	`, database.ImportStatusCompleted, old, old, old, old, importJob.ID); err != nil {
-		t.Fatalf("age import: %v", err)
-	}
+	`, database.ImportStatusCompleted, old, old, old, old, importJob.ID)
 
 	req := withAdminTestUser(httptest.NewRequest(http.MethodGet, "/api/admin/system/import-stage-cleanup", nil), ownerID)
 	w := httptest.NewRecorder()
@@ -1015,13 +992,11 @@ func TestHandleRunImportStageCleanup(t *testing.T) {
 		t.Fatalf("mark uploaded: %v", err)
 	}
 	old := time.Now().UTC().AddDate(0, 0, -8)
-	if _, err := store.DB().ExecContext(ctx, `
+	execSystemControlSQL(t, store, `
 		UPDATE site_imports
 		SET status = ?, created_at = ?, updated_at = ?, validated_at = ?, finished_at = ?
 		WHERE id = ?
-	`, database.ImportStatusValidated, old, old, old, old, importJob.ID); err != nil {
-		t.Fatalf("age import: %v", err)
-	}
+	`, database.ImportStatusValidated, old, old, old, old, importJob.ID)
 
 	req := withAdminTestUser(httptest.NewRequest(http.MethodPost, "/api/admin/system/import-stage-cleanup/run", nil), ownerID)
 	w := httptest.NewRecorder()

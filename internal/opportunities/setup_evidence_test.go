@@ -15,7 +15,7 @@ import (
 )
 
 func TestBuildSetupEvidenceSnapshotIncludesConfiguredAndAggregateSignals(t *testing.T) {
-	shared, site, _, _ := setupOpportunityServiceTestStore(t)
+	_, shared, site, _, _ := setupOpportunityServiceTestStore(t)
 	ctx := context.Background()
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := from.AddDate(0, 0, 30)
@@ -77,7 +77,6 @@ func TestBuildSetupEvidenceSnapshotIncludesConfiguredAndAggregateSignals(t *test
 	}
 
 	snapshot, err := buildSetupEvidenceSnapshot(ctx, setupEvidenceSnapshotInput{
-		SharedStore:    shared,
 		AnalyticsStore: shared,
 		SiteID:         site.ID,
 		From:           from,
@@ -95,7 +94,7 @@ func TestBuildSetupEvidenceSnapshotIncludesConfiguredAndAggregateSignals(t *test
 }
 
 func TestBuildSetupEvidenceSnapshotDoesNotExposeRawRows(t *testing.T) {
-	shared, site, _, _ := setupOpportunityServiceTestStore(t)
+	_, shared, site, _, _ := setupOpportunityServiceTestStore(t)
 	ctx := context.Background()
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := from.AddDate(0, 0, 30)
@@ -126,7 +125,6 @@ func TestBuildSetupEvidenceSnapshotDoesNotExposeRawRows(t *testing.T) {
 	}), "create event")
 
 	snapshot, err := buildSetupEvidenceSnapshot(ctx, setupEvidenceSnapshotInput{
-		SharedStore:    shared,
 		AnalyticsStore: shared,
 		SiteID:         site.ID,
 		From:           from,
@@ -152,7 +150,7 @@ func TestBuildSetupEvidenceSnapshotDoesNotExposeRawRows(t *testing.T) {
 }
 
 func TestLoadOpportunitySignalsCanProvideSetupEvidenceSnapshot(t *testing.T) {
-	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	control, shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	ctx := context.Background()
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := from.AddDate(0, 0, 30)
@@ -163,7 +161,7 @@ func TestLoadOpportunitySignalsCanProvideSetupEvidenceSnapshot(t *testing.T) {
 		Value:  "signup",
 	}), "create goal")
 
-	signals, err := loadOpportunitySignals(ctx, shared, GenerateInput{
+	signals, err := loadOpportunitySignals(ctx, control, GenerateInput{
 		Store:           shared,
 		Site:            site,
 		TeamID:          teamID,

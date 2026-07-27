@@ -13,12 +13,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/nsqio/go-nsq"
 	"github.com/nsqio/nsq/nsqd"
 	"golang.org/x/sync/errgroup"
 
 	"hitkeep/internal/cluster"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/hklog"
@@ -93,7 +95,7 @@ func Run() {
 		slog.Warn("Mailer not configured, email features will not work", "error", err)
 	}
 
-	var store *database.Store
+	var store *controlstore.Store
 	var tenantMgr *database.TenantStoreManager
 	var producer *nsq.Producer
 	ent := entitlements.NewProvider(conf)
@@ -151,8 +153,6 @@ func Run() {
 			select {
 			case <-gCtx.Done():
 				return nil
-			case fatalErr := <-store.FatalErrors():
-				return fmt.Errorf("database requires controlled restart: %w", fatalErr)
 			case fatalErr := <-tenantMgr.FatalErrors():
 				return fatalErr
 			}
@@ -225,13 +225,13 @@ func startSearchConsoleSyncWorker(ctx context.Context, conf *config.Config, tena
 	go searchConsoleWorker.Start(ctx)
 }
 
-func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.Logger, logLevel slog.Level, realtimeBroker *realtime.Broker) (*database.Store, *database.TenantStoreManager, *nsq.Producer, func(), error) {
+func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.Logger, logLevel slog.Level, realtimeBroker *realtime.Broker) (*controlstore.Store, *database.TenantStoreManager, *nsq.Producer, func(), error) {
 	slog.Debug("(Leader) Starting stateful services...")
 	if err := validateLiveDatabasePaths(conf); err != nil {
 		return nil, nil, nil, nil, err
 	}
 
-	openStore := func(forMandatorySplit bool) (*database.Store, error) {
+	openLegacyStore := func(forMandatorySplit bool) (*database.Store, error) {
 		opener := database.OpenMigratedStore
 		if forMandatorySplit {
 			opener = database.OpenDefaultSplitControlStore
@@ -245,57 +245,117 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 		)
 	}
 
-	store, err := openStore(true)
+	publicationState, err := controlstore.InspectPublication(ctx, conf.DBPath)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-
-	// Recover and migrate before compaction so a problematic database is never
-	// rewritten before its recovery bundle exists.
-	recoveredAtStartup := store.RecoveredDuringConnect()
-	if recoveredAtStartup {
-		_ = store.Close()
-		return nil, nil, nil, nil, fmt.Errorf("automatic database recovery completed; restart HitKeep to run the mandatory 2.13 default-tenant migration from a clean startup")
-	}
-	complete, markerErr := store.DefaultTenantSplitComplete(ctx)
-	if markerErr != nil {
-		_ = store.Close()
-		return nil, nil, nil, nil, markerErr
-	}
-	if !complete {
-		if err := store.Close(); err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("close database before default tenant split: %w", err)
+	if publicationState == controlstore.PublicationNeedsRebuild || publicationState == controlstore.PublicationNeedsWorkRebuild {
+		rebuildFromEvidence := publicationState == controlstore.PublicationNeedsRebuild
+		if err := controlstore.ResetInvalidLegacyWork(ctx, conf.DBPath); err != nil {
+			return nil, nil, nil, nil, err
 		}
-		if err := database.RunDefaultTenantSplit(ctx, conf.DBPath, conf.DataPath,
+		sourcePath := conf.DBPath
+		if rebuildFromEvidence {
+			sourcePath = controlstore.PreSQLiteEvidencePath(conf.DBPath)
+		}
+		source, sourceSHA, schemaSHA, sourceErr := database.OpenLegacyControlSource(ctx, sourcePath)
+		if sourceErr != nil {
+			return nil, nil, nil, nil, sourceErr
+		}
+		_, importErr := controlstore.ImportLegacy(ctx, controlstore.SQLiteWorkPath(conf.DBPath), source, sourceSHA, schemaSHA)
+		closeErr := source.Close()
+		if importErr != nil {
+			return nil, nil, nil, nil, importErr
+		}
+		if closeErr != nil {
+			return nil, nil, nil, nil, closeErr
+		}
+		if err := controlstore.PublishLegacyConversion(ctx, conf.DBPath); err != nil {
+			return nil, nil, nil, nil, err
+		}
+		publicationState = controlstore.PublicationSQLiteReady
+	}
+	if publicationState == controlstore.PublicationCanComplete {
+		if err := controlstore.PublishLegacyConversion(ctx, conf.DBPath); err != nil {
+			return nil, nil, nil, nil, err
+		}
+		publicationState = controlstore.PublicationSQLiteReady
+	}
+	if publicationState == controlstore.PublicationNeedsConversion {
+		legacy, openErr := openLegacyStore(true)
+		if openErr != nil {
+			return nil, nil, nil, nil, openErr
+		}
+		if legacy.RecoveredDuringConnect() {
+			_ = legacy.Close()
+			return nil, nil, nil, nil, fmt.Errorf("automatic DuckDB recovery completed; restart HitKeep to continue the mandatory 2.13 migration from a clean startup")
+		}
+		complete, markerErr := legacy.DefaultTenantSplitComplete(ctx)
+		if markerErr != nil {
+			_ = legacy.Close()
+			return nil, nil, nil, nil, markerErr
+		}
+		if !complete {
+			if err := legacy.Close(); err != nil {
+				return nil, nil, nil, nil, fmt.Errorf("close DuckDB control database before default tenant split: %w", err)
+			}
+			if err := database.RunDefaultTenantSplit(ctx, conf.DBPath, conf.DataPath,
+				database.WithMemoryLimit(conf.DuckDBMemoryLimit),
+				database.WithThreads(conf.DuckDBThreads),
+			); err != nil {
+				return nil, nil, nil, nil, err
+			}
+			legacy, err = openLegacyStore(false)
+			if err != nil {
+				return nil, nil, nil, nil, fmt.Errorf("reopen DuckDB control database after default tenant split: %w", err)
+			}
+		}
+		if err := legacy.Close(); err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("close legacy DuckDB control database: %w", err)
+		}
+		if err := database.DrainLegacyTenantAnalytics(ctx, conf.DBPath, conf.DataPath,
 			database.WithMemoryLimit(conf.DuckDBMemoryLimit),
 			database.WithThreads(conf.DuckDBThreads),
 		); err != nil {
 			return nil, nil, nil, nil, err
 		}
-		store, err = openStore(false)
-		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("reopen control database after default tenant split: %w", err)
+		workPath := controlstore.SQLiteWorkPath(conf.DBPath)
+		if _, statErr := os.Stat(workPath); errors.Is(statErr, os.ErrNotExist) {
+			source, sourceSHA, schemaSHA, sourceErr := database.OpenLegacyControlSource(ctx, conf.DBPath)
+			if sourceErr != nil {
+				return nil, nil, nil, nil, sourceErr
+			}
+			_, importErr := controlstore.ImportLegacy(ctx, workPath, source, sourceSHA, schemaSHA)
+			closeErr := source.Close()
+			if importErr != nil {
+				return nil, nil, nil, nil, importErr
+			}
+			if closeErr != nil {
+				return nil, nil, nil, nil, closeErr
+			}
+		} else if statErr != nil {
+			return nil, nil, nil, nil, fmt.Errorf("inspect SQLite conversion work file: %w", statErr)
 		}
-	}
-	if conf.DBCompactOnStart {
-		if err := store.Close(); err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("close database before startup compaction: %w", err)
-		}
-		compaction := database.DefaultCompactionOptions()
-		compaction.MemoryLimit = conf.DuckDBMemoryLimit
-		compaction.Threads = conf.DuckDBThreads
-		if result, err := database.MaybeCompactDatabase(ctx, conf.DBPath, compaction, database.PrepareSharedSchema); err != nil {
-			slog.Warn("Skipping database compaction at startup", "path", conf.DBPath, "error", err)
-		} else if result.Compacted {
-			slog.Info("Compacted database at startup", "path", conf.DBPath, "bytes_before", result.BytesBefore, "bytes_after", result.BytesAfter)
-		}
-		store, err = openStore(false)
-		if err != nil {
+		if err := controlstore.PublishLegacyConversion(ctx, conf.DBPath); err != nil {
 			return nil, nil, nil, nil, err
 		}
 	}
-	store.StartMaintenance(ctx)
+	store, err := controlstore.Open(ctx, conf.DBPath)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	if _, err := store.EnsureDefaultTenant(ctx); err != nil {
+		_ = store.Close()
+		return nil, nil, nil, nil, fmt.Errorf("ensure default control tenant: %w", err)
+	}
 
+	storeOptions := []database.StoreOption{
+		database.WithMemoryLimit(conf.DuckDBMemoryLimit),
+		database.WithThreads(conf.DuckDBThreads),
+		database.WithCheckpointInterval(time.Duration(conf.DBCheckpointIntervalMinutes) * time.Minute),
+		database.WithAutomaticRecovery(conf.DBAutoRecover, conf.DBRecoveryPath),
+		database.WithAutomaticWALRecovery(conf.DBAutoRecoverWAL),
+	}
 	var tenantOpts []database.TenantStoreManagerOption
 	if conf.DBCompactOnStart {
 		compaction := database.DefaultCompactionOptions()
@@ -303,17 +363,21 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 		compaction.Threads = conf.DuckDBThreads
 		tenantOpts = append(tenantOpts, database.WithTenantCompaction(compaction))
 	}
-	tenantOpts = append(tenantOpts, database.WithTenantDataPlane(true))
-	tenantMgr := database.NewTenantStoreManager(store, conf.DataPath, tenantOpts...)
+	tenantMgr := database.NewTenantStoreManager(store, conf.DataPath, storeOptions, tenantOpts...)
+	if _, err := tenantMgr.ForTenant(ctx, uuid.Nil); err != nil {
+		_ = store.Close()
+		return nil, nil, nil, nil, fmt.Errorf("open default tenant data-plane root: %w", err)
+	}
 	closeStores := func() {
 		if err := tenantMgr.Close(); err != nil {
 			slog.Error("Failed to close tenant databases during startup cleanup", "error", err)
 		}
 		if err := store.Close(); err != nil {
-			slog.Error("Failed to close shared database during startup cleanup", "error", err)
+			slog.Error("Failed to close SQLite control database during startup cleanup", "error", err)
 		}
 	}
 	tenantMgr.StartMaintenance(ctx)
+	store.StartMaintenance(ctx, time.Duration(conf.DBCheckpointIntervalMinutes)*time.Minute)
 	if err := tenantMgr.SyncAllTenants(ctx); err != nil {
 		closeStores()
 		return nil, nil, nil, nil, err
@@ -394,7 +458,7 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 			slog.Error("Failed to close tenant databases", "error", err)
 		}
 		if err := store.Close(); err != nil {
-			slog.Error("Failed to close shared database cleanly", "error", err)
+			slog.Error("Failed to close SQLite control database cleanly", "error", err)
 		}
 		os.RemoveAll(tmpDir)
 	}
@@ -404,7 +468,7 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 
 func validateLiveDatabasePaths(conf *config.Config) error {
 	if worker.IsS3ArchivePath(conf.DBPath) {
-		return fmt.Errorf("HITKEEP_DB_PATH must be a local writable DuckDB path; use HITKEEP_BACKUP_PATH for S3 snapshots")
+		return fmt.Errorf("HITKEEP_DB_PATH must be a local writable SQLite control path; use HITKEEP_BACKUP_PATH for S3 snapshots")
 	}
 	if worker.IsS3ArchivePath(conf.DataPath) {
 		return fmt.Errorf("HITKEEP_DATA_PATH must be a local writable directory; use HITKEEP_BACKUP_PATH for S3 snapshots")

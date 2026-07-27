@@ -17,6 +17,7 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2/expirable"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 )
 
 const (
@@ -31,20 +32,18 @@ type siteSyncKey struct {
 	tenantID uuid.UUID
 }
 
-// TenantStoreManager provides per-tenant database isolation. During the
-// transition release the control store remains hitkeep.db, while a published
-// default tenant file becomes the root of one shared tenant-data DuckDB
-// instance and non-default files are attached as catalogs.
+// TenantStoreManager provides per-tenant database isolation. The default
+// tenant file is the root of one shared tenant-data DuckDB instance and
+// non-default files are attached as catalogs.
 type TenantStoreManager struct {
-	shared   *Store
-	basePath string
+	control      *controlstore.Store
+	basePath     string
+	storeOptions []StoreOption
 
-	mu                 sync.RWMutex
-	stores             map[uuid.UUID]*Store
-	attachedAliases    map[uuid.UUID]string
-	dataPlaneRoot      *Store
-	dataPlaneEnabled   bool
-	dataPlaneOptionSet bool
+	mu              sync.RWMutex
+	stores          map[uuid.UUID]*Store
+	attachedAliases map[uuid.UUID]string
+	dataPlaneRoot   *Store
 
 	// recentSyncs suppresses repeated mirror syncs on the ingest path;
 	// explicit SyncSite calls bypass it and force a refresh.
@@ -70,23 +69,13 @@ func WithTenantCompaction(opts CompactionOptions) TenantStoreManagerOption {
 	}
 }
 
-// WithTenantDataPlane controls whether a completed default-tenant split is
-// used for routing. It is deliberately separate from the split marker so a
-// The option remains available to isolated compatibility tests and recovery
-// tooling. Production startup always enables the tenant data plane.
-func WithTenantDataPlane(enabled bool) TenantStoreManagerOption {
-	return func(m *TenantStoreManager) {
-		m.dataPlaneEnabled = enabled
-		m.dataPlaneOptionSet = true
-	}
-}
-
-// NewTenantStoreManager creates a TenantStoreManager that wraps the shared store.
-// It resolves and caches the default tenant ID from the shared database.
-func NewTenantStoreManager(shared *Store, basePath string, opts ...TenantStoreManagerOption) *TenantStoreManager {
+// NewTenantStoreManager creates a tenant data-plane coordinator backed by the
+// SQLite control store. It resolves and caches the default tenant ID there.
+func NewTenantStoreManager(control *controlstore.Store, basePath string, storeOptions []StoreOption, opts ...TenantStoreManagerOption) *TenantStoreManager {
 	mgr := &TenantStoreManager{
-		shared:          shared,
+		control:         control,
 		basePath:        basePath,
+		storeOptions:    append([]StoreOption(nil), storeOptions...),
 		stores:          make(map[uuid.UUID]*Store),
 		attachedAliases: make(map[uuid.UUID]string),
 		recentSyncs:     lru.NewLRU[siteSyncKey, struct{}](siteSyncMemoSize, nil, siteSyncMemoTTL),
@@ -98,38 +87,18 @@ func NewTenantStoreManager(shared *Store, basePath string, opts ...TenantStoreMa
 
 	// Best-effort default tenant ID resolution. If the tenant table doesn't
 	// exist yet (pre-migration) we'll resolve lazily.
-	defaultID, err := shared.GetDefaultTenantID(context.Background())
+	defaultID, err := control.GetDefaultTenantID(context.Background())
 	if err != nil {
 		slog.Debug("TenantStoreManager: could not resolve default tenant ID at init (will resolve lazily)", "error", err)
 	} else {
 		mgr.defaultID = defaultID
-		if !mgr.dataPlaneOptionSet {
-			if applied, markerErr := shared.HasDefaultTenantSplit(context.Background()); markerErr == nil && applied {
-				path := filepath.Join(basePath, "tenants", defaultID.String(), "hitkeep.db")
-				if _, statErr := os.Stat(path); statErr == nil {
-					mgr.dataPlaneEnabled = true
-				}
-			}
-		}
 	}
 
 	return mgr
 }
 
-// Shared returns the legacy-named control store. New callers should use
-// Control to make the control/data-plane boundary explicit.
-func (m *TenantStoreManager) Shared() *Store {
-	return m.shared
-}
-
 // Control returns the control-plane store (hitkeep.db).
-func (m *TenantStoreManager) Control() *Store { return m.shared }
-
-// TenantDataPlaneEnabled reports whether analytics routing uses the split
-// tenant data plane for this process.
-func (m *TenantStoreManager) TenantDataPlaneEnabled() bool {
-	return m != nil && m.dataPlaneEnabled
-}
+func (m *TenantStoreManager) Control() *controlstore.Store { return m.control }
 
 // FatalErrors reports tenant database conditions that require a controlled
 // process restart.
@@ -175,7 +144,7 @@ func (m *TenantStoreManager) DefaultTenantID(ctx context.Context) (uuid.UUID, er
 		return m.defaultID, nil
 	}
 
-	defaultID, err := m.shared.GetDefaultTenantID(ctx)
+	defaultID, err := m.control.GetDefaultTenantID(ctx)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -193,9 +162,6 @@ func (m *TenantStoreManager) ForTenant(ctx context.Context, tenantID uuid.UUID) 
 	}
 	if tenantID == uuid.Nil {
 		tenantID = defaultID
-	}
-	if tenantID == defaultID && !m.dataPlaneEnabled {
-		return m.shared, nil
 	}
 
 	// Fast path: check cache with read lock.
@@ -236,7 +202,7 @@ func (m *TenantStoreManager) ForTenant(ctx context.Context, tenantID uuid.UUID) 
 // ResolveTenantStore resolves the active tenant for a user and returns
 // the tenant's store along with the tenant ID.
 func (m *TenantStoreManager) ResolveTenantStore(ctx context.Context, userID uuid.UUID) (*Store, uuid.UUID, error) {
-	tenantID, err := m.shared.GetActiveTenantID(ctx, userID)
+	tenantID, err := m.control.GetActiveTenantID(ctx, userID)
 	if err != nil {
 		return nil, uuid.Nil, fmt.Errorf("could not resolve active tenant for user %s: %w", userID, err)
 	}
@@ -251,7 +217,7 @@ func (m *TenantStoreManager) ResolveTenantStore(ctx context.Context, userID uuid
 // ResolveSiteStore resolves the tenant for a site, ensures the tenant-local
 // mirror/config bridge is in place, and returns the analytics store.
 func (m *TenantStoreManager) ResolveSiteStore(ctx context.Context, siteID uuid.UUID) (*Store, uuid.UUID, error) {
-	tenantID, err := m.shared.GetSiteTenantID(ctx, siteID)
+	tenantID, err := m.control.GetSiteTenantID(ctx, siteID)
 	if err != nil {
 		return nil, uuid.Nil, fmt.Errorf("resolve tenant for site %s: %w", siteID, err)
 	}
@@ -277,20 +243,22 @@ func (m *TenantStoreManager) ResolveSiteStore(ctx context.Context, siteID uuid.U
 // GetUserOnboarding keeps account and team progress on the control plane but
 // reads first-hit and automatic-event activity from each owning tenant store.
 func (m *TenantStoreManager) GetUserOnboarding(ctx context.Context, userID uuid.UUID) (*api.UserOnboarding, error) {
-	if m == nil || m.shared == nil {
+	if m == nil || m.control == nil {
 		return nil, fmt.Errorf("tenant store manager is not configured")
 	}
-	return m.shared.GetUserOnboardingWithResolver(ctx, userID, func(ctx context.Context, siteID uuid.UUID) (*Store, error) {
+	return m.control.GetUserOnboardingWithActivity(ctx, userID, func(ctx context.Context, siteID uuid.UUID) (*api.SiteTrackingStatus, error) {
 		store, _, err := m.ResolveSiteStore(ctx, siteID)
-		return store, err
+		if err != nil {
+			return nil, err
+		}
+		return store.GetSiteTrackingStatus(ctx, siteID, time.Now().UTC())
 	})
 }
 
-// SyncSite mirrors the site's metadata into the tenant-local store and
-// backfills legacy shared goals/funnels for bridge-release compatibility.
-// It always performs the sync; ResolveSiteStore memoizes it for ingest.
+// SyncSite mirrors the site's metadata into its tenant catalog. It always
+// performs the sync; ResolveSiteStore memoizes it for ingest.
 func (m *TenantStoreManager) SyncSite(ctx context.Context, siteID uuid.UUID) error {
-	tenantID, err := m.shared.GetSiteTenantID(ctx, siteID)
+	tenantID, err := m.control.GetSiteTenantID(ctx, siteID)
 	if err != nil {
 		return fmt.Errorf("resolve tenant for site %s: %w", siteID, err)
 	}
@@ -303,7 +271,7 @@ func (m *TenantStoreManager) SyncSite(ctx context.Context, siteID uuid.UUID) err
 
 // SyncAllTenants eagerly syncs all known sites into their tenant-local stores.
 func (m *TenantStoreManager) SyncAllTenants(ctx context.Context) error {
-	sites, err := m.shared.ListAllSites(ctx)
+	sites, err := m.control.ListAllSites(ctx)
 	if err != nil {
 		return fmt.Errorf("list sites for tenant sync: %w", err)
 	}
@@ -323,13 +291,11 @@ func (m *TenantStoreManager) DeleteSite(ctx context.Context, siteID uuid.UUID) e
 		return err
 	}
 
-	if analyticsStore != m.shared {
-		if err := analyticsStore.DeleteSite(ctx, siteID); err != nil {
-			return fmt.Errorf("delete tenant analytics site %s: %w", siteID, err)
-		}
+	if err := analyticsStore.DeleteSite(ctx, siteID); err != nil {
+		return fmt.Errorf("delete tenant analytics site %s: %w", siteID, err)
 	}
 
-	if err := m.shared.DeleteSite(ctx, siteID); err != nil {
+	if err := m.control.DeleteSite(ctx, siteID); err != nil {
 		return fmt.Errorf("delete shared site %s: %w", siteID, err)
 	}
 	return nil
@@ -340,16 +306,22 @@ func (m *TenantStoreManager) DeleteSiteWithWebhookEvent(ctx context.Context, sit
 	if err != nil {
 		return nil, err
 	}
-	if analyticsStore != m.shared {
-		if err := analyticsStore.DeleteSite(ctx, siteID); err != nil {
-			return nil, fmt.Errorf("delete tenant analytics site %s: %w", siteID, err)
-		}
+	if err := analyticsStore.DeleteSite(ctx, siteID); err != nil {
+		return nil, fmt.Errorf("delete tenant analytics site %s: %w", siteID, err)
 	}
-	jobs, err := m.shared.DeleteSiteWithWebhookEvent(ctx, siteID, event)
+	jobs, err := m.control.DeleteSiteWithWebhookEvent(ctx, siteID, toControlWebhookEvent(event))
 	if err != nil {
 		return nil, fmt.Errorf("delete shared site %s with webhook event: %w", siteID, err)
 	}
-	return jobs, nil
+	return fromControlWebhookJobs(jobs), nil
+}
+
+func toControlWebhookEvent(input WebhookEventInput) controlstore.WebhookEventInput {
+	return input
+}
+
+func fromControlWebhookJobs(input []controlstore.WebhookDeliveryJob) []WebhookDeliveryJob {
+	return input
 }
 
 func (m *TenantStoreManager) ResetSiteStats(ctx context.Context, siteID uuid.UUID) (api.SiteStatsResetResponse, error) {
@@ -358,15 +330,11 @@ func (m *TenantStoreManager) ResetSiteStats(ctx context.Context, siteID uuid.UUI
 		return api.SiteStatsResetResponse{Status: "reset"}, err
 	}
 
-	if analyticsStore == m.shared {
-		return m.shared.ResetSiteStats(ctx, siteID)
-	}
-
 	result, err := analyticsStore.resetSiteAnalyticsMeasurements(ctx, siteID)
 	if err != nil {
 		return result, fmt.Errorf("reset tenant analytics stats for site %s: %w", siteID, err)
 	}
-	sharedResult, err := m.shared.resetSiteSharedMeasurements(ctx, siteID)
+	sharedResult, err := m.control.ResetSiteControlMeasurements(ctx, siteID)
 	if err != nil {
 		return result, fmt.Errorf("reset shared stats for site %s: %w", siteID, err)
 	}
@@ -377,7 +345,7 @@ func (m *TenantStoreManager) ResetSiteStats(ctx context.Context, siteID uuid.UUI
 // PurgeArchivedTenant removes the per-tenant analytics database directory and
 // deletes archived control-plane records for a non-default tenant.
 func (m *TenantStoreManager) PurgeArchivedTenant(ctx context.Context, tenantID uuid.UUID) (*api.Team, error) {
-	team, err := m.shared.GetPurgeableTenant(ctx, tenantID)
+	team, err := m.control.GetPurgeableTenant(ctx, tenantID)
 	if err != nil || team == nil {
 		return team, err
 	}
@@ -390,7 +358,7 @@ func (m *TenantStoreManager) PurgeArchivedTenant(ctx context.Context, tenantID u
 		return nil, fmt.Errorf("remove tenant data directory: %w", err)
 	}
 
-	deleted, err := m.shared.DeleteArchivedTenantMetadata(ctx, tenantID)
+	deleted, err := m.control.DeleteArchivedTenantMetadata(ctx, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -405,7 +373,7 @@ func (m *TenantStoreManager) PurgeArchivedTenant(ctx context.Context, tenantID u
 // updates the shared site->tenant mapping, and removes stale analytics from the
 // previous tenant's data plane.
 func (m *TenantStoreManager) TransferSite(ctx context.Context, siteID, destinationTenantID uuid.UUID, auditEntries ...AuditEntryParams) error {
-	sourceTenantID, err := m.shared.GetSiteTenantID(ctx, siteID)
+	sourceTenantID, err := m.control.GetSiteTenantID(ctx, siteID)
 	if err != nil {
 		return fmt.Errorf("resolve source tenant for site %s: %w", siteID, err)
 	}
@@ -413,7 +381,7 @@ func (m *TenantStoreManager) TransferSite(ctx context.Context, siteID, destinati
 		return nil
 	}
 
-	site, err := m.shared.GetSiteByID(ctx, siteID)
+	site, err := m.control.GetSiteByID(ctx, siteID)
 	if err != nil {
 		return fmt.Errorf("load site %s for transfer: %w", siteID, err)
 	}
@@ -429,7 +397,7 @@ func (m *TenantStoreManager) TransferSite(ctx context.Context, siteID, destinati
 	if err != nil {
 		return err
 	}
-	searchConsoleMapping, err := m.shared.GetGoogleSearchConsoleSiteMappingForTeam(ctx, siteID, sourceTenantID)
+	searchConsoleMapping, err := m.control.GetGoogleSearchConsoleSiteMappingForTeam(ctx, siteID, sourceTenantID)
 	if err != nil {
 		return fmt.Errorf("load Search Console mapping before site transfer: %w", err)
 	}
@@ -443,26 +411,24 @@ func (m *TenantStoreManager) TransferSite(ctx context.Context, siteID, destinati
 	// Mirror the site into the destination before copying analytics: tenant
 	// schemas keep foreign keys on sites (e.g. ai_fetches), so the parent row
 	// must exist first.
-	if destinationStore != m.shared {
-		if err := destinationStore.UpsertSiteMirror(ctx, site); err != nil {
-			return fmt.Errorf("upsert destination site mirror: %w", err)
-		}
+	if err := destinationStore.UpsertSiteMirror(ctx, site); err != nil {
+		return fmt.Errorf("upsert destination site mirror: %w", err)
 	}
 
 	if sourceStore != destinationStore {
-		if err := m.shared.AppendAuditEntry(ctx, siteTransferDataMovePreparedAudit(site, sourceTenantID, destinationTenantID, auditEntries)); err != nil {
+		if err := m.control.AppendAuditEntry(ctx, toControlAudit(siteTransferDataMovePreparedAudit(site, sourceTenantID, destinationTenantID, auditEntries))); err != nil {
 			return fmt.Errorf("append site transfer data move audit: %w", err)
 		}
 		copiedTables, err := copySiteAnalyticsBetweenStores(ctx, sourceStore, destinationStore, siteID)
 		if err != nil {
 			return err
 		}
-		if err := deleteSiteAnalyticsOnly(ctx, sourceStore, siteID, copiedTables, sourceStore != m.shared); err != nil {
+		if err := deleteSiteAnalyticsOnly(ctx, sourceStore, siteID, copiedTables, true); err != nil {
 			return err
 		}
 	}
 
-	if err := m.shared.TransferSiteTeamWithAudit(ctx, siteID, destinationTenantID, searchConsoleMapping != nil, auditEntries); err != nil {
+	if err := m.control.TransferSiteTeamWithAudit(ctx, siteID, destinationTenantID, searchConsoleMapping != nil, toControlAudits(auditEntries)); err != nil {
 		return fmt.Errorf("update shared site transfer records: %w", err)
 	}
 	if err := m.SyncSite(ctx, siteID); err != nil {
@@ -470,6 +436,18 @@ func (m *TenantStoreManager) TransferSite(ctx context.Context, siteID, destinati
 	}
 
 	return nil
+}
+
+func toControlAudit(input AuditEntryParams) controlstore.AuditEntryParams {
+	return input
+}
+
+func toControlAudits(input []AuditEntryParams) []controlstore.AuditEntryParams {
+	result := make([]controlstore.AuditEntryParams, len(input))
+	for i := range input {
+		result[i] = toControlAudit(input[i])
+	}
+	return result
 }
 
 func siteTransferDataMovePreparedAudit(site *api.Site, sourceTenantID, destinationTenantID uuid.UUID, audits []AuditEntryParams) AuditEntryParams {
@@ -574,7 +552,27 @@ func (m *TenantStoreManager) openDefaultTenantStore(ctx context.Context, tenantI
 	}
 	if _, err := os.Stat(dbPath); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("default tenant split marker exists but tenant file is missing: %s", dbPath)
+			complete, markerErr := m.control.DefaultTenantSplitComplete(ctx)
+			if markerErr != nil {
+				return nil, fmt.Errorf("inspect default tenant split marker: %w", markerErr)
+			}
+			imported, importErr := m.control.LegacyControlImportComplete(ctx)
+			if importErr != nil {
+				return nil, fmt.Errorf("inspect legacy control import marker: %w", importErr)
+			}
+			if complete && imported {
+				return nil, fmt.Errorf("default tenant split marker exists but tenant file is missing: %s", dbPath)
+			}
+			fresh := NewStore(dbPath, m.tenantStoreOptions(tenantID)...)
+			if err := fresh.Connect(); err != nil {
+				return nil, fmt.Errorf("create default tenant database %s: %w", dbPath, err)
+			}
+			if err := fresh.migrateTenant(ctx, migrationRunOptions{guarded: true}); err != nil {
+				_ = fresh.Close()
+				return nil, fmt.Errorf("migrate fresh default tenant database %s: %w", dbPath, err)
+			}
+			m.dataPlaneRoot = fresh
+			return fresh, nil
 		}
 		return nil, fmt.Errorf("stat default tenant database %s: %w", dbPath, err)
 	}
@@ -629,60 +627,48 @@ func (m *TenantStoreManager) openTenantStore(ctx context.Context, tenantID uuid.
 	}
 
 	storeOptions := m.tenantStoreOptions(tenantID)
-	if m.dataPlaneEnabled {
-		if _, err := m.openDefaultTenantStore(ctx, m.defaultID); err != nil {
-			return nil, err
-		}
-		standalone := NewStore(dbPath, storeOptions...)
-		if err := standalone.Connect(); err != nil {
-			return nil, fmt.Errorf("could not connect to tenant database %s: %w", dbPath, err)
-		}
-		if err := standalone.migrateTenant(ctx, migrationRunOptions{guarded: true}); err != nil {
-			_ = standalone.Close()
-			return nil, fmt.Errorf("could not migrate tenant database %s: %w", dbPath, err)
-		}
-		if err := standalone.Close(); err != nil {
-			return nil, fmt.Errorf("close tenant database before attach %s: %w", dbPath, err)
-		}
-		alias := "tenant_" + strings.ReplaceAll(tenantID.String(), "-", "")
-		if _, err := m.dataPlaneRoot.DB().ExecContext(ctx, fmt.Sprintf("ATTACH '%s' AS %s;", escapeSQLString(dbPath), safeCatalogIdentifier(alias))); err != nil {
-			return nil, fmt.Errorf("attach tenant database %s: %w", tenantID, err)
-		}
-		store := newAttachedStore(m.dataPlaneRoot.path, dbPath, alias, storeOptions...)
-		// Set the shared gates before Connect builds the reconnecting
-		// connector. Assigning them after Connect would leave the pool using
-		// its private semaphore and defeat the process-wide native connection
-		// cap required by the shared data plane.
-		store.checkpointGate = m.dataPlaneRoot.checkpointGate
-		store.connectionGate = m.dataPlaneRoot.connectionGate
-		if err := store.Connect(); err != nil {
-			_, _ = m.dataPlaneRoot.DB().ExecContext(ctx, "DETACH "+safeCatalogIdentifier(alias))
-			return nil, fmt.Errorf("connect attached tenant database %s: %w", tenantID, err)
-		}
-		if m.maintenanceCtx != nil {
-			store.StartMaintenance(m.maintenanceCtx)
-		}
-		m.attachedAliases[tenantID] = alias
-		slog.Info("Attached tenant database", "tenant_id", tenantID, "catalog", alias, "path", dbPath)
-		return store, nil
+	if _, err := m.openDefaultTenantStore(ctx, m.defaultID); err != nil {
+		return nil, err
 	}
-	store := NewStore(dbPath, storeOptions...)
+	standalone := NewStore(dbPath, storeOptions...)
+	if err := standalone.Connect(); err != nil {
+		fatal := fmt.Errorf("could not connect to tenant database %s: %w", dbPath, err)
+		m.tenantFatalReporter(tenantID)(fatal)
+		return nil, fatal
+	}
+	if err := standalone.migrateTenant(ctx, migrationRunOptions{guarded: true}); err != nil {
+		_ = standalone.Close()
+		fatal := fmt.Errorf("could not migrate tenant database %s: %w", dbPath, err)
+		m.tenantFatalReporter(tenantID)(fatal)
+		return nil, fatal
+	}
+	if err := standalone.Close(); err != nil {
+		return nil, fmt.Errorf("close tenant database before attach %s: %w", dbPath, err)
+	}
+	alias := "tenant_" + strings.ReplaceAll(tenantID.String(), "-", "")
+	if _, err := m.dataPlaneRoot.DB().ExecContext(ctx, fmt.Sprintf("ATTACH '%s' AS %s;", escapeSQLString(dbPath), safeCatalogIdentifier(alias))); err != nil {
+		fatal := fmt.Errorf("attach tenant database %s: %w", tenantID, err)
+		m.tenantFatalReporter(tenantID)(fatal)
+		return nil, fatal
+	}
+	store := newAttachedStore(m.dataPlaneRoot.path, dbPath, alias, storeOptions...)
+	// Set the shared gates before Connect builds the reconnecting
+	// connector. Assigning them after Connect would leave the pool using
+	// its private semaphore and defeat the process-wide native connection
+	// cap required by the shared data plane.
+	store.checkpointGate = m.dataPlaneRoot.checkpointGate
+	store.connectionGate = m.dataPlaneRoot.connectionGate
 	if err := store.Connect(); err != nil {
-		if status := store.DatabaseStatus(); status.State != DatabaseStateHealthy {
-			m.tenantFatalReporter(tenantID)(fmt.Errorf("tenant database recovery failed during open: %w", err))
-		}
-		return nil, fmt.Errorf("could not connect to tenant database %s: %w", dbPath, err)
+		_, _ = m.dataPlaneRoot.DB().ExecContext(ctx, "DETACH "+safeCatalogIdentifier(alias))
+		fatal := fmt.Errorf("connect attached tenant database %s: %w", tenantID, err)
+		m.tenantFatalReporter(tenantID)(fatal)
+		return nil, fatal
 	}
-	if err := store.migrateTenant(ctx, migrationRunOptions{guarded: true}); err != nil {
-		store.Close()
-		return nil, fmt.Errorf("could not migrate tenant database %s: %w", dbPath, err)
-	}
-
 	if m.maintenanceCtx != nil {
 		store.StartMaintenance(m.maintenanceCtx)
 	}
-
-	slog.Info("Opened per-tenant database", "tenant_id", tenantID, "path", dbPath)
+	m.attachedAliases[tenantID] = alias
+	slog.Info("Attached tenant database", "tenant_id", tenantID, "catalog", alias, "path", dbPath)
 	return store, nil
 }
 
@@ -690,7 +676,7 @@ func (m *TenantStoreManager) openTenantStore(ctx context.Context, tenantID uuid.
 // store's DuckDB settings while adding tenant-specific routing and failure
 // reporting.
 func (m *TenantStoreManager) tenantStoreOptions(tenantID uuid.UUID) []StoreOption {
-	return append(m.shared.duckDBOptions(),
+	return append(append([]StoreOption(nil), m.storeOptions...),
 		withTenantID(tenantID),
 		withFatalReporter(m.tenantFatalReporter(tenantID)),
 	)
@@ -743,15 +729,7 @@ func (m *TenantStoreManager) syncSiteTenantData(ctx context.Context, siteID, ten
 	if err != nil {
 		return err
 	}
-	// Legacy routing keeps the default tenant's analytics in the control
-	// database, where a tenant-local site mirror would conflict with the
-	// analytics rows' foreign keys. Split mode returns a distinct data-plane
-	// root and therefore continues through the mirror/backfill path.
-	if tenantStore == m.shared {
-		return nil
-	}
-
-	site, err := m.shared.GetSiteByID(ctx, siteID)
+	site, err := m.control.GetSiteByID(ctx, siteID)
 	if err != nil {
 		return fmt.Errorf("load site %s for tenant sync: %w", siteID, err)
 	}
@@ -763,12 +741,6 @@ func (m *TenantStoreManager) syncSiteTenantData(ctx context.Context, siteID, ten
 		return fmt.Errorf("mirror site %s into tenant %s: %w", siteID, tenantID, err)
 	}
 
-	if err := m.backfillLegacyGoals(ctx, tenantStore, siteID, tenantID); err != nil {
-		return err
-	}
-	if err := m.backfillLegacyFunnels(ctx, tenantStore, siteID, tenantID); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -898,56 +870,6 @@ func placeholders(count int) string {
 		values[i] = "?"
 	}
 	return strings.Join(values, ", ")
-}
-
-func (m *TenantStoreManager) backfillLegacyGoals(ctx context.Context, tenantStore *Store, siteID, tenantID uuid.UUID) error {
-	goals, err := tenantStore.GetGoals(ctx, siteID)
-	if err != nil {
-		return fmt.Errorf("list tenant goals for site %s: %w", siteID, err)
-	}
-	if len(goals) > 0 {
-		return nil
-	}
-
-	legacyGoals, err := m.shared.GetGoals(ctx, siteID)
-	if err != nil {
-		return fmt.Errorf("list shared goals for site %s: %w", siteID, err)
-	}
-	for _, goal := range legacyGoals {
-		goalCopy := goal
-		if err := tenantStore.UpsertGoal(ctx, &goalCopy); err != nil {
-			return fmt.Errorf("backfill goal %s into tenant %s: %w", goal.ID, tenantID, err)
-		}
-	}
-	if len(legacyGoals) > 0 {
-		slog.Info("Backfilled legacy goals into tenant analytics store", "tenant_id", tenantID, "site_id", siteID, "count", len(legacyGoals))
-	}
-	return nil
-}
-
-func (m *TenantStoreManager) backfillLegacyFunnels(ctx context.Context, tenantStore *Store, siteID, tenantID uuid.UUID) error {
-	funnels, err := tenantStore.GetFunnels(ctx, siteID)
-	if err != nil {
-		return fmt.Errorf("list tenant funnels for site %s: %w", siteID, err)
-	}
-	if len(funnels) > 0 {
-		return nil
-	}
-
-	legacyFunnels, err := m.shared.GetFunnels(ctx, siteID)
-	if err != nil {
-		return fmt.Errorf("list shared funnels for site %s: %w", siteID, err)
-	}
-	for _, funnel := range legacyFunnels {
-		funnelCopy := funnel
-		if err := tenantStore.UpsertFunnel(ctx, &funnelCopy); err != nil {
-			return fmt.Errorf("backfill funnel %s into tenant %s: %w", funnel.ID, tenantID, err)
-		}
-	}
-	if len(legacyFunnels) > 0 {
-		slog.Info("Backfilled legacy funnels into tenant analytics store", "tenant_id", tenantID, "site_id", siteID, "count", len(legacyFunnels))
-	}
-	return nil
 }
 
 func IsNotFoundError(err error) bool {

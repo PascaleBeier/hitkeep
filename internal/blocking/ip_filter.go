@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 )
 
@@ -43,7 +44,7 @@ type compiledTrafficExclusions struct {
 }
 
 type IPFilter struct {
-	store *database.Store
+	store *controlstore.Store
 
 	instanceRules compiledTrafficExclusions
 	teamRules     map[uuid.UUID]compiledTrafficExclusions
@@ -65,7 +66,7 @@ type BlockDecision struct {
 	Reason  string
 }
 
-func NewIPFilter(store *database.Store) *IPFilter {
+func NewIPFilter(store *controlstore.Store) *IPFilter {
 	return &IPFilter{
 		store:         store,
 		instanceRules: newCompiledTrafficExclusions(),

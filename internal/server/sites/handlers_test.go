@@ -3,6 +3,7 @@ package sites
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,30 +21,24 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/exportfmt"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/testutil"
 )
 
 // setupTestEnv initializes an in-memory database and a handler instance.
-func setupTestEnv(t *testing.T) (*handler, *database.Store, uuid.UUID) {
+func setupTestEnv(t *testing.T) (*handler, *controlstore.Store, uuid.UUID) {
 	t.Helper()
 
-	// Use in-memory DuckDB
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("failed to connect to test db: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("failed to migrate test db: %v", err)
-	}
+	store, tenantStores := testutil.NewControlAndTenantStores(t)
 
 	// Create a dummy user
 	userID, err := store.CreateUser(context.Background(), "test@example.com", "hashed_secret")
 	if err != nil {
 		t.Fatalf("failed to create test user: %v", err)
 	}
-	tenantStores := database.NewTenantStoreManager(store, t.TempDir(), database.WithTenantDataPlane(false))
 	t.Cleanup(func() { _ = tenantStores.Close() })
 
 	ctx := &shared.Context{
@@ -55,16 +50,16 @@ func setupTestEnv(t *testing.T) (*handler, *database.Store, uuid.UUID) {
 	return &handler{ctx: ctx}, store, userID
 }
 
-func setupFileBackedTransferEnv(t *testing.T) (*handler, *database.Store, *database.TenantStoreManager, uuid.UUID) {
+func setupFileBackedTransferEnv(t *testing.T) (*handler, *controlstore.Store, *database.TenantStoreManager, uuid.UUID) {
 	t.Helper()
 
 	tmpDir := t.TempDir()
-	store := database.NewStore(filepath.Join(tmpDir, "hitkeep.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("failed to connect to file-backed test db: %v", err)
+	store, err := controlstore.Open(context.Background(), filepath.Join(tmpDir, "hitkeep.db"))
+	if err != nil {
+		t.Fatalf("failed to open file-backed control db: %v", err)
 	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("failed to migrate file-backed test db: %v", err)
+	if _, err := store.EnsureDefaultTenant(context.Background()); err != nil {
+		t.Fatalf("failed to ensure default tenant: %v", err)
 	}
 
 	userID, err := store.CreateUser(context.Background(), "transfer@example.com", "hashed_secret")
@@ -72,7 +67,7 @@ func setupFileBackedTransferEnv(t *testing.T) (*handler, *database.Store, *datab
 		t.Fatalf("failed to create test user: %v", err)
 	}
 
-	tenantStores := database.NewTenantStoreManager(store, filepath.Join(tmpDir, "tenant-data"))
+	tenantStores := database.NewTenantStoreManager(store, filepath.Join(tmpDir, "tenant-data"), nil)
 	ctx := &shared.Context{
 		Store:        store,
 		TenantStores: tenantStores,
@@ -80,6 +75,18 @@ func setupFileBackedTransferEnv(t *testing.T) (*handler, *database.Store, *datab
 	}
 
 	return &handler{ctx: ctx}, store, tenantStores, userID
+}
+
+func mustSiteAnalyticsStore(t *testing.T, h *handler, siteID uuid.UUID) *database.Store {
+	t.Helper()
+	if err := h.ctx.TenantStores.SyncSite(t.Context(), siteID); err != nil {
+		t.Fatalf("sync site analytics: %v", err)
+	}
+	store, err := h.ctx.AnalyticsStore(t.Context(), siteID)
+	if err != nil {
+		t.Fatalf("resolve site analytics: %v", err)
+	}
+	return store
 }
 
 type roundTripperFunc func(*http.Request) (*http.Response, error)
@@ -370,7 +377,7 @@ func TestHandleGetSitesOverviewStats(t *testing.T) {
 	base := time.Date(2026, time.July, 1, 12, 0, 0, 0, time.UTC)
 	sessionID := uuid.New()
 	for _, path := range []string{"/", "/pricing"} {
-		if err := store.CreateHit(ctx, &api.Hit{
+		if err := mustSiteAnalyticsStore(t, h, siteAlpha.ID).CreateHit(ctx, &api.Hit{
 			SiteID:    siteAlpha.ID,
 			SessionID: sessionID,
 			PageID:    uuid.New(),
@@ -814,7 +821,7 @@ func TestHandleResetSiteStatsSuccessClearsRowsAndAudits(t *testing.T) {
 		t.Fatalf("create site: %v", err)
 	}
 	now := time.Now().UTC()
-	if err := store.CreateHit(ctx, &api.Hit{
+	if err := mustSiteAnalyticsStore(t, h, site.ID).CreateHit(ctx, &api.Hit{
 		ID:        uuid.New(),
 		SiteID:    site.ID,
 		SessionID: uuid.New(),
@@ -825,7 +832,12 @@ func TestHandleResetSiteStatsSuccessClearsRowsAndAudits(t *testing.T) {
 		t.Fatalf("create hit: %v", err)
 	}
 	importID := uuid.New()
-	if _, err := store.DB().ExecContext(ctx,
+	inspectionDB, err := sql.Open("sqlite", store.Path())
+	if err != nil {
+		t.Fatalf("open control inspection database: %v", err)
+	}
+	defer inspectionDB.Close()
+	if _, err := inspectionDB.ExecContext(ctx,
 		"INSERT INTO site_imports (id, site_id, provider, status, source_hash, bytes_total, bytes_received, rows_scanned, rows_imported, created_by, created_at, updated_at, finished_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		importID, site.ID, "plausible", database.ImportStatusCompleted, "reset-success", 10, 10, 10, 10, userID, now, now, now,
 	); err != nil {
@@ -850,14 +862,14 @@ func TestHandleResetSiteStatsSuccessClearsRowsAndAudits(t *testing.T) {
 	}
 
 	var hits int
-	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM hits WHERE site_id = ?", site.ID).Scan(&hits); err != nil {
+	if err := mustSiteAnalyticsStore(t, h, site.ID).DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM hits WHERE site_id = ?", site.ID).Scan(&hits); err != nil {
 		t.Fatalf("count hits: %v", err)
 	}
 	if hits != 0 {
 		t.Fatalf("expected hits cleared, got %d", hits)
 	}
 	var deletedImports int
-	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM site_imports WHERE site_id = ? AND status = ?", site.ID, database.ImportStatusDeleted).Scan(&deletedImports); err != nil {
+	if err := inspectionDB.QueryRowContext(ctx, "SELECT COUNT(*) FROM site_imports WHERE site_id = ? AND status = ?", site.ID, database.ImportStatusDeleted).Scan(&deletedImports); err != nil {
 		t.Fatalf("count deleted imports: %v", err)
 	}
 	if deletedImports != 1 {
@@ -962,7 +974,7 @@ func TestHandleGetSiteStatsIncludesPageModes(t *testing.T) {
 		{sessionID: uuid.New(), path: "/home", timestamp: base.Add(-2 * time.Hour)},
 		{sessionID: uuid.New(), path: "/pricing", timestamp: base.Add(-90 * time.Minute)},
 	} {
-		if err := store.CreateHit(context.Background(), &api.Hit{
+		if err := mustSiteAnalyticsStore(t, h, site.ID).CreateHit(context.Background(), &api.Hit{
 			SiteID:    site.ID,
 			SessionID: hit.sessionID,
 			PageID:    uuid.New(),
@@ -1043,7 +1055,7 @@ func TestHandleGetSiteEcommerceSummary(t *testing.T) {
 	isUnique := true
 	timestamp := time.Date(2026, 3, 7, 9, 0, 0, 0, time.UTC)
 
-	if err := store.CreateHit(context.Background(), &api.Hit{
+	if err := mustSiteAnalyticsStore(t, h, site.ID).CreateHit(context.Background(), &api.Hit{
 		SiteID:        site.ID,
 		SessionID:     sessionID,
 		PageID:        uuid.New(),
@@ -1059,7 +1071,7 @@ func TestHandleGetSiteEcommerceSummary(t *testing.T) {
 		t.Fatalf("create hit: %v", err)
 	}
 
-	if err := store.CreateEvent(context.Background(), &api.Event{
+	if err := mustSiteAnalyticsStore(t, h, site.ID).CreateEvent(context.Background(), &api.Event{
 		SiteID:    site.ID,
 		SessionID: sessionID,
 		Name:      "begin_checkout",
@@ -1073,7 +1085,7 @@ func TestHandleGetSiteEcommerceSummary(t *testing.T) {
 		t.Fatalf("create checkout: %v", err)
 	}
 
-	if err := store.CreateEvent(context.Background(), &api.Event{
+	if err := mustSiteAnalyticsStore(t, h, site.ID).CreateEvent(context.Background(), &api.Event{
 		SiteID:    site.ID,
 		SessionID: sessionID,
 		Name:      "purchase",
@@ -1120,7 +1132,7 @@ func TestHandleGetSiteWebVitalsSummary(t *testing.T) {
 		t.Fatalf("create site: %v", err)
 	}
 	base := time.Date(2026, 5, 6, 12, 0, 0, 0, time.UTC)
-	if err := store.CreateWebVitalsBulk(context.Background(), []*api.WebVital{
+	if err := mustSiteAnalyticsStore(t, h, site.ID).CreateWebVitalsBulk(context.Background(), []*api.WebVital{
 		{SiteID: site.ID, SessionID: uuid.New(), PageID: uuid.New(), Metric: api.WebVitalLCP, Value: 1200, Path: "/"},
 		{SiteID: site.ID, SessionID: uuid.New(), PageID: uuid.New(), Metric: api.WebVitalLCP, Value: 2800, Path: "/pricing"},
 		{SiteID: site.ID, SessionID: uuid.New(), PageID: uuid.New(), Metric: api.WebVitalLCP, Value: 5200, Path: "/checkout"},
@@ -1184,7 +1196,7 @@ func TestHandleGetSiteWebVitalsPagesSupportsFilters(t *testing.T) {
 		t.Fatalf("create site: %v", err)
 	}
 	base := time.Date(2026, 5, 6, 12, 0, 0, 0, time.UTC)
-	if err := store.CreateWebVitalsBulk(context.Background(), []*api.WebVital{
+	if err := mustSiteAnalyticsStore(t, h, site.ID).CreateWebVitalsBulk(context.Background(), []*api.WebVital{
 		{SiteID: site.ID, SessionID: uuid.New(), PageID: uuid.New(), Metric: api.WebVitalINP, Value: 180, Path: "/pricing", Timestamp: base},
 		{SiteID: site.ID, SessionID: uuid.New(), PageID: uuid.New(), Metric: api.WebVitalINP, Value: 640, Path: "/checkout", Timestamp: base.Add(time.Hour)},
 	}); err != nil {
@@ -1230,7 +1242,7 @@ func TestHandleGetSiteWebVitalsBreakdownReturnsVisitorContext(t *testing.T) {
 	lang := "en-US"
 	country := "US"
 	viewportWidth := 1440
-	if err := store.CreateHit(context.Background(), &api.Hit{
+	if err := mustSiteAnalyticsStore(t, h, site.ID).CreateHit(context.Background(), &api.Hit{
 		SiteID:        site.ID,
 		SessionID:     sessionID,
 		PageID:        pageID,
@@ -1243,7 +1255,7 @@ func TestHandleGetSiteWebVitalsBreakdownReturnsVisitorContext(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("CreateHit: %v", err)
 	}
-	if err := store.CreateWebVitalsBulk(context.Background(), []*api.WebVital{
+	if err := mustSiteAnalyticsStore(t, h, site.ID).CreateWebVitalsBulk(context.Background(), []*api.WebVital{
 		{SiteID: site.ID, SessionID: sessionID, PageID: pageID, Metric: api.WebVitalLCP, Value: 2800, Path: "/pricing", Timestamp: base},
 	}); err != nil {
 		t.Fatalf("CreateWebVitalsBulk: %v", err)
@@ -1283,7 +1295,7 @@ func TestHandleGetSiteEcommerceProductsSupportsItemFilter(t *testing.T) {
 	isUnique := true
 	timestamp := time.Date(2026, 3, 7, 12, 0, 0, 0, time.UTC)
 
-	if err := store.CreateHit(context.Background(), &api.Hit{
+	if err := mustSiteAnalyticsStore(t, h, site.ID).CreateHit(context.Background(), &api.Hit{
 		SiteID:      site.ID,
 		SessionID:   sessionID,
 		PageID:      uuid.New(),
@@ -1297,7 +1309,7 @@ func TestHandleGetSiteEcommerceProductsSupportsItemFilter(t *testing.T) {
 		t.Fatalf("create hit: %v", err)
 	}
 
-	if err := store.CreateEvent(context.Background(), &api.Event{
+	if err := mustSiteAnalyticsStore(t, h, site.ID).CreateEvent(context.Background(), &api.Event{
 		SiteID:    site.ID,
 		SessionID: sessionID,
 		Name:      "order_completed",
@@ -1411,7 +1423,7 @@ func TestHandleExportSiteHitsSupportsAllFormats(t *testing.T) {
 
 	now := time.Now().UTC()
 	isUnique := true
-	if err := store.CreateHit(context.Background(), &api.Hit{
+	if err := mustSiteAnalyticsStore(t, h, site.ID).CreateHit(context.Background(), &api.Hit{
 		SiteID:      site.ID,
 		SessionID:   uuid.New(),
 		PageID:      uuid.New(),
@@ -1680,7 +1692,7 @@ func TestHandleGetSiteSetupStateReportsRecordedSurfaces(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create site: %v", err)
 	}
-	if err := store.CreateWebVital(ctx, &api.WebVital{
+	if err := mustSiteAnalyticsStore(t, h, site.ID).CreateWebVital(ctx, &api.WebVital{
 		SiteID:    site.ID,
 		SessionID: uuid.New(),
 		PageID:    uuid.New(),

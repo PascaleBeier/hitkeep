@@ -43,18 +43,14 @@ func (h *handler) handleReadyz() http.HandlerFunc {
 			return
 		}
 
-		status := h.ctx.Store.DatabaseStatus()
-		if status.State == database.DatabaseStateHealthy && h.ctx.TenantStores != nil {
-			if tenantStatus, unavailable := h.ctx.TenantStores.UnavailableDatabaseStatus(); unavailable {
-				status = tenantStatus
+		if h.ctx.TenantStores != nil {
+			if status, unavailable := h.ctx.TenantStores.UnavailableDatabaseStatus(); unavailable {
+				writeNotReady(w, databaseReadinessReason(status.State))
+				return
 			}
 		}
-		if status.State != database.DatabaseStateHealthy {
-			writeNotReady(w, databaseReadinessReason(status.State))
-			return
-		}
 
-		if err := h.ctx.Store.DB().Ping(); err != nil {
+		if err := h.ctx.Store.Ping(r.Context()); err != nil {
 			slog.Error("Readiness check failed: database unreachable", "error", err)
 			writeNotReady(w, "database_unavailable")
 			return

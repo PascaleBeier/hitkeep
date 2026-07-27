@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"hitkeep/internal/controlstore"
 )
 
 const (
@@ -26,16 +28,7 @@ var cloudConversionEventNames = map[string]struct{}{
 	CloudConversionSubscriptionActivated: {},
 }
 
-type CloudConversionEvent struct {
-	ID              uuid.UUID
-	TenantID        uuid.UUID
-	EventName       string
-	PlanCode        string
-	BillingInterval string
-	DedupeKey       string
-	OccurredAt      time.Time
-	CreatedAt       time.Time
-}
+type CloudConversionEvent = controlstore.CloudConversionEvent
 
 // RecordCloudConversionEvent records a privacy-safe product milestone. Blank
 // plan and interval values inherit the tenant's current billing account. A

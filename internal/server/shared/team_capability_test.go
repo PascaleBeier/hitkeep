@@ -9,7 +9,9 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/auth"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
+	"hitkeep/internal/testutil"
 )
 
 func TestHandlerConfigAuthHelpers(t *testing.T) {
@@ -197,14 +199,7 @@ func sitePermissionRequest(userID, siteID uuid.UUID) *http.Request {
 	return req.WithContext(context.WithValue(req.Context(), UserIDKey, userID))
 }
 
-func newSharedTestStore(t *testing.T) *database.Store {
+func newSharedTestStore(t *testing.T) *controlstore.Store {
 	t.Helper()
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
-	return store
+	return testutil.NewControlStore(t)
 }

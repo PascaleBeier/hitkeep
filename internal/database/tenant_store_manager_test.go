@@ -12,13 +12,13 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/importables"
 )
 
 func newSharedTestStore(t *testing.T) *Store {
 	t.Helper()
-	tmpDir := t.TempDir()
-	store := NewStore(filepath.Join(tmpDir, "test.db"))
+	store := NewStore(filepath.Join(t.TempDir(), "test.db"))
 	if err := store.Connect(); err != nil {
 		t.Fatalf("connect: %v", err)
 	}
@@ -29,10 +29,37 @@ func newSharedTestStore(t *testing.T) *Store {
 	return store
 }
 
+func newControlTestStore(t *testing.T) *controlstore.Store {
+	t.Helper()
+	store, err := controlstore.Open(context.Background(), filepath.Join(t.TempDir(), "control.db"))
+	if err != nil {
+		t.Fatalf("open control store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if _, err := store.EnsureDefaultTenant(context.Background()); err != nil {
+		t.Fatalf("ensure default tenant: %v", err)
+	}
+	return store
+}
+
+func newManagerTestTenant(t *testing.T, store *controlstore.Store, name string) uuid.UUID {
+	t.Helper()
+	ctx := context.Background()
+	userID, err := store.CreateUser(ctx, uuid.NewString()+"@example.test", "hash")
+	if err != nil {
+		t.Fatalf("create tenant owner: %v", err)
+	}
+	tenant, err := store.CreateTenant(ctx, userID, name, "")
+	if err != nil {
+		t.Fatalf("create tenant: %v", err)
+	}
+	return tenant.ID
+}
+
 func TestForTenantDefaultReturnsShared(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(store, t.TempDir())
+	store := newControlTestStore(t)
+	mgr := NewTenantStoreManager(store, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	defaultID, err := store.GetDefaultTenantID(ctx)
@@ -44,47 +71,48 @@ func TestForTenantDefaultReturnsShared(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ForTenant(default): %v", err)
 	}
-	if got != store {
-		t.Fatal("expected ForTenant(defaultID) to return the shared store")
+	if got == nil || got.path == store.Path() {
+		t.Fatal("expected ForTenant(defaultID) to return the default tenant DuckDB root")
 	}
 }
 
 func TestForTenantNilReturnsShared(t *testing.T) {
-	store := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(store, t.TempDir())
+	store := newControlTestStore(t)
+	mgr := NewTenantStoreManager(store, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	got, err := mgr.ForTenant(context.Background(), uuid.Nil)
 	if err != nil {
 		t.Fatalf("ForTenant(nil): %v", err)
 	}
-	if got != store {
-		t.Fatal("expected ForTenant(uuid.Nil) to return the shared store")
+	defaultStore, err := mgr.ForTenant(context.Background(), mgr.defaultID)
+	if err != nil {
+		t.Fatalf("ForTenant(default): %v", err)
+	}
+	if got != defaultStore {
+		t.Fatal("expected ForTenant(uuid.Nil) to return the default tenant DuckDB root")
 	}
 }
 
 func TestForTenantCreatesNewDB(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
+	store := newControlTestStore(t)
 	basePath := t.TempDir()
-	mgr := NewTenantStoreManager(store, basePath)
+	mgr := NewTenantStoreManager(store, basePath, nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
-	tenantID := uuid.New()
-	// Insert a non-default tenant into the shared DB.
-	if _, err := store.DB().ExecContext(ctx,
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		tenantID, "Test Tenant", time.Now().UTC(),
-	); err != nil {
-		t.Fatalf("insert tenant: %v", err)
-	}
+	tenantID := newManagerTestTenant(t, store, "Test Tenant")
 
 	got, err := mgr.ForTenant(ctx, tenantID)
 	if err != nil {
 		t.Fatalf("ForTenant(custom): %v", err)
 	}
-	if got == store {
-		t.Fatal("expected ForTenant(customID) to return a different store from shared")
+	defaultStore, err := mgr.ForTenant(ctx, uuid.Nil)
+	if err != nil {
+		t.Fatalf("ForTenant(default): %v", err)
+	}
+	if got == defaultStore {
+		t.Fatal("expected ForTenant(customID) to use its attached tenant catalog")
 	}
 
 	// Verify the DB file was created.
@@ -96,17 +124,11 @@ func TestForTenantCreatesNewDB(t *testing.T) {
 
 func TestForTenantCacheHit(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(store, t.TempDir())
+	store := newControlTestStore(t)
+	mgr := NewTenantStoreManager(store, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
-	tenantID := uuid.New()
-	if _, err := store.DB().ExecContext(ctx,
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		tenantID, "Test Tenant", time.Now().UTC(),
-	); err != nil {
-		t.Fatalf("insert tenant: %v", err)
-	}
+	tenantID := newManagerTestTenant(t, store, "Test Tenant")
 
 	first, err := mgr.ForTenant(ctx, tenantID)
 	if err != nil {
@@ -125,17 +147,11 @@ func TestForTenantCacheHit(t *testing.T) {
 
 func TestForTenantMigratesOnFirstAccess(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(store, t.TempDir())
+	store := newControlTestStore(t)
+	mgr := NewTenantStoreManager(store, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
-	tenantID := uuid.New()
-	if _, err := store.DB().ExecContext(ctx,
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		tenantID, "Test Tenant", time.Now().UTC(),
-	); err != nil {
-		t.Fatalf("insert tenant: %v", err)
-	}
+	tenantID := newManagerTestTenant(t, store, "Test Tenant")
 
 	tenantStore, err := mgr.ForTenant(ctx, tenantID)
 	if err != nil {
@@ -161,16 +177,10 @@ func TestForTenantMigratesOnFirstAccess(t *testing.T) {
 
 func TestCloseClosesAllTenantStores(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(store, t.TempDir())
+	store := newControlTestStore(t)
+	mgr := NewTenantStoreManager(store, t.TempDir(), nil)
 
-	tenantID := uuid.New()
-	if _, err := store.DB().ExecContext(ctx,
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		tenantID, "Test Tenant", time.Now().UTC(),
-	); err != nil {
-		t.Fatalf("insert tenant: %v", err)
-	}
+	tenantID := newManagerTestTenant(t, store, "Test Tenant")
 
 	tenantStore, err := mgr.ForTenant(ctx, tenantID)
 	if err != nil {
@@ -190,8 +200,8 @@ func TestCloseClosesAllTenantStores(t *testing.T) {
 
 func TestResolveTenantStore(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(store, t.TempDir())
+	store := newControlTestStore(t)
+	mgr := NewTenantStoreManager(store, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	// Create a user.
@@ -213,16 +223,20 @@ func TestResolveTenantStore(t *testing.T) {
 	if tenantID != defaultID {
 		t.Fatalf("expected default tenant ID %s, got %s", defaultID, tenantID)
 	}
-	if resolvedStore != store {
-		t.Fatal("expected resolved store to be the shared store for default tenant")
+	defaultStore, err := mgr.ForTenant(ctx, defaultID)
+	if err != nil {
+		t.Fatalf("ForTenant(default): %v", err)
+	}
+	if resolvedStore != defaultStore {
+		t.Fatal("expected resolved store to be the default tenant DuckDB root")
 	}
 }
 
-func TestResolveSiteStoreBackfillsLegacyAnalyticsConfig(t *testing.T) {
+func TestResolveSiteStoreMirrorsControlSiteIntoTenantCatalog(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
+	store := newControlTestStore(t)
 	basePath := t.TempDir()
-	mgr := NewTenantStoreManager(store, basePath)
+	mgr := NewTenantStoreManager(store, basePath, nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	userID, err := store.CreateUser(ctx, "sync@test.com", "hash")
@@ -243,29 +257,6 @@ func TestResolveSiteStoreBackfillsLegacyAnalyticsConfig(t *testing.T) {
 		t.Fatalf("create site: %v", err)
 	}
 
-	legacyGoal := &api.Goal{
-		ID:        uuid.New(),
-		SiteID:    site.ID,
-		Name:      "Legacy Signup",
-		Type:      "event",
-		Value:     "signup_completed",
-		CreatedAt: time.Now().UTC(),
-	}
-	if err := store.CreateGoal(ctx, legacyGoal); err != nil {
-		t.Fatalf("create shared goal: %v", err)
-	}
-
-	legacyFunnel := &api.Funnel{
-		ID:        uuid.New(),
-		SiteID:    site.ID,
-		Name:      "Legacy Funnel",
-		Steps:     []api.FunnelStep{{Type: "path", Value: "/"}, {Type: "event", Value: "signup_completed"}},
-		CreatedAt: time.Now().UTC(),
-	}
-	if err := store.CreateFunnel(ctx, legacyFunnel); err != nil {
-		t.Fatalf("create shared funnel: %v", err)
-	}
-
 	tenantStore, tenantID, err := mgr.ResolveSiteStore(ctx, site.ID)
 	if err != nil {
 		t.Fatalf("ResolveSiteStore: %v", err)
@@ -273,10 +264,6 @@ func TestResolveSiteStoreBackfillsLegacyAnalyticsConfig(t *testing.T) {
 	if tenantID != team.ID {
 		t.Fatalf("expected tenant %s, got %s", team.ID, tenantID)
 	}
-	if tenantStore == store {
-		t.Fatal("expected custom tenant site to resolve to tenant-local store")
-	}
-
 	var mirroredDomain string
 	var mirroredRetention int
 	if err := tenantStore.DB().QueryRowContext(ctx,
@@ -289,28 +276,13 @@ func TestResolveSiteStoreBackfillsLegacyAnalyticsConfig(t *testing.T) {
 		t.Fatalf("expected mirrored domain %q, got %q", site.Domain, mirroredDomain)
 	}
 
-	tenantGoals, err := tenantStore.GetGoals(ctx, site.ID)
-	if err != nil {
-		t.Fatalf("tenant GetGoals: %v", err)
-	}
-	if len(tenantGoals) != 1 || tenantGoals[0].ID != legacyGoal.ID {
-		t.Fatalf("expected legacy goal to be backfilled, got %+v", tenantGoals)
-	}
-
-	tenantFunnels, err := tenantStore.GetFunnels(ctx, site.ID)
-	if err != nil {
-		t.Fatalf("tenant GetFunnels: %v", err)
-	}
-	if len(tenantFunnels) != 1 || tenantFunnels[0].ID != legacyFunnel.ID {
-		t.Fatalf("expected legacy funnel to be backfilled, got %+v", tenantFunnels)
-	}
 }
 
 func TestDeleteSiteRemovesTenantAndSharedData(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
+	store := newControlTestStore(t)
 	basePath := t.TempDir()
-	mgr := NewTenantStoreManager(store, basePath)
+	mgr := NewTenantStoreManager(store, basePath, nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	userID, err := store.CreateUser(ctx, "delete-site@test.com", "hash")
@@ -363,12 +335,12 @@ func TestDeleteSiteRemovesTenantAndSharedData(t *testing.T) {
 		t.Fatalf("DeleteSite: %v", err)
 	}
 
-	var sharedCount int
-	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM sites WHERE id = ?", site.ID).Scan(&sharedCount); err != nil {
-		t.Fatalf("count shared sites: %v", err)
+	deletedSite, err := store.GetSiteByID(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("get deleted control site: %v", err)
 	}
-	if sharedCount != 0 {
-		t.Fatalf("expected shared site row deleted, got count=%d", sharedCount)
+	if deletedSite != nil {
+		t.Fatalf("expected control site row deleted, got %+v", deletedSite)
 	}
 
 	var tenantCount int
@@ -390,9 +362,9 @@ func TestDeleteSiteRemovesTenantAndSharedData(t *testing.T) {
 
 func TestResetSiteStatsClearsTenantAnalyticsAndSharedMeasuredData(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
+	store := newControlTestStore(t)
 	basePath := t.TempDir()
-	mgr := NewTenantStoreManager(store, basePath)
+	mgr := NewTenantStoreManager(store, basePath, nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	userID, err := store.CreateUser(ctx, "reset-tenant-site@test.com", "hash")
@@ -453,7 +425,14 @@ func TestResetSiteStatsClearsTenantAnalyticsAndSharedMeasuredData(t *testing.T) 
 	}); err != nil {
 		t.Fatalf("create tenant web vital: %v", err)
 	}
-	importID := uuid.New()
+	importJob, err := store.CreateSiteImportUpload(ctx, site.ID, userID, "plausible", nil)
+	if err != nil {
+		t.Fatalf("create control import: %v", err)
+	}
+	importID := importJob.ID
+	if err := store.MarkImportCompleted(ctx, site.ID, importID, 10, &api.ImportManifest{Provider: "plausible", RowsScanned: 10, RowsAccepted: 10}); err != nil {
+		t.Fatalf("complete control import: %v", err)
+	}
 	if _, err := tenantStore.DB().ExecContext(ctx,
 		"INSERT INTO imported_traffic_daily (site_id, import_id, date, visitors, visits, pageviews, bounces, visit_duration, source_file) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		site.ID, importID, now.Format("2006-01-02"), 1, 1, 1, 0, 10, "visits.csv",
@@ -466,37 +445,29 @@ func TestResetSiteStatsClearsTenantAnalyticsAndSharedMeasuredData(t *testing.T) 
 	); err != nil {
 		t.Fatalf("insert tenant ai fetch: %v", err)
 	}
-
-	if _, err := store.DB().ExecContext(ctx,
-		"INSERT INTO site_imports (id, site_id, provider, status, source_hash, bytes_total, bytes_received, rows_scanned, rows_imported, created_by, created_at, updated_at, finished_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		importID, site.ID, "plausible", ImportStatusCompleted, "hash", 10, 10, 10, 10, userID, now, now, now,
-	); err != nil {
-		t.Fatalf("insert shared import: %v", err)
+	if err := tenantStore.RecordHitActivity(ctx, []*api.Hit{{SiteID: site.ID, Timestamp: now}}); err != nil {
+		t.Fatalf("record tenant activity: %v", err)
 	}
-	if _, err := store.DB().ExecContext(ctx,
-		"INSERT INTO site_activity_summary (site_id, tenant_id, first_hit_at, last_hit_at, last_event_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-		site.ID, team.ID, now, now, now, now,
-	); err != nil {
-		t.Fatalf("insert shared activity summary: %v", err)
+	aiRunID, err := store.AppendAIRun(ctx, controlstore.AIRunParams{
+		TeamID: team.ID, SiteID: site.ID, ActorID: userID, ActorType: "user",
+		Feature: "opportunities", Provider: "test", Model: "test-model",
+		TemplateVersion: "test.v1", EvidenceIDs: []string{"evidence"}, InputHash: "input", OutputHash: "output",
+		OutputJSON: `{"title_key":"title"}`, Status: "success", CreatedAt: now,
+	})
+	if err != nil {
+		t.Fatalf("append control AI run: %v", err)
 	}
-	if _, err := store.DB().ExecContext(ctx,
-		"INSERT INTO site_activity_hourly_counts (site_id, tenant_id, bucket, hits, events, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-		site.ID, team.ID, now.Truncate(time.Hour), 1, 1, now,
-	); err != nil {
-		t.Fatalf("insert shared activity hourly: %v", err)
-	}
-	aiRunID := uuid.New()
-	if _, err := store.DB().ExecContext(ctx,
-		"INSERT INTO ai_runs (id, team_id, site_id, actor_id, actor_type, feature, provider, model, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		aiRunID, team.ID, site.ID, userID, "user", "opportunities", "test", "test-model", "completed", now,
-	); err != nil {
-		t.Fatalf("insert shared ai run: %v", err)
-	}
-	if _, err := store.DB().ExecContext(ctx,
-		"INSERT INTO opportunities (id, team_id, site_id, kind, type_key, title_key, summary_key, action_key, impact_value, impact_label_key, confidence, status, ai_run_id, generated_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		uuid.New(), team.ID, site.ID, "analytics", "type", "title", "summary", "action", "10", "impact", "high", "open", aiRunID, now, now, now,
-	); err != nil {
-		t.Fatalf("insert shared opportunity: %v", err)
+	if _, err := store.UpsertOpportunities(ctx, []controlstore.OpportunityInput{{
+		ID: uuid.New(), TeamID: team.ID, SiteID: site.ID, Kind: "analytics",
+		TypeKey: "opportunities.types.analytics", TitleKey: "opportunities.test.title",
+		SummaryKey: "opportunities.test.summary", ActionKey: "opportunities.test.action",
+		DigestKey: "opportunities.test.digest", ImpactValue: "10", ImpactLabelKey: "opportunities.impact.test",
+		RouteLabelKey: "opportunities.test.route", Confidence: "high", Status: "open",
+		Evidence:         []api.OpportunityEvidence{{ID: "evidence", LabelKey: "opportunities.test.evidence", Value: "1"}},
+		CitedEvidenceIDs: []string{"evidence"},
+		AIRunID:          aiRunID, GeneratedAt: now, DetectorVersion: "test.v1",
+	}}); err != nil {
+		t.Fatalf("upsert control opportunity: %v", err)
 	}
 
 	result, err := mgr.ResetSiteStats(ctx, site.ID)
@@ -514,20 +485,32 @@ func TestResetSiteStatsClearsTenantAnalyticsAndSharedMeasuredData(t *testing.T) 
 	for _, table := range []string{"hits", "events", "web_vitals", "imported_traffic_daily", "ai_fetches"} {
 		assertTableCount(t, ctx, tenantStore, table, "site_id", site.ID, 0)
 	}
-	for _, table := range []string{"site_activity_summary", "site_activity_hourly_counts", "ai_runs", "opportunities"} {
-		assertTableCount(t, ctx, store, table, "site_id", site.ID, 0)
+	opportunities, err := store.ListOpportunities(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("list opportunities after reset: %v", err)
 	}
-	assertTableCount(t, ctx, store, "sites", "id", site.ID, 1)
-	assertTableCount(t, ctx, store, "site_tenants", "site_id", site.ID, 1)
+	if len(opportunities) != 0 {
+		t.Fatalf("expected control opportunities cleared, got %+v", opportunities)
+	}
+	controlSite, err := store.GetSiteByID(ctx, site.ID)
+	if err != nil || controlSite == nil {
+		t.Fatalf("expected control site retained after reset, site=%+v err=%v", controlSite, err)
+	}
 	assertTableCount(t, ctx, tenantStore, "sites", "id", site.ID, 1)
-	assertSiteImportStatuses(t, ctx, store, site.ID, map[string]int{ImportStatusDeleted: 1})
+	resetImport, err := store.GetSiteImport(ctx, site.ID, importID)
+	if err != nil {
+		t.Fatalf("get import after reset: %v", err)
+	}
+	if resetImport.Status != controlstore.ImportStatusDeleted {
+		t.Fatalf("expected completed import marked deleted, got %+v", resetImport)
+	}
 }
 
 func TestDeleteSiteWithImportedUnattributedPropertiesDoesNotInvalidateTenantDB(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
+	store := newControlTestStore(t)
 	basePath := t.TempDir()
-	mgr := NewTenantStoreManager(store, basePath)
+	mgr := NewTenantStoreManager(store, basePath, nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	userID, err := store.CreateUser(ctx, "delete-imported-site@test.com", "hash")
@@ -585,9 +568,9 @@ func TestDeleteSiteWithImportedUnattributedPropertiesDoesNotInvalidateTenantDB(t
 
 func TestTransferSiteMovesAnalyticsToDestinationTenant(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
+	store := newControlTestStore(t)
 	basePath := t.TempDir()
-	mgr := NewTenantStoreManager(store, basePath)
+	mgr := NewTenantStoreManager(store, basePath, nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	userID, err := store.CreateUser(ctx, "transfer-site@test.com", "hash")
@@ -599,7 +582,11 @@ func TestTransferSiteMovesAnalyticsToDestinationTenant(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create site: %v", err)
 	}
-	if err := store.CreateGoal(ctx, &api.Goal{
+	sourceStore, sourceTeamID, err := mgr.ResolveSiteStore(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("resolve source analytics store: %v", err)
+	}
+	if err := sourceStore.CreateGoal(ctx, &api.Goal{
 		ID:        uuid.New(),
 		SiteID:    site.ID,
 		Name:      "Signup",
@@ -611,7 +598,7 @@ func TestTransferSiteMovesAnalyticsToDestinationTenant(t *testing.T) {
 	}
 	sessionID := uuid.New()
 	pageID := uuid.New()
-	if err := store.CreateHit(ctx, &api.Hit{
+	if err := sourceStore.CreateHit(ctx, &api.Hit{
 		ID:        uuid.New(),
 		SiteID:    site.ID,
 		SessionID: sessionID,
@@ -621,7 +608,7 @@ func TestTransferSiteMovesAnalyticsToDestinationTenant(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("create hit in shared store: %v", err)
 	}
-	if err := store.CreateWebVital(ctx, &api.WebVital{
+	if err := sourceStore.CreateWebVital(ctx, &api.WebVital{
 		ID:             uuid.New(),
 		SiteID:         site.ID,
 		SessionID:      sessionID,
@@ -636,7 +623,7 @@ func TestTransferSiteMovesAnalyticsToDestinationTenant(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("create web vital in shared store: %v", err)
 	}
-	if err := store.CreateEvent(ctx, &api.Event{
+	if err := sourceStore.CreateEvent(ctx, &api.Event{
 		ID:        uuid.New(),
 		SiteID:    site.ID,
 		SessionID: uuid.New(),
@@ -649,7 +636,7 @@ func TestTransferSiteMovesAnalyticsToDestinationTenant(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("create event in shared store: %v", err)
 	}
-	if err := store.CreateFunnel(ctx, &api.Funnel{
+	if err := sourceStore.CreateFunnel(ctx, &api.Funnel{
 		ID:     uuid.New(),
 		SiteID: site.ID,
 		Name:   "Signup funnel",
@@ -668,10 +655,6 @@ func TestTransferSiteMovesAnalyticsToDestinationTenant(t *testing.T) {
 	}
 	seedGoogleSearchConsoleSiteMappingForTransfer(t, store, site.ID, userID)
 
-	sourceTeamID, err := store.GetSiteTenantID(ctx, site.ID)
-	if err != nil {
-		t.Fatalf("GetSiteTenantID before transfer: %v", err)
-	}
 	if err := mgr.TransferSite(ctx, site.ID, destinationTeam.ID, AuditEntryParams{
 		ActorID:     userID,
 		TeamID:      sourceTeamID,
@@ -761,20 +744,20 @@ func TestTransferSiteMovesAnalyticsToDestinationTenant(t *testing.T) {
 		t.Fatalf("expected site tenant %s, got %s", destinationTeam.ID, tenantID)
 	}
 
-	var sharedHitCount int
-	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM hits WHERE site_id = ?", site.ID).Scan(&sharedHitCount); err != nil {
-		t.Fatalf("count shared hits after transfer: %v", err)
+	var sourceHitCount int
+	if err := sourceStore.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM hits WHERE site_id = ?", site.ID).Scan(&sourceHitCount); err != nil {
+		t.Fatalf("count source hits after transfer: %v", err)
 	}
-	if sharedHitCount != 0 {
-		t.Fatalf("expected shared analytics to be cleared after transfer, got %d hit rows", sharedHitCount)
+	if sourceHitCount != 0 {
+		t.Fatalf("expected source tenant analytics to be cleared after transfer, got %d hit rows", sourceHitCount)
 	}
 
-	var sharedWebVitalCount int
-	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM web_vitals WHERE site_id = ?", site.ID).Scan(&sharedWebVitalCount); err != nil {
-		t.Fatalf("count shared web vitals after transfer: %v", err)
+	var sourceWebVitalCount int
+	if err := sourceStore.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM web_vitals WHERE site_id = ?", site.ID).Scan(&sourceWebVitalCount); err != nil {
+		t.Fatalf("count source web vitals after transfer: %v", err)
 	}
-	if sharedWebVitalCount != 0 {
-		t.Fatalf("expected shared Web Vitals to be cleared after transfer, got %d rows", sharedWebVitalCount)
+	if sourceWebVitalCount != 0 {
+		t.Fatalf("expected source Web Vitals to be cleared after transfer, got %d rows", sourceWebVitalCount)
 	}
 
 	requireNoGoogleSearchConsoleSiteMapping(t, store, site.ID)
@@ -799,8 +782,8 @@ func TestTransferSiteMovesAnalyticsToDestinationTenant(t *testing.T) {
 
 func TestTransferSiteRequiresTransferAudit(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(store, t.TempDir())
+	store := newControlTestStore(t)
+	mgr := NewTenantStoreManager(store, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	userID, err := store.CreateUser(ctx, "transfer-audit@test.dev", "hash")
@@ -827,8 +810,8 @@ func TestTransferSiteRequiresTransferAudit(t *testing.T) {
 
 func TestTransferSiteRequiresSearchConsoleAuditWhenMappingExists(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(store, t.TempDir())
+	store := newControlTestStore(t)
+	mgr := NewTenantStoreManager(store, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	userID, err := store.CreateUser(ctx, "transfer-gsc-audit@test.dev", "hash")
@@ -884,7 +867,7 @@ func TestTransferSiteRequiresSearchConsoleAuditWhenMappingExists(t *testing.T) {
 	}
 }
 
-func seedGoogleSearchConsoleSiteMappingForTransfer(t *testing.T, store *Store, siteID, userID uuid.UUID) {
+func seedGoogleSearchConsoleSiteMappingForTransfer(t *testing.T, store *controlstore.Store, siteID, userID uuid.UUID) {
 	t.Helper()
 	sourceTeamID, err := store.GetSiteTenantID(context.Background(), siteID)
 	if err != nil {
@@ -901,7 +884,7 @@ func seedGoogleSearchConsoleSiteMappingForTransfer(t *testing.T, store *Store, s
 	}
 }
 
-func requireNoGoogleSearchConsoleSiteMapping(t *testing.T, store *Store, siteID uuid.UUID) {
+func requireNoGoogleSearchConsoleSiteMapping(t *testing.T, store *controlstore.Store, siteID uuid.UUID) {
 	t.Helper()
 	mapping, err := store.GetGoogleSearchConsoleSiteMapping(context.Background(), siteID)
 	if err != nil {
@@ -914,8 +897,8 @@ func requireNoGoogleSearchConsoleSiteMapping(t *testing.T, store *Store, siteID 
 
 func TestTransferSiteCopiesAIFetchRowsIntoTenantStore(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(store, t.TempDir())
+	store := newControlTestStore(t)
+	mgr := NewTenantStoreManager(store, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	userID, err := store.CreateUser(ctx, "transfer-ai-fetch@test.com", "hash")
@@ -926,7 +909,11 @@ func TestTransferSiteCopiesAIFetchRowsIntoTenantStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create site: %v", err)
 	}
-	if _, err := store.DB().ExecContext(ctx, `
+	sourceStore, sourceTeamID, err := mgr.ResolveSiteStore(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("resolve source analytics store: %v", err)
+	}
+	if _, err := sourceStore.DB().ExecContext(ctx, `
 		INSERT INTO ai_fetches (id, site_id, timestamp, assistant_name, assistant_family, path, status_code, resource_type)
 		VALUES (?, ?, now(), 'TestBot', 'test', '/docs', 200, 'page')`,
 		uuid.New(), site.ID,
@@ -938,11 +925,6 @@ func TestTransferSiteCopiesAIFetchRowsIntoTenantStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create destination team: %v", err)
 	}
-	sourceTeamID, err := store.GetSiteTenantID(ctx, site.ID)
-	if err != nil {
-		t.Fatalf("resolve source team: %v", err)
-	}
-
 	if err := mgr.TransferSite(ctx, site.ID, destinationTeam.ID, AuditEntryParams{
 		ActorID: userID, TeamID: sourceTeamID, Action: "site.transferred_out",
 		TargetType: "site", TargetID: site.ID.String(), TargetLabel: site.Domain, Outcome: "success",
@@ -965,7 +947,7 @@ func TestTransferSiteCopiesAIFetchRowsIntoTenantStore(t *testing.T) {
 		t.Fatalf("expected 1 ai fetch row in destination tenant store, got %d", count)
 	}
 	var sourceCount int
-	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM ai_fetches WHERE site_id = ?", site.ID).Scan(&sourceCount); err != nil {
+	if err := sourceStore.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM ai_fetches WHERE site_id = ?", site.ID).Scan(&sourceCount); err != nil {
 		t.Fatalf("count source ai fetches: %v", err)
 	}
 	if sourceCount != 0 {
@@ -983,11 +965,11 @@ func TestTransferSiteCopiesAIFetchRowsIntoTenantStore(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("transfer site back out of tenant store: %v", err)
 	}
-	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM ai_fetches WHERE site_id = ?", site.ID).Scan(&sourceCount); err != nil {
-		t.Fatalf("count shared ai fetches after transfer back: %v", err)
+	if err := sourceStore.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM ai_fetches WHERE site_id = ?", site.ID).Scan(&sourceCount); err != nil {
+		t.Fatalf("count source ai fetches after transfer back: %v", err)
 	}
 	if sourceCount != 1 {
-		t.Fatalf("expected ai fetch row back in shared store, got %d", sourceCount)
+		t.Fatalf("expected ai fetch row back in source tenant store, got %d", sourceCount)
 	}
 	var mirrorCount int
 	if err := destinationStore.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM sites WHERE id = ?", site.ID).Scan(&mirrorCount); err != nil {

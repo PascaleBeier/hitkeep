@@ -7,7 +7,8 @@ import (
 	"time"
 
 	"hitkeep/internal/api"
-	"hitkeep/internal/database"
+	"hitkeep/internal/controlstore"
+	"hitkeep/internal/testutil"
 	"hitkeep/internal/webhooks"
 )
 
@@ -58,15 +59,9 @@ func TestEmitterPersistsBeforePublishingAndIgnoresProducerFailure(t *testing.T) 
 	}
 }
 
-func setupDispatcherStore(t *testing.T) (*database.Store, string, api.Site) {
+func setupDispatcherStore(t *testing.T) (*controlstore.Store, string, api.Site) {
 	t.Helper()
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
+	store := testutil.NewControlStore(t)
 	userID, err := store.CreateUser(context.Background(), "dispatcher@example.test", "hash")
 	if err != nil {
 		t.Fatalf("create user: %v", err)

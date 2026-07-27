@@ -17,6 +17,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/appurl"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/localization"
@@ -316,7 +317,7 @@ func (h *handler) handleVerifySignup() http.HandlerFunc {
 			TeamName:       teamName,
 			Locale:         entry.Locale,
 		})
-		if errors.Is(err, database.ErrUserEmailAlreadyExists) {
+		if errors.Is(err, controlstore.ErrUserEmailAlreadyExists) {
 			http.Redirect(w, r, signupURL("exists"), http.StatusFound)
 			return
 		}

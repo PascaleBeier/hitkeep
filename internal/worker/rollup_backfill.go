@@ -5,8 +5,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/google/uuid"
-
 	"hitkeep/internal/database"
 )
 
@@ -50,21 +48,12 @@ func (w *RollupBackfillWorker) Start(ctx context.Context) {
 }
 
 func (w *RollupBackfillWorker) Run(ctx context.Context) error {
-	shared := w.tenantMgr.Shared()
-
-	rows, err := shared.DB().QueryContext(ctx, "SELECT id FROM sites")
+	sites, err := w.tenantMgr.Control().ListAllSites(ctx)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var siteID uuid.UUID
-		if err := rows.Scan(&siteID); err != nil {
-			slog.Warn("Failed to scan site for rollup backfill", "error", err)
-			continue
-		}
-
+	for _, site := range sites {
+		siteID := site.ID
 		tenantStore, _, err := w.tenantMgr.ResolveSiteStore(ctx, siteID)
 		if err != nil {
 			slog.Warn("Failed to resolve tenant store for rollup backfill", "error", err, "site_id", siteID)
@@ -76,25 +65,16 @@ func (w *RollupBackfillWorker) Run(ctx context.Context) error {
 		}
 	}
 
-	return rows.Err()
+	return nil
 }
 
 func (w *RollupBackfillWorker) RunDirty(ctx context.Context) error {
-	shared := w.tenantMgr.Shared()
-
-	rows, err := shared.DB().QueryContext(ctx, "SELECT id FROM sites")
+	sites, err := w.tenantMgr.Control().ListAllSites(ctx)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var siteID uuid.UUID
-		if err := rows.Scan(&siteID); err != nil {
-			slog.Warn("Failed to scan site for dirty rollup refresh", "error", err)
-			continue
-		}
-
+	for _, site := range sites {
+		siteID := site.ID
 		tenantStore, _, err := w.tenantMgr.ResolveSiteStore(ctx, siteID)
 		if err != nil {
 			slog.Warn("Failed to resolve tenant store for dirty rollup refresh", "error", err, "site_id", siteID)
@@ -106,5 +86,5 @@ func (w *RollupBackfillWorker) RunDirty(ctx context.Context) error {
 		}
 	}
 
-	return rows.Err()
+	return nil
 }

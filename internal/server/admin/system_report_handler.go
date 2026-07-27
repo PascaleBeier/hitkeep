@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -10,6 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
+	"hitkeep/internal/api"
 	"hitkeep/internal/database"
 )
 
@@ -74,7 +78,11 @@ func (h *handler) handleGetSystemReport() http.HandlerFunc {
 		writeLine("")
 		writeLine("## DuckDB Memory")
 		writeLine("")
-		if stats, err := h.ctx.Store.GetDuckDBMemoryStats(ctx); err == nil {
+		var memoryStore *database.Store
+		if h.ctx.TenantStores != nil {
+			memoryStore, _ = h.ctx.TenantStores.ForTenant(ctx, uuid.Nil)
+		}
+		if stats, err := memoryStoreStats(ctx, memoryStore); err == nil {
 			writeLine("| Tag | Memory | Temporary storage |")
 			writeLine("| :-- | --: | --: |")
 			for _, stat := range stats {
@@ -124,6 +132,13 @@ func (h *handler) handleGetSystemReport() http.HandlerFunc {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(b.String()))
 	}
+}
+
+func memoryStoreStats(ctx context.Context, store *database.Store) ([]api.DuckDBMemoryStat, error) {
+	if store == nil {
+		return nil, fmt.Errorf("tenant data plane unavailable")
+	}
+	return store.GetDuckDBMemoryStats(ctx)
 }
 
 func reportValueOrDefault(value, fallback string) string {

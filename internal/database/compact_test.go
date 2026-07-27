@@ -215,7 +215,7 @@ func TestRecoverCompactionSwapRestoresMissingLiveFile(t *testing.T) {
 
 func TestTenantStoreManagerCompactsTenantDatabaseOnOpen(t *testing.T) {
 	ctx := context.Background()
-	shared := newSharedTestStore(t)
+	shared := newControlTestStore(t)
 	basePath := t.TempDir()
 
 	userID, err := shared.CreateUser(ctx, "tenant-compact@test.com", "hash")
@@ -228,7 +228,7 @@ func TestTenantStoreManagerCompactsTenantDatabaseOnOpen(t *testing.T) {
 	}
 
 	// Fragment the tenant database, then close every tenant store.
-	seeder := NewTenantStoreManager(shared, basePath)
+	seeder := NewTenantStoreManager(shared, basePath, nil)
 	tenantStore, err := seeder.ForTenant(ctx, team.ID)
 	if err != nil {
 		t.Fatalf("open tenant store: %v", err)
@@ -267,7 +267,7 @@ func TestTenantStoreManagerCompactsTenantDatabaseOnOpen(t *testing.T) {
 	sizeBefore := fileSize(t, dbPath)
 
 	// A manager with compaction enabled must shrink the file on lazy open.
-	mgr := NewTenantStoreManager(shared, basePath, WithTenantCompaction(CompactionOptions{MinReclaimableBytes: 1, MinFreeRatio: 0}))
+	mgr := NewTenantStoreManager(shared, basePath, nil, WithTenantCompaction(CompactionOptions{MinReclaimableBytes: 1, MinFreeRatio: 0}))
 	t.Cleanup(func() { _ = mgr.Close() })
 	reopened, err := mgr.ForTenant(ctx, team.ID)
 	if err != nil {

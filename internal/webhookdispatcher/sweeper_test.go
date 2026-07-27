@@ -2,6 +2,7 @@ package webhookdispatcher
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"testing"
 	"time"
@@ -43,7 +44,12 @@ func TestSweeperRecoversStaleProcessingAndPublishesDueDeliveries(t *testing.T) {
 		t.Fatalf("enqueue: jobs=%+v err=%v", jobs, err)
 	}
 	stale := time.Now().UTC().Add(-10 * time.Minute)
-	if _, err := store.DB().ExecContext(context.Background(), `
+	faultDB, err := sql.Open("sqlite", store.Path())
+	if err != nil {
+		t.Fatalf("open fault-injection connection: %v", err)
+	}
+	defer faultDB.Close()
+	if _, err := faultDB.ExecContext(context.Background(), `
 		UPDATE webhook_deliveries SET status = ?, last_attempt_at = ?, next_attempt_at = NULL WHERE id = ?
 	`, database.WebhookDeliveryProcessing, stale, jobs[0].DeliveryID); err != nil {
 		t.Fatalf("mark stale processing: %v", err)

@@ -13,48 +13,52 @@ import (
 	"hitkeep/internal/analyticscatalog"
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
+	"hitkeep/internal/testutil"
 )
 
-func setupToolBridgeStore(t *testing.T) (*database.Store, uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID) {
+func setupToolBridgeStore(t *testing.T) (*controlstore.Store, *database.Store, uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID) {
 	t.Helper()
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
+	control, manager := testutil.NewControlAndTenantStores(t)
+	t.Cleanup(func() { _ = manager.Close() })
+	t.Cleanup(func() { _ = control.Close() })
 
-	ownerID, err := store.CreateUser(context.Background(), "owner-tools@example.com", "hashed")
+	ownerID, err := control.CreateUser(context.Background(), "owner-tools@example.com", "hashed")
 	if err != nil {
 		t.Fatalf("create owner: %v", err)
 	}
-	viewerID, err := store.CreateUser(context.Background(), "viewer-tools@example.com", "hashed")
+	viewerID, err := control.CreateUser(context.Background(), "viewer-tools@example.com", "hashed")
 	if err != nil {
 		t.Fatalf("create viewer: %v", err)
 	}
-	outsiderID, err := store.CreateUser(context.Background(), "outsider-tools@example.com", "hashed")
+	outsiderID, err := control.CreateUser(context.Background(), "outsider-tools@example.com", "hashed")
 	if err != nil {
 		t.Fatalf("create outsider: %v", err)
 	}
-	site, err := store.CreateSite(context.Background(), ownerID, "tools.example")
+	site, err := control.CreateSite(context.Background(), ownerID, "tools.example")
 	if err != nil {
 		t.Fatalf("create site: %v", err)
 	}
-	teamID, err := store.GetSiteTenantID(context.Background(), site.ID)
+	teamID, err := control.GetSiteTenantID(context.Background(), site.ID)
 	if err != nil {
 		t.Fatalf("site team: %v", err)
 	}
-	if err := store.AddTeamMember(context.Background(), teamID, viewerID, database.TenantRoleMember, ownerID); err != nil {
+	if err := control.AddTeamMember(context.Background(), teamID, viewerID, database.TenantRoleMember, ownerID); err != nil {
 		t.Fatalf("add viewer team member: %v", err)
 	}
-	if err := store.AddSiteMember(context.Background(), site.ID, viewerID, auth.SiteViewer, ownerID); err != nil {
+	if err := control.AddSiteMember(context.Background(), site.ID, viewerID, auth.SiteViewer, ownerID); err != nil {
 		t.Fatalf("add viewer site member: %v", err)
 	}
+	if err := manager.SyncSite(context.Background(), site.ID); err != nil {
+		t.Fatalf("sync site: %v", err)
+	}
+	store, _, err := manager.ResolveSiteStore(context.Background(), site.ID)
+	if err != nil {
+		t.Fatalf("resolve analytics store: %v", err)
+	}
 	seedToolBridgeAggregates(t, store, site.ID)
-	return store, site.ID, teamID, viewerID, outsiderID
+	return control, store, site.ID, teamID, viewerID, outsiderID
 }
 
 func seedToolBridgeAggregates(t *testing.T, store *database.Store, siteID uuid.UUID) {
@@ -98,9 +102,9 @@ func seedToolBridgeAggregates(t *testing.T, store *database.Store, siteID uuid.U
 }
 
 func TestToolBridgeAllowsViewerAggregateToolsWithoutRawRows(t *testing.T) {
-	store, siteID, teamID, viewerID, _ := setupToolBridgeStore(t)
+	control, store, siteID, teamID, viewerID, _ := setupToolBridgeStore(t)
 	bridge := NewToolBridge(ToolBridgeConfig{
-		Shared:            store,
+		Shared:            control,
 		Analytics:         store,
 		TeamID:            teamID,
 		SiteID:            siteID,
@@ -128,9 +132,9 @@ func TestToolBridgeAllowsViewerAggregateToolsWithoutRawRows(t *testing.T) {
 }
 
 func TestToolBridgeExposesSharedAggregateCatalogTools(t *testing.T) {
-	store, siteID, teamID, viewerID, _ := setupToolBridgeStore(t)
+	control, store, siteID, teamID, viewerID, _ := setupToolBridgeStore(t)
 	bridge := NewToolBridge(ToolBridgeConfig{
-		Shared:            store,
+		Shared:            control,
 		Analytics:         store,
 		TeamID:            teamID,
 		SiteID:            siteID,
@@ -156,9 +160,9 @@ func TestToolBridgeExposesSharedAggregateCatalogTools(t *testing.T) {
 }
 
 func TestToolBridgeExecutesSharedEventNamesTool(t *testing.T) {
-	store, siteID, teamID, viewerID, _ := setupToolBridgeStore(t)
+	control, store, siteID, teamID, viewerID, _ := setupToolBridgeStore(t)
 	bridge := NewToolBridge(ToolBridgeConfig{
-		Shared:            store,
+		Shared:            control,
 		Analytics:         store,
 		TeamID:            teamID,
 		SiteID:            siteID,
@@ -193,9 +197,9 @@ func TestToolBridgeExecutesSharedEventNamesTool(t *testing.T) {
 }
 
 func TestToolBridgeDeniesUnauthorizedActor(t *testing.T) {
-	store, siteID, teamID, _, outsiderID := setupToolBridgeStore(t)
+	control, store, siteID, teamID, _, outsiderID := setupToolBridgeStore(t)
 	bridge := NewToolBridge(ToolBridgeConfig{
-		Shared:    store,
+		Shared:    control,
 		Analytics: store,
 		TeamID:    teamID,
 		SiteID:    siteID,
@@ -212,9 +216,9 @@ func TestToolBridgeDeniesUnauthorizedActor(t *testing.T) {
 }
 
 func TestToolBridgeDeniesUserWhenEffectivePrincipalDoesNotMatchActor(t *testing.T) {
-	store, siteID, teamID, viewerID, outsiderID := setupToolBridgeStore(t)
+	control, store, siteID, teamID, viewerID, outsiderID := setupToolBridgeStore(t)
 	bridge := NewToolBridge(ToolBridgeConfig{
-		Shared:            store,
+		Shared:            control,
 		Analytics:         store,
 		TeamID:            teamID,
 		SiteID:            siteID,
@@ -233,9 +237,9 @@ func TestToolBridgeDeniesUserWhenEffectivePrincipalDoesNotMatchActor(t *testing.
 }
 
 func TestToolBridgeDeniesViewerWhenConfiguredTeamDoesNotOwnSite(t *testing.T) {
-	store, siteID, _, viewerID, _ := setupToolBridgeStore(t)
+	control, store, siteID, _, viewerID, _ := setupToolBridgeStore(t)
 	bridge := NewToolBridge(ToolBridgeConfig{
-		Shared:            store,
+		Shared:            control,
 		Analytics:         store,
 		TeamID:            uuid.New(),
 		SiteID:            siteID,
@@ -254,16 +258,16 @@ func TestToolBridgeDeniesViewerWhenConfiguredTeamDoesNotOwnSite(t *testing.T) {
 }
 
 func TestToolBridgeAllowsInstanceActorWithSiteViewPermission(t *testing.T) {
-	store, siteID, teamID, _, _ := setupToolBridgeStore(t)
-	adminID, err := store.CreateUser(context.Background(), "instance-admin-tools@example.com", "hashed")
+	control, store, siteID, teamID, _, _ := setupToolBridgeStore(t)
+	adminID, err := control.CreateUser(context.Background(), "instance-admin-tools@example.com", "hashed")
 	if err != nil {
 		t.Fatalf("create admin: %v", err)
 	}
-	if err := store.UpdateInstanceRole(context.Background(), adminID, auth.InstanceAdmin, adminID); err != nil {
+	if err := control.UpdateInstanceRole(context.Background(), adminID, auth.InstanceAdmin, adminID); err != nil {
 		t.Fatalf("make admin: %v", err)
 	}
 	bridge := NewToolBridge(ToolBridgeConfig{
-		Shared:                store,
+		Shared:                control,
 		Analytics:             store,
 		TeamID:                teamID,
 		SiteID:                siteID,
@@ -281,10 +285,10 @@ func TestToolBridgeAllowsInstanceActorWithSiteViewPermission(t *testing.T) {
 }
 
 func TestToolBridgeAllowsAPIClientWhenEffectiveRoleAndDelegationCanViewSite(t *testing.T) {
-	store, siteID, teamID, _, _ := setupToolBridgeStore(t)
+	control, store, siteID, teamID, _, _ := setupToolBridgeStore(t)
 	clientID := uuid.New()
 	bridge := NewToolBridge(ToolBridgeConfig{
-		Shared:            store,
+		Shared:            control,
 		Analytics:         store,
 		TeamID:            teamID,
 		SiteID:            siteID,
@@ -307,9 +311,9 @@ func TestToolBridgeAllowsAPIClientWhenEffectiveRoleAndDelegationCanViewSite(t *t
 }
 
 func TestToolBridgeDeniesAPIClientWhenDelegationDoesNotMatchActor(t *testing.T) {
-	store, siteID, teamID, _, _ := setupToolBridgeStore(t)
+	control, store, siteID, teamID, _, _ := setupToolBridgeStore(t)
 	bridge := NewToolBridge(ToolBridgeConfig{
-		Shared:            store,
+		Shared:            control,
 		Analytics:         store,
 		TeamID:            teamID,
 		SiteID:            siteID,
@@ -333,10 +337,10 @@ func TestToolBridgeDeniesAPIClientWhenDelegationDoesNotMatchActor(t *testing.T) 
 }
 
 func TestToolBridgeDeniesAPIClientWithoutDelegatedSiteView(t *testing.T) {
-	store, siteID, teamID, _, _ := setupToolBridgeStore(t)
+	control, store, siteID, teamID, _, _ := setupToolBridgeStore(t)
 	clientID := uuid.New()
 	bridge := NewToolBridge(ToolBridgeConfig{
-		Shared:            store,
+		Shared:            control,
 		Analytics:         store,
 		TeamID:            teamID,
 		SiteID:            siteID,
@@ -360,10 +364,10 @@ func TestToolBridgeDeniesAPIClientWithoutDelegatedSiteView(t *testing.T) {
 }
 
 func TestToolBridgeDeniesAPIClientWithoutEffectiveSiteView(t *testing.T) {
-	store, siteID, teamID, _, _ := setupToolBridgeStore(t)
+	control, store, siteID, teamID, _, _ := setupToolBridgeStore(t)
 	clientID := uuid.New()
 	bridge := NewToolBridge(ToolBridgeConfig{
-		Shared:          store,
+		Shared:          control,
 		Analytics:       store,
 		TeamID:          teamID,
 		SiteID:          siteID,
@@ -386,9 +390,9 @@ func TestToolBridgeDeniesAPIClientWithoutEffectiveSiteView(t *testing.T) {
 }
 
 func TestToolBridgeSchedulerIsScopedToTeamAndSite(t *testing.T) {
-	store, siteID, teamID, _, _ := setupToolBridgeStore(t)
+	control, store, siteID, teamID, _, _ := setupToolBridgeStore(t)
 	allowed := NewToolBridge(ToolBridgeConfig{
-		Shared:          store,
+		Shared:          control,
 		Analytics:       store,
 		TeamID:          teamID,
 		SiteID:          siteID,
@@ -403,7 +407,7 @@ func TestToolBridgeSchedulerIsScopedToTeamAndSite(t *testing.T) {
 	}
 
 	denied := NewToolBridge(ToolBridgeConfig{
-		Shared:          store,
+		Shared:          control,
 		Analytics:       store,
 		TeamID:          teamID,
 		SiteID:          siteID,
@@ -419,7 +423,7 @@ func TestToolBridgeSchedulerIsScopedToTeamAndSite(t *testing.T) {
 	}
 
 	deniedTeam := NewToolBridge(ToolBridgeConfig{
-		Shared:          store,
+		Shared:          control,
 		Analytics:       store,
 		TeamID:          teamID,
 		SiteID:          siteID,

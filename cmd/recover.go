@@ -12,16 +12,25 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 	"github.com/google/uuid"
 	"github.com/klauspost/compress/zstd"
 
+	"hitkeep/internal/api"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/worker"
 )
@@ -92,6 +101,63 @@ type databaseRecoveryBundleArtifact struct {
 	SHA256       string `json:"sha256"`
 }
 
+type offlineMFAResult struct {
+	TOTPDisabled        bool
+	PasskeysDeleted     int
+	SessionsInvalidated int
+}
+
+type offlineMFAStore struct {
+	close                    func() error
+	getUserByEmail           func(context.Context, string) (*api.User, error)
+	hasEnabledTOTP           func(context.Context, uuid.UUID) (bool, error)
+	listUserPasskeys         func(context.Context, uuid.UUID) ([]api.UserPasskey, error)
+	countActiveRecoveryCodes func(context.Context, uuid.UUID) (int, error)
+	disableUserMFA           func(context.Context, uuid.UUID) (offlineMFAResult, error)
+}
+
+func openOfflineMFAStore(ctx context.Context, path string) (offlineMFAStore, error) {
+	format, err := controlstore.InspectFormat(path)
+	if err != nil {
+		return offlineMFAStore{}, err
+	}
+	if format == controlstore.FileSQLite {
+		store, err := controlstore.Open(ctx, path)
+		if err != nil {
+			return offlineMFAStore{}, err
+		}
+		return offlineMFAStore{
+			close:                    store.Close,
+			getUserByEmail:           store.GetUserByEmail,
+			hasEnabledTOTP:           store.HasEnabledTOTP,
+			listUserPasskeys:         store.ListUserPasskeys,
+			countActiveRecoveryCodes: store.CountActiveRecoveryCodes,
+			disableUserMFA: func(ctx context.Context, userID uuid.UUID) (offlineMFAResult, error) {
+				result, err := store.DisableUserMFA(ctx, userID)
+				return offlineMFAResult{TOTPDisabled: result.TOTPDisabled, PasskeysDeleted: result.PasskeysDeleted, SessionsInvalidated: result.SessionsInvalidated}, err
+			},
+		}, nil
+	}
+	if format != controlstore.FileDuckDB {
+		return offlineMFAStore{}, fmt.Errorf("control database has unsupported format %s", format)
+	}
+	store, err := database.OpenMigratedStore(ctx, path)
+	if err != nil {
+		return offlineMFAStore{}, err
+	}
+	return offlineMFAStore{
+		close:                    store.Close,
+		getUserByEmail:           store.GetUserByEmail,
+		hasEnabledTOTP:           store.HasEnabledTOTP,
+		listUserPasskeys:         store.ListUserPasskeys,
+		countActiveRecoveryCodes: store.CountActiveRecoveryCodes,
+		disableUserMFA: func(ctx context.Context, userID uuid.UUID) (offlineMFAResult, error) {
+			result, err := store.DisableUserMFA(ctx, userID)
+			return offlineMFAResult{TOTPDisabled: result.TOTPDisabled, PasskeysDeleted: result.PasskeysDeleted, SessionsInvalidated: result.SessionsInvalidated}, err
+		},
+	}, nil
+}
+
 func recoverDisable2FA(args []string) {
 	fs := flag.NewFlagSet("disable-2fa", flag.ExitOnError)
 	email := fs.String("email", "", "User email address (required)")
@@ -122,16 +188,20 @@ func recoverDisable2FA(args []string) {
 	fmt.Printf("DB:    %s\n", *dbPath)
 	fmt.Printf("User:  %s\n\n", *email)
 
-	store, err := database.OpenMigratedStore(ctx, *dbPath)
+	store, err := openOfflineMFAStore(ctx, *dbPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: could not open database: %v\n", err)
 		fmt.Fprintln(os.Stderr, "Make sure HitKeep is stopped before running recovery commands.")
 		os.Exit(1)
 	}
-	defer store.Close()
+	defer func() {
+		if err := store.close(); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not close recovery database cleanly: %v\n", err)
+		}
+	}()
 
 	// ---- Look up user ---------------------------------------------------
-	user, err := store.GetUserByEmail(ctx, *email)
+	user, err := store.getUserByEmail(ctx, *email)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: database lookup failed: %v\n", err)
 		os.Exit(1)
@@ -149,18 +219,18 @@ func recoverDisable2FA(args []string) {
 	fmt.Printf("Found user: %s (%s)\n\n", name, user.Email)
 
 	// ---- Inventory active 2FA ------------------------------------------
-	hasTOTP, err := store.HasEnabledTOTP(ctx, user.ID)
+	hasTOTP, err := store.hasEnabledTOTP(ctx, user.ID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: could not check TOTP status: %v\n", err)
 		os.Exit(1)
 	}
 
-	passkeys, err := store.ListUserPasskeys(ctx, user.ID)
+	passkeys, err := store.listUserPasskeys(ctx, user.ID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: could not list passkeys: %v\n", err)
 		os.Exit(1)
 	}
-	recoveryCodesRemaining, err := store.CountActiveRecoveryCodes(ctx, user.ID)
+	recoveryCodesRemaining, err := store.countActiveRecoveryCodes(ctx, user.ID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: could not count recovery codes: %v\n", err)
 		os.Exit(1)
@@ -219,7 +289,7 @@ func recoverDisable2FA(args []string) {
 	}
 
 	// ---- Execute -------------------------------------------------------
-	result, err := store.DisableUserMFA(ctx, user.ID)
+	result, err := store.disableUserMFA(ctx, user.ID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: could not disable MFA: %v\n", err)
 		os.Exit(1)
@@ -563,23 +633,37 @@ func recoverRestoreBackup(args []string) {
 		})
 	}
 
-	// Restore shared DB.
+	// Restore the control snapshot. New backups contain a compressed SQLite
+	// control database; legacy backups remain DuckDB exports and are converted by
+	// normal offline startup after restore.
 	sharedSource := joinRestorePath(*from, "shared", snapshotName)
 	sharedRestored := false
-	if err := restoreDatabase(ctx, *dbPath, sharedSource, isS3Source, s3Conf); err != nil {
-		fmt.Fprintf(os.Stderr, "Error restoring shared database: %v\n", err)
+	restoreErr := restoreSQLiteControlDatabase(ctx, *dbPath, sharedSource, isS3Source, s3Conf)
+	if errors.Is(restoreErr, errNoSQLiteControlSnapshot) {
+		restoreErr = restoreDatabase(ctx, *dbPath, sharedSource, isS3Source, s3Conf)
+	}
+	if restoreErr != nil {
+		fmt.Fprintf(os.Stderr, "Error restoring control database: %v\n", restoreErr)
 		exitCode = 1
 	} else {
 		sharedRestored = true
-		fmt.Printf("Shared database restored to %s\n", *dbPath)
+		fmt.Printf("Control database restored to %s\n", *dbPath)
 	}
-	if isS3Source && sharedRestored {
+	if sharedRestored {
 		var err error
 		tenantIDs, err = discoverS3TenantBackupsFromControl(ctx, *dbPath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error discovering tenant backups from restored control database: %v\n", err)
 			exitCode = 1
 			tenantIDs = nil
+		} else if !isS3Source {
+			if err := validateLocalTenantSnapshots(*from, snapshotName, tenantIDs); err != nil {
+				fmt.Fprintf(os.Stderr, "Error validating tenant backup set: %v\n", err)
+				exitCode = 1
+				tenantIDs = nil
+			} else {
+				fmt.Printf("Validated %d tenant database(s) from restored control snapshot.\n", len(tenantIDs))
+			}
 		} else {
 			fmt.Printf("Discovered %d tenant database(s) from restored control snapshot.\n", len(tenantIDs))
 		}
@@ -610,6 +694,259 @@ func recoverRestoreBackup(args []string) {
 		fmt.Fprintln(os.Stderr, "\nRestore completed with errors (see above).")
 	}
 	os.Exit(exitCode)
+}
+
+var errNoSQLiteControlSnapshot = errors.New("backup does not contain a SQLite control snapshot")
+
+type sqliteControlBackupManifest struct {
+	Version int    `json:"version"`
+	Engine  string `json:"engine"`
+	File    string `json:"file"`
+	Bytes   int64  `json:"bytes"`
+	SHA256  string `json:"sha256"`
+}
+
+func restoreSQLiteControlDatabase(ctx context.Context, targetPath, sourcePath string, isS3 bool, s3Conf *worker.S3Config) error {
+	targetDir := filepath.Dir(targetPath)
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		return fmt.Errorf("create control restore directory: %w", err)
+	}
+	staging, err := os.MkdirTemp(targetDir, ".control-restore-*")
+	if err != nil {
+		return fmt.Errorf("create control restore staging directory: %w", err)
+	}
+	if err := os.Chmod(staging, 0o700); err != nil {
+		_ = os.RemoveAll(staging)
+		return err
+	}
+	defer os.RemoveAll(staging)
+
+	manifestPath := filepath.Join(staging, "manifest.json")
+	compressedPath := filepath.Join(staging, "control.db.zst")
+	completePath := filepath.Join(staging, "_COMPLETE")
+	if isS3 {
+		for name, destination := range map[string]string{
+			"_COMPLETE":      completePath,
+			"manifest.json":  manifestPath,
+			"control.db.zst": compressedPath,
+		} {
+			err := downloadRestoreS3Object(ctx, joinRestorePath(sourcePath, name), destination, s3Conf)
+			if isS3ObjectMissing(err) {
+				return errNoSQLiteControlSnapshot
+			}
+			if err != nil {
+				return fmt.Errorf("download SQLite control backup %s: %w", name, err)
+			}
+		}
+	} else {
+		if _, err := os.Stat(filepath.Join(sourcePath, "control.db.zst")); errors.Is(err, os.ErrNotExist) {
+			return errNoSQLiteControlSnapshot
+		} else if err != nil {
+			return fmt.Errorf("inspect SQLite control snapshot: %w", err)
+		}
+		if _, err := os.Stat(filepath.Join(sourcePath, "_COMPLETE")); err != nil {
+			return fmt.Errorf("SQLite control snapshot is incomplete: %w", err)
+		}
+		for source, destination := range map[string]string{
+			filepath.Join(sourcePath, "_COMPLETE"):      completePath,
+			filepath.Join(sourcePath, "manifest.json"):  manifestPath,
+			filepath.Join(sourcePath, "control.db.zst"): compressedPath,
+		} {
+			if err := copyRestoreFile(source, destination); err != nil {
+				return err
+			}
+		}
+	}
+	if _, err := os.Stat(completePath); err != nil {
+		return fmt.Errorf("SQLite control snapshot is incomplete: %w", err)
+	}
+	payload, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return fmt.Errorf("read SQLite control backup manifest: %w", err)
+	}
+	var manifest sqliteControlBackupManifest
+	if err := json.Unmarshal(payload, &manifest); err != nil {
+		return fmt.Errorf("decode SQLite control backup manifest: %w", err)
+	}
+	if manifest.Version != 1 || manifest.Engine != "sqlite" || manifest.File != "control.db.zst" || manifest.Bytes < 0 || len(manifest.SHA256) != 64 {
+		return fmt.Errorf("unsupported or malformed SQLite control backup manifest")
+	}
+
+	tempPath := filepath.Join(targetDir, fmt.Sprintf(".%s.restore-%d.tmp", filepath.Base(targetPath), time.Now().UTC().UnixNano()))
+	defer os.Remove(tempPath)
+	if err := decompressSQLiteControlSnapshot(compressedPath, tempPath, manifest); err != nil {
+		return err
+	}
+	if err := controlstore.ValidateSnapshot(ctx, tempPath); err != nil {
+		return fmt.Errorf("validate restored SQLite control database: %w", err)
+	}
+	return activateRestoredControlDatabase(tempPath, targetPath)
+}
+
+func copyRestoreFile(source, destination string) error {
+	input, err := os.Open(source)
+	if err != nil {
+		return fmt.Errorf("open restore artifact %s: %w", filepath.Base(source), err)
+	}
+	defer input.Close()
+	output, err := os.OpenFile(destination, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	_, copyErr := io.Copy(output, input)
+	syncErr := output.Sync()
+	closeErr := output.Close()
+	return errors.Join(copyErr, syncErr, closeErr)
+}
+
+func decompressSQLiteControlSnapshot(sourcePath, targetPath string, manifest sqliteControlBackupManifest) error {
+	source, err := os.Open(sourcePath)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+	decoder, err := zstd.NewReader(source, zstd.WithDecoderConcurrency(1), zstd.WithDecoderLowmem(true))
+	if err != nil {
+		return fmt.Errorf("open SQLite control snapshot decoder: %w", err)
+	}
+	defer decoder.Close()
+	target, err := os.OpenFile(targetPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	hash := sha256.New()
+	written, copyErr := io.Copy(io.MultiWriter(target, hash), decoder)
+	syncErr := target.Sync()
+	closeErr := target.Close()
+	if err := errors.Join(copyErr, syncErr, closeErr); err != nil {
+		return fmt.Errorf("decompress SQLite control snapshot: %w", err)
+	}
+	if written != manifest.Bytes {
+		return fmt.Errorf("SQLite control snapshot size mismatch: got %d bytes, expected %d", written, manifest.Bytes)
+	}
+	if digest := hex.EncodeToString(hash.Sum(nil)); !strings.EqualFold(digest, manifest.SHA256) {
+		return fmt.Errorf("SQLite control snapshot checksum mismatch")
+	}
+	return nil
+}
+
+func activateRestoredControlDatabase(tempPath, targetPath string) (retErr error) {
+	backupPath := fmt.Sprintf("%s.pre-restore.%s", targetPath, time.Now().UTC().Format("2006-01-02T150405.000000000Z"))
+	moved := make([]string, 0, 4)
+	for _, suffix := range []string{"", "-wal", "-shm", ".wal"} {
+		source := targetPath + suffix
+		if _, err := os.Stat(source); errors.Is(err, os.ErrNotExist) {
+			continue
+		} else if err != nil {
+			return fmt.Errorf("inspect existing control artifact: %w", err)
+		}
+		if err := os.Rename(source, backupPath+suffix); err != nil {
+			for i := len(moved) - 1; i >= 0; i-- {
+				_ = os.Rename(backupPath+moved[i], targetPath+moved[i])
+			}
+			return fmt.Errorf("preserve existing control artifact: %w", err)
+		}
+		moved = append(moved, suffix)
+	}
+	defer func() {
+		if retErr == nil {
+			return
+		}
+		_ = os.Remove(targetPath)
+		for i := len(moved) - 1; i >= 0; i-- {
+			_ = os.Rename(backupPath+moved[i], targetPath+moved[i])
+		}
+	}()
+	if err := os.Rename(tempPath, targetPath); err != nil {
+		return fmt.Errorf("publish restored SQLite control database: %w", err)
+	}
+	if err := os.Chmod(targetPath, 0o600); err != nil {
+		return err
+	}
+	directory, err := os.Open(filepath.Dir(targetPath))
+	if err != nil {
+		return err
+	}
+	syncErr := directory.Sync()
+	closeErr := directory.Close()
+	if err := errors.Join(syncErr, closeErr); err != nil {
+		return fmt.Errorf("sync restored control directory: %w", err)
+	}
+	return nil
+}
+
+func downloadRestoreS3Object(ctx context.Context, sourceURI, destination string, s3Conf *worker.S3Config) error {
+	bucket, key, err := parseRestoreS3URI(sourceURI)
+	if err != nil {
+		return err
+	}
+	region := ""
+	if s3Conf != nil {
+		region = s3Conf.Region
+	}
+	loadOptions := []func(*awsconfig.LoadOptions) error{awsconfig.WithRegion(region)}
+	if s3Conf != nil && strings.TrimSpace(s3Conf.AccessKeyID) != "" {
+		loadOptions = append(loadOptions, awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(s3Conf.AccessKeyID, s3Conf.SecretAccessKey, s3Conf.SessionToken)))
+	}
+	cfg, err := awsconfig.LoadDefaultConfig(ctx, loadOptions...)
+	if err != nil {
+		return err
+	}
+	client := s3.NewFromConfig(cfg, func(options *s3.Options) {
+		if s3Conf == nil {
+			return
+		}
+		if endpoint := strings.TrimSpace(s3Conf.Endpoint); endpoint != "" {
+			if !strings.Contains(endpoint, "://") {
+				scheme := "https"
+				if !s3Conf.UseSSL {
+					scheme = "http"
+				}
+				endpoint = scheme + "://" + endpoint
+			}
+			options.BaseEndpoint = aws.String(endpoint)
+		}
+		style := strings.ToLower(strings.TrimSpace(s3Conf.URLStyle))
+		options.UsePathStyle = style == "path" || style == "path_style"
+	})
+	result, err := client.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(bucket), Key: aws.String(key)})
+	if err != nil {
+		return err
+	}
+	defer result.Body.Close()
+	target, err := os.OpenFile(destination, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	_, copyErr := io.Copy(target, result.Body)
+	syncErr := target.Sync()
+	closeErr := target.Close()
+	return errors.Join(copyErr, syncErr, closeErr)
+}
+
+func parseRestoreS3URI(value string) (string, string, error) {
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Scheme != "s3" || parsed.Host == "" {
+		return "", "", fmt.Errorf("invalid S3 restore path %q", value)
+	}
+	key := strings.TrimPrefix(parsed.EscapedPath(), "/")
+	key, err = url.PathUnescape(key)
+	if err != nil || key == "" {
+		return "", "", fmt.Errorf("invalid S3 restore object path %q", value)
+	}
+	return parsed.Host, key, nil
+}
+
+func isS3ObjectMissing(err error) bool {
+	if err == nil {
+		return false
+	}
+	var missing *types.NoSuchKey
+	if errors.As(err, &missing) {
+		return true
+	}
+	var apiError smithy.APIError
+	return errors.As(err, &apiError) && (apiError.ErrorCode() == "NoSuchKey" || apiError.ErrorCode() == "NotFound")
 }
 
 // restoreDatabase imports a backup snapshot into a fresh DuckDB at targetPath.
@@ -779,8 +1116,9 @@ func moveExistingDatabaseAside(targetPath string) (string, error) {
 	return "", nil
 }
 
-// findLatestLocalSnapshot finds the latest snapshot directory (lexicographic sort)
-// under the given directory.
+// findLatestLocalSnapshot finds the latest completed snapshot directory. New
+// SQLite backup cycles commit with _COMPLETE; historical DuckDB exports are
+// recognized by their load.sql/schema.sql pair.
 func findLatestLocalSnapshot(dir string) (string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -789,17 +1127,30 @@ func findLatestLocalSnapshot(dir string) (string, error) {
 
 	dirs := make([]string, 0, len(entries))
 	for _, e := range entries {
-		if e.IsDir() {
+		if e.IsDir() && completeLocalSnapshot(filepath.Join(dir, e.Name())) {
 			dirs = append(dirs, e.Name())
 		}
 	}
 
 	if len(dirs) == 0 {
-		return "", fmt.Errorf("no snapshots found in %s", dir)
+		return "", fmt.Errorf("no completed snapshots found in %s", dir)
 	}
 
 	sort.Strings(dirs)
 	return dirs[len(dirs)-1], nil
+}
+
+func completeLocalSnapshot(path string) bool {
+	if info, err := os.Stat(filepath.Join(path, "_COMPLETE")); err == nil && info.Mode().IsRegular() {
+		return true
+	}
+	for _, name := range []string{"load.sql", "schema.sql"} {
+		info, err := os.Stat(filepath.Join(path, name))
+		if err != nil || !info.Mode().IsRegular() {
+			return false
+		}
+	}
+	return true
 }
 
 // discoverLocalTenantBackups returns tenant ID directory names that have a
@@ -829,12 +1180,53 @@ func discoverLocalTenantBackups(fromPath, snapshotName string) ([]string, error)
 	return ids, nil
 }
 
+func validateLocalTenantSnapshots(fromPath, snapshotName string, tenantIDs []string) error {
+	var missing []string
+	for _, tenantID := range tenantIDs {
+		snapshotPath := filepath.Join(fromPath, "tenants", tenantID, snapshotName)
+		if !completeLocalSnapshot(snapshotPath) {
+			missing = append(missing, tenantID)
+		}
+	}
+	if len(missing) != 0 {
+		sort.Strings(missing)
+		return fmt.Errorf("snapshot %s is incomplete for %d active tenant(s): %s", snapshotName, len(missing), strings.Join(missing, ", "))
+	}
+	return nil
+}
+
 // discoverS3TenantBackupsFromControl derives S3 object prefixes from the
 // restored control database because restore-backup intentionally does not list
 // buckets. Split snapshots contain every active tenant, including the default;
 // legacy snapshots contain only non-default tenant exports because the default
 // tenant still lived in the shared database.
 func discoverS3TenantBackupsFromControl(ctx context.Context, controlPath string) ([]string, error) {
+	format, err := controlstore.InspectFormat(controlPath)
+	if err != nil {
+		return nil, err
+	}
+	if format == controlstore.FileSQLite {
+		control, err := controlstore.Open(ctx, controlPath)
+		if err != nil {
+			return nil, fmt.Errorf("open restored SQLite control database: %w", err)
+		}
+		defer control.Close()
+		tenantIDs, err := control.ListActiveTenantIDs(ctx)
+		if err != nil {
+			if isMissingTenantBackupSchema(err) {
+				return nil, nil
+			}
+			return nil, fmt.Errorf("list tenants in restored SQLite control database: %w", err)
+		}
+		ids := make([]string, 0, len(tenantIDs))
+		for _, tenantID := range tenantIDs {
+			ids = append(ids, tenantID.String())
+		}
+		return ids, nil
+	}
+	if format != controlstore.FileDuckDB {
+		return nil, fmt.Errorf("restored control database has unsupported format %s", format)
+	}
 	control := database.NewStore(controlPath)
 	if err := control.Connect(); err != nil {
 		return nil, fmt.Errorf("open restored control database: %w", err)

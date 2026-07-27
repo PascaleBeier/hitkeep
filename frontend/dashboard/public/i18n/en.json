@@ -2363,7 +2363,7 @@
       },
       "storage": {
         "title": "Storage",
-        "sharedDb": "Shared database",
+        "sharedDb": "Control database",
         "sharedDbSize": "Size",
         "dataPath": "Data path",
         "tenantDbs": "Tenant databases",
@@ -2374,7 +2374,7 @@
           "size": "Size",
           "path": "Path"
         },
-        "memory": "DuckDB memory",
+        "memory": "Tenant DuckDB memory",
         "memoryOther": "Other"
       },
       "ingest": {

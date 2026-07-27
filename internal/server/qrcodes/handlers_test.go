@@ -13,6 +13,7 @@ import (
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/testutil"
 )
 
 func TestBuildDestinationURLAppliesCampaignParametersAndQRAttribution(t *testing.T) {
@@ -53,14 +54,9 @@ func TestRecordOpenBestEffortDropsPathAndUserAgentExclusions(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
-			store := database.NewStore(":memory:")
-			if err := store.Connect(); err != nil {
-				t.Fatalf("connect: %v", err)
-			}
+			store, tenantStores := testutil.NewControlAndTenantStores(t)
 			t.Cleanup(func() { _ = store.Close() })
-			if err := store.Migrate(ctx); err != nil {
-				t.Fatalf("migrate: %v", err)
-			}
+			t.Cleanup(func() { _ = tenantStores.Close() })
 			userID, err := store.CreateUser(ctx, "qr-exclusion-"+test.slug+"@example.test", "hash")
 			if err != nil {
 				t.Fatalf("create user: %v", err)
@@ -68,6 +64,9 @@ func TestRecordOpenBestEffortDropsPathAndUserAgentExclusions(t *testing.T) {
 			site, err := store.CreateSite(ctx, userID, "qr-exclusion-"+test.slug+".example.test")
 			if err != nil {
 				t.Fatalf("create site: %v", err)
+			}
+			if err := tenantStores.SyncSite(ctx, site.ID); err != nil {
+				t.Fatalf("sync site: %v", err)
 			}
 			qr, _, err := store.CreateQRCode(ctx, site.ID, userID, api.QRCodeCreateRequest{Name: "Excluded QR", DestinationURL: test.destination})
 			if err != nil {
@@ -80,13 +79,17 @@ func TestRecordOpenBestEffortDropsPathAndUserAgentExclusions(t *testing.T) {
 			if err := filter.Refresh(ctx); err != nil {
 				t.Fatalf("refresh traffic exclusions: %v", err)
 			}
-			h := &handler{ctx: &shared.Context{Store: store, Config: &config.Config{}, IPFilter: filter}}
+			h := &handler{ctx: &shared.Context{Store: store, TenantStores: tenantStores, Config: &config.Config{}, IPFilter: filter}}
 			req := httptest.NewRequest("GET", "/q/token", nil)
 			req.RemoteAddr = "198.51.100.22:1234"
 			req.Header.Set("User-Agent", test.userAgent)
 			h.recordOpenBestEffort(ctx, req, qr)
 
-			count, err := store.CountQRCodeOpens(ctx, site.ID, qr.ID, time.Now().Add(-time.Hour), time.Now().Add(time.Hour))
+			analytics, _, err := tenantStores.ResolveSiteStore(ctx, site.ID)
+			if err != nil {
+				t.Fatalf("resolve analytics: %v", err)
+			}
+			count, err := analytics.CountQRCodeOpens(ctx, site.ID, qr.ID, time.Now().Add(-time.Hour), time.Now().Add(time.Hour))
 			if err != nil {
 				t.Fatalf("count QR opens: %v", err)
 			}

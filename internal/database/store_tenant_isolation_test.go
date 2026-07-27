@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -17,17 +16,8 @@ func TestCrossTenantHitIsolation(t *testing.T) {
 	ctx := context.Background()
 	tmpDir := t.TempDir()
 
-	// Set up the shared (control plane) store.
-	shared := NewStore(filepath.Join(tmpDir, "shared.db"))
-	if err := shared.Connect(); err != nil {
-		t.Fatalf("connect shared: %v", err)
-	}
-	t.Cleanup(func() { _ = shared.Close() })
-	if err := shared.Migrate(ctx); err != nil {
-		t.Fatalf("migrate shared: %v", err)
-	}
-
-	mgr := NewTenantStoreManager(shared, tmpDir)
+	shared := newControlTestStore(t)
+	mgr := NewTenantStoreManager(shared, tmpDir, nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	// Create a user (owner of the default tenant).
@@ -42,20 +32,12 @@ func TestCrossTenantHitIsolation(t *testing.T) {
 	}
 
 	// Create a second tenant.
-	tenantBID := uuid.New()
+	tenantB, err := shared.CreateTenant(ctx, userID, "Tenant B", "")
+	if err != nil {
+		t.Fatalf("create tenant B: %v", err)
+	}
+	tenantBID := tenantB.ID
 	now := time.Now().UTC()
-	if _, err := shared.DB().ExecContext(ctx,
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		tenantBID, "Tenant B", now,
-	); err != nil {
-		t.Fatalf("insert tenant B: %v", err)
-	}
-	if _, err := shared.DB().ExecContext(ctx,
-		"INSERT INTO tenant_members (tenant_id, user_id, role, added_by) VALUES (?, ?, ?, ?)",
-		tenantBID, userID, TenantRoleOwner, userID,
-	); err != nil {
-		t.Fatalf("add user to tenant B: %v", err)
-	}
 
 	// Create a site in the default tenant.
 	siteA, err := shared.CreateSite(ctx, userID, "site-a.test")
@@ -165,16 +147,8 @@ func TestCrossTenantGetHitsIsolation(t *testing.T) {
 	ctx := context.Background()
 	tmpDir := t.TempDir()
 
-	shared := NewStore(filepath.Join(tmpDir, "shared.db"))
-	if err := shared.Connect(); err != nil {
-		t.Fatalf("connect shared: %v", err)
-	}
-	t.Cleanup(func() { _ = shared.Close() })
-	if err := shared.Migrate(ctx); err != nil {
-		t.Fatalf("migrate shared: %v", err)
-	}
-
-	mgr := NewTenantStoreManager(shared, tmpDir)
+	shared := newControlTestStore(t)
+	mgr := NewTenantStoreManager(shared, tmpDir, nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	userID, err := shared.CreateUser(ctx, "hits-isolation@test.com", "hash")
@@ -187,20 +161,12 @@ func TestCrossTenantGetHitsIsolation(t *testing.T) {
 		t.Fatalf("get default tenant: %v", err)
 	}
 
-	tenantBID := uuid.New()
+	tenantB, err := shared.CreateTenant(ctx, userID, "Tenant B Hits", "")
+	if err != nil {
+		t.Fatalf("create tenant B: %v", err)
+	}
+	tenantBID := tenantB.ID
 	now := time.Now().UTC()
-	if _, err := shared.DB().ExecContext(ctx,
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		tenantBID, "Tenant B Hits", now,
-	); err != nil {
-		t.Fatalf("insert tenant B: %v", err)
-	}
-	if _, err := shared.DB().ExecContext(ctx,
-		"INSERT INTO tenant_members (tenant_id, user_id, role, added_by) VALUES (?, ?, ?, ?)",
-		tenantBID, userID, TenantRoleOwner, userID,
-	); err != nil {
-		t.Fatalf("add user to tenant B: %v", err)
-	}
 
 	siteA, err := shared.CreateSite(ctx, userID, "hits-a.test")
 	if err != nil {
@@ -295,16 +261,8 @@ func TestAnalyticsStoreResolution(t *testing.T) {
 	ctx := context.Background()
 	tmpDir := t.TempDir()
 
-	shared := NewStore(filepath.Join(tmpDir, "shared.db"))
-	if err := shared.Connect(); err != nil {
-		t.Fatalf("connect shared: %v", err)
-	}
-	t.Cleanup(func() { _ = shared.Close() })
-	if err := shared.Migrate(ctx); err != nil {
-		t.Fatalf("migrate shared: %v", err)
-	}
-
-	mgr := NewTenantStoreManager(shared, tmpDir)
+	shared := newControlTestStore(t)
+	mgr := NewTenantStoreManager(shared, tmpDir, nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	userID, err := shared.CreateUser(ctx, "resolve@test.com", "hash")
@@ -335,25 +293,12 @@ func TestAnalyticsStoreResolution(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ForTenant(default): %v", err)
 	}
-	if storeForDefault != shared {
-		t.Fatal("expected default tenant site to resolve to shared store")
-	}
-
 	// Custom tenant site resolves to a separate store.
-	customTenantID := uuid.New()
-	now := time.Now().UTC()
-	if _, err := shared.DB().ExecContext(ctx,
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		customTenantID, "Custom Resolve", now,
-	); err != nil {
-		t.Fatalf("insert custom tenant: %v", err)
+	customTenant, err := shared.CreateTenant(ctx, userID, "Custom Resolve", "")
+	if err != nil {
+		t.Fatalf("create custom tenant: %v", err)
 	}
-	if _, err := shared.DB().ExecContext(ctx,
-		"INSERT INTO tenant_members (tenant_id, user_id, role, added_by) VALUES (?, ?, ?, ?)",
-		customTenantID, userID, TenantRoleOwner, userID,
-	); err != nil {
-		t.Fatalf("add user to custom tenant: %v", err)
-	}
+	customTenantID := customTenant.ID
 
 	if err := shared.SetActiveTenantID(ctx, userID, customTenantID); err != nil {
 		t.Fatalf("set active tenant: %v", err)
@@ -375,7 +320,7 @@ func TestAnalyticsStoreResolution(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ForTenant(custom): %v", err)
 	}
-	if storeForCustom == shared {
-		t.Fatal("expected custom tenant site to resolve to a different store")
+	if storeForCustom == storeForDefault {
+		t.Fatal("expected custom tenant site to resolve to a different tenant catalog handle")
 	}
 }

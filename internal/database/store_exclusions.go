@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 )
 
 const (
@@ -18,14 +19,7 @@ const (
 	TrafficExclusionScopeSite     = "site"
 )
 
-type TrafficExclusionValues struct {
-	Type        string
-	CIDR        string
-	CountryCode string
-	UserAgent   string
-	Path        string
-	Description string
-}
+type TrafficExclusionValues = controlstore.TrafficExclusionValues
 
 type SiteExclusionCIDR struct {
 	SiteID uuid.UUID
