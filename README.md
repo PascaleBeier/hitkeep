@@ -16,7 +16,7 @@ HitKeep is open source web analytics for teams that want useful product reportin
 
 [Website](https://hitkeep.com) · [Live Demo](https://demo.hitkeep.com/share/7a55968bb42df256512fbe7ff73ab88f29dd45c236eddc818bd66420b4ffbaad) · [Docs](https://hitkeep.com/guides/introduction/) · [Cloud](https://hitkeep.com/cloud) · [AI Performance](https://hitkeep.com/ai-performance/) · [API](https://hitkeep.com/api/) · [Releases](https://github.com/PascaleBeier/hitkeep/releases)
 
-![HitKeep analytics dashboard with traffic overview, geographic breakdown, goals, funnels, and UTM attribution](./.github/assets/dashboard-overview.png)
+![HitKeep AI Agents dashboard with crawler traffic trends, AI referrals, named assistants, and fetch-depth analytics](./.github/assets/dashboard-overview.png)
 
 ## Why HitKeep
 
@@ -116,7 +116,7 @@ More tracking guides:
 <summary>See six product screenshots</summary>
 
 ### Dashboard
-![HitKeep analytics dashboard with traffic overview, geographic breakdown, goals, funnels, and UTM attribution](./.github/assets/dashboard-overview.png)
+![HitKeep AI Agents dashboard with crawler traffic trends, AI referrals, named assistants, and fetch-depth analytics](./.github/assets/dashboard-overview.png)
 
 ### Ecommerce
 ![HitKeep ecommerce analytics with revenue KPIs, chart, top products, and revenue sources](./.github/assets/analytics-ecommerce.png)
@@ -125,7 +125,7 @@ More tracking guides:
 ![HitKeep Search Console drilldown with clicks, impressions, CTR, position, trends, top queries, pages, countries, and devices](./.github/assets/analytics-search-console.png)
 
 ### AI Visibility
-![HitKeep AI visibility analytics with fetch KPIs, assistant filters, and fetch volume chart](./.github/assets/analytics-ai-visibility.png)
+![HitKeep AI visibility analytics with crawler traffic trends, ChatGPT and Perplexity referrals, GPTBot and ClaudeBot activity, and fetch-depth analytics](./.github/assets/analytics-ai-visibility.png)
 
 ### Ask AI
 ![HitKeep Ask AI answer with completed analytics tool chips, citations, a table, and a safe dashboard action](./.github/assets/feature-ask-ai-answer.png)
