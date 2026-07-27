@@ -214,7 +214,9 @@ func differingTableColumns(ctx context.Context, tx *sql.Tx, source LegacySource,
 	for i, column := range columns {
 		quoted[i] = quoteIdentifier(column.Name)
 	}
-	targetRows, err := tx.QueryContext(ctx, "SELECT "+strings.Join(quoted, ",")+" FROM "+quoteIdentifier(table))
+	// Identifiers come from the exhaustive legacy registry and are quoted by quoteIdentifier.
+	// columnDigests owns closing the rows and checking Rows.Err after iteration.
+	targetRows, err := tx.QueryContext(ctx, "SELECT "+strings.Join(quoted, ",")+" FROM "+quoteIdentifier(table)) //nolint:gosec,rowserrcheck
 	if err != nil {
 		return nil, err
 	}
@@ -319,7 +321,8 @@ func copyLegacyTable(ctx context.Context, tx *sql.Tx, source LegacySource, table
 		quotedColumns[i] = quoteIdentifier(column.Name)
 		placeholders[i] = "?"
 	}
-	statement := "INSERT INTO " + quoteIdentifier(table) + "(" + strings.Join(quotedColumns, ",") + ") VALUES (" + strings.Join(placeholders, ",") + ")"
+	// Identifiers come from the exhaustive legacy registry and are quoted by quoteIdentifier.
+	statement := "INSERT INTO " + quoteIdentifier(table) + "(" + strings.Join(quotedColumns, ",") + ") VALUES (" + strings.Join(placeholders, ",") + ")" //nolint:gosec
 	prepared, err := tx.PrepareContext(ctx, statement)
 	if err != nil {
 		return TableFingerprint{}, fmt.Errorf("prepare SQLite import for %s: %w", table, err)

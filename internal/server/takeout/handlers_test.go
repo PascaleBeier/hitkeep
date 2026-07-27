@@ -24,8 +24,8 @@ import (
 	"hitkeep/internal/database"
 	"hitkeep/internal/exportfmt"
 	"hitkeep/internal/server/shared"
-	"hitkeep/internal/testutil"
 	takeoutsvc "hitkeep/internal/takeout"
+	"hitkeep/internal/testutil"
 )
 
 type takeoutSentinel struct {

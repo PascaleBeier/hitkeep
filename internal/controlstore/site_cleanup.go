@@ -170,19 +170,30 @@ func listSiteIDTables(ctx context.Context, q queryer) ([]string, error) {
 	}
 	var tables []string
 	for table := range tableSet {
-		rows, err := q.QueryContext(ctx, `SELECT 1 FROM pragma_table_xinfo(?) WHERE name = 'site_id' AND hidden = 0`, table)
+		hasSiteID, err := tableHasSiteID(ctx, q, table)
 		if err != nil {
 			return nil, err
 		}
-		if rows.Next() {
+		if hasSiteID {
 			tables = append(tables, table)
-		}
-		if err := rows.Close(); err != nil {
-			return nil, err
 		}
 	}
 	slices.Sort(tables)
 	return tables, nil
+}
+
+func tableHasSiteID(ctx context.Context, q queryer, table string) (bool, error) {
+	rows, err := q.QueryContext(ctx, `SELECT 1 FROM pragma_table_xinfo(?) WHERE name = 'site_id' AND hidden = 0`, table)
+	if err != nil {
+		return false, fmt.Errorf("inspect site scope for %s: %w", table, err)
+	}
+	defer rows.Close()
+
+	hasSiteID := rows.Next()
+	if err := rows.Err(); err != nil {
+		return false, fmt.Errorf("read site scope for %s: %w", table, err)
+	}
+	return hasSiteID, nil
 }
 
 func findSiteReferences(ctx context.Context, q queryer, siteID uuid.UUID) ([]string, error) {

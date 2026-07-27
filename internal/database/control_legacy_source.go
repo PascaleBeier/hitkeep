@@ -134,8 +134,11 @@ func (s *LegacyControlSource) Rows(ctx context.Context, table string, columns []
 			selected = append(selected, quoted+" IS NULL")
 		}
 	}
-	query := "SELECT " + strings.Join(selected, ",") + " FROM " + quoteDuckDBIdentifier(legacyControlCatalog) + ".main." + quoteDuckDBIdentifier(table)
-	rows, err := s.db.QueryContext(ctx, query)
+	// Catalog, table, and columns are schema-discovered and passed through the
+	// DuckDB identifier quoter before interpolation.
+	query := "SELECT " + strings.Join(selected, ",") + " FROM " + quoteDuckDBIdentifier(legacyControlCatalog) + ".main." + quoteDuckDBIdentifier(table) //nolint:gosec
+	// legacyControlRows exposes Rows.Err to the importer, which checks it after iteration.
+	rows, err := s.db.QueryContext(ctx, query) //nolint:rowserrcheck
 	if err != nil {
 		return nil, err
 	}

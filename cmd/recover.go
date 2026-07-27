@@ -194,7 +194,11 @@ func recoverDisable2FA(args []string) {
 		fmt.Fprintln(os.Stderr, "Make sure HitKeep is stopped before running recovery commands.")
 		os.Exit(1)
 	}
-	defer store.close()
+	defer func() {
+		if err := store.close(); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not close recovery database cleanly: %v\n", err)
+		}
+	}()
 
 	// ---- Look up user ---------------------------------------------------
 	user, err := store.getUserByEmail(ctx, *email)

@@ -93,9 +93,10 @@ func InspectPublication(ctx context.Context, path string) (PublicationState, err
 			}
 		}
 		return PublicationNeedsConversion, nil
-	default:
+	case FileUnknown:
 		return 0, fmt.Errorf("configured control database has an unknown or malformed format; refusing to overwrite it")
 	}
+	return 0, fmt.Errorf("unsupported control database format %d", finalFormat)
 }
 
 // ResetInvalidLegacyWork removes only the recognized SQLite conversion work
@@ -165,9 +166,12 @@ func PublishLegacyConversion(ctx context.Context, path string) error {
 			return fmt.Errorf("sync SQLite control publication: %w", err)
 		}
 		return nil
-	default:
-		return errors.New("unsupported SQLite publication state")
+	case PublicationNeedsRebuild:
+		return errors.New("retained DuckDB evidence requires a rebuilt SQLite work file before publication")
+	case PublicationNeedsWorkRebuild:
+		return errors.New("legacy DuckDB source requires its invalid SQLite work file to be rebuilt before publication")
 	}
+	return fmt.Errorf("unsupported SQLite publication state %d", state)
 }
 
 type importRecord struct {

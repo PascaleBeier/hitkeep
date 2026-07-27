@@ -10,9 +10,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/internal/controlstore"
-
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 )
 
 func (s *Store) AppendTeamAuditEntry(ctx context.Context, tenantID, actorID uuid.UUID, action, details string, targetUserID *uuid.UUID) error {

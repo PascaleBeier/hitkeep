@@ -317,20 +317,11 @@ func (m *TenantStoreManager) DeleteSiteWithWebhookEvent(ctx context.Context, sit
 }
 
 func toControlWebhookEvent(input WebhookEventInput) controlstore.WebhookEventInput {
-	return controlstore.WebhookEventInput{
-		ID: input.ID, SiteID: input.SiteID, TargetWebhookID: input.TargetWebhookID,
-		EventType: input.EventType, APIVersion: input.APIVersion, OccurredAt: input.OccurredAt,
-		Data: input.Data, PreserveAfterSiteDeletion: input.PreserveAfterSiteDeletion,
-		Deduplicate: input.Deduplicate,
-	}
+	return input
 }
 
 func fromControlWebhookJobs(input []controlstore.WebhookDeliveryJob) []WebhookDeliveryJob {
-	jobs := make([]WebhookDeliveryJob, len(input))
-	for i, job := range input {
-		jobs[i] = WebhookDeliveryJob{DeliveryID: job.DeliveryID, EventID: job.EventID, WebhookID: job.WebhookID, Payload: job.Payload}
-	}
-	return jobs
+	return input
 }
 
 func (m *TenantStoreManager) ResetSiteStats(ctx context.Context, siteID uuid.UUID) (api.SiteStatsResetResponse, error) {
@@ -448,14 +439,7 @@ func (m *TenantStoreManager) TransferSite(ctx context.Context, siteID, destinati
 }
 
 func toControlAudit(input AuditEntryParams) controlstore.AuditEntryParams {
-	return controlstore.AuditEntryParams{
-		ActorID: input.ActorID, ActorEmail: input.ActorEmail, ActorRole: input.ActorRole,
-		TeamID: input.TeamID, TargetUserID: input.TargetUserID, Action: input.Action,
-		TargetType: input.TargetType, TargetID: input.TargetID, TargetLabel: input.TargetLabel,
-		Outcome: input.Outcome, IPAddress: input.IPAddress, IPCountryCode: input.IPCountryCode,
-		UserAgent: input.UserAgent, RequestID: input.RequestID, Details: input.Details,
-		MetadataJSON: input.MetadataJSON,
-	}
+	return input
 }
 
 func toControlAudits(input []AuditEntryParams) []controlstore.AuditEntryParams {

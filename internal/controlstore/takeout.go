@@ -41,24 +41,29 @@ func (s *Store) WriteTakeoutNDJSON(ctx context.Context, dst io.Writer, scope Tak
 	encoder := json.NewEncoder(buffered)
 	var count int64
 	for _, selection := range selects {
-		rows, err := s.db.QueryContext(ctx, selection.query, selection.args...)
-		if err != nil {
-			return count, fmt.Errorf("query %s control takeout records: %w", selection.recordType, err)
-		}
-		written, err := encodeTakeoutRows(encoder, rows, selection.recordType)
-		closeErr := rows.Close()
+		written, err := s.writeTakeoutSelection(ctx, encoder, selection)
 		count += written
 		if err != nil {
 			return count, err
-		}
-		if closeErr != nil {
-			return count, fmt.Errorf("close %s control takeout rows: %w", selection.recordType, closeErr)
 		}
 	}
 	if err := buffered.Flush(); err != nil {
 		return count, fmt.Errorf("flush control takeout: %w", err)
 	}
 	return count, nil
+}
+
+func (s *Store) writeTakeoutSelection(ctx context.Context, encoder *json.Encoder, selection takeoutSelect) (count int64, err error) {
+	rows, err := s.db.QueryContext(ctx, selection.query, selection.args...)
+	if err != nil {
+		return 0, fmt.Errorf("query %s control takeout records: %w", selection.recordType, err)
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("close %s control takeout rows: %w", selection.recordType, closeErr)
+		}
+	}()
+	return encodeTakeoutRows(encoder, rows, selection.recordType)
 }
 
 func controlTakeoutSelects(scope TakeoutScope) []takeoutSelect {

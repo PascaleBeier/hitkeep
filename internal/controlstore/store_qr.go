@@ -54,9 +54,16 @@ func (s *Store) CreateQRCode(ctx context.Context, siteID, createdBy uuid.UUID, r
 // touched here.
 func (s *Store) DeleteSiteQRCampaignData(ctx context.Context, siteID uuid.UUID) error {
 	return s.transact(ctx, func(tx *sql.Tx) error {
-		for _, table := range []string{"qr_code_share_links", "qr_code_assets", "qr_codes"} {
-			if _, err := tx.ExecContext(ctx, "DELETE FROM "+table+" WHERE site_id = ?", siteID); err != nil {
-				return fmt.Errorf("delete site QR data from %s: %w", table, err)
+		for _, step := range []struct {
+			table string
+			query string
+		}{
+			{table: "qr_code_share_links", query: "DELETE FROM qr_code_share_links WHERE site_id = ?"},
+			{table: "qr_code_assets", query: "DELETE FROM qr_code_assets WHERE site_id = ?"},
+			{table: "qr_codes", query: "DELETE FROM qr_codes WHERE site_id = ?"},
+		} {
+			if _, err := tx.ExecContext(ctx, step.query, siteID); err != nil {
+				return fmt.Errorf("delete site QR data from %s: %w", step.table, err)
 			}
 		}
 		return nil

@@ -52,29 +52,37 @@ func listFKEdges(ctx context.Context, q queryer) ([]fkEdge, error) {
 	}
 	var edges []fkEdge
 	for table := range tables {
-		rows, err := q.QueryContext(ctx, `
-			SELECT id, seq, "table", "from", "to", on_update, on_delete, "match"
-			FROM pragma_foreign_key_list(?)
-			ORDER BY id, seq
-		`, table)
+		tableEdges, err := listTableFKEdges(ctx, q, table)
 		if err != nil {
-			return nil, fmt.Errorf("could not list foreign keys for %s: %w", table, err)
-		}
-		for rows.Next() {
-			var id, seq int
-			var referencedTable, column, referencedColumn, onUpdate, onDelete, match string
-			if err := rows.Scan(&id, &seq, &referencedTable, &column, &referencedColumn, &onUpdate, &onDelete, &match); err != nil {
-				rows.Close()
-				return nil, fmt.Errorf("could not scan foreign key for %s: %w", table, err)
-			}
-			edges = append(edges, fkEdge{table: table, column: column, referencedTable: referencedTable, referencedColumn: referencedColumn})
-		}
-		if err := rows.Close(); err != nil {
 			return nil, err
 		}
-		if err := rows.Err(); err != nil {
-			return nil, fmt.Errorf("read foreign keys for %s: %w", table, err)
+		edges = append(edges, tableEdges...)
+	}
+	return edges, nil
+}
+
+func listTableFKEdges(ctx context.Context, q queryer, table string) ([]fkEdge, error) {
+	rows, err := q.QueryContext(ctx, `
+		SELECT id, seq, "table", "from", "to", on_update, on_delete, "match"
+		FROM pragma_foreign_key_list(?)
+		ORDER BY id, seq
+	`, table)
+	if err != nil {
+		return nil, fmt.Errorf("could not list foreign keys for %s: %w", table, err)
+	}
+	defer rows.Close()
+
+	var edges []fkEdge
+	for rows.Next() {
+		var id, seq int
+		var referencedTable, column, referencedColumn, onUpdate, onDelete, match string
+		if err := rows.Scan(&id, &seq, &referencedTable, &column, &referencedColumn, &onUpdate, &onDelete, &match); err != nil {
+			return nil, fmt.Errorf("could not scan foreign key for %s: %w", table, err)
 		}
+		edges = append(edges, fkEdge{table: table, column: column, referencedTable: referencedTable, referencedColumn: referencedColumn})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read foreign keys for %s: %w", table, err)
 	}
 	return edges, nil
 }
@@ -88,30 +96,40 @@ func listScopedTables(ctx context.Context, q queryer, scopeColumns []string) (ma
 	}
 	scoped := make(map[string]string)
 	for table := range tables {
-		rows, err := q.QueryContext(ctx, `SELECT name FROM pragma_table_xinfo(?) WHERE hidden = 0 ORDER BY cid`, table)
+		columns, err := listVisibleTableColumns(ctx, q, table)
 		if err != nil {
-			return nil, fmt.Errorf("could not list columns for %s: %w", table, err)
+			return nil, err
 		}
-		for rows.Next() {
-			var column string
-			if err := rows.Scan(&column); err != nil {
-				rows.Close()
-				return nil, err
-			}
+		for _, column := range columns {
 			if slices.Contains(scopeColumns, column) {
 				if _, exists := scoped[table]; !exists {
 					scoped[table] = column
 				}
 			}
 		}
-		if err := rows.Close(); err != nil {
-			return nil, err
-		}
-		if err := rows.Err(); err != nil {
-			return nil, err
-		}
 	}
 	return scoped, nil
+}
+
+func listVisibleTableColumns(ctx context.Context, q queryer, table string) ([]string, error) {
+	rows, err := q.QueryContext(ctx, `SELECT name FROM pragma_table_xinfo(?) WHERE hidden = 0 ORDER BY cid`, table)
+	if err != nil {
+		return nil, fmt.Errorf("could not list columns for %s: %w", table, err)
+	}
+	defer rows.Close()
+
+	var columns []string
+	for rows.Next() {
+		var column string
+		if err := rows.Scan(&column); err != nil {
+			return nil, fmt.Errorf("could not scan column for %s: %w", table, err)
+		}
+		columns = append(columns, column)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read columns for %s: %w", table, err)
+	}
+	return columns, nil
 }
 
 // buildScopedDeletePlan derives the ordered DELETE statements that remove all
@@ -250,101 +268,6 @@ func sortedEdges(edges []fkEdge) []fkEdge {
 		return sorted[i].referencedTable < sorted[j].referencedTable
 	})
 	return sorted
-}
-
-// validateCleanupPlans builds each spec's delete plan against the connected
-// schema and reports the first failure. It runs after migrations so schema
-// mistakes (e.g. a new table referencing sites without a site_id column)
-// fail at startup instead of at the first delete.
-func validateCleanupPlans(ctx context.Context, q queryer, specs ...scopedDeleteSpec) error {
-	for _, spec := range specs {
-		if _, err := buildScopedDeletePlan(ctx, q, spec); err != nil {
-			return fmt.Errorf("%s cleanup plan is invalid: %w", spec.rootTable, err)
-		}
-	}
-	return nil
-}
-
-// listScopedCopyTables returns the base tables carrying scopeColumn that
-// exist in both the source and destination schemas, ordered so foreign-key
-// parents come before their children (safe insert order for copies). The
-// root table is excluded; callers mirror it explicitly.
-func listScopedCopyTables(ctx context.Context, source, destination queryer, scopeColumn, rootTable string, extraEdges []fkEdge) ([]string, error) {
-	sourceTables, err := listTables(ctx, source)
-	if err != nil {
-		return nil, err
-	}
-	sourceScoped, err := listScopedTables(ctx, source, []string{scopeColumn})
-	if err != nil {
-		return nil, err
-	}
-	destinationTables, err := listTables(ctx, destination)
-	if err != nil {
-		return nil, err
-	}
-	destinationScoped, err := listScopedTables(ctx, destination, []string{scopeColumn})
-	if err != nil {
-		return nil, err
-	}
-
-	members := make(map[string]struct{})
-	for table := range sourceScoped {
-		if table == rootTable {
-			continue
-		}
-		if !isSafeIdentifier(table) {
-			return nil, fmt.Errorf("unsafe identifier in scoped table %s", table)
-		}
-		if _, ok := sourceTables[table]; !ok {
-			continue
-		}
-		if _, ok := destinationScoped[table]; !ok {
-			continue
-		}
-		if _, ok := destinationTables[table]; !ok {
-			continue
-		}
-		members[table] = struct{}{}
-	}
-
-	edges, err := listFKEdges(ctx, destination)
-	if err != nil {
-		return nil, err
-	}
-	if err := appendExistingExtraEdges(destinationTables, &edges, extraEdges); err != nil {
-		return nil, err
-	}
-	// A copied table whose foreign key points outside the copy set (and not
-	// at the mirrored root) would land rows without their parents. Fail
-	// loudly instead of silently skipping or violating the constraint.
-	for _, edge := range edges {
-		if _, ok := members[edge.table]; !ok {
-			continue
-		}
-		if edge.referencedTable == rootTable {
-			continue
-		}
-		if _, ok := members[edge.referencedTable]; !ok {
-			// Tenant-local schemas intentionally omit the control-plane tenants
-			// table. Its IDs remain valid when rows are copied back to the
-			// control store, so treat that parent as shared identity only when it
-			// is absent from the source catalog. Full shared-to-shared copies
-			// remain rejected below rather than silently crossing tenant scope.
-			if edge.referencedTable == "tenants" {
-				if _, sourceHasTenants := sourceTables[edge.referencedTable]; !sourceHasTenants {
-					continue
-				}
-			}
-			return nil, fmt.Errorf("cannot derive a safe copy plan: %s references %s, which is not copied", edge.table, edge.referencedTable)
-		}
-	}
-
-	childrenFirst, err := orderChildrenFirst(members, edges)
-	if err != nil {
-		return nil, err
-	}
-	slices.Reverse(childrenFirst)
-	return childrenFirst, nil
 }
 
 func appendExistingExtraEdges(tables map[string]struct{}, edges *[]fkEdge, extraEdges []fkEdge) error {

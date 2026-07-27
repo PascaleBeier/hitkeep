@@ -86,13 +86,6 @@ func (s *Store) transact(ctx context.Context, fn func(*sql.Tx) error) (err error
 	return fn(tx)
 }
 
-func nullableStringPtr(value *string) any {
-	if value == nil {
-		return nil
-	}
-	return *value
-}
-
 func nullStringValue(value sql.NullString) string {
 	if !value.Valid {
 		return ""

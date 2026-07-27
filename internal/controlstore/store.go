@@ -56,9 +56,10 @@ func (f FileFormat) String() string {
 		return "sqlite"
 	case FileDuckDB:
 		return "duckdb"
-	default:
+	case FileUnknown:
 		return "unknown"
 	}
+	return "unknown"
 }
 
 // InspectFormat reads only the database header and never modifies path.

@@ -98,19 +98,17 @@ func (s *TakeoutService) ExportSiteData(ctx context.Context, siteID uuid.UUID, f
 	filename := filepath.Join(s.path, fmt.Sprintf("site_takeout_%s_%d.%s", siteID, time.Now().Unix(), normalizedFormat))
 	whereClause := fmt.Sprintf("site_id = '%s'", siteID)
 
-	store := s.store
 	if s.tenantStores != nil {
 		analyticsStore, _, err := s.tenantStores.ResolveSiteStore(ctx, siteID)
 		if err != nil {
 			return "", fmt.Errorf("failed to resolve site analytics store: %w", err)
 		}
-		store = analyticsStore
 		return s.exportTakeoutFromSources(ctx, "site", filename, normalizedFormat, exportfmt.DuckDBCopyOptions(normalizedFormat), []takeoutStoreSource{
 			{Store: analyticsStore, Source: takeoutQuerySource{WhereClause: whereClause, IncludeAnalytics: true}},
 		}, controlstore.TakeoutScope{SiteIDs: []uuid.UUID{siteID}})
 	}
 
-	return s.exportTakeoutFromStore(ctx, store, "site", filename, normalizedFormat, exportfmt.DuckDBCopyOptions(normalizedFormat), []takeoutQuerySource{
+	return s.exportTakeoutFromStore(ctx, s.store, "site", filename, normalizedFormat, exportfmt.DuckDBCopyOptions(normalizedFormat), []takeoutQuerySource{
 		{WhereClause: whereClause, IncludeAnalytics: true, IncludeControl: true},
 	})
 }
@@ -170,7 +168,7 @@ func (s *TakeoutService) exportTakeoutFromSources(ctx context.Context, label, fi
 		tempFile := filepath.Join(s.path, fmt.Sprintf("takeout_merge_%d_%d.parquet", time.Now().UnixNano(), i))
 		tempFiles = append(tempFiles, tempFile)
 		if _, err := s.exportTakeoutFromStore(ctx, source.Store, label, tempFile, exportfmt.FormatParquet, exportfmt.DuckDBCopyOptions(exportfmt.FormatParquet), []takeoutQuerySource{source.Source}); err != nil {
-			return "", err
+			return "", fmt.Errorf("export %s analytics staging data: %w", label, err)
 		}
 	}
 	var controlScope controlstore.TakeoutScope
@@ -179,7 +177,7 @@ func (s *TakeoutService) exportTakeoutFromSources(ctx context.Context, label, fi
 	}
 	controlFile, err := s.exportControlTakeoutParquet(ctx, root, controlScope)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("export %s control staging data: %w", label, err)
 	}
 	if controlFile != "" {
 		tempFiles = append(tempFiles, controlFile)
@@ -231,15 +229,66 @@ func (s *TakeoutService) exportControlTakeoutParquet(ctx context.Context, root *
 	}
 
 	parquetPath := filepath.Join(s.path, fmt.Sprintf("takeout_control_%d.parquet", time.Now().UnixNano()))
-	query := fmt.Sprintf("COPY (SELECT * FROM read_ndjson_auto('%s')) TO '%s' (FORMAT PARQUET)", escapeTakeoutSQLString(ndjsonPath), escapeTakeoutSQLString(parquetPath))
 	if err := root.WithDuckDBSession(ctx, database.DuckDBSessionOptions{}, func(conn *sql.Conn) error {
-		_, err := conn.ExecContext(ctx, query)
-		return err
+		return convertControlNDJSONToParquet(ctx, conn, ndjsonPath, parquetPath)
 	}); err != nil {
 		_ = os.Remove(parquetPath)
 		return "", fmt.Errorf("convert SQLite control takeout records: %w", err)
 	}
 	return parquetPath, nil
+}
+
+func convertControlNDJSONToParquet(ctx context.Context, conn *sql.Conn, ndjsonPath, parquetPath string) error {
+	// DuckDB may infer free-form SQLite TEXT values as its logical JSON type.
+	// That is unsafe for union-by-name when an analytics table uses the same
+	// column as ordinary VARCHAR (for example QR and hit UTM fields). Preserve
+	// JSON text as VARCHAR in the control staging file while retaining inferred
+	// numeric, UUID, and timestamp types for every other column.
+	source := fmt.Sprintf("read_ndjson_auto('%s')", escapeTakeoutSQLString(ndjsonPath))
+	replacements, err := controlNDJSONJSONReplacements(ctx, conn, source)
+	if err != nil {
+		return err
+	}
+
+	projection := "*"
+	if len(replacements) > 0 {
+		projection += " REPLACE (" + strings.Join(replacements, ", ") + ")"
+	}
+	// Paths are application-created staging files and are escaped as DuckDB
+	// string literals; projected identifiers come from DESCRIBE and are quoted.
+	query := fmt.Sprintf("COPY (SELECT %s FROM %s) TO '%s' (FORMAT PARQUET)", projection, source, escapeTakeoutSQLString(parquetPath)) //nolint:gosec
+	if _, err := conn.ExecContext(ctx, query); err != nil {
+		return fmt.Errorf("write control takeout Parquet: %w", err)
+	}
+	return nil
+}
+
+func controlNDJSONJSONReplacements(ctx context.Context, conn *sql.Conn, source string) ([]string, error) {
+	rows, err := conn.QueryContext(ctx, "DESCRIBE SELECT * FROM "+source) //nolint:gosec
+	if err != nil {
+		return nil, fmt.Errorf("describe control takeout JSON schema: %w", err)
+	}
+	defer rows.Close()
+	var replacements []string
+	for rows.Next() {
+		var name, logicalType string
+		var nullable, key, defaultValue, extra sql.NullString
+		if err := rows.Scan(&name, &logicalType, &nullable, &key, &defaultValue, &extra); err != nil {
+			return nil, fmt.Errorf("scan control takeout JSON schema: %w", err)
+		}
+		if strings.EqualFold(logicalType, "JSON") {
+			quoted := quoteTakeoutIdentifier(name)
+			replacements = append(replacements, "CAST("+quoted+" AS VARCHAR) AS "+quoted)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read control takeout JSON schema: %w", err)
+	}
+	return replacements, nil
+}
+
+func quoteTakeoutIdentifier(value string) string {
+	return `"` + strings.ReplaceAll(value, `"`, `""`) + `"`
 }
 
 func (s *TakeoutService) exportSplitQRCodeTakeout(ctx context.Context, analyticsStore *database.Store, filename, normalizedFormat, duckFormat string, siteID, qrCodeID uuid.UUID) (string, error) {

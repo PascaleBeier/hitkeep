@@ -190,24 +190,6 @@ func NewStore(path string, opts ...StoreOption) *Store {
 	return store
 }
 
-// duckDBOptions returns the DuckDB tuning options this store was created
-// with, so per-tenant stores can inherit them.
-func (s *Store) duckDBOptions() []StoreOption {
-	var opts []StoreOption
-	if s.memoryLimit != "" {
-		opts = append(opts, WithMemoryLimit(s.memoryLimit))
-	}
-	if s.threads != 0 {
-		opts = append(opts, WithThreads(s.threads))
-	}
-	opts = append(opts,
-		WithCheckpointInterval(s.checkpointInterval),
-		WithAutomaticRecovery(s.recoveryOptions.enabled, s.recoveryOptions.root),
-		WithAutomaticWALRecovery(s.recoveryOptions.automaticWALRecovery),
-	)
-	return opts
-}
-
 func (s *Store) Connect() error {
 	s.recoveredOnConnect = false
 	if s.memoryLimit != "" && !memoryLimitPattern.MatchString(s.memoryLimit) {

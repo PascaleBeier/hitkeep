@@ -450,33 +450,6 @@ func newMigratedRecoverTestStore(t *testing.T, ctx context.Context, dbPath strin
 	return store
 }
 
-func seedGeoNetworkHitForBackup(t *testing.T, ctx context.Context, store *database.Store, fixture geoNetworkBackupFixture) uuid.UUID {
-	t.Helper()
-	userID, err := store.CreateUser(ctx, "backup-geo@example.com", "hash")
-	if err != nil {
-		t.Fatalf("create user: %v", err)
-	}
-	site, err := store.CreateSite(ctx, userID, "backup-geo.test")
-	if err != nil {
-		t.Fatalf("create site: %v", err)
-	}
-	if err := store.CreateHit(ctx, &api.Hit{
-		SiteID:    site.ID,
-		SessionID: uuid.New(),
-		PageID:    uuid.New(),
-		Timestamp: time.Now().UTC(),
-		Path:      "/geo-backup",
-		Region:    &fixture.region,
-		City:      &fixture.city,
-		Provider:  &fixture.provider,
-		ASN:       &fixture.asn,
-		ASNOrg:    &fixture.asnOrg,
-	}); err != nil {
-		t.Fatalf("create geo hit: %v", err)
-	}
-	return site.ID
-}
-
 func TestDiscoverS3TenantBackupsFromRestoredControl(t *testing.T) {
 	t.Parallel()
 
@@ -571,21 +544,6 @@ func TestResolveRestoreS3ConfigPreservesTemporaryCredentialsAndEndpointTLS(t *te
 	})
 	if overridden.SessionToken != "flag-session-token" || !overridden.UseSSL {
 		t.Fatal("expected explicit restore flags to override S3 configuration")
-	}
-}
-
-func restoreLatestSharedSnapshot(t *testing.T, ctx context.Context, backupDir string, targetPath string) {
-	t.Helper()
-	entries, err := os.ReadDir(filepath.Join(backupDir, "shared"))
-	if err != nil {
-		t.Fatalf("read shared backup dir: %v", err)
-	}
-	if len(entries) == 0 {
-		t.Fatal("expected shared backup snapshot")
-	}
-	snapshotPath := filepath.Join(backupDir, "shared", entries[0].Name())
-	if err := restoreDatabase(ctx, targetPath, snapshotPath, false, nil); err != nil {
-		t.Fatalf("restoreDatabase: %v", err)
 	}
 }
 

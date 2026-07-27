@@ -31,7 +31,15 @@ func TestSQLiteControlAndTenantAnalyticsTakeoutMerge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qr, _, err := control.CreateQRCode(ctx, site.ID, userID, api.QRCodeCreateRequest{Name: "SQLite control QR", DestinationURL: "https://example.invalid/qr"})
+	qr, _, err := control.CreateQRCode(ctx, site.ID, userID, api.QRCodeCreateRequest{
+		Name:           "SQLite control QR",
+		DestinationURL: "https://example.invalid/qr",
+		UTMSource:      "release notes",
+		UTMMedium:      "qr",
+		UTMCampaign:    "SQLite migration",
+		UTMTerm:        "open source analytics",
+		UTMContent:     "control plane",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +63,7 @@ func TestSQLiteControlAndTenantAnalyticsTakeoutMerge(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(content)
-	for _, expected := range []string{`"record_type":"qr_code"`, qr.ID.String(), "SQLite control QR"} {
+	for _, expected := range []string{`"record_type":"qr_code"`, qr.ID.String(), "SQLite control QR", "open source analytics"} {
 		if !strings.Contains(text, expected) {
 			t.Fatalf("merged takeout does not contain %q: %s", expected, text)
 		}
