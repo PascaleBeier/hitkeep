@@ -323,7 +323,7 @@ func execMigration(ctx context.Context, tx *sql.Tx, body string) error {
 	// SQLite control migrations deliberately contain plain DDL only (no
 	// triggers or semicolons inside literals), so statement-at-a-time execution
 	// is deterministic across database/sql drivers.
-	for _, statement := range strings.Split(body, ";") {
+	for statement := range strings.SplitSeq(body, ";") {
 		statement = strings.TrimSpace(statement)
 		if statement == "" {
 			continue
