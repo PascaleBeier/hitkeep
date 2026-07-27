@@ -15,19 +15,30 @@ import (
 	"golang.org/x/crypto/argon2"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 )
 
-func TestEnsureUserResetsExistingUserPassword(t *testing.T) {
+func newSeedTestStores(t *testing.T) (context.Context, *controlstore.Store, *database.TenantStoreManager) {
+	t.Helper()
 	ctx := context.Background()
-	store := database.NewStore(filepath.Join(t.TempDir(), "seed.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
+	root := t.TempDir()
+	store, err := controlstore.Open(ctx, filepath.Join(root, "control.db"))
+	if err != nil {
+		t.Fatalf("open control store: %v", err)
 	}
+	if _, err := store.EnsureDefaultTenant(ctx); err != nil {
+		_ = store.Close()
+		t.Fatalf("ensure default tenant: %v", err)
+	}
+	tenantMgr := database.NewTenantStoreManager(store, filepath.Join(root, "data"), nil)
+	return ctx, store, tenantMgr
+}
+
+func TestEnsureUserResetsExistingUserPassword(t *testing.T) {
+	ctx, store, tenantMgr := newSeedTestStores(t)
 	defer store.Close()
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
+	defer tenantMgr.Close()
 
 	userID := ensureUser(ctx, store, "demo@example.com", "old-password")
 	original, err := store.GetUserByEmail(ctx, "demo@example.com")
@@ -62,15 +73,9 @@ func TestEnsureUserResetsExistingUserPassword(t *testing.T) {
 }
 
 func TestSeedActivationFixturesKeepsPrimaryDemoSiteFirst(t *testing.T) {
-	ctx := context.Background()
-	store := database.NewStore(filepath.Join(t.TempDir(), "seed.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
+	ctx, store, tenantMgr := newSeedTestStores(t)
 	defer store.Close()
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
+	defer tenantMgr.Close()
 
 	userID := ensureUser(ctx, store, "demo@example.com", "demo1234")
 	seedTeam(ctx, store, userID)
@@ -80,7 +85,7 @@ func TestSeedActivationFixturesKeepsPrimaryDemoSiteFirst(t *testing.T) {
 		t.Fatalf("ensure primary site: %v", err)
 	}
 
-	seedActivationFixtures(ctx, store, userID, primary.ID)
+	seedActivationFixtures(ctx, store, tenantMgr, userID, primary.ID)
 
 	sites, err := store.GetSites(ctx, userID)
 	if err != nil {
@@ -95,16 +100,8 @@ func TestSeedActivationFixturesKeepsPrimaryDemoSiteFirst(t *testing.T) {
 }
 
 func TestSeedGoogleSearchConsoleAndActivationFixturesKeepMappedPrimarySiteFirst(t *testing.T) {
-	ctx := context.Background()
-	store := database.NewStore(filepath.Join(t.TempDir(), "seed.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
+	ctx, store, tenantMgr := newSeedTestStores(t)
 	defer store.Close()
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
-	tenantMgr := database.NewTenantStoreManager(store, t.TempDir())
 	defer tenantMgr.Close()
 
 	userID := ensureUser(ctx, store, "demo@example.com", "demo1234")
@@ -118,7 +115,7 @@ func TestSeedGoogleSearchConsoleAndActivationFixturesKeepMappedPrimarySiteFirst(
 	}
 
 	seedGoogleSearchConsoleFixtures(ctx, store, tenantMgr, userID, primary.ID, 90)
-	seedActivationFixtures(ctx, store, userID, primary.ID)
+	seedActivationFixtures(ctx, store, tenantMgr, userID, primary.ID)
 
 	sites, err := store.GetSites(ctx, userID)
 	if err != nil {
@@ -133,16 +130,8 @@ func TestSeedGoogleSearchConsoleAndActivationFixturesKeepMappedPrimarySiteFirst(
 }
 
 func TestSeedGoogleSearchConsoleFixturesCreatesMappedReportRows(t *testing.T) {
-	ctx := context.Background()
-	store := database.NewStore(filepath.Join(t.TempDir(), "seed.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
+	ctx, store, tenantMgr := newSeedTestStores(t)
 	defer store.Close()
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
-	tenantMgr := database.NewTenantStoreManager(store, t.TempDir())
 	defer tenantMgr.Close()
 
 	userID := ensureUser(ctx, store, "demo@example.com", "demo1234")
@@ -205,23 +194,24 @@ func TestSeedGoogleSearchConsoleFixturesCreatesMappedReportRows(t *testing.T) {
 }
 
 func TestSeedWebVitalsCreatesReportableSamples(t *testing.T) {
-	ctx := context.Background()
-	store := database.NewStore(filepath.Join(t.TempDir(), "seed.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
+	ctx, store, tenantMgr := newSeedTestStores(t)
 	defer store.Close()
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
+	defer tenantMgr.Close()
 
 	userID := ensureUser(ctx, store, "demo@example.com", "demo1234")
 	site, err := store.CreateSite(ctx, userID, "web-vitals-seed.test")
 	if err != nil {
 		t.Fatalf("create site: %v", err)
 	}
+	if err := tenantMgr.SyncSite(ctx, site.ID); err != nil {
+		t.Fatalf("sync site: %v", err)
+	}
+	analyticsStore, _, err := tenantMgr.ResolveSiteStore(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("resolve site store: %v", err)
+	}
 
-	count, err := seedWebVitals(ctx, store, site.ID, 7, mrand.New(mrand.NewSource(147))) // #nosec G404 -- deterministic demo fixture test.
+	count, err := seedWebVitals(ctx, analyticsStore, site.ID, 7, mrand.New(mrand.NewSource(147))) // #nosec G404 -- deterministic demo fixture test.
 	if err != nil {
 		t.Fatalf("seedWebVitals: %v", err)
 	}
@@ -229,7 +219,7 @@ func TestSeedWebVitalsCreatesReportableSamples(t *testing.T) {
 		t.Fatal("expected seeded Web Vitals samples")
 	}
 
-	summary, err := store.GetWebVitalsSummary(ctx, api.WebVitalsParams{
+	summary, err := analyticsStore.GetWebVitalsSummary(ctx, api.WebVitalsParams{
 		SiteID: site.ID,
 		Start:  time.Now().UTC().AddDate(0, 0, -8),
 		End:    time.Now().UTC().AddDate(0, 0, 1),
@@ -473,17 +463,9 @@ func hasSeedMetricNamed(rows []api.MetricStat, name string) bool {
 	return false
 }
 
-func newSeedQRCampaignTestContext(t *testing.T) (context.Context, *database.Store, *database.TenantStoreManager, *api.Site, uuid.UUID, *database.Store) {
+func newSeedQRCampaignTestContext(t *testing.T) (context.Context, *controlstore.Store, *database.TenantStoreManager, *api.Site, uuid.UUID, *database.Store) {
 	t.Helper()
-	ctx := context.Background()
-	store := database.NewStore(filepath.Join(t.TempDir(), "seed.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
-	tenantMgr := database.NewTenantStoreManager(store, t.TempDir())
+	ctx, store, tenantMgr := newSeedTestStores(t)
 
 	userID := ensureUser(ctx, store, "demo@example.com", "demo1234")
 	seedTeam(ctx, store, userID)
@@ -508,7 +490,7 @@ func requireSeedQRCampaignStats(t *testing.T, stats seedStats) {
 	}
 }
 
-func requireSeedQRCampaignDefinitions(t *testing.T, ctx context.Context, store *database.Store, siteID uuid.UUID, expected int) []api.QRCode {
+func requireSeedQRCampaignDefinitions(t *testing.T, ctx context.Context, store *controlstore.Store, siteID uuid.UUID, expected int) []api.QRCode {
 	t.Helper()
 	qrs, err := store.ListQRCodes(ctx, siteID, false)
 	if err != nil {
@@ -589,26 +571,27 @@ func requireSeedQRCodeAttribution(t *testing.T, ctx context.Context, analyticsSt
 }
 
 func TestSeedOpportunitiesCreatesWebVitalsPerformanceOpportunity(t *testing.T) {
-	ctx := context.Background()
-	store := database.NewStore(filepath.Join(t.TempDir(), "seed.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
+	ctx, store, tenantMgr := newSeedTestStores(t)
 	defer store.Close()
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
+	defer tenantMgr.Close()
 
 	userID := ensureUser(ctx, store, "demo@example.com", "demo1234")
 	site, err := store.CreateSite(ctx, userID, "web-vitals-opportunity.test")
 	if err != nil {
 		t.Fatalf("create site: %v", err)
 	}
-	if _, err := seedWebVitals(ctx, store, site.ID, 30, mrand.New(mrand.NewSource(147))); err != nil { // #nosec G404 -- deterministic demo fixture test.
+	if err := tenantMgr.SyncSite(ctx, site.ID); err != nil {
+		t.Fatalf("sync site: %v", err)
+	}
+	analyticsStore, _, err := tenantMgr.ResolveSiteStore(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("resolve site store: %v", err)
+	}
+	if _, err := seedWebVitals(ctx, analyticsStore, site.ID, 30, mrand.New(mrand.NewSource(147))); err != nil { // #nosec G404 -- deterministic demo fixture test.
 		t.Fatalf("seedWebVitals: %v", err)
 	}
 
-	count, err := seedOpportunities(ctx, store, store, *site, userID, time.Now().UTC().AddDate(0, 0, -31), time.Now().UTC())
+	count, err := seedOpportunities(ctx, store, analyticsStore, *site, userID, time.Now().UTC().AddDate(0, 0, -31), time.Now().UTC())
 	if err != nil {
 		t.Fatalf("seedOpportunities: %v", err)
 	}
@@ -662,16 +645,8 @@ func seedOpportunityHasEvidence(item api.Opportunity, evidenceID string) bool {
 }
 
 func TestSeedGoogleSearchConsoleFixturesCreatesStatusExamples(t *testing.T) {
-	ctx := context.Background()
-	store := database.NewStore(filepath.Join(t.TempDir(), "seed.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
+	ctx, store, tenantMgr := newSeedTestStores(t)
 	defer store.Close()
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
-	tenantMgr := database.NewTenantStoreManager(store, t.TempDir())
 	defer tenantMgr.Close()
 
 	userID := ensureUser(ctx, store, "demo@example.com", "demo1234")
@@ -709,18 +684,16 @@ func TestSeedGoogleSearchConsoleFixturesCreatesStatusExamples(t *testing.T) {
 	}
 }
 
-func requireSeedSiteByDomain(t *testing.T, ctx context.Context, store *database.Store, domain string) *api.Site {
+func requireSeedSiteByDomain(t *testing.T, ctx context.Context, store *controlstore.Store, domain string) *api.Site {
 	t.Helper()
-	var site api.Site
-	if err := store.DB().QueryRowContext(ctx, `
-		SELECT id, user_id, domain, data_retention_days, created_at
-		FROM sites
-		WHERE lower(domain) = lower(?)
-		LIMIT 1
-	`, domain).Scan(&site.ID, &site.UserID, &site.Domain, &site.DataRetentionDays, &site.CreatedAt); err != nil {
+	site, err := store.FindSiteByDomain(ctx, domain)
+	if err != nil {
 		t.Fatalf("load seed site %s: %v", domain, err)
 	}
-	return &site
+	if site == nil {
+		t.Fatalf("seed site %s not found", domain)
+	}
+	return site
 }
 
 func seedPasswordMatches(t *testing.T, password string, encoded string) bool {

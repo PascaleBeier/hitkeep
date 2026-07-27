@@ -13,6 +13,7 @@ import (
 
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
 	webhookcore "hitkeep/internal/webhooks"
@@ -125,7 +126,7 @@ func (h *handler) handleUpdate(siteID *uuid.UUID) http.HandlerFunc {
 			return
 		}
 		updated, err := h.ctx.Store.UpdateWebhookWithAudit(r.Context(), webhookID, siteID, input, audit)
-		if errors.Is(err, database.ErrWebhookNotFound) {
+		if errors.Is(err, controlstore.ErrWebhookNotFound) {
 			http.Error(w, "Webhook not found", http.StatusNotFound)
 			return
 		}
@@ -151,7 +152,7 @@ func (h *handler) handleRotate(siteID *uuid.UUID) http.HandlerFunc {
 			return
 		}
 		updated, secret, err := h.ctx.Store.RotateWebhookSecretWithAudit(r.Context(), webhookID, siteID, audit)
-		if errors.Is(err, database.ErrWebhookNotFound) {
+		if errors.Is(err, controlstore.ErrWebhookNotFound) {
 			http.Error(w, "Webhook not found", http.StatusNotFound)
 			return
 		}
@@ -240,7 +241,7 @@ func (h *handler) handleDeliveries(siteID *uuid.UUID) http.HandlerFunc {
 			return
 		}
 		items, err := h.ctx.Store.ListWebhookDeliveries(r.Context(), webhookID, siteID, 100)
-		if errors.Is(err, database.ErrWebhookNotFound) {
+		if errors.Is(err, controlstore.ErrWebhookNotFound) {
 			http.Error(w, "Webhook not found", http.StatusNotFound)
 			return
 		}

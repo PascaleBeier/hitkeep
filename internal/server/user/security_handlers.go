@@ -17,7 +17,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
-	"hitkeep/internal/database"
+	"hitkeep/internal/controlstore"
 	appsecurity "hitkeep/internal/security"
 	"hitkeep/internal/server/shared"
 )
@@ -379,7 +379,7 @@ func (h *handler) handleDeleteUserPasskey() http.HandlerFunc {
 				http.Error(w, "Passkey not found", http.StatusNotFound)
 				return
 			}
-			if errors.Is(err, database.ErrLastPrimaryLoginMethod) {
+			if errors.Is(err, controlstore.ErrLastPrimaryLoginMethod) {
 				http.Error(w, "Passkey is the last usable login method", http.StatusConflict)
 				return
 			}

@@ -7,20 +7,20 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/internal/database"
+	"hitkeep/internal/controlstore"
 )
 
 type StoreRecorder struct {
-	Store *database.Store
+	Store *controlstore.Store
 }
 
 func (r StoreRecorder) RecordAIRun(ctx context.Context, run RunRecord) (uuid.UUID, error) {
 	if r.Store == nil {
 		return uuid.Nil, nil
 	}
-	lifecycleEvents := make([]database.AILifecycleEvent, 0, len(run.LifecycleEvents))
+	lifecycleEvents := make([]controlstore.AILifecycleEvent, 0, len(run.LifecycleEvents))
 	for _, event := range run.LifecycleEvents {
-		lifecycleEvents = append(lifecycleEvents, database.AILifecycleEvent{
+		lifecycleEvents = append(lifecycleEvents, controlstore.AILifecycleEvent{
 			Type:          event.Type,
 			Provider:      event.Provider,
 			Model:         event.Model,
@@ -35,7 +35,7 @@ func (r StoreRecorder) RecordAIRun(ctx context.Context, run RunRecord) (uuid.UUI
 			Timestamp:     event.Timestamp,
 		})
 	}
-	return r.Store.AppendAIRun(ctx, database.AIRunParams{
+	return r.Store.AppendAIRun(ctx, controlstore.AIRunParams{
 		ID:              run.ID,
 		TeamID:          run.TeamID,
 		SiteID:          run.SiteID,
@@ -65,7 +65,7 @@ func (r StoreRecorder) ReserveAIRun(ctx context.Context, run RunRecord, since ti
 	if r.Store == nil {
 		return uuid.Nil, nil
 	}
-	id, err := r.Store.ReserveAIRun(ctx, database.AIRunParams{
+	id, err := r.Store.ReserveAIRun(ctx, controlstore.AIRunParams{
 		ID:              run.ID,
 		TeamID:          run.TeamID,
 		SiteID:          run.SiteID,
@@ -88,7 +88,7 @@ func (r StoreRecorder) ReserveAIRun(ctx context.Context, run RunRecord, since ti
 		LatencyMS:       run.Latency.Milliseconds(),
 		CreatedAt:       run.CreatedAt,
 	}, since, requestLimit, tokenLimit)
-	if errors.Is(err, database.ErrAIBudgetExhausted) {
+	if errors.Is(err, controlstore.ErrAIBudgetExhausted) {
 		return uuid.Nil, ErrBudgetExhausted
 	}
 	return id, err

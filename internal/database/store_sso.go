@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"hitkeep/internal/controlstore"
 )
 
 var (
@@ -17,31 +19,9 @@ var (
 	ErrSSOIdentityUserMismatch = errors.New("SSO identity does not match the authorized user")
 )
 
-type TeamSSOConfig struct {
-	TeamID                uuid.UUID
-	ProviderType          string
-	IssuerURL             string
-	ClientID              string
-	ClientSecretEncrypted string
-	AllowedDomains        []string
-	EmailClaim            string
-	DisplayNameClaim      string
-	AutoProvision         bool
-	Enabled               bool
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
-}
+type TeamSSOConfig = controlstore.TeamSSOConfig
 
-type ResolveSSOUserInput struct {
-	TeamID         uuid.UUID
-	IssuerURL      string
-	Subject        string
-	Email          string
-	GivenName      string
-	LastName       string
-	PasswordHash   string
-	ExpectedUserID uuid.UUID
-}
+type ResolveSSOUserInput = controlstore.ResolveSSOUserInput
 
 type ResolveSSOUserResult struct {
 	UserID  uuid.UUID

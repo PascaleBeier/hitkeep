@@ -10,6 +10,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/internal/controlstore"
+
 	"hitkeep/internal/api"
 )
 
@@ -59,16 +61,7 @@ func (s *Store) AppendTeamAuditEntry(ctx context.Context, tenantID, actorID uuid
 	return nil
 }
 
-type TeamAuditFilter struct {
-	Action     string
-	TargetType string
-	Outcome    string
-	Query      string
-	From       time.Time
-	To         time.Time
-	Limit      int
-	Offset     int
-}
+type TeamAuditFilter = controlstore.TeamAuditFilter
 
 const (
 	DefaultTeamAuditListLimit = 25

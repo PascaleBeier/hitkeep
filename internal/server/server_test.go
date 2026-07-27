@@ -12,8 +12,10 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
+	"hitkeep/internal/testutil"
 )
 
 func TestServerMountsMCPRouteWhenEnabled(t *testing.T) {
@@ -547,17 +549,9 @@ func testServerConfig(t *testing.T) *config.Config {
 	}
 }
 
-func testServerStore(t *testing.T) *database.Store {
+func testServerStore(t *testing.T) *controlstore.Store {
 	t.Helper()
-	store := database.NewStore(filepath.Join(t.TempDir(), "hitkeep.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("Connect: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		store.Close()
-		t.Fatalf("Migrate: %v", err)
-	}
-	return store
+	return testutil.NewControlStore(t)
 }
 
 func testPublicFS() fstest.MapFS {
@@ -577,7 +571,7 @@ func testPublicFS() fstest.MapFS {
 	}
 }
 
-func createRouteableCustomTrackingDomain(t *testing.T, store *database.Store, hostname string) *api.CustomTrackingDomain {
+func createRouteableCustomTrackingDomain(t *testing.T, store *controlstore.Store, hostname string) *api.CustomTrackingDomain {
 	t.Helper()
 
 	ctx := context.Background()

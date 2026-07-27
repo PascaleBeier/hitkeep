@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/searchconsole"
 )
@@ -28,7 +29,7 @@ type googleSearchConsoleFixture struct {
 	mapped   bool
 }
 
-func seedGoogleSearchConsoleFixtures(ctx context.Context, store *database.Store, tenantMgr *database.TenantStoreManager, userID, primarySiteID uuid.UUID, days int) searchConsoleSeedStats {
+func seedGoogleSearchConsoleFixtures(ctx context.Context, store *controlstore.Store, tenantMgr *database.TenantStoreManager, userID, primarySiteID uuid.UUID, days int) searchConsoleSeedStats {
 	teamID, err := store.GetSiteTenantID(ctx, primarySiteID)
 	if err != nil {
 		slog.Warn("Skipping Search Console fixtures; primary site tenant unavailable", "site_id", primarySiteID, "error", err)
@@ -49,7 +50,7 @@ func seedGoogleSearchConsoleFixtures(ctx context.Context, store *database.Store,
 	return stats
 }
 
-func seedGoogleSearchConsoleConnection(ctx context.Context, store *database.Store, teamID, userID uuid.UUID, now time.Time) bool {
+func seedGoogleSearchConsoleConnection(ctx context.Context, store *controlstore.Store, teamID, userID uuid.UUID, now time.Time) bool {
 	// #nosec G101 -- these inert demo placeholders are deliberately unusable and keep seed data offline.
 	if err := store.UpsertGoogleSearchConsoleConnectionWithAudit(ctx, database.GoogleSearchConsoleConnectionInput{
 		TeamID:             teamID,
@@ -77,7 +78,7 @@ func seedGoogleSearchConsoleConnection(ctx context.Context, store *database.Stor
 	return true
 }
 
-func seedPrimaryGoogleSearchConsoleFixture(ctx context.Context, store *database.Store, tenantMgr *database.TenantStoreManager, primarySiteID, teamID, userID uuid.UUID, days int, now time.Time) searchConsoleSeedStats {
+func seedPrimaryGoogleSearchConsoleFixture(ctx context.Context, store *controlstore.Store, tenantMgr *database.TenantStoreManager, primarySiteID, teamID, userID uuid.UUID, days int, now time.Time) searchConsoleSeedStats {
 	stats := searchConsoleSeedStats{}
 	primaryProperty := "sc-domain:acme-analytics.io"
 	if err := seedGoogleSearchConsoleProperty(ctx, store, teamID, primaryProperty, now); err != nil {
@@ -95,7 +96,7 @@ func seedPrimaryGoogleSearchConsoleFixture(ctx context.Context, store *database.
 	return stats
 }
 
-func seedGoogleSearchConsoleStatusFixtures(ctx context.Context, store *database.Store, tenantMgr *database.TenantStoreManager, teamID, userID uuid.UUID, now time.Time) searchConsoleSeedStats {
+func seedGoogleSearchConsoleStatusFixtures(ctx context.Context, store *controlstore.Store, tenantMgr *database.TenantStoreManager, teamID, userID uuid.UUID, now time.Time) searchConsoleSeedStats {
 	stats := searchConsoleSeedStats{}
 	for _, fixture := range googleSearchConsoleStatusFixtures() {
 		if seedGoogleSearchConsoleStatusFixture(ctx, store, tenantMgr, teamID, userID, now, fixture) {
@@ -114,7 +115,7 @@ func googleSearchConsoleStatusFixtures() []googleSearchConsoleFixture {
 	}
 }
 
-func seedGoogleSearchConsoleStatusFixture(ctx context.Context, store *database.Store, tenantMgr *database.TenantStoreManager, teamID, userID uuid.UUID, now time.Time, fixture googleSearchConsoleFixture) bool {
+func seedGoogleSearchConsoleStatusFixture(ctx context.Context, store *controlstore.Store, tenantMgr *database.TenantStoreManager, teamID, userID uuid.UUID, now time.Time, fixture googleSearchConsoleFixture) bool {
 	site, ok := ensureGoogleSearchConsoleFixtureSite(ctx, store, tenantMgr, userID, fixture.domain)
 	if !ok {
 		return false
@@ -126,7 +127,7 @@ func seedGoogleSearchConsoleStatusFixture(ctx context.Context, store *database.S
 	return seedGoogleSearchConsoleFixtureMappingIfNeeded(ctx, store, site.ID, teamID, userID, now, fixture)
 }
 
-func ensureGoogleSearchConsoleFixtureSite(ctx context.Context, store *database.Store, tenantMgr *database.TenantStoreManager, userID uuid.UUID, domain string) (*api.Site, bool) {
+func ensureGoogleSearchConsoleFixtureSite(ctx context.Context, store *controlstore.Store, tenantMgr *database.TenantStoreManager, userID uuid.UUID, domain string) (*api.Site, bool) {
 	site, err := ensureSiteInActiveTeam(ctx, store, userID, domain)
 	if err != nil {
 		slog.Warn("Failed to ensure Search Console fixture site", "domain", domain, "error", err)
@@ -139,7 +140,7 @@ func ensureGoogleSearchConsoleFixtureSite(ctx context.Context, store *database.S
 	return site, true
 }
 
-func seedGoogleSearchConsoleMappedFixture(ctx context.Context, store *database.Store, siteID, teamID, userID uuid.UUID, now time.Time, fixture googleSearchConsoleFixture) bool {
+func seedGoogleSearchConsoleMappedFixture(ctx context.Context, store *controlstore.Store, siteID, teamID, userID uuid.UUID, now time.Time, fixture googleSearchConsoleFixture) bool {
 	if err := seedGoogleSearchConsoleMappedSite(ctx, store, siteID, teamID, fixture.property, userID, now); err != nil {
 		slog.Warn("Failed to seed Search Console fixture mapping", "domain", fixture.domain, "error", err)
 		return false
@@ -148,14 +149,14 @@ func seedGoogleSearchConsoleMappedFixture(ctx context.Context, store *database.S
 	return true
 }
 
-func seedGoogleSearchConsoleFixtureMappingIfNeeded(ctx context.Context, store *database.Store, siteID, teamID, userID uuid.UUID, now time.Time, fixture googleSearchConsoleFixture) bool {
+func seedGoogleSearchConsoleFixtureMappingIfNeeded(ctx context.Context, store *controlstore.Store, siteID, teamID, userID uuid.UUID, now time.Time, fixture googleSearchConsoleFixture) bool {
 	if fixture.mapped {
 		return seedGoogleSearchConsoleMappedFixture(ctx, store, siteID, teamID, userID, now, fixture)
 	}
 	return true
 }
 
-func seedGoogleSearchConsoleProperty(ctx context.Context, store *database.Store, teamID uuid.UUID, propertyURI string, seenAt time.Time) error {
+func seedGoogleSearchConsoleProperty(ctx context.Context, store *controlstore.Store, teamID uuid.UUID, propertyURI string, seenAt time.Time) error {
 	return store.UpsertGoogleSearchConsoleProperty(ctx, database.GoogleSearchConsolePropertyInput{
 		TeamID:          teamID,
 		URI:             propertyURI,
@@ -164,7 +165,7 @@ func seedGoogleSearchConsoleProperty(ctx context.Context, store *database.Store,
 	})
 }
 
-func seedGoogleSearchConsoleMappedSite(ctx context.Context, store *database.Store, siteID, teamID uuid.UUID, propertyURI string, userID uuid.UUID, mappedAt time.Time) error {
+func seedGoogleSearchConsoleMappedSite(ctx context.Context, store *controlstore.Store, siteID, teamID uuid.UUID, propertyURI string, userID uuid.UUID, mappedAt time.Time) error {
 	siteLabel := siteID.String()
 	if site, err := store.GetSiteByID(ctx, siteID); err == nil && site != nil {
 		siteLabel = site.Domain
@@ -193,14 +194,14 @@ func seedGoogleSearchConsoleFacts(ctx context.Context, tenantMgr *database.Tenan
 		slog.Warn("Failed to resolve tenant store for Search Console facts", "site_id", siteID, "error", err)
 		return 0
 	}
-	if !prepareGoogleSearchConsoleFactSeed(ctx, tenantMgr.Shared(), tenantStore, siteID, teamID, propertyURI, userID) {
+	if !prepareGoogleSearchConsoleFactSeed(ctx, tenantMgr.Control(), tenantStore, siteID, teamID, propertyURI, userID) {
 		return 0
 	}
 	rows := buildGoogleSearchConsoleFactInputs(siteID, propertyURI, days, now)
 	return upsertGoogleSearchConsoleSeedFacts(ctx, tenantStore, siteID, rows)
 }
 
-func prepareGoogleSearchConsoleFactSeed(ctx context.Context, shared *database.Store, tenantStore *database.Store, siteID, teamID uuid.UUID, propertyURI string, userID uuid.UUID) bool {
+func prepareGoogleSearchConsoleFactSeed(ctx context.Context, shared *controlstore.Store, tenantStore *database.Store, siteID, teamID uuid.UUID, propertyURI string, userID uuid.UUID) bool {
 	if err := auditSeededGoogleSearchConsoleFacts(ctx, shared, siteID, teamID, propertyURI, userID); err != nil {
 		slog.Warn("Failed to audit seeded Search Console fact refresh", "site_id", siteID, "error", err)
 		return false
@@ -220,7 +221,7 @@ func upsertGoogleSearchConsoleSeedFacts(ctx context.Context, tenantStore *databa
 	return len(rows)
 }
 
-func auditSeededGoogleSearchConsoleFacts(ctx context.Context, store *database.Store, siteID, teamID uuid.UUID, propertyURI string, userID uuid.UUID) error {
+func auditSeededGoogleSearchConsoleFacts(ctx context.Context, store *controlstore.Store, siteID, teamID uuid.UUID, propertyURI string, userID uuid.UUID) error {
 	return store.AppendAuditEntry(ctx, database.AuditEntryParams{
 		ActorID:    userID,
 		TeamID:     teamID,
@@ -295,7 +296,7 @@ func googleSearchConsoleSeedFact(siteID uuid.UUID, propertyURI string, date time
 	}
 }
 
-func seedGoogleSearchConsoleSyncState(ctx context.Context, store *database.Store, siteID, teamID, userID uuid.UUID, state string, category string, manual bool, now time.Time) {
+func seedGoogleSearchConsoleSyncState(ctx context.Context, store *controlstore.Store, siteID, teamID, userID uuid.UUID, state string, category string, manual bool, now time.Time) {
 	input := googleSearchConsoleSyncStateInput(siteID, teamID, state, category, manual, now)
 	err := store.UpsertGoogleSearchConsoleSyncStateWithAudit(ctx, input, seedGoogleSearchConsoleSyncAudit(siteID, teamID, userID, input.State, category))
 	logGoogleSearchConsoleSyncSeedError(err, siteID, state)

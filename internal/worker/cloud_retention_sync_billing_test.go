@@ -10,11 +10,12 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 )
 
-func newCloudRetentionSyncEntitlementsService(store *database.Store) *entitlements.Service {
+func newCloudRetentionSyncEntitlementsService(store *controlstore.Store) *entitlements.Service {
 	return entitlements.NewService(store, entitlements.NewProvider(cloudRetentionSyncWorkerConfig()), cloudRetentionSyncWorkerConfig())
 }
 
@@ -25,7 +26,7 @@ func cloudRetentionSyncWorkerConfig() *config.Config {
 	}
 }
 
-func getSiteRetentionDays(t *testing.T, store *database.Store, tenantID uuid.UUID) int {
+func getSiteRetentionDays(t *testing.T, store *controlstore.Store, tenantID uuid.UUID) int {
 	t.Helper()
 	sites, err := store.ListSitesForTenant(context.Background(), tenantID)
 	if err != nil {
@@ -37,16 +38,23 @@ func getSiteRetentionDays(t *testing.T, store *database.Store, tenantID uuid.UUI
 	return sites[0].DataRetentionDays
 }
 
+func setFirstSiteRetention(t *testing.T, store *controlstore.Store, tenantID uuid.UUID, days int, syncedFromPlan bool) {
+	t.Helper()
+	sites, err := store.ListSitesForTenant(context.Background(), tenantID)
+	if err != nil || len(sites) == 0 {
+		t.Fatalf("resolve site for tenant %s: sites=%d err=%v", tenantID, len(sites), err)
+	}
+	if err := store.SetSiteRetentionDaysSystem(context.Background(), sites[0].ID, days, syncedFromPlan); err != nil {
+		t.Fatalf("seed site retention: %v", err)
+	}
+}
+
 func TestCloudRetentionSyncWorkerClampsFreePlanSiteToCap(t *testing.T) {
 	store, mgr := setupCloudLifecycleWorkerStore(t)
-	team := seedWorkerCloudLifecycleTeam(t, store, "free@example.com", "free.example.com", database.CloudPlanFree, database.CloudSubscriptionStatusFree, nil)
+	team := seedWorkerCloudLifecycleTeam(t, store, mgr, "free@example.com", "free.example.com", database.CloudPlanFree, database.CloudSubscriptionStatusFree, nil)
 
 	// Simulate a stale value predating this feature.
-	if _, err := store.DB().ExecContext(context.Background(),
-		"UPDATE sites SET data_retention_days = 365 WHERE user_id = ?", team.UserID,
-	); err != nil {
-		t.Fatalf("seed stale retention: %v", err)
-	}
+	setFirstSiteRetention(t, store, team.TenantID, 365, true)
 
 	ent := newCloudRetentionSyncEntitlementsService(store)
 	worker := NewCloudRetentionSyncWorker(mgr, ent, cloudRetentionSyncWorkerConfig())
@@ -59,15 +67,11 @@ func TestCloudRetentionSyncWorkerClampsFreePlanSiteToCap(t *testing.T) {
 
 func TestCloudRetentionSyncWorkerRaisesPlanManagedSiteToExactBusinessCap(t *testing.T) {
 	store, mgr := setupCloudLifecycleWorkerStore(t)
-	team := seedWorkerCloudLifecycleTeam(t, store, "biz@example.com", "biz.example.com", database.CloudPlanBusiness, database.CloudSubscriptionStatusActive, nil)
+	team := seedWorkerCloudLifecycleTeam(t, store, mgr, "biz@example.com", "biz.example.com", database.CloudPlanBusiness, database.CloudSubscriptionStatusActive, nil)
 
 	// Plan-managed sites always sync to exactly the plan cap, in both
 	// directions - a stale lower value must be raised, not left alone.
-	if _, err := store.DB().ExecContext(context.Background(),
-		"UPDATE sites SET data_retention_days = 200 WHERE user_id = ?", team.UserID,
-	); err != nil {
-		t.Fatalf("seed retention: %v", err)
-	}
+	setFirstSiteRetention(t, store, team.TenantID, 200, true)
 
 	ent := newCloudRetentionSyncEntitlementsService(store)
 	worker := NewCloudRetentionSyncWorker(mgr, ent, cloudRetentionSyncWorkerConfig())
@@ -80,13 +84,9 @@ func TestCloudRetentionSyncWorkerRaisesPlanManagedSiteToExactBusinessCap(t *test
 
 func TestCloudRetentionSyncWorkerLeavesManuallyCustomizedSiteUnderCapUnchanged(t *testing.T) {
 	store, mgr := setupCloudLifecycleWorkerStore(t)
-	team := seedWorkerCloudLifecycleTeam(t, store, "biz2@example.com", "biz2.example.com", database.CloudPlanBusiness, database.CloudSubscriptionStatusActive, nil)
+	team := seedWorkerCloudLifecycleTeam(t, store, mgr, "biz2@example.com", "biz2.example.com", database.CloudPlanBusiness, database.CloudSubscriptionStatusActive, nil)
 
-	if _, err := store.DB().ExecContext(context.Background(),
-		"UPDATE sites SET data_retention_days = 200, retention_synced_from_plan = FALSE WHERE user_id = ?", team.UserID,
-	); err != nil {
-		t.Fatalf("seed retention: %v", err)
-	}
+	setFirstSiteRetention(t, store, team.TenantID, 200, false)
 
 	ent := newCloudRetentionSyncEntitlementsService(store)
 	worker := NewCloudRetentionSyncWorker(mgr, ent, cloudRetentionSyncWorkerConfig())
@@ -114,9 +114,7 @@ func TestCloudRetentionSyncWorkerAppliesStaticCapForLegacyTeamWithoutBillingAcco
 	if err != nil {
 		t.Fatalf("create site: %v", err)
 	}
-	if _, err := store.DB().ExecContext(ctx,
-		"UPDATE sites SET data_retention_days = 3650 WHERE id = ?", site.ID,
-	); err != nil {
+	if err := store.SetSiteRetentionDaysSystem(ctx, site.ID, 3650, true); err != nil {
 		t.Fatalf("seed retention: %v", err)
 	}
 
@@ -131,12 +129,8 @@ func TestCloudRetentionSyncWorkerAppliesStaticCapForLegacyTeamWithoutBillingAcco
 
 func TestCloudRetentionSyncWorkerNoOpWhenNotCloudHosted(t *testing.T) {
 	store, mgr := setupCloudLifecycleWorkerStore(t)
-	team := seedWorkerCloudLifecycleTeam(t, store, "free2@example.com", "free2.example.com", database.CloudPlanFree, database.CloudSubscriptionStatusFree, nil)
-	if _, err := store.DB().ExecContext(context.Background(),
-		"UPDATE sites SET data_retention_days = 365 WHERE user_id = ?", team.UserID,
-	); err != nil {
-		t.Fatalf("seed retention: %v", err)
-	}
+	team := seedWorkerCloudLifecycleTeam(t, store, mgr, "free2@example.com", "free2.example.com", database.CloudPlanFree, database.CloudSubscriptionStatusFree, nil)
+	setFirstSiteRetention(t, store, team.TenantID, 365, true)
 
 	conf := &config.Config{CloudHosted: false}
 	ent := entitlements.NewService(store, entitlements.NewProvider(conf), conf)
@@ -150,12 +144,8 @@ func TestCloudRetentionSyncWorkerNoOpWhenNotCloudHosted(t *testing.T) {
 
 func TestCloudRetentionSyncWorkerIdempotentReRun(t *testing.T) {
 	store, mgr := setupCloudLifecycleWorkerStore(t)
-	team := seedWorkerCloudLifecycleTeam(t, store, "idem@example.com", "idem.example.com", database.CloudPlanFree, database.CloudSubscriptionStatusFree, nil)
-	if _, err := store.DB().ExecContext(context.Background(),
-		"UPDATE sites SET data_retention_days = 365 WHERE user_id = ?", team.UserID,
-	); err != nil {
-		t.Fatalf("seed retention: %v", err)
-	}
+	team := seedWorkerCloudLifecycleTeam(t, store, mgr, "idem@example.com", "idem.example.com", database.CloudPlanFree, database.CloudSubscriptionStatusFree, nil)
+	setFirstSiteRetention(t, store, team.TenantID, 365, true)
 
 	ent := newCloudRetentionSyncEntitlementsService(store)
 	worker := NewCloudRetentionSyncWorker(mgr, ent, cloudRetentionSyncWorkerConfig())

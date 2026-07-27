@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 )
 
 type sqlQueryExecContext interface {
@@ -19,32 +20,7 @@ type sqlQueryExecContext interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
 }
 
-type OpportunityInput struct {
-	ID               uuid.UUID
-	TeamID           uuid.UUID
-	SiteID           uuid.UUID
-	Kind             string
-	TypeKey          string
-	TitleKey         string
-	SummaryKey       string
-	ActionKey        string
-	DigestKey        string
-	CopyParams       map[string]any
-	ImpactValue      string
-	ImpactLabelKey   string
-	Confidence       string
-	Score            int
-	ScoreBreakdown   api.OpportunityScoreBreakdown
-	Status           string
-	RouteLabelKey    string
-	RouteParams      map[string]any
-	RouteIcon        string
-	DetectorVersion  string
-	Evidence         []api.OpportunityEvidence
-	CitedEvidenceIDs []string
-	AIRunID          uuid.UUID
-	GeneratedAt      time.Time
-}
+type OpportunityInput = controlstore.OpportunityInput
 
 func (s *Store) UpsertOpportunities(ctx context.Context, inputs []OpportunityInput) ([]api.Opportunity, error) {
 	return s.upsertOpportunities(ctx, inputs, nil)

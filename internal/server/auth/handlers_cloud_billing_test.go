@@ -9,9 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
-
-	"github.com/google/uuid"
 
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
@@ -43,27 +40,17 @@ func TestHandleAcceptInviteRejectsSecondHostedCloudTeam(t *testing.T) {
 		t.Fatalf("create invitee user: %v", err)
 	}
 
-	existingTeamID := uuid.New()
-	if _, err := store.DB().ExecContext(context.Background(),
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		existingTeamID, "Existing Cloud Team", time.Now().UTC(),
-	); err != nil {
-		t.Fatalf("insert existing team: %v", err)
+	existingTeam, err := store.CreateTenant(context.Background(), inviteeID, "Existing Cloud Team", "")
+	if err != nil {
+		t.Fatalf("create existing team: %v", err)
 	}
-	if err := store.AddTeamMember(context.Background(), existingTeamID, inviteeID, database.TenantRoleOwner, inviteeID); err != nil {
-		t.Fatalf("add invitee to existing team: %v", err)
-	}
+	_ = existingTeam
 
-	targetTeamID := uuid.New()
-	if _, err := store.DB().ExecContext(context.Background(),
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		targetTeamID, "Target Cloud Team", time.Now().UTC(),
-	); err != nil {
-		t.Fatalf("insert target team: %v", err)
+	targetTeam, err := store.CreateTenant(context.Background(), ownerID, "Target Cloud Team", "")
+	if err != nil {
+		t.Fatalf("create target team: %v", err)
 	}
-	if err := store.AddTeamMember(context.Background(), targetTeamID, ownerID, database.TenantRoleOwner, ownerID); err != nil {
-		t.Fatalf("add owner to target team: %v", err)
-	}
+	targetTeamID := targetTeam.ID
 	if _, err := store.CreateTeamInvite(context.Background(), targetTeamID, "invite-cloud@example.com", database.TenantRoleAdmin, &inviteeID, ownerID, true); err != nil {
 		t.Fatalf("create team invite: %v", err)
 	}

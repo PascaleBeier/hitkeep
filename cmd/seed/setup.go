@@ -2,17 +2,15 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"os"
-	"time"
 
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 )
 
@@ -32,17 +30,15 @@ func deleteSiteAnalyticsData(ctx context.Context, store *database.Store, siteID 
 	slog.Info("Cleared existing analytics data", "site_id", siteID)
 }
 
-func deleteSiteQRCampaignData(ctx context.Context, sharedStore, analyticsStore *database.Store, siteID uuid.UUID) {
+func deleteSiteQRCampaignData(ctx context.Context, sharedStore *controlstore.Store, analyticsStore *database.Store, siteID uuid.UUID) {
 	if analyticsStore != nil {
 		if err := analyticsStore.Exec(ctx, "DELETE FROM qr_code_opens WHERE site_id = ?", siteID); err != nil {
 			slog.Warn("Failed to clear QR opens", "error", err)
 		}
 	}
 
-	for _, table := range []string{"qr_code_share_links", "qr_code_assets", "qr_codes"} {
-		if err := sharedStore.Exec(ctx, fmt.Sprintf("DELETE FROM %s WHERE site_id = ?", table), siteID); err != nil {
-			slog.Warn("Failed to clear QR campaign data", "table", table, "error", err)
-		}
+	if err := sharedStore.DeleteSiteQRCampaignData(ctx, siteID); err != nil {
+		slog.Warn("Failed to clear QR campaign data", "error", err)
 	}
 	slog.Info("Cleared existing QR campaign data", "site_id", siteID)
 }
@@ -57,7 +53,7 @@ func deleteSiteGoalsAndFunnels(ctx context.Context, store *database.Store, siteI
 	slog.Info("Cleared existing goals and funnels", "site_id", siteID)
 }
 
-func ensureUser(ctx context.Context, store *database.Store, email, password string) uuid.UUID {
+func ensureUser(ctx context.Context, store *controlstore.Store, email, password string) uuid.UUID {
 	existing, err := store.GetUserByEmail(ctx, email)
 	if err != nil {
 		slog.Error("Failed to look up user", "error", err)
@@ -91,7 +87,7 @@ func ensureUser(ctx context.Context, store *database.Store, email, password stri
 	return id
 }
 
-func seedAPIClients(ctx context.Context, store *database.Store, userID, tenantID, siteID uuid.UUID) {
+func seedAPIClients(ctx context.Context, store *controlstore.Store, userID, tenantID, siteID uuid.UUID) {
 	personalName := "Personal Export Token"
 	personalClients, err := store.ListAPIClients(ctx, userID)
 	if err != nil {
@@ -121,39 +117,17 @@ func seedAPIClients(ctx context.Context, store *database.Store, userID, tenantID
 	slog.Info("Demo API clients ensured", "user_id", userID, "tenant_id", tenantID)
 }
 
-func seedShareLink(ctx context.Context, store *database.Store, siteID, createdBy uuid.UUID, token string) {
-	if len(token) != 64 {
-		slog.Error("Share token must be a 64-character hex string", "len", len(token))
+func seedShareLink(ctx context.Context, store *controlstore.Store, siteID, createdBy uuid.UUID, token string) {
+	created, err := store.EnsureShareLinkWithToken(ctx, siteID, createdBy, token)
+	if err != nil {
+		slog.Error("Failed to ensure share link", "error", err)
 		os.Exit(1)
 	}
-	if _, err := hex.DecodeString(token); err != nil {
-		slog.Error("Share token is not valid hex", "error", err)
-		os.Exit(1)
-	}
-
-	sum := sha256.Sum256([]byte(token))
-	tokenHash := hex.EncodeToString(sum[:])
-
-	var exists bool
-	_ = store.DB().QueryRowContext(ctx,
-		"SELECT COUNT(*) > 0 FROM share_links WHERE token_hash = ? AND revoked_at IS NULL",
-		tokenHash,
-	).Scan(&exists)
-	if exists {
-		slog.Info("Share link already exists, skipping", "token_hint", tokenHash[:8])
+	if !created {
+		slog.Info("Share link already exists, skipping")
 		return
 	}
-
-	linkID := uuid.New()
-	now := time.Now().UTC()
-	if err := store.Exec(ctx,
-		"INSERT INTO share_links (id, site_id, token_hash, created_by, created_at) VALUES (?, ?, ?, ?, ?)",
-		linkID, siteID, tokenHash, createdBy, now,
-	); err != nil {
-		slog.Error("Failed to create share link", "error", err)
-		os.Exit(1)
-	}
-	slog.Info("Share link seeded", "token_hint", tokenHash[:8])
+	slog.Info("Share link seeded")
 }
 
 type goalIDs struct {

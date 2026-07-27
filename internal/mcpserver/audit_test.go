@@ -10,9 +10,9 @@ import (
 )
 
 func TestMCPPublishedSurfaceAudit(t *testing.T) {
-	store, _, token := setupMCPStore(t)
+	store, tenantStores, _, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -85,10 +85,10 @@ func TestMCPPublishedSurfaceAudit(t *testing.T) {
 }
 
 func TestMCPDocsDisabledSurfaceAudit(t *testing.T) {
-	store, _, token := setupMCPStore(t)
+	store, tenantStores, _, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
 	conf.MCPDocsEnabled = false
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 

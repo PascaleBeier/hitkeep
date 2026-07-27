@@ -11,13 +11,14 @@ import (
 	hitai "hitkeep/internal/ai"
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 )
 
 const detectorVersion = "opportunities-detectors-v1"
 
 type Service struct {
-	Shared  *database.Store
+	Shared  *controlstore.Store
 	AI      hitai.Client
 	Catalog DetectorCatalog
 }
@@ -99,7 +100,7 @@ func normalizeGenerateWindow(input GenerateInput) GenerateInput {
 	return input
 }
 
-func loadOpportunitySignals(ctx context.Context, shared *database.Store, input GenerateInput, required []OpportunitySignal) (opportunitySignals, error) {
+func loadOpportunitySignals(ctx context.Context, shared *controlstore.Store, input GenerateInput, required []OpportunitySignal) (opportunitySignals, error) {
 	signals := opportunitySignals{}
 	for _, signal := range required {
 		switch signal {
@@ -153,7 +154,6 @@ func loadOpportunitySignals(ctx context.Context, shared *database.Store, input G
 				continue
 			}
 			snapshot, err := buildSetupEvidenceSnapshot(ctx, setupEvidenceSnapshotInput{
-				SharedStore:    shared,
 				AnalyticsStore: input.Store,
 				SiteID:         input.Site.ID,
 				From:           input.From,
@@ -179,7 +179,7 @@ func loadOpportunitySignals(ctx context.Context, shared *database.Store, input G
 	return signals, nil
 }
 
-func loadSearchConsoleSignal(ctx context.Context, shared *database.Store, input GenerateInput) (*api.SearchConsoleOverview, error) {
+func loadSearchConsoleSignal(ctx context.Context, shared *controlstore.Store, input GenerateInput) (*api.SearchConsoleOverview, error) {
 	mapping, err := shared.GetGoogleSearchConsoleSiteMappingForTeam(ctx, input.Site.ID, input.TeamID)
 	if err != nil {
 		return nil, fmt.Errorf("load search console mapping: %w", err)
@@ -268,7 +268,7 @@ func (s Service) generateCandidateProposal(ctx context.Context, input GenerateIn
 	return result, nil
 }
 
-func newOpportunityToolBridgeConfig(shared *database.Store, input GenerateInput) ToolBridgeConfig {
+func newOpportunityToolBridgeConfig(shared *controlstore.Store, input GenerateInput) ToolBridgeConfig {
 	return ToolBridgeConfig{
 		Shared:                shared,
 		Analytics:             input.Store,

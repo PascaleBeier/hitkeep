@@ -15,6 +15,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/appurl"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/localization"
 	"hitkeep/internal/mailables"
@@ -281,7 +282,7 @@ func (h *handler) completeAuthenticatedSocialLink(r *http.Request, userID uuid.U
 			return err
 		}
 		if matched != nil && matched.ID != userID {
-			return database.ErrSocialIdentityConflict
+			return controlstore.ErrSocialIdentityConflict
 		}
 	}
 	_, err := h.ctx.Store.LinkSocialIdentity(r.Context(), database.LinkSocialIdentityInput{
@@ -572,7 +573,7 @@ func (h *handler) handleSocialCloudSignupComplete() http.HandlerFunc {
 		if err != nil {
 			status := http.StatusInternalServerError
 			code := "social_signup_failed"
-			if errors.Is(err, database.ErrUserEmailAlreadyExists) || errors.Is(err, database.ErrSocialIdentityConflict) {
+			if errors.Is(err, controlstore.ErrUserEmailAlreadyExists) || errors.Is(err, controlstore.ErrSocialIdentityConflict) {
 				status = http.StatusConflict
 				code = "social_account_exists"
 			}
@@ -751,10 +752,10 @@ func (h *handler) handleSocialUnlink() http.HandlerFunc {
 		if err := h.ctx.Store.DeleteSocialIdentityWithGuard(r.Context(), userID, provider, passwordConfirmed); err != nil {
 			reason := "storage"
 			switch {
-			case errors.Is(err, database.ErrSocialIdentityNotFound):
+			case errors.Is(err, controlstore.ErrSocialIdentityNotFound):
 				reason = "identity_not_found"
 				writeSocialError(w, http.StatusNotFound, "social_identity_not_found")
-			case errors.Is(err, database.ErrSocialLastLoginMethod):
+			case errors.Is(err, controlstore.ErrSocialLastLoginMethod):
 				reason = "last_login_method"
 				writeSocialError(w, http.StatusConflict, "social_last_login_method")
 			default:
@@ -858,9 +859,9 @@ func socialErrorCategory(err error) string {
 
 func socialDatabaseErrorCategory(err error) string {
 	switch {
-	case errors.Is(err, database.ErrSocialIdentityConflict):
+	case errors.Is(err, controlstore.ErrSocialIdentityConflict):
 		return "subject_conflict"
-	case errors.Is(err, database.ErrSocialProviderAlreadyLinked):
+	case errors.Is(err, controlstore.ErrSocialProviderAlreadyLinked):
 		return "provider_conflict"
 	default:
 		return "storage"

@@ -24,10 +24,6 @@ jobs:
     with:
       version: snapshot-${{ github.sha }}
       meta_config: |
-        type=raw,value=snapshot
-        type=raw,value=main,enable={{is_default_branch}}
-        type=ref,event=branch
-        type=ref,event=pr
         type=sha,prefix=sha-,format=short
       upload_to_release: ${{ github.event_name == 'push' }}
       release_prerelease: ${{ github.event_name == 'push' }}
@@ -38,8 +34,7 @@ jobs:
         - Commit: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
         - Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       docker_tags_summary: |
-        - `snapshot`
-        - `main`
+        - `sha-${{ github.sha }}`
       docker_sha_tag_prefix: sha-
     secrets:
       token: ${{ secrets.GHT }}

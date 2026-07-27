@@ -12,14 +12,14 @@ import (
 	"github.com/nsqio/go-nsq"
 
 	"hitkeep/internal/config"
-	"hitkeep/internal/database"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/hklog"
 )
 
 const Channel = "dispatcher"
 
 type Worker struct {
-	store      *database.Store
+	store      *controlstore.Store
 	producer   Producer
 	config     config.Config
 	dispatcher *Dispatcher
@@ -29,7 +29,7 @@ type Worker struct {
 	limits     sync.Map
 }
 
-func NewWorker(store *database.Store, producer Producer, conf config.Config, logger *slog.Logger, logLevel slog.Level) *Worker {
+func NewWorker(store *controlstore.Store, producer Producer, conf config.Config, logger *slog.Logger, logLevel slog.Level) *Worker {
 	if logger == nil {
 		logger = slog.Default()
 	}

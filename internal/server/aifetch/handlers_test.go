@@ -18,39 +18,40 @@ import (
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/testutil"
 )
 
 func setupAIFetchTestEnv(t *testing.T) (*database.Store, *shared.Context, uuid.UUID, uuid.UUID, string) {
 	t.Helper()
 
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
+	control, tenantStores := testutil.NewControlAndTenantStores(t)
+	t.Cleanup(func() { _ = control.Close() })
+	t.Cleanup(func() { _ = tenantStores.Close() })
 
-	userID, err := store.CreateUser(context.Background(), "ai-fetch@example.com", "hashed")
+	userID, err := control.CreateUser(context.Background(), "ai-fetch@example.com", "hashed")
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}
-	site, err := store.CreateSite(context.Background(), userID, "aifetch.example.com")
+	site, err := control.CreateSite(context.Background(), userID, "aifetch.example.com")
 	if err != nil {
 		t.Fatalf("CreateSite: %v", err)
 	}
-	_, token, err := store.CreateAPIClient(context.Background(), userID, "AI Fetch", "test", auth.InstanceUser, map[uuid.UUID]auth.SiteRole{
+	_, token, err := control.CreateAPIClient(context.Background(), userID, "AI Fetch", "test", auth.InstanceUser, map[uuid.UUID]auth.SiteRole{
 		site.ID: auth.SiteOwner,
 	}, nil)
 	if err != nil {
 		t.Fatalf("CreateAPIClient: %v", err)
 	}
-	tenantStores := database.NewTenantStoreManager(store, t.TempDir(), database.WithTenantDataPlane(false))
-	t.Cleanup(func() { _ = tenantStores.Close() })
+	if err := tenantStores.SyncSite(context.Background(), site.ID); err != nil {
+		t.Fatalf("SyncSite: %v", err)
+	}
+	store, _, err := tenantStores.ResolveSiteStore(context.Background(), site.ID)
+	if err != nil {
+		t.Fatalf("ResolveSiteStore: %v", err)
+	}
 
 	ctx := &shared.Context{
-		Store:          store,
+		Store:          control,
 		TenantStores:   tenantStores,
 		Config:         &config.Config{},
 		SystemCounters: &database.SystemCounter{},
@@ -245,9 +246,9 @@ func TestHandleCreateAIFetchRejectsUnknownBot(t *testing.T) {
 }
 
 func TestHandleCreateAIFetchRejectsDeletedSite(t *testing.T) {
-	store, ctx, _, siteID, _ := setupAIFetchTestEnv(t)
+	_, ctx, _, siteID, _ := setupAIFetchTestEnv(t)
 
-	if err := store.DeleteSite(context.Background(), siteID); err != nil {
+	if err := ctx.Store.DeleteSite(context.Background(), siteID); err != nil {
 		t.Fatalf("DeleteSite: %v", err)
 	}
 
@@ -319,10 +320,10 @@ func TestHandleCreateAIFetchRejectsOversizedBody(t *testing.T) {
 func TestHandleCreateAIFetchDropsBlockedSiteExclusion(t *testing.T) {
 	store, ctx, userID, siteID, token := setupAIFetchTestEnv(t)
 
-	if _, err := store.CreateSiteExclusion(context.Background(), siteID, "198.51.100.0/24", "blocked", userID); err != nil {
+	if _, err := ctx.Store.CreateSiteExclusion(context.Background(), siteID, "198.51.100.0/24", "blocked", userID); err != nil {
 		t.Fatalf("CreateSiteExclusion: %v", err)
 	}
-	ipFilter := blocking.NewIPFilter(store)
+	ipFilter := blocking.NewIPFilter(ctx.Store)
 	if err := ipFilter.Refresh(context.Background()); err != nil {
 		t.Fatalf("Refresh ip filter: %v", err)
 	}
@@ -368,10 +369,10 @@ func TestHandleCreateAIFetchDropsBlockedSiteExclusion(t *testing.T) {
 func TestHandleCreateAIFetchDropsCountryExclusion(t *testing.T) {
 	store, ctx, userID, siteID, token := setupAIFetchTestEnv(t)
 
-	if _, err := store.CreateInstanceCountryExclusion(context.Background(), "US", "United States", userID); err != nil {
+	if _, err := ctx.Store.CreateInstanceCountryExclusion(context.Background(), "US", "United States", userID); err != nil {
 		t.Fatalf("CreateInstanceCountryExclusion: %v", err)
 	}
-	ipFilter := blocking.NewIPFilter(store)
+	ipFilter := blocking.NewIPFilter(ctx.Store)
 	if err := ipFilter.Refresh(context.Background()); err != nil {
 		t.Fatalf("Refresh ip filter: %v", err)
 	}
@@ -434,10 +435,10 @@ func TestHandleCreateAIFetchDropsPathAndUserAgentExclusions(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			store, ctx, userID, siteID, token := setupAIFetchTestEnv(t)
-			if _, err := store.CreateSiteTrafficExclusion(context.Background(), siteID, test.rule, userID); err != nil {
+			if _, err := ctx.Store.CreateSiteTrafficExclusion(context.Background(), siteID, test.rule, userID); err != nil {
 				t.Fatalf("create contextual exclusion: %v", err)
 			}
-			filter := blocking.NewIPFilter(store)
+			filter := blocking.NewIPFilter(ctx.Store)
 			if err := filter.Refresh(context.Background()); err != nil {
 				t.Fatalf("refresh traffic exclusions: %v", err)
 			}

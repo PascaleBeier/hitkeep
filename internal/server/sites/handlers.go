@@ -320,7 +320,7 @@ func (h *handler) handleCreateSite() http.HandlerFunc {
 
 func (h *handler) handleDeleteSite() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if h.ctx.Store == nil {
+		if h.ctx.Store == nil || h.ctx.TenantStores == nil {
 			http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
 			return
 		}
@@ -409,12 +409,7 @@ func (h *handler) handleResetSiteStats() http.HandlerFunc {
 			return
 		}
 
-		var result api.SiteStatsResetResponse
-		if h.ctx.TenantStores != nil {
-			result, err = h.ctx.TenantStores.ResetSiteStats(r.Context(), siteID)
-		} else {
-			result, err = h.ctx.Store.ResetSiteStats(r.Context(), siteID)
-		}
+		result, err := h.ctx.TenantStores.ResetSiteStats(r.Context(), siteID)
 		if err != nil {
 			slog.Error("Failed to reset site stats", "error", err, "site_id", siteID)
 			http.Error(w, "Failed to reset site stats", http.StatusInternalServerError)

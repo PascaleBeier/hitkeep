@@ -17,7 +17,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/config"
-	"hitkeep/internal/database"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/webhooks"
 )
 
@@ -29,12 +29,12 @@ const (
 )
 
 type Dispatcher struct {
-	store      *database.Store
+	store      *controlstore.Store
 	config     config.Config
 	httpClient *http.Client
 }
 
-func NewDispatcher(store *database.Store, conf config.Config) *Dispatcher {
+func NewDispatcher(store *controlstore.Store, conf config.Config) *Dispatcher {
 	timeout := time.Duration(conf.WebhookDeliveryTimeoutSeconds) * time.Second
 	if timeout <= 0 {
 		timeout = 10 * time.Second
@@ -62,7 +62,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, deliveryID uuid.UUID) error {
 		return err
 	}
 
-	result := database.WebhookAttemptResult{StartedAt: startedAt}
+	result := controlstore.WebhookAttemptResult{StartedAt: startedAt}
 	destination, err := webhooks.ValidateDestination(ctx, delivery.DestinationURL, d.config.WebhookAllowDevelopmentTargets, net.DefaultResolver)
 	if err != nil {
 		result.ErrorCode = "invalid_destination"
@@ -98,7 +98,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, deliveryID uuid.UUID) error {
 	_ = resp.Body.Close()
 	result.ResponseStatus = resp.StatusCode
 	if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
-		result.Status = database.WebhookDeliverySucceeded
+		result.Status = controlstore.WebhookDeliverySucceeded
 		result.CompletedAt = time.Now().UTC()
 		return d.store.RecordWebhookDeliveryAttempt(ctx, delivery.ID, result)
 	}
@@ -107,7 +107,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, deliveryID uuid.UUID) error {
 	return d.finishAttempt(ctx, delivery, result)
 }
 
-func (d *Dispatcher) finishAttempt(ctx context.Context, delivery *database.WebhookDeliveryRecord, result database.WebhookAttemptResult) error {
+func (d *Dispatcher) finishAttempt(ctx context.Context, delivery *controlstore.WebhookDeliveryRecord, result controlstore.WebhookAttemptResult) error {
 	result.CompletedAt = time.Now().UTC()
 	maxAttempts := d.config.WebhookMaxAttempts
 	if maxAttempts <= 0 {
@@ -115,10 +115,10 @@ func (d *Dispatcher) finishAttempt(ctx context.Context, delivery *database.Webho
 	}
 	nextAttemptNumber := delivery.AttemptCount + 1
 	if nextAttemptNumber >= maxAttempts {
-		result.Status = database.WebhookDeliveryFailed
+		result.Status = controlstore.WebhookDeliveryFailed
 		result.NextAttemptAt = nil
 	} else {
-		result.Status = database.WebhookDeliveryRetrying
+		result.Status = controlstore.WebhookDeliveryRetrying
 		next := result.CompletedAt.Add(d.retryDelay(nextAttemptNumber))
 		result.NextAttemptAt = &next
 	}

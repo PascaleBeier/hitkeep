@@ -15,8 +15,10 @@ import (
 	"github.com/nsqio/go-nsq"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/realtime"
+	"hitkeep/internal/testutil"
 	"hitkeep/internal/webhooks"
 )
 
@@ -89,9 +91,7 @@ func TestConsumerPropagatesConversionOutboxFailureForSafeRetry(t *testing.T) {
 
 func TestConsumerRetryAfterConversionOutboxFailureDoesNotDuplicateSourceEvent(t *testing.T) {
 	ctx := context.Background()
-	store := setupConsumerStore(t)
-	mgr := database.NewTenantStoreManager(store, t.TempDir())
-	t.Cleanup(func() { _ = mgr.Close() })
+	store, mgr := setupConsumerStores(t)
 	userID, err := store.CreateUser(ctx, "conversion-retry@example.com", "hash")
 	if err != nil {
 		t.Fatalf("create user: %v", err)
@@ -100,7 +100,14 @@ func TestConsumerRetryAfterConversionOutboxFailureDoesNotDuplicateSourceEvent(t 
 	if err != nil {
 		t.Fatalf("create site: %v", err)
 	}
-	if err := store.CreateGoal(ctx, &api.Goal{SiteID: site.ID, Name: "Signup", Type: "event", Value: "signup"}); err != nil {
+	if err := mgr.SyncSite(ctx, site.ID); err != nil {
+		t.Fatalf("sync site: %v", err)
+	}
+	tenantStore, _, err := mgr.ResolveSiteStore(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("resolve tenant store: %v", err)
+	}
+	if err := tenantStore.CreateGoal(ctx, &api.Goal{SiteID: site.ID, Name: "Signup", Type: "event", Value: "signup"}); err != nil {
 		t.Fatalf("create goal: %v", err)
 	}
 	source := api.Event{ID: uuid.New(), SiteID: site.ID, SessionID: uuid.New(), Name: "signup", Timestamp: time.Now().UTC()}
@@ -110,15 +117,15 @@ func TestConsumerRetryAfterConversionOutboxFailureDoesNotDuplicateSourceEvent(t 
 	consumer.SetWebhookEmitter(emitter)
 	t.Cleanup(consumer.Stop)
 
-	if err := consumer.eventBatcher.persist(store, ctx, []*api.Event{&source}); !errors.Is(err, expected) {
+	if err := consumer.eventBatcher.persist(tenantStore, ctx, []*api.Event{&source}); !errors.Is(err, expected) {
 		t.Fatalf("expected first attempt to requeue: %v", err)
 	}
 	emitter.err = nil
-	if err := consumer.eventBatcher.persist(store, ctx, []*api.Event{&source}); err != nil {
+	if err := consumer.eventBatcher.persist(tenantStore, ctx, []*api.Event{&source}); err != nil {
 		t.Fatalf("retry event: %v", err)
 	}
 	var count int
-	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM events WHERE id = ?", source.ID).Scan(&count); err != nil || count != 1 {
+	if err := tenantStore.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM events WHERE id = ?", source.ID).Scan(&count); err != nil || count != 1 {
 		t.Fatalf("source retry was not idempotent: count=%d err=%v", count, err)
 	}
 	if emitter.batchCalls != 2 || len(emitter.events) != 2 || emitter.events[0].ID != emitter.events[1].ID {
@@ -242,9 +249,7 @@ func TestStoreBatcherFlushesOnIntervalAndPropagatesError(t *testing.T) {
 
 func TestConsumerPersistsHitCanonicalTimestampFromMessage(t *testing.T) {
 	ctx := context.Background()
-	store := setupConsumerStore(t)
-	mgr := database.NewTenantStoreManager(store, t.TempDir())
-	t.Cleanup(func() { _ = mgr.Close() })
+	store, mgr := setupConsumerStores(t)
 
 	userID, err := store.CreateUser(ctx, "consumer-hit@example.com", "hash")
 	if err != nil {
@@ -274,7 +279,11 @@ func TestConsumerPersistsHitCanonicalTimestampFromMessage(t *testing.T) {
 		t.Fatalf("handleHit: %v", err)
 	}
 
-	hits, err := store.GetHits(ctx, api.HitQueryParams{
+	analytics, _, err := mgr.ResolveSiteStore(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("resolve analytics: %v", err)
+	}
+	hits, err := analytics.GetHits(ctx, api.HitQueryParams{
 		SiteID: site.ID,
 		Start:  canonical.Add(-time.Minute),
 		End:    canonical.Add(time.Minute),
@@ -293,9 +302,7 @@ func TestConsumerPersistsHitCanonicalTimestampFromMessage(t *testing.T) {
 
 func TestConsumerPersistsEventCanonicalTimestampFromMessage(t *testing.T) {
 	ctx := context.Background()
-	store := setupConsumerStore(t)
-	mgr := database.NewTenantStoreManager(store, t.TempDir())
-	t.Cleanup(func() { _ = mgr.Close() })
+	store, mgr := setupConsumerStores(t)
 
 	userID, err := store.CreateUser(ctx, "consumer-event@example.com", "hash")
 	if err != nil {
@@ -325,7 +332,11 @@ func TestConsumerPersistsEventCanonicalTimestampFromMessage(t *testing.T) {
 		t.Fatalf("handleEvent: %v", err)
 	}
 
-	series, err := store.GetEventTimeseries(ctx, api.EventTimeseriesParams{
+	analytics, _, err := mgr.ResolveSiteStore(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("resolve analytics: %v", err)
+	}
+	series, err := analytics.GetEventTimeseries(ctx, api.EventTimeseriesParams{
 		SiteID:    site.ID,
 		EventName: "signup_started",
 		Start:     canonical.Add(-time.Minute),
@@ -345,9 +356,7 @@ func TestConsumerPersistsEventCanonicalTimestampFromMessage(t *testing.T) {
 
 func TestConsumerPublishesRealtimeAfterPersistingEvents(t *testing.T) {
 	ctx := context.Background()
-	store := setupConsumerStore(t)
-	mgr := database.NewTenantStoreManager(store, t.TempDir())
-	t.Cleanup(func() { _ = mgr.Close() })
+	store, mgr := setupConsumerStores(t)
 
 	userID, err := store.CreateUser(ctx, "consumer-realtime@example.com", "hash")
 	if err != nil {
@@ -396,9 +405,7 @@ func TestConsumerPublishesRealtimeAfterPersistingEvents(t *testing.T) {
 
 func TestConsumerPersistsWebVitalCanonicalTimestampFromMessage(t *testing.T) {
 	ctx := context.Background()
-	store := setupConsumerStore(t)
-	mgr := database.NewTenantStoreManager(store, t.TempDir())
-	t.Cleanup(func() { _ = mgr.Close() })
+	store, mgr := setupConsumerStores(t)
 
 	userID, err := store.CreateUser(ctx, "consumer-vital@example.com", "hash")
 	if err != nil {
@@ -434,7 +441,11 @@ func TestConsumerPersistsWebVitalCanonicalTimestampFromMessage(t *testing.T) {
 		t.Fatalf("handleWebVital: %v", err)
 	}
 
-	summary, err := store.GetWebVitalsSummary(ctx, api.WebVitalsParams{
+	analytics, _, err := mgr.ResolveSiteStore(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("resolve analytics: %v", err)
+	}
+	summary, err := analytics.GetWebVitalsSummary(ctx, api.WebVitalsParams{
 		SiteID: site.ID,
 		Start:  canonical.Add(-time.Minute),
 		End:    canonical.Add(time.Minute),
@@ -482,4 +493,12 @@ func setupConsumerStore(t *testing.T) *database.Store {
 		t.Fatalf("migrate: %v", err)
 	}
 	return store
+}
+
+func setupConsumerStores(t *testing.T) (*controlstore.Store, *database.TenantStoreManager) {
+	t.Helper()
+	store, manager := testutil.NewControlAndTenantStores(t)
+	t.Cleanup(func() { _ = store.Close() })
+	t.Cleanup(func() { _ = manager.Close() })
+	return store, manager
 }

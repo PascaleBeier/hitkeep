@@ -21,6 +21,7 @@ import (
 	hitai "hitkeep/internal/ai"
 	"hitkeep/internal/api"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/socialauth"
@@ -217,7 +218,7 @@ func (h *handler) handleGetHealth() http.HandlerFunc {
 		}
 
 		if h.ctx.Store != nil {
-			if err := h.ctx.Store.DB().Ping(); err != nil {
+			if err := h.ctx.Store.Ping(r.Context()); err != nil {
 				health.Database = fmt.Sprintf("error: %v", err)
 				health.Status = "degraded"
 			}
@@ -253,7 +254,7 @@ func (h *handler) handleGetAI() http.HandlerFunc {
 	}
 }
 
-func aiSystemStatus(cfg *config.Config, store *database.Store) api.SystemAIStatus {
+func aiSystemStatus(cfg *config.Config, store *controlstore.Store) api.SystemAIStatus {
 	status := api.SystemAIStatus{
 		ConfigMode: "self_hosted",
 	}
@@ -406,12 +407,14 @@ func (h *handler) handleGetStorage() http.HandlerFunc {
 		cfg := h.ctx.Config
 
 		storage := api.SystemStorage{
-			SharedDBPath: cfg.DBPath,
-			DataPath:     cfg.DataPath,
-			BackupPath:   cfg.BackupPath,
+			ControlDBPath: cfg.DBPath,
+			SharedDBPath:  cfg.DBPath,
+			DataPath:      cfg.DataPath,
+			BackupPath:    cfg.BackupPath,
 		}
 
 		if fi, err := os.Stat(cfg.DBPath); err == nil {
+			storage.ControlDBBytes = fi.Size()
 			storage.SharedDBBytes = fi.Size()
 		}
 
@@ -428,10 +431,14 @@ func (h *handler) handleGetStorage() http.HandlerFunc {
 			storage.TenantDBs = tenants
 		}
 
-		if memoryStats, err := h.ctx.Store.GetDuckDBMemoryStats(ctx); err == nil {
-			storage.DuckDBMemory = memoryStats
-		} else {
-			slog.Debug("Failed to read DuckDB memory stats", "error", err)
+		if h.ctx.TenantStores != nil {
+			root, err := h.ctx.TenantStores.ForTenant(ctx, uuid.Nil)
+			if err == nil {
+				if memoryStats, memoryErr := root.GetDuckDBMemoryStats(ctx); memoryErr == nil {
+					storage.TenantDuckDBMemory = memoryStats
+					storage.DuckDBMemory = memoryStats
+				}
+			}
 		}
 
 		spamCachePath := cfg.SpamFilterPath
@@ -508,7 +515,18 @@ func (h *handler) handleGetDatabase() http.HandlerFunc {
 			http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
 			return
 		}
-		writeJSON(w, http.StatusOK, systemDatabaseStatus(h.ctx.Store.DatabaseStatus()))
+		status := database.DatabaseStatus{State: database.DatabaseStateHealthy}
+		if h.ctx.TenantStores != nil {
+			if root, err := h.ctx.TenantStores.ForTenant(r.Context(), uuid.Nil); err == nil {
+				status = root.DatabaseStatus()
+			} else {
+				status = database.DatabaseStatus{State: database.DatabaseStateFailed}
+			}
+			if tenantStatus, unavailable := h.ctx.TenantStores.UnavailableDatabaseStatus(); unavailable {
+				status = tenantStatus
+			}
+		}
+		writeJSON(w, http.StatusOK, systemDatabaseStatus(status))
 	}
 }
 
@@ -520,7 +538,7 @@ func (h *handler) handleRunDatabaseCheckpoint() http.HandlerFunc {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
-		if err := h.ctx.Store.Checkpoint(ctx, "manual"); err != nil {
+		if err := h.ctx.Store.Optimize(ctx); err != nil {
 			slog.Error("Manual database checkpoint failed", "error", err)
 			h.appendAudit(r, "database.checkpoint_requested", "database", "", "shared", "failure", "checkpoint_failed")
 			writeJSON(w, http.StatusInternalServerError, api.SystemActionResponse{
@@ -528,6 +546,18 @@ func (h *handler) handleRunDatabaseCheckpoint() http.HandlerFunc {
 				Message: "Database checkpoint failed",
 			})
 			return
+		}
+		if h.ctx.TenantStores != nil {
+			root, err := h.ctx.TenantStores.ForTenant(ctx, uuid.Nil)
+			if err == nil {
+				err = root.Checkpoint(ctx, "manual")
+			}
+			if err != nil {
+				slog.Error("Manual tenant checkpoint failed", "error", err)
+				h.appendAudit(r, "database.checkpoint_requested", "database", "", "tenant_data_plane", "failure", "checkpoint_failed")
+				writeJSON(w, http.StatusInternalServerError, api.SystemActionResponse{Status: "error", Message: "Database checkpoint failed"})
+				return
+			}
 		}
 
 		h.appendAudit(r, "database.checkpoint_requested", "database", "", "shared", "success", "checkpoint_completed")

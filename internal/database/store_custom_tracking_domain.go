@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 )
 
 const (
@@ -23,20 +24,8 @@ const (
 
 var ErrCustomTrackingDomainNotFound = errors.New("custom tracking domain not found")
 
-type CustomTrackingDomainInput struct {
-	TeamID  uuid.UUID
-	Host    string
-	TLSMode string
-}
-
-type CustomTrackingDomainVerificationResult struct {
-	VerificationStatus string
-	TargetStatus       string
-	TLSStatus          string
-	LastError          string
-	VerifiedAt         *time.Time
-	LastCheckedAt      time.Time
-}
+type CustomTrackingDomainInput = controlstore.CustomTrackingDomainInput
+type CustomTrackingDomainVerificationResult = controlstore.CustomTrackingDomainVerificationResult
 
 func NewCustomTrackingDomainVerificationToken() (string, error) {
 	var b [16]byte

@@ -16,7 +16,31 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/assetstore"
+	"hitkeep/internal/controlstore"
 )
+
+func openConvertedControlTest(t *testing.T, ctx context.Context, path string) *controlstore.Store {
+	t.Helper()
+	source, sourceSHA, schemaSHA, err := OpenLegacyControlSource(ctx, path)
+	if err != nil {
+		t.Fatalf("open legacy control source: %v", err)
+	}
+	if _, err := controlstore.ImportLegacy(ctx, controlstore.SQLiteWorkPath(path), source, sourceSHA, schemaSHA); err != nil {
+		_ = source.Close()
+		t.Fatalf("import legacy control: %v", err)
+	}
+	if err := source.Close(); err != nil {
+		t.Fatalf("close legacy control source: %v", err)
+	}
+	if err := controlstore.PublishLegacyConversion(ctx, path); err != nil {
+		t.Fatalf("publish SQLite control: %v", err)
+	}
+	store, err := controlstore.Open(ctx, path)
+	if err != nil {
+		t.Fatalf("open SQLite control: %v", err)
+	}
+	return store
+}
 
 // defaultTenantSplitFixtureTables is the explicit migration acceptance
 // registry. The schema-contract test below fails whenever a site-scoped tenant
@@ -706,10 +730,7 @@ func TestTenantStoreManagerUsesOneAttachedDataPlane(t *testing.T) {
 	if err := RunDefaultTenantSplit(ctx, sharedPath, dataPath); err != nil {
 		t.Fatal(err)
 	}
-	control := NewStore(sharedPath)
-	if err := control.Connect(); err != nil {
-		t.Fatal(err)
-	}
+	control := openConvertedControlTest(t, ctx, sharedPath)
 	tenants, err := control.GetTenantList(ctx)
 	defaultCount := 0
 	for _, tenant := range tenants {
@@ -721,7 +742,7 @@ func TestTenantStoreManagerUsesOneAttachedDataPlane(t *testing.T) {
 		_ = control.Close()
 		t.Fatalf("expected active enumeration to include the default tenant exactly once: tenants=%+v err=%v", tenants, err)
 	}
-	mgr := NewTenantStoreManager(control, dataPath, WithTenantDataPlane(true))
+	mgr := NewTenantStoreManager(control, dataPath, nil)
 	defaultStore, err := mgr.ForTenant(ctx, uuid.Nil)
 	if err != nil {
 		_ = control.Close()
@@ -851,6 +872,17 @@ func TestTenantStoreManagerUsesOneAttachedDataPlane(t *testing.T) {
 		_ = control.Close()
 		t.Fatal(err)
 	}
+	if err := os.Remove(defaultStore.path); err != nil {
+		_ = control.Close()
+		t.Fatal(err)
+	}
+	missingRootManager := NewTenantStoreManager(control, dataPath, nil)
+	if _, err := missingRootManager.ForTenant(ctx, uuid.Nil); err == nil {
+		_ = missingRootManager.Close()
+		_ = control.Close()
+		t.Fatal("converted control accepted a missing default tenant data-plane root")
+	}
+	_ = missingRootManager.Close()
 	if err := control.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -886,11 +918,8 @@ func TestTenantStoreManagerActivationReadsTenantActivity(t *testing.T) {
 	if err := RunDefaultTenantSplit(ctx, sharedPath, dataPath); err != nil {
 		t.Fatal(err)
 	}
-	control := NewStore(sharedPath)
-	if err := control.Connect(); err != nil {
-		t.Fatal(err)
-	}
-	manager := NewTenantStoreManager(control, dataPath, WithTenantDataPlane(true))
+	control := openConvertedControlTest(t, ctx, sharedPath)
+	manager := NewTenantStoreManager(control, dataPath, nil)
 	defer func() {
 		_ = manager.Close()
 		_ = control.Close()

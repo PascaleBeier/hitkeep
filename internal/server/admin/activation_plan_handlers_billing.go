@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/server/shared"
@@ -53,7 +54,7 @@ func (h *handler) handleSetActivationTeamPlan() http.HandlerFunc {
 		}
 
 		account, err := h.ctx.Store.GetCloudBillingAccount(r.Context(), teamID)
-		if err != nil && !errors.Is(err, database.ErrCloudBillingAccountNotFound) {
+		if err != nil && !errors.Is(err, controlstore.ErrCloudBillingAccountNotFound) {
 			slog.Error("Failed to load cloud billing account", "team_id", teamID, "error", err)
 			h.appendAudit(r, "cloud_billing.plan_override", "team", teamID.String(), "", "failure", err.Error())
 			writeJSON(w, http.StatusInternalServerError, map[string]string{

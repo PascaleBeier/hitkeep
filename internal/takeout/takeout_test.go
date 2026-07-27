@@ -22,6 +22,7 @@ import (
 	"hitkeep/internal/database"
 	"hitkeep/internal/exportfmt"
 	"hitkeep/internal/importables"
+	"hitkeep/internal/testutil"
 )
 
 func TestTakeoutWebhookExportsExcludeSecretsAndPayloadBodies(t *testing.T) {
@@ -739,19 +740,10 @@ func TestExportUserDataSupportsAllFormats(t *testing.T) {
 func TestExportUserDataWithTenantStoresIncludesCrossTenantRowsInAllFormats(t *testing.T) {
 	ctx := context.Background()
 	tmpDir := t.TempDir()
-	dbPath := filepath.Join(tmpDir, "shared.db")
 	exportDir := filepath.Join(tmpDir, "exports")
 
-	store := database.NewStore(dbPath)
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect shared store: %v", err)
-	}
+	store, tenantStores := testutil.NewControlAndTenantStores(t)
 	t.Cleanup(func() { _ = store.Close() })
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate shared store: %v", err)
-	}
-
-	tenantStores := database.NewTenantStoreManager(store, filepath.Join(tmpDir, "tenants"))
 	t.Cleanup(func() { _ = tenantStores.Close() })
 
 	userID, err := store.CreateUser(ctx, "tenant-aware-takeout@example.com", "hash")
@@ -762,7 +754,11 @@ func TestExportUserDataWithTenantStoresIncludesCrossTenantRowsInAllFormats(t *te
 	if err != nil {
 		t.Fatalf("create default site: %v", err)
 	}
-	createTakeoutHit(t, store, defaultSite.ID, "/default-scope")
+	defaultStore, _, err := tenantStores.ResolveSiteStore(ctx, defaultSite.ID)
+	if err != nil {
+		t.Fatalf("resolve default analytics store: %v", err)
+	}
+	createTakeoutHit(t, defaultStore, defaultSite.ID, "/default-scope")
 
 	team, err := store.CreateTenant(ctx, userID, "Tenant Takeout", "")
 	if err != nil {
@@ -788,8 +784,8 @@ func TestExportUserDataWithTenantStoresIncludesCrossTenantRowsInAllFormats(t *te
 			if err != nil {
 				t.Fatalf("export user data %s: %v", format, err)
 			}
-			assertTakeoutContainsSentinel(t, store, filename, format, takeoutSentinel{RecordType: "hit", Path: "/default-scope"})
-			assertTakeoutContainsSentinel(t, store, filename, format, takeoutSentinel{RecordType: "hit", Path: "/team-scope"})
+			assertTakeoutContainsSentinel(t, defaultStore, filename, format, takeoutSentinel{RecordType: "hit", Path: "/default-scope"})
+			assertTakeoutContainsSentinel(t, defaultStore, filename, format, takeoutSentinel{RecordType: "hit", Path: "/team-scope"})
 		})
 	}
 }
@@ -834,14 +830,9 @@ func TestExportUserDataWithTenantStoresPreservesParquetSchema(t *testing.T) {
 	tmpDir := t.TempDir()
 	exportDir := filepath.Join(tmpDir, "exports")
 
-	store := database.NewStore(filepath.Join(tmpDir, "shared.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect shared store: %v", err)
-	}
+	store, tenantStores := testutil.NewControlAndTenantStores(t)
 	t.Cleanup(func() { _ = store.Close() })
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate shared store: %v", err)
-	}
+	t.Cleanup(func() { _ = tenantStores.Close() })
 
 	userID, err := store.CreateUser(ctx, "schema-takeout@example.com", "hash")
 	if err != nil {
@@ -851,17 +842,19 @@ func TestExportUserDataWithTenantStoresPreservesParquetSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create default site: %v", err)
 	}
-	createTakeoutHit(t, store, defaultSite.ID, "/schema-default")
+	defaultStore, _, err := tenantStores.ResolveSiteStore(ctx, defaultSite.ID)
+	if err != nil {
+		t.Fatalf("resolve default analytics store: %v", err)
+	}
+	createTakeoutHit(t, defaultStore, defaultSite.ID, "/schema-default")
 
-	plainService := NewTakeoutService(store, filepath.Join(tmpDir, "plain-exports"))
+	plainService := NewTakeoutServiceWithTenantStores(store, tenantStores, filepath.Join(tmpDir, "plain-exports"))
 	plainFilename, err := plainService.ExportUserData(ctx, userID, "parquet")
 	if err != nil {
-		t.Fatalf("export direct user data: %v", err)
+		t.Fatalf("export single-tenant user data: %v", err)
 	}
-	wantSchema := parquetTakeoutSchema(t, store, plainFilename)
+	wantSchema := parquetTakeoutSchema(t, defaultStore, plainFilename)
 
-	tenantStores := database.NewTenantStoreManager(store, filepath.Join(tmpDir, "tenants"))
-	t.Cleanup(func() { _ = tenantStores.Close() })
 	team, err := store.CreateTenant(ctx, userID, "Schema Team", "")
 	if err != nil {
 		t.Fatalf("create tenant: %v", err)
@@ -884,7 +877,7 @@ func TestExportUserDataWithTenantStoresPreservesParquetSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("export tenant-aware user data: %v", err)
 	}
-	gotSchema := parquetTakeoutSchema(t, store, mergedFilename)
+	gotSchema := parquetTakeoutSchema(t, defaultStore, mergedFilename)
 
 	for column, wantType := range wantSchema {
 		if gotType, ok := gotSchema[column]; !ok {
@@ -900,15 +893,8 @@ func TestExportSiteDataWithTenantStoresIncludesTeamSiteRowsInAllFormats(t *testi
 	tmpDir := t.TempDir()
 	exportDir := filepath.Join(tmpDir, "exports")
 
-	store := database.NewStore(filepath.Join(tmpDir, "shared.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect shared store: %v", err)
-	}
+	store, tenantStores := testutil.NewControlAndTenantStores(t)
 	t.Cleanup(func() { _ = store.Close() })
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate shared store: %v", err)
-	}
-	tenantStores := database.NewTenantStoreManager(store, filepath.Join(tmpDir, "tenants"))
 	t.Cleanup(func() { _ = tenantStores.Close() })
 
 	userID, err := store.CreateUser(ctx, "site-tenant-aware-takeout@example.com", "hash")
@@ -939,7 +925,7 @@ func TestExportSiteDataWithTenantStoresIncludesTeamSiteRowsInAllFormats(t *testi
 			if err != nil {
 				t.Fatalf("export site data %s: %v", format, err)
 			}
-			assertTakeoutContainsSentinel(t, store, filename, format, takeoutSentinel{RecordType: "hit", Path: "/team-site-export"})
+			assertTakeoutContainsSentinel(t, teamStore, filename, format, takeoutSentinel{RecordType: "hit", Path: "/team-site-export"})
 		})
 	}
 }

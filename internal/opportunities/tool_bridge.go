@@ -9,11 +9,12 @@ import (
 
 	"hitkeep/internal/analyticstools"
 	"hitkeep/internal/auth"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 )
 
 type ToolBridgeConfig struct {
-	Shared                *database.Store
+	Shared                *controlstore.Store
 	Analytics             *database.Store
 	TeamID                uuid.UUID
 	SiteID                uuid.UUID

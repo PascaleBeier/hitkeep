@@ -9,11 +9,12 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/opportunities"
 )
 
-func seedOpportunities(ctx context.Context, sharedStore, analyticsStore *database.Store, site api.Site, actorID uuid.UUID, from, to time.Time) (int, error) {
+func seedOpportunities(ctx context.Context, sharedStore *controlstore.Store, analyticsStore *database.Store, site api.Site, actorID uuid.UUID, from, to time.Time) (int, error) {
 	if sharedStore == nil {
 		return 0, fmt.Errorf("shared store is required")
 	}

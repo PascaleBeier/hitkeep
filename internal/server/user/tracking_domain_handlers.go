@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
 )
@@ -195,7 +196,7 @@ func (h *handler) handleUpdateCustomTrackingDomain() http.HandlerFunc {
 			return
 		}
 		domain, err := h.ctx.Store.UpdateCustomTrackingDomainEnabled(r.Context(), teamID, domainID, *req.Enabled)
-		if errors.Is(err, database.ErrCustomTrackingDomainNotFound) {
+		if errors.Is(err, controlstore.ErrCustomTrackingDomainNotFound) {
 			http.Error(w, "Custom tracking domain not found", http.StatusNotFound)
 			return
 		}
@@ -236,7 +237,7 @@ func (h *handler) handleDeleteCustomTrackingDomain() http.HandlerFunc {
 			http.Error(w, "Custom tracking domain not found", http.StatusNotFound)
 			return
 		}
-		if err := h.ctx.Store.DeleteCustomTrackingDomain(r.Context(), teamID, domainID); errors.Is(err, database.ErrCustomTrackingDomainNotFound) {
+		if err := h.ctx.Store.DeleteCustomTrackingDomain(r.Context(), teamID, domainID); errors.Is(err, controlstore.ErrCustomTrackingDomainNotFound) {
 			http.Error(w, "Custom tracking domain not found", http.StatusNotFound)
 			return
 		} else if err != nil {

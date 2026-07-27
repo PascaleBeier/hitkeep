@@ -14,6 +14,7 @@ import (
 
 	"hitkeep/internal/appurl"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
 )
@@ -75,7 +76,7 @@ func (h *handler) handleCreateBillingPortalSession() http.HandlerFunc {
 		}
 
 		account, err := h.ctx.Store.GetCloudBillingAccount(r.Context(), activeTenantID)
-		if errors.Is(err, database.ErrCloudBillingAccountNotFound) || account == nil {
+		if errors.Is(err, controlstore.ErrCloudBillingAccountNotFound) || account == nil {
 			newAccount := database.CloudBillingAccount{
 				TenantID:           activeTenantID,
 				PlanCode:           database.CloudPlanFree,
@@ -89,7 +90,7 @@ func (h *handler) handleCreateBillingPortalSession() http.HandlerFunc {
 			}
 			account = &newAccount
 		}
-		if err != nil && !errors.Is(err, database.ErrCloudBillingAccountNotFound) {
+		if err != nil && !errors.Is(err, controlstore.ErrCloudBillingAccountNotFound) {
 			slog.Error("Failed to load cloud billing account", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
@@ -154,7 +155,7 @@ func (h *handler) handleCreateBillingCheckoutSession() http.HandlerFunc {
 		}
 
 		account, err := h.ctx.Store.GetCloudBillingAccount(r.Context(), activeTenantID)
-		if errors.Is(err, database.ErrCloudBillingAccountNotFound) || account == nil {
+		if errors.Is(err, controlstore.ErrCloudBillingAccountNotFound) || account == nil {
 			// Auto-create a free billing account for legacy users who signed up
 			// before the billing account table existed.
 			newAccount := database.CloudBillingAccount{
@@ -170,7 +171,7 @@ func (h *handler) handleCreateBillingCheckoutSession() http.HandlerFunc {
 			}
 			account = &newAccount
 		}
-		if err != nil && !errors.Is(err, database.ErrCloudBillingAccountNotFound) {
+		if err != nil && !errors.Is(err, controlstore.ErrCloudBillingAccountNotFound) {
 			slog.Error("Failed to load cloud billing account", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return

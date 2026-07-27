@@ -14,21 +14,18 @@ import (
 	hitai "hitkeep/internal/ai"
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/testutil"
 )
 
-func setupOpportunityHandlerTestEnv(t *testing.T) (*database.Store, *shared.Context, uuid.UUID, uuid.UUID) {
+func setupOpportunityHandlerTestEnv(t *testing.T) (*controlstore.Store, *shared.Context, uuid.UUID, uuid.UUID) {
 	t.Helper()
 
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store, tenantStores := testutil.NewControlAndTenantStores(t)
 	t.Cleanup(func() { _ = store.Close() })
+	t.Cleanup(func() { _ = tenantStores.Close() })
 
 	userID, err := store.CreateUser(context.Background(), "opportunities@example.com", "hashed")
 	if err != nil {
@@ -42,8 +39,9 @@ func setupOpportunityHandlerTestEnv(t *testing.T) (*database.Store, *shared.Cont
 	if err != nil {
 		t.Fatalf("GetSiteTenantID: %v", err)
 	}
-	tenantStores := database.NewTenantStoreManager(store, t.TempDir(), database.WithTenantDataPlane(false))
-	t.Cleanup(func() { _ = tenantStores.Close() })
+	if err := tenantStores.SyncSite(context.Background(), site.ID); err != nil {
+		t.Fatalf("SyncSite: %v", err)
+	}
 
 	ctx := &shared.Context{Store: store, TenantStores: tenantStores}
 
@@ -461,7 +459,11 @@ func TestOpportunityRoutesEnforceSitePermissions(t *testing.T) {
 
 func TestGenerateAttributesAPIClientActor(t *testing.T) {
 	store, ctx, siteID, teamID := setupOpportunityHandlerTestEnv(t)
-	seedSetupSuggestionEvidence(t, store, siteID)
+	analytics, err := ctx.AnalyticsStore(context.Background(), siteID)
+	if err != nil {
+		t.Fatalf("resolve analytics: %v", err)
+	}
+	seedSetupSuggestionEvidence(t, analytics, siteID)
 	client, token, err := store.CreateTeamAPIClient(context.Background(), teamID, "team opportunities", "", map[uuid.UUID]authcore.SiteRole{
 		siteID: authcore.SiteAdmin,
 	}, nil)
@@ -472,7 +474,7 @@ func TestGenerateAttributesAPIClientActor(t *testing.T) {
 		t.Fatal("expected api client")
 	}
 
-	ai := &recordingOpportunityAI{}
+	ai := &recordingOpportunityAI{store: store}
 	ctx.AI = ai
 	mux := http.NewServeMux()
 	Register(mux, ctx)
@@ -538,11 +540,12 @@ func seedSetupSuggestionEvidence(t *testing.T, store *database.Store, siteID uui
 }
 
 type recordingOpportunityAI struct {
+	store   *controlstore.Store
 	last    hitai.OpportunityRequest
 	toolErr error
 }
 
-func (a *recordingOpportunityAI) GenerateOpportunityProposal(_ context.Context, req hitai.OpportunityRequest) (hitai.OpportunityProposalResult, error) {
+func (a *recordingOpportunityAI) GenerateOpportunityProposal(ctx context.Context, req hitai.OpportunityRequest) (hitai.OpportunityProposalResult, error) {
 	a.last = req
 	if len(req.Tools) > 0 {
 		_, a.toolErr = req.Tools[0].Execute(context.Background(), nil)
@@ -555,8 +558,23 @@ func (a *recordingOpportunityAI) GenerateOpportunityProposal(_ context.Context, 
 	if len(req.DetectorInput.AllowedActionTypes) > 0 {
 		actionType = req.DetectorInput.AllowedActionTypes[0]
 	}
+	runID := uuid.New()
+	if _, err := a.store.AppendAIRun(ctx, controlstore.AIRunParams{
+		ID:         runID,
+		TeamID:     req.TeamID,
+		SiteID:     req.SiteID,
+		ActorID:    req.ActorID,
+		ActorType:  req.ActorType,
+		Feature:    "opportunities",
+		Provider:   "test",
+		Model:      "test-model",
+		OutputJSON: `{}`,
+		Status:     "success",
+	}); err != nil {
+		return hitai.OpportunityProposalResult{}, err
+	}
 	return hitai.OpportunityProposalResult{
-		RunID: uuid.New(),
+		RunID: runID,
 		Proposal: hitai.OpportunityCandidateProposal{
 			TypeKey:          req.DetectorInput.TypeKey,
 			Category:         req.DetectorInput.Category,

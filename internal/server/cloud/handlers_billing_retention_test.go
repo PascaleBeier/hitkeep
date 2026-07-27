@@ -9,17 +9,19 @@ import (
 	"github.com/google/uuid"
 	stripe "github.com/stripe/stripe-go/v86"
 
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 )
 
-func setupCloudTestHandlerWithTenantStores(t *testing.T) (*handler, *database.Store) {
+func setupCloudTestHandlerWithTenantStores(t *testing.T) (*handler, *controlstore.Store) {
 	t.Helper()
 	h, store := setupCloudTestHandler(t)
-	h.ctx.TenantStores = database.NewTenantStoreManager(store, t.TempDir())
+	h.ctx.TenantStores = database.NewTenantStoreManager(store, t.TempDir(), nil)
+	t.Cleanup(func() { _ = h.ctx.TenantStores.Close() })
 	return h, store
 }
 
-func siteRetentionDaysForTeam(t *testing.T, store *database.Store, tenantID uuid.UUID) int {
+func siteRetentionDaysForTeam(t *testing.T, store *controlstore.Store, tenantID uuid.UUID) int {
 	t.Helper()
 	sites, err := store.ListSitesForTenant(context.Background(), tenantID)
 	if err != nil {

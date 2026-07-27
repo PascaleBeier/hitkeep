@@ -23,9 +23,11 @@ import (
 	"golang.org/x/time/rate"
 
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/testutil"
 )
 
 type fakeStripeClient struct {
@@ -98,16 +100,10 @@ func (f fakeWebhookVerifier) ConstructEvent(_ []byte, _ string, _ string) (strip
 	return f.event, f.err
 }
 
-func setupCloudTestHandler(t *testing.T) (*handler, *database.Store) {
+func setupCloudTestHandler(t *testing.T) (*handler, *controlstore.Store) {
 	t.Helper()
 
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
+	store := testutil.NewControlStore(t)
 
 	testConf := &config.Config{
 		PublicURL:                   "https://cloud.hitkeep.eu",
@@ -137,7 +133,7 @@ func setupCloudTestHandler(t *testing.T) (*handler, *database.Store) {
 	return h, store
 }
 
-func setupSignedCloudWebhookTestHandler(t *testing.T) (*handler, *database.Store, *fakeStripeClient) {
+func setupSignedCloudWebhookTestHandler(t *testing.T) (*handler, *controlstore.Store, *fakeStripeClient) {
 	t.Helper()
 
 	h, store := setupCloudTestHandler(t)
@@ -185,14 +181,8 @@ func postSignedStripeWebhook(t *testing.T, h *handler, eventID string, eventType
 }
 
 func TestRegisterUsesDedicatedWebhookLimiter(t *testing.T) {
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
+	store := testutil.NewControlStore(t)
 	defer store.Close()
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
 
 	apiLimiter := shared.NewIPRateLimiter(0, 0)
 	defer apiLimiter.Stop()
@@ -228,14 +218,8 @@ func TestRegisterUsesDedicatedWebhookLimiter(t *testing.T) {
 }
 
 func TestRegisterWebhookLimiterCanThrottleStripeWebhook(t *testing.T) {
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
+	store := testutil.NewControlStore(t)
 	defer store.Close()
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
 
 	apiLimiter := shared.NewIPRateLimiter(rate.Inf, 1)
 	defer apiLimiter.Stop()
@@ -492,7 +476,7 @@ func TestHandleVerifySignupWithExistingDefaultTeamDoesNotJoinDefaultTeam(t *test
 	requireSingleNonDefaultActiveTeam(t, store, userID, defaultTenantID)
 }
 
-func createDefaultOwner(t *testing.T, store *database.Store) (uuid.UUID, uuid.UUID) {
+func createDefaultOwner(t *testing.T, store *controlstore.Store) (uuid.UUID, uuid.UUID) {
 	t.Helper()
 	defaultOwnerID, err := store.CreateUser(context.Background(), "default-owner@example.com", "hashed")
 	if err != nil {
@@ -505,7 +489,7 @@ func createDefaultOwner(t *testing.T, store *database.Store) (uuid.UUID, uuid.UU
 	return defaultOwnerID, defaultTenantID
 }
 
-func createPendingPublicSignupToken(t *testing.T, store *database.Store, email string) string {
+func createPendingPublicSignupToken(t *testing.T, store *controlstore.Store, email string) string {
 	t.Helper()
 	token, err := store.CreatePendingSignup(context.Background(), database.PendingSignupEntry{
 		Email:          email,
@@ -531,7 +515,7 @@ func verifySignupToken(t *testing.T, h *handler, token string) {
 	}
 }
 
-func requireCloudSignupUser(t *testing.T, store *database.Store, email string) uuid.UUID {
+func requireCloudSignupUser(t *testing.T, store *controlstore.Store, email string) uuid.UUID {
 	t.Helper()
 	user, err := store.GetUserByEmail(context.Background(), email)
 	if err != nil {
@@ -543,7 +527,7 @@ func requireCloudSignupUser(t *testing.T, store *database.Store, email string) u
 	return user.ID
 }
 
-func requireTenantMembership(t *testing.T, store *database.Store, tenantID, userID uuid.UUID, want bool, label string) {
+func requireTenantMembership(t *testing.T, store *controlstore.Store, tenantID, userID uuid.UUID, want bool, label string) {
 	t.Helper()
 	isMember, err := store.IsTenantMember(context.Background(), tenantID, userID)
 	if err != nil {
@@ -554,7 +538,7 @@ func requireTenantMembership(t *testing.T, store *database.Store, tenantID, user
 	}
 }
 
-func requireSingleNonDefaultActiveTeam(t *testing.T, store *database.Store, userID, defaultTenantID uuid.UUID) {
+func requireSingleNonDefaultActiveTeam(t *testing.T, store *controlstore.Store, userID, defaultTenantID uuid.UUID) {
 	t.Helper()
 	teams, activeTenantID, err := store.ListUserTeams(context.Background(), userID)
 	if err != nil {
@@ -832,7 +816,7 @@ func TestHandleStripeEventIgnoresOtherJurisdictions(t *testing.T) {
 		t.Fatalf("handle stripe event: %v", err)
 	}
 
-	if _, err := store.GetCloudBillingEvent(context.Background(), event.ID); !errors.Is(err, database.ErrCloudBillingEventNotFound) {
+	if _, err := store.GetCloudBillingEvent(context.Background(), event.ID); !errors.Is(err, controlstore.ErrCloudBillingEventNotFound) {
 		t.Fatalf("expected foreign-jurisdiction event to be ignored, got %v", err)
 	}
 }

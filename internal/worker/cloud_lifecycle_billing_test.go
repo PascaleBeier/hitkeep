@@ -5,15 +5,16 @@ package worker
 import (
 	"context"
 	"errors"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/mailer"
+	"hitkeep/internal/testutil"
 )
 
 type cloudLifecycleWorkerMailDriver struct {
@@ -43,7 +44,7 @@ func (d *cloudLifecycleWorkerMailDriver) Close() error { return nil }
 func TestCloudLifecycleWorkerSendsWelcomeAndReminderOnce(t *testing.T) {
 	store, mgr := setupCloudLifecycleWorkerStore(t)
 	now := time.Date(2026, 6, 24, 12, 0, 0, 0, time.UTC)
-	team := seedWorkerCloudLifecycleTeam(t, store, "owner@example.com", "example.com", database.CloudPlanFree, database.CloudSubscriptionStatusFree, ptrWorkerTime(now.AddDate(0, 0, -20)))
+	team := seedWorkerCloudLifecycleTeam(t, store, mgr, "owner@example.com", "example.com", database.CloudPlanFree, database.CloudSubscriptionStatusFree, ptrWorkerTime(now.AddDate(0, 0, -20)))
 	driver := &cloudLifecycleWorkerMailDriver{}
 	worker := NewCloudLifecycleWorker(mgr, mailer.NewWithDriver(driver, nil), cloudLifecycleWorkerConfig())
 
@@ -72,7 +73,7 @@ func TestCloudLifecycleWorkerSendsPreTrimWarningBeforeFirstRollOff(t *testing.T)
 	store, mgr := setupCloudLifecycleWorkerStore(t)
 	now := time.Date(2026, 6, 24, 12, 0, 0, 0, time.UTC)
 	firstHit := now.AddDate(0, 0, -(database.CloudFreePlanRetentionDays - database.CloudRetentionPreTrimLeadDays + 1))
-	team := seedWorkerCloudLifecycleTeam(t, store, "pretrim-worker@example.com", "pretrim-worker.example", database.CloudPlanFree, database.CloudSubscriptionStatusFree, ptrWorkerTime(firstHit))
+	team := seedWorkerCloudLifecycleTeam(t, store, mgr, "pretrim-worker@example.com", "pretrim-worker.example", database.CloudPlanFree, database.CloudSubscriptionStatusFree, ptrWorkerTime(firstHit))
 	driver := &cloudLifecycleWorkerMailDriver{}
 	worker := NewCloudLifecycleWorker(mgr, mailer.NewWithDriver(driver, nil), cloudLifecycleWorkerConfig())
 
@@ -107,13 +108,13 @@ func TestCloudLifecycleWorkerSendsPreTrimWarningBeforeFirstRollOff(t *testing.T)
 func TestCloudLifecycleWorkerSkipsWhenMailerMissing(t *testing.T) {
 	store, mgr := setupCloudLifecycleWorkerStore(t)
 	now := time.Date(2026, 6, 24, 12, 0, 0, 0, time.UTC)
-	team := seedWorkerCloudLifecycleTeam(t, store, "missing-mailer@example.com", "missing-mailer.example", database.CloudPlanFree, database.CloudSubscriptionStatusFree, ptrWorkerTime(now.Add(-time.Hour)))
+	team := seedWorkerCloudLifecycleTeam(t, store, mgr, "missing-mailer@example.com", "missing-mailer.example", database.CloudPlanFree, database.CloudSubscriptionStatusFree, ptrWorkerTime(now.Add(-time.Hour)))
 	worker := NewCloudLifecycleWorker(mgr, nil, cloudLifecycleWorkerConfig())
 
 	worker.RunAt(context.Background(), now)
 
 	_, err := store.GetCloudLifecycleMessage(context.Background(), team.TenantID, team.UserID, database.CloudLifecycleMessageWelcome)
-	if !errors.Is(err, database.ErrCloudLifecycleMessageNotFound) {
+	if !errors.Is(err, controlstore.ErrCloudLifecycleMessageNotFound) {
 		t.Fatalf("expected no lifecycle message when mailer is missing, got %v", err)
 	}
 }
@@ -121,7 +122,7 @@ func TestCloudLifecycleWorkerSkipsWhenMailerMissing(t *testing.T) {
 func TestCloudLifecycleWorkerRetriesFailedSend(t *testing.T) {
 	store, mgr := setupCloudLifecycleWorkerStore(t)
 	now := time.Date(2026, 6, 24, 12, 0, 0, 0, time.UTC)
-	team := seedWorkerCloudLifecycleTeam(t, store, "retry-worker@example.com", "retry-worker.example", database.CloudPlanFree, database.CloudSubscriptionStatusFree, ptrWorkerTime(now.Add(-time.Hour)))
+	team := seedWorkerCloudLifecycleTeam(t, store, mgr, "retry-worker@example.com", "retry-worker.example", database.CloudPlanFree, database.CloudSubscriptionStatusFree, ptrWorkerTime(now.Add(-time.Hour)))
 	driver := &cloudLifecycleWorkerMailDriver{sendErr: errors.New("smtp unavailable")}
 	worker := NewCloudLifecycleWorker(mgr, mailer.NewWithDriver(driver, nil), cloudLifecycleWorkerConfig())
 
@@ -150,7 +151,7 @@ func TestCloudLifecycleWorkerRetriesFailedSend(t *testing.T) {
 func TestCloudLifecycleWorkerUsesConfiguredLinks(t *testing.T) {
 	store, mgr := setupCloudLifecycleWorkerStore(t)
 	now := time.Date(2026, 6, 24, 12, 0, 0, 0, time.UTC)
-	seedWorkerCloudLifecycleTeam(t, store, "links@example.com", "links.example", database.CloudPlanPro, database.CloudSubscriptionStatusActive, ptrWorkerTime(now.Add(-time.Hour)))
+	seedWorkerCloudLifecycleTeam(t, store, mgr, "links@example.com", "links.example", database.CloudPlanPro, database.CloudSubscriptionStatusActive, ptrWorkerTime(now.Add(-time.Hour)))
 	driver := &cloudLifecycleWorkerMailDriver{}
 	conf := cloudLifecycleWorkerConfig()
 	conf.PublicURL = "https://cloud.hitkeep.eu"
@@ -176,21 +177,15 @@ func TestCloudLifecycleWorkerUsesConfiguredLinks(t *testing.T) {
 	}
 }
 
-func setupCloudLifecycleWorkerStore(t *testing.T) (*database.Store, *database.TenantStoreManager) {
+func setupCloudLifecycleWorkerStore(t *testing.T) (*controlstore.Store, *database.TenantStoreManager) {
 	t.Helper()
-	dbPath := filepath.Join(t.TempDir(), "hitkeep.db")
-	store := database.NewStore(dbPath)
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
+	store, manager := testutil.NewControlAndTenantStores(t)
 	t.Cleanup(func() { _ = store.Close() })
-	return store, database.NewTenantStoreManager(store, t.TempDir())
+	t.Cleanup(func() { _ = manager.Close() })
+	return store, manager
 }
 
-func seedWorkerCloudLifecycleTeam(t *testing.T, store *database.Store, email string, domain string, planCode string, status string, firstHitAt *time.Time) *database.ManagedCloudAccount {
+func seedWorkerCloudLifecycleTeam(t *testing.T, store *controlstore.Store, manager *database.TenantStoreManager, email string, domain string, planCode string, status string, firstHitAt *time.Time) *controlstore.ManagedCloudAccount {
 	t.Helper()
 	ctx := context.Background()
 	account, err := store.CreateManagedCloudAccount(ctx, database.CreateManagedCloudAccountInput{
@@ -215,7 +210,11 @@ func seedWorkerCloudLifecycleTeam(t *testing.T, store *database.Store, email str
 		t.Fatalf("create site: %v", err)
 	}
 	if firstHitAt != nil {
-		if err := store.RecordHitActivity(ctx, []*api.Hit{{
+		analytics, _, err := manager.ResolveSiteStore(ctx, site.ID)
+		if err != nil {
+			t.Fatalf("resolve activity store: %v", err)
+		}
+		if err := analytics.RecordHitActivity(ctx, []*api.Hit{{
 			SiteID:    site.ID,
 			Timestamp: firstHitAt.UTC(),
 			Path:      "/",

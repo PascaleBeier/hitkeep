@@ -375,6 +375,9 @@ describe('AdminSettings', () => {
             checkpoint_interval_min: 5
         });
         storageRequest.flush({
+            control_db_path: '/data/hitkeep.db',
+            control_db_bytes: 4096,
+            tenant_duckdb_memory: [],
             shared_db_path: '/data/hitkeep.db',
             shared_db_bytes: 1024,
             data_path: '/data',
@@ -417,6 +420,9 @@ describe('AdminSettings', () => {
             last_checkpoint_at: '2026-07-16T12:00:00Z'
         });
         storageRequest.flush({
+            control_db_path: '/data/hitkeep.db',
+            control_db_bytes: 4096,
+            tenant_duckdb_memory: [],
             shared_db_path: '/data/hitkeep.db',
             shared_db_bytes: 1024,
             data_path: '/data',
@@ -721,6 +727,9 @@ describe('AdminSettings rendered system status', () => {
             budget_exhausted: false
         });
         httpMock.expectOne('/api/admin/system/storage').flush({
+            control_db_path: '/tmp/hitkeep.db',
+            control_db_bytes: 4096,
+            tenant_duckdb_memory: [],
             shared_db_path: '/tmp/hitkeep.db',
             shared_db_bytes: 1024,
             data_path: '/tmp',

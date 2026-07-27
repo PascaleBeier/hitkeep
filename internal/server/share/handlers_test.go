@@ -13,16 +13,42 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/exportfmt"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/testutil"
 )
 
-func newShareTestContext(t *testing.T, store *database.Store) *shared.Context {
+func newShareTestContext(t *testing.T, store *controlstore.Store) *shared.Context {
 	t.Helper()
-	tenantStores := database.NewTenantStoreManager(store, t.TempDir(), database.WithTenantDataPlane(false))
+	tenantStores := database.NewTenantStoreManager(store, t.TempDir(), nil)
 	t.Cleanup(func() { _ = tenantStores.Close() })
 	return &shared.Context{Store: store, TenantStores: tenantStores, Config: &config.Config{}}
+}
+
+func setupShareDataPlane(t *testing.T, email, domain string) (*controlstore.Store, *database.Store, *shared.Context, uuid.UUID, *api.Site) {
+	t.Helper()
+	ctx := context.Background()
+	control := testutil.NewControlStore(t)
+	t.Cleanup(func() { _ = control.Close() })
+	appCtx := newShareTestContext(t, control)
+	userID, err := control.CreateUser(ctx, email, "hash")
+	if err != nil {
+		t.Fatalf("create share test user: %v", err)
+	}
+	site, err := control.CreateSite(ctx, userID, domain)
+	if err != nil {
+		t.Fatalf("create share test site: %v", err)
+	}
+	if err := appCtx.TenantStores.SyncSite(ctx, site.ID); err != nil {
+		t.Fatalf("sync share test site: %v", err)
+	}
+	analytics, _, err := appCtx.TenantStores.ResolveSiteStore(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("resolve share analytics store: %v", err)
+	}
+	return control, analytics, appCtx, userID, site
 }
 
 func TestHandleExportShareHitsSupportsAllFormats(t *testing.T) {
@@ -106,13 +132,7 @@ func TestHandleGetShareSiteStatsIncludesGeoNetworkAggregates(t *testing.T) {
 
 func TestShareOpportunitiesListIsScopedToShareTokenSite(t *testing.T) {
 	ctx := context.Background()
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store := testutil.NewControlStore(t)
 	t.Cleanup(func() { _ = store.Close() })
 
 	userID, err := store.CreateUser(ctx, "share-opportunities@example.com", "hash")
@@ -178,13 +198,7 @@ func TestShareOpportunitiesListIsScopedToShareTokenSite(t *testing.T) {
 
 func TestShareOpportunitiesListReturnsEmptyArrayWhenNoRowsExist(t *testing.T) {
 	ctx := context.Background()
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store := testutil.NewControlStore(t)
 	t.Cleanup(func() { _ = store.Close() })
 
 	userID, err := store.CreateUser(ctx, "share-opportunities-empty@example.com", "hash")
@@ -223,11 +237,23 @@ func TestShareOpportunitiesListReturnsEmptyArrayWhenNoRowsExist(t *testing.T) {
 	}
 }
 
-func seedShareOpportunities(t *testing.T, ctx context.Context, store *database.Store, teamID, siteID, activeID uuid.UUID) {
+func seedShareOpportunities(t *testing.T, ctx context.Context, store *controlstore.Store, teamID, siteID, activeID uuid.UUID) {
 	t.Helper()
 	active := shareOpportunityInput(teamID, siteID, activeID, "new", 84, "42%")
 	active.ScoreBreakdown = api.OpportunityScoreBreakdown{Sample: 82, Impact: 70, Urgency: 55, EvidenceFit: 99, Total: 84}
-	active.AIRunID = uuid.New()
+	runID, err := store.AppendAIRun(ctx, controlstore.AIRunParams{
+		TeamID:     teamID,
+		SiteID:     siteID,
+		Feature:    "opportunities",
+		Provider:   "test",
+		Model:      "test-model",
+		OutputJSON: `{}`,
+		Status:     "success",
+	})
+	if err != nil {
+		t.Fatalf("append ai run: %v", err)
+	}
+	active.AIRunID = runID
 	dismissed := shareOpportunityInput(teamID, siteID, uuid.New(), "dismissed", 40, "12%")
 	if _, err := store.UpsertOpportunities(ctx, []database.OpportunityInput{active, dismissed}); err != nil {
 		t.Fatalf("upsert opportunities: %v", err)
@@ -267,23 +293,7 @@ func setupShareEventsTestEnv(t *testing.T) (*handler, *database.Store, string, u
 	t.Helper()
 
 	ctx := context.Background()
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-
-	userID, err := store.CreateUser(ctx, "share-events@example.com", "hash")
-	if err != nil {
-		t.Fatalf("create user: %v", err)
-	}
-
-	site, err := store.CreateSite(ctx, userID, "share-events.test")
-	if err != nil {
-		t.Fatalf("create site: %v", err)
-	}
+	control, store, appCtx, userID, site := setupShareDataPlane(t, "share-events@example.com", "share-events.test")
 
 	sessionID := uuid.New()
 	now := time.Now().UTC()
@@ -326,12 +336,12 @@ func setupShareEventsTestEnv(t *testing.T) (*handler, *database.Store, string, u
 		t.Fatalf("create event: %v", err)
 	}
 
-	_, token, err := store.CreateShareLink(ctx, site.ID, userID)
+	_, token, err := control.CreateShareLink(ctx, site.ID, userID)
 	if err != nil {
 		t.Fatalf("create share link: %v", err)
 	}
 
-	h := &handler{ctx: newShareTestContext(t, store)}
+	h := &handler{ctx: appCtx}
 	return h, store, token, site.ID
 }
 
@@ -615,23 +625,7 @@ func setupShareEcommerceTestEnv(t *testing.T) (*handler, *database.Store, string
 	t.Helper()
 
 	ctx := context.Background()
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-
-	userID, err := store.CreateUser(ctx, "share-ecom@example.com", "hash")
-	if err != nil {
-		t.Fatalf("create user: %v", err)
-	}
-
-	site, err := store.CreateSite(ctx, userID, "share-ecom.test")
-	if err != nil {
-		t.Fatalf("create site: %v", err)
-	}
+	control, store, appCtx, userID, site := setupShareDataPlane(t, "share-ecom@example.com", "share-ecom.test")
 
 	sessionID := uuid.New()
 	now := time.Now().UTC()
@@ -690,12 +684,12 @@ func setupShareEcommerceTestEnv(t *testing.T) (*handler, *database.Store, string
 		t.Fatalf("create purchase event: %v", err)
 	}
 
-	_, token, err := store.CreateShareLink(ctx, site.ID, userID)
+	_, token, err := control.CreateShareLink(ctx, site.ID, userID)
 	if err != nil {
 		t.Fatalf("create share link: %v", err)
 	}
 
-	h := &handler{ctx: newShareTestContext(t, store)}
+	h := &handler{ctx: appCtx}
 	return h, store, token, site.ID
 }
 
@@ -841,23 +835,7 @@ func setupShareWebVitalsTestEnv(t *testing.T) (*handler, *database.Store, string
 	t.Helper()
 
 	ctx := context.Background()
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-
-	userID, err := store.CreateUser(ctx, "share-vitals@example.com", "hash")
-	if err != nil {
-		t.Fatalf("create user: %v", err)
-	}
-
-	site, err := store.CreateSite(ctx, userID, "share-vitals.test")
-	if err != nil {
-		t.Fatalf("create site: %v", err)
-	}
+	control, store, appCtx, userID, site := setupShareDataPlane(t, "share-vitals@example.com", "share-vitals.test")
 
 	sessionID := uuid.New()
 	pageID := uuid.New()
@@ -893,12 +871,12 @@ func setupShareWebVitalsTestEnv(t *testing.T) (*handler, *database.Store, string
 		t.Fatalf("create web vitals: %v", err)
 	}
 
-	_, token, err := store.CreateShareLink(ctx, site.ID, userID)
+	_, token, err := control.CreateShareLink(ctx, site.ID, userID)
 	if err != nil {
 		t.Fatalf("create share link: %v", err)
 	}
 
-	h := &handler{ctx: newShareTestContext(t, store)}
+	h := &handler{ctx: appCtx}
 	return h, store, token, site.ID
 }
 
@@ -992,23 +970,7 @@ func setupShareExportTestEnv(t *testing.T) (*handler, *database.Store, string, u
 	t.Helper()
 
 	ctx := context.Background()
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("failed to connect to test db: %v", err)
-	}
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("failed to migrate test db: %v", err)
-	}
-
-	userID, err := store.CreateUser(ctx, "share-export@example.com", "hash")
-	if err != nil {
-		t.Fatalf("failed to create test user: %v", err)
-	}
-
-	site, err := store.CreateSite(ctx, userID, "share-export.test")
-	if err != nil {
-		t.Fatalf("failed to create test site: %v", err)
-	}
+	control, store, appCtx, userID, site := setupShareDataPlane(t, "share-export@example.com", "share-export.test")
 
 	now := time.Now().UTC()
 	isUnique := true
@@ -1036,13 +998,13 @@ func setupShareExportTestEnv(t *testing.T) (*handler, *database.Store, string, u
 		t.Fatalf("failed to seed hit: %v", err)
 	}
 
-	_, token, err := store.CreateShareLink(ctx, site.ID, userID)
+	_, token, err := control.CreateShareLink(ctx, site.ID, userID)
 	if err != nil {
 		t.Fatalf("failed to create share link: %v", err)
 	}
 
 	h := &handler{
-		ctx: newShareTestContext(t, store),
+		ctx: appCtx,
 	}
 	return h, store, token, site.ID
 }

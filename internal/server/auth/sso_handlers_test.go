@@ -23,6 +23,7 @@ import (
 
 	"hitkeep/internal/api"
 	appauth "hitkeep/internal/auth"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/sso"
@@ -101,8 +102,8 @@ func TestSSOLoginRejectsUnverifiedEmail(t *testing.T) {
 	if w.Code != http.StatusSeeOther || !strings.Contains(w.Header().Get("Location"), "error=sso_email_unverified") {
 		t.Fatalf("expected unverified email rejection, status=%d location=%q", w.Code, w.Header().Get("Location"))
 	}
-	var identityCount int
-	if err := store.DB().QueryRowContext(callback.Context(), "SELECT COUNT(*) FROM sso_identities WHERE tenant_id = ?", teamID).Scan(&identityCount); err != nil || identityCount != 0 {
+	identityCount, err := store.CountTeamSSOIdentities(callback.Context(), teamID)
+	if err != nil || identityCount != 0 {
 		t.Fatalf("unverified identity was linked: count=%d err=%v", identityCount, err)
 	}
 }
@@ -130,8 +131,8 @@ func TestSSOLoginRejectsIDTokenIssuerMismatch(t *testing.T) {
 	if w.Code != http.StatusSeeOther || !strings.Contains(w.Header().Get("Location"), "error=sso_failed") {
 		t.Fatalf("expected issuer mismatch rejection, status=%d location=%q", w.Code, w.Header().Get("Location"))
 	}
-	var identityCount int
-	if err := store.DB().QueryRowContext(callback.Context(), "SELECT COUNT(*) FROM sso_identities WHERE tenant_id = ?", teamID).Scan(&identityCount); err != nil || identityCount != 0 {
+	identityCount, err := store.CountTeamSSOIdentities(callback.Context(), teamID)
+	if err != nil || identityCount != 0 {
 		t.Fatalf("issuer mismatch identity was linked: count=%d err=%v", identityCount, err)
 	}
 }
@@ -289,10 +290,7 @@ func TestSSOInvitationFlowPreservesTokenAndRequestedRole(t *testing.T) {
 	provider := newFakeOIDCProvider(t, "invited-admin@example.com", true)
 	h.ctx.SSO = sso.NewClient(provider.server.Client())
 	teamID := configureTestSSO(t, h, store, provider.server.URL)
-	var ownerID uuid.UUID
-	if err := store.DB().QueryRowContext(context.Background(), "SELECT user_id FROM tenant_members WHERE tenant_id = ? AND role = ? LIMIT 1", teamID, database.TenantRoleOwner).Scan(&ownerID); err != nil {
-		t.Fatalf("get team owner: %v", err)
-	}
+	ownerID := testTeamOwnerID(t, store, teamID)
 	inviteeID, err := store.CreateUserWithoutDefaultTenant(context.Background(), "invited-admin@example.com", "temporary-password-hash")
 	if err != nil {
 		t.Fatalf("create invitee: %v", err)
@@ -348,10 +346,7 @@ func TestSSOInvitationProviderErrorReturnsToInvitationWithoutConsumingToken(t *t
 	provider := newFakeOIDCProvider(t, "invited-error@example.com", true)
 	h.ctx.SSO = sso.NewClient(provider.server.Client())
 	teamID := configureTestSSO(t, h, store, provider.server.URL)
-	var ownerID uuid.UUID
-	if err := store.DB().QueryRowContext(t.Context(), "SELECT user_id FROM tenant_members WHERE tenant_id = ? AND role = ? LIMIT 1", teamID, database.TenantRoleOwner).Scan(&ownerID); err != nil {
-		t.Fatalf("get team owner: %v", err)
-	}
+	ownerID := testTeamOwnerID(t, store, teamID)
 	inviteeID, err := store.CreateUserWithoutDefaultTenant(t.Context(), "invited-error@example.com", "temporary-password-hash")
 	if err != nil {
 		t.Fatalf("create invitee: %v", err)
@@ -387,7 +382,7 @@ func TestSSOInvitationProviderErrorReturnsToInvitationWithoutConsumingToken(t *t
 	}
 }
 
-func configureTestSSO(t *testing.T, h *handler, store *database.Store, issuerURL string) uuid.UUID {
+func configureTestSSO(t *testing.T, h *handler, store *controlstore.Store, issuerURL string) uuid.UUID {
 	t.Helper()
 	ownerID, err := store.CreateUser(t.Context(), "sso-owner@example.net", "owner-password-hash")
 	if err != nil {
@@ -415,7 +410,7 @@ func configureTestSSO(t *testing.T, h *handler, store *database.Store, issuerURL
 	return teamID
 }
 
-func enableTestSSOAutoProvision(t *testing.T, store *database.Store, teamID uuid.UUID) {
+func enableTestSSOAutoProvision(t *testing.T, store *controlstore.Store, teamID uuid.UUID) {
 	t.Helper()
 	config, err := store.GetTeamSSOConfig(t.Context(), teamID)
 	if err != nil || config == nil {
@@ -427,7 +422,7 @@ func enableTestSSOAutoProvision(t *testing.T, store *database.Store, teamID uuid
 	}
 }
 
-func addTestSSOMember(t *testing.T, store *database.Store, teamID uuid.UUID, email string) uuid.UUID {
+func addTestSSOMember(t *testing.T, store *controlstore.Store, teamID uuid.UUID, email string) uuid.UUID {
 	t.Helper()
 	userID, err := store.CreateUserWithoutDefaultTenant(t.Context(), email, "existing-password-hash")
 	if err != nil {
@@ -437,6 +432,21 @@ func addTestSSOMember(t *testing.T, store *database.Store, teamID uuid.UUID, ema
 		t.Fatalf("add SSO member: %v", err)
 	}
 	return userID
+}
+
+func testTeamOwnerID(t *testing.T, store *controlstore.Store, teamID uuid.UUID) uuid.UUID {
+	t.Helper()
+	members, err := store.ListTeamMembers(t.Context(), teamID)
+	if err != nil {
+		t.Fatalf("list team members: %v", err)
+	}
+	for _, member := range members {
+		if member.Role == database.TenantRoleOwner {
+			return member.UserID
+		}
+	}
+	t.Fatalf("team %s has no owner", teamID)
+	return uuid.Nil
 }
 
 func startTestSSOLogin(t *testing.T, h *handler, email, returnURL string, rememberMe bool) string {

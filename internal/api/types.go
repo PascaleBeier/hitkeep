@@ -1954,6 +1954,10 @@ type TenantDBInfo struct {
 }
 
 type SystemStorage struct {
+	ControlDBPath      string             `json:"control_db_path"`
+	ControlDBBytes     int64              `json:"control_db_bytes"`
+	TenantDuckDBMemory []DuckDBMemoryStat `json:"tenant_duckdb_memory,omitempty"`
+	// Deprecated compatibility aliases; remove after one release.
 	SharedDBPath  string             `json:"shared_db_path"`
 	SharedDBBytes int64              `json:"shared_db_bytes"`
 	DataPath      string             `json:"data_path"`
@@ -1966,8 +1970,8 @@ type SystemStorage struct {
 	DuckDBMemory  []DuckDBMemoryStat `json:"duckdb_memory,omitempty"`
 }
 
-// DuckDBMemoryStat is one row of DuckDB's duckdb_memory() breakdown for the
-// shared database, e.g. buffer-managed table data or in-memory ART indexes.
+// DuckDBMemoryStat is one row of the tenant data plane's duckdb_memory()
+// breakdown, e.g. buffer-managed table data or in-memory ART indexes.
 type DuckDBMemoryStat struct {
 	Tag              string `json:"tag"`
 	MemoryBytes      int64  `json:"memory_bytes"`

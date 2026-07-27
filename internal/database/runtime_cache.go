@@ -12,6 +12,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
+	"hitkeep/internal/controlstore"
 )
 
 const (
@@ -47,19 +48,7 @@ type passwordResetEntry struct {
 	ExpiresAt time.Time
 }
 
-type PendingSignupEntry struct {
-	Email           string
-	HashedPassword  string
-	GivenName       string
-	LastName        string
-	TeamName        string
-	Jurisdiction    string
-	Locale          string
-	PlanCode        string
-	BillingInterval string
-	AcceptedTosAt   time.Time
-	ExpiresAt       time.Time
-}
+type PendingSignupEntry = controlstore.PendingSignupEntry
 
 type apiClientAuthCacheEntry struct {
 	Auth      APIClientAuth

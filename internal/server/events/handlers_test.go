@@ -19,39 +19,40 @@ import (
 	"hitkeep/internal/database"
 	"hitkeep/internal/exportfmt"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/testutil"
 )
 
 func setupEventHandlerTestEnv(t *testing.T) (*database.Store, *shared.Context, uuid.UUID, uuid.UUID, string) {
 	t.Helper()
 
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
+	control, tenantStores := testutil.NewControlAndTenantStores(t)
+	t.Cleanup(func() { _ = control.Close() })
+	t.Cleanup(func() { _ = tenantStores.Close() })
 
-	userID, err := store.CreateUser(context.Background(), "events@example.com", "hashed")
+	userID, err := control.CreateUser(context.Background(), "events@example.com", "hashed")
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}
-	site, err := store.CreateSite(context.Background(), userID, "events.example.com")
+	site, err := control.CreateSite(context.Background(), userID, "events.example.com")
 	if err != nil {
 		t.Fatalf("CreateSite: %v", err)
 	}
-	_, token, err := store.CreateAPIClient(context.Background(), userID, "Events", "test", auth.InstanceUser, map[uuid.UUID]auth.SiteRole{
+	_, token, err := control.CreateAPIClient(context.Background(), userID, "Events", "test", auth.InstanceUser, map[uuid.UUID]auth.SiteRole{
 		site.ID: auth.SiteOwner,
 	}, nil)
 	if err != nil {
 		t.Fatalf("CreateAPIClient: %v", err)
 	}
-	tenantStores := database.NewTenantStoreManager(store, t.TempDir(), database.WithTenantDataPlane(false))
-	t.Cleanup(func() { _ = tenantStores.Close() })
+	if err := tenantStores.SyncSite(context.Background(), site.ID); err != nil {
+		t.Fatalf("SyncSite: %v", err)
+	}
+	store, _, err := tenantStores.ResolveSiteStore(context.Background(), site.ID)
+	if err != nil {
+		t.Fatalf("ResolveSiteStore: %v", err)
+	}
 
 	ctx := &shared.Context{
-		Store:        store,
+		Store:        control,
 		TenantStores: tenantStores,
 		Config:       &config.Config{},
 	}

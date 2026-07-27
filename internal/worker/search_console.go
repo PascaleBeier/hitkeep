@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/searchconsole"
 )
@@ -78,7 +79,7 @@ func (w *SearchConsoleSyncWorker) RunDue(ctx context.Context, limit int) (Search
 	if w == nil || w.tenantMgr == nil || w.source == nil {
 		return SearchConsoleSyncRunSummary{}, fmt.Errorf("search console sync worker is not configured")
 	}
-	candidates, err := w.tenantMgr.Shared().ListGoogleSearchConsoleSyncCandidates(ctx, w.now().UTC(), limit)
+	candidates, err := w.tenantMgr.Control().ListGoogleSearchConsoleSyncCandidates(ctx, w.now().UTC(), limit)
 	if err != nil {
 		return SearchConsoleSyncRunSummary{}, err
 	}
@@ -103,7 +104,7 @@ func (w *SearchConsoleSyncWorker) ImportSite(ctx context.Context, siteID uuid.UU
 	if w == nil || w.tenantMgr == nil || w.source == nil {
 		return fmt.Errorf("search console sync worker is not configured")
 	}
-	shared := w.tenantMgr.Shared()
+	shared := w.tenantMgr.Control()
 	mapping, err := shared.GetGoogleSearchConsoleSiteMapping(ctx, siteID)
 	if err != nil {
 		return err
@@ -238,7 +239,7 @@ func (w *SearchConsoleSyncWorker) recordSyncFailure(ctx context.Context, mapping
 	now := w.now().UTC()
 	category := searchconsole.ClassifyError(syncErr)
 	nextRetry := searchConsoleRetryTime(now, category)
-	previous, err := w.tenantMgr.Shared().GetGoogleSearchConsoleSyncState(ctx, mapping.SiteID)
+	previous, err := w.tenantMgr.Control().GetGoogleSearchConsoleSyncState(ctx, mapping.SiteID)
 	if err != nil {
 		return err
 	}
@@ -256,8 +257,8 @@ func (w *SearchConsoleSyncWorker) recordSyncFailure(ctx context.Context, mapping
 		input.ImportedEndDate = previous.ImportedEndDate
 		input.LastSuccessAt = previous.LastSuccessAt
 	}
-	failureAudit := searchConsoleSyncFailureAuditParams(ctx, w.tenantMgr.Shared(), mapping, category)
-	if err := w.tenantMgr.Shared().UpsertGoogleSearchConsoleSyncStateWithAudit(ctx, input, failureAudit); err != nil {
+	failureAudit := searchConsoleSyncFailureAuditParams(ctx, w.tenantMgr.Control(), mapping, category)
+	if err := w.tenantMgr.Control().UpsertGoogleSearchConsoleSyncStateWithAudit(ctx, input, failureAudit); err != nil {
 		return err
 	}
 	return syncErr
@@ -306,7 +307,7 @@ func searchConsoleDate(value time.Time) time.Time {
 	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
 }
 
-func searchConsoleSyncAuditParams(ctx context.Context, shared *database.Store, mapping database.GoogleSearchConsoleSiteMapping, importedRows int) database.AuditEntryParams {
+func searchConsoleSyncAuditParams(ctx context.Context, shared *controlstore.Store, mapping database.GoogleSearchConsoleSiteMapping, importedRows int) database.AuditEntryParams {
 	targetLabel := ""
 	if site, err := shared.GetSiteByID(ctx, mapping.SiteID); err == nil && site != nil {
 		targetLabel = site.Domain
@@ -322,7 +323,7 @@ func searchConsoleSyncAuditParams(ctx context.Context, shared *database.Store, m
 	}
 }
 
-func appendSearchConsoleSyncPreparedAudit(ctx context.Context, shared *database.Store, mapping database.GoogleSearchConsoleSiteMapping, preparedRows int) error {
+func appendSearchConsoleSyncPreparedAudit(ctx context.Context, shared *controlstore.Store, mapping database.GoogleSearchConsoleSiteMapping, preparedRows int) error {
 	targetLabel := ""
 	if site, err := shared.GetSiteByID(ctx, mapping.SiteID); err == nil && site != nil {
 		targetLabel = site.Domain
@@ -341,7 +342,7 @@ func appendSearchConsoleSyncPreparedAudit(ctx context.Context, shared *database.
 	return nil
 }
 
-func appendSearchConsoleSyncStartedAudit(ctx context.Context, shared *database.Store, mapping database.GoogleSearchConsoleSiteMapping) error {
+func appendSearchConsoleSyncStartedAudit(ctx context.Context, shared *controlstore.Store, mapping database.GoogleSearchConsoleSiteMapping) error {
 	targetLabel := ""
 	if site, err := shared.GetSiteByID(ctx, mapping.SiteID); err == nil && site != nil {
 		targetLabel = site.Domain
@@ -360,7 +361,7 @@ func appendSearchConsoleSyncStartedAudit(ctx context.Context, shared *database.S
 	return nil
 }
 
-func searchConsoleSyncFailureAuditParams(ctx context.Context, shared *database.Store, mapping database.GoogleSearchConsoleSiteMapping, category searchconsole.ErrorCategory) database.AuditEntryParams {
+func searchConsoleSyncFailureAuditParams(ctx context.Context, shared *controlstore.Store, mapping database.GoogleSearchConsoleSiteMapping, category searchconsole.ErrorCategory) database.AuditEntryParams {
 	targetLabel := ""
 	if site, err := shared.GetSiteByID(ctx, mapping.SiteID); err == nil && site != nil {
 		targetLabel = site.Domain

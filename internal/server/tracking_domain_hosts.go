@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/subtle"
 	"io/fs"
 	"log/slog"
@@ -170,8 +171,8 @@ func (s *Server) handleCaddyOnDemandTLSAsk() http.HandlerFunc {
 
 func (s *Server) writeDatabaseQueryFailure(w http.ResponseWriter) {
 	if s != nil && s.store != nil {
-		if status := s.store.DatabaseStatus(); status.State != database.DatabaseStateHealthy {
-			writeDatabaseUnavailable(w, status.State)
+		if err := s.store.Ping(context.Background()); err != nil {
+			writeDatabaseUnavailable(w, database.DatabaseStateFailed)
 			return
 		}
 	}

@@ -8,8 +8,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -21,12 +19,14 @@ import (
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/testutil"
 )
 
 func TestAskAIRejectsDisabledFeatureWithSafeStatus(t *testing.T) {
-	mux, store, siteID, userID, ai := setupAskAIHandlerTestEnv(t, &config.Config{
+	mux, store, siteID, userID, ai, _ := setupAskAIHandlerTestEnv(t, &config.Config{
 		JWTSecret:    "ask-ai-test-secret",
 		PublicURL:    "http://ask-ai.test",
 		AIEnabled:    true,
@@ -62,7 +62,7 @@ func TestAskAIRejectsDisabledFeatureWithSafeStatus(t *testing.T) {
 }
 
 func TestAskAIRejectsAPIClients(t *testing.T) {
-	mux, store, siteID, userID, ai := setupAskAIHandlerTestEnv(t, askAITestConfig())
+	mux, store, siteID, userID, ai, _ := setupAskAIHandlerTestEnv(t, askAITestConfig())
 	_, token, err := store.CreateAPIClient(context.Background(), userID, "Ask AI API Client", "test", authcore.InstanceUser, map[uuid.UUID]authcore.SiteRole{
 		siteID: authcore.SiteViewer,
 	}, nil)
@@ -93,10 +93,10 @@ func TestAskAIRejectsAPIClients(t *testing.T) {
 }
 
 func TestAskAIHistoryListsSafeRunsForHumanSession(t *testing.T) {
-	mux, store, siteID, userID, _ := setupAskAIHandlerTestEnv(t, askAITestConfig())
+	mux, store, siteID, userID, _, _ := setupAskAIHandlerTestEnv(t, askAITestConfig())
 	teamID := requireSiteTeamID(t, store, siteID)
 	runID := uuid.New()
-	if _, err := store.AppendAIRun(context.Background(), database.AIRunParams{
+	if _, err := store.AppendAIRun(context.Background(), controlstore.AIRunParams{
 		ID:              runID,
 		TeamID:          teamID,
 		SiteID:          siteID,
@@ -121,7 +121,7 @@ func TestAskAIHistoryListsSafeRunsForHumanSession(t *testing.T) {
 		OutputTokens:    12,
 		TotalTokens:     23,
 		ToolCallCount:   1,
-		LifecycleEvents: []database.AILifecycleEvent{{Type: "tool_call_start", ToolName: "hitkeep_get_site_overview", Status: "started", Timestamp: time.Now().UTC()}},
+		LifecycleEvents: []controlstore.AILifecycleEvent{{Type: "tool_call_start", ToolName: "hitkeep_get_site_overview", Status: "started", Timestamp: time.Now().UTC()}},
 		Status:          "success",
 		CreatedAt:       time.Now().UTC(),
 	}); err != nil {
@@ -155,7 +155,7 @@ func TestAskAIHistoryListsSafeRunsForHumanSession(t *testing.T) {
 }
 
 func TestAskAIHistoryRejectsAPIClients(t *testing.T) {
-	mux, store, siteID, userID, _ := setupAskAIHandlerTestEnv(t, askAITestConfig())
+	mux, store, siteID, userID, _, _ := setupAskAIHandlerTestEnv(t, askAITestConfig())
 	_, token, err := store.CreateAPIClient(context.Background(), userID, "Ask AI API Client", "test", authcore.InstanceUser, map[uuid.UUID]authcore.SiteRole{
 		siteID: authcore.SiteViewer,
 	}, nil)
@@ -178,7 +178,7 @@ func TestAskAIHistoryRejectsAPIClients(t *testing.T) {
 }
 
 func TestAskAIRejectsAPIClientsBeforeSitePermissionChecks(t *testing.T) {
-	mux, store, siteID, userID, ai := setupAskAIHandlerTestEnv(t, askAITestConfig())
+	mux, store, siteID, userID, ai, _ := setupAskAIHandlerTestEnv(t, askAITestConfig())
 	_, token, err := store.CreateAPIClient(context.Background(), userID, "Ask AI API Client", "test", authcore.InstanceUser, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateAPIClient: %v", err)
@@ -206,7 +206,7 @@ func TestAskAIRejectsAPIClientsBeforeSitePermissionChecks(t *testing.T) {
 }
 
 func TestAskAIHumanSessionUsesScopedToolsAndSkills(t *testing.T) {
-	mux, store, siteID, userID, ai := setupAskAIHandlerTestEnv(t, askAITestConfig())
+	mux, store, siteID, userID, ai, _ := setupAskAIHandlerTestEnv(t, askAITestConfig())
 	ai.output = &hitai.AskAIOutput{
 		AnswerMarkdown: "Traffic increased.",
 		Charts: []hitai.AskAIChart{{
@@ -270,11 +270,15 @@ func TestAskAIHumanSessionUsesScopedToolsAndSkills(t *testing.T) {
 }
 
 func TestAskAIWithoutExplicitRangeUsesObservedSiteDataBounds(t *testing.T) {
-	mux, store, siteID, userID, ai := setupAskAIHandlerTestEnv(t, askAITestConfig())
+	mux, _, siteID, userID, ai, tenantStores := setupAskAIHandlerTestEnv(t, askAITestConfig())
 	firstHit := time.Date(2026, 6, 10, 8, 0, 0, 0, time.UTC)
 	lastHit := time.Date(2026, 6, 12, 18, 30, 0, 0, time.UTC)
-	seedAskAIHit(t, store, siteID, firstHit)
-	seedAskAIHit(t, store, siteID, lastHit)
+	analytics, _, err := tenantStores.ResolveSiteStore(t.Context(), siteID)
+	if err != nil {
+		t.Fatalf("resolve analytics: %v", err)
+	}
+	seedAskAIHit(t, analytics, siteID, firstHit)
+	seedAskAIHit(t, analytics, siteID, lastHit)
 
 	rec := requestAskAIWithBody(t, mux, siteID, askAISessionCookie(t, userID), "", `{
 		"query": "What changed in traffic?",
@@ -293,16 +297,18 @@ func TestAskAIWithoutExplicitRangeUsesObservedSiteDataBounds(t *testing.T) {
 
 func TestAskAINonDefaultSiteUsesTenantAnalyticsBounds(t *testing.T) {
 	ctx := context.Background()
-	control := database.NewStore(":memory:")
-	if err := control.Connect(); err != nil {
-		t.Fatal(err)
-	}
-	if err := control.Migrate(ctx); err != nil {
+	control, manager := testutil.NewControlAndTenantStores(t)
+	userID, err := control.CreateUser(ctx, "ask-ai-tenant@example.com", "hash")
+	if err != nil {
 		_ = control.Close()
 		t.Fatal(err)
 	}
-	userID, err := control.CreateUser(ctx, "ask-ai-tenant@example.com", "hash")
+	tenant, err := control.CreateTenant(ctx, userID, "Ask AI Tenant", "")
 	if err != nil {
+		_ = control.Close()
+		t.Fatal(err)
+	}
+	if err := control.SetActiveTenantID(ctx, userID, tenant.ID); err != nil {
 		_ = control.Close()
 		t.Fatal(err)
 	}
@@ -311,49 +317,17 @@ func TestAskAINonDefaultSiteUsesTenantAnalyticsBounds(t *testing.T) {
 		_ = control.Close()
 		t.Fatal(err)
 	}
-	tenantID := uuid.New()
-	if _, err := control.DB().ExecContext(ctx, "INSERT INTO tenants (id, name, is_default, created_at) VALUES (?, ?, FALSE, ?)", tenantID, "Ask AI Tenant", time.Now().UTC()); err != nil {
-		_ = control.Close()
+	if err := manager.SyncSite(ctx, site.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := control.DB().ExecContext(ctx, "DELETE FROM site_tenants WHERE site_id = ?", site.ID); err != nil {
-		_ = control.Close()
-		t.Fatal(err)
-	}
-	if _, err := control.DB().ExecContext(ctx, "INSERT INTO site_tenants (site_id, tenant_id, created_at) VALUES (?, ?, ?)", site.ID, tenantID, time.Now().UTC()); err != nil {
-		_ = control.Close()
-		t.Fatal(err)
-	}
-	dataPath := t.TempDir()
-	tenantPath := filepath.Join(dataPath, "tenants", tenantID.String(), "hitkeep.db")
-	if err := os.MkdirAll(filepath.Dir(tenantPath), 0o755); err != nil {
-		_ = control.Close()
-		t.Fatal(err)
-	}
-	tenant := database.NewStore(tenantPath)
-	if err := tenant.Connect(); err != nil {
-		_ = control.Close()
-		t.Fatal(err)
-	}
-	if err := tenant.MigrateTenant(ctx); err != nil {
-		_ = tenant.Close()
-		_ = control.Close()
-		t.Fatal(err)
-	}
-	if err := tenant.UpsertSiteMirror(ctx, site); err != nil {
-		_ = tenant.Close()
-		_ = control.Close()
+	tenantStore, _, err := manager.ResolveSiteStore(ctx, site.ID)
+	if err != nil {
 		t.Fatal(err)
 	}
 	firstHit := time.Date(2026, 6, 10, 8, 0, 0, 0, time.UTC)
 	lastHit := time.Date(2026, 6, 12, 18, 30, 0, 0, time.UTC)
-	seedAskAIHit(t, tenant, site.ID, firstHit)
-	seedAskAIHit(t, tenant, site.ID, lastHit)
-	if err := tenant.Close(); err != nil {
-		_ = control.Close()
-		t.Fatal(err)
-	}
-	manager := database.NewTenantStoreManager(control, dataPath, database.WithTenantDataPlane(false))
+	seedAskAIHit(t, tenantStore, site.ID, firstHit)
+	seedAskAIHit(t, tenantStore, site.ID, lastHit)
 	ai := &recordingAskAIClient{}
 	cfg := askAITestConfig()
 	appCtx := &shared.Context{Store: control, TenantStores: manager, Config: cfg, AI: ai}
@@ -373,7 +347,7 @@ func TestAskAINonDefaultSiteUsesTenantAnalyticsBounds(t *testing.T) {
 }
 
 func TestAskAIStreamingEmitsProgressBeforeFinalResponse(t *testing.T) {
-	mux, store, siteID, userID, ai := setupAskAIHandlerTestEnv(t, askAITestConfig())
+	mux, store, siteID, userID, ai, _ := setupAskAIHandlerTestEnv(t, askAITestConfig())
 	releaseAI := make(chan struct{})
 	calledAI := make(chan struct{})
 	ai.block = releaseAI
@@ -447,7 +421,7 @@ func TestAskAIStreamingEmitsProgressBeforeFinalResponse(t *testing.T) {
 }
 
 func TestAskAIStreamingAuditsTerminalResponseAfterRequestContextCancel(t *testing.T) {
-	mux, store, siteID, userID, ai := setupAskAIHandlerTestEnv(t, askAITestConfig())
+	mux, store, siteID, userID, ai, _ := setupAskAIHandlerTestEnv(t, askAITestConfig())
 	failedRunID := uuid.New()
 	ctx, cancel := context.WithCancel(context.Background())
 	ai.cancelBeforeReturn = cancel
@@ -471,7 +445,7 @@ func TestAskAIStreamingAuditsTerminalResponseAfterRequestContextCancel(t *testin
 }
 
 func TestAskAIStreamingAuditsTerminalResponseWhenProgressWriteFails(t *testing.T) {
-	mux, store, siteID, userID, ai := setupAskAIHandlerTestEnv(t, askAITestConfig())
+	mux, store, siteID, userID, ai, _ := setupAskAIHandlerTestEnv(t, askAITestConfig())
 
 	req := newAskAIHTTPTestRequest(t, http.MethodPost, "/api/sites/"+siteID.String()+"/ask-ai/events", askAISessionCookie(t, userID), "")
 	rec := &failingAskAIStreamResponseWriter{header: http.Header{}}
@@ -492,7 +466,7 @@ func TestAskAIStreamingAuditsTerminalResponseWhenProgressWriteFails(t *testing.T
 }
 
 func TestAskAIStreamingAuditsTerminalResponseWhenFinalWriteFails(t *testing.T) {
-	mux, store, siteID, userID, ai := setupAskAIHandlerTestEnv(t, askAITestConfig())
+	mux, store, siteID, userID, ai, _ := setupAskAIHandlerTestEnv(t, askAITestConfig())
 
 	req := newAskAIHTTPTestRequest(t, http.MethodPost, "/api/sites/"+siteID.String()+"/ask-ai/events", askAISessionCookie(t, userID), "")
 	rec := &eventuallyFailingAskAIStreamResponseWriter{header: http.Header{}, failOnWrite: 3}
@@ -523,7 +497,7 @@ func TestAskAIStreamingAuditsTerminalResponseWhenFinalWriteFails(t *testing.T) {
 }
 
 func TestAskAIAuditsProviderFailures(t *testing.T) {
-	mux, store, siteID, userID, ai := setupAskAIHandlerTestEnv(t, askAITestConfig())
+	mux, store, siteID, userID, ai, _ := setupAskAIHandlerTestEnv(t, askAITestConfig())
 	failedRunID := uuid.New()
 	ai.err = hitai.ErrInvalidOutput
 	ai.runIDOnError = failedRunID
@@ -550,7 +524,7 @@ func TestAskAIAuditsProviderFailures(t *testing.T) {
 }
 
 func TestAskAIRejectsUnscopedAPIClientsBeforeSiteLookup(t *testing.T) {
-	mux, store, _, userID, ai := setupAskAIHandlerTestEnv(t, askAITestConfig())
+	mux, store, _, userID, ai, _ := setupAskAIHandlerTestEnv(t, askAITestConfig())
 	_, token, err := store.CreateAPIClient(context.Background(), userID, "Ask AI API Client", "test", authcore.InstanceUser, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateAPIClient: %v", err)
@@ -579,7 +553,7 @@ func TestAskAIRejectsUnscopedAPIClientsBeforeSiteLookup(t *testing.T) {
 }
 
 func TestAskAIRejectsUsersWithoutSiteView(t *testing.T) {
-	mux, store, siteID, _, ai := setupAskAIHandlerTestEnv(t, askAITestConfig())
+	mux, store, siteID, _, ai, _ := setupAskAIHandlerTestEnv(t, askAITestConfig())
 	otherID, err := store.CreateUser(context.Background(), "ask-ai-no-access@example.com", "hash")
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
@@ -605,7 +579,7 @@ func TestAskAIRejectsUsersWithoutSiteView(t *testing.T) {
 }
 
 func TestAskAIAuditsInvalidRequests(t *testing.T) {
-	mux, store, siteID, userID, ai := setupAskAIHandlerTestEnv(t, askAITestConfig())
+	mux, store, siteID, userID, ai, _ := setupAskAIHandlerTestEnv(t, askAITestConfig())
 
 	req := httptest.NewRequest(http.MethodPost, "/api/sites/"+siteID.String()+"/ask-ai", strings.NewReader(`{"query":""}`))
 	req.AddCookie(askAISessionCookie(t, userID))
@@ -630,16 +604,10 @@ func TestAskAIAuditsInvalidRequests(t *testing.T) {
 	}
 }
 
-func setupAskAIHandlerTestEnv(t *testing.T, cfg *config.Config) (*http.ServeMux, *database.Store, uuid.UUID, uuid.UUID, *recordingAskAIClient) {
+func setupAskAIHandlerTestEnv(t *testing.T, cfg *config.Config) (*http.ServeMux, *controlstore.Store, uuid.UUID, uuid.UUID, *recordingAskAIClient, *database.TenantStoreManager) {
 	t.Helper()
 	cfg.AuthSessionMinutes = 15
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store, tenantStores := testutil.NewControlAndTenantStores(t)
 	t.Cleanup(func() { _ = store.Close() })
 
 	userID, err := store.CreateUser(context.Background(), "ask-ai-human@example.com", "hash")
@@ -652,12 +620,14 @@ func setupAskAIHandlerTestEnv(t *testing.T, cfg *config.Config) (*http.ServeMux,
 	}
 
 	ai := &recordingAskAIClient{}
-	tenantStores := database.NewTenantStoreManager(store, t.TempDir(), database.WithTenantDataPlane(false))
 	t.Cleanup(func() { _ = tenantStores.Close() })
+	if err := tenantStores.SyncSite(context.Background(), site.ID); err != nil {
+		t.Fatalf("SyncSite: %v", err)
+	}
 	appCtx := &shared.Context{Store: store, TenantStores: tenantStores, Config: cfg, AI: ai}
 	mux := http.NewServeMux()
 	Register(mux, appCtx)
-	return mux, store, site.ID, userID, ai
+	return mux, store, site.ID, userID, ai, tenantStores
 }
 
 func askAITestConfig() *config.Config {
@@ -790,7 +760,7 @@ func readAskAISSEEvent(t *testing.T, reader *bufio.Reader) askAISSEEvent {
 	}
 }
 
-func requireSiteTeamID(t *testing.T, store *database.Store, siteID uuid.UUID) uuid.UUID {
+func requireSiteTeamID(t *testing.T, store *controlstore.Store, siteID uuid.UUID) uuid.UUID {
 	t.Helper()
 	teamID, err := store.GetSiteTenantID(context.Background(), siteID)
 	if err != nil {
@@ -799,13 +769,13 @@ func requireSiteTeamID(t *testing.T, store *database.Store, siteID uuid.UUID) uu
 	return teamID
 }
 
-func requireTeamAuditEntry(t *testing.T, store *database.Store, teamID uuid.UUID, action string) api.TeamAuditEntry {
+func requireTeamAuditEntry(t *testing.T, store *controlstore.Store, teamID uuid.UUID, action string) api.TeamAuditEntry {
 	t.Helper()
 	entries := requireTeamAuditEntries(t, store, teamID, action, 1)
 	return entries[0]
 }
 
-func requireTeamAuditEntries(t *testing.T, store *database.Store, teamID uuid.UUID, action string, want int) []api.TeamAuditEntry {
+func requireTeamAuditEntries(t *testing.T, store *controlstore.Store, teamID uuid.UUID, action string, want int) []api.TeamAuditEntry {
 	t.Helper()
 	entries, total, err := store.ListTeamAuditEntries(context.Background(), teamID, action, 10, 0)
 	if err != nil {
@@ -817,7 +787,7 @@ func requireTeamAuditEntries(t *testing.T, store *database.Store, teamID uuid.UU
 	return entries
 }
 
-func requireInstanceAuditEntry(t *testing.T, store *database.Store, action string) api.InstanceAuditEntry {
+func requireInstanceAuditEntry(t *testing.T, store *controlstore.Store, action string) api.InstanceAuditEntry {
 	t.Helper()
 	entries, total, err := store.ListInstanceAuditEntries(context.Background(), database.InstanceAuditFilter{Action: action, Limit: 10})
 	if err != nil {
@@ -829,16 +799,10 @@ func requireInstanceAuditEntry(t *testing.T, store *database.Store, action strin
 	return entries[0]
 }
 
-func requireInstanceAuditMetadataJSON(t *testing.T, store *database.Store, action string) string {
+func requireInstanceAuditMetadataJSON(t *testing.T, store *controlstore.Store, action string) string {
 	t.Helper()
-	var metadataJSON string
-	if err := store.DB().QueryRowContext(context.Background(), `
-		SELECT CAST(metadata_json AS VARCHAR)
-		FROM instance_audit_log
-		WHERE action = ?
-		ORDER BY created_at DESC
-		LIMIT 1
-	`, action).Scan(&metadataJSON); err != nil {
+	metadataJSON, err := store.LatestInstanceAuditMetadataJSON(context.Background(), action)
+	if err != nil {
 		t.Fatalf("read %s audit metadata: %v", action, err)
 	}
 	return metadataJSON

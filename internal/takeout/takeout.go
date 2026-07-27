@@ -12,11 +12,13 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/exportfmt"
 )
 
 type TakeoutService struct {
+	control      *controlstore.Store
 	store        *database.Store
 	tenantStores *database.TenantStoreManager
 	path         string
@@ -28,19 +30,23 @@ type ExportFile struct {
 	Name string
 }
 
-func NewTakeoutService(store *database.Store, path string) *TakeoutService {
-	return &TakeoutService{
-		store: store,
-		path:  path,
-	}
+func NewTakeoutService(store any, path string) *TakeoutService {
+	return newTakeoutService(store, nil, path)
 }
 
-func NewTakeoutServiceWithTenantStores(store *database.Store, tenantStores *database.TenantStoreManager, path string) *TakeoutService {
-	return &TakeoutService{
-		store:        store,
-		tenantStores: tenantStores,
-		path:         path,
+func NewTakeoutServiceWithTenantStores(store any, tenantStores *database.TenantStoreManager, path string) *TakeoutService {
+	return newTakeoutService(store, tenantStores, path)
+}
+
+func newTakeoutService(store any, tenantStores *database.TenantStoreManager, path string) *TakeoutService {
+	service := &TakeoutService{tenantStores: tenantStores, path: path}
+	switch value := store.(type) {
+	case *controlstore.Store:
+		service.control = value
+	case *database.Store:
+		service.store = value
 	}
+	return service
 }
 
 func (s *TakeoutService) ExportUserData(ctx context.Context, userID uuid.UUID, format string) (string, error) {
@@ -49,7 +55,15 @@ func (s *TakeoutService) ExportUserData(ctx context.Context, userID uuid.UUID, f
 		return "", fmt.Errorf("failed to create export directory: %w", err)
 	}
 
-	sites, err := s.store.ListAccessibleSitesForTakeout(ctx, userID)
+	var sites []api.Site
+	var err error
+	if s.control != nil {
+		sites, err = s.control.ListAccessibleSitesForTakeout(ctx, userID)
+	} else if s.store != nil {
+		sites, err = s.store.ListAccessibleSitesForTakeout(ctx, userID)
+	} else {
+		err = fmt.Errorf("control store unavailable")
+	}
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve accessible sites: %w", err)
 	}
@@ -62,7 +76,10 @@ func (s *TakeoutService) ExportUserData(ctx context.Context, userID uuid.UUID, f
 		if err != nil {
 			return "", err
 		}
-		return s.exportTakeoutFromSources(ctx, "user", filename, normalizedFormat, exportfmt.DuckDBCopyOptions(normalizedFormat), sources)
+		return s.exportTakeoutFromSources(ctx, "user", filename, normalizedFormat, exportfmt.DuckDBCopyOptions(normalizedFormat), sources, controlstore.TakeoutScope{
+			SiteIDs: takeoutSiteIDs(sites),
+			UserID:  userID,
+		})
 	}
 
 	return s.exportTakeoutFromStore(ctx, s.store, "user", filename, normalizedFormat, exportfmt.DuckDBCopyOptions(normalizedFormat), []takeoutQuerySource{
@@ -88,12 +105,9 @@ func (s *TakeoutService) ExportSiteData(ctx context.Context, siteID uuid.UUID, f
 			return "", fmt.Errorf("failed to resolve site analytics store: %w", err)
 		}
 		store = analyticsStore
-		if analyticsStore != s.store {
-			return s.exportTakeoutFromSources(ctx, "site", filename, normalizedFormat, exportfmt.DuckDBCopyOptions(normalizedFormat), []takeoutStoreSource{
-				{Store: analyticsStore, Source: takeoutQuerySource{WhereClause: whereClause, IncludeAnalytics: true}},
-				{Store: s.store, Source: takeoutQuerySource{WhereClause: whereClause, IncludeControl: true}},
-			})
-		}
+		return s.exportTakeoutFromSources(ctx, "site", filename, normalizedFormat, exportfmt.DuckDBCopyOptions(normalizedFormat), []takeoutStoreSource{
+			{Store: analyticsStore, Source: takeoutQuerySource{WhereClause: whereClause, IncludeAnalytics: true}},
+		}, controlstore.TakeoutScope{SiteIDs: []uuid.UUID{siteID}})
 	}
 
 	return s.exportTakeoutFromStore(ctx, store, "site", filename, normalizedFormat, exportfmt.DuckDBCopyOptions(normalizedFormat), []takeoutQuerySource{
@@ -118,38 +132,13 @@ func (s *TakeoutService) ExportQRCodeData(ctx context.Context, siteID, qrCodeID 
 		analyticsStore = resolved
 	}
 
-	if analyticsStore == s.store {
-		return s.exportQRCodeTakeoutFromStore(ctx, s.store, filename, normalizedFormat, exportfmt.DuckDBCopyOptions(normalizedFormat), siteID, qrCodeID, true, true)
+	if analyticsStore == nil {
+		return "", fmt.Errorf("tenant analytics store unavailable")
 	}
-
-	tempFiles := []string{
-		filepath.Join(s.path, fmt.Sprintf("qr_takeout_control_%d.parquet", time.Now().UnixNano())),
-		filepath.Join(s.path, fmt.Sprintf("qr_takeout_analytics_%d.parquet", time.Now().UnixNano())),
+	if s.control == nil {
+		return s.exportQRCodeTakeoutFromStore(ctx, analyticsStore, filename, normalizedFormat, exportfmt.DuckDBCopyOptions(normalizedFormat), siteID, qrCodeID, true, true)
 	}
-	defer func() {
-		for _, tempFile := range tempFiles {
-			_ = os.Remove(tempFile)
-		}
-	}()
-
-	if _, err := s.exportQRCodeTakeoutFromStore(ctx, s.store, tempFiles[0], exportfmt.FormatParquet, exportfmt.DuckDBCopyOptions(exportfmt.FormatParquet), siteID, qrCodeID, true, false); err != nil {
-		return "", err
-	}
-	if _, err := s.exportQRCodeTakeoutFromStore(ctx, analyticsStore, tempFiles[1], exportfmt.FormatParquet, exportfmt.DuckDBCopyOptions(exportfmt.FormatParquet), siteID, qrCodeID, false, true); err != nil {
-		return "", err
-	}
-
-	query := buildTakeoutMergeQuery(tempFiles, filename, exportfmt.DuckDBCopyOptions(normalizedFormat))
-	err := s.store.WithDuckDBSession(ctx, database.DuckDBSessionOptions{
-		Excel: normalizedFormat == exportfmt.FormatXLSX,
-	}, func(conn *sql.Conn) error {
-		_, err := conn.ExecContext(ctx, query)
-		return err
-	})
-	if err != nil {
-		return "", fmt.Errorf("failed to export qr data: %w", err)
-	}
-	return filename, nil
+	return s.exportSplitQRCodeTakeout(ctx, analyticsStore, filename, normalizedFormat, exportfmt.DuckDBCopyOptions(normalizedFormat), siteID, qrCodeID)
 }
 
 type takeoutQuerySource struct {
@@ -164,15 +153,13 @@ type takeoutStoreSource struct {
 	Source takeoutQuerySource
 }
 
-func (s *TakeoutService) exportTakeoutFromSources(ctx context.Context, label, filename, normalizedFormat, duckFormat string, sources []takeoutStoreSource) (string, error) {
-	if len(sources) == 0 {
-		return s.exportTakeoutFromStore(ctx, s.store, label, filename, normalizedFormat, duckFormat, []takeoutQuerySource{{WhereClause: "FALSE"}})
-	}
-	if len(sources) == 1 {
-		return s.exportTakeoutFromStore(ctx, sources[0].Store, label, filename, normalizedFormat, duckFormat, []takeoutQuerySource{sources[0].Source})
+func (s *TakeoutService) exportTakeoutFromSources(ctx context.Context, label, filename, normalizedFormat, duckFormat string, sources []takeoutStoreSource, controlScopes ...controlstore.TakeoutScope) (string, error) {
+	root, err := s.dataPlaneRoot(ctx)
+	if err != nil {
+		return "", err
 	}
 
-	tempFiles := make([]string, 0, len(sources))
+	tempFiles := make([]string, 0, len(sources)+1)
 	defer func() {
 		for _, tempFile := range tempFiles {
 			_ = os.Remove(tempFile)
@@ -186,12 +173,23 @@ func (s *TakeoutService) exportTakeoutFromSources(ctx context.Context, label, fi
 			return "", err
 		}
 	}
+	var controlScope controlstore.TakeoutScope
+	if len(controlScopes) > 0 {
+		controlScope = controlScopes[0]
+	}
+	controlFile, err := s.exportControlTakeoutParquet(ctx, root, controlScope)
+	if err != nil {
+		return "", err
+	}
+	if controlFile != "" {
+		tempFiles = append(tempFiles, controlFile)
+	}
 	if len(tempFiles) == 0 {
-		return s.exportTakeoutFromStore(ctx, s.store, label, filename, normalizedFormat, duckFormat, []takeoutQuerySource{{WhereClause: "FALSE"}})
+		return s.exportTakeoutFromStore(ctx, root, label, filename, normalizedFormat, duckFormat, []takeoutQuerySource{{WhereClause: "FALSE"}})
 	}
 
 	query := buildTakeoutMergeQuery(tempFiles, filename, duckFormat)
-	err := s.store.WithDuckDBSession(ctx, database.DuckDBSessionOptions{
+	err = root.WithDuckDBSession(ctx, database.DuckDBSessionOptions{
 		Excel: normalizedFormat == exportfmt.FormatXLSX,
 	}, func(conn *sql.Conn) error {
 		if _, err := conn.ExecContext(ctx, query); err != nil {
@@ -203,6 +201,76 @@ func (s *TakeoutService) exportTakeoutFromSources(ctx context.Context, label, fi
 		return "", fmt.Errorf("failed to export %s data: %w", label, err)
 	}
 
+	return filename, nil
+}
+
+func (s *TakeoutService) exportControlTakeoutParquet(ctx context.Context, root *database.Store, scope controlstore.TakeoutScope) (string, error) {
+	if s.control == nil {
+		return "", nil
+	}
+	ndjson, err := os.CreateTemp(s.path, "takeout_control_*.ndjson")
+	if err != nil {
+		return "", fmt.Errorf("create control takeout staging file: %w", err)
+	}
+	ndjsonPath := ndjson.Name()
+	defer os.Remove(ndjsonPath)
+	if err := ndjson.Chmod(0o600); err != nil {
+		_ = ndjson.Close()
+		return "", fmt.Errorf("secure control takeout staging file: %w", err)
+	}
+	count, writeErr := s.control.WriteTakeoutNDJSON(ctx, ndjson, scope)
+	closeErr := ndjson.Close()
+	if writeErr != nil {
+		return "", writeErr
+	}
+	if closeErr != nil {
+		return "", fmt.Errorf("close control takeout staging file: %w", closeErr)
+	}
+	if count == 0 {
+		return "", nil
+	}
+
+	parquetPath := filepath.Join(s.path, fmt.Sprintf("takeout_control_%d.parquet", time.Now().UnixNano()))
+	query := fmt.Sprintf("COPY (SELECT * FROM read_ndjson_auto('%s')) TO '%s' (FORMAT PARQUET)", escapeTakeoutSQLString(ndjsonPath), escapeTakeoutSQLString(parquetPath))
+	if err := root.WithDuckDBSession(ctx, database.DuckDBSessionOptions{}, func(conn *sql.Conn) error {
+		_, err := conn.ExecContext(ctx, query)
+		return err
+	}); err != nil {
+		_ = os.Remove(parquetPath)
+		return "", fmt.Errorf("convert SQLite control takeout records: %w", err)
+	}
+	return parquetPath, nil
+}
+
+func (s *TakeoutService) exportSplitQRCodeTakeout(ctx context.Context, analyticsStore *database.Store, filename, normalizedFormat, duckFormat string, siteID, qrCodeID uuid.UUID) (string, error) {
+	root, err := s.dataPlaneRoot(ctx)
+	if err != nil {
+		return "", err
+	}
+	analyticsPath := filepath.Join(s.path, fmt.Sprintf("takeout_qr_analytics_%d.parquet", time.Now().UnixNano()))
+	tempFiles := []string{analyticsPath}
+	defer func() {
+		for _, path := range tempFiles {
+			_ = os.Remove(path)
+		}
+	}()
+	if _, err := s.exportQRCodeTakeoutFromStore(ctx, analyticsStore, analyticsPath, exportfmt.FormatParquet, exportfmt.DuckDBCopyOptions(exportfmt.FormatParquet), siteID, qrCodeID, false, true); err != nil {
+		return "", err
+	}
+	controlPath, err := s.exportControlTakeoutParquet(ctx, root, controlstore.TakeoutScope{SiteIDs: []uuid.UUID{siteID}, QRCodeID: qrCodeID})
+	if err != nil {
+		return "", err
+	}
+	if controlPath != "" {
+		tempFiles = append(tempFiles, controlPath)
+	}
+	query := buildTakeoutMergeQuery(tempFiles, filename, duckFormat)
+	if err := root.WithDuckDBSession(ctx, database.DuckDBSessionOptions{Excel: normalizedFormat == exportfmt.FormatXLSX}, func(conn *sql.Conn) error {
+		_, err := conn.ExecContext(ctx, query)
+		return err
+	}); err != nil {
+		return "", fmt.Errorf("failed to export qr data: %w", err)
+	}
 	return filename, nil
 }
 
@@ -224,36 +292,24 @@ func (s *TakeoutService) exportTakeoutFromStore(ctx context.Context, store *data
 }
 
 func (s *TakeoutService) takeoutSourcesForSites(ctx context.Context, userID uuid.UUID, sites []api.Site) ([]takeoutStoreSource, error) {
+	root, err := s.dataPlaneRoot(ctx)
+	if err != nil {
+		return nil, err
+	}
 	if len(sites) == 0 {
-		return []takeoutStoreSource{{Store: s.store, Source: takeoutQuerySource{WhereClause: "FALSE", IncludeAnalytics: true, IncludeControl: true, UserID: &userID}}}, nil
+		return []takeoutStoreSource{{Store: root, Source: takeoutQuerySource{WhereClause: "FALSE", IncludeAnalytics: true, UserID: &userID}}}, nil
 	}
 
-	sharedIDs := make([]uuid.UUID, 0)
 	tenantIDsByStore := make(map[*database.Store][]uuid.UUID)
 	for _, site := range sites {
 		analyticsStore, _, err := s.tenantStores.ResolveSiteStore(ctx, site.ID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve analytics store for site %s: %w", site.ID, err)
 		}
-		if analyticsStore == s.store {
-			sharedIDs = append(sharedIDs, site.ID)
-			continue
-		}
 		tenantIDsByStore[analyticsStore] = append(tenantIDsByStore[analyticsStore], site.ID)
 	}
 
-	sources := make([]takeoutStoreSource, 0, len(tenantIDsByStore)+1)
-	if len(sharedIDs) > 0 {
-		sources = append(sources, takeoutStoreSource{
-			Store:  s.store,
-			Source: takeoutQuerySource{WhereClause: takeoutWhereClauseForSiteIDs(sharedIDs), IncludeAnalytics: true},
-		})
-	}
-	sources = append(sources, takeoutStoreSource{
-		Store:  s.store,
-		Source: takeoutQuerySource{WhereClause: takeoutWhereClauseForSites(sites), IncludeControl: true, UserID: &userID},
-	})
-
+	sources := make([]takeoutStoreSource, 0, len(tenantIDsByStore))
 	for store, ids := range tenantIDsByStore {
 		sources = append(sources, takeoutStoreSource{
 			Store:  store,
@@ -261,9 +317,19 @@ func (s *TakeoutService) takeoutSourcesForSites(ctx context.Context, userID uuid
 		})
 	}
 	if len(sources) == 0 {
-		return []takeoutStoreSource{{Store: s.store, Source: takeoutQuerySource{WhereClause: "FALSE", IncludeAnalytics: true, IncludeControl: true, UserID: &userID}}}, nil
+		return []takeoutStoreSource{{Store: root, Source: takeoutQuerySource{WhereClause: "FALSE", IncludeAnalytics: true, UserID: &userID}}}, nil
 	}
 	return sources, nil
+}
+
+func (s *TakeoutService) dataPlaneRoot(ctx context.Context) (*database.Store, error) {
+	if s.store != nil {
+		return s.store, nil
+	}
+	if s.tenantStores == nil {
+		return nil, fmt.Errorf("tenant data plane unavailable")
+	}
+	return s.tenantStores.ForTenant(ctx, uuid.Nil)
 }
 
 func (s *TakeoutService) CleanupExportFile(filename string) {
@@ -674,11 +740,15 @@ func buildTakeoutMergeQuery(filenames []string, filename, format string) string 
 }
 
 func takeoutWhereClauseForSites(sites []api.Site) string {
+	return takeoutWhereClauseForSiteIDs(takeoutSiteIDs(sites))
+}
+
+func takeoutSiteIDs(sites []api.Site) []uuid.UUID {
 	ids := make([]uuid.UUID, 0, len(sites))
 	for _, site := range sites {
 		ids = append(ids, site.ID)
 	}
-	return takeoutWhereClauseForSiteIDs(ids)
+	return ids
 }
 
 func takeoutWhereClauseForSiteIDs(siteIDs []uuid.UUID) string {

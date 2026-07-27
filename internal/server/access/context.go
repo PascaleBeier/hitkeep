@@ -8,12 +8,12 @@ import (
 
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
-	"hitkeep/internal/database"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/entitlements"
 )
 
 type Builder struct {
-	Store *database.Store
+	Store *controlstore.Store
 	// Limits derives plan-limit capabilities such as CanCreateTeams. A nil
 	// Limits is permissive, matching deployments without managed-cloud limits.
 	Limits *entitlements.Service

@@ -18,7 +18,7 @@ import (
 
 type Config struct {
 	HTTPAddr          string  `env:"HITKEEP_HTTP_ADDR"        default:":8080"                               desc:"HTTP listen address"                                    deprecated:"http"`
-	DBPath            string  `env:"HITKEEP_DB_PATH"          default:"hitkeep.db"                          desc:"Database file path"                                     deprecated:"db"`
+	DBPath            string  `env:"HITKEEP_DB_PATH"          default:"hitkeep.db"                          desc:"Local SQLite control database path"                     deprecated:"db"`
 	BindAddr          string  `env:"HITKEEP_BIND_ADDR"        default:"0.0.0.0:7946"                       desc:"Address for cluster gossip"                             deprecated:"bind"`
 	JoinAddr          string  `env:"HITKEEP_JOIN_ADDR"        default:""                                   desc:"Address of a peer to join"                              deprecated:"join"`
 	IngestRateLimit   float64 `env:"HITKEEP_INGEST_RATE_LIMIT" default:"20"                                desc:"Ingest rate limit"                                      deprecated:"ingest-rate"`
@@ -28,13 +28,13 @@ type Config struct {
 	DataRetentionDays int     `env:"HITKEEP_DATA_RETENTION_DAYS" default:"365"                             desc:"Default data retention in days"                         deprecated:"retention-days"`
 	NodeName          string  `env:"HITKEEP_NODE_NAME"         default:""                                  docdefault:"hostname-timestamp" desc:"Unique node name"                                       deprecated:"name"`
 
-	DuckDBMemoryLimit           string `env:"HITKEEP_DUCKDB_MEMORY_LIMIT" default:"" docdefault:"derived" desc:"DuckDB memory limit per database (e.g. 2GB); empty derives a container-aware default, 'none' keeps the DuckDB default of 80% of system RAM"`
-	DuckDBThreads               int    `env:"HITKEEP_DUCKDB_THREADS"      default:"0" docdefault:"GOMAXPROCS" desc:"DuckDB threads per database; 0 derives the default from GOMAXPROCS"`
-	DBCompactOnStart            bool   `env:"HITKEEP_DB_COMPACT_ON_START" default:"true" desc:"Rewrite fragmented database files on startup and tenant open to return space freed by retention and deletes to the operating system"`
-	DBAutoRecover               bool   `env:"HITKEEP_DB_AUTO_RECOVER" default:"true" desc:"Automatically recover recognized DuckDB non-unique index invalidations after creating a local recovery bundle"`
-	DBAutoRecoverWAL            bool   `env:"HITKEEP_DB_AUTO_RECOVER_WAL" default:"false" desc:"After retaining a recovery bundle, automatically bypass a recognized non-migration WAL and accept loss of WAL-only changes"`
-	DBCheckpointIntervalMinutes int    `env:"HITKEEP_DB_CHECKPOINT_INTERVAL" default:"5" desc:"Minutes between periodic DuckDB checkpoints; 0 disables periodic checkpoints"`
-	DBRecoveryPath              string `env:"HITKEEP_DB_RECOVERY_PATH" default:"" docdefault:"<data-path>/recovery" desc:"Directory for permission-restricted DuckDB recovery bundles; defaults to <data-path>/recovery"`
+	DuckDBMemoryLimit           string `env:"HITKEEP_DUCKDB_MEMORY_LIMIT" default:"" docdefault:"derived" desc:"Memory limit for the single attached tenant DuckDB data plane (e.g. 2GB); empty derives a container-aware default"`
+	DuckDBThreads               int    `env:"HITKEEP_DUCKDB_THREADS"      default:"0" docdefault:"GOMAXPROCS" desc:"Threads for the tenant DuckDB data plane; 0 derives the default from GOMAXPROCS"`
+	DBCompactOnStart            bool   `env:"HITKEEP_DB_COMPACT_ON_START" default:"true" desc:"Rewrite fragmented tenant DuckDB files on open to return space freed by retention and deletes"`
+	DBAutoRecover               bool   `env:"HITKEEP_DB_AUTO_RECOVER" default:"true" desc:"Automatically recover recognized tenant DuckDB invalidations after creating a local recovery bundle"`
+	DBAutoRecoverWAL            bool   `env:"HITKEEP_DB_AUTO_RECOVER_WAL" default:"false" desc:"After retaining a recovery bundle, bypass a recognized tenant DuckDB WAL and accept loss of WAL-only changes"`
+	DBCheckpointIntervalMinutes int    `env:"HITKEEP_DB_CHECKPOINT_INTERVAL" default:"5" desc:"Minutes between tenant DuckDB checkpoints; 0 disables periodic checkpoints"`
+	DBRecoveryPath              string `env:"HITKEEP_DB_RECOVERY_PATH" default:"" docdefault:"<data-path>/recovery" desc:"Directory for permission-restricted tenant DuckDB recovery bundles"`
 
 	DataPath       string `env:"HITKEEP_DATA_PATH"          default:"data"           desc:"Local writable base directory for per-tenant database files"`
 	ArchivePath    string `env:"HITKEEP_ARCHIVE_PATH"       default:"archive"        desc:"Data archive path"`

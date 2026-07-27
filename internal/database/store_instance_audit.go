@@ -5,11 +5,11 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 )
 
 type InstanceAuditParams struct {
@@ -29,24 +29,7 @@ type InstanceAuditParams struct {
 	MetadataJSON  string
 }
 
-type AuditEntryParams struct {
-	ActorID       uuid.UUID
-	ActorEmail    string
-	ActorRole     string
-	TeamID        uuid.UUID
-	TargetUserID  uuid.UUID
-	Action        string
-	TargetType    string
-	TargetID      string
-	TargetLabel   string
-	Outcome       string
-	IPAddress     string
-	IPCountryCode string
-	UserAgent     string
-	RequestID     string
-	Details       string
-	MetadataJSON  string
-}
+type AuditEntryParams = controlstore.AuditEntryParams
 
 func (s *Store) AppendAuditEntry(ctx context.Context, params AuditEntryParams) error {
 	return appendAuditEntry(ctx, s.db, params)
@@ -128,17 +111,7 @@ func (s *Store) AppendInstanceAuditEntry(ctx context.Context, params InstanceAud
 	return nil
 }
 
-type InstanceAuditFilter struct {
-	Action     string
-	ActorID    uuid.UUID
-	TargetType string
-	Outcome    string
-	From       time.Time
-	To         time.Time
-	Query      string
-	Limit      int
-	Offset     int
-}
+type InstanceAuditFilter = controlstore.InstanceAuditFilter
 
 const (
 	DefaultInstanceAuditListLimit   = 100

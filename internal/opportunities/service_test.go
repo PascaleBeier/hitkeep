@@ -12,11 +12,13 @@ import (
 
 	hitai "hitkeep/internal/ai"
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
+	"hitkeep/internal/testutil"
 )
 
 func TestGeneratePersistsValidatedAIProposal(t *testing.T) {
-	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	runID := uuid.New()
 	catalog := NewDetectorCatalog(fakeDetector{
 		contract: DetectorContract{
@@ -64,8 +66,9 @@ func TestGeneratePersistsValidatedAIProposal(t *testing.T) {
 		},
 	})
 	service := Service{
-		Shared: shared,
+		Shared: control,
 		AI: fakeOpportunityAI{
+			store: control,
 			runID: runID,
 			proposal: hitai.OpportunityCandidateProposal{
 				TypeKey:          "opportunities.types.fixture",
@@ -86,7 +89,7 @@ func TestGeneratePersistsValidatedAIProposal(t *testing.T) {
 	opportunities, gotRunID, status, err := service.Generate(context.Background(), GenerateInput{
 		TeamID:    teamID,
 		Site:      site,
-		Store:     shared,
+		Store:     analytics,
 		From:      time.Now().UTC().AddDate(0, 0, -30),
 		To:        time.Now().UTC(),
 		ActorID:   actorID,
@@ -120,7 +123,7 @@ func TestGeneratePersistsValidatedAIProposal(t *testing.T) {
 }
 
 func TestGeneratePersistsGoalSetupSuggestionFromTrackedConversionEvent(t *testing.T) {
-	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	ctx := context.Background()
 	from := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
 	to := from.AddDate(0, 0, 30)
@@ -128,7 +131,7 @@ func TestGeneratePersistsGoalSetupSuggestionFromTrackedConversionEvent(t *testin
 	isUnique := true
 	for i := range minSetupGoalEventCount {
 		timestamp := from.Add(time.Duration(i+1) * time.Hour)
-		requireNoError(t, shared.CreateHit(ctx, &api.Hit{
+		requireNoError(t, analytics.CreateHit(ctx, &api.Hit{
 			SiteID:    site.ID,
 			SessionID: sessionID,
 			PageID:    uuid.New(),
@@ -136,7 +139,7 @@ func TestGeneratePersistsGoalSetupSuggestionFromTrackedConversionEvent(t *testin
 			Timestamp: timestamp,
 			IsUnique:  &isUnique,
 		}), "create hit")
-		requireNoError(t, shared.CreateEvent(ctx, &api.Event{
+		requireNoError(t, analytics.CreateEvent(ctx, &api.Event{
 			SiteID:    site.ID,
 			SessionID: sessionID,
 			Name:      "demo_request",
@@ -144,8 +147,8 @@ func TestGeneratePersistsGoalSetupSuggestionFromTrackedConversionEvent(t *testin
 		}), "create event")
 	}
 
-	opportunities, _, aiStatus, err := (Service{Shared: shared}).Generate(ctx, GenerateInput{
-		Store:           shared,
+	opportunities, _, aiStatus, err := (Service{Shared: control}).Generate(ctx, GenerateInput{
+		Store:           analytics,
 		Site:            site,
 		TeamID:          teamID,
 		ActorID:         actorID,
@@ -170,7 +173,7 @@ func TestGeneratePersistsGoalSetupSuggestionFromTrackedConversionEvent(t *testin
 }
 
 func TestGeneratePersistsFunnelSetupSuggestionFromTrackedPageAndConversionEvent(t *testing.T) {
-	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	ctx := context.Background()
 	from := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
 	to := from.AddDate(0, 0, 30)
@@ -178,7 +181,7 @@ func TestGeneratePersistsFunnelSetupSuggestionFromTrackedPageAndConversionEvent(
 	isUnique := true
 	for i := range minSetupFunnelStartPageviews {
 		timestamp := from.Add(time.Duration(i+1) * time.Minute)
-		requireNoError(t, shared.CreateHit(ctx, &api.Hit{
+		requireNoError(t, analytics.CreateHit(ctx, &api.Hit{
 			SiteID:    site.ID,
 			SessionID: sessionID,
 			PageID:    uuid.New(),
@@ -188,7 +191,7 @@ func TestGeneratePersistsFunnelSetupSuggestionFromTrackedPageAndConversionEvent(
 		}), "create hit")
 	}
 	for i := range minSetupGoalEventCount {
-		requireNoError(t, shared.CreateEvent(ctx, &api.Event{
+		requireNoError(t, analytics.CreateEvent(ctx, &api.Event{
 			SiteID:    site.ID,
 			SessionID: sessionID,
 			Name:      "demo_request",
@@ -196,8 +199,8 @@ func TestGeneratePersistsFunnelSetupSuggestionFromTrackedPageAndConversionEvent(
 		}), "create event")
 	}
 
-	opportunities, _, _, err := (Service{Shared: shared}).Generate(ctx, GenerateInput{
-		Store:           shared,
+	opportunities, _, _, err := (Service{Shared: control}).Generate(ctx, GenerateInput{
+		Store:           analytics,
 		Site:            site,
 		TeamID:          teamID,
 		ActorID:         actorID,
@@ -219,13 +222,13 @@ func TestGeneratePersistsFunnelSetupSuggestionFromTrackedPageAndConversionEvent(
 }
 
 func TestGenerateSuppressesNoDataSetupOpportunityBeforeAI(t *testing.T) {
-	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	ai := &countingEchoOpportunityAI{}
 	from := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
 	to := from.AddDate(0, 0, 30)
 
-	opportunities, runID, aiStatus, err := (Service{Shared: shared, AI: ai}).Generate(context.Background(), GenerateInput{
-		Store:           shared,
+	opportunities, runID, aiStatus, err := (Service{Shared: control, AI: ai}).Generate(context.Background(), GenerateInput{
+		Store:           analytics,
 		Site:            site,
 		TeamID:          teamID,
 		ActorID:         actorID,
@@ -252,10 +255,10 @@ func TestGenerateSuppressesNoDataSetupOpportunityBeforeAI(t *testing.T) {
 }
 
 func TestGeneratePassesEvidenceSnapshotToAI(t *testing.T) {
-	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
-	ai := &recordingOpportunityAI{runID: uuid.New(), proposal: fixtureAIProposal("one")}
+	control, analytics, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	ai := &recordingOpportunityAI{store: control, runID: uuid.New(), proposal: fixtureAIProposal("one")}
 	service := Service{
-		Shared:  shared,
+		Shared:  control,
 		AI:      ai,
 		Catalog: NewDetectorCatalog(fakeDetector{contract: fixtureDetectorContract("one"), output: fixtureOpportunity(teamID, site.ID, "one")}),
 	}
@@ -265,7 +268,7 @@ func TestGeneratePassesEvidenceSnapshotToAI(t *testing.T) {
 	_, _, status, err := service.Generate(context.Background(), GenerateInput{
 		TeamID:    teamID,
 		Site:      site,
-		Store:     shared,
+		Store:     analytics,
 		From:      from,
 		To:        to,
 		ActorID:   actorID,
@@ -289,7 +292,7 @@ func TestGeneratePassesEvidenceSnapshotToAI(t *testing.T) {
 }
 
 func TestGenerateUsesActiveCatalogContractForDefaultTypeKey(t *testing.T) {
-	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	contract := DetectorContract{
 		Category: DetectorCategoryTraffic,
 		TypeKey:  "opportunities.types.checkout_conversion",
@@ -329,9 +332,9 @@ func TestGenerateUsesActiveCatalogContractForDefaultTypeKey(t *testing.T) {
 		},
 		GeneratedAt: time.Now().UTC(),
 	}
-	ai := &echoOpportunityAI{runID: uuid.New(), citedEvidenceIDs: []string{"custom-evidence"}}
+	ai := &echoOpportunityAI{store: control, runID: uuid.New(), citedEvidenceIDs: []string{"custom-evidence"}}
 	service := Service{
-		Shared:  shared,
+		Shared:  control,
 		AI:      ai,
 		Catalog: NewDetectorCatalog(fakeDetector{contract: contract, output: output}),
 	}
@@ -339,7 +342,7 @@ func TestGenerateUsesActiveCatalogContractForDefaultTypeKey(t *testing.T) {
 	_, _, status, err := service.Generate(context.Background(), GenerateInput{
 		TeamID:    teamID,
 		Site:      site,
-		Store:     shared,
+		Store:     analytics,
 		ActorID:   actorID,
 		ActorType: "user",
 	})
@@ -361,7 +364,7 @@ func TestGenerateUsesActiveCatalogContractForDefaultTypeKey(t *testing.T) {
 }
 
 func TestGenerateLoadsOnlySignalsRequiredByActiveCatalog(t *testing.T) {
-	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	contract := fixtureDetectorContract("one")
 	contract.Category = DetectorCategoryTrafficQuality
 	contract.RequiredSignals = []OpportunitySignal{OpportunitySignalSiteStats}
@@ -370,7 +373,7 @@ func TestGenerateLoadsOnlySignalsRequiredByActiveCatalog(t *testing.T) {
 		output:   fixtureOpportunity(teamID, site.ID, "one"),
 	}
 	service := Service{
-		Shared:  shared,
+		Shared:  control,
 		AI:      nil,
 		Catalog: NewDetectorCatalog(&detector),
 	}
@@ -378,7 +381,7 @@ func TestGenerateLoadsOnlySignalsRequiredByActiveCatalog(t *testing.T) {
 	_, _, _, err := service.Generate(context.Background(), GenerateInput{
 		TeamID:    teamID,
 		Site:      site,
-		Store:     shared,
+		Store:     analytics,
 		ActorID:   actorID,
 		ActorType: "user",
 	})
@@ -394,7 +397,7 @@ func TestGenerateLoadsOnlySignalsRequiredByActiveCatalog(t *testing.T) {
 }
 
 func TestGenerateLoadsOptionalSupportingSignalsForActiveCatalog(t *testing.T) {
-	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	contract := fixtureDetectorContract("one")
 	contract.Category = DetectorCategoryAIVisibility
 	contract.RequiredSignals = []OpportunitySignal{OpportunitySignalAIVisibility}
@@ -404,7 +407,7 @@ func TestGenerateLoadsOptionalSupportingSignalsForActiveCatalog(t *testing.T) {
 		output:   fixtureOpportunity(teamID, site.ID, "one"),
 	}
 	service := Service{
-		Shared:  shared,
+		Shared:  control,
 		AI:      nil,
 		Catalog: NewDetectorCatalog(&detector),
 	}
@@ -412,7 +415,7 @@ func TestGenerateLoadsOptionalSupportingSignalsForActiveCatalog(t *testing.T) {
 	_, _, _, err := service.Generate(context.Background(), GenerateInput{
 		TeamID:    teamID,
 		Site:      site,
-		Store:     shared,
+		Store:     analytics,
 		ActorID:   actorID,
 		ActorType: "user",
 	})
@@ -431,11 +434,11 @@ func TestGenerateLoadsOptionalSupportingSignalsForActiveCatalog(t *testing.T) {
 }
 
 func TestGenerateLoadsSearchConsoleSignalThroughMappedProperty(t *testing.T) {
-	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	from := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 5, 31, 0, 0, 0, 0, time.UTC)
 	propertyURI := "sc-domain:example.com"
-	if err := shared.UpsertGoogleSearchConsoleSiteMapping(context.Background(), database.GoogleSearchConsoleSiteMappingInput{
+	if err := control.UpsertGoogleSearchConsoleSiteMapping(context.Background(), database.GoogleSearchConsoleSiteMappingInput{
 		SiteID:      site.ID,
 		TeamID:      teamID,
 		PropertyURI: propertyURI,
@@ -444,7 +447,7 @@ func TestGenerateLoadsSearchConsoleSignalThroughMappedProperty(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("upsert search console mapping: %v", err)
 	}
-	if err := shared.UpsertSearchConsoleFact(context.Background(), database.SearchConsoleFactInput{
+	if err := analytics.UpsertSearchConsoleFact(context.Background(), database.SearchConsoleFactInput{
 		SiteID:          site.ID,
 		PropertyURI:     propertyURI,
 		Date:            time.Date(2026, 5, 12, 0, 0, 0, 0, time.UTC),
@@ -465,7 +468,7 @@ func TestGenerateLoadsSearchConsoleSignalThroughMappedProperty(t *testing.T) {
 		output:   fixtureOpportunity(teamID, site.ID, "one"),
 	}
 	service := Service{
-		Shared:  shared,
+		Shared:  control,
 		AI:      nil,
 		Catalog: NewDetectorCatalog(&detector),
 	}
@@ -473,7 +476,7 @@ func TestGenerateLoadsSearchConsoleSignalThroughMappedProperty(t *testing.T) {
 	_, _, _, err := service.Generate(context.Background(), GenerateInput{
 		TeamID:    teamID,
 		Site:      site,
-		Store:     shared,
+		Store:     analytics,
 		From:      from,
 		To:        to,
 		ActorID:   actorID,
@@ -491,11 +494,11 @@ func TestGenerateLoadsSearchConsoleSignalThroughMappedProperty(t *testing.T) {
 }
 
 func TestGenerateLoadsEventNamesSignalForActiveCatalog(t *testing.T) {
-	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	from := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 5, 31, 0, 0, 0, 0, time.UTC)
 	for _, eventName := range []string{"external_link_click", "download"} {
-		if err := shared.CreateEvent(context.Background(), &api.Event{
+		if err := analytics.CreateEvent(context.Background(), &api.Event{
 			SiteID:     site.ID,
 			SessionID:  uuid.New(),
 			Name:       eventName,
@@ -513,7 +516,7 @@ func TestGenerateLoadsEventNamesSignalForActiveCatalog(t *testing.T) {
 		output:   fixtureOpportunity(teamID, site.ID, "one"),
 	}
 	service := Service{
-		Shared:  shared,
+		Shared:  control,
 		AI:      nil,
 		Catalog: NewDetectorCatalog(&detector),
 	}
@@ -521,7 +524,7 @@ func TestGenerateLoadsEventNamesSignalForActiveCatalog(t *testing.T) {
 	_, _, _, err := service.Generate(context.Background(), GenerateInput{
 		TeamID:    teamID,
 		Site:      site,
-		Store:     shared,
+		Store:     analytics,
 		From:      from,
 		To:        to,
 		ActorID:   actorID,
@@ -536,10 +539,10 @@ func TestGenerateLoadsEventNamesSignalForActiveCatalog(t *testing.T) {
 }
 
 func TestGenerateLoadsWebVitalsSignalForActiveCatalog(t *testing.T) {
-	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	from := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 5, 31, 0, 0, 0, 0, time.UTC)
-	seedOpportunityWebVitals(t, context.Background(), shared, site.ID, from, minWebVitalsSamples)
+	seedOpportunityWebVitals(t, context.Background(), analytics, site.ID, from, minWebVitalsSamples)
 	contract := fixtureDetectorContract("one")
 	contract.Category = DetectorCategoryPerformance
 	contract.RequiredSignals = []OpportunitySignal{OpportunitySignalWebVitals}
@@ -548,7 +551,7 @@ func TestGenerateLoadsWebVitalsSignalForActiveCatalog(t *testing.T) {
 		output:   fixtureOpportunity(teamID, site.ID, "one"),
 	}
 	service := Service{
-		Shared:  shared,
+		Shared:  control,
 		AI:      nil,
 		Catalog: NewDetectorCatalog(&detector),
 	}
@@ -556,7 +559,7 @@ func TestGenerateLoadsWebVitalsSignalForActiveCatalog(t *testing.T) {
 	_, _, _, err := service.Generate(context.Background(), GenerateInput{
 		TeamID:    teamID,
 		Site:      site,
-		Store:     shared,
+		Store:     analytics,
 		From:      from,
 		To:        to,
 		ActorID:   actorID,
@@ -570,14 +573,14 @@ func TestGenerateLoadsWebVitalsSignalForActiveCatalog(t *testing.T) {
 }
 
 func TestGeneratePersistsWebVitalsOpportunityFromStoredSamples(t *testing.T) {
-	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	ctx := context.Background()
 	from := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 5, 31, 0, 0, 0, 0, time.UTC)
-	seedOpportunityWebVitals(t, ctx, shared, site.ID, from, minWebVitalsSamples+10)
+	seedOpportunityWebVitals(t, ctx, analytics, site.ID, from, minWebVitalsSamples+10)
 
-	opportunities, _, aiStatus, err := (Service{Shared: shared}).Generate(ctx, GenerateInput{
-		Store:           shared,
+	opportunities, _, aiStatus, err := (Service{Shared: control}).Generate(ctx, GenerateInput{
+		Store:           analytics,
 		Site:            site,
 		TeamID:          teamID,
 		ActorID:         actorID,
@@ -694,7 +697,7 @@ func assertPersistedWebVitalsOpportunity(t *testing.T, opportunity api.Opportuni
 }
 
 func TestGenerateRejectsUnknownRequiredSignal(t *testing.T) {
-	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	contract := fixtureDetectorContract("one")
 	contract.RequiredSignals = []OpportunitySignal{"unknown_signal"}
 	detector := signalInspectingDetector{
@@ -702,7 +705,7 @@ func TestGenerateRejectsUnknownRequiredSignal(t *testing.T) {
 		output:   fixtureOpportunity(teamID, site.ID, "one"),
 	}
 	service := Service{
-		Shared:  shared,
+		Shared:  control,
 		AI:      nil,
 		Catalog: NewDetectorCatalog(&detector),
 	}
@@ -710,7 +713,7 @@ func TestGenerateRejectsUnknownRequiredSignal(t *testing.T) {
 	opportunities, runID, status, err := service.Generate(context.Background(), GenerateInput{
 		TeamID:    teamID,
 		Site:      site,
-		Store:     shared,
+		Store:     analytics,
 		ActorID:   actorID,
 		ActorType: "user",
 	})
@@ -726,9 +729,9 @@ func TestGenerateRejectsUnknownRequiredSignal(t *testing.T) {
 }
 
 func TestGenerateReportsNoOpportunitiesWhenAIIsConfiguredAndNoCandidatesExist(t *testing.T) {
-	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	service := Service{
-		Shared:  shared,
+		Shared:  control,
 		AI:      fakeOpportunityAI{runID: uuid.New()},
 		Catalog: NewDetectorCatalog(noOpportunityDetector{contract: fixtureDetectorContract("quiet")}),
 	}
@@ -736,7 +739,7 @@ func TestGenerateReportsNoOpportunitiesWhenAIIsConfiguredAndNoCandidatesExist(t 
 	opportunities, runID, status, err := service.Generate(context.Background(), GenerateInput{
 		TeamID:    teamID,
 		Site:      site,
-		Store:     shared,
+		Store:     analytics,
 		ActorID:   actorID,
 		ActorType: "user",
 	})
@@ -752,7 +755,7 @@ func TestGenerateReportsNoOpportunitiesWhenAIIsConfiguredAndNoCandidatesExist(t 
 }
 
 func TestGenerateSuppressesSavedOpportunityWithSameIdentityEvidence(t *testing.T) {
-	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	opportunityID := uuid.New()
 	detector := &sequenceDetector{
 		contract: identityDetectorContract("semantic"),
@@ -763,9 +766,9 @@ func TestGenerateSuppressesSavedOpportunityWithSameIdentityEvidence(t *testing.T
 	}
 	detector.outputs[0].RouteParams = nil
 	detector.outputs[1].RouteParams = nil
-	ai := &countingEchoOpportunityAI{}
+	ai := &countingEchoOpportunityAI{store: control}
 	service := Service{
-		Shared:  shared,
+		Shared:  control,
 		AI:      ai,
 		Catalog: NewDetectorCatalog(detector),
 	}
@@ -773,7 +776,7 @@ func TestGenerateSuppressesSavedOpportunityWithSameIdentityEvidence(t *testing.T
 	first, firstRunID, firstStatus, err := service.Generate(context.Background(), GenerateInput{
 		TeamID:    teamID,
 		Site:      site,
-		Store:     shared,
+		Store:     analytics,
 		ActorID:   actorID,
 		ActorType: "user",
 	})
@@ -787,7 +790,7 @@ func TestGenerateSuppressesSavedOpportunityWithSameIdentityEvidence(t *testing.T
 	second, secondRunID, secondStatus, err := service.Generate(context.Background(), GenerateInput{
 		TeamID:    teamID,
 		Site:      site,
-		Store:     shared,
+		Store:     analytics,
 		ActorID:   actorID,
 		ActorType: "user",
 	})
@@ -803,7 +806,7 @@ func TestGenerateSuppressesSavedOpportunityWithSameIdentityEvidence(t *testing.T
 }
 
 func TestGenerateReturnsRankedActionableOpportunities(t *testing.T) {
-	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	low := fixtureOpportunity(teamID, site.ID, "low")
 	low.Score = 62
 	low.ScoreBreakdown = api.OpportunityScoreBreakdown{Impact: 40, Actionability: 45, EvidenceFit: 50, Total: 62}
@@ -816,8 +819,8 @@ func TestGenerateReturnsRankedActionableOpportunities(t *testing.T) {
 	done.ScoreBreakdown = api.OpportunityScoreBreakdown{Impact: 99, Actionability: 99, EvidenceFit: 99, Total: 99}
 
 	service := Service{
-		Shared: shared,
-		AI:     &countingEchoOpportunityAI{},
+		Shared: control,
+		AI:     &countingEchoOpportunityAI{store: control},
 		Catalog: NewDetectorCatalog(
 			fakeDetector{contract: fixtureDetectorContract("low"), output: low},
 			fakeDetector{contract: fixtureDetectorContract("done"), output: done},
@@ -828,7 +831,7 @@ func TestGenerateReturnsRankedActionableOpportunities(t *testing.T) {
 	opportunities, _, status, err := service.Generate(context.Background(), GenerateInput{
 		TeamID:    teamID,
 		Site:      site,
-		Store:     shared,
+		Store:     analytics,
 		ActorID:   actorID,
 		ActorType: "user",
 	})
@@ -846,7 +849,7 @@ func TestGenerateReturnsRankedActionableOpportunities(t *testing.T) {
 }
 
 func TestGenerateRegeneratesSavedOpportunityWhenIdentityEvidenceChanges(t *testing.T) {
-	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	opportunityID := uuid.New()
 	detector := &sequenceDetector{
 		contract: identityDetectorContract("semantic"),
@@ -855,9 +858,9 @@ func TestGenerateRegeneratesSavedOpportunityWhenIdentityEvidenceChanges(t *testi
 			identityOpportunity(teamID, site.ID, opportunityID, "pascalebeier", 985),
 		},
 	}
-	ai := &countingEchoOpportunityAI{}
+	ai := &countingEchoOpportunityAI{store: control}
 	service := Service{
-		Shared:  shared,
+		Shared:  control,
 		AI:      ai,
 		Catalog: NewDetectorCatalog(detector),
 	}
@@ -865,7 +868,7 @@ func TestGenerateRegeneratesSavedOpportunityWhenIdentityEvidenceChanges(t *testi
 	_, _, _, err := service.Generate(context.Background(), GenerateInput{
 		TeamID:    teamID,
 		Site:      site,
-		Store:     shared,
+		Store:     analytics,
 		ActorID:   actorID,
 		ActorType: "user",
 	})
@@ -875,7 +878,7 @@ func TestGenerateRegeneratesSavedOpportunityWhenIdentityEvidenceChanges(t *testi
 	second, secondRunID, secondStatus, err := service.Generate(context.Background(), GenerateInput{
 		TeamID:    teamID,
 		Site:      site,
-		Store:     shared,
+		Store:     analytics,
 		ActorID:   actorID,
 		ActorType: "user",
 	})
@@ -894,14 +897,14 @@ func TestGenerateRegeneratesSavedOpportunityWhenIdentityEvidenceChanges(t *testi
 }
 
 func TestGenerateRejectsUnsupportedAIProposalAndPersistsEvidenceBackedFallback(t *testing.T) {
-	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	runID := uuid.New()
 	catalog := NewDetectorCatalog(fakeDetector{
 		contract: fixtureDetectorContract("one"),
 		output:   fixtureOpportunity(teamID, site.ID, "one"),
 	})
 	service := Service{
-		Shared: shared,
+		Shared: control,
 		AI: fakeOpportunityAI{
 			runID: runID,
 			proposal: hitai.OpportunityCandidateProposal{
@@ -923,7 +926,7 @@ func TestGenerateRejectsUnsupportedAIProposalAndPersistsEvidenceBackedFallback(t
 	opportunities, gotRunID, status, err := service.Generate(context.Background(), GenerateInput{
 		TeamID:    teamID,
 		Site:      site,
-		Store:     shared,
+		Store:     analytics,
 		From:      time.Now().UTC().AddDate(0, 0, -30),
 		To:        time.Now().UTC(),
 		ActorID:   actorID,
@@ -951,13 +954,13 @@ func TestGenerateRejectsUnsupportedAIProposalAndPersistsEvidenceBackedFallback(t
 }
 
 func TestGenerateRejectsAIProposalThatChangesEvidenceBoundParams(t *testing.T) {
-	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	catalog := NewDetectorCatalog(fakeDetector{
 		contract: fixtureDetectorContract("one"),
 		output:   fixtureOpportunity(teamID, site.ID, "one"),
 	})
 	service := Service{
-		Shared: shared,
+		Shared: control,
 		AI: fakeOpportunityAI{
 			runID: uuid.New(),
 			proposal: hitai.OpportunityCandidateProposal{
@@ -979,7 +982,7 @@ func TestGenerateRejectsAIProposalThatChangesEvidenceBoundParams(t *testing.T) {
 	opportunities, gotRunID, status, err := service.Generate(context.Background(), GenerateInput{
 		TeamID:    teamID,
 		Site:      site,
-		Store:     shared,
+		Store:     analytics,
 		From:      time.Now().UTC().AddDate(0, 0, -30),
 		To:        time.Now().UTC(),
 		ActorID:   actorID,
@@ -1006,11 +1009,11 @@ func TestGenerateRejectsAIProposalThatChangesEvidenceBoundParams(t *testing.T) {
 }
 
 func TestGenerateRejectsAIProposalWithUnsupportedMetadata(t *testing.T) {
-	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	proposal := fixtureAIProposal("one")
 	proposal.Category = "search_visibility"
 	service := Service{
-		Shared: shared,
+		Shared: control,
 		AI: fakeOpportunityAI{
 			runID:    uuid.New(),
 			proposal: proposal,
@@ -1021,7 +1024,7 @@ func TestGenerateRejectsAIProposalWithUnsupportedMetadata(t *testing.T) {
 	opportunities, gotRunID, status, err := service.Generate(context.Background(), GenerateInput{
 		TeamID:    teamID,
 		Site:      site,
-		Store:     shared,
+		Store:     analytics,
 		From:      time.Now().UTC().AddDate(0, 0, -30),
 		To:        time.Now().UTC(),
 		ActorID:   actorID,
@@ -1042,7 +1045,7 @@ func TestGenerateRejectsAIProposalWithUnsupportedMetadata(t *testing.T) {
 }
 
 func TestGenerateAppliesAIProposalToEveryCandidate(t *testing.T) {
-	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	firstRunID := uuid.New()
 	secondRunID := uuid.New()
 	catalog := NewDetectorCatalog(
@@ -1056,8 +1059,9 @@ func TestGenerateAppliesAIProposalToEveryCandidate(t *testing.T) {
 		},
 	)
 	service := Service{
-		Shared: shared,
+		Shared: control,
 		AI: &sequenceOpportunityAI{
+			store:  control,
 			runIDs: []uuid.UUID{firstRunID, secondRunID},
 		},
 		Catalog: catalog,
@@ -1066,7 +1070,7 @@ func TestGenerateAppliesAIProposalToEveryCandidate(t *testing.T) {
 	opportunities, gotRunID, status, err := service.Generate(context.Background(), GenerateInput{
 		TeamID:    teamID,
 		Site:      site,
-		Store:     shared,
+		Store:     analytics,
 		From:      time.Now().UTC().AddDate(0, 0, -30),
 		To:        time.Now().UTC(),
 		ActorID:   actorID,
@@ -1103,13 +1107,13 @@ func TestGenerateAppliesAIProposalToEveryCandidate(t *testing.T) {
 }
 
 func TestGenerateAuditRecordsSafeAIStatus(t *testing.T) {
-	shared, site, teamID, actorID := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, actorID := setupOpportunityServiceTestStore(t)
 	catalog := NewDetectorCatalog(fakeDetector{
 		contract: fixtureDetectorContract("one"),
 		output:   fixtureOpportunity(teamID, site.ID, "one"),
 	})
 	service := Service{
-		Shared:  shared,
+		Shared:  control,
 		AI:      fakeOpportunityAI{err: hitai.ErrBudgetExhausted},
 		Catalog: catalog,
 	}
@@ -1117,7 +1121,7 @@ func TestGenerateAuditRecordsSafeAIStatus(t *testing.T) {
 	opportunities, _, status, err := service.Generate(context.Background(), GenerateInput{
 		TeamID:    teamID,
 		Site:      site,
-		Store:     shared,
+		Store:     analytics,
 		Audit:     &database.AuditEntryParams{ActorID: actorID, TeamID: teamID, Action: "opportunities.generated", TargetType: "site", TargetID: site.ID.String(), Outcome: "success", Details: "generated opportunities"},
 		From:      time.Now().UTC().AddDate(0, 0, -30),
 		To:        time.Now().UTC(),
@@ -1134,7 +1138,7 @@ func TestGenerateAuditRecordsSafeAIStatus(t *testing.T) {
 		t.Fatalf("expected deterministic fallback opportunity to persist, got %d", len(opportunities))
 	}
 
-	entries, _, err := shared.ListInstanceAuditEntries(context.Background(), database.InstanceAuditFilter{Action: "opportunities.generated", Limit: 10})
+	entries, _, err := control.ListInstanceAuditEntries(context.Background(), database.InstanceAuditFilter{Action: "opportunities.generated", Limit: 10})
 	if err != nil {
 		t.Fatalf("list audit entries: %v", err)
 	}
@@ -1147,9 +1151,9 @@ func TestGenerateAuditRecordsSafeAIStatus(t *testing.T) {
 }
 
 func TestGenerateRejectsSchedulerWithoutExplicitScope(t *testing.T) {
-	shared, site, teamID, _ := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, _ := setupOpportunityServiceTestStore(t)
 	service := Service{
-		Shared:  shared,
+		Shared:  control,
 		AI:      fakeOpportunityAI{runID: uuid.New()},
 		Catalog: NewDetectorCatalog(fakeDetector{contract: fixtureDetectorContract("one"), output: fixtureOpportunity(teamID, site.ID, "one")}),
 	}
@@ -1157,7 +1161,7 @@ func TestGenerateRejectsSchedulerWithoutExplicitScope(t *testing.T) {
 	opportunities, runID, status, err := service.Generate(context.Background(), GenerateInput{
 		TeamID:    teamID,
 		Site:      site,
-		Store:     shared,
+		Store:     analytics,
 		ActorType: "ai_scheduler",
 	})
 
@@ -1173,9 +1177,9 @@ func TestGenerateRejectsSchedulerWithoutExplicitScope(t *testing.T) {
 }
 
 func TestGenerateRejectsSchedulerWithMismatchedScope(t *testing.T) {
-	shared, site, teamID, _ := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, _ := setupOpportunityServiceTestStore(t)
 	service := Service{
-		Shared:  shared,
+		Shared:  control,
 		AI:      fakeOpportunityAI{runID: uuid.New()},
 		Catalog: NewDetectorCatalog(fakeDetector{contract: fixtureDetectorContract("one"), output: fixtureOpportunity(teamID, site.ID, "one")}),
 	}
@@ -1183,7 +1187,7 @@ func TestGenerateRejectsSchedulerWithMismatchedScope(t *testing.T) {
 	_, _, status, err := service.Generate(context.Background(), GenerateInput{
 		TeamID:    teamID,
 		Site:      site,
-		Store:     shared,
+		Store:     analytics,
 		ActorType: "ai_scheduler",
 		SchedulerScope: SchedulerScope{
 			TeamID: teamID,
@@ -1200,18 +1204,18 @@ func TestGenerateRejectsSchedulerWithMismatchedScope(t *testing.T) {
 }
 
 func TestGenerateAllowsExplicitlyScopedScheduler(t *testing.T) {
-	shared, site, teamID, _ := setupOpportunityServiceTestStore(t)
+	control, analytics, site, teamID, _ := setupOpportunityServiceTestStore(t)
 	runID := uuid.New()
 	service := Service{
-		Shared:  shared,
-		AI:      fakeOpportunityAI{runID: runID, proposal: fixtureAIProposal("one")},
+		Shared:  control,
+		AI:      fakeOpportunityAI{store: control, runID: runID, proposal: fixtureAIProposal("one")},
 		Catalog: NewDetectorCatalog(fakeDetector{contract: fixtureDetectorContract("one"), output: fixtureOpportunity(teamID, site.ID, "one")}),
 	}
 
 	opportunities, gotRunID, status, err := service.Generate(context.Background(), GenerateInput{
 		TeamID:    teamID,
 		Site:      site,
-		Store:     shared,
+		Store:     analytics,
 		ActorType: "ai_scheduler",
 		SchedulerScope: SchedulerScope{
 			TeamID: teamID,
@@ -1233,15 +1237,10 @@ func TestGenerateAllowsExplicitlyScopedScheduler(t *testing.T) {
 	}
 }
 
-func setupOpportunityServiceTestStore(t *testing.T) (*database.Store, api.Site, uuid.UUID, uuid.UUID) {
+func setupOpportunityServiceTestStore(t *testing.T) (*controlstore.Store, *database.Store, api.Site, uuid.UUID, uuid.UUID) {
 	t.Helper()
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store, manager := testutil.NewControlAndTenantStores(t)
+	t.Cleanup(func() { _ = manager.Close() })
 	t.Cleanup(func() { _ = store.Close() })
 
 	userID, err := store.CreateUser(context.Background(), "opportunity-service@example.com", "hashed")
@@ -1256,7 +1255,14 @@ func setupOpportunityServiceTestStore(t *testing.T) (*database.Store, api.Site, 
 	if err != nil {
 		t.Fatalf("get site tenant: %v", err)
 	}
-	return store, *site, teamID, userID
+	if err := manager.SyncSite(context.Background(), site.ID); err != nil {
+		t.Fatalf("sync site: %v", err)
+	}
+	analytics, _, err := manager.ResolveSiteStore(context.Background(), site.ID)
+	if err != nil {
+		t.Fatalf("resolve analytics store: %v", err)
+	}
+	return store, analytics, *site, teamID, userID
 }
 
 func findAPIOpportunityByType(opportunities []api.Opportunity, typeKey string) *api.Opportunity {
@@ -1269,14 +1275,18 @@ func findAPIOpportunityByType(opportunities []api.Opportunity, typeKey string) *
 }
 
 type fakeOpportunityAI struct {
+	store    *controlstore.Store
 	runID    uuid.UUID
 	proposal hitai.OpportunityCandidateProposal
 	err      error
 }
 
-func (f fakeOpportunityAI) GenerateOpportunityProposal(context.Context, hitai.OpportunityRequest) (hitai.OpportunityProposalResult, error) {
+func (f fakeOpportunityAI) GenerateOpportunityProposal(ctx context.Context, req hitai.OpportunityRequest) (hitai.OpportunityProposalResult, error) {
 	if f.err != nil {
 		return hitai.OpportunityProposalResult{}, f.err
+	}
+	if err := recordFakeOpportunityAIRun(ctx, f.store, f.runID, req); err != nil {
+		return hitai.OpportunityProposalResult{}, err
 	}
 	return hitai.OpportunityProposalResult{RunID: f.runID, Proposal: f.proposal}, nil
 }
@@ -1291,13 +1301,17 @@ func (fakeOpportunityAI) Provider() string { return "test" }
 func (fakeOpportunityAI) Model() string    { return "test-model" }
 
 type recordingOpportunityAI struct {
+	store    *controlstore.Store
 	runID    uuid.UUID
 	proposal hitai.OpportunityCandidateProposal
 	last     hitai.OpportunityRequest
 }
 
-func (f *recordingOpportunityAI) GenerateOpportunityProposal(_ context.Context, req hitai.OpportunityRequest) (hitai.OpportunityProposalResult, error) {
+func (f *recordingOpportunityAI) GenerateOpportunityProposal(ctx context.Context, req hitai.OpportunityRequest) (hitai.OpportunityProposalResult, error) {
 	f.last = req
+	if err := recordFakeOpportunityAIRun(ctx, f.store, f.runID, req); err != nil {
+		return hitai.OpportunityProposalResult{}, err
+	}
 	return hitai.OpportunityProposalResult{RunID: f.runID, Proposal: f.proposal}, nil
 }
 
@@ -1311,13 +1325,17 @@ func (*recordingOpportunityAI) Provider() string { return "test" }
 func (*recordingOpportunityAI) Model() string    { return "test-model" }
 
 type echoOpportunityAI struct {
+	store            *controlstore.Store
 	runID            uuid.UUID
 	citedEvidenceIDs []string
 	last             hitai.OpportunityRequest
 }
 
-func (f *echoOpportunityAI) GenerateOpportunityProposal(_ context.Context, req hitai.OpportunityRequest) (hitai.OpportunityProposalResult, error) {
+func (f *echoOpportunityAI) GenerateOpportunityProposal(ctx context.Context, req hitai.OpportunityRequest) (hitai.OpportunityProposalResult, error) {
 	f.last = req
+	if err := recordFakeOpportunityAIRun(ctx, f.store, f.runID, req); err != nil {
+		return hitai.OpportunityProposalResult{}, err
+	}
 	citations := append([]string(nil), f.citedEvidenceIDs...)
 	if len(citations) == 0 {
 		for _, evidence := range req.DetectorInput.Evidence {
@@ -1351,16 +1369,20 @@ func (*echoOpportunityAI) Provider() string { return "test" }
 func (*echoOpportunityAI) Model() string    { return "test-model" }
 
 type sequenceOpportunityAI struct {
+	store  *controlstore.Store
 	runIDs []uuid.UUID
 	calls  int
 }
 
-func (f *sequenceOpportunityAI) GenerateOpportunityProposal(_ context.Context, req hitai.OpportunityRequest) (hitai.OpportunityProposalResult, error) {
+func (f *sequenceOpportunityAI) GenerateOpportunityProposal(ctx context.Context, req hitai.OpportunityRequest) (hitai.OpportunityProposalResult, error) {
 	if f.calls >= len(f.runIDs) {
 		return hitai.OpportunityProposalResult{}, errors.New("unexpected sequence call")
 	}
 	runID := f.runIDs[f.calls]
 	f.calls++
+	if err := recordFakeOpportunityAIRun(ctx, f.store, runID, req); err != nil {
+		return hitai.OpportunityProposalResult{}, err
+	}
 	return hitai.OpportunityProposalResult{
 		RunID: runID,
 		Proposal: hitai.OpportunityCandidateProposal{
@@ -1388,11 +1410,12 @@ func (*sequenceOpportunityAI) Provider() string { return "test" }
 func (*sequenceOpportunityAI) Model() string    { return "test-model" }
 
 type countingEchoOpportunityAI struct {
+	store *controlstore.Store
 	calls int
 	last  hitai.OpportunityRequest
 }
 
-func (f *countingEchoOpportunityAI) GenerateOpportunityProposal(_ context.Context, req hitai.OpportunityRequest) (hitai.OpportunityProposalResult, error) {
+func (f *countingEchoOpportunityAI) GenerateOpportunityProposal(ctx context.Context, req hitai.OpportunityRequest) (hitai.OpportunityProposalResult, error) {
 	f.calls++
 	f.last = req
 	citations := make([]string, 0, len(req.DetectorInput.Evidence))
@@ -1400,6 +1423,9 @@ func (f *countingEchoOpportunityAI) GenerateOpportunityProposal(_ context.Contex
 		citations = append(citations, evidence.ID)
 	}
 	runID := uuid.New()
+	if err := recordFakeOpportunityAIRun(ctx, f.store, runID, req); err != nil {
+		return hitai.OpportunityProposalResult{}, err
+	}
 	return hitai.OpportunityProposalResult{
 		RunID: runID,
 		Proposal: hitai.OpportunityCandidateProposal{
@@ -1425,6 +1451,25 @@ func (*countingEchoOpportunityAI) Configured() bool { return true }
 func (*countingEchoOpportunityAI) Enabled() bool    { return true }
 func (*countingEchoOpportunityAI) Provider() string { return "test" }
 func (*countingEchoOpportunityAI) Model() string    { return "test-model" }
+
+func recordFakeOpportunityAIRun(ctx context.Context, store *controlstore.Store, runID uuid.UUID, req hitai.OpportunityRequest) error {
+	if store == nil || runID == uuid.Nil {
+		return nil
+	}
+	_, err := store.AppendAIRun(ctx, controlstore.AIRunParams{
+		ID:         runID,
+		TeamID:     req.TeamID,
+		SiteID:     req.SiteID,
+		ActorID:    req.ActorID,
+		ActorType:  req.ActorType,
+		Feature:    "opportunities",
+		Provider:   "test",
+		Model:      "test-model",
+		OutputJSON: `{}`,
+		Status:     "success",
+	})
+	return err
+}
 
 type noOpportunityDetector struct {
 	contract DetectorContract

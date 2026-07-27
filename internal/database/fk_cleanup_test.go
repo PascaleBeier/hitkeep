@@ -159,18 +159,12 @@ func TestScopedDeletePlanExecutesForSeededSite(t *testing.T) {
 func TestListScopedCopyTablesMatchesTenantAnalyticsSchema(t *testing.T) {
 	ctx := context.Background()
 	store := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(store, t.TempDir())
+	control := newControlTestStore(t)
+	mgr := NewTenantStoreManager(control, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
-	userID, err := store.CreateUser(ctx, "copy-tables@test.com", "hash")
-	if err != nil {
-		t.Fatalf("create user: %v", err)
-	}
-	team, err := store.CreateTenant(ctx, userID, "Copy Tables Team", "")
-	if err != nil {
-		t.Fatalf("create team: %v", err)
-	}
-	tenantStore, err := mgr.ForTenant(ctx, team.ID)
+	tenantID := newManagerTestTenant(t, control, "Copy Tables Team")
+	tenantStore, err := mgr.ForTenant(ctx, tenantID)
 	if err != nil {
 		t.Fatalf("open tenant store: %v", err)
 	}

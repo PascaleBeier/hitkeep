@@ -295,7 +295,7 @@ export class AdminSettings implements OnInit {
     });
     protected readonly duckdbMemoryRows = computed(() => {
         this.activeLanguage();
-        const stats = (this.systemStorage()?.duckdb_memory ?? []).filter((stat) => stat.memory_bytes > 0);
+        const stats = (this.systemStorage()?.tenant_duckdb_memory ?? this.systemStorage()?.duckdb_memory ?? []).filter((stat) => stat.memory_bytes > 0);
         const total = stats.reduce((sum, stat) => sum + stat.memory_bytes, 0);
         if (total === 0) return [];
         const top = stats.slice(0, 5).map((stat, index) => ({
@@ -310,7 +310,7 @@ export class AdminSettings implements OnInit {
         }
         return top;
     });
-    protected readonly duckdbMemoryTotalBytes = computed(() => (this.systemStorage()?.duckdb_memory ?? []).reduce((sum, stat) => sum + stat.memory_bytes, 0));
+    protected readonly duckdbMemoryTotalBytes = computed(() => (this.systemStorage()?.tenant_duckdb_memory ?? this.systemStorage()?.duckdb_memory ?? []).reduce((sum, stat) => sum + stat.memory_bytes, 0));
     protected readonly isLoadingDatabaseOverview = computed(() => this.isLoadingDatabase() || this.isLoadingStorage());
     private static readonly memorySwatchColors = [
         'var(--p-primary-color)',

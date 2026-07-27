@@ -14,14 +14,16 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/testutil"
 )
 
 func TestSearchConsoleOverviewReturnsMappedSiteMetrics(t *testing.T) {
 	ctx := context.Background()
-	store, appCtx, _, siteID, token := setupSearchConsoleReportsTestEnv(t)
-	seedSearchConsoleReportMapping(t, store, siteID)
+	control, store, appCtx, _, siteID, token := setupSearchConsoleReportsTestEnv(t)
+	seedSearchConsoleReportMapping(t, control, siteID)
 	seedSearchConsoleReportFact(t, store, database.SearchConsoleFactInput{
 		SiteID:          siteID,
 		PropertyURI:     "sc-domain:reports.example.com",
@@ -61,14 +63,14 @@ func TestSearchConsoleOverviewReturnsMappedSiteMetrics(t *testing.T) {
 		t.Fatalf("unexpected overview metrics: %+v", overview)
 	}
 
-	if _, err := store.GetGoogleSearchConsoleSiteMapping(ctx, siteID); err != nil {
+	if _, err := control.GetGoogleSearchConsoleSiteMapping(ctx, siteID); err != nil {
 		t.Fatalf("mapping should remain readable after report request: %v", err)
 	}
 }
 
 func TestSearchConsoleSeriesReturnsDailyRowsSortedByDate(t *testing.T) {
-	store, appCtx, _, siteID, token := setupSearchConsoleReportsTestEnv(t)
-	seedSearchConsoleReportMapping(t, store, siteID)
+	control, store, appCtx, _, siteID, token := setupSearchConsoleReportsTestEnv(t)
+	seedSearchConsoleReportMapping(t, control, siteID)
 	for _, fact := range []database.SearchConsoleFactInput{
 		{
 			SiteID:          siteID,
@@ -134,8 +136,8 @@ func TestSearchConsoleSeriesReturnsDailyRowsSortedByDate(t *testing.T) {
 }
 
 func TestSearchConsoleSeriesReturnsEmptyArrayWhenNoRowsMatch(t *testing.T) {
-	store, appCtx, _, siteID, token := setupSearchConsoleReportsTestEnv(t)
-	seedSearchConsoleReportMapping(t, store, siteID)
+	control, _, appCtx, _, siteID, token := setupSearchConsoleReportsTestEnv(t)
+	seedSearchConsoleReportMapping(t, control, siteID)
 
 	mux := http.NewServeMux()
 	Register(mux, appCtx)
@@ -162,8 +164,8 @@ func TestSearchConsoleSeriesReturnsEmptyArrayWhenNoRowsMatch(t *testing.T) {
 }
 
 func TestSearchConsoleQueriesHonorDateFilters(t *testing.T) {
-	store, appCtx, _, siteID, token := setupSearchConsoleReportsTestEnv(t)
-	seedSearchConsoleReportMapping(t, store, siteID)
+	control, store, appCtx, _, siteID, token := setupSearchConsoleReportsTestEnv(t)
+	seedSearchConsoleReportMapping(t, control, siteID)
 	inside := database.SearchConsoleFactInput{
 		SiteID:          siteID,
 		PropertyURI:     "sc-domain:reports.example.com",
@@ -213,8 +215,8 @@ func TestSearchConsoleQueriesHonorDateFilters(t *testing.T) {
 }
 
 func TestSearchConsolePagesApplyCountryAndDeviceFilters(t *testing.T) {
-	store, appCtx, _, siteID, token := setupSearchConsoleReportsTestEnv(t)
-	seedSearchConsoleReportMapping(t, store, siteID)
+	control, store, appCtx, _, siteID, token := setupSearchConsoleReportsTestEnv(t)
+	seedSearchConsoleReportMapping(t, control, siteID)
 	base := database.SearchConsoleFactInput{
 		SiteID:          siteID,
 		PropertyURI:     "sc-domain:reports.example.com",
@@ -268,8 +270,8 @@ func TestSearchConsolePagesApplyCountryAndDeviceFilters(t *testing.T) {
 }
 
 func TestSearchConsoleOverviewAppliesPathFilterToPageURLs(t *testing.T) {
-	store, appCtx, _, siteID, token := setupSearchConsoleReportsTestEnv(t)
-	seedSearchConsoleReportMapping(t, store, siteID)
+	control, store, appCtx, _, siteID, token := setupSearchConsoleReportsTestEnv(t)
+	seedSearchConsoleReportMapping(t, control, siteID)
 	matching := database.SearchConsoleFactInput{
 		SiteID:          siteID,
 		PropertyURI:     "sc-domain:reports.example.com",
@@ -314,8 +316,8 @@ func TestSearchConsoleOverviewAppliesPathFilterToPageURLs(t *testing.T) {
 }
 
 func TestSearchConsoleQueriesReturnEmptyRowsArrayWhenNoRowsMatch(t *testing.T) {
-	store, appCtx, _, siteID, token := setupSearchConsoleReportsTestEnv(t)
-	seedSearchConsoleReportMapping(t, store, siteID)
+	control, _, appCtx, _, siteID, token := setupSearchConsoleReportsTestEnv(t)
+	seedSearchConsoleReportMapping(t, control, siteID)
 
 	mux := http.NewServeMux()
 	Register(mux, appCtx)
@@ -342,7 +344,7 @@ func TestSearchConsoleQueriesReturnEmptyRowsArrayWhenNoRowsMatch(t *testing.T) {
 }
 
 func TestSearchConsoleBreakdownsRejectUnsupportedDimensions(t *testing.T) {
-	_, appCtx, _, siteID, token := setupSearchConsoleReportsTestEnv(t)
+	_, _, appCtx, _, siteID, token := setupSearchConsoleReportsTestEnv(t)
 
 	mux := http.NewServeMux()
 	Register(mux, appCtx)
@@ -361,8 +363,8 @@ func TestSearchConsoleBreakdownsRejectUnsupportedDimensions(t *testing.T) {
 }
 
 func TestSearchConsoleBreakdownsReturnCountryRows(t *testing.T) {
-	store, appCtx, _, siteID, token := setupSearchConsoleReportsTestEnv(t)
-	seedSearchConsoleReportMapping(t, store, siteID)
+	control, store, appCtx, _, siteID, token := setupSearchConsoleReportsTestEnv(t)
+	seedSearchConsoleReportMapping(t, control, siteID)
 	base := database.SearchConsoleFactInput{
 		SiteID:          siteID,
 		PropertyURI:     "sc-domain:reports.example.com",
@@ -410,17 +412,17 @@ func TestSearchConsoleBreakdownsReturnCountryRows(t *testing.T) {
 }
 
 func TestSearchConsoleReportsRejectCrossSiteAccess(t *testing.T) {
-	store, appCtx, _, siteID, _ := setupSearchConsoleReportsTestEnv(t)
-	seedSearchConsoleReportMapping(t, store, siteID)
-	otherUserID, err := store.CreateUser(context.Background(), "other-gsc-reports@example.com", "hashed")
+	control, _, appCtx, _, siteID, _ := setupSearchConsoleReportsTestEnv(t)
+	seedSearchConsoleReportMapping(t, control, siteID)
+	otherUserID, err := control.CreateUser(context.Background(), "other-gsc-reports@example.com", "hashed")
 	if err != nil {
 		t.Fatalf("CreateUser(other): %v", err)
 	}
-	otherSite, err := store.CreateSite(context.Background(), otherUserID, "other-reports.example.com")
+	otherSite, err := control.CreateSite(context.Background(), otherUserID, "other-reports.example.com")
 	if err != nil {
 		t.Fatalf("CreateSite(other): %v", err)
 	}
-	_, otherToken, err := store.CreateAPIClient(context.Background(), otherUserID, "Other Reports", "test", auth.InstanceUser, map[uuid.UUID]auth.SiteRole{
+	_, otherToken, err := control.CreateAPIClient(context.Background(), otherUserID, "Other Reports", "test", auth.InstanceUser, map[uuid.UUID]auth.SiteRole{
 		otherSite.ID: auth.SiteOwner,
 	}, nil)
 	if err != nil {
@@ -441,7 +443,7 @@ func TestSearchConsoleReportsRejectCrossSiteAccess(t *testing.T) {
 }
 
 func TestSearchConsoleReportsDoNotRegisterShareRoutes(t *testing.T) {
-	_, appCtx, _, siteID, _ := setupSearchConsoleReportsTestEnv(t)
+	_, _, appCtx, _, siteID, _ := setupSearchConsoleReportsTestEnv(t)
 
 	mux := http.NewServeMux()
 	Register(mux, appCtx)
@@ -457,28 +459,26 @@ func TestSearchConsoleReportsDoNotRegisterShareRoutes(t *testing.T) {
 
 func TestSearchConsoleReportsReadTenantScopedFacts(t *testing.T) {
 	ctx := context.Background()
-	store, appCtx, userID, _, _ := setupSearchConsoleReportsTestEnv(t)
-	tenantMgr := database.NewTenantStoreManager(store, t.TempDir())
-	t.Cleanup(func() { _ = tenantMgr.Close() })
-	appCtx.TenantStores = tenantMgr
-	team, err := store.CreateTenant(ctx, userID, "Tenant Reports", "")
+	control, _, appCtx, userID, _, _ := setupSearchConsoleReportsTestEnv(t)
+	tenantMgr := appCtx.TenantStores
+	team, err := control.CreateTenant(ctx, userID, "Tenant Reports", "")
 	if err != nil {
 		t.Fatalf("CreateTenant: %v", err)
 	}
-	if err := store.SetActiveTenantID(ctx, userID, team.ID); err != nil {
+	if err := control.SetActiveTenantID(ctx, userID, team.ID); err != nil {
 		t.Fatalf("SetActiveTenantID: %v", err)
 	}
-	site, err := store.CreateSite(ctx, userID, "tenant-reports.example.com")
+	site, err := control.CreateSite(ctx, userID, "tenant-reports.example.com")
 	if err != nil {
 		t.Fatalf("CreateSite: %v", err)
 	}
-	_, token, err := store.CreateAPIClient(ctx, userID, "Tenant Search Console Reports", "test", auth.InstanceUser, map[uuid.UUID]auth.SiteRole{
+	_, token, err := control.CreateAPIClient(ctx, userID, "Tenant Search Console Reports", "test", auth.InstanceUser, map[uuid.UUID]auth.SiteRole{
 		site.ID: auth.SiteOwner,
 	}, nil)
 	if err != nil {
 		t.Fatalf("CreateAPIClient: %v", err)
 	}
-	seedSearchConsoleReportMapping(t, store, site.ID)
+	seedSearchConsoleReportMapping(t, control, site.ID)
 	sharedFact := database.SearchConsoleFactInput{
 		SiteID:          site.ID,
 		PropertyURI:     "sc-domain:reports.example.com",
@@ -495,7 +495,6 @@ func TestSearchConsoleReportsReadTenantScopedFacts(t *testing.T) {
 		DataState:       "final",
 		ImportedAt:      time.Date(2026, 5, 4, 12, 0, 0, 0, time.UTC),
 	}
-	seedSearchConsoleReportFact(t, store, sharedFact)
 	tenantStore, _, err := tenantMgr.ResolveSiteStore(ctx, site.ID)
 	if err != nil {
 		t.Fatalf("ResolveSiteStore: %v", err)
@@ -526,16 +525,11 @@ func TestSearchConsoleReportsReadTenantScopedFacts(t *testing.T) {
 	}
 }
 
-func setupSearchConsoleReportsTestEnv(t *testing.T) (*database.Store, *shared.Context, uuid.UUID, uuid.UUID, string) {
+func setupSearchConsoleReportsTestEnv(t *testing.T) (*controlstore.Store, *database.Store, *shared.Context, uuid.UUID, uuid.UUID, string) {
 	t.Helper()
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
+	store, tenantStores := testutil.NewControlAndTenantStores(t)
 	t.Cleanup(func() { _ = store.Close() })
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	t.Cleanup(func() { _ = tenantStores.Close() })
 
 	userID, err := store.CreateUser(context.Background(), "gsc-reports@example.com", "hashed")
 	if err != nil {
@@ -551,28 +545,38 @@ func setupSearchConsoleReportsTestEnv(t *testing.T) (*database.Store, *shared.Co
 	if err != nil {
 		t.Fatalf("CreateAPIClient: %v", err)
 	}
-	tenantStores := database.NewTenantStoreManager(store, t.TempDir(), database.WithTenantDataPlane(false))
-	t.Cleanup(func() { _ = tenantStores.Close() })
+	if err := tenantStores.SyncSite(context.Background(), site.ID); err != nil {
+		t.Fatalf("SyncSite: %v", err)
+	}
+	analytics, _, err := tenantStores.ResolveSiteStore(context.Background(), site.ID)
+	if err != nil {
+		t.Fatalf("ResolveSiteStore: %v", err)
+	}
 
 	appCtx := &shared.Context{
 		Store:        store,
 		TenantStores: tenantStores,
 		Config:       &config.Config{},
 	}
-	return store, appCtx, userID, site.ID, token
+	return store, analytics, appCtx, userID, site.ID, token
 }
 
-func seedSearchConsoleReportMapping(t *testing.T, store *database.Store, siteID uuid.UUID) uuid.UUID {
+func seedSearchConsoleReportMapping(t *testing.T, store *controlstore.Store, siteID uuid.UUID) uuid.UUID {
 	t.Helper()
+	ctx := context.Background()
 	teamID, err := store.GetSiteTenantID(context.Background(), siteID)
 	if err != nil {
 		t.Fatalf("GetSiteTenantID: %v", err)
 	}
-	if err := store.UpsertGoogleSearchConsoleSiteMapping(context.Background(), database.GoogleSearchConsoleSiteMappingInput{
+	site, err := store.GetSiteByID(ctx, siteID)
+	if err != nil {
+		t.Fatalf("GetSiteByID: %v", err)
+	}
+	if err := store.UpsertGoogleSearchConsoleSiteMapping(ctx, database.GoogleSearchConsoleSiteMappingInput{
 		SiteID:      siteID,
 		TeamID:      teamID,
 		PropertyURI: "sc-domain:reports.example.com",
-		MappedBy:    uuid.New(),
+		MappedBy:    site.UserID,
 		MappedAt:    time.Date(2026, 5, 1, 9, 0, 0, 0, time.UTC),
 	}); err != nil {
 		t.Fatalf("seed mapping: %v", err)

@@ -13,20 +13,15 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
 	"hitkeep/internal/config"
-	"hitkeep/internal/database"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/testutil"
 )
 
-func setupTestEnv(t *testing.T) (*shared.Context, *database.Store, uuid.UUID) {
+func setupTestEnv(t *testing.T) (*shared.Context, *controlstore.Store, uuid.UUID) {
 	t.Helper()
 
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("failed to connect to test db: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("failed to migrate test db: %v", err)
-	}
+	store := testutil.NewControlStore(t)
 
 	userID, err := store.CreateUser(context.Background(), "test@example.com", "hashed_secret")
 	if err != nil {

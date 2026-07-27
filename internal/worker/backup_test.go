@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,10 +12,11 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 )
 
-func TestBackupExportsSharedDatabase(t *testing.T) {
+func TestBackupExportsSQLiteControlSnapshot(t *testing.T) {
 	ctx := context.Background()
 	store := newTestStore(t)
 	backupDir := filepath.Join(t.TempDir(), "backups")
@@ -38,14 +40,13 @@ func TestBackupExportsSharedDatabase(t *testing.T) {
 		t.Fatal("expected at least one snapshot directory under shared/")
 	}
 
-	// Check Parquet files exist within the snapshot.
+	// The compatibility shared/ location now contains a compressed SQLite
+	// control snapshot, manifest, and completion marker.
 	snapshotDir := filepath.Join(sharedDir, entries[0].Name())
-	files, err := findParquetFiles(snapshotDir)
-	if err != nil {
-		t.Fatalf("find parquet files: %v", err)
-	}
-	if len(files) == 0 {
-		t.Fatal("expected parquet files in backup snapshot")
+	for _, name := range []string{"control.db.zst", "manifest.json", "_COMPLETE"} {
+		if info, err := os.Stat(filepath.Join(snapshotDir, name)); err != nil || !info.Mode().IsRegular() {
+			t.Fatalf("expected control snapshot file %s: info=%v err=%v", name, info, err)
+		}
 	}
 }
 
@@ -113,6 +114,49 @@ func TestBackupRecordsFailureInStatusTracker(t *testing.T) {
 	}
 }
 
+func TestBackupFailsWhenActiveTenantEnumerationFails(t *testing.T) {
+	ctx := context.Background()
+	store := newTestStore(t)
+	backupDir := filepath.Join(t.TempDir(), "backups")
+	oldSnapshot := filepath.Join(backupDir, "shared", "2026-01-01T000000Z")
+	if err := os.MkdirAll(oldSnapshot, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(oldSnapshot, "_COMPLETE"), []byte("ok\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	status := &database.BackupStatusTracker{}
+	status.SetConfig(true, backupDir, 15, 1)
+
+	mgr := newTestTenantMgr(t, store)
+	w := NewBackupWorker(mgr, t.TempDir(), backupDir, 15, 1, nil, status)
+	w.listTenantIDs = func(context.Context) ([]uuid.UUID, error) {
+		return nil, errors.New("catalog unavailable")
+	}
+
+	err := w.Run(ctx)
+	if err == nil || !strings.Contains(err.Error(), "list active tenants") {
+		t.Fatalf("expected tenant enumeration failure, got %v", err)
+	}
+	got := status.Status()
+	if got.LastBackup != nil {
+		t.Fatalf("incomplete cycle must not be marked successful: %v", got.LastBackup)
+	}
+	if got.LastFailedAt == nil || got.RecentFailures != 1 {
+		t.Fatalf("expected failed backup status, got %+v", got)
+	}
+	sharedEntries, readErr := os.ReadDir(filepath.Join(backupDir, "shared"))
+	if readErr != nil {
+		t.Fatalf("read shared snapshots after failure: %v", readErr)
+	}
+	if len(sharedEntries) != 1 || sharedEntries[0].Name() != filepath.Base(oldSnapshot) {
+		t.Fatalf("failed cycle pruned or published snapshots: %v", sharedEntries)
+	}
+	if _, markerErr := os.Stat(filepath.Join(oldSnapshot, "_COMPLETE")); markerErr != nil {
+		t.Fatalf("older completed backup was changed: %v", markerErr)
+	}
+}
+
 func TestBackupDisabledWhenPathEmpty(t *testing.T) {
 	store := newTestStore(t)
 	mgr := newTestTenantMgr(t, store)
@@ -177,6 +221,35 @@ func TestBackupPrunesOldLocalSnapshots(t *testing.T) {
 	}
 }
 
+func TestPruneLocalSnapshotsDiscardsIncompleteBeforeRetentionCounting(t *testing.T) {
+	root := t.TempDir()
+	for _, name := range []string{"2026-07-25T000000Z", "2026-07-26T000000Z"} {
+		path := filepath.Join(root, name)
+		if err := os.MkdirAll(path, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(path, "_COMPLETE"), []byte("ok\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	incomplete := filepath.Join(root, "2026-07-27T000000Z")
+	if err := os.MkdirAll(incomplete, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(incomplete, "control.db.zst"), []byte("partial"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	(&BackupWorker{retentionCount: 2}).pruneLocalSnapshots(root)
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 2 || entries[0].Name() != "2026-07-25T000000Z" || entries[1].Name() != "2026-07-26T000000Z" {
+		t.Fatalf("completed snapshots after prune=%v", entries)
+	}
+}
+
 func TestBackupAndRestoreRoundTrip(t *testing.T) {
 	ctx := context.Background()
 	store := newTestStore(t)
@@ -203,16 +276,11 @@ func TestBackupAndRestoreRoundTrip(t *testing.T) {
 		t.Fatalf("backup run: %v", err)
 	}
 
-	// Find the snapshot directory.
-	sharedDir := filepath.Join(backupDir, "shared")
-	entries, err := os.ReadDir(sharedDir)
+	defaultTenantID, err := mgr.DefaultTenantID(ctx)
 	if err != nil {
-		t.Fatalf("read shared dir: %v", err)
+		t.Fatalf("resolve default tenant: %v", err)
 	}
-	if len(entries) == 0 {
-		t.Fatal("no snapshot created")
-	}
-	snapshotPath := filepath.Join(sharedDir, entries[0].Name())
+	snapshotPath := latestTenantSnapshot(t, backupDir, defaultTenantID)
 
 	// Restore into a fresh DB.
 	restoredDBPath := filepath.Join(t.TempDir(), "restored.db")
@@ -254,22 +322,23 @@ func TestBackupHandlesMultipleTenants(t *testing.T) {
 	ctx := context.Background()
 	store := newTestStore(t)
 	backupDir := filepath.Join(t.TempDir(), "backups")
-	dataPath := t.TempDir()
+	dataPath := testDataPath(t, store)
 
 	// Seed shared data.
 	seedSite(t, ctx, store, 365)
 
 	// Create a non-default tenant.
-	customTenantID := uuid.New()
-	if _, err := store.DB().ExecContext(ctx,
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		customTenantID, "Test Tenant", time.Now().UTC(),
-	); err != nil {
-		t.Fatalf("insert custom tenant: %v", err)
+	control := testControlStore(t, store)
+	creatorID, err := control.CreateUser(ctx, "multi-tenant-backup@example.test", "hash")
+	if err != nil {
+		t.Fatalf("create tenant owner: %v", err)
 	}
-
-	mgr := database.NewTenantStoreManager(store, dataPath)
-	t.Cleanup(func() { _ = mgr.Close() })
+	tenant, err := control.CreateTenant(ctx, creatorID, "Test Tenant", "")
+	if err != nil {
+		t.Fatalf("create custom tenant: %v", err)
+	}
+	customTenantID := tenant.ID
+	mgr := newTestTenantMgr(t, store)
 
 	// Open tenant store to create the DB file.
 	tenantStore, err := mgr.ForTenant(ctx, customTenantID)
@@ -278,9 +347,19 @@ func TestBackupHandlesMultipleTenants(t *testing.T) {
 	}
 
 	// Seed tenant data.
+	tenantSite, err := control.CreateSite(ctx, creatorID, "tenant-backup.example.test")
+	if err != nil {
+		t.Fatalf("create tenant site: %v", err)
+	}
+	if err := control.UpdateSiteTenant(ctx, tenantSite.ID, customTenantID); err != nil {
+		t.Fatalf("assign tenant site: %v", err)
+	}
+	if err := mgr.SyncSite(ctx, tenantSite.ID); err != nil {
+		t.Fatalf("sync tenant site: %v", err)
+	}
 	if _, err := tenantStore.DB().ExecContext(ctx,
 		"INSERT INTO hits (id, site_id, session_id, page_id, timestamp, path, is_unique) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		uuid.New(), uuid.New(), uuid.New(), uuid.New(), time.Now().UTC(), "/tenant-page", true,
+		uuid.New(), tenantSite.ID, uuid.New(), uuid.New(), time.Now().UTC(), "/tenant-page", true,
 	); err != nil {
 		t.Fatalf("seed tenant hit: %v", err)
 	}
@@ -333,7 +412,7 @@ func TestBackupExportsSplitDefaultAndAttachedTenantCatalogs(t *testing.T) {
 	if err := shared.Migrate(ctx); err != nil {
 		t.Fatalf("migrate shared database: %v", err)
 	}
-	defaultSiteID := seedSite(t, ctx, shared, 365)
+	defaultSiteID := seedLegacySite(t, ctx, shared, 365)
 	isUnique := true
 	if err := shared.CreateHit(ctx, &api.Hit{
 		SiteID: defaultSiteID, SessionID: uuid.New(), PageID: uuid.New(),
@@ -355,12 +434,15 @@ func TestBackupExportsSplitDefaultAndAttachedTenantCatalogs(t *testing.T) {
 		t.Fatalf("split default tenant: %v", err)
 	}
 
-	control := database.NewStore(sharedPath)
-	if err := control.Connect(); err != nil {
-		t.Fatalf("reopen control database: %v", err)
+	if err := convertLegacyControlForWorkerTest(ctx, sharedPath); err != nil {
+		t.Fatalf("convert legacy control database: %v", err)
+	}
+	control, err := controlstore.Open(ctx, sharedPath)
+	if err != nil {
+		t.Fatalf("open SQLite control database: %v", err)
 	}
 	t.Cleanup(func() { _ = control.Close() })
-	mgr := database.NewTenantStoreManager(control, dataPath, database.WithTenantDataPlane(true))
+	mgr := database.NewTenantStoreManager(control, dataPath, nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 	defaultID, err := mgr.DefaultTenantID(ctx)
 	if err != nil {
@@ -441,18 +523,19 @@ func TestBackupFailsWhenTenantSnapshotFails(t *testing.T) {
 	ctx := context.Background()
 	store := newTestStore(t)
 	backupDir := filepath.Join(t.TempDir(), "backups")
-	dataPath := t.TempDir()
+	dataPath := testDataPath(t, store)
 
-	customTenantID := uuid.New()
-	if _, err := store.DB().ExecContext(ctx,
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		customTenantID, "Broken Backup Tenant", time.Now().UTC(),
-	); err != nil {
-		t.Fatalf("insert custom tenant: %v", err)
+	control := testControlStore(t, store)
+	creatorID, err := control.CreateUser(ctx, "broken-tenant-backup@example.test", "hash")
+	if err != nil {
+		t.Fatalf("create tenant owner: %v", err)
 	}
-
-	mgr := database.NewTenantStoreManager(store, dataPath)
-	t.Cleanup(func() { _ = mgr.Close() })
+	tenant, err := control.CreateTenant(ctx, creatorID, "Broken Backup Tenant", "")
+	if err != nil {
+		t.Fatalf("create custom tenant: %v", err)
+	}
+	customTenantID := tenant.ID
+	mgr := newTestTenantMgr(t, store)
 	tenantStore, err := mgr.ForTenant(ctx, customTenantID)
 	if err != nil {
 		t.Fatalf("open tenant store: %v", err)
@@ -489,4 +572,36 @@ func TestRemoveIncompleteLocalSnapshot(t *testing.T) {
 	if _, err := os.Stat(dir); !os.IsNotExist(err) {
 		t.Fatalf("expected incomplete local snapshot to be removed, got %v", err)
 	}
+}
+
+func seedLegacySite(t *testing.T, ctx context.Context, store *database.Store, retentionDays int) uuid.UUID {
+	t.Helper()
+	userID, err := store.CreateUser(ctx, "legacy-backup-"+uuid.NewString()+"@example.test", "hash")
+	if err != nil {
+		t.Fatalf("create legacy user: %v", err)
+	}
+	site, err := store.CreateSite(ctx, userID, "legacy-backup-"+uuid.NewString()+".example.test")
+	if err != nil {
+		t.Fatalf("create legacy site: %v", err)
+	}
+	if _, err := store.DB().ExecContext(ctx, "UPDATE sites SET data_retention_days = ? WHERE id = ?", retentionDays, site.ID); err != nil {
+		t.Fatalf("set legacy retention: %v", err)
+	}
+	return site.ID
+}
+
+func convertLegacyControlForWorkerTest(ctx context.Context, path string) error {
+	source, sourceSHA, schemaSHA, err := database.OpenLegacyControlSource(ctx, path)
+	if err != nil {
+		return err
+	}
+	_, importErr := controlstore.ImportLegacy(ctx, controlstore.SQLiteWorkPath(path), source, sourceSHA, schemaSHA)
+	closeErr := source.Close()
+	if importErr != nil {
+		return importErr
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	return controlstore.PublishLegacyConversion(ctx, path)
 }

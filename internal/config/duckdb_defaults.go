@@ -36,7 +36,7 @@ func resolveDuckDBDefaults(conf *Config) {
 	}
 }
 
-// deriveDuckDBMemoryLimitBytes picks a per-database DuckDB memory limit from
+// deriveDuckDBMemoryLimitBytes picks the shared tenant-data-plane DuckDB memory limit from
 // the strongest available signal: an operator-set GOMEMLIMIT, else the
 // effective memory (cgroup limit if the process is containerized, physical
 // RAM otherwise) halved and clamped to [1GiB, 16GiB].

@@ -9,18 +9,18 @@ import (
 	"time"
 
 	"hitkeep/internal/config"
-	"hitkeep/internal/database"
+	"hitkeep/internal/controlstore"
 )
 
 type Sweeper struct {
-	store    *database.Store
+	store    *controlstore.Store
 	producer Producer
 	config   config.Config
 	mu       sync.Mutex
 	lastGC   time.Time
 }
 
-func NewSweeper(store *database.Store, producer Producer, conf config.Config) *Sweeper {
+func NewSweeper(store *controlstore.Store, producer Producer, conf config.Config) *Sweeper {
 	return &Sweeper{store: store, producer: producer, config: conf}
 }
 

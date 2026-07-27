@@ -17,6 +17,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/appurl"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
@@ -514,7 +515,7 @@ func (h *handler) handleGetReportRecipientConfirmation() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		confirmation, err := h.ctx.Store.GetReportRecipientConfirmation(r.Context(), r.PathValue("opaque_token"), time.Now().UTC())
 		if err != nil {
-			if errors.Is(err, database.ErrReportConfirmationExpired) {
+			if errors.Is(err, controlstore.ErrReportConfirmationExpired) {
 				writeReportError(w, http.StatusGone, "confirmation_expired", "This confirmation link has expired")
 				return
 			}
@@ -548,7 +549,7 @@ func (h *handler) handleConfirmReportRecipient() http.HandlerFunc {
 			return
 		}
 		if err != nil {
-			if errors.Is(err, database.ErrReportConfirmationExpired) {
+			if errors.Is(err, controlstore.ErrReportConfirmationExpired) {
 				writeReportError(w, http.StatusGone, "confirmation_expired", "This confirmation link has expired")
 				return
 			}
@@ -601,9 +602,9 @@ func (h *handler) handleResendReportRecipientConfirmation() http.HandlerFunc {
 		)
 		if err != nil {
 			switch {
-			case errors.Is(err, database.ErrReportConfirmationCooldown):
+			case errors.Is(err, controlstore.ErrReportConfirmationCooldown):
 				writeReportError(w, http.StatusTooManyRequests, "confirmation_recently_sent", "A confirmation email was sent recently")
-			case errors.Is(err, database.ErrReportConfirmationInvalid):
+			case errors.Is(err, controlstore.ErrReportConfirmationInvalid):
 				http.Error(w, "Not found", http.StatusNotFound)
 			default:
 				http.Error(w, "Internal server error", http.StatusInternalServerError)

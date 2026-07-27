@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,10 +11,12 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
+	"hitkeep/internal/testutil"
 )
 
-func createImportStageCleanupTestUpload(t *testing.T, store *database.Store, dataPath string, siteID, userID uuid.UUID, filename string, content string) (uuid.UUID, uuid.UUID, string) {
+func createImportStageCleanupTestUpload(t *testing.T, store *controlstore.Store, dataPath string, siteID, userID uuid.UUID, filename string, content string) (uuid.UUID, uuid.UUID, string) {
 	t.Helper()
 	fileID := uuid.New()
 	relativePath := filepath.Join("imports", siteID.String(), fileID.String()+"-"+filename)
@@ -41,9 +44,14 @@ func createImportStageCleanupTestUpload(t *testing.T, store *database.Store, dat
 	return job.ID, fileID, path
 }
 
-func forceImportStageCleanupStatus(t *testing.T, store *database.Store, importID uuid.UUID, status string, at time.Time) {
+func forceImportStageCleanupStatus(t *testing.T, store *controlstore.Store, importID uuid.UUID, status string, at time.Time) {
 	t.Helper()
-	if _, err := store.DB().ExecContext(context.Background(), `
+	db, err := sql.Open("sqlite", store.Path())
+	if err != nil {
+		t.Fatalf("open control fixture: %v", err)
+	}
+	defer db.Close()
+	if _, err := db.ExecContext(context.Background(), `
 		UPDATE site_imports
 		SET status = ?, created_at = ?, updated_at = ?, validated_at = ?, finished_at = ?
 		WHERE id = ?
@@ -54,7 +62,8 @@ func forceImportStageCleanupStatus(t *testing.T, store *database.Store, importID
 
 func TestImportStageCleanerRemovesStaleFilesAndPrunesEmptySiteDir(t *testing.T) {
 	ctx := context.Background()
-	store := newTestStore(t)
+	store := testutil.NewControlStore(t)
+	t.Cleanup(func() { _ = store.Close() })
 	dataPath := t.TempDir()
 	userID, err := store.CreateUser(ctx, "cleanup-worker@example.com", "hash")
 	if err != nil {
@@ -95,7 +104,8 @@ func TestImportStageCleanerRemovesStaleFilesAndPrunesEmptySiteDir(t *testing.T) 
 
 func TestImportStageCleanerMarksResumableImportsFailed(t *testing.T) {
 	ctx := context.Background()
-	store := newTestStore(t)
+	store := testutil.NewControlStore(t)
+	t.Cleanup(func() { _ = store.Close() })
 	dataPath := t.TempDir()
 	userID, err := store.CreateUser(ctx, "cleanup-resumable@example.com", "hash")
 	if err != nil {
@@ -127,7 +137,8 @@ func TestImportStageCleanerMarksResumableImportsFailed(t *testing.T) {
 
 func TestImportStageCleanerHandlesMissingFilesAndKeepsRunIdempotent(t *testing.T) {
 	ctx := context.Background()
-	store := newTestStore(t)
+	store := testutil.NewControlStore(t)
+	t.Cleanup(func() { _ = store.Close() })
 	dataPath := t.TempDir()
 	userID, err := store.CreateUser(ctx, "cleanup-missing@example.com", "hash")
 	if err != nil {
@@ -163,7 +174,8 @@ func TestImportStageCleanerHandlesMissingFilesAndKeepsRunIdempotent(t *testing.T
 
 func TestImportStageCleanerRejectsUnsafeRelativePaths(t *testing.T) {
 	ctx := context.Background()
-	store := newTestStore(t)
+	store := testutil.NewControlStore(t)
+	t.Cleanup(func() { _ = store.Close() })
 	dataPath := t.TempDir()
 	userID, err := store.CreateUser(ctx, "cleanup-unsafe@example.com", "hash")
 	if err != nil {
@@ -176,7 +188,12 @@ func TestImportStageCleanerRejectsUnsafeRelativePaths(t *testing.T) {
 
 	importID, _, _ := createImportStageCleanupTestUpload(t, store, dataPath, site.ID, userID, "unsafe.csv", "abc")
 	forceImportStageCleanupStatus(t, store, importID, database.ImportStatusCompleted, time.Now().UTC().AddDate(0, 0, -8))
-	if _, err := store.DB().ExecContext(ctx, "UPDATE site_import_files SET relative_path = ? WHERE import_id = ?", filepath.Join("imports", site.ID.String(), "..", "..", "escape.csv"), importID); err != nil {
+	db, err := sql.Open("sqlite", store.Path())
+	if err != nil {
+		t.Fatalf("open control fixture: %v", err)
+	}
+	defer db.Close()
+	if _, err := db.ExecContext(ctx, "UPDATE site_import_files SET relative_path = ? WHERE import_id = ?", filepath.Join("imports", site.ID.String(), "..", "..", "escape.csv"), importID); err != nil {
 		t.Fatalf("set unsafe relative path: %v", err)
 	}
 

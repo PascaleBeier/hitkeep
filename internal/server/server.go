@@ -18,6 +18,7 @@ import (
 	"hitkeep/internal/blocking"
 	"hitkeep/internal/cluster"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailer"
@@ -57,7 +58,7 @@ const (
 
 type Server struct {
 	httpServer     *http.Server
-	store          *database.Store
+	store          *controlstore.Store
 	cluster        *cluster.Manager
 	producer       *nsq.Producer
 	mailer         *mailer.Mailer
@@ -80,7 +81,7 @@ type Server struct {
 	publicBasePath string
 }
 
-func New(conf *config.Config, publicFS fs.FS, store *database.Store, tenantStores *database.TenantStoreManager, ent entitlements.Provider, cluster *cluster.Manager, producer *nsq.Producer, mailService *mailer.Mailer, realtimeBroker *realtime.Broker) *Server {
+func New(conf *config.Config, publicFS fs.FS, store *controlstore.Store, tenantStores *database.TenantStoreManager, ent entitlements.Provider, cluster *cluster.Manager, producer *nsq.Producer, mailService *mailer.Mailer, realtimeBroker *realtime.Broker) *Server {
 	config.NormalizeMCPConfig(conf)
 
 	ingestLim := shared.NewIPRateLimiter(rate.Limit(conf.IngestRateLimit), conf.IngestBurst)

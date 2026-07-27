@@ -1,4 +1,4 @@
-name: Default Tenant Migration Acceptance
+name: 2.13 Storage Migration Acceptance
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   migration-acceptance:
-    name: Run exhaustive migration acceptance
+    name: Run split and SQLite conversion acceptance
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:

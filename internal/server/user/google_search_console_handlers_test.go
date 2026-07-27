@@ -15,6 +15,7 @@ import (
 
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/searchconsole"
 )
@@ -62,13 +63,7 @@ func TestGoogleSearchConsoleStatusRejectsUsersOutsideTeam(t *testing.T) {
 	h, store, userID := setupUserSecurityTestEnv(t)
 	defer store.Close()
 
-	otherTeamID := uuid.New()
-	if _, err := store.DB().ExecContext(context.Background(),
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, now())",
-		otherTeamID, "Other Team",
-	); err != nil {
-		t.Fatalf("insert other team: %v", err)
-	}
+	otherTeamID := createOtherTestTeam(t, store, "Other Team")
 
 	req := withTestUser(httptest.NewRequest(http.MethodGet, "/api/user/teams/"+otherTeamID.String()+"/integrations/google-search-console/status", nil), userID)
 	req.SetPathValue("id", otherTeamID.String())
@@ -423,10 +418,7 @@ func TestGoogleSearchConsoleMappingRejectsSiteOutsideActiveTeam(t *testing.T) {
 	h, store, userID := setupUserSecurityTestEnv(t)
 	defer store.Close()
 	_, site := seedGoogleSearchConsoleMappableSite(t, store, userID, "wrong-team.example.com", "sc-domain:wrong-team.example.com")
-	otherTeamID := uuid.New()
-	if _, err := store.DB().ExecContext(context.Background(), "INSERT INTO tenants (id, name, created_at) VALUES (?, ?, now())", otherTeamID, "Other Team"); err != nil {
-		t.Fatalf("insert other team: %v", err)
-	}
+	otherTeamID := createOtherTestTeam(t, store, "Other Team")
 	if err := store.AddTeamMember(context.Background(), otherTeamID, userID, database.TenantRoleAdmin, userID); err != nil {
 		t.Fatalf("add other team member: %v", err)
 	}
@@ -622,9 +614,7 @@ func TestGoogleSearchConsoleCallbackRejectsUserWhoLostTeamManagerRole(t *testing
 		t.Fatalf("get active team: %v", err)
 	}
 	state := h.ctx.AuthState.CreateGoogleSearchConsoleOAuthState(userID, teamID, "/integration/google-search-console", time.Now().UTC().Add(time.Minute))
-	if _, err := store.DB().ExecContext(context.Background(), "UPDATE tenant_members SET role = ? WHERE tenant_id = ? AND user_id = ?", database.TenantRoleMember, teamID, userID); err != nil {
-		t.Fatalf("demote team role: %v", err)
-	}
+	demoteTestTeamOwnerToMember(t, store, teamID, userID)
 
 	req := withTestUser(httptest.NewRequest(http.MethodGet, "/api/integrations/google-search-console/oauth/callback?state="+state+"&code=oauth-code", nil), userID)
 	w := httptest.NewRecorder()
@@ -818,7 +808,7 @@ func (c *fakeSearchConsoleClient) QuerySearchAnalytics(ctx context.Context, toke
 	return c.rows, nil
 }
 
-func requireGoogleSearchConsoleConnection(t *testing.T, store *database.Store, teamID uuid.UUID) *database.GoogleSearchConsoleConnection {
+func requireGoogleSearchConsoleConnection(t *testing.T, store *controlstore.Store, teamID uuid.UUID) *database.GoogleSearchConsoleConnection {
 	t.Helper()
 	conn, err := store.GetGoogleSearchConsoleConnection(context.Background(), teamID)
 	if err != nil {
@@ -830,7 +820,7 @@ func requireGoogleSearchConsoleConnection(t *testing.T, store *database.Store, t
 	return conn
 }
 
-func requireGoogleSearchConsoleAuditEntries(t *testing.T, store *database.Store, teamID uuid.UUID, action string) []api.TeamAuditEntry {
+func requireGoogleSearchConsoleAuditEntries(t *testing.T, store *controlstore.Store, teamID uuid.UUID, action string) []api.TeamAuditEntry {
 	t.Helper()
 	entries, _, err := store.ListTeamAuditEntries(context.Background(), teamID, action, 5, 0)
 	if err != nil {
@@ -842,7 +832,7 @@ func requireGoogleSearchConsoleAuditEntries(t *testing.T, store *database.Store,
 	return entries
 }
 
-func seedGoogleSearchConsoleMappableSite(t *testing.T, store *database.Store, userID uuid.UUID, domain, propertyURI string) (uuid.UUID, *api.Site) {
+func seedGoogleSearchConsoleMappableSite(t *testing.T, store *controlstore.Store, userID uuid.UUID, domain, propertyURI string) (uuid.UUID, *api.Site) {
 	t.Helper()
 	teamID, err := store.GetActiveTenantID(context.Background(), userID)
 	if err != nil {
@@ -876,12 +866,9 @@ func seedGoogleSearchConsoleMappableSite(t *testing.T, store *database.Store, us
 	return teamID, site
 }
 
-func seedStaleGoogleSearchConsoleMapping(t *testing.T, store *database.Store, siteID, userID uuid.UUID) {
+func seedStaleGoogleSearchConsoleMapping(t *testing.T, store *controlstore.Store, siteID, userID uuid.UUID) {
 	t.Helper()
-	previousTeamID := uuid.New()
-	if _, err := store.DB().ExecContext(context.Background(), "INSERT INTO tenants (id, name, created_at) VALUES (?, ?, now())", previousTeamID, "Previous Team"); err != nil {
-		t.Fatalf("insert previous team: %v", err)
-	}
+	previousTeamID := createOtherTestTeam(t, store, "Previous Team")
 	if err := store.UpsertGoogleSearchConsoleSiteMapping(context.Background(), database.GoogleSearchConsoleSiteMappingInput{
 		SiteID:      siteID,
 		TeamID:      previousTeamID,
@@ -893,7 +880,7 @@ func seedStaleGoogleSearchConsoleMapping(t *testing.T, store *database.Store, si
 	}
 }
 
-func seedSucceededGoogleSearchConsoleSyncState(t *testing.T, store *database.Store, siteID, teamID uuid.UUID) (time.Time, time.Time, time.Time) {
+func seedSucceededGoogleSearchConsoleSyncState(t *testing.T, store *controlstore.Store, siteID, teamID uuid.UUID) (time.Time, time.Time, time.Time) {
 	t.Helper()
 	importedStart := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
 	importedEnd := time.Date(2026, 5, 2, 0, 0, 0, 0, time.UTC)
@@ -909,6 +896,39 @@ func seedSucceededGoogleSearchConsoleSyncState(t *testing.T, store *database.Sto
 		t.Fatalf("seed sync status: %v", err)
 	}
 	return importedStart, importedEnd, lastSuccess
+}
+
+func createOtherTestTeam(t *testing.T, store *controlstore.Store, name string) uuid.UUID {
+	t.Helper()
+	ownerID, err := store.CreateUser(t.Context(), uuid.NewString()+"@example.test", "hash")
+	if err != nil {
+		t.Fatalf("create other team owner: %v", err)
+	}
+	team, err := store.CreateTenant(t.Context(), ownerID, name, "")
+	if err != nil {
+		t.Fatalf("create other team: %v", err)
+	}
+	return team.ID
+}
+
+func demoteTestTeamOwnerToMember(t *testing.T, store *controlstore.Store, teamID, ownerID uuid.UUID) {
+	t.Helper()
+	replacementID, err := store.CreateUser(t.Context(), uuid.NewString()+"@example.test", "hash")
+	if err != nil {
+		t.Fatalf("create replacement owner: %v", err)
+	}
+	if err := store.AddTeamMember(t.Context(), teamID, replacementID, database.TenantRoleAdmin, ownerID); err != nil {
+		t.Fatalf("add replacement owner: %v", err)
+	}
+	if err := store.TransferTeamOwnership(t.Context(), teamID, ownerID, replacementID); err != nil {
+		t.Fatalf("transfer test team ownership: %v", err)
+	}
+	if err := store.RemoveTeamMember(t.Context(), teamID, ownerID); err != nil {
+		t.Fatalf("remove former owner: %v", err)
+	}
+	if err := store.AddTeamMember(t.Context(), teamID, ownerID, database.TenantRoleMember, replacementID); err != nil {
+		t.Fatalf("re-add former owner as member: %v", err)
+	}
 }
 
 func requireGoogleSearchConsoleSiteUnmapped(t *testing.T, mux *http.ServeMux, siteID, userID, teamID uuid.UUID) {

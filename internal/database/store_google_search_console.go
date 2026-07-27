@@ -9,119 +9,24 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"hitkeep/internal/controlstore"
 )
 
-type GoogleSearchConsoleConnectionInput struct {
-	TeamID             uuid.UUID
-	ConnectedByUserID  uuid.UUID
-	GoogleAccountEmail string
-	GoogleAccountID    string
-	AccessToken        string
-	RefreshToken       string
-	TokenType          string
-	Scope              string
-	TokenExpiry        time.Time
-	ConnectedAt        time.Time
-}
+type GoogleSearchConsoleConnectionInput = controlstore.GoogleSearchConsoleConnectionInput
+type GoogleSearchConsoleConnection = controlstore.GoogleSearchConsoleConnection
+type GoogleSearchConsolePropertyInput = controlstore.GoogleSearchConsolePropertyInput
 
-type GoogleSearchConsoleConnection struct {
-	TeamID             uuid.UUID
-	ConnectedByUserID  uuid.UUID
-	GoogleAccountEmail string
-	GoogleAccountID    string
-	AccessToken        string
-	RefreshToken       string
-	TokenType          string
-	Scope              string
-	TokenExpiry        time.Time
-	Connected          bool
-	ConnectedAt        time.Time
-	DisconnectedAt     *time.Time
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
-}
+type GoogleSearchConsoleProperty = controlstore.GoogleSearchConsoleProperty
 
-type GoogleSearchConsolePropertyInput struct {
-	TeamID          uuid.UUID
-	URI             string
-	PermissionLevel string
-	SeenAt          time.Time
-}
+type GoogleSearchConsoleSiteMappingInput = controlstore.GoogleSearchConsoleSiteMappingInput
+type GoogleSearchConsoleSiteMapping = controlstore.GoogleSearchConsoleSiteMapping
 
-type GoogleSearchConsoleProperty struct {
-	TeamID          uuid.UUID
-	URI             string
-	PermissionLevel string
-	LastSeenAt      time.Time
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-}
+type GoogleSearchConsoleSyncStateInput = controlstore.GoogleSearchConsoleSyncStateInput
+type GoogleSearchConsoleSyncState = controlstore.GoogleSearchConsoleSyncState
+type GoogleSearchConsoleSystemStatus = controlstore.GoogleSearchConsoleSystemStatus
 
-type GoogleSearchConsoleSiteMappingInput struct {
-	SiteID      uuid.UUID
-	TeamID      uuid.UUID
-	PropertyURI string
-	MappedBy    uuid.UUID
-	MappedAt    time.Time
-}
-
-type GoogleSearchConsoleSiteMapping struct {
-	SiteID      uuid.UUID
-	TeamID      uuid.UUID
-	PropertyURI string
-	MappedBy    uuid.UUID
-	MappedAt    time.Time
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-}
-
-type GoogleSearchConsoleSyncStateInput struct {
-	SiteID            uuid.UUID
-	TeamID            uuid.UUID
-	State             string
-	ImportedStartDate *time.Time
-	ImportedEndDate   *time.Time
-	LastSuccessAt     *time.Time
-	LastAttemptAt     *time.Time
-	LastErrorCategory string
-	NextRetryAt       *time.Time
-	Manual            bool
-}
-
-type GoogleSearchConsoleSyncState struct {
-	SiteID            uuid.UUID
-	TeamID            uuid.UUID
-	State             string
-	ImportedStartDate *time.Time
-	ImportedEndDate   *time.Time
-	LastSuccessAt     *time.Time
-	LastAttemptAt     *time.Time
-	LastErrorCategory string
-	NextRetryAt       *time.Time
-	Manual            bool
-	UpdatedAt         time.Time
-}
-
-type GoogleSearchConsoleSyncCandidate struct {
-	SiteID        uuid.UUID
-	TeamID        uuid.UUID
-	State         string
-	LastSuccessAt *time.Time
-	NextRetryAt   *time.Time
-	Manual        bool
-}
-
-type GoogleSearchConsoleSystemStatus struct {
-	ConnectedTeams      int
-	MappedSites         int
-	PendingSyncs        int
-	RunningSyncs        int
-	FailedSyncs         int
-	NeedsAttentionSyncs int
-	LastSuccessAt       *time.Time
-	LastAttemptAt       *time.Time
-	NextRetryAt         *time.Time
-}
+type GoogleSearchConsoleSyncCandidate = controlstore.GoogleSearchConsoleSyncCandidate
 
 func (s *Store) UpsertGoogleSearchConsoleConnection(ctx context.Context, input GoogleSearchConsoleConnectionInput) error {
 	return upsertGoogleSearchConsoleConnection(ctx, s.db, input)

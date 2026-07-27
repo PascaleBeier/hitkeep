@@ -12,6 +12,7 @@ import (
 	"hitkeep/internal/auth"
 	"hitkeep/internal/blocking"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailer"
@@ -59,7 +60,7 @@ type ClusterState interface {
 // policy and behavior belong to the packages the dependencies come from
 // (see Limits), and request middleware lives in authn.go and authz.go.
 type Context struct {
-	Store          *database.Store
+	Store          *controlstore.Store
 	TenantStores   *database.TenantStoreManager
 	Cluster        ClusterState
 	Producer       MessageProducer

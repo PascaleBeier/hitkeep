@@ -23,6 +23,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/assetstore"
 	"hitkeep/internal/auth"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/worker"
 )
@@ -84,36 +85,23 @@ func main() {
 
 	ctx := context.Background()
 
-	store, err := database.OpenDefaultSplitControlStore(ctx, *dbPath)
+	store, err := controlstore.Open(ctx, *dbPath)
 	if err != nil {
 		slog.Error("Failed to connect to database", "error", err)
 		os.Exit(1)
 	}
 	defer func() { _ = store.Close() }()
-	tenantBasePath := strings.TrimSpace(*dataPath)
-	complete, err := store.DefaultTenantSplitComplete(ctx)
-	if err != nil {
-		slog.Error("Failed to inspect default tenant migration", "error", err)
+	if _, err := store.EnsureDefaultTenant(ctx); err != nil {
+		slog.Error("Failed to ensure default tenant", "error", err)
 		os.Exit(1)
 	}
-	if !complete {
-		if err := store.Close(); err != nil {
-			slog.Error("Failed to close control database before default tenant migration", "error", err)
-			os.Exit(1)
-		}
-		if err := database.RunDefaultTenantSplit(ctx, *dbPath, tenantBasePath); err != nil {
-			slog.Error("Failed to migrate default tenant analytics", "error", err)
-			os.Exit(1)
-		}
-		store, err = database.OpenMigratedStore(ctx, *dbPath)
-		if err != nil {
-			slog.Error("Failed to reopen control database", "error", err)
-			os.Exit(1)
-		}
-	}
-
-	tenantMgr := database.NewTenantStoreManager(store, tenantBasePath, database.WithTenantDataPlane(true))
+	tenantBasePath := strings.TrimSpace(*dataPath)
+	tenantMgr := database.NewTenantStoreManager(store, tenantBasePath, nil)
 	defer tenantMgr.Close()
+	if _, err := tenantMgr.ForTenant(ctx, uuid.Nil); err != nil {
+		slog.Error("Failed to initialize default tenant data plane", "error", err)
+		os.Exit(1)
+	}
 
 	rng := mrand.New(mrand.NewSource(*seed)) // #nosec G404 -- demo data seeding uses reproducible randomness.
 
@@ -184,7 +172,7 @@ func main() {
 	stats.sessions += aiSeedStats.sessions + aiSeedStats.botHits
 
 	searchConsoleStats := seedGoogleSearchConsoleFixtures(ctx, store, tenantMgr, userID, siteID, *days)
-	seedActivationFixtures(ctx, store, userID, siteID)
+	seedActivationFixtures(ctx, store, tenantMgr, userID, siteID)
 
 	slog.Info("Running rollup backfill...")
 	rollupWorker := worker.NewRollupBackfillWorker(tenantMgr)
@@ -201,7 +189,7 @@ func main() {
 	printSeedSummary(*email, *password, *domain, siteID, tenantBasePath, stats, searchConsoleStats, *days)
 }
 
-func ensureAdminUser(ctx context.Context, store *database.Store, actorID uuid.UUID) uuid.UUID {
+func ensureAdminUser(ctx context.Context, store *controlstore.Store, actorID uuid.UUID) uuid.UUID {
 	adminEmail := "admin@example.com"
 	adminID := ensureUser(ctx, store, adminEmail, "admin1234")
 	if err := store.UpdateInstanceRole(ctx, adminID, auth.InstanceAdmin, actorID); err != nil {
@@ -218,7 +206,7 @@ type seedSiteContext struct {
 	analyticsStore *database.Store
 }
 
-func ensureSeedSiteContext(ctx context.Context, store *database.Store, tenantMgr *database.TenantStoreManager, userID uuid.UUID, domain, shareToken string) seedSiteContext {
+func ensureSeedSiteContext(ctx context.Context, store *controlstore.Store, tenantMgr *database.TenantStoreManager, userID uuid.UUID, domain, shareToken string) seedSiteContext {
 	slog.Info("Creating demo site", "domain", domain)
 	site, err := ensureSiteInActiveTeam(ctx, store, userID, domain)
 	if err != nil {

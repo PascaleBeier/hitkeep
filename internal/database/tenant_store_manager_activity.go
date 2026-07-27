@@ -23,11 +23,8 @@ type activationSiteMetadata struct {
 // boots, while split boots must never query compatibility activity tables in
 // hitkeep.db.
 func (m *TenantStoreManager) ListSystemActivation(ctx context.Context, q ActivationQuery) (*api.SystemActivationResponse, error) {
-	if m == nil || m.shared == nil || !m.dataPlaneEnabled {
-		if m == nil || m.shared == nil {
-			return nil, fmt.Errorf("tenant store manager is not configured")
-		}
-		return m.shared.ListSystemActivation(ctx, q)
+	if m == nil || m.control == nil {
+		return nil, fmt.Errorf("tenant store manager is not configured")
 	}
 	if q.Limit <= 0 || q.Limit > 200 {
 		q.Limit = 50
@@ -39,9 +36,13 @@ func (m *TenantStoreManager) ListSystemActivation(ctx context.Context, q Activat
 		q.Now = time.Now().UTC()
 	}
 
-	metadataRows, err := m.loadActivationMetadata(ctx)
+	controlRows, err := m.control.ListActivationMetadata(ctx)
 	if err != nil {
 		return nil, err
+	}
+	metadataRows := make([]activationSiteMetadata, len(controlRows))
+	for i, entry := range controlRows {
+		metadataRows[i] = activationSiteMetadata{row: entry.Row, tenantID: entry.TenantID, createdAt: entry.CreatedAt}
 	}
 	dormantCutoff := q.Now.UTC().Add(-activityDormantAfter)
 	statusFilter := strings.ToLower(strings.TrimSpace(q.Status))
@@ -127,44 +128,4 @@ func (m *TenantStoreManager) ListSystemActivation(ctx context.Context, q Activat
 	}
 	resp.HasMore = q.Offset+len(resp.Rows) < resp.Total
 	return resp, nil
-}
-
-func (m *TenantStoreManager) loadActivationMetadata(ctx context.Context) ([]activationSiteMetadata, error) {
-	rows, err := m.shared.DB().QueryContext(ctx, `
-		SELECT
-			t.id, t.name,
-			COALESCE((SELECT MIN(u.email)
-				FROM tenant_members tm
-				JOIN users u ON u.id = tm.user_id
-				WHERE tm.tenant_id = t.id AND tm.role = 'owner'), ''),
-			COALESCE(cba.plan_code, ''), COALESCE(cba.plan_name, ''),
-			s.id, s.domain, s.created_at, st.tenant_id
-		FROM sites s
-		JOIN site_tenants st ON st.site_id = s.id
-		JOIN tenants t ON t.id = st.tenant_id
-		LEFT JOIN tenant_archives ta ON ta.tenant_id = t.id
-		LEFT JOIN cloud_billing_accounts cba ON cba.tenant_id = t.id
-		WHERE ta.tenant_id IS NULL
-		ORDER BY s.created_at DESC, s.domain ASC
-	`)
-	if err != nil {
-		return nil, fmt.Errorf("query activation metadata: %w", err)
-	}
-	defer rows.Close()
-	result := make([]activationSiteMetadata, 0)
-	for rows.Next() {
-		var entry activationSiteMetadata
-		if err := rows.Scan(
-			&entry.row.TeamID, &entry.row.TeamName, &entry.row.OwnerEmail,
-			&entry.row.PlanCode, &entry.row.PlanName,
-			&entry.row.SiteID, &entry.row.SiteDomain, &entry.createdAt, &entry.tenantID,
-		); err != nil {
-			return nil, fmt.Errorf("scan activation metadata: %w", err)
-		}
-		result = append(result, entry)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("read activation metadata: %w", err)
-	}
-	return result, nil
 }

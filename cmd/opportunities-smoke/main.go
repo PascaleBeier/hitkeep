@@ -14,6 +14,7 @@ import (
 
 	hitai "hitkeep/internal/ai"
 	"hitkeep/internal/auth"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/opportunities"
 	"hitkeep/internal/opportunities/smokegate"
@@ -125,7 +126,7 @@ func runSmoke(ctx context.Context, conf smokeConfig) (smokegate.Report, error) {
 	}
 	defer cleanup()
 
-	store, err := database.OpenMigratedStore(ctx, workingDB)
+	store, err := controlstore.Open(ctx, workingDB)
 	if err != nil {
 		return smokegate.Report{}, fmt.Errorf("connect restored db: %w", err)
 	}
@@ -135,8 +136,8 @@ func runSmoke(ctx context.Context, conf smokeConfig) (smokegate.Report, error) {
 		return smokegate.Report{}, err
 	}
 	defer cleanupDataPath()
-	tenantStores := map[uuid.UUID]*database.Store{}
-	defer closeTenantStores(tenantStores)
+	tenantMgr := database.NewTenantStoreManager(store, workingDataPath, nil)
+	defer tenantMgr.Close()
 
 	recorder := &recordingRecorder{base: hitai.StoreRecorder{Store: store}}
 	service := opportunities.Service{
@@ -185,7 +186,7 @@ func runSmoke(ctx context.Context, conf smokeConfig) (smokegate.Report, error) {
 			report.Targets = append(report.Targets, target)
 			continue
 		}
-		analyticsStore, err := tenantAnalyticsStore(ctx, store, tenantStores, conf.DataPath, workingDataPath, teamID)
+		analyticsStore, err := tenantMgr.ForTenant(ctx, teamID)
 		if err != nil {
 			target.Error = err.Error()
 			report.Targets = append(report.Targets, target)
@@ -231,37 +232,28 @@ func prepareWorkingDataPath(source string) (string, func(), error) {
 	if err != nil {
 		return "", func() {}, fmt.Errorf("create working data dir: %w", err)
 	}
+	sourceTenants := filepath.Join(source, "tenants")
+	err = filepath.WalkDir(sourceTenants, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		if entry.Name() != "hitkeep.db" && entry.Name() != "hitkeep.db.wal" {
+			return nil
+		}
+		relative, relErr := filepath.Rel(source, path)
+		if relErr != nil {
+			return relErr
+		}
+		return copyFile(path, filepath.Join(tmp, relative))
+	})
+	if err != nil && !os.IsNotExist(err) {
+		_ = os.RemoveAll(tmp)
+		return "", func() {}, fmt.Errorf("copy tenant data path: %w", err)
+	}
 	return tmp, func() { _ = os.RemoveAll(tmp) }, nil
-}
-
-func tenantAnalyticsStore(ctx context.Context, shared *database.Store, cache map[uuid.UUID]*database.Store, sourceDataPath, workingDataPath string, tenantID uuid.UUID) (*database.Store, error) {
-	defaultID, err := shared.GetDefaultTenantID(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("resolve default tenant: %w", err)
-	}
-	if tenantID == uuid.Nil || tenantID == defaultID {
-		return shared, nil
-	}
-	if store, ok := cache[tenantID]; ok {
-		return store, nil
-	}
-	sourcePath := filepath.Join(sourceDataPath, "tenants", tenantID.String(), "hitkeep.db")
-	targetPath := filepath.Join(workingDataPath, "tenants", tenantID.String(), "hitkeep.db")
-	if err := copyFile(sourcePath, targetPath); err != nil {
-		return nil, fmt.Errorf("copy tenant db %s: %w", tenantID, err)
-	}
-	store, err := database.OpenMigratedTenantStore(ctx, targetPath)
-	if err != nil {
-		return nil, fmt.Errorf("connect tenant db %s: %w", tenantID, err)
-	}
-	cache[tenantID] = store
-	return store, nil
-}
-
-func closeTenantStores(stores map[uuid.UUID]*database.Store) {
-	for _, store := range stores {
-		_ = store.Close()
-	}
 }
 
 func splitCSV(value string) []string {

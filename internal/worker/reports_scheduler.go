@@ -12,6 +12,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/appurl"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
@@ -36,13 +37,13 @@ type ReportContentRequest struct {
 // them. Keeping content generation separate from transport prevents previews
 // and test sends from drifting away from scheduled delivery.
 type ReportContentBuilder struct {
-	shared                *database.Store
+	shared                *controlstore.Store
 	resolveAnalyticsStore func(context.Context, uuid.UUID) (*database.Store, error)
 	pubURL                string
 }
 
 func NewReportContentBuilder(
-	shared *database.Store,
+	shared *controlstore.Store,
 	resolveAnalyticsStore func(context.Context, uuid.UUID) (*database.Store, error),
 	pubURL string,
 ) *ReportContentBuilder {
@@ -68,7 +69,7 @@ func (w *ReportWorker) RunAt(ctx context.Context, now time.Time) {
 		slog.Debug("ReportWorker: mail delivery unavailable")
 		return
 	}
-	shared := w.tenantMgr.Shared()
+	shared := w.tenantMgr.Control()
 	if err := shared.RecoverStaleReportDeliveries(ctx, now); err != nil {
 		slog.Error("ReportWorker: failed to recover interrupted deliveries", "error_code", "delivery_recovery_failed")
 		return
@@ -95,7 +96,7 @@ func (w *ReportWorker) RunAt(ctx context.Context, now time.Time) {
 }
 
 func (w *ReportWorker) processNamedDelivery(ctx context.Context, deliveryID uuid.UUID, now time.Time) {
-	shared := w.tenantMgr.Shared()
+	shared := w.tenantMgr.Control()
 	delivery, err := shared.GetPendingReportDelivery(ctx, deliveryID)
 	if err != nil {
 		_ = shared.MarkReportDeliverySkipped(ctx, deliveryID, "delivery_state_unavailable", now)
@@ -182,7 +183,7 @@ func (w *ReportWorker) allowsExternalReportRecipient(ctx context.Context, report
 }
 
 func (w *ReportWorker) contentBuilder() *ReportContentBuilder {
-	return NewReportContentBuilder(w.tenantMgr.Shared(), w.resolveAnalyticsStore, w.pubURL)
+	return NewReportContentBuilder(w.tenantMgr.Control(), w.resolveAnalyticsStore, w.pubURL)
 }
 
 func (b *ReportContentBuilder) Build(ctx context.Context, request ReportContentRequest) (mailer.Mailable, bool, error) {

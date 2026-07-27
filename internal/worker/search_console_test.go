@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/searchconsole"
 )
@@ -44,8 +45,9 @@ func TestSearchConsoleSyncWorkerInitialSyncImportsRecentFinalizedRows(t *testing
 
 func TestSearchConsoleSyncWorkerQuotaErrorBacksOff(t *testing.T) {
 	ctx := context.Background()
-	shared := newTestStore(t)
-	tenantMgr := newTestTenantMgr(t, shared)
+	analytics := newTestStore(t)
+	shared := testControlStore(t, analytics)
+	tenantMgr := newTestTenantMgr(t, analytics)
 	userID, err := shared.CreateUser(ctx, "gsc-quota@test.dev", "hash")
 	if err != nil {
 		t.Fatalf("create user: %v", err)
@@ -349,7 +351,7 @@ func TestSearchConsoleSyncWorkerRunDueImportsReadySitesAndContinuesAfterFailure(
 }
 
 type searchConsoleWorkerFixture struct {
-	shared      *database.Store
+	shared      *controlstore.Store
 	tenantMgr   *database.TenantStoreManager
 	site        *api.Site
 	teamID      uuid.UUID
@@ -359,8 +361,9 @@ type searchConsoleWorkerFixture struct {
 func newSearchConsoleWorkerFixture(t *testing.T, email string, domain string) searchConsoleWorkerFixture {
 	t.Helper()
 	ctx := context.Background()
-	shared := newTestStore(t)
-	tenantMgr := newTestTenantMgr(t, shared)
+	analytics := newTestStore(t)
+	shared := testControlStore(t, analytics)
+	tenantMgr := newTestTenantMgr(t, analytics)
 	userID, err := shared.CreateUser(ctx, email, "hash")
 	if err != nil {
 		t.Fatalf("create user: %v", err)
@@ -403,7 +406,7 @@ func newSearchConsoleWorkerFixture(t *testing.T, email string, domain string) se
 	}
 }
 
-func addSearchConsoleWorkerFixtureSite(t *testing.T, shared *database.Store, tenantMgr *database.TenantStoreManager, email string, domain string) (searchConsoleWorkerFixture, error) {
+func addSearchConsoleWorkerFixtureSite(t *testing.T, shared *controlstore.Store, tenantMgr *database.TenantStoreManager, email string, domain string) (searchConsoleWorkerFixture, error) {
 	t.Helper()
 	ctx := context.Background()
 	userID, err := shared.CreateUser(ctx, email, "hash")
@@ -522,7 +525,7 @@ func requireSearchConsoleImportedClicks(t *testing.T, tenantMgr *database.Tenant
 	}
 }
 
-func requireSearchConsoleSucceededState(t *testing.T, shared *database.Store, siteID uuid.UUID, startDate, endDate string) {
+func requireSearchConsoleSucceededState(t *testing.T, shared *controlstore.Store, siteID uuid.UUID, startDate, endDate string) {
 	t.Helper()
 	state, err := shared.GetGoogleSearchConsoleSyncState(context.Background(), siteID)
 	if err != nil {
@@ -542,7 +545,7 @@ func requireSearchConsoleSucceededState(t *testing.T, shared *database.Store, si
 	}
 }
 
-func requireSearchConsoleImportAudit(t *testing.T, shared *database.Store, teamID, siteID uuid.UUID) {
+func requireSearchConsoleImportAudit(t *testing.T, shared *controlstore.Store, teamID, siteID uuid.UUID) {
 	t.Helper()
 	entries, total, err := shared.ListTeamAuditEntries(context.Background(), teamID, "google_search_console.sync_imported", 5, 0)
 	if err != nil {
@@ -559,7 +562,7 @@ func requireSearchConsoleImportAudit(t *testing.T, shared *database.Store, teamI
 	}
 }
 
-func requireSearchConsolePreparedAudit(t *testing.T, shared *database.Store, teamID, siteID uuid.UUID) {
+func requireSearchConsolePreparedAudit(t *testing.T, shared *controlstore.Store, teamID, siteID uuid.UUID) {
 	t.Helper()
 	entries, total, err := shared.ListTeamAuditEntries(context.Background(), teamID, "google_search_console.sync_import_prepared", 5, 0)
 	if err != nil {
@@ -576,7 +579,7 @@ func requireSearchConsolePreparedAudit(t *testing.T, shared *database.Store, tea
 	}
 }
 
-func requireSearchConsoleStartAudit(t *testing.T, shared *database.Store, teamID, siteID uuid.UUID) {
+func requireSearchConsoleStartAudit(t *testing.T, shared *controlstore.Store, teamID, siteID uuid.UUID) {
 	t.Helper()
 	entries, total, err := shared.ListTeamAuditEntries(context.Background(), teamID, "google_search_console.sync_started", 5, 0)
 	if err != nil {

@@ -10,6 +10,7 @@ import (
 
 	"hitkeep/internal/appurl"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
@@ -41,7 +42,7 @@ func (w *CloudLifecycleWorker) Run(ctx context.Context) {
 }
 
 func (w *CloudLifecycleWorker) RunAt(ctx context.Context, now time.Time) {
-	if w == nil || w.mailer == nil || w.tenantMgr == nil || w.tenantMgr.Shared() == nil || w.conf == nil || !w.conf.CloudHosted {
+	if w == nil || w.mailer == nil || w.tenantMgr == nil || w.tenantMgr.Control() == nil || w.conf == nil || !w.conf.CloudHosted {
 		return
 	}
 	if now.IsZero() {
@@ -56,13 +57,7 @@ func (w *CloudLifecycleWorker) RunAt(ctx context.Context, now time.Time) {
 
 func (w *CloudLifecycleWorker) processKind(ctx context.Context, kind string, now time.Time) {
 	store := w.tenantMgr.Control()
-	var recipients []database.CloudLifecycleRecipient
-	var err error
-	if w.tenantMgr.TenantDataPlaneEnabled() {
-		recipients, err = w.tenantMgr.ListEligibleCloudLifecycleRecipients(ctx, kind, now, 100)
-	} else {
-		recipients, err = store.ListEligibleCloudLifecycleRecipients(ctx, kind, now, 100)
-	}
+	recipients, err := w.tenantMgr.ListEligibleCloudLifecycleRecipients(ctx, kind, now, 100)
 	if err != nil {
 		slog.Error("CloudLifecycleWorker: failed to load recipients", "kind", kind, "error", err)
 		return
@@ -82,7 +77,7 @@ func (w *CloudLifecycleWorker) processKind(ctx context.Context, kind string, now
 
 		if err := w.mailer.Send(recipient.Email, email); err != nil {
 			slog.Error("CloudLifecycleWorker: failed to send email", "kind", kind, "tenant_id", recipient.TenantID, "user_id", recipient.UserID, "error", err)
-			if markErr := store.MarkCloudLifecycleMessageFailed(ctx, database.CloudLifecycleMessageUpdate{
+			if markErr := store.MarkCloudLifecycleMessageFailed(ctx, controlstore.CloudLifecycleMessageUpdate{
 				TenantID: recipient.TenantID,
 				UserID:   recipient.UserID,
 				Kind:     kind,
@@ -94,7 +89,7 @@ func (w *CloudLifecycleWorker) processKind(ctx context.Context, kind string, now
 			continue
 		}
 
-		if err := store.MarkCloudLifecycleMessageSent(ctx, database.CloudLifecycleMessageUpdate{
+		if err := store.MarkCloudLifecycleMessageSent(ctx, controlstore.CloudLifecycleMessageUpdate{
 			TenantID: recipient.TenantID,
 			UserID:   recipient.UserID,
 			Kind:     kind,

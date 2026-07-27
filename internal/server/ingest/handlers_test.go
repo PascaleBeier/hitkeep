@@ -20,9 +20,11 @@ import (
 	"hitkeep/internal/auth"
 	"hitkeep/internal/blocking"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/ipmeta"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/testutil"
 )
 
 func TestGeoNetworkFromVisitorIPLooksUpMetadataOnce(t *testing.T) {
@@ -1413,13 +1415,7 @@ func TestHandleServerPageviewIngestUsesIngestLimiter(t *testing.T) {
 func setupIngestHandler(t *testing.T, mutateCtx func(*shared.Context)) (*handler, func()) {
 	t.Helper()
 
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect test db: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate test db: %v", err)
-	}
+	store, tenantStores := testutil.NewControlAndTenantStores(t)
 
 	userID, err := store.CreateUser(context.Background(), "ingest-test@example.com", "hashed_secret")
 	if err != nil {
@@ -1431,6 +1427,7 @@ func setupIngestHandler(t *testing.T, mutateCtx func(*shared.Context)) (*handler
 
 	ctx := &shared.Context{
 		Store:          store,
+		TenantStores:   tenantStores,
 		Config:         &config.Config{},
 		SystemCounters: &database.SystemCounter{},
 	}
@@ -1439,21 +1436,17 @@ func setupIngestHandler(t *testing.T, mutateCtx func(*shared.Context)) (*handler
 	}
 
 	return &handler{ctx: ctx}, func() {
-		store.Close()
+		_ = tenantStores.Close()
+		_ = store.Close()
 	}
 }
 
-func setupServerIngestTestEnv(t *testing.T, siteRole auth.SiteRole, mutateCtx func(*shared.Context)) (*database.Store, *shared.Context, uuid.UUID, uuid.UUID, string) {
+func setupServerIngestTestEnv(t *testing.T, siteRole auth.SiteRole, mutateCtx func(*shared.Context)) (*controlstore.Store, *shared.Context, uuid.UUID, uuid.UUID, string) {
 	t.Helper()
 
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect test db: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate test db: %v", err)
-	}
+	store, tenantStores := testutil.NewControlAndTenantStores(t)
 	t.Cleanup(func() { _ = store.Close() })
+	t.Cleanup(func() { _ = tenantStores.Close() })
 
 	userID, err := store.CreateUser(context.Background(), "server-ingest-test@example.com", "hashed_secret")
 	if err != nil {
@@ -1472,6 +1465,7 @@ func setupServerIngestTestEnv(t *testing.T, siteRole auth.SiteRole, mutateCtx fu
 
 	ctx := &shared.Context{
 		Store:          store,
+		TenantStores:   tenantStores,
 		Config:         &config.Config{},
 		SystemCounters: &database.SystemCounter{},
 	}
@@ -1481,7 +1475,7 @@ func setupServerIngestTestEnv(t *testing.T, siteRole auth.SiteRole, mutateCtx fu
 	return store, ctx, userID, site.ID, token
 }
 
-func createActiveIngestTrackingDomain(t *testing.T, store *database.Store, hostname string) api.CustomTrackingDomain {
+func createActiveIngestTrackingDomain(t *testing.T, store *controlstore.Store, hostname string) api.CustomTrackingDomain {
 	t.Helper()
 
 	teamID, err := store.GetDefaultTenantID(context.Background())
@@ -1491,7 +1485,7 @@ func createActiveIngestTrackingDomain(t *testing.T, store *database.Store, hostn
 	return createActiveIngestTrackingDomainForTeam(t, store, teamID, hostname)
 }
 
-func createActiveIngestTrackingDomainForTeam(t *testing.T, store *database.Store, teamID uuid.UUID, hostname string) api.CustomTrackingDomain {
+func createActiveIngestTrackingDomainForTeam(t *testing.T, store *controlstore.Store, teamID uuid.UUID, hostname string) api.CustomTrackingDomain {
 	t.Helper()
 
 	domain, err := store.CreateCustomTrackingDomain(context.Background(), database.CustomTrackingDomainInput{

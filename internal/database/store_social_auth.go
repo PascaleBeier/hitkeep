@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 )
 
 const pendingSocialConfirmationTTL = 30 * time.Minute
@@ -39,48 +40,10 @@ type SocialIdentity struct {
 	LastUsedAt    *time.Time
 }
 
-type LinkSocialIdentityInput struct {
-	UserID        uuid.UUID
-	Provider      string
-	Subject       string
-	ObservedEmail string
-	MarkUsed      bool
-}
-
-type PendingSocialConfirmation struct {
-	Provider        string
-	Subject         string
-	ObservedEmail   string
-	TargetEmail     string
-	TargetUserID    *uuid.UUID
-	TeamName        string
-	Jurisdiction    string
-	Locale          string
-	PlanCode        string
-	BillingInterval string
-	AcceptedTosAt   time.Time
-	ReturnPath      string
-	RememberMe      bool
-	ExpiresAt       time.Time
-}
-
-type CreateManagedSocialAccountInput struct {
-	Email           string
-	HashedPassword  string
-	TeamName        string
-	Locale          string
-	Provider        string
-	Subject         string
-	ObservedEmail   string
-	PlanCode        string
-	PlanName        string
-	BillingInterval string
-}
-
-type ManagedSocialAccount struct {
-	UserID   uuid.UUID
-	TenantID uuid.UUID
-}
+type LinkSocialIdentityInput = controlstore.LinkSocialIdentityInput
+type PendingSocialConfirmation = controlstore.PendingSocialConfirmation
+type CreateManagedSocialAccountInput = controlstore.CreateManagedSocialAccountInput
+type ManagedSocialAccount = controlstore.ManagedSocialAccount
 
 func normalizeSocialProvider(provider string) (string, error) {
 	provider = strings.ToLower(strings.TrimSpace(provider))

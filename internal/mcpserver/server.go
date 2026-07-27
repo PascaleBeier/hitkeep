@@ -16,6 +16,7 @@ import (
 
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
 )
@@ -28,7 +29,7 @@ type authContextKey struct{}
 
 type service struct {
 	conf         *config.Config
-	store        *database.Store
+	store        *controlstore.Store
 	tenantStores *database.TenantStoreManager
 	docs         *docsClient
 	apiLimiter   *shared.IPRateLimiter
@@ -40,7 +41,7 @@ func Register(mux *http.ServeMux, ctx *shared.Context, logger *slog.Logger) {
 	mux.Handle(ctx.Config.MCPPath, NewHandler(ctx.Config, ctx.Store, ctx.TenantStores, ctx.ApiLimiter, logger))
 }
 
-func NewHandler(conf *config.Config, store *database.Store, tenantStores *database.TenantStoreManager, apiLimiter *shared.IPRateLimiter, logger *slog.Logger) http.Handler {
+func NewHandler(conf *config.Config, store *controlstore.Store, tenantStores *database.TenantStoreManager, apiLimiter *shared.IPRateLimiter, logger *slog.Logger) http.Handler {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -310,7 +311,7 @@ func (s *service) requireSiteView(ctx context.Context, siteID uuid.UUID) (*datab
 
 func (s *service) analyticsStore(ctx context.Context, siteID uuid.UUID) (*database.Store, error) {
 	if s.tenantStores == nil {
-		return s.store, nil
+		return nil, errors.New("tenant analytics data plane is unavailable")
 	}
 	store, _, err := s.tenantStores.ResolveSiteStore(ctx, siteID)
 	return store, err

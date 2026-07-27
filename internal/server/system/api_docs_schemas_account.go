@@ -449,8 +449,11 @@ func openAPIV1AccountSchemas() map[string]any {
 		"SystemStorage": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"shared_db_path":       map[string]any{"type": "string"},
-				"shared_db_bytes":      map[string]any{"type": "integer", "format": "int64"},
+				"control_db_path":      map[string]any{"type": "string"},
+				"control_db_bytes":     map[string]any{"type": "integer", "format": "int64"},
+				"tenant_duckdb_memory": map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/DuckDBMemoryStat"}},
+				"shared_db_path":       map[string]any{"type": "string", "deprecated": true},
+				"shared_db_bytes":      map[string]any{"type": "integer", "format": "int64", "deprecated": true},
 				"data_path":            map[string]any{"type": "string"},
 				"tenant_db_count":      map[string]any{"type": "integer"},
 				"tenant_dbs":           map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/TenantDBInfo"}},
@@ -458,7 +461,7 @@ func openAPIV1AccountSchemas() map[string]any {
 				"backup_path":          map[string]any{"type": "string"},
 				"disk_available_bytes": map[string]any{"type": "integer", "format": "int64"},
 				"disk_total_bytes":     map[string]any{"type": "integer", "format": "int64"},
-				"duckdb_memory":        map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/DuckDBMemoryStat"}},
+				"duckdb_memory":        map[string]any{"type": "array", "deprecated": true, "items": map[string]any{"$ref": "#/components/schemas/DuckDBMemoryStat"}},
 			},
 		},
 		"DuckDBMemoryStat": map[string]any{

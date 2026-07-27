@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/webhooks"
 )
 
@@ -23,24 +24,8 @@ const (
 	WebhookDeliveryFailed     = "failed"
 )
 
-type WebhookEventInput struct {
-	ID                        uuid.UUID
-	SiteID                    *uuid.UUID
-	TargetWebhookID           *uuid.UUID
-	EventType                 string
-	APIVersion                string
-	OccurredAt                time.Time
-	Data                      map[string]any
-	PreserveAfterSiteDeletion bool
-	Deduplicate               bool
-}
-
-type WebhookDeliveryJob struct {
-	DeliveryID uuid.UUID `json:"delivery_id"`
-	EventID    uuid.UUID `json:"event_id"`
-	WebhookID  uuid.UUID `json:"webhook_id"`
-	Payload    []byte    `json:"-"`
-}
+type WebhookEventInput = controlstore.WebhookEventInput
+type WebhookDeliveryJob = controlstore.WebhookDeliveryJob
 
 type WebhookDeliveryRecord struct {
 	ID               uuid.UUID

@@ -240,7 +240,8 @@ func listTables(ctx context.Context, q queryer) (map[string]struct{}, error) {
 	rows, err := q.QueryContext(ctx, `
 		SELECT table_name
 		FROM information_schema.tables
-		WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
+		WHERE table_catalog = current_database()
+			AND table_schema NOT IN ('information_schema', 'pg_catalog')
 			AND table_type = 'BASE TABLE'
 	`)
 	if err != nil {
@@ -267,6 +268,7 @@ func listSiteIDTables(ctx context.Context, q queryer) ([]string, error) {
 		SELECT table_name
 		FROM information_schema.columns
 		WHERE column_name = 'site_id'
+			AND table_catalog = current_database()
 			AND table_schema NOT IN ('information_schema', 'pg_catalog')
 	`)
 	if err != nil {

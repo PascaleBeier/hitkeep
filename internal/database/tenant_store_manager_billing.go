@@ -25,11 +25,8 @@ type lifecycleSiteCandidate struct {
 // message state on the control plane while resolving activation timestamps
 // from the owning tenant catalogs.
 func (m *TenantStoreManager) ListEligibleCloudLifecycleRecipients(ctx context.Context, kind string, now time.Time, limit int) ([]CloudLifecycleRecipient, error) {
-	if m == nil || m.shared == nil || !m.dataPlaneEnabled {
-		if m == nil || m.shared == nil {
-			return nil, fmt.Errorf("tenant store manager is not configured")
-		}
-		return m.shared.ListEligibleCloudLifecycleRecipients(ctx, kind, now, limit)
+	if m == nil || m.control == nil {
+		return nil, fmt.Errorf("tenant store manager is not configured")
 	}
 	if now.IsZero() {
 		now = time.Now().UTC()
@@ -40,49 +37,26 @@ func (m *TenantStoreManager) ListEligibleCloudLifecycleRecipients(ctx context.Co
 	if kind != CloudLifecycleMessageWelcome && kind != CloudLifecycleMessageFreeRetentionReminder && kind != CloudLifecycleMessageFreeRetentionPreTrim && kind != CloudLifecycleMessageFreeLimitReminder {
 		return nil, fmt.Errorf("unsupported cloud lifecycle message kind %q", kind)
 	}
-	rows, err := m.shared.DB().QueryContext(ctx, `
-		SELECT
-			st.tenant_id, t.name, tm.user_id, u.email,
-			COALESCE(up.default_locale, ''), s.id, s.domain, s.created_at,
-			COALESCE(cba.plan_code, ''), COALESCE(cba.plan_name, ''),
-			COALESCE(cba.subscription_status, ''), COALESCE(clm.attempts, 0),
-			COALESCE(clm.status, ''), clm.sent_at,
-			(SELECT COUNT(*) FROM site_tenants st2 WHERE st2.tenant_id = st.tenant_id),
-			(SELECT COUNT(*) FROM tenant_members tm2 WHERE tm2.tenant_id = st.tenant_id)
-		FROM site_tenants st
-		JOIN sites s ON s.id = st.site_id
-		JOIN tenants t ON t.id = st.tenant_id
-		JOIN tenant_members tm ON tm.tenant_id = st.tenant_id AND tm.role = 'owner'
-		JOIN users u ON u.id = tm.user_id
-		LEFT JOIN user_preferences up ON up.user_id = tm.user_id
-		JOIN cloud_billing_accounts cba ON cba.tenant_id = st.tenant_id
-		LEFT JOIN tenant_archives ta ON ta.tenant_id = st.tenant_id
-		LEFT JOIN cloud_lifecycle_messages clm
-			ON clm.tenant_id = st.tenant_id AND clm.user_id = tm.user_id AND clm.kind = ?
-		WHERE ta.tenant_id IS NULL
-		  AND COALESCE(clm.status, '') <> ?
-		  AND clm.sent_at IS NULL
-		  AND COALESCE(clm.attempts, 0) < ?
-	`, kind, CloudLifecycleMessageStatusSent, CloudLifecycleMessageMaxAttempts)
+	controlCandidates, err := m.control.ListCloudLifecycleControlCandidates(ctx, kind)
 	if err != nil {
-		return nil, fmt.Errorf("query cloud lifecycle control metadata: %w", err)
+		return nil, err
 	}
-	defer rows.Close()
 	selected := make(map[uuid.UUID]lifecycleSiteCandidate)
-	for rows.Next() {
-		var candidate lifecycleSiteCandidate
-		var sentAt *time.Time
-		if err := rows.Scan(
-			&candidate.recipient.TenantID, &candidate.recipient.TenantName,
-			&candidate.recipient.UserID, &candidate.recipient.Email, &candidate.recipient.Locale,
-			&candidate.recipient.SiteID, &candidate.recipient.SiteDomain, &candidate.createdAt,
-			&candidate.recipient.PlanCode, &candidate.recipient.PlanName,
-			&candidate.recipient.SubscriptionStatus, &candidate.recipient.Attempts,
-			&candidate.clmStatus, &sentAt, &candidate.siteCount, &candidate.memberCount,
-		); err != nil {
-			return nil, fmt.Errorf("scan cloud lifecycle control metadata: %w", err)
+	for _, controlCandidate := range controlCandidates {
+		candidate := lifecycleSiteCandidate{
+			recipient: CloudLifecycleRecipient{
+				TenantID: controlCandidate.Recipient.TenantID, TenantName: controlCandidate.Recipient.TenantName,
+				UserID: controlCandidate.Recipient.UserID, Email: controlCandidate.Recipient.Email, Locale: controlCandidate.Recipient.Locale,
+				SiteID: controlCandidate.Recipient.SiteID, SiteDomain: controlCandidate.Recipient.SiteDomain,
+				PlanCode: controlCandidate.Recipient.PlanCode, PlanName: controlCandidate.Recipient.PlanName,
+				SubscriptionStatus: controlCandidate.Recipient.SubscriptionStatus, Attempts: controlCandidate.Recipient.Attempts,
+			},
+			createdAt:   controlCandidate.SiteCreated,
+			clmStatus:   controlCandidate.MessageStatus,
+			sent:        controlCandidate.MessageSent,
+			siteCount:   controlCandidate.SiteCount,
+			memberCount: controlCandidate.MemberCount,
 		}
-		candidate.sent = sentAt != nil
 		store, _, err := m.ResolveSiteStore(ctx, candidate.recipient.SiteID)
 		if err != nil {
 			return nil, fmt.Errorf("resolve lifecycle analytics store for site %s: %w", candidate.recipient.SiteID, err)
@@ -110,9 +84,6 @@ func (m *TenantStoreManager) ListEligibleCloudLifecycleRecipients(ctx context.Co
 			continue
 		}
 		selected[candidate.recipient.TenantID] = candidate
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("read cloud lifecycle control metadata: %w", err)
 	}
 	result := make([]CloudLifecycleRecipient, 0, len(selected))
 	for _, candidate := range selected {

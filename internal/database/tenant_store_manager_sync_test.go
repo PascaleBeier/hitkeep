@@ -3,15 +3,12 @@ package database
 import (
 	"context"
 	"testing"
-	"time"
-
-	"github.com/google/uuid"
 )
 
 func TestResolveSiteStoreMemoizesSiteSync(t *testing.T) {
 	ctx := context.Background()
-	shared := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(shared, t.TempDir())
+	shared := newControlTestStore(t)
+	mgr := NewTenantStoreManager(shared, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	userID, err := shared.CreateUser(ctx, "sync-memo@example.com", "hash")
@@ -23,13 +20,7 @@ func TestResolveSiteStoreMemoizesSiteSync(t *testing.T) {
 		t.Fatalf("create site: %v", err)
 	}
 
-	customTenantID := uuid.New()
-	if _, err := shared.DB().ExecContext(ctx,
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		customTenantID, "Sync Memo Team", time.Now().UTC(),
-	); err != nil {
-		t.Fatalf("create tenant: %v", err)
-	}
+	customTenantID := newManagerTestTenant(t, shared, "Sync Memo Team")
 	if err := shared.UpdateSiteTenant(ctx, site.ID, customTenantID); err != nil {
 		t.Fatalf("map site to tenant: %v", err)
 	}
@@ -54,9 +45,7 @@ func TestResolveSiteStoreMemoizesSiteSync(t *testing.T) {
 	}
 
 	before := mirroredRetention()
-	if _, err := shared.DB().ExecContext(ctx,
-		"UPDATE sites SET data_retention_days = ? WHERE id = ?", before+7, site.ID,
-	); err != nil {
+	if err := shared.SetSiteRetentionDaysSystem(ctx, site.ID, before+7, site.RetentionSyncedFromPlan); err != nil {
 		t.Fatalf("update shared site retention: %v", err)
 	}
 

@@ -16,6 +16,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/appurl"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailables"
@@ -163,17 +164,7 @@ func (h *handler) hydrateTeamSummaries(r *http.Request, teams []api.Team) []api.
 			enriched[idx].Plan = teamPlanResponse(limits.TeamPlan(r.Context(), team.ID))
 		}
 
-		analyticsStore := h.ctx.Store
-		if h.ctx.TenantStores != nil {
-			store, err := h.ctx.TenantStores.ForTenant(r.Context(), team.ID)
-			if err != nil {
-				slog.Warn("Failed to resolve analytics store for team usage", "error", err, "team_id", team.ID)
-				continue
-			}
-			analyticsStore = store
-		}
-
-		usage, err := h.ctx.Store.BuildTeamUsageSummary(r.Context(), team.ID, analyticsStore)
+		usage, err := h.ctx.Store.BuildTeamUsageSummary(r.Context(), team.ID)
 		if err != nil {
 			slog.Warn("Failed to build team usage summary", "error", err, "team_id", team.ID)
 			continue
@@ -354,7 +345,7 @@ func (h *handler) handleSetActiveTeam() http.HandlerFunc {
 		}
 
 		if err := h.ctx.Store.SetActiveTenantID(r.Context(), userID, teamID); err != nil {
-			if errors.Is(err, database.ErrTenantMembershipRequired) {
+			if errors.Is(err, controlstore.ErrTenantMembershipRequired) {
 				http.Error(w, "Access denied", http.StatusForbidden)
 				return
 			}

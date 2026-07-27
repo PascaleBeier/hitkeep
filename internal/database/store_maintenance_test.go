@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"hitkeep/internal/controlstore"
 )
 
 func maintenanceRunning(s *Store) bool {
@@ -18,24 +20,17 @@ func maintenanceRunning(s *Store) bool {
 	return s.maintenanceCancel != nil
 }
 
-func insertTestTenant(t *testing.T, store *Store) uuid.UUID {
+func insertTestTenant(t *testing.T, store *controlstore.Store) uuid.UUID {
 	t.Helper()
-	tenantID := uuid.New()
-	if _, err := store.DB().ExecContext(context.Background(),
-		"INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
-		tenantID, "Maintenance Tenant", time.Now().UTC(),
-	); err != nil {
-		t.Fatalf("insert tenant: %v", err)
-	}
-	return tenantID
+	return newManagerTestTenant(t, store, "Maintenance Tenant")
 }
 
 func TestTenantStoreOpenedAfterStartMaintenanceRunsCheckpoints(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
-	shared := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(shared, t.TempDir())
+	shared := newControlTestStore(t)
+	mgr := NewTenantStoreManager(shared, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 	mgr.StartMaintenance(ctx)
 
@@ -52,8 +47,8 @@ func TestTenantStoreOpenedBeforeStartMaintenanceRunsCheckpoints(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
-	shared := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(shared, t.TempDir())
+	shared := newControlTestStore(t)
+	mgr := NewTenantStoreManager(shared, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	tenantStore, err := mgr.ForTenant(ctx, insertTestTenant(t, shared))
@@ -104,8 +99,8 @@ func TestCloseIsIdempotentAndQueriesReturnClosedError(t *testing.T) {
 }
 
 func TestTenantStoreManagerForwardsFatalErrorsAndAvailability(t *testing.T) {
-	shared := newSharedTestStore(t)
-	mgr := NewTenantStoreManager(shared, t.TempDir())
+	shared := newControlTestStore(t)
+	mgr := NewTenantStoreManager(shared, t.TempDir(), nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	tenantID := uuid.New()
@@ -170,7 +165,7 @@ func TestTenantStoreInvalidationDefersRecoveryUntilRestart(t *testing.T) {
 
 func TestTenantStoreOpenRecoveryFailureRequestsControlledRestart(t *testing.T) {
 	ctx := context.Background()
-	shared := newSharedTestStore(t)
+	shared := newControlTestStore(t)
 	basePath := t.TempDir()
 	tenantID := insertTestTenant(t, shared)
 	dbPath := filepath.Join(basePath, "tenants", tenantID.String(), "hitkeep.db")
@@ -207,7 +202,7 @@ func TestTenantStoreOpenRecoveryFailureRequestsControlledRestart(t *testing.T) {
 		t.Fatalf("write pending tenant recovery marker: %v", err)
 	}
 
-	mgr := NewTenantStoreManager(shared, basePath)
+	mgr := NewTenantStoreManager(shared, basePath, nil)
 	t.Cleanup(func() { _ = mgr.Close() })
 	if _, err := mgr.ForTenant(ctx, tenantID); !errors.Is(err, errAutomaticWALRecoveryDisabled) {
 		t.Fatalf("expected tenant WAL recovery opt-in error, got %v", err)

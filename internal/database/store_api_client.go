@@ -16,6 +16,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
+	"hitkeep/internal/controlstore"
 )
 
 var (
@@ -28,13 +29,7 @@ const (
 	APIClientOwnerTeam     = "team"
 )
 
-type APIClientAuth struct {
-	ClientID     uuid.UUID
-	UserID       uuid.UUID
-	TenantID     uuid.UUID
-	InstanceRole auth.InstanceRole
-	SiteRoles    map[uuid.UUID]auth.SiteRole
-}
+type APIClientAuth = controlstore.APIClientAuth
 
 func (s *Store) CreateAPIClient(
 	ctx context.Context,

@@ -7,15 +7,16 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"testing"
 
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/config"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/testutil"
 	"hitkeep/internal/webhooks"
 )
 
@@ -29,20 +30,11 @@ func (e *recordingWebhookEmitter) Emit(_ context.Context, event webhooks.Event) 
 	return webhooks.Emission{EventID: uuid.New()}, e.err
 }
 
-func setupTenantGoalsTestEnv(t *testing.T) (*handler, *database.Store, *database.Store, uuid.UUID) {
+func setupTenantGoalsTestEnv(t *testing.T) (*handler, *controlstore.Store, *database.Store, uuid.UUID) {
 	t.Helper()
 
 	ctx := context.Background()
-	basePath := t.TempDir()
-	store := database.NewStore(filepath.Join(basePath, "hitkeep.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect shared store: %v", err)
-	}
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate shared store: %v", err)
-	}
-
-	tenantMgr := database.NewTenantStoreManager(store, basePath)
+	store, tenantMgr := testutil.NewControlAndTenantStores(t)
 
 	t.Cleanup(func() {
 		_ = tenantMgr.Close()
@@ -66,6 +58,9 @@ func setupTenantGoalsTestEnv(t *testing.T) (*handler, *database.Store, *database
 	if err != nil {
 		t.Fatalf("create site: %v", err)
 	}
+	if err := tenantMgr.SyncSite(ctx, site.ID); err != nil {
+		t.Fatalf("sync site: %v", err)
+	}
 
 	tenantStore, err := tenantMgr.ForTenant(ctx, team.ID)
 	if err != nil {
@@ -84,7 +79,7 @@ func setupTenantGoalsTestEnv(t *testing.T) (*handler, *database.Store, *database
 }
 
 func TestHandleGoalCRUDUsesTenantAnalyticsStore(t *testing.T) {
-	h, sharedStore, tenantStore, siteID := setupTenantGoalsTestEnv(t)
+	h, _, tenantStore, siteID := setupTenantGoalsTestEnv(t)
 	ctx := context.Background()
 	emitter := &recordingWebhookEmitter{err: errors.New("webhook storage unavailable")}
 	h.ctx.Webhooks = emitter
@@ -108,14 +103,6 @@ func TestHandleGoalCRUDUsesTenantAnalyticsStore(t *testing.T) {
 	}
 	if len(emitter.events) != 1 || emitter.events[0].Type != webhooks.EventGoalCreated || emitter.events[0].SiteID == nil || *emitter.events[0].SiteID != siteID {
 		t.Fatalf("expected non-blocking goal.created event, got %+v", emitter.events)
-	}
-
-	sharedGoals, err := sharedStore.GetGoals(ctx, siteID)
-	if err != nil {
-		t.Fatalf("shared GetGoals: %v", err)
-	}
-	if len(sharedGoals) != 0 {
-		t.Fatalf("analytics writes must not reach the control store, got %d shared goals", len(sharedGoals))
 	}
 
 	tenantGoals, err := tenantStore.GetGoals(ctx, siteID)
@@ -177,17 +164,10 @@ func TestHandleGoalCRUDUsesTenantAnalyticsStore(t *testing.T) {
 		t.Fatalf("expected tenant goal to be deleted, got %d remaining", len(tenantGoals))
 	}
 
-	sharedGoals, err = sharedStore.GetGoals(ctx, siteID)
-	if err != nil {
-		t.Fatalf("shared GetGoals after delete: %v", err)
-	}
-	if len(sharedGoals) != 0 {
-		t.Fatalf("analytics delete must not touch the control store, got %d remaining", len(sharedGoals))
-	}
 }
 
 func TestHandleGetFunnelsUsesTenantAnalyticsStore(t *testing.T) {
-	h, sharedStore, tenantStore, siteID := setupTenantGoalsTestEnv(t)
+	h, _, tenantStore, siteID := setupTenantGoalsTestEnv(t)
 	ctx := context.Background()
 
 	err := tenantStore.CreateFunnel(ctx, &api.Funnel{
@@ -200,14 +180,6 @@ func TestHandleGetFunnelsUsesTenantAnalyticsStore(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("create funnel in tenant store: %v", err)
-	}
-
-	sharedFunnels, err := sharedStore.GetFunnels(ctx, siteID)
-	if err != nil {
-		t.Fatalf("shared GetFunnels: %v", err)
-	}
-	if len(sharedFunnels) != 0 {
-		t.Fatalf("expected no funnels in shared store, got %d", len(sharedFunnels))
 	}
 
 	getReq := httptest.NewRequest(http.MethodGet, "/api/sites/"+siteID.String()+"/funnels", nil)

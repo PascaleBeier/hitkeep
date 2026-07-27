@@ -74,7 +74,12 @@ export interface DuckDBMemoryStat {
 }
 
 export interface SystemStorage {
+    control_db_path: string;
+    control_db_bytes: number;
+    tenant_duckdb_memory?: DuckDBMemoryStat[];
+    /** @deprecated compatibility alias for control_db_path */
     shared_db_path: string;
+    /** @deprecated compatibility alias for control_db_bytes */
     shared_db_bytes: number;
     data_path: string;
     tenant_db_count: number;
@@ -83,6 +88,7 @@ export interface SystemStorage {
     backup_path: string;
     disk_available_bytes: number;
     disk_total_bytes: number;
+    /** @deprecated compatibility alias for tenant_duckdb_memory */
     duckdb_memory?: DuckDBMemoryStat[];
 }
 

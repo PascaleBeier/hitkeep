@@ -15,6 +15,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/assetstore"
+	"hitkeep/internal/controlstore"
 	"hitkeep/internal/database"
 )
 
@@ -37,7 +38,7 @@ type qrCampaignSeedFixture struct {
 	withShare      bool
 }
 
-func seedQRCampaigns(ctx context.Context, sharedStore, analyticsStore *database.Store, siteID, userID uuid.UUID, domain string, numDays int, dataPath string, rng *mrand.Rand) (seedStats, error) {
+func seedQRCampaigns(ctx context.Context, sharedStore *controlstore.Store, analyticsStore *database.Store, siteID, userID uuid.UUID, domain string, numDays int, dataPath string, rng *mrand.Rand) (seedStats, error) {
 	fixtures := qrCampaignSeedFixtures(domain)
 	stats := seedStats{}
 	var batch seedWriteBatch
@@ -214,7 +215,7 @@ func qrCampaignSeedFixtures(domain string) []qrCampaignSeedFixture {
 	}
 }
 
-func seedQRCodeAsset(ctx context.Context, store *database.Store, dataPath string, siteID, qrID uuid.UUID) error {
+func seedQRCodeAsset(ctx context.Context, store *controlstore.Store, dataPath string, siteID, qrID uuid.UUID) error {
 	data, err := base64.StdEncoding.DecodeString(seedQRLogoPNGBase64)
 	if err != nil {
 		return err

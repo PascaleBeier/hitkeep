@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"hitkeep/internal/controlstore"
 )
 
 var ErrAIBudgetExhausted = errors.New("ai budget exhausted")
@@ -55,10 +57,7 @@ type AIRunParams struct {
 	CreatedAt       time.Time
 }
 
-type AIUsageSummary struct {
-	Requests int
-	Tokens   int
-}
+type AIUsageSummary = controlstore.AIUsageSummary
 
 type AIRunSummary struct {
 	LastSuccessAt     *time.Time
@@ -66,29 +65,7 @@ type AIRunSummary struct {
 	LastErrorCategory string
 }
 
-type AskAIHistoryEntry struct {
-	RunID               uuid.UUID
-	CreatedAt           time.Time
-	Status              string
-	ErrorCategory       string
-	Provider            string
-	Model               string
-	TemplateVersion     string
-	InputHash           string
-	OutputHash          string
-	AnswerChars         int
-	CitationCount       int
-	ChartCount          int
-	ActionCount         int
-	ChartTypes          []string
-	ActionTypes         []string
-	InputTokens         int
-	OutputTokens        int
-	TotalTokens         int
-	ToolCallCount       int
-	LifecycleEventCount int
-	ToolNames           []string
-}
+type AskAIHistoryEntry = controlstore.AskAIHistoryEntry
 
 type preparedAIRun struct {
 	ID                  uuid.UUID
