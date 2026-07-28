@@ -268,13 +268,6 @@ describe('RangeToolbar', () => {
         return translatedTimeRanges().map((option) => option.shortLabel);
     };
 
-    const datePickerFormat = (toolbar: RangeToolbar) => {
-        const { datePickerDateFormat } = toolbar as unknown as {
-            datePickerDateFormat: Signal<string>;
-        };
-        return datePickerDateFormat();
-    };
-
     const datePickerHourFormat = (toolbar: RangeToolbar) => {
         const { datePickerHourFormat } = toolbar as unknown as {
             datePickerHourFormat: Signal<'12' | '24'>;
@@ -430,14 +423,14 @@ describe('RangeToolbar', () => {
     });
 
     it('uses the active locale for the custom date picker format', async () => {
-        expect(datePickerFormat(component)).toBe('mm/dd/yy');
+        expect(OptimusUI.translation.dateFormat).toBe('mm/dd/yy');
         expect(datePickerHourFormat(component)).toBe('12');
 
         transloco.setActiveLang('de');
         fixture.detectChanges();
         await fixture.whenStable();
 
-        expect(datePickerFormat(component)).toBe('dd.mm.yy');
+        expect(OptimusUI.translation.dateFormat).toBe('dd.mm.yy');
         expect(datePickerHourFormat(component)).toBe('24');
     });
 
@@ -445,6 +438,7 @@ describe('RangeToolbar', () => {
         expect(OptimusUI.translation.dayNames?.[0]).toBe('Sunday');
         expect(OptimusUI.translation.monthNames?.[0]).toBe('January');
         expect(OptimusUI.translation.firstDayOfWeek).toBe(0);
+        expect(OptimusUI.translation.aria?.firstPageLabel).toBe('First Page');
 
         transloco.setActiveLang('de');
         fixture.detectChanges();
@@ -453,5 +447,6 @@ describe('RangeToolbar', () => {
         expect(OptimusUI.translation.dayNames?.[0]).toBe('Sonntag');
         expect(OptimusUI.translation.monthNames?.[0]).toBe('Januar');
         expect(OptimusUI.translation.firstDayOfWeek).toBe(1);
+        expect(OptimusUI.translation.aria?.firstPageLabel).toBe('Erste Seite');
     });
 });

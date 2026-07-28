@@ -1,6 +1,6 @@
 @import "@fontsource-variable/lexend";
 @import "tailwindcss" source(none);
-@import "tailwindcss-primeui";
+@import "@openng/optimus-ui-tailwindcss";
 @custom-variant dark (&:where(.p-dark, .p-dark *));
 @source "./app";
 @source "./index.html";

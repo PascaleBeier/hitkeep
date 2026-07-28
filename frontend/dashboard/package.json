@@ -34,7 +34,11 @@
         "@angular/router": "^22.0.8",
         "@fontsource-variable/lexend": "^5.3.0",
         "@jsverse/transloco-locale": "^8.4.0",
+        "@openng/icons": "^1.0.0",
         "@openng/optimus-ui": "^1.0.0-rc.2",
+        "@openng/optimus-ui-locale": "^1.0.0-rc.2",
+        "@openng/optimus-ui-tailwindcss": "^1.0.0-rc.2",
+        "@openng/optimus-ui-themes": "^1.0.0-rc.2",
         "@scalar/api-reference": "^1.63.0",
         "@tailwindcss/postcss": "^4.3.3",
         "circle-flags": "^2.8.3",
@@ -45,11 +49,8 @@
         "qr-code-styling": "^1.9.2",
         "rxjs": "~7.8.2",
         "tailwindcss": "^4.3.3",
-        "tailwindcss-primeui": "^0.6.1",
         "tslib": "^2.8.1",
-        "web-vitals": "^6.0.1",
-        "@openng/icons": "^1.0.0",
-        "@openng/optimus-ui-themes": "^1.0.0-rc.2"
+        "web-vitals": "^6.0.1"
     },
     "devDependencies": {
         "@angular-devkit/schematics": "^22.0.8",

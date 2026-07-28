@@ -1,6 +1,7 @@
 import { ApplicationConfig, inject, isDevMode, provideBrowserGlobalErrorListeners, provideEnvironmentInitializer, provideZonelessChangeDetection } from '@angular/core';
 import { PreloadAllModules, provideRouter, withPreloading } from '@angular/router';
 import { provideOptimus } from '@openng/optimus-ui/config';
+import { en } from '@openng/optimus-ui-locale/js/en.js';
 
 import { routes } from './app.routes';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
@@ -24,6 +25,7 @@ export const appConfig: ApplicationConfig = {
         provideHttpClient(withInterceptors([shareInterceptor, authInterceptor, basePathInterceptor])),
         provideRouter(routes, withPreloading(PreloadAllModules)),
         provideOptimus({
+            translation: en,
             theme: {
                 preset: HitKeepPreset,
                 options: { darkModeSelector: '.p-dark' }
