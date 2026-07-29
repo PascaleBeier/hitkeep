@@ -7,6 +7,58 @@
 * Split default-tenant analytics into `data/tenants/<tenant-id>/hitkeep.db` and run tenant files through one attached DuckDB data plane. This migration is mandatory in 2.13.0. Downgrading a split installation to 2.12 or older is unsupported because those releases do not understand the tenant file or split markers; restore a complete pre-upgrade backup instead.
 * Restore every tenant database from S3 backup snapshots by deriving tenant object prefixes from the restored control snapshot, including temporary STS credentials and non-TLS S3-compatible endpoints.
 
+## [2.13.0](https://github.com/PascaleBeier/hitkeep/compare/v2.12.0...v2.13.0) (2026-07-29)
+
+
+### Features
+
+* **ai:** embedded multi-source AI agent master list and classification pipeline ([c57b5f1](https://github.com/PascaleBeier/hitkeep/commit/c57b5f1a66d4f4386fed9d48223c7cb8f16e144c))
+* **api:** unified AI activity report, setup state, and AI analytics surface ([651b7d8](https://github.com/PascaleBeier/hitkeep/commit/651b7d84783849af1398201a36fc72bb1a9f2780))
+* **auth:** add social sign-in ([e67252a](https://github.com/PascaleBeier/hitkeep/commit/e67252a332b7709e5bb8a2fb03b1571efb7ae88d))
+* automate release metadata and configuration docs ([1612f78](https://github.com/PascaleBeier/hitkeep/commit/1612f7883e04ee3414d797b2aaf37fd8c71fb65d))
+* **dashboard:** install-method switcher for the site tracking tab ([e4af0bc](https://github.com/PascaleBeier/hitkeep/commit/e4af0bcdc8eea95902461c1934acf6c95b88c00d))
+* **dashboard:** unified AI Agents page, dashboard AI cards, and setup callouts ([75bea8a](https://github.com/PascaleBeier/hitkeep/commit/75bea8a0f1114f0959d5ff6a94d368a8d8f16c59))
+* **database:** split default tenant data plane ([#272](https://github.com/PascaleBeier/hitkeep/issues/272)) ([1a4f49c](https://github.com/PascaleBeier/hitkeep/commit/1a4f49c254f88587ffe00168e7ba49bbcb2fb73b)), closes [#259](https://github.com/PascaleBeier/hitkeep/issues/259) [#236](https://github.com/PascaleBeier/hitkeep/issues/236)
+* **dev:** add unified developer platform ([#252](https://github.com/PascaleBeier/hitkeep/issues/252)) ([96cba3e](https://github.com/PascaleBeier/hitkeep/commit/96cba3e084fdf2ae1d5641be2139e3a063f9181c))
+* **dev:** centralize MCP and local auth setup ([7cbc4a0](https://github.com/PascaleBeier/hitkeep/commit/7cbc4a02c39f69d745f1a94ec820767c227ed351))
+* **goals:** filter custom events in traffic records ([50071d9](https://github.com/PascaleBeier/hitkeep/commit/50071d91d5cd23fe7d10e9d738fe95e7746e8bc8)), closes [#275](https://github.com/PascaleBeier/hitkeep/issues/275)
+* **reports:** add configurable scheduled reporting ([4ee9546](https://github.com/PascaleBeier/hitkeep/commit/4ee9546aca267f0466064c375a90d5a1665f6733))
+* **reports:** consolidate scheduled reporting ([cdd3ade](https://github.com/PascaleBeier/hitkeep/commit/cdd3adeebae70b056e72f0052ea5f3229189af7e))
+* **security:** migrate Spamhaus feeds to JSON ([#256](https://github.com/PascaleBeier/hitkeep/issues/256)) ([f385131](https://github.com/PascaleBeier/hitkeep/commit/f38513115745e67b78c418ce2a489f2d0697897f))
+* **tracker:** publish @hitkeep/tracker npm package ([#269](https://github.com/PascaleBeier/hitkeep/issues/269)) ([7227d5d](https://github.com/PascaleBeier/hitkeep/commit/7227d5d9abaea614e5855a098c486728f6941f66))
+* Unify design tokens ([f1cf602](https://github.com/PascaleBeier/hitkeep/commit/f1cf602c21f9225348a04246b6ea0c5f910eb7ac))
+* unify traffic controls and operational tooling ([a594349](https://github.com/PascaleBeier/hitkeep/commit/a594349b51a0989026b4ed2a74ae513f05f6c461))
+
+
+### Bug Fixes
+
+* add valid Docker build argument defaults ([35d90f3](https://github.com/PascaleBeier/hitkeep/commit/35d90f3966e69b2112329b13324bbe9047d6bd68))
+* **auth:** explain session endings on the login screen ([a23ab78](https://github.com/PascaleBeier/hitkeep/commit/a23ab788e73b1dcce583fb514f1f9e4099c5e196))
+* Bump deps ([8d20b91](https://github.com/PascaleBeier/hitkeep/commit/8d20b9154e264fe341b07f2b56e42045dc12c6a8))
+* **ci:** bootstrap canonical npm before caching ([091eef5](https://github.com/PascaleBeier/hitkeep/commit/091eef5b1408fe76ef8f0c490c9c2767e8685dbf))
+* **database:** add automatic recovery and checkpoints ([0129d2c](https://github.com/PascaleBeier/hitkeep/commit/0129d2c7ed406c64d2868a626b9c7a7f69ca260c))
+* **database:** Add migration guard ([d801cf0](https://github.com/PascaleBeier/hitkeep/commit/d801cf0602acde2019a12918876b6998d03f5820))
+* **database:** include migration guard implementation ([79af19b](https://github.com/PascaleBeier/hitkeep/commit/79af19b8a1959bd3abda309f9470f7b46c1f523f))
+* **database:** Mitigate corrupted indexes ([de8e979](https://github.com/PascaleBeier/hitkeep/commit/de8e979bd732832bcb19518aa08278c8dfa69c09))
+* **database:** serialize social confirmation consumption ([8e5b1a6](https://github.com/PascaleBeier/hitkeep/commit/8e5b1a677670e1f0603fa0fd388c9bf6f237a1b7))
+* **deps:** Bump frontend deps ([bee6bac](https://github.com/PascaleBeier/hitkeep/commit/bee6bac7c684c8303090088581dbea36eb2c0af3))
+* **deps:** Bump go dependencies ([e450e91](https://github.com/PascaleBeier/hitkeep/commit/e450e917cea555b5f5e80557a9f47a4a7b71d971))
+* **deps:** Bump go deps ([a6995f0](https://github.com/PascaleBeier/hitkeep/commit/a6995f023c3736d0e5a2433873f9ae2c87bdf61c))
+* **deps:** resolve frontend audit findings ([4c14315](https://github.com/PascaleBeier/hitkeep/commit/4c143156e45b7a35aef595ab20b48abe7626b3b2))
+* **dev:** preserve forwarded progress notifications ([794ee83](https://github.com/PascaleBeier/hitkeep/commit/794ee835d0dc53a7dc49be145944172b6d5b2357))
+* **devtool:** serve object-form MCP tool schemas ([549803d](https://github.com/PascaleBeier/hitkeep/commit/549803d29fa668a5bedc6a15d882fcbe9f913d6f))
+* **frontend:** Migrate to OptimusUI ([6b09350](https://github.com/PascaleBeier/hitkeep/commit/6b09350ca8ad43b282781727801088521814907f))
+* **frontend:** Migrate to OptimusUI ([ab7d114](https://github.com/PascaleBeier/hitkeep/commit/ab7d114d2bcff1b0c6f9c6da9fcb7938a5007b05))
+* **frontend:** provide recoverable application failure states ([5e11d82](https://github.com/PascaleBeier/hitkeep/commit/5e11d827a73f2e2fe1ff61e4336306401abfd095))
+* **frontend:** update web vitals metric fixture ([d1532f3](https://github.com/PascaleBeier/hitkeep/commit/d1532f3c2894aa06c150ff205e0b2707fd701480))
+* **i18n:** Move handrolled component translations to OptimusUI ([3f2b5b7](https://github.com/PascaleBeier/hitkeep/commit/3f2b5b7eb0c7912d0a5d9ea73b2c9846f27855ef))
+* **tracker:** defer analytics during prerender ([f6e7bc8](https://github.com/PascaleBeier/hitkeep/commit/f6e7bc82355aebd03d082ffdebf2eab9c72743b6)), closes [#271](https://github.com/PascaleBeier/hitkeep/issues/271)
+
+
+### Performance Improvements
+
+* **ipmeta:** add block-addressable lookup assets ([4f43357](https://github.com/PascaleBeier/hitkeep/commit/4f4335732d2e7bae88c0dbbcd504d7ee9c8a081f))
+
 ## [2.12.0](https://github.com/PascaleBeier/hitkeep/compare/v2.11.0...v2.12.0) (2026-07-14)
 
 
