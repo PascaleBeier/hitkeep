@@ -657,7 +657,7 @@ async function run() {
       await captureAskAI(page, record);
     } else {
       console.log("  Dashboard:");
-      await captureRoute(page, record, "dashboard-overview", "/ai-agents", CHART_SETTLE);
+      await captureRoute(page, record, "dashboard-overview", "/dashboard", CHART_SETTLE);
       record("feature-onboarding-checklist", await shoot(page, "feature-onboarding-checklist"));
 
     if (await openTeamSwitcher(page)) {
