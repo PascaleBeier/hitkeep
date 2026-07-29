@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-25T01:46:38.438583Z",
+  "generated_at": "2026-07-29T11:29:39.505474Z",
   "sources": {
     "ai_robots_txt": "https://raw.githubusercontent.com/ai-robots-txt/ai.robots.txt/main/robots.json",
     "crawler_user_agents": "https://raw.githubusercontent.com/monperrus/crawler-user-agents/master/crawler-user-agents.json",
@@ -969,11 +969,10 @@
       "family": "Google-NotebookLM",
       "category": "ai_assistant",
       "respects_robots_txt": "unclear",
-      "url": "https://developers.google.com/crawling/docs/crawlers-fetchers/google-user-triggered-fetchers",
+      "url": "https://developers.google.com/search/docs/crawling-indexing/google-user-triggered-fetchers",
       "sources": [
         "ai_robots_txt",
-        "crawler_user_agents",
-        "device_detector_bots"
+        "crawler_user_agents"
       ]
     },
     {
@@ -1306,13 +1305,37 @@
       ]
     },
     {
+      "token": "kimi-searchbot",
+      "name": "Kimi-SearchBot",
+      "family": "Moonshot AI Pte. Ltd.",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "unclear",
+      "url": "https://www.kimi.com/policies/kimi-crawlers",
+      "sources": [
+        "device_detector_bots"
+      ]
+    },
+    {
       "token": "kimi-user",
       "name": "Kimi-User",
       "family": "Moonshot AI that fetches web content on behalf of users interacting with Kimi",
       "category": "ai_assistant",
       "respects_robots_txt": "unclear",
+      "url": "https://www.kimi.com/policies/kimi-crawlers",
       "sources": [
-        "ai_robots_txt"
+        "ai_robots_txt",
+        "device_detector_bots"
+      ]
+    },
+    {
+      "token": "kimibot",
+      "name": "KimiBot",
+      "family": "Moonshot AI Pte. Ltd.",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "url": "https://www.kimi.com/policies/kimi-crawlers",
+      "sources": [
+        "device_detector_bots"
       ]
     },
     {
@@ -1475,6 +1498,17 @@
       "url": "https://developers.facebook.com/docs/sharing/webmasters/web-crawlers/",
       "sources": [
         "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "mistralai-index",
+      "name": "MistralAI-Index",
+      "family": "Mistral AI",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "unclear",
+      "url": "https://docs.mistral.ai/robots",
+      "sources": [
+        "device_detector_bots"
       ]
     },
     {
