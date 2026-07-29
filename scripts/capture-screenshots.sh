@@ -229,6 +229,10 @@ else
   for screenshot in "${README_SCREENSHOTS[@]}"; do
     source_path="$OUTPUT_DIR/$screenshot"
     if [[ ! -f "$source_path" ]]; then
+      if [[ -f "$REPO_DIR/.github/assets/$screenshot" ]]; then
+        echo "  ↻ Keeping existing README screenshot: $screenshot"
+        continue
+      fi
       echo "  ✗ Missing README screenshot: $source_path" >&2
       exit 1
     fi

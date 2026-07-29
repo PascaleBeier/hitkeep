@@ -115,8 +115,8 @@ More tracking guides:
 <details>
 <summary>See six product screenshots</summary>
 
-### Dashboard
-![HitKeep analytics dashboard with traffic overview, geographic breakdown, goals, funnels, and UTM attribution](./.github/assets/dashboard-overview.png)
+### AI dashboard
+![HitKeep AI Agents dashboard with AI request, referral, crawl, and pageview analytics](./.github/assets/dashboard-overview.png)
 
 ### Ecommerce
 ![HitKeep ecommerce analytics with revenue KPIs, chart, top products, and revenue sources](./.github/assets/analytics-ecommerce.png)

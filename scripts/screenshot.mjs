@@ -657,7 +657,7 @@ async function run() {
       await captureAskAI(page, record);
     } else {
       console.log("  Dashboard:");
-      await captureRoute(page, record, "dashboard-overview", "/dashboard", CHART_SETTLE);
+      await captureRoute(page, record, "dashboard-overview", "/ai-agents", CHART_SETTLE);
       record("feature-onboarding-checklist", await shoot(page, "feature-onboarding-checklist"));
 
     if (await openTeamSwitcher(page)) {
@@ -690,20 +690,25 @@ async function run() {
 
     const siteSettingsBtn = page.getByRole("button", { name: /site settings/i }).first();
     if (await siteSettingsBtn.count()) {
-      await siteSettingsBtn.click();
-      await page.getByRole("heading", { name: /site settings/i }).waitFor({ state: "visible", timeout: 8_000 });
-      if (await clickTab(page, "tracking", FORM_SETTLE)) {
-        await page.getByText(/live tracking verifier/i).first().waitFor({ state: "visible", timeout: 8_000 });
-        record("feature-tracking-verifier", await shoot(page, "feature-tracking-verifier"));
-        await page.getByText(/automatic event tracking/i).first().waitFor({ state: "visible", timeout: 8_000 });
-        record("feature-site-tracking", await shoot(page, "feature-site-tracking"));
+      try {
+        await siteSettingsBtn.click();
+        await page.getByRole("heading", { name: /site settings/i }).waitFor({ state: "visible", timeout: 8_000 });
+        if (await clickTab(page, "tracking", FORM_SETTLE)) {
+          await page.getByText(/live tracking verifier/i).first().waitFor({ state: "visible", timeout: 8_000 });
+          record("feature-tracking-verifier", await shoot(page, "feature-tracking-verifier"));
+          await page.getByText(/automatic event tracking/i).first().waitFor({ state: "visible", timeout: 8_000 });
+          record("feature-site-tracking", await shoot(page, "feature-site-tracking"));
+        }
+        if (await clickTab(page, "team", FORM_SETTLE)) {
+          await page.getByRole("heading", { name: /transfer site/i }).waitFor({ state: "visible", timeout: 8_000 });
+          record("feature-site-transfer", await shoot(page, "feature-site-transfer"));
+        }
+      } catch (error) {
+        console.warn(`    ! Site settings screenshots unavailable, continuing: ${error.message}`);
+      } finally {
+        await page.keyboard.press("Escape").catch(() => {});
+        await page.waitForTimeout(300);
       }
-      if (await clickTab(page, "team", FORM_SETTLE)) {
-        await page.getByRole("heading", { name: /transfer site/i }).waitFor({ state: "visible", timeout: 8_000 });
-        record("feature-site-transfer", await shoot(page, "feature-site-transfer"));
-      }
-      await page.keyboard.press("Escape");
-      await page.waitForTimeout(300);
     } else {
       console.warn("    ! Site settings button not found, skipping team transfer screenshot");
     }
