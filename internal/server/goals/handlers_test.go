@@ -249,6 +249,14 @@ func TestHandleUpdateFunnelPreservesIdentityAndReturnsNotFound(t *testing.T) {
 	if err := tenantStore.CreateFunnel(ctx, &funnel); err != nil {
 		t.Fatalf("create funnel: %v", err)
 	}
+	storedFunnels, err := tenantStore.GetFunnels(ctx, siteID)
+	if err != nil {
+		t.Fatalf("get created funnel: %v", err)
+	}
+	if len(storedFunnels) != 1 {
+		t.Fatalf("expected one stored funnel, got %d", len(storedFunnels))
+	}
+	persistedCreatedAt := storedFunnels[0].CreatedAt
 
 	body, _ := json.Marshal(api.Funnel{
 		Name: "Updated checkout",
@@ -269,7 +277,7 @@ func TestHandleUpdateFunnelPreservesIdentityAndReturnsNotFound(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&updated); err != nil {
 		t.Fatalf("decode updated funnel: %v", err)
 	}
-	if updated.ID != funnel.ID || !updated.CreatedAt.Equal(funnel.CreatedAt) || updated.Name != "Updated checkout" || updated.Steps[0].Type != "event" {
+	if updated.ID != funnel.ID || !updated.CreatedAt.Equal(persistedCreatedAt) || updated.Name != "Updated checkout" || updated.Steps[0].Type != "event" {
 		t.Fatalf("expected stable funnel identity and updated definition, got %+v", updated)
 	}
 
