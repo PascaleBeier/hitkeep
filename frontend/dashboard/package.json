@@ -2,7 +2,7 @@
     "name": "@hitkeep/dashboard",
     "license": "MIT",
     "version": "2.13.0",
-    "packageManager": "npm@12.0.1",
+    "packageManager": "npm@12.0.2",
     "scripts": {
         "ng": "ng",
         "start": "ng serve",
@@ -80,7 +80,7 @@
     },
     "engines": {
         "node": "24.18.0",
-        "npm": "12.0.1"
+        "npm": "12.0.2"
     },
     "devEngines": {
         "runtime": {
@@ -90,7 +90,7 @@
         },
         "packageManager": {
             "name": "npm",
-            "version": "12.0.1",
+            "version": "12.0.2",
             "onFail": "error"
         }
     },

@@ -19,7 +19,7 @@ func TestToolchainConfigUsesCanonicalVersionFiles(t *testing.T) {
 	for name, body := range map[string]string{
 		"go.mod":                          "module example.test\n\ngo 1.26.5\n",
 		"frontend/dashboard/.nvmrc":       "24.18.0\n",
-		"frontend/dashboard/package.json": `{"packageManager":"npm@12.0.1"}`,
+		"frontend/dashboard/package.json": `{"packageManager":"npm@12.0.2"}`,
 	} {
 		if err := os.WriteFile(filepath.Join(root, name), []byte(body), 0o600); err != nil {
 			t.Fatal(err)
@@ -33,7 +33,7 @@ func TestToolchainConfigUsesCanonicalVersionFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if config.Go != "1.26.5" || config.Node != "24.18.0" || config.NPM != "12.0.1" {
+	if config.Go != "1.26.5" || config.Node != "24.18.0" || config.NPM != "12.0.2" {
 		t.Fatalf("unexpected toolchain: %+v", config)
 	}
 }

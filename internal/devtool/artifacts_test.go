@@ -8,8 +8,8 @@ import (
 )
 
 func TestExactNPMCommandPinsEveryInvocation(t *testing.T) {
-	want := []string{"npx", "--yes", "npm@12.0.1", "run", "build:prod"}
-	if got := exactNPMCommand("12.0.1", "run", "build:prod"); !slices.Equal(got, want) {
+	want := []string{"npx", "--yes", "npm@12.0.2", "run", "build:prod"}
+	if got := exactNPMCommand("12.0.2", "run", "build:prod"); !slices.Equal(got, want) {
 		t.Fatalf("exact npm command = %v, want %v", got, want)
 	}
 }
