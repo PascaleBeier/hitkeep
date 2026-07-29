@@ -62,7 +62,6 @@ export class UserMenuService {
                 catchError(() => of(null)),
                 finalize(() => {
                     this.isSigningOut = false;
-                    this.router.navigate(['/login']);
                 })
             )
             .subscribe();

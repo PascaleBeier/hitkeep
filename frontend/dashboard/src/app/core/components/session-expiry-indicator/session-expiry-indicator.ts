@@ -30,6 +30,6 @@ export class SessionExpiryIndicator {
     }
 
     signOut() {
-        this.auth.logout().subscribe();
+        this.auth.logout().subscribe({ error: () => undefined });
     }
 }

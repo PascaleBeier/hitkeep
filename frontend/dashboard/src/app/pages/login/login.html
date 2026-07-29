@@ -8,7 +8,9 @@
             </header>
 
             <form (submit)="onSubmit($event)" class="hk-auth-form" novalidate>
-                @if (errorMessage(); as errorMessageKey) {
+                @if (sessionEndNotice(); as sessionEndNotice) {
+                <p-message [severity]="sessionEndNotice.severity" icon="pi pi-info-circle" role="status" aria-live="polite" aria-atomic="true">{{ sessionEndNotice.key | transloco }}</p-message>
+                } @if (errorMessage(); as errorMessageKey) {
                 <p-message severity="error" role="alert" aria-live="assertive">{{ errorMessageKey | transloco }}</p-message>
                 } @if (infoMessage(); as infoMessageKey) {
                 <p-message severity="success" icon="pi pi-envelope" role="status" aria-live="polite">{{ infoMessageKey | transloco }}</p-message>

@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, catchError, finalize, of, tap } from 'rxjs';
 
 import { PublicKeyCredentialAssertionJson, PublicKeyCredentialRequestOptionsJson } from '@core/utils/webauthn';
+import { SessionEndNavigationService } from '@services/session-end-navigation.service';
 
 export type AuthStatus = 'unknown' | 'authenticated' | 'unauthenticated';
 
@@ -99,6 +100,7 @@ export interface AuthSession {
 @Injectable({ providedIn: 'root' })
 export class AuthService {
     private http = inject(HttpClient);
+    private sessionEndNavigation = inject(SessionEndNavigationService);
     private ticker: ReturnType<typeof setInterval> | null = null;
     private socialMfaHandoff: SocialCompleteResponse | null = null;
     readonly status = signal<AuthStatus>('unknown');
@@ -195,7 +197,7 @@ export class AuthService {
     }
 
     logout(): Observable<void> {
-        return this.http.post<void>('/api/logout', {}).pipe(finalize(() => this.markUnauthenticated()));
+        return this.http.post<void>('/api/logout', {}).pipe(tap({ next: () => this.endSession('signed-out'), error: () => this.endSession('signed-out') }));
     }
 
     loadSession(): Observable<AuthSession | null> {
@@ -299,13 +301,18 @@ export class AuthService {
         this.stopTicker();
     }
 
+    private endSession(reason: 'signed-out' | 'session-ended') {
+        this.markUnauthenticated();
+        this.sessionEndNavigation.navigateToLogin(reason);
+    }
+
     private startTicker() {
         this.nowMs.set(Date.now());
         if (this.ticker) return;
         this.ticker = setInterval(() => {
             this.nowMs.set(Date.now());
             if (this.sessionExpired()) {
-                this.markUnauthenticated();
+                this.endSession('session-ended');
             }
         }, 1000);
         const nodeTimer = this.ticker as ReturnType<typeof setInterval> & {

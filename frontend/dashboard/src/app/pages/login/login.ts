@@ -24,10 +24,16 @@ import { CloudStatus } from '@models/analytics.types';
 import { AuthService, LoginResponse, PasskeyLoginFinishRequest, PasskeyLoginStartResponse, SocialProvider, SocialProviderID } from '@services/auth.service';
 import { AnalyticsService } from '@services/analytics.service';
 import { UserPreferencesService } from '@services/user-preferences.service';
+import { readSessionEndState, SessionEndReason } from '@services/session-end-navigation.service';
 import { toAssertionResponseJson, toPublicKeyRequestOptions } from '@core/utils/webauthn';
 
 type MfaFactor = 'totp' | 'passkey' | 'recovery_code' | 'email_link';
 type AuthMode = 'password' | 'sso' | 'social';
+
+const SESSION_END_NOTICES = {
+    'signed-out': { key: 'login.sessionEnded.signedOut', severity: 'success' },
+    'session-ended': { key: 'login.sessionEnded.expired', severity: 'warn' }
+} as const;
 
 @Component({
     selector: 'app-login',
@@ -60,6 +66,11 @@ export class Login {
     protected readonly authMode = signal<AuthMode>('password');
     protected errorMessage = signal<string | null>(null);
     protected infoMessage = signal<string | null>(null);
+    protected readonly sessionEndReason = signal<SessionEndReason | null>(null);
+    protected readonly sessionEndNotice = computed(() => {
+        const reason = this.sessionEndReason();
+        return reason ? SESSION_END_NOTICES[reason] : null;
+    });
     protected currentYear = new Date().getFullYear();
     protected readonly isPasskeySupported = signal(typeof window !== 'undefined' && typeof navigator !== 'undefined' && Boolean(window.PublicKeyCredential) && Boolean(navigator.credentials));
     protected readonly mfaChallengeToken = signal<string | null>(null);
@@ -159,6 +170,14 @@ export class Login {
     protected readonly loginForm = compatForm(this.loginModel);
 
     constructor() {
+        // Browser history state can outlive the navigation that created it. Only
+        // honour state carried by this router navigation, so a direct or reloaded
+        // /login URL never inherits an old session-ended notice.
+        const sessionEndState = readSessionEndState(this.router.getCurrentNavigation()?.extras.state);
+        if (sessionEndState) {
+            this.sessionEndReason.set(sessionEndState.reason);
+        }
+
         const requestedEmail = this.route.snapshot.queryParamMap.get('email')?.trim();
         const requestedSSO = this.route.snapshot.queryParamMap.get('method')?.trim().toLowerCase() === 'sso';
         if (requestedEmail) {

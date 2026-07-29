@@ -1,3 +1,4 @@
+import { Location } from '@angular/common';
 import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
@@ -8,6 +9,7 @@ import { vi } from 'vitest';
 import { Login } from '@pages/login/login';
 import { AnalyticsService } from '@services/analytics.service';
 import { AuthService } from '@services/auth.service';
+import { createSessionEndState, SESSION_END_STATE_KEY } from '@services/session-end-navigation.service';
 import { UserPreferencesService } from '@services/user-preferences.service';
 
 @Component({
@@ -44,7 +46,16 @@ describe('Login', () => {
         getSSOAvailability: vi.fn(() => of({ enabled: false })),
         getSocialProviders: vi.fn(() => of({ providers: [], signup_enabled: false })),
         startSocial: vi.fn(() => of({ auth_url: 'https://identity.example.com/authorize' })),
-        previewSocial: vi.fn(() => of({ provider: 'google', display_name: 'Google', observed_email: 'user@example.com', email_verified: true, email_confirmation_required: false, flow: 'login' })),
+        previewSocial: vi.fn(() =>
+            of({
+                provider: 'google',
+                display_name: 'Google',
+                observed_email: 'user@example.com',
+                email_verified: true,
+                email_confirmation_required: false,
+                flow: 'login'
+            })
+        ),
         completeSocial: vi.fn(() => of({ status: 'ok' as const })),
         consumeSocialMfaHandoff: vi.fn(() => null),
         startSSOLogin: vi.fn(() => of({ auth_url: 'https://identity.example.com/authorize' })),
@@ -138,6 +149,20 @@ describe('Login', () => {
         expect(component).toBeTruthy();
     });
 
+    it('does not show a session notice from retained browser history on a direct login visit', async () => {
+        TestBed.inject(Location).replaceState('/login', 'returnUrl=%2F', {
+            [SESSION_END_STATE_KEY]: createSessionEndState('session-ended')
+        });
+        fixture.destroy();
+        fixture = TestBed.createComponent(Login);
+        component = fixture.componentInstance;
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        expect(component['sessionEndNotice']()).toBeNull();
+        expect((fixture.nativeElement as HTMLElement).querySelector('p-message[role="status"]')).toBeNull();
+    });
+
     it('resolves valid in-app returnUrl', () => {
         returnUrl = '/events?range=30d';
         expect(component['resolveReturnUrl']()).toBe('/events?range=30d');
@@ -198,7 +223,14 @@ describe('Login', () => {
     });
 
     it('starts configured social login with the safe return URL and remember-me choice', () => {
-        const navigate = vi.spyOn(component as unknown as { navigateToSSOProvider: (url: string) => void }, 'navigateToSSOProvider').mockImplementation(() => undefined);
+        const navigate = vi
+            .spyOn(
+                component as unknown as {
+                    navigateToSSOProvider: (url: string) => void;
+                },
+                'navigateToSSOProvider'
+            )
+            .mockImplementation(() => undefined);
         component['socialProviders'].set([{ id: 'google', display_name: 'Google' }]);
         component['loginForm'].rememberMe().control().setValue(true);
         returnUrl = '/events?range=30d';
@@ -227,7 +259,16 @@ describe('Login', () => {
     });
 
     it('requires an explicit HitKeep email before completing a first Microsoft login', () => {
-        authMock.previewSocial.mockReturnValueOnce(of({ provider: 'microsoft', display_name: 'Microsoft', observed_email: 'mutable@example.com', email_verified: false, email_confirmation_required: true, flow: 'login' }));
+        authMock.previewSocial.mockReturnValueOnce(
+            of({
+                provider: 'microsoft',
+                display_name: 'Microsoft',
+                observed_email: 'mutable@example.com',
+                email_verified: false,
+                email_confirmation_required: true,
+                flow: 'login'
+            })
+        );
 
         component['completeSocialLogin']('completion-token');
 
@@ -242,7 +283,16 @@ describe('Login', () => {
     });
 
     it('completes an already-linked Microsoft identity without asking for mutable email', () => {
-        authMock.previewSocial.mockReturnValueOnce(of({ provider: 'microsoft', display_name: 'Microsoft', observed_email: 'mutable@example.com', email_verified: false, email_confirmation_required: false, flow: 'login' }));
+        authMock.previewSocial.mockReturnValueOnce(
+            of({
+                provider: 'microsoft',
+                display_name: 'Microsoft',
+                observed_email: 'mutable@example.com',
+                email_verified: false,
+                email_confirmation_required: false,
+                flow: 'login'
+            })
+        );
 
         component['completeSocialLogin']('linked-completion-token');
 
@@ -260,7 +310,14 @@ describe('Login', () => {
     });
 
     it('stays loading while preview hands off to social completion', () => {
-        const preview = new Subject<{ provider: 'google'; display_name: string; observed_email: string; email_verified: boolean; email_confirmation_required: boolean; flow: 'login' }>();
+        const preview = new Subject<{
+            provider: 'google';
+            display_name: string;
+            observed_email: string;
+            email_verified: boolean;
+            email_confirmation_required: boolean;
+            flow: 'login';
+        }>();
         const completion = new Subject<{ status: 'ok'; redirect_url: string }>();
         authMock.previewSocial.mockReturnValueOnce(preview);
         authMock.completeSocial.mockReturnValueOnce(completion);
@@ -268,7 +325,14 @@ describe('Login', () => {
         component['completeSocialLogin']('loading-token');
         expect(component['isLoading']()).toBe(true);
 
-        preview.next({ provider: 'google', display_name: 'Google', observed_email: 'user@example.com', email_verified: true, email_confirmation_required: false, flow: 'login' });
+        preview.next({
+            provider: 'google',
+            display_name: 'Google',
+            observed_email: 'user@example.com',
+            email_verified: true,
+            email_confirmation_required: false,
+            flow: 'login'
+        });
         preview.complete();
         expect(component['isLoading']()).toBe(true);
 
@@ -278,7 +342,14 @@ describe('Login', () => {
     });
 
     it('keeps the server-bound social return path through MFA email verification', () => {
-        authMock.completeSocial.mockReturnValueOnce(of({ status: 'mfa_required' as const, redirect_url: '/events?range=30d', challenge_token: 'social-mfa', factors: ['email_link' as const] }));
+        authMock.completeSocial.mockReturnValueOnce(
+            of({
+                status: 'mfa_required' as const,
+                redirect_url: '/events?range=30d',
+                challenge_token: 'social-mfa',
+                factors: ['email_link' as const]
+            })
+        );
 
         component['completeSocialLogin']('social-mfa-token');
         component['requestEmailLinkMfa']();
@@ -313,6 +384,26 @@ describe('Login', () => {
         expect(element.querySelector('app-auth-card p-card.p-card')).toBeTruthy();
         expect(element.querySelector('p-message.p-message')).toBeTruthy();
         expect(element.querySelector('app-auth-divider p-divider.p-divider')).toBeTruthy();
+    });
+
+    it('announces an intentional sign-out as an accessible status message', async () => {
+        component['sessionEndReason'].set('signed-out');
+        await fixture.whenStable();
+
+        const notice = (fixture.nativeElement as HTMLElement).querySelector('p-message[role="status"]');
+        expect(notice?.textContent).toContain('login.sessionEnded.signedOut');
+        expect(notice?.getAttribute('aria-live')).toBe('polite');
+        expect(notice?.getAttribute('aria-atomic')).toBe('true');
+    });
+
+    it('announces an ended session without showing a notice on ordinary login visits', async () => {
+        component['sessionEndReason'].set('session-ended');
+        await fixture.whenStable();
+        expect((fixture.nativeElement as HTMLElement).querySelector('p-message[role="status"]')?.textContent).toContain('login.sessionEnded.expired');
+
+        component['sessionEndReason'].set(null);
+        await fixture.whenStable();
+        expect((fixture.nativeElement as HTMLElement).querySelector('p-message[role="status"]')).toBeNull();
     });
 
     it('switches to an email-only SSO workflow with a password fallback', async () => {
