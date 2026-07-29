@@ -1,37 +1,26 @@
-import { Component, effect, inject, signal, computed, ChangeDetectionStrategy, DestroyRef } from '@angular/core';
+import { Component, effect, inject, signal, computed, ChangeDetectionStrategy, DestroyRef, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { injectActiveLang } from '@core/i18n/active-lang';
-import { DOCUMENT, NgOptimizedImage } from '@angular/common';
-import { ReactiveFormsModule } from '@angular/forms';
-import { debounceTime, distinctUntilChanged, finalize, Subject } from 'rxjs';
+import { finalize } from 'rxjs';
 import { TranslocoService } from '@jsverse/transloco';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { TranslocoLocaleService } from '@jsverse/transloco-locale';
 // OptimusUI
 import { CardModule } from '@openng/optimus-ui/card';
-import { TableModule, TableLazyLoadEvent } from '@openng/optimus-ui/table';
-import { SelectModule } from '@openng/optimus-ui/select';
 import { ButtonModule } from '@openng/optimus-ui/button';
-import { IconFieldModule } from '@openng/optimus-ui/iconfield';
-import { InputIconModule } from '@openng/optimus-ui/inputicon';
-import { InputTextModule } from '@openng/optimus-ui/inputtext';
-import { SkeletonModule } from '@openng/optimus-ui/skeleton';
 import { TooltipModule } from '@openng/optimus-ui/tooltip';
 // Features
 import { SiteService } from '@features/sites/services/site.service';
 import { injectStatsQuery, type StatsQueryMode } from '@features/analytics/services/stats-query';
-import { HitService } from '@features/hits/services/hit.service';
+import { TrafficRecordsCard } from '@features/hits/components/traffic-records-card';
 import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
 import { REALTIME_ALL_ANALYTICS_KINDS } from '@services/realtime.service';
 import { TrafficChart } from '@features/analytics/components/traffic-chart';
-import { MetricCardGroup, MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
-import { GoalList } from '@features/analytics/components/goal-list';
-import { FunnelList } from '@features/analytics/components/funnel-list';
+import { MetricCardGroup, MetricCardGroupAction, MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
 import { SearchConsoleDrilldown } from '@features/analytics/components/search-console-drilldown';
-import { FunnelManager } from '@features/funnels/components/funnel-manager';
-import { FunnelViewer } from '@features/funnels/components/funnel-viewer';
-import type { Funnel, MetricStat } from '@models/analytics.types';
+import type { Funnel, GoalStats, MetricStat } from '@models/analytics.types';
+import type { ConversionSubject } from '@features/analytics/models/conversion-subject';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { WorkflowProgress, type WorkflowProgressStep } from '@components/workflow-progress/workflow-progress';
@@ -41,7 +30,6 @@ import { KPI_PERCENT_FORMAT, KPI_SHORT_DECIMAL_FORMAT, KpiCard } from '@features
 import { ShareService } from '@services/share.service';
 import { translateRangeLabel } from '@components/range-toolbar/range-toolbar';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
-import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
 import { buildTakeoutExportFilename, DEFAULT_HITS_EXPORT_FORMAT, TakeoutExportFormat, withTakeoutExportFormat } from '@core/export/export-formats';
 import { calcDelta } from '@core/analytics/delta-utils';
 import { aiFilterChipLabel } from '@features/analytics/ai-category-labels';
@@ -50,13 +38,23 @@ import { TakeoutDownloadService } from '@services/takeout-download.service';
 import { AddSiteDialog } from '@features/sites/components/add-site-dialog';
 import { TeamService } from '@services/team.service';
 import { OnboardingService, OnboardingStep } from '@services/onboarding.service';
-import { browserAppUrl } from '@core/interceptors/base-path.interceptor';
 import { injectReportRange } from '@services/report-range-preferences.service';
+import { AccessService } from '@services/access.service';
+import { SITE_CAPABILITIES } from '@core/access/capabilities';
+import { NavigationNoticeService } from '@services/navigation-notice.service';
 
 type MetricFilterType = 'path' | 'referrer' | 'device' | 'country' | 'city' | 'provider' | 'asn' | 'browser' | 'language' | 'ai_bot' | 'ai_bot_category' | 'ai_source';
+type DashboardMetricAction = MetricFilterType | ConversionSubject['kind'];
 interface MetricFilter {
     type: MetricFilterType;
     value: string;
+}
+interface DashboardReportRequest {
+    siteId: string;
+    from: string;
+    to: string;
+    filters: MetricFilter[];
+    subject: { kind: ConversionSubject['kind']; id: string } | null;
 }
 type KpiMetricID = 'live_visitors' | 'total_pageviews' | 'unique_sessions' | 'bounce_rate' | 'avg_session_duration' | 'pages_per_session';
 interface KpiCardData {
@@ -76,16 +74,9 @@ interface KpiCardData {
     selector: 'app-dashboard',
     standalone: true,
     imports: [
-        ReactiveFormsModule,
         TranslocoPipe,
         CardModule,
-        TableModule,
-        SelectModule,
         ButtonModule,
-        IconFieldModule,
-        InputIconModule,
-        InputTextModule,
-        SkeletonModule,
         TooltipModule,
         PageHeader,
         PageHeaderLeft,
@@ -95,17 +86,12 @@ interface KpiCardData {
         ExportSplitButton,
         ExportStatusBanner,
         FilterChipRow,
-        RelativeDateTime,
         KpiCard,
         TrafficChart,
         MetricCardGroup,
-        GoalList,
-        FunnelList,
         SearchConsoleDrilldown,
-        FunnelManager,
-        FunnelViewer,
-        NgOptimizedImage,
-        AddSiteDialog
+        AddSiteDialog,
+        TrafficRecordsCard
     ],
     templateUrl: './dashboard.html',
     styleUrl: './dashboard.css',
@@ -113,7 +99,6 @@ interface KpiCardData {
 })
 export class Dashboard {
     protected siteService = inject(SiteService);
-    protected hitService = inject(HitService);
     private shareService = inject(ShareService);
     private teamService = inject(TeamService);
     private takeoutDownloadService = inject(TakeoutDownloadService);
@@ -123,24 +108,30 @@ export class Dashboard {
     private router = inject(Router);
     private route = inject(ActivatedRoute);
     private onboarding = inject(OnboardingService);
-    private document = inject(DOCUMENT);
     private realtimeRefresh = inject(RealtimeRefreshCoordinator);
+    private access = inject(AccessService);
+    private navigationNotice = inject(NavigationNoticeService);
     protected readonly reportRange = injectReportRange();
     private reportLinkApplied = false;
     private readonly activeLanguage = injectActiveLang();
     private statsQuery = injectStatsQuery();
+    private validationRequestKey: string | null = null;
+    private validationAfterResultSequence = 0;
     protected isShareMode = computed(() => this.shareService.isShareMode());
+    protected trafficShareToken = computed(() => this.shareService.token());
     protected stats = this.statsQuery.stats;
     protected isStatsLoading = this.statsQuery.isLoading;
     protected currentComparisonRange = this.statsQuery.comparisonRange;
     protected readonly kpiUpdateKey = signal(0);
-    protected showFunnelManager = signal(false);
-    protected showFunnelViewer = signal(false);
-    protected selectedFunnelId = signal<string | null>(null);
-    protected funnelEditRequestId = signal<string | null>(null);
+    protected selectedConversion = signal<ConversionSubject | null>(null, {
+        equal: (a, b) => a?.kind === b?.kind && a?.id === b?.id && a?.name === b?.name
+    });
+    private requestedConversion = signal<{ kind: ConversionSubject['kind']; id: string } | null>(null, {
+        equal: (a, b) => a?.kind === b?.kind && a?.id === b?.id
+    });
+    private conversionSiteId: string | null = null;
     protected searchConsoleRefreshKey = signal(0);
     protected isAddSiteVisible = signal(false);
-    protected funnelDateRange = computed(() => this.getCurrentDateRange());
     protected searchConsoleDateRange = computed(() => this.getCurrentDateRange());
     protected searchConsoleFilters = computed(() => ({
         path: this.activeFilterValue('path'),
@@ -149,23 +140,57 @@ export class Dashboard {
     }));
     protected siteDomain = computed(() => this.siteService.activeSite()?.domain ?? null);
     protected emptyTeamName = computed(() => this.teamService.activeTeam()?.name ?? null);
-    protected siteFaviconUrl = computed(() => {
-        const domain = this.siteDomain();
-        return domain ? browserAppUrl(this.document, `/api/favicon/${encodeURIComponent(domain)}`) : '';
-    });
     protected activeFilters = signal<MetricFilter[]>([]);
-    protected hasFilters = computed(() => this.activeFilters().length > 0);
+    protected trafficRefreshKey = signal(0);
+    protected trafficDateRange = computed(() => this.getCurrentDateRange());
+    protected trafficGoalIds = computed(() => {
+        const subject = this.requestedConversion();
+        return subject?.kind === 'goal' ? [subject.id] : [];
+    });
+    protected trafficFunnelIds = computed(() => {
+        const subject = this.requestedConversion();
+        return subject?.kind === 'funnel' ? [subject.id] : [];
+    });
+    private reportRequest = computed<DashboardReportRequest | null>(
+        () => {
+            const site = this.siteService.activeSite();
+            const dates = this.getCurrentDateRange();
+            if (!site || !dates) return null;
+            return {
+                siteId: site.id,
+                from: dates.from,
+                to: dates.to,
+                filters: this.activeFilters(),
+                subject: this.requestedConversion()
+            };
+        },
+        { equal: (a, b) => JSON.stringify(a) === JSON.stringify(b) }
+    );
+    protected hasFilters = computed(() => this.activeFilters().length > 0 || this.selectedConversion() !== null);
+    protected canManageConversions = computed(() => {
+        const site = this.siteService.activeSite();
+        return !this.isShareMode() && !!site && this.access.canSite(site.id, SITE_CAPABILITIES.manageGoals);
+    });
     protected isExportingFiltered = signal(false);
     protected filteredExportState = signal<'idle' | 'success' | 'error'>('idle');
     protected filterChips = computed<FilterChipItem[]>(() => {
         this.activeLanguage();
-        return this.activeFilters().map((filter) => ({
+        const chips = this.activeFilters().map((filter) => ({
             key: `${filter.type}:${filter.value}`,
             label: this.filterLabel(filter),
             remove: () => this.removeFilter(filter.type, filter.value)
         }));
+        const subject = this.selectedConversion();
+        if (subject) {
+            chips.unshift({
+                key: `${subject.kind}:${subject.id}`,
+                label: this.transloco.translate(`dashboard.conversions.filters.${subject.kind}`, { name: subject.name }),
+                remove: () => this.clearConversionSubject()
+            });
+        }
+        return chips;
     });
-    protected readonly metricCardTabs = computed<MetricCardGroupTab<MetricFilterType>[]>(() => {
+    protected readonly metricCardTabs = computed<MetricCardGroupTab<DashboardMetricAction>[]>(() => {
         this.activeLanguage();
         const stats = this.stats();
         const loading = this.isStatsLoading();
@@ -328,6 +353,54 @@ export class Dashboard {
                         filterType: 'asn'
                     }
                 ]
+            },
+            {
+                id: 'conversions',
+                label: this.transloco.translate('dashboard.conversions.title'),
+                icon: 'pi-chart-line',
+                cards: [
+                    {
+                        id: 'goals',
+                        title: this.transloco.translate('goals.list.title'),
+                        data:
+                            stats?.goals.map((goal) => ({
+                                key: goal.goal_id,
+                                name: goal.name,
+                                value: goal.conversions,
+                                shareLabel: `${this.localeService.localizeNumber(goal.conversion_rate, 'decimal', undefined, { maximumFractionDigits: 1 })}%`,
+                                detailsHref: `/goals?goal=${encodeURIComponent(goal.goal_id)}`,
+                                detailsAriaLabel: this.transloco.translate('goals.list.detailsAria', { name: goal.name })
+                            })) ?? [],
+                        linkMode: 'details',
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.selectedConversion()?.kind === 'goal' ? this.selectedConversion()?.id : null,
+                        filterType: 'goal',
+                        actionId: this.canManageConversions() ? 'goal' : undefined,
+                        actionLabel: this.canManageConversions() ? this.transloco.translate('goals.list.createAction') : undefined
+                    },
+                    {
+                        id: 'funnels',
+                        title: this.transloco.translate('funnels.list.title'),
+                        data:
+                            stats?.funnels.map((funnel) => ({
+                                key: funnel.id,
+                                name: funnel.name,
+                                value: funnel.steps.length,
+                                valueLabel: this.transloco.translate('funnels.list.stepsCount', { count: funnel.steps.length }),
+                                detailsHref: `/funnels?funnel=${encodeURIComponent(funnel.id)}`,
+                                detailsAriaLabel: this.transloco.translate('funnels.list.detailsAria', { name: funnel.name })
+                            })) ?? [],
+                        linkMode: 'details',
+                        isLoading: loading,
+                        isRowClickable: true,
+                        activeValue: this.selectedConversion()?.kind === 'funnel' ? this.selectedConversion()?.id : null,
+                        showShare: false,
+                        filterType: 'funnel',
+                        actionId: this.canManageConversions() ? 'funnel' : undefined,
+                        actionLabel: this.canManageConversions() ? this.transloco.translate('funnels.list.createAction') : undefined
+                    }
+                ]
             }
         ];
     });
@@ -373,6 +446,8 @@ export class Dashboard {
         for (const filter of this.activeFilters()) {
             params.append('filter', `${filter.type}:${filter.value}`);
         }
+        const subject = this.requestedConversion();
+        if (subject) params.append(`${subject.kind}_id`, subject.id);
         if (this.isShareMode() && shareToken) {
             return `/api/share/${encodeURIComponent(shareToken)}/sites/${site.id}/hits/export?${params.toString()}`;
         }
@@ -468,9 +543,6 @@ export class Dashboard {
         return [{ label: site.domain, favicon: site, isCurrent: true }];
     });
 
-    private searchSubject = new Subject<string>();
-    protected searchQuery = signal('');
-    private lastTableEvent: TableLazyLoadEvent | null = null;
     protected readonly isShortRange = this.reportRange.isShortRange;
     protected chartTitle = computed(() => {
         this.activeLanguage();
@@ -502,9 +574,13 @@ export class Dashboard {
         return this.transloco.translate('dashboard.chartTitleOverview');
     });
     constructor() {
-        this.searchSubject.pipe(debounceTime(400), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef)).subscribe((q) => {
-            this.searchQuery.set(q);
-            this.refreshHits();
+        this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+            const goalId = params.get('goal');
+            const funnelId = params.get('funnel');
+            this.requestedConversion.set(goalId ? { kind: 'goal', id: goalId } : funnelId ? { kind: 'funnel', id: funnelId } : null);
+            if (goalId && funnelId) {
+                void this.router.navigate([], { relativeTo: this.route, queryParams: { funnel: null }, queryParamsHandling: 'merge', replaceUrl: true });
+            }
         });
 
         this.refreshOnboarding();
@@ -533,10 +609,34 @@ export class Dashboard {
 
         effect(() => {
             const site = this.siteService.activeSite();
-            const dates = this.getCurrentDateRange();
-            if (site && dates) {
-                this.loadStatsForCurrentRange();
-                this.refreshHits();
+            const request = this.reportRequest();
+            const siteId = site?.id ?? null;
+            if (this.conversionSiteId && siteId !== this.conversionSiteId) {
+                untracked(() => this.clearConversionSubject());
+                this.conversionSiteId = siteId;
+                return;
+            }
+            this.conversionSiteId = siteId;
+            if (request) untracked(() => this.loadStats(request));
+        });
+
+        effect(() => {
+            const request = this.requestedConversion();
+            const stats = this.stats();
+            const result = this.statsQuery.lastResult();
+            const requestKey = request ? `${request.kind}:${request.id}` : null;
+            if (!request || !stats || this.isStatsLoading() || this.validationRequestKey !== requestKey || !result || result.sequence <= this.validationAfterResultSequence) return;
+            const subject = request.kind === 'goal' ? stats.goals.find((goal) => goal.goal_id === request.id) : stats.funnels.find((funnel) => funnel.id === request.id);
+            if (!subject) {
+                this.selectedConversion.set(null);
+                this.requestedConversion.set(null);
+                this.navigationNotice.show('dashboard.conversions.invalidSubject', { preserveNextNavigation: true });
+                void this.router.navigate([], { relativeTo: this.route, queryParams: { goal: null, funnel: null }, queryParamsHandling: 'merge', replaceUrl: true });
+                return;
+            }
+            const selected = this.selectedConversion();
+            if (selected?.kind !== request.kind || selected.id !== request.id || selected.name !== subject.name) {
+                this.selectedConversion.set({ kind: request.kind, id: request.id, name: subject.name });
             }
         });
 
@@ -551,7 +651,7 @@ export class Dashboard {
 
     refreshAll() {
         this.loadStatsForCurrentRange();
-        this.refreshHits();
+        this.trafficRefreshKey.update((key) => key + 1);
         this.refreshOnboarding();
         this.searchConsoleRefreshKey.update((key) => key + 1);
     }
@@ -609,32 +709,23 @@ export class Dashboard {
         }
     }
 
-    onSearch(event: Event) {
-        this.searchSubject.next((event.target as HTMLInputElement).value);
-    }
-
     protected onMetricCardClick(event: MetricCardGroupRowClick): void {
+        if (event.filterType === 'goal') {
+            const goal = this.stats()?.goals.find((candidate) => candidate.goal_id === event.metric.key);
+            if (goal) this.toggleGoal(goal);
+            return;
+        }
+        if (event.filterType === 'funnel') {
+            const funnel = this.stats()?.funnels.find((candidate) => candidate.id === event.metric.key);
+            if (funnel) this.toggleFunnel(funnel);
+            return;
+        }
         this.applyMetricFilter(event.filterType as MetricFilterType, event.metric);
     }
 
-    loadHits(event: TableLazyLoadEvent) {
-        this.lastTableEvent = event;
-        const site = this.siteService.activeSite();
-        const dates = this.getCurrentDateRange();
-        if (!site || !dates) return;
-        const filters = this.activeFilters();
-
-        const rows = event.rows || 10;
-        const first = event.first || 0;
-        const page = first / rows + 1;
-
-        this.hitService.loadHits(site.id, dates.from, dates.to, page, rows, event.sortField as string, event.sortOrder === 1 ? 'asc' : 'desc', this.searchQuery(), filters);
-    }
-
-    private refreshHits() {
-        if (this.lastTableEvent) {
-            this.lastTableEvent.first = 0;
-            this.loadHits(this.lastTableEvent);
+    protected onMetricCardAction(event: MetricCardGroupAction): void {
+        if (event.actionId === 'goal' || event.actionId === 'funnel') {
+            this.openConversionCreate(event.actionId);
         }
     }
 
@@ -644,7 +735,7 @@ export class Dashboard {
 
     private refreshRealtimeData() {
         this.refreshStatsOnly('background');
-        this.refreshHits();
+        this.trafficRefreshKey.update((key) => key + 1);
         this.refreshOnboarding();
     }
 
@@ -659,16 +750,22 @@ export class Dashboard {
     });
 
     private loadStatsForCurrentRange(mode: StatsQueryMode = 'blocking') {
-        const site = this.siteService.activeSite();
-        const dates = this.getCurrentDateRange();
-        const filters = this.activeFilters();
-        if (!site || !dates) return;
+        const request = this.reportRequest();
+        if (!request) return;
+        this.loadStats(request, mode);
+    }
+
+    private loadStats(request: DashboardReportRequest, mode: StatsQueryMode = 'blocking') {
+        this.validationRequestKey = request.subject ? `${request.subject.kind}:${request.subject.id}` : null;
+        this.validationAfterResultSequence = this.statsQuery.lastResult()?.sequence ?? 0;
         const effectiveMode = mode === 'background' && this.stats() && !this.isStatsLoading() ? 'background' : 'blocking';
         this.statsQuery.load({
-            siteId: site.id,
-            from: dates.from,
-            to: dates.to,
-            filters,
+            siteId: request.siteId,
+            from: request.from,
+            to: request.to,
+            filters: request.filters,
+            goalIds: request.subject?.kind === 'goal' ? [request.subject.id] : [],
+            funnelIds: request.subject?.kind === 'funnel' ? [request.subject.id] : [],
             mode: effectiveMode,
             onSuccess: effectiveMode === 'background' ? () => this.kpiUpdateKey.update((key) => key + 1) : undefined
         });
@@ -680,29 +777,38 @@ export class Dashboard {
         return this.reportRange.currentDateRange();
     }
 
-    protected openFunnelViewer(funnel: Funnel) {
-        this.selectedFunnelId.set(funnel.id);
-        this.showFunnelViewer.set(true);
+    protected toggleGoal(goal: GoalStats) {
+        this.setConversionSubject({ kind: 'goal', id: goal.goal_id, name: goal.name });
     }
 
-    protected openFunnelManager() {
-        this.funnelEditRequestId.set(null);
-        this.showFunnelManager.set(true);
+    protected toggleFunnel(funnel: Funnel) {
+        this.setConversionSubject({ kind: 'funnel', id: funnel.id, name: funnel.name });
     }
 
-    protected setFunnelManagerVisible(visible: boolean) {
-        this.showFunnelManager.set(visible);
-        if (!visible) {
-            this.funnelEditRequestId.set(null);
+    protected openConversionCreate(kind: ConversionSubject['kind']) {
+        void this.router.navigate([kind === 'goal' ? '/goals' : '/funnels'], { queryParams: { create: '1' } });
+    }
+
+    private setConversionSubject(subject: ConversionSubject) {
+        const current = this.requestedConversion();
+        if (current?.kind === subject.kind && current.id === subject.id) {
+            this.clearConversionSubject();
+            return;
         }
+        this.selectedConversion.set(subject);
+        this.requestedConversion.set({ kind: subject.kind, id: subject.id });
+        void this.router.navigate([], {
+            relativeTo: this.route,
+            queryParams: { goal: subject.kind === 'goal' ? subject.id : null, funnel: subject.kind === 'funnel' ? subject.id : null },
+            queryParamsHandling: 'merge',
+            replaceUrl: true
+        });
     }
 
-    protected editSelectedFunnel() {
-        const funnelId = this.selectedFunnelId();
-        if (!funnelId) return;
-        this.funnelEditRequestId.set(funnelId);
-        this.showFunnelViewer.set(false);
-        this.showFunnelManager.set(true);
+    protected clearConversionSubject() {
+        if (this.selectedConversion()) this.selectedConversion.set(null);
+        if (this.requestedConversion()) this.requestedConversion.set(null);
+        void this.router.navigate([], { relativeTo: this.route, queryParams: { goal: null, funnel: null }, queryParamsHandling: 'merge', replaceUrl: true });
     }
 
     protected applyMetricFilter(type: MetricFilterType, metric: MetricStat) {
@@ -724,6 +830,7 @@ export class Dashboard {
 
     protected clearFilter() {
         this.activeFilters.set([]);
+        this.clearConversionSubject();
     }
 
     protected removeFilter(type: MetricFilterType, value: string) {
@@ -798,46 +905,6 @@ export class Dashboard {
                 next: () => this.filteredExportState.set('success'),
                 error: () => this.filteredExportState.set('error')
             });
-    }
-
-    protected buildSiteUrl(path: string | null | undefined): string | null {
-        const domain = this.siteDomain();
-        if (!domain || !path) return null;
-        const normalized = path.startsWith('/') ? path : `/${path}`;
-        return `https://${domain}${normalized}`;
-    }
-
-    protected buildReferrerUrl(referrer: string | null | undefined): string | null {
-        const url = this.normalizeUrl(referrer);
-        return url ? url.href : null;
-    }
-
-    // TODO: Refactor global url vanity handling at some point
-    protected displayReferrerUrl(url: string | null | undefined): string {
-        if (!url) return '';
-
-        return url.replace(/^https?:\/\//, '').replace(/^www\./, '');
-    }
-
-    protected referrerDomain(referrer: string | null | undefined): string | null {
-        const url = this.normalizeUrl(referrer);
-        return url ? url.hostname : null;
-    }
-
-    protected faviconUrlForDomain(domain: string | null | undefined): string | null {
-        return domain ? browserAppUrl(this.document, `/api/favicon/${encodeURIComponent(domain)}`) : null;
-    }
-
-    private normalizeUrl(raw: string | null | undefined): URL | null {
-        if (!raw) return null;
-        const trimmed = raw.trim();
-        if (!trimmed || trimmed.toLowerCase() === 'direct') return null;
-        const normalized = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-        try {
-            return new URL(normalized);
-        } catch {
-            return null;
-        }
     }
 
     private displayLanguageLabel(value: string): string {

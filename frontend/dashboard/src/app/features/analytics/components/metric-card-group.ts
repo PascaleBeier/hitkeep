@@ -1,16 +1,16 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { CardModule } from '@openng/optimus-ui/card';
+import { ButtonModule } from '@openng/optimus-ui/button';
 import { TabsModule } from '@openng/optimus-ui/tabs';
-import { MetricStat } from '@models/analytics.types';
-import { MetricList } from './metric-list';
+import { MetricList, MetricListItem } from './metric-list';
 
 export interface MetricCardConfig<TFilter extends string = string> {
     id: string;
     title: string;
     icon?: string;
-    data: MetricStat[];
+    data: MetricListItem[];
     isLoading?: boolean;
-    linkMode?: 'none' | 'path' | 'url';
+    linkMode?: 'none' | 'path' | 'url' | 'details';
     siteDomain?: string | null;
     isRowClickable?: boolean;
     activeValue?: string | null;
@@ -26,6 +26,10 @@ export interface MetricCardConfig<TFilter extends string = string> {
     /** Share-of-total column; off for rows that are not parts of one whole. */
     showShare?: boolean;
     filterType?: TFilter;
+    actionId?: string;
+    actionLabel?: string;
+    actionAriaLabel?: string;
+    actionIcon?: string;
 }
 
 export interface MetricCardGroupTab<TFilter extends string = string> {
@@ -39,12 +43,18 @@ export interface MetricCardGroupRowClick<TFilter extends string = string> {
     tabId: string;
     cardId: string;
     filterType: TFilter;
-    metric: MetricStat;
+    metric: MetricListItem;
+}
+
+export interface MetricCardGroupAction {
+    tabId: string;
+    cardId: string;
+    actionId: string;
 }
 
 @Component({
     selector: 'app-metric-card-group',
-    imports: [CardModule, TabsModule, MetricList],
+    imports: [ButtonModule, CardModule, TabsModule, MetricList],
     templateUrl: './metric-card-group.html',
     styleUrl: './metric-card-group.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -53,6 +63,7 @@ export class MetricCardGroup {
     tabs = input.required<MetricCardGroupTab[]>();
 
     rowClicked = output<MetricCardGroupRowClick>();
+    actionClicked = output<MetricCardGroupAction>();
 
     protected readonly requestedCards = signal<Record<string, string>>({});
     protected readonly visibleGroups = computed(() => this.tabs().filter((tab) => tab.cards.length > 0));
@@ -78,7 +89,7 @@ export class MetricCardGroup {
         return group.label;
     }
 
-    protected handleRowClick(tab: MetricCardGroupTab, card: MetricCardConfig, metric: MetricStat): void {
+    protected handleRowClick(tab: MetricCardGroupTab, card: MetricCardConfig, metric: MetricListItem): void {
         if (!card.filterType) return;
         this.rowClicked.emit({
             tabId: tab.id,
@@ -86,5 +97,10 @@ export class MetricCardGroup {
             filterType: card.filterType,
             metric
         });
+    }
+
+    protected handleAction(tab: MetricCardGroupTab, card: MetricCardConfig): void {
+        if (!card.actionId) return;
+        this.actionClicked.emit({ tabId: tab.id, cardId: card.id, actionId: card.actionId });
     }
 }

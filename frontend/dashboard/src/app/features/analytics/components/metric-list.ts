@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, output, signal, viewChild } from '@angular/core';
 import { DOCUMENT, NgOptimizedImage, NgTemplateOutlet } from '@angular/common';
+import { Router, RouterLink, UrlTree } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { TranslocoDecimalPipe } from '@jsverse/transloco-locale';
 import { CardModule } from '@openng/optimus-ui/card';
@@ -12,6 +13,14 @@ import { AIAgentIconsService } from '@services/ai-agent-icons.service';
 import { injectSkeletonGate } from '@services/report-subject.service';
 import { AIActivityStat, MetricStat } from '@models/analytics.types';
 
+export interface MetricListItem extends MetricStat {
+    key?: string;
+    shareLabel?: string;
+    valueLabel?: string;
+    detailsHref?: string;
+    detailsAriaLabel?: string;
+}
+
 /** True for rows the AI activity report enriched with provenance counters. */
 function hasProvenanceCounters(item: MetricStat): item is AIActivityStat {
     const candidate = item as Partial<AIActivityStat>;
@@ -20,7 +29,7 @@ function hasProvenanceCounters(item: MetricStat): item is AIActivityStat {
 
 @Component({
     selector: 'app-metric-list',
-    imports: [CardModule, SkeletonModule, TranslocoPipe, TranslocoDecimalPipe, NgOptimizedImage, NgTemplateOutlet],
+    imports: [CardModule, SkeletonModule, TranslocoPipe, TranslocoDecimalPipe, NgOptimizedImage, NgTemplateOutlet, RouterLink],
     templateUrl: './metric-list.html',
     styleUrl: './metric-list.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -28,14 +37,15 @@ function hasProvenanceCounters(item: MetricStat): item is AIActivityStat {
 export class MetricList {
     private readonly transloco = inject(TranslocoService);
     private readonly document = inject(DOCUMENT);
+    private readonly router = inject(Router);
     private readonly aiAgentIcons = inject(AIAgentIconsService);
     private readonly scrollFrame = viewChild<ElementRef<HTMLElement>>('scrollFrame');
 
     title = input.required<string>();
     icon = input<string>('pi-list');
-    data = input.required<MetricStat[]>();
+    data = input.required<MetricListItem[]>();
     isLoading = input<boolean>(false);
-    linkMode = input<'none' | 'path' | 'url'>('none');
+    linkMode = input<'none' | 'path' | 'url' | 'details'>('none');
     siteDomain = input<string | null>(null);
     isRowClickable = input<boolean>(false);
     activeValue = input<string | null>(null);
@@ -60,7 +70,7 @@ export class MetricList {
     showShare = input<boolean>(true);
     framed = input<boolean>(true);
     showHeader = input<boolean>(true);
-    rowClicked = output<MetricStat>();
+    rowClicked = output<MetricListItem>();
 
     protected readonly hasRows = computed(() => this.data().length > 0);
     protected readonly showSkeleton = injectSkeletonGate(this.isLoading, this.hasRows);
@@ -90,9 +100,19 @@ export class MetricList {
         });
     }
 
-    protected linkInfo(item: MetricStat): { href: string; faviconUrl: string | null } | null {
+    protected linkInfo(item: MetricListItem): { href?: string; routerLink?: UrlTree; faviconUrl: string | null; external: boolean; ariaLabel: string } | null {
         const mode = this.linkMode();
         if (mode === 'none' || !item.name) return null;
+
+        if (mode === 'details') {
+            if (!item.detailsHref) return null;
+            return {
+                routerLink: this.router.parseUrl(item.detailsHref),
+                faviconUrl: null,
+                external: false,
+                ariaLabel: item.detailsAriaLabel ?? this.transloco.translate('common.actions.open')
+            };
+        }
 
         if (mode === 'path') {
             const domain = this.siteDomain();
@@ -100,7 +120,9 @@ export class MetricList {
             const path = item.name.startsWith('/') ? item.name : `/${item.name}`;
             return {
                 href: `https://${domain}${path}`,
-                faviconUrl: null
+                faviconUrl: null,
+                external: true,
+                ariaLabel: this.transloco.translate('common.openInNewTabAria')
             };
         }
 
@@ -109,7 +131,9 @@ export class MetricList {
 
         return {
             href: url.href,
-            faviconUrl: this.buildFaviconUrl(url.hostname)
+            faviconUrl: this.buildFaviconUrl(url.hostname),
+            external: true,
+            ariaLabel: this.transloco.translate('common.openInNewTabAria')
         };
     }
 
@@ -152,7 +176,7 @@ export class MetricList {
         });
     }
 
-    protected shareForItem(item: MetricStat): number {
+    protected shareForItem(item: MetricListItem): number {
         const total = this.totalValue();
         if (!total) return 0;
         return (item.value / total) * 100;
@@ -190,7 +214,7 @@ export class MetricList {
         return (item.value / max) * 100;
     }
 
-    protected onRowClick(item: MetricStat): void {
+    protected onRowClick(item: MetricListItem): void {
         if (!this.isRowClickable()) return;
         this.rowClicked.emit(item);
     }
@@ -205,7 +229,7 @@ export class MetricList {
         return `metric-list__scroll-shell${scrollable}${atBottom}`;
     }
 
-    protected rowClass(item: MetricStat): string {
+    protected rowClass(item: MetricListItem): string {
         const base = 'metric-list__row group relative flex items-center justify-between overflow-hidden rounded-md text-sm transition-colors';
         const clickable = this.isRowClickable() ? ' cursor-pointer hover:bg-surface-50 dark:hover:bg-surface-800' : '';
         const active = this.isActive(item) ? ' metric-list__row--active' : '';
@@ -277,8 +301,8 @@ export class MetricList {
         }
     }
 
-    private isActive(item: MetricStat): boolean {
+    private isActive(item: MetricListItem): boolean {
         const active = this.activeValue();
-        return !!active && active === item.name;
+        return !!active && active === (item.key ?? item.name);
     }
 }

@@ -13,7 +13,15 @@ import (
 )
 
 func (s *Store) buildSessionFilter(ctx context.Context, params api.AnalyticsParams, alias string) (string, []any, error) {
-	if len(params.GoalIDs) == 0 && len(params.FunnelIDs) == 0 {
+	return s.buildSessionCohortFilter(ctx, params.SiteID, params.Start, params.End, params.GoalIDs, params.FunnelIDs, alias)
+}
+
+func (s *Store) buildHitSessionFilter(ctx context.Context, params api.HitQueryParams, alias string) (string, []any, error) {
+	return s.buildSessionCohortFilter(ctx, params.SiteID, params.Start, params.End, params.GoalIDs, params.FunnelIDs, alias)
+}
+
+func (s *Store) buildSessionCohortFilter(ctx context.Context, siteID uuid.UUID, start, end time.Time, goalIDs, funnelIDs []uuid.UUID, alias string) (string, []any, error) {
+	if len(goalIDs) == 0 && len(funnelIDs) == 0 {
 		return "", nil, nil
 	}
 
@@ -25,13 +33,13 @@ func (s *Store) buildSessionFilter(ctx context.Context, params api.AnalyticsPara
 	var clauses []string
 	var args []any
 
-	if len(params.GoalIDs) > 0 {
-		goals, err := s.GetGoals(ctx, params.SiteID)
+	if len(goalIDs) > 0 {
+		goals, err := s.GetGoals(ctx, siteID)
 		if err != nil {
 			return "", nil, fmt.Errorf("failed to load goals: %w", err)
 		}
-		allowed := make(map[uuid.UUID]struct{}, len(params.GoalIDs))
-		for _, id := range params.GoalIDs {
+		allowed := make(map[uuid.UUID]struct{}, len(goalIDs))
+		for _, id := range goalIDs {
 			allowed[id] = struct{}{}
 		}
 
@@ -53,18 +61,18 @@ func (s *Store) buildSessionFilter(ctx context.Context, params api.AnalyticsPara
 			return " AND 1=0", nil, nil
 		}
 
-		subquery, subArgs := buildSessionUnionSubquery(params.SiteID, params.Start, params.End, pathValues, eventValues)
+		subquery, subArgs := buildSessionUnionSubquery(siteID, start, end, pathValues, eventValues)
 		clauses = append(clauses, fmt.Sprintf("%ssession_id IN (%s)", prefix, subquery))
 		args = append(args, subArgs...)
 	}
 
-	if len(params.FunnelIDs) > 0 {
-		funnels, err := s.GetFunnels(ctx, params.SiteID)
+	if len(funnelIDs) > 0 {
+		funnels, err := s.GetFunnels(ctx, siteID)
 		if err != nil {
 			return "", nil, fmt.Errorf("failed to load funnels: %w", err)
 		}
-		allowed := make(map[uuid.UUID]struct{}, len(params.FunnelIDs))
-		for _, id := range params.FunnelIDs {
+		allowed := make(map[uuid.UUID]struct{}, len(funnelIDs))
+		for _, id := range funnelIDs {
 			allowed[id] = struct{}{}
 		}
 
@@ -90,7 +98,7 @@ func (s *Store) buildSessionFilter(ctx context.Context, params api.AnalyticsPara
 			return " AND 1=0", nil, nil
 		}
 
-		subquery, subArgs := buildSessionUnionSubquery(params.SiteID, params.Start, params.End, entryPathValues, entryEventValues)
+		subquery, subArgs := buildSessionUnionSubquery(siteID, start, end, entryPathValues, entryEventValues)
 		clauses = append(clauses, fmt.Sprintf("%ssession_id IN (%s)", prefix, subquery))
 		args = append(args, subArgs...)
 	}
@@ -100,55 +108,6 @@ func (s *Store) buildSessionFilter(ctx context.Context, params api.AnalyticsPara
 	}
 
 	return " AND " + strings.Join(clauses, " AND "), args, nil
-}
-
-func (s *Store) buildFunnelPathFilter(ctx context.Context, params api.AnalyticsParams, alias string) (string, []any, error) {
-	if len(params.FunnelIDs) == 0 {
-		return "", nil, nil
-	}
-
-	prefix := ""
-	if alias != "" {
-		prefix = alias + "."
-	}
-
-	funnels, err := s.GetFunnels(ctx, params.SiteID)
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to load funnels: %w", err)
-	}
-	allowed := make(map[uuid.UUID]struct{}, len(params.FunnelIDs))
-	for _, id := range params.FunnelIDs {
-		allowed[id] = struct{}{}
-	}
-
-	pathSet := make(map[string]struct{})
-	for _, funnel := range funnels {
-		if _, ok := allowed[funnel.ID]; !ok {
-			continue
-		}
-		for _, step := range funnel.Steps {
-			if step.Type == "path" && step.Value != "" {
-				pathSet[step.Value] = struct{}{}
-			}
-		}
-	}
-
-	if len(pathSet) == 0 {
-		return " AND 1=0", nil, nil
-	}
-
-	values := make([]string, 0, len(pathSet))
-	for value := range pathSet {
-		values = append(values, value)
-	}
-
-	placeholders := buildPlaceholders(len(values))
-	args := make([]any, 0, len(values))
-	for _, value := range values {
-		args = append(args, value)
-	}
-
-	return fmt.Sprintf(" AND %spath IN (%s)", prefix, placeholders), args, nil
 }
 
 func (s *Store) queryChartData(

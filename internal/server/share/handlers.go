@@ -285,7 +285,6 @@ func (h *handler) handleGetShareSiteStats() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-
 		goalIDs, err := parseUUIDQueryParam(q, "goal_id")
 		if err != nil {
 			http.Error(w, "Invalid goal_id", http.StatusBadRequest)
@@ -427,6 +426,16 @@ func (h *handler) handleGetShareHits() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		goalIDs, err := parseUUIDQueryParam(q, "goal_id")
+		if err != nil {
+			http.Error(w, "Invalid goal_id", http.StatusBadRequest)
+			return
+		}
+		funnelIDs, err := parseUUIDQueryParam(q, "funnel_id")
+		if err != nil {
+			http.Error(w, "Invalid funnel_id", http.StatusBadRequest)
+			return
+		}
 
 		limit := 10
 		offset := 0
@@ -458,6 +467,8 @@ func (h *handler) handleGetShareHits() http.HandlerFunc {
 			Limit:     limit,
 			Offset:    offset,
 			Filters:   filters,
+			GoalIDs:   goalIDs,
+			FunnelIDs: funnelIDs,
 		}
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), site.ID)
@@ -514,16 +525,28 @@ func (h *handler) handleExportShareHits() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		goalIDs, err := parseUUIDQueryParam(q, "goal_id")
+		if err != nil {
+			http.Error(w, "Invalid goal_id", http.StatusBadRequest)
+			return
+		}
+		funnelIDs, err := parseUUIDQueryParam(q, "funnel_id")
+		if err != nil {
+			http.Error(w, "Invalid funnel_id", http.StatusBadRequest)
+			return
+		}
 
 		format := exportfmt.Normalize(q.Get("format"), exportfmt.FormatCSV)
 
 		params := api.HitQueryParams{
-			SiteID:  site.ID,
-			UserID:  site.UserID,
-			Start:   start,
-			End:     end,
-			Query:   q.Get("q"),
-			Filters: filters,
+			SiteID:    site.ID,
+			UserID:    site.UserID,
+			Start:     start,
+			End:       end,
+			Query:     q.Get("q"),
+			Filters:   filters,
+			GoalIDs:   goalIDs,
+			FunnelIDs: funnelIDs,
 		}
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), site.ID)

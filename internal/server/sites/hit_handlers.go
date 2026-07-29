@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -60,6 +61,16 @@ func (h *handler) handleGetSiteHits() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		goalIDs, err := parseHitUUIDQueryParam(q, "goal_id")
+		if err != nil {
+			http.Error(w, "Invalid goal_id", http.StatusBadRequest)
+			return
+		}
+		funnelIDs, err := parseHitUUIDQueryParam(q, "funnel_id")
+		if err != nil {
+			http.Error(w, "Invalid funnel_id", http.StatusBadRequest)
+			return
+		}
 
 		limit := 10
 		offset := 0
@@ -91,6 +102,8 @@ func (h *handler) handleGetSiteHits() http.HandlerFunc {
 			Limit:     limit,
 			Offset:    offset,
 			Filters:   filters,
+			GoalIDs:   goalIDs,
+			FunnelIDs: funnelIDs,
 		}
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
@@ -155,16 +168,28 @@ func (h *handler) handleExportSiteHits() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		goalIDs, err := parseHitUUIDQueryParam(q, "goal_id")
+		if err != nil {
+			http.Error(w, "Invalid goal_id", http.StatusBadRequest)
+			return
+		}
+		funnelIDs, err := parseHitUUIDQueryParam(q, "funnel_id")
+		if err != nil {
+			http.Error(w, "Invalid funnel_id", http.StatusBadRequest)
+			return
+		}
 
 		format := exportfmt.Normalize(q.Get("format"), exportfmt.FormatCSV)
 
 		params := api.HitQueryParams{
-			SiteID:  siteID,
-			UserID:  userID,
-			Start:   start,
-			End:     end,
-			Query:   q.Get("q"),
-			Filters: filters,
+			SiteID:    siteID,
+			UserID:    userID,
+			Start:     start,
+			End:       end,
+			Query:     q.Get("q"),
+			Filters:   filters,
+			GoalIDs:   goalIDs,
+			FunnelIDs: funnelIDs,
 		}
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
@@ -198,6 +223,19 @@ func (h *handler) handleExportSiteHits() http.HandlerFunc {
 			cleanupSiteHitsExportFile(filename)
 		}()
 	}
+}
+
+func parseHitUUIDQueryParam(q url.Values, key string) ([]uuid.UUID, error) {
+	values := q[key]
+	ids := make([]uuid.UUID, 0, len(values))
+	for _, rawID := range values {
+		id, err := uuid.Parse(rawID)
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
 }
 
 func cleanupSiteHitsExportFile(filename string) {

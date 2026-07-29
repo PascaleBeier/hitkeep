@@ -397,67 +397,45 @@ test("secondary analytics metric cards keep equal-height tabbed surfaces and scr
     await expectMetricCardGroupPolish(page);
 });
 
-test("goals page surfaces seeded geography and network data", async ({ page }) => {
+test("goals page presents a focused selectable conversion workspace", async ({ page }) => {
     await login(page, "/goals");
     await selectSeededSite(page);
     await selectRange(page, SEEDED_EVENT_RANGE);
 
     await expect(page.getByRole("heading", { name: "Goals" }).first()).toBeVisible();
     await expect(page.getByText("Conversions", { exact: true }).first()).toBeVisible();
-    await expect(page.getByText("Cities")).toBeVisible();
-    await expect(page.getByText("Providers")).toBeVisible();
-    await expect(page.getByText("ASNs")).toBeVisible();
-    await expectSeededGeoNetworkMetrics(page);
+    await expect(page.getByText("Converting sessions", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Conversion rate", { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Goal definitions" })).toBeVisible();
+
+    await page.getByRole("row").filter({ hasText: "Newsletter Signup" }).click();
+    await expect(page).toHaveURL(/goal=[0-9a-f-]+/);
+    await expect(page.getByRole("heading", { name: "Newsletter Signup" })).toBeVisible();
+    const matchingTraffic = page.locator("app-traffic-records-card");
+    await expect(matchingTraffic.getByRole("heading", { name: "Matching traffic" })).toBeVisible();
+    await expect(matchingTraffic.getByText("Page views from sessions that completed this goal.")).toBeVisible();
+    await expect(matchingTraffic.getByRole("button", { name: /Export CSV/i })).toBeVisible();
 });
 
-test("goals page filters by seeded geography and network metrics", async ({ page }) => {
-    await login(page, "/goals");
-    await selectSeededSite(page);
-    await selectRange(page, SEEDED_EVENT_RANGE);
-
-    await clickSeededMetricRow(page, "Cities", SEEDED_CITY_RE);
-    await expect(page.getByText(/City: (Mountain View|New York|Seattle|Berlin|Munich|London|Paris|Amsterdam)/)).toBeVisible();
-    await page.getByRole("button", { name: "Clear all" }).click();
-    await expect(page.getByText("No active filter")).toBeVisible();
-
-    await clickSeededMetricRow(page, "Providers", SEEDED_PROVIDER_RE);
-    await expect(page.getByText(/Provider: (Google LLC|Verizon Business|Comcast Cable|Deutsche Telekom AG|Vodafone GmbH|BT|Orange|KPN)/)).toBeVisible();
-    await page.getByRole("button", { name: "Clear all" }).click();
-    await expect(page.getByText("No active filter")).toBeVisible();
-
-    await clickSeededMetricRow(page, "ASNs", SEEDED_ASN_RE);
-    await expect(page.getByText(/ASN: (AS15169|AS701|AS7922|AS3320|AS3209|AS2856|AS3215|AS1136)/)).toBeVisible();
-});
-
-test("funnels page surfaces seeded geography and network data", async ({ page }) => {
+test("funnels page presents inline step performance for one subject", async ({ page }) => {
     await login(page, "/funnels");
     await selectSeededSite(page);
     await selectRange(page, SEEDED_EVENT_RANGE);
 
     await expect(page.getByText("Entries", { exact: true }).first()).toBeVisible();
-    await expect(page.getByText("Cities")).toBeVisible();
-    await expect(page.getByText("Providers")).toBeVisible();
-    await expect(page.getByText("ASNs")).toBeVisible();
-    await expectSeededGeoNetworkMetrics(page);
-});
+    await expect(page.getByText("Completions", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Completion rate", { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Funnel definitions" })).toBeVisible();
 
-test("funnels page filters by seeded geography and network metrics", async ({ page }) => {
-    await login(page, "/funnels");
-    await selectSeededSite(page);
-    await selectRange(page, SEEDED_EVENT_RANGE);
-
-    await clickSeededMetricRow(page, "Cities", SEEDED_CITY_RE);
-    await expect(page.getByText(/City: (Mountain View|New York|Seattle|Berlin|Munich|London|Paris|Amsterdam)/)).toBeVisible();
-    await page.getByRole("button", { name: "Clear all" }).click();
-    await expect(page.getByText("No active filter")).toBeVisible();
-
-    await clickSeededMetricRow(page, "Providers", SEEDED_PROVIDER_RE);
-    await expect(page.getByText(/Provider: (Google LLC|Verizon Business|Comcast Cable|Deutsche Telekom AG|Vodafone GmbH|BT|Orange|KPN)/)).toBeVisible();
-    await page.getByRole("button", { name: "Clear all" }).click();
-    await expect(page.getByText("No active filter")).toBeVisible();
-
-    await clickSeededMetricRow(page, "ASNs", SEEDED_ASN_RE);
-    await expect(page.getByText(/ASN: (AS15169|AS701|AS7922|AS3320|AS3209|AS2856|AS3215|AS1136)/)).toBeVisible();
+    await page.getByRole("row").filter({ hasText: "Acquisition Funnel" }).click();
+    await expect(page).toHaveURL(/funnel=[0-9a-f-]+/);
+    await expect(page.getByRole("heading", { name: "Acquisition Funnel" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Step performance" })).toBeVisible();
+    await expect(page.getByText("event: trial_started", { exact: true })).toBeVisible();
+    const matchingTraffic = page.locator("app-traffic-records-card");
+    await expect(matchingTraffic.getByRole("heading", { name: "Matching traffic" })).toBeVisible();
+    await expect(matchingTraffic.getByText("Page views from sessions that entered this funnel.")).toBeVisible();
+    await expect(matchingTraffic.getByRole("button", { name: /Export CSV/i })).toBeVisible();
 });
 
 test("ai agents page shows the fetch depth section with correlation insights", async ({ page }) => {

@@ -1,0 +1,111 @@
+<p-card data-testid="traffic-records-card">
+    <div class="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div class="min-w-0">
+            <h2 class="text-lg font-semibold">{{ titleKey() | transloco }}</h2>
+            @if (descriptionKey()) {
+            <p class="mt-1 text-sm text-muted-color">{{ descriptionKey()! | transloco }}</p>
+            }
+        </div>
+        @if (enabled()) {
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <p-iconfield>
+                <p-inputicon class="pi pi-search" />
+                <input pInputText (input)="onSearch($event)" [placeholder]="'common.searchPlaceholder' | transloco" [attr.aria-label]="'common.searchPlaceholder' | transloco" class="w-full sm:w-64" />
+            </p-iconfield>
+            @if (showExport()) {
+            <app-export-split-button [isExporting]="isExporting()" [disabled]="!exportUrl() || isExporting()" (export)="exportTraffic($event)" />
+            }
+        </div>
+        }
+    </div>
+
+    @if (!enabled()) {
+    <app-page-state [titleKey]="unavailableTitleKey()" [messageKey]="unavailableDescriptionKey()" icon="pi pi-filter" />
+    } @else if (hitService.hasError()) {
+    <app-page-state titleKey="trafficRecords.errorTitle" messageKey="trafficRecords.errorDescription" icon="pi pi-exclamation-circle" actionLabelKey="common.actions.retry" actionIcon="pi pi-refresh" (actionClicked)="retry()" />
+    } @else {
+    <p-table
+        [value]="hitService.hits()"
+        [lazy]="true"
+        (onLazyLoad)="loadHits($event)"
+        [totalRecords]="hitService.total()"
+        [loading]="hitService.isLoading()"
+        [rows]="10"
+        [paginator]="true"
+        [rowsPerPageOptions]="[10, 25, 50]"
+        [rowHover]="true"
+        responsiveLayout="scroll"
+        styleClass="p-datatable-sm"
+        sortField="timestamp"
+        [sortOrder]="-1"
+        [tableStyle]="{ 'min-width': '760px' }"
+    >
+        <ng-template pTemplate="header">
+            <tr>
+                <th pSortableColumn="path">
+                    {{ 'common.columns.path' | transloco }}
+                    <p-sortIcon field="path" />
+                </th>
+                <th pSortableColumn="timestamp">
+                    {{ 'common.columns.time' | transloco }}
+                    <p-sortIcon field="timestamp" />
+                </th>
+                <th pSortableColumn="referrer">
+                    {{ 'common.columns.referrer' | transloco }}
+                    <p-sortIcon field="referrer" />
+                </th>
+                <th>{{ 'common.columns.device' | transloco }}</th>
+            </tr>
+        </ng-template>
+
+        <ng-template pTemplate="body" let-hit>
+            <tr class="text-sm hover:bg-[var(--p-surface-hover)]">
+                <td class="max-w-[200px] truncate font-medium" [title]="hit.path">
+                    <div class="flex min-w-0 items-center gap-2">
+                        @if (siteDomain(); as domain) {
+                        <app-site-favicon [site]="{ domain }" />
+                        }
+                        <span class="truncate" [title]="hit.path">{{ hit.path }}</span>
+                        @if (buildSiteUrl(hit.path); as pageUrl) {
+                        <a class="shrink-0 text-muted-color hover:text-[var(--p-text-color)]" [href]="pageUrl" target="_blank" rel="noopener noreferrer" [attr.aria-label]="'dashboard.openPageInNewTabAria' | transloco">
+                            <i class="pi pi-external-link text-xs" aria-hidden="true"></i>
+                        </a>
+                        }
+                    </div>
+                </td>
+                <td class="whitespace-nowrap text-muted-color"><app-relative-date-time [value]="hit.timestamp" /></td>
+                <td class="max-w-[200px] truncate text-muted-color" [title]="hit.referrer">
+                    @if (hit.referrer) {
+                    <div class="flex min-w-0 items-center gap-2">
+                        @if (referrerDomain(hit.referrer); as domain) { <app-site-favicon [site]="{ domain }" /> }
+                        <span class="truncate" [title]="hit.referrer">{{ displayReferrerUrl(hit.referrer) }}</span>
+                        @if (buildReferrerUrl(hit.referrer); as referrerUrl) {
+                        <a class="shrink-0 text-muted-color hover:text-[var(--p-text-color)]" [href]="referrerUrl" target="_blank" rel="noopener noreferrer" [attr.aria-label]="'dashboard.openReferrerInNewTabAria' | transloco">
+                            <i class="pi pi-external-link text-xs" aria-hidden="true"></i>
+                        </a>
+                        }
+                    </div>
+                    } @else {
+                    <span>{{ 'common.direct' | transloco }}</span>
+                    }
+                </td>
+                <td>
+                    <div class="inline-flex items-center gap-1.5 rounded border border-surface-200 bg-surface-100 px-2 py-1 text-xs dark:border-surface-700 dark:bg-surface-800">
+                        <i [class]="(hit.viewport_width ?? 0) > 768 ? 'pi pi-desktop' : 'pi pi-mobile'" aria-hidden="true"></i>
+                        {{ (hit.viewport_width ?? 0) > 768 ? ('common.devices.desktop' | transloco) : ('common.devices.mobile' | transloco) }}
+                    </div>
+                </td>
+            </tr>
+        </ng-template>
+
+        <ng-template pTemplate="emptymessage">
+            <tr>
+                <td colspan="4" class="py-8 text-center text-muted-color">{{ 'trafficRecords.empty' | transloco }}</td>
+            </tr>
+        </ng-template>
+    </p-table>
+    }
+</p-card>
+@if (showExport()) {
+<app-export-status-banner [state]="exportState()" successKey="dashboard.exportStatus.success" errorKey="dashboard.exportStatus.error" />
+}

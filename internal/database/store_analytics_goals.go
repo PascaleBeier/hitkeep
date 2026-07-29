@@ -434,17 +434,11 @@ func (s *Store) GetComparisonStats(ctx context.Context, params api.AnalyticsPara
 	gridStart := truncToUnit(cmp.Start, truncUnit)
 	gridEnd := truncToUnit(cmp.End, truncUnit)
 	filterSQL, filterArgs := buildHitFilters(cmp.Filters, "h")
-	funnelPathSQL, funnelPathArgs, err := s.buildFunnelPathFilter(ctx, cmp, "h")
-	if err != nil {
-		return nil, err
-	}
 	sessionSQL, sessionArgs, err := s.buildSessionFilter(ctx, cmp, "h")
 	if err != nil {
 		return nil, err
 	}
-	filterSQL += funnelPathSQL
 	filterSQL += sessionSQL
-	filterArgs = append(filterArgs, funnelPathArgs...)
 	filterArgs = append(filterArgs, sessionArgs...)
 
 	if err := s.queryKpis(ctx, cmp, filterSQL, filterArgs, false, rollupHourly,

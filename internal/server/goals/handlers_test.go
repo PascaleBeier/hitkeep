@@ -152,6 +152,13 @@ func TestHandleGoalCRUDUsesTenantAnalyticsStore(t *testing.T) {
 	if updateResp.Code != http.StatusOK {
 		t.Fatalf("expected update status %d, got %d: %s", http.StatusOK, updateResp.Code, updateResp.Body.String())
 	}
+	var updatedGoal api.Goal
+	if err := json.NewDecoder(updateResp.Body).Decode(&updatedGoal); err != nil {
+		t.Fatalf("decode updated goal: %v", err)
+	}
+	if updatedGoal.ID != gotGoals[0].ID || !updatedGoal.CreatedAt.Equal(gotGoals[0].CreatedAt) || updatedGoal.Value != "account_activated" {
+		t.Fatalf("expected stable goal identity and updated definition, got %+v", updatedGoal)
+	}
 	if len(emitter.events) != 2 || emitter.events[1].Type != webhooks.EventGoalUpdated {
 		t.Fatalf("expected non-blocking goal.updated event, got %+v", emitter.events)
 	}
@@ -225,5 +232,54 @@ func TestHandleGetFunnelsUsesTenantAnalyticsStore(t *testing.T) {
 	}
 	if len(gotFunnels) != 1 || gotFunnels[0].Name != "Checkout Funnel" {
 		t.Fatalf("expected tenant funnel in response, got %+v", gotFunnels)
+	}
+}
+
+func TestHandleUpdateFunnelPreservesIdentityAndReturnsNotFound(t *testing.T) {
+	h, _, tenantStore, siteID := setupTenantGoalsTestEnv(t)
+	ctx := context.Background()
+	funnel := api.Funnel{
+		SiteID: siteID,
+		Name:   "Checkout",
+		Steps: []api.FunnelStep{
+			{Type: "path", Value: "/cart"},
+			{Type: "event", Value: "purchase"},
+		},
+	}
+	if err := tenantStore.CreateFunnel(ctx, &funnel); err != nil {
+		t.Fatalf("create funnel: %v", err)
+	}
+
+	body, _ := json.Marshal(api.Funnel{
+		Name: "Updated checkout",
+		Steps: []api.FunnelStep{
+			{Type: "event", Value: "begin_checkout"},
+			{Type: "event", Value: "purchase"},
+		},
+	})
+	req := httptest.NewRequest(http.MethodPut, "/api/sites/"+siteID.String()+"/funnels/"+funnel.ID.String(), bytes.NewReader(body))
+	req.SetPathValue("id", siteID.String())
+	req.SetPathValue("funnelID", funnel.ID.String())
+	resp := httptest.NewRecorder()
+	h.handleUpdateFunnel().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected update status %d, got %d: %s", http.StatusOK, resp.Code, resp.Body.String())
+	}
+	var updated api.Funnel
+	if err := json.NewDecoder(resp.Body).Decode(&updated); err != nil {
+		t.Fatalf("decode updated funnel: %v", err)
+	}
+	if updated.ID != funnel.ID || !updated.CreatedAt.Equal(funnel.CreatedAt) || updated.Name != "Updated checkout" || updated.Steps[0].Type != "event" {
+		t.Fatalf("expected stable funnel identity and updated definition, got %+v", updated)
+	}
+
+	missingID := uuid.New()
+	missingReq := httptest.NewRequest(http.MethodPut, "/api/sites/"+siteID.String()+"/funnels/"+missingID.String(), bytes.NewReader(body))
+	missingReq.SetPathValue("id", siteID.String())
+	missingReq.SetPathValue("funnelID", missingID.String())
+	missingResp := httptest.NewRecorder()
+	h.handleUpdateFunnel().ServeHTTP(missingResp, missingReq)
+	if missingResp.Code != http.StatusNotFound {
+		t.Fatalf("expected missing update status %d, got %d", http.StatusNotFound, missingResp.Code)
 	}
 }

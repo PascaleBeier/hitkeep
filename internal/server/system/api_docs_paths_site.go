@@ -388,12 +388,13 @@ func openAPIV1AdminSitePaths() map[string]any {
 				paramRef("#/components/parameters/limit"), paramRef("#/components/parameters/offset"), paramRef("#/components/parameters/query"),
 				paramRef("#/components/parameters/sort"), paramRef("#/components/parameters/order"),
 				paramRef("#/components/parameters/filter"), paramRef("#/components/parameters/filterType"), paramRef("#/components/parameters/filterValue"),
+				paramRef("#/components/parameters/goalIDQuery"), paramRef("#/components/parameters/funnelIDQuery"),
 			}, nil, map[string]any{"200": jsonRefResp("Paginated hits", "#/components/schemas/PaginatedHits")}),
 		},
 		"/api/sites/{id}/hits/export": map[string]any{
 			"get": op([]string{"Sites"}, "Export site hits", "Exports filtered site hits in csv/xlsx/parquet/json/ndjson.", secAnyAuth(), []any{
 				paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/from"), paramRef("#/components/parameters/to"),
-				paramRef("#/components/parameters/query"), paramRef("#/components/parameters/filter"), paramRef("#/components/parameters/filterType"), paramRef("#/components/parameters/filterValue"), paramRef("#/components/parameters/format"),
+				paramRef("#/components/parameters/query"), paramRef("#/components/parameters/filter"), paramRef("#/components/parameters/filterType"), paramRef("#/components/parameters/filterValue"), paramRef("#/components/parameters/goalIDQuery"), paramRef("#/components/parameters/funnelIDQuery"), paramRef("#/components/parameters/format"),
 			}, nil, map[string]any{"200": desc("Export file stream")}),
 		},
 		"/api/sites/{id}/events/names": map[string]any{
@@ -571,6 +572,7 @@ func openAPIV1AdminSitePaths() map[string]any {
 				map[string]any{"201": desc("Created")}),
 		},
 		"/api/sites/{id}/goals/{goalID}": map[string]any{
+			"put":    op([]string{"Goals"}, "Update goal", "Updates a site-scoped goal in place and invalidates its rollups.", secCookie(), []any{paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/goalID")}, jsonBody(map[string]any{"$ref": "#/components/schemas/Goal"}), map[string]any{"200": jsonRefResp("Updated goal", "#/components/schemas/Goal"), "404": errResp("Goal not found")}),
 			"delete": op([]string{"Goals"}, "Delete goal", "Deletes goal from site.", secCookie(), []any{paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/goalID")}, nil, map[string]any{"200": desc("Deleted")}),
 		},
 		"/api/sites/{id}/goals/timeseries": map[string]any{
@@ -585,6 +587,7 @@ func openAPIV1AdminSitePaths() map[string]any {
 				map[string]any{"201": desc("Created")}),
 		},
 		"/api/sites/{id}/funnels/{funnelID}": map[string]any{
+			"put":    op([]string{"Funnels"}, "Update funnel", "Updates a site-scoped funnel in place and invalidates its rollups.", secCookie(), []any{paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/funnelID")}, jsonBody(map[string]any{"$ref": "#/components/schemas/Funnel"}), map[string]any{"200": jsonRefResp("Updated funnel", "#/components/schemas/Funnel"), "404": errResp("Funnel not found")}),
 			"delete": op([]string{"Funnels"}, "Delete funnel", "Deletes funnel from site.", secCookie(), []any{paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/funnelID")}, nil, map[string]any{"200": desc("Deleted")}),
 		},
 		"/api/sites/{id}/funnels/timeseries": map[string]any{
@@ -684,10 +687,10 @@ func openAPIV1AdminSitePaths() map[string]any {
 			}, nil, map[string]any{"200": jsonRefResp("AI activity report", "#/components/schemas/AIActivityReport")}),
 		},
 		"/api/share/{token}/sites/{id}/hits": map[string]any{
-			"get": op([]string{"Share"}, "Shared hits", "Returns paginated raw hits through share token.", nil, []any{paramRef("#/components/parameters/token"), paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/from"), paramRef("#/components/parameters/to"), paramRef("#/components/parameters/limit"), paramRef("#/components/parameters/offset"), paramRef("#/components/parameters/query"), paramRef("#/components/parameters/sort"), paramRef("#/components/parameters/order"), paramRef("#/components/parameters/filter"), paramRef("#/components/parameters/filterType"), paramRef("#/components/parameters/filterValue")}, nil, map[string]any{"200": jsonRefResp("Paginated hits", "#/components/schemas/PaginatedHits")}),
+			"get": op([]string{"Share"}, "Shared hits", "Returns paginated raw hits through share token.", nil, []any{paramRef("#/components/parameters/token"), paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/from"), paramRef("#/components/parameters/to"), paramRef("#/components/parameters/limit"), paramRef("#/components/parameters/offset"), paramRef("#/components/parameters/query"), paramRef("#/components/parameters/sort"), paramRef("#/components/parameters/order"), paramRef("#/components/parameters/filter"), paramRef("#/components/parameters/filterType"), paramRef("#/components/parameters/filterValue"), paramRef("#/components/parameters/goalIDQuery"), paramRef("#/components/parameters/funnelIDQuery")}, nil, map[string]any{"200": jsonRefResp("Paginated hits", "#/components/schemas/PaginatedHits")}),
 		},
 		"/api/share/{token}/sites/{id}/hits/export": map[string]any{
-			"get": op([]string{"Share"}, "Export shared hits", "Exports hits through share token in csv/xlsx/parquet/json/ndjson.", nil, []any{paramRef("#/components/parameters/token"), paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/from"), paramRef("#/components/parameters/to"), paramRef("#/components/parameters/query"), paramRef("#/components/parameters/filter"), paramRef("#/components/parameters/filterType"), paramRef("#/components/parameters/filterValue"), paramRef("#/components/parameters/format")}, nil, map[string]any{"200": desc("Export file stream")}),
+			"get": op([]string{"Share"}, "Export shared hits", "Exports hits through share token in csv/xlsx/parquet/json/ndjson.", nil, []any{paramRef("#/components/parameters/token"), paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/from"), paramRef("#/components/parameters/to"), paramRef("#/components/parameters/query"), paramRef("#/components/parameters/filter"), paramRef("#/components/parameters/filterType"), paramRef("#/components/parameters/filterValue"), paramRef("#/components/parameters/goalIDQuery"), paramRef("#/components/parameters/funnelIDQuery"), paramRef("#/components/parameters/format")}, nil, map[string]any{"200": desc("Export file stream")}),
 		},
 		"/api/share/{token}/sites/{id}/realtime": map[string]any{
 			"get": internalOp(op([]string{"Share"}, "Stream shared realtime changes", "Streams privacy-safe site-scoped analytics invalidation events through a read-only share token using server-sent events.", nil, []any{paramRef("#/components/parameters/token"), paramRef("#/components/parameters/siteID")}, nil,

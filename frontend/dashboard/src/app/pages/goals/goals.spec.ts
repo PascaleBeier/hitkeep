@@ -2,13 +2,17 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { TRANSLOCO_LOCALE_CONFIG, TRANSLOCO_LOCALE_LANG_MAPPING, TranslocoLocaleService } from '@jsverse/transloco-locale';
-import { of } from 'rxjs';
+import { Observable, of, Subject } from 'rxjs';
 import { vi } from 'vitest';
+import { provideRouter } from '@angular/router';
 
 import { AnalyticsService } from '@services/analytics.service';
 import { StatsService } from '@features/analytics/services/stats.service';
 import { SiteService } from '@features/sites/services/site.service';
 import { Goals } from './goals';
+import { AccessService } from '@services/access.service';
+import { ConfirmationService } from '@openng/optimus-ui/api';
+import { GoalSeriesPoint } from '@models/analytics.types';
 
 describe('Goals', () => {
     const stats = signal({
@@ -46,12 +50,13 @@ describe('Goals', () => {
         stats,
         isLoading: signal(false),
         currentComparisonRange: signal(null),
+        comparisonRange: () => null,
         loadStats: vi.fn(),
         fetchStats: vi.fn(() => of(stats()))
     };
     const analyticsServiceStub = {
         getGoals: vi.fn(() => of([])),
-        getGoalTimeseries: vi.fn(() => of([]))
+        getGoalTimeseries: vi.fn<() => Observable<GoalSeriesPoint[]>>(() => of<GoalSeriesPoint[]>([]))
     };
 
     beforeEach(async () => {
@@ -124,6 +129,9 @@ describe('Goals', () => {
                 },
                 { provide: StatsService, useValue: statsServiceStub },
                 { provide: AnalyticsService, useValue: analyticsServiceStub },
+                { provide: AccessService, useValue: { canSite: () => true } },
+                ConfirmationService,
+                provideRouter([]),
                 {
                     provide: TranslocoLocaleService,
                     useValue: {
@@ -140,28 +148,44 @@ describe('Goals', () => {
         }).compileComponents();
     });
 
-    it('keeps goal metric cards in canonical groups and preserves metric filter clicks', () => {
+    it('presents one reporting subject and exactly three conversion KPIs', () => {
         const component = TestBed.runInInjectionContext(() => new Goals()) as unknown as {
-            metricCardTabs: () => { id: string; cards: { id: string }[] }[];
-            onMetricCardClick: (event: { tabId: string; cardId: string; filterType: string; metric: { name: string; value: number } }) => void;
-            activeFilters: () => { type: string; value: string }[];
-            activeFilterValue: (type: 'city') => string | null;
+            kpis: () => { label: string }[];
+            subjectOptions: () => { label: string; value: string | null }[];
+            selectGoal: (id: string | null) => void;
+            selectedGoalId: () => string | null;
+            goals: { set: (goals: { id: string; name: string; type: 'path'; value: string; created_at: string }[]) => void };
+            trafficGoalIds: () => string[];
+            trafficEnabled: () => boolean;
         };
+        expect(component.kpis().length).toBe(3);
+        expect(component.subjectOptions()[0].value).toBeNull();
+        expect(component.trafficEnabled()).toBe(false);
+        component.goals.set([
+            { id: 'goal-1', name: 'Pricing', type: 'path', value: '/pricing', created_at: '2026-01-01T00:00:00Z' },
+            { id: 'goal-2', name: 'Checkout', type: 'path', value: '/checkout', created_at: '2026-01-01T00:00:00Z' }
+        ]);
+        expect(component.trafficGoalIds()).toEqual(['goal-1', 'goal-2']);
+        component.selectGoal('goal-2');
+        expect(component.trafficGoalIds()).toEqual(['goal-2']);
+        component.selectGoal(null);
+        expect(component.selectedGoalId()).toBeNull();
+    });
 
-        const tabs = component.metricCardTabs();
+    it('ignores a late goal series response after the reporting scope changes', () => {
+        const component = TestBed.runInInjectionContext(() => new Goals()) as unknown as {
+            loadReporting: (siteID: string, from: string, to: string, cohortIDs: string[], seriesIDs: string[]) => void;
+            goalSeries: () => { time: string; conversions: number }[];
+        };
+        const first = new Subject<GoalSeriesPoint[]>();
+        const second = new Subject<GoalSeriesPoint[]>();
+        analyticsServiceStub.getGoalTimeseries.mockReset().mockReturnValue(of<GoalSeriesPoint[]>([])).mockReturnValueOnce(first).mockReturnValueOnce(second);
 
-        expect(tabs.map((tab) => tab.id)).toEqual(['content', 'acquisition', 'audience', 'location', 'network']);
-        expect(tabs.find((tab) => tab.id === 'location')?.cards.map((card) => card.id)).toEqual(['countries', 'cities']);
-        expect(tabs.find((tab) => tab.id === 'network')?.cards.map((card) => card.id)).toEqual(['providers', 'asns']);
+        component.loadReporting('site-1', '2026-07-01', '2026-07-02', ['goal-1'], ['goal-1']);
+        component.loadReporting('site-1', '2026-07-01', '2026-07-02', ['goal-2'], ['goal-2']);
+        first.next([{ time: '2026-07-01', conversions: 1 }]);
+        second.next([{ time: '2026-07-01', conversions: 2 }]);
 
-        component.onMetricCardClick({
-            tabId: 'location',
-            cardId: 'cities',
-            filterType: 'city',
-            metric: { name: 'Berlin', value: 3 }
-        });
-
-        expect(component.activeFilters()).toEqual([{ type: 'city', value: 'Berlin' }]);
-        expect(component.activeFilterValue('city')).toBe('Berlin');
+        expect(component.goalSeries()).toEqual([{ time: '2026-07-01', conversions: 2 }]);
     });
 });

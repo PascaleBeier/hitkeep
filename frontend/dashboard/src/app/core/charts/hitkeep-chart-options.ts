@@ -2,6 +2,12 @@ import type { EChartsCoreOption } from 'echarts/core';
 
 export type HitkeepChartDesign = 'area' | 'line' | 'bar';
 
+export const HITKEEP_CHART_PALETTE = {
+    primary: '#6366f1',
+    secondary: '#14b8a6',
+    warning: '#d97706'
+} as const;
+
 export interface HitkeepChartTheme {
     textColor: string;
     gridColor: string;

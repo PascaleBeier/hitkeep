@@ -1,583 +1,415 @@
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, signal, untracked } from '@angular/core';
-import { injectActiveLang } from '@core/i18n/active-lang';
-import { calcDelta } from '@core/analytics/delta-utils';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { compatForm } from '@angular/forms/signals/compat';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormControl } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { TranslocoLocaleService } from '@jsverse/transloco-locale';
+import { TranslocoDecimalPipe, TranslocoLocaleService } from '@jsverse/transloco-locale';
+import { ConfirmationService } from '@openng/optimus-ui/api';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { CardModule } from '@openng/optimus-ui/card';
-import { SelectModule } from '@openng/optimus-ui/select';
-import { SiteService } from '@features/sites/services/site.service';
-import { AnalyticsService } from '@services/analytics.service';
-import { injectStatsQuery, type StatsQueryMode } from '@features/analytics/services/stats-query';
-import { FunnelList } from '@features/analytics/components/funnel-list';
-import { MetricCardGroup, MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
-import { FunnelManager } from '@features/funnels/components/funnel-manager';
-import { FunnelViewer } from '@features/funnels/components/funnel-viewer';
-import { Funnel } from '@models/analytics.types';
-import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
+import { ConfirmDialogModule } from '@openng/optimus-ui/confirmdialog';
+import { InputTextModule } from '@openng/optimus-ui/inputtext';
+import { TableModule } from '@openng/optimus-ui/table';
+import { finalize, Subscription } from 'rxjs';
+import { SITE_CAPABILITIES } from '@core/access/capabilities';
+import { calcDelta } from '@core/analytics/delta-utils';
+import { HITKEEP_CHART_PALETTE } from '@core/charts/hitkeep-chart-options';
+import { injectActiveLang } from '@core/i18n/active-lang';
+import { dialogCancelButton, dialogDangerButton } from '@components/dialog-actions/dialog-actions';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
-import { NoSiteSelected } from '@components/no-site-selected/no-site-selected';
-import { SeriesChart, SeriesDefinition, SeriesChartPoint } from '@features/analytics/components/series-chart';
-import { FunnelSeriesPoint } from '@models/analytics.types';
-import { KPI_PERCENT_FORMAT, KpiCard, KpiCardModel } from '@features/analytics/components/kpi-card';
+import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
+import { PageState } from '@components/page-state/page-state';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
-import { finalize } from 'rxjs';
-import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
+import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
+import { KpiCard, KpiCardModel, KPI_PERCENT_FORMAT } from '@features/analytics/components/kpi-card';
+import { ConversionSubjectCard } from '@features/analytics/components/conversion-subject-card';
+import { SeriesChart, SeriesChartPoint, SeriesDefinition } from '@features/analytics/components/series-chart';
+import { TrafficRecordsCard } from '@features/hits/components/traffic-records-card';
+import { injectStatsQuery, StatsQueryMode } from '@features/analytics/services/stats-query';
+import { FunnelManager } from '@features/funnels/components/funnel-manager';
+import { SiteService } from '@features/sites/services/site.service';
+import { Funnel, FunnelSeriesPoint, FunnelStats } from '@models/analytics.types';
+import { AccessService } from '@services/access.service';
+import { AnalyticsService } from '@services/analytics.service';
+import { NavigationNoticeService } from '@services/navigation-notice.service';
 import { REALTIME_FUNNEL_KINDS } from '@services/realtime.service';
+import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
 import { injectReportRange } from '@services/report-range-preferences.service';
-
-type MetricFilterType = 'path' | 'referrer' | 'device' | 'country' | 'city' | 'provider' | 'asn';
-interface MetricFilter {
-    type: MetricFilterType;
-    value: string;
-}
+import { ShareService } from '@services/share.service';
 
 @Component({
     selector: 'app-funnels',
     standalone: true,
-    imports: [ReactiveFormsModule, ButtonModule, CardModule, SelectModule, PageHeader, PageHeaderLeft, PageBreadcrumb, ReportRangeToolbar, SeriesChart, KpiCard, MetricCardGroup, FunnelList, FunnelManager, FunnelViewer, NoSiteSelected, TranslocoPipe],
+    imports: [
+        ButtonModule,
+        CardModule,
+        ConfirmDialogModule,
+        ConversionSubjectCard,
+        FunnelManager,
+        InputTextModule,
+        KpiCard,
+        PageBreadcrumb,
+        PageHeader,
+        PageHeaderLeft,
+        PageState,
+        ReportRangeToolbar,
+        SeriesChart,
+        TableModule,
+        TableRowActions,
+        TrafficRecordsCard,
+        TranslocoDecimalPipe,
+        TranslocoPipe
+    ],
+    providers: [ConfirmationService],
     templateUrl: './funnels.html',
     styleUrl: './funnels.css',
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Funnels {
     protected siteService = inject(SiteService);
-    protected analyticsService = inject(AnalyticsService);
-    private localeService = inject(TranslocoLocaleService);
+    private analytics = inject(AnalyticsService);
+    private access = inject(AccessService);
+    private route = inject(ActivatedRoute);
+    private router = inject(Router);
     private transloco = inject(TranslocoService);
+    private locale = inject(TranslocoLocaleService);
+    private confirmation = inject(ConfirmationService);
     private destroyRef = inject(DestroyRef);
-    private realtimeRefresh = inject(RealtimeRefreshCoordinator);
-    private readonly reportRange = injectReportRange();
-    private readonly activeLanguage = injectActiveLang();
+    private realtime = inject(RealtimeRefreshCoordinator);
+    private notice = inject(NavigationNoticeService);
+    private share = inject(ShareService);
+    protected reportRange = injectReportRange();
+    private activeLanguage = injectActiveLang();
     private statsQuery = injectStatsQuery();
-
-    private readonly funnelFilterFormModel = signal({
-        funnelFilter: new FormControl<{ id: string; name: string } | null>(null)
-    });
-    protected readonly funnelFilterForm = compatForm(this.funnelFilterFormModel);
-    protected readonly isShortRange = this.reportRange.isShortRange;
-    protected isFunnelManagerVisible = signal(false);
-    protected isFunnelViewerVisible = signal(false);
-    protected selectedFunnel = signal<Funnel | null>(null);
-    protected funnelEditRequestId = signal<string | null>(null);
+    private lastSiteId: string | null = null;
+    private createRequested = false;
+    private reportingRequest: Subscription | null = null;
+    private funnelStatsRequest: Subscription | null = null;
+    private reportingSequence = 0;
+    private funnelStatsSequence = 0;
 
     protected funnels = signal<Funnel[]>([]);
     protected loading = signal(false);
-    protected funnelsLoaded = signal(false);
+    protected loadError = signal(false);
+    protected selectedFunnelId = signal<string | null>(null);
+    protected selectedFunnel = computed(() => this.funnels().find((funnel) => funnel.id === this.selectedFunnelId()) ?? null);
+    protected subjectControl = new FormControl<string | null>(null);
+    protected editorVisible = signal(false);
+    protected editingFunnel = signal<Funnel | null>(null);
+    protected deletingFunnelId = signal<string | null>(null);
+    protected funnelSeries = signal<FunnelSeriesPoint[]>([]);
+    protected comparisonFunnelSeries = signal<FunnelSeriesPoint[]>([]);
+    protected seriesLoading = signal(false);
+    protected funnelStats = signal<FunnelStats | null>(null);
+    protected funnelStatsLoading = signal(false);
+    protected trafficRefreshKey = signal(0);
+    protected isShortRange = this.reportRange.isShortRange;
     protected stats = this.statsQuery.stats;
     protected isStatsLoading = this.statsQuery.isLoading;
-    protected currentComparisonRange = this.statsQuery.comparisonRange;
-    protected readonly kpiUpdateKey = signal(0);
-    protected isRefreshing = computed(() => this.isStatsLoading() || this.isFunnelSeriesLoading() || this.loading());
-    protected funnelSeries = signal<FunnelSeriesPoint[]>([]);
-    protected funnelSeriesChart = computed<SeriesChartPoint[]>(() =>
+    protected isRefreshing = computed(() => this.loading() || this.seriesLoading() || this.funnelStatsLoading());
+    protected canManage = computed(() => {
+        const site = this.siteService.activeSite();
+        return !!site && this.access.canSite(site.id, SITE_CAPABILITIES.manageGoals);
+    });
+    protected trafficDateRange = computed(() => this.reportRange.currentDateRange());
+    protected trafficFunnelIds = computed(() => {
+        const selected = this.selectedFunnelId();
+        return selected ? [selected] : this.funnels().map((funnel) => funnel.id);
+    });
+    protected trafficEnabled = computed(() => this.trafficFunnelIds().length > 0);
+    protected trafficDescriptionKey = computed(() => (this.selectedFunnelId() ? 'funnels.traffic.selectedDescription' : 'funnels.traffic.allDescription'));
+    protected trafficShareToken = computed(() => this.share.token());
+    protected subjectOptions = computed(() => {
+        this.activeLanguage();
+        return [
+            { label: this.transloco.translate('funnels.subject.all'), value: null },
+            ...this.funnels().map((funnel) => ({
+                label: funnel.name,
+                value: funnel.id
+            }))
+        ];
+    });
+    protected subjectDescription = computed(() => {
+        this.activeLanguage();
+        const funnel = this.selectedFunnel();
+        if (!funnel)
+            return this.transloco.translate('funnels.definitions.count', {
+                count: this.funnels().length
+            });
+        const steps = funnel.steps.map((step) => step.value).join(' → ');
+        return `${this.transloco.translate('funnels.list.stepsCount', { count: funnel.steps.length })} · ${steps}`;
+    });
+    protected seriesData = computed<SeriesChartPoint[]>(() =>
         this.funnelSeries().map((point) => ({
             time: point.time,
             entries: point.entries,
             completions: point.completions
         }))
     );
-    protected comparisonFunnelSeries = signal<FunnelSeriesPoint[]>([]);
-    protected comparisonFunnelSeriesChart = computed<SeriesChartPoint[]>(() =>
+    protected comparisonSeriesData = computed<SeriesChartPoint[]>(() =>
         this.comparisonFunnelSeries().map((point) => ({
             time: point.time,
             entries: point.entries,
             completions: point.completions
         }))
     );
-    protected isFunnelSeriesLoading = signal(false);
-    protected isComparisonFunnelSeriesLoading = signal(false);
-    protected activeFunnelFilters = signal<{ id: string; name: string }[]>([]);
-    protected activeFilters = signal<{ type: MetricFilterType; value: string }[]>([]);
-    protected hasFilters = computed(() => this.activeFilters().length > 0);
-    protected filterChips = computed(() =>
-        this.activeFilters().map((filter) => ({
-            ...filter,
-            label: this.filterLabel(filter)
-        }))
-    );
-
-    protected comparisonLabel = computed(() => {
-        this.activeLanguage();
-        const r = this.currentComparisonRange();
-        if (!r) return '';
-        const showYear = new Date(r.from).getFullYear() !== new Date().getFullYear();
-        const opts = showYear ? ({ month: 'short', day: 'numeric', year: 'numeric' } as const) : ({ month: 'short', day: 'numeric' } as const);
-        const fmt = (d: string) => this.localeService.localizeDate(new Date(d), undefined, opts);
-        return `${fmt(r.from)} – ${fmt(r.to)}`;
-    });
-
-    protected readonly funnelKpis = computed<KpiCardModel[]>(() => {
-        this.activeLanguage();
-        const activeIds = new Set(this.activeFunnelFilters().map((filter) => filter.id));
-        const funnelsCount = activeIds.size > 0 ? this.funnels().filter((funnel) => activeIds.has(funnel.id)).length : this.funnels().length;
-        const entries = this.funnelSeries().reduce((sum, point) => sum + point.entries, 0);
-        const completions = this.funnelSeries().reduce((sum, point) => sum + point.completions, 0);
-        const completionRate = entries > 0 ? (completions / entries) * 100 : 0;
-        const cmpEntries = this.comparisonFunnelSeries().reduce((sum, point) => sum + point.entries, 0);
-        const cmpCompletions = this.comparisonFunnelSeries().reduce((sum, point) => sum + point.completions, 0);
-        const cmpCompletionRate = cmpEntries > 0 ? (cmpCompletions / cmpEntries) * 100 : 0;
-        const updateKey = this.kpiUpdateKey();
-
-        return [
-            {
-                label: this.transloco.translate('funnels.kpis.funnels'),
-                value: funnelsCount,
-                loading: this.loading(),
-                updateKey,
-                valueClass: 'text-2xl xl:text-3xl font-bold',
-                delta: null as number | null
-            },
-            {
-                label: this.transloco.translate('funnels.kpis.entries'),
-                value: entries,
-                loading: this.isFunnelSeriesLoading(),
-                updateKey,
-                valueClass: 'text-2xl xl:text-3xl font-bold',
-                delta: this.calcDelta(entries, cmpEntries)
-            },
-            {
-                label: this.transloco.translate('funnels.kpis.completions'),
-                value: completions,
-                loading: this.isFunnelSeriesLoading(),
-                updateKey,
-                valueClass: 'text-2xl xl:text-3xl font-bold',
-                delta: this.calcDelta(completions, cmpCompletions)
-            },
-            {
-                label: this.transloco.translate('funnels.kpis.completionRate'),
-                value: completionRate,
-                loading: this.isFunnelSeriesLoading(),
-                updateKey,
-                valueClass: 'text-2xl xl:text-3xl font-bold',
-                format: KPI_PERCENT_FORMAT,
-                suffix: '%',
-                delta: this.calcDelta(completionRate, cmpCompletionRate)
-            }
-        ];
-    });
-    protected readonly funnelSeriesConfig = computed<SeriesDefinition[]>(() => {
+    protected seriesConfig = computed<SeriesDefinition[]>(() => {
         this.activeLanguage();
         return [
             {
                 key: 'entries',
                 label: this.transloco.translate('funnels.kpis.entries'),
-                color: '#6366f1',
-                gradientFrom: 'rgba(99, 102, 241, 0.5)',
-                gradientTo: 'rgba(99, 102, 241, 0.0)'
+                color: HITKEEP_CHART_PALETTE.primary
             },
             {
                 key: 'completions',
                 label: this.transloco.translate('funnels.kpis.completions'),
-                color: '#14b8a6',
-                gradientFrom: 'rgba(20, 184, 166, 0.5)',
-                gradientTo: 'rgba(20, 184, 166, 0.0)'
+                color: HITKEEP_CHART_PALETTE.secondary
             }
         ];
     });
-    protected readonly metricCardTabs = computed<MetricCardGroupTab<MetricFilterType>[]>(() => {
+    protected comparisonLabel = computed(() => {
         this.activeLanguage();
-        const stats = this.stats();
-        const loading = this.isStatsLoading();
-        const siteDomain = this.siteService.activeSite()?.domain ?? null;
+        const range = this.statsQuery.comparisonRange();
+        if (!range) return '';
+        const format = (value: string) =>
+            this.locale.localizeDate(new Date(value), undefined, {
+                month: 'short',
+                day: 'numeric'
+            });
+        return `${format(range.from)} – ${format(range.to)}`;
+    });
+    protected kpis = computed<KpiCardModel[]>(() => {
+        this.activeLanguage();
+        const entries = this.funnelSeries().reduce((sum, point) => sum + point.entries, 0);
+        const completions = this.funnelSeries().reduce((sum, point) => sum + point.completions, 0);
+        const comparisonEntries = this.comparisonFunnelSeries().reduce((sum, point) => sum + point.entries, 0);
+        const comparisonCompletions = this.comparisonFunnelSeries().reduce((sum, point) => sum + point.completions, 0);
+        const rate = entries ? (completions / entries) * 100 : 0;
+        const comparisonRate = comparisonEntries ? (comparisonCompletions / comparisonEntries) * 100 : 0;
         return [
             {
-                id: 'content',
-                label: this.transloco.translate('common.metricGroups.content'),
-                icon: 'pi-file',
-                cards: [
-                    {
-                        id: 'top-pages',
-                        title: this.transloco.translate('common.metrics.topPages'),
-                        icon: 'pi-file',
-                        data: stats?.top_pages ?? [],
-                        linkMode: 'path',
-                        siteDomain,
-                        isLoading: loading,
-                        isRowClickable: true,
-                        activeValue: this.activeFilterValue('path'),
-                        filterType: 'path'
-                    }
-                ]
+                label: this.transloco.translate('funnels.kpis.entries'),
+                value: entries,
+                loading: this.seriesLoading(),
+                delta: calcDelta(entries, comparisonEntries)
             },
             {
-                id: 'acquisition',
-                label: this.transloco.translate('common.metricGroups.acquisition'),
-                icon: 'pi-link',
-                cards: [
-                    {
-                        id: 'sources',
-                        title: this.transloco.translate('common.metrics.topSources'),
-                        icon: 'pi-link',
-                        data: stats?.top_referrers ?? [],
-                        linkMode: 'url',
-                        isLoading: loading,
-                        isRowClickable: true,
-                        activeValue: this.activeFilterValue('referrer'),
-                        filterType: 'referrer'
-                    }
-                ]
+                label: this.transloco.translate('funnels.kpis.completions'),
+                value: completions,
+                loading: this.seriesLoading(),
+                delta: calcDelta(completions, comparisonCompletions)
             },
             {
-                id: 'audience',
-                label: this.transloco.translate('common.metricGroups.audience'),
-                icon: 'pi-users',
-                cards: [
-                    {
-                        id: 'devices',
-                        title: this.transloco.translate('common.metrics.devices'),
-                        icon: 'pi-mobile',
-                        data: stats?.top_devices ?? [],
-                        isLoading: loading,
-                        isRowClickable: true,
-                        activeValue: this.activeFilterValue('device'),
-                        filterType: 'device'
-                    }
-                ]
-            },
-            {
-                id: 'location',
-                label: this.transloco.translate('common.metricGroups.location'),
-                icon: 'pi-map',
-                cards: [
-                    {
-                        id: 'countries',
-                        title: this.transloco.translate('common.metrics.countries'),
-                        icon: 'pi-globe',
-                        data: stats?.top_countries ?? [],
-                        isLoading: loading,
-                        isRowClickable: true,
-                        activeValue: this.activeFilterValue('country'),
-                        showCountryFlags: true,
-                        showCountryNames: true,
-                        filterType: 'country'
-                    },
-                    {
-                        id: 'cities',
-                        title: this.transloco.translate('common.metrics.cities'),
-                        icon: 'pi-map-marker',
-                        data: stats?.top_cities ?? [],
-                        isLoading: loading,
-                        isRowClickable: true,
-                        activeValue: this.activeFilterValue('city'),
-                        filterType: 'city'
-                    }
-                ]
-            },
-            {
-                id: 'network',
-                label: this.transloco.translate('common.metricGroups.network'),
-                icon: 'pi-server',
-                cards: [
-                    {
-                        id: 'providers',
-                        title: this.transloco.translate('common.metrics.providers'),
-                        icon: 'pi-server',
-                        data: stats?.top_providers ?? [],
-                        isLoading: loading,
-                        isRowClickable: true,
-                        activeValue: this.activeFilterValue('provider'),
-                        filterType: 'provider'
-                    },
-                    {
-                        id: 'asns',
-                        title: this.transloco.translate('common.metrics.asns'),
-                        icon: 'pi-sitemap',
-                        data: stats?.top_asns ?? [],
-                        isLoading: loading,
-                        isRowClickable: true,
-                        activeValue: this.activeFilterValue('asn'),
-                        filterType: 'asn'
-                    }
-                ]
+                label: this.transloco.translate('funnels.kpis.completionRate'),
+                value: rate,
+                loading: this.seriesLoading(),
+                format: KPI_PERCENT_FORMAT,
+                suffix: '%',
+                delta: calcDelta(rate, comparisonRate)
             }
         ];
     });
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
+    protected pathSuggestions = computed(() => (this.stats()?.top_pages ?? []).map((item) => item.name).filter(Boolean));
+    protected eventSuggestions = computed(() => [...new Set(this.funnels().flatMap((funnel) => funnel.steps.filter((step) => step.type === 'event').map((step) => step.value)))]);
+    protected breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
         this.activeLanguage();
         const site = this.siteService.activeSite();
-        if (!site) {
-            return [{ label: this.transloco.translate('nav.funnels'), isCurrent: true }];
-        }
-        return [
-            { label: site.domain, favicon: site, routerLink: '/dashboard' },
-            { label: this.transloco.translate('nav.funnels'), isCurrent: true }
-        ];
+        return site
+            ? [
+                  { label: site.domain, favicon: site, routerLink: '/dashboard' },
+                  { label: this.transloco.translate('nav.funnels'), isCurrent: true }
+              ]
+            : [{ label: this.transloco.translate('nav.funnels'), isCurrent: true }];
     });
-    protected readonly viewerDateRange = computed(() => this.getDateRange());
 
     constructor() {
+        this.destroyRef.onDestroy(() => {
+            this.reportingRequest?.unsubscribe();
+            this.funnelStatsRequest?.unsubscribe();
+        });
+        this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+            this.selectedFunnelId.set(params.get('funnel'));
+            this.createRequested = params.get('create') === '1';
+        });
         effect(() => {
             const site = this.siteService.activeSite();
-            if (site) {
-                this.loadFunnels();
-            } else {
-                this.funnels.set([]);
-                this.funnelsLoaded.set(false);
+            if (this.lastSiteId && site?.id !== this.lastSiteId) {
+                this.selectedFunnelId.set(null);
+                this.subjectControl.setValue(null, { emitEvent: false });
+                void this.router.navigate([], {
+                    relativeTo: this.route,
+                    queryParams: { funnel: null },
+                    queryParamsHandling: 'merge',
+                    replaceUrl: true
+                });
             }
+            this.lastSiteId = site?.id ?? null;
+            if (site) this.loadFunnels(site.id);
+            else this.funnels.set([]);
         });
-
         effect(() => {
             const site = this.siteService.activeSite();
-            const filters = this.activeFunnelFilters();
-            const metricFilters = this.activeFilters();
-            const dates = this.getCurrentDateRange();
-            if (site && dates && this.funnelsLoaded()) {
-                const funnelIds = this.getFunnelIdsForFilters();
-                if (funnelIds.length === 0 && filters.length === 0) {
-                    this.stats.set(null);
-                    return;
-                }
-                this.loadFunnelSeries(site.id, dates.from, dates.to, funnelIds);
-                this.loadStats(site.id, dates.from, dates.to, metricFilters, funnelIds);
-                const cmpRange = untracked(() => this.currentComparisonRange());
-                if (cmpRange) {
-                    this.loadComparisonFunnelSeries(site.id, cmpRange.from, cmpRange.to, funnelIds);
-                }
+            const dates = this.reportRange.currentDateRange();
+            const funnels = this.funnels();
+            const selected = this.selectedFunnelId();
+            if (!site || !dates || this.loading()) return;
+            if (this.createRequested && this.canManage()) {
+                this.createRequested = false;
+                this.openCreate();
             }
+            if (selected && !funnels.some((funnel) => funnel.id === selected)) {
+                this.notice.show('funnels.notices.unavailable', {
+                    preserveNextNavigation: true
+                });
+                this.selectFunnel(null);
+                return;
+            }
+            this.loadReporting(site.id, dates.from, dates.to, selected ? [selected] : []);
+            if (selected) this.loadFunnelStats(site.id, selected, dates.from, dates.to);
+            else this.clearFunnelStats();
         });
-        this.realtimeRefresh.registerUntilDestroyed(this.destroyRef, {
+        this.realtime.registerUntilDestroyed(this.destroyRef, {
             siteId: () => this.siteService.activeSite()?.id ?? null,
             kinds: REALTIME_FUNNEL_KINDS,
-            enabled: () => !!this.siteService.activeSite() && !!this.getCurrentDateRange(),
-            refresh: () => this.refreshStats('background'),
+            enabled: () => !!this.siteService.activeSite(),
+            refresh: () => this.refresh('background'),
             debounceMs: 700
         });
     }
 
-    loadFunnels() {
+    protected selectFunnel(id: string | null) {
+        this.selectedFunnelId.set(id);
+        this.subjectControl.setValue(id, { emitEvent: false });
+        void this.router.navigate([], {
+            relativeTo: this.route,
+            queryParams: { funnel: id, create: null },
+            queryParamsHandling: 'merge',
+            replaceUrl: true
+        });
+    }
+    protected openCreate() {
+        if (!this.canManage()) return;
+        this.editingFunnel.set(null);
+        this.editorVisible.set(true);
+    }
+    protected openEdit(funnel: Funnel) {
+        this.editingFunnel.set(funnel);
+        this.editorVisible.set(true);
+    }
+    protected funnelActions(funnel: Funnel): TableRowActionItem[] {
+        return [
+            {
+                label: this.transloco.translate('common.actions.edit'),
+                icon: 'pi pi-pencil',
+                command: () => this.openEdit(funnel)
+            },
+            {
+                label: this.transloco.translate('common.actions.delete'),
+                icon: 'pi pi-trash',
+                danger: true,
+                command: () => this.confirmDelete(funnel)
+            }
+        ];
+    }
+    private confirmDelete(funnel: Funnel) {
+        this.confirmation.confirm({
+            message: this.transloco.translate('funnels.manager.confirmDelete', {
+                name: funnel.name
+            }),
+            icon: 'pi pi-exclamation-triangle',
+            rejectButtonProps: dialogCancelButton(this.transloco.translate('common.actions.cancel')),
+            acceptButtonProps: dialogDangerButton(this.transloco.translate('common.actions.delete')),
+            accept: () => this.deleteFunnel(funnel)
+        });
+    }
+    private deleteFunnel(funnel: Funnel) {
         const site = this.siteService.activeSite();
         if (!site) return;
-        this.loading.set(true);
-        this.funnelsLoaded.set(false);
-        this.analyticsService.getFunnels(site.id).subscribe({
-            next: (data) => {
-                this.funnels.set(data);
-                this.loading.set(false);
-                this.funnelsLoaded.set(true);
-            },
-            error: () => {
-                this.loading.set(false);
-                this.funnelsLoaded.set(true);
-            }
-        });
-    }
-
-    protected availableFunnelFilters = computed(() => {
-        const selected = new Set(this.activeFunnelFilters().map((filter) => filter.id));
-        return this.funnels()
-            .filter((funnel) => !selected.has(funnel.id))
-            .map((funnel) => ({
-                label: funnel.name,
-                value: { id: funnel.id, name: funnel.name }
-            }));
-    });
-
-    protected addFunnelFilter(filter: { id: string; name: string } | null) {
-        if (!filter) return;
-        const active = this.activeFunnelFilters();
-        if (active.some((existing) => existing.id === filter.id)) return;
-        this.activeFunnelFilters.set([...active, filter]);
-    }
-
-    protected onFunnelFilterSelect(filter: { id: string; name: string } | null): void {
-        this.addFunnelFilter(filter);
-        this.funnelFilterForm.funnelFilter().control().setValue(null, { emitEvent: false });
-    }
-
-    protected removeFunnelFilter(id: string) {
-        this.activeFunnelFilters.update((list) => list.filter((item) => item.id !== id));
-    }
-
-    protected clearFunnelFilters() {
-        this.activeFunnelFilters.set([]);
-    }
-
-    private getFunnelIdsForFilters(): string[] {
-        const active = this.activeFunnelFilters();
-        if (active.length > 0) {
-            return active.map((filter) => filter.id);
-        }
-        return this.funnels().map((funnel) => funnel.id);
-    }
-
-    protected applyMetricFilter(type: MetricFilterType, metric: { name: string }) {
-        if (!metric.name) return;
-        this.activeFilters.update((filters) => {
-            const existingIndex = filters.findIndex((filter) => filter.type === type);
-            if (existingIndex >= 0) {
-                const existing = filters[existingIndex];
-                if (existing.value === metric.name) {
-                    return filters.filter((_, idx) => idx !== existingIndex);
-                }
-                const next = [...filters];
-                next[existingIndex] = { type, value: metric.name };
-                return next;
-            }
-            return [...filters, { type, value: metric.name }];
-        });
-    }
-
-    protected onMetricCardClick(event: MetricCardGroupRowClick): void {
-        this.applyMetricFilter(event.filterType as MetricFilterType, event.metric);
-    }
-
-    protected clearFilter() {
-        this.activeFilters.set([]);
-    }
-
-    protected removeFilter(type: MetricFilterType, value: string) {
-        this.activeFilters.update((filters) => filters.filter((filter) => !(filter.type === type && filter.value === value)));
-    }
-
-    protected activeFilterValue(type: MetricFilterType): string | null {
-        return this.activeFilters().find((filter) => filter.type === type)?.value ?? null;
-    }
-
-    private filterLabel(filter: MetricFilter): string {
-        switch (filter.type) {
-            case 'path':
-                return this.transloco.translate('common.filters.page', {
-                    value: filter.value
-                });
-            case 'referrer':
-                return this.transloco.translate('common.filters.source', {
-                    value: filter.value
-                });
-            case 'device':
-                return this.transloco.translate('common.filters.device', {
-                    value: filter.value
-                });
-            case 'country':
-                return this.transloco.translate('common.filters.country', {
-                    value: filter.value
-                });
-            case 'city':
-                return this.transloco.translate('common.filters.city', {
-                    value: filter.value
-                });
-            case 'provider':
-                return this.transloco.translate('common.filters.provider', {
-                    value: filter.value
-                });
-            case 'asn':
-                return this.transloco.translate('common.filters.asn', {
-                    value: filter.value
-                });
-            default:
-                return `${filter.type}: ${filter.value}`;
-        }
-    }
-
-    private loadFunnelSeries(siteId: string, from: string, to: string, funnelIds: string[], mode: StatsQueryMode = 'blocking') {
-        const blocking = mode === 'blocking' || this.isFunnelSeriesLoading();
-        if (blocking) this.isFunnelSeriesLoading.set(true);
-        this.analyticsService
-            .getFunnelTimeseries(siteId, from, to, funnelIds)
-            .pipe(
-                finalize(() => {
-                    if (blocking) this.isFunnelSeriesLoading.set(false);
-                })
-            )
+        this.deletingFunnelId.set(funnel.id);
+        this.analytics
+            .deleteFunnel(site.id, funnel.id)
+            .pipe(finalize(() => this.deletingFunnelId.set(null)))
             .subscribe({
-                next: (data) => {
-                    this.funnelSeries.set(data ?? []);
-                    if (!blocking) this.kpiUpdateKey.update((key) => key + 1);
+                next: () => {
+                    if (this.selectedFunnelId() === funnel.id) this.selectFunnel(null);
+                    this.loadFunnels(site.id);
+                }
+            });
+    }
+    protected onDefinitionsChanged() {
+        const site = this.siteService.activeSite();
+        if (site) this.loadFunnels(site.id);
+    }
+    protected refresh(mode: StatsQueryMode = 'blocking') {
+        const site = this.siteService.activeSite();
+        const dates = this.reportRange.currentDateRange();
+        if (!site || !dates) return;
+        this.trafficRefreshKey.update((key) => key + 1);
+        const selected = this.selectedFunnelId();
+        this.loadReporting(site.id, dates.from, dates.to, selected ? [selected] : [], mode);
+        if (selected) this.loadFunnelStats(site.id, selected, dates.from, dates.to);
+    }
+    private loadFunnels(siteId: string) {
+        this.loading.set(true);
+        this.loadError.set(false);
+        this.analytics
+            .getFunnels(siteId)
+            .pipe(finalize(() => this.loading.set(false)))
+            .subscribe({
+                next: (funnels) => {
+                    this.funnels.set(funnels ?? []);
+                    this.subjectControl.setValue(this.selectedFunnelId(), {
+                        emitEvent: false
+                    });
                 },
                 error: () => {
-                    if (blocking) this.funnelSeries.set([]);
+                    this.funnels.set([]);
+                    this.loadError.set(true);
                 }
             });
     }
-
-    private loadComparisonFunnelSeries(siteId: string, from: string, to: string, funnelIds: string[], mode: StatsQueryMode = 'blocking') {
-        const blocking = mode === 'blocking' || this.isComparisonFunnelSeriesLoading();
-        if (blocking) this.isComparisonFunnelSeriesLoading.set(true);
-        this.analyticsService
-            .getFunnelTimeseries(siteId, from, to, funnelIds)
-            .pipe(
-                finalize(() => {
-                    if (blocking) this.isComparisonFunnelSeriesLoading.set(false);
+    private loadReporting(siteId: string, from: string, to: string, funnelIds: string[], mode: StatsQueryMode = 'blocking') {
+        const sequence = ++this.reportingSequence;
+        this.reportingRequest?.unsubscribe();
+        const request = new Subscription();
+        this.reportingRequest = request;
+        this.statsQuery.load({ siteId, from, to, funnelIds, mode });
+        const blocking = mode === 'blocking';
+        if (blocking) this.seriesLoading.set(true);
+        request.add(
+            this.analytics
+                .getFunnelTimeseries(siteId, from, to, funnelIds)
+                .pipe(finalize(() => sequence === this.reportingSequence && blocking && this.seriesLoading.set(false)))
+                .subscribe({ next: (series) => sequence === this.reportingSequence && this.funnelSeries.set(series ?? []) })
+        );
+        const comparison = untracked(() => this.statsQuery.comparisonRange());
+        if (comparison) {
+            request.add(
+                this.analytics.getFunnelTimeseries(siteId, comparison.from, comparison.to, funnelIds).subscribe({
+                    next: (series) => sequence === this.reportingSequence && this.comparisonFunnelSeries.set(series ?? [])
                 })
-            )
+            );
+        }
+    }
+    private loadFunnelStats(siteId: string, funnelId: string, from: string, to: string) {
+        const sequence = ++this.funnelStatsSequence;
+        this.funnelStatsRequest?.unsubscribe();
+        this.funnelStatsLoading.set(true);
+        this.funnelStatsRequest = this.analytics
+            .getFunnelStats(siteId, funnelId, from, to)
+            .pipe(finalize(() => sequence === this.funnelStatsSequence && this.funnelStatsLoading.set(false)))
             .subscribe({
-                next: (data) => this.comparisonFunnelSeries.set(data ?? []),
-                error: () => {
-                    if (blocking) this.comparisonFunnelSeries.set([]);
-                }
+                next: (stats) => sequence === this.funnelStatsSequence && this.funnelStats.set(stats),
+                error: () => sequence === this.funnelStatsSequence && this.funnelStats.set(null)
             });
     }
 
-    protected readonly calcDelta = calcDelta;
-
-    protected refreshStats(mode: StatsQueryMode = 'blocking') {
-        const site = this.siteService.activeSite();
-        const dates = this.getCurrentDateRange();
-        if (!site || !dates) return;
-
-        const filters = this.activeFunnelFilters();
-        const metricFilters = this.activeFilters();
-        const funnelIds = this.getFunnelIdsForFilters();
-
-        if (funnelIds.length === 0 && filters.length === 0) {
-            this.stats.set(null);
-            return;
-        }
-
-        this.loadFunnelSeries(site.id, dates.from, dates.to, funnelIds, mode);
-        this.loadStats(site.id, dates.from, dates.to, metricFilters, funnelIds, mode);
-        const cmpRange = this.currentComparisonRange();
-        if (cmpRange) {
-            this.loadComparisonFunnelSeries(site.id, cmpRange.from, cmpRange.to, funnelIds, mode);
-        }
-    }
-
-    private loadStats(siteId: string, from: string, to: string, filters: MetricFilter[], funnelIds: string[], mode: StatsQueryMode = 'blocking') {
-        const effectiveMode = mode === 'background' && this.stats() && !this.isStatsLoading() ? 'background' : 'blocking';
-        this.statsQuery.load({
-            siteId,
-            from,
-            to,
-            filters,
-            funnelIds,
-            mode: effectiveMode
-        });
-    }
-
-    protected getCurrentDateRange() {
-        return this.reportRange.currentDateRange();
-    }
-
-    openFunnelManager() {
-        this.funnelEditRequestId.set(null);
-        this.isFunnelManagerVisible.set(true);
-    }
-
-    setFunnelManagerVisible(visible: boolean) {
-        this.isFunnelManagerVisible.set(visible);
-        if (!visible) {
-            this.funnelEditRequestId.set(null);
-        }
-    }
-
-    viewFunnel(funnel: Funnel) {
-        this.selectedFunnel.set(funnel);
-        this.isFunnelViewerVisible.set(true);
-    }
-
-    editSelectedFunnel() {
-        const funnel = this.selectedFunnel();
-        if (!funnel) return;
-        this.funnelEditRequestId.set(funnel.id);
-        this.isFunnelViewerVisible.set(false);
-        this.isFunnelManagerVisible.set(true);
-    }
-
-    getDateRange() {
-        const range = this.getCurrentDateRange();
-        if (range) return range;
-        return this.reportRange.defaultDateRange();
+    private clearFunnelStats() {
+        this.funnelStatsSequence += 1;
+        this.funnelStatsRequest?.unsubscribe();
+        this.funnelStatsRequest = null;
+        this.funnelStatsLoading.set(false);
+        this.funnelStats.set(null);
     }
 }

@@ -16,17 +16,11 @@ func (s *Store) GetSiteOverviewStats(ctx context.Context, params api.AnalyticsPa
 	}
 
 	filterSQL, filterArgs := buildHitFilters(params.Filters, "h")
-	funnelPathSQL, funnelPathArgs, err := s.buildFunnelPathFilter(ctx, params, "h")
-	if err != nil {
-		return nil, err
-	}
 	sessionSQL, sessionArgs, err := s.buildSessionFilter(ctx, params, "h")
 	if err != nil {
 		return nil, err
 	}
-	filterSQL += funnelPathSQL
 	filterSQL += sessionSQL
-	filterArgs = append(filterArgs, funnelPathArgs...)
 	filterArgs = append(filterArgs, sessionArgs...)
 
 	truncUnit := truncUnitForRange(params.Start, params.End)
@@ -34,7 +28,7 @@ func (s *Store) GetSiteOverviewStats(ctx context.Context, params api.AnalyticsPa
 	gridStart := truncToUnit(params.Start, truncUnit)
 	gridEnd := truncToUnit(params.End, truncUnit)
 	useRollups := len(params.Filters) == 0 && canUseRollupsForTruncUnit(truncUnit)
-	if sessionSQL != "" || funnelPathSQL != "" {
+	if sessionSQL != "" {
 		useRollups = false
 	}
 

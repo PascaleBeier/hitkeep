@@ -1,101 +1,123 @@
-<div class="flex flex-col h-full w-full bg-[var(--p-surface-ground)] transition-colors duration-200">
-    <!-- Header -->
+<div class="flex flex-col h-full w-full bg-[var(--p-surface-ground)]">
+    <p-confirmdialog />
     <app-page-header>
-        <ng-template appPageHeaderLeft>
-            <div>
-                <app-page-breadcrumb [items]="breadcrumbItems()" />
-            </div>
-        </ng-template>
+        <ng-template appPageHeaderLeft><app-page-breadcrumb [items]="breadcrumbItems()" /></ng-template>
     </app-page-header>
 
-    <app-report-range-toolbar [loading]="isRefreshing()" (refresh)="refreshStats()">
-        <p-button toolbar-right icon="pi pi-plus" [label]="'goals.manageAction' | transloco" (onClick)="openGoalManager()" class="p-button-rounded p-button-secondary" size="small"> </p-button>
+    <app-report-range-toolbar [loading]="isRefreshing()" (refresh)="refresh()">
+        @if (canManage()) {
+        <p-button toolbar-right icon="pi pi-plus" [label]="'goals.list.createAction' | transloco" size="small" (onClick)="openCreate()" />
+        }
     </app-report-range-toolbar>
 
     @if (siteService.isLoading()) {
-    <div class="flex items-center gap-2 text-sm text-[var(--p-text-muted-color)]">
-        <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
-        <span>{{ "common.loadingSiteData" | transloco }}</span>
-    </div>
-    } @else if (siteService.activeSite()) {
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        @for (card of goalKpis(); track card.label) {
-        <app-kpi-card [label]="card.label" [value]="card.value" [loading]="card.loading" [updateKey]="card.updateKey ?? 0" [valueClass]="card.valueClass ?? ''" [format]="card.format" [suffix]="card.suffix" [delta]="card.delta ?? null" />
+    <app-page-state titleKey="common.loading" messageKey="common.loadingSiteData" icon="pi pi-spin pi-spinner" />
+    } @else if (!siteService.activeSite()) {
+    <app-page-state titleKey="common.noSiteSelected" messageKey="goals.noSiteDescription" icon="pi pi-globe" />
+    } @else if (goalsError()) {
+    <app-page-state titleKey="goals.states.errorTitle" messageKey="goals.states.errorDescription" icon="pi pi-exclamation-circle" actionLabelKey="common.actions.refresh" (actionClicked)="refresh()" />
+    } @else {
+    <app-conversion-subject-card
+        labelKey="goals.subject.label"
+        headingId="goal-subject-heading"
+        controlId="goal-subject"
+        [description]="subjectDescription()"
+        [options]="subjectOptions()"
+        [control]="subjectControl"
+        (subjectChanged)="selectGoal($event)"
+    />
+
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        @for (card of kpis(); track card.label) {
+        <app-kpi-card [label]="card.label" [value]="card.value" [loading]="card.loading" [format]="card.format" [suffix]="card.suffix" [delta]="card.delta ?? null" />
         }
     </div>
 
-    <div class="mb-6">
-        <p-card class="shadow-sm border border-surface-200 dark:border-surface-700 surface-card">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-                <div>
-                    <h3 class="text-lg font-semibold">{{ "goals.series.title" | transloco }}</h3>
-                    <p class="text-sm text-[var(--p-text-muted-color)]">{{ "goals.series.description" | transloco }}</p>
-                </div>
-                <p-select
-                    [options]="availableGoalFilters()"
-                    [formControl]="goalFilterForm.goalFilter().control()"
-                    optionLabel="label"
-                    optionValue="value"
-                    [placeholder]="'goals.series.addFilterPlaceholder' | transloco"
-                    class="w-full sm:w-64"
-                    (onChange)="onGoalFilterSelect($event.value)"
-                >
-                </p-select>
-            </div>
-
-            @if (activeGoalFilters().length) {
-            <div class="flex flex-wrap items-center gap-2 mb-4">
-                @for (filter of activeGoalFilters(); track filter.id) {
-                <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--p-primary-color)] text-sm">
-                    <span class="font-medium text-[var(--p-text-color)]">{{ filter.name }}</span>
-                    <button type="button" class="text-muted-color hover:text-[var(--p-text-color)]" (click)="removeGoalFilter(filter.id)" [attr.aria-label]="'common.removeFilterAria' | transloco">
-                        <i class="pi pi-times" aria-hidden="true"></i>
-                    </button>
-                </span>
-                }
-                <button type="button" class="text-xs text-muted-color hover:text-[var(--p-text-color)] underline" (click)="clearGoalFilters()">{{ "common.actions.clearAll" | transloco }}</button>
-            </div>
-            }
-            <app-series-chart
-                [data]="goalSeriesChart()"
-                [series]="goalSeriesConfig()"
-                [comparisonData]="comparisonGoalSeriesChart()"
-                [isLoading]="isGoalSeriesLoading()"
-                [isShortRange]="isShortRange()"
-                [emptyTitle]="'goals.series.emptyTitle' | transloco"
-                [emptyDescription]="'goals.series.emptyDescription' | transloco"
-                [comparisonLabel]="comparisonLabel()"
-            />
-        </p-card>
-    </div>
-
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div class="flex flex-wrap items-center gap-2">
-            @if (hasFilters()) { @for (filter of filterChips(); track filter.type) {
-            <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--p-primary-color)] text-sm">
-                <span class="font-medium text-[var(--p-text-color)]">{{ filter.label }}</span>
-                <button type="button" class="text-muted-color hover:text-[var(--p-text-color)]" (click)="removeFilter(filter.type, filter.value)" [attr.aria-label]="'common.removeFilterAria' | transloco">
-                    <i class="pi pi-times" aria-hidden="true"></i>
-                </button>
-            </span>
-            }
-            <button type="button" class="text-xs text-muted-color hover:text-[var(--p-text-color)] underline" (click)="clearFilter()">{{ "common.actions.clearAll" | transloco }}</button>
-            } @else {
-            <span class="text-sm text-[var(--p-text-muted-color)]">{{ "common.noActiveFilter" | transloco }}</span>
-            }
+    <p-card styleClass="mb-6">
+        <div class="mb-4">
+            <h2 class="text-lg font-semibold">{{ selectedGoal()?.name || ('goals.series.title' | transloco) }}</h2>
+            <p class="text-sm text-muted-color mt-1">{{ 'goals.series.workspaceDescription' | transloco }}</p>
         </div>
-    </div>
+        <app-series-chart
+            [data]="goalSeriesChart()"
+            [series]="seriesConfig()"
+            [comparisonData]="comparisonGoalSeriesChart()"
+            [isLoading]="seriesLoading()"
+            [isShortRange]="isShortRange()"
+            [emptyTitle]="'goals.series.emptyTitle' | transloco"
+            [emptyDescription]="'goals.series.emptyDescription' | transloco"
+            [comparisonLabel]="comparisonLabel()"
+        />
+    </p-card>
 
-    <app-metric-card-group class="mb-6" [tabs]="metricCardTabs()" (rowClicked)="onMetricCardClick($event)" />
+    <app-traffic-records-card
+        class="mb-6 block"
+        titleKey="goals.traffic.title"
+        [descriptionKey]="trafficDescriptionKey()"
+        unavailableTitleKey="goals.traffic.unavailableTitle"
+        unavailableDescriptionKey="goals.traffic.unavailableDescription"
+        [siteId]="siteService.activeSite()?.id || null"
+        [siteDomain]="siteService.activeSite()?.domain || null"
+        [from]="trafficDateRange()?.from || null"
+        [to]="trafficDateRange()?.to || null"
+        [goalIds]="trafficGoalIds()"
+        [enabled]="trafficEnabled()"
+        [refreshKey]="trafficRefreshKey()"
+        [shareToken]="trafficShareToken()"
+        [showExport]="true"
+    />
 
-    <div class="grid grid-cols-1 gap-4">
-        <app-goal-list [data]="stats()?.goals || []" [siteId]="siteService.activeSite()?.id || null" [isLoading]="isStatsLoading()" (refresh)="refreshStats()" />
-    </div>
-    } @else {
-    <app-page-state titleKey="common.noSiteSelected" messageKey="goals.noSiteDescription" icon="pi pi-globe" />
+    <p-card>
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <div>
+                <h2 class="text-lg font-semibold">{{ 'goals.definitions.title' | transloco }}</h2>
+                <p class="text-sm text-muted-color mt-1">{{ 'goals.definitions.count' | transloco: { count: goals().length } }}</p>
+            </div>
+            <input pInputText #search [placeholder]="'common.searchPlaceholder' | transloco" [attr.aria-label]="'common.searchPlaceholder' | transloco" (input)="goalsTable.filterGlobal(search.value, 'contains')" class="w-full sm:w-64" />
+        </div>
+        <div class="hk-crud-table-wrap">
+            <p-table #goalsTable [value]="goals()" [loading]="goalsLoading()" [paginator]="goals().length > 10" [rows]="10" [globalFilterFields]="['name', 'type', 'value']" sortField="name" [sortOrder]="1" styleClass="hk-crud-table p-datatable-sm">
+                <ng-template pTemplate="header"
+                    ><tr>
+                        <th pSortableColumn="name">
+                            {{ 'common.columns.name' | transloco }}
+                            <p-sortIcon field="name" />
+                        </th>
+                        <th pSortableColumn="type">
+                            {{ 'common.columns.type' | transloco }}
+                            <p-sortIcon field="type" />
+                        </th>
+                        <th>{{ 'common.columns.value' | transloco }}</th>
+                        <th pSortableColumn="conversions">{{ 'goals.kpis.conversions' | transloco }}</th>
+                        <th>{{ 'common.kpis.conversionRate' | transloco }}</th>
+                        @if (canManage()) {
+                        <th class="hk-actions-column">{{ 'common.columns.actions' | transloco }}</th>
+                        }
+                    </tr></ng-template
+                >
+                <ng-template pTemplate="body" let-goal>
+                    <tr class="cursor-pointer" [class.bg-highlight]="selectedGoalId() === goal.id" (click)="selectGoal(goal.id)" tabindex="0" (keydown.enter)="selectGoal(goal.id)" (keydown.space)="$event.preventDefault(); selectGoal(goal.id)">
+                        <td class="font-medium">{{ goal.name }}</td>
+                        <td>{{ ('goals.types.' + goal.type) | transloco }}</td>
+                        <td class="font-mono text-sm">{{ goal.value }}</td>
+                        <td>{{ conversionStats(goal)?.conversions ?? 0 }}</td>
+                        <td>{{ (conversionStats(goal)?.conversion_rate ?? 0) | translocoDecimal: { maximumFractionDigits: 1 } }}%</td>
+                        @if (canManage()) {
+                        <td class="hk-actions-cell" (click)="$event.stopPropagation()">
+                            <app-table-row-actions [items]="goalActions(goal)" [loading]="deletingGoalId() === goal.id" />
+                        </td>
+                        }
+                    </tr>
+                </ng-template>
+                <ng-template pTemplate="emptymessage"
+                    ><tr>
+                        <td [attr.colspan]="canManage() ? 6 : 5" class="text-center py-8 text-muted-color">{{ 'goals.manager.empty' | transloco }}</td>
+                    </tr></ng-template
+                >
+            </p-table>
+        </div>
+    </p-card>
     }
 
-    <app-goal-manager [(visible)]="isGoalManagerVisible" [siteId]="siteService.activeSite()?.id || null" (goalsChanged)="refreshStats()" />
+    <app-goal-manager [(visible)]="editorVisible" [siteId]="siteService.activeSite()?.id || null" [goal]="editingGoal()" [pathSuggestions]="pathSuggestions()" [eventSuggestions]="eventSuggestions()" (goalsChanged)="onDefinitionsChanged()" />
 </div>
-
-<!-- Date Range Dialog -->

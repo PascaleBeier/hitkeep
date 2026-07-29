@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideHttpClient } from '@angular/common/http';
 import { provideRouter, Router } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
@@ -10,6 +11,7 @@ import { Dashboard } from '@pages/dashboard/dashboard';
 import { SiteService } from '@features/sites/services/site.service';
 import { StatsService } from '@features/analytics/services/stats.service';
 import { HitService } from '@features/hits/services/hit.service';
+import { TrafficRecordsCard } from '@features/hits/components/traffic-records-card';
 import { TeamService } from '@services/team.service';
 import { OnboardingService } from '@services/onboarding.service';
 import { RealtimeEvent, RealtimeService } from '@services/realtime.service';
@@ -104,6 +106,22 @@ describe('Dashboard', () => {
 
     it('should create', () => {
         expect(component).toBeTruthy();
+    });
+
+    it('presents dashboard conversions as one card with goal and funnel tabs', () => {
+        const siteService = TestBed.inject(SiteService);
+        vi.spyOn(TestBed.inject(StatsService), 'loadStats').mockImplementation(() => undefined);
+        vi.spyOn(TestBed.inject(HitService), 'loadHits').mockImplementation(() => undefined);
+        siteService.activeSite.set({ id: 'site-1', user_id: 'user-1', domain: 'example.com', created_at: '2026-01-01T00:00:00Z' });
+        fixture.detectChanges();
+
+        const conversionCard = fixture.debugElement.query(By.css('[data-testid="metric-card-group-conversions"]'));
+
+        expect(conversionCard).toBeTruthy();
+        expect(conversionCard.queryAll(By.css('p-tab')).length).toBe(2);
+        expect(fixture.debugElement.queryAll(By.css('[data-testid^="metric-card-group-"]')).at(-1)).toBe(conversionCard);
+        expect(fixture.debugElement.query(By.css('app-conversion-card'))).toBeNull();
+        expect(fixture.debugElement.query(By.css('section[aria-labelledby="conversions-heading"]'))).toBeNull();
     });
 
     it('keeps headline values numeric with formatting metadata and no permanent live pulse', () => {
@@ -678,9 +696,77 @@ describe('Dashboard', () => {
 
         fixture.detectChanges();
 
+        const conversionCard = fixture.debugElement.query(By.css('[data-testid="metric-card-group-conversions"]'));
+        const funnelTab = conversionCard.queryAll(By.css('p-tab')).find((tab) => tab.nativeElement.textContent.includes('funnels.list.title'));
+        funnelTab?.nativeElement.click();
+        fixture.detectChanges();
+
         expect(fixture.nativeElement.textContent).toContain('Checkout funnel');
         expect(fixture.nativeElement.textContent).toContain('funnels.list.stepsCount');
         expect(fixture.nativeElement.textContent).not.toContain('funnels.list.emptyTitle');
+    });
+
+    it('applies an event-based goal cohort to raw hits and exports, then clears it from the shared chip row', () => {
+        const siteService = TestBed.inject(SiteService);
+        const statsService = TestBed.inject(StatsService);
+        siteService.activeSite.set({ id: 'site-1', user_id: 'user-1', domain: 'example.com', created_at: '2026-01-01T00:00:00Z' });
+        fixture.detectChanges();
+        vi.mocked(statsService.fetchStats).mockReturnValue(
+            of({
+                ...emptyStats(),
+                goals: [{ goal_id: 'event-goal-1', name: 'Signup completed', conversions: 4, conversion_rate: 20 }]
+            })
+        );
+
+        const dashboard = component as unknown as {
+            toggleGoal: (goal: { goal_id: string; name: string; conversions: number; conversion_rate: number }) => void;
+            selectedConversion: () => { kind: string; id: string; name: string } | null;
+            trafficGoalIds: () => string[];
+            trafficFunnelIds: () => string[];
+            filterChips: () => { key: string; remove: () => void }[];
+            exportUrl: () => string;
+        };
+        dashboard.toggleGoal({ goal_id: 'event-goal-1', name: 'Signup completed', conversions: 4, conversion_rate: 20 });
+        fixture.detectChanges();
+
+        expect(dashboard.selectedConversion()).toEqual({ kind: 'goal', id: 'event-goal-1', name: 'Signup completed' });
+        expect(dashboard.trafficGoalIds()).toEqual(['event-goal-1']);
+        expect(dashboard.trafficFunnelIds()).toEqual([]);
+        expect(fixture.debugElement.query(By.directive(TrafficRecordsCard)).componentInstance.goalIds()).toEqual(['event-goal-1']);
+        expect(dashboard.exportUrl()).toContain('goal_id=event-goal-1');
+        expect(dashboard.filterChips()[0].key).toBe('goal:event-goal-1');
+
+        dashboard.filterChips()[0].remove();
+        expect(dashboard.selectedConversion()).toBeNull();
+    });
+
+    it('settles a goal cohort after one request and does not reload when the response reconciles its name', () => {
+        const siteService = TestBed.inject(SiteService);
+        const statsService = TestBed.inject(StatsService);
+        siteService.activeSite.set({ id: 'site-1', user_id: 'user-1', domain: 'example.com', created_at: '2026-01-01T00:00:00Z' });
+        fixture.detectChanges();
+
+        const response = new Subject<ReturnType<typeof emptyStats>>();
+        vi.mocked(statsService.fetchStats).mockClear();
+        vi.mocked(statsService.fetchStats).mockReturnValue(response);
+        const dashboard = component as unknown as {
+            toggleGoal: (goal: { goal_id: string; name: string; conversions: number; conversion_rate: number }) => void;
+        };
+
+        dashboard.toggleGoal({ goal_id: 'goal-1', name: 'Signup', conversions: 4, conversion_rate: 20 });
+        fixture.detectChanges();
+
+        expect(statsService.fetchStats).toHaveBeenCalledTimes(1);
+        expect(vi.mocked(statsService.fetchStats).mock.calls[0][4]).toEqual(['goal-1']);
+
+        response.next({
+            ...emptyStats(),
+            goals: [{ goal_id: 'goal-1', name: 'Signup', conversions: 4, conversion_rate: 20 }]
+        });
+        response.complete();
+        fixture.detectChanges();
+
+        expect(statsService.fetchStats).toHaveBeenCalledTimes(1);
     });
 
     it('should refresh Search Console drilldown data from the shared dashboard refresh action', async () => {
@@ -911,11 +997,11 @@ describe('Dashboard', () => {
         fixture.detectChanges();
         await fixture.whenStable();
 
-        const rawHitsTable = fixture.nativeElement.querySelector('p-table') as HTMLElement | null;
+        const trafficRecordsCard = fixture.nativeElement.querySelector('app-traffic-records-card') as HTMLElement | null;
         const searchConsoleDrilldown = fixture.nativeElement.querySelector('app-search-console-drilldown') as HTMLElement | null;
 
-        expect(rawHitsTable).toBeTruthy();
+        expect(trafficRecordsCard).toBeTruthy();
         expect(searchConsoleDrilldown).toBeTruthy();
-        expect(rawHitsTable!.compareDocumentPosition(searchConsoleDrilldown!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(trafficRecordsCard!.compareDocumentPosition(searchConsoleDrilldown!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 });

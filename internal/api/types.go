@@ -1551,6 +1551,8 @@ type HitQueryParams struct {
 	Limit     int
 	Offset    int
 	Filters   []Filter
+	GoalIDs   []uuid.UUID
+	FunnelIDs []uuid.UUID
 }
 
 type Filter struct {

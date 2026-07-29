@@ -3,6 +3,7 @@ package goals
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -58,6 +59,10 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		SitePerm:    authcore.PermSiteManageGoals,
 		RateLimiter: ctx.ApiLimiter,
 	}, h.handleCreateFunnel()))
+	mux.HandleFunc("PUT /api/sites/{id}/funnels/{funnelID}", ctx.Handler(shared.HandlerConfig{
+		SitePerm:    authcore.PermSiteManageGoals,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleUpdateFunnel()))
 	mux.HandleFunc("DELETE /api/sites/{id}/funnels/{funnelID}", ctx.Handler(shared.HandlerConfig{
 		SitePerm:    authcore.PermSiteManageGoals,
 		RateLimiter: ctx.ApiLimiter,
@@ -181,7 +186,7 @@ func (h *handler) handleCreateGoal() http.HandlerFunc {
 			return
 		}
 
-		if req.Name == "" || req.Value == "" || (req.Type != "event" && req.Type != "path") {
+		if !validGoal(req) {
 			http.Error(w, "Invalid goal data", http.StatusBadRequest)
 			return
 		}
@@ -252,7 +257,7 @@ func (h *handler) handleUpdateGoal() http.HandlerFunc {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-		if input.Name == "" || input.Value == "" || (input.Type != "event" && input.Type != "path") {
+		if !validGoal(input) {
 			http.Error(w, "Invalid goal data", http.StatusBadRequest)
 			return
 		}
@@ -261,26 +266,14 @@ func (h *handler) handleUpdateGoal() http.HandlerFunc {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		goals, err := analyticsStore.GetGoals(r.Context(), siteID)
-		if err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-		var existing *api.Goal
-		for i := range goals {
-			if goals[i].ID == goalID {
-				existing = &goals[i]
-				break
-			}
-		}
-		if existing == nil {
-			http.Error(w, "Goal not found", http.StatusNotFound)
-			return
-		}
 		input.ID = goalID
 		input.SiteID = siteID
-		input.CreatedAt = existing.CreatedAt
-		if err := analyticsStore.UpsertGoal(r.Context(), &input); err != nil {
+		if err := analyticsStore.UpdateGoal(r.Context(), &input); err != nil {
+			if errors.Is(err, database.ErrGoalNotFound) {
+				http.Error(w, "Goal not found", http.StatusNotFound)
+				return
+			}
+			slog.Error("Failed to update goal", "error", err, "site_id", siteID, "goal_id", goalID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -295,6 +288,10 @@ func (h *handler) handleUpdateGoal() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(input)
 	}
+}
+
+func validGoal(goal api.Goal) bool {
+	return strings.TrimSpace(goal.Name) != "" && strings.TrimSpace(goal.Value) != "" && (goal.Type == "event" || goal.Type == "path")
 }
 
 // Funnels
@@ -411,7 +408,7 @@ func (h *handler) handleCreateFunnel() http.HandlerFunc {
 			return
 		}
 
-		if req.Name == "" || len(req.Steps) < 2 {
+		if !validFunnel(req) {
 			http.Error(w, "Invalid funnel data (need name and at least 2 steps)", http.StatusBadRequest)
 			return
 		}
@@ -435,6 +432,65 @@ func (h *handler) handleCreateFunnel() http.HandlerFunc {
 
 		w.WriteHeader(http.StatusCreated)
 	}
+}
+
+func (h *handler) handleUpdateFunnel() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		siteID, ok := parseSiteID(w, r)
+		if !ok {
+			return
+		}
+		funnelID, err := uuid.Parse(r.PathValue("funnelID"))
+		if err != nil {
+			http.Error(w, "Invalid funnel_id", http.StatusBadRequest)
+			return
+		}
+
+		var input api.Funnel
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		if !validFunnel(input) {
+			http.Error(w, "Invalid funnel data (need name and at least 2 valid steps)", http.StatusBadRequest)
+			return
+		}
+
+		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
+		if err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		input.ID = funnelID
+		input.SiteID = siteID
+		if err := analyticsStore.UpdateFunnel(r.Context(), &input); err != nil {
+			if errors.Is(err, database.ErrFunnelNotFound) {
+				http.Error(w, "Funnel not found", http.StatusNotFound)
+				return
+			}
+			slog.Error("Failed to update funnel", "error", err, "site_id", siteID, "funnel_id", funnelID)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		h.publishDefinitionChange(siteID, realtime.KindFunnels)
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(input); err != nil {
+			slog.Error("Failed to encode response", "error", err)
+		}
+	}
+}
+
+func validFunnel(funnel api.Funnel) bool {
+	if strings.TrimSpace(funnel.Name) == "" || len(funnel.Steps) < 2 {
+		return false
+	}
+	for _, step := range funnel.Steps {
+		if strings.TrimSpace(step.Value) == "" || (step.Type != "event" && step.Type != "path") {
+			return false
+		}
+	}
+	return true
 }
 
 func (h *handler) handleDeleteFunnel() http.HandlerFunc {

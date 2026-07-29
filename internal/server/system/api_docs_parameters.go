@@ -70,8 +70,8 @@ func openAPIV1Parameters() map[string]any {
 			"description": "Web Vital threshold rating.",
 			"schema":      map[string]any{"type": "string", "enum": []string{"good", "needs_improvement", "poor"}},
 		},
-		"goalIDQuery":   map[string]any{"name": "goal_id", "in": "query", "schema": map[string]any{"type": "string", "format": "uuid"}},
-		"funnelIDQuery": map[string]any{"name": "funnel_id", "in": "query", "schema": map[string]any{"type": "string", "format": "uuid"}},
+		"goalIDQuery":   map[string]any{"name": "goal_id", "in": "query", "description": "Repeatable goal definition UUID used to select matching-session cohorts.", "schema": map[string]any{"type": "array", "items": map[string]any{"type": "string", "format": "uuid"}}},
+		"funnelIDQuery": map[string]any{"name": "funnel_id", "in": "query", "description": "Repeatable funnel definition UUID used to select first-step session cohorts.", "schema": map[string]any{"type": "array", "items": map[string]any{"type": "string", "format": "uuid"}}},
 		"format": map[string]any{
 			"name":        "format",
 			"in":          "query",

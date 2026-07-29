@@ -238,4 +238,32 @@ describe('MetricCardGroup', () => {
             }
         ]);
     });
+
+    it('renders the active card action through the shared header and emits it', () => {
+        const emitted: unknown[] = [];
+        fixture.componentInstance.actionClicked.subscribe((event) => emitted.push(event));
+        fixture.componentRef.setInput('tabs', [
+            {
+                id: 'conversions',
+                label: 'Conversions',
+                cards: [
+                    { id: 'goals', title: 'Goals', data: [], actionId: 'goal', actionLabel: 'Create goal' },
+                    { id: 'funnels', title: 'Funnels', data: [], actionId: 'funnel', actionLabel: 'Create funnel' }
+                ]
+            }
+        ]);
+        fixture.detectChanges();
+
+        const action = fixture.debugElement.query(By.css('p-button'));
+        expect(action.nativeElement.textContent).toContain('Create goal');
+        action.nativeElement.querySelector('button').click();
+
+        expect(emitted).toEqual([{ tabId: 'conversions', cardId: 'goals', actionId: 'goal' }]);
+
+        const funnelTab = fixture.debugElement.queryAll(By.css('p-tab')).find((tab) => tab.nativeElement.textContent.includes('Funnels'));
+        funnelTab?.nativeElement.click();
+        fixture.detectChanges();
+
+        expect(fixture.debugElement.query(By.css('p-button')).nativeElement.textContent).toContain('Create funnel');
+    });
 });

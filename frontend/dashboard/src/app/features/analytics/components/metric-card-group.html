@@ -7,6 +7,9 @@
                 <div class="metric-card-group__title-wrap">
                     <h3 class="metric-card-group__title">{{ cardHeading(group) }}</h3>
                 </div>
+                @if (activeCard(group); as card) { @if (card.actionLabel && card.actionId) {
+                <p-button [label]="card.actionLabel" [ariaLabel]="card.actionAriaLabel ?? card.actionLabel" [icon]="card.actionIcon ?? 'pi pi-plus'" size="small" [text]="true" (onClick)="handleAction(group, card)" />
+                } }
             </div>
 
             @if (group.cards.length > 1) {

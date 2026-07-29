@@ -4,12 +4,18 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+)
+
+var (
+	ErrGoalNotFound   = errors.New("goal not found")
+	ErrFunnelNotFound = errors.New("funnel not found")
 )
 
 // Goals
@@ -84,6 +90,40 @@ func (s *Store) GetGoals(ctx context.Context, siteID uuid.UUID) ([]api.Goal, err
 	}
 
 	return goals, nil
+}
+
+func (s *Store) UpdateGoal(ctx context.Context, goal *api.Goal) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	res, err := tx.ExecContext(ctx, `
+		UPDATE goals
+		SET name = ?, type = ?, value = ?
+		WHERE id = ? AND site_id = ?`,
+		goal.Name, goal.Type, goal.Value, goal.ID, goal.SiteID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update goal: %w", err)
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return ErrGoalNotFound
+	}
+	if err := tx.QueryRowContext(ctx,
+		"SELECT created_at FROM goals WHERE id = ? AND site_id = ?", goal.ID, goal.SiteID,
+	).Scan(&goal.CreatedAt); err != nil {
+		return fmt.Errorf("failed to load updated goal: %w", err)
+	}
+	if err := deleteRollups(ctx, tx, goal.SiteID, goal.ID, goalRollupQueries); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
 }
 
 func (s *Store) DeleteGoal(ctx context.Context, id uuid.UUID, siteID uuid.UUID) error {
@@ -197,6 +237,45 @@ func (s *Store) GetFunnels(ctx context.Context, siteID uuid.UUID) ([]api.Funnel,
 	}
 
 	return funnels, nil
+}
+
+func (s *Store) UpdateFunnel(ctx context.Context, funnel *api.Funnel) error {
+	stepsJSON, err := json.Marshal(funnel.Steps)
+	if err != nil {
+		return fmt.Errorf("failed to marshal funnel steps: %w", err)
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	res, err := tx.ExecContext(ctx, `
+		UPDATE funnels
+		SET name = ?, steps = ?
+		WHERE id = ? AND site_id = ?`,
+		funnel.Name, stepsJSON, funnel.ID, funnel.SiteID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update funnel: %w", err)
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return ErrFunnelNotFound
+	}
+	if err := tx.QueryRowContext(ctx,
+		"SELECT created_at FROM funnels WHERE id = ? AND site_id = ?", funnel.ID, funnel.SiteID,
+	).Scan(&funnel.CreatedAt); err != nil {
+		return fmt.Errorf("failed to load updated funnel: %w", err)
+	}
+	if err := deleteRollups(ctx, tx, funnel.SiteID, funnel.ID, funnelRollupQueries); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
 }
 
 func (s *Store) DeleteFunnel(ctx context.Context, id uuid.UUID, siteID uuid.UUID) error {

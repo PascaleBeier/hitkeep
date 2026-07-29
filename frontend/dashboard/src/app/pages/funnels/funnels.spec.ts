@@ -2,13 +2,17 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { TRANSLOCO_LOCALE_CONFIG, TRANSLOCO_LOCALE_LANG_MAPPING, TranslocoLocaleService } from '@jsverse/transloco-locale';
-import { of } from 'rxjs';
+import { Observable, of, Subject } from 'rxjs';
 import { vi } from 'vitest';
+import { provideRouter } from '@angular/router';
 
 import { AnalyticsService } from '@services/analytics.service';
 import { StatsService } from '@features/analytics/services/stats.service';
 import { SiteService } from '@features/sites/services/site.service';
 import { Funnels } from './funnels';
+import { AccessService } from '@services/access.service';
+import { ConfirmationService } from '@openng/optimus-ui/api';
+import { FunnelSeriesPoint } from '@models/analytics.types';
 
 describe('Funnels', () => {
     const stats = signal({
@@ -46,11 +50,14 @@ describe('Funnels', () => {
         stats,
         isLoading: signal(false),
         currentComparisonRange: signal(null),
-        loadStats: vi.fn()
+        comparisonRange: () => null,
+        loadStats: vi.fn(),
+        fetchStats: vi.fn(() => of(stats()))
     };
     const analyticsServiceStub = {
         getFunnels: vi.fn(() => of([])),
-        getFunnelTimeseries: vi.fn(() => of([]))
+        getFunnelTimeseries: vi.fn<() => Observable<FunnelSeriesPoint[]>>(() => of<FunnelSeriesPoint[]>([])),
+        getFunnelStats: vi.fn(() => of(null))
     };
 
     beforeEach(async () => {
@@ -122,6 +129,9 @@ describe('Funnels', () => {
                 },
                 { provide: StatsService, useValue: statsServiceStub },
                 { provide: AnalyticsService, useValue: analyticsServiceStub },
+                { provide: AccessService, useValue: { canSite: () => true } },
+                ConfirmationService,
+                provideRouter([]),
                 {
                     provide: TranslocoLocaleService,
                     useValue: {
@@ -138,28 +148,44 @@ describe('Funnels', () => {
         }).compileComponents();
     });
 
-    it('keeps funnel metric cards in canonical groups and preserves metric filter clicks', () => {
+    it('presents one reporting subject and exactly three funnel KPIs', () => {
         const component = TestBed.runInInjectionContext(() => new Funnels()) as unknown as {
-            metricCardTabs: () => { id: string; cards: { id: string }[] }[];
-            onMetricCardClick: (event: { tabId: string; cardId: string; filterType: string; metric: { name: string; value: number } }) => void;
-            activeFilters: () => { type: string; value: string }[];
-            activeFilterValue: (type: 'provider') => string | null;
+            kpis: () => { label: string }[];
+            subjectOptions: () => { label: string; value: string | null }[];
+            selectFunnel: (id: string | null) => void;
+            selectedFunnelId: () => string | null;
+            funnels: { set: (funnels: { id: string; name: string; steps: { type: 'path'; value: string }[]; created_at: string }[]) => void };
+            trafficFunnelIds: () => string[];
+            trafficEnabled: () => boolean;
         };
+        expect(component.kpis().length).toBe(3);
+        expect(component.subjectOptions()[0].value).toBeNull();
+        expect(component.trafficEnabled()).toBe(false);
+        component.funnels.set([
+            { id: 'funnel-1', name: 'Signup', steps: [{ type: 'path', value: '/' }], created_at: '2026-01-01T00:00:00Z' },
+            { id: 'funnel-2', name: 'Checkout', steps: [{ type: 'path', value: '/cart' }], created_at: '2026-01-01T00:00:00Z' }
+        ]);
+        expect(component.trafficFunnelIds()).toEqual(['funnel-1', 'funnel-2']);
+        component.selectFunnel('funnel-2');
+        expect(component.trafficFunnelIds()).toEqual(['funnel-2']);
+        component.selectFunnel(null);
+        expect(component.selectedFunnelId()).toBeNull();
+    });
 
-        const tabs = component.metricCardTabs();
+    it('ignores a late funnel series response after the reporting scope changes', () => {
+        const component = TestBed.runInInjectionContext(() => new Funnels()) as unknown as {
+            loadReporting: (siteID: string, from: string, to: string, funnelIDs: string[]) => void;
+            funnelSeries: () => { time: string; entries: number; completions: number }[];
+        };
+        const first = new Subject<FunnelSeriesPoint[]>();
+        const second = new Subject<FunnelSeriesPoint[]>();
+        analyticsServiceStub.getFunnelTimeseries.mockReset().mockReturnValue(of<FunnelSeriesPoint[]>([])).mockReturnValueOnce(first).mockReturnValueOnce(second);
 
-        expect(tabs.map((tab) => tab.id)).toEqual(['content', 'acquisition', 'audience', 'location', 'network']);
-        expect(tabs.find((tab) => tab.id === 'location')?.cards.map((card) => card.id)).toEqual(['countries', 'cities']);
-        expect(tabs.find((tab) => tab.id === 'network')?.cards.map((card) => card.id)).toEqual(['providers', 'asns']);
+        component.loadReporting('site-1', '2026-07-01', '2026-07-02', ['funnel-1']);
+        component.loadReporting('site-1', '2026-07-01', '2026-07-02', ['funnel-2']);
+        first.next([{ time: '2026-07-01', entries: 1, completions: 1 }]);
+        second.next([{ time: '2026-07-01', entries: 2, completions: 1 }]);
 
-        component.onMetricCardClick({
-            tabId: 'network',
-            cardId: 'providers',
-            filterType: 'provider',
-            metric: { name: 'Hetzner Online GmbH', value: 2 }
-        });
-
-        expect(component.activeFilters()).toEqual([{ type: 'provider', value: 'Hetzner Online GmbH' }]);
-        expect(component.activeFilterValue('provider')).toBe('Hetzner Online GmbH');
+        expect(component.funnelSeries()).toEqual([{ time: '2026-07-01', entries: 2, completions: 1 }]);
     });
 });

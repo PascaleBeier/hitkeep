@@ -1,5 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { APP_BASE_HREF } from '@angular/common';
 import { By } from '@angular/platform-browser';
+import { RouterLink, provideRouter } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { provideTranslocoLocale } from '@jsverse/transloco-locale';
 import { MetricList } from '@features/analytics/components/metric-list';
@@ -21,6 +23,8 @@ describe('MetricList', () => {
                 })
             ],
             providers: [
+                provideRouter([]),
+                { provide: APP_BASE_HREF, useValue: '/analytics/' },
                 provideTranslocoLocale({
                     defaultLocale: 'en-US',
                     langToLocaleMapping: {
@@ -96,6 +100,36 @@ describe('MetricList', () => {
         const active = fixture.debugElement.query(By.css('.metric-list__row--active'));
         expect(active).not.toBeNull();
         expect(active.nativeElement.textContent).toContain('Desktop');
+    });
+
+    it('uses a stable row key for selection and renders explicit conversion labels', () => {
+        fixture.componentRef.setInput('activeValue', 'goal-1');
+        fixture.componentRef.setInput('data', [{ key: 'goal-1', name: 'Signup', value: 4, shareLabel: '20.5%' }]);
+        fixture.detectChanges();
+
+        expect(fixture.debugElement.query(By.css('.metric-list__row--active'))).not.toBeNull();
+        expect(fixture.debugElement.query(By.css('.metric-list__share')).nativeElement.textContent.trim()).toBe('20.5%');
+        expect(fixture.debugElement.query(By.css('.metric-list__value')).nativeElement.textContent.trim()).toBe('4');
+    });
+
+    it('renders details through the shared row-link pattern without opening a new tab', () => {
+        fixture.componentRef.setInput('linkMode', 'details');
+        fixture.componentRef.setInput('data', [
+            {
+                key: 'goal-1',
+                name: 'Signup',
+                value: 4,
+                detailsHref: '/goals?goal=goal-1',
+                detailsAriaLabel: 'Open details for Signup'
+            }
+        ]);
+        fixture.detectChanges();
+
+        const link = fixture.debugElement.query(By.css('.metric-list__link')).nativeElement as HTMLAnchorElement;
+        expect(fixture.debugElement.query(By.directive(RouterLink))).not.toBeNull();
+        expect(link.getAttribute('href')).toBe('/analytics/goals?goal=goal-1');
+        expect(link.getAttribute('target')).toBeNull();
+        expect(link.getAttribute('aria-label')).toBe('Open details for Signup');
     });
 
     it('should render distinct device icons', () => {

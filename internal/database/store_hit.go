@@ -253,6 +253,12 @@ func (s *Store) GetHits(ctx context.Context, params api.HitQueryParams) (*api.Pa
 	filterSQL, filterArgs := buildHitFilters(params.Filters, "h")
 	baseQuery += filterSQL
 	args = append(args, filterArgs...)
+	cohortSQL, cohortArgs, err := s.buildHitSessionFilter(ctx, params, "h")
+	if err != nil {
+		return nil, err
+	}
+	baseQuery += cohortSQL
+	args = append(args, cohortArgs...)
 
 	if params.Query != "" {
 		baseQuery += ` AND (
@@ -339,7 +345,10 @@ func hitSortDirection(order string) string {
 }
 
 func (s *Store) ExportHitsCSV(ctx context.Context, params api.HitQueryParams, w io.Writer) error {
-	selectQuery, args := buildHitExportQuery(params)
+	selectQuery, args, err := s.buildHitExportQuery(ctx, params)
+	if err != nil {
+		return err
+	}
 
 	rows, err := s.db.QueryContext(ctx, selectQuery, args...)
 	if err != nil {
@@ -472,7 +481,10 @@ func (s *Store) ExportHitsCSV(ctx context.Context, params api.HitQueryParams, w 
 }
 
 func (s *Store) ExportHitsFile(ctx context.Context, params api.HitQueryParams, format string) (string, error) {
-	selectQuery, args := buildHitExportQuery(params)
+	selectQuery, args, err := s.buildHitExportQuery(ctx, params)
+	if err != nil {
+		return "", err
+	}
 	filename, err := s.exportQueryToTempFile(ctx, "hitkeep_hits_", "hitkeep_hits_", selectQuery, args, format)
 	if err != nil {
 		return "", fmt.Errorf("failed to export hits: %w", err)
@@ -512,7 +524,7 @@ func nullUUID(value uuid.NullUUID) string {
 	return ""
 }
 
-func buildHitExportQuery(params api.HitQueryParams) (string, []any) {
+func (s *Store) buildHitExportQuery(ctx context.Context, params api.HitQueryParams) (string, []any, error) {
 	// Authorization is handled by the handler middleware (SitePerm/RequirePermission).
 	// This query runs against the tenant-specific analytics DB which has no sites table.
 	baseQuery := `
@@ -526,6 +538,12 @@ func buildHitExportQuery(params api.HitQueryParams) (string, []any) {
 	filterSQL, filterArgs := buildHitFilters(params.Filters, "h")
 	baseQuery += filterSQL
 	args = append(args, filterArgs...)
+	cohortSQL, cohortArgs, err := s.buildHitSessionFilter(ctx, params, "h")
+	if err != nil {
+		return "", nil, err
+	}
+	baseQuery += cohortSQL
+	args = append(args, cohortArgs...)
 
 	if params.Query != "" {
 		baseQuery += ` AND (
@@ -555,5 +573,5 @@ func buildHitExportQuery(params api.HitQueryParams) (string, []any) {
             h.utm_source, h.utm_medium, h.utm_campaign, h.utm_term, h.utm_content, h.qr_code_id, h.is_unique
 	` + baseQuery
 
-	return selectQuery, args
+	return selectQuery, args, nil
 }

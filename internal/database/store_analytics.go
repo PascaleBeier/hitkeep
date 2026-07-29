@@ -60,17 +60,11 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 	}
 
 	filterSQL, filterArgs := buildHitFilters(params.Filters, "h")
-	funnelPathSQL, funnelPathArgs, err := s.buildFunnelPathFilter(ctx, params, "h")
-	if err != nil {
-		return nil, err
-	}
 	sessionSQL, sessionArgs, err := s.buildSessionFilter(ctx, params, "h")
 	if err != nil {
 		return nil, err
 	}
-	filterSQL += funnelPathSQL
 	filterSQL += sessionSQL
-	filterArgs = append(filterArgs, funnelPathArgs...)
 	filterArgs = append(filterArgs, sessionArgs...)
 	liveThreshold := time.Now().Add(-5 * time.Minute)
 	liveQuery := "SELECT COUNT(DISTINCT h.session_id) FROM hits h WHERE h.site_id = ? AND h.timestamp >= ?" + filterSQL
@@ -84,7 +78,7 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 	gridStart := truncToUnit(params.Start, truncUnit)
 	gridEnd := truncToUnit(params.End, truncUnit)
 	useRollups := len(params.Filters) == 0 && canUseRollupsForTruncUnit(truncUnit)
-	if sessionSQL != "" || funnelPathSQL != "" {
+	if sessionSQL != "" {
 		useRollups = false
 	}
 

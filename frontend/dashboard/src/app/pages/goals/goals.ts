@@ -1,549 +1,397 @@
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, signal, untracked } from '@angular/core';
-import { injectActiveLang } from '@core/i18n/active-lang';
-import { calcDelta } from '@core/analytics/delta-utils';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { compatForm } from '@angular/forms/signals/compat';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormControl } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { TranslocoLocaleService } from '@jsverse/transloco-locale';
+import { TranslocoDecimalPipe, TranslocoLocaleService } from '@jsverse/transloco-locale';
+import { ConfirmationService } from '@openng/optimus-ui/api';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { CardModule } from '@openng/optimus-ui/card';
-import { SelectModule } from '@openng/optimus-ui/select';
-import { SiteService } from '@features/sites/services/site.service';
-import { StatsService } from '@features/analytics/services/stats.service';
-import { injectStatsQuery, type StatsQueryMode } from '@features/analytics/services/stats-query';
-import { AnalyticsService } from '@services/analytics.service';
-import { GoalList } from '@features/analytics/components/goal-list';
-import { MetricCardGroup, MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
-import { GoalManager } from '@features/goals/components/goal-manager';
-import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
+import { ConfirmDialogModule } from '@openng/optimus-ui/confirmdialog';
+import { InputTextModule } from '@openng/optimus-ui/inputtext';
+import { MessageModule } from '@openng/optimus-ui/message';
+import { TableModule } from '@openng/optimus-ui/table';
+import { finalize, Subscription } from 'rxjs';
+import { SITE_CAPABILITIES } from '@core/access/capabilities';
+import { calcDelta } from '@core/analytics/delta-utils';
+import { HITKEEP_CHART_PALETTE } from '@core/charts/hitkeep-chart-options';
+import { dialogCancelButton, dialogDangerButton } from '@components/dialog-actions/dialog-actions';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
+import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageState } from '@components/page-state/page-state';
-import { SeriesChart, SeriesDefinition, SeriesChartPoint } from '@features/analytics/components/series-chart';
-import { Goal, GoalSeriesPoint, SiteStats } from '@models/analytics.types';
-import { KPI_PERCENT_FORMAT, KpiCard, KpiCardModel } from '@features/analytics/components/kpi-card';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
-import { finalize } from 'rxjs';
-import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
+import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
+import { KpiCard, KpiCardModel, KPI_PERCENT_FORMAT } from '@features/analytics/components/kpi-card';
+import { ConversionSubjectCard } from '@features/analytics/components/conversion-subject-card';
+import { SeriesChart, SeriesChartPoint, SeriesDefinition } from '@features/analytics/components/series-chart';
+import { TrafficRecordsCard } from '@features/hits/components/traffic-records-card';
+import { injectStatsQuery, StatsQueryMode } from '@features/analytics/services/stats-query';
+import { StatsService } from '@features/analytics/services/stats.service';
+import { SiteService } from '@features/sites/services/site.service';
+import { GoalManager } from '@features/goals/components/goal-manager';
+import { Goal, GoalSeriesPoint, GoalStats, SiteStats } from '@models/analytics.types';
+import { AccessService } from '@services/access.service';
+import { AnalyticsService } from '@services/analytics.service';
+import { NavigationNoticeService } from '@services/navigation-notice.service';
 import { REALTIME_GOAL_KINDS } from '@services/realtime.service';
+import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
 import { injectReportRange } from '@services/report-range-preferences.service';
-
-type MetricFilterType = 'path' | 'referrer' | 'device' | 'country' | 'city' | 'provider' | 'asn';
-interface MetricFilter {
-    type: MetricFilterType;
-    value: string;
-}
+import { ShareService } from '@services/share.service';
+import { injectActiveLang } from '@core/i18n/active-lang';
 
 @Component({
     selector: 'app-goals',
     standalone: true,
-    imports: [ReactiveFormsModule, ButtonModule, CardModule, SelectModule, PageHeader, PageHeaderLeft, PageBreadcrumb, PageState, ReportRangeToolbar, SeriesChart, KpiCard, MetricCardGroup, GoalList, GoalManager, TranslocoPipe],
+    imports: [
+        ButtonModule,
+        CardModule,
+        ConfirmDialogModule,
+        ConversionSubjectCard,
+        GoalManager,
+        InputTextModule,
+        KpiCard,
+        MessageModule,
+        PageBreadcrumb,
+        PageHeader,
+        PageHeaderLeft,
+        PageState,
+        ReportRangeToolbar,
+        SeriesChart,
+        TableModule,
+        TableRowActions,
+        TrafficRecordsCard,
+        TranslocoDecimalPipe,
+        TranslocoPipe
+    ],
+    providers: [ConfirmationService],
     templateUrl: './goals.html',
     styleUrl: './goals.css',
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Goals {
     protected siteService = inject(SiteService);
-    protected statsService = inject(StatsService);
-    private analyticsService = inject(AnalyticsService);
-    private localeService = inject(TranslocoLocaleService);
+    private analytics = inject(AnalyticsService);
+    private statsService = inject(StatsService);
+    private access = inject(AccessService);
+    private route = inject(ActivatedRoute);
+    private router = inject(Router);
     private transloco = inject(TranslocoService);
+    private locale = inject(TranslocoLocaleService);
+    private confirmation = inject(ConfirmationService);
     private destroyRef = inject(DestroyRef);
-    private realtimeRefresh = inject(RealtimeRefreshCoordinator);
-    private readonly reportRange = injectReportRange();
-    private readonly activeLanguage = injectActiveLang();
+    private realtime = inject(RealtimeRefreshCoordinator);
+    private notice = inject(NavigationNoticeService);
+    private share = inject(ShareService);
+    protected reportRange = injectReportRange();
+    private activeLanguage = injectActiveLang();
     private statsQuery = injectStatsQuery();
+    private lastSiteId: string | null = null;
+    private createRequested = false;
+    private reportingRequest: Subscription | null = null;
+    private reportingSequence = 0;
 
-    private readonly goalFilterFormModel = signal({
-        goalFilter: new FormControl<{ id: string; name: string } | null>(null)
-    });
-    protected readonly goalFilterForm = compatForm(this.goalFilterFormModel);
-    protected readonly isShortRange = this.reportRange.isShortRange;
-    protected isGoalManagerVisible = signal(false);
     protected goals = signal<Goal[]>([]);
     protected goalsLoading = signal(false);
+    protected goalsError = signal(false);
+    protected selectedGoalId = signal<string | null>(null);
+    protected selectedGoal = computed(() => this.goals().find((goal) => goal.id === this.selectedGoalId()) ?? null);
+    protected subjectControl = new FormControl<string | null>(null);
+    protected editorVisible = signal(false);
+    protected editingGoal = signal<Goal | null>(null);
+    protected deletingGoalId = signal<string | null>(null);
     protected stats = this.statsQuery.stats;
     protected isStatsLoading = this.statsQuery.isLoading;
-    protected currentComparisonRange = this.statsQuery.comparisonRange;
-    protected readonly kpiUpdateKey = signal(0);
     protected baselineStats = signal<SiteStats | null>(null);
     protected baselineLoading = signal(false);
-    protected isRefreshing = computed(() => this.isStatsLoading() || this.isGoalSeriesLoading() || this.baselineLoading());
     protected goalSeries = signal<GoalSeriesPoint[]>([]);
+    protected comparisonGoalSeries = signal<GoalSeriesPoint[]>([]);
+    protected seriesLoading = signal(false);
+    protected trafficRefreshKey = signal(0);
+    protected isRefreshing = computed(() => this.goalsLoading() || this.isStatsLoading() || this.baselineLoading() || this.seriesLoading());
+    protected isShortRange = this.reportRange.isShortRange;
+    protected canManage = computed(() => {
+        const site = this.siteService.activeSite();
+        return !!site && this.access.canSite(site.id, SITE_CAPABILITIES.manageGoals);
+    });
+    protected trafficDateRange = computed(() => this.reportRange.currentDateRange());
+    protected trafficGoalIds = computed(() => {
+        const selected = this.selectedGoalId();
+        return selected ? [selected] : this.goals().map((goal) => goal.id);
+    });
+    protected trafficEnabled = computed(() => this.trafficGoalIds().length > 0);
+    protected trafficDescriptionKey = computed(() => (this.selectedGoalId() ? 'goals.traffic.selectedDescription' : 'goals.traffic.allDescription'));
+    protected trafficShareToken = computed(() => this.share.token());
+    protected subjectOptions = computed(() => {
+        this.activeLanguage();
+        return [{ label: this.transloco.translate('goals.subject.all'), value: null }, ...this.goals().map((goal) => ({ label: goal.name, value: goal.id }))];
+    });
+    protected subjectDescription = computed(() => {
+        this.activeLanguage();
+        const goal = this.selectedGoal();
+        if (!goal)
+            return this.transloco.translate('goals.definitions.count', {
+                count: this.goals().length
+            });
+        return `${this.transloco.translate(`goals.types.${goal.type}`)} · ${goal.value}`;
+    });
     protected goalSeriesChart = computed<SeriesChartPoint[]>(() =>
         this.goalSeries().map((point) => ({
             time: point.time,
             conversions: point.conversions
         }))
     );
-    protected comparisonGoalSeries = signal<GoalSeriesPoint[]>([]);
     protected comparisonGoalSeriesChart = computed<SeriesChartPoint[]>(() =>
         this.comparisonGoalSeries().map((point) => ({
             time: point.time,
             conversions: point.conversions
         }))
     );
-    protected isGoalSeriesLoading = signal(false);
-    protected isComparisonGoalSeriesLoading = signal(false);
-    protected activeGoalFilters = signal<{ id: string; name: string }[]>([]);
-    protected activeFilters = signal<{ type: MetricFilterType; value: string }[]>([]);
-    protected hasFilters = computed(() => this.activeFilters().length > 0);
-    protected filterChips = computed(() =>
-        this.activeFilters().map((filter) => ({
-            ...filter,
-            label: this.filterLabel(filter)
-        }))
-    );
-
-    protected comparisonLabel = computed(() => {
-        this.activeLanguage();
-        const r = this.currentComparisonRange();
-        if (!r) return '';
-        const showYear = new Date(r.from).getFullYear() !== new Date().getFullYear();
-        const opts = showYear ? ({ month: 'short', day: 'numeric', year: 'numeric' } as const) : ({ month: 'short', day: 'numeric' } as const);
-        const fmt = (d: string) => this.localeService.localizeDate(new Date(d), undefined, opts);
-        return `${fmt(r.from)} – ${fmt(r.to)}`;
-    });
-
-    protected readonly goalKpis = computed<KpiCardModel[]>(() => {
-        this.activeLanguage();
-        const activeIds = new Set(this.activeGoalFilters().map((filter) => filter.id));
-        const goals = this.goals();
-        const totalGoals = activeIds.size > 0 ? goals.filter((goal) => activeIds.has(goal.id)).length : goals.length;
-        const totalConversions = this.goalSeries().reduce((sum, point) => sum + point.conversions, 0);
-        const cmpTotalConversions = this.comparisonGoalSeries().reduce((sum, point) => sum + point.conversions, 0);
-        const sessionsWithGoals = this.stats()?.unique_sessions ?? 0;
-        const totalSessions = this.baselineStats()?.unique_sessions ?? 0;
-        const conversionRate = totalSessions > 0 ? (sessionsWithGoals / totalSessions) * 100 : 0;
-        const cmpTotalSessions = this.baselineStats()?.comparison?.unique_sessions ?? 0;
-        const cmpConversionRate = cmpTotalSessions > 0 ? (cmpTotalConversions / cmpTotalSessions) * 100 : 0;
-        const isLoading = this.isStatsLoading() || this.baselineLoading() || this.isGoalSeriesLoading();
-        const updateKey = this.kpiUpdateKey();
-
-        return [
-            {
-                label: this.transloco.translate('goals.kpis.totalGoals'),
-                value: totalGoals,
-                loading: isLoading,
-                updateKey,
-                valueClass: 'text-2xl xl:text-3xl font-bold',
-                delta: null as number | null
-            },
-            {
-                label: this.transloco.translate('goals.kpis.conversions'),
-                value: totalConversions,
-                loading: isLoading,
-                updateKey,
-                valueClass: 'text-2xl xl:text-3xl font-bold',
-                delta: this.calcDelta(totalConversions, cmpTotalConversions)
-            },
-            {
-                label: this.transloco.translate('common.kpis.conversionRate'),
-                value: conversionRate,
-                loading: isLoading,
-                updateKey,
-                valueClass: 'text-2xl xl:text-3xl font-bold',
-                format: KPI_PERCENT_FORMAT,
-                suffix: '%',
-                delta: this.calcDelta(conversionRate, cmpConversionRate)
-            },
-            {
-                label: this.transloco.translate('dashboard.kpis.uniqueSessions'),
-                value: totalSessions,
-                loading: isLoading,
-                updateKey,
-                valueClass: 'text-2xl xl:text-3xl font-bold',
-                delta: this.calcDelta(totalSessions, cmpTotalSessions)
-            }
-        ];
-    });
-    protected readonly goalSeriesConfig = computed<SeriesDefinition[]>(() => {
+    protected seriesConfig = computed<SeriesDefinition[]>(() => {
         this.activeLanguage();
         return [
             {
                 key: 'conversions',
                 label: this.transloco.translate('goals.kpis.conversions'),
-                color: '#6366f1',
-                gradientFrom: 'rgba(99, 102, 241, 0.5)',
-                gradientTo: 'rgba(99, 102, 241, 0.0)'
+                color: HITKEEP_CHART_PALETTE.primary
             }
         ];
     });
-    protected readonly metricCardTabs = computed<MetricCardGroupTab<MetricFilterType>[]>(() => {
+    protected comparisonLabel = computed(() => {
         this.activeLanguage();
-        const stats = this.stats();
-        const loading = this.isStatsLoading();
-        const siteDomain = this.siteService.activeSite()?.domain ?? null;
+        const range = this.statsQuery.comparisonRange();
+        if (!range) return '';
+        const format = (value: string) =>
+            this.locale.localizeDate(new Date(value), undefined, {
+                month: 'short',
+                day: 'numeric'
+            });
+        return `${format(range.from)} – ${format(range.to)}`;
+    });
+    protected kpis = computed<KpiCardModel[]>(() => {
+        this.activeLanguage();
+        const conversions = this.goalSeries().reduce((sum, point) => sum + point.conversions, 0);
+        const comparisonConversions = this.comparisonGoalSeries().reduce((sum, point) => sum + point.conversions, 0);
+        const convertingSessions = this.stats()?.unique_sessions ?? 0;
+        const comparisonConvertingSessions = this.stats()?.comparison?.unique_sessions ?? 0;
+        const allSessions = this.baselineStats()?.unique_sessions ?? 0;
+        const comparisonAllSessions = this.baselineStats()?.comparison?.unique_sessions ?? 0;
+        const rate = allSessions ? (convertingSessions / allSessions) * 100 : 0;
+        const comparisonRate = comparisonAllSessions ? (comparisonConvertingSessions / comparisonAllSessions) * 100 : 0;
+        const loading = this.isStatsLoading() || this.baselineLoading() || this.seriesLoading();
         return [
             {
-                id: 'content',
-                label: this.transloco.translate('common.metricGroups.content'),
-                icon: 'pi-file',
-                cards: [
-                    {
-                        id: 'top-pages',
-                        title: this.transloco.translate('common.metrics.topPages'),
-                        icon: 'pi-file',
-                        data: stats?.top_pages ?? [],
-                        linkMode: 'path',
-                        siteDomain,
-                        isLoading: loading,
-                        isRowClickable: true,
-                        activeValue: this.activeFilterValue('path'),
-                        filterType: 'path'
-                    }
-                ]
+                label: this.transloco.translate('goals.kpis.conversions'),
+                value: conversions,
+                loading,
+                delta: calcDelta(conversions, comparisonConversions)
             },
             {
-                id: 'acquisition',
-                label: this.transloco.translate('common.metricGroups.acquisition'),
-                icon: 'pi-link',
-                cards: [
-                    {
-                        id: 'sources',
-                        title: this.transloco.translate('common.metrics.topSources'),
-                        icon: 'pi-link',
-                        data: stats?.top_referrers ?? [],
-                        linkMode: 'url',
-                        isLoading: loading,
-                        isRowClickable: true,
-                        activeValue: this.activeFilterValue('referrer'),
-                        filterType: 'referrer'
-                    }
-                ]
+                label: this.transloco.translate('goals.kpis.convertingSessions'),
+                value: convertingSessions,
+                loading,
+                delta: calcDelta(convertingSessions, comparisonConvertingSessions)
             },
             {
-                id: 'audience',
-                label: this.transloco.translate('common.metricGroups.audience'),
-                icon: 'pi-users',
-                cards: [
-                    {
-                        id: 'devices',
-                        title: this.transloco.translate('common.metrics.devices'),
-                        icon: 'pi-mobile',
-                        data: stats?.top_devices ?? [],
-                        isLoading: loading,
-                        isRowClickable: true,
-                        activeValue: this.activeFilterValue('device'),
-                        filterType: 'device'
-                    }
-                ]
-            },
-            {
-                id: 'location',
-                label: this.transloco.translate('common.metricGroups.location'),
-                icon: 'pi-map',
-                cards: [
-                    {
-                        id: 'countries',
-                        title: this.transloco.translate('common.metrics.countries'),
-                        icon: 'pi-globe',
-                        data: stats?.top_countries ?? [],
-                        isLoading: loading,
-                        isRowClickable: true,
-                        activeValue: this.activeFilterValue('country'),
-                        showCountryFlags: true,
-                        showCountryNames: true,
-                        filterType: 'country'
-                    },
-                    {
-                        id: 'cities',
-                        title: this.transloco.translate('common.metrics.cities'),
-                        icon: 'pi-map-marker',
-                        data: stats?.top_cities ?? [],
-                        isLoading: loading,
-                        isRowClickable: true,
-                        activeValue: this.activeFilterValue('city'),
-                        filterType: 'city'
-                    }
-                ]
-            },
-            {
-                id: 'network',
-                label: this.transloco.translate('common.metricGroups.network'),
-                icon: 'pi-server',
-                cards: [
-                    {
-                        id: 'providers',
-                        title: this.transloco.translate('common.metrics.providers'),
-                        icon: 'pi-server',
-                        data: stats?.top_providers ?? [],
-                        isLoading: loading,
-                        isRowClickable: true,
-                        activeValue: this.activeFilterValue('provider'),
-                        filterType: 'provider'
-                    },
-                    {
-                        id: 'asns',
-                        title: this.transloco.translate('common.metrics.asns'),
-                        icon: 'pi-sitemap',
-                        data: stats?.top_asns ?? [],
-                        isLoading: loading,
-                        isRowClickable: true,
-                        activeValue: this.activeFilterValue('asn'),
-                        filterType: 'asn'
-                    }
-                ]
+                label: this.transloco.translate('common.kpis.conversionRate'),
+                value: rate,
+                loading,
+                format: KPI_PERCENT_FORMAT,
+                suffix: '%',
+                delta: calcDelta(rate, comparisonRate)
             }
         ];
     });
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
+    protected tableStats = computed(() => new Map((this.baselineStats()?.goals ?? []).map((item) => [item.goal_id, item])));
+    protected pathSuggestions = computed(() => (this.baselineStats()?.top_pages ?? []).map((item) => item.name).filter(Boolean));
+    protected eventSuggestions = computed(() =>
+        this.goals()
+            .filter((goal) => goal.type === 'event')
+            .map((goal) => goal.value)
+    );
+    protected breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
         this.activeLanguage();
         const site = this.siteService.activeSite();
-        if (!site) {
-            return [{ label: this.transloco.translate('nav.goals'), isCurrent: true }];
-        }
-        return [
-            { label: site.domain, favicon: site, routerLink: '/dashboard' },
-            { label: this.transloco.translate('nav.goals'), isCurrent: true }
-        ];
+        return site
+            ? [
+                  { label: site.domain, favicon: site, routerLink: '/dashboard' },
+                  { label: this.transloco.translate('nav.goals'), isCurrent: true }
+              ]
+            : [{ label: this.transloco.translate('nav.goals'), isCurrent: true }];
     });
 
     constructor() {
+        this.destroyRef.onDestroy(() => this.reportingRequest?.unsubscribe());
+        this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+            this.selectedGoalId.set(params.get('goal'));
+            this.createRequested = params.get('create') === '1';
+        });
         effect(() => {
             const site = this.siteService.activeSite();
-            if (site) {
-                this.loadGoals(site.id);
-            } else {
-                this.goals.set([]);
+            if (this.lastSiteId && site?.id !== this.lastSiteId) {
+                this.selectedGoalId.set(null);
+                this.subjectControl.setValue(null, { emitEvent: false });
+                void this.router.navigate([], {
+                    relativeTo: this.route,
+                    queryParams: { goal: null },
+                    queryParamsHandling: 'merge',
+                    replaceUrl: true
+                });
             }
+            this.lastSiteId = site?.id ?? null;
+            if (site) this.loadGoals(site.id);
+            else this.goals.set([]);
         });
-
         effect(() => {
             const site = this.siteService.activeSite();
-            const metricFilters = this.activeFilters();
-            const dates = this.getCurrentDateRange();
-            if (site && dates) {
-                const goalIds = this.getGoalIdsForFilters();
-                this.loadStats(site.id, dates.from, dates.to, metricFilters, goalIds);
-                this.loadBaselineStats(site.id, dates.from, dates.to, metricFilters);
-                this.loadGoalSeries(site.id, dates.from, dates.to, goalIds);
-                const cmpRange = untracked(() => this.currentComparisonRange());
-                if (cmpRange) {
-                    this.loadComparisonGoalSeries(site.id, cmpRange.from, cmpRange.to, goalIds);
-                }
+            const dates = this.reportRange.currentDateRange();
+            const goals = this.goals();
+            const selected = this.selectedGoalId();
+            if (!site || !dates || this.goalsLoading()) return;
+            if (this.createRequested && this.canManage()) {
+                this.createRequested = false;
+                this.openCreate();
             }
+            if (selected && !goals.some((goal) => goal.id === selected)) {
+                this.notice.show('goals.notices.unavailable', {
+                    preserveNextNavigation: true
+                });
+                this.selectGoal(null);
+                return;
+            }
+            const cohortIds = selected ? [selected] : goals.map((goal) => goal.id);
+            const seriesIds = selected ? [selected] : [];
+            this.loadReporting(site.id, dates.from, dates.to, cohortIds, seriesIds);
         });
-        this.realtimeRefresh.registerUntilDestroyed(this.destroyRef, {
+        this.realtime.registerUntilDestroyed(this.destroyRef, {
             siteId: () => this.siteService.activeSite()?.id ?? null,
             kinds: REALTIME_GOAL_KINDS,
-            enabled: () => !!this.siteService.activeSite() && !!this.getCurrentDateRange(),
-            refresh: () => this.refreshStats('background'),
+            enabled: () => !!this.siteService.activeSite(),
+            refresh: () => this.refresh('background'),
             debounceMs: 700
         });
     }
 
-    openGoalManager() {
-        this.isGoalManagerVisible.set(true);
-    }
-
-    refreshStats(mode: StatsQueryMode = 'blocking') {
-        const site = this.siteService.activeSite();
-        const dates = this.getCurrentDateRange();
-        if (site && dates) {
-            const goalIds = this.getGoalIdsForFilters();
-            this.loadStats(site.id, dates.from, dates.to, this.activeFilters(), goalIds, mode);
-            this.loadBaselineStats(site.id, dates.from, dates.to, this.activeFilters(), mode);
-            this.loadGoalSeries(site.id, dates.from, dates.to, goalIds, mode);
-            const cmpRange = this.currentComparisonRange();
-            if (cmpRange) {
-                this.loadComparisonGoalSeries(site.id, cmpRange.from, cmpRange.to, goalIds, mode);
-            }
-        }
-    }
-
-    private loadStats(siteId: string, from: string, to: string, filters: MetricFilter[], goalIds: string[], mode: StatsQueryMode = 'blocking') {
-        const effectiveMode = mode === 'background' && this.stats() && !this.isStatsLoading() ? 'background' : 'blocking';
-        this.statsQuery.load({
-            siteId,
-            from,
-            to,
-            filters,
-            goalIds,
-            mode: effectiveMode,
-            onSuccess: effectiveMode === 'background' ? () => this.kpiUpdateKey.update((key) => key + 1) : undefined
+    protected selectGoal(id: string | null) {
+        this.selectedGoalId.set(id);
+        this.subjectControl.setValue(id, { emitEvent: false });
+        void this.router.navigate([], {
+            relativeTo: this.route,
+            queryParams: { goal: id, create: null },
+            queryParamsHandling: 'merge',
+            replaceUrl: true
         });
     }
-
-    protected availableGoalFilters = computed(() => {
-        const selected = new Set(this.activeGoalFilters().map((filter) => filter.id));
-        return this.goals()
-            .filter((goal) => !selected.has(goal.id))
-            .map((goal) => ({
-                label: goal.name,
-                value: { id: goal.id, name: goal.name }
-            }));
-    });
-
-    protected addGoalFilter(filter: { id: string; name: string } | null) {
-        if (!filter) return;
-        const active = this.activeGoalFilters();
-        if (active.some((existing) => existing.id === filter.id)) return;
-        this.activeGoalFilters.set([...active, filter]);
+    protected openCreate() {
+        if (!this.canManage()) return;
+        this.editingGoal.set(null);
+        this.editorVisible.set(true);
     }
-
-    protected onGoalFilterSelect(filter: { id: string; name: string } | null): void {
-        this.addGoalFilter(filter);
-        this.goalFilterForm.goalFilter().control().setValue(null, { emitEvent: false });
+    protected openEdit(goal: Goal) {
+        this.editingGoal.set(goal);
+        this.editorVisible.set(true);
     }
-
-    protected removeGoalFilter(id: string) {
-        this.activeGoalFilters.update((list) => list.filter((item) => item.id !== id));
+    protected goalActions(goal: Goal): TableRowActionItem[] {
+        return [
+            {
+                label: this.transloco.translate('common.actions.edit'),
+                icon: 'pi pi-pencil',
+                command: () => this.openEdit(goal)
+            },
+            {
+                label: this.transloco.translate('common.actions.delete'),
+                icon: 'pi pi-trash',
+                danger: true,
+                command: () => this.confirmDelete(goal)
+            }
+        ];
     }
-
-    protected clearGoalFilters() {
-        this.activeGoalFilters.set([]);
+    private confirmDelete(goal: Goal) {
+        this.confirmation.confirm({
+            message: this.transloco.translate('goals.manager.confirmDelete', {
+                name: goal.name
+            }),
+            icon: 'pi pi-exclamation-triangle',
+            rejectButtonProps: dialogCancelButton(this.transloco.translate('common.actions.cancel')),
+            acceptButtonProps: dialogDangerButton(this.transloco.translate('common.actions.delete')),
+            accept: () => this.deleteGoal(goal)
+        });
     }
-
-    private getGoalIdsForFilters(): string[] {
-        const active = this.activeGoalFilters();
-        if (active.length > 0) {
-            return active.map((filter) => filter.id);
-        }
-        return this.goals().map((goal) => goal.id);
+    private deleteGoal(goal: Goal) {
+        const site = this.siteService.activeSite();
+        if (!site) return;
+        this.deletingGoalId.set(goal.id);
+        this.analytics
+            .deleteGoal(site.id, goal.id)
+            .pipe(finalize(() => this.deletingGoalId.set(null)))
+            .subscribe({
+                next: () => {
+                    if (this.selectedGoalId() === goal.id) this.selectGoal(null);
+                    this.loadGoals(site.id);
+                }
+            });
     }
-
+    protected onDefinitionsChanged() {
+        const site = this.siteService.activeSite();
+        if (site) this.loadGoals(site.id);
+    }
+    protected refresh(mode: StatsQueryMode = 'blocking') {
+        const site = this.siteService.activeSite();
+        const dates = this.reportRange.currentDateRange();
+        if (!site || !dates) return;
+        this.trafficRefreshKey.update((key) => key + 1);
+        const selected = this.selectedGoalId();
+        this.loadReporting(site.id, dates.from, dates.to, selected ? [selected] : this.goals().map((goal) => goal.id), selected ? [selected] : [], mode);
+    }
     private loadGoals(siteId: string) {
         this.goalsLoading.set(true);
-        this.analyticsService
+        this.goalsError.set(false);
+        this.analytics
             .getGoals(siteId)
             .pipe(finalize(() => this.goalsLoading.set(false)))
             .subscribe({
-                next: (data) => this.goals.set(data ?? []),
-                error: () => this.goals.set([])
-            });
-    }
-
-    private loadBaselineStats(siteId: string, from: string, to: string, filters: { type: MetricFilterType; value: string }[], mode: StatsQueryMode = 'blocking') {
-        const blocking = mode === 'blocking' || this.baselineLoading() || !this.baselineStats();
-        if (blocking) this.baselineLoading.set(true);
-        this.statsService
-            .fetchStats(siteId, from, to, filters, [], [])
-            .pipe(
-                finalize(() => {
-                    if (blocking) this.baselineLoading.set(false);
-                })
-            )
-            .subscribe({
-                next: (data) => {
-                    this.baselineStats.set(data);
-                    if (!blocking) this.kpiUpdateKey.update((key) => key + 1);
+                next: (goals) => {
+                    this.goals.set(goals ?? []);
+                    this.subjectControl.setValue(this.selectedGoalId(), {
+                        emitEvent: false
+                    });
                 },
                 error: () => {
-                    if (blocking) this.baselineStats.set(null);
+                    this.goals.set([]);
+                    this.goalsError.set(true);
                 }
             });
     }
-
-    protected applyMetricFilter(type: MetricFilterType, metric: { name: string }) {
-        if (!metric.name) return;
-        this.activeFilters.update((filters) => {
-            const existingIndex = filters.findIndex((filter) => filter.type === type);
-            if (existingIndex >= 0) {
-                const existing = filters[existingIndex];
-                if (existing.value === metric.name) {
-                    return filters.filter((_, idx) => idx !== existingIndex);
-                }
-                const next = [...filters];
-                next[existingIndex] = { type, value: metric.name };
-                return next;
-            }
-            return [...filters, { type, value: metric.name }];
-        });
-    }
-
-    protected onMetricCardClick(event: MetricCardGroupRowClick): void {
-        this.applyMetricFilter(event.filterType as MetricFilterType, event.metric);
-    }
-
-    protected clearFilter() {
-        this.activeFilters.set([]);
-    }
-
-    protected removeFilter(type: MetricFilterType, value: string) {
-        this.activeFilters.update((filters) => filters.filter((filter) => !(filter.type === type && filter.value === value)));
-    }
-
-    protected activeFilterValue(type: MetricFilterType): string | null {
-        return this.activeFilters().find((filter) => filter.type === type)?.value ?? null;
-    }
-
-    private filterLabel(filter: MetricFilter): string {
-        switch (filter.type) {
-            case 'path':
-                return this.transloco.translate('common.filters.page', {
-                    value: filter.value
-                });
-            case 'referrer':
-                return this.transloco.translate('common.filters.source', {
-                    value: filter.value
-                });
-            case 'device':
-                return this.transloco.translate('common.filters.device', {
-                    value: filter.value
-                });
-            case 'country':
-                return this.transloco.translate('common.filters.country', {
-                    value: filter.value
-                });
-            case 'city':
-                return this.transloco.translate('common.filters.city', {
-                    value: filter.value
-                });
-            case 'provider':
-                return this.transloco.translate('common.filters.provider', {
-                    value: filter.value
-                });
-            case 'asn':
-                return this.transloco.translate('common.filters.asn', {
-                    value: filter.value
-                });
-            default:
-                return `${filter.type}: ${filter.value}`;
+    private loadReporting(siteId: string, from: string, to: string, cohortIds: string[], seriesIds: string[], mode: StatsQueryMode = 'blocking') {
+        const sequence = ++this.reportingSequence;
+        this.reportingRequest?.unsubscribe();
+        const request = new Subscription();
+        this.reportingRequest = request;
+        this.statsQuery.load({ siteId, from, to, goalIds: cohortIds, mode });
+        const blocking = mode === 'blocking' || !this.baselineStats();
+        if (blocking) this.baselineLoading.set(true);
+        request.add(
+            this.statsService
+                .fetchStats(siteId, from, to)
+                .pipe(finalize(() => sequence === this.reportingSequence && blocking && this.baselineLoading.set(false)))
+                .subscribe({ next: (stats) => sequence === this.reportingSequence && this.baselineStats.set(stats) })
+        );
+        this.seriesLoading.set(blocking);
+        request.add(
+            this.analytics
+                .getGoalTimeseries(siteId, from, to, seriesIds)
+                .pipe(finalize(() => sequence === this.reportingSequence && blocking && this.seriesLoading.set(false)))
+                .subscribe({ next: (series) => sequence === this.reportingSequence && this.goalSeries.set(series ?? []) })
+        );
+        const comparison = untracked(() => this.statsQuery.comparisonRange());
+        if (comparison) {
+            request.add(
+                this.analytics.getGoalTimeseries(siteId, comparison.from, comparison.to, seriesIds).subscribe({
+                    next: (series) => sequence === this.reportingSequence && this.comparisonGoalSeries.set(series ?? [])
+                })
+            );
         }
     }
-
-    private loadGoalSeries(siteId: string, from: string, to: string, goalIds: string[], mode: StatsQueryMode = 'blocking') {
-        const blocking = mode === 'blocking' || this.isGoalSeriesLoading();
-        if (blocking) this.isGoalSeriesLoading.set(true);
-        this.analyticsService
-            .getGoalTimeseries(siteId, from, to, goalIds)
-            .pipe(
-                finalize(() => {
-                    if (blocking) this.isGoalSeriesLoading.set(false);
-                })
-            )
-            .subscribe({
-                next: (data) => {
-                    this.goalSeries.set(data ?? []);
-                    if (!blocking) this.kpiUpdateKey.update((key) => key + 1);
-                },
-                error: () => {
-                    if (blocking) this.goalSeries.set([]);
-                }
-            });
-    }
-
-    private loadComparisonGoalSeries(siteId: string, from: string, to: string, goalIds: string[], mode: StatsQueryMode = 'blocking') {
-        const blocking = mode === 'blocking' || this.isComparisonGoalSeriesLoading();
-        if (blocking) this.isComparisonGoalSeriesLoading.set(true);
-        this.analyticsService
-            .getGoalTimeseries(siteId, from, to, goalIds)
-            .pipe(
-                finalize(() => {
-                    if (blocking) this.isComparisonGoalSeriesLoading.set(false);
-                })
-            )
-            .subscribe({
-                next: (data) => this.comparisonGoalSeries.set(data ?? []),
-                error: () => {
-                    if (blocking) this.comparisonGoalSeries.set([]);
-                }
-            });
-    }
-
-    protected readonly calcDelta = calcDelta;
-
-    protected getCurrentDateRange() {
-        return this.reportRange.currentDateRange();
+    protected conversionStats(goal: Goal): GoalStats | undefined {
+        return this.tableStats().get(goal.id);
     }
 }
