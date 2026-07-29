@@ -195,8 +195,7 @@ test("tracks local downloads once and only downloads once", async ({ page, baseU
 
     await page.locator("#local-download-link").click();
 
-    const [payload, download] = await Promise.all([requestPromise, downloadPromise]);
-    await download.path();
+    const [payload] = await Promise.all([requestPromise, downloadPromise]);
     await page.waitForTimeout(400);
 
     expect(downloadCount).toBe(1);
