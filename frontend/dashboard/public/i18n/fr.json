@@ -100,6 +100,58 @@
       "siteStatsFailed": "Statistiques indisponibles"
     }
   },
+  "applicationError": {
+    "loading": {
+      "title": "Chargement de HitKeep",
+      "message": "Vérification de l’état de l’application et préparation de votre espace de travail."
+    },
+    "routeUnavailable": {
+      "title": "Cette page n’a pas pu être ouverte",
+      "message": "La navigation s’est arrêtée avant que la page soit prête. Rechargez HitKeep puis réessayez."
+    },
+    "notFound": {
+      "title": "Page introuvable",
+      "message": "L’adresse est peut-être obsolète ou la page a été déplacée."
+    },
+    "offline": {
+      "title": "HitKeep est inaccessible",
+      "message": "Vérifiez votre connexion puis essayez de charger la page à nouveau."
+    },
+    "client": {
+      "title": "La requête n’a pas pu aboutir",
+      "message": "HitKeep n’a pas pu charger cette page, car la requête a été refusée."
+    },
+    "server": {
+      "title": "HitKeep est temporairement indisponible",
+      "message": "Le serveur n’a pas pu terminer le chargement de cette page. Réessayez dans un instant."
+    },
+    "navigation": {
+      "title": "Cette page n’a pas pu être chargée",
+      "message": "Une ressource de la page n’a pas pu être chargée. Recharger la page résout généralement ce problème."
+    },
+    "generic": {
+      "title": "Un problème a empêché le chargement de cette page",
+      "message": "Rechargez HitKeep ou revenez au tableau de bord."
+    },
+    "status": {
+      "http": "HTTP {{status}}",
+      "offline": "Hors connexion",
+      "navigation": "Erreur de navigation"
+    },
+    "context": {
+      "setupStatus": "HitKeep n’a pas pu confirmer si la configuration est terminée. Réessayez lorsque le serveur sera disponible.",
+      "dashboardBootstrap": "HitKeep n’a pas pu charger votre session du tableau de bord. Réessayez sans vous reconnecter.",
+    "cloudSignupStatus": "HitKeep n’a pas pu vérifier si l’inscription cloud est disponible. Réessayez dans un instant.",
+    "cloudSignupProfile": "HitKeep n’a pas pu confirmer votre session cloud. Réessayez dans un instant."
+    },
+    "actions": {
+      "tryAgain": "Réessayer",
+      "reloadPage": "Recharger la page",
+      "reloadApplication": "Recharger HitKeep",
+      "dashboard": "Aller au tableau de bord",
+      "goBack": "Retour"
+    }
+  },
   "askAi": {
     "triggerPlaceholder": "Ask AI",
     "triggerAria": "Interroger Ask AI sur ce site",
@@ -593,6 +645,7 @@
       "exportCsv": "Exporter CSV",
       "open": "Ouvrir",
       "refresh": "Actualiser",
+      "retry": "Réessayer",
       "save": "Enregistrer",
       "more": "Plus d'actions",
       "edit": "Edit",
@@ -765,6 +818,7 @@
     "unknown": "Inconnu"
   },
   "dashboard": {
+    "conversions": { "title": "Conversions", "description": "Filtrez tout l’espace de travail par cohorte d’objectif ou d’entonnoir.", "filters": { "goal": "Objectif : {{name}}", "funnel": "Entonnoir : {{name}}" }, "invalidSubject": "Cet objectif ou cet entonnoir n’est plus disponible pour ce site." },
     "breadcrumbOverview": "Aperçu",
     "filteredBadge": "Filtré",
     "rawHitsTitle": "Derniers hits",
@@ -821,20 +875,23 @@
       }
     }
   },
+  "trafficRecords": { "unavailableTitle": "Aucun trafic de conversion pour le moment", "unavailableDescription": "Créez un objectif ou un entonnoir pour définir le trafic affiché ici.", "errorTitle": "Trafic indisponible", "errorDescription": "Les enregistrements de trafic n’ont pas pu être chargés. Réessayez.", "empty": "Aucun enregistrement de trafic correspondant." },
   "goals": {
     "manageAction": "Gérer les objectifs",
     "noSiteDescription": "Sélectionnez ou créez un site pour voir les objectifs.",
     "series": {
       "title": "Objectifs",
       "description": "Filtrer la série par objectif.",
+      "workspaceDescription": "Conversions dans le temps pour le sujet de rapport sélectionné.",
       "addFilterPlaceholder": "Ajouter un filtre d'objectif",
       "emptyTitle": "Aucune conversion d'objectif pour le moment",
       "emptyDescription": "Créez un objectif et générez du trafic pour voir les conversions dans le temps."
     },
     "kpis": {
       "totalGoals": "Total des objectifs",
-      "conversions": "Conversions"
+      "conversions": "Conversions", "convertingSessions": "Sessions converties"
     },
+    "subject": { "label": "Sujet du rapport", "all": "Tous les objectifs" }, "traffic": { "title": "Trafic correspondant", "selectedDescription": "Pages vues des sessions ayant atteint cet objectif.", "allDescription": "Pages vues des sessions ayant atteint un objectif.", "unavailableTitle": "Aucun objectif à analyser", "unavailableDescription": "Créez un objectif pour voir le trafic des sessions correspondant." }, "states": { "errorTitle": "Objectifs indisponibles", "errorDescription": "Impossible de charger les objectifs. Réessayez." }, "notices": { "unavailable": "Cet objectif n’est plus disponible pour ce site." }, "definitions": { "title": "Définitions des objectifs", "count": "{{count}} objectifs", "steps": "Étapes" }, "types": { "path": "Chemin", "event": "Événement" },
     "list": {
       "title": "Objectifs",
       "manageTooltip": "Gérer les objectifs",
@@ -843,6 +900,7 @@
       "createAction": "Créer un objectif",
       "conversionsSuffix": "conversions",
       "conversionRateShort": "CR"
+      ,"dashboardDescription": "Actions terminées et leurs taux de conversion.", "detailsAria": "Ouvrir les détails de {{name}}"
     },
     "manager": {
       "dialogTitle": "Gérer les objectifs",
@@ -866,6 +924,7 @@
       "eventNameHelpSuffix": ".",
       "createAction": "Créer un objectif",
       "saveAction": "Enregistrer les modifications",
+      "suggestionsHelp": "Choisissez une valeur observée ou saisissez une valeur future exacte.", "errors": { "save": "Impossible d’enregistrer l’objectif. Vérifiez le formulaire et réessayez." },
       "messages": {
         "createSuccess": "Objectif créé.",
         "createError": "Impossible de créer l’objectif.",
@@ -883,6 +942,7 @@
     "series": {
       "title": "Entonnoirs",
       "description": "Filtrer la série par entonnoir.",
+      "workspaceDescription": "Entrées et finalisations dans le temps pour le sujet de rapport sélectionné.",
       "addFilterPlaceholder": "Ajouter un filtre d'entonnoir",
       "emptyTitle": "Aucune activité d'entonnoir pour le moment",
       "emptyDescription": "Créez un entonnoir et générez du trafic pour voir les entrées et finalisations dans le temps."
@@ -893,6 +953,7 @@
       "completions": "Finalisations",
       "completionRate": "Taux de finalisation"
     },
+    "subject": { "label": "Sujet du rapport", "all": "Tous les entonnoirs" }, "traffic": { "title": "Trafic correspondant", "selectedDescription": "Pages vues des sessions entrées dans cet entonnoir.", "allDescription": "Pages vues des sessions entrées dans un entonnoir.", "unavailableTitle": "Aucun entonnoir à analyser", "unavailableDescription": "Créez un entonnoir pour voir le trafic des sessions correspondant." }, "states": { "errorTitle": "Entonnoirs indisponibles", "errorDescription": "Impossible de charger les entonnoirs. Réessayez." }, "notices": { "unavailable": "Cet entonnoir n’est plus disponible pour ce site." }, "definitions": { "title": "Définitions des entonnoirs", "count": "{{count}} entonnoirs", "steps": "Étapes ordonnées" }, "steps": { "title": "Performance des étapes", "retention": "{{rate}} % retenus", "dropoff": "{{count}} abandons" },
     "list": {
       "title": "Entonnoirs",
       "manageTooltip": "Gérer les entonnoirs",
@@ -900,6 +961,7 @@
       "emptyDescription": "Construisez un parcours d'événements pour mesurer les abandons et les conversions.",
       "createAction": "Créer un entonnoir",
       "stepsCount": "{{count}} étapes"
+      ,"dashboardDescription": "Parcours révélant la progression et les abandons.", "detailsAria": "Ouvrir les détails de {{name}}"
     },
     "manager": {
       "dialogTitle": "Gérer les entonnoirs",
@@ -919,6 +981,7 @@
       "addStep": "Ajouter une étape",
       "createAction": "Créer un entonnoir",
       "saveAction": "Enregistrer les modifications",
+      "stepsTitle": "Étapes ordonnées", "reorderHelp": "Faites glisser les étapes ou utilisez les commandes de déplacement. Deux étapes minimum sont requises.", "dragStepAria": "Faire glisser l’étape {{index}}", "stepValueAria": "Valeur de l’étape {{index}}", "moveUpAria": "Monter l’étape", "moveDownAria": "Descendre l’étape", "removeStepAria": "Supprimer l’étape", "errors": { "save": "Impossible d’enregistrer l’entonnoir. Vérifiez le formulaire et réessayez." },
       "typePagePath": "Chemin",
       "typeCustomEvent": "Événement",
       "messages": {
@@ -2642,6 +2705,10 @@
   },
   "login": {
     "subtitle": "Connectez-vous à votre tableau de bord",
+    "sessionEnded": {
+      "signedOut": "Vous avez été déconnecté.",
+      "expired": "Votre session a pris fin. Reconnectez-vous pour continuer."
+    },
     "ssoSubtitle": "Saisissez votre adresse e-mail professionnelle pour continuer avec le fournisseur d’identité de votre équipe.",
     "authenticationMethods": "Options de connexion",
     "cloudSignupPrompt": "Nouveau sur HitKeep Cloud ?",

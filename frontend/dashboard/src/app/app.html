@@ -1,2 +1,16 @@
 <app-route-progress-bar />
+@if (routeUnavailable()) {
+<app-application-state
+    titleKey="applicationError.routeUnavailable.title"
+    messageKey="applicationError.routeUnavailable.message"
+    icon="pi pi-exclamation-triangle"
+    [danger]="true"
+    primaryActionLabelKey="applicationError.actions.reloadApplication"
+    primaryActionIcon="pi pi-refresh"
+    (primaryAction)="reloadApplication()"
+/>
+} @else { @if (!initialNavigationCompleted()) {
+<app-application-state titleKey="applicationError.loading.title" messageKey="applicationError.loading.message" icon="pi pi-spin pi-spinner" />
+}
 <router-outlet />
+}

@@ -100,6 +100,58 @@
       "siteStatsFailed": "Statistieken niet beschikbaar"
     }
   },
+  "applicationError": {
+    "loading": {
+      "title": "HitKeep laden",
+      "message": "De applicatiestatus wordt gecontroleerd en je werkruimte wordt voorbereid."
+    },
+    "routeUnavailable": {
+      "title": "Deze pagina kon niet worden geopend",
+      "message": "De navigatie stopte voordat de pagina gereed was. Laad HitKeep opnieuw en probeer het nogmaals."
+    },
+    "notFound": {
+      "title": "Pagina niet gevonden",
+      "message": "Het adres is mogelijk verouderd of de pagina is verplaatst."
+    },
+    "offline": {
+      "title": "HitKeep is niet bereikbaar",
+      "message": "Controleer je verbinding en probeer de pagina opnieuw te laden."
+    },
+    "client": {
+      "title": "De aanvraag kon niet worden voltooid",
+      "message": "HitKeep kon deze pagina niet laden omdat de aanvraag is geweigerd."
+    },
+    "server": {
+      "title": "HitKeep is tijdelijk niet beschikbaar",
+      "message": "De server kon deze pagina niet volledig laden. Probeer het zo opnieuw."
+    },
+    "navigation": {
+      "title": "Deze pagina kon niet worden geladen",
+      "message": "Een paginabron kon niet worden geladen. Opnieuw laden lost dit meestal op."
+    },
+    "generic": {
+      "title": "De pagina kon niet worden geladen",
+      "message": "Laad HitKeep opnieuw of ga terug naar het dashboard."
+    },
+    "status": {
+      "http": "HTTP {{status}}",
+      "offline": "Offline",
+      "navigation": "Navigatiefout"
+    },
+    "context": {
+      "setupStatus": "HitKeep kon niet bevestigen of de configuratie is voltooid. Probeer het opnieuw zodra de server beschikbaar is.",
+      "dashboardBootstrap": "HitKeep kon je dashboardsessie niet laden. Probeer het opnieuw zonder opnieuw in te loggen.",
+    "cloudSignupStatus": "HitKeep kon niet controleren of cloudregistratie beschikbaar is. Probeer het zo opnieuw.",
+    "cloudSignupProfile": "HitKeep kon je cloudsessie niet bevestigen. Probeer het zo opnieuw."
+    },
+    "actions": {
+      "tryAgain": "Opnieuw proberen",
+      "reloadPage": "Pagina opnieuw laden",
+      "reloadApplication": "HitKeep opnieuw laden",
+      "dashboard": "Naar dashboard",
+      "goBack": "Terug"
+    }
+  },
   "askAi": {
     "triggerPlaceholder": "Ask AI",
     "triggerAria": "Vraag Ask AI over deze site",
@@ -593,6 +645,7 @@
       "exportCsv": "CSV exporteren",
       "open": "Openen",
       "refresh": "Vernieuwen",
+      "retry": "Opnieuw proberen",
       "save": "Opslaan",
       "more": "Meer acties",
       "edit": "Edit",
@@ -765,6 +818,7 @@
     }
   },
   "dashboard": {
+    "conversions": { "title": "Conversies", "description": "Filter de hele werkruimte op een doel- of funnelcohort.", "filters": { "goal": "Doel: {{name}}", "funnel": "Funnel: {{name}}" }, "invalidSubject": "Dit doel of deze funnel is niet meer beschikbaar voor deze site." },
     "breadcrumbOverview": "Overzicht",
     "filteredBadge": "Gefilterd",
     "rawHitsTitle": "Laatste hits",
@@ -821,20 +875,23 @@
       }
     }
   },
+  "trafficRecords": { "unavailableTitle": "Nog geen conversieverkeer", "unavailableDescription": "Maak een doel of funnel om het verkeer te bepalen dat hier wordt getoond.", "errorTitle": "Verkeer niet beschikbaar", "errorDescription": "De verkeersrecords konden niet worden geladen. Probeer het opnieuw.", "empty": "Geen overeenkomende verkeersrecords gevonden." },
   "goals": {
     "manageAction": "Beheer doelen",
     "noSiteDescription": "Selecteer of maak een site om doelen te bekijken.",
     "series": {
       "title": "Doelen",
       "description": "Filter de reeks op doel.",
+      "workspaceDescription": "Conversies door de tijd voor het geselecteerde rapportonderwerp.",
       "addFilterPlaceholder": "Doelfilter toevoegen",
       "emptyTitle": "Nog geen doelconversies",
       "emptyDescription": "Creëer een doel en genereer verkeer om in de loop van de tijd conversies te zien."
     },
     "kpis": {
       "totalGoals": "Totaal doelen",
-      "conversions": "Conversies"
+      "conversions": "Conversies", "convertingSessions": "Converterende sessies"
     },
+    "subject": { "label": "Rapportonderwerp", "all": "Alle doelen" }, "traffic": { "title": "Overeenkomend verkeer", "selectedDescription": "Paginaweergaven uit sessies die dit doel hebben voltooid.", "allDescription": "Paginaweergaven uit sessies die een doel hebben voltooid.", "unavailableTitle": "Geen doelen om te vergelijken", "unavailableDescription": "Maak een doel om overeenkomend sessieverkeer te bekijken." }, "states": { "errorTitle": "Doelen niet beschikbaar", "errorDescription": "Doelen konden niet worden geladen. Probeer het opnieuw." }, "notices": { "unavailable": "Dit doel is niet meer beschikbaar voor deze site." }, "definitions": { "title": "Doeldefinities", "count": "{{count}} doelen", "steps": "Stappen" }, "types": { "path": "Pad", "event": "Event" },
     "list": {
       "title": "Doelen",
       "manageTooltip": "Beheer doelen",
@@ -843,6 +900,7 @@
       "createAction": "Doel creëren",
       "conversionsSuffix": "conversies",
       "conversionRateShort": "CR"
+      ,"dashboardDescription": "Voltooide acties en hun conversiepercentages.", "detailsAria": "Details voor {{name}} openen"
     },
     "manager": {
       "dialogTitle": "Beheer doelen",
@@ -866,6 +924,7 @@
       "eventNameHelpSuffix": ".",
       "createAction": "Doel creëren",
       "saveAction": "Wijzigingen opslaan",
+      "suggestionsHelp": "Kies een waargenomen waarde of voer een exacte toekomstige waarde in.", "errors": { "save": "Doel kon niet worden opgeslagen. Controleer het formulier en probeer opnieuw." },
       "messages": {
         "createSuccess": "Doel gemaakt.",
         "createError": "Doel kon niet worden gemaakt.",
@@ -883,6 +942,7 @@
     "series": {
       "title": "Funnels",
       "description": "Filter de reeks op funnel.",
+      "workspaceDescription": "Inzendingen en voltooiingen door de tijd voor het geselecteerde rapportonderwerp.",
       "addFilterPlaceholder": "Trechterfilter toevoegen",
       "emptyTitle": "Nog geen trechteractiviteit",
       "emptyDescription": "Creëer een funnel en genereer verkeer om inzendingen en voltooiingen in de loop van de tijd te zien."
@@ -893,6 +953,7 @@
       "completions": "Voltooiingen",
       "completionRate": "Voltooiingspercentage"
     },
+    "subject": { "label": "Rapportonderwerp", "all": "Alle funnels" }, "traffic": { "title": "Overeenkomend verkeer", "selectedDescription": "Paginaweergaven uit sessies die deze funnel zijn binnengegaan.", "allDescription": "Paginaweergaven uit sessies die een funnel zijn binnengegaan.", "unavailableTitle": "Geen funnels om te vergelijken", "unavailableDescription": "Maak een funnel om overeenkomend sessieverkeer te bekijken." }, "states": { "errorTitle": "Funnels niet beschikbaar", "errorDescription": "Funnels konden niet worden geladen. Probeer het opnieuw." }, "notices": { "unavailable": "Deze funnel is niet meer beschikbaar voor deze site." }, "definitions": { "title": "Funneldefinities", "count": "{{count}} funnels", "steps": "Geordende stappen" }, "steps": { "title": "Stapresultaten", "retention": "{{rate}}% behouden", "dropoff": "{{count}} afgehaakt" },
     "list": {
       "title": "Funnels",
       "manageTooltip": "Beheer funnels",
@@ -900,6 +961,7 @@
       "emptyDescription": "Bouw een pad van gebeurtenissen om het aantal drop-offs en conversies te meten.",
       "createAction": "Funnel maken",
       "stepsCount": "{{count}} stappen"
+      ,"dashboardDescription": "Trajecten die voortgang en uitval tonen.", "detailsAria": "Details voor {{name}} openen"
     },
     "manager": {
       "dialogTitle": "Beheer funnels",
@@ -919,6 +981,7 @@
       "addStep": "Stap toevoegen",
       "createAction": "Funnel maken",
       "saveAction": "Wijzigingen opslaan",
+      "stepsTitle": "Geordende stappen", "reorderHelp": "Sleep stappen of gebruik de verplaatsknoppen. Minstens twee stappen zijn vereist.", "dragStepAria": "Stap {{index}} slepen", "stepValueAria": "Waarde voor stap {{index}}", "moveUpAria": "Stap omhoog", "moveDownAria": "Stap omlaag", "removeStepAria": "Stap verwijderen", "errors": { "save": "Funnel kon niet worden opgeslagen. Controleer het formulier en probeer opnieuw." },
       "typePagePath": "Pad",
       "typeCustomEvent": "Event",
       "messages": {
@@ -2625,6 +2688,10 @@
   },
   "login": {
     "subtitle": "Log in op je dashboard",
+    "sessionEnded": {
+      "signedOut": "Je bent uitgelogd.",
+      "expired": "Je sessie is beëindigd. Log opnieuw in om door te gaan."
+    },
     "ssoSubtitle": "Voer je zakelijke e-mailadres in om door te gaan naar de identiteitsprovider van je team.",
     "authenticationMethods": "Aanmeldopties",
     "cloudSignupPrompt": "Nieuw bij HitKeep Cloud?",

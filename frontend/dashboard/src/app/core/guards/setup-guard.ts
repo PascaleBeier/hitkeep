@@ -1,38 +1,29 @@
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { CanActivateFn, Router } from '@angular/router';
-import { map, catchError, of } from 'rxjs';
+import { catchError, map, of, timeout } from 'rxjs';
 
-export const setupGuard: CanActivateFn = (route, state) => {
+import { SKIP_AUTH_REDIRECT } from '@core/interceptors/auth.interceptor';
+import { SystemStatus } from '@models/analytics.types';
+import { ApplicationErrorNavigationService, ROUTE_CRITICAL_REQUEST_TIMEOUT_MS } from '@services/application-error-navigation.service';
+
+export const setupGuard: CanActivateFn = (_route, state) => {
     const http = inject(HttpClient);
     const router = inject(Router);
+    const applicationErrors = inject(ApplicationErrorNavigationService);
 
     // Check if we are already on the setup page to avoid redirect loops
     const isSetupRoute = state.url.startsWith('/setup');
 
-    return http.get<{ needs_setup: boolean }>('/api/status').pipe(
+    const context = new HttpContext().set(SKIP_AUTH_REDIRECT, true);
+    return http.get<SystemStatus>('/api/status', { context }).pipe(
+        timeout({ first: ROUTE_CRITICAL_REQUEST_TIMEOUT_MS }),
         map((status) => {
             if (status.needs_setup) {
-                // If setup is needed and we are NOT on the setup page, redirect to it.
-                if (!isSetupRoute) {
-                    return router.createUrlTree(['/setup']);
-                }
-                // Otherwise, allow access (we are already on the setup page).
-                return true;
-            } else {
-                // If setup is NOT needed and we ARE on the setup page, redirect away (to login).
-                if (isSetupRoute) {
-                    return router.createUrlTree(['/login']);
-                }
-                // Otherwise, allow access to the requested page (e.g., /login, /dashboard).
-                return true;
+                return isSetupRoute ? true : router.createUrlTree(['/setup']);
             }
+            return isSetupRoute ? router.createUrlTree(['/login']) : true;
         }),
-        catchError(() => {
-            // If the API fails, we can't know the status.
-            // Redirect to an error page or show a message. For now, block access.
-            console.error('Could not determine application status.');
-            return of(false);
-        })
+        catchError((error: unknown) => of(applicationErrors.fromHttp(error, 'setup-status', state.url)))
     );
 };

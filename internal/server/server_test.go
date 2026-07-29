@@ -81,12 +81,13 @@ func TestServerDoesNotMountMCPRouteWhenDisabled(t *testing.T) {
 	}()
 
 	req := httptest.NewRequest(http.MethodGet, "/mcp", nil)
+	req.Header.Set("Accept", "text/html")
 	rec := httptest.NewRecorder()
 
 	srv.httpServer.Handler.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "hitkeep test shell") {
-		t.Fatalf("expected disabled MCP path to fall through to SPA, got %d %q", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected disabled MCP path to remain outside the SPA, got %d %q", rec.Code, rec.Body.String())
 	}
 }
 
@@ -157,6 +158,7 @@ func TestServerInjectsPublicBasePathIntoDashboardIndex(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/hitkeep/dashboard", nil)
 	req.Host = "www.example.net"
+	req.Header.Set("Accept", "text/html,application/xhtml+xml")
 	rec := httptest.NewRecorder()
 
 	srv.httpServer.Handler.ServeHTTP(rec, req)
@@ -293,6 +295,109 @@ func TestServerServesPrefixedStaticAssets(t *testing.T) {
 	}
 	if cacheControl := rec.Header().Get("Cache-Control"); cacheControl != cacheControlImmutable {
 		t.Fatalf("expected immutable cache control, got %q", cacheControl)
+	}
+}
+
+func TestServerReturnsNotFoundForMissingStaticAssets(t *testing.T) {
+	conf := testServerConfig(t)
+	store := testServerStore(t)
+	defer store.Close()
+
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	defer func() {
+		_ = srv.Shutdown(context.Background())
+	}()
+
+	req := httptest.NewRequest(http.MethodGet, "/missing.abc123.js", nil)
+	req.Header.Set("Accept", "*/*")
+	rec := httptest.NewRecorder()
+
+	srv.httpServer.Handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected missing static asset to return 404, got %d body %q", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), "hitkeep test shell") {
+		t.Fatalf("expected missing static asset not to receive the dashboard shell")
+	}
+}
+
+func TestServerServesDashboardShellForHTMLNavigation(t *testing.T) {
+	conf := testServerConfig(t)
+	store := testServerStore(t)
+	defer store.Close()
+
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	defer func() {
+		_ = srv.Shutdown(context.Background())
+	}()
+
+	req := httptest.NewRequest(http.MethodGet, "/missing-client-route", nil)
+	req.Header.Set("Accept", "text/html,application/xhtml+xml")
+	rec := httptest.NewRecorder()
+
+	srv.httpServer.Handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected HTML navigation to receive dashboard shell, got %d body %q", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "hitkeep test shell") {
+		t.Fatalf("expected HTML navigation to receive dashboard shell")
+	}
+}
+
+func TestServerSPAFallbackRequiresDocumentNavigation(t *testing.T) {
+	conf := testServerConfig(t)
+	store := testServerStore(t)
+	defer store.Close()
+
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	defer func() {
+		_ = srv.Shutdown(context.Background())
+	}()
+
+	tests := []struct {
+		name       string
+		method     string
+		path       string
+		accept     string
+		fetchDest  string
+		wantStatus int
+	}{
+		{name: "unknown API without accept", method: http.MethodGet, path: "/api/unknown", wantStatus: http.StatusNotFound},
+		{name: "unknown API with HTML accept", method: http.MethodGet, path: "/api/unknown", accept: "text/html", wantStatus: http.StatusNotFound},
+		{name: "mutation with HTML accept", method: http.MethodPost, path: "/unknown", accept: "text/html", wantStatus: http.StatusNotFound},
+		{name: "mutation of static asset", method: http.MethodPost, path: "/main.abc123.js", accept: "*/*", wantStatus: http.StatusNotFound},
+		{name: "missing asset with HTML accept", method: http.MethodGet, path: "/missing.js", accept: "text/html", wantStatus: http.StatusNotFound},
+		{name: "HEAD missing asset", method: http.MethodHead, path: "/missing.js", accept: "*/*", wantStatus: http.StatusNotFound},
+		{name: "mutation of explicit index", method: http.MethodPost, path: "/index.html", accept: "text/html", wantStatus: http.StatusNotFound},
+		{name: "HTML explicitly refused", method: http.MethodGet, path: "/unknown", accept: "text/html;q=0,application/json", wantStatus: http.StatusNotFound},
+		{name: "specific HTML refusal overrides text wildcard", method: http.MethodGet, path: "/unknown", accept: "text/html;q=0,text/*;q=1", wantStatus: http.StatusNotFound},
+		{name: "document signal with non-HTML accept", method: http.MethodGet, path: "/unknown", accept: "application/json", fetchDest: "document", wantStatus: http.StatusOK},
+		{name: "document signal cannot override HTML refusal", method: http.MethodGet, path: "/unknown", accept: "text/html;q=0", fetchDest: "document", wantStatus: http.StatusNotFound},
+		{name: "wildcard is not enough without document signal", method: http.MethodGet, path: "/unknown", accept: "*/*", wantStatus: http.StatusNotFound},
+		{name: "document signal permits extensionless wildcard", method: http.MethodGet, path: "/unknown", accept: "*/*", fetchDest: "document", wantStatus: http.StatusOK},
+		{name: "scalar assets are never SPA routes", method: http.MethodGet, path: "/scalar/unknown.js", accept: "text/html", wantStatus: http.StatusNotFound},
+		{name: "configured MCP path is never an SPA route", method: http.MethodGet, path: "/mcp/unknown", accept: "text/html", wantStatus: http.StatusNotFound},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			req := httptest.NewRequest(test.method, test.path, nil)
+			if test.accept != "" {
+				req.Header.Set("Accept", test.accept)
+			}
+			if test.fetchDest != "" {
+				req.Header.Set("Sec-Fetch-Dest", test.fetchDest)
+			}
+			rec := httptest.NewRecorder()
+
+			srv.httpServer.Handler.ServeHTTP(rec, req)
+
+			if rec.Code != test.wantStatus {
+				t.Fatalf("expected status %d, got %d body %q", test.wantStatus, rec.Code, rec.Body.String())
+			}
+		})
 	}
 }
 

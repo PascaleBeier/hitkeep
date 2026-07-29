@@ -100,6 +100,58 @@
       "siteStatsFailed": "Estatísticas indisponíveis"
     }
   },
+  "applicationError": {
+    "loading": {
+      "title": "A carregar o HitKeep",
+      "message": "A verificar o estado da aplicação e a preparar o teu espaço de trabalho."
+    },
+    "routeUnavailable": {
+      "title": "Não foi possível abrir esta página",
+      "message": "A navegação parou antes de a página estar pronta. Recarrega o HitKeep e tenta novamente."
+    },
+    "notFound": {
+      "title": "Página não encontrada",
+      "message": "O endereço pode estar desatualizado ou a página pode ter sido movida."
+    },
+    "offline": {
+      "title": "Não é possível aceder ao HitKeep",
+      "message": "Verifica a tua ligação e tenta carregar a página novamente."
+    },
+    "client": {
+      "title": "Não foi possível concluir o pedido",
+      "message": "O HitKeep não conseguiu carregar esta página porque o pedido foi rejeitado."
+    },
+    "server": {
+      "title": "O HitKeep está temporariamente indisponível",
+      "message": "O servidor não conseguiu terminar de carregar esta página. Tenta novamente dentro de instantes."
+    },
+    "navigation": {
+      "title": "Não foi possível carregar esta página",
+      "message": "Não foi possível carregar um recurso da página. Recarregar costuma resolver o problema."
+    },
+    "generic": {
+      "title": "Algo impediu o carregamento desta página",
+      "message": "Recarrega o HitKeep ou volta ao painel."
+    },
+    "status": {
+      "http": "HTTP {{status}}",
+      "offline": "Offline",
+      "navigation": "Erro de navegação"
+    },
+    "context": {
+      "setupStatus": "O HitKeep não conseguiu confirmar se a configuração está concluída. Tenta novamente quando o servidor estiver disponível.",
+      "dashboardBootstrap": "O HitKeep não conseguiu carregar a tua sessão do painel. Tenta novamente sem iniciar sessão outra vez.",
+    "cloudSignupStatus": "O HitKeep não conseguiu verificar se o registo na cloud está disponível. Tenta novamente dentro de instantes.",
+    "cloudSignupProfile": "O HitKeep não conseguiu confirmar a tua sessão na cloud. Tenta novamente dentro de instantes."
+    },
+    "actions": {
+      "tryAgain": "Tentar novamente",
+      "reloadPage": "Recarregar página",
+      "reloadApplication": "Recarregar o HitKeep",
+      "dashboard": "Ir para o painel",
+      "goBack": "Voltar"
+    }
+  },
   "askAi": {
     "triggerPlaceholder": "Ask AI",
     "triggerAria": "Perguntar ao Ask AI sobre este site",
@@ -593,6 +645,7 @@
       "exportCsv": "Exportar CSV",
       "open": "Abrir",
       "refresh": "Atualizar",
+      "retry": "Tentar novamente",
       "save": "Salvar",
       "more": "Mais ações"
     },
@@ -758,6 +811,7 @@
     }
   },
   "dashboard": {
+    "conversions": { "title": "Conversões", "description": "Filtre todo o espaço de trabalho por uma coorte de meta ou funil.", "filters": { "goal": "Meta: {{name}}", "funnel": "Funil: {{name}}" }, "invalidSubject": "Essa meta ou funil não está mais disponível para este site." },
     "breadcrumbOverview": "Visão geral",
     "filteredBadge": "Filtrado",
     "rawHitsTitle": "Últimos acessos",
@@ -814,20 +868,23 @@
       }
     }
   },
+  "trafficRecords": { "unavailableTitle": "Ainda não há tráfego de conversão", "unavailableDescription": "Crie uma meta ou funil para definir o tráfego mostrado aqui.", "errorTitle": "Tráfego indisponível", "errorDescription": "Não foi possível carregar os registros de tráfego. Tente novamente.", "empty": "Nenhum registro de tráfego correspondente encontrado." },
   "goals": {
     "manageAction": "Gerenciar metas",
     "noSiteDescription": "Selecione ou crie um site para visualizar as metas.",
     "series": {
       "title": "Metas",
       "description": "Filtrar a série por meta.",
+      "workspaceDescription": "Conversões ao longo do tempo para o assunto de relatório selecionado.",
       "addFilterPlaceholder": "Adicionar filtro de meta",
       "emptyTitle": "Nenhuma conversão de meta ainda",
       "emptyDescription": "Crie uma meta e gere tráfego para ver as conversões ao longo do tempo."
     },
     "kpis": {
       "totalGoals": "Total de metas",
-      "conversions": "Conversões"
+      "conversions": "Conversões", "convertingSessions": "Sessões com conversão"
     },
+    "subject": { "label": "Assunto do relatório", "all": "Todas as metas" }, "traffic": { "title": "Tráfego correspondente", "selectedDescription": "Visualizações de página de sessões que concluíram esta meta.", "allDescription": "Visualizações de página de sessões que concluíram qualquer meta.", "unavailableTitle": "Nenhuma meta para corresponder", "unavailableDescription": "Crie uma meta para ver o tráfego de sessões correspondente." }, "states": { "errorTitle": "Metas indisponíveis", "errorDescription": "Não foi possível carregar as metas. Tente novamente." }, "notices": { "unavailable": "Essa meta não está mais disponível para este site." }, "definitions": { "title": "Definições de metas", "count": "{{count}} metas", "steps": "Etapas" }, "types": { "path": "Caminho", "event": "Evento" },
     "list": {
       "title": "Metas",
       "manageTooltip": "Gerenciar metas",
@@ -836,6 +893,7 @@
       "createAction": "Criar meta",
       "conversionsSuffix": "conversões",
       "conversionRateShort": "TC"
+      ,"dashboardDescription": "Ações concluídas e suas taxas de conversão.", "detailsAria": "Abrir detalhes de {{name}}"
     },
     "manager": {
       "dialogTitle": "Gerenciar metas",
@@ -859,6 +917,7 @@
       "eventNameHelpSuffix": ".",
       "createAction": "Criar meta",
       "saveAction": "Salvar alterações",
+      "suggestionsHelp": "Escolha um valor observado ou informe um valor futuro exato.", "errors": { "save": "Não foi possível salvar a meta. Verifique o formulário e tente novamente." },
       "messages": {
         "createSuccess": "Meta criada.",
         "createError": "Não foi possível criar a meta.",
@@ -876,6 +935,7 @@
     "series": {
       "title": "Funis",
       "description": "Filtrar a série por funil.",
+      "workspaceDescription": "Entradas e conclusões ao longo do tempo para o assunto de relatório selecionado.",
       "addFilterPlaceholder": "Adicionar filtro de funil",
       "emptyTitle": "Nenhuma atividade de funil ainda",
       "emptyDescription": "Crie um funil e gere tráfego para ver entradas e conclusões ao longo do tempo."
@@ -886,6 +946,7 @@
       "completions": "Conclusões",
       "completionRate": "Taxa de conclusão"
     },
+    "subject": { "label": "Assunto do relatório", "all": "Todos os funis" }, "traffic": { "title": "Tráfego correspondente", "selectedDescription": "Visualizações de página de sessões que entraram neste funil.", "allDescription": "Visualizações de página de sessões que entraram em qualquer funil.", "unavailableTitle": "Nenhum funil para corresponder", "unavailableDescription": "Crie um funil para ver o tráfego de sessões correspondente." }, "states": { "errorTitle": "Funis indisponíveis", "errorDescription": "Não foi possível carregar os funis. Tente novamente." }, "notices": { "unavailable": "Esse funil não está mais disponível para este site." }, "definitions": { "title": "Definições de funis", "count": "{{count}} funis", "steps": "Etapas ordenadas" }, "steps": { "title": "Desempenho das etapas", "retention": "{{rate}}% retido", "dropoff": "{{count}} abandonaram" },
     "list": {
       "title": "Funis",
       "manageTooltip": "Gerenciar funis",
@@ -893,6 +954,7 @@
       "emptyDescription": "Crie um caminho de eventos para medir a evasão e as conversões.",
       "createAction": "Criar funil",
       "stepsCount": "{{count}} etapas"
+      ,"dashboardDescription": "Jornadas que revelam progresso e abandono.", "detailsAria": "Abrir detalhes de {{name}}"
     },
     "manager": {
       "dialogTitle": "Gerenciar funis",
@@ -912,6 +974,7 @@
       "addStep": "Adicionar etapa",
       "createAction": "Criar funil",
       "saveAction": "Salvar alterações",
+      "stepsTitle": "Etapas ordenadas", "reorderHelp": "Arraste as etapas ou use os controles de movimento. São necessárias pelo menos duas etapas.", "dragStepAria": "Arrastar etapa {{index}}", "stepValueAria": "Valor da etapa {{index}}", "moveUpAria": "Mover etapa para cima", "moveDownAria": "Mover etapa para baixo", "removeStepAria": "Remover etapa", "errors": { "save": "Não foi possível salvar o funil. Verifique o formulário e tente novamente." },
       "typePagePath": "Caminho",
       "typeCustomEvent": "Evento",
       "messages": {
@@ -2615,6 +2678,10 @@
   },
   "login": {
     "subtitle": "Faça login no seu painel",
+    "sessionEnded": {
+      "signedOut": "Você saiu da sua conta.",
+      "expired": "Sua sessão terminou. Faça login novamente para continuar."
+    },
     "ssoSubtitle": "Digite seu e-mail profissional para continuar com o provedor de identidade da sua equipe.",
     "authenticationMethods": "Opções de login",
     "cloudSignupPrompt": "Novo no HitKeep Cloud?",

@@ -1,6 +1,6 @@
 import { HttpClient, HttpContext } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { finalize, tap } from 'rxjs';
+import { finalize, tap, timeout } from 'rxjs';
 
 import { Site, SystemStatus, UserTeamsResponse } from '@models/analytics.types';
 import { SKIP_AUTH_REDIRECT } from '@core/interceptors/auth.interceptor';
@@ -10,6 +10,7 @@ import { PermissionService, UserPermissions } from '@services/permission.service
 import { TeamService } from '@services/team.service';
 import { UserPreferences, UserPreferencesService } from '@services/user-preferences.service';
 import { UserProfile, UserProfileService } from '@services/user-profile.service';
+import { ROUTE_CRITICAL_REQUEST_TIMEOUT_MS } from '@services/application-error-navigation.service';
 
 export interface DashboardBootstrap {
     session: AuthSession;
@@ -40,6 +41,7 @@ export class DashboardBootstrapService {
         this.isLoading.set(true);
         const context = new HttpContext().set(SKIP_AUTH_REDIRECT, true);
         return this.http.get<DashboardBootstrap>('/api/user/bootstrap', { context }).pipe(
+            timeout({ first: ROUTE_CRITICAL_REQUEST_TIMEOUT_MS }),
             tap((bootstrap) => this.applyBootstrap(bootstrap)),
             finalize(() => this.isLoading.set(false))
         );

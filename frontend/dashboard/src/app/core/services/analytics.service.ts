@@ -326,7 +326,7 @@ export class AnalyticsService {
      * Fetches raw hits (RESTful nested resource).
      * GET /api/sites/{id}/hits
      */
-    getHits(siteId: string, from: string, to: string, page = 1, pageSize = 10, sortField?: string, sortOrder?: string, query?: string): Observable<PaginatedHits> {
+    getHits(siteId: string, from: string, to: string, page = 1, pageSize = 10, sortField?: string, sortOrder?: string, query?: string, goalIds: string[] = [], funnelIds: string[] = []): Observable<PaginatedHits> {
         let params = new HttpParams()
             .set('from', from)
             .set('to', to)
@@ -336,6 +336,8 @@ export class AnalyticsService {
         if (sortField) params = params.set('sort', sortField);
         if (sortOrder) params = params.set('order', sortOrder);
         if (query) params = params.set('q', query);
+        for (const id of goalIds) params = params.append('goal_id', id);
+        for (const id of funnelIds) params = params.append('funnel_id', id);
 
         return this.http.get<PaginatedHits>(`/api/sites/${siteId}/hits`, { params });
     }
@@ -357,6 +359,10 @@ export class AnalyticsService {
 
     createGoal(siteId: string, goal: Partial<Goal>): Observable<void> {
         return this.http.post<void>(`/api/sites/${siteId}/goals`, goal);
+    }
+
+    updateGoal(siteId: string, goalId: string, goal: Partial<Goal>): Observable<Goal> {
+        return this.http.put<Goal>(`/api/sites/${siteId}/goals/${goalId}`, goal);
     }
 
     deleteGoal(siteId: string, goalId: string): Observable<void> {
@@ -419,6 +425,10 @@ export class AnalyticsService {
 
     createFunnel(siteId: string, funnel: Partial<Funnel>): Observable<void> {
         return this.http.post<void>(`/api/sites/${siteId}/funnels`, funnel);
+    }
+
+    updateFunnel(siteId: string, funnelId: string, funnel: Partial<Funnel>): Observable<Funnel> {
+        return this.http.put<Funnel>(`/api/sites/${siteId}/funnels/${funnelId}`, funnel);
     }
 
     deleteFunnel(siteId: string, funnelId: string): Observable<void> {

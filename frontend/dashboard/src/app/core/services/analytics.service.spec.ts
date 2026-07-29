@@ -106,4 +106,22 @@ describe('AnalyticsService Web Vitals', () => {
         expect(req.request.params.has('compare_to')).toBe(false);
         req.flush({});
     });
+
+    it('updates goals and funnels in place and sends cohort ids to hit queries', () => {
+        service.updateGoal('site-1', 'goal-1', { name: 'Signup', type: 'event', value: 'signup' }).subscribe();
+        const goalReq = httpMock.expectOne('/api/sites/site-1/goals/goal-1');
+        expect(goalReq.request.method).toBe('PUT');
+        goalReq.flush({ id: 'goal-1' });
+
+        service.updateFunnel('site-1', 'funnel-1', { name: 'Checkout', steps: [] }).subscribe();
+        const funnelReq = httpMock.expectOne('/api/sites/site-1/funnels/funnel-1');
+        expect(funnelReq.request.method).toBe('PUT');
+        funnelReq.flush({ id: 'funnel-1' });
+
+        service.getHits('site-1', 'from', 'to', 1, 10, undefined, undefined, undefined, ['goal-1'], ['funnel-1']).subscribe();
+        const hitsReq = httpMock.expectOne((request) => request.url === '/api/sites/site-1/hits');
+        expect(hitsReq.request.params.getAll('goal_id')).toEqual(['goal-1']);
+        expect(hitsReq.request.params.getAll('funnel_id')).toEqual(['funnel-1']);
+        hitsReq.flush({ data: [], total: 0 });
+    });
 });

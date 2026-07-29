@@ -100,6 +100,58 @@
       "siteStatsFailed": "Stats unavailable"
     }
   },
+  "applicationError": {
+    "loading": {
+      "title": "Loading HitKeep",
+      "message": "Checking the application status and preparing your workspace."
+    },
+    "routeUnavailable": {
+      "title": "This page could not be opened",
+      "message": "Navigation stopped before the page was ready. Reload HitKeep and try again."
+    },
+    "notFound": {
+      "title": "Page not found",
+      "message": "The address may be outdated or the page may have moved."
+    },
+    "offline": {
+      "title": "HitKeep is unreachable",
+      "message": "Check your connection and try loading the page again."
+    },
+    "client": {
+      "title": "The request could not be completed",
+      "message": "HitKeep could not load this page because the request was rejected."
+    },
+    "server": {
+      "title": "HitKeep is temporarily unavailable",
+      "message": "The server could not finish loading this page. Try again in a moment."
+    },
+    "navigation": {
+      "title": "This page could not be loaded",
+      "message": "A page resource failed to load. Reloading can usually resolve this."
+    },
+    "generic": {
+      "title": "Something prevented this page from loading",
+      "message": "Reload HitKeep or return to the dashboard."
+    },
+    "status": {
+      "http": "HTTP {{status}}",
+      "offline": "Offline",
+      "navigation": "Navigation error"
+    },
+    "context": {
+      "setupStatus": "HitKeep could not confirm whether setup is complete. Try again when the server is available.",
+      "dashboardBootstrap": "HitKeep could not load your dashboard session. Try again without signing in again.",
+    "cloudSignupStatus": "HitKeep could not check whether cloud signup is available. Try again in a moment.",
+    "cloudSignupProfile": "HitKeep could not confirm your cloud session. Try again in a moment."
+    },
+    "actions": {
+      "tryAgain": "Try again",
+      "reloadPage": "Reload page",
+      "reloadApplication": "Reload HitKeep",
+      "dashboard": "Go to dashboard",
+      "goBack": "Go back"
+    }
+  },
   "askAi": {
     "triggerPlaceholder": "Ask AI",
     "triggerAria": "Ask AI about this site",
@@ -593,6 +645,7 @@
       "exportCsv": "Export CSV",
       "open": "Open",
       "refresh": "Refresh",
+      "retry": "Retry",
       "save": "Save",
       "remove": "Remove",
       "more": "More actions",
@@ -765,6 +818,12 @@
     }
   },
   "dashboard": {
+    "conversions": {
+      "title": "Conversions",
+      "description": "Filter the entire workspace by a goal or funnel cohort.",
+      "filters": { "goal": "Goal: {{name}}", "funnel": "Funnel: {{name}}" },
+      "invalidSubject": "That goal or funnel is no longer available for this site."
+    },
     "breadcrumbOverview": "Overview",
     "filteredBadge": "Filtered",
     "rawHitsTitle": "Latest Hits",
@@ -821,20 +880,35 @@
       }
     }
   },
+  "trafficRecords": {
+    "unavailableTitle": "No conversion traffic yet",
+    "unavailableDescription": "Create a goal or funnel to define the traffic shown here.",
+    "errorTitle": "Traffic unavailable",
+    "errorDescription": "Traffic records could not be loaded. Try again.",
+    "empty": "No matching traffic records found."
+  },
   "goals": {
     "manageAction": "Manage goals",
     "noSiteDescription": "Select or create a site to view goals.",
     "series": {
       "title": "Goals",
       "description": "Filter the series by goal.",
+      "workspaceDescription": "Conversions over time for the selected reporting subject.",
       "addFilterPlaceholder": "Add goal filter",
       "emptyTitle": "No goal conversions yet",
       "emptyDescription": "Create a goal and drive traffic to see conversions over time."
     },
     "kpis": {
       "totalGoals": "Total goals",
-      "conversions": "Conversions"
+      "conversions": "Conversions",
+      "convertingSessions": "Converting sessions"
     },
+    "subject": { "label": "Reporting subject", "all": "All goals" },
+    "traffic": { "title": "Matching traffic", "selectedDescription": "Page views from sessions that completed this goal.", "allDescription": "Page views from sessions that completed any goal.", "unavailableTitle": "No goals to match", "unavailableDescription": "Create a goal to see matching session traffic." },
+    "states": { "errorTitle": "Goals unavailable", "errorDescription": "Goals could not be loaded. Try again." },
+    "notices": { "unavailable": "That goal is no longer available for this site." },
+    "definitions": { "title": "Goal definitions", "count": "{{count}} goals", "steps": "Steps" },
+    "types": { "path": "Path", "event": "Event" },
     "list": {
       "title": "Goals",
       "manageTooltip": "Manage goals",
@@ -843,6 +917,8 @@
       "createAction": "Create goal",
       "conversionsSuffix": "conversions",
       "conversionRateShort": "CR"
+      ,"dashboardDescription": "Completed actions and their conversion rates.",
+      "detailsAria": "Open details for {{name}}"
     },
     "manager": {
       "dialogTitle": "Manage goals",
@@ -866,6 +942,8 @@
       "eventNameHelpSuffix": ".",
       "createAction": "Create goal",
       "saveAction": "Save changes",
+      "suggestionsHelp": "Choose an observed value or enter an exact future value.",
+      "errors": { "save": "Goal could not be saved. Check the form and try again." },
       "messages": {
         "createSuccess": "Goal created.",
         "createError": "Goal could not be created.",
@@ -883,6 +961,7 @@
     "series": {
       "title": "Funnels",
       "description": "Filter the series by funnel.",
+      "workspaceDescription": "Entries and completions over time for the selected reporting subject.",
       "addFilterPlaceholder": "Add funnel filter",
       "emptyTitle": "No funnel activity yet",
       "emptyDescription": "Create a funnel and drive traffic to see entries and completions over time."
@@ -893,6 +972,12 @@
       "completions": "Completions",
       "completionRate": "Completion rate"
     },
+    "subject": { "label": "Reporting subject", "all": "All funnels" },
+    "traffic": { "title": "Matching traffic", "selectedDescription": "Page views from sessions that entered this funnel.", "allDescription": "Page views from sessions that entered any funnel.", "unavailableTitle": "No funnels to match", "unavailableDescription": "Create a funnel to see matching session traffic." },
+    "states": { "errorTitle": "Funnels unavailable", "errorDescription": "Funnels could not be loaded. Try again." },
+    "notices": { "unavailable": "That funnel is no longer available for this site." },
+    "definitions": { "title": "Funnel definitions", "count": "{{count}} funnels", "steps": "Ordered steps" },
+    "steps": { "title": "Step performance", "retention": "{{rate}}% retained", "dropoff": "{{count}} dropped" },
     "list": {
       "title": "Funnels",
       "manageTooltip": "Manage funnels",
@@ -900,6 +985,8 @@
       "emptyDescription": "Build a path of events to measure drop-off and conversions.",
       "createAction": "Create funnel",
       "stepsCount": "{{count}} steps"
+      ,"dashboardDescription": "Journeys that reveal progression and drop-off.",
+      "detailsAria": "Open details for {{name}}"
     },
     "manager": {
       "dialogTitle": "Manage funnels",
@@ -919,6 +1006,14 @@
       "addStep": "Add step",
       "createAction": "Create funnel",
       "saveAction": "Save changes",
+      "stepsTitle": "Ordered steps",
+      "reorderHelp": "Drag steps or use the move controls. At least two steps are required.",
+      "dragStepAria": "Drag step {{index}}",
+      "stepValueAria": "Value for step {{index}}",
+      "moveUpAria": "Move step up",
+      "moveDownAria": "Move step down",
+      "removeStepAria": "Remove step",
+      "errors": { "save": "Funnel could not be saved. Check the form and try again." },
       "typePagePath": "Path",
       "typeCustomEvent": "Event",
       "messages": {
@@ -2712,6 +2807,10 @@
   },
   "login": {
     "subtitle": "Sign in to your dashboard",
+    "sessionEnded": {
+      "signedOut": "You have been signed out.",
+      "expired": "Your session has ended. Sign in again to continue."
+    },
     "ssoSubtitle": "Enter your work email to continue to your team's identity provider.",
     "authenticationMethods": "Sign-in options",
     "cloudSignupPrompt": "New to HitKeep Cloud?",

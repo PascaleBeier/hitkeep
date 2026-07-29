@@ -100,6 +100,58 @@
       "siteStatsFailed": "Estadísticas no disponibles"
     }
   },
+  "applicationError": {
+    "loading": {
+      "title": "Cargando HitKeep",
+      "message": "Comprobando el estado de la aplicación y preparando tu espacio de trabajo."
+    },
+    "routeUnavailable": {
+      "title": "No se pudo abrir esta página",
+      "message": "La navegación se detuvo antes de que la página estuviera lista. Recarga HitKeep e inténtalo de nuevo."
+    },
+    "notFound": {
+      "title": "Página no encontrada",
+      "message": "Es posible que la dirección esté obsoleta o que la página se haya movido."
+    },
+    "offline": {
+      "title": "No se puede acceder a HitKeep",
+      "message": "Comprueba tu conexión e intenta cargar la página de nuevo."
+    },
+    "client": {
+      "title": "No se pudo completar la solicitud",
+      "message": "HitKeep no pudo cargar esta página porque la solicitud fue rechazada."
+    },
+    "server": {
+      "title": "HitKeep no está disponible temporalmente",
+      "message": "El servidor no pudo terminar de cargar esta página. Inténtalo de nuevo en unos instantes."
+    },
+    "navigation": {
+      "title": "No se pudo cargar esta página",
+      "message": "No se pudo cargar un recurso de la página. Recargarla suele resolver el problema."
+    },
+    "generic": {
+      "title": "Algo impidió cargar esta página",
+      "message": "Recarga HitKeep o vuelve al panel."
+    },
+    "status": {
+      "http": "HTTP {{status}}",
+      "offline": "Sin conexión",
+      "navigation": "Error de navegación"
+    },
+    "context": {
+      "setupStatus": "HitKeep no pudo confirmar si la configuración está completa. Inténtalo de nuevo cuando el servidor esté disponible.",
+      "dashboardBootstrap": "HitKeep no pudo cargar tu sesión del panel. Inténtalo de nuevo sin volver a iniciar sesión.",
+    "cloudSignupStatus": "HitKeep no pudo comprobar si el registro en la nube está disponible. Inténtalo de nuevo en unos instantes.",
+    "cloudSignupProfile": "HitKeep no pudo confirmar tu sesión en la nube. Inténtalo de nuevo en unos instantes."
+    },
+    "actions": {
+      "tryAgain": "Intentar de nuevo",
+      "reloadPage": "Recargar página",
+      "reloadApplication": "Recargar HitKeep",
+      "dashboard": "Ir al panel",
+      "goBack": "Volver"
+    }
+  },
   "askAi": {
     "triggerPlaceholder": "Ask AI",
     "triggerAria": "Preguntar a Ask AI sobre este sitio",
@@ -593,6 +645,7 @@
       "exportCsv": "Exportar CSV",
       "open": "Abrir",
       "refresh": "Actualizar",
+      "retry": "Reintentar",
       "save": "Guardar",
       "more": "Más acciones",
       "edit": "Edit",
@@ -765,6 +818,7 @@
     "unknown": "Desconocido"
   },
   "dashboard": {
+    "conversions": { "title": "Conversiones", "description": "Filtra todo el espacio de trabajo por una cohorte de objetivo o embudo.", "filters": { "goal": "Objetivo: {{name}}", "funnel": "Embudo: {{name}}" }, "invalidSubject": "Ese objetivo o embudo ya no está disponible para este sitio." },
     "breadcrumbOverview": "Resumen",
     "filteredBadge": "Filtrado",
     "rawHitsTitle": "Últimos hits",
@@ -821,20 +875,23 @@
       }
     }
   },
+  "trafficRecords": { "unavailableTitle": "Aún no hay tráfico de conversión", "unavailableDescription": "Crea un objetivo o embudo para definir el tráfico que se muestra aquí.", "errorTitle": "Tráfico no disponible", "errorDescription": "No se pudieron cargar los registros de tráfico. Inténtalo de nuevo.", "empty": "No se encontraron registros de tráfico coincidentes." },
   "goals": {
     "manageAction": "Administrar objetivos",
     "noSiteDescription": "Selecciona o crea un sitio para ver objetivos.",
     "series": {
       "title": "Objetivos",
       "description": "Filtra la serie por objetivo.",
+      "workspaceDescription": "Conversiones a lo largo del tiempo para el objeto de informe seleccionado.",
       "addFilterPlaceholder": "Agregar filtro de objetivo",
       "emptyTitle": "Aún no hay conversiones de objetivos",
       "emptyDescription": "Crea un objetivo y genera tráfico para ver conversiones a lo largo del tiempo."
     },
     "kpis": {
       "totalGoals": "Objetivos totales",
-      "conversions": "Conversiones"
+      "conversions": "Conversiones", "convertingSessions": "Sesiones con conversión"
     },
+    "subject": { "label": "Objeto del informe", "all": "Todos los objetivos" }, "traffic": { "title": "Tráfico coincidente", "selectedDescription": "Vistas de página de sesiones que completaron este objetivo.", "allDescription": "Vistas de página de sesiones que completaron cualquier objetivo.", "unavailableTitle": "No hay objetivos que comparar", "unavailableDescription": "Crea un objetivo para ver el tráfico de sesiones coincidente." }, "states": { "errorTitle": "Objetivos no disponibles", "errorDescription": "No se pudieron cargar los objetivos. Inténtalo de nuevo." }, "notices": { "unavailable": "Ese objetivo ya no está disponible para este sitio." }, "definitions": { "title": "Definiciones de objetivos", "count": "{{count}} objetivos", "steps": "Pasos" }, "types": { "path": "Ruta", "event": "Evento" },
     "list": {
       "title": "Objetivos",
       "manageTooltip": "Administrar objetivos",
@@ -843,6 +900,7 @@
       "createAction": "Crear objetivo",
       "conversionsSuffix": "conversiones",
       "conversionRateShort": "CR"
+      ,"dashboardDescription": "Acciones completadas y sus tasas de conversión.", "detailsAria": "Abrir detalles de {{name}}"
     },
     "manager": {
       "dialogTitle": "Administrar objetivos",
@@ -866,6 +924,7 @@
       "eventNameHelpSuffix": ".",
       "createAction": "Crear objetivo",
       "saveAction": "Guardar cambios",
+      "suggestionsHelp": "Elige un valor observado o introduce un valor futuro exacto.", "errors": { "save": "No se pudo guardar el objetivo. Revisa el formulario e inténtalo de nuevo." },
       "messages": {
         "createSuccess": "Objetivo creado.",
         "createError": "No se pudo crear el objetivo.",
@@ -883,6 +942,7 @@
     "series": {
       "title": "Embudos",
       "description": "Filtra la serie por embudo.",
+      "workspaceDescription": "Entradas y completaciones a lo largo del tiempo para el objeto de informe seleccionado.",
       "addFilterPlaceholder": "Agregar filtro de embudo",
       "emptyTitle": "Aún no hay actividad de embudo",
       "emptyDescription": "Crea un embudo y genera tráfico para ver entradas y completaciones a lo largo del tiempo."
@@ -893,6 +953,7 @@
       "completions": "Completaciones",
       "completionRate": "Tasa de completacion"
     },
+    "subject": { "label": "Objeto del informe", "all": "Todos los embudos" }, "traffic": { "title": "Tráfico coincidente", "selectedDescription": "Vistas de página de sesiones que entraron en este embudo.", "allDescription": "Vistas de página de sesiones que entraron en cualquier embudo.", "unavailableTitle": "No hay embudos que comparar", "unavailableDescription": "Crea un embudo para ver el tráfico de sesiones coincidente." }, "states": { "errorTitle": "Embudos no disponibles", "errorDescription": "No se pudieron cargar los embudos. Inténtalo de nuevo." }, "notices": { "unavailable": "Ese embudo ya no está disponible para este sitio." }, "definitions": { "title": "Definiciones de embudos", "count": "{{count}} embudos", "steps": "Pasos ordenados" }, "steps": { "title": "Rendimiento por paso", "retention": "{{rate}}% retenido", "dropoff": "{{count}} abandonos" },
     "list": {
       "title": "Embudos",
       "manageTooltip": "Administrar embudos",
@@ -900,6 +961,7 @@
       "emptyDescription": "Construye un flujo de eventos para medir abandonos y conversiones.",
       "createAction": "Crear embudo",
       "stepsCount": "{{count}} pasos"
+      ,"dashboardDescription": "Recorridos que muestran progreso y abandono.", "detailsAria": "Abrir detalles de {{name}}"
     },
     "manager": {
       "dialogTitle": "Administrar embudos",
@@ -919,6 +981,7 @@
       "addStep": "Agregar paso",
       "createAction": "Crear embudo",
       "saveAction": "Guardar cambios",
+      "stepsTitle": "Pasos ordenados", "reorderHelp": "Arrastra los pasos o usa los controles de movimiento. Se requieren al menos dos pasos.", "dragStepAria": "Arrastrar paso {{index}}", "stepValueAria": "Valor del paso {{index}}", "moveUpAria": "Mover paso hacia arriba", "moveDownAria": "Mover paso hacia abajo", "removeStepAria": "Eliminar paso", "errors": { "save": "No se pudo guardar el embudo. Revisa el formulario e inténtalo de nuevo." },
       "typePagePath": "Ruta",
       "typeCustomEvent": "Evento",
       "messages": {
@@ -2651,6 +2714,10 @@
   },
   "login": {
     "subtitle": "Inicia sesión en tu panel",
+    "sessionEnded": {
+      "signedOut": "Has cerrado sesión.",
+      "expired": "Tu sesión ha terminado. Inicia sesión de nuevo para continuar."
+    },
     "ssoSubtitle": "Introduce tu correo de trabajo para continuar con el proveedor de identidad de tu equipo.",
     "authenticationMethods": "Opciones de inicio de sesión",
     "cloudSignupPrompt": "¿Nuevo en HitKeep Cloud?",

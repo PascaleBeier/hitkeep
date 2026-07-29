@@ -9,8 +9,117 @@
         <link rel="icon" type="image/svg+xml" href="favicon.svg" />
         <link rel="shortcut icon" href="favicon.ico" />
         <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+        <style>
+            .hk-preboot {
+                align-items: center;
+                background: #f8fafc;
+                color: #334155;
+                display: flex;
+                font-family: ui-sans-serif, system-ui, sans-serif;
+                justify-content: center;
+                min-height: 100vh;
+                padding: 1.25rem;
+                text-align: center;
+            }
+
+            .hk-preboot__content {
+                align-items: center;
+                display: flex;
+                flex-direction: column;
+                gap: 0.75rem;
+                max-width: 28rem;
+            }
+
+            .hk-preboot__brand {
+                color: #0f172a;
+                font-size: 1.5rem;
+                font-weight: 700;
+                letter-spacing: -0.025em;
+            }
+
+            .hk-preboot__spinner {
+                animation: hk-preboot-spin 0.9s linear infinite;
+                border: 2px solid #cbd5e1;
+                border-radius: 9999px;
+                border-top-color: #047857;
+                height: 1.75rem;
+                width: 1.75rem;
+            }
+
+            .hk-preboot__message {
+                line-height: 1.5;
+                margin: 0;
+            }
+
+            .hk-preboot__help {
+                animation: hk-preboot-reveal 0s 4s forwards;
+                color: #64748b;
+                font-size: 0.875rem;
+                line-height: 1.5;
+                margin: 0;
+                visibility: hidden;
+            }
+
+            .hk-preboot__help a {
+                color: #047857;
+                font-weight: 600;
+            }
+
+            @keyframes hk-preboot-spin {
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+
+            @keyframes hk-preboot-reveal {
+                to {
+                    visibility: visible;
+                }
+            }
+
+            @media (prefers-color-scheme: dark) {
+                .hk-preboot {
+                    background: #09090b;
+                    color: #a1a1aa;
+                }
+
+                .hk-preboot__brand {
+                    color: #ffffff;
+                }
+
+                .hk-preboot__spinner {
+                    border-color: #3f3f46;
+                    border-top-color: #34d399;
+                }
+
+                .hk-preboot__help a {
+                    color: #34d399;
+                }
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                .hk-preboot__spinner {
+                    animation: none;
+                }
+
+                .hk-preboot__help {
+                    animation: none;
+                    visibility: visible;
+                }
+            }
+        </style>
     </head>
     <body class="antialiased bg-surface-50 dark:bg-surface-950 min-h-screen">
-        <app-root></app-root>
+        <app-root>
+            <main class="hk-preboot" role="status" aria-live="polite">
+                <div class="hk-preboot__content">
+                    <strong class="hk-preboot__brand">HitKeep</strong>
+                    <span class="hk-preboot__spinner" aria-hidden="true"></span>
+                    <p class="hk-preboot__message">Starting HitKeep…</p>
+                    <p class="hk-preboot__help">If this screen does not change, <a href="">reload the page</a>.</p>
+                    <noscript>JavaScript is required to use the HitKeep dashboard.</noscript>
+                </div>
+            </main>
+        </app-root>
     </body>
 </html>

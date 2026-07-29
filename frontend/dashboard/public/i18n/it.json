@@ -100,6 +100,58 @@
       "siteStatsFailed": "Statistiche non disponibili"
     }
   },
+  "applicationError": {
+    "loading": {
+      "title": "Caricamento di HitKeep",
+      "message": "Verifica dello stato dell’applicazione e preparazione del tuo spazio di lavoro."
+    },
+    "routeUnavailable": {
+      "title": "Impossibile aprire questa pagina",
+      "message": "La navigazione si è interrotta prima che la pagina fosse pronta. Ricarica HitKeep e riprova."
+    },
+    "notFound": {
+      "title": "Pagina non trovata",
+      "message": "L’indirizzo potrebbe non essere più valido oppure la pagina potrebbe essere stata spostata."
+    },
+    "offline": {
+      "title": "HitKeep non è raggiungibile",
+      "message": "Controlla la connessione e prova a caricare nuovamente la pagina."
+    },
+    "client": {
+      "title": "Impossibile completare la richiesta",
+      "message": "HitKeep non ha potuto caricare questa pagina perché la richiesta è stata rifiutata."
+    },
+    "server": {
+      "title": "HitKeep è temporaneamente non disponibile",
+      "message": "Il server non ha potuto completare il caricamento della pagina. Riprova tra poco."
+    },
+    "navigation": {
+      "title": "Impossibile caricare questa pagina",
+      "message": "Non è stato possibile caricare una risorsa della pagina. In genere, ricaricare risolve il problema."
+    },
+    "generic": {
+      "title": "Un problema ha impedito il caricamento della pagina",
+      "message": "Ricarica HitKeep o torna alla dashboard."
+    },
+    "status": {
+      "http": "HTTP {{status}}",
+      "offline": "Offline",
+      "navigation": "Errore di navigazione"
+    },
+    "context": {
+      "setupStatus": "HitKeep non ha potuto verificare se la configurazione è completa. Riprova quando il server sarà disponibile.",
+      "dashboardBootstrap": "HitKeep non ha potuto caricare la sessione della dashboard. Riprova senza accedere di nuovo.",
+    "cloudSignupStatus": "HitKeep non ha potuto verificare se la registrazione cloud è disponibile. Riprova tra poco.",
+    "cloudSignupProfile": "HitKeep non ha potuto confermare la tua sessione cloud. Riprova tra poco."
+    },
+    "actions": {
+      "tryAgain": "Riprova",
+      "reloadPage": "Ricarica la pagina",
+      "reloadApplication": "Ricarica HitKeep",
+      "dashboard": "Vai alla dashboard",
+      "goBack": "Indietro"
+    }
+  },
   "askAi": {
     "triggerPlaceholder": "Ask AI",
     "triggerAria": "Chiedi ad Ask AI informazioni su questo sito",
@@ -593,6 +645,7 @@
       "exportCsv": "Esporta CSV",
       "open": "Apri",
       "refresh": "Aggiorna",
+      "retry": "Riprova",
       "save": "Salva",
       "more": "Altre azioni",
       "edit": "Edit",
@@ -765,6 +818,7 @@
     "unknown": "Sconosciuto"
   },
   "dashboard": {
+    "conversions": { "title": "Conversioni", "description": "Filtra l’intero spazio di lavoro per una coorte di obiettivo o funnel.", "filters": { "goal": "Obiettivo: {{name}}", "funnel": "Funnel: {{name}}" }, "invalidSubject": "Questo obiettivo o funnel non è più disponibile per il sito." },
     "breadcrumbOverview": "Panoramica",
     "filteredBadge": "Filtrato",
     "rawHitsTitle": "Ultimi hit",
@@ -821,20 +875,23 @@
       }
     }
   },
+  "trafficRecords": { "unavailableTitle": "Nessun traffico di conversione", "unavailableDescription": "Crea un obiettivo o un funnel per definire il traffico mostrato qui.", "errorTitle": "Traffico non disponibile", "errorDescription": "Impossibile caricare i record di traffico. Riprova.", "empty": "Nessun record di traffico corrispondente." },
   "goals": {
     "manageAction": "Gestisci obiettivi",
     "noSiteDescription": "Seleziona o crea un sito per vedere gli obiettivi.",
     "series": {
       "title": "Obiettivi",
       "description": "Filtra la serie per obiettivo.",
+      "workspaceDescription": "Conversioni nel tempo per il soggetto del report selezionato.",
       "addFilterPlaceholder": "Aggiungi filtro obiettivo",
       "emptyTitle": "Nessuna conversione obiettivo al momento",
       "emptyDescription": "Crea un obiettivo e porta traffico per vedere le conversioni nel tempo."
     },
     "kpis": {
       "totalGoals": "Obiettivi totali",
-      "conversions": "Conversioni"
+      "conversions": "Conversioni", "convertingSessions": "Sessioni convertite"
     },
+    "subject": { "label": "Soggetto del report", "all": "Tutti gli obiettivi" }, "traffic": { "title": "Traffico corrispondente", "selectedDescription": "Visualizzazioni di pagina dalle sessioni che hanno completato questo obiettivo.", "allDescription": "Visualizzazioni di pagina dalle sessioni che hanno completato un obiettivo.", "unavailableTitle": "Nessun obiettivo da abbinare", "unavailableDescription": "Crea un obiettivo per vedere il traffico delle sessioni corrispondente." }, "states": { "errorTitle": "Obiettivi non disponibili", "errorDescription": "Impossibile caricare gli obiettivi. Riprova." }, "notices": { "unavailable": "Questo obiettivo non è più disponibile per il sito." }, "definitions": { "title": "Definizioni degli obiettivi", "count": "{{count}} obiettivi", "steps": "Passaggi" }, "types": { "path": "Percorso", "event": "Evento" },
     "list": {
       "title": "Obiettivi",
       "manageTooltip": "Gestisci obiettivi",
@@ -843,6 +900,7 @@
       "createAction": "Crea obiettivo",
       "conversionsSuffix": "conversioni",
       "conversionRateShort": "CR"
+      ,"dashboardDescription": "Azioni completate e relativi tassi di conversione.", "detailsAria": "Apri i dettagli di {{name}}"
     },
     "manager": {
       "dialogTitle": "Gestisci obiettivi",
@@ -866,6 +924,7 @@
       "eventNameHelpSuffix": ".",
       "createAction": "Crea obiettivo",
       "saveAction": "Salva modifiche",
+      "suggestionsHelp": "Scegli un valore osservato o inserisci un valore futuro esatto.", "errors": { "save": "Impossibile salvare l’obiettivo. Controlla il modulo e riprova." },
       "messages": {
         "createSuccess": "Obiettivo creato.",
         "createError": "Impossibile creare l’obiettivo.",
@@ -883,6 +942,7 @@
     "series": {
       "title": "Funnel",
       "description": "Filtra la serie per funnel.",
+      "workspaceDescription": "Ingressi e completamenti nel tempo per il soggetto del report selezionato.",
       "addFilterPlaceholder": "Aggiungi filtro funnel",
       "emptyTitle": "Nessuna attività funnel al momento",
       "emptyDescription": "Crea un funnel e porta traffico per vedere ingressi e completamenti nel tempo."
@@ -893,6 +953,7 @@
       "completions": "Completamenti",
       "completionRate": "Tasso di completamento"
     },
+    "subject": { "label": "Soggetto del report", "all": "Tutti i funnel" }, "traffic": { "title": "Traffico corrispondente", "selectedDescription": "Visualizzazioni di pagina dalle sessioni entrate in questo funnel.", "allDescription": "Visualizzazioni di pagina dalle sessioni entrate in un funnel.", "unavailableTitle": "Nessun funnel da abbinare", "unavailableDescription": "Crea un funnel per vedere il traffico delle sessioni corrispondente." }, "states": { "errorTitle": "Funnel non disponibili", "errorDescription": "Impossibile caricare i funnel. Riprova." }, "notices": { "unavailable": "Questo funnel non è più disponibile per il sito." }, "definitions": { "title": "Definizioni dei funnel", "count": "{{count}} funnel", "steps": "Passaggi ordinati" }, "steps": { "title": "Prestazioni dei passaggi", "retention": "{{rate}}% mantenuto", "dropoff": "{{count}} abbandoni" },
     "list": {
       "title": "Funnel",
       "manageTooltip": "Gestisci funnel",
@@ -900,6 +961,7 @@
       "emptyDescription": "Crea un percorso di eventi per misurare abbandoni e conversioni.",
       "createAction": "Crea funnel",
       "stepsCount": "{{count}} passaggi"
+      ,"dashboardDescription": "Percorsi che mostrano avanzamento e abbandoni.", "detailsAria": "Apri i dettagli di {{name}}"
     },
     "manager": {
       "dialogTitle": "Gestisci funnel",
@@ -919,6 +981,7 @@
       "addStep": "Aggiungi passaggio",
       "createAction": "Crea funnel",
       "saveAction": "Salva modifiche",
+      "stepsTitle": "Passaggi ordinati", "reorderHelp": "Trascina i passaggi o usa i controlli di spostamento. Sono necessari almeno due passaggi.", "dragStepAria": "Trascina il passaggio {{index}}", "stepValueAria": "Valore del passaggio {{index}}", "moveUpAria": "Sposta il passaggio in alto", "moveDownAria": "Sposta il passaggio in basso", "removeStepAria": "Rimuovi il passaggio", "errors": { "save": "Impossibile salvare il funnel. Controlla il modulo e riprova." },
       "typePagePath": "Percorso",
       "typeCustomEvent": "Evento",
       "messages": {
@@ -2639,6 +2702,10 @@
   },
   "login": {
     "subtitle": "Accedi alla tua dashboard",
+    "sessionEnded": {
+      "signedOut": "Hai effettuato la disconnessione.",
+      "expired": "La sessione è terminata. Accedi di nuovo per continuare."
+    },
     "ssoSubtitle": "Inserisci il tuo indirizzo email di lavoro per continuare con il provider di identità del tuo team.",
     "authenticationMethods": "Opzioni di accesso",
     "cloudSignupPrompt": "Nuovo su HitKeep Cloud?",

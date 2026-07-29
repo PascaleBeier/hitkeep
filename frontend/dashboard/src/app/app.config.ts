@@ -1,5 +1,5 @@
 import { ApplicationConfig, inject, isDevMode, provideBrowserGlobalErrorListeners, provideEnvironmentInitializer, provideZonelessChangeDetection } from '@angular/core';
-import { PreloadAllModules, provideRouter, withPreloading } from '@angular/router';
+import { PreloadAllModules, provideRouter, withNavigationErrorHandler, withPreloading } from '@angular/router';
 import { provideOptimus } from '@openng/optimus-ui/config';
 import { en } from '@openng/optimus-ui-locale/js/en.js';
 
@@ -17,13 +17,18 @@ import { DASHBOARD_LANGUAGE_CODES, DASHBOARD_LOCALE_MAPPING, DEFAULT_DASHBOARD_L
 import { DashboardTitleService } from '@services/dashboard-title.service';
 import { PreferencesService } from '@services/preferences.service';
 import { HitKeepPreset } from '@core/theme/hitkeep-preset';
+import { ApplicationErrorNavigationService } from '@services/application-error-navigation.service';
 
 export const appConfig: ApplicationConfig = {
     providers: [
         provideBrowserGlobalErrorListeners(),
         provideZonelessChangeDetection(),
         provideHttpClient(withInterceptors([shareInterceptor, authInterceptor, basePathInterceptor])),
-        provideRouter(routes, withPreloading(PreloadAllModules)),
+        provideRouter(
+            routes,
+            withPreloading(PreloadAllModules),
+            withNavigationErrorHandler((error) => inject(ApplicationErrorNavigationService).fromNavigation(error))
+        ),
         provideOptimus({
             translation: en,
             theme: {

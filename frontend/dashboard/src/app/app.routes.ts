@@ -8,10 +8,16 @@ import { overviewDefaultGuard } from '@pages/overview/overview-default.guard';
 import { siteSettingsSectionGuard, siteSettingsSiteGuard } from '@pages/site-settings/site-settings.guard';
 import { INSTANCE_CAPABILITIES, TEAM_CAPABILITIES } from '@core/access/capabilities';
 import type { DashboardTitleScope } from '@services/dashboard-title.service';
+import { ApplicationErrorPage } from '@pages/error/application-error-page';
 
 const titleData = (titleKey: string, titleScope: DashboardTitleScope = 'none') => ({ titleKey, titleScope });
 
 export const routes: Routes = [
+    {
+        path: 'error',
+        component: ApplicationErrorPage,
+        data: titleData('applicationError.generic.title')
+    },
     {
         path: 'setup',
         loadComponent: () => import('@pages/setup/setup').then((m) => m.Setup),
@@ -437,5 +443,12 @@ export const routes: Routes = [
             }
         ]
     },
-    { path: '**', redirectTo: '/dashboard' }
+    {
+        path: '**',
+        component: ApplicationErrorPage,
+        data: {
+            ...titleData('applicationError.notFound.title'),
+            applicationErrorKind: 'not-found'
+        }
+    }
 ];

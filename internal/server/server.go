@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -392,6 +393,10 @@ func (s *Server) spaHandler(publicFS fs.FS) http.HandlerFunc {
 	fileServer := http.FileServer(http.FS(publicFS))
 
 	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			http.NotFound(w, r)
+			return
+		}
 		path := strings.TrimPrefix(r.URL.Path, "/")
 
 		if path == "scalar" || strings.HasPrefix(path, "scalar/") {
@@ -413,14 +418,14 @@ func (s *Server) spaHandler(publicFS fs.FS) http.HandlerFunc {
 
 		f, err := publicFS.Open(path)
 		if err != nil {
-			s.serveIndex(w)
+			s.serveSPAFallback(w, r)
 			return
 		}
 		defer f.Close()
 
 		stat, err := f.Stat()
 		if err == nil && stat.IsDir() {
-			s.serveIndex(w)
+			s.serveSPAFallback(w, r)
 			return
 		}
 
@@ -436,6 +441,93 @@ func (s *Server) spaHandler(publicFS fs.FS) http.HandlerFunc {
 
 		fileServer.ServeHTTP(w, r)
 	}
+}
+
+// serveSPAFallback serves the Angular shell only for document navigations. Asset
+// and API clients must receive a real 404 instead of an HTML document that the
+// browser then tries to parse as JavaScript, CSS, or JSON.
+func (s *Server) serveSPAFallback(w http.ResponseWriter, r *http.Request) {
+	if (r.Method == http.MethodGet || r.Method == http.MethodHead) && !s.isNonDashboardPath(r.URL.Path) && acceptsSPADocument(r) {
+		s.serveIndex(w)
+		return
+	}
+	http.NotFound(w, r)
+}
+
+func (s *Server) isNonDashboardPath(requestPath string) bool {
+	requestPath = "/" + strings.TrimPrefix(requestPath, "/")
+	prefixes := []string{"/api", "/ingest", "/internal", "/.well-known", "/q", "/healthz", "/readyz", "/scalar"}
+	if s.conf != nil {
+		mcpPath := strings.TrimRight(strings.TrimSpace(s.conf.MCPPath), "/")
+		if mcpPath != "" {
+			prefixes = append(prefixes, mcpPath)
+		}
+	}
+	for _, prefix := range prefixes {
+		if requestPath == prefix || strings.HasPrefix(requestPath, prefix+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+func acceptsSPADocument(r *http.Request) bool {
+	if path.Ext(r.URL.Path) != "" {
+		return false
+	}
+	accept := strings.TrimSpace(strings.ToLower(r.Header.Get("Accept")))
+	documentFetch := strings.EqualFold(strings.TrimSpace(r.Header.Get("Sec-Fetch-Dest")), "document")
+	if accept == "" {
+		return documentFetch
+	}
+
+	var htmlQuality float64
+	htmlSpecified := false
+	var textWildcardQuality float64
+	textWildcardSpecified := false
+	var anyQuality float64
+	anySpecified := false
+	for mediaRange := range strings.SplitSeq(accept, ",") {
+		parts := strings.Split(mediaRange, ";")
+		mediaType := strings.TrimSpace(parts[0])
+		quality := 1.0
+		for _, parameter := range parts[1:] {
+			name, value, ok := strings.Cut(strings.TrimSpace(parameter), "=")
+			if !ok || !strings.EqualFold(strings.TrimSpace(name), "q") {
+				continue
+			}
+			parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+			if err != nil {
+				quality = 0
+			} else {
+				quality = parsed
+			}
+		}
+		switch mediaType {
+		case "text/html":
+			htmlSpecified = true
+			htmlQuality = quality
+		case "text/*":
+			textWildcardSpecified = true
+			textWildcardQuality = quality
+		case "*/*":
+			anySpecified = true
+			anyQuality = quality
+		}
+	}
+	if htmlSpecified {
+		return htmlQuality > 0
+	}
+	if textWildcardSpecified {
+		return textWildcardQuality > 0
+	}
+	if anySpecified && anyQuality <= 0 {
+		return false
+	}
+	if documentFetch {
+		return true
+	}
+	return false
 }
 
 // serveIndex serves the Angular index.html from memory.
