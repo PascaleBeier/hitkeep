@@ -84,6 +84,7 @@ type GoogleSearchConsoleSyncStateInput struct {
 	LastSuccessAt     *time.Time
 	LastAttemptAt     *time.Time
 	LastErrorCategory string
+	LastErrorMessage  string
 	NextRetryAt       *time.Time
 	Manual            bool
 }
@@ -97,6 +98,7 @@ type GoogleSearchConsoleSyncState struct {
 	LastSuccessAt     *time.Time
 	LastAttemptAt     *time.Time
 	LastErrorCategory string
+	LastErrorMessage  string
 	NextRetryAt       *time.Time
 	Manual            bool
 	UpdatedAt         time.Time
@@ -497,9 +499,9 @@ func upsertGoogleSearchConsoleSyncState(ctx context.Context, exec sqlExecContext
 	_, err := exec.ExecContext(ctx, `
 		INSERT INTO google_search_console_sync_state (
 			site_id, team_id, state, imported_start_date, imported_end_date,
-			last_success_at, last_attempt_at, last_error_category, next_retry_at,
-			manual, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now())
+			last_success_at, last_attempt_at, last_error_category, last_error_message,
+			next_retry_at, manual, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now())
 		ON CONFLICT (site_id) DO UPDATE SET
 			team_id = excluded.team_id,
 			state = excluded.state,
@@ -508,6 +510,7 @@ func upsertGoogleSearchConsoleSyncState(ctx context.Context, exec sqlExecContext
 			last_success_at = excluded.last_success_at,
 			last_attempt_at = excluded.last_attempt_at,
 			last_error_category = excluded.last_error_category,
+			last_error_message = excluded.last_error_message,
 			next_retry_at = excluded.next_retry_at,
 			manual = excluded.manual,
 			updated_at = now()
@@ -520,6 +523,7 @@ func upsertGoogleSearchConsoleSyncState(ctx context.Context, exec sqlExecContext
 		nullableTimePtr(input.LastSuccessAt),
 		nullableTimePtr(input.LastAttemptAt),
 		strings.TrimSpace(input.LastErrorCategory),
+		strings.TrimSpace(input.LastErrorMessage),
 		nullableTimePtr(input.NextRetryAt),
 		input.Manual,
 	)
@@ -534,7 +538,7 @@ func (s *Store) GetGoogleSearchConsoleSyncState(ctx context.Context, siteID uuid
 	var importedStart, importedEnd, lastSuccess, lastAttempt, nextRetry sql.NullTime
 	err := s.db.QueryRowContext(ctx, `
 		SELECT site_id, team_id, state, imported_start_date, imported_end_date,
-			last_success_at, last_attempt_at, last_error_category, next_retry_at,
+			last_success_at, last_attempt_at, last_error_category, last_error_message, next_retry_at,
 			manual, updated_at
 		FROM google_search_console_sync_state
 		WHERE site_id = ?
@@ -548,6 +552,7 @@ func (s *Store) GetGoogleSearchConsoleSyncState(ctx context.Context, siteID uuid
 		&lastSuccess,
 		&lastAttempt,
 		&state.LastErrorCategory,
+		&state.LastErrorMessage,
 		&nextRetry,
 		&state.Manual,
 		&state.UpdatedAt,

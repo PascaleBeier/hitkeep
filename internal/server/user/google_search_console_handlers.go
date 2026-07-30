@@ -390,11 +390,13 @@ func (h *handler) handleRequestGoogleSearchConsoleSiteSync() http.HandlerFunc {
 			return
 		}
 		if err := h.runGoogleSearchConsoleManualSync(r, siteID, teamID); err != nil {
-			slog.Warn("Immediate Google Search Console sync failed",
+			logValues := make([]any, 0, 14)
+			logValues = append(logValues,
 				"site_id", siteID,
 				"team_id", teamID,
-				"category", searchconsole.ClassifyError(err),
 			)
+			logValues = append(logValues, worker.SearchConsoleSyncLogValues(err)...)
+			slog.Warn("Immediate Google Search Console sync failed", logValues...)
 		}
 
 		resp, err := h.googleSearchConsoleSiteMappingResponse(r.Context(), siteID, teamID, true)
@@ -914,6 +916,7 @@ func googleSearchConsoleSyncStatusResponse(state *database.GoogleSearchConsoleSy
 		LastSuccessAt:     state.LastSuccessAt,
 		LastAttemptAt:     state.LastAttemptAt,
 		LastErrorCategory: state.LastErrorCategory,
+		LastErrorMessage:  state.LastErrorMessage,
 		NextRetryAt:       state.NextRetryAt,
 		Manual:            state.Manual,
 	}

@@ -3114,6 +3114,7 @@
         "unmapped": "Não mapeado"
       },
       "labels": {
+        "connection": "Conexão",
         "account": "Conta",
         "site": "Site",
         "property": "Propriedade",

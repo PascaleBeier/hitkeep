@@ -3141,6 +3141,7 @@
         "unmapped": "Non associé"
       },
       "labels": {
+        "connection": "Connexion",
         "account": "Compte",
         "site": "Site",
         "property": "Propriété",

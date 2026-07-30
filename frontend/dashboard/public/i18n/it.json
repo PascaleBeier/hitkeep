@@ -3138,6 +3138,7 @@
         "unmapped": "Non mappata"
       },
       "labels": {
+        "connection": "Connessione",
         "account": "Account",
         "site": "Sito",
         "property": "Proprietà",

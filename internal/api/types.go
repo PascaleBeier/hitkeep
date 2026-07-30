@@ -373,6 +373,7 @@ type GoogleSearchConsoleSyncStatus struct {
 	LastSuccessAt     *time.Time `json:"last_success_at,omitempty"`
 	LastAttemptAt     *time.Time `json:"last_attempt_at,omitempty"`
 	LastErrorCategory string     `json:"last_error_category,omitempty"`
+	LastErrorMessage  string     `json:"last_error_message,omitempty"`
 	NextRetryAt       *time.Time `json:"next_retry_at,omitempty"`
 	Manual            bool       `json:"manual"`
 }

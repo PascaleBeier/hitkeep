@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"google.golang.org/api/googleapi"
 
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
@@ -599,6 +601,56 @@ func TestGoogleSearchConsoleManualSyncRunsImmediatelyAndAudits(t *testing.T) {
 	}
 	if overview.Clicks != 7 || overview.Impressions != 70 {
 		t.Fatalf("expected imported facts, got %+v", overview)
+	}
+}
+
+func TestGoogleSearchConsoleManualSyncFailureAuditsFullUpstreamResponseBody(t *testing.T) {
+	responseBody := `{"error":{"code":400,"message":"Invalid Search Console request","status":"INVALID_ARGUMENT"}}`
+	h, store, userID := setupUserSecurityTestEnv(t)
+	defer store.Close()
+	h.ctx.SearchConsole = &fakeSearchConsoleClient{
+		queryErr: &googleapi.Error{
+			Code:    http.StatusBadRequest,
+			Message: "Invalid Search Console request fallback",
+			Body:    responseBody,
+			Errors:  []googleapi.ErrorItem{{Reason: "invalidArgument"}},
+		},
+	}
+	teamID, site := seedGoogleSearchConsoleMappableSite(t, store, userID, "manual-sync-failure.example.com", "sc-domain:manual-sync-failure.example.com")
+	if err := store.UpsertGoogleSearchConsoleSiteMapping(context.Background(), database.GoogleSearchConsoleSiteMappingInput{
+		SiteID:      site.ID,
+		TeamID:      teamID,
+		PropertyURI: "sc-domain:manual-sync-failure.example.com",
+		MappedBy:    userID,
+		MappedAt:    time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("seed mapping: %v", err)
+	}
+	mux := googleSearchConsoleUserMux(h)
+
+	req := withTestUser(httptest.NewRequest(http.MethodPost, "/api/sites/"+site.ID.String()+"/integrations/google-search-console/sync", nil), userID)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected sync status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
+	}
+	var response api.GoogleSearchConsoleSiteMappingResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode sync response: %v", err)
+	}
+	if response.SyncStatus == nil || response.SyncStatus.LastErrorMessage != responseBody {
+		t.Fatalf("expected full upstream response body in sync status, got %+v", response.SyncStatus)
+	}
+
+	entries := requireGoogleSearchConsoleAuditEntries(t, store, teamID, "google_search_console.sync_failed")
+	details := entries[0].Details
+	for _, expected := range []string{"stage=query", "category=credentials_invalid", "http_status=400", `provider_reason="invalidArgument"`, "error_message="} {
+		if !strings.Contains(details, expected) {
+			t.Fatalf("expected %q in failure audit: %q", expected, details)
+		}
+	}
+	if !strings.Contains(details, strconv.Quote(responseBody)) {
+		t.Fatalf("failure audit did not include the full upstream response body: %q", details)
 	}
 }
 

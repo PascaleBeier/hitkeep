@@ -129,6 +129,7 @@ describe('GoogleSearchConsolePage', () => {
                                         unmapped: 'Unmapped'
                                     },
                                     labels: {
+                                        connection: 'Connection',
                                         account: 'Account',
                                         site: 'Site',
                                         property: 'Property',
@@ -272,8 +273,8 @@ describe('GoogleSearchConsolePage', () => {
         expect(fixture.nativeElement.textContent).not.toContain('Self-hosted');
         const docsLink = fixture.nativeElement.querySelector('[data-testid="gsc-docs-link"]') as HTMLAnchorElement;
         expect(docsLink?.href).toBe('https://hitkeep.com/guides/integrations/google-search-console/');
-        expect(docsLink.closest('.google-search-console-panel__header-actions')).toBeTruthy();
-        expect(docsLink.closest('.google-search-console-actions')).toBeFalsy();
+        expect(docsLink.closest('[settings-card-header]')).toBeTruthy();
+        expect(docsLink.closest('[settings-card-footer]')).toBeFalsy();
     });
 
     it('reloads status when the active team changes', () => {
@@ -557,6 +558,7 @@ describe('GoogleSearchConsolePage', () => {
                     last_success_at: '2026-05-04T12:00:00Z',
                     last_attempt_at: '2026-05-05T10:00:00Z',
                     last_error_category: 'quota_limited',
+                    last_error_message: '{"error":{"code":429,"message":"Quota exceeded for quota metric queries per day"}}',
                     next_retry_at: '2026-05-05T11:00:00Z',
                     manual: false
                 }
@@ -571,6 +573,7 @@ describe('GoogleSearchConsolePage', () => {
         expect(fixture.nativeElement.textContent).toContain('Sync status');
         expect(fixture.nativeElement.textContent).toContain('Failed');
         expect(fixture.nativeElement.textContent).toContain('Quota limited');
+        expect(fixture.nativeElement.querySelector('[data-testid="gsc-sync-error-details"]')?.textContent).toContain('Quota exceeded for quota metric queries per day');
         expect(fixture.nativeElement.textContent).not.toContain('2026-04-01');
         expect(fixture.nativeElement.textContent).not.toContain('2026-04-30');
         expect(fixture.nativeElement.textContent).toContain('Next retry');

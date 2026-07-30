@@ -138,6 +138,29 @@ func TestClassifyErrorDetectsDisabledSearchConsoleAPI(t *testing.T) {
 	}
 }
 
+func TestDiagnoseErrorExtractsFullGoogleAPIResponseBody(t *testing.T) {
+	responseBody := `{"error":{"code":400,"message":"Invalid request","status":"INVALID_ARGUMENT"}}`
+	err := fmt.Errorf("wrapped query failure: %w", &googleapi.Error{
+		Code:    http.StatusBadRequest,
+		Message: "Invalid request fallback",
+		Body:    responseBody,
+		Errors: []googleapi.ErrorItem{
+			{Reason: "invalidArgument", Message: "fallback message"},
+		},
+	})
+
+	diagnostic := DiagnoseError(err)
+	if diagnostic.Category != CategoryCredentialsInvalid {
+		t.Fatalf("expected credentials-invalid category, got %q", diagnostic.Category)
+	}
+	if diagnostic.HTTPStatus != http.StatusBadRequest || diagnostic.ProviderReason != "invalidArgument" {
+		t.Fatalf("unexpected Google API diagnostic: %+v", diagnostic)
+	}
+	if diagnostic.Message != responseBody {
+		t.Fatalf("expected full upstream response body, got %q", diagnostic.Message)
+	}
+}
+
 func TestGoogleClientQuerySearchAnalyticsUsesFinalDataState(t *testing.T) {
 	var requestBody string
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

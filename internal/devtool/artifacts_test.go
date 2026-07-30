@@ -7,10 +7,10 @@ import (
 	"testing"
 )
 
-func TestExactNPMCommandPinsEveryInvocation(t *testing.T) {
-	want := []string{"npx", "--yes", "npm@12.0.2", "run", "build:prod"}
-	if got := exactNPMCommand("12.0.2", "run", "build:prod"); !slices.Equal(got, want) {
-		t.Fatalf("exact npm command = %v, want %v", got, want)
+func TestNPMCommandUsesCanonicalInstalledBinary(t *testing.T) {
+	want := []string{"npm", "run", "build:prod"}
+	if got := npmCommand("run", "build:prod"); !slices.Equal(got, want) {
+		t.Fatalf("npm command = %v, want %v", got, want)
 	}
 }
 

@@ -38,6 +38,7 @@ export interface GoogleSearchConsoleSyncStatus {
     last_success_at?: string;
     last_attempt_at?: string;
     last_error_category?: string;
+    last_error_message?: string;
     next_retry_at?: string;
     manual: boolean;
 }

@@ -3180,6 +3180,7 @@
         "unmapped": "Nicht zugeordnet"
       },
       "labels": {
+        "connection": "Verbindung",
         "account": "Konto",
         "site": "Site",
         "property": "Property",

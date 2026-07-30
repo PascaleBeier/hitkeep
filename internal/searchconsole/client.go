@@ -55,6 +55,13 @@ const (
 
 type ErrorCategory string
 
+type ErrorDiagnostic struct {
+	Category       ErrorCategory
+	HTTPStatus     int
+	ProviderReason string
+	Message        string
+}
+
 type Error struct {
 	Category ErrorCategory
 	Err      error
@@ -106,6 +113,57 @@ func ClassifyError(err error) ErrorCategory {
 	default:
 		return CategoryUnknown
 	}
+}
+
+func DiagnoseError(err error) ErrorDiagnostic {
+	diagnostic := ErrorDiagnostic{Category: ClassifyError(err)}
+	if err == nil {
+		return diagnostic
+	}
+
+	var googleErr *googleapi.Error
+	if errors.As(err, &googleErr) {
+		diagnostic.HTTPStatus = googleErr.Code
+		diagnostic.ProviderReason = googleAPIErrorReason(googleErr)
+		diagnostic.Message = googleAPIErrorMessage(googleErr)
+		return diagnostic
+	}
+
+	diagnostic.Message = err.Error()
+	return diagnostic
+}
+
+func googleAPIErrorReason(err *googleapi.Error) string {
+	if err == nil {
+		return ""
+	}
+	for _, item := range err.Errors {
+		if reason := strings.TrimSpace(item.Reason); reason != "" {
+			return reason
+		}
+	}
+	return ""
+}
+
+func googleAPIErrorMessage(err *googleapi.Error) string {
+	if err == nil {
+		return ""
+	}
+	if body := strings.TrimSpace(err.Body); body != "" {
+		return body
+	}
+	message := strings.TrimSpace(err.Message)
+	if message == "" {
+		for _, item := range err.Errors {
+			if message = strings.TrimSpace(item.Message); message != "" {
+				break
+			}
+		}
+	}
+	if message == "" && err.Code > 0 {
+		message = http.StatusText(err.Code)
+	}
+	return message
 }
 
 func classifyGoogleAPIError(err *googleapi.Error) ErrorCategory {

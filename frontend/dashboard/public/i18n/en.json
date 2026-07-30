@@ -3243,6 +3243,7 @@
         "unmapped": "Unmapped"
       },
       "labels": {
+        "connection": "Connection",
         "account": "Account",
         "site": "Site",
         "property": "Property",

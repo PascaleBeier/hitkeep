@@ -3124,6 +3124,7 @@
         "unmapped": "Niet in kaart gebracht"
       },
       "labels": {
+        "connection": "Verbinding",
         "account": "Rekening",
         "site": "Locatie",
         "property": "Eigendom",

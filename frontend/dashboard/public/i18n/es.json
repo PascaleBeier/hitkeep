@@ -3150,6 +3150,7 @@
         "unmapped": "Sin asignar"
       },
       "labels": {
+        "connection": "Conexión",
         "account": "Cuenta",
         "site": "Sitio",
         "property": "Propiedad",

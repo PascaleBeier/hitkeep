@@ -1019,6 +1019,7 @@ func googleSearchConsoleSyncStatusSchema() map[string]any {
 			"last_success_at":     map[string]any{"type": "string", "format": "date-time"},
 			"last_attempt_at":     map[string]any{"type": "string", "format": "date-time"},
 			"last_error_category": map[string]any{"type": "string"},
+			"last_error_message":  map[string]any{"type": "string", "description": "Full error response returned by Google for the latest failed sync."},
 			"next_retry_at":       map[string]any{"type": "string", "format": "date-time"},
 			"manual":              map[string]any{"type": "boolean"},
 		},

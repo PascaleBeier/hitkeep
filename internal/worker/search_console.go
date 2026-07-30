@@ -2,8 +2,10 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,6 +27,56 @@ type SearchConsoleSyncRunSummary struct {
 	Attempted int
 	Succeeded int
 	Failed    int
+}
+
+const (
+	searchConsoleSyncStageConnection    = "connection"
+	searchConsoleSyncStageQuery         = "query"
+	searchConsoleSyncStageImport        = "import"
+	searchConsoleSyncStageOrchestration = "orchestration"
+)
+
+type searchConsoleSyncError struct {
+	stage string
+	err   error
+}
+
+func (e *searchConsoleSyncError) Error() string {
+	if e == nil || e.err == nil {
+		return "google search console sync failed"
+	}
+	return e.err.Error()
+}
+
+func (e *searchConsoleSyncError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.err
+}
+
+func SearchConsoleSyncLogValues(err error) []any {
+	diagnostic := searchconsole.DiagnoseError(err)
+	values := []any{
+		"stage", searchConsoleSyncErrorStage(err),
+		"category", diagnostic.Category,
+		"error_message", diagnostic.Message,
+	}
+	if diagnostic.HTTPStatus > 0 {
+		values = append(values, "http_status", diagnostic.HTTPStatus)
+	}
+	if diagnostic.ProviderReason != "" {
+		values = append(values, "provider_reason", diagnostic.ProviderReason)
+	}
+	return values
+}
+
+func searchConsoleSyncErrorStage(err error) string {
+	var syncErr *searchConsoleSyncError
+	if errors.As(err, &syncErr) && strings.TrimSpace(syncErr.stage) != "" {
+		return syncErr.stage
+	}
+	return searchConsoleSyncStageOrchestration
 }
 
 func NewSearchConsoleSyncWorker(tenantMgr *database.TenantStoreManager, source searchconsole.Client) *SearchConsoleSyncWorker {
@@ -87,11 +139,13 @@ func (w *SearchConsoleSyncWorker) RunDue(ctx context.Context, limit int) (Search
 		summary.Attempted++
 		if err := w.ImportSite(ctx, candidate.SiteID); err != nil {
 			summary.Failed++
-			slog.Warn("Search Console site sync failed",
+			logValues := make([]any, 0, 14)
+			logValues = append(logValues,
 				"site_id", candidate.SiteID,
 				"team_id", candidate.TeamID,
-				"category", searchconsole.ClassifyError(err),
 			)
+			logValues = append(logValues, SearchConsoleSyncLogValues(err)...)
+			slog.Warn("Search Console site sync failed", logValues...)
 			continue
 		}
 		summary.Succeeded++
@@ -117,7 +171,7 @@ func (w *SearchConsoleSyncWorker) ImportSite(ctx context.Context, siteID uuid.UU
 	}
 	if conn == nil || !conn.Connected {
 		err := searchconsole.ClassifiedError(searchconsole.CategoryAuthorizationRevoked, fmt.Errorf("google search console connection is not active"))
-		return w.recordSyncFailure(ctx, *mapping, err)
+		return w.recordSyncFailure(ctx, *mapping, searchConsoleSyncStageConnection, err)
 	}
 
 	if err := appendSearchConsoleSyncStartedAudit(ctx, shared, *mapping); err != nil {
@@ -139,7 +193,7 @@ func (w *SearchConsoleSyncWorker) ImportSite(ctx context.Context, siteID uuid.UU
 		query := searchConsoleSyncQuery(mapping.PropertyURI, window)
 		rows, err := w.source.QuerySearchAnalytics(ctx, googleSearchConsoleToken(conn), query)
 		if err != nil {
-			return w.recordSyncFailure(ctx, *mapping, err)
+			return w.recordSyncFailure(ctx, *mapping, searchConsoleSyncStageQuery, err)
 		}
 		rowsToImport = append(rowsToImport, rows...)
 	}
@@ -148,7 +202,7 @@ func (w *SearchConsoleSyncWorker) ImportSite(ctx context.Context, siteID uuid.UU
 		return err
 	}
 	if err := importSearchConsoleRows(ctx, tenantStore, rowsToImport, siteID, mapping.PropertyURI, now); err != nil {
-		return w.recordSyncFailure(ctx, *mapping, err)
+		return w.recordSyncFailure(ctx, *mapping, searchConsoleSyncStageImport, err)
 	}
 	importedStart, importedEnd := mergedSearchConsoleImportedRange(state, windows)
 	successState := database.GoogleSearchConsoleSyncStateInput{
@@ -234,13 +288,14 @@ func importSearchConsoleRows(ctx context.Context, tenantStore *database.Store, r
 	return tenantStore.UpsertSearchConsoleFacts(ctx, inputs)
 }
 
-func (w *SearchConsoleSyncWorker) recordSyncFailure(ctx context.Context, mapping database.GoogleSearchConsoleSiteMapping, syncErr error) error {
+func (w *SearchConsoleSyncWorker) recordSyncFailure(ctx context.Context, mapping database.GoogleSearchConsoleSiteMapping, stage string, syncErr error) error {
 	now := w.now().UTC()
-	category := searchconsole.ClassifyError(syncErr)
+	diagnostic := searchconsole.DiagnoseError(syncErr)
+	category := diagnostic.Category
 	nextRetry := searchConsoleRetryTime(now, category)
 	previous, err := w.tenantMgr.Shared().GetGoogleSearchConsoleSyncState(ctx, mapping.SiteID)
 	if err != nil {
-		return err
+		return &searchConsoleSyncError{stage: stage, err: fmt.Errorf("load previous sync state while recording failure: %w", err)}
 	}
 	input := database.GoogleSearchConsoleSyncStateInput{
 		SiteID:            mapping.SiteID,
@@ -248,6 +303,7 @@ func (w *SearchConsoleSyncWorker) recordSyncFailure(ctx context.Context, mapping
 		State:             searchConsoleFailureState(category),
 		LastAttemptAt:     &now,
 		LastErrorCategory: string(category),
+		LastErrorMessage:  diagnostic.Message,
 		NextRetryAt:       nextRetry,
 		Manual:            false,
 	}
@@ -256,11 +312,11 @@ func (w *SearchConsoleSyncWorker) recordSyncFailure(ctx context.Context, mapping
 		input.ImportedEndDate = previous.ImportedEndDate
 		input.LastSuccessAt = previous.LastSuccessAt
 	}
-	failureAudit := searchConsoleSyncFailureAuditParams(ctx, w.tenantMgr.Shared(), mapping, category)
+	failureAudit := searchConsoleSyncFailureAuditParams(ctx, w.tenantMgr.Shared(), mapping, stage, diagnostic)
 	if err := w.tenantMgr.Shared().UpsertGoogleSearchConsoleSyncStateWithAudit(ctx, input, failureAudit); err != nil {
-		return err
+		return &searchConsoleSyncError{stage: stage, err: fmt.Errorf("record sync failure: %w", err)}
 	}
-	return syncErr
+	return &searchConsoleSyncError{stage: stage, err: syncErr}
 }
 
 func searchConsoleRetryTime(now time.Time, category searchconsole.ErrorCategory) *time.Time {
@@ -360,10 +416,25 @@ func appendSearchConsoleSyncStartedAudit(ctx context.Context, shared *database.S
 	return nil
 }
 
-func searchConsoleSyncFailureAuditParams(ctx context.Context, shared *database.Store, mapping database.GoogleSearchConsoleSiteMapping, category searchconsole.ErrorCategory) database.AuditEntryParams {
+func searchConsoleSyncFailureAuditParams(ctx context.Context, shared *database.Store, mapping database.GoogleSearchConsoleSiteMapping, stage string, diagnostic searchconsole.ErrorDiagnostic) database.AuditEntryParams {
 	targetLabel := ""
 	if site, err := shared.GetSiteByID(ctx, mapping.SiteID); err == nil && site != nil {
 		targetLabel = site.Domain
+	}
+	details := fmt.Sprintf(
+		"outcome=failed;property_uri=%s;stage=%s;category=%s",
+		strings.TrimSpace(mapping.PropertyURI),
+		strings.TrimSpace(stage),
+		diagnostic.Category,
+	)
+	if diagnostic.HTTPStatus > 0 {
+		details += fmt.Sprintf(";http_status=%d", diagnostic.HTTPStatus)
+	}
+	if diagnostic.ProviderReason != "" {
+		details += ";provider_reason=" + strconv.Quote(diagnostic.ProviderReason)
+	}
+	if diagnostic.Message != "" {
+		details += ";error_message=" + strconv.Quote(diagnostic.Message)
 	}
 	return database.AuditEntryParams{
 		TeamID:      mapping.TeamID,
@@ -372,6 +443,6 @@ func searchConsoleSyncFailureAuditParams(ctx context.Context, shared *database.S
 		TargetID:    mapping.SiteID.String(),
 		TargetLabel: targetLabel,
 		Outcome:     "failure",
-		Details:     fmt.Sprintf("outcome=failed;property_uri=%s;category=%s", mapping.PropertyURI, category),
+		Details:     details,
 	}
 }

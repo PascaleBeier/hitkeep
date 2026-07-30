@@ -3,11 +3,14 @@ package worker
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"google.golang.org/api/googleapi"
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
@@ -93,6 +96,9 @@ func TestSearchConsoleSyncWorkerQuotaErrorBacksOff(t *testing.T) {
 	if state == nil || state.State != "failed" || state.LastErrorCategory != string(searchconsole.CategoryQuotaLimited) {
 		t.Fatalf("expected quota-limited failed state, got %+v", state)
 	}
+	if state.LastErrorMessage != "daily quota exceeded" {
+		t.Fatalf("expected useful persisted error message, got %q", state.LastErrorMessage)
+	}
 	if state.NextRetryAt == nil || !state.NextRetryAt.After(time.Date(2026, 5, 5, 12, 0, 0, 0, time.UTC)) {
 		t.Fatalf("expected quota retry time, got %+v", state.NextRetryAt)
 	}
@@ -105,6 +111,9 @@ func TestSearchConsoleSyncWorkerQuotaErrorBacksOff(t *testing.T) {
 	}
 	if entries[0].Outcome != "failure" || !strings.Contains(entries[0].Details, "category=quota_limited") {
 		t.Fatalf("unexpected failure audit: %+v", entries[0])
+	}
+	if !strings.Contains(entries[0].Details, "stage=query") || !strings.Contains(entries[0].Details, `error_message="daily quota exceeded"`) {
+		t.Fatalf("expected query-stage failure diagnostic, got %+v", entries[0])
 	}
 	requireSearchConsoleStartAudit(t, shared, teamID, site.ID)
 }
@@ -193,7 +202,7 @@ func TestSearchConsoleSyncWorkerAuthFailuresNeedAttentionAndAuditSafeCategories(
 			ctx := context.Background()
 			fixture := newSearchConsoleWorkerFixture(t, "gsc-"+string(tc.category)+"@test.dev", "gsc-"+string(tc.category)+".example.com")
 			defer fixture.shared.Close()
-			source := &fakeSearchConsoleSource{err: searchconsole.ClassifiedError(tc.category, errors.New("safe classified auth error"))}
+			source := &fakeSearchConsoleSource{err: searchconsole.ClassifiedError(tc.category, errors.New("provider auth failed"))}
 			worker := NewSearchConsoleSyncWorker(fixture.tenantMgr, source)
 			worker.now = func() time.Time { return time.Date(2026, 5, 5, 12, 0, 0, 0, time.UTC) }
 
@@ -214,13 +223,43 @@ func TestSearchConsoleSyncWorkerAuthFailuresNeedAttentionAndAuditSafeCategories(
 			if total != 1 || len(entries) != 1 {
 				t.Fatalf("expected one sync failure audit entry, got total=%d entries=%+v", total, entries)
 			}
-			if entries[0].Outcome != "failure" || !strings.Contains(entries[0].Details, "category="+string(tc.category)) {
+			if entries[0].Outcome != "failure" || !strings.Contains(entries[0].Details, "category="+string(tc.category)) || !strings.Contains(entries[0].Details, "stage=query") {
 				t.Fatalf("expected safe category failure audit, got %+v", entries[0])
 			}
-			if strings.Contains(entries[0].Details, "access-token") || strings.Contains(entries[0].Details, "refresh-token") || strings.Contains(entries[0].Details, "safe classified auth error") {
-				t.Fatalf("failure audit leaked token or raw provider error details: %q", entries[0].Details)
+			if !strings.Contains(entries[0].Details, `error_message="provider auth failed"`) {
+				t.Fatalf("expected provider error in failure audit: %q", entries[0].Details)
 			}
 		})
+	}
+}
+
+func TestSearchConsoleSyncLogValuesIncludeFullUpstreamResponseBody(t *testing.T) {
+	responseBody := `{"error":{"code":403,"message":"Property access denied","status":"PERMISSION_DENIED"}}`
+	err := &searchConsoleSyncError{stage: searchConsoleSyncStageQuery, err: fmt.Errorf("query failed: %w", &googleapi.Error{
+		Code:    http.StatusForbidden,
+		Message: "Property access denied fallback",
+		Body:    responseBody,
+		Errors:  []googleapi.ErrorItem{{Reason: "forbidden"}},
+	})}
+
+	values := SearchConsoleSyncLogValues(err)
+	fields := make(map[string]any, len(values)/2)
+	for i := 0; i+1 < len(values); i += 2 {
+		key, ok := values[i].(string)
+		if !ok {
+			t.Fatalf("expected string log key at %d, got %T", i, values[i])
+		}
+		fields[key] = values[i+1]
+	}
+	if fields["stage"] != searchConsoleSyncStageQuery || fields["category"] != searchconsole.CategoryPropertyAccessLost {
+		t.Fatalf("unexpected structured failure fields: %+v", fields)
+	}
+	if fields["http_status"] != http.StatusForbidden || fields["provider_reason"] != "forbidden" {
+		t.Fatalf("expected provider status and reason, got %+v", fields)
+	}
+	message, _ := fields["error_message"].(string)
+	if message != responseBody {
+		t.Fatalf("expected full upstream response body, got %q", message)
 	}
 }
 
@@ -537,8 +576,8 @@ func requireSearchConsoleSucceededState(t *testing.T, shared *database.Store, si
 	if state.ImportedEndDate == nil || state.ImportedEndDate.Format(time.DateOnly) != endDate {
 		t.Fatalf("expected imported end date %s, got %+v", endDate, state.ImportedEndDate)
 	}
-	if state.LastErrorCategory != "" || state.NextRetryAt != nil {
-		t.Fatalf("expected successful sync to clear error status, got category=%q retry=%+v", state.LastErrorCategory, state.NextRetryAt)
+	if state.LastErrorCategory != "" || state.LastErrorMessage != "" || state.NextRetryAt != nil {
+		t.Fatalf("expected successful sync to clear error status, got category=%q message=%q retry=%+v", state.LastErrorCategory, state.LastErrorMessage, state.NextRetryAt)
 	}
 }
 

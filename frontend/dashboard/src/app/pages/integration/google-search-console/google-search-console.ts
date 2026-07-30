@@ -13,9 +13,10 @@ import { TooltipModule } from '@openng/optimus-ui/tooltip';
 import { finalize } from 'rxjs';
 
 import { dialogCancelButton, dialogDangerButton } from '@components/dialog-actions/dialog-actions';
-import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
-import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
+import { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
+import { PageFrame } from '@components/page-frame/page-frame';
 import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
+import { SettingsCard } from '@features/settings/components/settings-card';
 import { SiteService } from '@features/sites/services/site.service';
 import { TeamService } from '@services/team.service';
 import { GoogleSearchConsoleProperty, GoogleSearchConsoleService, GoogleSearchConsoleSiteMapping, GoogleSearchConsoleStatus } from '@services/google-search-console.service';
@@ -27,10 +28,9 @@ interface GoogleSearchConsoleNotice {
 
 @Component({
     selector: 'app-google-search-console-page',
-    imports: [FormsModule, PageHeader, PageHeaderLeft, PageBreadcrumb, RelativeDateTime, ButtonModule, ConfirmDialogModule, MessageModule, SelectModule, TagModule, TooltipModule, TranslocoPipe],
+    imports: [FormsModule, PageFrame, RelativeDateTime, SettingsCard, ButtonModule, ConfirmDialogModule, MessageModule, SelectModule, TagModule, TooltipModule, TranslocoPipe],
     providers: [ConfirmationService],
     templateUrl: './google-search-console.html',
-    styleUrl: './google-search-console.css',
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class GoogleSearchConsolePage {
@@ -72,6 +72,9 @@ export class GoogleSearchConsolePage {
     });
 
     protected readonly statusKey = computed(() => {
+        if (this.loading() && !this.status()) {
+            return 'integration.googleSearchConsole.status.loading';
+        }
         const state = this.status()?.status ?? 'disconnected';
         return `integration.googleSearchConsole.status.${state}`;
     });
@@ -183,6 +186,8 @@ export class GoogleSearchConsolePage {
         }
         return `integration.googleSearchConsole.sync.${category}`;
     });
+
+    protected readonly syncErrorMessage = computed(() => this.syncStatus()?.last_error_message?.trim() ?? '');
 
     protected readonly showReconnectHint = computed(() => {
         const category = this.syncStatus()?.last_error_category;
