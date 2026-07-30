@@ -7,6 +7,18 @@
 * Split default-tenant analytics into `data/tenants/<tenant-id>/hitkeep.db` and run tenant files through one attached DuckDB data plane. This migration is mandatory in 2.13.0. Downgrading a split installation to 2.12 or older is unsupported because those releases do not understand the tenant file or split markers; restore a complete pre-upgrade backup instead.
 * Restore every tenant database from S3 backup snapshots by deriving tenant object prefixes from the restored control snapshot, including temporary STS credentials and non-TLS S3-compatible endpoints.
 
+## [2.13.1](https://github.com/PascaleBeier/hitkeep/compare/v2.13.0...v2.13.1) (2026-07-30)
+
+
+### Bug Fixes
+
+* **dashboard:** keep brand navigation in SPA ([a9f57d4](https://github.com/PascaleBeier/hitkeep/commit/a9f57d46dafa9f23a5c315d75acf24d7d2c5145b))
+* **deps:** Bump go deps ([6a0eae1](https://github.com/PascaleBeier/hitkeep/commit/6a0eae14d3f4f47dabd3c0b8907cf2388d14d259))
+* **frontend:** unify favicon fallbacks ([56e09ca](https://github.com/PascaleBeier/hitkeep/commit/56e09ca7371dbec7188c487fa776c3fd5288f7bc))
+* **search-console:** Improve search console observability and merge into app design tokens, references [#277](https://github.com/PascaleBeier/hitkeep/issues/277) ([1abc7ae](https://github.com/PascaleBeier/hitkeep/commit/1abc7ae9eedb0a012e66adc9444848d70edbb123))
+* **search-console:** persist error messages ([fa5c4aa](https://github.com/PascaleBeier/hitkeep/commit/fa5c4aa685d3939e2e82dd9093aa0d8ca1a94c4c))
+* Simplify GSC audit log ([2aa73c1](https://github.com/PascaleBeier/hitkeep/commit/2aa73c1c08452181b8cfa1e004471701b99a1855))
+
 ## [2.13.0](https://github.com/PascaleBeier/hitkeep/compare/v2.12.0...v2.13.0) (2026-07-29)
 
 
