@@ -17,21 +17,13 @@ import (
 	"hitkeep/internal/assetstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/importables"
+	"hitkeep/internal/testutil/testdb"
 )
 
 // newTestStore creates a file-backed DuckDB store for testing.
 func newTestStore(t *testing.T) *database.Store {
 	t.Helper()
-	tmpDir := t.TempDir()
-	store := database.NewStore(filepath.Join(tmpDir, "test.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-	return store
+	return testdb.Shared(t)
 }
 
 // newTestTenantMgr creates a TenantStoreManager backed by the given shared store.

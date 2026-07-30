@@ -1,6 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, linkedSignal, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, input, linkedSignal, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { SplitButtonModule } from '@openng/optimus-ui/splitbutton';
@@ -15,6 +14,7 @@ import { SeriesChart, SeriesChartPoint, SeriesDefinition } from '@features/analy
 import { QRCodePreview } from '@features/qr/qr-code-preview';
 import { QRCode, QRCodeSummary } from '@models/analytics.types';
 import { QRCodesService, buildQRCodeDestination } from '@services/qr-codes.service';
+import { finalize, Subscription } from 'rxjs';
 
 @Component({
     selector: 'app-qr-share-page',
@@ -25,11 +25,10 @@ import { QRCodesService, buildQRCodeDestination } from '@services/qr-codes.servi
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class QRSharePage {
-    private readonly route = inject(ActivatedRoute);
     private readonly service = inject(QRCodesService);
     private readonly transloco = inject(TranslocoService);
     private readonly destroyRef = inject(DestroyRef);
-    private readonly token = this.route.snapshot.paramMap.get('token') ?? '';
+    protected readonly token = input<string>();
 
     protected readonly qr = signal<QRCode | null>(null);
     protected readonly summary = signal<QRCodeSummary | null>(null);
@@ -37,6 +36,7 @@ export class QRSharePage {
     protected readonly loading = signal(true);
     protected readonly statsLoading = signal(false);
     protected readonly errorKey = signal<string | null>(null);
+    private readonly refreshSequence = signal(0);
 
     protected readonly timeRanges = signal<RangeOption[]>(DEFAULT_RANGE_OPTIONS);
     protected readonly selectedRange = linkedSignal<RangeOption[], RangeOption>({
@@ -44,7 +44,10 @@ export class QRSharePage {
         computation: (ranges, previous) => selectDefaultRange(ranges, previous?.value)
     });
     protected readonly customRangeDates = signal<Date[] | null>(null);
-    protected readonly assetURL = computed(() => (this.qr()?.has_asset ? this.service.qrShareAssetURL(this.token) : null));
+    protected readonly assetURL = computed(() => {
+        const token = this.token()?.trim();
+        return token && this.qr()?.has_asset ? this.service.qrShareAssetURL(token) : null;
+    });
     protected readonly finalDestination = computed(() => {
         const qr = this.qr();
         if (!qr) return '';
@@ -99,39 +102,53 @@ export class QRSharePage {
     });
 
     constructor() {
-        if (!this.token) {
-            this.errorKey.set('qrCodes.share.invalid');
-            this.loading.set(false);
-            return;
-        }
+        effect((onCleanup) => {
+            const token = this.token()?.trim();
+            this.qr.set(null);
+            this.summary.set(null);
+            this.series.set([]);
+            this.errorKey.set(null);
+            this.loading.set(true);
+            if (!token) {
+                this.errorKey.set('qrCodes.share.invalid');
+                this.loading.set(false);
+                return;
+            }
 
-        this.service
-            .getQRShare(this.token)
-            .pipe(takeUntilDestroyed(this.destroyRef))
-            .subscribe({
-                next: (qr) => this.qr.set(qr),
-                error: () => this.errorKey.set('qrCodes.share.invalid'),
-                complete: () => this.loading.set(false)
+            const subscription = this.service.getQRShare(token).subscribe({
+                next: (qr) => {
+                    this.qr.set(qr);
+                    this.loading.set(false);
+                },
+                error: () => {
+                    this.errorKey.set('qrCodes.share.invalid');
+                    this.loading.set(false);
+                }
             });
+            onCleanup(() => subscription.unsubscribe());
+        });
 
-        effect(() => {
+        effect((onCleanup) => {
+            this.refreshSequence();
+            const token = this.token()?.trim();
             const qr = this.qr();
             const range = this.currentDateRange();
-            if (!qr || !range) return;
-            this.loadStats(range.from, range.to);
+            if (!token || !qr || !range) return;
+            const subscription = this.loadStats(token, range.from, range.to);
+            onCleanup(() => subscription.unsubscribe());
         });
     }
 
     protected refresh(): void {
-        const range = this.currentDateRange();
-        if (range) this.loadStats(range.from, range.to);
+        this.refreshSequence.update((sequence) => sequence + 1);
     }
 
     protected exportTakeout(format: TakeoutExportFormat): void {
+        const token = this.token()?.trim();
         const qr = this.qr();
-        if (!qr) return;
+        if (!token || !qr) return;
         this.service
-            .downloadQRShareTakeout(this.token, qr, format)
+            .downloadQRShareTakeout(token, qr, format)
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe({ error: () => this.errorKey.set('qrCodes.errors.takeout') });
     }
@@ -140,23 +157,33 @@ export class QRSharePage {
         return buildTakeoutExportMenuItems(this.transloco, (format) => this.exportTakeout(format));
     }
 
-    private loadStats(from: string, to: string): void {
+    private loadStats(token: string, from: string, to: string): Subscription {
         this.statsLoading.set(true);
-        this.service
-            .qrShareSummary(this.token, from, to)
-            .pipe(takeUntilDestroyed(this.destroyRef))
-            .subscribe({
-                next: (summary) => this.summary.set(summary),
-                error: () => this.errorKey.set('qrCodes.errors.stats'),
-                complete: () => this.statsLoading.set(false)
-            });
-        this.service
-            .qrShareOpenSeries(this.token, from, to)
-            .pipe(takeUntilDestroyed(this.destroyRef))
-            .subscribe({
-                next: (points) => this.series.set(points.map((point) => ({ time: point.time, opens: point.opens }))),
-                error: () => this.errorKey.set('qrCodes.errors.stats')
-            });
+        const subscriptions = new Subscription();
+        let pending = 2;
+        const markComplete = () => {
+            pending -= 1;
+            if (pending === 0) this.statsLoading.set(false);
+        };
+        subscriptions.add(
+            this.service
+                .qrShareSummary(token, from, to)
+                .pipe(finalize(markComplete))
+                .subscribe({
+                    next: (summary) => this.summary.set(summary),
+                    error: () => this.errorKey.set('qrCodes.errors.stats')
+                })
+        );
+        subscriptions.add(
+            this.service
+                .qrShareOpenSeries(token, from, to)
+                .pipe(finalize(markComplete))
+                .subscribe({
+                    next: (points) => this.series.set(points.map((point) => ({ time: point.time, opens: point.opens }))),
+                    error: () => this.errorKey.set('qrCodes.errors.stats')
+                })
+        );
+        return subscriptions;
     }
 
     private currentDateRange(): { from: string; to: string } | null {

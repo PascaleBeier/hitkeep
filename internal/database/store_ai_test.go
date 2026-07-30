@@ -17,14 +17,7 @@ import (
 
 func setupAIStore(t *testing.T) (*Store, uuid.UUID, uuid.UUID, uuid.UUID) {
 	t.Helper()
-	store := NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
+	store := newSharedTestFixtureStore(t)
 
 	userID, err := store.CreateUser(context.Background(), "ai-store@example.com", "hashed")
 	if err != nil {
@@ -74,6 +67,8 @@ func assertNoOpportunityColumn(t *testing.T, store *Store, column string) {
 }
 
 func TestRemoveOpportunityMoneyContractMigrationHandlesIndexedLegacyTable(t *testing.T) {
+	// This test intentionally creates a legacy schema instead of using the
+	// current shared fixture.
 	store := NewStore(":memory:")
 	if err := store.Connect(); err != nil {
 		t.Fatalf("connect: %v", err)

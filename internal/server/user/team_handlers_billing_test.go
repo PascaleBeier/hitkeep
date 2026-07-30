@@ -15,17 +15,12 @@ import (
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/testutil/testdb"
 )
 
 func TestHandleGetTeamsIncludesPlanMetadata(t *testing.T) {
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
+	store := testdb.Shared(t)
 	defer store.Close()
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
 
 	userID, err := store.CreateUser(context.Background(), "plan@test.dev", "hash")
 	if err != nil {
@@ -101,14 +96,8 @@ func TestHandleGetTeamsIncludesPlanMetadata(t *testing.T) {
 }
 
 func TestHandleGetTeamsTreatsPendingCheckoutAsFreePlan(t *testing.T) {
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
+	store := testdb.Shared(t)
 	defer store.Close()
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
 
 	userID, err := store.CreateUser(context.Background(), "pending@test.dev", "hash")
 	if err != nil {

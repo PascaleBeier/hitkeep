@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { Injectable, inject } from '@angular/core';
+import { inject, Service } from '@angular/core';
 
 const CLOUD_SIGNUP_TRACKER_ID = 'hk-cloud-signup-tracker';
 const MAX_PENDING_EVENTS = 20;
@@ -17,7 +17,7 @@ interface PendingEvent {
     properties: EventProperties;
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class CloudSignupTrackingService {
     private readonly document = inject(DOCUMENT);
     private readonly pendingEvents: PendingEvent[] = [];

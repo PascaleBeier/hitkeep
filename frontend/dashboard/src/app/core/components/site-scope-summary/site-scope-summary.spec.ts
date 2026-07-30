@@ -1,5 +1,4 @@
 import { TestBed } from '@angular/core/testing';
-import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 
 import { SiteScopeSummary } from './site-scope-summary';
 
@@ -9,7 +8,7 @@ describe('SiteScopeSummary', () => {
     });
 
     it('renders one site as a compact globe tag', () => {
-        const fixture = TestBed.configureTestingModule({ imports: [SiteScopeSummary, NoopAnimationsModule] }).createComponent(SiteScopeSummary);
+        const fixture = TestBed.configureTestingModule({ imports: [SiteScopeSummary] }).createComponent(SiteScopeSummary);
         fixture.componentRef.setInput('items', [{ id: 'site-1', label: 'shop.example.com', detail: 'Viewer', severity: 'secondary' }]);
         fixture.componentRef.setInput('countLabel', '1 site');
         fixture.componentRef.setInput('popoverTitle', 'Sites');
@@ -21,7 +20,7 @@ describe('SiteScopeSummary', () => {
     });
 
     it('summarizes multiple sites and exposes their full scope in a popover', async () => {
-        const fixture = TestBed.configureTestingModule({ imports: [SiteScopeSummary, NoopAnimationsModule] }).createComponent(SiteScopeSummary);
+        const fixture = TestBed.configureTestingModule({ imports: [SiteScopeSummary] }).createComponent(SiteScopeSummary);
         fixture.componentRef.setInput('items', [
             { id: 'site-1', label: 'shop.example.com', detail: 'Viewer', severity: 'secondary' },
             { id: 'site-2', label: 'docs.example.com', detail: 'Admin', severity: 'info' }
@@ -42,7 +41,7 @@ describe('SiteScopeSummary', () => {
     });
 
     it('renders a supplied empty-scope label', () => {
-        const fixture = TestBed.configureTestingModule({ imports: [SiteScopeSummary, NoopAnimationsModule] }).createComponent(SiteScopeSummary);
+        const fixture = TestBed.configureTestingModule({ imports: [SiteScopeSummary] }).createComponent(SiteScopeSummary);
         fixture.componentRef.setInput('items', []);
         fixture.componentRef.setInput('countLabel', '0 sites');
         fixture.componentRef.setInput('popoverTitle', 'Sites');

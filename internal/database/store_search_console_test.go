@@ -409,13 +409,5 @@ func TestReplaceSearchConsoleFactsMaximumDailyPageUnderLowMemoryLimit(t *testing
 
 func newSearchConsoleTenantTestStore(t *testing.T) *Store {
 	t.Helper()
-	store := NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-	if err := store.MigrateTenant(context.Background()); err != nil {
-		t.Fatalf("migrate tenant store: %v", err)
-	}
-	return store
+	return newTenantTestFixtureStore(t)
 }

@@ -24,14 +24,13 @@
     },
     "private": true,
     "dependencies": {
-        "@angular/animations": "^22.0.8",
-        "@angular/cdk": "~22.0.6",
-        "@angular/common": "^22.0.8",
-        "@angular/compiler": "^22.0.8",
-        "@angular/core": "^22.0.8",
-        "@angular/forms": "^22.0.8",
-        "@angular/platform-browser": "^22.0.8",
-        "@angular/router": "^22.0.8",
+        "@angular/cdk": "~22.1.0",
+        "@angular/common": "^22.1.0",
+        "@angular/compiler": "^22.1.0",
+        "@angular/core": "^22.1.0",
+        "@angular/forms": "^22.1.0",
+        "@angular/platform-browser": "^22.1.0",
+        "@angular/router": "^22.1.0",
         "@fontsource-variable/lexend": "^5.3.0",
         "@jsverse/transloco-locale": "^8.4.0",
         "@openng/icons": "^1.0.0",
@@ -53,11 +52,11 @@
         "web-vitals": "^6.0.1"
     },
     "devDependencies": {
-        "@angular-devkit/schematics": "^22.0.8",
+        "@angular-devkit/schematics": "^22.1.1",
         "@angular-eslint/builder": "^22.1.0",
-        "@angular/build": "^22.0.8",
-        "@angular/cli": "^22.0.8",
-        "@angular/compiler-cli": "^22.0.8",
+        "@angular/build": "^22.1.1",
+        "@angular/cli": "^22.1.1",
+        "@angular/compiler-cli": "^22.1.0",
         "@eslint/js": "^10.0.1",
         "@jsverse/transloco": "^8.4.0",
         "@jsverse/transloco-optimize": "^8.4.0",
@@ -66,14 +65,14 @@
         "@vitest/browser-playwright": "^4.1.10",
         "@vitest/coverage-v8": "^4.1.10",
         "angular-eslint": "22.1.0",
-        "baseline-browser-mapping": "^2.11.5",
+        "baseline-browser-mapping": "^2.11.7",
         "esbuild": "0.28.1",
         "eslint": "^10.8.0",
         "jasmine-core": "~6.3.0",
-        "jsdom": "^30.0.0",
+        "jsdom": "^30.0.1",
         "oxfmt": "^0.61.0",
         "playwright": "^1.62.0",
-        "postcss": "^8.5.23",
+        "postcss": "^8.5.25",
         "typescript": "~6.0.3",
         "typescript-eslint": "8.65.0",
         "vitest": "^4.1.10"
@@ -95,9 +94,9 @@
         }
     },
     "overrides": {
-        "dompurify": "3.4.2",
+        "dompurify": "3.4.12",
         "@jsverse/transloco-optimize": {
-            "glob": "^11.1.0"
+            "glob": "^13.0.6"
         }
     },
     "packageExtensions": {
@@ -108,12 +107,11 @@
         }
     },
     "allowScripts": {
-        "@parcel/watcher@2.5.6": true,
-        "esbuild@0.27.7": true,
+        "@parcel/watcher@2.6.0": true,
         "esbuild@0.28.1": true,
         "fsevents@2.3.2": true,
         "fsevents@2.3.3": true,
-        "lmdb@3.5.4": true,
+        "lmdb@3.5.6": true,
         "msgpackr-extract@3.0.4": true,
         "vue-demi@0.14.10": true
     }

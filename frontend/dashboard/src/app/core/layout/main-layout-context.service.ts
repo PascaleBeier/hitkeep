@@ -1,4 +1,4 @@
-import { Injectable, TemplateRef, computed, inject, signal } from '@angular/core';
+import { TemplateRef, computed, inject, signal, Service } from '@angular/core';
 import { Router } from '@angular/router';
 import { Site, Team } from '@models/analytics.types';
 import { TEAM_CAPABILITIES } from '@core/access/capabilities';
@@ -10,7 +10,7 @@ import { TeamService } from '@services/team.service';
 import type { SiteSettingsSection } from '@features/sites/site-settings-section';
 import { SiteService } from '@features/sites/services/site.service';
 
-@Injectable()
+@Service({ autoProvided: false })
 export class MainLayoutContextService {
     private readonly router = inject(Router);
     readonly siteService = inject(SiteService);

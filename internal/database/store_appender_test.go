@@ -14,15 +14,7 @@ import (
 
 func setupAppenderStore(t *testing.T) (*Store, uuid.UUID, *api.Site) {
 	t.Helper()
-
-	store := NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
+	store := newSharedTestFixtureStore(t)
 
 	userID, err := store.CreateUser(context.Background(), "appender@example.com", "hashed")
 	if err != nil {

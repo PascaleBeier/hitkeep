@@ -15,14 +15,7 @@ const unifyTrafficExclusionsMigrationFile = "2026_07_18_000000_unify_traffic_exc
 
 func setupExclusionStore(t *testing.T) (*Store, uuid.UUID, uuid.UUID) {
 	t.Helper()
-
-	store := NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
+	store := newSharedTestFixtureStore(t)
 
 	userID, err := store.CreateUser(context.Background(), "owner@example.com", "hashed-secret")
 	if err != nil {

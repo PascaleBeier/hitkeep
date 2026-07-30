@@ -1,6 +1,6 @@
 import { Location } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 
 import { ApplicationState } from '@core/components/application-state/application-state';
@@ -34,19 +34,19 @@ interface ErrorPresentation {
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ApplicationErrorPage {
-    private readonly route = inject(ActivatedRoute);
     private readonly router = inject(Router);
     private readonly location = inject(Location);
     private readonly transloco = inject(TranslocoService);
     private readonly activeLanguage = injectActiveLang();
     private readonly state = readApplicationErrorState(this.location.getState());
-    private readonly notFound = this.route.snapshot.data['applicationErrorKind'] === 'not-found';
+    protected readonly applicationErrorKind = input<ApplicationErrorKind | 'not-found'>();
+    private readonly notFound = computed(() => this.applicationErrorKind() === 'not-found');
 
-    protected readonly kind = computed<ApplicationErrorKind | 'not-found'>(() => (this.notFound ? 'not-found' : (this.state?.kind ?? 'generic')));
+    protected readonly kind = computed<ApplicationErrorKind | 'not-found'>(() => (this.notFound() ? 'not-found' : (this.state?.kind ?? 'generic')));
     protected readonly presentation = computed<ErrorPresentation>(() => this.resolvePresentation());
     protected readonly statusLabel = computed(() => {
         this.activeLanguage();
-        if (this.notFound) return this.transloco.translate('applicationError.status.http', { status: 404 });
+        if (this.notFound()) return this.transloco.translate('applicationError.status.http', { status: 404 });
         if (this.state?.status) return this.transloco.translate('applicationError.status.http', { status: this.state.status });
         if (this.kind() === 'offline') return this.transloco.translate('applicationError.status.offline');
         if (this.kind() === 'navigation') return this.transloco.translate('applicationError.status.navigation');

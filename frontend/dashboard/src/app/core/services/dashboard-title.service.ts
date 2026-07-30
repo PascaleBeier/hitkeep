@@ -1,4 +1,4 @@
-import { Injectable, effect, inject } from '@angular/core';
+import { effect, inject, Service } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Title } from '@angular/platform-browser';
 import { ActivatedRouteSnapshot, NavigationEnd, Router } from '@angular/router';
@@ -17,7 +17,7 @@ export interface DashboardTitleRouteData {
     titleScope?: DashboardTitleScope;
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class DashboardTitleService {
     private readonly router = inject(Router);
     private readonly title = inject(Title);

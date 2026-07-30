@@ -19,6 +19,7 @@ import (
 	"hitkeep/internal/database"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/testutil/testdb"
 	"hitkeep/internal/webhooks"
 )
 
@@ -52,14 +53,7 @@ func setupAdminTestEnv(t *testing.T) (*handler, *database.Store, *database.Tenan
 	t.Helper()
 
 	basePath := t.TempDir()
-	store := database.NewStore(filepath.Join(basePath, "shared.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
+	store := testdb.Shared(t)
 
 	targetUserID, err := store.CreateUser(context.Background(), "target-owner@example.com", "hash")
 	if err != nil {

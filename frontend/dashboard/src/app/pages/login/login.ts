@@ -173,7 +173,7 @@ export class Login {
         // Browser history state can outlive the navigation that created it. Only
         // honour state carried by this router navigation, so a direct or reloaded
         // /login URL never inherits an old session-ended notice.
-        const sessionEndState = readSessionEndState(this.router.getCurrentNavigation()?.extras.state);
+        const sessionEndState = readSessionEndState(this.router.currentNavigation()?.extras.state);
         if (sessionEndState) {
             this.sessionEndReason.set(sessionEndState.reason);
         }

@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { computed, inject, signal, Service } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, catchError, finalize, of, tap } from 'rxjs';
 
@@ -97,7 +97,7 @@ export interface AuthSession {
     remember_me_duration_days: number;
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class AuthService {
     private http = inject(HttpClient);
     private sessionEndNavigation = inject(SessionEndNavigationService);

@@ -1,4 +1,4 @@
-import { Injectable, inject, signal, computed } from '@angular/core';
+import { inject, signal, computed, Service } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { tap } from 'rxjs';
 import type { InstanceRole, SiteRole, TeamRole } from '@core/access/capabilities';
@@ -15,7 +15,7 @@ export interface UserPermissions {
     can_create_teams?: boolean;
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class PermissionService {
     private http = inject(HttpClient);
 

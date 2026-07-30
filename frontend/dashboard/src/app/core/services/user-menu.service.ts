@@ -1,4 +1,4 @@
-import { Injectable, computed, inject } from '@angular/core';
+import { computed, inject, Service } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { MenuItem } from '@openng/optimus-ui/api';
@@ -7,7 +7,7 @@ import { formatDurationInterval } from '@core/i18n/duration-format';
 import { AuthService } from '@services/auth.service';
 import { catchError, finalize, of } from 'rxjs';
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class UserMenuService {
     private router = inject(Router);
     private auth = inject(AuthService);

@@ -257,8 +257,9 @@ describe('KpiCard', () => {
 
     it('keeps the surface cue hidden during normal motion and neutral under reduced motion', () => {
         const styles = (KpiCard as unknown as { ɵcmp: { styles: string[] } }).ɵcmp.styles.join('\n');
+        const normalizedStyles = styles.replaceAll('%NS%', '');
 
-        expect(styles).toContain('background: color-mix(in srgb, var(--p-text-color) 5%, transparent)');
+        expect(normalizedStyles).toContain('background: color-mix(in srgb, var(--p-text-color) 5%, transparent)');
         expect(styles).toContain('display: none');
         expect(styles).toContain('@media (prefers-reduced-motion: reduce)');
         expect(styles).toContain('display: block');

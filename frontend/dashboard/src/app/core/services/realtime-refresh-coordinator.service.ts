@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { DestroyRef, Injectable, WritableSignal, inject } from '@angular/core';
+import { DestroyRef, WritableSignal, inject, Service } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RealtimeEvent, RealtimeKind, RealtimeService } from '@services/realtime.service';
 
@@ -27,7 +27,7 @@ export interface RealtimeRefreshSignalOptions extends Omit<RealtimeRefreshOption
 const FALLBACK_REFRESH_MS = 30000;
 const DEFAULT_DEBOUNCE_MS = 500;
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class RealtimeRefreshCoordinator {
     private readonly realtime = inject(RealtimeService);
     private readonly destroyRef = inject(DestroyRef);

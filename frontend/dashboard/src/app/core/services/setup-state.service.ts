@@ -1,5 +1,5 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, inject, signal } from '@angular/core';
+import { inject, signal, Service } from '@angular/core';
 
 /** Which analytics features a site has ever produced data for. */
 export interface SiteSetupState {
@@ -29,7 +29,7 @@ const CONFIGURED: SiteSetupState = {
  * realtime refreshes never ask again, and a failed lookup counts as configured
  * rather than accusing the user of a missing setup.
  */
-@Injectable({ providedIn: 'root' })
+@Service()
 export class SetupStateService {
     private readonly http = inject(HttpClient);
     private readonly states = signal<Record<string, SiteSetupState>>({});

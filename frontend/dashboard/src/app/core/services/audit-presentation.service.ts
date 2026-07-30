@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { inject, Service } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslocoService } from '@jsverse/transloco';
 
@@ -184,7 +184,7 @@ const TARGET_TYPE_KEYS: Record<string, string> = {
 
 const TARGET_TYPES = Object.keys(TARGET_TYPE_KEYS);
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class AuditPresentationService {
     private readonly transloco = inject(TranslocoService);
     private readonly activeLanguage = toSignal(this.transloco.langChanges$, { initialValue: this.transloco.getActiveLang() });

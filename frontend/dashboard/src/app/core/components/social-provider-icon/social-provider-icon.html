@@ -1,8 +1,8 @@
-@switch (provider()) { @case ("google") {
+@let currentProvider = provider(); @switch (currentProvider) { @case ("google") {
 <img class="hk-social-provider-mark hk-social-provider-mark--google" src="icons/social-auth/google.svg" alt="" draggable="false" />
 } @case ("github") {
 <img class="hk-social-provider-mark hk-social-provider-mark--github-light" src="icons/social-auth/github-black.svg" alt="" draggable="false" />
 <img class="hk-social-provider-mark hk-social-provider-mark--github-dark" src="icons/social-auth/github-white.svg" alt="" draggable="false" />
 } @case ("microsoft") {
 <img class="hk-social-provider-mark hk-social-provider-mark--microsoft" src="icons/social-auth/microsoft.svg" alt="" draggable="false" />
-} }
+} @default never; }

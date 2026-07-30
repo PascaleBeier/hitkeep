@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/url"
 	"os"
 	"os/exec"
@@ -161,6 +162,58 @@ func TestCentralDeveloperMCPRejectsUncataloguedWorkspace(t *testing.T) {
 	}
 	if !result.IsError || !strings.Contains(result.StructuredContent.(map[string]any)["error"].(string), "configured fallback clone") {
 		t.Fatalf("uncatalogued workspace was accepted: %#v", result.StructuredContent)
+	}
+}
+
+func TestCentralDeveloperMCPCommandTransportSurvivesChildClose(t *testing.T) {
+	ctx := context.Background()
+	root := testRepository(t)
+	t.Setenv("HITKEEP_MCP_TEST_BINARY", os.Args[0])
+	launcher := filepath.Join(root, "hk")
+	launcherScript := fmt.Sprintf("#!/bin/sh\nexport HITKEEP_MCP_COMMAND_HELPER=1\nexport HITKEEP_MCP_WORKSPACE=%q\nexec %q -test.run '^TestMCPCommandHelper$'\n", root, os.Args[0])
+	if err := os.WriteFile(launcher, []byte(launcherScript), 0o700); err != nil {
+		t.Fatalf("write MCP helper launcher: %v", err)
+	}
+
+	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+	serverSession, err := newServer(newCentralAppResolver(root, nil), "test").Connect(ctx, serverTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer serverSession.Close()
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "test"}, nil)
+	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clientSession.Close()
+
+	for range 2 {
+		result, callErr := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "hk_workspace_status", Arguments: map[string]any{}})
+		if callErr != nil || result.IsError {
+			t.Fatalf("command-transport request failed after child lifecycle: %v %#v", callErr, result)
+		}
+		if got := result.StructuredContent.(map[string]any)["workspace_id"]; got == "" {
+			t.Fatalf("command-transport response omitted workspace ID: %#v", result.StructuredContent)
+		}
+	}
+	read, err := clientSession.ReadResource(ctx, &mcp.ReadResourceParams{URI: "hitkeep-dev://catalog/variants"})
+	if err != nil || len(read.Contents) != 1 {
+		t.Fatalf("command-transport resource request failed after child lifecycle: %v %#v", err, read)
+	}
+}
+
+func TestMCPCommandHelper(t *testing.T) {
+	if os.Getenv("HITKEEP_MCP_COMMAND_HELPER") != "1" {
+		return
+	}
+	app, err := devtool.NewApp(os.Getenv("HITKEEP_MCP_WORKSPACE"))
+	if err != nil {
+		os.Exit(2)
+	}
+	if err := RunStdio(context.Background(), app, "test-child"); err != nil {
+		os.Exit(3)
 	}
 }
 

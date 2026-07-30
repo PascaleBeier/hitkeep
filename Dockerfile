@@ -4,10 +4,25 @@ ARG GOLANG_VERSION=required-by-hk
 ARG NODE_VERSION=required-by-hk
 ARG NPM_VERSION
 
-FROM node:${NODE_VERSION}-bookworm AS frontend-dev
+FROM buildpack-deps:bookworm AS frontend-dev
 
+ARG NODE_VERSION
 ARG NPM_VERSION
-RUN npm install --global "npm@${NPM_VERSION}"
+ARG TARGETARCH
+RUN case "${TARGETARCH}" in \
+      amd64) node_arch="x64" ;; \
+      arm64) node_arch="arm64" ;; \
+      *) echo "unsupported Node build architecture: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    node_archive="node-v${NODE_VERSION}-linux-${node_arch}.tar.xz"; \
+    curl --fail --show-error --silent --location --remote-name \
+      "https://nodejs.org/dist/v${NODE_VERSION}/${node_archive}"; \
+    curl --fail --show-error --silent --location --remote-name \
+      "https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt"; \
+    grep " ${node_archive}$" SHASUMS256.txt | sha256sum --check --strict; \
+    tar --extract --xz --file "${node_archive}" --directory /usr/local --strip-components=1 --no-same-owner; \
+    rm "${node_archive}" SHASUMS256.txt; \
+    npm install --global "npm@${NPM_VERSION}"
 
 FROM frontend-dev AS frontend-builder
 

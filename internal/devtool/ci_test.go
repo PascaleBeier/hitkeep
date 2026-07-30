@@ -68,25 +68,43 @@ func TestReleaseBuildRejectsUnboundedInputs(t *testing.T) {
 
 func TestRaceShardsAreDisjointAndComplete(t *testing.T) {
 	packages := []string{
-		"hitkeep/cmd/hitkeep",
 		"hitkeep/internal/database",
 		"hitkeep/internal/database/migrations",
-		"hitkeep/internal/mailer",
-		"hitkeep/internal/mcpserver",
 		"hitkeep/internal/server",
+		"hitkeep/internal/server/admin",
+		"hitkeep/cmd/hitkeep",
+		"hitkeep/internal/mailer",
 	}
-	heavy := partitionRacePackages(packages, "heavy")
-	rest := partitionRacePackages(packages, "rest")
-	for _, packageName := range heavy {
-		if slices.Contains(rest, packageName) {
-			t.Fatalf("package appears in both race shards: %s", packageName)
+	selected := make([]string, 0, len(packages))
+	for _, shard := range raceShardNames {
+		for _, packageName := range partitionRacePackages(packages, shard) {
+			if slices.Contains(selected, packageName) {
+				t.Fatalf("package appears in multiple race shards: %s", packageName)
+			}
+			selected = append(selected, packageName)
 		}
 	}
-	combined := append(slices.Clone(heavy), rest...)
-	slices.Sort(combined)
-	slices.Sort(packages)
-	if !slices.Equal(combined, packages) {
-		t.Fatalf("race shards do not cover package catalog\nwant %v\n got %v", packages, combined)
+	slices.Sort(selected)
+	want := slices.Clone(packages)
+	slices.Sort(want)
+	if !slices.Equal(selected, want) {
+		t.Fatalf("race shards do not cover package catalog\nwant %v\n got %v", want, selected)
+	}
+}
+
+func TestTestBearingGoPackagesExcludeProductionOnlyAndFrontendDependencies(t *testing.T) {
+	output := []byte(`{"ImportPath":"hitkeep/internal/database","TestGoFiles":["store_test.go"]}
+{"ImportPath":"hitkeep/internal/server","XTestGoFiles":["server_test.go"]}
+{"ImportPath":"hitkeep/internal/config"}
+{"ImportPath":"hitkeep/frontend/dashboard/node_modules/flatted/golang/pkg/flatted","TestGoFiles":["flatted_test.go"]}
+`)
+	got, err := testBearingGoPackages(output, "self-hosted")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"hitkeep/internal/database", "hitkeep/internal/server"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("test-bearing packages = %v, want %v", got, want)
 	}
 }
 
@@ -117,7 +135,7 @@ func TestCIQAMatrixUsesCanonicalStableGateIDs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"go-race-heavy", "go-race-rest"}
+	want := []string{"go-race-database", "go-race-server", "go-race-rest"}
 	if !slices.Equal(matrix.GateIDs, want) {
 		t.Fatalf("race matrix = %v, want %v", matrix.GateIDs, want)
 	}
@@ -128,7 +146,7 @@ func TestCIQAMatrixUsesCanonicalStableGateIDs(t *testing.T) {
 
 func TestRaceTestArgsUseGateBoundedPackageTimeout(t *testing.T) {
 	got := raceTestArgs([]string{"hitkeep/internal/database"})
-	want := []string{"go", "test", "-race", "-timeout", "20m", "hitkeep/internal/database"}
+	want := []string{"go", "test", "-race", "-count=1", "-timeout", "20m", "hitkeep/internal/database"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("race arguments = %v, want %v", got, want)
 	}

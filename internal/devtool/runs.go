@@ -781,8 +781,10 @@ func (a *App) executeQA(ctx context.Context, runID string, request RunRequest, w
 					var result SourceChangeResult
 					result, err = a.FixGo(gateContext, false)
 					writeSourceResult(target, result)
-				case "go-race-heavy":
-					_, err = a.RunRaceShard(gateContext, "heavy", target)
+				case "go-race-database":
+					_, err = a.RunRaceShard(gateContext, "database", target)
+				case "go-race-server":
+					_, err = a.RunRaceShard(gateContext, "server", target)
 				case "go-race-rest":
 					_, err = a.RunRaceShard(gateContext, "rest", target)
 				case "cloud-test":

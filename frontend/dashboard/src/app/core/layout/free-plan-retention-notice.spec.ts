@@ -1,6 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 
@@ -26,7 +25,6 @@ describe('FreePlanRetentionNotice', () => {
         await TestBed.configureTestingModule({
             imports: [
                 FreePlanRetentionNotice,
-                NoopAnimationsModule,
                 TranslocoTestingModule.forRoot({
                     langs: {
                         en: {

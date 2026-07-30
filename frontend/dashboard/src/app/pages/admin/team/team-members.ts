@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
+import { booleanAttribute, ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -48,7 +48,7 @@ export class TeamMembersPage {
     private readonly router = inject(Router);
     private readonly navigationNotice = inject(NavigationNoticeService);
     private readonly activeLanguage = toSignal(this.transloco.langChanges$, { initialValue: this.transloco.getActiveLang() });
-    private readonly routeData = toSignal(this.route.data, { initialValue: this.route.snapshot.data });
+    protected readonly openInvite = input(false, { transform: booleanAttribute });
 
     protected readonly team = this.teamService.activeTeam;
     protected readonly members = signal<TeamMember[]>([]);
@@ -94,7 +94,10 @@ export class TeamMembersPage {
         });
 
         effect(() => {
-            if (this.routeData()['openInvite'] !== true) return;
+            if (!this.openInvite()) {
+                this.isInviteDialogVisible.set(false);
+                return;
+            }
             if (this.canManageMembers()) {
                 this.isInviteDialogVisible.set(true);
                 return;
@@ -120,7 +123,7 @@ export class TeamMembersPage {
         this.isInviteDialogVisible.set(visible);
         if (!visible) {
             this.resetInviteForm();
-            if (this.routeData()['openInvite'] === true) {
+            if (this.openInvite()) {
                 void this.router.navigate(['../'], { relativeTo: this.route, replaceUrl: true });
             }
         }
@@ -162,7 +165,7 @@ export class TeamMembersPage {
     private closeInviteDialog() {
         this.isInviteDialogVisible.set(false);
         this.resetInviteForm();
-        if (this.routeData()['openInvite'] === true) {
+        if (this.openInvite()) {
             void this.router.navigate(['../'], { relativeTo: this.route, replaceUrl: true });
         }
     }

@@ -1,5 +1,5 @@
 import { HttpClient, HttpContext } from '@angular/common/http';
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { computed, inject, signal, Service } from '@angular/core';
 import { finalize, tap, timeout } from 'rxjs';
 
 import { Site, SystemStatus, UserTeamsResponse } from '@models/analytics.types';
@@ -22,7 +22,7 @@ export interface DashboardBootstrap {
     status: SystemStatus;
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class DashboardBootstrapService {
     private http = inject(HttpClient);
     private auth = inject(AuthService);

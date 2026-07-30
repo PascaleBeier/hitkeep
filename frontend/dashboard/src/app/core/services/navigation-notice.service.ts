@@ -1,9 +1,9 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { inject, signal, Service } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationStart, Router } from '@angular/router';
 import { filter } from 'rxjs';
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class NavigationNoticeService {
     private readonly router = inject(Router);
     private navigationsToPreserve = 0;

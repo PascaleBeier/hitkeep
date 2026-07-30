@@ -1,9 +1,9 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { inject, signal, Service } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { finalize, tap } from 'rxjs';
 import { ReportDefinition, ReportDefinitionInput, ReportPreview, ReportRecipientConfirmation, ReportRun } from '@models/analytics.types';
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class ReportDefinitionsService {
     private readonly http = inject(HttpClient);
 

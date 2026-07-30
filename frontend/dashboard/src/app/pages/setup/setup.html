@@ -2,7 +2,7 @@
     <section class="hk-auth-shell" aria-labelledby="setup-title">
         <app-auth-card>
             <header class="hk-auth-header">
-                <app-brand size="large"></app-brand>
+                <app-brand size="large" />
                 <h1 id="setup-title" class="hk-auth-title">{{ "setup.createAdminAction" | transloco }}</h1>
                 <p class="hk-auth-subtitle">{{ "setup.description" | transloco }}</p>
             </header>
@@ -61,7 +61,7 @@
                         [feedback]="false"
                         [attr.aria-invalid]="setupForm.password().touched() && setupForm.password().invalid() ? true : null"
                         [attr.aria-describedby]="'setup-password-help'"
-                    ></p-password>
+                    />
                     <small id="setup-password-help" class="hk-auth-field-help">{{ "password.reset.minimumLength" | transloco }}</small>
                     @if (setupForm.password().touched() && setupForm.password().invalid()) {
                     <p-message severity="error" variant="simple" size="small" role="status">{{ "password.reset.minimumLength" | transloco }}</p-message>

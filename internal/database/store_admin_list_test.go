@@ -11,16 +11,7 @@ import (
 
 func setupAdminListStore(t *testing.T) *Store {
 	t.Helper()
-
-	store := NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
-
-	return store
+	return newSharedTestFixtureStore(t)
 }
 
 func TestListUsersIncludesInstanceRole(t *testing.T) {

@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -11,17 +10,7 @@ import (
 
 func TestShareLinksCreateListRevoke(t *testing.T) {
 	ctx := context.Background()
-	dbPath := filepath.Join(t.TempDir(), "share-links.db")
-
-	store := NewStore(dbPath)
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store := newSharedTestFixtureStore(t)
 
 	userID := uuid.New()
 	siteID := uuid.New()

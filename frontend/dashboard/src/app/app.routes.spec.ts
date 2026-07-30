@@ -65,15 +65,16 @@ describe('routes', () => {
 
         const notFound = routes.find((route) => route.path === '**');
         expect(notFound?.redirectTo).toBeUndefined();
-        expect(notFound?.component).toBeTruthy();
+        expect(notFound?.component).toBeUndefined();
+        expect(notFound?.loadComponent).toBeTruthy();
         expect(notFound?.data?.['applicationErrorKind']).toBe('not-found');
     });
 
-    it('keeps the generic application error route eager and outside guarded route trees', () => {
+    it('keeps the generic application error route lazy and outside guarded route trees', () => {
         const errorRoute = routes.find((route) => route.path === 'error');
 
-        expect(errorRoute?.component).toBeTruthy();
-        expect(errorRoute?.loadComponent).toBeUndefined();
+        expect(errorRoute?.component).toBeUndefined();
+        expect(errorRoute?.loadComponent).toBeTruthy();
         expect(errorRoute?.canActivate).toBeUndefined();
     });
 

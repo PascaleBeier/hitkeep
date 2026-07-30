@@ -18,17 +18,7 @@ import (
 
 func TestExportHitsCSVIncludesUTMFields(t *testing.T) {
 	ctx := context.Background()
-	dbPath := filepath.Join(t.TempDir(), "hits-export.db")
-
-	store := NewStore(dbPath)
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store := newSharedTestFixtureStore(t)
 
 	userID, err := store.CreateUser(ctx, "utm-export@example.com", "hash")
 	if err != nil {
@@ -112,17 +102,7 @@ func TestExportHitsCSVIncludesUTMFields(t *testing.T) {
 
 func TestExportHitsCSVIncludesGeoNetworkFields(t *testing.T) {
 	ctx := context.Background()
-	dbPath := filepath.Join(t.TempDir(), "hits-geo-export.db")
-
-	store := NewStore(dbPath)
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store := newSharedTestFixtureStore(t)
 
 	userID, err := store.CreateUser(ctx, "geo-export@example.com", "hash")
 	if err != nil {
@@ -200,17 +180,7 @@ func TestExportHitsCSVIncludesGeoNetworkFields(t *testing.T) {
 
 func TestExportHitsFileSupportsAllFormats(t *testing.T) {
 	ctx := context.Background()
-	dbPath := filepath.Join(t.TempDir(), "hits-export-file.db")
-
-	store := NewStore(dbPath)
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store := newSharedTestFixtureStore(t)
 
 	userID, err := store.CreateUser(ctx, "hits-file-export@example.com", "hash")
 	if err != nil {

@@ -1,9 +1,9 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { inject, signal, Service } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { finalize, Observable } from 'rxjs';
 import { SiteStats, SitesOverviewStatsResponse } from '@models/analytics.types';
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class StatsService {
     private http = inject(HttpClient);
 

@@ -14,6 +14,7 @@ import (
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
+	"hitkeep/internal/testutil/testdb"
 )
 
 func TestServerMountsMCPRouteWhenEnabled(t *testing.T) {
@@ -654,15 +655,7 @@ func testServerConfig(t *testing.T) *config.Config {
 
 func testServerStore(t *testing.T) *database.Store {
 	t.Helper()
-	store := database.NewStore(filepath.Join(t.TempDir(), "hitkeep.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("Connect: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		store.Close()
-		t.Fatalf("Migrate: %v", err)
-	}
-	return store
+	return testdb.Shared(t)
 }
 
 func testPublicFS() fstest.MapFS {

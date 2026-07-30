@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
+import { inject, Service } from '@angular/core';
 import { NavigationError, RedirectCommand, Router } from '@angular/router';
 import { TimeoutError } from 'rxjs';
 
@@ -20,7 +20,7 @@ export interface ApplicationErrorState {
     status?: number;
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class ApplicationErrorNavigationService {
     private readonly router = inject(Router);
 

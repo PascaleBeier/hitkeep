@@ -17,16 +17,7 @@ import (
 
 func newSharedTestStore(t *testing.T) *Store {
 	t.Helper()
-	tmpDir := t.TempDir()
-	store := NewStore(filepath.Join(tmpDir, "test.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-	return store
+	return newSharedTestFixtureStore(t)
 }
 
 func TestForTenantDefaultReturnsShared(t *testing.T) {

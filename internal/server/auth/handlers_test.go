@@ -22,6 +22,7 @@ import (
 	"hitkeep/internal/security"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/testutil"
+	"hitkeep/internal/testutil/testdb"
 )
 
 type authTestMailDriver struct {
@@ -65,13 +66,7 @@ func extractMagicLinkToken(t *testing.T, body string) string {
 func setupAuthTestEnv(t *testing.T) (*handler, *database.Store) {
 	t.Helper()
 
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("failed to connect to test db: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("failed to migrate test db: %v", err)
-	}
+	store := testdb.Shared(t)
 
 	conf := &config.Config{
 		PublicURL: "http://localhost:8080",

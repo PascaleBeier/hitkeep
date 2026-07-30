@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { inject, signal, Service } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { AIAgentCatalog } from '@models/analytics.types';
 
@@ -8,7 +8,7 @@ import { AIAgentCatalog } from '@models/analytics.types';
  * progressive enhancement: lookups return null until the catalog has loaded
  * and for entries without a documentation URL.
  */
-@Injectable({ providedIn: 'root' })
+@Service()
 export class AIAgentIconsService {
     private readonly http = inject(HttpClient);
     private requested = false;

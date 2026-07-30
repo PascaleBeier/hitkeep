@@ -677,7 +677,7 @@ func ciCommand(options *options) *cobra.Command {
 	race := &cobra.Command{Use: "race", Short: "Run one canonical Go race shard", Args: cobra.NoArgs, RunE: withApp(options, "ci race", func(ctx context.Context, app *devtool.App) (any, error) {
 		return app.RunRaceShard(ctx, shard, options.stderr)
 	})}
-	race.Flags().StringVar(&shard, "shard", "", "canonical shard: heavy or rest")
+	race.Flags().StringVar(&shard, "shard", "", "canonical shard: database, server, or rest")
 	_ = race.MarkFlagRequired("shard")
 	cloudTest := &cobra.Command{Use: "cloud-test", Short: "Test cloud-tagged packages outside the developer platform", Args: cobra.NoArgs, RunE: withApp(options, "ci cloud-test", func(ctx context.Context, app *devtool.App) (any, error) {
 		return app.RunCloudTests(ctx, options.stderr)

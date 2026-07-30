@@ -1,4 +1,4 @@
-import { Injectable, effect, inject, signal } from '@angular/core';
+import { effect, inject, signal, Service } from '@angular/core';
 import { HttpClient, HttpContext } from '@angular/common/http';
 import { finalize, tap } from 'rxjs';
 import { TranslocoService } from '@jsverse/transloco';
@@ -12,7 +12,7 @@ export interface UserPreferences {
 
 type AvailableLang = string | { id: string; label: string };
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class UserPreferencesService {
     private http = inject(HttpClient);
     private transloco = inject(TranslocoService);

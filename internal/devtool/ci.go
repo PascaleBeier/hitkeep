@@ -1,7 +1,9 @@
 package devtool
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -102,7 +104,7 @@ func (a *App) GoBuildConfig(variantID string, extraTags []string) (GoBuildConfig
 }
 
 func (a *App) RunRaceShard(ctx context.Context, shard string, writer io.Writer) (RaceShardResult, error) {
-	if !slices.Contains([]string{"heavy", "rest"}, shard) {
+	if !slices.Contains(raceShardNames, shard) {
 		return RaceShardResult{}, fmt.Errorf("unknown race shard %q", shard)
 	}
 	common, _ := VariantByID("self-hosted")
@@ -126,7 +128,7 @@ func raceTestArgs(packages []string) []string {
 	// Keep the package timeout below the enclosing 30-minute gate timeout so a
 	// genuine hang still emits a Go stack dump while normal slower race runs are
 	// not constrained by Go's 10-minute default.
-	return append([]string{"go", "test", "-race", "-timeout", "20m"}, packages...)
+	return append([]string{"go", "test", "-race", "-count=1", "-timeout", "20m"}, packages...)
 }
 
 func (a *App) RunCloudTests(ctx context.Context, writer io.Writer) (GoTestResult, error) {
@@ -149,19 +151,37 @@ func (a *App) RunCloudTests(ctx context.Context, writer io.Writer) (GoTestResult
 }
 
 func (a *App) listGoPackages(ctx context.Context, variant Variant) ([]string, error) {
-	list := exec.CommandContext(ctx, "go", "list", "./...") //nolint:gosec // fixed command and arguments
+	list := exec.CommandContext(ctx, "go", "list", "-json", "./...") //nolint:gosec // fixed command and arguments
 	list.Dir = a.workspace.Root
 	list.Env = a.commandEnvironment([]string{"GOFLAGS=-tags=" + strings.Join(variant.BuildTags, ",")})
 	output, err := list.Output()
 	if err != nil {
 		return nil, fmt.Errorf("list %s Go packages: %w", variant.ID, err)
 	}
+	return testBearingGoPackages(output, variant.ID)
+}
+
+type goPackageJSON struct {
+	ImportPath   string   `json:"ImportPath"`
+	TestGoFiles  []string `json:"TestGoFiles"`
+	XTestGoFiles []string `json:"XTestGoFiles"`
+}
+
+func testBearingGoPackages(output []byte, variantID string) ([]string, error) {
+	decoder := json.NewDecoder(bytes.NewReader(output))
 	packages := make([]string, 0)
-	for packageName := range strings.FieldsSeq(string(output)) {
-		if strings.Contains(packageName, "/node_modules/") {
+	for {
+		var packageInfo goPackageJSON
+		if err := decoder.Decode(&packageInfo); err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return nil, fmt.Errorf("decode %s Go package list: %w", variantID, err)
+		}
+		if packageInfo.ImportPath == "" || strings.Contains(packageInfo.ImportPath, "/node_modules/") || len(packageInfo.TestGoFiles)+len(packageInfo.XTestGoFiles) == 0 {
 			continue
 		}
-		packages = append(packages, packageName)
+		packages = append(packages, packageInfo.ImportPath)
 	}
 	return compactSorted(packages), nil
 }
@@ -177,18 +197,29 @@ func cloudTestPackages(packages []string) []string {
 	return selected
 }
 
+var raceShardNames = []string{"database", "server", "rest"}
+
+var raceShardPrefixes = map[string][]string{
+	"database": {"hitkeep/internal/database"},
+	"server":   {"hitkeep/internal/server"},
+}
+
 func partitionRacePackages(packages []string, shard string) []string {
-	heavyPrefixes := []string{"hitkeep/internal/database", "hitkeep/internal/mcpserver", "hitkeep/internal/mailer"}
 	var selected []string
 	for _, packageName := range packages {
-		heavy := false
-		for _, prefix := range heavyPrefixes {
-			if packageName == prefix || strings.HasPrefix(packageName, prefix+"/") {
-				heavy = true
+		selectedShard := "rest"
+		for candidate, prefixes := range raceShardPrefixes {
+			for _, prefix := range prefixes {
+				if packageName == prefix || strings.HasPrefix(packageName, prefix+"/") {
+					selectedShard = candidate
+					break
+				}
+			}
+			if selectedShard == candidate {
 				break
 			}
 		}
-		if shard == "heavy" && heavy || shard == "rest" && !heavy {
+		if selectedShard == shard {
 			selected = append(selected, packageName)
 		}
 	}

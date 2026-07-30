@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/csv"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -15,14 +14,7 @@ import (
 
 func TestHitQueriesAndExportsUseConversionSessionCohorts(t *testing.T) {
 	ctx := context.Background()
-	store := NewStore(filepath.Join(t.TempDir(), "conversion-cohorts.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store := newSharedTestFixtureStore(t)
 	userID, err := store.CreateUser(ctx, "cohorts@example.com", "hash")
 	if err != nil {
 		t.Fatalf("create user: %v", err)

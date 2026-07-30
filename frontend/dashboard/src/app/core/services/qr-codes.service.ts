@@ -1,5 +1,5 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
+import { inject, Service } from '@angular/core';
 import { Observable } from 'rxjs';
 import { TakeoutExportFormat } from '@core/export/export-formats';
 import { QRCode, QRCodeAsset, QRCodeOpenSeriesPoint, QRCodeRequest, QRCodeShareLink, QRCodeSummary } from '@models/analytics.types';
@@ -10,7 +10,7 @@ export interface QRCodeShareLinkResponse extends QRCodeShareLink {
     url: string;
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class QRCodesService {
     private readonly http = inject(HttpClient);
     private readonly takeout = inject(TakeoutDownloadService);

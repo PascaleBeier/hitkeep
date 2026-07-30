@@ -6,14 +6,7 @@ import (
 )
 
 func TestBuildTeamUsageSummary(t *testing.T) {
-	store := NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
-	defer store.Close()
+	store := newSharedTestFixtureStore(t)
 	ctx := context.Background()
 
 	ownerID, err := store.CreateUser(ctx, "usage-owner@test.dev", "hash")

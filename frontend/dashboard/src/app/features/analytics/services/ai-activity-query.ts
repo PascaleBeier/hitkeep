@@ -1,6 +1,6 @@
-import { DestroyRef, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { finalize, Subscription } from 'rxjs';
+import { inject, Injector, signal } from '@angular/core';
+import { rxResource } from '@angular/core/rxjs-interop';
+import { finalize, tap } from 'rxjs';
 
 import { AnalyticsService } from '@core/services/analytics.service';
 import type { AIActivityReport } from '@models/analytics.types';
@@ -26,43 +26,42 @@ export class AIActivityQuery {
     readonly report = signal<AIActivityReport | null>(null);
     readonly isLoading = signal(false);
 
-    private request: Subscription | null = null;
+    private readonly request = signal<(AIActivityQueryRequest & { mode: AIActivityQueryMode }) | undefined>(undefined);
+    private readonly query;
 
     constructor(
         private readonly analyticsService: AnalyticsService,
-        private readonly destroyRef: DestroyRef
+        injector: Injector
     ) {
-        this.destroyRef.onDestroy(() => this.request?.unsubscribe());
+        this.query = rxResource({
+            params: () => this.request(),
+            stream: ({ params }) =>
+                this.analyticsService.getAIActivity(params.siteId, params.from, params.to, params.filters ?? [], params.comparison ?? undefined).pipe(
+                    tap({
+                        next: (report) => {
+                            this.report.set(report);
+                            params.onSuccess?.(report);
+                        },
+                        error: (error) => console.error(error)
+                    }),
+                    finalize(() => {
+                        if (this.request() === params && params.mode !== 'background') {
+                            this.isLoading.set(false);
+                        }
+                    })
+                ),
+            injector
+        });
     }
 
     load(request: AIActivityQueryRequest, mode: AIActivityQueryMode = 'blocking'): void {
-        this.request?.unsubscribe();
         // A background refresh replaces the report in place: no skeleton, so the
         // visible loading flag stays untouched for the whole round trip.
-        if (mode !== 'background') {
-            this.isLoading.set(true);
-        }
-
-        this.request = this.analyticsService
-            .getAIActivity(request.siteId, request.from, request.to, request.filters ?? [], request.comparison ?? undefined)
-            .pipe(
-                takeUntilDestroyed(this.destroyRef),
-                finalize(() => {
-                    if (mode !== 'background') {
-                        this.isLoading.set(false);
-                    }
-                })
-            )
-            .subscribe({
-                next: (report) => {
-                    this.report.set(report);
-                    request.onSuccess?.(report);
-                },
-                error: (e) => console.error(e)
-            });
+        this.isLoading.set(mode !== 'background');
+        this.request.set({ ...request, mode });
     }
 }
 
 export function injectAIActivityQuery(): AIActivityQuery {
-    return new AIActivityQuery(inject(AnalyticsService), inject(DestroyRef));
+    return new AIActivityQuery(inject(AnalyticsService), inject(Injector));
 }

@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { Injectable, inject } from '@angular/core';
+import { inject, Service } from '@angular/core';
 import { NavigationExtras, RedirectCommand, Router } from '@angular/router';
 
 import { browserBasePath } from '@core/interceptors/base-path.interceptor';
@@ -25,7 +25,7 @@ interface ReturnUrlRouterContext {
     };
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class SessionEndNavigationService {
     private readonly router = inject(Router);
     private readonly document = inject(DOCUMENT);

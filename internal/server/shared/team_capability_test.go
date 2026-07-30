@@ -10,6 +10,7 @@ import (
 
 	"hitkeep/internal/auth"
 	"hitkeep/internal/database"
+	"hitkeep/internal/testutil/testdb"
 )
 
 func TestHandlerConfigAuthHelpers(t *testing.T) {
@@ -199,12 +200,5 @@ func sitePermissionRequest(userID, siteID uuid.UUID) *http.Request {
 
 func newSharedTestStore(t *testing.T) *database.Store {
 	t.Helper()
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
-	return store
+	return testdb.Shared(t)
 }

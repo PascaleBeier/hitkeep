@@ -22,6 +22,7 @@ import (
 	"hitkeep/internal/database"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/testutil/testdb"
 )
 
 func setupSystemTestEnv(t *testing.T) (*handler, *database.Store, *database.TenantStoreManager, uuid.UUID, uuid.UUID, uuid.UUID) {
@@ -29,14 +30,7 @@ func setupSystemTestEnv(t *testing.T) (*handler, *database.Store, *database.Tena
 
 	basePath := t.TempDir()
 	sharedPath := filepath.Join(basePath, "shared.db")
-	store := database.NewStore(sharedPath)
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
+	store := testdb.SharedAtWithOptions(t, sharedPath, database.WithCheckpointInterval(5*time.Minute))
 
 	ownerUserID, err := store.CreateUser(context.Background(), "owner@example.com", "hash")
 	if err != nil {

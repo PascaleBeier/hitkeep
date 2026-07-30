@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { inject, Service } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 
 import { CurrentIP, IPExclusion } from '@models/analytics.types';
@@ -12,7 +12,7 @@ export interface CreateExclusionPayload {
     description?: string;
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class ExclusionsService {
     private http = inject(HttpClient);
 

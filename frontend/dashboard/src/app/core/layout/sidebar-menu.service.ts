@@ -1,4 +1,4 @@
-import { Injectable, computed, inject } from '@angular/core';
+import { computed, inject, Service } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
@@ -27,7 +27,7 @@ interface SidebarSection {
     items: SidebarItem[];
 }
 
-@Injectable()
+@Service({ autoProvided: false })
 export class SidebarMenuService {
     private static readonly docsURL = 'https://hitkeep.com/guides/introduction/';
     private static readonly supportFallbackURL = 'https://hitkeep.com/support/help/';

@@ -1,6 +1,5 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { provideTranslocoLocale } from '@jsverse/transloco-locale';
 import { Observable, of, Subject, throwError } from 'rxjs';
@@ -51,7 +50,6 @@ describe('WebhooksPage', () => {
         await TestBed.configureTestingModule({
             imports: [
                 WebhooksPage,
-                NoopAnimationsModule,
                 TranslocoTestingModule.forRoot({
                     langs: {
                         en: {

@@ -11,14 +11,7 @@ import (
 
 func setupImportStoreTest(t *testing.T) (*Store, uuid.UUID, uuid.UUID) {
 	t.Helper()
-	store := NewStore(filepath.Join(t.TempDir(), "hitkeep.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
+	store := newSharedTestFixtureStore(t)
 
 	userID, err := store.CreateUser(context.Background(), "import-store@example.com", "hash")
 	if err != nil {

@@ -1,6 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { provideTranslocoLocale } from '@jsverse/transloco-locale';
 import { TeamOverviewPage } from './team-overview';
@@ -77,7 +76,6 @@ describe('TeamOverviewPage', () => {
         await TestBed.configureTestingModule({
             imports: [
                 TeamOverviewPage,
-                NoopAnimationsModule,
                 TranslocoTestingModule.forRoot({
                     langs: {
                         en: {

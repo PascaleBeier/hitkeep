@@ -13,6 +13,7 @@ import (
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
+	"hitkeep/internal/testutil/testdb"
 )
 
 func TestBuilderForUserBuildsDerivedAccessContext(t *testing.T) {
@@ -188,14 +189,7 @@ func TestBuilderHandlesStoreErrors(t *testing.T) {
 
 func newAccessTestStore(t *testing.T) *database.Store {
 	t.Helper()
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
-	return store
+	return testdb.Shared(t)
 }
 
 func hasAccessValue(values []string, target string) bool {

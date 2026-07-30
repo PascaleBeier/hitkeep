@@ -1,4 +1,4 @@
-import { computed, Injectable, inject, signal } from '@angular/core';
+import { computed, inject, signal, Service } from '@angular/core';
 import { DEFAULT_RANGE_OPTIONS, DateRange, isShortRange, RangeOption, RangeSelectEvent, RangeValue, resolveDateRange, selectDefaultRange } from '@components/range-toolbar/range-toolbar';
 import { PreferenceStorage } from '@services/preference-storage';
 
@@ -14,7 +14,7 @@ export interface ReportRangeSelection {
 
 const REPORT_RANGE_STORAGE_KEY = 'hitkeep.reportRange';
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class ReportRangePreferencesService {
     private readonly storage = inject(PreferenceStorage);
     private readonly defaultRange = selectDefaultRange(DEFAULT_RANGE_OPTIONS);

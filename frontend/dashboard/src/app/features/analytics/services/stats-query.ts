@@ -1,6 +1,6 @@
-import { DestroyRef, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { finalize, Subscription } from 'rxjs';
+import { inject, Injector, signal } from '@angular/core';
+import { rxResource } from '@angular/core/rxjs-interop';
+import { finalize, tap } from 'rxjs';
 import type { SiteStats } from '@models/analytics.types';
 import { StatsService } from '@features/analytics/services/stats.service';
 
@@ -29,49 +29,54 @@ export class StatsQuery {
     readonly comparisonRange = signal<{ from: string; to: string } | null>(null);
     readonly lastResult = signal<StatsQueryResult | null>(null);
 
-    private request: Subscription | null = null;
+    private readonly request = signal<StatsQueryRequest | undefined>(undefined);
+    private readonly query;
     private resultSequence = 0;
 
     constructor(
         private readonly statsService: StatsService,
-        private readonly destroyRef: DestroyRef
+        injector: Injector
     ) {
-        this.destroyRef.onDestroy(() => this.request?.unsubscribe());
+        this.query = rxResource({
+            params: () => this.request(),
+            stream: ({ params }) =>
+                this.statsService.fetchStats(params.siteId, params.from, params.to, params.filters ?? [], params.goalIds ?? [], params.funnelIds ?? []).pipe(
+                    tap({
+                        next: (stats) => {
+                            const result = { mode: params.mode ?? 'blocking', sequence: ++this.resultSequence };
+                            this.stats.set(stats);
+                            this.lastResult.set(result);
+                            params.onSuccess?.(stats, result);
+                        },
+                        error: (error) => console.error(error)
+                    }),
+                    finalize(() => {
+                        if (this.request() !== params) return;
+                        if ((params.mode ?? 'blocking') === 'background') {
+                            this.isBackgroundRefreshing.set(false);
+                        } else {
+                            this.isLoading.set(false);
+                        }
+                    })
+                ),
+            injector
+        });
     }
 
     load(request: StatsQueryRequest): void {
         const mode = request.mode ?? 'blocking';
         this.comparisonRange.set(this.statsService.comparisonRange(request.from, request.to));
-        this.request?.unsubscribe();
         if (mode === 'background') {
+            this.isLoading.set(false);
             this.isBackgroundRefreshing.set(true);
         } else {
+            this.isBackgroundRefreshing.set(false);
             this.isLoading.set(true);
         }
-        this.request = this.statsService
-            .fetchStats(request.siteId, request.from, request.to, request.filters ?? [], request.goalIds ?? [], request.funnelIds ?? [])
-            .pipe(
-                takeUntilDestroyed(this.destroyRef),
-                finalize(() => {
-                    if (mode === 'background') {
-                        this.isBackgroundRefreshing.set(false);
-                    } else {
-                        this.isLoading.set(false);
-                    }
-                })
-            )
-            .subscribe({
-                next: (stats) => {
-                    const result = { mode, sequence: ++this.resultSequence };
-                    this.stats.set(stats);
-                    this.lastResult.set(result);
-                    request.onSuccess?.(stats, result);
-                },
-                error: (e) => console.error(e)
-            });
+        this.request.set({ ...request, mode });
     }
 }
 
 export function injectStatsQuery(): StatsQuery {
-    return new StatsQuery(inject(StatsService), inject(DestroyRef));
+    return new StatsQuery(inject(StatsService), inject(Injector));
 }

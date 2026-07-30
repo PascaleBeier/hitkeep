@@ -1,5 +1,5 @@
 import { ApplicationConfig, inject, isDevMode, provideBrowserGlobalErrorListeners, provideEnvironmentInitializer, provideZonelessChangeDetection } from '@angular/core';
-import { PreloadAllModules, provideRouter, withNavigationErrorHandler, withPreloading } from '@angular/router';
+import { PreloadAllModules, provideRouter, withComponentInputBinding, withNavigationErrorHandler, withPreloading } from '@angular/router';
 import { provideOptimus } from '@openng/optimus-ui/config';
 import { en } from '@openng/optimus-ui-locale/js/en.js';
 
@@ -27,6 +27,7 @@ export const appConfig: ApplicationConfig = {
         provideRouter(
             routes,
             withPreloading(PreloadAllModules),
+            withComponentInputBinding({ unmatchedInputBehavior: 'undefinedIfStale' }),
             withNavigationErrorHandler((error) => inject(ApplicationErrorNavigationService).fromNavigation(error))
         ),
         provideOptimus({

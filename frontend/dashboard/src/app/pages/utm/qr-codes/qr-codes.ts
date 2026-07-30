@@ -1,8 +1,8 @@
 import { Clipboard } from '@angular/cdk/clipboard';
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, input, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormControl, FormGroup, FormsModule, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ConfirmationService, MenuItem } from '@openng/optimus-ui/api';
 import { ButtonModule } from '@openng/optimus-ui/button';
@@ -19,7 +19,6 @@ import { SplitButtonModule } from '@openng/optimus-ui/splitbutton';
 import { TableModule } from '@openng/optimus-ui/table';
 import { TagModule } from '@openng/optimus-ui/tag';
 import { TextareaModule } from '@openng/optimus-ui/textarea';
-import { map } from 'rxjs';
 import { buildTakeoutExportMenuItems, TakeoutExportFormat } from '@core/export/export-formats';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { CopyControl } from '@components/copy-control/copy-control';
@@ -107,7 +106,6 @@ export class QRCodesPage {
     protected readonly siteService = inject(SiteService);
     private readonly service = inject(QRCodesService);
     private readonly share = inject(ShareService);
-    private readonly route = inject(ActivatedRoute);
     private readonly router = inject(Router);
     private readonly transloco = inject(TranslocoService);
     private readonly destroyRef = inject(DestroyRef);
@@ -145,10 +143,10 @@ export class QRCodesPage {
     private statsRequestID = 0;
     private sharesRequestID = 0;
 
-    private readonly routeQRID = toSignal(this.route.paramMap.pipe(map((params) => params.get('qrID'))), { initialValue: this.route.snapshot.paramMap.get('qrID') });
+    protected readonly qrID = input<string>();
 
     protected readonly isShareMode = computed(() => this.share.isShareMode());
-    protected readonly isDetailRoute = computed(() => !!this.routeQRID());
+    protected readonly isDetailRoute = computed(() => !!this.qrID());
 
     protected readonly form = new FormGroup({
         name: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
@@ -168,7 +166,7 @@ export class QRCodesPage {
     private readonly formValue = toSignal(this.form.valueChanges, { initialValue: this.form.getRawValue() });
 
     protected readonly selectedQR = computed(() => {
-        const id = this.routeQRID();
+        const id = this.qrID();
         const items = this.qrs();
         if (id) return items.find((qr) => qr.id === id) ?? null;
         return null;

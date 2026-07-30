@@ -1,10 +1,10 @@
-import { Injectable, computed, inject } from '@angular/core';
+import { computed, inject, Service } from '@angular/core';
 import { SiteService } from '@features/sites/services/site.service';
 import { INSTANCE_ROLE_CAPABILITIES, InstanceCapability, SITE_ROLE_CAPABILITIES, SiteCapability, TEAM_ROLE_CAPABILITIES, TeamCapability } from '@core/access/capabilities';
 import { PermissionService } from '@services/permission.service';
 import { TeamService } from '@services/team.service';
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class AccessService {
     private readonly permissions = inject(PermissionService);
     private readonly sites = inject(SiteService);

@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { inject, signal, Service } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { defer, finalize, tap } from 'rxjs';
 
@@ -17,7 +17,7 @@ export interface UserOnboarding {
     steps: OnboardingStep[];
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class OnboardingService {
     private http = inject(HttpClient);
     private pendingLoads = 0;

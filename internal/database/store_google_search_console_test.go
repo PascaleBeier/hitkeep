@@ -12,14 +12,7 @@ import (
 
 func TestGoogleSearchConsoleConnectionRoundTripAndDisconnect(t *testing.T) {
 	ctx := context.Background()
-	store := NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	defer store.Close()
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store := newSharedTestFixtureStore(t)
 
 	userID, teamID := createGoogleSearchConsoleTestTeam(t, store)
 
@@ -74,14 +67,7 @@ func TestGoogleSearchConsoleConnectionRoundTripAndDisconnect(t *testing.T) {
 
 func TestGetGoogleSearchConsoleConnectionMissing(t *testing.T) {
 	ctx := context.Background()
-	store := NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	defer store.Close()
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store := newSharedTestFixtureStore(t)
 
 	conn, err := store.GetGoogleSearchConsoleConnection(ctx, uuid.New())
 	if err != nil {
@@ -94,14 +80,7 @@ func TestGetGoogleSearchConsoleConnectionMissing(t *testing.T) {
 
 func TestPruneGoogleSearchConsoleErrorMessagesRetainsMetadataAndRecentPayloads(t *testing.T) {
 	ctx := context.Background()
-	store := NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	defer store.Close()
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store := newSharedTestFixtureStore(t)
 
 	userID, teamID := createGoogleSearchConsoleTestTeam(t, store)
 	oldSite, err := store.CreateSite(ctx, userID, "old-gsc-error.example.com")
@@ -181,14 +160,7 @@ func TestPruneGoogleSearchConsoleErrorMessagesRetainsMetadataAndRecentPayloads(t
 
 func TestGoogleSearchConsoleMappingWithAuditRollsBackWhenAuditFails(t *testing.T) {
 	ctx := context.Background()
-	store := NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	defer store.Close()
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store := newSharedTestFixtureStore(t)
 
 	userID, teamID := createGoogleSearchConsoleTestTeam(t, store)
 	site, err := store.CreateSite(ctx, userID, "audit-rollback.example.com")
@@ -233,14 +205,7 @@ func TestGoogleSearchConsoleMappingWithAuditRollsBackWhenAuditFails(t *testing.T
 
 func TestListGoogleSearchConsoleSyncCandidatesSelectsDueConnectedMappings(t *testing.T) {
 	ctx := context.Background()
-	store := NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	defer store.Close()
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store := newSharedTestFixtureStore(t)
 
 	now := time.Date(2026, 5, 5, 12, 0, 0, 0, time.UTC)
 	connectedUserID, connectedTeamID := createGoogleSearchConsoleNamedTeam(t, store, "gsc-connected@test.dev", "Connected GSC Team")

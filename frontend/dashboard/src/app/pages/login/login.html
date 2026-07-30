@@ -2,7 +2,7 @@
     <section class="hk-auth-shell" aria-labelledby="login-title">
         <app-auth-card>
             <header class="hk-auth-header">
-                <app-brand size="large"></app-brand>
+                <app-brand size="large" />
                 <h1 id="login-title" class="hk-auth-title">{{ "login.signIn" | transloco }}</h1>
                 <p class="hk-auth-subtitle">{{ authSubtitleKey() | transloco }}</p>
             </header>
@@ -57,14 +57,14 @@
                         [fluid]="true"
                         [class.ng-invalid]="loginForm.password().touched() && loginForm.password().invalid()"
                         [class.ng-dirty]="loginForm.password().dirty()"
-                    ></p-password>
+                    />
                     @if (loginForm.password().touched() && loginForm.password().invalid()) {
                     <p-message severity="error" variant="simple" size="small" role="status">{{ "login.passwordRequired" | transloco }}</p-message>
                     }
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <p-checkbox [formControl]="loginForm.rememberMe().control()" [binary]="true" inputId="rememberMe" [attr.aria-describedby]="'rememberMeHelp'"></p-checkbox>
+                    <p-checkbox [formControl]="loginForm.rememberMe().control()" [binary]="true" inputId="rememberMe" [attr.aria-describedby]="'rememberMeHelp'" />
                     <label for="rememberMe" class="text-sm text-[var(--p-text-color)] cursor-pointer select-none">{{ "login.rememberMe" | transloco }}</label>
                     <p-button
                         id="rememberMeHelp"

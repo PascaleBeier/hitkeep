@@ -68,7 +68,7 @@
                 <small class="site-exclusions__error-text">{{ "sites.exclusions.errors.invalidPath" | transloco }}</small>
                 }
             </div>
-            } @default {
+            } @case ("cidr") {
             <div class="site-settings-field">
                 <label for="site-exclusion-cidr">{{ "sites.exclusions.cidrLabel" | transloco }}</label>
                 <input id="site-exclusion-cidr" pInputText formControlName="cidr" [placeholder]="'sites.exclusions.cidrPlaceholder' | transloco" />
@@ -76,7 +76,7 @@
                 <small class="site-exclusions__error-text">{{ "sites.exclusions.errors.invalidCidr" | transloco }}</small>
                 }
             </div>
-            } }
+            } @default never; }
 
             <div class="site-settings-field">
                 <label for="site-exclusion-description">{{ "sites.exclusions.descriptionLabel" | transloco }}</label>

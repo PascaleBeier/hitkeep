@@ -9,14 +9,7 @@ import (
 )
 
 func TestCreateManagedCloudAccountDoesNotJoinDefaultTenant(t *testing.T) {
-	store := NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	defer store.Close()
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
+	store := newSharedTestFixtureStore(t)
 
 	account, err := store.CreateManagedCloudAccount(context.Background(), CreateManagedCloudAccountInput{
 		Email:          "cloud-owner@example.com",
@@ -45,14 +38,7 @@ func TestCreateManagedCloudAccountDoesNotJoinDefaultTenant(t *testing.T) {
 }
 
 func TestUpsertCloudBillingAccountRoundTrips(t *testing.T) {
-	store := NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	defer store.Close()
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
+	store := newSharedTestFixtureStore(t)
 
 	account, err := store.CreateManagedCloudAccount(context.Background(), CreateManagedCloudAccountInput{
 		Email:          "billing-owner@example.com",
@@ -105,14 +91,7 @@ func TestUpsertCloudBillingAccountRoundTrips(t *testing.T) {
 }
 
 func TestRecordCloudConversionEventsPreservesIntentAndDeduplicatesMilestones(t *testing.T) {
-	store := NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	defer store.Close()
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
+	store := newSharedTestFixtureStore(t)
 
 	account, err := store.CreateManagedCloudAccount(context.Background(), CreateManagedCloudAccountInput{
 		Email:          "conversion-owner@example.com",
@@ -165,14 +144,7 @@ func TestRecordCloudConversionEventsPreservesIntentAndDeduplicatesMilestones(t *
 }
 
 func TestCloudBillingEventsAreIdempotentAndTrackStatus(t *testing.T) {
-	store := NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	defer store.Close()
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
+	store := newSharedTestFixtureStore(t)
 
 	account, err := store.CreateManagedCloudAccount(context.Background(), CreateManagedCloudAccountInput{
 		Email:          "events-owner@example.com",

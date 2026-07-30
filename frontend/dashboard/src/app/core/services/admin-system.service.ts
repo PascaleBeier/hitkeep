@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { inject, Service } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 
 export interface SystemFeatureStatus {
@@ -267,7 +267,7 @@ export interface AuditFilterParams {
 
 const AUDIT_EXPORT_LIMIT = 50000;
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class AdminSystemService {
     private http = inject(HttpClient);
 

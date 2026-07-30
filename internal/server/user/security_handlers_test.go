@@ -20,18 +20,13 @@ import (
 	serverauth "hitkeep/internal/server/auth"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/testutil"
+	"hitkeep/internal/testutil/testdb"
 )
 
 func setupUserSecurityTestEnv(t *testing.T) (*handler, *database.Store, uuid.UUID) {
 	t.Helper()
 
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("failed to connect to test db: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("failed to migrate test db: %v", err)
-	}
+	store := testdb.Shared(t)
 
 	hashed, err := serverauth.HashPassword("password123")
 	if err != nil {

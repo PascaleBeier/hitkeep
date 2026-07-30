@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { provideRouter } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 
 import { ReportConfirmation } from './report-confirmation';
@@ -38,13 +38,14 @@ describe('ReportConfirmation', () => {
                     translocoConfig: { availableLangs: ['en'], defaultLang: 'en' }
                 })
             ],
-            providers: [provideHttpClient(), provideHttpClientTesting(), { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({ token: 'opaque-token' }) } } }]
+            providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])]
         }).compileComponents();
         fixture = TestBed.createComponent(ReportConfirmation);
+        fixture.componentRef.setInput('token', 'opaque-token');
         http = TestBed.inject(HttpTestingController);
     });
 
-    afterEach(() => http.verify());
+    afterEach(() => http?.verify());
 
     it('loads non-sensitive metadata without mutating consent, then confirms by POST', () => {
         fixture.detectChanges();
@@ -78,5 +79,48 @@ describe('ReportConfirmation', () => {
         http.expectOne('/api/report-recipient-confirmations/opaque-token').flush({ code: 'confirmation_expired' }, { status: 410, statusText: 'Gone' });
         fixture.detectChanges();
         expect(fixture.nativeElement.textContent).toContain('Ask for a resend');
+    });
+
+    it('cancels the stale request and loads metadata for a changed query token', () => {
+        fixture.detectChanges();
+        const stale = http.expectOne('/api/report-recipient-confirmations/opaque-token');
+
+        fixture.componentRef.setInput('token', 'replacement-token');
+        fixture.detectChanges();
+
+        expect(stale.cancelled).toBe(true);
+        const replacement = http.expectOne('/api/report-recipient-confirmations/replacement-token');
+        replacement.flush({
+            report_name: 'Replacement report',
+            team_name: 'Agency',
+            preset: 'site_summary',
+            schedule: { frequency: 'daily', timezone: 'UTC', local_time: '08:00' },
+            sites: [],
+            expires_at: '2026-07-26T08:00:00Z'
+        });
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.textContent).toContain('Replacement report');
+    });
+
+    it('cancels an in-flight decision when the query token changes', () => {
+        fixture.detectChanges();
+        http.expectOne('/api/report-recipient-confirmations/opaque-token').flush({
+            report_name: 'Client pulse',
+            team_name: 'Agency',
+            preset: 'site_summary',
+            schedule: { frequency: 'daily', timezone: 'UTC', local_time: '08:00' },
+            sites: [],
+            expires_at: '2026-07-26T08:00:00Z'
+        });
+
+        (fixture.componentInstance as unknown as { decide(action: 'confirm'): void }).decide('confirm');
+        const decision = http.expectOne('/api/report-recipient-confirmations/opaque-token');
+
+        fixture.componentRef.setInput('token', 'replacement-token');
+        fixture.detectChanges();
+
+        expect(decision.cancelled).toBe(true);
+        http.expectOne('/api/report-recipient-confirmations/replacement-token').flush({ code: 'confirmation_expired' }, { status: 410, statusText: 'Gone' });
     });
 });

@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { inject, Service } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { ShareService } from './share.service';
@@ -121,7 +121,7 @@ type OpportunityDigestPreviewPayload = Omit<OpportunityDigestPreviewResponse, 'i
     items?: (OpportunityDigestPreviewItemPayload | null)[] | null;
 };
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class OpportunitiesService {
     private readonly http = inject(HttpClient);
     private readonly shareService = inject(ShareService);

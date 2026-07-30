@@ -4,7 +4,6 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
-import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
@@ -130,7 +129,6 @@ describe('EcommercePage', () => {
         await TestBed.configureTestingModule({
             imports: [
                 EcommercePage,
-                NoopAnimationsModule,
                 TranslocoTestingModule.forRoot({
                     langs: {
                         en: {

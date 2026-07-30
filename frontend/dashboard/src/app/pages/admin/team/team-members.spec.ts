@@ -3,7 +3,7 @@ import { signal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute, Router } from '@angular/router';
-import { BehaviorSubject, EMPTY, Subject, of } from 'rxjs';
+import { EMPTY, Subject, of } from 'rxjs';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { provideTranslocoLocale } from '@jsverse/transloco-locale';
 import { vi } from 'vitest';
@@ -36,11 +36,7 @@ interface TeamMembersTestAccess {
 describe('TeamMembersPage', () => {
     let fixture: ComponentFixture<TeamMembersPage>;
     let component: TeamMembersPage;
-    const routeData = new BehaviorSubject<Record<string, unknown>>({});
-    const activatedRouteMock = {
-        data: routeData.asObservable(),
-        snapshot: { data: {} }
-    };
+    const activatedRouteMock = {};
     const routerMock = {
         events: EMPTY,
         navigate: vi.fn((commands: unknown[], extras?: unknown) => {
@@ -114,7 +110,6 @@ describe('TeamMembersPage', () => {
     };
 
     beforeEach(async () => {
-        routeData.next({});
         routerMock.navigate.mockClear();
         permissionServiceMock.permissions.set({
             instance_role: 'user',
@@ -218,16 +213,20 @@ describe('TeamMembersPage', () => {
     });
 
     it('opens the invitation dialog when activated through the invite child route', () => {
-        routeData.next({ openInvite: true });
+        fixture.componentRef.setInput('openInvite', true);
         fixture.detectChanges();
 
         expect(document.body.querySelector('#team-member-email')).toBeTruthy();
         expect(document.body.textContent).toContain('Invite team member');
+
+        fixture.componentRef.setInput('openInvite', false);
+        fixture.detectChanges();
+        expect((component as unknown as TeamMembersTestAccess).isInviteDialogVisible()).toBe(false);
     });
 
     it('invites a member from the dialog and returns feedback to the member surface', () => {
         const access = component as unknown as TeamMembersTestAccess;
-        routeData.next({ openInvite: true });
+        fixture.componentRef.setInput('openInvite', true);
         fixture.detectChanges();
 
         access.inviteForm.email().control().setValue('New.Member@Example.com');
@@ -255,7 +254,7 @@ describe('TeamMembersPage', () => {
             active_team_capabilities: []
         });
 
-        routeData.next({ openInvite: true });
+        fixture.componentRef.setInput('openInvite', true);
         fixture.detectChanges();
         await fixture.whenStable();
 

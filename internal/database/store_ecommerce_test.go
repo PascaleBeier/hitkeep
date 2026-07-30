@@ -11,14 +11,7 @@ import (
 )
 
 func TestGetEcommerceSummaryAndBreakdowns(t *testing.T) {
-	store := NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
-	defer store.Close()
+	store := newSharedTestFixtureStore(t)
 
 	ctx := context.Background()
 	userID, err := store.CreateUser(ctx, "ecommerce@test.dev", "hash")
@@ -259,14 +252,7 @@ func TestGetEcommerceSummaryAndBreakdowns(t *testing.T) {
 func TestGetEcommerceSummaryWithoutPurchasesLeavesCurrencyEmpty(t *testing.T) {
 	t.Parallel()
 
-	store := NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
-	defer store.Close()
+	store := newSharedTestFixtureStore(t)
 
 	ctx := context.Background()
 	userID, err := store.CreateUser(ctx, "empty-ecommerce@test.dev", "hash")

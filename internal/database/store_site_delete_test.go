@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -11,17 +10,7 @@ import (
 
 func TestDeleteSiteRemovesAllSiteData(t *testing.T) {
 	ctx := context.Background()
-	dbPath := filepath.Join(t.TempDir(), "delete-site.db")
-
-	store := NewStore(dbPath)
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store := newSharedTestFixtureStore(t)
 
 	siteID, goalID, funnelID := seedSiteData(t, ctx, store)
 
@@ -48,17 +37,7 @@ func TestDeleteSiteRemovesAllSiteData(t *testing.T) {
 
 func TestResetSiteStatsClearsMeasuredDataOnly(t *testing.T) {
 	ctx := context.Background()
-	dbPath := filepath.Join(t.TempDir(), "reset-site-stats.db")
-
-	store := NewStore(dbPath)
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store := newSharedTestFixtureStore(t)
 
 	siteID, goalID, funnelID := seedSiteData(t, ctx, store)
 	seedSiteStatsResetData(t, ctx, store, siteID)

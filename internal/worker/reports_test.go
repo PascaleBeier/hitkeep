@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"maps"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/reporting"
+	"hitkeep/internal/testutil/testdb"
 )
 
 type capturedScheduledReport struct {
@@ -351,15 +351,7 @@ func setupDueReportWorkerFixture(t *testing.T, store *database.Store, email stri
 
 func setupReportContentStore(t *testing.T) *database.Store {
 	t.Helper()
-	store := database.NewStore(filepath.Join(t.TempDir(), "report-content.db"))
-	if err := store.Connect(); err != nil {
-		t.Fatal(err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-	return store
+	return testdb.Shared(t)
 }
 
 func reportingPeriod(schedule api.ReportSchedule, scheduledFor time.Time) (time.Time, time.Time, time.Time, time.Time, error) {

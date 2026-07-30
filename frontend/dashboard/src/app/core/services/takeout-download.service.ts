@@ -1,9 +1,9 @@
 import { HttpClient, HttpResponse } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
+import { inject, Service } from '@angular/core';
 import { buildTakeoutExportFilename, TakeoutExportFormat } from '@core/export/export-formats';
 import { map, Observable } from 'rxjs';
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class TakeoutDownloadService {
     private http = inject(HttpClient);
 

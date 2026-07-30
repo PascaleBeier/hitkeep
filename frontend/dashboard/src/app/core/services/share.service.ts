@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { computed, inject, signal, Service } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { tap } from 'rxjs';
 import { Site } from '@models/analytics.types';
@@ -16,7 +16,7 @@ export interface ShareLinkResponse extends ShareLink {
     token: string;
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class ShareService {
     private http = inject(HttpClient);
 

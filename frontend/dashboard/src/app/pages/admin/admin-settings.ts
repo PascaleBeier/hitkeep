@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 
 import { DecimalPipe } from '@angular/common';
@@ -17,7 +17,7 @@ import { TagModule } from '@openng/optimus-ui/tag';
 import { TooltipModule } from '@openng/optimus-ui/tooltip';
 import { HttpClient } from '@angular/common/http';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ActivatedRoute, Router } from '@angular/router';
+import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { dialogCancelButton, dialogDangerButton, dialogWarnButton } from '@components/dialog-actions/dialog-actions';
 import { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
@@ -151,7 +151,6 @@ export class AdminSettings implements OnInit {
     private http = inject(HttpClient);
     private confirmationService = inject(ConfirmationService);
     private transloco = inject(TranslocoService);
-    private route = inject(ActivatedRoute);
     private router = inject(Router);
     private destroyRef = inject(DestroyRef);
     private profile = inject(UserProfileService);
@@ -163,7 +162,7 @@ export class AdminSettings implements OnInit {
 
     protected activeAdminTab = signal<AdminStatusTab>('runtime');
     protected activeSettingsTab = signal<AdminSettingsTab>('users');
-    private routeData = toSignal(this.route.data, { initialValue: this.route.snapshot.data });
+    protected readonly adminPage = input<'status' | 'settings'>();
     private loadedRuntime = signal(false);
     private loadedOperations = signal(false);
     private loadedActivation = signal(false);
@@ -400,8 +399,8 @@ export class AdminSettings implements OnInit {
         if (status.status === 'needs_attention') return 'needsAttention';
         return 'ready';
     });
-    protected readonly pageTitleKey = computed(() => (this.routeData()['adminPage'] === 'settings' ? 'nav.systemSettings' : 'nav.systemStatus'));
-    protected readonly isSettingsPage = computed(() => this.routeData()['adminPage'] === 'settings');
+    protected readonly pageTitleKey = computed(() => (this.adminPage() === 'settings' ? 'nav.systemSettings' : 'nav.systemStatus'));
+    protected readonly isSettingsPage = computed(() => this.adminPage() === 'settings');
 
     protected users = signal<User[]>([]);
     protected sites = signal<Site[]>([]);

@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { inject, Service } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 
 export interface GoogleSearchConsoleStatus {
@@ -98,7 +98,7 @@ export interface SearchConsoleDimensionResponse {
     rows: SearchConsoleDimensionRow[];
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class GoogleSearchConsoleService {
     private http = inject(HttpClient);
 

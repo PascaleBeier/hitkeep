@@ -101,7 +101,7 @@
         </div>
 
         <div settings-card-body class="tracking-install">
-            @switch (installMethod()) { @case ("script") {
+            @let currentInstallMethod = installMethod(); @switch (currentInstallMethod) { @case ("script") {
             <p class="tracking-install__description">{{ "sites.tracking.install.script.description" | transloco }}</p>
             <app-code-block [code]="snippetCode()" [wrap]="true" data-testid="tracking-snippet" />
 
@@ -149,7 +149,7 @@
                                 <label id="collect-dnt-label" for="collect-dnt-switch" class="site-settings-toggle-row__title">{{ "sites.tracking.collectDntLabel" | transloco }}</label>
                                 <span class="site-settings-field-hint">{{ "sites.tracking.collectDntDescription" | transloco }}</span>
                             </div>
-                            <p-toggleswitch inputId="collect-dnt-switch" ariaLabelledBy="collect-dnt-label" styleClass="shrink-0" [formControl]="trackingForm.collectDnt().control()"></p-toggleswitch>
+                            <p-toggleswitch inputId="collect-dnt-switch" ariaLabelledBy="collect-dnt-label" styleClass="shrink-0" [formControl]="trackingForm.collectDnt().control()" />
                         </div>
 
                         <div class="site-settings-toggle-row">
@@ -157,7 +157,7 @@
                                 <label id="disable-beacon-label" for="disable-beacon-switch" class="site-settings-toggle-row__title">{{ "sites.tracking.disableBeaconLabel" | transloco }}</label>
                                 <span class="site-settings-field-hint">{{ "sites.tracking.disableBeaconDescription" | transloco }}</span>
                             </div>
-                            <p-toggleswitch inputId="disable-beacon-switch" ariaLabelledBy="disable-beacon-label" styleClass="shrink-0" [formControl]="trackingForm.disableBeacon().control()"></p-toggleswitch>
+                            <p-toggleswitch inputId="disable-beacon-switch" ariaLabelledBy="disable-beacon-label" styleClass="shrink-0" [formControl]="trackingForm.disableBeacon().control()" />
                         </div>
 
                         <div class="site-settings-toggle-row">
@@ -165,7 +165,7 @@
                                 <label id="web-vitals-label" for="web-vitals-switch" class="site-settings-toggle-row__title">{{ "sites.tracking.webVitalsLabel" | transloco }}</label>
                                 <span class="site-settings-field-hint">{{ "sites.tracking.webVitalsDescription" | transloco }}</span>
                             </div>
-                            <p-toggleswitch inputId="web-vitals-switch" ariaLabelledBy="web-vitals-label" styleClass="shrink-0" [formControl]="trackingForm.enableWebVitals().control()"></p-toggleswitch>
+                            <p-toggleswitch inputId="web-vitals-switch" ariaLabelledBy="web-vitals-label" styleClass="shrink-0" [formControl]="trackingForm.enableWebVitals().control()" />
                         </div>
 
                         <div class="site-settings-subsection">
@@ -178,7 +178,7 @@
                                 <label id="outbound-tracking-label" for="outbound-tracking-switch" class="site-settings-toggle-row__title">{{ "sites.tracking.outboundTrackingLabel" | transloco }}</label>
                                 <span class="site-settings-field-hint">{{ "sites.tracking.outboundTrackingDescription" | transloco }}</span>
                             </div>
-                            <p-toggleswitch inputId="outbound-tracking-switch" ariaLabelledBy="outbound-tracking-label" styleClass="shrink-0" [formControl]="trackingForm.trackOutbound().control()"></p-toggleswitch>
+                            <p-toggleswitch inputId="outbound-tracking-switch" ariaLabelledBy="outbound-tracking-label" styleClass="shrink-0" [formControl]="trackingForm.trackOutbound().control()" />
                         </div>
 
                         <div class="site-settings-toggle-row">
@@ -186,7 +186,7 @@
                                 <label id="download-tracking-label" for="download-tracking-switch" class="site-settings-toggle-row__title">{{ "sites.tracking.downloadTrackingLabel" | transloco }}</label>
                                 <span class="site-settings-field-hint">{{ "sites.tracking.downloadTrackingDescription" | transloco }}</span>
                             </div>
-                            <p-toggleswitch inputId="download-tracking-switch" ariaLabelledBy="download-tracking-label" styleClass="shrink-0" [formControl]="trackingForm.trackDownloads().control()"></p-toggleswitch>
+                            <p-toggleswitch inputId="download-tracking-switch" ariaLabelledBy="download-tracking-label" styleClass="shrink-0" [formControl]="trackingForm.trackDownloads().control()" />
                         </div>
 
                         <div class="site-settings-toggle-row">
@@ -194,7 +194,7 @@
                                 <label id="form-tracking-label" for="form-tracking-switch" class="site-settings-toggle-row__title">{{ "sites.tracking.formTrackingLabel" | transloco }}</label>
                                 <span class="site-settings-field-hint">{{ "sites.tracking.formTrackingDescription" | transloco }}</span>
                             </div>
-                            <p-toggleswitch inputId="form-tracking-switch" ariaLabelledBy="form-tracking-label" styleClass="shrink-0" [formControl]="trackingForm.trackForms().control()"></p-toggleswitch>
+                            <p-toggleswitch inputId="form-tracking-switch" ariaLabelledBy="form-tracking-label" styleClass="shrink-0" [formControl]="trackingForm.trackForms().control()" />
                         </div>
                     </div>
                 </p-fieldset>
@@ -222,7 +222,7 @@
             <app-code-block [code]="serverIngestSnippet()" [wrap]="true" data-testid="tracking-server-snippet" />
             <p-message severity="info" styleClass="w-full">{{ "sites.tracking.install.server.tokenHint" | transloco }}</p-message>
 
-            } }
+            } @default never; }
 
             <div class="tracking-install__links">
                 @for (link of installLinks[installMethod()]; track link.testId) {

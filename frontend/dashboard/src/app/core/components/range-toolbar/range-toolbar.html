@@ -122,7 +122,7 @@
         />
     </div>
 
-    <ng-content select="[toolbar-right]"></ng-content>
+    <ng-content select="[toolbar-right]" />
 
     @if (retentionHintDays(); as days) {
     <p class="range-toolbar__retention-hint m-0 inline-flex basis-full flex-wrap items-center gap-1.5 text-sm text-[var(--p-text-muted-color)]" data-testid="range-retention-hint">

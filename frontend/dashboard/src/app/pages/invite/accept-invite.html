@@ -2,7 +2,7 @@
     <section class="hk-auth-shell" aria-labelledby="accept-invite-title">
         <app-auth-card>
             <header class="hk-auth-header">
-                <app-brand size="large"></app-brand>
+                <app-brand size="large" />
                 <h1 id="accept-invite-title" class="hk-auth-title">{{ "invite.accept.title" | transloco }}</h1>
                 <p class="hk-auth-subtitle">{{ "invite.accept.description" | transloco }}</p>
             </header>
@@ -11,7 +11,7 @@
             <p-message severity="error" role="alert" aria-live="assertive">{{ errorMessage()! | transloco }}</p-message>
             } @if (loginRequired()) {
             <p-message severity="info" role="status" aria-live="polite">{{ "invite.accept.loginRequired" | transloco }}</p-message>
-            <p-button [label]="'invite.accept.signIn' | transloco" type="button" class="w-full" (onClick)="goToLogin()"> </p-button>
+            <p-button [label]="'invite.accept.signIn' | transloco" type="button" class="w-full" (onClick)="goToLogin()" />
             } @if (isCheckingSession() || isAutoAccepting()) {
             <p-message severity="secondary" icon="pi pi-spin pi-spinner" role="status" aria-live="polite">{{ "invite.accept.checkingSession" | transloco }}</p-message>
             } @if (token && !loginRequired() && !isCheckingSession() && !isAutoAccepting()) { @if (authMethods().length > 0) {
@@ -31,14 +31,14 @@
                         class="w-full"
                         [attr.aria-invalid]="form.password().touched() && form.password().invalid() ? true : null"
                         [attr.aria-describedby]="'accept-invite-password-help'"
-                    ></p-password>
+                    />
                     <p id="accept-invite-password-help" class="hk-auth-field-help">{{ "invite.accept.minimumLength" | transloco }}</p>
                     @if (form.password().touched() && form.password().invalid()) {
                     <small class="hk-auth-field-error" role="status">{{ "invite.accept.minimumLength" | transloco }}</small>
                     }
                 </div>
 
-                <p-button [label]="'invite.accept.submit' | transloco" type="submit" [loading]="isLoading()" class="w-full" [disabled]="isLoading() || form().invalid()"> </p-button>
+                <p-button [label]="'invite.accept.submit' | transloco" type="submit" [loading]="isLoading()" class="w-full" [disabled]="isLoading() || form().invalid()" />
             </form>
             }
         </app-auth-card>

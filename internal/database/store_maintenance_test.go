@@ -34,7 +34,7 @@ func TestTenantStoreOpenedAfterStartMaintenanceRunsCheckpoints(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
-	shared := newSharedTestStore(t)
+	shared := newSharedMaintenanceTestStore(t)
 	mgr := NewTenantStoreManager(shared, t.TempDir())
 	t.Cleanup(func() { _ = mgr.Close() })
 	mgr.StartMaintenance(ctx)
@@ -52,7 +52,7 @@ func TestTenantStoreOpenedBeforeStartMaintenanceRunsCheckpoints(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
-	shared := newSharedTestStore(t)
+	shared := newSharedMaintenanceTestStore(t)
 	mgr := NewTenantStoreManager(shared, t.TempDir())
 	t.Cleanup(func() { _ = mgr.Close() })
 

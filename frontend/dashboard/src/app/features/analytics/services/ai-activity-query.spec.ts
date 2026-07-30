@@ -1,10 +1,10 @@
-import { DestroyRef } from '@angular/core';
+import { Injector } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Subject } from 'rxjs';
 import { vi } from 'vitest';
 
 import { AnalyticsService } from '@core/services/analytics.service';
-import { AIActivityQuery } from '@features/analytics/services/ai-activity-query';
+import { AIActivityQuery, type AIActivityQueryRequest } from '@features/analytics/services/ai-activity-query';
 import type { AIActivityReport } from '@models/analytics.types';
 import { emptyAIActivityReport } from '@testing/empty-ai-activity-report';
 
@@ -28,15 +28,20 @@ describe('AIActivityQuery', () => {
             })
         } as unknown as AnalyticsService;
 
-        return { query: new AIActivityQuery(analyticsService, TestBed.inject(DestroyRef)), responses, calls };
+        return { query: new AIActivityQuery(analyticsService, TestBed.inject(Injector)), responses, calls };
     }
 
     const request = { siteId: 'site-1', from: '2026-07-01T00:00:00Z', to: '2026-07-08T00:00:00Z' };
 
+    function load(query: AIActivityQuery, value: AIActivityQueryRequest = request, mode: 'blocking' | 'background' = 'blocking'): void {
+        query.load(value, mode);
+        TestBed.tick();
+    }
+
     it('forwards site, range, filters and comparison window to the analytics service', () => {
         const { query, responses, calls } = createQuery();
 
-        query.load({
+        load(query, {
             ...request,
             filters: [{ type: 'ai_bot', value: 'GPTBot' }],
             comparison: { from: '2026-06-24T00:00:00Z', to: '2026-07-01T00:00:00Z' }
@@ -53,12 +58,11 @@ describe('AIActivityQuery', () => {
         expect(query.isLoading()).toBe(false);
     });
 
-    it('keeps the visible loading flag off for background refreshes', () => {
+    it('keeps the visible loading flag off for background refreshes and runs the success hook', () => {
         const { query, responses } = createQuery();
         const onSuccess = vi.fn();
 
-        query.load({ ...request, onSuccess }, 'background');
-
+        load(query, { ...request, onSuccess }, 'background');
         expect(query.isLoading()).toBe(false);
 
         const report = emptyAIActivityReport({ ai_requests: 7 });
@@ -70,31 +74,46 @@ describe('AIActivityQuery', () => {
         expect(onSuccess).toHaveBeenCalledWith(report);
     });
 
-    it('applies only the last of two rapid loads', () => {
+    it('cancels the first of two rapid loads so only the latest can commit', () => {
         const { query, responses } = createQuery();
 
-        query.load({ ...request, filters: [{ type: 'ai_bot', value: 'GPTBot' }] });
-        query.load({ ...request, filters: [{ type: 'ai_bot', value: 'ClaudeBot' }] });
+        load(query, { ...request, filters: [{ type: 'ai_bot', value: 'GPTBot' }] });
+        load(query, { ...request, filters: [{ type: 'ai_bot', value: 'ClaudeBot' }] });
 
-        const stale = emptyAIActivityReport({ ai_requests: 111 });
+        expect(responses[0].observed).toBe(false);
+        expect(responses[1].observed).toBe(true);
+        responses[0].next(emptyAIActivityReport({ ai_requests: 111 }));
         const fresh = emptyAIActivityReport({ ai_requests: 222 });
-        responses[0].next(stale);
         responses[1].next(fresh);
 
         expect(query.report()).toBe(fresh);
         expect(query.report()?.ai_requests).toBe(222);
     });
 
-    it('leaves the report untouched when a request fails', () => {
+    it('preserves the last successful report when a later request fails', () => {
         const { query, responses } = createQuery();
         vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+        load(query);
+        const successful = emptyAIActivityReport({ ai_requests: 5 });
+        responses[0].next(successful);
+        responses[0].complete();
+
         const onSuccess = vi.fn();
+        load(query, { ...request, onSuccess });
+        responses[1].error(new Error('unavailable'));
 
-        query.load({ ...request, onSuccess });
-        responses[0].error(new Error('unavailable'));
-
-        expect(query.report()).toBeNull();
+        expect(query.report()).toBe(successful);
         expect(query.isLoading()).toBe(false);
         expect(onSuccess).not.toHaveBeenCalled();
+    });
+
+    it('tears down the active observable with its injector', () => {
+        const { query, responses } = createQuery();
+        load(query);
+        expect(responses[0].observed).toBe(true);
+
+        TestBed.resetTestingModule();
+        expect(responses[0].observed).toBe(false);
     });
 });

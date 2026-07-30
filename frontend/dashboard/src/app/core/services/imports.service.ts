@@ -1,5 +1,5 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
+import { inject, Service } from '@angular/core';
 
 export interface ImportProviderDescriptor {
     key: string;
@@ -138,7 +138,7 @@ export interface ImportListResponse {
     imports: ImportJob[];
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class ImportsService {
     private readonly http = inject(HttpClient);
 

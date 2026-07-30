@@ -1,4 +1,4 @@
-import { Injectable, inject, signal, computed } from '@angular/core';
+import { inject, signal, computed, Service } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { DOCUMENT } from '@angular/common';
 import { catchError, finalize, tap, throwError } from 'rxjs';
@@ -14,7 +14,7 @@ export interface UserProfile {
     avatar_url: string;
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class UserProfileService {
     private http = inject(HttpClient);
     private auth = inject(AuthService);

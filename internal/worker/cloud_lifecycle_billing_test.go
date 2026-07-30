@@ -5,7 +5,6 @@ package worker
 import (
 	"context"
 	"errors"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/mailer"
+	"hitkeep/internal/testutil/testdb"
 )
 
 type cloudLifecycleWorkerMailDriver struct {
@@ -178,15 +178,7 @@ func TestCloudLifecycleWorkerUsesConfiguredLinks(t *testing.T) {
 
 func setupCloudLifecycleWorkerStore(t *testing.T) (*database.Store, *database.TenantStoreManager) {
 	t.Helper()
-	dbPath := filepath.Join(t.TempDir(), "hitkeep.db")
-	store := database.NewStore(dbPath)
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
+	store := testdb.Shared(t)
 	return store, database.NewTenantStoreManager(store, t.TempDir())
 }
 

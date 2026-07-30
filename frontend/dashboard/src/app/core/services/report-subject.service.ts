@@ -1,4 +1,4 @@
-import { Injectable, Signal, computed, inject, linkedSignal, signal } from '@angular/core';
+import { Signal, computed, inject, linkedSignal, signal, Service } from '@angular/core';
 
 /**
  * Identity of what the analytics surfaces are currently reporting on. A date
@@ -6,7 +6,7 @@ import { Injectable, Signal, computed, inject, linkedSignal, signal } from '@ang
  * reloads may keep the previous values on screen. A different site is a
  * different subject and has to start over from an empty surface.
  */
-@Injectable({ providedIn: 'root' })
+@Service()
 export class ReportSubjectService {
     private readonly current = signal('');
 

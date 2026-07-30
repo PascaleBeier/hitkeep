@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { computed, inject, signal, Service } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { finalize, of, tap } from 'rxjs';
 import { CustomTrackingDomain, Team, TeamAuditListResponse, TeamInvite, TeamMember, TeamRole, TeamSSOConfig, UpdateTeamSSORequest, UserTeamsResponse } from '@models/analytics.types';
@@ -44,7 +44,7 @@ interface UpdateTrackingDomainRequest {
     enabled: boolean;
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class TeamService {
     private http = inject(HttpClient);
 

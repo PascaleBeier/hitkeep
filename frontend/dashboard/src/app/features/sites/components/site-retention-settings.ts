@@ -29,8 +29,7 @@ import { Site } from '@models/analytics.types';
                     <div class="site-settings-field">
                         <label for="retentionDays">{{ "sites.retention.periodLabel" | transloco }}</label>
                         <div class="site-settings-inline-control site-settings-inline-control--retention">
-                            <p-inputnumber
-                                inputId="retentionDays"
+                            <p-inputnumber inputId="retentionDays"
                                 [formControl]="retentionForm.retentionDays().control()"
                                 [min]="1"
                                 [max]="3650"
@@ -42,8 +41,7 @@ import { Site } from '@models/analytics.types';
                                 incrementButtonIcon="pi pi-plus"
                                 decrementButtonIcon="pi pi-minus"
                                 styleClass="site-settings-number-input"
-                            >
-                            </p-inputnumber>
+                             />
                             <span class="site-settings-field-hint">{{ "sites.retention.hotDataSuffix" | transloco }}</span>
                         </div>
                         <small class="site-settings-field-hint">{{ "sites.retention.defaultHint" | transloco }}</small>

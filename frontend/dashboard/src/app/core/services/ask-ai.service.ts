@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Service } from '@angular/core';
 import { Observable, Subscriber } from 'rxjs';
 import { AskAIRequest, AskAIStatus, AskAIStreamEvent } from '@models/analytics.types';
 
@@ -12,7 +12,7 @@ export class AskAIStreamStatusError extends Error {
     }
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class AskAIService {
     askStream(siteId: string, request: AskAIRequest): Observable<AskAIStreamEvent> {
         return new Observable<AskAIStreamEvent>((subscriber) => {

@@ -64,12 +64,12 @@
                     class="w-full"
                     [class.ng-invalid]="form.currentPassword().touched() && form.currentPassword().invalid()"
                     [class.ng-dirty]="form.currentPassword().dirty()"
-                ></p-password>
+                />
             </div>
 
             <div class="flex flex-col gap-2">
                 <label for="newPassword" class="text-sm font-medium">{{ "settings.security.newPasswordLabel" | transloco }}</label>
-                <p-password id="newPassword" [formControl]="form.newPassword().control()" [toggleMask]="true" [feedback]="false" class="w-full"></p-password>
+                <p-password id="newPassword" [formControl]="form.newPassword().control()" [toggleMask]="true" [feedback]="false" class="w-full" />
                 <small class="text-xs text-muted-color">{{ "settings.security.minimumLengthHint" | transloco }}</small>
             </div>
         </form>

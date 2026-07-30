@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, resource, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
+import { rxResource, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { TranslocoLocaleService } from '@jsverse/transloco-locale';
@@ -13,7 +13,6 @@ import { TeamService } from '@services/team.service';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { AnalyticsService } from '@services/analytics.service';
 import { BillingInterval, CloudService } from '@services/cloud.service';
-import { firstValueFrom } from 'rxjs';
 
 import { CloudPlanTier, TeamPlan, TeamRole } from '@models/analytics.types';
 import { AdminItemList, type AdminItemListEntry } from '../components/admin-item-list';
@@ -42,10 +41,10 @@ export class TeamOverviewPage {
     protected readonly teamService = inject(TeamService);
 
     protected readonly team = this.teamService.activeTeam;
-    protected readonly systemStatusResource = resource({
-        loader: () => firstValueFrom(this.analyticsService.getSystemStatus())
+    protected readonly systemStatusResource = rxResource({
+        stream: () => this.analyticsService.getSystemStatus()
     });
-    protected readonly systemStatus = computed(() => this.systemStatusResource.value() ?? null);
+    protected readonly systemStatus = computed(() => (this.systemStatusResource.hasValue() ? this.systemStatusResource.value() : null));
     protected readonly planTiers = signal<CloudPlanTier[]>([]);
     protected readonly portalPending = signal(false);
     protected readonly checkoutPending = signal(false);

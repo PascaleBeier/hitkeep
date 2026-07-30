@@ -1,6 +1,5 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
-import { finalize } from 'rxjs';
+import { ChangeDetectionStrategy, Component, effect, inject, input, signal } from '@angular/core';
+import { finalize, Subscription } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { MessageModule } from '@openng/optimus-ui/message';
@@ -21,30 +20,46 @@ type ConfirmationState = 'loading' | 'ready' | 'submitting' | 'confirmed' | 'dec
 })
 export class ReportConfirmation {
     private readonly service = inject(ReportDefinitionsService);
-    private readonly token = inject(ActivatedRoute).snapshot.queryParamMap.get('token')?.trim() ?? '';
+    private decisionRequest: Subscription | null = null;
+    protected readonly token = input<string>();
 
     protected readonly state = signal<ConfirmationState>('loading');
     protected readonly confirmation = signal<ReportRecipientConfirmation | null>(null);
 
     constructor() {
-        if (!this.token) {
-            this.state.set('invalid');
-            return;
-        }
-        this.service.confirmation(this.token).subscribe({
-            next: (confirmation) => {
-                this.confirmation.set(confirmation);
-                this.state.set('ready');
-            },
-            error: () => this.state.set('invalid')
+        effect((onCleanup) => {
+            const token = this.token()?.trim();
+            this.decisionRequest?.unsubscribe();
+            this.decisionRequest = null;
+            this.confirmation.set(null);
+            if (!token) {
+                this.state.set('invalid');
+                return;
+            }
+
+            this.state.set('loading');
+            const subscription = this.service.confirmation(token).subscribe({
+                next: (confirmation) => {
+                    this.confirmation.set(confirmation);
+                    this.state.set('ready');
+                },
+                error: () => this.state.set('invalid')
+            });
+            onCleanup(() => {
+                subscription.unsubscribe();
+                this.decisionRequest?.unsubscribe();
+                this.decisionRequest = null;
+            });
         });
     }
 
     protected decide(action: 'confirm' | 'decline'): void {
         if (this.state() !== 'ready') return;
+        const token = this.token()?.trim();
+        if (!token) return;
         this.state.set('submitting');
-        this.service
-            .decideConfirmation(this.token, action)
+        this.decisionRequest = this.service
+            .decideConfirmation(token, action)
             .pipe(finalize(() => this.state.update((state) => (state === 'submitting' ? 'invalid' : state))))
             .subscribe({
                 next: () => this.state.set(action === 'confirm' ? 'confirmed' : 'declined'),

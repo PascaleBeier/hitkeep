@@ -11,15 +11,7 @@ import (
 func TestUpdateSiteDomainKeepsForeignKeyReferences(t *testing.T) {
 	ctx := context.Background()
 
-	store := NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store := newSharedTestFixtureStore(t)
 
 	userID, err := store.CreateUser(ctx, "domain-update@example.com", "hashed_secret")
 	if err != nil {

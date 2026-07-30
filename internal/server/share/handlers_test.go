@@ -16,6 +16,7 @@ import (
 	"hitkeep/internal/database"
 	"hitkeep/internal/exportfmt"
 	"hitkeep/internal/server/shared"
+	"hitkeep/internal/testutil/testdb"
 )
 
 func newShareTestContext(t *testing.T, store *database.Store) *shared.Context {
@@ -106,13 +107,7 @@ func TestHandleGetShareSiteStatsIncludesGeoNetworkAggregates(t *testing.T) {
 
 func TestShareOpportunitiesListIsScopedToShareTokenSite(t *testing.T) {
 	ctx := context.Background()
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store := testdb.Shared(t)
 	t.Cleanup(func() { _ = store.Close() })
 
 	userID, err := store.CreateUser(ctx, "share-opportunities@example.com", "hash")
@@ -178,13 +173,7 @@ func TestShareOpportunitiesListIsScopedToShareTokenSite(t *testing.T) {
 
 func TestShareOpportunitiesListReturnsEmptyArrayWhenNoRowsExist(t *testing.T) {
 	ctx := context.Background()
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store := testdb.Shared(t)
 	t.Cleanup(func() { _ = store.Close() })
 
 	userID, err := store.CreateUser(ctx, "share-opportunities-empty@example.com", "hash")
@@ -267,13 +256,7 @@ func setupShareEventsTestEnv(t *testing.T) (*handler, *database.Store, string, u
 	t.Helper()
 
 	ctx := context.Background()
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store := testdb.Shared(t)
 
 	userID, err := store.CreateUser(ctx, "share-events@example.com", "hash")
 	if err != nil {
@@ -615,13 +598,7 @@ func setupShareEcommerceTestEnv(t *testing.T) (*handler, *database.Store, string
 	t.Helper()
 
 	ctx := context.Background()
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store := testdb.Shared(t)
 
 	userID, err := store.CreateUser(ctx, "share-ecom@example.com", "hash")
 	if err != nil {
@@ -841,13 +818,7 @@ func setupShareWebVitalsTestEnv(t *testing.T) (*handler, *database.Store, string
 	t.Helper()
 
 	ctx := context.Background()
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store := testdb.Shared(t)
 
 	userID, err := store.CreateUser(ctx, "share-vitals@example.com", "hash")
 	if err != nil {
@@ -992,13 +963,7 @@ func setupShareExportTestEnv(t *testing.T) (*handler, *database.Store, string, u
 	t.Helper()
 
 	ctx := context.Background()
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("failed to connect to test db: %v", err)
-	}
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("failed to migrate test db: %v", err)
-	}
+	store := testdb.Shared(t)
 
 	userID, err := store.CreateUser(ctx, "share-export@example.com", "hash")
 	if err != nil {

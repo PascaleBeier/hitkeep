@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { DestroyRef, Injectable, computed, effect, inject, signal } from '@angular/core';
+import { DestroyRef, computed, effect, inject, signal, Service } from '@angular/core';
 import { Subject } from 'rxjs';
 import { SiteService } from '@features/sites/services/site.service';
 import { ShareService } from '@services/share.service';
@@ -46,7 +46,7 @@ export interface RealtimeEvent {
     counts: Partial<Record<RealtimeKind, number>>;
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class RealtimeService {
     private readonly siteService = inject(SiteService);
     private readonly shareService = inject(ShareService);

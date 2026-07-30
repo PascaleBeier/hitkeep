@@ -10,19 +10,14 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	"hitkeep/internal/testutil/testdb"
 )
 
 func setupShareAIActivityTestEnv(t *testing.T) (*handler, *database.Store, string, uuid.UUID) {
 	t.Helper()
 
 	ctx := context.Background()
-	store := database.NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	store := testdb.Shared(t)
 
 	userID, err := store.CreateUser(ctx, "share-ai-activity@example.com", "hash")
 	if err != nil {

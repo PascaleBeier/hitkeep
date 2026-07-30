@@ -1,4 +1,4 @@
-import { Injectable, effect, inject } from '@angular/core';
+import { effect, inject, Service } from '@angular/core';
 import { Translation } from '@openng/optimus-ui/api';
 import { Optimus } from '@openng/optimus-ui/config';
 import { de } from '@openng/optimus-ui-locale/js/de.js';
@@ -21,7 +21,7 @@ const OPTIMUS_TRANSLATIONS = {
     pt: pt_BR
 } satisfies Record<DashboardLanguage, Translation>;
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class OptimusLocaleSyncService {
     private readonly optimus = inject(Optimus);
     private readonly activeLanguage = injectActiveLang();

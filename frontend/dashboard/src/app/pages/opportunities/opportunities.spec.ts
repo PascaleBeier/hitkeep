@@ -2,7 +2,6 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { provideTranslocoLocale } from '@jsverse/transloco-locale';
@@ -22,7 +21,6 @@ describe('OpportunitiesPage', () => {
         await TestBed.configureTestingModule({
             imports: [
                 OpportunitiesPage,
-                NoopAnimationsModule,
                 TranslocoTestingModule.forRoot({
                     langs: {
                         en: {

@@ -8,7 +8,7 @@ import { injectReportRange } from '@services/report-range-preferences.service';
     template: `
         <app-range-toolbar [timeRanges]="timeRanges()" [selectedRange]="selectedRange()" [customRangeDates]="customRangeDates()" [loading]="loading()" (rangeChange)="selectRange($event)" (refresh)="refresh.emit()">
             <div toolbar-right class="contents">
-                <ng-content select="[toolbar-right]"></ng-content>
+                <ng-content select="[toolbar-right]" />
             </div>
         </app-range-toolbar>
     `,

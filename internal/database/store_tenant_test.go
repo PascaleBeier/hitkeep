@@ -15,17 +15,7 @@ import (
 
 func setupTenantStore(t *testing.T) *Store {
 	t.Helper()
-
-	store := NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect store: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate store: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-
-	return store
+	return newSharedTestFixtureStore(t)
 }
 
 func TestCreateUserAddsDefaultTenantMembership(t *testing.T) {

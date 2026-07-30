@@ -1,6 +1,6 @@
 import { Location } from '@angular/common';
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRoute, Router, provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { vi } from 'vitest';
 
@@ -9,7 +9,6 @@ import { APPLICATION_ERROR_STATE_KEY } from '@services/application-error-navigat
 import { ApplicationErrorPage } from './application-error-page';
 
 describe('ApplicationErrorPage', () => {
-    let routeData: Record<string, unknown>;
     let historyState: Record<string, unknown>;
     const location = {
         getState: vi.fn(() => historyState),
@@ -19,7 +18,6 @@ describe('ApplicationErrorPage', () => {
     };
 
     beforeEach(async () => {
-        routeData = {};
         historyState = {};
         vi.clearAllMocks();
 
@@ -51,26 +49,13 @@ describe('ApplicationErrorPage', () => {
                     preloadLangs: true
                 })
             ],
-            providers: [
-                provideRouter([]),
-                { provide: Location, useValue: location },
-                {
-                    provide: ActivatedRoute,
-                    useValue: {
-                        snapshot: {
-                            get data() {
-                                return routeData;
-                            }
-                        }
-                    }
-                }
-            ]
+            providers: [provideRouter([]), { provide: Location, useValue: location }]
         }).compileComponents();
     });
 
     it('renders a real 404 page with recovery actions', async () => {
-        routeData = { applicationErrorKind: 'not-found' };
         const fixture = TestBed.createComponent(ApplicationErrorPage);
+        fixture.componentRef.setInput('applicationErrorKind', 'not-found');
         await fixture.whenStable();
 
         const element = fixture.nativeElement as HTMLElement;

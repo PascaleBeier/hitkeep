@@ -1,10 +1,10 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { inject, signal, Service } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { finalize } from 'rxjs';
 import type { Subscription } from 'rxjs';
 import { Hit, PaginatedHits } from '@models/analytics.types';
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class HitService {
     private http = inject(HttpClient);
 

@@ -13,14 +13,7 @@ import (
 
 func setupComparisonStore(t *testing.T) (*Store, uuid.UUID) {
 	t.Helper()
-	store := NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
+	store := newSharedTestFixtureStore(t)
 
 	userID, err := store.CreateUser(context.Background(), "cmp@example.com", "hashed")
 	if err != nil {

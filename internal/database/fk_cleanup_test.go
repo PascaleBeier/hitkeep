@@ -11,15 +11,7 @@ import (
 
 func newMigratedStore(t *testing.T) *Store {
 	t.Helper()
-	store := NewStore(":memory:")
-	if err := store.Connect(); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-	if err := store.Migrate(context.Background()); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-	return store
+	return newSharedTestFixtureStore(t)
 }
 
 func planStepIndex(steps []scopedDeleteStep, table string) int {

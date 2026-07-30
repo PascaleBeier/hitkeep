@@ -1,4 +1,4 @@
-import { Injectable, effect, inject, signal } from '@angular/core';
+import { effect, inject, signal, Service } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { tap } from 'rxjs';
 import { Site, SiteTrackingDomainOptions } from '@models/analytics.types';
@@ -33,7 +33,7 @@ export interface SiteStatsResetResponse {
     families_cleared: string[];
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class SiteService {
     private http = inject(HttpClient);
     private reportSubject = inject(ReportSubjectService);
