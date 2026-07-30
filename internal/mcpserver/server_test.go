@@ -1266,9 +1266,7 @@ func TestMCPSearchConsoleReturnsOverviewAndSeriesFromImportedFacts(t *testing.T)
 	defer tenantStores.Close()
 	seedSearchConsoleMapping(t, store, site)
 	sharedFact := searchConsoleFact(site, 99, 990)
-	if err := store.UpsertSearchConsoleFact(context.Background(), sharedFact); err != nil {
-		t.Fatalf("seed shared Search Console fact: %v", err)
-	}
+	seedSearchConsoleFact(t, store, sharedFact)
 	tenantStore, _, err := tenantStores.ResolveSiteStore(context.Background(), site.ID)
 	if err != nil {
 		t.Fatalf("ResolveSiteStore: %v", err)
@@ -1278,9 +1276,7 @@ func TestMCPSearchConsoleReturnsOverviewAndSeriesFromImportedFacts(t *testing.T)
 	tenantFact.Clicks = 4
 	tenantFact.Impressions = 40
 	tenantFact.CTR = 0.1
-	if err := tenantStore.UpsertSearchConsoleFact(context.Background(), tenantFact); err != nil {
-		t.Fatalf("seed tenant Search Console fact: %v", err)
-	}
+	seedSearchConsoleFact(t, tenantStore, tenantFact)
 
 	conf := testMCPConfig(t, "")
 	handler := NewHandler(conf, store, tenantStores, nil, nil)
@@ -1312,9 +1308,7 @@ func TestMCPSearchConsoleReturnsExplicitSectionsWithFiltersAndCappedLimit(t *tes
 		fact.Page = "https://" + site.Domain + "/landing?utm=test"
 		fact.Country = "US"
 		fact.Device = "desktop"
-		if err := tenantStore.UpsertSearchConsoleFact(context.Background(), fact); err != nil {
-			t.Fatalf("seed tenant Search Console fact %d: %v", i, err)
-		}
+		seedSearchConsoleFact(t, tenantStore, fact)
 	}
 
 	conf := testMCPConfig(t, "")
@@ -1448,9 +1442,7 @@ func TestMCPSearchConsoleReturnsImportedDataWithSyncWarnings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveSiteStore: %v", err)
 	}
-	if err := tenantStore.UpsertSearchConsoleFact(context.Background(), searchConsoleFact(site, 7, 70)); err != nil {
-		t.Fatalf("seed tenant Search Console fact: %v", err)
-	}
+	seedSearchConsoleFact(t, tenantStore, searchConsoleFact(site, 7, 70))
 
 	conf := testMCPConfig(t, "")
 	handler := NewHandler(conf, store, tenantStores, nil, nil)
@@ -1491,9 +1483,7 @@ func TestMCPSearchConsoleWarnsWhenSyncFailedButImportedDataExists(t *testing.T) 
 	if err != nil {
 		t.Fatalf("ResolveSiteStore: %v", err)
 	}
-	if err := tenantStore.UpsertSearchConsoleFact(context.Background(), searchConsoleFact(site, 7, 70)); err != nil {
-		t.Fatalf("seed tenant Search Console fact: %v", err)
-	}
+	seedSearchConsoleFact(t, tenantStore, searchConsoleFact(site, 7, 70))
 
 	conf := testMCPConfig(t, "")
 	handler := NewHandler(conf, store, tenantStores, nil, nil)
@@ -1534,9 +1524,7 @@ func TestMCPSearchConsoleReturnsEmptyWarningsArrayWhenHealthy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveSiteStore: %v", err)
 	}
-	if err := tenantStore.UpsertSearchConsoleFact(context.Background(), searchConsoleFact(site, 7, 70)); err != nil {
-		t.Fatalf("seed tenant Search Console fact: %v", err)
-	}
+	seedSearchConsoleFact(t, tenantStore, searchConsoleFact(site, 7, 70))
 
 	conf := testMCPConfig(t, "")
 	handler := NewHandler(conf, store, tenantStores, nil, nil)
@@ -2109,6 +2097,29 @@ func searchConsoleFact(site *api.Site, clicks, impressions int) database.SearchC
 		DataState:       "final",
 		ImportedAt:      time.Date(2026, 5, 4, 12, 0, 0, 0, time.UTC),
 	}
+}
+
+func seedSearchConsoleFact(t *testing.T, store *database.Store, fact database.SearchConsoleFactInput) {
+	t.Helper()
+	fact.Country = normalizeSearchConsoleTestCountry(fact.Country)
+	fact.Device = strings.ToUpper(strings.TrimSpace(fact.Device))
+	if _, err := store.DB().ExecContext(context.Background(), `
+		INSERT INTO search_console_facts (
+			site_id, property_uri, date, query, page, country, device,
+			clicks, impressions, ctr, position, aggregation_type, data_state, imported_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, fact.SiteID, fact.PropertyURI, fact.Date, fact.Query, fact.Page, fact.Country, fact.Device,
+		fact.Clicks, fact.Impressions, fact.CTR, fact.Position, fact.AggregationType, fact.DataState, fact.ImportedAt); err != nil {
+		t.Fatalf("seed Search Console fact: %v", err)
+	}
+}
+
+func normalizeSearchConsoleTestCountry(country string) string {
+	country = strings.ToUpper(strings.TrimSpace(country))
+	if country == "US" {
+		return "USA"
+	}
+	return country
 }
 
 func testMCPConfig(t *testing.T, docsURL string) *config.Config {

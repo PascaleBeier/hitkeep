@@ -202,10 +202,13 @@ func TestSearchConsoleSyncWorkerPropertyAccessLossKeepsImportedFacts(t *testing.
 	if err != nil {
 		t.Fatalf("resolve tenant store: %v", err)
 	}
-	if err := tenantStore.UpsertSearchConsoleFact(ctx, database.SearchConsoleFactInput{
+	existingDate := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
+	if err := tenantStore.ReplaceSearchConsoleFacts(ctx, database.SearchConsoleFactScope{
+		SiteID: fixture.site.ID, PropertyURI: fixture.propertyURI, StartDate: existingDate, EndDate: existingDate, DataState: "final",
+	}, []database.SearchConsoleFactInput{{
 		SiteID:      fixture.site.ID,
 		PropertyURI: fixture.propertyURI,
-		Date:        time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC),
+		Date:        existingDate,
 		Query:       "existing query",
 		Page:        "https://gsc-property-loss.example.com/",
 		Country:     "USA",
@@ -214,7 +217,7 @@ func TestSearchConsoleSyncWorkerPropertyAccessLossKeepsImportedFacts(t *testing.
 		Impressions: 100,
 		DataState:   "final",
 		ImportedAt:  time.Now().UTC(),
-	}); err != nil {
+	}}); err != nil {
 		t.Fatalf("seed existing fact: %v", err)
 	}
 
@@ -350,12 +353,16 @@ func TestSearchConsoleSyncWorkerRecurringSyncRechecksRecentCompletedDays(t *test
 	if err := worker.ImportSite(ctx, fixture.site.ID); err != nil {
 		t.Fatalf("import site: %v", err)
 	}
-	if len(source.queries) != 1 {
-		t.Fatalf("expected one recurring query, got %+v", source.queries)
+	if len(source.queries) != 7 {
+		t.Fatalf("expected seven daily recurring queries, got %+v", source.queries)
 	}
-	query := source.queries[0].Query
-	if query.StartDate.Format(time.DateOnly) != "2026-04-27" || query.EndDate.Format(time.DateOnly) != "2026-05-03" {
-		t.Fatalf("expected recent completed recheck window, got %s to %s", query.StartDate.Format(time.DateOnly), query.EndDate.Format(time.DateOnly))
+	firstQuery := source.queries[0].Query
+	lastQuery := source.queries[len(source.queries)-1].Query
+	if firstQuery.StartDate.Format(time.DateOnly) != "2026-05-03" || firstQuery.EndDate.Format(time.DateOnly) != "2026-05-03" ||
+		lastQuery.StartDate.Format(time.DateOnly) != "2026-04-27" || lastQuery.EndDate.Format(time.DateOnly) != "2026-04-27" {
+		t.Fatalf("expected newest-first daily recheck window, got first=%s to %s last=%s to %s",
+			firstQuery.StartDate.Format(time.DateOnly), firstQuery.EndDate.Format(time.DateOnly),
+			lastQuery.StartDate.Format(time.DateOnly), lastQuery.EndDate.Format(time.DateOnly))
 	}
 }
 
@@ -423,7 +430,7 @@ func TestSearchConsoleSyncWorkerRunDueImportsReadySitesAndContinuesAfterFailure(
 	for _, query := range source.queries {
 		queried[query.Query.SiteURL] = true
 	}
-	if len(source.queries) != 2 || !queried[first.propertyURI] || !queried[failing.propertyURI] || queried[second.propertyURI] {
+	if !queried[first.propertyURI] || !queried[failing.propertyURI] || queried[second.propertyURI] {
 		t.Fatalf("expected due sites to be queried and future retry skipped, got %+v", source.queries)
 	}
 	state, err := first.shared.GetGoogleSearchConsoleSyncState(ctx, first.site.ID)
@@ -586,8 +593,8 @@ func initialSearchConsoleRows() []searchconsole.SearchAnalyticsRow {
 
 func requireInitialSearchConsoleQuery(t *testing.T, source *fakeSearchConsoleSource, propertyURI string) {
 	t.Helper()
-	if len(source.queries) != 1 {
-		t.Fatalf("expected one Search Analytics query, got %+v", source.queries)
+	if len(source.queries) != 90 {
+		t.Fatalf("expected 90 daily Search Analytics queries, got %d", len(source.queries))
 	}
 	query := source.queries[0]
 	if query.Token.RefreshToken != "refresh-token" {
@@ -596,8 +603,12 @@ func requireInitialSearchConsoleQuery(t *testing.T, source *fakeSearchConsoleSou
 	if query.Query.SiteURL != propertyURI {
 		t.Fatalf("expected mapped property URI %q, got %q", propertyURI, query.Query.SiteURL)
 	}
-	if query.Query.StartDate.Format(time.DateOnly) != "2026-02-03" || query.Query.EndDate.Format(time.DateOnly) != "2026-05-03" {
-		t.Fatalf("expected recent finalized 90 day window, got %s to %s", query.Query.StartDate.Format(time.DateOnly), query.Query.EndDate.Format(time.DateOnly))
+	lastQuery := source.queries[len(source.queries)-1].Query
+	if query.Query.StartDate.Format(time.DateOnly) != "2026-05-03" || query.Query.EndDate.Format(time.DateOnly) != "2026-05-03" ||
+		lastQuery.StartDate.Format(time.DateOnly) != "2026-02-03" || lastQuery.EndDate.Format(time.DateOnly) != "2026-02-03" {
+		t.Fatalf("expected newest-first finalized daily windows, got first=%s to %s last=%s to %s",
+			query.Query.StartDate.Format(time.DateOnly), query.Query.EndDate.Format(time.DateOnly),
+			lastQuery.StartDate.Format(time.DateOnly), lastQuery.EndDate.Format(time.DateOnly))
 	}
 	if query.Query.DataState != searchconsole.DataStateFinal {
 		t.Fatalf("expected final data state, got %q", query.Query.DataState)
@@ -728,7 +739,18 @@ func (f *fakeSearchConsoleSource) QuerySearchAnalytics(ctx context.Context, toke
 		return nil, f.errBySiteURL[query.SiteURL]
 	}
 	if f.rowsBySiteURL != nil {
-		return f.rowsBySiteURL[query.SiteURL], nil
+		return searchConsoleRowsInQueryRange(f.rowsBySiteURL[query.SiteURL], query), nil
 	}
-	return f.rows, nil
+	return searchConsoleRowsInQueryRange(f.rows, query), nil
+}
+
+func searchConsoleRowsInQueryRange(rows []searchconsole.SearchAnalyticsRow, query searchconsole.SearchAnalyticsQuery) []searchconsole.SearchAnalyticsRow {
+	filtered := make([]searchconsole.SearchAnalyticsRow, 0, len(rows))
+	for _, row := range rows {
+		if row.Date.Before(query.StartDate) || row.Date.After(query.EndDate) {
+			continue
+		}
+		filtered = append(filtered, row)
+	}
+	return filtered
 }

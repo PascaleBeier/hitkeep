@@ -338,9 +338,11 @@ func migrationNeedsNativeReopen(fileName string) bool {
 	case "2026_07_08_000000_drop_analytics_art_indexes.sql",
 		"2026_07_08_000001_drop_events_art_indexes.sql",
 		"2026_07_08_000002_drop_web_vitals_art_indexes.sql",
+		"2026_07_30_010000_drop_search_console_fact_art_indexes.sql",
 		"0013_drop_analytics_art_indexes.sql",
 		"0013a_drop_events_art_indexes.sql",
-		"0013b_drop_web_vitals_art_indexes.sql":
+		"0013b_drop_web_vitals_art_indexes.sql",
+		"0016_drop_search_console_fact_art_indexes.sql":
 		return true
 	default:
 		return false

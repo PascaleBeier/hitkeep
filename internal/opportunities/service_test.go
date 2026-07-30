@@ -444,17 +444,20 @@ func TestGenerateLoadsSearchConsoleSignalThroughMappedProperty(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("upsert search console mapping: %v", err)
 	}
-	if err := shared.UpsertSearchConsoleFact(context.Background(), database.SearchConsoleFactInput{
+	factDate := time.Date(2026, 5, 12, 0, 0, 0, 0, time.UTC)
+	if err := shared.ReplaceSearchConsoleFacts(context.Background(), database.SearchConsoleFactScope{
+		SiteID: site.ID, PropertyURI: propertyURI, StartDate: factDate, EndDate: factDate, DataState: "final",
+	}, []database.SearchConsoleFactInput{{
 		SiteID:          site.ID,
 		PropertyURI:     propertyURI,
-		Date:            time.Date(2026, 5, 12, 0, 0, 0, 0, time.UTC),
+		Date:            factDate,
 		Clicks:          54,
 		Impressions:     4200,
 		CTR:             0.0129,
 		Position:        8.4,
 		AggregationType: "by_property",
 		DataState:       "final",
-	}); err != nil {
+	}}); err != nil {
 		t.Fatalf("upsert search console fact: %v", err)
 	}
 	contract := fixtureDetectorContract("one")

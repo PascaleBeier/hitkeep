@@ -582,7 +582,18 @@ func seedSearchConsoleReportMapping(t *testing.T, store *database.Store, siteID 
 
 func seedSearchConsoleReportFact(t *testing.T, store *database.Store, input database.SearchConsoleFactInput) {
 	t.Helper()
-	if err := store.UpsertSearchConsoleFact(context.Background(), input); err != nil {
+	input.Country = strings.ToUpper(strings.TrimSpace(input.Country))
+	if input.Country == "US" {
+		input.Country = "USA"
+	}
+	input.Device = strings.ToUpper(strings.TrimSpace(input.Device))
+	if _, err := store.DB().ExecContext(context.Background(), `
+		INSERT INTO search_console_facts (
+			site_id, property_uri, date, query, page, country, device,
+			clicks, impressions, ctr, position, aggregation_type, data_state, imported_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, input.SiteID, input.PropertyURI, input.Date, input.Query, input.Page, input.Country, input.Device,
+		input.Clicks, input.Impressions, input.CTR, input.Position, input.AggregationType, input.DataState, input.ImportedAt); err != nil {
 		t.Fatalf("seed Search Console fact: %v", err)
 	}
 }

@@ -195,21 +195,20 @@ func (w *SearchConsoleSyncWorker) ImportSite(ctx context.Context, siteID uuid.UU
 		return err
 	}
 	windows := searchConsoleSyncWindows(now, state)
-	var rowsToImport []searchconsole.SearchAnalyticsRow
-	for _, window := range windows {
+	importedRows := 0
+	for _, window := range searchConsoleSyncDays(windows) {
 		query := searchConsoleSyncQuery(mapping.PropertyURI, window)
 		rows, err := w.source.QuerySearchAnalytics(ctx, googleSearchConsoleToken(conn), query)
 		if err != nil {
 			return w.recordSyncFailure(ctx, *mapping, searchConsoleSyncStageQuery, err)
 		}
-		rowsToImport = append(rowsToImport, rows...)
+		if err := importSearchConsoleRows(ctx, tenantStore, rows, siteID, mapping.PropertyURI, window, now); err != nil {
+			return w.recordSyncFailure(ctx, *mapping, searchConsoleSyncStageImport, err)
+		}
+		importedRows += len(rows)
 	}
-	importedRows := len(rowsToImport)
 	if err := appendSearchConsoleSyncPreparedAudit(ctx, shared, *mapping, importedRows); err != nil {
 		return err
-	}
-	if err := importSearchConsoleRows(ctx, tenantStore, rowsToImport, siteID, mapping.PropertyURI, now); err != nil {
-		return w.recordSyncFailure(ctx, *mapping, searchConsoleSyncStageImport, err)
 	}
 	importedStart, importedEnd := mergedSearchConsoleImportedRange(state, windows)
 	successState := database.GoogleSearchConsoleSyncStateInput{
@@ -243,6 +242,18 @@ func searchConsoleSyncWindows(now time.Time, state *database.GoogleSearchConsole
 	return []searchConsoleSyncWindow{{Start: start, End: end}}
 }
 
+func searchConsoleSyncDays(windows []searchConsoleSyncWindow) []searchConsoleSyncWindow {
+	var days []searchConsoleSyncWindow
+	for _, window := range windows {
+		start := searchConsoleDate(window.Start)
+		end := searchConsoleDate(window.End)
+		for day := end; !day.Before(start); day = day.AddDate(0, 0, -1) {
+			days = append(days, searchConsoleSyncWindow{Start: day, End: day})
+		}
+	}
+	return days
+}
+
 func mergedSearchConsoleImportedRange(state *database.GoogleSearchConsoleSyncState, windows []searchConsoleSyncWindow) (*time.Time, *time.Time) {
 	if len(windows) == 0 {
 		return nil, nil
@@ -272,7 +283,7 @@ func searchConsoleSyncQuery(propertyURI string, window searchConsoleSyncWindow) 
 	}
 }
 
-func importSearchConsoleRows(ctx context.Context, tenantStore *database.Store, rows []searchconsole.SearchAnalyticsRow, siteID uuid.UUID, propertyURI string, importedAt time.Time) error {
+func importSearchConsoleRows(ctx context.Context, tenantStore *database.Store, rows []searchconsole.SearchAnalyticsRow, siteID uuid.UUID, propertyURI string, window searchConsoleSyncWindow, importedAt time.Time) error {
 	inputs := make([]database.SearchConsoleFactInput, 0, len(rows))
 	for _, row := range rows {
 		inputs = append(inputs, database.SearchConsoleFactInput{
@@ -292,7 +303,9 @@ func importSearchConsoleRows(ctx context.Context, tenantStore *database.Store, r
 			ImportedAt:      importedAt,
 		})
 	}
-	return tenantStore.UpsertSearchConsoleFacts(ctx, inputs)
+	return tenantStore.ReplaceSearchConsoleFacts(ctx, database.SearchConsoleFactScope{
+		SiteID: siteID, PropertyURI: propertyURI, StartDate: window.Start, EndDate: window.End, DataState: searchconsole.DataStateFinal,
+	}, inputs)
 }
 
 func (w *SearchConsoleSyncWorker) recordSyncFailure(ctx context.Context, mapping database.GoogleSearchConsoleSiteMapping, stage string, syncErr error) error {

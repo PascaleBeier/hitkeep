@@ -3,11 +3,14 @@ package database
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
 	"time"
 
+	duckdb "github.com/duckdb/duckdb-go/v2"
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
@@ -30,71 +33,159 @@ type SearchConsoleFactInput struct {
 	ImportedAt      time.Time
 }
 
-func (s *Store) UpsertSearchConsoleFact(ctx context.Context, input SearchConsoleFactInput) error {
-	return upsertSearchConsoleFact(ctx, s.db, input)
+type SearchConsoleFactScope struct {
+	SiteID      uuid.UUID
+	PropertyURI string
+	StartDate   time.Time
+	EndDate     time.Time
+	DataState   string
 }
 
-func (s *Store) UpsertSearchConsoleFacts(ctx context.Context, inputs []SearchConsoleFactInput) error {
-	return s.Transact(ctx, func(tx *sql.Tx) error {
-		for _, input := range inputs {
-			if err := upsertSearchConsoleFact(ctx, tx, input); err != nil {
+var searchConsoleFactColumns = []string{
+	"site_id", "property_uri", "date", "query", "page", "country", "device",
+	"clicks", "impressions", "ctr", "position", "aggregation_type", "data_state", "imported_at",
+}
+
+// ReplaceSearchConsoleFacts atomically replaces one bounded Search Console
+// date range. It deliberately avoids INSERT ... ON CONFLICT: the facts table
+// is append-heavy analytics data and carries no ART indexes after migration.
+func (s *Store) ReplaceSearchConsoleFacts(ctx context.Context, scope SearchConsoleFactScope, inputs []SearchConsoleFactInput) error {
+	normalizedScope, err := normalizeSearchConsoleFactScope(scope)
+	if err != nil {
+		return err
+	}
+	normalizedInputs, err := normalizeSearchConsoleFactInputs(normalizedScope, inputs)
+	if err != nil {
+		return err
+	}
+
+	return s.WithDuckDBSession(ctx, DuckDBSessionOptions{}, func(conn *sql.Conn) (retErr error) {
+		if _, err := conn.ExecContext(ctx, "BEGIN TRANSACTION"); err != nil {
+			return fmt.Errorf("begin Search Console fact replacement: %w", err)
+		}
+		defer func() {
+			if p := recover(); p != nil {
+				_, _ = conn.ExecContext(context.Background(), "ROLLBACK")
+				panic(p)
+			}
+			if retErr != nil {
+				if _, rollbackErr := conn.ExecContext(context.Background(), "ROLLBACK"); rollbackErr != nil {
+					retErr = errors.Join(retErr, fmt.Errorf("rollback Search Console fact replacement: %w", rollbackErr))
+				}
+			}
+		}()
+
+		if _, err := conn.ExecContext(ctx, `
+			DELETE FROM search_console_facts
+			WHERE site_id = ? AND property_uri = ? AND data_state = ? AND date BETWEEN ? AND ?
+		`, normalizedScope.SiteID, normalizedScope.PropertyURI, normalizedScope.DataState, normalizedScope.StartDate, normalizedScope.EndDate); err != nil {
+			return fmt.Errorf("delete replaced Search Console facts: %w", err)
+		}
+
+		if len(normalizedInputs) > 0 {
+			if err := withAppenderOnConn(conn, "search_console_facts", searchConsoleFactColumns, func(appender rowAppender) error {
+				for _, input := range normalizedInputs {
+					if err := appender.AppendRow(searchConsoleFactValues(input)...); err != nil {
+						return fmt.Errorf("append Search Console fact: %w", err)
+					}
+				}
+				return nil
+			}); err != nil {
 				return err
 			}
+		}
+
+		if _, err := conn.ExecContext(ctx, "COMMIT"); err != nil {
+			return fmt.Errorf("commit Search Console fact replacement: %w", err)
 		}
 		return nil
 	})
 }
 
-func upsertSearchConsoleFact(ctx context.Context, exec sqlExecContext, input SearchConsoleFactInput) error {
-	if input.SiteID == uuid.Nil {
-		return fmt.Errorf("site id is required")
+func normalizeSearchConsoleFactScope(scope SearchConsoleFactScope) (SearchConsoleFactScope, error) {
+	if scope.SiteID == uuid.Nil {
+		return SearchConsoleFactScope{}, fmt.Errorf("site id is required")
 	}
-	propertyURI := strings.TrimSpace(input.PropertyURI)
-	if propertyURI == "" {
-		return fmt.Errorf("property uri is required")
+	scope.PropertyURI = strings.TrimSpace(scope.PropertyURI)
+	if scope.PropertyURI == "" {
+		return SearchConsoleFactScope{}, fmt.Errorf("property uri is required")
 	}
-	if input.Date.IsZero() {
-		return fmt.Errorf("date is required")
+	if scope.StartDate.IsZero() || scope.EndDate.IsZero() {
+		return SearchConsoleFactScope{}, fmt.Errorf("start and end dates are required")
 	}
-	if input.ImportedAt.IsZero() {
-		input.ImportedAt = time.Now().UTC()
+	scope.StartDate = searchConsoleReportDate(scope.StartDate)
+	scope.EndDate = searchConsoleReportDate(scope.EndDate)
+	if scope.EndDate.Before(scope.StartDate) {
+		return SearchConsoleFactScope{}, fmt.Errorf("end date must not precede start date")
 	}
-	dataState := strings.TrimSpace(input.DataState)
-	if dataState == "" {
-		dataState = "final"
+	scope.DataState = strings.ToLower(strings.TrimSpace(scope.DataState))
+	if scope.DataState == "" {
+		scope.DataState = "final"
 	}
+	return scope, nil
+}
 
-	_, err := exec.ExecContext(ctx, `
-		INSERT INTO search_console_facts (
-			site_id, property_uri, date, query, page, country, device,
-			clicks, impressions, ctr, position, aggregation_type, data_state, imported_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT (site_id, property_uri, date, query, page, country, device, aggregation_type, data_state) DO UPDATE SET
-			clicks = excluded.clicks,
-			impressions = excluded.impressions,
-			ctr = excluded.ctr,
-			position = excluded.position,
-			imported_at = excluded.imported_at
-	`,
-		input.SiteID,
-		propertyURI,
-		input.Date.UTC(),
-		strings.TrimSpace(input.Query),
-		strings.TrimSpace(input.Page),
-		normalizeSearchConsoleCountry(input.Country),
-		strings.ToUpper(strings.TrimSpace(input.Device)),
-		input.Clicks,
-		input.Impressions,
-		input.CTR,
-		input.Position,
-		strings.TrimSpace(input.AggregationType),
-		dataState,
-		input.ImportedAt.UTC(),
-	)
-	if err != nil {
-		return fmt.Errorf("upsert Search Console fact: %w", err)
+type searchConsoleFactKey struct {
+	Date            time.Time
+	Query           string
+	Page            string
+	Country         string
+	Device          string
+	AggregationType string
+}
+
+func normalizeSearchConsoleFactInputs(scope SearchConsoleFactScope, inputs []SearchConsoleFactInput) ([]SearchConsoleFactInput, error) {
+	normalized := make([]SearchConsoleFactInput, 0, len(inputs))
+	positions := make(map[searchConsoleFactKey]int, len(inputs))
+	for _, input := range inputs {
+		if input.SiteID == uuid.Nil {
+			input.SiteID = scope.SiteID
+		}
+		input.PropertyURI = strings.TrimSpace(input.PropertyURI)
+		if input.PropertyURI == "" {
+			input.PropertyURI = scope.PropertyURI
+		}
+		if input.Date.IsZero() {
+			return nil, fmt.Errorf("date is required")
+		}
+		input.Date = searchConsoleReportDate(input.Date)
+		input.Query = strings.TrimSpace(input.Query)
+		input.Page = strings.TrimSpace(input.Page)
+		input.Country = normalizeSearchConsoleCountry(input.Country)
+		input.Device = strings.ToUpper(strings.TrimSpace(input.Device))
+		input.AggregationType = strings.TrimSpace(input.AggregationType)
+		input.DataState = strings.ToLower(strings.TrimSpace(input.DataState))
+		if input.DataState == "" {
+			input.DataState = "final"
+		}
+		if input.ImportedAt.IsZero() {
+			input.ImportedAt = time.Now().UTC()
+		} else {
+			input.ImportedAt = input.ImportedAt.UTC()
+		}
+
+		if input.SiteID != scope.SiteID || input.PropertyURI != scope.PropertyURI || input.DataState != scope.DataState || input.Date.Before(scope.StartDate) || input.Date.After(scope.EndDate) {
+			return nil, fmt.Errorf("search console fact is outside replacement scope")
+		}
+		key := searchConsoleFactKey{
+			Date: input.Date, Query: input.Query, Page: input.Page, Country: input.Country,
+			Device: input.Device, AggregationType: input.AggregationType,
+		}
+		if position, ok := positions[key]; ok {
+			normalized[position] = input
+			continue
+		}
+		positions[key] = len(normalized)
+		normalized = append(normalized, input)
 	}
-	return nil
+	return normalized, nil
+}
+
+func searchConsoleFactValues(input SearchConsoleFactInput) []driver.Value {
+	return []driver.Value{
+		duckdb.UUID(input.SiteID), input.PropertyURI, input.Date, input.Query, input.Page, input.Country, input.Device,
+		int64(input.Clicks), int64(input.Impressions), input.CTR, input.Position, input.AggregationType, input.DataState, input.ImportedAt,
+	}
 }
 
 func (s *Store) GetSearchConsoleOverview(ctx context.Context, params api.SearchConsoleReportParams) (api.SearchConsoleOverview, error) {

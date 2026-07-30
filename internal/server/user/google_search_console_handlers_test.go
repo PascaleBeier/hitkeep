@@ -520,10 +520,13 @@ func TestGoogleSearchConsoleUnmapAuditsOldPropertyWithoutSecrets(t *testing.T) {
 func TestGoogleSearchConsoleManualSyncRunsImmediatelyAndAudits(t *testing.T) {
 	h, store, userID := setupUserSecurityTestEnv(t)
 	defer store.Close()
+	syncDateValue := time.Now().UTC().AddDate(0, 0, -2)
+	syncYear, syncMonth, syncDay := syncDateValue.Date()
+	syncDate := time.Date(syncYear, syncMonth, syncDay, 0, 0, 0, 0, time.UTC)
 	h.ctx.SearchConsole = &fakeSearchConsoleClient{
 		rows: []searchconsole.SearchAnalyticsRow{
 			{
-				Date:            time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC),
+				Date:            syncDate,
 				Query:           "hitkeep analytics",
 				Page:            "https://manual-sync.example.com/",
 				Country:         "usa",
@@ -593,8 +596,8 @@ func TestGoogleSearchConsoleManualSyncRunsImmediatelyAndAudits(t *testing.T) {
 	overview, err := tenantStore.GetSearchConsoleOverview(context.Background(), api.SearchConsoleReportParams{
 		SiteID:      site.ID,
 		PropertyURI: "sc-domain:manual-sync.example.com",
-		Start:       time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC),
-		End:         time.Date(2026, 5, 2, 0, 0, 0, 0, time.UTC),
+		Start:       syncDate,
+		End:         syncDate,
 	})
 	if err != nil {
 		t.Fatalf("get imported overview: %v", err)
@@ -867,7 +870,14 @@ func (c *fakeSearchConsoleClient) QuerySearchAnalytics(ctx context.Context, toke
 	if c.queryErr != nil {
 		return nil, c.queryErr
 	}
-	return c.rows, nil
+	rows := make([]searchconsole.SearchAnalyticsRow, 0, len(c.rows))
+	for _, row := range c.rows {
+		if row.Date.Before(query.StartDate) || row.Date.After(query.EndDate) {
+			continue
+		}
+		rows = append(rows, row)
+	}
+	return rows, nil
 }
 
 func requireGoogleSearchConsoleConnection(t *testing.T, store *database.Store, teamID uuid.UUID) *database.GoogleSearchConsoleConnection {

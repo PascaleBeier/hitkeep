@@ -74,8 +74,9 @@ func TestDetachedCLIActionOutlivesLauncher(t *testing.T) {
 
 	stateDir := filepath.Join(t.TempDir(), "state")
 	t.Setenv("HK_STATE_DIR", stateDir)
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	command := exec.Command(binary, "--workspace", workspace, "--output", "json", "setup", "--detach")
-	command.Env = append(os.Environ(), "PATH="+fakeBin+":"+os.Getenv("PATH"), "HK_STATE_DIR="+stateDir)
+	command.Env = os.Environ()
 	output, err := command.CombinedOutput()
 	if err != nil {
 		t.Fatalf("start detached setup: %v: %s", err, output)

@@ -600,6 +600,7 @@ func TestGuardedTenantMigrationSurvivesAbruptRestart(t *testing.T) {
 		migrationFile     = "0013_drop_analytics_art_indexes.sql"
 		eventsMigration   = "0013a_drop_events_art_indexes.sql"
 		vitalsMigration   = "0013b_drop_web_vitals_art_indexes.sql"
+		searchMigration   = "0016_drop_search_console_fact_art_indexes.sql"
 	)
 	if dbPath := os.Getenv(helperDBEnv); dbPath != "" {
 		store := NewStore(dbPath,
@@ -609,11 +610,16 @@ func TestGuardedTenantMigrationSurvivesAbruptRestart(t *testing.T) {
 		if err := store.Connect(); err != nil {
 			t.Fatalf("connect abrupt migration helper: %v", err)
 		}
+		committedHeavyMigrations := 0
 		if err := store.migrateTenant(context.Background(), migrationRunOptions{
 			guarded: true,
 			afterCommit: func() {
+				committedHeavyMigrations++
+				if committedHeavyMigrations < 4 {
+					return
+				}
 				// Deliberately skip the post-migration checkpoint and clean close so
-				// the committed migration remains in the WAL.
+				// the committed Search Console rebuild remains in the WAL.
 				os.Exit(0)
 			},
 		}); err != nil {
@@ -633,8 +639,8 @@ func TestGuardedTenantMigrationSurvivesAbruptRestart(t *testing.T) {
 	}
 	if _, err := seed.DB().ExecContext(ctx, `
 		CREATE TABLE migrations (migration VARCHAR NOT NULL, applied_at TIMESTAMPTZ NOT NULL);
-		INSERT INTO migrations (migration, applied_at) VALUES (?, now()), (?, now()), (?, now())`,
-		migrationFile, eventsMigration, vitalsMigration); err != nil {
+		INSERT INTO migrations (migration, applied_at) VALUES (?, now()), (?, now()), (?, now()), (?, now())`,
+		migrationFile, eventsMigration, vitalsMigration, searchMigration); err != nil {
 		t.Fatalf("hold back replay migration: %v", err)
 	}
 	if err := seed.MigrateTenant(ctx); err != nil {
@@ -644,7 +650,9 @@ func TestGuardedTenantMigrationSurvivesAbruptRestart(t *testing.T) {
 		INSERT INTO sites (id, domain, data_retention_days) VALUES (uuid(), 'migration.test', 365);
 		INSERT INTO hits (id, site_id, session_id, page_id, timestamp, path)
 		SELECT uuid(), id, uuid(), uuid(), now(), '/before-migration' FROM sites;
-		DELETE FROM migrations WHERE migration IN (?, ?, ?)`, migrationFile, eventsMigration, vitalsMigration); err != nil {
+		INSERT INTO search_console_facts (site_id, property_uri, date, query, clicks, imported_at)
+		SELECT id, 'sc-domain:migration.test', current_date, 'before migration', 7, now() FROM sites;
+		DELETE FROM migrations WHERE migration IN (?, ?, ?, ?)`, migrationFile, eventsMigration, vitalsMigration, searchMigration); err != nil {
 		t.Fatalf("seed checkpointed tenant data: %v", err)
 	}
 	if err := seed.Close(); err != nil {
@@ -669,21 +677,31 @@ func TestGuardedTenantMigrationSurvivesAbruptRestart(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = store.Close() })
 
-	var rows, appliedMigrations, remainingIndexes int
+	var rows, searchRows, appliedMigrations, remainingIndexes, remainingSearchIndexes int
 	if err := store.DB().QueryRowContext(ctx, "SELECT count(*) FROM hits WHERE path = '/before-migration'").Scan(&rows); err != nil {
 		t.Fatalf("read base data after migration WAL recovery: %v", err)
 	}
 	if err := store.DB().QueryRowContext(ctx,
-		"SELECT count(*) FROM migrations WHERE migration = ?", migrationFile).Scan(&appliedMigrations); err != nil {
+		"SELECT count(*) FROM migrations WHERE migration IN (?, ?, ?, ?)",
+		migrationFile, eventsMigration, vitalsMigration, searchMigration).Scan(&appliedMigrations); err != nil {
 		t.Fatalf("count reapplied migration: %v", err)
+	}
+	if err := store.DB().QueryRowContext(ctx,
+		"SELECT count(*) FROM search_console_facts WHERE query = 'before migration' AND clicks = 7").Scan(&searchRows); err != nil {
+		t.Fatalf("read Search Console data after migration WAL recovery: %v", err)
 	}
 	if err := store.DB().QueryRowContext(ctx, `
 		SELECT count(*) FROM duckdb_indexes()
 		WHERE table_name IN ('hits', 'events', 'web_vitals') AND NOT is_unique`).Scan(&remainingIndexes); err != nil {
 		t.Fatalf("inspect migrated tenant indexes: %v", err)
 	}
-	if rows != 1 || appliedMigrations != 1 || remainingIndexes != 0 {
-		t.Fatalf("unexpected recovered migration state: rows=%d migrations=%d indexes=%d", rows, appliedMigrations, remainingIndexes)
+	if err := store.DB().QueryRowContext(ctx,
+		"SELECT count(*) FROM duckdb_indexes() WHERE table_name = 'search_console_facts'").Scan(&remainingSearchIndexes); err != nil {
+		t.Fatalf("inspect migrated Search Console indexes: %v", err)
+	}
+	if rows != 1 || searchRows != 1 || appliedMigrations != 4 || remainingIndexes != 0 || remainingSearchIndexes != 0 {
+		t.Fatalf("unexpected recovered migration state: rows=%d search_rows=%d migrations=%d indexes=%d search_indexes=%d",
+			rows, searchRows, appliedMigrations, remainingIndexes, remainingSearchIndexes)
 	}
 	if _, err := os.Stat(store.recovery.migrationGuardPath()); !os.IsNotExist(err) {
 		t.Fatalf("expected completed migration guard to be cleared, got %v", err)

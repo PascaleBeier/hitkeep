@@ -213,7 +213,22 @@ func prepareGoogleSearchConsoleFactSeed(ctx context.Context, shared *database.St
 }
 
 func upsertGoogleSearchConsoleSeedFacts(ctx context.Context, tenantStore *database.Store, siteID uuid.UUID, rows []database.SearchConsoleFactInput) int {
-	if err := tenantStore.UpsertSearchConsoleFacts(ctx, rows); err != nil {
+	if len(rows) == 0 {
+		return 0
+	}
+	startDate := rows[0].Date
+	endDate := rows[0].Date
+	for _, row := range rows[1:] {
+		if row.Date.Before(startDate) {
+			startDate = row.Date
+		}
+		if row.Date.After(endDate) {
+			endDate = row.Date
+		}
+	}
+	if err := tenantStore.ReplaceSearchConsoleFacts(ctx, database.SearchConsoleFactScope{
+		SiteID: siteID, PropertyURI: rows[0].PropertyURI, StartDate: startDate, EndDate: endDate, DataState: rows[0].DataState,
+	}, rows); err != nil {
 		slog.Warn("Failed to seed Search Console facts", "site_id", siteID, "error", err)
 		return 0
 	}

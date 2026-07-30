@@ -19,39 +19,46 @@ func (s *Store) withAppender(ctx context.Context, table string, fn func(rowAppen
 
 func (s *Store) withAppenderColumns(ctx context.Context, table string, columns []string, fn func(rowAppender) error) error {
 	return s.WithDuckDBSession(ctx, DuckDBSessionOptions{}, func(conn *sql.Conn) error {
-		return conn.Raw(func(driverConn any) error {
-			if unwrapper, ok := driverConn.(duckdbConnUnwrapper); ok {
-				driverConn = unwrapper.UnwrapDuckDBConn()
-			}
-			rawConn, ok := driverConn.(driver.Conn)
-			if !ok {
-				return fmt.Errorf("unexpected duckdb driver connection type %T", driverConn)
-			}
+		return withAppenderOnConn(conn, table, columns, fn)
+	})
+}
 
-			var (
-				appender *duckdb.Appender
-				err      error
-			)
-			if len(columns) == 0 {
-				appender, err = duckdb.NewAppenderFromConn(rawConn, "", table)
-			} else {
-				appender, err = duckdb.NewAppenderWithColumns(rawConn, "", "", table, columns)
-			}
-			if err != nil {
-				return fmt.Errorf("create appender for %s: %w", table, err)
-			}
+// withAppenderOnConn appends through an already pinned physical connection.
+// Callers may start a transaction on conn before invoking it; DuckDB's
+// appender then participates in that same connection-local transaction.
+func withAppenderOnConn(conn *sql.Conn, table string, columns []string, fn func(rowAppender) error) error {
+	return conn.Raw(func(driverConn any) error {
+		if unwrapper, ok := driverConn.(duckdbConnUnwrapper); ok {
+			driverConn = unwrapper.UnwrapDuckDBConn()
+		}
+		rawConn, ok := driverConn.(driver.Conn)
+		if !ok {
+			return fmt.Errorf("unexpected duckdb driver connection type %T", driverConn)
+		}
 
-			if err := fn(appender); err != nil {
-				_ = appender.Close()
-				return err
-			}
+		var (
+			appender *duckdb.Appender
+			err      error
+		)
+		if len(columns) == 0 {
+			appender, err = duckdb.NewAppenderFromConn(rawConn, "", table)
+		} else {
+			appender, err = duckdb.NewAppenderWithColumns(rawConn, "", "", table, columns)
+		}
+		if err != nil {
+			return fmt.Errorf("create appender for %s: %w", table, err)
+		}
 
-			if err := appender.Close(); err != nil {
-				return fmt.Errorf("close appender for %s: %w", table, err)
-			}
+		if err := fn(appender); err != nil {
+			_ = appender.Close()
+			return err
+		}
 
-			return nil
-		})
+		if err := appender.Close(); err != nil {
+			return fmt.Errorf("close appender for %s: %w", table, err)
+		}
+
+		return nil
 	})
 }
 
