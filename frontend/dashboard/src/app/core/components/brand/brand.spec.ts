@@ -1,4 +1,7 @@
+import { APP_BASE_HREF } from '@angular/common';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
+import { RouterLink, provideRouter } from '@angular/router';
 import { afterEach } from 'vitest';
 import { Brand } from './brand';
 
@@ -16,7 +19,8 @@ describe('Brand', () => {
         }
 
         await TestBed.configureTestingModule({
-            imports: [Brand]
+            imports: [Brand],
+            providers: [provideRouter([]), { provide: APP_BASE_HREF, useValue: '/hitkeep/' }]
         }).compileComponents();
 
         fixture = TestBed.createComponent(Brand);
@@ -54,9 +58,10 @@ describe('Brand', () => {
         expect(image?.classList.contains('hk-brand-icon')).toBe(true);
     });
 
-    it('links the brand to the configured app root', () => {
+    it('routes the brand to the configured app root without a document navigation', () => {
         const link = fixture.nativeElement.querySelector('a');
 
+        expect(fixture.debugElement.query(By.directive(RouterLink))).not.toBeNull();
         expect(link?.getAttribute('href')).toBe('/hitkeep/');
         expect(link?.textContent).toContain('HitKeep');
     });
