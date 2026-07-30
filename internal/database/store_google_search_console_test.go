@@ -2,6 +2,8 @@ package database
 
 import (
 	"context"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -87,6 +89,93 @@ func TestGetGoogleSearchConsoleConnectionMissing(t *testing.T) {
 	}
 	if conn != nil {
 		t.Fatalf("expected nil connection, got %+v", conn)
+	}
+}
+
+func TestPruneGoogleSearchConsoleErrorMessagesRetainsMetadataAndRecentPayloads(t *testing.T) {
+	ctx := context.Background()
+	store := NewStore(":memory:")
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer store.Close()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	userID, teamID := createGoogleSearchConsoleTestTeam(t, store)
+	oldSite, err := store.CreateSite(ctx, userID, "old-gsc-error.example.com")
+	if err != nil {
+		t.Fatalf("create old error site: %v", err)
+	}
+	recentSite, err := store.CreateSite(ctx, userID, "recent-gsc-error.example.com")
+	if err != nil {
+		t.Fatalf("create recent error site: %v", err)
+	}
+	now := time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC)
+	oldAttempt := now.AddDate(0, 0, -31)
+	recentAttempt := now.AddDate(0, 0, -29)
+	for _, input := range []struct {
+		siteID  uuid.UUID
+		message string
+	}{
+		{siteID: oldSite.ID, message: "old provider payload"},
+		{siteID: recentSite.ID, message: "recent provider payload"},
+	} {
+		if err := store.AppendAuditEntry(ctx, AuditEntryParams{
+			TeamID: teamID, Action: "google_search_console.sync_failed", TargetType: "site", TargetID: input.siteID.String(), Outcome: "failure",
+			Details: `outcome=failed;stage=query;category=credentials_invalid;http_status=400;error_message=` + strconv.Quote(input.message),
+		}); err != nil {
+			t.Fatalf("seed audit entry: %v", err)
+		}
+	}
+	if _, err := store.DB().ExecContext(ctx, "UPDATE instance_audit_log SET created_at = ? WHERE target_id = ?", oldAttempt, oldSite.ID.String()); err != nil {
+		t.Fatalf("age old audit entry: %v", err)
+	}
+	if _, err := store.DB().ExecContext(ctx, "UPDATE instance_audit_log SET created_at = ? WHERE target_id = ?", recentAttempt, recentSite.ID.String()); err != nil {
+		t.Fatalf("age recent audit entry: %v", err)
+	}
+
+	message, err := store.GetLatestGoogleSearchConsoleErrorMessage(ctx, teamID, recentSite.ID, now.AddDate(0, 0, -30))
+	if err != nil || message != "recent provider payload" {
+		t.Fatalf("derive recent error from audit log: message=%q err=%v", message, err)
+	}
+	message, err = store.GetLatestGoogleSearchConsoleErrorMessage(ctx, teamID, oldSite.ID, oldAttempt.Add(-time.Hour))
+	if err != nil || message != "old provider payload" {
+		t.Fatalf("derive old error from audit log: message=%q err=%v", message, err)
+	}
+
+	pruned, err := store.PruneGoogleSearchConsoleErrorMessages(ctx, now.AddDate(0, 0, -30))
+	if err != nil {
+		t.Fatalf("prune retained errors: %v", err)
+	}
+	if pruned != 1 {
+		t.Fatalf("expected one audit payload pruned, got %d", pruned)
+	}
+	message, err = store.GetLatestGoogleSearchConsoleErrorMessage(ctx, teamID, oldSite.ID, oldAttempt.Add(-time.Hour))
+	if err != nil || message != "" {
+		t.Fatalf("expected old audit payload scrubbed: message=%q err=%v", message, err)
+	}
+	message, err = store.GetLatestGoogleSearchConsoleErrorMessage(ctx, teamID, recentSite.ID, now.AddDate(0, 0, -30))
+	if err != nil || message != "recent provider payload" {
+		t.Fatalf("expected recent audit payload retained: message=%q err=%v", message, err)
+	}
+
+	entries, total, err := store.ListTeamAuditEntries(ctx, teamID, "google_search_console.sync_failed", 10, 0)
+	if err != nil {
+		t.Fatalf("list audit entries: %v", err)
+	}
+	if total != 2 || len(entries) != 2 {
+		t.Fatalf("expected both audit events retained, got total=%d entries=%+v", total, entries)
+	}
+	for _, entry := range entries {
+		hasPayload := strings.Contains(entry.Details, ";error_message=")
+		if entry.TargetID == oldSite.ID.String() && hasPayload {
+			t.Fatalf("expected old audit payload scrubbed: %+v", entry)
+		}
+		if entry.TargetID == recentSite.ID.String() && !hasPayload {
+			t.Fatalf("expected recent audit payload retained: %+v", entry)
+		}
 	}
 }
 

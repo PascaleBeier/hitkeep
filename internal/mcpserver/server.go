@@ -21,7 +21,9 @@ import (
 )
 
 const (
-	serverName = "hitkeep"
+	serverName              = "hitkeep"
+	mcpListCacheTTL         = 5 * time.Minute
+	mcpStaticResourceTTL    = time.Hour
 )
 
 type authContextKey struct{}
@@ -69,13 +71,68 @@ func NewHandler(conf *config.Config, store *database.Store, tenantStores *databa
 
 func (s *service) newMCPServer() *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{
-		Name:    serverName,
-		Version: s.conf.Version,
-	}, nil)
-	server.AddReceivingMiddleware(s.logMiddleware())
+		Name:        serverName,
+		Title:       "HitKeep Analytics MCP",
+		Description: "Read-only aggregate HitKeep analytics and official documentation over a stateless MCP endpoint.",
+		Version:     s.conf.Version,
+	}, &mcp.ServerOptions{
+		Capabilities: &mcp.ServerCapabilities{
+			Tools:     &mcp.ToolCapabilities{ListChanged: false},
+			Resources: &mcp.ResourceCapabilities{ListChanged: false, Subscribe: false},
+		},
+	})
+	server.AddReceivingMiddleware(s.logMiddleware(), s.cacheMiddleware())
 	s.registerTools(server)
 	s.registerResources(server)
 	return server
+}
+
+func (s *service) cacheMiddleware() mcp.Middleware {
+	docsTTL := time.Duration(s.conf.MCPDocsCacheMinutes) * time.Minute
+	return func(next mcp.MethodHandler) mcp.MethodHandler {
+		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+			result, err := next(ctx, method, req)
+			if err != nil || result == nil {
+				return result, err
+			}
+
+			setCache := func(cache *mcp.Cacheable, ttl time.Duration) {
+				if cache == nil {
+					return
+				}
+				if ttl < 0 {
+					ttl = 0
+				}
+				cache.TTLMs = int(ttl / time.Millisecond)
+				cache.CacheScope = "private"
+			}
+
+			switch typed := result.(type) {
+			case *mcp.DiscoverResult:
+				setCache(&typed.Cacheable, mcpListCacheTTL)
+			case *mcp.ListToolsResult:
+				setCache(&typed.Cacheable, mcpListCacheTTL)
+			case *mcp.ListResourcesResult:
+				setCache(&typed.Cacheable, mcpListCacheTTL)
+			case *mcp.ListResourceTemplatesResult:
+				setCache(&typed.Cacheable, mcpListCacheTTL)
+			case *mcp.ReadResourceResult:
+				ttl := time.Duration(0)
+				if request, ok := req.(*mcp.ReadResourceRequest); ok && request.Params != nil {
+					switch request.Params.URI {
+					case helpMCPURI, helpMetricsURI:
+						ttl = mcpStaticResourceTTL
+					default:
+						if s.docs != nil {
+							ttl = docsTTL
+						}
+					}
+				}
+				setCache(&typed.Cacheable, ttl)
+			}
+			return result, nil
+		}
+	}
 }
 
 func (s *service) hostValidationMiddleware(next http.Handler) http.Handler {

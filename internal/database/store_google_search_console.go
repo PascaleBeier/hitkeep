@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -84,7 +85,6 @@ type GoogleSearchConsoleSyncStateInput struct {
 	LastSuccessAt     *time.Time
 	LastAttemptAt     *time.Time
 	LastErrorCategory string
-	LastErrorMessage  string
 	NextRetryAt       *time.Time
 	Manual            bool
 }
@@ -98,7 +98,6 @@ type GoogleSearchConsoleSyncState struct {
 	LastSuccessAt     *time.Time
 	LastAttemptAt     *time.Time
 	LastErrorCategory string
-	LastErrorMessage  string
 	NextRetryAt       *time.Time
 	Manual            bool
 	UpdatedAt         time.Time
@@ -124,6 +123,8 @@ type GoogleSearchConsoleSystemStatus struct {
 	LastAttemptAt       *time.Time
 	NextRetryAt         *time.Time
 }
+
+const GoogleSearchConsoleErrorMessageRetention = 30 * 24 * time.Hour
 
 func (s *Store) UpsertGoogleSearchConsoleConnection(ctx context.Context, input GoogleSearchConsoleConnectionInput) error {
 	return upsertGoogleSearchConsoleConnection(ctx, s.db, input)
@@ -499,9 +500,9 @@ func upsertGoogleSearchConsoleSyncState(ctx context.Context, exec sqlExecContext
 	_, err := exec.ExecContext(ctx, `
 		INSERT INTO google_search_console_sync_state (
 			site_id, team_id, state, imported_start_date, imported_end_date,
-			last_success_at, last_attempt_at, last_error_category, last_error_message,
-			next_retry_at, manual, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now())
+			last_success_at, last_attempt_at, last_error_category, next_retry_at,
+			manual, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now())
 		ON CONFLICT (site_id) DO UPDATE SET
 			team_id = excluded.team_id,
 			state = excluded.state,
@@ -510,7 +511,6 @@ func upsertGoogleSearchConsoleSyncState(ctx context.Context, exec sqlExecContext
 			last_success_at = excluded.last_success_at,
 			last_attempt_at = excluded.last_attempt_at,
 			last_error_category = excluded.last_error_category,
-			last_error_message = excluded.last_error_message,
 			next_retry_at = excluded.next_retry_at,
 			manual = excluded.manual,
 			updated_at = now()
@@ -523,7 +523,6 @@ func upsertGoogleSearchConsoleSyncState(ctx context.Context, exec sqlExecContext
 		nullableTimePtr(input.LastSuccessAt),
 		nullableTimePtr(input.LastAttemptAt),
 		strings.TrimSpace(input.LastErrorCategory),
-		strings.TrimSpace(input.LastErrorMessage),
 		nullableTimePtr(input.NextRetryAt),
 		input.Manual,
 	)
@@ -538,7 +537,7 @@ func (s *Store) GetGoogleSearchConsoleSyncState(ctx context.Context, siteID uuid
 	var importedStart, importedEnd, lastSuccess, lastAttempt, nextRetry sql.NullTime
 	err := s.db.QueryRowContext(ctx, `
 		SELECT site_id, team_id, state, imported_start_date, imported_end_date,
-			last_success_at, last_attempt_at, last_error_category, last_error_message, next_retry_at,
+			last_success_at, last_attempt_at, last_error_category, next_retry_at,
 			manual, updated_at
 		FROM google_search_console_sync_state
 		WHERE site_id = ?
@@ -552,7 +551,6 @@ func (s *Store) GetGoogleSearchConsoleSyncState(ctx context.Context, siteID uuid
 		&lastSuccess,
 		&lastAttempt,
 		&state.LastErrorCategory,
-		&state.LastErrorMessage,
 		&nextRetry,
 		&state.Manual,
 		&state.UpdatedAt,
@@ -569,6 +567,59 @@ func (s *Store) GetGoogleSearchConsoleSyncState(ctx context.Context, siteID uuid
 	state.LastAttemptAt = nullableTimeValue(lastAttempt)
 	state.NextRetryAt = nullableTimeValue(nextRetry)
 	return &state, nil
+}
+
+func (s *Store) GetLatestGoogleSearchConsoleErrorMessage(ctx context.Context, teamID, siteID uuid.UUID, notBefore time.Time) (string, error) {
+	var details string
+	err := s.db.QueryRowContext(ctx, `
+		SELECT details
+		FROM instance_audit_log
+		WHERE team_id = ?
+			AND action = 'google_search_console.sync_failed'
+			AND target_type = 'site'
+			AND target_id = ?
+			AND created_at >= ?
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, teamID, siteID.String(), notBefore.UTC()).Scan(&details)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("get latest Google Search Console audit error: %w", err)
+	}
+	const marker = ";error_message="
+	index := strings.Index(details, marker)
+	if index < 0 {
+		return "", nil
+	}
+	encoded := strings.TrimSpace(details[index+len(marker):])
+	message, err := strconv.Unquote(encoded)
+	if err != nil {
+		return encoded, nil
+	}
+	return message, nil
+}
+
+func (s *Store) PruneGoogleSearchConsoleErrorMessages(ctx context.Context, before time.Time) (int64, error) {
+	if before.IsZero() {
+		return 0, fmt.Errorf("search console error retention cutoff is required")
+	}
+	auditResult, err := s.db.ExecContext(ctx, `
+			UPDATE instance_audit_log
+			SET details = split_part(details, ';error_message=', 1)
+			WHERE action = 'google_search_console.sync_failed'
+				AND created_at < ?
+				AND strpos(details, ';error_message=') > 0
+	`, before.UTC())
+	if err != nil {
+		return 0, fmt.Errorf("prune retained Google Search Console audit errors: %w", err)
+	}
+	pruned, err := auditResult.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("count pruned Google Search Console audit errors: %w", err)
+	}
+	return pruned, nil
 }
 
 func (s *Store) ListGoogleSearchConsoleSyncCandidates(ctx context.Context, now time.Time, limit int) ([]GoogleSearchConsoleSyncCandidate, error) {

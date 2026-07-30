@@ -1,5 +1,7 @@
 package system
 
+import "hitkeep/internal/searchconsole"
+
 var opportunityEvidenceOpenAPISchema = map[string]any{
 	"type": "object",
 	"properties": map[string]any{
@@ -1019,7 +1021,7 @@ func googleSearchConsoleSyncStatusSchema() map[string]any {
 			"last_success_at":     map[string]any{"type": "string", "format": "date-time"},
 			"last_attempt_at":     map[string]any{"type": "string", "format": "date-time"},
 			"last_error_category": map[string]any{"type": "string"},
-			"last_error_message":  map[string]any{"type": "string", "description": "Full error response returned by Google for the latest failed sync."},
+			"last_error_message":  map[string]any{"type": "string", "maxLength": searchconsole.MaxErrorDiagnosticBytes, "description": "Error response returned by Google for the latest failed sync. Raw provider details are retained for up to 30 days and may be truncated at the documented maximum length."},
 			"next_retry_at":       map[string]any{"type": "string", "format": "date-time"},
 			"manual":              map[string]any{"type": "boolean"},
 		},

@@ -130,7 +130,14 @@ func (w *SearchConsoleSyncWorker) RunDue(ctx context.Context, limit int) (Search
 	if w == nil || w.tenantMgr == nil || w.source == nil {
 		return SearchConsoleSyncRunSummary{}, fmt.Errorf("search console sync worker is not configured")
 	}
-	candidates, err := w.tenantMgr.Shared().ListGoogleSearchConsoleSyncCandidates(ctx, w.now().UTC(), limit)
+	now := w.now().UTC()
+	pruned, pruneErr := w.tenantMgr.Shared().PruneGoogleSearchConsoleErrorMessages(ctx, now.Add(-database.GoogleSearchConsoleErrorMessageRetention))
+	if pruneErr != nil {
+		slog.Error("Failed to prune retained Google Search Console error messages", "error", pruneErr)
+	} else if pruned > 0 {
+		slog.Info("Pruned retained Google Search Console error messages", "audit_entries", pruned)
+	}
+	candidates, err := w.tenantMgr.Shared().ListGoogleSearchConsoleSyncCandidates(ctx, now, limit)
 	if err != nil {
 		return SearchConsoleSyncRunSummary{}, err
 	}
@@ -303,7 +310,6 @@ func (w *SearchConsoleSyncWorker) recordSyncFailure(ctx context.Context, mapping
 		State:             searchConsoleFailureState(category),
 		LastAttemptAt:     &now,
 		LastErrorCategory: string(category),
-		LastErrorMessage:  diagnostic.Message,
 		NextRetryAt:       nextRetry,
 		Manual:            false,
 	}

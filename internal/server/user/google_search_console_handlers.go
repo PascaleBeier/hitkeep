@@ -657,6 +657,13 @@ func (h *handler) googleSearchConsoleSiteMappingResponse(ctx context.Context, si
 	}
 	if syncState != nil && syncState.TeamID == teamID {
 		resp.SyncStatus = googleSearchConsoleSyncStatusResponse(syncState)
+		if syncState.State == "failed" || syncState.State == "needs_attention" {
+			message, err := h.ctx.Store.GetLatestGoogleSearchConsoleErrorMessage(ctx, teamID, siteID, time.Now().UTC().Add(-database.GoogleSearchConsoleErrorMessageRetention))
+			if err != nil {
+				return resp, err
+			}
+			resp.SyncStatus.LastErrorMessage = message
+		}
 	}
 	return resp, nil
 }
@@ -916,7 +923,6 @@ func googleSearchConsoleSyncStatusResponse(state *database.GoogleSearchConsoleSy
 		LastSuccessAt:     state.LastSuccessAt,
 		LastAttemptAt:     state.LastAttemptAt,
 		LastErrorCategory: state.LastErrorCategory,
-		LastErrorMessage:  state.LastErrorMessage,
 		NextRetryAt:       state.NextRetryAt,
 		Manual:            state.Manual,
 	}

@@ -96,9 +96,6 @@ func TestSearchConsoleSyncWorkerQuotaErrorBacksOff(t *testing.T) {
 	if state == nil || state.State != "failed" || state.LastErrorCategory != string(searchconsole.CategoryQuotaLimited) {
 		t.Fatalf("expected quota-limited failed state, got %+v", state)
 	}
-	if state.LastErrorMessage != "daily quota exceeded" {
-		t.Fatalf("expected useful persisted error message, got %q", state.LastErrorMessage)
-	}
 	if state.NextRetryAt == nil || !state.NextRetryAt.After(time.Date(2026, 5, 5, 12, 0, 0, 0, time.UTC)) {
 		t.Fatalf("expected quota retry time, got %+v", state.NextRetryAt)
 	}
@@ -116,6 +113,71 @@ func TestSearchConsoleSyncWorkerQuotaErrorBacksOff(t *testing.T) {
 		t.Fatalf("expected query-stage failure diagnostic, got %+v", entries[0])
 	}
 	requireSearchConsoleStartAudit(t, shared, teamID, site.ID)
+}
+
+func TestSearchConsoleSyncWorkerPrunesExpiredErrorPayloadsWithoutRetryingAttentionState(t *testing.T) {
+	ctx := context.Background()
+	fixture := newSearchConsoleWorkerFixture(t, "gsc-retention@test.dev", "gsc-retention.example.com")
+	defer fixture.shared.Close()
+	now := time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC)
+	oldAttempt := now.Add(-database.GoogleSearchConsoleErrorMessageRetention - time.Hour)
+	if err := fixture.shared.UpsertGoogleSearchConsoleSyncState(ctx, database.GoogleSearchConsoleSyncStateInput{
+		SiteID: fixture.site.ID, TeamID: fixture.teamID, State: "needs_attention", LastAttemptAt: &oldAttempt,
+		LastErrorCategory: string(searchconsole.CategoryCredentialsInvalid),
+	}); err != nil {
+		t.Fatalf("seed expired sync error: %v", err)
+	}
+	if err := fixture.shared.AppendAuditEntry(ctx, database.AuditEntryParams{
+		TeamID: fixture.teamID, Action: "google_search_console.sync_failed", TargetType: "site", TargetID: fixture.site.ID.String(), Outcome: "failure",
+		Details: `outcome=failed;stage=query;category=credentials_invalid;http_status=400;error_message="expired provider payload"`,
+	}); err != nil {
+		t.Fatalf("seed expired audit error: %v", err)
+	}
+	if _, err := fixture.shared.DB().ExecContext(ctx, "UPDATE instance_audit_log SET created_at = ? WHERE target_id = ?", oldAttempt, fixture.site.ID.String()); err != nil {
+		t.Fatalf("age audit error: %v", err)
+	}
+
+	worker := NewSearchConsoleSyncWorker(fixture.tenantMgr, &fakeSearchConsoleSource{})
+	worker.now = func() time.Time { return now }
+	summary, err := worker.RunDue(ctx, 10)
+	if err != nil {
+		t.Fatalf("run due: %v", err)
+	}
+	if summary.Attempted != 0 {
+		t.Fatalf("expected attention state not to retry, got %+v", summary)
+	}
+	entries, _, err := fixture.shared.ListTeamAuditEntries(ctx, fixture.teamID, "google_search_console.sync_failed", 5, 0)
+	if err != nil {
+		t.Fatalf("list pruned audit: %v", err)
+	}
+	if len(entries) != 1 || strings.Contains(entries[0].Details, ";error_message=") || !strings.Contains(entries[0].Details, "http_status=400") {
+		t.Fatalf("expected audit metadata without expired payload, got %+v", entries)
+	}
+}
+
+func TestSearchConsoleSyncWorkerContinuesWhenErrorRetentionMaintenanceFails(t *testing.T) {
+	ctx := context.Background()
+	fixture := newSearchConsoleWorkerFixture(t, "gsc-retention-failure@test.dev", "gsc-retention-failure.example.com")
+	defer fixture.shared.Close()
+	now := time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC)
+	if err := fixture.shared.UpsertGoogleSearchConsoleSyncState(ctx, database.GoogleSearchConsoleSyncStateInput{
+		SiteID: fixture.site.ID, TeamID: fixture.teamID, State: "needs_attention", LastAttemptAt: new(now),
+	}); err != nil {
+		t.Fatalf("seed attention state: %v", err)
+	}
+	if _, err := fixture.shared.DB().ExecContext(ctx, "DROP TABLE instance_audit_log"); err != nil {
+		t.Fatalf("break retention audit storage: %v", err)
+	}
+
+	worker := NewSearchConsoleSyncWorker(fixture.tenantMgr, &fakeSearchConsoleSource{})
+	worker.now = func() time.Time { return now }
+	summary, err := worker.RunDue(ctx, 10)
+	if err != nil {
+		t.Fatalf("retention maintenance must not stop sync scheduling: %v", err)
+	}
+	if summary.Attempted != 0 {
+		t.Fatalf("expected attention state not to retry, got %+v", summary)
+	}
 }
 
 func TestSearchConsoleSyncWorkerPropertyAccessLossKeepsImportedFacts(t *testing.T) {
@@ -576,8 +638,8 @@ func requireSearchConsoleSucceededState(t *testing.T, shared *database.Store, si
 	if state.ImportedEndDate == nil || state.ImportedEndDate.Format(time.DateOnly) != endDate {
 		t.Fatalf("expected imported end date %s, got %+v", endDate, state.ImportedEndDate)
 	}
-	if state.LastErrorCategory != "" || state.LastErrorMessage != "" || state.NextRetryAt != nil {
-		t.Fatalf("expected successful sync to clear error status, got category=%q message=%q retry=%+v", state.LastErrorCategory, state.LastErrorMessage, state.NextRetryAt)
+	if state.LastErrorCategory != "" || state.NextRetryAt != nil {
+		t.Fatalf("expected successful sync to clear error status, got category=%q retry=%+v", state.LastErrorCategory, state.NextRetryAt)
 	}
 }
 

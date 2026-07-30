@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"google.golang.org/api/googleapi"
 )
@@ -158,6 +159,21 @@ func TestDiagnoseErrorExtractsFullGoogleAPIResponseBody(t *testing.T) {
 	}
 	if diagnostic.Message != responseBody {
 		t.Fatalf("expected full upstream response body, got %q", diagnostic.Message)
+	}
+}
+
+func TestDiagnoseErrorBoundsPathologicalResponseBodiesWithoutBreakingUTF8(t *testing.T) {
+	body := strings.Repeat("é", MaxErrorDiagnosticBytes)
+	diagnostic := DiagnoseError(&googleapi.Error{Code: http.StatusBadRequest, Body: body})
+
+	if len(diagnostic.Message) > MaxErrorDiagnosticBytes {
+		t.Fatalf("expected diagnostic at most %d bytes, got %d", MaxErrorDiagnosticBytes, len(diagnostic.Message))
+	}
+	if !utf8.ValidString(diagnostic.Message) {
+		t.Fatalf("expected valid UTF-8 after truncation")
+	}
+	if !strings.HasSuffix(diagnostic.Message, errorDiagnosticTruncatedLabel) {
+		t.Fatalf("expected an explicit truncation marker, got suffix %q", diagnostic.Message[len(diagnostic.Message)-64:])
 	}
 }
 

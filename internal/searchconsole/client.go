@@ -7,12 +7,18 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
 	searchconsoleapi "google.golang.org/api/searchconsole/v1"
+)
+
+const (
+	MaxErrorDiagnosticBytes       = 64 << 10
+	errorDiagnosticTruncatedLabel = "\n[truncated by HitKeep]"
 )
 
 const ReadOnlyScope = "https://www.googleapis.com/auth/webmasters.readonly"
@@ -125,12 +131,24 @@ func DiagnoseError(err error) ErrorDiagnostic {
 	if errors.As(err, &googleErr) {
 		diagnostic.HTTPStatus = googleErr.Code
 		diagnostic.ProviderReason = googleAPIErrorReason(googleErr)
-		diagnostic.Message = googleAPIErrorMessage(googleErr)
+		diagnostic.Message = boundErrorDiagnostic(googleAPIErrorMessage(googleErr))
 		return diagnostic
 	}
 
-	diagnostic.Message = err.Error()
+	diagnostic.Message = boundErrorDiagnostic(err.Error())
 	return diagnostic
+}
+
+func boundErrorDiagnostic(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) <= MaxErrorDiagnosticBytes {
+		return value
+	}
+	cutoff := MaxErrorDiagnosticBytes - len(errorDiagnosticTruncatedLabel)
+	for cutoff > 0 && !utf8.RuneStart(value[cutoff]) {
+		cutoff--
+	}
+	return value[:cutoff] + errorDiagnosticTruncatedLabel
 }
 
 func googleAPIErrorReason(err *googleapi.Error) string {
