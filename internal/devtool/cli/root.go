@@ -714,21 +714,27 @@ func ciCommand(options *options) *cobra.Command {
 
 func mcpCommand(options *options) *cobra.Command {
 	command := &cobra.Command{Use: "mcp", Short: "Expose hk over local Model Context Protocol"}
+	var fallbackWorkspace string
+	serve := &cobra.Command{Use: "serve", Short: "Serve stateless MCP over stdio", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		if cmd.Root().PersistentFlags().Changed("workspace") {
+			app, err := devtool.NewApp(options.workspace)
+			if err != nil {
+				return err
+			}
+			return devmcp.RunStdio(cmd.Context(), app, options.version)
+		}
+		fallback := fallbackWorkspace
+		if fallback == "" {
+			fallback, _ = os.Getwd()
+		}
+		return devmcp.RunCentralStdio(cmd.Context(), fallback, options.version)
+	}}
+	serve.Flags().StringVar(&fallbackWorkspace, "fallback-workspace", "", "Fallback HitKeep worktree used when a workspace selector is omitted")
 	command.AddCommand(
 		&cobra.Command{Use: "manifest", Short: "Emit the central client registration", Args: cobra.NoArgs, RunE: withApp(options, "mcp manifest", func(_ context.Context, app *devtool.App) (any, error) {
 			return app.MCPManifest()
 		})},
-		&cobra.Command{Use: "serve", Short: "Serve MCP over stdio", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
-			if cmd.Root().PersistentFlags().Changed("workspace") {
-				app, err := devtool.NewApp(options.workspace)
-				if err != nil {
-					return err
-				}
-				return devmcp.RunStdio(cmd.Context(), app, options.version)
-			}
-			fallback, _ := os.Getwd()
-			return devmcp.RunCentralStdio(cmd.Context(), fallback, options.version)
-		}},
+		serve,
 	)
 	return command
 }
@@ -961,7 +967,7 @@ func renderPlain(writer io.Writer, envelope devtool.Envelope) error {
 			_, _ = fmt.Fprintf(writer, "  %-24s %-7s %s\n", gate.ID, gate.Timeout, gate.Description)
 		}
 	case devtool.DeveloperMCPManifest:
-		_, _ = fmt.Fprintln(writer, "One-time central MCP registration (model-agnostic; routes by client roots):")
+		_, _ = fmt.Fprintln(writer, "One-time central MCP registration (model-agnostic; stateless server-catalog routing):")
 		raw, err := json.MarshalIndent(value.ClientConfig, "", "  ")
 		if err != nil {
 			return err

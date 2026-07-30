@@ -9,7 +9,7 @@ Treat `AGENTS.md` as repository policy and the live `hk` QA catalog as workflow 
 
 ## Select
 
-Use `hk_qa_plan` whenever it is callable. If it is absent or fails, report whether registration, startup, root routing, or task reload is blocking MCP and obtain explicit user approval before using an equivalent CLI action. After approval, discover the planning command through `./hk qa --help` and request `--output json`.
+Use `hk_qa_plan` whenever it is callable. If it is absent or fails, report whether registration, startup, workspace routing, or task reload is blocking MCP and obtain explicit user approval before using an equivalent CLI action. After approval, discover the planning command through `./hk qa --help` and request `--output json`.
 
 - Use the change-aware profile while iterating.
 - Use the PR-parity profile before review.

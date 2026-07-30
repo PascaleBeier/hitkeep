@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 )
 
-const DeveloperMCPManifestSchemaVersion = "hk.dev/mcp-manifest/v3"
+const DeveloperMCPManifestSchemaVersion = "hk.dev/mcp-manifest/v4"
 
 const developerMCPServerName = "hitkeep-dev"
 
@@ -26,6 +26,7 @@ type DeveloperMCPManifest struct {
 	Scope            string                 `json:"scope"`
 	WorkspaceRouting string                 `json:"workspace_routing"`
 	Delegation       string                 `json:"delegation"`
+	ProtocolMode     string                 `json:"protocol_mode"`
 	Notifications    []string               `json:"notifications"`
 	Command          string                 `json:"command"`
 	Args             []string               `json:"args"`
@@ -34,7 +35,8 @@ type DeveloperMCPManifest struct {
 
 // MCPManifest returns a one-time central registration anchored to this
 // checkout's portable launcher. The launcher builds hk locally for the host,
-// while the server routes client roots to each workspace's own MCP process.
+// while the server routes the configured fallback or explicit workspace to
+// that worktree's own MCP process using the server's workspace catalog and without protocol sessions.
 func (a *App) MCPManifest() (DeveloperMCPManifest, error) {
 	launcher := filepath.Join(a.workspace.Root, "hk")
 	info, err := os.Lstat(launcher)
@@ -44,16 +46,17 @@ func (a *App) MCPManifest() (DeveloperMCPManifest, error) {
 	if !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
 		return DeveloperMCPManifest{}, fmt.Errorf("hk launcher must be a regular executable file: %s", launcher)
 	}
-	arguments := []string{"mcp", "serve"}
+	arguments := []string{"mcp", "serve", "--fallback-workspace", a.workspace.Root}
 	definition := MCPServerDefinition{Command: launcher, Args: arguments}
 	return DeveloperMCPManifest{
 		SchemaVersion:    DeveloperMCPManifestSchemaVersion,
 		ServerName:       developerMCPServerName,
 		Transport:        "stdio",
 		Scope:            "central",
-		WorkspaceRouting: "client-roots",
+		WorkspaceRouting: "server-catalog",
 		Delegation:       "workspace-mcp",
-		Notifications:    []string{"progress", "logging"},
+		ProtocolMode:     "stateless",
+		Notifications:    []string{"progress"},
 		Command:          definition.Command,
 		Args:             arguments,
 		ClientConfig: MCPClientConfiguration{MCPServers: map[string]MCPServerDefinition{

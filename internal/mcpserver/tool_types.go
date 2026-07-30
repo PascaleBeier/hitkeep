@@ -57,6 +57,7 @@ type webVitalsInput struct {
 	Metric             string `json:"metric,omitempty" jsonschema:"Optional Web Vital metric filter: LCP, INP, CLS, FCP, or TTFB. Defaults to all metrics for summary and LCP for page or dimension breakdowns."`
 	Path               string `json:"path,omitempty" jsonschema:"Optional normalized page path filter."`
 	Rating             string `json:"rating,omitempty" jsonschema:"Optional rating filter: good, needs_improvement, or poor."`
+	IncludeTimeseries  bool   `json:"include_timeseries,omitempty" jsonschema:"Whether to include metric timeseries when metric is set."`
 	IncludePages       bool   `json:"include_pages,omitempty" jsonschema:"Whether to include aggregate page breakdown rows."`
 	BreakdownDimension string `json:"breakdown_dimension,omitempty" jsonschema:"Optional aggregate visitor context breakdown: browser, country, language, device, city, provider, or asn."`
 	Limit              int    `json:"limit,omitempty" jsonschema:"Maximum page or breakdown rows to return. Defaults to 10 and is capped at 50."`
@@ -68,8 +69,23 @@ type aiVisibilityInput struct {
 	AssistantName      string `json:"assistant_name,omitempty" jsonschema:"Optional AI assistant name filter."`
 	AssistantFamily    string `json:"assistant_family,omitempty" jsonschema:"Optional AI assistant family filter."`
 	ResourceType       string `json:"resource_type,omitempty" jsonschema:"Optional fetched resource type filter."`
+	Path               string `json:"path,omitempty" jsonschema:"Optional normalized page path filter."`
+	IncludeTimeseries  *bool  `json:"include_timeseries,omitempty" jsonschema:"Whether to include AI fetch timeseries. Defaults to true."`
 	IncludeCorrelation bool   `json:"include_correlation,omitempty" jsonschema:"Whether to include fetch-to-visit correlation details."`
 	WindowDays         int    `json:"window_days,omitempty" jsonschema:"Correlation window in days. Defaults to 30 and is capped at 90."`
+	rangeInput
+}
+
+type funnelStatsInput struct {
+	SiteID   string `json:"site_id" jsonschema:"HitKeep site UUID."`
+	FunnelID string `json:"funnel_id" jsonschema:"Configured funnel UUID."`
+	rangeInput
+}
+
+type qrCampaignsInput struct {
+	SiteID        string `json:"site_id" jsonschema:"HitKeep site UUID."`
+	Limit         int    `json:"limit,omitempty" jsonschema:"Maximum campaigns to return. Defaults to 10 and is capped at 50."`
+	IncludeSeries bool   `json:"include_series,omitempty" jsonschema:"Whether to include QR open timeseries for each campaign."`
 	rangeInput
 }
 
@@ -147,9 +163,34 @@ type webVitalsOutput struct {
 	To                 string                      `json:"to"`
 	Metric             api.WebVitalMetric          `json:"metric,omitempty"`
 	Summary            []api.WebVitalSummaryMetric `json:"summary"`
+	Timeseries         []api.WebVitalSeriesPoint   `json:"timeseries,omitempty"`
 	Pages              []api.WebVitalPageRow       `json:"pages,omitempty"`
 	BreakdownDimension api.WebVitalDimension       `json:"breakdown_dimension,omitempty"`
 	Breakdown          []api.WebVitalDimensionRow  `json:"breakdown,omitempty"`
+}
+
+type funnelStatsOutput struct {
+	SiteID string           `json:"site_id"`
+	From   string           `json:"from"`
+	To     string           `json:"to"`
+	Stats  *api.FunnelStats `json:"stats"`
+}
+
+type qrCampaignsOutput struct {
+	SiteID    string              `json:"site_id"`
+	From      string              `json:"from"`
+	To        string              `json:"to"`
+	Campaigns []mcpQRCodeCampaign `json:"campaigns"`
+}
+
+type mcpQRCodeCampaign struct {
+	ID         string                      `json:"id"`
+	Name       string                      `json:"name"`
+	CreatedAt  string                      `json:"created_at"`
+	OpenCount  int                         `json:"open_count"`
+	Pageviews  int                         `json:"pageviews"`
+	Visitors   int                         `json:"visitors"`
+	Timeseries []api.QRCodeOpenSeriesPoint `json:"timeseries,omitempty"`
 }
 
 type aiVisibilityOutput struct {
@@ -157,7 +198,7 @@ type aiVisibilityOutput struct {
 	From        string                        `json:"from"`
 	To          string                        `json:"to"`
 	Overview    *api.AIFetchOverview          `json:"overview"`
-	Timeseries  []mcpAIFetchSeriesPoint       `json:"timeseries"`
+	Timeseries  []mcpAIFetchSeriesPoint       `json:"timeseries,omitempty"`
 	Correlation *api.AIFetchCorrelationReport `json:"correlation,omitempty"`
 }
 
@@ -302,6 +343,7 @@ type mcpSiteStats struct {
 	UTMSourceHits       int                         `json:"utm_source_hits"`
 	UTMTermHits         int                         `json:"utm_term_hits"`
 	Goals               []mcpGoalStats              `json:"goals"`
+	Funnels             []api.Funnel                `json:"funnels"`
 	Comparison          *mcpComparisonStats         `json:"comparison,omitempty"`
 }
 

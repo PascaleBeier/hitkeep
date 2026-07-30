@@ -24,18 +24,24 @@ fi
 
 rpc() {
   local method="$1"
+  local body
+  body=$(printf '{"jsonrpc":"2.0","id":1,"method":"%s","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientInfo":{"name":"hitkeep-audit","version":"1"},"io.modelcontextprotocol/clientCapabilities":{}}}}' "$method")
   curl -fsSL "$HITKEEP_MCP_URL" \
     -H "Accept: application/json, text/event-stream" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $HITKEEP_MCP_TOKEN" \
-    --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"$method\"}"
+    -H "Mcp-Protocol-Version: 2026-07-28" \
+    -H "Mcp-Method: $method" \
+    --data "$body"
 }
 
+DISCOVER_JSON="$(rpc "server/discover")"
 TOOLS_JSON="$(rpc "tools/list")"
 RESOURCES_JSON="$(rpc "resources/list")"
 TEMPLATES_JSON="$(rpc "resources/templates/list")"
 
-TOOLS_JSON="$TOOLS_JSON" RESOURCES_JSON="$RESOURCES_JSON" TEMPLATES_JSON="$TEMPLATES_JSON" node <<'NODE'
+DISCOVER_JSON="$DISCOVER_JSON" TOOLS_JSON="$TOOLS_JSON" RESOURCES_JSON="$RESOURCES_JSON" TEMPLATES_JSON="$TEMPLATES_JSON" node <<'NODE'
+const discover = JSON.parse(process.env.DISCOVER_JSON);
 const tools = JSON.parse(process.env.TOOLS_JSON);
 const resources = JSON.parse(process.env.RESOURCES_JSON);
 const templates = JSON.parse(process.env.TEMPLATES_JSON);
@@ -53,6 +59,10 @@ const expectedTools = new Set([
   "hitkeep_get_event_breakdown",
   "hitkeep_get_ecommerce",
   "hitkeep_get_ai_visibility",
+  "hitkeep_get_web_vitals",
+  "hitkeep_get_opportunities",
+  "hitkeep_get_funnel_stats",
+  "hitkeep_get_qr_campaigns",
   "hitkeep_get_search_console_status",
   "hitkeep_get_search_console",
   "hitkeep_search_docs",
@@ -78,8 +88,23 @@ const forbidden = [
   "exclusion",
 ];
 
+function assertCache(result, label, ttlMs) {
+  assert(result?.resultType === "complete", `${label} missing resultType=complete`);
+  assert(result?.cacheScope === "private", `${label} must be private-cache scoped`);
+  assert(result?.ttlMs === ttlMs, `${label} ttlMs=${result?.ttlMs}, want ${ttlMs}`);
+}
+
+assert(!discover.error, `server/discover failed: ${JSON.stringify(discover.error)}`);
+assert(discover.result?.supportedVersions?.includes("2026-07-28"), "server/discover did not advertise 2026-07-28");
+assert(!discover.result?.capabilities?.logging, "deprecated logging capability advertised");
+assert(discover.result?.capabilities?.tools?.listChanged === false, "tools listChanged must be false");
+assert(discover.result?.capabilities?.resources?.listChanged === false, "resources listChanged must be false");
+assert(discover.result?.capabilities?.resources?.subscribe === false, "resource subscriptions must be disabled");
+assertCache(discover.result, "server/discover", 300000);
+
 assert(!tools.error, `tools/list failed: ${JSON.stringify(tools.error)}`);
 assert(Array.isArray(tools.result?.tools), "tools/list did not return result.tools");
+assertCache(tools.result, "tools/list", 300000);
 for (const name of expectedTools) {
   assert(tools.result.tools.some((tool) => tool.name === name), `missing tool ${name}`);
 }
@@ -87,6 +112,9 @@ for (const tool of tools.result.tools) {
   assert(tool.name?.startsWith("hitkeep_"), `unexpected tool namespace ${tool.name}`);
   assert(tool.title && tool.description, `tool ${tool.name} needs title and description`);
   assert(tool.annotations?.readOnlyHint === true, `tool ${tool.name} must be read-only`);
+  assert(tool.annotations?.idempotentHint === true, `tool ${tool.name} must be idempotent`);
+  assert(tool.inputSchema?.type === "object", `tool ${tool.name} input schema must be an object`);
+  assert(tool.outputSchema?.type === "object", `tool ${tool.name} output schema must be an object`);
   if (!openWorldTools.has(tool.name)) {
     assert(tool.annotations?.openWorldHint === false, `tool ${tool.name} must be closed-world`);
   }
@@ -94,12 +122,14 @@ for (const tool of tools.result.tools) {
 }
 
 assert(!resources.error, `resources/list failed: ${JSON.stringify(resources.error)}`);
+assertCache(resources.result, "resources/list", 300000);
 const resourceUris = new Set((resources.result?.resources ?? []).map((resource) => resource.uri));
 for (const uri of ["hitkeep://help/mcp", "hitkeep://help/metrics", "hitkeep://docs/llms"]) {
   assert(resourceUris.has(uri), `missing resource ${uri}`);
 }
 
 assert(!templates.error, `resources/templates/list failed: ${JSON.stringify(templates.error)}`);
+assertCache(templates.result, "resources/templates/list", 300000);
 assert(
   (templates.result?.resourceTemplates ?? []).some((template) => template.uriTemplate === "hitkeep://docs/{+path}"),
   "missing docs resource template",

@@ -71,6 +71,7 @@ func toMCPSiteStats(stats *api.SiteStats) *mcpSiteStats {
 		UTMSourceHits:       stats.UTMSourceHits,
 		UTMTermHits:         stats.UTMTermHits,
 		Goals:               toMCPGoals(stats.Goals),
+		Funnels:             stats.Funnels,
 		Comparison:          toMCPComparisonStats(stats.Comparison),
 	}
 }
@@ -219,7 +220,7 @@ Team API clients are recommended for shared assistants and automations.
 
 ## Analytics Scope
 
-Analytics tools require a ` + "`site_id`" + ` that the API client can view. The server returns aggregate KPIs, event summaries, ecommerce summaries, Web Vitals summaries and visitor-context breakdowns, AI visibility reports, and saved Opportunities recommendations. It does not expose raw hit exports, raw Web Vitals samples, or write/admin actions.
+Analytics tools require a ` + "`site_id`" + ` that the API client can view. The server returns aggregate KPIs, event summaries, ecommerce summaries, Web Vitals summaries and visitor-context breakdowns, AI visibility reports, funnel conversion stats, QR campaign analytics, and saved Opportunities recommendations. It does not expose raw hit exports, raw Web Vitals samples, redirect tokens, QR assets, or write/admin actions. Ecommerce series and Web Vitals series are opt-in; AI visibility series are included by default and can be disabled.
 
 Date inputs use RFC3339 timestamps. If omitted, tools default to the last 30 days. Filters and visitor-context breakdowns support aggregate geo/network dimensions such as city, provider, and ASN, plus AI visibility dimensions such as AI bot, AI bot category, and AI source, where the selected tool supports them.
 

@@ -18,7 +18,7 @@ import (
 )
 
 func (s *service) registerTools(server *mcp.Server) {
-	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: new(false)}
+	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: new(false)}
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "hitkeep_list_sites",
@@ -75,6 +75,18 @@ func (s *service) registerTools(server *mcp.Server) {
 		Annotations: readOnly,
 	}, s.getOpportunities)
 	mcp.AddTool(server, &mcp.Tool{
+		Name:        "hitkeep_get_funnel_stats",
+		Title:       "Get HitKeep Funnel Stats",
+		Description: "Read aggregate step visitors, drop-off, and conversion for one configured funnel.",
+		Annotations: readOnly,
+	}, s.getFunnelStats)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "hitkeep_get_qr_campaigns",
+		Title:       "Get HitKeep QR Campaigns",
+		Description: "Read aggregate QR campaign opens, pageviews, visitors, and optional open timeseries without redirect tokens or raw hit data.",
+		Annotations: readOnly,
+	}, s.getQRCampaigns)
+	mcp.AddTool(server, &mcp.Tool{
 		Name:        "hitkeep_get_search_console_status",
 		Title:       "Get HitKeep Search Console Status",
 		Description: "Read Google Search Console mapping and sync status for one HitKeep site.",
@@ -87,7 +99,7 @@ func (s *service) registerTools(server *mcp.Server) {
 		Annotations: readOnly,
 	}, s.getSearchConsole)
 	if s.docs != nil {
-		docsReadOnly := &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: new(true)}
+		docsReadOnly := &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: new(true)}
 		mcp.AddTool(server, &mcp.Tool{
 			Name:        "hitkeep_search_docs",
 			Title:       "Search HitKeep Docs",
@@ -249,7 +261,7 @@ func (s *service) getEcommerce(ctx context.Context, _ *mcp.CallToolRequest, inpu
 	payload, err := analyticstools.NewBridge(analyticstools.Config{
 		Analytics: analyticsStore, SiteID: siteID, From: start, To: end, Filters: filters,
 	}).EcommerceData(ctx, analyticstools.EcommerceInput{
-		ItemID: input.ItemID, ItemName: input.ItemName, Limit: normalizeLimit(input.Limit),
+		ItemID: input.ItemID, ItemName: input.ItemName, Limit: normalizeLimit(input.Limit), IncludeSeries: false,
 	})
 	if err != nil {
 		return nil, ecommerceOutput{}, err
@@ -278,7 +290,7 @@ func (s *service) getWebVitals(ctx context.Context, _ *mcp.CallToolRequest, inpu
 		Analytics: analyticsStore, SiteID: siteID, From: start, To: end,
 	}).WebVitalsData(ctx, analyticstools.WebVitalsInput{
 		Metric: params.Metric, Path: params.Path, Rating: params.Rating, IncludePages: input.IncludePages,
-		BreakdownDimension: breakdownDimension, Limit: params.Limit,
+		IncludeTimeseries: input.IncludeTimeseries, BreakdownDimension: breakdownDimension, Limit: params.Limit,
 	})
 	if err != nil {
 		return nil, webVitalsOutput{}, err
@@ -297,6 +309,10 @@ func (s *service) getWebVitals(ctx context.Context, _ *mcp.CallToolRequest, inpu
 		output.Metric = payload.Metric
 		output.BreakdownDimension = payload.BreakdownDimension
 		output.Breakdown = payload.Breakdown
+	}
+	if len(payload.Timeseries) > 0 {
+		output.Metric = payload.Metric
+		output.Timeseries = payload.Timeseries
 	}
 	return nil, output, nil
 }
@@ -383,13 +399,86 @@ func (s *service) getAIVisibility(ctx context.Context, _ *mcp.CallToolRequest, i
 		Analytics: analyticsStore, SiteID: siteID, From: start, To: end,
 	}).AIVisibilityData(ctx, analyticstools.AIVisibilityInput{
 		AssistantName: input.AssistantName, AssistantFamily: input.AssistantFamily, ResourceType: input.ResourceType,
-		IncludeTimeseries: true, IncludeCorrelation: input.IncludeCorrelation, WindowDays: input.WindowDays,
+		Path: input.Path, IncludeTimeseries: includeAIVisibilityTimeseries(input.IncludeTimeseries), IncludeCorrelation: input.IncludeCorrelation, WindowDays: input.WindowDays,
 	})
 	if err != nil {
 		return nil, aiVisibilityOutput{}, err
 	}
 	output := aiVisibilityOutput{SiteID: siteID.String(), From: formatMCPTime(start), To: formatMCPTime(end), Overview: payload.Overview, Timeseries: toMCPAIFetchSeries(payload.Timeseries), Correlation: payload.Correlation}
 	return nil, output, nil
+}
+
+func includeAIVisibilityTimeseries(value *bool) bool {
+	return value == nil || *value
+}
+
+func (s *service) getFunnelStats(ctx context.Context, _ *mcp.CallToolRequest, input funnelStatsInput) (*mcp.CallToolResult, funnelStatsOutput, error) {
+	siteID, start, end, err := s.parseSiteRange(input.SiteID, input.rangeInput)
+	if err != nil {
+		return nil, funnelStatsOutput{}, err
+	}
+	if _, err := s.requireSiteView(ctx, siteID); err != nil {
+		return nil, funnelStatsOutput{}, err
+	}
+	funnelID, err := uuid.Parse(strings.TrimSpace(input.FunnelID))
+	if err != nil {
+		return nil, funnelStatsOutput{}, errors.New("invalid funnel_id")
+	}
+	analyticsStore, err := s.analyticsStore(ctx, siteID)
+	if err != nil {
+		return nil, funnelStatsOutput{}, err
+	}
+	stats, err := analyticsStore.GetFunnelStats(ctx, funnelID, api.AnalyticsParams{SiteID: siteID, Start: start, End: end})
+	if err != nil {
+		return nil, funnelStatsOutput{}, err
+	}
+	return nil, funnelStatsOutput{SiteID: siteID.String(), From: formatMCPTime(start), To: formatMCPTime(end), Stats: stats}, nil
+}
+
+func (s *service) getQRCampaigns(ctx context.Context, _ *mcp.CallToolRequest, input qrCampaignsInput) (*mcp.CallToolResult, qrCampaignsOutput, error) {
+	siteID, start, end, err := s.parseSiteRange(input.SiteID, input.rangeInput)
+	if err != nil {
+		return nil, qrCampaignsOutput{}, err
+	}
+	if _, err := s.requireSiteView(ctx, siteID); err != nil {
+		return nil, qrCampaignsOutput{}, err
+	}
+	qrs, err := s.store.ListQRCodes(ctx, siteID, false)
+	if err != nil {
+		return nil, qrCampaignsOutput{}, err
+	}
+	qrs = qrs[:min(len(qrs), normalizeLimit(input.Limit))]
+	analyticsStore, err := s.analyticsStore(ctx, siteID)
+	if err != nil {
+		return nil, qrCampaignsOutput{}, err
+	}
+	campaigns := make([]mcpQRCodeCampaign, 0, len(qrs))
+	for _, qr := range qrs {
+		stats, err := analyticsStore.GetSiteStats(ctx, api.AnalyticsParams{
+			SiteID: siteID, Start: start, End: end,
+			Filters: []api.Filter{{Type: "qr_code_id", Value: qr.ID.String()}},
+		})
+		if err != nil {
+			return nil, qrCampaignsOutput{}, err
+		}
+		opens, err := analyticsStore.CountQRCodeOpens(ctx, siteID, qr.ID, start, end)
+		if err != nil {
+			return nil, qrCampaignsOutput{}, err
+		}
+		campaign := mcpQRCodeCampaign{ID: qr.ID.String(), Name: qr.Name, CreatedAt: formatMCPTime(qr.CreatedAt), OpenCount: opens}
+		if stats != nil {
+			campaign.Pageviews = stats.TotalPageviews
+			campaign.Visitors = stats.UniqueSessions
+		}
+		if input.IncludeSeries {
+			campaign.Timeseries, err = analyticsStore.GetQRCodeOpenSeries(ctx, siteID, qr.ID, start, end)
+			if err != nil {
+				return nil, qrCampaignsOutput{}, err
+			}
+		}
+		campaigns = append(campaigns, campaign)
+	}
+	return nil, qrCampaignsOutput{SiteID: siteID.String(), From: formatMCPTime(start), To: formatMCPTime(end), Campaigns: campaigns}, nil
 }
 
 func (s *service) getOpportunities(ctx context.Context, _ *mcp.CallToolRequest, input opportunitiesInput) (*mcp.CallToolResult, opportunitiesOutput, error) {

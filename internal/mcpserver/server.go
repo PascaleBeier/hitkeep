@@ -21,9 +21,9 @@ import (
 )
 
 const (
-	serverName              = "hitkeep"
-	mcpListCacheTTL         = 5 * time.Minute
-	mcpStaticResourceTTL    = time.Hour
+	serverName           = "hitkeep"
+	mcpListCacheTTL      = 5 * time.Minute
+	mcpStaticResourceTTL = time.Hour
 )
 
 type authContextKey struct{}

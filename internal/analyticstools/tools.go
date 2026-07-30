@@ -45,9 +45,10 @@ type EventBreakdownInput struct {
 }
 
 type EcommerceInput struct {
-	ItemID   string
-	ItemName string
-	Limit    int
+	ItemID        string
+	ItemName      string
+	Limit         int
+	IncludeSeries bool
 }
 
 type EcommercePayload struct {
@@ -190,7 +191,7 @@ func (b Bridge) EventBreakdownData(ctx context.Context, input EventBreakdownInpu
 }
 
 func (b Bridge) ecommerce(ctx context.Context, _ struct{}) (string, error) {
-	payload, err := b.EcommerceData(ctx, EcommerceInput{Limit: 10})
+	payload, err := b.EcommerceData(ctx, EcommerceInput{Limit: 10, IncludeSeries: true})
 	if err != nil {
 		return "", err
 	}
@@ -213,9 +214,12 @@ func (b Bridge) EcommerceData(ctx context.Context, input EcommerceInput) (Ecomme
 	if err != nil {
 		return EcommercePayload{}, err
 	}
-	series, err := b.config.Analytics.GetEcommerceTimeSeries(ctx, params)
-	if err != nil {
-		return EcommercePayload{}, err
+	var series []api.EcommerceSeriesPoint
+	if input.IncludeSeries {
+		series, err = b.config.Analytics.GetEcommerceTimeSeries(ctx, params)
+		if err != nil {
+			return EcommercePayload{}, err
+		}
 	}
 	products, err := b.config.Analytics.GetEcommerceTopProducts(ctx, params)
 	if err != nil {

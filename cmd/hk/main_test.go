@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -141,7 +140,7 @@ func TestMCPStdioWritesNoNonProtocolOutput(t *testing.T) {
 	}
 }
 
-func TestMCPStdioWithoutWorkspaceRoutesByClientRoots(t *testing.T) {
+func TestMCPStdioWithoutWorkspaceUsesConfiguredFallback(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds the hk command")
 	}
@@ -180,11 +179,10 @@ func TestMCPStdioWithoutWorkspaceRoutesByClientRoots(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	command := exec.Command(binary, "mcp", "serve")
+	command := exec.Command(binary, "mcp", "serve", "--fallback-workspace", workspace)
 	command.Dir = projectRoot
 	command.Env = append(os.Environ(), "HK_STATE_DIR="+stateDir)
 	client := mcp.NewClient(&mcp.Implementation{Name: "hk-central-integration-test", Version: "test"}, nil)
-	client.AddRoots(&mcp.Root{URI: (&url.URL{Scheme: "file", Path: filepath.ToSlash(workspace)}).String()})
 	session, err := client.Connect(ctx, &mcp.CommandTransport{Command: command}, nil)
 	if err != nil {
 		t.Fatal(err)

@@ -47,6 +47,129 @@ func TestMCPServerRequiresBearerToken(t *testing.T) {
 	}
 }
 
+func TestMCPServerSupportsSessionlessDiscoveryAndCacheHints(t *testing.T) {
+	store, _, token := setupMCPStore(t)
+	conf := testMCPConfig(t, "")
+	handler := NewHandler(conf, store, nil, nil, nil)
+	ts := httptest.NewServer(handler)
+	defer ts.Close()
+
+	meta := map[string]any{
+		"io.modelcontextprotocol/protocolVersion":    "2026-07-28",
+		"io.modelcontextprotocol/clientInfo":         map[string]any{"name": "test-client", "version": "test"},
+		"io.modelcontextprotocol/clientCapabilities": map[string]any{},
+	}
+	call := func(method string, params map[string]any, headers map[string]string) (int, http.Header, []byte) {
+		t.Helper()
+		if params == nil {
+			params = map[string]any{}
+		}
+		params["_meta"] = meta
+		body, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
+		if err != nil {
+			t.Fatal(err)
+		}
+		req, err := http.NewRequest(http.MethodPost, ts.URL+conf.MCPPath, strings.NewReader(string(body)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Accept", "application/json, text/event-stream")
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Mcp-Protocol-Version", "2026-07-28")
+		req.Header.Set("Mcp-Method", method)
+		for key, value := range headers {
+			req.Header.Set(key, value)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		responseBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resp.StatusCode, resp.Header, responseBody
+	}
+
+	status, headers, body := call("server/discover", nil, nil)
+	if status != http.StatusOK {
+		t.Fatalf("server/discover status = %d, body = %s", status, body)
+	}
+	if headers.Get("Mcp-Session-Id") != "" {
+		t.Fatalf("sessionless discover returned Mcp-Session-Id: %q", headers.Get("Mcp-Session-Id"))
+	}
+	var discover struct {
+		Result mcp.DiscoverResult `json:"result"`
+		Error  any                `json:"error"`
+	}
+	if err := json.Unmarshal(body, &discover); err != nil {
+		t.Fatalf("decode server/discover: %v; body = %s", err, body)
+	}
+	if discover.Error != nil {
+		t.Fatalf("server/discover returned error: %v", discover.Error)
+	}
+	if !slices.Contains(discover.Result.SupportedVersions, "2026-07-28") {
+		t.Fatalf("server/discover versions = %v, want 2026-07-28", discover.Result.SupportedVersions)
+	}
+	if discover.Result.Capabilities == nil || discover.Result.Capabilities.Tools == nil || discover.Result.Capabilities.Resources == nil {
+		t.Fatalf("server/discover capabilities unexpectedly advertise deprecated or missing features: %+v", discover.Result.Capabilities)
+	}
+	var capabilityFields map[string]json.RawMessage
+	capabilityJSON, err := json.Marshal(discover.Result.Capabilities)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(capabilityJSON, &capabilityFields); err != nil {
+		t.Fatal(err)
+	}
+	if _, advertised := capabilityFields["logging"]; advertised {
+		t.Fatalf("deprecated logging capability advertised: %s", capabilityJSON)
+	}
+	if discover.Result.Capabilities.Tools.ListChanged || discover.Result.Capabilities.Resources.ListChanged || discover.Result.Capabilities.Resources.Subscribe {
+		t.Fatalf("server/discover capabilities advertise stateful changes: %+v", discover.Result.Capabilities)
+	}
+	if discover.Result.TTLMs != int(mcpListCacheTTL/time.Millisecond) || discover.Result.CacheScope != "private" {
+		t.Fatalf("server/discover cache = ttl %d scope %q, want %d/private", discover.Result.TTLMs, discover.Result.CacheScope, int(mcpListCacheTTL/time.Millisecond))
+	}
+
+	status, _, body = call("tools/list", nil, nil)
+	if status != http.StatusOK {
+		t.Fatalf("tools/list status = %d, body = %s", status, body)
+	}
+	var list struct {
+		Result mcp.ListToolsResult `json:"result"`
+	}
+	if err := json.Unmarshal(body, &list); err != nil {
+		t.Fatalf("decode tools/list: %v; body = %s", err, body)
+	}
+	if list.Result.TTLMs != int(mcpListCacheTTL/time.Millisecond) || list.Result.CacheScope != "private" {
+		t.Fatalf("tools/list cache = ttl %d scope %q, want %d/private", list.Result.TTLMs, list.Result.CacheScope, int(mcpListCacheTTL/time.Millisecond))
+	}
+
+	status, _, body = call("tools/list", nil, map[string]string{"Mcp-Method": "resources/list"})
+	if status != http.StatusBadRequest || !strings.Contains(string(body), "header mismatch") {
+		t.Fatalf("conflicting standardized header status/body = %d/%s, want 400/header mismatch", status, body)
+	}
+
+	for _, method := range []string{http.MethodGet, http.MethodDelete} {
+		req, err := http.NewRequest(method, ts.URL+conf.MCPPath, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusMethodNotAllowed {
+			t.Fatalf("%s status = %d, want 405", method, resp.StatusCode)
+		}
+	}
+}
+
 func TestMCPServerInitializesWithConfiguredPublicHostBehindLoopback(t *testing.T) {
 	store, _, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
@@ -1502,6 +1625,7 @@ func TestMCPDocsToolsFetchMarkdown(t *testing.T) {
 
 	store, _, token := setupMCPStore(t)
 	conf := testMCPConfig(t, docsTS.URL)
+	conf.MCPDocsCacheMinutes = 7
 	handler := NewHandler(conf, store, nil, nil, nil)
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
@@ -1541,6 +1665,13 @@ func TestMCPDocsToolsFetchMarkdown(t *testing.T) {
 	}
 	if !sawMarkdownAccept {
 		t.Fatalf("expected docs client to request text/markdown")
+	}
+	catalog, err := session.ReadResource(context.Background(), &mcp.ReadResourceParams{URI: docsLLMSURI})
+	if err != nil {
+		t.Fatalf("read docs catalog: %v", err)
+	}
+	if catalog.TTLMs != int((7*time.Minute)/time.Millisecond) || catalog.CacheScope != "private" {
+		t.Fatalf("docs resource cache = ttl %d scope %q, want 420000/private", catalog.TTLMs, catalog.CacheScope)
 	}
 }
 

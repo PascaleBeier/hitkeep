@@ -33,7 +33,7 @@ func TestSkillMetadataRejectsUnclosedFrontmatter(t *testing.T) {
 func TestRepositoryContributorSkillContracts(t *testing.T) {
 	root := repositoryRoot(t)
 	required := map[string][]string{
-		"hitkeep-development": {"AGENTS.md", "callable `hk_*` tools", "explicit user approval", "registration, startup, root routing, or task reload", "./hk mcp manifest --output json", "client exposes multiple HitKeep roots", "hk_doctor", "hk_setup_start", "hk_dev_start", "hk_screenshot", "hk_build_start", "hk_smoke_start", "--detach --output json", "$hitkeep-workspace", "$hitkeep-qa"},
+		"hitkeep-development": {"AGENTS.md", "callable `hk_*` tools", "explicit user approval", "registration, startup, workspace routing, or task reload", "./hk mcp manifest --output json", "configured fallback or explicit workspace selector", "hk_doctor", "hk_setup_start", "hk_dev_start", "hk_screenshot", "hk_build_start", "hk_smoke_start", "--detach --output json", "$hitkeep-workspace", "$hitkeep-qa"},
 		"hitkeep-workspace":   {"AGENTS.md", "whenever they are callable", "explicit user approval", "hk_workspace_status", "hk_workspace_handoff", "hk_run_list", "hk_run_status", "hk_logs_tail", "next_cursor", "hk_dev_start", "hk_dev_stop", "hk_screenshot", "hk_run_cancel", "--output json"},
 		"hitkeep-qa":          {"AGENTS.md", "whenever it is callable", "explicit user approval", "hk_qa_plan", "hk_qa_start", "hk_run_status", "hk_logs_tail", "hk_run_cancel", "--detach --output json"},
 		"hitkeep-i18n":        {"AGENTS.md", "$hitkeep-qa", "frontend/dashboard/public/i18n", "every currently supported locale"},
