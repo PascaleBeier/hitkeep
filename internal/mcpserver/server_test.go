@@ -598,6 +598,13 @@ func TestMCPServerRejectsMalformedAndRevokedBearerToken(t *testing.T) {
 
 func TestMCPToolsListAndSiteOverview(t *testing.T) {
 	store, site, token := setupMCPStore(t)
+	if err := store.CreateFunnel(context.Background(), &api.Funnel{
+		SiteID: site.ID,
+		Name:   "Homepage funnel",
+		Steps:  []api.FunnelStep{{Type: "path", Value: "/"}},
+	}); err != nil {
+		t.Fatalf("CreateFunnel: %v", err)
+	}
 	conf := testMCPConfig(t, "")
 	handler := NewHandler(conf, store, nil, nil, nil)
 	ts := httptest.NewServer(handler)
@@ -660,6 +667,9 @@ func TestMCPToolsListAndSiteOverview(t *testing.T) {
 	}
 	if len(output.Stats.Goals) != 1 || output.Stats.Goals[0].GoalID == "" {
 		t.Fatalf("expected string goal id in overview output, got %+v", output.Stats.Goals)
+	}
+	if len(output.Stats.Funnels) != 1 || output.Stats.Funnels[0].ID == "" || output.Stats.Funnels[0].SiteID != site.ID.String() {
+		t.Fatalf("expected string funnel and site ids in overview output, got %+v", output.Stats.Funnels)
 	}
 	if len(output.Stats.TopCities) != 1 || output.Stats.TopCities[0].Name != "Mountain View" {
 		t.Fatalf("expected city aggregate in overview output, got %+v", output.Stats.TopCities)

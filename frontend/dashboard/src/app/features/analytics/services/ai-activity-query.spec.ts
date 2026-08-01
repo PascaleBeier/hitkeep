@@ -44,10 +44,12 @@ describe('AIActivityQuery', () => {
         load(query, {
             ...request,
             filters: [{ type: 'ai_bot', value: 'GPTBot' }],
-            comparison: { from: '2026-06-24T00:00:00Z', to: '2026-07-01T00:00:00Z' }
+            comparison: { from: '2026-06-24T00:00:00Z', to: '2026-07-01T00:00:00Z' },
+            goalIds: ['goal-1'],
+            funnelIds: ['funnel-1']
         });
 
-        expect(calls).toEqual([['site-1', '2026-07-01T00:00:00Z', '2026-07-08T00:00:00Z', [{ type: 'ai_bot', value: 'GPTBot' }], { from: '2026-06-24T00:00:00Z', to: '2026-07-01T00:00:00Z' }]]);
+        expect(calls).toEqual([['site-1', '2026-07-01T00:00:00Z', '2026-07-08T00:00:00Z', [{ type: 'ai_bot', value: 'GPTBot' }], { from: '2026-06-24T00:00:00Z', to: '2026-07-01T00:00:00Z' }, ['goal-1'], ['funnel-1']]]);
         expect(query.isLoading()).toBe(true);
 
         const report = emptyAIActivityReport({ ai_requests: 12 });
@@ -90,9 +92,20 @@ describe('AIActivityQuery', () => {
         expect(query.report()?.ai_requests).toBe(222);
     });
 
-    it('preserves the last successful report when a later request fails', () => {
+    it('clears site state and cancels an active request', () => {
         const { query, responses } = createQuery();
-        vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        load(query);
+
+        query.clear();
+        TestBed.tick();
+
+        expect(responses[0].observed).toBe(false);
+        expect(query.report()).toBeNull();
+        expect(query.isLoading()).toBe(false);
+    });
+
+    it('clears the report when a later request fails so the dashboard can fall back to stats', () => {
+        const { query, responses } = createQuery();
 
         load(query);
         const successful = emptyAIActivityReport({ ai_requests: 5 });
@@ -103,7 +116,7 @@ describe('AIActivityQuery', () => {
         load(query, { ...request, onSuccess });
         responses[1].error(new Error('unavailable'));
 
-        expect(query.report()).toBe(successful);
+        expect(query.report()).toBeNull();
         expect(query.isLoading()).toBe(false);
         expect(onSuccess).not.toHaveBeenCalled();
     });

@@ -3,6 +3,7 @@ import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 
 import { buildAIMetricCardTabs } from '@features/analytics/ai-metric-cards';
 import { emptySiteStats } from '@testing/empty-site-stats';
+import { emptyAIActivityReport } from '@testing/empty-ai-activity-report';
 
 describe('buildAIMetricCardTabs', () => {
     let transloco: TranslocoService;
@@ -45,7 +46,7 @@ describe('buildAIMetricCardTabs', () => {
             top_ai_sources: [{ name: 'chatgpt.com', value: 4 }]
         });
 
-        const cards = buildAIMetricCardTabs(transloco, stats, false, noFilters).find((tab) => tab.id === 'ai')?.cards ?? [];
+        const cards = buildAIMetricCardTabs(transloco, stats, null, false, false, noFilters).find((tab) => tab.id === 'ai')?.cards ?? [];
 
         expect(cards.map((card) => card.id)).toEqual(['ai-bots', 'ai-bot-categories', 'ai-sources']);
         expect(cards.map((card) => card.title)).toEqual(['AI agents', 'Agent categories', 'AI referrers']);
@@ -56,7 +57,7 @@ describe('buildAIMetricCardTabs', () => {
     });
 
     it('wires filter types and the active value from the required lookup', () => {
-        const tabs = buildAIMetricCardTabs(transloco, emptySiteStats({ top_ai_bots_by_category: { ai_agent: [{ name: 'ChatGPT-User', value: 3 }] } }), false, (type) => (type === 'ai_bot' ? 'GPTBot' : null));
+        const tabs = buildAIMetricCardTabs(transloco, emptySiteStats({ top_ai_bots_by_category: { ai_agent: [{ name: 'ChatGPT-User', value: 3 }] } }), null, false, false, (type) => (type === 'ai_bot' ? 'GPTBot' : null));
         const aiCards = tabs.find((tab) => tab.id === 'ai')?.cards ?? [];
         const botCards = tabs.find((tab) => tab.id === 'bots')?.cards ?? [];
 
@@ -71,11 +72,30 @@ describe('buildAIMetricCardTabs', () => {
     it('keeps every category card visible while stats load and drops empty ones afterwards', () => {
         const stats = emptySiteStats({ top_ai_bots_by_category: { ai_search_indexer: [{ name: 'OAI-SearchBot', value: 2 }], ai_assistant: [] } });
 
-        const loadingCards = buildAIMetricCardTabs(transloco, null, true, noFilters).find((tab) => tab.id === 'bots')?.cards ?? [];
-        const settledCards = buildAIMetricCardTabs(transloco, stats, false, noFilters).find((tab) => tab.id === 'bots')?.cards ?? [];
+        const loadingCards = buildAIMetricCardTabs(transloco, null, null, true, false, noFilters).find((tab) => tab.id === 'bots')?.cards ?? [];
+        const settledCards = buildAIMetricCardTabs(transloco, stats, null, false, false, noFilters).find((tab) => tab.id === 'bots')?.cards ?? [];
 
         expect(loadingCards.map((card) => card.id)).toEqual(['bots-ai_training_crawler', 'bots-ai_search_indexer', 'bots-ai_assistant', 'bots-ai_agent', 'bots-ai_coding_agent', 'bots-other_ai']);
         expect(loadingCards.map((card) => card.title)).toEqual(['Training crawlers', 'Search indexers', 'Assistants', 'Agents', 'Coding agents', 'Other AI']);
         expect(settledCards.map((card) => card.id)).toEqual(['bots-ai_search_indexer']);
+    });
+
+    it('uses unified activity rows and exposes their provenance on the dashboard', () => {
+        const activity = emptyAIActivityReport({
+            top_agents: [{ name: 'GPTBot', value: 12, tracked_hits: 3, fetch_count: 9 }],
+            top_categories: [{ name: 'ai_training_crawler', value: 12, tracked_hits: 3, fetch_count: 9 }],
+            top_sources: [{ name: 'chatgpt.com', value: 4, tracked_hits: 4, fetch_count: 0 }],
+            top_agents_by_category: { ai_training_crawler: [{ name: 'GPTBot', value: 12, tracked_hits: 3, fetch_count: 9 }] }
+        });
+
+        const tabs = buildAIMetricCardTabs(transloco, emptySiteStats(), activity, false, false, noFilters);
+        const aiCards = tabs.find((tab) => tab.id === 'ai')?.cards ?? [];
+        const bots = tabs.find((tab) => tab.id === 'bots')?.cards ?? [];
+
+        expect(aiCards[0].data).toEqual(activity.top_agents);
+        expect(aiCards[0].showProvenance).toBe(true);
+        expect(aiCards[1].data).toEqual(activity.top_categories);
+        expect(aiCards[2].data).toEqual(activity.top_sources);
+        expect(bots[0]?.data).toEqual(activity.top_agents_by_category['ai_training_crawler']);
     });
 });

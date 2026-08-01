@@ -23,6 +23,15 @@ const aiActivityTopListLimit = 10
 // aiActivitySummaryDim marks the single summary row inside the merged result set.
 const aiActivitySummaryDim = "__summary__"
 
+type aiActivityFilterSet struct {
+	hitSQL       string
+	hitArgs      []any
+	fetchSQL     string
+	fetchArgs    []any
+	pageviewSQL  string
+	pageviewArgs []any
+}
+
 // GetAIActivity returns the unified AI activity report for one site: a single
 // merged view over tracked AI hits and server-log AI fetch records.
 //
@@ -66,22 +75,23 @@ func (s *Store) GetAIActivity(ctx context.Context, params api.AnalyticsParams) (
 		Series:              []api.AIActivitySeriesPoint{},
 	}
 
-	hitFilterSQL, hitFilterArgs := buildHitFilters(params.Filters, "h")
-	fetchFilterSQL, fetchFilterArgs := buildAIActivityFetchFilters(params.Filters, "f")
-	pageviewFilterSQL, pageviewFilterArgs := buildHitFilters(nonAIHitFilters(params.Filters), "h")
+	filters, err := s.buildAIActivityFilterSet(ctx, params)
+	if err != nil {
+		return nil, err
+	}
 
-	rangeArgs := func(start, end time.Time) []any {
-		args := make([]any, 0, 9+len(hitFilterArgs)+len(fetchFilterArgs)+len(pageviewFilterArgs))
+	rangeArgs := func(filterSet aiActivityFilterSet, start, end time.Time) []any {
+		args := make([]any, 0, 9+len(filterSet.hitArgs)+len(filterSet.fetchArgs)+len(filterSet.pageviewArgs))
 		args = append(args, params.SiteID, start, end)
-		args = append(args, hitFilterArgs...)
+		args = append(args, filterSet.hitArgs...)
 		args = append(args, params.SiteID, start, end)
-		args = append(args, fetchFilterArgs...)
+		args = append(args, filterSet.fetchArgs...)
 		args = append(args, params.SiteID, start, end)
-		args = append(args, pageviewFilterArgs...)
+		args = append(args, filterSet.pageviewArgs...)
 		return args
 	}
 
-	ctes := aiActivityCTEs(hitFilterSQL, fetchFilterSQL, pageviewFilterSQL)
+	ctes := aiActivityCTEs(filters.hitSQL, filters.fetchSQL, filters.pageviewSQL)
 
 	//nolint:gosec // ctes is assembled from fixed SQL fragments; every filter clause is parameterized.
 	mainQuery := `WITH ` + ctes + `,
@@ -129,7 +139,7 @@ func (s *Store) GetAIActivity(ctx context.Context, params api.AnalyticsParams) (
 		SELECT * FROM results
 		ORDER BY CASE WHEN dim = '` + aiActivitySummaryDim + `' THEN 0 ELSE 1 END, dim, (tracked + fetched) DESC, name ASC`
 
-	rows, err := s.db.QueryContext(ctx, mainQuery, rangeArgs(params.Start, params.End)...)
+	rows, err := s.db.QueryContext(ctx, mainQuery, rangeArgs(filters, params.Start, params.End)...)
 	if err != nil {
 		return nil, fmt.Errorf("query ai activity report: %w", err)
 	}
@@ -204,7 +214,7 @@ func (s *Store) GetAIActivity(ctx context.Context, params api.AnalyticsParams) (
 		return nil, fmt.Errorf("read ai activity rows: %w", err)
 	}
 
-	series, err := s.aiActivitySeries(ctx, params, hitFilterSQL, hitFilterArgs, fetchFilterSQL, fetchFilterArgs)
+	series, err := s.aiActivitySeries(ctx, params, filters.hitSQL, filters.hitArgs, filters.fetchSQL, filters.fetchArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -214,8 +224,15 @@ func (s *Store) GetAIActivity(ctx context.Context, params api.AnalyticsParams) (
 	// half-specified window would measure against [start, zero time] and report
 	// an empty baseline as a 100% drop.
 	if !params.CompareStart.IsZero() && !params.CompareEnd.IsZero() {
+		comparisonParams := params
+		comparisonParams.Start = params.CompareStart
+		comparisonParams.End = params.CompareEnd
+		comparisonFilters, err := s.buildAIActivityFilterSet(ctx, comparisonParams)
+		if err != nil {
+			return nil, err
+		}
 		//nolint:gosec // ctes is assembled from fixed SQL fragments; every filter clause is parameterized.
-		comparisonQuery := `WITH ` + ctes + `
+		comparisonQuery := `WITH ` + aiActivityCTEs(comparisonFilters.hitSQL, comparisonFilters.fetchSQL, comparisonFilters.pageviewSQL) + `
 			SELECT tracked_hits, fetch_count, referral_visits, paths_crawled, unique_agents, pageviews
 			FROM summary`
 
@@ -227,7 +244,7 @@ func (s *Store) GetAIActivity(ctx context.Context, params api.AnalyticsParams) (
 			uniqueAgents   int64
 			pageviews      int64
 		)
-		if err := s.db.QueryRowContext(ctx, comparisonQuery, rangeArgs(params.CompareStart, params.CompareEnd)...).Scan(
+		if err := s.db.QueryRowContext(ctx, comparisonQuery, rangeArgs(comparisonFilters, params.CompareStart, params.CompareEnd)...).Scan(
 			&trackedHits, &fetchCount, &referralVisits, &pathsCrawled, &uniqueAgents, &pageviews,
 		); err != nil {
 			return nil, fmt.Errorf("query ai activity comparison: %w", err)
@@ -244,6 +261,30 @@ func (s *Store) GetAIActivity(ctx context.Context, params api.AnalyticsParams) (
 	}
 
 	return report, nil
+}
+
+func (s *Store) buildAIActivityFilterSet(ctx context.Context, params api.AnalyticsParams) (aiActivityFilterSet, error) {
+	hitSQL, hitArgs := buildHitFilters(params.Filters, "h")
+	sessionSQL, sessionArgs, err := s.buildSessionFilter(ctx, params, "h")
+	if err != nil {
+		return aiActivityFilterSet{}, fmt.Errorf("build ai activity session filter: %w", err)
+	}
+	hitSQL += sessionSQL
+	hitArgs = append(hitArgs, sessionArgs...)
+
+	fetchSQL, fetchArgs := buildAIActivityFetchFilters(params.Filters, "f")
+	pageviewSQL, pageviewArgs := buildHitFilters(nonAIHitFilters(params.Filters), "h")
+	pageviewSQL += sessionSQL
+	pageviewArgs = append(pageviewArgs, sessionArgs...)
+
+	return aiActivityFilterSet{
+		hitSQL:       hitSQL,
+		hitArgs:      hitArgs,
+		fetchSQL:     fetchSQL,
+		fetchArgs:    fetchArgs,
+		pageviewSQL:  pageviewSQL,
+		pageviewArgs: pageviewArgs,
+	}, nil
 }
 
 // aiActivityCTEs builds the shared CTE prelude. Placeholders appear in CTE

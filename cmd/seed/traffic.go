@@ -92,10 +92,10 @@ func seedTraffic(ctx context.Context, store *database.Store, siteID uuid.UUID, g
 					ASN:            asn,
 					ASNOrg:         asnOrg,
 					Language:       lang,
-					ViewportWidth:  new(vw),
-					ViewportHeight: new(vh),
-					ScreenWidth:    new(sw),
-					ScreenHeight:   new(sh),
+					ViewportWidth:  &vw,
+					ViewportHeight: &vh,
+					ScreenWidth:    &sw,
+					ScreenHeight:   &sh,
 					IsUnique:       new(i == 0),
 				}
 

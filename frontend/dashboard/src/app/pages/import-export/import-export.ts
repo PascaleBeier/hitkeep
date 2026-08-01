@@ -19,8 +19,8 @@ type ImportExportTab = 'import' | 'export';
 export class ImportExportPage {
     private readonly router = inject(Router);
     private readonly transloco = inject(TranslocoService);
-    private readonly activeLanguage = toSignal(this.transloco.langChanges$, {
-        initialValue: this.transloco.getActiveLang()
+    private readonly pageTitle = toSignal(this.transloco.selectTranslate('importExport.title'), {
+        initialValue: this.transloco.translate('importExport.title')
     });
 
     protected readonly activeTab = toSignal(
@@ -33,10 +33,9 @@ export class ImportExportPage {
     );
 
     protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
         return [
             {
-                label: this.transloco.translate('importExport.title'),
+                label: this.pageTitle(),
                 isCurrent: true
             }
         ];

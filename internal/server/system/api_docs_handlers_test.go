@@ -873,6 +873,20 @@ func TestOpenAPISpecV1IncludesAIActivityReport(t *testing.T) {
 		if ref, _ := schema["$ref"].(string); ref != "#/components/schemas/AIActivityReport" {
 			t.Fatalf("expected AI activity report schema ref for %s, got %q", path, ref)
 		}
+		parameters, _ := operation["parameters"].([]any)
+		refs := map[string]bool{}
+		for _, parameter := range parameters {
+			if item, ok := parameter.(map[string]any); ok {
+				if ref, ok := item["$ref"].(string); ok {
+					refs[ref] = true
+				}
+			}
+		}
+		for _, ref := range []string{"#/components/parameters/goalIDQuery", "#/components/parameters/funnelIDQuery"} {
+			if !refs[ref] {
+				t.Fatalf("expected %s parameter on %s", ref, path)
+			}
+		}
 	}
 }
 

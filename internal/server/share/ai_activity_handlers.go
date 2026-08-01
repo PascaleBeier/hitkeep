@@ -38,6 +38,16 @@ func (h *handler) handleGetShareAIActivity() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		goalIDs, err := parseUUIDQueryParam(q, "goal_id")
+		if err != nil {
+			http.Error(w, "Invalid goal_id", http.StatusBadRequest)
+			return
+		}
+		funnelIDs, err := parseUUIDQueryParam(q, "funnel_id")
+		if err != nil {
+			http.Error(w, "Invalid funnel_id", http.StatusBadRequest)
+			return
+		}
 
 		compareStart, compareEnd := filterparams.ParseComparisonRange(q.Get("compare_from"), q.Get("compare_to"))
 
@@ -54,6 +64,8 @@ func (h *handler) handleGetShareAIActivity() http.HandlerFunc {
 			Start:        start,
 			End:          end,
 			Filters:      filters,
+			GoalIDs:      goalIDs,
+			FunnelIDs:    funnelIDs,
 			CompareStart: compareStart,
 			CompareEnd:   compareEnd,
 		})

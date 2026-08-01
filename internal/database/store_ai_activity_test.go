@@ -294,6 +294,76 @@ func TestGetAIActivityFilters(t *testing.T) {
 	})
 }
 
+func TestGetAIActivityAppliesConversionCohortsToTrackedRowsOnly(t *testing.T) {
+	store, userID := setupComparisonStore(t)
+	ctx := context.Background()
+	siteID := createAIActivitySite(t, store, userID, "ai-activity-cohort.example.com")
+	base := aiActivityBase
+
+	matchedSession := uuid.New()
+	unmatchedSession := uuid.New()
+	createAIActivityHits(t, store, siteID, []*api.Hit{
+		{SessionID: matchedSession, Timestamp: base.Add(-2 * time.Hour), Path: "/signup", UserAgent: new(uaAIActivityGPT)},
+		{SessionID: matchedSession, Timestamp: base.Add(-time.Hour), Path: "/after", UserAgent: new(uaAIActivityHuman)},
+		{SessionID: unmatchedSession, Timestamp: base.Add(-90 * time.Minute), Path: "/other", UserAgent: new(uaAIActivityClaude)},
+		// A matching session in the comparison window proves that the cohort is
+		// rebuilt for the comparison range rather than copied from the current one.
+		{SessionID: matchedSession, Timestamp: base.Add(-30 * time.Hour), Path: "/signup", UserAgent: new(uaAIActivityGPT)},
+		{SessionID: unmatchedSession, Timestamp: base.Add(-31 * time.Hour), Path: "/other", UserAgent: new(uaAIActivityClaude)},
+	})
+	createAIActivityFetches(t, store, siteID, []*api.AIFetch{
+		aiActivityFetch(base.Add(-2*time.Hour), "GPTBot", "OpenAI", aianalytics.CategoryTrainingCrawler, "/signup", 200, 100, 100),
+		aiActivityFetch(base.Add(-30*time.Hour), "ClaudeBot", "Anthropic", aianalytics.CategoryTrainingCrawler, "/other", 200, 100, 100),
+	})
+	if err := store.CreateEvent(ctx, &api.Event{SiteID: siteID, SessionID: matchedSession, Name: "signup_completed", Timestamp: base.Add(-30 * time.Minute)}); err != nil {
+		t.Fatalf("create current goal event: %v", err)
+	}
+	if err := store.CreateEvent(ctx, &api.Event{SiteID: siteID, SessionID: matchedSession, Name: "signup_completed", Timestamp: base.Add(-29 * time.Hour)}); err != nil {
+		t.Fatalf("create comparison goal event: %v", err)
+	}
+	goal := api.Goal{SiteID: siteID, Name: "Signup", Type: "event", Value: "signup_completed"}
+	if err := store.CreateGoal(ctx, &goal); err != nil {
+		t.Fatalf("create goal: %v", err)
+	}
+
+	params := aiActivityParams(siteID)
+	params.GoalIDs = []uuid.UUID{goal.ID}
+	params.CompareStart = base.Add(-48 * time.Hour)
+	params.CompareEnd = base.Add(-24 * time.Hour)
+	report, err := store.GetAIActivity(ctx, params)
+	if err != nil {
+		t.Fatalf("GetAIActivity: %v", err)
+	}
+	if report.TrackedHits != 1 || report.FetchCount != 1 || report.Pageviews != 2 {
+		t.Fatalf("current cohort totals tracked %d fetched %d pageviews %d, want 1/1/2", report.TrackedHits, report.FetchCount, report.Pageviews)
+	}
+	var seriesTracked, seriesFetched int
+	for _, point := range report.Series {
+		seriesTracked += point.TrackedHits
+		seriesFetched += point.FetchCount
+	}
+	if seriesTracked != 1 || seriesFetched != 1 {
+		t.Fatalf("current series totals tracked %d fetched %d, want 1/1", seriesTracked, seriesFetched)
+	}
+	if report.Comparison == nil || report.Comparison.TrackedHits != 1 || report.Comparison.FetchCount != 1 || report.Comparison.Pageviews != 1 {
+		t.Fatalf("comparison cohort = %+v, want tracked 1 fetched 1 pageviews 1", report.Comparison)
+	}
+
+	funnel := api.Funnel{SiteID: siteID, Name: "Signup funnel", Steps: []api.FunnelStep{{Type: "event", Value: "signup_completed"}}}
+	if err := store.CreateFunnel(ctx, &funnel); err != nil {
+		t.Fatalf("create funnel: %v", err)
+	}
+	funnelParams := aiActivityParams(siteID)
+	funnelParams.FunnelIDs = []uuid.UUID{funnel.ID}
+	funnelReport, err := store.GetAIActivity(ctx, funnelParams)
+	if err != nil {
+		t.Fatalf("GetAIActivity funnel cohort: %v", err)
+	}
+	if funnelReport.TrackedHits != 1 || funnelReport.FetchCount != 1 || funnelReport.Pageviews != 2 {
+		t.Fatalf("funnel cohort totals tracked %d fetched %d pageviews %d, want 1/1/2", funnelReport.TrackedHits, funnelReport.FetchCount, funnelReport.Pageviews)
+	}
+}
+
 func TestGetAIActivityPathsCrawledCountsEveryMergedPath(t *testing.T) {
 	store, userID := setupComparisonStore(t)
 	ctx := context.Background()
@@ -347,6 +417,24 @@ func TestGetAIActivityWithoutFetchesZeroesDepthScalars(t *testing.T) {
 	if len(report.TopFamilies) != 0 || len(report.TopResourceTypes) != 0 {
 		t.Fatalf("expected empty fetch-only top lists, got families %+v resource types %+v", report.TopFamilies, report.TopResourceTypes)
 	}
+}
+
+func TestGetAIActivityWithFetchesOnlyKeepsUnifiedRows(t *testing.T) {
+	store, userID := setupComparisonStore(t)
+	ctx := context.Background()
+	siteID := createAIActivitySite(t, store, userID, "ai-activity-fetches-only.example.com")
+	createAIActivityFetches(t, store, siteID, []*api.AIFetch{
+		aiActivityFetch(aiActivityBase.Add(-2*time.Hour), "GPTBot", "OpenAI", aianalytics.CategoryTrainingCrawler, "/docs", 200, 100, 100),
+	})
+
+	report, err := store.GetAIActivity(ctx, aiActivityParams(siteID))
+	if err != nil {
+		t.Fatalf("GetAIActivity: %v", err)
+	}
+	if report.TrackedHits != 0 || report.FetchCount != 1 || report.AIRequests != 1 || report.Pageviews != 0 {
+		t.Fatalf("fetch-only totals tracked %d fetched %d ai_requests %d pageviews %d, want 0/1/1/0", report.TrackedHits, report.FetchCount, report.AIRequests, report.Pageviews)
+	}
+	requireAIActivityStat(t, report.TopAgents, "GPTBot", 1, 0, 1)
 }
 
 func TestGetAIActivitySeriesMergesBothSides(t *testing.T) {

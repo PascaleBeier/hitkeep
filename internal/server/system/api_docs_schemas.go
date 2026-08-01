@@ -586,7 +586,7 @@ func openAPIV1AnalyticsSchemas() map[string]any {
 		},
 		"AIActivityReport": map[string]any{
 			"type":        "object",
-			"description": "Unified AI activity report merging tracked AI hits with server-log AI fetch records. Every count follows one rule: tracked hits plus fetch records. Depth metrics describe the fetch side only, because tracked hits carry no status code, response time, or transferred bytes.",
+			"description": "Unified AI activity report merging tracked AI hits with server-log AI fetch records. Every count follows one rule: tracked hits plus fetch records, and each row exposes its tracked_hits/fetch_count provenance. Path, ai_bot, and ai_bot_category filters apply to both sides; ai_source excludes fetch records; hit-only dimensions leave fetch totals visible. Depth metrics describe the fetch side only, because tracked hits carry no status code, response time, or transferred bytes. Goal and funnel cohorts apply to tracked hits and pageview denominators, never fetch records.",
 			"properties": map[string]any{
 				"ai_requests":            map[string]any{"type": "integer"},
 				"tracked_hits":           map[string]any{"type": "integer"},

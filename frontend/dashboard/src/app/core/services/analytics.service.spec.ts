@@ -83,7 +83,9 @@ describe('AnalyticsService Web Vitals', () => {
                     { type: 'ai_bot', value: 'GPTBot' },
                     { type: 'path', value: '/docs' }
                 ],
-                { from: '2026-06-24T00:00:00Z', to: '2026-07-01T00:00:00Z' }
+                { from: '2026-06-24T00:00:00Z', to: '2026-07-01T00:00:00Z' },
+                ['goal-1'],
+                ['funnel-1']
             )
             .subscribe();
 
@@ -94,6 +96,8 @@ describe('AnalyticsService Web Vitals', () => {
         expect(req.request.params.getAll('filter')).toEqual(['ai_bot:GPTBot', 'path:/docs']);
         expect(req.request.params.get('compare_from')).toBe('2026-06-24T00:00:00Z');
         expect(req.request.params.get('compare_to')).toBe('2026-07-01T00:00:00Z');
+        expect(req.request.params.getAll('goal_id')).toEqual(['goal-1']);
+        expect(req.request.params.getAll('funnel_id')).toEqual(['funnel-1']);
         req.flush({});
     });
 
@@ -104,6 +108,8 @@ describe('AnalyticsService Web Vitals', () => {
         expect(req.request.params.has('filter')).toBe(false);
         expect(req.request.params.has('compare_from')).toBe(false);
         expect(req.request.params.has('compare_to')).toBe(false);
+        expect(req.request.params.has('goal_id')).toBe(false);
+        expect(req.request.params.has('funnel_id')).toBe(false);
         req.flush({});
     });
 

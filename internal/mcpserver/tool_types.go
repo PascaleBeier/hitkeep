@@ -306,6 +306,19 @@ type mcpSite struct {
 	CreatedAt         string `json:"created_at"`
 }
 
+type mcpFunnelStep struct {
+	Type  string `json:"type"`
+	Value string `json:"value"`
+}
+
+type mcpFunnel struct {
+	ID        string          `json:"id"`
+	SiteID    string          `json:"site_id"`
+	Name      string          `json:"name"`
+	Steps     []mcpFunnelStep `json:"steps"`
+	CreatedAt string          `json:"created_at"`
+}
+
 type mcpSiteStats struct {
 	LiveVisitors int `json:"live_visitors"`
 
@@ -343,7 +356,7 @@ type mcpSiteStats struct {
 	UTMSourceHits       int                         `json:"utm_source_hits"`
 	UTMTermHits         int                         `json:"utm_term_hits"`
 	Goals               []mcpGoalStats              `json:"goals"`
-	Funnels             []api.Funnel                `json:"funnels"`
+	Funnels             []mcpFunnel                 `json:"funnels"`
 	Comparison          *mcpComparisonStats         `json:"comparison,omitempty"`
 }
 

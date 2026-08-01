@@ -141,10 +141,10 @@ func seedAIReferredVisits(batch *seedWriteBatch, siteID uuid.UUID, fetch *api.AI
 				ASN:            asn,
 				ASNOrg:         asnOrg,
 				Language:       lang,
-				ViewportWidth:  new(vw),
-				ViewportHeight: new(vh),
-				ScreenWidth:    new(sw),
-				ScreenHeight:   new(sh),
+				ViewportWidth:  &vw,
+				ViewportHeight: &vh,
+				ScreenWidth:    &sw,
+				ScreenHeight:   &sh,
 				IsUnique:       new(i == 0),
 			}
 			if i == 0 {
@@ -170,7 +170,7 @@ func seedGeoNetworkMetadata(country *string, rng *mrand.Rand) (*string, *string,
 		return nil, nil, nil, nil, nil
 	}
 	meta := pickWeighted(rng, choices)
-	return new(meta.region), new(meta.city), new(meta.provider), new(meta.asn), new(meta.asnOrg)
+	return &meta.region, &meta.city, &meta.provider, &meta.asn, &meta.asnOrg
 }
 
 type seedGeoNetwork struct {

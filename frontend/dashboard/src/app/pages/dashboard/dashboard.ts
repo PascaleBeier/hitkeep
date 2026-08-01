@@ -13,6 +13,7 @@ import { TooltipModule } from '@openng/optimus-ui/tooltip';
 // Features
 import { SiteService } from '@features/sites/services/site.service';
 import { injectStatsQuery, type StatsQueryMode } from '@features/analytics/services/stats-query';
+import { injectAIActivityQuery, type AIActivityQueryMode } from '@features/analytics/services/ai-activity-query';
 import { TrafficRecordsCard } from '@features/hits/components/traffic-records-card';
 import { RealtimeRefreshCoordinator } from '@services/realtime-refresh-coordinator.service';
 import { REALTIME_ALL_ANALYTICS_KINDS } from '@services/realtime.service';
@@ -115,12 +116,15 @@ export class Dashboard {
     private reportLinkApplied = false;
     private readonly activeLanguage = injectActiveLang();
     private statsQuery = injectStatsQuery();
+    private aiActivityQuery = injectAIActivityQuery();
     private validationRequestKey: string | null = null;
     private validationAfterResultSequence = 0;
     protected isShareMode = computed(() => this.shareService.isShareMode());
     protected trafficShareToken = computed(() => this.shareService.token());
     protected stats = this.statsQuery.stats;
     protected isStatsLoading = this.statsQuery.isLoading;
+    protected aiActivity = this.aiActivityQuery.report;
+    protected isAIActivityLoading = this.aiActivityQuery.isLoading;
     protected currentComparisonRange = this.statsQuery.comparisonRange;
     protected readonly kpiUpdateKey = signal(0);
     protected selectedConversion = signal<ConversionSubject | null>(null, {
@@ -184,7 +188,7 @@ export class Dashboard {
         if (subject) {
             chips.unshift({
                 key: `${subject.kind}:${subject.id}`,
-                label: this.transloco.translate(`dashboard.conversions.filters.${subject.kind}`, { name: subject.name }),
+                label: this.scopedAIHitLabel(this.transloco.translate(`dashboard.conversions.filters.${subject.kind}`, { name: subject.name }), true),
                 remove: () => this.clearConversionSubject()
             });
         }
@@ -257,7 +261,7 @@ export class Dashboard {
                     }
                 ]
             },
-            ...buildAIMetricCardTabs(this.transloco, stats, loading, (type) => this.activeFilterValue(type)),
+            ...buildAIMetricCardTabs(this.transloco, stats, this.aiActivity(), loading, this.isAIActivityLoading(), (type) => this.activeFilterValue(type)),
             {
                 id: 'audience',
                 label: this.transloco.translate('common.metricGroups.audience'),
@@ -612,12 +616,28 @@ export class Dashboard {
             const request = this.reportRequest();
             const siteId = site?.id ?? null;
             if (this.conversionSiteId && siteId !== this.conversionSiteId) {
-                untracked(() => this.clearConversionSubject());
+                const hadConversion = this.requestedConversion() !== null;
+                untracked(() => {
+                    this.aiActivityQuery.clear();
+                    this.clearConversionSubject();
+                    // If there is no conversion chip to clear, no signal would
+                    // cause this effect to run again for the new site. Start
+                    // the activity request here so a site switch cannot leave
+                    // the old report visible or skip the new site's cards.
+                    if (!hadConversion) this.loadAIActivityForCurrentRange();
+                });
                 this.conversionSiteId = siteId;
                 return;
             }
             this.conversionSiteId = siteId;
-            if (request) untracked(() => this.loadStats(request));
+            if (request) {
+                untracked(() => {
+                    this.loadStats(request);
+                    this.loadAIActivity(request);
+                });
+            } else {
+                untracked(() => this.aiActivityQuery.clear());
+            }
         });
 
         effect(() => {
@@ -651,6 +671,7 @@ export class Dashboard {
 
     refreshAll() {
         this.loadStatsForCurrentRange();
+        this.loadAIActivityForCurrentRange();
         this.trafficRefreshKey.update((key) => key + 1);
         this.refreshOnboarding();
         this.searchConsoleRefreshKey.update((key) => key + 1);
@@ -731,6 +752,7 @@ export class Dashboard {
 
     private refreshStatsOnly(mode: StatsQueryMode = 'blocking') {
         this.loadStatsForCurrentRange(mode);
+        this.loadAIActivityForCurrentRange(mode);
     }
 
     private refreshRealtimeData() {
@@ -755,6 +777,15 @@ export class Dashboard {
         this.loadStats(request, mode);
     }
 
+    private loadAIActivityForCurrentRange(mode: AIActivityQueryMode = 'blocking') {
+        const request = this.reportRequest();
+        if (!request) {
+            this.aiActivityQuery.clear();
+            return;
+        }
+        this.loadAIActivity(request, mode);
+    }
+
     private loadStats(request: DashboardReportRequest, mode: StatsQueryMode = 'blocking') {
         this.validationRequestKey = request.subject ? `${request.subject.kind}:${request.subject.id}` : null;
         this.validationAfterResultSequence = this.statsQuery.lastResult()?.sequence ?? 0;
@@ -769,6 +800,21 @@ export class Dashboard {
             mode: effectiveMode,
             onSuccess: effectiveMode === 'background' ? () => this.kpiUpdateKey.update((key) => key + 1) : undefined
         });
+    }
+
+    private loadAIActivity(request: DashboardReportRequest, mode: AIActivityQueryMode = 'blocking') {
+        const effectiveMode: AIActivityQueryMode = mode === 'background' && this.aiActivity() && !this.isAIActivityLoading() ? 'background' : 'blocking';
+        this.aiActivityQuery.load(
+            {
+                siteId: request.siteId,
+                from: request.from,
+                to: request.to,
+                filters: request.filters,
+                goalIds: request.subject?.kind === 'goal' ? [request.subject.id] : [],
+                funnelIds: request.subject?.kind === 'funnel' ? [request.subject.id] : []
+            },
+            effectiveMode
+        );
     }
 
     protected readonly calcDelta = calcDelta;
@@ -842,50 +888,68 @@ export class Dashboard {
     }
 
     private filterLabel(filter: MetricFilter): string {
+        let label: string;
         switch (filter.type) {
             case 'path':
-                return this.transloco.translate('common.filters.page', {
+                label = this.transloco.translate('common.filters.page', {
                     value: filter.value
                 });
+                break;
             case 'referrer':
-                return this.transloco.translate('common.filters.source', {
+                label = this.transloco.translate('common.filters.source', {
                     value: filter.value
                 });
+                break;
             case 'device':
-                return this.transloco.translate('common.filters.device', {
+                label = this.transloco.translate('common.filters.device', {
                     value: filter.value
                 });
+                break;
             case 'country':
-                return this.transloco.translate('common.filters.country', {
+                label = this.transloco.translate('common.filters.country', {
                     value: filter.value
                 });
+                break;
             case 'city':
-                return this.transloco.translate('common.filters.city', {
+                label = this.transloco.translate('common.filters.city', {
                     value: filter.value
                 });
+                break;
             case 'provider':
-                return this.transloco.translate('common.filters.provider', {
+                label = this.transloco.translate('common.filters.provider', {
                     value: filter.value
                 });
+                break;
             case 'asn':
-                return this.transloco.translate('common.filters.asn', {
+                label = this.transloco.translate('common.filters.asn', {
                     value: filter.value
                 });
+                break;
             case 'browser':
-                return this.transloco.translate('common.filters.browser', {
+                label = this.transloco.translate('common.filters.browser', {
                     value: filter.value
                 });
+                break;
             case 'language':
-                return this.transloco.translate('common.filters.language', {
+                label = this.transloco.translate('common.filters.language', {
                     value: this.displayLanguageLabel(filter.value)
                 });
+                break;
             case 'ai_bot':
             case 'ai_bot_category':
             case 'ai_source':
-                return aiFilterChipLabel(this.transloco, filter.type, filter.value);
+                label = aiFilterChipLabel(this.transloco, filter.type, filter.value);
+                break;
             default:
-                return `${filter.type}: ${filter.value}`;
+                label = `${filter.type}: ${filter.value}`;
+                break;
         }
+        return this.scopedAIHitLabel(label, !['path', 'ai_bot', 'ai_bot_category'].includes(filter.type));
+    }
+
+    private scopedAIHitLabel(label: string, hitOnly: boolean): string {
+        if (!hitOnly) return label;
+        return `${label} · ${this.transloco.translate('aiAgents.filters.scopeHits')}`;
     }
 
     protected exportFiltered(format: TakeoutExportFormat = DEFAULT_HITS_EXPORT_FORMAT) {

@@ -43,6 +43,16 @@ func (h *handler) handleGetSiteAIActivity() http.HandlerFunc {
 
 		q := r.URL.Query()
 		compareStart, compareEnd := filterparams.ParseComparisonRange(q.Get("compare_from"), q.Get("compare_to"))
+		goalIDs, err := parseHitUUIDQueryParam(q, "goal_id")
+		if err != nil {
+			http.Error(w, "Invalid goal_id", http.StatusBadRequest)
+			return
+		}
+		funnelIDs, err := parseHitUUIDQueryParam(q, "funnel_id")
+		if err != nil {
+			http.Error(w, "Invalid funnel_id", http.StatusBadRequest)
+			return
+		}
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
 		if err != nil {
@@ -57,6 +67,8 @@ func (h *handler) handleGetSiteAIActivity() http.HandlerFunc {
 			Start:        window.Start,
 			End:          window.End,
 			Filters:      window.Filters,
+			GoalIDs:      goalIDs,
+			FunnelIDs:    funnelIDs,
 			CompareStart: compareStart,
 			CompareEnd:   compareEnd,
 		})

@@ -4,12 +4,13 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideRouter, Router } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { provideTranslocoLocale } from '@jsverse/transloco-locale';
-import { Subject, of } from 'rxjs';
+import { EMPTY, Subject, of } from 'rxjs';
 import { vi } from 'vitest';
 
 import { Dashboard } from '@pages/dashboard/dashboard';
 import { SiteService } from '@features/sites/services/site.service';
 import { StatsService } from '@features/analytics/services/stats.service';
+import { AnalyticsService } from '@core/services/analytics.service';
 import { HitService } from '@features/hits/services/hit.service';
 import { TrafficRecordsCard } from '@features/hits/components/traffic-records-card';
 import { TeamService } from '@services/team.service';
@@ -62,6 +63,12 @@ describe('Dashboard', () => {
             providers: [
                 provideHttpClient(),
                 provideRouter([]),
+                {
+                    provide: AnalyticsService,
+                    useValue: {
+                        getAIActivity: vi.fn(() => EMPTY)
+                    }
+                },
                 provideTranslocoLocale({
                     defaultLocale: 'en-US',
                     langToLocaleMapping: {
@@ -627,6 +634,39 @@ describe('Dashboard', () => {
 
         expect(dashboard.filterChips()).toEqual([]);
         expect(fixture.nativeElement.textContent).toContain('common.noActiveFilter');
+    });
+
+    it('marks dashboard filters that apply to tracked visits only', () => {
+        const dashboard = component as unknown as {
+            activeFilters: { set: (value: { type: string; value: string }[]) => void };
+            filterChips: () => { label: string }[];
+        };
+        dashboard.activeFilters.set([
+            { type: 'path', value: '/docs' },
+            { type: 'ai_source', value: 'ChatGPT' },
+            { type: 'device', value: 'mobile' }
+        ]);
+        fixture.detectChanges();
+
+        const labels = dashboard.filterChips().map((chip) => chip.label);
+        expect(labels[0]).not.toContain('aiAgents.filters.scopeHits');
+        expect(labels[1]).toContain('aiAgents.filters.scopeHits');
+        expect(labels[2]).toContain('aiAgents.filters.scopeHits');
+    });
+
+    it('clears unified activity when switching sites', () => {
+        const siteService = TestBed.inject(SiteService);
+        const dashboard = component as unknown as {
+            aiActivityQuery: { report: { set: (value: unknown) => void } };
+            aiActivity: () => unknown;
+        };
+        siteService.activeSite.set({ id: 'site-1', user_id: 'user-1', domain: 'one.example', created_at: '2026-01-01T00:00:00Z' });
+        fixture.detectChanges();
+        dashboard.aiActivityQuery.report.set({ ai_requests: 4 });
+        siteService.activeSite.set({ id: 'site-2', user_id: 'user-1', domain: 'two.example', created_at: '2026-01-01T00:00:00Z' });
+        fixture.detectChanges();
+
+        expect(dashboard.aiActivity()).toBeNull();
     });
 
     it('should render configured funnels from dashboard stats', () => {

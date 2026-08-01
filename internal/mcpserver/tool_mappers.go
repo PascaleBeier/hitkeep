@@ -71,9 +71,27 @@ func toMCPSiteStats(stats *api.SiteStats) *mcpSiteStats {
 		UTMSourceHits:       stats.UTMSourceHits,
 		UTMTermHits:         stats.UTMTermHits,
 		Goals:               toMCPGoals(stats.Goals),
-		Funnels:             stats.Funnels,
+		Funnels:             toMCPFunnels(stats.Funnels),
 		Comparison:          toMCPComparisonStats(stats.Comparison),
 	}
+}
+
+func toMCPFunnels(funnels []api.Funnel) []mcpFunnel {
+	out := make([]mcpFunnel, 0, len(funnels))
+	for _, funnel := range funnels {
+		steps := make([]mcpFunnelStep, 0, len(funnel.Steps))
+		for _, step := range funnel.Steps {
+			steps = append(steps, mcpFunnelStep{Type: step.Type, Value: step.Value})
+		}
+		out = append(out, mcpFunnel{
+			ID:        funnel.ID.String(),
+			SiteID:    funnel.SiteID.String(),
+			Name:      funnel.Name,
+			Steps:     steps,
+			CreatedAt: formatMCPTime(funnel.CreatedAt),
+		})
+	}
+	return out
 }
 
 func toMCPComparisonStats(stats *api.ComparisonStats) *mcpComparisonStats {

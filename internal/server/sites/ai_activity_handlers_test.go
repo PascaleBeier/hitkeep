@@ -148,6 +148,22 @@ func TestHandleGetSiteAIActivity(t *testing.T) {
 		}
 	})
 
+	t.Run("accepts repeatable conversion cohort UUIDs", func(t *testing.T) {
+		w := serveAIActivity(t, h, siteID, userID, query+"&goal_id="+uuid.NewString()+"&goal_id="+uuid.NewString()+"&funnel_id="+uuid.NewString())
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("rejects invalid conversion cohort UUIDs", func(t *testing.T) {
+		for _, key := range []string{"goal_id", "funnel_id"} {
+			w := serveAIActivity(t, h, siteID, userID, query+"&"+key+"=not-a-uuid")
+			if w.Code != http.StatusBadRequest {
+				t.Fatalf("%s: expected status %d, got %d: %s", key, http.StatusBadRequest, w.Code, w.Body.String())
+			}
+		}
+	})
+
 	t.Run("rejects invalid filter", func(t *testing.T) {
 		w := serveAIActivity(t, h, siteID, userID, "?filter=ai_bogus:x")
 		if w.Code != http.StatusBadRequest {

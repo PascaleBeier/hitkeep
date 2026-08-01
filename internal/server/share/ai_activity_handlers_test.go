@@ -104,6 +104,18 @@ func TestHandleGetShareAIActivity(t *testing.T) {
 		}
 	})
 
+	t.Run("accepts conversion cohort UUIDs", func(t *testing.T) {
+		w := serveShareWebVitals(t, h.handleGetShareAIActivity(), token, siteID, "/ai-activity?goal_id="+uuid.NewString()+"&funnel_id="+uuid.NewString())
+		requireShareStatus(t, w, http.StatusOK)
+	})
+
+	t.Run("rejects invalid conversion cohort UUIDs", func(t *testing.T) {
+		for _, key := range []string{"goal_id", "funnel_id"} {
+			w := serveShareWebVitals(t, h.handleGetShareAIActivity(), token, siteID, "/ai-activity?"+key+"=not-a-uuid")
+			requireShareStatus(t, w, http.StatusBadRequest)
+		}
+	})
+
 	t.Run("invalid filter", func(t *testing.T) {
 		w := serveShareWebVitals(t, h.handleGetShareAIActivity(), token, siteID, "/ai-activity?filter=ai_bogus:x")
 		requireShareStatus(t, w, http.StatusBadRequest)
