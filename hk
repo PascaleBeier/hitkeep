@@ -87,7 +87,7 @@ if [ ! -x "$binary" ]; then
       "golang:$go_version" \
       go build -trimpath -ldflags "-X main.version=dev-$key" -o "/out/$(basename "$temporary")" ./cmd/hk
   else
-    echo "hk requires Go $go_version or Docker for its first bootstrap" >&2
+    echo "hk requires Docker for its first bootstrap when no cached developer binary or exact optional host Go $go_version is available" >&2
     exit 1
   fi
   chmod 755 "$temporary"

@@ -13,5 +13,11 @@ import { map, switchMap } from 'rxjs';
  */
 export function injectActiveLang(): Signal<string> {
     const transloco = inject(TranslocoService);
-    return toSignal(transloco.langChanges$.pipe(switchMap((lang) => transloco.selectTranslation(lang).pipe(map(() => lang)))), { initialValue: transloco.getActiveLang() }) as Signal<string>;
+    return toSignal(transloco.langChanges$.pipe(switchMap((lang) => transloco.selectTranslation(lang).pipe(map(() => lang)))), {
+        initialValue: transloco.getActiveLang(),
+        // The active language can already equal the initial value while its
+        // catalog is still loading. Preserve that second emission so computed
+        // labels invalidate when the translation becomes available.
+        equal: () => false
+    }) as Signal<string>;
 }

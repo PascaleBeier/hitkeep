@@ -1,9 +1,10 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
-import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { finalize } from 'rxjs';
 
 import { buildTakeoutExportMenuItems, DEFAULT_TAKEOUT_EXPORT_FORMAT, TakeoutExportFormat } from '@core/export/export-formats';
+import { injectActiveLang } from '@core/i18n/active-lang';
 import { Site } from '@models/analytics.types';
 import { TakeoutDownloadService } from '@services/takeout-download.service';
 import { SiteService } from '@features/sites/services/site.service';
@@ -31,7 +32,7 @@ export class ImportExportExportPage {
     private readonly takeoutDownloadService = inject(TakeoutDownloadService);
     private readonly siteService = inject(SiteService);
     private readonly transloco = inject(TranslocoService);
-    private readonly activeLanguage = toSignal(this.transloco.langChanges$, { initialValue: this.transloco.getActiveLang() });
+    private readonly activeLanguage = injectActiveLang();
     private readonly siteExportMenuItemsCache = new Map<string, { language: string; items: MenuItem[] }>();
     protected readonly sites = this.siteService.sites;
     protected readonly isSitesLoading = this.siteService.isLoading;

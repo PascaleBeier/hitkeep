@@ -67,7 +67,7 @@ func TestDoctorBoundsSlowChecksAndRunsThemInParallel(t *testing.T) {
 	t.Setenv("PATH", fakeBin)
 	started := time.Now()
 	report := app.Doctor(context.Background())
-	if elapsed := time.Since(started); elapsed > 4*time.Second {
+	if elapsed := time.Since(started); elapsed > 7*time.Second {
 		t.Fatalf("parallel bounded doctor took %s", elapsed)
 	}
 	for _, name := range []string{"docker", "compose", "buildx"} {
@@ -82,6 +82,124 @@ func TestDoctorBoundsSlowChecksAndRunsThemInParallel(t *testing.T) {
 		}
 		if !found {
 			t.Fatalf("missing %s check", name)
+		}
+	}
+}
+
+func TestDoctorUsesManagedToolchainsWithoutHostGoOrNode(t *testing.T) {
+	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	root := initTestRepository(t)
+	writeTestToolchainConfig(t, root)
+	app, err := NewApp(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config, err := app.ToolchainConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	paths, err := app.managedToolchainPaths()
+	if err != nil {
+		t.Fatal(err)
+	}
+	managedCommands := map[string]string{
+		paths.GoExecutable:   "go version go" + config.Go + " test/arch",
+		paths.NodeExecutable: "v" + config.Node,
+		paths.NPMExecutable:  config.NPM,
+	}
+	for path, output := range managedCommands {
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("#!/bin/sh\nprintf '%s\\n' '"+output+"'\n"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fakeBin := t.TempDir()
+	hostCommands := map[string]string{
+		"git":           "git version 2.50.0",
+		"cc":            "cc 1.0",
+		"docker":        "27.0.0",
+		"golangci-lint": ToolVersion("golangci-lint"),
+		"zizmor":        ToolVersion("zizmor"),
+	}
+	for name, output := range hostCommands {
+		if err := os.WriteFile(filepath.Join(fakeBin, name), []byte("#!/bin/sh\nprintf '%s\\n' '"+output+"'\n"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", fakeBin)
+	report := app.Doctor(context.Background())
+	if !report.Ready {
+		t.Fatalf("managed toolchains did not preserve developer readiness without host Go or Node: %+v", report)
+	}
+	for _, name := range []string{"go", "node", "npm"} {
+		found := false
+		for _, check := range report.Checks {
+			if check.Name == name {
+				found = true
+				if check.Status != "ok" {
+					t.Fatalf("managed %s check failed without a host installation: %+v", name, check)
+				}
+			}
+		}
+		if !found {
+			t.Fatalf("managed %s check is missing: %+v", name, report)
+		}
+	}
+}
+
+func TestCommandEnvironmentPrefersManagedToolchains(t *testing.T) {
+	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	root := initTestRepository(t)
+	writeTestToolchainConfig(t, root)
+	app, err := NewApp(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", "/host/bin")
+	paths, err := app.managedToolchainPaths()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, executable := range []string{paths.GoExecutable, paths.NodeExecutable} {
+		if err := os.MkdirAll(filepath.Dir(executable), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(executable, []byte("#!/bin/sh\n"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	environment := app.commandEnvironment(nil)
+	wantPath := strings.Join([]string{filepath.Dir(paths.GoExecutable), filepath.Dir(paths.NodeExecutable), "/host/bin"}, string(os.PathListSeparator))
+	if got := environmentValue(environment, "PATH"); got != wantPath {
+		t.Fatalf("managed toolchains were not preferred in PATH: got %q want %q", got, wantPath)
+	}
+	for name, want := range map[string]string{
+		"GOCACHE":                  paths.GoBuildCache,
+		"GOMODCACHE":               paths.GoModuleCache,
+		"NPM_CONFIG_CACHE":         paths.NPMCache,
+		"PLAYWRIGHT_BROWSERS_PATH": paths.PlaywrightCache,
+	} {
+		if got := environmentValue(environment, name); got != want {
+			t.Fatalf("%s = %q, want %q", name, got, want)
+		}
+	}
+}
+
+func writeTestToolchainConfig(t *testing.T, root string) {
+	t.Helper()
+	for path, content := range map[string]string{
+		"go.mod":                          "module example.test\n\ngo 1.26.5\n",
+		"frontend/dashboard/.nvmrc":       "24.18.0\n",
+		"frontend/dashboard/package.json": `{"packageManager":"npm@12.0.2"}`,
+	} {
+		absolute := filepath.Join(root, path)
+		if err := os.MkdirAll(filepath.Dir(absolute), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(absolute, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
 		}
 	}
 }

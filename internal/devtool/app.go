@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-const doctorCommandTimeout = 2 * time.Second
+const doctorCommandTimeout = 5 * time.Second
 
 type App struct {
 	workspace        Workspace
@@ -108,16 +108,17 @@ func (a *App) Doctor(ctx context.Context) DoctorReport {
 	goVersion := requiredVersion(a.workspace.Root, "go.mod", "go ")
 	nodeVersion := requiredVersion(a.workspace.Root, filepath.Join("frontend", "dashboard", ".nvmrc"), "")
 	npmVersion := requiredPackageManagerVersion(a.workspace.Root)
+	npmExecutable, npmArgs := a.preferredNPMProbe()
 	probes := []func(context.Context) Check{
 		func(ctx context.Context) Check { return checkCommand(ctx, "git", "git", "--version") },
 		func(ctx context.Context) Check {
-			return checkExactCommand(ctx, "go", goVersion, "go"+goVersion, "go", "version")
+			return managedToolchainCheck(ctx, "go", goVersion, "go"+goVersion, a.preferredDeveloperExecutable("go"), "version")
 		},
 		func(ctx context.Context) Check {
-			return checkExactCommand(ctx, "node", nodeVersion, "v"+nodeVersion, "node", "--version")
+			return managedToolchainCheck(ctx, "node", nodeVersion, "v"+nodeVersion, a.preferredDeveloperExecutable("node"), "--version")
 		},
 		func(ctx context.Context) Check {
-			return checkExactCommand(ctx, "npm", npmVersion, npmVersion, "npm", "--version")
+			return managedToolchainCheck(ctx, "npm", npmVersion, npmVersion, npmExecutable, npmArgs...)
 		},
 		func(ctx context.Context) Check { return checkCommand(ctx, "c-compiler", "cc", "--version") },
 		func(ctx context.Context) Check {
@@ -144,9 +145,9 @@ func (a *App) Doctor(ctx context.Context) DoctorReport {
 	for _, check := range checks {
 		statuses[check.Name] = check.Status == "ok"
 	}
-	nativeToolchainReady := statuses["go"] && statuses["node"] && statuses["npm"] && statuses["c-compiler"]
+	toolchainReady := statuses["go"] && statuses["node"] && statuses["npm"] && statuses["c-compiler"]
 	containerReady := statuses["docker"] && statuses["compose"]
-	prQA := nativeToolchainReady && statuses["golangci"] && statuses["zizmor"]
+	prQA := toolchainReady && statuses["golangci"] && statuses["zizmor"]
 	fullQA := prQA && statuses["docker"] && statuses["buildx"]
 	ready := statuses["git"] && containerReady
 	return DoctorReport{Ready: ready, Capabilities: DoctorCapabilities{ContainerDevelopment: containerReady, PRQA: prQA, FullQA: fullQA}, Checks: checks}
@@ -226,11 +227,27 @@ func (a *App) localImageRef(variant Variant) string {
 }
 
 func (a *App) SharedCacheEnvironment() []string {
-	// Go, npm, and Playwright already use safe user-level caches shared by all
-	// worktrees. Keep those native defaults instead of creating a second large
-	// cache tree under hk state. Only prevent implicit Go toolchain downloads;
-	// the bootstrap has already verified the exact repository toolchain.
-	return []string{"GOTOOLCHAIN=local"}
+	environment := []string{"GOTOOLCHAIN=local"}
+	paths, err := a.managedToolchainPaths()
+	if err != nil {
+		return environment
+	}
+	pathEntries := make([]string, 0, 3)
+	if isExecutableFile(paths.GoExecutable) {
+		pathEntries = append(pathEntries, filepath.Dir(paths.GoExecutable))
+		environment = append(environment, "GOCACHE="+paths.GoBuildCache, "GOMODCACHE="+paths.GoModuleCache)
+	}
+	if isExecutableFile(paths.NodeExecutable) {
+		pathEntries = append(pathEntries, filepath.Dir(paths.NodeExecutable))
+		environment = append(environment, "NPM_CONFIG_CACHE="+paths.NPMCache, "PLAYWRIGHT_BROWSERS_PATH="+paths.PlaywrightCache)
+	}
+	if len(pathEntries) > 0 {
+		if currentPath := os.Getenv("PATH"); currentPath != "" {
+			pathEntries = append(pathEntries, currentPath)
+		}
+		environment = append(environment, "PATH="+strings.Join(pathEntries, string(os.PathListSeparator)))
+	}
+	return environment
 }
 
 func (a *App) commandEnvironment(overrides []string) []string {
@@ -319,6 +336,14 @@ func checkExactCommand(ctx context.Context, name, required, expected, executable
 	if check.Status == "ok" && required != "" && !strings.Contains(check.Detected, expected) {
 		check.Status = "mismatch"
 		check.Remediation = "install the exact repository version or use the container runtime"
+	}
+	return check
+}
+
+func managedToolchainCheck(ctx context.Context, name, required, expected, executable string, args ...string) Check {
+	check := checkExactCommand(ctx, name, required, expected, executable, args...)
+	if check.Status != "ok" {
+		check.Remediation = "run ./hk setup to provision the pinned managed toolchain"
 	}
 	return check
 }

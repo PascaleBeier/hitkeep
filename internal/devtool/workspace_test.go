@@ -49,6 +49,51 @@ func TestQACancellationPreservesCancelledGateState(t *testing.T) {
 	}
 }
 
+func TestQAGateTimeoutStartsAfterSchedulerWait(t *testing.T) {
+	root := initTestRepository(t)
+	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	t.Setenv("HK_QA_SLOTS", "1")
+	app, err := NewApp(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	releaseBlockingSlot, err := app.acquireQASlots(context.Background(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type acquiredGate struct {
+		ctx        context.Context
+		finish     func()
+		acquiredAt time.Time
+		err        error
+	}
+	result := make(chan acquiredGate, 1)
+	started := time.Now()
+	go func() {
+		gateContext, finish, acquireErr := app.acquireQAGateContext(context.Background(), Gate{Weight: 1, Timeout: "200ms"})
+		result <- acquiredGate{ctx: gateContext, finish: finish, acquiredAt: time.Now(), err: acquireErr}
+	}()
+	time.Sleep(250 * time.Millisecond)
+	releaseBlockingSlot()
+
+	acquired := <-result
+	if acquired.err != nil {
+		t.Fatal(acquired.err)
+	}
+	defer acquired.finish()
+	if elapsed := time.Since(started); elapsed < 200*time.Millisecond {
+		t.Fatalf("scheduler wait = %s, want it to exceed the gate timeout", elapsed)
+	}
+	deadline, ok := acquired.ctx.Deadline()
+	if !ok {
+		t.Fatal("gate context has no execution deadline")
+	}
+	if remainingAtAcquisition := deadline.Sub(acquired.acquiredAt); remainingAtAcquisition < 150*time.Millisecond {
+		t.Fatalf("gate timeout remaining after scheduler wait = %s, want nearly the full execution timeout", remainingAtAcquisition)
+	}
+}
+
 func TestGetRunReconcilesExitedWorker(t *testing.T) {
 	root := initTestRepository(t)
 	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))

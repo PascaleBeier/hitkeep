@@ -62,10 +62,6 @@ func TestDetachedCLIActionOutlivesLauncher(t *testing.T) {
 	}
 	for name, script := range map[string]string{
 		"docker": "#!/bin/sh\necho 1.0.0\nexit 0\n",
-		"go":     "#!/bin/sh\nif [ \"${1:-}\" = version ]; then echo 'go version go1.26.5 test'; fi\nexit 0\n",
-		"npm":    "#!/bin/sh\nif [ \"${1:-}\" = --version ]; then echo '12.0.2'; exit 0; fi\nmkdir -p node_modules\nexit 0\n",
-		"node":   "#!/bin/sh\necho v24.18.0\n",
-		"npx":    "#!/bin/sh\nmkdir -p node_modules\nexit 0\n",
 	} {
 		if err := os.WriteFile(filepath.Join(fakeBin, name), []byte(script), 0o755); err != nil {
 			t.Fatal(err)
@@ -73,6 +69,7 @@ func TestDetachedCLIActionOutlivesLauncher(t *testing.T) {
 	}
 
 	stateDir := filepath.Join(t.TempDir(), "state")
+	installFakeManagedToolchain(t, stateDir)
 	t.Setenv("HK_STATE_DIR", stateDir)
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	command := exec.Command(binary, "--workspace", workspace, "--output", "json", "setup", "--detach")
@@ -259,8 +256,10 @@ func TestMCPStdioActionRunLifecycle(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
+	stateDir := filepath.Join(t.TempDir(), "state")
+	installFakeManagedToolchain(t, stateDir)
 	command := exec.Command(binary, "mcp", "serve", "--workspace", workspace)
-	command.Env = append(os.Environ(), "PATH="+fakeBin+":"+os.Getenv("PATH"), "HK_STATE_DIR="+filepath.Join(t.TempDir(), "state"))
+	command.Env = append(os.Environ(), "PATH="+fakeBin+":"+os.Getenv("PATH"), "HK_STATE_DIR="+stateDir)
 	client := mcp.NewClient(&mcp.Implementation{Name: "hk-integration-test", Version: "test"}, nil)
 	session, err := client.Connect(ctx, &mcp.CommandTransport{Command: command}, nil)
 	if err != nil {
@@ -326,6 +325,32 @@ func TestMCPStdioActionRunLifecycle(t *testing.T) {
 		case <-ctx.Done():
 			t.Fatalf("%v: last cancelled run state %#v", ctx.Err(), run)
 		case <-time.After(50 * time.Millisecond):
+		}
+	}
+}
+
+func installFakeManagedToolchain(t *testing.T, stateDir string) {
+	t.Helper()
+	platform := runtime.GOOS + "-" + runtime.GOARCH
+	goBin := filepath.Join(stateDir, "shared", "toolchains", "go-1.26.5-"+platform, "bin")
+	nodeRoot := filepath.Join(stateDir, "shared", "toolchains", "node-24.18.0-"+platform)
+	nodeBin := filepath.Join(nodeRoot, "bin")
+	npmCLI := filepath.Join(nodeRoot, "lib", "node_modules", "npm", "bin", "npm-cli.js")
+	for _, directory := range []string{goBin, nodeBin, filepath.Dir(npmCLI)} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	managedCommands := map[string]string{
+		filepath.Join(goBin, "go"):     "#!/bin/sh\nif [ \"${1:-}\" = version ]; then echo 'go version go1.26.5 test'; fi\nexit 0\n",
+		filepath.Join(nodeBin, "node"): "#!/bin/sh\ncase \"${1:-}\" in *npm-cli.js) echo 12.0.2 ;; *) echo v24.18.0 ;; esac\nexit 0\n",
+		filepath.Join(nodeBin, "npm"):  "#!/bin/sh\nif [ \"${1:-}\" = --version ]; then echo '12.0.2'; exit 0; fi\nmkdir -p node_modules\nexit 0\n",
+		filepath.Join(nodeBin, "npx"):  "#!/bin/sh\nmkdir -p node_modules\nexit 0\n",
+		npmCLI:                         "#!/bin/sh\nexit 0\n",
+	}
+	for path, script := range managedCommands {
+		if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+			t.Fatal(err)
 		}
 	}
 }

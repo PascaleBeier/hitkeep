@@ -38,12 +38,18 @@ async function selectComboboxOption(page, name, optionName) {
     }
 
     await select.click();
-
-    const option = page.getByRole("option", { name: optionName, exact: true }).first();
-    await expect(option).toBeVisible();
-
-    await option.click();
-    await expect(page.getByText(optionName, { exact: true }).first()).toBeVisible();
+    // PrimeNG only materializes the visible option window. Use the select's
+    // keyboard typeahead to focus an option below that window, then click the
+    // materialized active descendant to commit the selection.
+    await expect(page.getByRole("listbox").last()).toBeVisible();
+    await select.press(optionName[0]);
+    await expect.poll(() => select.getAttribute("aria-activedescendant")).not.toBeNull();
+    const activeOptionId = await select.getAttribute("aria-activedescendant");
+    expect(activeOptionId).not.toBeNull();
+    const activeOption = page.locator(`[id="${activeOptionId}"]`);
+    await expect(activeOption).toHaveAttribute("aria-label", optionName);
+    await activeOption.click();
+    await expect(page.getByRole("combobox", { name: optionName, exact: true }).first()).toBeVisible();
     return optionName;
 }
 

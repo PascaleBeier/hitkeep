@@ -43,11 +43,24 @@ func (a *App) CacheStatus() (CacheReport, error) {
 	}
 	report.Entries = append(report.Entries, snapshots...)
 
+	toolchains, err := cacheChildren(filepath.Join(root, "shared", "toolchains"), "managed-toolchain", func(entry os.DirEntry) bool {
+		return entry.IsDir() && !strings.HasPrefix(entry.Name(), ".")
+	})
+	if err != nil {
+		return report, err
+	}
+	managedPaths, managedPathsErr := a.managedToolchainPaths()
+	for index := range toolchains {
+		toolchains[index].InUse = managedPathsErr == nil && (sameFilePath(toolchains[index].Path, managedPaths.GoRoot) || sameFilePath(toolchains[index].Path, managedPaths.NodeRoot))
+		toolchains[index].Prunable = !toolchains[index].InUse
+	}
+	report.Entries = append(report.Entries, toolchains...)
+
 	for _, name := range []string{"go-build", "go-mod", "npm", "playwright"} {
 		path := filepath.Join(root, "shared", name)
-		entry, statErr := cachePath(path, "legacy-managed-cache", name)
+		entry, statErr := cachePath(path, "managed-cache", name)
 		if statErr == nil {
-			entry.Prunable = true
+			entry.InUse = true
 			report.Entries = append(report.Entries, entry)
 		} else if !os.IsNotExist(statErr) {
 			return report, statErr

@@ -135,6 +135,39 @@ func TestCentralDeveloperMCPUsesConfiguredFallback(t *testing.T) {
 	}
 }
 
+func TestCentralDeveloperMCPForwardsJSONProgressToken(t *testing.T) {
+	ctx := context.Background()
+	root := testRepository(t)
+	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+	connector := &testWorkspaceMCPConnector{}
+	defer connector.Close()
+	serverSession, err := newServer(newCentralAppResolver(root, connector.Connect), "test").Connect(ctx, serverTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer serverSession.Close()
+	clientSession, err := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "test"}, nil).Connect(ctx, clientTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clientSession.Close()
+
+	params := &mcp.CallToolParams{
+		Meta:      mcp.Meta{"progressToken": float64(1)},
+		Name:      "hk_workspace_status",
+		Arguments: map[string]any{},
+	}
+	result, err := clientSession.CallTool(ctx, params)
+	if err != nil || result.IsError {
+		t.Fatalf("JSON numeric progress token failed: %v %#v", err, result)
+	}
+	result, err = clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "hk_workspace_status", Arguments: map[string]any{}})
+	if err != nil || result.IsError {
+		t.Fatalf("transport did not survive progress-token call: %v %#v", err, result)
+	}
+}
+
 func TestCentralDeveloperMCPRejectsUncataloguedWorkspace(t *testing.T) {
 	ctx := context.Background()
 	fallback := testRepository(t)

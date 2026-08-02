@@ -110,3 +110,43 @@ func TestCachePruneRechecksFrontendSnapshotUseAfterLock(t *testing.T) {
 		t.Fatalf("newly linked snapshot is missing: %v", err)
 	}
 }
+
+func TestCacheStatusKeepsCurrentManagedToolchains(t *testing.T) {
+	workspace := initTestRepository(t)
+	writeTestToolchainConfig(t, workspace)
+	stateRoot := filepath.Join(t.TempDir(), "state")
+	t.Setenv("HK_STATE_DIR", stateRoot)
+	app, err := NewApp(workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	paths, err := app.managedToolchainPaths()
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldToolchain := filepath.Join(paths.Root, "toolchains", "go-0.0.1-"+paths.Platform)
+	for _, path := range []string{paths.GoRoot, paths.NodeRoot, oldToolchain} {
+		if err := os.MkdirAll(path, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	report, err := app.CacheStatus()
+	if err != nil {
+		t.Fatal(err)
+	}
+	statuses := map[string]CacheEntry{}
+	for _, entry := range report.Entries {
+		if entry.Kind == "managed-toolchain" {
+			statuses[entry.Path] = entry
+		}
+	}
+	for _, current := range []string{paths.GoRoot, paths.NodeRoot} {
+		entry, ok := statuses[current]
+		if !ok || !entry.InUse || entry.Prunable {
+			t.Fatalf("current managed toolchain is not retained: %+v", entry)
+		}
+	}
+	if entry := statuses[oldToolchain]; entry.InUse || !entry.Prunable {
+		t.Fatalf("old managed toolchain is not prunable: %+v", entry)
+	}
+}

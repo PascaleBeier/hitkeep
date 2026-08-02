@@ -204,7 +204,9 @@ func (resolver *centralAppResolver) DelegateTool(ctx context.Context, request *m
 	delete(arguments, "workspace")
 	callParams := &mcp.CallToolParams{Name: request.Params.Name, Arguments: arguments}
 	if progressToken := request.Params.GetProgressToken(); progressToken != nil {
-		callParams.SetProgressToken(progressToken)
+		if delegatedToken, ok := delegatedProgressToken(progressToken); ok {
+			callParams.SetProgressToken(delegatedToken)
+		}
 	}
 	result, err := resolver.callTool(ctx, app, request, callParams)
 	if err != nil {
@@ -215,6 +217,25 @@ func (resolver *centralAppResolver) DelegateTool(ctx context.Context, request *m
 		return output(app, command, nil, err)
 	}
 	return result, envelopeOutput{Envelope: envelope}, nil
+}
+
+// delegatedProgressToken converts JSON-decoded numeric tokens into a form the
+// Go MCP SDK accepts. The broker restores the original outer token when it
+// forwards child progress notifications, so using its exact string form for
+// the request-scoped child connection preserves the client-facing identity.
+func delegatedProgressToken(token any) (any, bool) {
+	switch token := token.(type) {
+	case int, int32, int64, string:
+		return token, true
+	case float32:
+		return strconv.FormatFloat(float64(token), 'g', -1, 32), true
+	case float64:
+		return strconv.FormatFloat(token, 'g', -1, 64), true
+	case json.Number:
+		return token.String(), true
+	default:
+		return nil, false
+	}
 }
 
 func (resolver *centralAppResolver) DelegateResource(ctx context.Context, request *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
@@ -436,7 +457,7 @@ func registerTools(server *mcp.Server, resolver appResolver) {
 	mcp.AddTool(server, tool("hk_workspace_handoff", "Return compact, secret-free handoff context for the selected worktree.", readOnly), routedHandler(resolver, "workspace handoff", func(ctx context.Context, app *devtool.App, _ emptyInput) (any, error) {
 		return app.Handoff(ctx)
 	}))
-	mcp.AddTool(server, tool("hk_doctor", "Check the local toolchain and container runtime prerequisites.", readOnly), routedHandler(resolver, "doctor", func(ctx context.Context, app *devtool.App, _ emptyInput) (any, error) {
+	mcp.AddTool(server, tool("hk_doctor", "Check the managed toolchain and container runtime prerequisites.", readOnly), routedHandler(resolver, "doctor", func(ctx context.Context, app *devtool.App, _ emptyInput) (any, error) {
 		return app.Doctor(ctx), nil
 	}))
 	mcp.AddTool(server, tool("hk_qa_plan", "Select canonical QA gates without running them.", readOnly), routedHandler(resolver, "qa plan", func(ctx context.Context, app *devtool.App, input qaPlanInput) (any, error) {

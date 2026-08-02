@@ -509,16 +509,12 @@ func (a *App) executeSetup(ctx context.Context, writer io.Writer) error {
 	if err := a.executeContainerSetup(ctx, writer); err != nil {
 		return err
 	}
-	statuses := map[string]bool{}
-	for _, check := range doctor.Checks {
-		statuses[check.Name] = check.Status == "ok"
+	_, _ = fmt.Fprintln(writer, "preparing pinned managed developer toolchain")
+	if err := a.ensureManagedToolchains(ctx, writer); err != nil {
+		return err
 	}
-	if !statuses["node"] || !statuses["npm"] {
-		_, _ = fmt.Fprintln(writer, "host frontend QA dependencies: skipped (exact Node and npm are not available)")
-		return nil
-	}
-	_, _ = fmt.Fprintln(writer, "preparing host frontend QA dependencies")
-	if err := a.prepareHostFrontendDependencies(ctx, writer); err != nil {
+	_, _ = fmt.Fprintln(writer, "preparing managed frontend QA dependencies")
+	if err := a.prepareFrontendDependencies(ctx, writer); err != nil {
 		return err
 	}
 	return a.runCommand(ctx, writer, commandSpec{Args: []string{"npx", "playwright", "install", "chromium"}, Dir: "frontend/dashboard", Display: "npx playwright install chromium [shared browser cache]"})
@@ -539,8 +535,14 @@ func (a *App) executeContainerSetup(ctx context.Context, writer io.Writer) error
 	return nil
 }
 
-func (a *App) prepareHostFrontendDependencies(ctx context.Context, writer io.Writer) error {
-	return a.runCommand(ctx, writer, commandSpec{Args: []string{"npm", "ci", "--no-audit", "--no-fund"}, Dir: "frontend/dashboard"})
+func (a *App) prepareFrontendDependencies(ctx context.Context, writer io.Writer) error {
+	if err := a.runCommand(ctx, writer, commandSpec{Args: []string{"npm", "ci", "--no-audit", "--no-fund"}, Dir: "frontend/dashboard"}); err != nil {
+		return err
+	}
+	// npm can intermittently omit a platform-specific optional dependency from
+	// a clean install even when it is present in the lockfile. A locked, no-save
+	// reification fills that missing native package without changing source.
+	return a.runCommand(ctx, writer, commandSpec{Args: []string{"npm", "install", "--no-save", "--no-audit", "--no-fund"}, Dir: "frontend/dashboard"})
 }
 
 func (a *App) resetDevData(ctx context.Context, writer io.Writer) error {
@@ -585,7 +587,7 @@ func (a *App) executeBuild(ctx context.Context, request RunRequest, writer io.Wr
 	}
 	tags := strings.Join(variant.BuildTags, " ")
 	if request.Target == "binary" {
-		if err := a.prepareHostFrontendDependencies(ctx, writer); err != nil {
+		if err := a.prepareFrontendDependencies(ctx, writer); err != nil {
 			return err
 		}
 		if err := a.runCommand(ctx, writer, commandSpec{Args: []string{"npm", "run", "build:prod"}, Dir: "frontend/dashboard"}); err != nil {
@@ -749,15 +751,9 @@ func (a *App) executeQA(ctx context.Context, runID string, request RunRequest, w
 				if strings.HasPrefix(gate.ID, "cloud-") {
 					environment = append(a.ComposeEnvironment(variants[1]), "GOFLAGS=-tags="+strings.Join(variants[1].BuildTags, ","))
 				}
-				gateContext := ctx
-				cancel := func() {}
-				if timeout, parseErr := time.ParseDuration(gate.Timeout); parseErr == nil {
-					gateContext, cancel = context.WithTimeout(ctx, timeout)
-				}
 				persistProgress(id, "waiting", nil, nil, nil)
-				releaseSlots, acquireErr := a.acquireQASlots(gateContext, gate.Weight)
+				gateContext, finishGate, acquireErr := a.acquireQAGateContext(ctx, gate)
 				if acquireErr != nil {
-					cancel()
 					_ = gateLog.Close()
 					finished := time.Now().UTC()
 					status := "failed"
@@ -798,8 +794,7 @@ func (a *App) executeQA(ctx context.Context, runID string, request RunRequest, w
 				default:
 					err = a.runCommand(gateContext, target, commandSpec{Args: gate.Command, Dir: gate.WorkingDir, Env: environment})
 				}
-				releaseSlots()
-				cancel()
+				finishGate()
 				_ = gateLog.Close()
 				finished := time.Now().UTC()
 				status := "passed"
@@ -849,6 +844,25 @@ func (a *App) executeQA(ctx context.Context, runID string, request RunRequest, w
 		return gateResults, errors.New(strings.Join(failures, "; "))
 	}
 	return gateResults, nil
+}
+
+// acquireQAGateContext keeps scheduler wait time outside the gate's execution
+// timeout. A busy weighted queue must not consume the time reserved for the
+// command itself, while cancellation of the parent QA run still stops waiting.
+func (a *App) acquireQAGateContext(ctx context.Context, gate Gate) (context.Context, func(), error) {
+	releaseSlots, err := a.acquireQASlots(ctx, gate.Weight)
+	if err != nil {
+		return nil, nil, err
+	}
+	gateContext := ctx
+	cancel := func() {}
+	if timeout, parseErr := time.ParseDuration(gate.Timeout); parseErr == nil {
+		gateContext, cancel = context.WithTimeout(ctx, timeout)
+	}
+	return gateContext, func() {
+		releaseSlots()
+		cancel()
+	}, nil
 }
 
 func writeSourceResult(writer io.Writer, result SourceChangeResult) {

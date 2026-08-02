@@ -12,9 +12,9 @@ cd hitkeep
 ./hk setup
 ```
 
-The checked-in `./hk` file is an executable POSIX launcher, not a compiled artifact. It builds the current worktree's CLI and central MCP broker locally, caches the native executable by source content, and selects the host's macOS or Linux and AMD64 or ARM64 target. WSL2 follows the Linux path; WSL1 is not supported. The exact Go version from `go.mod` is used directly when available, with Docker as the first-bootstrap fallback.
+The checked-in `./hk` file is an executable POSIX launcher, not a compiled artifact. It builds the current worktree's CLI and central MCP broker locally, caches the native executable by source content, and selects the host's macOS or Linux and AMD64 or ARM64 target. WSL2 follows the Linux path; WSL1 is not supported. Docker performs the first bootstrap when the exact Go version from `go.mod` is not already present on the host; a host Go installation is only an optional fast path.
 
-Developer CLI binaries are neither committed nor published as HitKeep release assets. Git keeps the launcher and implementation in lockstep with every branch, while GitHub Releases remain limited to deployable HitKeep product artifacts. `setup` pulls and builds the development containers for the selected worktree. Docker Compose is the only development runtime; host Go and Node installations remain useful for fast QA and source tooling but do not change how the application runs.
+Developer CLI binaries are neither committed nor published as HitKeep release assets. Git keeps the launcher and implementation in lockstep with every branch, while GitHub Releases remain limited to deployable HitKeep product artifacts. `setup` pulls and builds the development containers for the selected worktree, verifies and installs the repository-pinned Go and Node.js archives from their official SHA-256 metadata, then installs the pinned npm release through that managed Node.js toolchain. Docker Compose is the only application runtime; host Go, Node.js, and npm installations are never required for setup, QA, builds, source tooling, or the developer MCP.
 
 Check prerequisites and local development status at any time:
 
@@ -161,7 +161,7 @@ Git worktree creation and deletion remain your responsibility. `hk` never create
 ./hk workspace handoff --output json
 ```
 
-Workspace state, application data, host frontend dependencies, services, logs, and generated configuration remain isolated. Container images, safe download/compiler caches, and explicitly shared package caches are reused. This allows development and QA to run concurrently without fixed-port, host-native dependency, or Compose-project collisions.
+Workspace state, application data, frontend dependency links, services, logs, and generated configuration remain isolated. Container images, verified managed toolchains, safe download/compiler caches, and explicitly shared package caches are reused. This allows development and QA to run concurrently without fixed-port, host-native dependency, or Compose-project collisions.
 
 ## Local Developer MCP
 

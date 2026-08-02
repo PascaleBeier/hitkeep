@@ -22,7 +22,7 @@ test("dashboard goal and funnel rows replace the active conversion cohort", asyn
     expect(filteredGoalStatsCount).toBe(1);
     expect(filteredGoalHitsCount).toBe(1);
     await expect(page).toHaveURL(/goal=[0-9a-f-]+/);
-    await expect(page.getByText("Goal: Newsletter Signup", { exact: true })).toBeVisible();
+    await expect(page.getByText("Goal: Newsletter Signup · tracked visits only", { exact: true })).toBeVisible();
 
     await page.getByRole("tab", { name: /Funnels/ }).click();
     let filteredFunnelStatsCount = 0;
@@ -40,7 +40,7 @@ test("dashboard goal and funnel rows replace the active conversion cohort", asyn
     expect(filteredFunnelHitsCount).toBe(1);
     await expect(page).toHaveURL(/funnel=[0-9a-f-]+/);
     await expect(page).not.toHaveURL(/goal=/);
-    await expect(page.getByText("Funnel: Acquisition Funnel", { exact: true })).toBeVisible();
+    await expect(page.getByText("Funnel: Acquisition Funnel · tracked visits only", { exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: "Remove filter" }).click();
     await expect(page).not.toHaveURL(/funnel=/);
