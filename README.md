@@ -1,5 +1,7 @@
 # HitKeep
 
+[![MCP Toplist](https://mcptoplist.com/badge/io.github.PascaleBeier%2Fhitkeep.svg)](https://mcptoplist.com/server/io.github.PascaleBeier%2Fhitkeep)
+
 > Privacy-first web analytics with conversion reporting, AI visibility, and optional Ask AI, self-hosted or in EU/US cloud.
 
 [![Continuous Integration](https://github.com/PascaleBeier/hitkeep/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/PascaleBeier/hitkeep/actions/workflows/ci.yml)
