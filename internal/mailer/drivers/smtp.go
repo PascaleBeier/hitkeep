@@ -91,17 +91,26 @@ func (s *SMTPDriver) Send(to []string, subject string, htmlBody string, textBody
 }
 
 func (s *SMTPDriver) SendWithHeaders(to []string, subject string, htmlBody string, textBody string, messageID string, headers map[string]string) error {
-	msg := mail.NewMsg()
-	if err := msg.FromFormat(s.name, s.from); err != nil {
+	msg, err := s.buildMessage(to, subject, htmlBody, textBody, messageID, headers)
+	if err != nil {
 		return err
 	}
+
+	return s.client.DialAndSend(msg)
+}
+
+func (s *SMTPDriver) buildMessage(to []string, subject string, htmlBody string, textBody string, messageID string, headers map[string]string) (*mail.Msg, error) {
+	msg := mail.NewMsg()
+	if err := msg.FromFormat(s.name, s.from); err != nil {
+		return nil, err
+	}
 	if err := msg.To(to...); err != nil {
-		return err
+		return nil, err
 	}
 
 	msg.Subject(subject)
 	if strings.TrimSpace(messageID) != "" {
-		msg.SetGenHeaderPreformatted(mail.HeaderMessageID, strings.TrimSpace(messageID))
+		msg.SetGenHeader(mail.HeaderMessageID, strings.TrimSpace(messageID))
 	}
 	for key, value := range headers {
 		if strings.TrimSpace(key) == "" || strings.TrimSpace(value) == "" {
@@ -112,7 +121,7 @@ func (s *SMTPDriver) SendWithHeaders(to []string, subject string, htmlBody strin
 	msg.SetBodyString(mail.TypeTextPlain, textBody)
 	msg.AddAlternativeString(mail.TypeTextHTML, htmlBody)
 
-	return s.client.DialAndSend(msg)
+	return msg, nil
 }
 
 func (s *SMTPDriver) Close() error {
