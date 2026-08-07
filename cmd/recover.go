@@ -44,6 +44,8 @@ func Recover() {
 		recoverRestoreDatabaseBundle(os.Args[3:])
 	case "rebuild-default-tenant":
 		recoverRebuildDefaultTenant(os.Args[3:])
+	case "import-archives":
+		recoverImportArchives(os.Args[3:])
 	default:
 		//nolint:gosec // G705: writes to stderr, not an HTTP response; %q safely quotes the argument.
 		fmt.Fprintf(os.Stderr, "Unknown recover subcommand: %q\n\n%s\n", os.Args[2], recoverUsage)
@@ -64,6 +66,9 @@ Subcommands:
                    Recreate a missing default tenant database as an empty,
                    schema-migrated file when no backup exists. Analytics
                    history is NOT restored.
+  import-archives  Import local retention archive parquet exports back into
+                   a tenant database, for example after rebuild-default-tenant.
+                   Idempotent; rows already present are not duplicated.
 
 Flags for disable-2fa:
   -email string   User email address (required)
@@ -88,6 +93,13 @@ Flags for rebuild-default-tenant:
   -db        string   Path to hitkeep.db (default: same as server config)
   -data-path string   Tenant data directory (default: same as server config)
   -yes                Skip interactive confirmation prompt
+
+Flags for import-archives:
+  -db           string   Path to hitkeep.db (default: same as server config)
+  -data-path    string   Tenant data directory (default: same as server config)
+  -archive-path string   Local retention archive directory (default: same as server config)
+  -tenant       string   Tenant ID to import into (default: the default tenant)
+  -yes                   Skip interactive confirmation prompt
 
 NOTE: HitKeep must be stopped before running recovery commands.
       DuckDB does not allow concurrent write access.`
@@ -951,4 +963,106 @@ func recoverRebuildDefaultTenant(args []string) {
 	}
 	fmt.Printf("✓ Rebuilt empty default tenant database at %s\n", tenantPath)
 	fmt.Println("Start HitKeep to begin collecting analytics again.")
+}
+
+func recoverImportArchives(args []string) {
+	fs := flag.NewFlagSet("import-archives", flag.ExitOnError)
+	dbPath := fs.String("db", "", "Path to hitkeep.db (defaults to server config value)")
+	dataPath := fs.String("data-path", "", "Tenant data directory (defaults to server config value)")
+	archivePath := fs.String("archive-path", "", "Local retention archive directory (defaults to server config value)")
+	tenantFlag := fs.String("tenant", "", "Tenant ID to import into (defaults to the default tenant)")
+	yes := fs.Bool("yes", false, "Skip confirmation prompt")
+	if err := fs.Parse(args); err != nil {
+		os.Exit(1)
+	}
+	conf := config.Load()
+	if *dbPath == "" {
+		*dbPath = conf.DBPath
+	}
+	if *dataPath == "" {
+		*dataPath = conf.DataPath
+	}
+	if *archivePath == "" {
+		*archivePath = conf.ArchivePath
+	}
+	if worker.IsS3ArchivePath(*archivePath) {
+		fmt.Fprintln(os.Stderr, "Error: import-archives reads local archives only; download the s3:// archive directory first and pass it via -archive-path")
+		os.Exit(1)
+	}
+
+	ctx := context.Background()
+	control, err := database.OpenMigratedStore(ctx, *dbPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: could not open database: %v\n", err)
+		fmt.Fprintln(os.Stderr, "Make sure HitKeep is stopped before running recovery commands.")
+		os.Exit(1)
+	}
+	defaultID, err := control.GetDefaultTenantID(ctx)
+	if closeErr := control.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: could not resolve default tenant: %v\n", err)
+		os.Exit(1)
+	}
+	tenantID := defaultID
+	if *tenantFlag != "" {
+		tenantID, err = uuid.Parse(*tenantFlag)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: invalid -tenant %q: %v\n", *tenantFlag, err)
+			os.Exit(1)
+		}
+	}
+
+	files, err := database.DiscoverLocalRetentionArchives(*archivePath, tenantID, tenantID == defaultID)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	if len(files) == 0 {
+		fmt.Printf("No retention archives found for tenant %s under %s. Nothing to do.\n", tenantID, *archivePath)
+		os.Exit(0)
+	}
+	tenantPath := filepath.Join(*dataPath, "tenants", tenantID.String(), "hitkeep.db")
+
+	fmt.Printf("HitKeep Recovery — Import Retention Archives\n")
+	fmt.Printf("=============================================\n")
+	fmt.Printf("Tenant DB: %s\n", tenantPath)
+	fmt.Printf("Archives:  %d parquet file(s) under %s\n\n", len(files), *archivePath)
+	fmt.Println("Rows already present are kept once; rows whose parent row no longer")
+	fmt.Println("exists are skipped. HitKeep must be stopped.")
+	fmt.Println()
+
+	if !*yes {
+		fmt.Print(`Type "yes" to confirm: `)
+		scanner := bufio.NewScanner(os.Stdin)
+		scanner.Scan()
+		if strings.TrimSpace(scanner.Text()) != "yes" {
+			fmt.Println("Aborted.")
+			os.Exit(0)
+		}
+		fmt.Println()
+	}
+
+	summary, err := database.ImportRetentionArchives(ctx, tenantPath, files,
+		database.WithMemoryLimit(conf.DuckDBMemoryLimit),
+		database.WithThreads(conf.DuckDBThreads),
+	)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	tables := make([]string, 0, len(summary.Imported))
+	for table := range summary.Imported {
+		tables = append(tables, table)
+	}
+	sort.Strings(tables)
+	fmt.Printf("✓ Imported %d archive file(s)\n", summary.Files)
+	for _, table := range tables {
+		if summary.Imported[table] == 0 && summary.Skipped[table] == 0 {
+			continue
+		}
+		fmt.Printf("  %-32s %8d imported %8d skipped\n", table, summary.Imported[table], summary.Skipped[table])
+	}
 }
