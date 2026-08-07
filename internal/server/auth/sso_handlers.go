@@ -77,19 +77,19 @@ func (h *handler) handleSSOStart() http.HandlerFunc {
 			return
 		}
 		if config == nil {
-			h.appendAuthAuditSystem(r, "auth.sso_login_failed", "failure", email, "SSO login could not resolve an enabled provider")
+			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", uuid.Nil, uuid.Nil, email, ssoAuditFlowStart, ssoReasonProviderUnresolved, 0, "SSO login could not resolve an enabled provider")
 			writeSSOStartError(w, http.StatusBadRequest, "sso_unavailable")
 			return
 		}
 		if !h.ctx.Limits().AllowsSSO(r.Context(), uuid.Nil, config.TeamID) {
-			h.appendAuthAuditSystem(r, "auth.sso_login_failed", "failure", email, "SSO login is not entitled for the configured team")
+			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, uuid.Nil, email, ssoAuditFlowStart, ssoReasonEntitlementDenied, 0, "SSO login is not entitled for the configured team")
 			writeSSOStartError(w, http.StatusBadRequest, "sso_unavailable")
 			return
 		}
 		decision, err := h.authorizeSSOAccess(r.Context(), config, email, req.InviteToken)
 		if err != nil {
 			if errors.Is(err, errSSOAccessDenied) {
-				h.appendAuthAuditSystem(r, "auth.sso_login_failed", "failure", email, "SSO login was not authorized for the configured team")
+				h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, uuid.Nil, email, ssoAuditFlowStart, ssoReasonAccessDenied, 0, "SSO login was not authorized for the configured team")
 				writeSSOStartError(w, http.StatusForbidden, "sso_access_denied")
 				return
 			}
@@ -98,7 +98,7 @@ func (h *handler) handleSSOStart() http.HandlerFunc {
 			return
 		}
 		if err := h.requireSSOAccessCapacity(r.Context(), config.TeamID, decision); err != nil {
-			h.appendAuthAuditSystem(r, "auth.sso_login_failed", "failure", email, "SSO login exceeded a managed-cloud team or seat limit")
+			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, decision.UserID, email, ssoAuditFlowStart, ssoReasonCapacityDenied, decision.Mode, "SSO login exceeded a managed-cloud team or seat limit")
 			writeSSOStartError(w, http.StatusForbidden, "sso_access_denied")
 			return
 		}
@@ -106,14 +106,14 @@ func (h *handler) handleSSOStart() http.HandlerFunc {
 		teamConfig, err := h.teamSSOConfig(config)
 		if err != nil {
 			slog.Warn("Failed to decrypt configured SSO provider", "team_id", config.TeamID)
-			h.appendAuthAuditSystem(r, "auth.sso_login_failed", "failure", email, "SSO provider configuration was unavailable")
+			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, decision.UserID, email, ssoAuditFlowStart, ssoReasonProviderUnavailable, decision.Mode, "SSO provider configuration was unavailable")
 			writeSSOStartError(w, http.StatusServiceUnavailable, "sso_unavailable")
 			return
 		}
 		authorization, err := h.ssoRelyingParty().Begin(r.Context(), teamConfig)
 		if err != nil {
 			slog.Warn("Failed to prepare configured SSO provider", "team_id", config.TeamID)
-			h.appendAuthAuditSystem(r, "auth.sso_login_failed", "failure", email, "SSO provider configuration was unavailable")
+			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, decision.UserID, email, ssoAuditFlowStart, ssoReasonProviderUnavailable, decision.Mode, "SSO provider configuration was unavailable")
 			writeSSOStartError(w, http.StatusServiceUnavailable, "sso_unavailable")
 			return
 		}
@@ -296,31 +296,32 @@ func (h *handler) handleSSOCallback() http.HandlerFunc {
 			return
 		}
 		if !h.ctx.Limits().AllowsSSO(r.Context(), uuid.Nil, state.TeamID) {
-			h.appendAuthAuditSystem(r, "auth.sso_login_failed", "failure", state.Email, "SSO entitlement changed during login")
+			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", state.TeamID, uuid.Nil, state.Email, ssoAuditFlowCallback, ssoReasonEntitlementDenied, 0, "SSO entitlement changed during login")
 			http.Redirect(w, r, h.ssoErrorRedirectURL(state, "sso_unavailable"), http.StatusSeeOther)
 			return
 		}
 		if providerError := strings.TrimSpace(r.URL.Query().Get("error")); providerError != "" {
-			h.appendAuthAuditSystem(r, "auth.sso_login_failed", "failure", state.Email, "SSO provider denied or cancelled login")
+			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", state.TeamID, uuid.Nil, state.Email, ssoAuditFlowCallback, ssoReasonProviderDenied, 0, "SSO provider denied or cancelled login")
 			http.Redirect(w, r, h.ssoErrorRedirectURL(state, "sso_provider_error"), http.StatusSeeOther)
 			return
 		}
 		code := strings.TrimSpace(r.URL.Query().Get("code"))
 		if code == "" {
-			h.appendAuthAuditSystem(r, "auth.sso_login_failed", "failure", state.Email, "SSO callback omitted authorization code")
+			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", state.TeamID, uuid.Nil, state.Email, ssoAuditFlowCallback, ssoReasonAuthorizationMissing, 0, "SSO callback omitted authorization code")
 			http.Redirect(w, r, h.ssoErrorRedirectURL(state, "sso_failed"), http.StatusSeeOther)
 			return
 		}
 
 		config, err := h.ctx.Store.GetTeamSSOConfig(r.Context(), state.TeamID)
 		if err != nil || !ssoStateMatchesConfig(state, config) {
-			h.appendAuthAuditSystem(r, "auth.sso_login_failed", "failure", state.Email, "SSO configuration changed during login")
+			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", state.TeamID, uuid.Nil, state.Email, ssoAuditFlowCallback, ssoReasonConfigurationChanged, 0, "SSO configuration changed during login")
 			http.Redirect(w, r, h.ssoErrorRedirectURL(state, "sso_unavailable"), http.StatusSeeOther)
 			return
 		}
 		teamConfig, err := h.teamSSOConfig(config)
 		if err != nil {
 			slog.Warn("Failed to decrypt SSO provider during callback", "team_id", state.TeamID)
+			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", state.TeamID, uuid.Nil, state.Email, ssoAuditFlowCallback, ssoReasonProviderUnavailable, 0, "SSO provider configuration was unavailable")
 			http.Redirect(w, r, h.ssoErrorRedirectURL(state, "sso_unavailable"), http.StatusSeeOther)
 			return
 		}
@@ -333,7 +334,7 @@ func (h *handler) handleSSOCallback() http.HandlerFunc {
 			return
 		}
 		if !strings.EqualFold(identity.Email, state.Email) || !slices.Contains(config.AllowedDomains, identity.Domain) {
-			h.appendAuthAuditSystem(r, "auth.sso_login_failed", "failure", identity.Email, "SSO email did not match the requested account or allowed domain")
+			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, uuid.Nil, identity.Email, ssoAuditFlowCallback, ssoReasonEmailNotAllowed, 0, "SSO email did not match the requested account or allowed domain")
 			http.Redirect(w, r, h.ssoErrorRedirectURL(state, "sso_email_not_allowed"), http.StatusSeeOther)
 			return
 		}
@@ -342,23 +343,25 @@ func (h *handler) handleSSOCallback() http.HandlerFunc {
 			if !errors.Is(err, errSSOAccessDenied) {
 				slog.Error("Failed to re-authorize SSO login", "error", err, "team_id", config.TeamID)
 			}
-			h.appendAuthAuditSystem(r, "auth.sso_login_failed", "failure", identity.Email, "SSO team access was removed during login")
+			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, decision.UserID, identity.Email, ssoAuditFlowCallback, ssoReasonAccessDenied, decision.Mode, "SSO team access was removed during login")
 			http.Redirect(w, r, h.ssoErrorRedirectURL(state, "sso_access_denied"), http.StatusSeeOther)
 			return
 		}
 		if err := h.requireSSOAccessCapacity(r.Context(), config.TeamID, decision); err != nil {
-			h.appendAuthAuditSystem(r, "auth.sso_login_failed", "failure", identity.Email, "SSO login exceeded a managed-cloud team or seat limit")
+			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, decision.UserID, identity.Email, ssoAuditFlowCallback, ssoReasonCapacityDenied, decision.Mode, "SSO login exceeded a managed-cloud team or seat limit")
 			http.Redirect(w, r, h.ssoErrorRedirectURL(state, "sso_access_denied"), http.StatusSeeOther)
 			return
 		}
 
 		randomPassword, err := security.GenerateRandomChallenge(48)
 		if err != nil {
+			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, decision.UserID, identity.Email, ssoAuditFlowCallback, ssoReasonInternalError, decision.Mode, "SSO login could not create a local credential")
 			http.Redirect(w, r, h.ssoErrorRedirectURL(state, "sso_failed"), http.StatusSeeOther)
 			return
 		}
 		passwordHash, err := HashPassword(randomPassword)
 		if err != nil {
+			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, decision.UserID, identity.Email, ssoAuditFlowCallback, ssoReasonInternalError, decision.Mode, "SSO login could not create a local credential")
 			http.Redirect(w, r, h.ssoErrorRedirectURL(state, "sso_failed"), http.StatusSeeOther)
 			return
 		}
@@ -375,23 +378,24 @@ func (h *handler) handleSSOCallback() http.HandlerFunc {
 		})
 		if err != nil {
 			slog.Error("Failed to resolve SSO user", "error", err, "team_id", config.TeamID)
-			h.appendAuthAuditSystem(r, "auth.sso_login_failed", "failure", identity.Email, "SSO identity could not be linked")
+			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, decision.UserID, identity.Email, ssoAuditFlowCallback, ssoReasonIdentityLinkFailed, decision.Mode, "SSO identity could not be linked")
 			http.Redirect(w, r, h.ssoErrorRedirectURL(state, "sso_failed"), http.StatusSeeOther)
 			return
 		}
 		if decision.UserID != uuid.Nil && decision.UserID != resolved.UserID {
-			h.appendAuthAuditSystem(r, "auth.sso_login_failed", "failure", identity.Email, "SSO identity resolved to a different authorized user")
+			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, resolved.UserID, identity.Email, ssoAuditFlowCallback, ssoReasonAccessDenied, decision.Mode, "SSO identity resolved to a different authorized user")
 			http.Redirect(w, r, h.ssoErrorRedirectURL(state, "sso_access_denied"), http.StatusSeeOther)
 			return
 		}
 		if err := h.completeSSOTeamAccess(r, config, decision, resolved.UserID, identity.Email, state.InviteToken); err != nil {
 			slog.Error("Failed to complete SSO team access", "error", err, "team_id", config.TeamID, "user_id", resolved.UserID)
-			h.appendAuthAuditSystem(r, "auth.sso_login_failed", "failure", identity.Email, "SSO team access could not be completed")
+			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, resolved.UserID, identity.Email, ssoAuditFlowCallback, ssoReasonMembershipFailed, decision.Mode, "SSO team access could not be completed")
 			http.Redirect(w, r, h.ssoErrorRedirectURL(state, "sso_access_denied"), http.StatusSeeOther)
 			return
 		}
 		if err := h.issueLoginSession(r.Context(), w, resolved.UserID, state.RememberMe); err != nil {
 			slog.Error("Failed to issue SSO login session", "error", err, "user_id", resolved.UserID)
+			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, resolved.UserID, identity.Email, ssoAuditFlowCallback, ssoReasonSessionFailed, decision.Mode, "SSO login session could not be issued")
 			http.Redirect(w, r, h.ssoErrorRedirectURL(state, "sso_failed"), http.StatusSeeOther)
 			return
 		}
@@ -399,7 +403,7 @@ func (h *handler) handleSSOCallback() http.HandlerFunc {
 		if resolved.Created {
 			details = "SSO login succeeded and created a user"
 		}
-		h.appendAuthAuditForUserTeams(r, resolved.UserID, "auth.sso_login_succeeded", "success", details, true)
+		h.appendSSOAuditForUserTeams(r, resolved.UserID, "auth.sso_login_succeeded", "success", identity.Email, config.TeamID, ssoAuditFlowCallback, ssoReasonLoginSucceeded, decision.Mode, details)
 		http.Redirect(w, r, h.publicRedirectURL(state.ReturnPath), http.StatusSeeOther)
 	}
 }
@@ -521,21 +525,23 @@ func writeSSOStartError(w http.ResponseWriter, status int, code string) {
 
 func (h *handler) handleSSOCompletionError(w http.ResponseWriter, r *http.Request, state shared.SSOOAuthState, err error) {
 	redirectCode := "sso_failed"
+	reason := ssoReasonInternalError
 	switch {
 	case errors.Is(err, sso.ErrTokenExchange):
 		slog.Warn("SSO token exchange failed", "team_id", state.TeamID)
-		h.appendAuthAuditSystem(r, "auth.sso_login_failed", "failure", state.Email, "SSO token exchange failed")
+		reason = ssoReasonTokenExchangeFailed
 	case errors.Is(err, sso.ErrIDTokenMissing):
-		h.appendAuthAuditSystem(r, "auth.sso_login_failed", "failure", state.Email, "SSO provider omitted ID token")
+		reason = ssoReasonIDTokenMissing
 	case errors.Is(err, sso.ErrIDTokenValidation):
-		h.appendAuthAuditSystem(r, "auth.sso_login_failed", "failure", state.Email, "SSO ID token validation failed")
+		reason = ssoReasonIDTokenInvalid
 	case errors.Is(err, sso.ErrIdentityClaims):
-		h.appendAuthAuditSystem(r, "auth.sso_login_failed", "failure", state.Email, "SSO ID token did not contain an acceptable verified email")
+		reason = ssoReasonEmailUnverified
 		redirectCode = "sso_email_unverified"
 	default:
 		slog.Warn("Failed to prepare SSO provider during callback", "team_id", state.TeamID)
 		redirectCode = "sso_unavailable"
 	}
+	h.appendSSOAudit(r, "auth.sso_login_failed", "failure", state.TeamID, uuid.Nil, state.Email, ssoAuditFlowCallback, reason, 0, "SSO provider completion failed")
 	http.Redirect(w, r, h.ssoErrorRedirectURL(state, redirectCode), http.StatusSeeOther)
 }
 

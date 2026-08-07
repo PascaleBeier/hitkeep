@@ -1997,7 +1997,7 @@
         },
         "docsAction": "Guia de configuração",
         "saveAction": "Salvar configuração de SSO",
-        "testAction": "Testar conexão",
+        "testAction": "Testar conexão SSO",
         "saveSuccess": "Configuração de SSO salva.",
         "testSuccess": "O provedor de identidade está acessível e o documento de descoberta é válido.",
         "errors": {

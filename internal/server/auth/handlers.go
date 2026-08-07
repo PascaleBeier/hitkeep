@@ -228,13 +228,19 @@ func (h *handler) handleSSOAvailability() http.HandlerFunc {
 			return
 		}
 		enabled := false
+		eligibleTeams := 0
 		limits := h.ctx.Limits()
 		for _, teamID := range teamIDs {
 			if limits.AllowsSSO(r.Context(), uuid.Nil, teamID) {
+				eligibleTeams++
 				enabled = true
-				break
 			}
 		}
+		reason := ssoReasonAvailabilityUnavailable
+		if enabled {
+			reason = ssoReasonAvailabilityEnabled
+		}
+		slog.Info("SSO availability evaluated", "flow", ssoAuditFlowAvailability, "outcome", enabled, "reason", reason, "configured_teams", len(teamIDs), "eligible_teams", eligibleTeams, "request_id", r.Header.Get("X-Request-Id"))
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(api.SSOAvailability{Enabled: enabled}); err != nil {
 			slog.Error("Failed to encode SSO availability", "error", err)

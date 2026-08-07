@@ -1990,7 +1990,7 @@
         },
         "docsAction": "Configuratiehandleiding",
         "saveAction": "SSO-configuratie opslaan",
-        "testAction": "Verbinding testen",
+        "testAction": "SSO-verbinding testen",
         "saveSuccess": "SSO-configuratie opgeslagen.",
         "testSuccess": "De identiteitsprovider is bereikbaar en het discoverydocument is geldig.",
         "errors": {

@@ -37,6 +37,30 @@ func (s *Store) GetInstanceRole(ctx context.Context, userID uuid.UUID) (auth.Ins
 	return resolved, nil
 }
 
+// IsTeamOwnedByOperator reports whether an active team's owner has an
+// instance-level role that bypasses managed-cloud limits.
+func (s *Store) IsTeamOwnedByOperator(ctx context.Context, teamID uuid.UUID) (bool, error) {
+	if teamID == uuid.Nil {
+		return false, nil
+	}
+
+	var count int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM tenant_members tm
+		JOIN instance_roles ir ON ir.user_id = tm.user_id
+		LEFT JOIN tenant_archives ta ON ta.tenant_id = tm.tenant_id
+		WHERE tm.tenant_id = ?
+		  AND tm.role = ?
+		  AND ir.role IN (?, ?)
+		  AND ta.tenant_id IS NULL
+	`, teamID, TenantRoleOwner, auth.InstanceOwner, auth.InstanceAdmin).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("failed to resolve team operator ownership: %w", err)
+	}
+	return count > 0, nil
+}
+
 // UpdateInstanceRole updates a user's instance-level role
 func (s *Store) UpdateInstanceRole(ctx context.Context, targetUserID uuid.UUID, role auth.InstanceRole, actorID uuid.UUID) error {
 	var oldRole string

@@ -53,6 +53,18 @@ func (s *Service) BypassesCloudLimits(ctx context.Context, userID uuid.UUID) boo
 	return err == nil && role.BypassesCloudLimits()
 }
 
+// TeamBypassesCloudLimits reports whether the team owner is an instance
+// operator who is exempt from managed-cloud team limits. Unlike
+// BypassesCloudLimits, this is intentionally actor-independent so public
+// routes can apply the same team policy as authenticated dashboard routes.
+func (s *Service) TeamBypassesCloudLimits(ctx context.Context, teamID uuid.UUID) bool {
+	if !s.cloudHosted() || s.store == nil || teamID == uuid.Nil {
+		return false
+	}
+	owned, err := s.store.IsTeamOwnedByOperator(ctx, teamID)
+	return err == nil && owned
+}
+
 // TeamPlan resolves the team's current plan, preferring the cloud billing
 // account over the entitlements provider. Returns nil when no plan applies.
 func (s *Service) TeamPlan(ctx context.Context, teamID uuid.UUID) *PlanInfo {
@@ -117,13 +129,14 @@ func (s *Service) AllowsCustomTrackingDomains(ctx context.Context, actorID, team
 
 // AllowsSSO reports whether the actor may use SSO for the team. Managed cloud
 // plans expose this entitlement only on Business; self-hosted deployments are
-// never gated. Passing uuid.Nil enforces the team entitlement without an actor
-// bypass, as required by public login routes.
+// never gated. Passing uuid.Nil omits the actor bypass while still honoring an
+// operator-owned team's team-level exemption, as required by public login
+// routes.
 func (s *Service) AllowsSSO(ctx context.Context, actorID, teamID uuid.UUID) bool {
 	if !s.cloudHosted() {
 		return true
 	}
-	if s.BypassesCloudLimits(ctx, actorID) {
+	if s.BypassesCloudLimits(ctx, actorID) || s.TeamBypassesCloudLimits(ctx, teamID) {
 		return true
 	}
 	ent := s.TeamEntitlements(ctx, teamID)
@@ -149,6 +162,9 @@ func (s *Service) AllowsExternalReportRecipients(ctx context.Context, actorID, t
 // RequireTeamMemberCapacity returns ErrTeamMemberLimitReached when the team's
 // members plus pending invites have reached the plan's member limit.
 func (s *Service) RequireTeamMemberCapacity(ctx context.Context, teamID uuid.UUID) error {
+	if s.TeamBypassesCloudLimits(ctx, teamID) {
+		return nil
+	}
 	ent := s.TeamEntitlements(ctx, teamID)
 	if ent == nil || ent.MaxTeamMembers <= 0 {
 		return nil

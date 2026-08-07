@@ -208,6 +208,7 @@ func TestSSOLoginAutoProvisionsTrustedDomainUserAsMember(t *testing.T) {
 	}
 	provider.setNonce(parsedAuthURL.Query().Get("nonce"))
 	callback := httptest.NewRequest(http.MethodGet, "/api/auth/sso/callback?state="+url.QueryEscape(parsedAuthURL.Query().Get("state"))+"&code=test-code", nil)
+	callback.Header.Set("X-Request-Id", "sso-auto-provision-request")
 	response := httptest.NewRecorder()
 	h.handleSSOCallback().ServeHTTP(response, callback)
 
@@ -221,6 +222,30 @@ func TestSSOLoginAutoProvisionsTrustedDomainUserAsMember(t *testing.T) {
 	role, err := store.GetTenantRole(t.Context(), teamID, user.ID)
 	if err != nil || role != database.TenantRoleMember {
 		t.Fatalf("expected auto-provisioned Member role, role=%q err=%v", role, err)
+	}
+
+	var metadataJSON, requestID, targetLabel string
+	if err := store.DB().QueryRowContext(t.Context(), `
+		SELECT metadata_json, request_id, target_label
+		FROM instance_audit_log
+		WHERE action = 'auth.sso_login_succeeded'
+		ORDER BY created_at DESC
+		LIMIT 1
+	`).Scan(&metadataJSON, &requestID, &targetLabel); err != nil {
+		t.Fatalf("load SSO success audit metadata: %v", err)
+	}
+	var metadata map[string]string
+	if err := json.Unmarshal([]byte(metadataJSON), &metadata); err != nil {
+		t.Fatalf("decode SSO success audit metadata: %v", err)
+	}
+	if metadata["flow"] != "callback" || metadata["reason"] != "login_succeeded" || metadata["access_mode"] != "auto_provision" || metadata["email_domain"] != "example.com" || metadata["configured_team_id"] != teamID.String() {
+		t.Fatalf("unexpected SSO success metadata: %+v", metadata)
+	}
+	if requestID != "sso-auto-provision-request" {
+		t.Fatalf("expected request ID correlation, got %q", requestID)
+	}
+	if targetLabel != "new-member@example.com" || strings.Contains(metadataJSON, "test-client-secret") || strings.Contains(metadataJSON, "test-code") {
+		t.Fatalf("SSO audit metadata exposed sensitive material: target=%q metadata=%q", targetLabel, metadataJSON)
 	}
 }
 
@@ -389,14 +414,18 @@ func TestSSOInvitationProviderErrorReturnsToInvitationWithoutConsumingToken(t *t
 
 func configureTestSSO(t *testing.T, h *handler, store *database.Store, issuerURL string) uuid.UUID {
 	t.Helper()
-	ownerID, err := store.CreateUser(t.Context(), "sso-owner@example.net", "owner-password-hash")
+	if _, err := store.CreateUser(t.Context(), "sso-instance-owner@example.net", "instance-owner-password-hash"); err != nil {
+		t.Fatalf("create instance owner: %v", err)
+	}
+	ownerID, err := store.CreateUserWithoutDefaultTenant(t.Context(), "sso-owner@example.net", "owner-password-hash")
 	if err != nil {
 		t.Fatalf("create SSO owner: %v", err)
 	}
-	teamID, err := store.GetActiveTenantID(t.Context(), ownerID)
+	team, err := store.CreateTenant(t.Context(), ownerID, "SSO Team", "")
 	if err != nil {
 		t.Fatalf("get SSO team: %v", err)
 	}
+	teamID := team.ID
 	box, _ := sso.NewSecretBox(h.ctx.Config.JWTSecret)
 	secret, _ := box.Seal("test-client-secret")
 	if err := store.UpsertTeamSSOConfig(t.Context(), database.TeamSSOConfig{

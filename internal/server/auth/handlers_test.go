@@ -159,14 +159,19 @@ func TestHandleCreateInitialUser(t *testing.T) {
 func TestHandleSSOAvailabilityReflectsEnabledTeamConfiguration(t *testing.T) {
 	h, store := setupAuthTestEnv(t)
 	defer store.Close()
-	userID, err := store.CreateUser(context.Background(), "sso-availability@example.com", "hash")
+	instanceOwnerID, err := store.CreateUser(context.Background(), "sso-instance-owner@example.com", "hash")
 	if err != nil {
-		t.Fatalf("create user: %v", err)
+		t.Fatalf("create instance owner: %v", err)
 	}
-	teamID, err := store.GetActiveTenantID(context.Background(), userID)
+	userID, err := store.CreateUserWithoutDefaultTenant(context.Background(), "sso-availability@example.com", "hash")
 	if err != nil {
-		t.Fatalf("get active team: %v", err)
+		t.Fatalf("create regular team owner: %v", err)
 	}
+	team, err := store.CreateTenant(context.Background(), userID, "SSO availability team", "")
+	if err != nil {
+		t.Fatalf("create team: %v", err)
+	}
+	teamID := team.ID
 
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/sso", nil)
 	w := httptest.NewRecorder()
@@ -201,6 +206,43 @@ func TestHandleSSOAvailabilityReflectsEnabledTeamConfiguration(t *testing.T) {
 	h.handleSSOAvailability().ServeHTTP(w, req)
 	if w.Code != http.StatusOK || strings.TrimSpace(w.Body.String()) != `{"enabled":false}` {
 		t.Fatalf("expected non-Business cloud SSO to be unavailable, status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	// Operator-owned teams remain eligible even when the configured plan is Pro.
+	operatorTeamID, err := store.GetActiveTenantID(context.Background(), instanceOwnerID)
+	if err != nil {
+		t.Fatalf("load operator-owned team: %v", err)
+	}
+	if err := store.UpsertTeamSSOConfig(context.Background(), database.TeamSSOConfig{
+		TeamID:                teamID,
+		ProviderType:          "oidc",
+		IssuerURL:             "https://id.example.com",
+		ClientID:              "hitkeep",
+		ClientSecretEncrypted: "v1.encrypted",
+		AllowedDomains:        []string{"example.com"},
+		EmailClaim:            "email",
+		DisplayNameClaim:      "name",
+		Enabled:               false,
+	}); err != nil {
+		t.Fatalf("disable regular team SSO config: %v", err)
+	}
+	if err := store.UpsertTeamSSOConfig(context.Background(), database.TeamSSOConfig{
+		TeamID:                operatorTeamID,
+		ProviderType:          "oidc",
+		IssuerURL:             "https://id.example.com",
+		ClientID:              "hitkeep",
+		ClientSecretEncrypted: "v1.encrypted",
+		AllowedDomains:        []string{"operator.example.com"},
+		EmailClaim:            "email",
+		DisplayNameClaim:      "name",
+		Enabled:               true,
+	}); err != nil {
+		t.Fatalf("save operator-owned team SSO config: %v", err)
+	}
+	w = httptest.NewRecorder()
+	h.handleSSOAvailability().ServeHTTP(w, req)
+	if w.Code != http.StatusOK || strings.TrimSpace(w.Body.String()) != `{"enabled":true}` {
+		t.Fatalf("expected operator-owned Pro SSO to be available, status=%d body=%s", w.Code, w.Body.String())
 	}
 
 	h.ctx.Entitlements = entitlements.NewStaticProvider(entitlements.Entitlements{AllowSSO: true}, entitlements.PlanInfo{Code: "business", Name: "Business"})
