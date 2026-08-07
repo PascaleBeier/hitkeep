@@ -85,12 +85,12 @@
         "runtime": {
             "name": "node",
             "version": "24.18.0",
-            "onFail": "error"
+            "onFail": "warn"
         },
         "packageManager": {
             "name": "npm",
             "version": "12.0.2",
-            "onFail": "error"
+            "onFail": "warn"
         }
     },
     "overrides": {
