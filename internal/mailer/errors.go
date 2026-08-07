@@ -134,6 +134,8 @@ func isRenderStage(stage string) bool {
 	switch SendStage(stage) {
 	case SendStageHTMLTemplateParse, SendStageHTMLTemplateExecute, SendStageMJMLRender, SendStageTextTemplateParse, SendStageTextTemplateExecute:
 		return true
+	case SendStageTransport, SendStageConfiguration:
+		return false
 	default:
 		return false
 	}

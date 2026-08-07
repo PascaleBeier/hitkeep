@@ -71,8 +71,11 @@ export class TeamSSOPage {
     protected readonly isLoading = signal(false);
     protected readonly isSaving = signal(false);
     protected readonly isTesting = signal(false);
-    protected readonly successKey = signal('');
-    protected readonly errorKey = signal('');
+    protected readonly loadErrorKey = signal('');
+    protected readonly saveSuccessKey = signal('');
+    protected readonly saveErrorKey = signal('');
+    protected readonly testSuccessKey = signal('');
+    protected readonly testErrorKey = signal('');
     protected readonly canSave = computed(() => !this.isLoading() && !this.isSaving() && !this.isTesting() && !this.ssoForm().invalid() && (this.clientSecretConfigured() || this.model().clientSecret.trim().length > 0));
 
     constructor() {
@@ -83,8 +86,11 @@ export class TeamSSOPage {
                 return;
             }
             this.isLoading.set(true);
-            this.successKey.set('');
-            this.errorKey.set('');
+            this.loadErrorKey.set('');
+            this.saveSuccessKey.set('');
+            this.saveErrorKey.set('');
+            this.testSuccessKey.set('');
+            this.testErrorKey.set('');
             const subscription = this.teamService
                 .getTeamSSO(teamID)
                 .pipe(takeUntilDestroyed(this.destroyRef))
@@ -95,7 +101,7 @@ export class TeamSSOPage {
                     },
                     error: () => {
                         this.isLoading.set(false);
-                        this.errorKey.set('admin.team.sso.errors.loadFailed');
+                        this.loadErrorKey.set('admin.team.sso.errors.loadFailed');
                     }
                 });
             onCleanup(() => subscription.unsubscribe());
@@ -115,18 +121,18 @@ export class TeamSSOPage {
             return;
         }
 
-        this.successKey.set('');
-        this.errorKey.set('');
+        this.saveSuccessKey.set('');
+        this.saveErrorKey.set('');
         this.isSaving.set(true);
         this.teamService.updateTeamSSO(teamID, this.requestPayload()).subscribe({
             next: (config) => {
                 this.applyConfig(config);
                 this.isSaving.set(false);
-                this.successKey.set('admin.team.sso.saveSuccess');
+                this.saveSuccessKey.set('admin.team.sso.saveSuccess');
             },
             error: (err) => {
                 this.isSaving.set(false);
-                this.errorKey.set(err?.error?.code === 'domain_conflict' ? 'admin.team.sso.errors.domainConflict' : 'admin.team.sso.errors.saveFailed');
+                this.saveErrorKey.set(err?.error?.code === 'domain_conflict' ? 'admin.team.sso.errors.domainConflict' : 'admin.team.sso.errors.saveFailed');
             }
         });
     }
@@ -136,17 +142,17 @@ export class TeamSSOPage {
         if (!teamID || !this.clientSecretConfigured() || this.isTesting()) {
             return;
         }
-        this.successKey.set('');
-        this.errorKey.set('');
+        this.testSuccessKey.set('');
+        this.testErrorKey.set('');
         this.isTesting.set(true);
         this.teamService.testTeamSSO(teamID).subscribe({
             next: () => {
                 this.isTesting.set(false);
-                this.successKey.set('admin.team.sso.testSuccess');
+                this.testSuccessKey.set('admin.team.sso.testSuccess');
             },
             error: () => {
                 this.isTesting.set(false);
-                this.errorKey.set('admin.team.sso.errors.testFailed');
+                this.testErrorKey.set('admin.team.sso.errors.testFailed');
             }
         });
     }

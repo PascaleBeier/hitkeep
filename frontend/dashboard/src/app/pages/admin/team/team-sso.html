@@ -1,11 +1,5 @@
 @if (team()) {
 <div class="grid gap-4">
-    @if (successKey(); as key) {
-    <p-message severity="success" role="status">{{ key | transloco }}</p-message>
-    } @if (errorKey(); as key) {
-    <p-message severity="error" role="alert">{{ key | transloco }}</p-message>
-    }
-
     <app-settings-card [title]="'admin.team.sso.title' | transloco" [subtitle]="'admin.team.sso.description' | transloco" icon="pi pi-shield">
         <div settings-card-header class="flex flex-wrap items-center justify-end gap-2 max-sm:w-full max-sm:justify-between">
             <a
@@ -26,6 +20,10 @@
         </div>
 
         <form settings-card-body id="team-sso-form" class="grid gap-5" (submit)="$event.preventDefault(); saveSettings()" novalidate>
+            @if (loadErrorKey(); as key) {
+            <p-message data-testid="sso-load-feedback" severity="error" role="alert" aria-live="assertive">{{ key | transloco }}</p-message>
+            }
+
             <section class="flex items-center justify-between gap-4" aria-labelledby="sso-provider-title">
                 <div>
                     <p id="sso-provider-title" class="m-0 text-sm font-semibold text-[var(--p-text-color)]">{{ "admin.team.sso.provider.title" | transloco }}</p>
@@ -154,17 +152,32 @@
             </div>
         </form>
 
-        <div settings-card-footer class="flex justify-end gap-3 max-sm:grid max-sm:gap-2">
-            <p-button
-                [label]="'admin.team.sso.testAction' | transloco"
-                icon="pi pi-bolt"
-                severity="secondary"
-                [outlined]="true"
-                [loading]="isTesting()"
-                [disabled]="isLoading() || isSaving() || isTesting() || !clientSecretConfigured()"
-                (onClick)="testConnection()"
-            />
-            <p-button [label]="'admin.team.sso.saveAction' | transloco" icon="pi pi-check" [loading]="isSaving()" [disabled]="!canSave()" (onClick)="saveSettings()" />
+        <div settings-card-footer class="flex justify-end gap-3 max-sm:grid max-sm:gap-3">
+            <div class="grid min-w-0 gap-2 sm:max-w-md">
+                <p-button
+                    data-testid="sso-test-button"
+                    [label]="'admin.team.sso.testAction' | transloco"
+                    icon="pi pi-bolt"
+                    severity="secondary"
+                    [outlined]="true"
+                    [loading]="isTesting()"
+                    [disabled]="isLoading() || isSaving() || isTesting() || !clientSecretConfigured()"
+                    (onClick)="testConnection()"
+                />
+                @if (testSuccessKey(); as key) {
+                <p-message data-testid="sso-test-feedback" severity="success" variant="simple" size="small" role="status" aria-live="polite">{{ key | transloco }}</p-message>
+                } @if (testErrorKey(); as key) {
+                <p-message data-testid="sso-test-feedback" severity="error" variant="simple" size="small" role="alert" aria-live="assertive">{{ key | transloco }}</p-message>
+                }
+            </div>
+            <div class="grid min-w-0 gap-2 sm:max-w-md">
+                <p-button data-testid="sso-save-button" [label]="'admin.team.sso.saveAction' | transloco" icon="pi pi-check" [loading]="isSaving()" [disabled]="!canSave()" (onClick)="saveSettings()" />
+                @if (saveSuccessKey(); as key) {
+                <p-message data-testid="sso-save-feedback" severity="success" variant="simple" size="small" role="status" aria-live="polite">{{ key | transloco }}</p-message>
+                } @if (saveErrorKey(); as key) {
+                <p-message data-testid="sso-save-feedback" severity="error" variant="simple" size="small" role="alert" aria-live="assertive">{{ key | transloco }}</p-message>
+                }
+            </div>
         </div>
     </app-settings-card>
 </div>

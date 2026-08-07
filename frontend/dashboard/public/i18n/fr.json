@@ -2007,7 +2007,7 @@
         },
         "docsAction": "Guide de configuration",
         "saveAction": "Enregistrer la configuration SSO",
-        "testAction": "Tester la connexion",
+        "testAction": "Tester la connexion SSO",
         "saveSuccess": "Configuration SSO enregistrée.",
         "testSuccess": "Le fournisseur d’identité est joignable et son document de découverte est valide.",
         "errors": {

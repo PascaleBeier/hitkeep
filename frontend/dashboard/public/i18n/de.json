@@ -2046,7 +2046,7 @@
         },
         "docsAction": "Einrichtungsanleitung",
         "saveAction": "SSO-Konfiguration speichern",
-        "testAction": "Verbindung testen",
+        "testAction": "SSO-Verbindung testen",
         "saveSuccess": "SSO-Konfiguration gespeichert.",
         "testSuccess": "Der Identitätsanbieter ist erreichbar und sein Discovery-Dokument ist gültig.",
         "errors": {

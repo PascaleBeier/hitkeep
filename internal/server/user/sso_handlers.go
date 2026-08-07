@@ -349,15 +349,26 @@ func (h *handler) appendTeamSSOAudit(r *http.Request, teamID, actorID uuid.UUID,
 	if team, err := h.ctx.Store.GetTenant(r.Context(), teamID); err == nil && team != nil {
 		targetLabel = team.Name
 	}
+	metadata, err := json.Marshal(map[string]string{
+		"flow":    "configuration",
+		"reason":  strings.TrimPrefix(action, "sso."),
+		"team_id": teamID.String(),
+	})
+	if err != nil {
+		slog.Error("Failed to encode SSO configuration audit metadata", "error", err, "team_id", teamID)
+		metadata = []byte("{}")
+	}
+	slog.Info("SSO configuration outcome", "action", action, "outcome", outcome, "flow", "configuration", "team_id", teamID, "request_id", r.Header.Get("X-Request-Id"))
 	h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
-		ActorID:     actorID,
-		TeamID:      teamID,
-		Action:      action,
-		TargetType:  "sso_configuration",
-		TargetID:    teamID.String(),
-		TargetLabel: targetLabel,
-		Outcome:     outcome,
-		Details:     details,
+		ActorID:      actorID,
+		TeamID:       teamID,
+		Action:       action,
+		TargetType:   "sso_configuration",
+		TargetID:     teamID.String(),
+		TargetLabel:  targetLabel,
+		Outcome:      outcome,
+		Details:      details,
+		MetadataJSON: string(metadata),
 	})
 }
 

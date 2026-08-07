@@ -2004,7 +2004,7 @@
         },
         "docsAction": "Guida alla configurazione",
         "saveAction": "Salva configurazione SSO",
-        "testAction": "Testa connessione",
+        "testAction": "Testa la connessione SSO",
         "saveSuccess": "Configurazione SSO salvata.",
         "testSuccess": "Il provider di identità è raggiungibile e il documento di discovery è valido.",
         "errors": {

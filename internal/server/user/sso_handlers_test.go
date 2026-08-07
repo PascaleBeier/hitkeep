@@ -37,6 +37,7 @@ func TestTeamSSOConfigurationIsValidatedEncryptedAndRedacted(t *testing.T) {
 	})
 	req := withTestUser(httptest.NewRequest(http.MethodPut, "/api/user/teams/"+teamID.String()+"/sso", bytes.NewReader(body)), userID)
 	req.SetPathValue("id", teamID.String())
+	req.Header.Set("X-Request-Id", "sso-config-request")
 	w := httptest.NewRecorder()
 
 	h.handleUpsertTeamSSO().ServeHTTP(w, req)
@@ -55,6 +56,26 @@ func TestTeamSSOConfigurationIsValidatedEncryptedAndRedacted(t *testing.T) {
 	}
 	if response.IssuerURL != issuerURL {
 		t.Fatalf("issuer identifier changed in response: got %q want %q", response.IssuerURL, issuerURL)
+	}
+	var metadataJSON, requestID string
+	if err := store.DB().QueryRowContext(context.Background(), `
+		SELECT metadata_json, request_id
+		FROM instance_audit_log
+		WHERE action = 'sso.configuration_updated'
+		ORDER BY created_at DESC
+		LIMIT 1
+	`).Scan(&metadataJSON, &requestID); err != nil {
+		t.Fatalf("load SSO configuration audit metadata: %v", err)
+	}
+	var metadata map[string]string
+	if err := json.Unmarshal([]byte(metadataJSON), &metadata); err != nil {
+		t.Fatalf("decode SSO configuration audit metadata: %v", err)
+	}
+	if metadata["flow"] != "configuration" || metadata["reason"] != "configuration_updated" || metadata["team_id"] != teamID.String() || requestID != "sso-config-request" {
+		t.Fatalf("unexpected SSO configuration audit metadata: metadata=%+v request_id=%q", metadata, requestID)
+	}
+	if strings.Contains(metadataJSON, "super-secret-value") {
+		t.Fatalf("SSO configuration audit metadata exposed secret: %s", metadataJSON)
 	}
 	if len(response.AllowedDomains) != 2 || response.AllowedDomains[0] != "example.com" {
 		t.Fatalf("domains were not normalized: %+v", response.AllowedDomains)

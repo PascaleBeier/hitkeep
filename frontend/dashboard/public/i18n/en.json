@@ -2101,7 +2101,7 @@
         },
         "docsAction": "Setup guide",
         "saveAction": "Save SSO configuration",
-        "testAction": "Test connection",
+        "testAction": "Test SSO connection",
         "saveSuccess": "SSO configuration saved.",
         "testSuccess": "The identity provider is reachable and its discovery document is valid.",
         "errors": {

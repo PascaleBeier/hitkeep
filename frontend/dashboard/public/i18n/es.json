@@ -2016,7 +2016,7 @@
         },
         "docsAction": "Guía de configuración",
         "saveAction": "Guardar configuración SSO",
-        "testAction": "Probar conexión",
+        "testAction": "Probar la conexión SSO",
         "saveSuccess": "Configuración SSO guardada.",
         "testSuccess": "El proveedor de identidad está disponible y su documento de descubrimiento es válido.",
         "errors": {

@@ -107,17 +107,55 @@ describe('TeamSSOPage', () => {
         expect(payload.allowed_domains).toEqual(['example.com', 'example.org', 'analytics.example']);
         expect(payload.auto_provision).toBe(true);
         expect(payload.enabled).toBe(true);
-        expect(component['successKey']()).toBe('admin.team.sso.saveSuccess');
+        expect(component['saveSuccessKey']()).toBe('admin.team.sso.saveSuccess');
     });
 
     it('tests only a previously saved connection', () => {
         component['testConnection']();
 
         expect(teamServiceMock.testTeamSSO).toHaveBeenCalledWith('team-1');
-        expect(component['successKey']()).toBe('admin.team.sso.testSuccess');
+        expect(component['testSuccessKey']()).toBe('admin.team.sso.testSuccess');
 
         component['clientSecretConfigured'].set(false);
         component['testConnection']();
         expect(teamServiceMock.testTeamSSO).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps test feedback directly below the test action and separate from save feedback', () => {
+        fixture.detectChanges();
+
+        const testButton = fixture.nativeElement.querySelector('[data-testid="sso-test-button"]');
+        const saveButton = fixture.nativeElement.querySelector('[data-testid="sso-save-button"]');
+        expect(testButton?.parentElement?.querySelector('[data-testid="sso-test-feedback"]')).toBeNull();
+        expect(saveButton?.parentElement?.querySelector('[data-testid="sso-save-feedback"]')).toBeNull();
+
+        component['testSuccessKey'].set('admin.team.sso.testSuccess');
+        component['saveSuccessKey'].set('admin.team.sso.saveSuccess');
+        fixture.detectChanges();
+
+        const testFeedback = testButton?.parentElement?.querySelector('[data-testid="sso-test-feedback"]');
+        const saveFeedback = saveButton?.parentElement?.querySelector('[data-testid="sso-save-feedback"]');
+        expect(testFeedback?.getAttribute('role')).toBe('status');
+        expect(testFeedback?.getAttribute('aria-live')).toBe('polite');
+        expect(saveFeedback?.getAttribute('role')).toBe('status');
+        expect(saveFeedback?.parentElement).toBe(saveButton?.parentElement);
+        expect(testFeedback?.parentElement).toBe(testButton?.parentElement);
+    });
+
+    it('does not clear test feedback when saving', () => {
+        component['testSuccessKey'].set('admin.team.sso.testSuccess');
+        component['saveSettings']();
+
+        expect(component['testSuccessKey']()).toBe('admin.team.sso.testSuccess');
+        expect(component['saveSuccessKey']()).toBe('admin.team.sso.saveSuccess');
+    });
+
+    it('announces test failures as assertive inline feedback', () => {
+        component['testErrorKey'].set('admin.team.sso.errors.testFailed');
+        fixture.detectChanges();
+
+        const feedback = fixture.nativeElement.querySelector('[data-testid="sso-test-feedback"]');
+        expect(feedback?.getAttribute('role')).toBe('alert');
+        expect(feedback?.getAttribute('aria-live')).toBe('assertive');
     });
 });

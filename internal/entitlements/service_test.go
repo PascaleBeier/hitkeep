@@ -165,8 +165,8 @@ func TestServiceAllowsSSO(t *testing.T) {
 	memberID := env.createMember(t, "sso-member@example.test")
 
 	withoutSSO := entitlements.NewStaticProvider(entitlements.Entitlements{}, entitlements.PlanInfo{Code: "pro", Name: "Pro"})
-	if env.service(withoutSSO).AllowsSSO(ctx, memberID, env.teamID) {
-		t.Fatal("expected a cloud plan without the SSO entitlement to be blocked")
+	if !env.service(withoutSSO).AllowsSSO(ctx, memberID, env.teamID) {
+		t.Fatal("expected members of an operator-owned team to use SSO")
 	}
 
 	withSSO := entitlements.NewStaticProvider(entitlements.Entitlements{AllowSSO: true}, entitlements.PlanInfo{Code: "business", Name: "Business"})
@@ -175,6 +175,21 @@ func TestServiceAllowsSSO(t *testing.T) {
 	}
 	if !env.service(withoutSSO).AllowsSSO(ctx, env.ownerID, env.teamID) {
 		t.Fatal("expected the instance owner to bypass the SSO plan gate")
+	}
+	if !env.service(withoutSSO).AllowsSSO(ctx, uuid.Nil, env.teamID) {
+		t.Fatal("expected public SSO to allow an operator-owned team")
+	}
+
+	regularOwnerID := env.createMember(t, "regular-team-owner@example.test")
+	regularTeam, err := env.store.CreateTenant(ctx, regularOwnerID, "Regular team", "")
+	if err != nil {
+		t.Fatalf("create regular team: %v", err)
+	}
+	if env.service(withoutSSO).AllowsSSO(ctx, uuid.Nil, regularTeam.ID) {
+		t.Fatal("expected public SSO to remain blocked for a non-entitled regular team")
+	}
+	if !env.service(withSSO).AllowsSSO(ctx, uuid.Nil, regularTeam.ID) {
+		t.Fatal("expected public SSO to allow an explicitly entitled regular team")
 	}
 
 	env.cfg.CloudHosted = false
@@ -213,21 +228,31 @@ func TestServiceAllowsExternalReportRecipients(t *testing.T) {
 func TestServiceRequireTeamMemberCapacity(t *testing.T) {
 	env := newServiceEnv(t)
 	ctx := context.Background()
+	regularOwnerID := env.createMember(t, "capacity-team-owner@example.test")
+	regularTeam, err := env.store.CreateTenant(ctx, regularOwnerID, "Capacity team", "")
+	if err != nil {
+		t.Fatalf("create capacity team: %v", err)
+	}
 
-	// The default team holds one member (the instance owner).
+	// A regular cloud team holds one member and remains subject to its plan cap.
 	limited := env.service(entitlements.NewStaticProvider(entitlements.Entitlements{MaxTeamMembers: 1}, entitlements.PlanInfo{}))
-	if err := limited.RequireTeamMemberCapacity(ctx, env.teamID); !errors.Is(err, entitlements.ErrTeamMemberLimitReached) {
+	if err := limited.RequireTeamMemberCapacity(ctx, regularTeam.ID); !errors.Is(err, entitlements.ErrTeamMemberLimitReached) {
 		t.Fatalf("expected ErrTeamMemberLimitReached, got %v", err)
 	}
 
 	roomy := env.service(entitlements.NewStaticProvider(entitlements.Entitlements{MaxTeamMembers: 2}, entitlements.PlanInfo{}))
-	if err := roomy.RequireTeamMemberCapacity(ctx, env.teamID); err != nil {
+	if err := roomy.RequireTeamMemberCapacity(ctx, regularTeam.ID); err != nil {
 		t.Fatalf("expected capacity below the limit, got %v", err)
 	}
 
 	unlimited := env.service(entitlements.NewStaticProvider(entitlements.Entitlements{}, entitlements.PlanInfo{}))
-	if err := unlimited.RequireTeamMemberCapacity(ctx, env.teamID); err != nil {
+	if err := unlimited.RequireTeamMemberCapacity(ctx, regularTeam.ID); err != nil {
 		t.Fatalf("expected zero limit to mean unlimited, got %v", err)
+	}
+
+	operatorLimited := env.service(entitlements.NewStaticProvider(entitlements.Entitlements{MaxTeamMembers: 1}, entitlements.PlanInfo{}))
+	if err := operatorLimited.RequireTeamMemberCapacity(ctx, env.teamID); err != nil {
+		t.Fatalf("expected operator-owned team to bypass member capacity, got %v", err)
 	}
 }
 
