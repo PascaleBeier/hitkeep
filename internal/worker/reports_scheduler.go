@@ -164,9 +164,10 @@ func (w *ReportWorker) processNamedDelivery(ctx context.Context, deliveryID uuid
 		if errors.Is(err, mailer.ErrMailerDisabled) {
 			code = "smtp_unavailable"
 		}
+		details := mailer.DescribeError(err)
 		_ = shared.MarkReportDeliveryFailed(ctx, deliveryID, delivery.AttemptCount, code, now)
 		_ = shared.FinalizeReportRun(ctx, delivery.RunID, now)
-		slog.Warn("ReportWorker: mail server did not accept delivery", "report_id", delivery.ReportID, "run_id", delivery.RunID, "delivery_id", deliveryID, "recipient_id", delivery.RecipientID, "error_code", code)
+		slog.Warn("ReportWorker: mail delivery failed", "report_id", delivery.ReportID, "run_id", delivery.RunID, "delivery_id", deliveryID, "recipient_id", delivery.RecipientID, "recipient_kind", delivery.RecipientKind, "message_id", delivery.MessageID, "attempt", delivery.AttemptCount, "error_code", code, "error_stage", details.Stage, "error_kind", details.Kind, "error_message", details.Message, "smtp_code", details.SMTPCode)
 		return
 	}
 	_ = shared.MarkReportDeliveryAccepted(ctx, deliveryID, now)

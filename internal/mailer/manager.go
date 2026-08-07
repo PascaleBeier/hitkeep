@@ -169,33 +169,33 @@ func (m *Mailer) SendWithOptions(to string, email Mailable, options SendOptions)
 	// Render MJML → HTML
 	htmlTmpl, err := htmltpl.New("layout.mjml").Funcs(templateFuncsForLocale(locale)).ParseFS(templateFS, "templates/layout.mjml", "templates/"+email.Template())
 	if err != nil {
-		return fmt.Errorf("failed to parse html templates: %w", err)
+		return wrapSendError(SendStageHTMLTemplateParse, fmt.Errorf("failed to parse html templates: %w", err))
 	}
 
 	var mjmlBuffer bytes.Buffer
 	if err := htmlTmpl.Execute(&mjmlBuffer, ctx); err != nil {
-		return fmt.Errorf("failed to execute html template: %w", err)
+		return wrapSendError(SendStageHTMLTemplateExecute, fmt.Errorf("failed to execute html template: %w", err))
 	}
 
 	htmlContent, err := mjml.ToHTML(context.Background(), mjmlBuffer.String(), mjml.WithMinify(true))
 	if err != nil {
-		return fmt.Errorf("mjml render error: %w", err)
+		return wrapSendError(SendStageMJMLRender, fmt.Errorf("mjml render error: %w", err))
 	}
 
 	// Render plain-text
 	textTemplateName := strings.TrimSuffix(email.Template(), ".mjml") + ".txt"
 	textTmpl, err := texttpl.New("layout.txt").Funcs(textTemplateFuncsForLocale(locale)).ParseFS(templateFS, "templates/layout.txt", "templates/"+textTemplateName)
 	if err != nil {
-		return fmt.Errorf("failed to parse text templates: %w", err)
+		return wrapSendError(SendStageTextTemplateParse, fmt.Errorf("failed to parse text templates: %w", err))
 	}
 
 	var textBuffer bytes.Buffer
 	if err := textTmpl.Execute(&textBuffer, ctx); err != nil {
-		return fmt.Errorf("failed to execute text template: %w", err)
+		return wrapSendError(SendStageTextTemplateExecute, fmt.Errorf("failed to execute text template: %w", err))
 	}
 
 	if driver, ok := m.driver.(HeaderDriver); ok && (options.MessageID != "" || len(options.Headers) > 0) {
-		return driver.SendWithHeaders([]string{to}, email.Subject(), htmlContent, textBuffer.String(), options.MessageID, options.Headers)
+		return wrapSendError(SendStageTransport, driver.SendWithHeaders([]string{to}, email.Subject(), htmlContent, textBuffer.String(), options.MessageID, options.Headers))
 	}
-	return m.driver.Send([]string{to}, email.Subject(), htmlContent, textBuffer.String())
+	return wrapSendError(SendStageTransport, m.driver.Send([]string{to}, email.Subject(), htmlContent, textBuffer.String()))
 }

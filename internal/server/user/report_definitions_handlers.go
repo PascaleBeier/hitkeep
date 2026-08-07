@@ -405,6 +405,8 @@ func (h *handler) handleTestSendReport() http.HandlerFunc {
 		}
 		messageID := fmt.Sprintf("<report-test.%s@hitkeep>", uuid.New())
 		if err := h.ctx.Mailer.SendWithOptions(user.Email, email, mailer.SendOptions{MessageID: messageID, Headers: map[string]string{"Auto-Submitted": "auto-generated"}}); err != nil {
+			details := mailer.DescribeError(err)
+			slog.Warn("Report test send failed", "report_id", report.ID, "user_id", userID, "message_id", messageID, "error_code", "smtp_send_failed", "error_stage", details.Stage, "error_kind", details.Kind, "error_message", details.Message, "smtp_code", details.SMTPCode)
 			writeReportError(w, http.StatusBadGateway, "smtp_send_failed", "Mail server did not accept the test message")
 			return
 		}
@@ -649,7 +651,8 @@ func (h *handler) sendPreparedReportConfirmation(r *http.Request, prepared *data
 	email := mailables.NewReportRecipientConfirmation(link, prepared.Locale, prepared.Metadata)
 	if err := h.ctx.Mailer.Send(prepared.Email, email); err != nil {
 		_ = h.ctx.Store.RecordReportConfirmationSendResult(r.Context(), prepared.RecipientID, "smtp_send_failed", time.Now().UTC())
-		slog.Warn("Mail server did not accept report confirmation", "recipient_id", prepared.RecipientID, "error_code", "smtp_send_failed")
+		details := mailer.DescribeError(err)
+		slog.Warn("Mail server did not accept report confirmation", "recipient_id", prepared.RecipientID, "error_code", "smtp_send_failed", "error_stage", details.Stage, "error_kind", details.Kind, "error_message", details.Message, "smtp_code", details.SMTPCode)
 		return err
 	}
 	return h.ctx.Store.RecordReportConfirmationSendResult(r.Context(), prepared.RecipientID, "", time.Now().UTC())

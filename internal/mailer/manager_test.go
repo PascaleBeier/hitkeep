@@ -392,6 +392,10 @@ func TestSendReturnsDriverError(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "connection refused") {
 		t.Fatalf("expected driver error to propagate, got %v", err)
 	}
+	details := DescribeError(err)
+	if details.Stage != string(SendStageTransport) || details.Kind != "transport" {
+		t.Fatalf("driver error details = %+v", details)
+	}
 }
 
 // ---------------------------------------------------------------------------

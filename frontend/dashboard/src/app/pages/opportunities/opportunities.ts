@@ -380,14 +380,12 @@ export class OpportunitiesPage {
             severity: this.severityFor(opportunity),
             score: opportunity.score,
             scoreWidth: this.scoreWidth(opportunity),
-            evidence: opportunity.evidence.map(
-                (evidence): OpportunityEvidenceView => ({
-                    id: evidence.id,
-                    label: this.evidenceLabelFor(evidence),
-                    value: evidence.value,
-                    detail: this.evidenceDetailFor(evidence)
-                })
-            )
+            evidence: opportunity.evidence.map((evidence): OpportunityEvidenceView => ({
+                id: evidence.id,
+                label: this.evidenceLabelFor(evidence),
+                value: evidence.value,
+                detail: this.evidenceDetailFor(evidence)
+            }))
         };
     }
 
