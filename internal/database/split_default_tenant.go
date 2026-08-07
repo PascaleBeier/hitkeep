@@ -91,7 +91,7 @@ func runDefaultTenantSplitWithFaults(ctx context.Context, sharedPath, dataPath s
 				return restoreErr
 			}
 			if !restored {
-				return errMissingSplitTenantFile(finalPath, "restore the tenant file or a pre-split control database backup")
+				return errMissingSplitTenantFile(finalPath, "restore the tenant file or a pre-split control database backup, or run 'hitkeep recover rebuild-default-tenant' to accept the loss and rebuild an empty one")
 			}
 			// The restored control predates the split, so run the whole split
 			// again from the top. The restore consumed the backup, so a second

@@ -42,6 +42,8 @@ func Recover() {
 		recoverRestoreBackup(os.Args[3:])
 	case "restore-database-bundle":
 		recoverRestoreDatabaseBundle(os.Args[3:])
+	case "rebuild-default-tenant":
+		recoverRebuildDefaultTenant(os.Args[3:])
 	default:
 		//nolint:gosec // G705: writes to stderr, not an HTTP response; %q safely quotes the argument.
 		fmt.Fprintf(os.Stderr, "Unknown recover subcommand: %q\n\n%s\n", os.Args[2], recoverUsage)
@@ -58,6 +60,10 @@ Subcommands:
   restore-database-bundle
                    Restore the exact database and WAL files retained before
                    an automatic DuckDB recovery.
+  rebuild-default-tenant
+                   Recreate a missing default tenant database as an empty,
+                   schema-migrated file when no backup exists. Analytics
+                   history is NOT restored.
 
 Flags for disable-2fa:
   -email string   User email address (required)
@@ -77,6 +83,11 @@ Flags for restore-database-bundle:
   -from string   Recovery bundle directory containing manifest.json (required)
   -db   string   Target hitkeep.db path (default: same as server config)
   -yes           Skip interactive confirmation prompt
+
+Flags for rebuild-default-tenant:
+  -db        string   Path to hitkeep.db (default: same as server config)
+  -data-path string   Tenant data directory (default: same as server config)
+  -yes                Skip interactive confirmation prompt
 
 NOTE: HitKeep must be stopped before running recovery commands.
       DuckDB does not allow concurrent write access.`
@@ -891,4 +902,53 @@ func joinRestorePath(parts ...string) string {
 		return normalized.String()
 	}
 	return filepath.Join(parts...)
+}
+
+func recoverRebuildDefaultTenant(args []string) {
+	fs := flag.NewFlagSet("rebuild-default-tenant", flag.ExitOnError)
+	dbPath := fs.String("db", "", "Path to hitkeep.db (defaults to server config value)")
+	dataPath := fs.String("data-path", "", "Tenant data directory (defaults to server config value)")
+	yes := fs.Bool("yes", false, "Skip confirmation prompt")
+	if err := fs.Parse(args); err != nil {
+		os.Exit(1)
+	}
+	conf := config.Load()
+	if *dbPath == "" {
+		*dbPath = conf.DBPath
+	}
+	if *dataPath == "" {
+		*dataPath = conf.DataPath
+	}
+
+	fmt.Printf("HitKeep Recovery — Rebuild Default Tenant Database\n")
+	fmt.Printf("===================================================\n")
+	fmt.Printf("Control DB: %s\n", *dbPath)
+	fmt.Printf("Data path:  %s\n\n", *dataPath)
+	fmt.Println("This recreates the default tenant's database as an EMPTY, schema-migrated")
+	fmt.Println("file with fresh site mirrors. Its analytics history is NOT restored; use a")
+	fmt.Println("backup restore instead whenever one exists. HitKeep must be stopped.")
+	fmt.Println()
+
+	if !*yes {
+		fmt.Print(`Type "yes" to confirm: `)
+		scanner := bufio.NewScanner(os.Stdin)
+		scanner.Scan()
+		if strings.TrimSpace(scanner.Text()) != "yes" {
+			fmt.Println("Aborted.")
+			os.Exit(0)
+		}
+		fmt.Println()
+	}
+
+	tenantPath, err := database.RebuildDefaultTenantFile(context.Background(), *dbPath, *dataPath,
+		database.WithMemoryLimit(conf.DuckDBMemoryLimit),
+		database.WithThreads(conf.DuckDBThreads),
+	)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Fprintln(os.Stderr, "Make sure HitKeep is stopped before running recovery commands.")
+		os.Exit(1)
+	}
+	fmt.Printf("✓ Rebuilt empty default tenant database at %s\n", tenantPath)
+	fmt.Println("Start HitKeep to begin collecting analytics again.")
 }
