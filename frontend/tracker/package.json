@@ -1,6 +1,6 @@
 {
     "name": "@hitkeep/tracker",
-    "version": "2.13.3",
+    "version": "2.13.4",
     "description": "Typed, cookieless web analytics tracker for React, Vue, Angular, and Astro. Official browser SDK for HitKeep, a privacy-friendly, self-hostable Google Analytics alternative.",
     "license": "MIT",
     "type": "module",
