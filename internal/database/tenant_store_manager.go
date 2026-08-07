@@ -574,7 +574,7 @@ func (m *TenantStoreManager) openDefaultTenantStore(ctx context.Context, tenantI
 	}
 	if _, err := os.Stat(dbPath); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("default tenant split marker exists but tenant file is missing: %s", dbPath)
+			return nil, errMissingSplitTenantFile(dbPath, "restore the tenant file from a backup")
 		}
 		return nil, fmt.Errorf("stat default tenant database %s: %w", dbPath, err)
 	}

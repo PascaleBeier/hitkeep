@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -404,6 +405,104 @@ func TestRunDefaultTenantSplitMovesDefaultScopedAnalytics(t *testing.T) {
 	}
 	if err := RunDefaultTenantSplit(ctx, sharedPath, dataPath); err == nil {
 		t.Fatal("expected split marker with missing tenant file to fail startup")
+	}
+}
+
+func TestDefaultTenantSplitRestoresPreCompactBackupWhenTenantFileMissing(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	sharedPath := filepath.Join(root, "hitkeep.db")
+	dataPath := filepath.Join(root, "data")
+
+	shared := NewStore(sharedPath)
+	if err := shared.Connect(); err != nil {
+		t.Fatalf("connect shared: %v", err)
+	}
+	if err := shared.Migrate(ctx); err != nil {
+		_ = shared.Close()
+		t.Fatalf("migrate shared: %v", err)
+	}
+	userID, err := shared.CreateUser(ctx, "split-backup-recovery@example.test", "hashed")
+	if err != nil {
+		_ = shared.Close()
+		t.Fatalf("create user: %v", err)
+	}
+	site, err := shared.CreateSite(ctx, userID, "split-backup-recovery.example.test")
+	if err != nil {
+		_ = shared.Close()
+		t.Fatalf("create site: %v", err)
+	}
+	now := time.Date(2026, 7, 1, 12, 0, 0, 0, time.UTC)
+	if err := shared.CreateHitsBulk(ctx, []*api.Hit{
+		{ID: uuid.New(), SiteID: site.ID, SessionID: uuid.New(), PageID: uuid.New(), Timestamp: now, Path: "/recovered"},
+	}); err != nil {
+		_ = shared.Close()
+		t.Fatalf("create hit: %v", err)
+	}
+	if err := shared.Close(); err != nil {
+		t.Fatalf("close shared before split: %v", err)
+	}
+
+	// Abort immediately after the rewritten control file (with the split
+	// marker) is published but before the pre-compaction backup is removed.
+	abort := errors.New("abort after control publication")
+	err = runDefaultTenantSplitWithFaults(ctx, sharedPath, dataPath, nil, nil, func(point string) error {
+		if point == "after-control-target-rename" {
+			return abort
+		}
+		return nil
+	})
+	if !errors.Is(err, abort) {
+		t.Fatalf("expected aborted split, got %v", err)
+	}
+	if _, err := os.Stat(sharedPath + ".pre-compact"); err != nil {
+		t.Fatalf("expected pre-compaction backup after aborted split: %v", err)
+	}
+
+	// Simulate a tenant data directory that was not on persistent storage,
+	// e.g. a recreated Docker container whose HITKEEP_DATA_PATH was off-volume.
+	if err := os.RemoveAll(dataPath); err != nil {
+		t.Fatalf("remove tenant data directory: %v", err)
+	}
+
+	if err := RunDefaultTenantSplit(ctx, sharedPath, dataPath); err != nil {
+		t.Fatalf("expected split to recover from pre-compaction backup: %v", err)
+	}
+	if _, err := os.Stat(sharedPath + ".pre-compact"); !os.IsNotExist(err) {
+		t.Fatalf("expected pre-compaction backup to be removed after recovery, err=%v", err)
+	}
+
+	control := NewStore(sharedPath)
+	if err := control.Connect(); err != nil {
+		t.Fatalf("connect control after recovery: %v", err)
+	}
+	defer control.Close()
+	if complete, err := control.DefaultTenantSplitComplete(ctx); err != nil || !complete {
+		t.Fatalf("expected complete split markers after recovery, complete=%v err=%v", complete, err)
+	}
+	var controlHits int
+	if err := control.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM hits WHERE site_id = ?", site.ID).Scan(&controlHits); err != nil {
+		t.Fatalf("count control hits: %v", err)
+	}
+	if controlHits != 0 {
+		t.Fatalf("expected control hits to be moved out, got %d", controlHits)
+	}
+	defaultID, err := control.GetDefaultTenantID(ctx)
+	if err != nil {
+		t.Fatalf("get default tenant: %v", err)
+	}
+	tenantPath := filepath.Join(dataPath, "tenants", defaultID.String(), "hitkeep.db")
+	tenant := NewStore(tenantPath)
+	if err := tenant.Connect(); err != nil {
+		t.Fatalf("open recovered tenant file: %v", err)
+	}
+	defer tenant.Close()
+	var tenantHits int
+	if err := tenant.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM hits WHERE site_id = ?", site.ID).Scan(&tenantHits); err != nil {
+		t.Fatalf("count recovered tenant hits: %v", err)
+	}
+	if tenantHits != 1 {
+		t.Fatalf("expected recovered tenant hit, got %d", tenantHits)
 	}
 }
 

@@ -22,6 +22,7 @@ const (
 	defaultTenantSplitMarker    = "default_tenant_split_v1"
 	defaultTenantCompactionMark = "default_tenant_split_compacted_v1"
 	defaultTenantSplitHeadroom  = int64(512 << 20)
+	preCompactBackupSuffix      = ".pre-compact"
 )
 
 type splitTableFingerprint struct {
@@ -82,10 +83,20 @@ func runDefaultTenantSplitWithFaults(ctx context.Context, sharedPath, dataPath s
 	workPath := finalPath + ".split-work"
 	if splitApplied {
 		if _, err := os.Stat(finalPath); err != nil {
-			if errors.Is(err, os.ErrNotExist) {
-				return fmt.Errorf("default tenant split marker exists but tenant file is missing: %s", finalPath)
+			if !errors.Is(err, os.ErrNotExist) {
+				return fmt.Errorf("stat default tenant file %s: %w", finalPath, err)
 			}
-			return fmt.Errorf("stat default tenant file %s: %w", finalPath, err)
+			restored, restoreErr := restoreSplitControlBackupForMissingTenantFile(sharedPath, finalPath)
+			if restoreErr != nil {
+				return restoreErr
+			}
+			if !restored {
+				return errMissingSplitTenantFile(finalPath, "restore the tenant file or a pre-split control database backup")
+			}
+			// The restored control predates the split, so run the whole split
+			// again from the top. The restore consumed the backup, so a second
+			// pass through this branch fails instead of looping.
+			return runDefaultTenantSplitWithFaults(ctx, sharedPath, dataPath, controlOpts, dataOpts, fault)
 		}
 	} else {
 		if err := prepareDefaultTenantFile(ctx, sharedPath, finalPath, workPath, defaultID, controlOpts, dataOpts, fault); err != nil {
@@ -147,7 +158,6 @@ func runDefaultTenantSplitWithFaults(ctx context.Context, sharedPath, dataPath s
 // this boot. A published shared file always wins; its split marker determines
 // whether another harmless rewrite is required.
 func recoverInterruptedSplitControlSwap(sharedPath string) error {
-	backupPath := sharedPath + ".pre-compact"
 	_, sharedErr := os.Stat(sharedPath)
 	if sharedErr == nil {
 		return nil
@@ -155,20 +165,57 @@ func recoverInterruptedSplitControlSwap(sharedPath string) error {
 	if !errors.Is(sharedErr, os.ErrNotExist) {
 		return fmt.Errorf("inspect shared database during split swap recovery: %w", sharedErr)
 	}
-	_, backupErr := os.Stat(backupPath)
+	_, backupErr := os.Stat(sharedPath + preCompactBackupSuffix)
 	if errors.Is(backupErr, os.ErrNotExist) {
 		return nil
 	}
 	if backupErr != nil {
 		return fmt.Errorf("inspect pre-compaction control database during split swap recovery: %w", backupErr)
 	}
-	if err := os.Rename(backupPath, sharedPath); err != nil {
-		return fmt.Errorf("restore interrupted split control database: %w", err)
+	return restorePreCompactControlBackup(sharedPath)
+}
+
+// restorePreCompactControlBackup moves the pre-compaction control backup back
+// over the shared database file and makes the rename durable. Callers decide
+// when restoring is the right resolution.
+func restorePreCompactControlBackup(sharedPath string) error {
+	if err := os.Rename(sharedPath+preCompactBackupSuffix, sharedPath); err != nil {
+		return fmt.Errorf("restore pre-compaction control database: %w", err)
 	}
 	if err := syncDirectory(filepath.Dir(sharedPath)); err != nil {
-		return fmt.Errorf("sync restored split control database: %w", err)
+		return fmt.Errorf("sync restored control database: %w", err)
 	}
 	return nil
+}
+
+// restoreSplitControlBackupForMissingTenantFile covers the crash window where
+// the rewritten control file (already carrying the split marker) was published
+// but the pre-compaction backup was not yet removed. If the split tenant file
+// has since disappeared, for example because the tenant data directory was
+// not on persistent storage, the backup still holds every pre-split row, so
+// restoring it and re-running the whole split loses nothing. The published
+// control never served application writes in this state: startup finishes the
+// split before the application starts.
+func restoreSplitControlBackupForMissingTenantFile(sharedPath, tenantPath string) (bool, error) {
+	if _, err := os.Stat(sharedPath + preCompactBackupSuffix); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, fmt.Errorf("inspect pre-compaction control database for missing tenant file recovery: %w", err)
+	}
+	if err := restorePreCompactControlBackup(sharedPath); err != nil {
+		return false, err
+	}
+	slog.Warn("Restored pre-split control database because the split tenant file is missing; the default tenant split will run again",
+		"tenant_path", tenantPath, "control_path", sharedPath)
+	return true, nil
+}
+
+// errMissingSplitTenantFile explains the unrecoverable split state to the
+// operator: the split marker is durable but the tenant database is gone,
+// which almost always means the tenant data directory was not persistent.
+func errMissingSplitTenantFile(path, remedy string) error {
+	return fmt.Errorf("default tenant split marker exists but tenant file is missing: %s; the tenant data directory (HITKEEP_DATA_PATH) no longer holds the split tenant database, most likely because it was not on persistent storage when the split ran (in Docker, keep HITKEEP_DATA_PATH on the mounted data volume); %s, then restart", path, remedy)
 }
 
 // HasDefaultTenantSplit reports whether the data-plane file has become
@@ -631,7 +678,7 @@ func rewriteSplitControlDatabase(ctx context.Context, sharedPath, tenantPath str
 		return err
 	}
 	workPath := sharedPath + ".compacting"
-	backupPath := sharedPath + ".pre-compact"
+	backupPath := sharedPath + preCompactBackupSuffix
 	for _, stale := range []string{workPath, workPath + ".wal", backupPath} {
 		if err := os.Remove(stale); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("remove stale split compaction artifact %s: %w", stale, err)

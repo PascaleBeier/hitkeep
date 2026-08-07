@@ -84,6 +84,7 @@ COPY --from=data-dir --chown=nonroot:nonroot /var/lib/hitkeep/data /var/lib/hitk
 WORKDIR /app
 
 ENV HITKEEP_DB_PATH="/var/lib/hitkeep/data/hitkeep.db"
+ENV HITKEEP_DATA_PATH="/var/lib/hitkeep/data"
 ENV HITKEEP_ARCHIVE_PATH="/var/lib/hitkeep/data/archive"
 VOLUME /var/lib/hitkeep/data
 

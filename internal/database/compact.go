@@ -84,7 +84,7 @@ func MaybeCompactDatabase(ctx context.Context, path string, opts CompactionOptio
 	result.BytesBefore = info.Size()
 
 	workPath := path + ".compacting"
-	backupPath := path + ".pre-compact"
+	backupPath := path + preCompactBackupSuffix
 	for _, stale := range []string{workPath, workPath + ".wal", backupPath} {
 		if err := os.Remove(stale); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return result, fmt.Errorf("remove stale compaction artifact %s: %w", stale, err)
@@ -148,7 +148,7 @@ func MaybeCompactDatabase(ctx context.Context, path string, opts CompactionOptio
 // database at the live path. A published replacement wins over a leftover
 // backup; the backup is then safe to remove.
 func recoverCompactionSwap(path string) error {
-	backupPath := path + ".pre-compact"
+	backupPath := path + preCompactBackupSuffix
 	workPath := path + ".compacting"
 	_, pathErr := os.Stat(path)
 	_, backupErr := os.Stat(backupPath)
