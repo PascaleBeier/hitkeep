@@ -7,6 +7,16 @@
 * Split default-tenant analytics into `data/tenants/<tenant-id>/hitkeep.db` and run tenant files through one attached DuckDB data plane. This migration is mandatory in 2.13.0. Downgrading a split installation to 2.12 or older is unsupported because those releases do not understand the tenant file or split markers; restore a complete pre-upgrade backup instead.
 * Restore every tenant database from S3 backup snapshots by deriving tenant object prefixes from the restored control snapshot, including temporary STS credentials and non-TLS S3-compatible endpoints.
 
+## [2.13.4](https://github.com/PascaleBeier/hitkeep/compare/v2.13.3...v2.13.4) (2026-08-07)
+
+
+### Bug Fixes
+
+* **auth:** harden SSO entitlement and UX ([1d446f3](https://github.com/PascaleBeier/hitkeep/commit/1d446f32223ae2a7d8703916e0e75623e00d681f))
+* **deps:** Bump Angular to 22.1.3 and OptimusUI to 1.0.1 ([62d7bc4](https://github.com/PascaleBeier/hitkeep/commit/62d7bc424d0c3054d6a00d74033797a120e77dda))
+* **deps:** Bump go dependencies ([ec79004](https://github.com/PascaleBeier/hitkeep/commit/ec790047f1bc711db79a1e2f4db3b5da1adb90f4))
+* **reports:** Improve mailer observability ([046744e](https://github.com/PascaleBeier/hitkeep/commit/046744e43d5b152c39bae2daa0cb23a72662dcb1))
+
 ## [2.13.3](https://github.com/PascaleBeier/hitkeep/compare/v2.13.2...v2.13.3) (2026-08-02)
 
 
