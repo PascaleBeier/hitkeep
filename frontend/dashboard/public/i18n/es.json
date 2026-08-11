@@ -2825,6 +2825,14 @@
     "tosRequired": "Debes aceptar los Términos de Servicio y la Política de Privacidad.",
     "verifyTitle": "Revisa tu bandeja de entrada",
     "verifySubtitle": "Hemos enviado un enlace de verificación a {{email}}. Haz clic para activar tu espacio de trabajo.",
+    "verification": {
+        "spamGuidance": "Puede tardar un momento. Revisa la carpeta de spam si no ves el correo.",
+        "resendAction": "Reenviar correo de verificación",
+        "resendCountdown": "Podrás reenviarlo en {{seconds}} s",
+        "resendSuccess": "Si la dirección cumple los requisitos, recibirás otro correo de verificación.",
+        "resendError": "No pudimos enviar la solicitud. Inténtalo de nuevo.",
+        "editEmail": "Usar otro correo"
+    },
     "errors": {
       "emailExists": "Ya existe una cuenta con este correo electrónico.",
       "planUnavailable": "Esta opción de registro no está disponible ahora mismo.",

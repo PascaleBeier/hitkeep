@@ -2799,6 +2799,14 @@
     "tosRequired": "Je moet de Servicevoorwaarden en het Privacybeleid accepteren.",
     "verifyTitle": "Controleer je inbox",
     "verifySubtitle": "We hebben een verificatielink naar {{email}} gestuurd. Klik erop om je workspace te activeren.",
+    "verification": {
+        "spamGuidance": "Het kan even duren voordat de e-mail aankomt. Controleer je spammap als je hem niet ziet.",
+        "resendAction": "Verificatie-e-mail opnieuw sturen",
+        "resendCountdown": "Opnieuw sturen over {{seconds}} s",
+        "resendSuccess": "Als het adres in aanmerking komt, is er nog een verificatie-e-mail onderweg.",
+        "resendError": "We konden het verzoek niet versturen. Probeer het opnieuw.",
+        "editEmail": "Een ander e-mailadres gebruiken"
+    },
     "errors": {
       "emailExists": "Er bestaat al een account met dit e-mailadres.",
       "planUnavailable": "Deze aanmeldingsoptie is momenteel niet beschikbaar.",

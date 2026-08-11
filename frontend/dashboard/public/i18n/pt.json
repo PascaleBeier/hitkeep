@@ -2789,6 +2789,14 @@
     "tosRequired": "Você deve aceitar os Termos de Serviço e a Política de Privacidade.",
     "verifyTitle": "Verifique sua caixa de entrada",
     "verifySubtitle": "Enviamos um link de verificação para {{email}}. Clique nele para ativar seu espaço de trabalho.",
+    "verification": {
+        "spamGuidance": "O e-mail pode levar alguns instantes para chegar. Verifique a pasta de spam caso não o encontre.",
+        "resendAction": "Reenviar e-mail de verificação",
+        "resendCountdown": "Reenvio disponível em {{seconds}} s",
+        "resendSuccess": "Se o endereço estiver qualificado, outro e-mail de verificação está a caminho.",
+        "resendError": "Não foi possível enviar a solicitação. Tente novamente.",
+        "editEmail": "Usar outro e-mail"
+    },
     "errors": {
       "emailExists": "Já existe uma conta com este e-mail.",
       "planUnavailable": "Esta opção de cadastro não está disponível no momento.",

@@ -214,10 +214,12 @@ func openAPIV1CorePaths() map[string]any {
 					"201": jsonSchemaResp("Cloud signup response", map[string]any{
 						"type": "object",
 						"properties": map[string]any{
-							"status":       map[string]any{"type": "string"},
-							"plan_code":    map[string]any{"type": "string"},
-							"redirect_url": map[string]any{"type": "string"},
-							"checkout_url": map[string]any{"type": "string"},
+							"status":              map[string]any{"type": "string"},
+							"plan_code":           map[string]any{"type": "string"},
+							"billing":             map[string]any{"type": "string", "enum": []string{"monthly", "annual"}},
+							"retry_after_seconds": map[string]any{"type": "integer", "minimum": 0},
+							"redirect_url":        map[string]any{"type": "string"},
+							"checkout_url":        map[string]any{"type": "string"},
 						},
 						"required": []string{"status", "plan_code"},
 					}),
@@ -225,6 +227,29 @@ func openAPIV1CorePaths() map[string]any {
 					"404": errResp("Cloud signup disabled"),
 					"409": errResp("Email already exists"),
 					"502": errResp("Unable to start checkout"),
+				}),
+		},
+		"/api/cloud/signup/resend-verification": map[string]any{
+			"post": cloudOp("Resend managed cloud signup verification", "Requests another verification email for a password-based managed cloud signup. Valid requests receive the same response regardless of account state.", nil, nil,
+				jsonBody(map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"email": map[string]any{"type": "string", "format": "email"},
+					},
+					"required": []string{"email"},
+				}),
+				map[string]any{
+					"202": jsonSchemaResp("Signup verification resend accepted", map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"status":              map[string]any{"type": "string", "enum": []string{"accepted"}},
+							"retry_after_seconds": map[string]any{"type": "integer", "minimum": 0},
+						},
+						"required": []string{"status", "retry_after_seconds"},
+					}),
+					"400": errResp("Invalid request"),
+					"404": errResp("Cloud signup disabled"),
+					"429": errResp("Too many requests"),
 				}),
 		},
 		"/api/cloud/billing/portal": map[string]any{

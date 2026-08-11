@@ -2855,6 +2855,14 @@
     "tosRequired": "Du musst die Nutzungsbedingungen und die Datenschutzrichtlinie akzeptieren.",
     "verifyTitle": "Überprüfe dein Postfach",
     "verifySubtitle": "Wir haben einen Bestätigungslink an {{email}} gesendet. Klicke darauf, um deinen Workspace zu aktivieren.",
+    "verification": {
+        "spamGuidance": "Es kann einen Moment dauern. Prüfe deinen Spam-Ordner, falls du die E-Mail nicht siehst.",
+        "resendAction": "Bestätigungs-E-Mail erneut senden",
+        "resendCountdown": "Erneut senden in {{seconds}} s",
+        "resendSuccess": "Falls die Adresse berechtigt ist, ist eine weitere Bestätigungs-E-Mail unterwegs.",
+        "resendError": "Die Anfrage konnte nicht gesendet werden. Bitte versuche es erneut.",
+        "editEmail": "Andere E-Mail-Adresse verwenden"
+    },
     "errors": {
       "emailExists": "Für diese E-Mail-Adresse existiert bereits ein Konto.",
       "planUnavailable": "Diese Registrierungsoption ist derzeit nicht verfügbar.",

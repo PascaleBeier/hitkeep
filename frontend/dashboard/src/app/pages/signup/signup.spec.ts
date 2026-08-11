@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { Router } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
-import { NEVER, of } from 'rxjs';
+import { NEVER, of, Subject, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { Signup } from '@pages/signup/signup';
@@ -19,8 +19,9 @@ describe('Signup', () => {
     let locationAssignMock: ReturnType<typeof vi.fn>;
     let documentMock: Document;
 
-    const cloudServiceMock: { signup: ReturnType<typeof vi.fn> } = {
-        signup: vi.fn(() => NEVER)
+    const cloudServiceMock: { signup: ReturnType<typeof vi.fn>; resendSignupVerification: ReturnType<typeof vi.fn> } = {
+        signup: vi.fn(() => NEVER),
+        resendSignupVerification: vi.fn(() => NEVER)
     };
 
     const analyticsServiceMock = {
@@ -128,6 +129,10 @@ describe('Signup', () => {
         fixture.detectChanges();
     });
 
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
     it('shows the hosted jurisdiction from system status', () => {
         expect(component['currentJurisdiction']()).toBe('EU');
     });
@@ -184,6 +189,121 @@ describe('Signup', () => {
             auth_method: 'password',
             response_status: 'verification_sent'
         });
+    });
+
+    it('starts the server-provided verification resend cooldown after password signup', () => {
+        vi.useFakeTimers();
+        cloudServiceMock.signup.mockReturnValue(
+            of({
+                status: 'verification_sent',
+                plan_code: 'free',
+                billing: 'monthly',
+                retry_after_seconds: 300
+            } as CloudSignupResponse)
+        );
+
+        component['signupForm'].teamName().control().setValue('Cloud Team');
+        component['signupForm'].email().control().setValue('user@example.com');
+        component['signupForm'].password().control().setValue('password123');
+        component['signupForm'].acceptedTos().control().setValue(true);
+
+        component['onSubmit']();
+
+        expect(component['verificationSent']()).toBe(true);
+        expect(component['submittedEmail']()).toBe('user@example.com');
+        expect(component['verificationResendSeconds']()).toBe(300);
+
+        vi.advanceTimersByTime(300_000);
+
+        expect(component['verificationResendSeconds']()).toBe(0);
+    });
+
+    it('resends once per click with safe funnel metadata and restarts the returned cooldown', () => {
+        cloudServiceMock.resendSignupVerification.mockReturnValue(of({ status: 'accepted', retry_after_seconds: 300 }));
+        component['submittedEmail'].set('user@example.com');
+        component['verificationSent'].set(true);
+        component['selectedPlan'].set('business');
+        component['selectedBilling'].set('annual');
+
+        component['resendSignupVerification']();
+
+        expect(cloudServiceMock.resendSignupVerification).toHaveBeenCalledTimes(1);
+        expect(cloudServiceMock.resendSignupVerification).toHaveBeenCalledWith('user@example.com');
+        const resendEvents = signupTrackingMock.trackEvent.mock.calls.filter(([name]) => name === 'signup_verification_resend_requested');
+        expect(resendEvents).toEqual([
+            [
+                'signup_verification_resend_requested',
+                {
+                    jurisdiction: 'EU',
+                    plan: 'business',
+                    interval: 'annual',
+                    source_path: '/signup'
+                }
+            ]
+        ]);
+        expect(JSON.stringify(resendEvents)).not.toContain('user@example.com');
+        expect(JSON.stringify(resendEvents)).not.toContain('token');
+        expect(component['verificationResendFeedbackKey']()).toBe('signup.verification.resendSuccess');
+        expect(component['verificationResendSeconds']()).toBe(300);
+        expect(component['verificationResendPending']()).toBe(false);
+    });
+
+    it('keeps resend pending feedback active and prevents duplicate requests until completion', () => {
+        const response$ = new Subject<{ status: 'accepted'; retry_after_seconds: number }>();
+        cloudServiceMock.resendSignupVerification.mockReturnValue(response$);
+        component['submittedEmail'].set('user@example.com');
+        component['verificationSent'].set(true);
+
+        component['resendSignupVerification']();
+        component['resendSignupVerification']();
+
+        expect(component['verificationResendPending']()).toBe(true);
+        expect(component['verificationResendFeedbackKey']()).toBeNull();
+        expect(cloudServiceMock.resendSignupVerification).toHaveBeenCalledTimes(1);
+        expect(signupTrackingMock.trackEvent.mock.calls.filter(([name]) => name === 'signup_verification_resend_requested').length).toBe(1);
+
+        response$.next({ status: 'accepted', retry_after_seconds: 300 });
+        response$.complete();
+
+        expect(component['verificationResendPending']()).toBe(false);
+        expect(component['verificationResendFeedbackKey']()).toBe('signup.verification.resendSuccess');
+    });
+
+    it('shows a recoverable resend transport error and immediately permits retry', () => {
+        cloudServiceMock.resendSignupVerification.mockReturnValue(throwError(() => ({ status: 503 })));
+        component['submittedEmail'].set('user@example.com');
+        component['verificationSent'].set(true);
+
+        component['resendSignupVerification']();
+
+        expect(component['verificationResendFeedbackKey']()).toBe('signup.verification.resendError');
+        expect(component['verificationResendSeconds']()).toBe(0);
+        expect(component['verificationResendPending']()).toBe(false);
+    });
+
+    it('returns to the form without losing signup intent', () => {
+        queryParams = {
+            plan: 'business',
+            billing: 'annual',
+            utm_source: 'hitkeep_docs'
+        };
+        fixture = TestBed.createComponent(Signup);
+        component = fixture.componentInstance;
+        fixture.detectChanges();
+        component['submittedEmail'].set('user@example.com');
+        component['verificationSent'].set(true);
+        component['verificationResendSeconds'].set(240);
+        component['verificationResendFeedbackKey'].set('signup.verification.resendSuccess');
+
+        component['editSignupEmail']();
+
+        expect(component['verificationSent']()).toBe(false);
+        expect(component['submittedEmail']()).toBe('');
+        expect(component['verificationResendSeconds']()).toBe(0);
+        expect(component['verificationResendFeedbackKey']()).toBeNull();
+        expect(component['selectedPlan']()).toBe('business');
+        expect(component['selectedBilling']()).toBe('annual');
+        expect(queryParams['utm_source']).toBe('hitkeep_docs');
     });
 
     it('hydrates and submits paid annual intent from query params', () => {

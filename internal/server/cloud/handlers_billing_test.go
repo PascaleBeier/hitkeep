@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -75,16 +76,21 @@ func (noopMailDriver) Send(_ []string, _ string, _ string, _ string) error { ret
 func (noopMailDriver) Close() error                                        { return nil }
 
 type captureMailDriver struct {
-	subject  string
-	htmlBody string
-	textBody string
+	recipients []string
+	subject    string
+	htmlBody   string
+	textBody   string
+	sendCount  int
+	err        error
 }
 
-func (d *captureMailDriver) Send(_ []string, subject, htmlBody, textBody string) error {
+func (d *captureMailDriver) Send(recipients []string, subject, htmlBody, textBody string) error {
+	d.recipients = append([]string(nil), recipients...)
 	d.subject = subject
 	d.htmlBody = htmlBody
 	d.textBody = textBody
-	return nil
+	d.sendCount++
+	return d.err
 }
 
 func (d *captureMailDriver) Close() error { return nil }
@@ -227,6 +233,46 @@ func TestRegisterUsesDedicatedWebhookLimiter(t *testing.T) {
 	}
 }
 
+func TestRegisterUsesAuthLimiterForSignupVerificationResend(t *testing.T) {
+	store := database.NewStore(":memory:")
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect store: %v", err)
+	}
+	defer store.Close()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatalf("migrate store: %v", err)
+	}
+
+	authLimiter := shared.NewIPRateLimiter(0, 0)
+	defer authLimiter.Stop()
+	apiLimiter := shared.NewIPRateLimiter(rate.Limit(10), 10)
+	defer apiLimiter.Stop()
+	webhookLimiter := shared.NewIPRateLimiter(rate.Limit(10), 10)
+	defer webhookLimiter.Stop()
+
+	ctx := &shared.Context{
+		Store: store,
+		Config: &config.Config{
+			CloudHosted:        true,
+			CloudSignupEnabled: true,
+			StripeSecretKey:    "sk_test_123",
+		},
+		AuthLimiter:    authLimiter,
+		ApiLimiter:     apiLimiter,
+		WebhookLimiter: webhookLimiter,
+	}
+	mux := http.NewServeMux()
+	Register(mux, ctx)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/cloud/signup/resend-verification", strings.NewReader(`{"email":"user@example.com"}`))
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusTooManyRequests)
+	}
+}
+
 func TestRegisterWebhookLimiterCanThrottleStripeWebhook(t *testing.T) {
 	store := database.NewStore(":memory:")
 	if err := store.Connect(); err != nil {
@@ -303,6 +349,9 @@ func TestHandleSignupSendsVerificationEmail(t *testing.T) {
 	if resp.Status != "verification_sent" {
 		t.Fatalf("expected status verification_sent, got %q", resp.Status)
 	}
+	if resp.RetryAfterSeconds != int(database.PendingSignupVerificationResendCooldown/time.Second) {
+		t.Fatalf("retry_after_seconds = %d, want %d", resp.RetryAfterSeconds, int(database.PendingSignupVerificationResendCooldown/time.Second))
+	}
 	if resp.RedirectURL != "" {
 		t.Fatalf("expected no redirect_url before verification, got %q", resp.RedirectURL)
 	}
@@ -311,6 +360,238 @@ func TestHandleSignupSendsVerificationEmail(t *testing.T) {
 	user, _ := store.GetUserByEmail(context.Background(), "free@example.com")
 	if user != nil {
 		t.Fatal("expected user NOT to exist before email verification")
+	}
+}
+
+func TestHandleResendSignupVerificationSendsExistingLocalizedLink(t *testing.T) {
+	h, store := setupCloudTestHandler(t)
+	defer store.Close()
+	mailDriver := &captureMailDriver{}
+	h.ctx.Mailer = mailer.NewWithDriver(mailDriver, h.ctx.Config)
+
+	token, err := store.CreatePendingSignup(context.Background(), database.PendingSignupEntry{
+		Email:          "Mixed.Case@Example.com",
+		HashedPassword: "hashed",
+		TeamName:       "Beispielteam",
+		Locale:         "de",
+	})
+	if err != nil {
+		t.Fatalf("create pending signup: %v", err)
+	}
+	var expiresAt time.Time
+	if err := store.DB().QueryRowContext(context.Background(), `SELECT expires_at FROM pending_signups WHERE token = ?`, token).Scan(&expiresAt); err != nil {
+		t.Fatalf("read pending signup expiry: %v", err)
+	}
+	if _, err := store.DB().ExecContext(context.Background(), `UPDATE pending_signups SET verification_sent_at = ? WHERE token = ?`, time.Now().UTC().Add(-database.PendingSignupVerificationResendCooldown), token); err != nil {
+		t.Fatalf("make pending signup eligible: %v", err)
+	}
+	var usersBefore, tenantsBefore, billingBefore, conversionsBefore int
+	if err := store.DB().QueryRowContext(context.Background(), `
+		SELECT
+			(SELECT COUNT(*) FROM users),
+			(SELECT COUNT(*) FROM tenants),
+			(SELECT COUNT(*) FROM cloud_billing_accounts),
+			(SELECT COUNT(*) FROM cloud_conversion_events)
+	`).Scan(&usersBefore, &tenantsBefore, &billingBefore, &conversionsBefore); err != nil {
+		t.Fatalf("snapshot account state before resend: %v", err)
+	}
+
+	w := postSignupVerificationResend(t, h, "  mixed.case@example.com  ")
+	assertSignupVerificationResendAccepted(t, w)
+	if mailDriver.sendCount != 1 || len(mailDriver.recipients) != 1 || mailDriver.recipients[0] != "Mixed.Case@Example.com" {
+		t.Fatalf("mail delivery = count %d recipients %v", mailDriver.sendCount, mailDriver.recipients)
+	}
+	if got := extractCloudSignupToken(t, mailDriver.htmlBody+"\n"+mailDriver.textBody); got != token {
+		t.Fatalf("resent token = %q, want %q", got, token)
+	}
+	if !strings.Contains(mailDriver.htmlBody+mailDriver.textBody, "Beispielteam") {
+		t.Fatalf("expected stored localized team name in resent email")
+	}
+	var gotExpiresAt time.Time
+	if err := store.DB().QueryRowContext(context.Background(), `SELECT expires_at FROM pending_signups WHERE token = ?`, token).Scan(&gotExpiresAt); err != nil {
+		t.Fatalf("read pending signup expiry after resend: %v", err)
+	}
+	if !gotExpiresAt.Equal(expiresAt) {
+		t.Fatalf("resend changed expiry from %s to %s", expiresAt, gotExpiresAt)
+	}
+	if user, _ := store.GetUserByEmail(context.Background(), "mixed.case@example.com"); user != nil {
+		t.Fatal("resend created a user")
+	}
+	var usersAfter, tenantsAfter, billingAfter, conversionsAfter int
+	if err := store.DB().QueryRowContext(context.Background(), `
+		SELECT
+			(SELECT COUNT(*) FROM users),
+			(SELECT COUNT(*) FROM tenants),
+			(SELECT COUNT(*) FROM cloud_billing_accounts),
+			(SELECT COUNT(*) FROM cloud_conversion_events)
+	`).Scan(&usersAfter, &tenantsAfter, &billingAfter, &conversionsAfter); err != nil {
+		t.Fatalf("snapshot account state after resend: %v", err)
+	}
+	if usersAfter != usersBefore || tenantsAfter != tenantsBefore || billingAfter != billingBefore || conversionsAfter != conversionsBefore {
+		t.Fatalf("resend changed account state: users %d→%d tenants %d→%d billing %d→%d conversions %d→%d", usersBefore, usersAfter, tenantsBefore, tenantsAfter, billingBefore, billingAfter, conversionsBefore, conversionsAfter)
+	}
+}
+
+func TestHandleResendSignupVerificationHidesPendingSignupState(t *testing.T) {
+	tests := []struct {
+		name    string
+		prepare func(t *testing.T, h *handler, store *database.Store, token string)
+		email   string
+	}{
+		{name: "unknown", email: "unknown@example.com"},
+		{name: "cooldown", email: "pending@example.com"},
+		{
+			name:  "expired",
+			email: "pending@example.com",
+			prepare: func(t *testing.T, _ *handler, store *database.Store, token string) {
+				t.Helper()
+				if _, err := store.DB().ExecContext(context.Background(), `UPDATE pending_signups SET expires_at = ? WHERE token = ?`, time.Now().UTC().Add(-time.Second), token); err != nil {
+					t.Fatalf("expire pending signup: %v", err)
+				}
+			},
+		},
+		{
+			name:  "consumed",
+			email: "pending@example.com",
+			prepare: func(t *testing.T, _ *handler, store *database.Store, token string) {
+				t.Helper()
+				if _, err := store.CompletePendingSignup(context.Background(), token); err != nil {
+					t.Fatalf("consume pending signup: %v", err)
+				}
+			},
+		},
+		{
+			name:  "mailer unavailable",
+			email: "pending@example.com",
+			prepare: func(t *testing.T, h *handler, store *database.Store, token string) {
+				t.Helper()
+				h.ctx.Mailer = nil
+				if _, err := store.DB().ExecContext(context.Background(), `UPDATE pending_signups SET verification_sent_at = ? WHERE token = ?`, time.Now().UTC().Add(-database.PendingSignupVerificationResendCooldown), token); err != nil {
+					t.Fatalf("make pending signup eligible: %v", err)
+				}
+			},
+		},
+	}
+
+	var wantBody string
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			h, store := setupCloudTestHandler(t)
+			defer store.Close()
+			mailDriver := &captureMailDriver{}
+			h.ctx.Mailer = mailer.NewWithDriver(mailDriver, h.ctx.Config)
+			token, err := store.CreatePendingSignup(context.Background(), database.PendingSignupEntry{Email: "pending@example.com", HashedPassword: "hashed"})
+			if err != nil {
+				t.Fatalf("create pending signup: %v", err)
+			}
+			if test.prepare != nil {
+				test.prepare(t, h, store, token)
+			}
+
+			w := postSignupVerificationResend(t, h, test.email)
+			assertSignupVerificationResendAccepted(t, w)
+			if wantBody == "" {
+				wantBody = w.Body.String()
+			} else if w.Body.String() != wantBody {
+				t.Fatalf("response body = %q, want indistinguishable %q", w.Body.String(), wantBody)
+			}
+			if mailDriver.sendCount != 0 {
+				t.Fatalf("unexpected mail deliveries: %d", mailDriver.sendCount)
+			}
+		})
+	}
+}
+
+func TestHandleResendSignupVerificationHidesMailFailure(t *testing.T) {
+	h, store := setupCloudTestHandler(t)
+	defer store.Close()
+	var logs bytes.Buffer
+	previousLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(previousLogger) })
+	mailDriver := &captureMailDriver{err: errors.New("smtp rejected message")}
+	h.ctx.Mailer = mailer.NewWithDriver(mailDriver, h.ctx.Config)
+
+	token, err := store.CreatePendingSignup(context.Background(), database.PendingSignupEntry{Email: "failure@example.com", HashedPassword: "hashed"})
+	if err != nil {
+		t.Fatalf("create pending signup: %v", err)
+	}
+	if _, err := store.DB().ExecContext(context.Background(), `UPDATE pending_signups SET verification_sent_at = ? WHERE token = ?`, time.Now().UTC().Add(-database.PendingSignupVerificationResendCooldown), token); err != nil {
+		t.Fatalf("make pending signup eligible: %v", err)
+	}
+
+	w := postSignupVerificationResend(t, h, "failure@example.com")
+	assertSignupVerificationResendAccepted(t, w)
+	if mailDriver.sendCount != 1 {
+		t.Fatalf("mail attempts = %d, want 1", mailDriver.sendCount)
+	}
+	if !strings.Contains(logs.String(), "error_code=mail_send_failed") {
+		t.Fatalf("expected safe mail failure category, got %q", logs.String())
+	}
+	if strings.Contains(logs.String(), "failure@example.com") || strings.Contains(logs.String(), token) || strings.Contains(logs.String(), "smtp rejected message") {
+		t.Fatalf("resend failure log exposed request or provider details: %q", logs.String())
+	}
+}
+
+func TestHandleResendSignupVerificationRejectsMalformedJSON(t *testing.T) {
+	h, store := setupCloudTestHandler(t)
+	defer store.Close()
+	req := httptest.NewRequest(http.MethodPost, "/api/cloud/signup/resend-verification", strings.NewReader("{"))
+	w := httptest.NewRecorder()
+	h.handleResendSignupVerification().ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandleResendSignupVerificationIsCloudOnly(t *testing.T) {
+	tests := []struct {
+		name          string
+		cloudHosted   bool
+		signupEnabled bool
+	}{
+		{name: "self hosted", signupEnabled: true},
+		{name: "signup disabled", cloudHosted: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			h, store := setupCloudTestHandler(t)
+			defer store.Close()
+			h.ctx.Config.CloudHosted = test.cloudHosted
+			h.ctx.Config.CloudSignupEnabled = test.signupEnabled
+
+			w := postSignupVerificationResend(t, h, "user@example.com")
+			if w.Code != http.StatusNotFound {
+				t.Fatalf("status = %d, want %d", w.Code, http.StatusNotFound)
+			}
+		})
+	}
+}
+
+func postSignupVerificationResend(t *testing.T, h *handler, email string) *httptest.ResponseRecorder {
+	t.Helper()
+	body, err := json.Marshal(resendSignupVerificationRequest{Email: email})
+	if err != nil {
+		t.Fatalf("marshal resend request: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/cloud/signup/resend-verification", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	h.handleResendSignupVerification().ServeHTTP(w, req)
+	return w
+}
+
+func assertSignupVerificationResendAccepted(t *testing.T, w *httptest.ResponseRecorder) {
+	t.Helper()
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want %d: %s", w.Code, http.StatusAccepted, w.Body.String())
+	}
+	var response resendSignupVerificationResponse
+	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+		t.Fatalf("decode resend response: %v", err)
+	}
+	if response.Status != "accepted" || response.RetryAfterSeconds != int(database.PendingSignupVerificationResendCooldown/time.Second) {
+		t.Fatalf("resend response = %+v", response)
 	}
 }
 
@@ -474,6 +755,24 @@ func TestHandleVerifySignupCreatesAccount(t *testing.T) {
 	}
 	if billingAccount.PlanCode != database.CloudPlanFree || billingAccount.SubscriptionStatus != database.CloudSubscriptionStatusFree {
 		t.Fatalf("unexpected billing account: %+v", billingAccount)
+	}
+
+	var verifiedEvents int
+	if err := store.DB().QueryRowContext(context.Background(), `SELECT COUNT(*) FROM cloud_conversion_events WHERE event_name = ?`, database.CloudConversionSignupVerified).Scan(&verifiedEvents); err != nil {
+		t.Fatalf("count signup verification conversions: %v", err)
+	}
+	if verifiedEvents != 1 {
+		t.Fatalf("signup verification conversions = %d, want 1", verifiedEvents)
+	}
+
+	repeatReq := httptest.NewRequest(http.MethodGet, "/api/cloud/signup/verify?token="+token, nil)
+	repeatResponse := httptest.NewRecorder()
+	h.handleVerifySignup().ServeHTTP(repeatResponse, repeatReq)
+	if err := store.DB().QueryRowContext(context.Background(), `SELECT COUNT(*) FROM cloud_conversion_events WHERE event_name = ?`, database.CloudConversionSignupVerified).Scan(&verifiedEvents); err != nil {
+		t.Fatalf("count repeated signup verification conversions: %v", err)
+	}
+	if verifiedEvents != 1 {
+		t.Fatalf("repeated verification recorded %d signup verification conversions, want 1", verifiedEvents)
 	}
 }
 

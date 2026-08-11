@@ -2816,6 +2816,14 @@
     "tosRequired": "Vous devez accepter les Conditions d'utilisation et la Politique de confidentialité.",
     "verifyTitle": "Vérifiez votre boîte de réception",
     "verifySubtitle": "Nous avons envoyé un lien de vérification à {{email}}. Cliquez dessus pour activer votre espace.",
+    "verification": {
+        "spamGuidance": "L’arrivée de l’e-mail peut prendre un moment. Vérifiez vos courriers indésirables si vous ne le voyez pas.",
+        "resendAction": "Renvoyer l’e-mail de vérification",
+        "resendCountdown": "Renvoi disponible dans {{seconds}} s",
+        "resendSuccess": "Si l’adresse est éligible, un autre e-mail de vérification est en route.",
+        "resendError": "Nous n’avons pas pu envoyer la demande. Veuillez réessayer.",
+        "editEmail": "Utiliser une autre adresse e-mail"
+    },
     "errors": {
       "emailExists": "Un compte existe déjà avec cette adresse e-mail.",
       "planUnavailable": "Cette option d'inscription n'est pas disponible pour le moment.",

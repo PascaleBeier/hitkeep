@@ -10,15 +10,28 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 )
 
-const pendingSignupTTL = 24 * time.Hour
+const (
+	pendingSignupTTL                        = 24 * time.Hour
+	PendingSignupVerificationResendCooldown = 5 * time.Minute
+)
 
 var (
-	ErrPendingSignupInvalid = errors.New("invalid or unknown signup verification token")
-	ErrPendingSignupExpired = errors.New("signup verification token has expired")
+	ErrPendingSignupInvalid           = errors.New("invalid or unknown signup verification token")
+	ErrPendingSignupExpired           = errors.New("signup verification token has expired")
+	ErrPendingSignupResendUnavailable = errors.New("pending signup verification resend is unavailable")
+	pendingSignupResendMu             sync.Mutex
 )
+
+type PreparedPendingSignupVerification struct {
+	Token    string
+	Email    string
+	TeamName string
+	Locale   string
+}
 
 func (s *Store) CreatePendingSignup(ctx context.Context, entry PendingSignupEntry) (string, error) {
 	bytes := make([]byte, 32)
@@ -26,7 +39,8 @@ func (s *Store) CreatePendingSignup(ctx context.Context, entry PendingSignupEntr
 		return "", err
 	}
 	token := hex.EncodeToString(bytes)
-	entry.ExpiresAt = time.Now().UTC().Add(pendingSignupTTL)
+	now := time.Now().UTC()
+	entry.ExpiresAt = now.Add(pendingSignupTTL)
 	entry.PlanCode = strings.TrimSpace(strings.ToLower(entry.PlanCode))
 	if entry.PlanCode == "" {
 		entry.PlanCode = CloudPlanFree
@@ -43,16 +57,55 @@ func (s *Store) CreatePendingSignup(ctx context.Context, entry PendingSignupEntr
 	}
 
 	if _, err := s.db.ExecContext(ctx, `
-		INSERT INTO pending_signups (token, email, hashed_password, given_name, last_name, team_name, jurisdiction, locale, plan_code, billing_interval, accepted_tos_at, expires_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO pending_signups (token, email, hashed_password, given_name, last_name, team_name, jurisdiction, locale, plan_code, billing_interval, accepted_tos_at, expires_at, verification_sent_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		token, entry.Email, entry.HashedPassword, entry.GivenName, entry.LastName,
 		entry.TeamName, entry.Jurisdiction, entry.Locale, entry.PlanCode, entry.BillingInterval,
-		sql.NullTime{Time: entry.AcceptedTosAt, Valid: !entry.AcceptedTosAt.IsZero()}, entry.ExpiresAt,
+		sql.NullTime{Time: entry.AcceptedTosAt, Valid: !entry.AcceptedTosAt.IsZero()}, entry.ExpiresAt, now,
 	); err != nil {
 		return "", fmt.Errorf("insert pending signup: %w", err)
 	}
 
 	return token, nil
+}
+
+func (s *Store) PreparePendingSignupVerificationResend(ctx context.Context, email string, now time.Time) (*PreparedPendingSignupVerification, error) {
+	pendingSignupResendMu.Lock()
+	defer pendingSignupResendMu.Unlock()
+
+	normalizedEmail := strings.TrimSpace(strings.ToLower(email))
+	if normalizedEmail == "" {
+		return nil, ErrPendingSignupResendUnavailable
+	}
+	now = now.UTC()
+
+	var prepared PreparedPendingSignupVerification
+	err := s.db.QueryRowContext(ctx, `
+		UPDATE pending_signups
+		SET verification_sent_at = ?
+		WHERE token = (
+			SELECT token
+			FROM pending_signups
+			WHERE LOWER(TRIM(email)) = ?
+			  AND expires_at > ?
+			  AND COALESCE(verification_sent_at, created_at) <= ?
+			ORDER BY created_at DESC
+			LIMIT 1
+		)
+		RETURNING token, email, team_name, locale
+	`, now, normalizedEmail, now, now.Add(-PendingSignupVerificationResendCooldown)).Scan(
+		&prepared.Token,
+		&prepared.Email,
+		&prepared.TeamName,
+		&prepared.Locale,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrPendingSignupResendUnavailable
+	}
+	if err != nil {
+		return nil, fmt.Errorf("prepare pending signup verification resend: %w", err)
+	}
+	return &prepared, nil
 }
 
 func (s *Store) CompletePendingSignup(ctx context.Context, token string) (*PendingSignupEntry, error) {

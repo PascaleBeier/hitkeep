@@ -1,5 +1,5 @@
 import { ApplicationConfig, inject, isDevMode, provideBrowserGlobalErrorListeners, provideEnvironmentInitializer, provideZonelessChangeDetection } from '@angular/core';
-import { PreloadAllModules, provideRouter, withComponentInputBinding, withNavigationErrorHandler, withPreloading } from '@angular/router';
+import { provideRouter, withComponentInputBinding, withNavigationErrorHandler, withPreloading } from '@angular/router';
 import { provideOptimus } from '@openng/optimus-ui/config';
 import { en } from '@openng/optimus-ui-locale/js/en.js';
 
@@ -18,6 +18,7 @@ import { DashboardTitleService } from '@services/dashboard-title.service';
 import { PreferencesService } from '@services/preferences.service';
 import { HitKeepPreset } from '@core/theme/hitkeep-preset';
 import { ApplicationErrorNavigationService } from '@services/application-error-navigation.service';
+import { SelectivePreloadingStrategy } from '@services/selective-preloading-strategy';
 
 export const appConfig: ApplicationConfig = {
     providers: [
@@ -26,7 +27,7 @@ export const appConfig: ApplicationConfig = {
         provideHttpClient(withInterceptors([shareInterceptor, authInterceptor, basePathInterceptor])),
         provideRouter(
             routes,
-            withPreloading(PreloadAllModules),
+            withPreloading(SelectivePreloadingStrategy),
             withComponentInputBinding({ unmatchedInputBehavior: 'undefinedIfStale' }),
             withNavigationErrorHandler((error) => inject(ApplicationErrorNavigationService).fromNavigation(error))
         ),

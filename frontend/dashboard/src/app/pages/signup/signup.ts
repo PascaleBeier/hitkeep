@@ -36,6 +36,7 @@ type Jurisdiction = 'EU' | 'US';
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Signup {
+    private static readonly DEFAULT_VERIFICATION_RESEND_COOLDOWN_SECONDS = 300;
     private static readonly REGION_BASE_URLS: Record<Jurisdiction, string> = {
         EU: 'https://cloud.hitkeep.eu',
         US: 'https://cloud.hitkeep.com'
@@ -58,6 +59,10 @@ export class Signup {
     protected readonly cloudStatus = signal<CloudStatus | null>(null);
     protected readonly verificationSent = signal(false);
     protected readonly submittedEmail = signal('');
+    protected readonly verificationResendPending = signal(false);
+    protected readonly verificationResendSeconds = signal(0);
+    protected readonly verificationResendFeedbackKey = signal<string | null>(null);
+    protected readonly verificationResendFeedbackSeverity = signal<'success' | 'error'>('success');
     protected readonly selectedPlan = signal<CloudPlanCode>('free');
     protected readonly selectedBilling = signal<BillingInterval>('monthly');
     private readonly activeLanguage = injectActiveLang();
@@ -78,6 +83,7 @@ export class Signup {
     );
     private trackedSignupPageView = false;
     private trackedInitialSignupError = false;
+    private verificationResendTimer: ReturnType<typeof setInterval> | null = null;
 
     private readonly signupModel = signal({
         email: new FormControl('', {
@@ -100,6 +106,7 @@ export class Signup {
     protected readonly signupForm = compatForm(this.signupModel);
 
     constructor() {
+        this.destroyRef.onDestroy(() => this.clearVerificationResendTimer());
         this.hydrateFromQuery();
         this.redirectToRequestedJurisdiction();
         this.analytics
@@ -172,6 +179,7 @@ export class Signup {
                     if (response.status === 'verification_sent') {
                         this.submittedEmail.set(payload.email);
                         this.verificationSent.set(true);
+                        this.startVerificationResendCooldown(response.retry_after_seconds ?? Signup.DEFAULT_VERIFICATION_RESEND_COOLDOWN_SECONDS);
                         return;
                     }
                     const target = response.redirect_url?.trim() || '/dashboard';
@@ -196,6 +204,42 @@ export class Signup {
                     });
                 }
             });
+    }
+
+    protected resendSignupVerification(): void {
+        const email = this.submittedEmail();
+        if (email === '' || this.verificationResendPending() || this.verificationResendSeconds() > 0) {
+            return;
+        }
+
+        this.verificationResendPending.set(true);
+        this.verificationResendFeedbackKey.set(null);
+        this.trackSignupEvent('signup_verification_resend_requested');
+        this.cloud
+            .resendSignupVerification(email)
+            .pipe(finalize(() => this.verificationResendPending.set(false)))
+            .subscribe({
+                next: (response) => {
+                    this.verificationResendFeedbackSeverity.set('success');
+                    this.verificationResendFeedbackKey.set('signup.verification.resendSuccess');
+                    this.startVerificationResendCooldown(response.retry_after_seconds ?? Signup.DEFAULT_VERIFICATION_RESEND_COOLDOWN_SECONDS);
+                },
+                error: () => {
+                    this.clearVerificationResendTimer();
+                    this.verificationResendSeconds.set(0);
+                    this.verificationResendFeedbackSeverity.set('error');
+                    this.verificationResendFeedbackKey.set('signup.verification.resendError');
+                }
+            });
+    }
+
+    protected editSignupEmail(): void {
+        this.clearVerificationResendTimer();
+        this.verificationSent.set(false);
+        this.submittedEmail.set('');
+        this.verificationResendPending.set(false);
+        this.verificationResendSeconds.set(0);
+        this.verificationResendFeedbackKey.set(null);
     }
 
     protected selectSocialMethod(method: string): void {
@@ -335,6 +379,33 @@ export class Signup {
             source_path: '/signup',
             ...properties
         });
+    }
+
+    private startVerificationResendCooldown(seconds: number): void {
+        this.clearVerificationResendTimer();
+        const duration = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : Signup.DEFAULT_VERIFICATION_RESEND_COOLDOWN_SECONDS;
+        this.verificationResendSeconds.set(duration);
+        if (duration === 0) {
+            return;
+        }
+
+        this.verificationResendTimer = setInterval(() => {
+            const remaining = this.verificationResendSeconds();
+            if (remaining <= 1) {
+                this.verificationResendSeconds.set(0);
+                this.clearVerificationResendTimer();
+                return;
+            }
+            this.verificationResendSeconds.set(remaining - 1);
+        }, 1000);
+    }
+
+    private clearVerificationResendTimer(): void {
+        if (this.verificationResendTimer === null) {
+            return;
+        }
+        clearInterval(this.verificationResendTimer);
+        this.verificationResendTimer = null;
     }
 
     private inferJurisdictionFromHost(hostname?: string): Jurisdiction {

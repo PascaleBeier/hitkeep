@@ -4,9 +4,31 @@
         <app-auth-card>
             <header class="hk-auth-header">
                 <i class="pi pi-envelope text-4xl text-primary-500"></i>
-                <h1 class="hk-auth-title">{{ "signup.verifyTitle" | transloco }}</h1>
+                <h1 id="signup-title" class="hk-auth-title">{{ "signup.verifyTitle" | transloco }}</h1>
                 <p class="hk-auth-subtitle">{{ "signup.verifySubtitle" | transloco : { email: submittedEmail() } }}</p>
             </header>
+            <div class="hk-auth-form">
+                <p class="text-sm text-[var(--p-text-muted-color)]">{{ "signup.verification.spamGuidance" | transloco }}</p>
+
+                @if (verificationResendFeedbackKey(); as feedbackKey) {
+                <p-message [severity]="verificationResendFeedbackSeverity()" role="status" aria-live="polite">{{ feedbackKey | transloco }}</p-message>
+                }
+
+                <p-button
+                    type="button"
+                    icon="pi pi-send"
+                    [label]="
+                        verificationResendSeconds() > 0
+                            ? ('signup.verification.resendCountdown' | transloco : { seconds: verificationResendSeconds() })
+                            : ('signup.verification.resendAction' | transloco)
+                    "
+                    [loading]="verificationResendPending()"
+                    [disabled]="verificationResendPending() || verificationResendSeconds() > 0"
+                    [fluid]="true"
+                    (onClick)="resendSignupVerification()"
+                />
+                <p-button type="button" severity="secondary" variant="text" [label]="'signup.verification.editEmail' | transloco" [disabled]="verificationResendPending()" [fluid]="true" (onClick)="editSignupEmail()" />
+            </div>
         </app-auth-card>
         } @else {
         <app-auth-card>

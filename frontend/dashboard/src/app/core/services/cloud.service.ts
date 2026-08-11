@@ -24,8 +24,14 @@ export interface CloudSignupResponse {
     status: string;
     plan_code: string;
     billing: BillingInterval;
+    retry_after_seconds?: number;
     redirect_url?: string;
     checkout_url?: string;
+}
+
+export interface CloudSignupVerificationResendResponse {
+    status: 'accepted';
+    retry_after_seconds: number;
 }
 
 export interface BillingPortalSessionResponse {
@@ -48,6 +54,10 @@ export class CloudService {
 
     signup(payload: CloudSignupRequest): Observable<CloudSignupResponse> {
         return this.http.post<CloudSignupResponse>('/api/cloud/signup', payload);
+    }
+
+    resendSignupVerification(email: string): Observable<CloudSignupVerificationResendResponse> {
+        return this.http.post<CloudSignupVerificationResendResponse>('/api/cloud/signup/resend-verification', { email });
     }
 
     createBillingPortalSession(payload: BillingPortalSessionRequest = {}): Observable<BillingPortalSessionResponse> {

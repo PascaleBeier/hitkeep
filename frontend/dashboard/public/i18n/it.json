@@ -2813,6 +2813,14 @@
     "tosRequired": "Devi accettare i Termini di Servizio e l'Informativa sulla Privacy.",
     "verifyTitle": "Controlla la tua casella di posta",
     "verifySubtitle": "Abbiamo inviato un link di verifica a {{email}}. Clicca per attivare il tuo workspace.",
+    "verification": {
+        "spamGuidance": "L’e-mail potrebbe impiegare qualche istante. Controlla la cartella spam se non la vedi.",
+        "resendAction": "Invia di nuovo l’e-mail di verifica",
+        "resendCountdown": "Nuovo invio disponibile tra {{seconds}} s",
+        "resendSuccess": "Se l’indirizzo è idoneo, riceverai un’altra e-mail di verifica.",
+        "resendError": "Non è stato possibile inviare la richiesta. Riprova.",
+        "editEmail": "Usa un altro indirizzo e-mail"
+    },
     "errors": {
       "emailExists": "Esiste già un account con questa email.",
       "planUnavailable": "Questa opzione di registrazione non è disponibile al momento.",

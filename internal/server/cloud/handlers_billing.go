@@ -115,6 +115,9 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 	mux.HandleFunc("POST /api/cloud/signup", ctx.Handler(shared.HandlerConfig{
 		RateLimiter: ctx.AuthLimiter,
 	}, h.handleSignup()))
+	mux.HandleFunc("POST /api/cloud/signup/resend-verification", ctx.Handler(shared.HandlerConfig{
+		RateLimiter: ctx.AuthLimiter,
+	}, h.handleResendSignupVerification()))
 	mux.HandleFunc("GET /api/cloud/signup/verify", ctx.Handler(shared.HandlerConfig{
 		RateLimiter: ctx.AuthLimiter,
 	}, h.handleVerifySignup()))
@@ -148,11 +151,21 @@ type signupRequest struct {
 }
 
 type signupResponse struct {
-	Status          string `json:"status"`
-	PlanCode        string `json:"plan_code"`
-	BillingInterval string `json:"billing"`
-	RedirectURL     string `json:"redirect_url,omitempty"`
-	CheckoutURL     string `json:"checkout_url,omitempty"`
+	Status            string `json:"status"`
+	PlanCode          string `json:"plan_code"`
+	BillingInterval   string `json:"billing"`
+	RetryAfterSeconds int    `json:"retry_after_seconds,omitempty"`
+	RedirectURL       string `json:"redirect_url,omitempty"`
+	CheckoutURL       string `json:"checkout_url,omitempty"`
+}
+
+type resendSignupVerificationRequest struct {
+	Email string `json:"email"`
+}
+
+type resendSignupVerificationResponse struct {
+	Status            string `json:"status"`
+	RetryAfterSeconds int    `json:"retry_after_seconds"`
 }
 
 type billingPortalSessionResponse struct {
@@ -254,7 +267,7 @@ func (h *handler) handleSignup() http.HandlerFunc {
 			return
 		}
 
-		verifyLink := appurl.Path(h.ctx.Config.PublicURL, "/api/cloud/signup/verify?token="+token)
+		verifyLink := signupVerificationLink(h.ctx.Config.PublicURL, token)
 		if err := h.ctx.Mailer.Send(req.Email, mailables.NewEmailVerification(verifyLink, req.TeamName, req.Locale)); err != nil {
 			slog.Error("Failed to send verification email", "error", err, "email", req.Email)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -262,9 +275,10 @@ func (h *handler) handleSignup() http.HandlerFunc {
 		}
 
 		resp := signupResponse{
-			Status:          "verification_sent",
-			PlanCode:        req.PlanCode,
-			BillingInterval: req.BillingInterval,
+			Status:            "verification_sent",
+			PlanCode:          req.PlanCode,
+			BillingInterval:   req.BillingInterval,
+			RetryAfterSeconds: int(database.PendingSignupVerificationResendCooldown / time.Second),
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -272,6 +286,61 @@ func (h *handler) handleSignup() http.HandlerFunc {
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			slog.Error("Failed to encode cloud signup response", "error", err)
 		}
+	}
+}
+
+func (h *handler) handleResendSignupVerification() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !h.ctx.Config.CloudHosted || !h.ctx.Config.CloudSignupEnabled {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
+		}
+		if h.ctx.Store == nil {
+			http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
+			return
+		}
+
+		var req resendSignupVerificationRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		if h.ctx.Mailer == nil {
+			writeResendSignupVerificationAccepted(w)
+			return
+		}
+
+		prepared, err := h.ctx.Store.PreparePendingSignupVerificationResend(r.Context(), req.Email, time.Now().UTC())
+		if err != nil {
+			if !errors.Is(err, database.ErrPendingSignupResendUnavailable) {
+				slog.Warn("Unable to prepare signup verification resend", "error_code", "store_unavailable")
+			}
+			writeResendSignupVerificationAccepted(w)
+			return
+		}
+
+		verifyLink := signupVerificationLink(h.ctx.Config.PublicURL, prepared.Token)
+		if err := h.ctx.Mailer.Send(prepared.Email, mailables.NewEmailVerification(verifyLink, prepared.TeamName, prepared.Locale)); err != nil {
+			slog.Warn("Unable to resend signup verification email", "error_code", "mail_send_failed")
+		}
+
+		writeResendSignupVerificationAccepted(w)
+	}
+}
+
+func signupVerificationLink(publicURL, token string) string {
+	return appurl.Path(publicURL, "/api/cloud/signup/verify?token="+token)
+}
+
+func writeResendSignupVerificationAccepted(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	if err := json.NewEncoder(w).Encode(resendSignupVerificationResponse{
+		Status:            "accepted",
+		RetryAfterSeconds: int(database.PendingSignupVerificationResendCooldown / time.Second),
+	}); err != nil {
+		slog.Error("Failed to encode signup verification resend response", "error_code", "response_encode_failed")
 	}
 }
 

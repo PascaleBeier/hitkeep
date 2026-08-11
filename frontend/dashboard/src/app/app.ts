@@ -3,13 +3,13 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationCancel, NavigationCancellationCode, NavigationEnd, NavigationError, NavigationStart, Router, RouterOutlet } from '@angular/router';
 
-import { ApplicationState } from '@core/components/application-state/application-state';
+import { ApplicationShellState } from '@core/components/application-shell-state/application-shell-state';
 import { RouteProgressBar } from '@layout/route-progress-bar';
 import { isApplicationErrorUrl } from '@services/application-error-navigation.service';
 
 @Component({
     selector: 'app-root',
-    imports: [RouterOutlet, RouteProgressBar, ApplicationState],
+    imports: [RouterOutlet, RouteProgressBar, ApplicationShellState],
     templateUrl: './app.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
     styleUrl: './app.css'

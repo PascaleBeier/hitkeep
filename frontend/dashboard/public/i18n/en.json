@@ -2918,6 +2918,14 @@
     "tosRequired": "You must accept the Terms of Service and Privacy Policy.",
     "verifyTitle": "Check your inbox",
     "verifySubtitle": "We sent a verification link to {{email}}. Click it to activate your workspace.",
+    "verification": {
+        "spamGuidance": "It may take a moment to arrive. Check your spam folder if you do not see it.",
+        "resendAction": "Resend verification email",
+        "resendCountdown": "Resend available in {{seconds}}s",
+        "resendSuccess": "If the address is eligible, another verification email is on its way.",
+        "resendError": "We could not send the request. Please try again.",
+        "editEmail": "Use a different email"
+    },
     "errors": {
       "emailExists": "An account with this email already exists.",
       "planUnavailable": "This signup option is not available right now.",

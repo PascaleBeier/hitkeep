@@ -309,6 +309,10 @@ func TestOpenAPISpecV1IncludesCloudSignupPaths(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected /api/cloud/signup path to exist")
 	}
+	resendPath, ok := paths["/api/cloud/signup/resend-verification"]
+	if !ok {
+		t.Fatalf("expected /api/cloud/signup/resend-verification path to exist")
+	}
 	portalPath, ok := paths["/api/cloud/billing/portal"]
 	if !ok {
 		t.Fatalf("expected /api/cloud/billing/portal path to exist")
@@ -322,10 +326,37 @@ func TestOpenAPISpecV1IncludesCloudSignupPaths(t *testing.T) {
 		t.Fatalf("expected /api/cloud/webhooks/stripe path to exist")
 	}
 
-	assertCloudOperation(t, requireMap(t, signupPath.(map[string]any), "post"))
+	signupPost := requireMap(t, signupPath.(map[string]any), "post")
+	assertCloudOperation(t, signupPost)
+	assertCloudOperation(t, requireMap(t, resendPath.(map[string]any), "post"))
 	assertCloudOperation(t, requireMap(t, portalPath.(map[string]any), "post"))
 	assertCloudOperation(t, requireMap(t, checkoutPath.(map[string]any), "post"))
 	assertCloudOperation(t, requireMap(t, webhookPath.(map[string]any), "post"))
+
+	signupResponses := requireMap(t, signupPost, "responses")
+	signupCreated := requireMap(t, signupResponses, "201")
+	signupContent := requireMap(t, signupCreated, "content")
+	signupJSON := requireMap(t, signupContent, "application/json")
+	signupSchema := requireMap(t, signupJSON, "schema")
+	signupProperties := requireMap(t, signupSchema, "properties")
+	if _, ok := signupProperties["retry_after_seconds"]; !ok {
+		t.Fatalf("expected signup response to expose optional retry_after_seconds")
+	}
+
+	resendPost := requireMap(t, resendPath.(map[string]any), "post")
+	resendResponses := requireMap(t, resendPost, "responses")
+	resendAccepted := requireMap(t, resendResponses, "202")
+	resendContent := requireMap(t, resendAccepted, "content")
+	resendJSON := requireMap(t, resendContent, "application/json")
+	resendSchema := requireMap(t, resendJSON, "schema")
+	resendProperties := requireMap(t, resendSchema, "properties")
+	statusSchema := requireMap(t, resendProperties, "status")
+	if got := statusSchema["enum"]; !reflect.DeepEqual(got, []string{"accepted"}) {
+		t.Fatalf("expected resend status enum [accepted], got %#v", got)
+	}
+	if _, ok := resendProperties["retry_after_seconds"]; !ok {
+		t.Fatalf("expected resend response retry_after_seconds")
+	}
 }
 
 func TestOpenAPISpecV1MarksEveryCloudOperationInternal(t *testing.T) {
