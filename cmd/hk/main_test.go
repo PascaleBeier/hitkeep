@@ -41,12 +41,12 @@ func TestDetachedCLIActionOutlivesLauncher(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, body := range map[string]string{
-		"go.mod":                               "module example.test/hk\n\ngo 1.26.5\n",
+		"go.mod":                               "module example.test/hk\n\ngo 1.26.6\n",
 		"CONTRIBUTING.md":                      "# Contributing\n",
 		"frontend/dashboard/package.json":      "{\"packageManager\":\"npm@12.0.2\"}\n",
 		"frontend/dashboard/package-lock.json": "{}\n",
 		"frontend/dashboard/.npmrc":            "legacy-peer-deps=true\n",
-		"frontend/dashboard/.nvmrc":            "24.18.0\n",
+		"frontend/dashboard/.node-version":     "24.19.0\n",
 	} {
 		path := filepath.Join(workspace, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -160,7 +160,7 @@ func TestMCPStdioWithoutWorkspaceUsesConfiguredFallback(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(workspace, "CONTRIBUTING.md"), []byte("# Contributing\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(workspace, "go.mod"), []byte("module hitkeep\n\ngo 1.26.5\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(workspace, "go.mod"), []byte("module hitkeep\n\ngo 1.26.6\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	delegated := filepath.Join(t.TempDir(), "delegated")
@@ -224,12 +224,12 @@ func TestMCPStdioActionRunLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, body := range map[string]string{
-		"go.mod":                               "module example.test/hk\n\ngo 1.26.5\n",
+		"go.mod":                               "module example.test/hk\n\ngo 1.26.6\n",
 		"CONTRIBUTING.md":                      "# Contributing\n",
 		"frontend/dashboard/package.json":      "{\"packageManager\":\"npm@12.0.2\"}\n",
 		"frontend/dashboard/package-lock.json": "{}\n",
 		"frontend/dashboard/.npmrc":            "legacy-peer-deps=true\n",
-		"frontend/dashboard/.nvmrc":            "24.18.0\n",
+		"frontend/dashboard/.node-version":     "24.19.0\n",
 	} {
 		path := filepath.Join(workspace, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -244,10 +244,10 @@ func TestMCPStdioActionRunLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	slowFile := filepath.Join(t.TempDir(), "slow")
-	goScript := "#!/bin/sh\nif [ \"${1:-}\" = version ]; then echo 'go version go1.26.5 test'; exit 0; fi\nif [ -f \"" + slowFile + "\" ]; then sleep 30; fi\nexit 0\n"
+	goScript := "#!/bin/sh\nif [ \"${1:-}\" = version ]; then echo 'go version go1.26.6 test'; exit 0; fi\nif [ -f \"" + slowFile + "\" ]; then sleep 30; fi\nexit 0\n"
 	dockerScript := "#!/bin/sh\ncase \"$*\" in *version*) echo 1.0.0; exit 0;; esac\nif [ -f \"" + slowFile + "\" ]; then sleep 30; fi\nexit 0\n"
 	for name, script := range map[string]string{
-		"docker": dockerScript, "go": goScript, "npm": "#!/bin/sh\nif [ \"${1:-}\" = --version ]; then echo '12.0.2'; exit 0; fi\nmkdir -p node_modules\nexit 0\n", "node": "#!/bin/sh\necho v24.18.0\n", "npx": "#!/bin/sh\nmkdir -p node_modules\nexit 0\n",
+		"docker": dockerScript, "go": goScript, "npm": "#!/bin/sh\nif [ \"${1:-}\" = --version ]; then echo '12.0.2'; exit 0; fi\nmkdir -p node_modules\nexit 0\n", "node": "#!/bin/sh\necho v24.19.0\n", "npx": "#!/bin/sh\nmkdir -p node_modules\nexit 0\n",
 	} {
 		if err := os.WriteFile(filepath.Join(fakeBin, name), []byte(script), 0o755); err != nil {
 			t.Fatal(err)
@@ -332,8 +332,8 @@ func TestMCPStdioActionRunLifecycle(t *testing.T) {
 func installFakeManagedToolchain(t *testing.T, stateDir string) {
 	t.Helper()
 	platform := runtime.GOOS + "-" + runtime.GOARCH
-	goBin := filepath.Join(stateDir, "shared", "toolchains", "go-1.26.5-"+platform, "bin")
-	nodeRoot := filepath.Join(stateDir, "shared", "toolchains", "node-24.18.0-"+platform)
+	goBin := filepath.Join(stateDir, "shared", "toolchains", "go-1.26.6-"+platform, "bin")
+	nodeRoot := filepath.Join(stateDir, "shared", "toolchains", "node-24.19.0-"+platform)
 	nodeBin := filepath.Join(nodeRoot, "bin")
 	npmCLI := filepath.Join(nodeRoot, "lib", "node_modules", "npm", "bin", "npm-cli.js")
 	for _, directory := range []string{goBin, nodeBin, filepath.Dir(npmCLI)} {
@@ -342,8 +342,8 @@ func installFakeManagedToolchain(t *testing.T, stateDir string) {
 		}
 	}
 	managedCommands := map[string]string{
-		filepath.Join(goBin, "go"):     "#!/bin/sh\nif [ \"${1:-}\" = version ]; then echo 'go version go1.26.5 test'; fi\nexit 0\n",
-		filepath.Join(nodeBin, "node"): "#!/bin/sh\ncase \"${1:-}\" in *npm-cli.js) echo 12.0.2 ;; *) echo v24.18.0 ;; esac\nexit 0\n",
+		filepath.Join(goBin, "go"):     "#!/bin/sh\nif [ \"${1:-}\" = version ]; then echo 'go version go1.26.6 test'; fi\nexit 0\n",
+		filepath.Join(nodeBin, "node"): "#!/bin/sh\ncase \"${1:-}\" in *npm-cli.js) echo 12.0.2 ;; *) echo v24.19.0 ;; esac\nexit 0\n",
 		filepath.Join(nodeBin, "npm"):  "#!/bin/sh\nif [ \"${1:-}\" = --version ]; then echo '12.0.2'; exit 0; fi\nmkdir -p node_modules\nexit 0\n",
 		filepath.Join(nodeBin, "npx"):  "#!/bin/sh\nmkdir -p node_modules\nexit 0\n",
 		npmCLI:                         "#!/bin/sh\nexit 0\n",

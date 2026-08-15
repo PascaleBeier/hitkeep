@@ -106,7 +106,7 @@ func (a *App) Handoff(ctx context.Context) (Handoff, error) {
 
 func (a *App) Doctor(ctx context.Context) DoctorReport {
 	goVersion := requiredVersion(a.workspace.Root, "go.mod", "go ")
-	nodeVersion := requiredVersion(a.workspace.Root, filepath.Join("frontend", "dashboard", ".nvmrc"), "")
+	nodeVersion := requiredVersion(a.workspace.Root, filepath.Join("frontend", "dashboard", ".node-version"), "")
 	npmVersion := requiredPackageManagerVersion(a.workspace.Root)
 	npmExecutable, npmArgs := a.preferredNPMProbe()
 	probes := []func(context.Context) Check{

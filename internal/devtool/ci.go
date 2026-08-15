@@ -58,7 +58,7 @@ type ToolchainConfig struct {
 func (a *App) ToolchainConfig() (ToolchainConfig, error) {
 	config := ToolchainConfig{
 		Go:   requiredVersion(a.workspace.Root, "go.mod", "go "),
-		Node: requiredVersion(a.workspace.Root, filepath.Join("frontend", "dashboard", ".nvmrc"), ""),
+		Node: requiredVersion(a.workspace.Root, filepath.Join("frontend", "dashboard", ".node-version"), ""),
 		NPM:  requiredPackageManagerVersion(a.workspace.Root),
 	}
 	if config.Go == "" || config.Node == "" || config.NPM == "" {

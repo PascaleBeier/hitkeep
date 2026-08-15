@@ -12,14 +12,14 @@ import (
 func TestDoctorRequiresDockerComposeForDevelopment(t *testing.T) {
 	root := initTestRepository(t)
 	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
-	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.test\n\ngo 1.26.5\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.test\n\ngo 1.26.6\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	dashboard := filepath.Join(root, "frontend", "dashboard")
 	if err := os.MkdirAll(dashboard, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dashboard, ".nvmrc"), []byte("24.18.0\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dashboard, ".node-version"), []byte("24.19.0\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dashboard, "package.json"), []byte(`{"packageManager":"npm@12.0.2"}`), 0o600); err != nil {
@@ -32,8 +32,8 @@ func TestDoctorRequiresDockerComposeForDevelopment(t *testing.T) {
 	fakeBin := t.TempDir()
 	commands := map[string]string{
 		"git":  "git version 2.50.0",
-		"go":   "go version go1.26.5 test/arch",
-		"node": "v24.18.0",
+		"go":   "go version go1.26.6 test/arch",
+		"node": "v24.19.0",
 		"npm":  "12.0.2",
 		"cc":   "cc 1.0",
 	}
@@ -190,9 +190,9 @@ func TestCommandEnvironmentPrefersManagedToolchains(t *testing.T) {
 func writeTestToolchainConfig(t *testing.T, root string) {
 	t.Helper()
 	for path, content := range map[string]string{
-		"go.mod":                          "module example.test\n\ngo 1.26.5\n",
-		"frontend/dashboard/.nvmrc":       "24.18.0\n",
-		"frontend/dashboard/package.json": `{"packageManager":"npm@12.0.2"}`,
+		"go.mod":                           "module example.test\n\ngo 1.26.6\n",
+		"frontend/dashboard/.node-version": "24.19.0\n",
+		"frontend/dashboard/package.json":  `{"packageManager":"npm@12.0.2"}`,
 	} {
 		absolute := filepath.Join(root, path)
 		if err := os.MkdirAll(filepath.Dir(absolute), 0o700); err != nil {

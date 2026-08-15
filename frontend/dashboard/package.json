@@ -78,13 +78,13 @@
         "vitest": "^4.1.10"
     },
     "engines": {
-        "node": "24.18.0",
+        "node": "24.19.0",
         "npm": "12.0.2"
     },
     "devEngines": {
         "runtime": {
             "name": "node",
-            "version": "24.18.0",
+            "version": "24.19.0",
             "onFail": "warn"
         },
         "packageManager": {
