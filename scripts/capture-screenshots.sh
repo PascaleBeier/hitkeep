@@ -154,7 +154,7 @@ echo ""
 echo "  [2/6] Building dashboard assets and HitKeep…"
 if [[ -z "$SKIP_BUILD" ]]; then
   (cd "$REPO_DIR/frontend/dashboard" && npm run build:prod)
-  (cd "$REPO_DIR" && go build -tags "$("$REPO_DIR/hk" ci go-config tags --output plain)" -o "$BIN_PATH" ./cmd/hitkeep/)
+  (cd "$REPO_DIR" && go build -trimpath -tags "$("$REPO_DIR/hk" ci go-config tags --output plain)" -o "$BIN_PATH" ./cmd/hitkeep/)
   echo "  ✓ Build complete"
 else
   if [[ ! -x "$BIN_PATH" ]]; then

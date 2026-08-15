@@ -56,6 +56,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     test -n "${GO_BUILD_TAGS}" && \
     CGO_ENABLED=1 go build \
+      -trimpath \
       -tags "${GO_BUILD_TAGS}" \
       -ldflags="-w -s -X 'hitkeep/cmd.Version=${HITKEEP_VERSION}'" \
       -o /out/hitkeep \

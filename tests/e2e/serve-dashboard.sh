@@ -117,7 +117,7 @@ if [[ "${SKIP_BINARY_BUILD}" == "1" ]]; then
   echo "[e2e] reusing hitkeep binary"
 else
   echo "[e2e] building hitkeep binary"
-  (cd "${REPO_DIR}" && go build -tags "$("${REPO_DIR}/hk" ci go-config tags --output plain)" -o "${BIN_PATH}" ./cmd/hitkeep/)
+  (cd "${REPO_DIR}" && go build -trimpath -tags "$("${REPO_DIR}/hk" ci go-config tags --output plain)" -o "${BIN_PATH}" ./cmd/hitkeep/)
 fi
 
 echo "[e2e] seeding demo data"

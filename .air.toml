@@ -3,7 +3,7 @@ tmp_dir = "tmp"
 
 [build]
 # Build the binary to the tmp directory
-cmd = "go build -tags \"$HITKEEP_GO_BUILD_TAGS\" -o ./tmp/main ./cmd/hitkeep/main.go"
+cmd = "go build -trimpath -tags \"$HITKEEP_GO_BUILD_TAGS\" -o ./tmp/main ./cmd/hitkeep/main.go"
 # Binary and default arguments to run after each successful build
 entrypoint = ["./tmp/main", "-log-level=debug"]
 # Watch for changes in these file extensions
