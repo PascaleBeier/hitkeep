@@ -30,7 +30,7 @@
         "@angular/core": "^22.1.0",
         "@angular/forms": "^22.1.0",
         "@angular/platform-browser": "^22.1.0",
-        "@angular/router": "^22.1.0",
+        "@angular/router": "^22.1.1",
         "@fontsource-variable/lexend": "^5.3.0",
         "@jsverse/transloco-locale": "^8.4.0",
         "@openng/icons": "^1.0.0",
