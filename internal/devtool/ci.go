@@ -18,6 +18,16 @@ var releaseValuePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]{0,99}$
 var buildTagPattern = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
 var exactToolVersionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?$`)
 
+const goTrimpathFlag = "-trimpath"
+
+func goFlagsForTags(tags []string) string {
+	return goTrimpathFlag + " -tags=" + strings.Join(tags, ",")
+}
+
+func goBuildTagArgs(tags []string) []string {
+	return []string{goTrimpathFlag, "-tags", strings.Join(tags, " ")}
+}
+
 type ReleaseBuildRequest struct {
 	Version string `json:"version"`
 	GOOS    string `json:"goos"`
@@ -100,7 +110,7 @@ func (a *App) GoBuildConfig(variantID string, extraTags []string) (GoBuildConfig
 	}
 	tags := compactSorted(append(variant.BuildTags, extraTags...))
 	csv := strings.Join(tags, ",")
-	return GoBuildConfig{Variant: variant.ID, Tags: tags, TagsCSV: csv, GOFLAGS: "-tags=" + csv, GolangCIArgs: "--build-tags=" + csv}, nil
+	return GoBuildConfig{Variant: variant.ID, Tags: tags, TagsCSV: csv, GOFLAGS: goFlagsForTags(tags), GolangCIArgs: "--build-tags=" + csv}, nil
 }
 
 func (a *App) RunRaceShard(ctx context.Context, shard string, writer io.Writer) (RaceShardResult, error) {
@@ -118,7 +128,7 @@ func (a *App) RunRaceShard(ctx context.Context, shard string, writer io.Writer) 
 		return result, fmt.Errorf("race shard %q selected no packages", shard)
 	}
 	args := raceTestArgs(packages)
-	if err := a.runCommand(ctx, writer, commandSpec{Args: args, Env: []string{"GOFLAGS=-tags=" + strings.Join(common.BuildTags, ",")}, Display: fmt.Sprintf("go test -race [%s shard: %d packages]", shard, len(packages))}); err != nil {
+	if err := a.runCommand(ctx, writer, commandSpec{Args: args, Env: []string{"GOFLAGS=" + goFlagsForTags(common.BuildTags)}, Display: fmt.Sprintf("go test -race [%s shard: %d packages]", shard, len(packages))}); err != nil {
 		return result, err
 	}
 	return result, nil
@@ -143,7 +153,7 @@ func (a *App) RunCloudTests(ctx context.Context, writer io.Writer) (GoTestResult
 		return result, errors.New("cloud test selected no repository packages")
 	}
 	args := append([]string{"go", "test"}, packages...)
-	environment := []string{"GOFLAGS=-tags=" + strings.Join(cloud.BuildTags, ",")}
+	environment := []string{"GOFLAGS=" + goFlagsForTags(cloud.BuildTags)}
 	if err := a.runCommand(ctx, writer, commandSpec{Args: args, Env: environment, Display: fmt.Sprintf("go test [cloud variant: %d repository packages]", len(packages))}); err != nil {
 		return result, err
 	}
@@ -153,7 +163,7 @@ func (a *App) RunCloudTests(ctx context.Context, writer io.Writer) (GoTestResult
 func (a *App) listGoPackages(ctx context.Context, variant Variant) ([]string, error) {
 	list := exec.CommandContext(ctx, "go", "list", "-json", "./...") //nolint:gosec // fixed command and arguments
 	list.Dir = a.workspace.Root
-	list.Env = a.commandEnvironment([]string{"GOFLAGS=-tags=" + strings.Join(variant.BuildTags, ",")})
+	list.Env = a.commandEnvironment([]string{"GOFLAGS=" + goFlagsForTags(variant.BuildTags)})
 	output, err := list.Output()
 	if err != nil {
 		return nil, fmt.Errorf("list %s Go packages: %w", variant.ID, err)
@@ -248,13 +258,12 @@ func (a *App) BuildReleaseBinaries(ctx context.Context, request ReleaseBuildRequ
 	}
 	environment := []string{"CGO_ENABLED=1", "GOOS=" + request.GOOS, "GOARCH=" + request.GOARCH}
 	for index, variant := range []Variant{common, cloud} {
-		args := []string{
-			"go", "build",
-			"-tags", strings.Join(variant.BuildTags, " "),
-			"-ldflags", "-w -s -X hitkeep/cmd.Version=" + request.Version,
+		args := append([]string{"go", "build"}, goBuildTagArgs(variant.BuildTags)...)
+		args = append(args,
+			"-ldflags", "-w -s -X hitkeep/cmd.Version="+request.Version,
 			"-o", artifacts[index],
 			"./cmd/hitkeep/main.go",
-		}
+		)
 		if err := a.runCommand(ctx, writer, commandSpec{Args: args, Env: environment}); err != nil {
 			return ReleaseBuildResult{}, err
 		}

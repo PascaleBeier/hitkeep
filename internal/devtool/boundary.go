@@ -16,7 +16,7 @@ const developerPackagePrefix = "hitkeep/internal/devtool"
 // the boundary that keeps cmd/hk and its adapters out of the HitKeep binary.
 func (a *App) ValidateProductionBoundary(ctx context.Context) error {
 	for _, variant := range CatalogSnapshot().Variants {
-		arguments := []string{"list", "-deps", "-tags", strings.Join(variant.BuildTags, ","), productionCommandPackage}
+		arguments := []string{"list", "-deps", goTrimpathFlag, "-tags", strings.Join(variant.BuildTags, ","), productionCommandPackage}
 		command := exec.CommandContext(ctx, "go", arguments...) //nolint:gosec // Arguments come from the closed variant catalog.
 		command.Dir = a.workspace.Root
 		command.Env = a.commandEnvironment(nil)

@@ -38,6 +38,19 @@ func TestToolchainConfigUsesCanonicalVersionFiles(t *testing.T) {
 	}
 }
 
+func TestGoBuildConfigUsesTrimpath(t *testing.T) {
+	config, err := (&App{}).GoBuildConfig("self-hosted", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.GOFLAGS != "-trimpath -tags=hashicorpmetrics,timetzdata" {
+		t.Fatalf("Go build flags = %q, want trimpath and self-hosted tags", config.GOFLAGS)
+	}
+	if !slices.Equal(goBuildTagArgs(config.Tags), []string{"-trimpath", "-tags", "hashicorpmetrics timetzdata"}) {
+		t.Fatalf("Go build arguments = %v, want trimpath and self-hosted tags", goBuildTagArgs(config.Tags))
+	}
+}
+
 func TestFrontendAuditGateIsCanonicalStaticCheck(t *testing.T) {
 	gate, err := GateByID("frontend-audit")
 	if err != nil {
