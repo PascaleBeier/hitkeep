@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-01T21:00:01.296369489Z",
+  "generated_at": "2026-08-15T20:27:06.166492269Z",
   "sources": {
     "ai_robots_txt": "https://raw.githubusercontent.com/ai-robots-txt/ai.robots.txt/main/robots.json",
     "crawler_user_agents": "https://raw.githubusercontent.com/monperrus/crawler-user-agents/master/crawler-user-agents.json",
@@ -249,7 +249,7 @@
       "name": "Applebot",
       "family": "Applebot",
       "category": "ai_search_indexer",
-      "respects_robots_txt": "unclear",
+      "respects_robots_txt": "yes",
       "url": "https://support.apple.com/en-us/119829",
       "sources": [
         "ai_robots_txt",
@@ -743,7 +743,7 @@
       "name": "DuckAssistBot",
       "family": "DuckAssistBot",
       "category": "ai_assistant",
-      "respects_robots_txt": "unclear",
+      "respects_robots_txt": "yes",
       "url": "https://duckduckgo.com/duckduckgo-help-pages/results/duckassistbot/",
       "sources": [
         "ai_robots_txt",
@@ -911,7 +911,7 @@
       "name": "Google-Agent",
       "family": "Google-Agent",
       "category": "ai_agent",
-      "respects_robots_txt": "unclear",
+      "respects_robots_txt": "yes",
       "sources": [
         "ai_robots_txt"
       ]
@@ -2232,8 +2232,8 @@
     },
     {
       "token": "webzio-extended",
-      "name": "webzio-extended",
-      "family": "webzio-extended",
+      "name": "Webzio-Extended",
+      "family": "Webzio-Extended",
       "category": "ai_training_crawler",
       "respects_robots_txt": "unclear",
       "url": "https://docs.webz.io/reference/how-it-works-video",
