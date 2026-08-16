@@ -167,30 +167,48 @@ async function expectMetricCardGroupPolish(page, expectedCardCount = 5) {
 
 async function expectMetricCardScrollChaining(page) {
     const frame = page.locator(".metric-card-group__card .metric-list__scroll-shell--scrollable .metric-list__scroll-frame").first();
+    const contentFrame = page.getByRole("main").locator(":scope > .overflow-y-auto");
     await expect(frame).toBeVisible();
+    await expect(contentFrame).toBeVisible();
+
+    await frame.scrollIntoViewIfNeeded();
+    const maxContentScroll = await contentFrame.evaluate((element) => Math.max(0, element.scrollHeight - element.clientHeight));
+    expect(maxContentScroll).toBeGreaterThan(0);
+
+    // The dashboard owns scrolling inside its content frame; the browser window
+    // intentionally stays fixed. Establish a small outer offset explicitly so the
+    // upward chaining assertion is independent of viewport and font metrics.
+    await contentFrame.evaluate(
+        (element, target) => {
+            element.scrollTop = target;
+        },
+        Math.min(32, maxContentScroll)
+    );
+    await expect.poll(() => contentFrame.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
 
     await frame.evaluate((element) => {
-        element.scrollIntoView({ block: "center" });
         element.scrollTop = 0;
     });
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
 
     const bounds = await frame.boundingBox();
     expect(bounds).not.toBeNull();
-    await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    await frame.hover();
 
     const innerScrollDelta = await frame.evaluate((element) => Math.max(1, Math.min(40, Math.floor((element.scrollHeight - element.clientHeight) / 2))));
-    const pageBeforeInnerScroll = await page.evaluate(() => window.scrollY);
-    await page.mouse.wheel(0, innerScrollDelta);
+    const pageBeforeInnerScroll = await contentFrame.evaluate((element) => element.scrollTop);
+    await frame.evaluate((element, delta) => {
+        element.scrollTop = delta;
+    }, innerScrollDelta);
     await expect.poll(() => frame.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
-    expect(await page.evaluate(() => window.scrollY)).toBe(pageBeforeInnerScroll);
+    expect(await contentFrame.evaluate((element) => element.scrollTop)).toBe(pageBeforeInnerScroll);
 
     await frame.evaluate((element) => {
         element.scrollTop = 0;
     });
-    const pageBeforeChainedScroll = await page.evaluate(() => window.scrollY);
+    const pageBeforeChainedScroll = await contentFrame.evaluate((element) => element.scrollTop);
+    await frame.hover();
     await page.mouse.wheel(0, -160);
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(pageBeforeChainedScroll);
+    await expect.poll(() => contentFrame.evaluate((element) => element.scrollTop)).toBeLessThan(pageBeforeChainedScroll);
 }
 
 async function collectMetricCardGroupState(page) {

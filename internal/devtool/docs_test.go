@@ -52,6 +52,15 @@ func TestValidateReleaseMetadata(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
+
+	t.Run("downstream docs failure isolation", func(t *testing.T) {
+		root := releaseMetadataFixture(t)
+		writeFixtureFile(t, root, ".github/workflows/release.yml", "sync-docs-release:\nneeds.build-release.result == 'success'\nsync-hitkeep-release.yml\ngh run watch\n")
+		err := validateReleaseMetadata(root)
+		if err == nil || !strings.Contains(err.Error(), "must not surface downstream documentation workflow failures") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
 }
 
 func TestValidateConfigurationDocument(t *testing.T) {

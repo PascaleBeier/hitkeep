@@ -320,6 +320,15 @@ func validateReleaseMetadata(root string) error {
 			}
 		}
 	}
+	releaseWorkflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "release.yml"))
+	if err != nil {
+		return err
+	}
+	for _, fragment := range []string{"gh run watch", "--log-failed", "::error::hitkeep-docs"} {
+		if bytes.Contains(releaseWorkflow, []byte(fragment)) {
+			return fmt.Errorf(".github/workflows/release.yml must not surface downstream documentation workflow failures through %q", fragment)
+		}
+	}
 	return nil
 }
 

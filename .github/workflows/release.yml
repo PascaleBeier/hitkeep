@@ -196,7 +196,8 @@ jobs:
       - publish-helm
     if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' && needs.publish-helm.result == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    continue-on-error: true
+    timeout-minutes: 5
     permissions:
       contents: read
     steps:
@@ -206,19 +207,22 @@ jobs:
           GH_TOKEN: ${{ secrets.HITKEEP_DOCS_DISPATCH_TOKEN }}
           TAG: ${{ needs.release-please.outputs.tag_name }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
           if [[ -z "$GH_TOKEN" ]]; then
-            echo "::error::HITKEEP_DOCS_DISPATCH_TOKEN must grant Actions write access to PascaleBeier/hitkeep-docs"
-            exit 1
+            echo "::warning::Documentation synchronization was not dispatched because HITKEEP_DOCS_DISPATCH_TOKEN is unavailable"
+            exit 0
           fi
 
-          gh workflow run sync-hitkeep-release.yml \
+          if ! gh workflow run sync-hitkeep-release.yml \
             --repo "$DOWNSTREAM_REPOSITORY" \
             --ref main \
             -f tag="${TAG}" \
             -f dry_run=false \
-            -f source_run_id="${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
+            -f source_run_id="${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"; then
+            echo "::warning::Documentation synchronization could not be dispatched; the HitKeep release remains successful"
+            exit 0
+          fi
 
           downstream_run_id=""
           for attempt in {1..30}; do
@@ -240,8 +244,8 @@ jobs:
           done
 
           if [[ -z "$downstream_run_id" ]]; then
-            echo "::error::Timed out locating the hitkeep-docs workflow run for source run ${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
-            exit 1
+            echo "::warning::Documentation synchronization was dispatched but its run URL was not available yet"
+            exit 0
           fi
 
           downstream_url="$(
@@ -250,20 +254,7 @@ jobs:
               --json url \
               --jq .url
           )"
-          echo "Watching hitkeep-docs release synchronization: ${downstream_url}"
-
-          if ! gh run watch "$downstream_run_id" \
-            --repo "$DOWNSTREAM_REPOSITORY" \
-            --interval 15 \
-            --exit-status; then
-            echo "::error::hitkeep-docs release synchronization failed: ${downstream_url}"
-            gh run view "$downstream_run_id" \
-              --repo "$DOWNSTREAM_REPOSITORY" \
-              --log-failed || true
-            exit 1
-          fi
-
-          echo "hitkeep-docs release synchronization completed successfully: ${downstream_url}"
+          echo "Documentation synchronization is owned by the downstream repository: ${downstream_url}"
 
   deploy-cloud:
     name: Trigger cloud deploy
