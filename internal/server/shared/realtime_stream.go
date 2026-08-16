@@ -1,9 +1,9 @@
 package shared
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -34,7 +34,7 @@ func ServeRealtimeStream(w http.ResponseWriter, r *http.Request, broker *realtim
 		return
 	}
 	if err := controller.Flush(); err != nil {
-		slog.Debug("Failed to flush realtime stream prelude", "error", err, "site_id", siteID)
+		LoggerFromContext(r.Context()).Debug("Failed to flush realtime stream prelude", "error", err, "site_id", siteID)
 		return
 	}
 
@@ -48,12 +48,12 @@ func ServeRealtimeStream(w http.ResponseWriter, r *http.Request, broker *realtim
 			BucketStart: now.Truncate(time.Minute),
 			Counts:      map[string]int{},
 		}
-		if !writeRealtimeEvent(w, controller, resync) {
+		if !writeRealtimeEvent(w, controller, r.Context(), resync) {
 			return
 		}
 	}
 	for _, event := range replay {
-		if !writeRealtimeEvent(w, controller, event) {
+		if !writeRealtimeEvent(w, controller, r.Context(), event) {
 			return
 		}
 	}
@@ -69,7 +69,7 @@ func ServeRealtimeStream(w http.ResponseWriter, r *http.Request, broker *realtim
 			if !ok {
 				return
 			}
-			if !writeRealtimeEvent(w, controller, event) {
+			if !writeRealtimeEvent(w, controller, r.Context(), event) {
 				return
 			}
 		case <-heartbeat.C:
@@ -83,7 +83,7 @@ func ServeRealtimeStream(w http.ResponseWriter, r *http.Request, broker *realtim
 	}
 }
 
-func writeRealtimeEvent(w http.ResponseWriter, controller *http.ResponseController, event realtime.Event) bool {
+func writeRealtimeEvent(w http.ResponseWriter, controller *http.ResponseController, ctx context.Context, event realtime.Event) bool {
 	name := event.Name
 	if name == "" {
 		name = realtime.EventAnalyticsChanged
@@ -99,7 +99,7 @@ func writeRealtimeEvent(w http.ResponseWriter, controller *http.ResponseControll
 
 	data, err := json.Marshal(event)
 	if err != nil {
-		slog.Error("Failed to encode realtime event", "error", err, "site_id", event.SiteID)
+		LoggerFromContext(ctx).Error("Failed to encode realtime event", "error", err, "site_id", event.SiteID)
 		return false
 	}
 	if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {

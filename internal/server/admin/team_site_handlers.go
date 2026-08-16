@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"net/mail"
 	"net/url"
@@ -19,6 +18,7 @@ import (
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailables"
+	"hitkeep/internal/mailer"
 	serverauth "hitkeep/internal/server/auth"
 	"hitkeep/internal/server/shared"
 )
@@ -34,13 +34,13 @@ func (h *handler) handleAdminListTeams() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		teams, err := h.ctx.Store.ListAllTeams(r.Context())
 		if err != nil {
-			slog.Error("Failed to list all teams", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to list all teams", "error", err)
 			http.Error(w, "Internal error", http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(teams); err != nil {
-			slog.Error("Failed to encode teams response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode teams response", "error", err)
 		}
 	}
 }
@@ -68,14 +68,14 @@ func (h *handler) handleAdminArchiveTeam() http.HandlerFunc {
 			case errors.Is(err, database.ErrTenantMembershipRequired):
 				http.Error(w, "Team not found or already archived", http.StatusBadRequest)
 			default:
-				slog.Error("Failed to archive team", "error", err, "team_id", teamID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to archive team", "error", err, "team_id", teamID)
 				http.Error(w, "Internal error", http.StatusInternalServerError)
 			}
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
-			slog.Error("Failed to encode archive team response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode archive team response", "error", err)
 		}
 	}
 }
@@ -107,7 +107,7 @@ func (h *handler) handleAdminDeleteTeam() http.HandlerFunc {
 								http.Error(w, "The default team cannot be deleted", http.StatusBadRequest)
 								return
 							}
-							slog.Error("Failed to archive empty hosted cloud team during force delete", "error", archiveErr, "team_id", teamID)
+							shared.LoggerFromContext(r.Context()).Error("Failed to archive empty hosted cloud team during force delete", "error", archiveErr, "team_id", teamID)
 							http.Error(w, "Failed to delete team", http.StatusInternalServerError)
 							return
 						}
@@ -119,7 +119,7 @@ func (h *handler) handleAdminDeleteTeam() http.HandlerFunc {
 						http.Error(w, "The default team cannot be deleted", http.StatusBadRequest)
 						return
 					} else {
-						slog.Error("Failed to check archived team before cloud force delete", "error", purgeableErr, "team_id", teamID)
+						shared.LoggerFromContext(r.Context()).Error("Failed to check archived team before cloud force delete", "error", purgeableErr, "team_id", teamID)
 						http.Error(w, "Failed to delete team", http.StatusInternalServerError)
 						return
 					}
@@ -133,14 +133,14 @@ func (h *handler) handleAdminDeleteTeam() http.HandlerFunc {
 
 				sites, sitesErr := h.ctx.Store.ListSitesForTenant(r.Context(), teamID)
 				if sitesErr != nil {
-					slog.Error("Failed to list sites for team during force delete", "error", sitesErr, "team_id", teamID)
+					shared.LoggerFromContext(r.Context()).Error("Failed to list sites for team during force delete", "error", sitesErr, "team_id", teamID)
 					http.Error(w, "Failed to delete team", http.StatusInternalServerError)
 					return
 				}
 				for _, site := range sites {
 					err = h.deleteSite(r.Context(), site.ID)
 					if err != nil {
-						slog.Error("Failed to delete site during force team delete", "error", err, "site_id", site.ID, "team_id", teamID)
+						shared.LoggerFromContext(r.Context()).Error("Failed to delete site during force team delete", "error", err, "site_id", site.ID, "team_id", teamID)
 						http.Error(w, "Failed to delete team", http.StatusInternalServerError)
 						return
 					}
@@ -152,7 +152,7 @@ func (h *handler) handleAdminDeleteTeam() http.HandlerFunc {
 						http.Error(w, "The default team cannot be deleted", http.StatusBadRequest)
 						return
 					}
-					slog.Error("Failed to archive team during force delete", "error", archiveErr, "team_id", teamID)
+					shared.LoggerFromContext(r.Context()).Error("Failed to archive team during force delete", "error", archiveErr, "team_id", teamID)
 					http.Error(w, "Failed to delete team", http.StatusInternalServerError)
 					return
 				}
@@ -169,7 +169,7 @@ func (h *handler) handleAdminDeleteTeam() http.HandlerFunc {
 			case errors.Is(err, database.ErrTeamPurgeHasSites):
 				http.Error(w, "Transfer or delete all sites before deleting the team", http.StatusBadRequest)
 			default:
-				slog.Error("Failed to purge archived team", "error", err, "team_id", teamID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to purge archived team", "error", err, "team_id", teamID)
 				http.Error(w, "Internal error", http.StatusInternalServerError)
 			}
 			return
@@ -185,7 +185,7 @@ func (h *handler) handleAdminDeleteTeam() http.HandlerFunc {
 			TeamID: deleted.ID,
 			Name:   deleted.Name,
 		}); err != nil {
-			slog.Error("Failed to encode delete team response", "error", err, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode delete team response", "error", err, "team_id", teamID)
 		}
 	}
 }
@@ -217,14 +217,14 @@ func (h *handler) handleAdminListSites() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sites, err := h.ctx.Store.ListAllSites(r.Context())
 		if err != nil {
-			slog.Error("Failed to list all sites", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to list all sites", "error", err)
 			http.Error(w, "Internal error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(sites); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -240,14 +240,14 @@ func (h *handler) handleAdminDeleteSite() http.HandlerFunc {
 
 		err = h.deleteSite(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to delete site", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to delete site", "error", err)
 			http.Error(w, "Failed to delete site", http.StatusInternalServerError)
 			return
 		}
 
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -263,14 +263,14 @@ func (h *handler) handleGetSiteMembers() http.HandlerFunc {
 
 		members, err := h.ctx.Store.GetSiteMembers(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to get members", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get members", "error", err)
 			http.Error(w, "Internal error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(members); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -303,17 +303,17 @@ func (h *handler) handleAddSiteMember() http.HandlerFunc {
 		actorID := shared.GetUserIDFromContext(r)
 		teamID, teamErr := h.ctx.Store.GetSiteTenantID(r.Context(), siteID)
 		if teamErr != nil {
-			slog.Error("Failed to resolve site team", "error", teamErr, "site_id", siteID, "actor_id", actorID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve site team", "error", teamErr, "site_id", siteID, "actor_id", actorID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		resolvedUser, err := h.resolveSiteMemberUser(r.Context(), teamID, actorID, email)
 		if err != nil {
-			if h.writeSiteInvitePreflightError(w, err, email, teamID, actorID) {
+			if h.writeSiteInvitePreflightError(r.Context(), w, err, teamID, actorID) {
 				return
 			}
-			slog.Error("Failed to resolve site member user", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve site member user", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -340,7 +340,7 @@ func (h *handler) handleAddSiteMember() http.HandlerFunc {
 			err = h.ctx.Store.AddPendingSiteMemberInviteAccess(r.Context(), siteID, userID, authcore.SiteRole(req.Role), actorID)
 		}
 		if err != nil {
-			slog.Error("Failed to add member", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to add member", "error", err)
 			http.Error(w, "Failed to add member", http.StatusInternalServerError)
 			return
 		}
@@ -385,13 +385,14 @@ func (h *handler) handleAddSiteMember() http.HandlerFunc {
 			inviteLink := siteInviteLink(h.ctx.Config.PublicURL, inviteToken, resolvedUser.requiresPasswordSetup)
 			err = h.ctx.Mailer.Send(email, mailables.NewUserInvite(inviteLink, siteName, inviterName, locale))
 			if err != nil {
-				slog.Warn("Failed to send invite email", "error", err, "email", email)
+				details := mailer.DescribeError(err)
+				shared.LoggerFromContext(r.Context()).Warn("Failed to send invite email", "error_code", "smtp_send_failed", "error_stage", details.Stage, "error_kind", details.Kind, "error_message", details.Message, "smtp_code", details.SMTPCode)
 			}
 		}
 
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -518,10 +519,10 @@ func (h *handler) validateHostedCloudSiteInvitee(ctx context.Context, teamID, us
 	return h.ctx.Limits().RequireTeamMembershipCapacity(ctx, userID, 1+pendingOutsideTeam)
 }
 
-func (h *handler) writeSiteInvitePreflightError(w http.ResponseWriter, err error, email string, teamID, actorID uuid.UUID) bool {
+func (h *handler) writeSiteInvitePreflightError(ctx context.Context, w http.ResponseWriter, err error, teamID, actorID uuid.UUID) bool {
 	switch {
 	case errors.Is(err, entitlements.ErrTeamMemberLimitReached):
-		slog.Warn("Cloud team member limit reached for site invite", "error", err, "email", email, "team_id", teamID, "actor_id", actorID)
+		shared.LoggerFromContext(ctx).Warn("Cloud team member limit reached for site invite", "error", err, "team_id", teamID, "actor_id", actorID)
 		http.Error(w, "Team member limit reached", http.StatusForbidden)
 		return true
 	case errors.Is(err, entitlements.ErrTeamMembershipLimitReached):
@@ -589,7 +590,7 @@ func (h *handler) handleRemoveSiteMember() http.HandlerFunc {
 
 		err = h.ctx.Store.RemoveSiteMember(r.Context(), siteID, userID, actorID)
 		if err != nil {
-			slog.Error("Failed to remove member", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to remove member", "error", err)
 			http.Error(w, "Failed to remove member", http.StatusInternalServerError)
 			return
 		}
@@ -613,7 +614,7 @@ func (h *handler) handleRemoveSiteMember() http.HandlerFunc {
 
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }

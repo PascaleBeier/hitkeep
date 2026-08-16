@@ -2,11 +2,12 @@ package sites
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
+
+	"hitkeep/internal/server/shared"
 )
 
 func (h *handler) handleGetSiteTrackingStatus() http.HandlerFunc {
@@ -24,13 +25,13 @@ func (h *handler) handleGetSiteTrackingStatus() http.HandlerFunc {
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to resolve tracking status analytics store", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve tracking status analytics store", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		status, err := analyticsStore.GetSiteTrackingStatus(r.Context(), siteID, time.Now().UTC())
 		if err != nil {
-			slog.Error("Failed to load site tracking status", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load site tracking status", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -41,7 +42,7 @@ func (h *handler) handleGetSiteTrackingStatus() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(status); err != nil {
-			slog.Error("Failed to encode tracking status response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode tracking status response", "error", err)
 		}
 	}
 }
@@ -64,21 +65,21 @@ func (h *handler) handleGetSiteSetupState() http.HandlerFunc {
 		// the control-plane store the tracking status above is happy with.
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		state, err := analyticsStore.GetSiteSetupState(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to load site setup state", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load site setup state", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(state); err != nil {
-			slog.Error("Failed to encode setup state response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode setup state response", "error", err)
 		}
 	}
 }

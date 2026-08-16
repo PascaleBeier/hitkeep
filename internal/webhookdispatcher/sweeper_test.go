@@ -53,7 +53,7 @@ func TestSweeperRecoversStaleProcessingAndPublishesDueDeliveries(t *testing.T) {
 	sweeper := NewSweeper(store, producer, config.Config{
 		WebhookDeliveryTimeoutSeconds: 2,
 		WebhookRetentionDays:          30,
-	})
+	}, testLogger())
 	if err := sweeper.RunOnce(context.Background(), time.Now().UTC()); err != nil {
 		t.Fatalf("run sweeper: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestSweeperDoesNotRepublishRecentlyQueuedDelivery(t *testing.T) {
 	}
 
 	producer := &recordingProducer{}
-	sweeper := NewSweeper(store, producer, config.Config{WebhookSweepSeconds: 30})
+	sweeper := NewSweeper(store, producer, config.Config{WebhookSweepSeconds: 30}, testLogger())
 	now := time.Now().UTC()
 	if err := sweeper.RunOnce(context.Background(), now); err != nil {
 		t.Fatalf("first sweep: %v", err)

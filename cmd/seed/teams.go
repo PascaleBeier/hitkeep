@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log/slog"
 	"strings"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	"hitkeep/internal/hklog"
 )
 
 func seedAdditionalUsers(ctx context.Context, store *database.Store) {
@@ -33,7 +33,7 @@ func seedAdditionalUsers(ctx context.Context, store *database.Store) {
 		_, _ = store.CreateSite(ctx, id, u.domain)
 		created++
 	}
-	slog.Info("Additional users seeded for admin panel", "count", created)
+	hklog.LoggerFromContext(ctx).Info("Additional users seeded for admin panel", "count", created)
 }
 
 func seedTeam(ctx context.Context, store *database.Store, ownerID uuid.UUID) {
@@ -55,7 +55,7 @@ func seedTeam(ctx context.Context, store *database.Store, ownerID uuid.UUID) {
 	if team == nil {
 		created, createErr := store.CreateTenant(ctx, ownerID, teamName, teamLogo)
 		if createErr != nil {
-			slog.Warn("Failed to create demo team; retrying lookup", "error", createErr)
+			hklog.LoggerFromContext(ctx).Warn("Failed to create demo team; retrying lookup", "error", createErr)
 			teams, _, err = store.ListUserTeams(ctx, ownerID)
 			if err == nil {
 				for _, candidate := range teams {
@@ -67,7 +67,7 @@ func seedTeam(ctx context.Context, store *database.Store, ownerID uuid.UUID) {
 				}
 			}
 			if team == nil {
-				slog.Warn("Failed to resolve demo team", "error", createErr)
+				hklog.LoggerFromContext(ctx).Warn("Failed to resolve demo team", "error", createErr)
 				return
 			}
 		} else {
@@ -76,7 +76,7 @@ func seedTeam(ctx context.Context, store *database.Store, ownerID uuid.UUID) {
 	}
 
 	if err := store.SetActiveTenantID(ctx, ownerID, team.ID); err != nil {
-		slog.Warn("Failed to set active tenant", "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Failed to set active tenant", "error", err)
 	}
 
 	memberRoles := []struct {
@@ -89,11 +89,11 @@ func seedTeam(ctx context.Context, store *database.Store, ownerID uuid.UUID) {
 	for _, m := range memberRoles {
 		user, err := store.GetUserByEmail(ctx, m.email)
 		if err != nil || user == nil {
-			slog.Warn("Team member user not found, skipping", "email", m.email)
+			hklog.LoggerFromContext(ctx).Warn("Team member user not found, skipping", "role", m.role)
 			continue
 		}
 		if err := store.AddTeamMember(ctx, team.ID, user.ID, m.role, ownerID); err != nil {
-			slog.Warn("Failed to add team member", "email", m.email, "error", err)
+			hklog.LoggerFromContext(ctx).Warn("Failed to add team member", "role", m.role, "error", err)
 		}
 	}
 
@@ -112,14 +112,14 @@ func seedTeam(ctx context.Context, store *database.Store, ownerID uuid.UUID) {
 		}
 	}
 	if secondaryTeam != nil {
-		slog.Info("Secondary demo team available", "name", secondaryTeamName, "id", secondaryTeam.ID)
+		hklog.LoggerFromContext(ctx).Info("Secondary demo team available", "name", secondaryTeamName, "id", secondaryTeam.ID)
 	}
 
 	if err := store.SetActiveTenantID(ctx, ownerID, team.ID); err != nil {
-		slog.Warn("Failed to restore active tenant after seeding extra teams", "error", err, "team_id", team.ID)
+		hklog.LoggerFromContext(ctx).Warn("Failed to restore active tenant after seeding extra teams", "error", err, "team_id", team.ID)
 	}
 
-	slog.Info("Demo team seeded", "name", teamName, "id", team.ID, "members", len(memberRoles)+1)
+	hklog.LoggerFromContext(ctx).Info("Demo team seeded", "name", teamName, "id", team.ID, "members", len(memberRoles)+1)
 }
 
 func ensureSiteInActiveTeam(ctx context.Context, store *database.Store, userID uuid.UUID, domain string) (*api.Site, error) {
@@ -151,7 +151,7 @@ func ensureSiteInActiveTeam(ctx context.Context, store *database.Store, userID u
 			return nil, fmt.Errorf("rebind existing site to active tenant: %w", err)
 		}
 
-		slog.Info("Reusing existing demo site", "site_id", existing.ID, "domain", existing.Domain, "tenant_id", activeTenantID)
+		hklog.LoggerFromContext(ctx).Info("Reusing existing demo site", "site_id", existing.ID, "domain", existing.Domain, "tenant_id", activeTenantID)
 		return &existing, nil
 	}
 	if err != nil && err != sql.ErrNoRows {
@@ -162,7 +162,7 @@ func ensureSiteInActiveTeam(ctx context.Context, store *database.Store, userID u
 	if err == nil {
 		for _, site := range sites {
 			if strings.EqualFold(strings.TrimSpace(site.Domain), normalized) {
-				slog.Info("Reusing existing demo site", "site_id", site.ID, "domain", site.Domain)
+				hklog.LoggerFromContext(ctx).Info("Reusing existing demo site", "site_id", site.ID, "domain", site.Domain)
 				siteCopy := site
 				return &siteCopy, nil
 			}
@@ -177,17 +177,17 @@ func seedActivationFixtures(ctx context.Context, store *database.Store, userID, 
 
 	primary, err := store.GetSiteByID(ctx, primarySiteID)
 	if err != nil || primary == nil {
-		slog.Warn("Skipping activation fixtures; primary site unavailable", "site_id", primarySiteID, "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Skipping activation fixtures; primary site unavailable", "site_id", primarySiteID, "error", err)
 		return
 	}
 
 	waiting, err := ensureSiteInActiveTeam(ctx, store, userID, "launch-waiting.example.com")
 	if err != nil {
-		slog.Warn("Failed to ensure waiting activation site", "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Failed to ensure waiting activation site", "error", err)
 	}
 	dormant, err := ensureSiteInActiveTeam(ctx, store, userID, "legacy-dormant.example.com")
 	if err != nil {
-		slog.Warn("Failed to ensure dormant activation site", "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Failed to ensure dormant activation site", "error", err)
 	}
 
 	sitesToReset := []uuid.UUID{primarySiteID}
@@ -200,16 +200,16 @@ func seedActivationFixtures(ctx context.Context, store *database.Store, userID, 
 
 	// Keep the analytics-rich primary site first in freshly seeded dashboards.
 	if err := store.Exec(ctx, "UPDATE sites SET created_at = ? WHERE id = ?", now, primarySiteID); err != nil {
-		slog.Warn("Failed to refresh primary demo site timestamp", "site_id", primarySiteID, "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Failed to refresh primary demo site timestamp", "site_id", primarySiteID, "error", err)
 	}
 	if waiting != nil {
 		if err := store.Exec(ctx, "UPDATE sites SET created_at = ? WHERE id = ?", now.Add(-2*time.Hour), waiting.ID); err != nil {
-			slog.Warn("Failed to age waiting activation site", "site_id", waiting.ID, "error", err)
+			hklog.LoggerFromContext(ctx).Warn("Failed to age waiting activation site", "site_id", waiting.ID, "error", err)
 		}
 	}
 	if dormant != nil {
 		if err := store.Exec(ctx, "UPDATE sites SET created_at = ? WHERE id = ?", now.Add(-3*time.Hour), dormant.ID); err != nil {
-			slog.Warn("Failed to age dormant activation site", "site_id", dormant.ID, "error", err)
+			hklog.LoggerFromContext(ctx).Warn("Failed to age dormant activation site", "site_id", dormant.ID, "error", err)
 		}
 	}
 
@@ -223,13 +223,13 @@ func seedActivationFixtures(ctx context.Context, store *database.Store, userID, 
 		{SiteID: primarySiteID, Timestamp: now.AddDate(0, 0, -30), Hostname: &primaryHost, TrackerSource: "hk.js"},
 		{SiteID: primarySiteID, Timestamp: now.Add(-9 * time.Minute), Hostname: &primaryHost, TrackerSource: "hk.js"},
 	}); err != nil {
-		slog.Warn("Failed to seed primary activation hits", "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Failed to seed primary activation hits", "error", err)
 	}
 	if err := store.RecordEventActivity(ctx, []*api.Event{
 		{SiteID: primarySiteID, Name: "outbound_click", Timestamp: now.Add(-7 * time.Minute), TrackerSource: "hk.js"},
 		{SiteID: primarySiteID, Name: "file_download", Timestamp: now.Add(-4 * time.Minute), TrackerSource: "hk.js"},
 	}); err != nil {
-		slog.Warn("Failed to seed primary activation events", "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Failed to seed primary activation events", "error", err)
 	}
 	seedActivationCount(ctx, store, primarySiteID, now, 184, 27)
 	seedActivationCount(ctx, store, primarySiteID, now.Add(-24*time.Hour), 612, 84)
@@ -241,22 +241,22 @@ func seedActivationFixtures(ctx context.Context, store *database.Store, userID, 
 		if err := store.RecordHitActivity(ctx, []*api.Hit{
 			{SiteID: dormant.ID, Timestamp: dormantAt, Hostname: &dormantHost, TrackerSource: "wordpress", TrackerVersion: "2.3.0-demo"},
 		}); err != nil {
-			slog.Warn("Failed to seed dormant activation hit", "error", err)
+			hklog.LoggerFromContext(ctx).Warn("Failed to seed dormant activation hit", "error", err)
 		}
 		if err := store.RecordEventActivity(ctx, []*api.Event{
 			{SiteID: dormant.ID, Name: "form_submit", Timestamp: dormantAt.Add(2 * time.Minute), TrackerSource: "wordpress", TrackerVersion: "2.3.0-demo"},
 		}); err != nil {
-			slog.Warn("Failed to seed dormant activation event", "error", err)
+			hklog.LoggerFromContext(ctx).Warn("Failed to seed dormant activation event", "error", err)
 		}
 	}
 
-	slog.Info("Activation fixtures seeded", "sites", len(sitesToReset))
+	hklog.LoggerFromContext(ctx).Info("Activation fixtures seeded", "sites", len(sitesToReset))
 }
 
 func seedActivationCount(ctx context.Context, store *database.Store, siteID uuid.UUID, ts time.Time, hits, events int) {
 	tenantID, err := store.GetSiteTenantID(ctx, siteID)
 	if err != nil {
-		slog.Warn("Failed to resolve activation fixture tenant", "site_id", siteID, "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Failed to resolve activation fixture tenant", "site_id", siteID, "error", err)
 		return
 	}
 	if err := store.Exec(ctx, `
@@ -268,6 +268,6 @@ func seedActivationCount(ctx context.Context, store *database.Store, siteID uuid
 			events = excluded.events,
 			updated_at = excluded.updated_at
 	`, siteID, tenantID, ts.UTC().Truncate(time.Hour), hits, events, time.Now().UTC()); err != nil {
-		slog.Warn("Failed to seed activation fixture counts", "site_id", siteID, "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Failed to seed activation fixture counts", "site_id", siteID, "error", err)
 	}
 }

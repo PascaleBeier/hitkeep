@@ -2,11 +2,11 @@ package database
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/hklog"
 )
 
 // SyncTeamRetention brings every plan-managed site owned by teamID in line
@@ -49,23 +49,23 @@ func (m *TenantStoreManager) SyncTeamRetention(ctx context.Context, teamID uuid.
 			if firstErr == nil {
 				firstErr = err
 			}
-			slog.Error("Failed to sync site retention to plan cap", "site_id", site.ID, "team_id", teamID, "error", err)
+			hklog.LoggerFromContextOr(ctx, m.logger).Error("Failed to sync site retention to plan cap", "site_id", site.ID, "team_id", teamID, "error", err)
 			continue
 		}
 		if err := m.SyncSite(ctx, site.ID); err != nil {
 			if firstErr == nil {
 				firstErr = err
 			}
-			slog.Error("Failed to sync tenant mirror after retention sync", "site_id", site.ID, "team_id", teamID, "error", err)
+			hklog.LoggerFromContextOr(ctx, m.logger).Error("Failed to sync tenant mirror after retention sync", "site_id", site.ID, "team_id", teamID, "error", err)
 			continue
 		}
 
 		updated++
-		slog.Info("Synced site retention to plan cap", "site_id", site.ID, "team_id", teamID, "days", newDays)
+		hklog.LoggerFromContextOr(ctx, m.logger).Info("Synced site retention to plan cap", "site_id", site.ID, "team_id", teamID, "days", newDays)
 	}
 
 	if updated > 0 {
-		slog.Info("Synced team retention to plan cap", "team_id", teamID, "sites_updated", updated, "max_retention_days", maxRetentionDays)
+		hklog.LoggerFromContextOr(ctx, m.logger).Info("Synced team retention to plan cap", "team_id", teamID, "sites_updated", updated, "max_retention_days", maxRetentionDays)
 	}
 
 	return updated, firstErr

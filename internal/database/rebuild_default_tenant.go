@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+
+	"hitkeep/internal/hklog"
 )
 
 // RebuildDefaultTenantFile recreates the default tenant's database file after
@@ -21,6 +22,7 @@ import (
 // mirrors so ingest and archive imports work immediately. HitKeep must be
 // stopped: DuckDB allows only one writer.
 func RebuildDefaultTenantFile(ctx context.Context, sharedPath, dataPath string, opts ...StoreOption) (string, error) {
+	ctx = hklog.WithLoggerIfAbsent(ctx, storeLoggerFromOptions(opts))
 	if strings.TrimSpace(sharedPath) == "" || strings.TrimSpace(dataPath) == "" {
 		return "", errors.New("default tenant rebuild requires shared and data paths")
 	}
@@ -41,7 +43,7 @@ func RebuildDefaultTenantFile(ctx context.Context, sharedPath, dataPath string, 
 	}
 
 	tenantPath := filepath.Join(dataPath, "tenants", defaultID.String(), "hitkeep.db")
-	if err := setAsideUnreadableTenantFile(tenantPath, opts); err != nil {
+	if err := setAsideUnreadableTenantFile(ctx, tenantPath, opts); err != nil {
 		return "", err
 	}
 	if err := os.MkdirAll(filepath.Dir(tenantPath), 0o755); err != nil {
@@ -70,7 +72,7 @@ func RebuildDefaultTenantFile(ctx context.Context, sharedPath, dataPath string, 
 	if err := syncParentDirectory(tenantPath); err != nil {
 		return "", fmt.Errorf("sync rebuilt default tenant database: %w", err)
 	}
-	slog.Warn("Rebuilt an empty default tenant database; its analytics history is not restored", "tenant_id", defaultID, "tenant_path", tenantPath)
+	hklog.LoggerFromContext(ctx).Warn("Rebuilt an empty default tenant database; its analytics history is not restored", "tenant_id", defaultID, "tenant_path", tenantPath)
 	return tenantPath, nil
 }
 
@@ -78,7 +80,7 @@ func RebuildDefaultTenantFile(ctx context.Context, sharedPath, dataPath string, 
 // tenant file that still opens is refused outright; only a file DuckDB
 // rejects as invalid is renamed aside together with its WAL. Any other open
 // failure (for example a held lock from a running HitKeep) aborts.
-func setAsideUnreadableTenantFile(tenantPath string, opts []StoreOption) error {
+func setAsideUnreadableTenantFile(ctx context.Context, tenantPath string, opts []StoreOption) error {
 	if _, err := os.Stat(tenantPath); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
@@ -105,7 +107,7 @@ func setAsideUnreadableTenantFile(tenantPath string, opts []StoreOption) error {
 		if renameErr := os.Rename(path, path+suffix); renameErr != nil {
 			return fmt.Errorf("set aside unreadable default tenant artifact %s: %w", path, renameErr)
 		}
-		slog.Warn("Set aside unreadable default tenant artifact before rebuild", "path", path+suffix)
+		hklog.LoggerFromContext(ctx).Warn("Set aside unreadable default tenant artifact before rebuild", "path", path+suffix)
 	}
 	if err := syncParentDirectory(tenantPath); err != nil {
 		return fmt.Errorf("sync set-aside default tenant artifacts: %w", err)

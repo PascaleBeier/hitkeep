@@ -4,13 +4,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
 	"hitkeep/internal/blocking"
 )
 
-func UpdateSpamLists(args []string) {
+func UpdateSpamLists(args []string, logger *slog.Logger) {
 	fs := flag.NewFlagSet("update-spam-lists", flag.ExitOnError)
 	fs.SetOutput(os.Stderr)
 
@@ -29,7 +30,7 @@ func UpdateSpamLists(args []string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	data, err := blocking.FetchSpamFeedData(ctx, nil)
+	data, err := blocking.FetchSpamFeedData(ctx, nil, logger)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: could not fetch spam feeds: %v\n", err)
 		os.Exit(1)

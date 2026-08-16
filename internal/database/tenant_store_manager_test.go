@@ -1,8 +1,10 @@
 package database
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -211,10 +213,12 @@ func TestResolveTenantStore(t *testing.T) {
 
 func TestResolveSiteStoreBackfillsLegacyAnalyticsConfig(t *testing.T) {
 	ctx := context.Background()
-	store := newSharedTestStore(t)
+	var logs bytes.Buffer
+	store := newSharedTestFixtureStoreWithOptions(t, WithLogger(slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))))
 	basePath := t.TempDir()
 	mgr := NewTenantStoreManager(store, basePath)
 	t.Cleanup(func() { _ = mgr.Close() })
+	logs.Reset()
 
 	userID, err := store.CreateUser(ctx, "sync@test.com", "hash")
 	if err != nil {
@@ -294,6 +298,18 @@ func TestResolveSiteStoreBackfillsLegacyAnalyticsConfig(t *testing.T) {
 	}
 	if len(tenantFunnels) != 1 || tenantFunnels[0].ID != legacyFunnel.ID {
 		t.Fatalf("expected legacy funnel to be backfilled, got %+v", tenantFunnels)
+	}
+	output := logs.String()
+	for _, message := range []string{
+		"Backfilled legacy goals into tenant analytics store",
+		"Backfilled legacy funnels into tenant analytics store",
+	} {
+		if !strings.Contains(output, "level=DEBUG msg=\""+message+"\"") {
+			t.Fatalf("expected %q at DEBUG level, got logs: %s", message, output)
+		}
+		if strings.Contains(output, "level=INFO msg=\""+message+"\"") {
+			t.Fatalf("expected %q not to be logged at INFO level: %s", message, output)
+		}
 	}
 }
 

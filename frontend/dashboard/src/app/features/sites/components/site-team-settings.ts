@@ -53,7 +53,7 @@ interface SiteMember {
             <form class="site-settings-dialog-form" (ngSubmit)="addMember()">
                 <div class="site-settings-field-grid site-settings-member-grid">
                     <div class="site-settings-field">
-                        <label for="member-email">{{ "common.emailAddress" | transloco }}</label>
+                        <label for="member-email">{{ 'common.emailAddress' | transloco }}</label>
                         <input
                             id="member-email"
                             pInputText
@@ -69,7 +69,7 @@ interface SiteMember {
                     </div>
 
                     <div class="site-settings-field">
-                        <label for="member-role">{{ "common.columns.role" | transloco }}</label>
+                        <label for="member-role">{{ 'common.columns.role' | transloco }}</label>
                         <p-select inputId="member-role" [options]="roleOptions()" [formControl]="memberForm.role().control()" optionLabel="label" optionValue="value" appendTo="body" class="w-full" />
                     </div>
                 </div>
@@ -85,20 +85,20 @@ interface SiteMember {
                         <div class="site-settings-card__title-row">
                             <span class="site-settings-card__icon"><i class="pi pi-arrow-right-arrow-left" aria-hidden="true"></i></span>
                             <div>
-                                <h3>{{ "sites.team.transfer.title" | transloco }}</h3>
-                                <p>{{ "sites.team.transfer.description" | transloco }}</p>
+                                <h3>{{ 'sites.team.transfer.title' | transloco }}</h3>
+                                <p>{{ 'sites.team.transfer.description' | transloco }}</p>
                             </div>
                         </div>
                     </header>
                     <div class="site-settings-card__body">
-                    @if (transferSuccessKey(); as key) {
-                        <p-message severity="success" [text]="key | transloco" />
-                    }
-                    @if (transferErrorKey(); as key) {
-                        <p-message severity="error" [text]="key | transloco" />
-                    }
+                        @if (transferSuccessKey(); as key) {
+                            <p-message severity="success" [text]="key | transloco" />
+                        }
+                        @if (transferErrorKey(); as key) {
+                            <p-message severity="error" [text]="key | transloco" />
+                        }
                         <div class="site-settings-field">
-                            <label for="site-transfer-team">{{ "sites.team.transfer.teamLabel" | transloco }}</label>
+                            <label for="site-transfer-team">{{ 'sites.team.transfer.teamLabel' | transloco }}</label>
                             <p-select
                                 inputId="site-transfer-team"
                                 [options]="availableTransferTeams()"
@@ -111,7 +111,14 @@ interface SiteMember {
                         </div>
                     </div>
                     <footer class="site-settings-card__footer">
-                        <p-button styleClass="site-settings-action-btn" [label]="'sites.team.transfer.action' | transloco" icon="pi pi-arrow-right-arrow-left" [loading]="isTransferring()" [disabled]="isTransferring() || transferForm().invalid()" (onClick)="transferSite()" />
+                        <p-button
+                            styleClass="site-settings-action-btn"
+                            [label]="'sites.team.transfer.action' | transloco"
+                            icon="pi pi-arrow-right-arrow-left"
+                            [loading]="isTransferring()"
+                            [disabled]="isTransferring() || transferForm().invalid()"
+                            (onClick)="transferSite()"
+                        />
                     </footer>
                 </section>
             }
@@ -121,7 +128,7 @@ interface SiteMember {
                     <div class="site-settings-card__title-row">
                         <span class="site-settings-card__icon"><i class="pi pi-users" aria-hidden="true"></i></span>
                         <div>
-                            <h3>{{ "sites.settings.tabs.access" | transloco }}</h3>
+                            <h3>{{ 'sites.settings.tabs.access' | transloco }}</h3>
                         </div>
                     </div>
                 </header>
@@ -150,19 +157,19 @@ interface SiteMember {
                                 <ng-template pTemplate="header">
                                     <tr>
                                         <th pSortableColumn="email">
-                                            {{ "common.columns.email" | transloco }}
+                                            {{ 'common.columns.email' | transloco }}
                                             <p-sortIcon field="email" />
                                         </th>
                                         <th pSortableColumn="role">
-                                            {{ "common.columns.role" | transloco }}
+                                            {{ 'common.columns.role' | transloco }}
                                             <p-sortIcon field="role" />
                                         </th>
                                         <th pSortableColumn="added_at">
-                                            {{ "common.columns.added" | transloco }}
+                                            {{ 'common.columns.added' | transloco }}
                                             <p-sortIcon field="added_at" />
                                         </th>
                                         @if (canManageTeam()) {
-                                        <th>{{ "common.columns.actions" | transloco }}</th>
+                                            <th>{{ 'common.columns.actions' | transloco }}</th>
                                         }
                                     </tr>
                                 </ng-template>
@@ -177,9 +184,9 @@ interface SiteMember {
                                         </td>
                                         <td><app-relative-date-time [value]="member.added_at" /></td>
                                         @if (canManageTeam()) {
-                                        <td>
-                                            <app-table-row-actions [items]="memberActions(member)" />
-                                        </td>
+                                            <td>
+                                                <app-table-row-actions [items]="memberActions(member)" />
+                                            </td>
                                         }
                                     </tr>
                                 </ng-template>

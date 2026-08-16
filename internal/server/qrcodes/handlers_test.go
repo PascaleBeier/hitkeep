@@ -2,6 +2,8 @@ package qrcodes
 
 import (
 	"context"
+	"io"
+	"log/slog"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -37,6 +39,10 @@ func TestBuildDestinationURLAppliesCampaignParametersAndQRAttribution(t *testing
 	if got != want {
 		t.Fatalf("destination mismatch\nwant: %s\n got: %s", want, got)
 	}
+}
+
+func testQRCodeLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
 func TestRecordOpenBestEffortDropsPathAndUserAgentExclusions(t *testing.T) {
@@ -76,7 +82,7 @@ func TestRecordOpenBestEffortDropsPathAndUserAgentExclusions(t *testing.T) {
 			if _, err := store.CreateSiteTrafficExclusion(ctx, site.ID, test.rule, userID); err != nil {
 				t.Fatalf("create traffic exclusion: %v", err)
 			}
-			filter := blocking.NewIPFilter(store)
+			filter := blocking.NewIPFilter(store, testQRCodeLogger())
 			if err := filter.Refresh(ctx); err != nil {
 				t.Fatalf("refresh traffic exclusions: %v", err)
 			}

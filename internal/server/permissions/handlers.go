@@ -1,8 +1,8 @@
 package permissions
 
 import (
+	"context"
 	"encoding/json"
-	"log/slog"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -38,13 +38,12 @@ func (h *handler) handleGetUserPermissions() http.HandlerFunc {
 
 		resp, err := builder.ForUser(r.Context(), userID)
 		if err != nil {
-			//nolint:gosec // user_id is sourced from authenticated context; structured logging is intentional.
-			slog.Error("Failed to build permission context", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to build permission context", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
-		writeJSON(w, resp)
+		writeJSON(r.Context(), w, resp)
 	}
 }
 
@@ -56,9 +55,9 @@ func (h *handler) accessBuilder(w http.ResponseWriter) (access.Builder, bool) {
 	return access.Builder{Store: h.ctx.Store, Limits: h.ctx.Limits()}, true
 }
 
-func writeJSON(w http.ResponseWriter, resp any) {
+func writeJSON(ctx context.Context, w http.ResponseWriter, resp any) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		slog.Error("Failed to encode response", "error", err)
+		shared.LoggerFromContext(ctx).Error("Failed to encode response", "error", err)
 	}
 }

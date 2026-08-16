@@ -16,12 +16,16 @@ type Sweeper struct {
 	store    *database.Store
 	producer Producer
 	config   config.Config
+	logger   *slog.Logger
 	mu       sync.Mutex
 	lastGC   time.Time
 }
 
-func NewSweeper(store *database.Store, producer Producer, conf config.Config) *Sweeper {
-	return &Sweeper{store: store, producer: producer, config: conf}
+func NewSweeper(store *database.Store, producer Producer, conf config.Config, logger *slog.Logger) *Sweeper {
+	if logger == nil {
+		panic("webhookdispatcher: logger is required")
+	}
+	return &Sweeper{store: store, producer: producer, config: conf, logger: logger}
 }
 
 func (s *Sweeper) RunOnce(ctx context.Context, now time.Time) error {
@@ -63,13 +67,13 @@ func (s *Sweeper) RunOnce(ctx context.Context, now time.Time) error {
 		marked := true
 		if err := s.store.MarkWebhookDeliveryQueued(ctx, job.DeliveryID, now); err != nil {
 			marked = false
-			slog.Warn("Webhook recovery publish could not acquire queue marker", "error", err, "delivery_id", job.DeliveryID)
+			s.logger.Warn("Webhook recovery publish could not acquire queue marker", "error", err, "delivery_id", job.DeliveryID)
 		}
 		if err := s.producer.Publish(Topic, body); err != nil {
-			slog.Warn("Webhook delivery remains pending after sweep publish failure", "error", err, "delivery_id", job.DeliveryID)
+			s.logger.Warn("Webhook delivery remains pending after sweep publish failure", "error", err, "delivery_id", job.DeliveryID)
 			if marked {
 				if clearErr := s.store.ClearWebhookDeliveryQueued(ctx, job.DeliveryID, time.Now().UTC()); clearErr != nil {
-					slog.Warn("Failed to release webhook recovery queue marker", "error", clearErr, "delivery_id", job.DeliveryID)
+					s.logger.Warn("Failed to release webhook recovery queue marker", "error", clearErr, "delivery_id", job.DeliveryID)
 				}
 			}
 			continue
@@ -107,7 +111,7 @@ func (s *Sweeper) Start(ctx context.Context) {
 		interval = 30 * time.Second
 	}
 	if err := s.RunOnce(ctx, time.Now().UTC()); err != nil {
-		slog.Error("Webhook recovery sweep failed", "error", err)
+		s.logger.Error("Webhook recovery sweep failed", "error", err)
 	}
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -117,7 +121,7 @@ func (s *Sweeper) Start(ctx context.Context) {
 			return
 		case now := <-ticker.C:
 			if err := s.RunOnce(ctx, now.UTC()); err != nil {
-				slog.Error("Webhook recovery sweep failed", "error", err)
+				s.logger.Error("Webhook recovery sweep failed", "error", err)
 			}
 		}
 	}

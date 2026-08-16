@@ -2,7 +2,6 @@ package auth
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -12,7 +11,9 @@ import (
 	"hitkeep/internal/appurl"
 	"hitkeep/internal/database"
 	"hitkeep/internal/mailables"
+	"hitkeep/internal/mailer"
 	"hitkeep/internal/security"
+	"hitkeep/internal/server/shared"
 )
 
 type mfaTotpVerifyRequest struct {
@@ -77,7 +78,7 @@ func (h *handler) handleMFATOTPVerify() http.HandlerFunc {
 
 		secret, enabled, err := h.ctx.Store.GetUserTOTPSecret(r.Context(), challenge.UserID)
 		if err != nil {
-			slog.Error("Failed to load user totp secret for mfa verify", "error", err, "user_id", challenge.UserID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load user totp secret for mfa verify", "error", err, "user_id", challenge.UserID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -98,7 +99,7 @@ func (h *handler) handleMFATOTPVerify() http.HandlerFunc {
 		h.ctx.AuthState.DeletePasskeyLoginChallenge(challengeID)
 
 		if err := h.issueLoginSession(r.Context(), w, challenge.UserID, challenge.RememberMe); err != nil {
-			slog.Error("Failed to issue login session after mfa totp verification", "error", err, "user_id", challenge.UserID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to issue login session after mfa totp verification", "error", err, "user_id", challenge.UserID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -108,7 +109,7 @@ func (h *handler) handleMFATOTPVerify() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(loginResponse{Status: "ok"}); err != nil {
-			slog.Error("Failed to encode mfa totp verification response", "error", err, "user_id", challenge.UserID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode mfa totp verification response", "error", err, "user_id", challenge.UserID)
 		}
 	}
 }
@@ -127,7 +128,7 @@ func (h *handler) handleMFARecoveryCodeVerify() http.HandlerFunc {
 
 		_, consumed, err := h.ctx.Store.ConsumeRecoveryCode(r.Context(), challenge.UserID, req.Code)
 		if err != nil {
-			slog.Error("Failed to consume recovery code for mfa verify", "error", err, "user_id", challenge.UserID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to consume recovery code for mfa verify", "error", err, "user_id", challenge.UserID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -144,7 +145,7 @@ func (h *handler) handleMFARecoveryCodeVerify() http.HandlerFunc {
 		h.ctx.AuthState.DeletePasskeyLoginChallenge(challengeID)
 
 		if err := h.issueLoginSession(r.Context(), w, challenge.UserID, challenge.RememberMe); err != nil {
-			slog.Error("Failed to issue login session after recovery code verification", "error", err, "user_id", challenge.UserID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to issue login session after recovery code verification", "error", err, "user_id", challenge.UserID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -154,7 +155,7 @@ func (h *handler) handleMFARecoveryCodeVerify() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(loginResponse{Status: "ok"}); err != nil {
-			slog.Error("Failed to encode recovery code verification response", "error", err, "user_id", challenge.UserID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode recovery code verification response", "error", err, "user_id", challenge.UserID)
 		}
 	}
 }
@@ -183,7 +184,7 @@ func (h *handler) handleMFAEmailLinkRequest() http.HandlerFunc {
 
 		user, err := h.ctx.Store.GetUserByID(r.Context(), challenge.UserID)
 		if err != nil {
-			slog.Error("Failed to load user for mfa email link", "error", err, "user_id", challenge.UserID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load user for mfa email link", "error", err, "user_id", challenge.UserID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -198,7 +199,8 @@ func (h *handler) handleMFAEmailLinkRequest() http.HandlerFunc {
 		locale := h.preferredMailLocale(r, user.ID)
 
 		if err := h.ctx.Mailer.Send(user.Email, mailables.NewMFAMagicLink(verifyURL, locale, expiresInMinutes)); err != nil {
-			slog.Error("Failed to send mfa email link", "error", err, "user_id", user.ID, "email", user.Email)
+			details := mailer.DescribeError(err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to send mfa email link", "error_code", "smtp_send_failed", "error_stage", details.Stage, "error_kind", details.Kind, "error_message", details.Message, "smtp_code", details.SMTPCode, "user_id", user.ID)
 			http.Error(w, "Failed to send email sign-in link", http.StatusBadGateway)
 			return
 		}
@@ -206,7 +208,7 @@ func (h *handler) handleMFAEmailLinkRequest() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(map[string]string{"status": "sent"}); err != nil {
-			slog.Error("Failed to encode mfa email link response", "error", err, "user_id", user.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode mfa email link response", "error", err, "user_id", user.ID)
 		}
 	}
 }
@@ -241,7 +243,7 @@ func (h *handler) handleMFAEmailLinkVerify() http.HandlerFunc {
 		}
 
 		if err := h.issueLoginSession(r.Context(), w, challenge.UserID, challenge.RememberMe); err != nil {
-			slog.Error("Failed to issue login session after mfa email link verification", "error", err, "user_id", challenge.UserID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to issue login session after mfa email link verification", "error", err, "user_id", challenge.UserID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}

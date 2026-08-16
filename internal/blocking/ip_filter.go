@@ -43,7 +43,8 @@ type compiledTrafficExclusions struct {
 }
 
 type IPFilter struct {
-	store *database.Store
+	store  *database.Store
+	logger *slog.Logger
 
 	instanceRules compiledTrafficExclusions
 	teamRules     map[uuid.UUID]compiledTrafficExclusions
@@ -65,9 +66,13 @@ type BlockDecision struct {
 	Reason  string
 }
 
-func NewIPFilter(store *database.Store) *IPFilter {
+func NewIPFilter(store *database.Store, logger *slog.Logger) *IPFilter {
+	if logger == nil {
+		panic("blocking: logger is required")
+	}
 	return &IPFilter{
 		store:         store,
+		logger:        logger,
 		instanceRules: newCompiledTrafficExclusions(),
 		teamRules:     make(map[uuid.UUID]compiledTrafficExclusions),
 		siteRules:     make(map[uuid.UUID]compiledTrafficExclusions),
@@ -86,7 +91,7 @@ func (f *IPFilter) StartRefreshLoop(ctx context.Context) {
 	}
 
 	if err := f.Refresh(ctx); err != nil && !errors.Is(err, context.Canceled) {
-		slog.Error("Failed initial traffic exclusion load", "error", err)
+		f.logger.Error("Failed initial traffic exclusion load", "error", err)
 	}
 
 	go func() {
@@ -99,7 +104,7 @@ func (f *IPFilter) StartRefreshLoop(ctx context.Context) {
 				return
 			case <-ticker.C:
 				if err := f.Refresh(ctx); err != nil && !errors.Is(err, context.Canceled) {
-					slog.Error("Failed to refresh traffic exclusions", "error", err)
+					f.logger.Error("Failed to refresh traffic exclusions", "error", err)
 				}
 			}
 		}

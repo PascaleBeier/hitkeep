@@ -3,6 +3,7 @@ package shared
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -59,6 +60,7 @@ type ClusterState interface {
 // policy and behavior belong to the packages the dependencies come from
 // (see Limits), and request middleware lives in authn.go and authz.go.
 type Context struct {
+	Logger         *slog.Logger
 	Store          *database.Store
 	TenantStores   *database.TenantStoreManager
 	Cluster        ClusterState
@@ -144,7 +146,13 @@ func (c *Context) Handler(config HandlerConfig, fn http.HandlerFunc) http.Handle
 		handler = c.WithRateLimit(config.RateLimiter, handler)
 	}
 
-	return handler
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if c != nil {
+			ctx = withLoggerIfAbsent(ctx, c.Logger)
+		}
+		handler(w, r.WithContext(ctx))
+	}
 }
 
 func (c *Context) applyAccessChecks(config HandlerConfig, handler http.HandlerFunc) http.HandlerFunc {

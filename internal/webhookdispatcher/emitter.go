@@ -23,10 +23,14 @@ type Emitter struct {
 	store      *database.Store
 	producer   Producer
 	apiVersion string
+	logger     *slog.Logger
 }
 
-func NewEmitter(store *database.Store, producer Producer, runtimeVersion string) *Emitter {
-	return &Emitter{store: store, producer: producer, apiVersion: webhooks.MinorAPIVersion(runtimeVersion)}
+func NewEmitter(store *database.Store, producer Producer, runtimeVersion string, logger *slog.Logger) *Emitter {
+	if logger == nil {
+		panic("webhookdispatcher: logger is required")
+	}
+	return &Emitter{store: store, producer: producer, apiVersion: webhooks.MinorAPIVersion(runtimeVersion), logger: logger}
 }
 
 func (e *Emitter) Emit(ctx context.Context, event webhooks.Event) (webhooks.Emission, error) {
@@ -95,20 +99,20 @@ func (e *Emitter) publishDelivery(ctx context.Context, deliveryID uuid.UUID) {
 	}
 	body, err := json.Marshal(WebhookDeliveryMessage{DeliveryID: deliveryID})
 	if err != nil {
-		slog.Error("Failed to marshal webhook delivery job", "error", err, "delivery_id", deliveryID)
+		e.logger.Error("Failed to marshal webhook delivery job", "error", err, "delivery_id", deliveryID)
 		return
 	}
 	now := time.Now().UTC()
 	marked := true
 	if err := e.store.MarkWebhookDeliveryQueued(ctx, deliveryID, now); err != nil {
 		marked = false
-		slog.Warn("Webhook delivery publish could not acquire queue marker", "error", err, "delivery_id", deliveryID)
+		e.logger.Warn("Webhook delivery publish could not acquire queue marker", "error", err, "delivery_id", deliveryID)
 	}
 	if err := e.producer.Publish(Topic, body); err != nil {
-		slog.Warn("Webhook delivery publish deferred to sweeper", "error", err, "delivery_id", deliveryID)
+		e.logger.Warn("Webhook delivery publish deferred to sweeper", "error", err, "delivery_id", deliveryID)
 		if marked {
 			if clearErr := e.store.ClearWebhookDeliveryQueued(ctx, deliveryID, time.Now().UTC()); clearErr != nil {
-				slog.Warn("Failed to release webhook delivery queue marker", "error", clearErr, "delivery_id", deliveryID)
+				e.logger.Warn("Failed to release webhook delivery queue marker", "error", clearErr, "delivery_id", deliveryID)
 			}
 		}
 		return

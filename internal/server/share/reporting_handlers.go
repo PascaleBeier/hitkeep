@@ -3,7 +3,6 @@ package share
 import (
 	"context"
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/filterparams"
+	"hitkeep/internal/server/shared"
 )
 
 func (h *handler) handleGetShareGoals() http.HandlerFunc {
@@ -56,21 +56,21 @@ func (h *handler) handleGetShareDefinitions(
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), site.ID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", site.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", site.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		definitions, err := fetch(r.Context(), analyticsStore, site.ID)
 		if err != nil {
-			slog.Error(logMessage, "error", err)
+			shared.LoggerFromContext(r.Context()).Error(logMessage, "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(definitions); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -110,14 +110,14 @@ func (h *handler) handleGetShareFunnelStats() http.HandlerFunc {
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), site.ID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", site.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", site.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		stats, err := analyticsStore.GetFunnelStats(r.Context(), funnelID, params)
 		if err != nil {
-			slog.Error("Failed to get share funnel stats", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get share funnel stats", "error", err)
 			if strings.Contains(err.Error(), "not found") {
 				http.Error(w, "Funnel not found", http.StatusNotFound)
 			} else {
@@ -128,7 +128,7 @@ func (h *handler) handleGetShareFunnelStats() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(stats); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -147,7 +147,7 @@ func (h *handler) loadShareSite(w http.ResponseWriter, r *http.Request) (*api.Si
 
 	site, err := h.ctx.Store.GetShareSiteByToken(r.Context(), token)
 	if err != nil {
-		slog.Error("Failed to load share site", "error", err)
+		shared.LoggerFromContext(r.Context()).Error("Failed to load share site", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return nil, false
 	}
@@ -195,7 +195,7 @@ func (h *handler) handleTimeseries(
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), site.ID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", site.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", site.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -217,14 +217,14 @@ func (h *handler) handleTimeseries(
 
 		series, err := fetch(r.Context(), analyticsStore, params, ids)
 		if err != nil {
-			slog.Error(logMessage, "error", err)
+			shared.LoggerFromContext(r.Context()).Error(logMessage, "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(series); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }

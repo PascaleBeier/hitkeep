@@ -1,11 +1,11 @@
 package webhooks
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"strings"
 
@@ -69,8 +69,8 @@ func (h *handler) siteScoped(build func(*uuid.UUID) http.HandlerFunc) http.Handl
 }
 
 func (h *handler) handleCatalog(scope webhookcore.Scope) http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, http.StatusOK, webhookcore.Catalog(scope))
+	return func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(r.Context(), w, http.StatusOK, webhookcore.Catalog(scope))
 	}
 }
 
@@ -78,11 +78,11 @@ func (h *handler) handleList(siteID *uuid.UUID) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		items, err := h.ctx.Store.ListWebhooks(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to list webhooks", "error", err, "site_id", nullableSiteLogValue(siteID))
+			shared.LoggerFromContext(r.Context()).Error("Failed to list webhooks", "error", err, "site_id", nullableSiteLogValue(siteID))
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, http.StatusOK, items)
+		writeJSON(r.Context(), w, http.StatusOK, items)
 	}
 }
 
@@ -94,17 +94,17 @@ func (h *handler) handleCreate(siteID *uuid.UUID) http.HandlerFunc {
 		}
 		audit, err := h.auditParams(r, siteID, "webhook.created", uuid.Nil, input.Name)
 		if err != nil {
-			slog.Error("Failed to prepare webhook create audit", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to prepare webhook create audit", "error", err)
 			http.Error(w, "Failed to audit webhook action", http.StatusInternalServerError)
 			return
 		}
 		created, secret, err := h.ctx.Store.CreateWebhookWithAudit(r.Context(), siteID, input, audit)
 		if err != nil {
-			slog.Error("Failed to create webhook", "error", err, "site_id", nullableSiteLogValue(siteID))
+			shared.LoggerFromContext(r.Context()).Error("Failed to create webhook", "error", err, "site_id", nullableSiteLogValue(siteID))
 			http.Error(w, "Failed to create webhook", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, http.StatusCreated, api.WebhookSecretResponse{Webhook: *created, Secret: secret})
+		writeJSON(r.Context(), w, http.StatusCreated, api.WebhookSecretResponse{Webhook: *created, Secret: secret})
 	}
 }
 
@@ -120,7 +120,7 @@ func (h *handler) handleUpdate(siteID *uuid.UUID) http.HandlerFunc {
 		}
 		audit, err := h.auditParams(r, siteID, "webhook.updated", webhookID, input.Name)
 		if err != nil {
-			slog.Error("Failed to prepare webhook update audit", "error", err, "webhook_id", webhookID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to prepare webhook update audit", "error", err, "webhook_id", webhookID)
 			http.Error(w, "Failed to audit webhook action", http.StatusInternalServerError)
 			return
 		}
@@ -130,11 +130,11 @@ func (h *handler) handleUpdate(siteID *uuid.UUID) http.HandlerFunc {
 			return
 		}
 		if err != nil {
-			slog.Error("Failed to update webhook", "error", err, "webhook_id", webhookID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to update webhook", "error", err, "webhook_id", webhookID)
 			http.Error(w, "Failed to update webhook", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, http.StatusOK, updated)
+		writeJSON(r.Context(), w, http.StatusOK, updated)
 	}
 }
 
@@ -146,7 +146,7 @@ func (h *handler) handleRotate(siteID *uuid.UUID) http.HandlerFunc {
 		}
 		audit, err := h.auditParams(r, siteID, "webhook.secret_rotated", webhookID, "")
 		if err != nil {
-			slog.Error("Failed to prepare webhook rotation audit", "error", err, "webhook_id", webhookID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to prepare webhook rotation audit", "error", err, "webhook_id", webhookID)
 			http.Error(w, "Failed to audit webhook action", http.StatusInternalServerError)
 			return
 		}
@@ -156,11 +156,11 @@ func (h *handler) handleRotate(siteID *uuid.UUID) http.HandlerFunc {
 			return
 		}
 		if err != nil {
-			slog.Error("Failed to rotate webhook secret", "error", err, "webhook_id", webhookID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to rotate webhook secret", "error", err, "webhook_id", webhookID)
 			http.Error(w, "Failed to rotate webhook secret", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, http.StatusOK, api.WebhookSecretResponse{Webhook: *updated, Secret: secret})
+		writeJSON(r.Context(), w, http.StatusOK, api.WebhookSecretResponse{Webhook: *updated, Secret: secret})
 	}
 }
 
@@ -172,7 +172,7 @@ func (h *handler) handleDelete(siteID *uuid.UUID) http.HandlerFunc {
 		}
 		existing, err := h.ctx.Store.GetWebhook(r.Context(), webhookID, siteID)
 		if err != nil {
-			slog.Error("Failed to load webhook before delete", "error", err, "webhook_id", webhookID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load webhook before delete", "error", err, "webhook_id", webhookID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -182,12 +182,12 @@ func (h *handler) handleDelete(siteID *uuid.UUID) http.HandlerFunc {
 		}
 		audit, err := h.auditParams(r, siteID, "webhook.deleted", webhookID, existing.Name)
 		if err != nil {
-			slog.Error("Failed to prepare webhook delete audit", "error", err, "webhook_id", webhookID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to prepare webhook delete audit", "error", err, "webhook_id", webhookID)
 			http.Error(w, "Failed to audit webhook action", http.StatusInternalServerError)
 			return
 		}
 		if err := h.ctx.Store.DeleteWebhookWithAudit(r.Context(), webhookID, siteID, audit); err != nil {
-			slog.Error("Failed to delete webhook", "error", err, "webhook_id", webhookID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to delete webhook", "error", err, "webhook_id", webhookID)
 			http.Error(w, "Failed to delete webhook", http.StatusInternalServerError)
 			return
 		}
@@ -203,7 +203,7 @@ func (h *handler) handleTest(siteID *uuid.UUID) http.HandlerFunc {
 		}
 		configured, err := h.ctx.Store.GetWebhook(r.Context(), webhookID, siteID)
 		if err != nil {
-			slog.Error("Failed to load webhook before test", "error", err, "webhook_id", webhookID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load webhook before test", "error", err, "webhook_id", webhookID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -225,11 +225,11 @@ func (h *handler) handleTest(siteID *uuid.UUID) http.HandlerFunc {
 			},
 		})
 		if err != nil {
-			slog.Error("Failed to create webhook test delivery", "error", err, "webhook_id", webhookID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to create webhook test delivery", "error", err, "webhook_id", webhookID)
 			http.Error(w, "Failed to create webhook test delivery", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, http.StatusAccepted, api.WebhookTestResponse{EventID: emission.EventID, DeliveryIDs: emission.DeliveryIDs})
+		writeJSON(r.Context(), w, http.StatusAccepted, api.WebhookTestResponse{EventID: emission.EventID, DeliveryIDs: emission.DeliveryIDs})
 	}
 }
 
@@ -245,11 +245,11 @@ func (h *handler) handleDeliveries(siteID *uuid.UUID) http.HandlerFunc {
 			return
 		}
 		if err != nil {
-			slog.Error("Failed to list webhook deliveries", "error", err, "webhook_id", webhookID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to list webhook deliveries", "error", err, "webhook_id", webhookID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, http.StatusOK, items)
+		writeJSON(r.Context(), w, http.StatusOK, items)
 	}
 }
 
@@ -321,11 +321,11 @@ func parseWebhookID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
 	return webhookID, true
 }
 
-func writeJSON(w http.ResponseWriter, status int, value any) {
+func writeJSON(ctx context.Context, w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(value); err != nil {
-		slog.Error("Failed to encode webhook response", "error", err)
+		shared.LoggerFromContext(ctx).Error("Failed to encode webhook response", "error", err)
 	}
 }
 

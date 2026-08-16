@@ -2,7 +2,6 @@ package sites
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"strings"
 
@@ -11,6 +10,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/appurl"
 	"hitkeep/internal/database"
+	"hitkeep/internal/server/shared"
 )
 
 func (h *handler) handleGetSiteTrackingDomainOptions() http.HandlerFunc {
@@ -21,7 +21,7 @@ func (h *handler) handleGetSiteTrackingDomainOptions() http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(options); err != nil {
-			slog.Error("Failed to encode site tracking domain options", "error", err, "site_id", options.SiteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode site tracking domain options", "error", err, "site_id", options.SiteID)
 		}
 	}
 }
@@ -50,7 +50,7 @@ func (h *handler) siteTeamID(w http.ResponseWriter, r *http.Request, siteID uuid
 	}
 	teamID, err := h.ctx.Store.GetSiteTenantID(r.Context(), siteID)
 	if err != nil {
-		slog.Error("Failed to resolve site team for tracking domain options", "error", err, "site_id", siteID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to resolve site team for tracking domain options", "error", err, "site_id", siteID)
 		http.Error(w, "Site not found", http.StatusNotFound)
 		return uuid.Nil, false
 	}
@@ -60,7 +60,7 @@ func (h *handler) siteTeamID(w http.ResponseWriter, r *http.Request, siteID uuid
 func (h *handler) buildSiteTrackingDomainOptions(r *http.Request, siteID, teamID uuid.UUID) (api.SiteTrackingDomainOptions, bool) {
 	domains, err := h.ctx.Store.ListCustomTrackingDomains(r.Context(), teamID)
 	if err != nil {
-		slog.Error("Failed to list site tracking domain options", "error", err, "site_id", siteID, "team_id", teamID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to list site tracking domain options", "error", err, "site_id", siteID, "team_id", teamID)
 		return api.SiteTrackingDomainOptions{}, false
 	}
 	target := ""

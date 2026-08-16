@@ -3,8 +3,10 @@
 package worker
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +14,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	"hitkeep/internal/hklog"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/testutil/testdb"
 )
@@ -122,21 +125,31 @@ func TestCloudLifecycleWorkerRetriesFailedSend(t *testing.T) {
 	store, mgr := setupCloudLifecycleWorkerStore(t)
 	now := time.Date(2026, 6, 24, 12, 0, 0, 0, time.UTC)
 	team := seedWorkerCloudLifecycleTeam(t, store, "retry-worker@example.com", "retry-worker.example", database.CloudPlanFree, database.CloudSubscriptionStatusFree, ptrWorkerTime(now.Add(-time.Hour)))
-	driver := &cloudLifecycleWorkerMailDriver{sendErr: errors.New("smtp unavailable")}
+	rawMailError := "provider response password=super-secret token=top-secret https://mail.example.test/reject"
+	driver := &cloudLifecycleWorkerMailDriver{sendErr: errors.New(rawMailError)}
 	worker := NewCloudLifecycleWorker(mgr, mailer.NewWithDriver(driver, nil), cloudLifecycleWorkerConfig())
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	ctx := hklog.WithLogger(context.Background(), logger)
 
-	worker.RunAt(context.Background(), now)
+	worker.RunAt(ctx, now)
 
 	message, err := store.GetCloudLifecycleMessage(context.Background(), team.TenantID, team.UserID, database.CloudLifecycleMessageWelcome)
 	if err != nil {
 		t.Fatalf("get failed welcome message: %v", err)
 	}
-	if message.Status != database.CloudLifecycleMessageStatusFailed || message.Attempts != 1 || !strings.Contains(message.ProcessingError, "smtp unavailable") {
+	if message.Status != database.CloudLifecycleMessageStatusFailed || message.Attempts != 1 || message.ProcessingError != "mail transport failed" {
 		t.Fatalf("unexpected failed lifecycle message: %+v", message)
+	}
+	if strings.Contains(logs.String(), rawMailError) || strings.Contains(message.ProcessingError, rawMailError) {
+		t.Fatalf("raw mail error leaked into logs or persisted state: logs=%q message=%q", logs.String(), message.ProcessingError)
+	}
+	if !strings.Contains(logs.String(), "error_stage=transport") || !strings.Contains(logs.String(), "error_kind=transport") || !strings.Contains(logs.String(), "error_message=\"mail transport failed\"") {
+		t.Fatalf("expected redacted mail diagnostics in logs, got %q", logs.String())
 	}
 
 	driver.sendErr = nil
-	worker.RunAt(context.Background(), now.Add(24*time.Hour))
+	worker.RunAt(ctx, now.Add(24*time.Hour))
 
 	message, err = store.GetCloudLifecycleMessage(context.Background(), team.TenantID, team.UserID, database.CloudLifecycleMessageWelcome)
 	if err != nil {

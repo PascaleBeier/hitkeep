@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/mail"
 	"net/netip"
@@ -312,14 +311,14 @@ func (h *handler) handleGetUserProfile() http.HandlerFunc {
 				http.Error(w, "User not found", http.StatusNotFound)
 				return
 			}
-			slog.Error("Failed to load user profile", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load user profile", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("Failed to encode user profile", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode user profile", "error", err, "user_id", userID)
 		}
 	}
 }
@@ -379,7 +378,7 @@ func (h *handler) handleUpdateUserProfile() http.HandlerFunc {
 			case errors.Is(err, database.ErrUserNotFound):
 				http.Error(w, "User not found", http.StatusNotFound)
 			default:
-				slog.Error("Failed to update user profile", "error", err, "user_id", userID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to update user profile", "error", err, "user_id", userID)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 			}
 			return
@@ -387,7 +386,7 @@ func (h *handler) handleUpdateUserProfile() http.HandlerFunc {
 
 		user, err := h.ctx.Store.GetUserByID(r.Context(), userID)
 		if err != nil {
-			slog.Error("Failed to load updated user profile", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load updated user profile", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -407,7 +406,7 @@ func (h *handler) handleUpdateUserProfile() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("Failed to encode updated user profile", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode updated user profile", "error", err, "user_id", userID)
 		}
 	}
 }
@@ -422,7 +421,7 @@ func (h *handler) handleGetUserAvatar() http.HandlerFunc {
 
 		user, err := h.ctx.Store.GetUserByID(r.Context(), userID)
 		if err != nil {
-			slog.Error("Failed to load user for avatar", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load user for avatar", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -441,7 +440,7 @@ func (h *handler) handleGetUserAvatar() http.HandlerFunc {
 		client := &http.Client{Timeout: 5 * time.Second}
 		resp, err := client.Do(req) //nolint:gosec // Request target is pinned to the Gravatar origin by newGravatarRequest; see avatar_test.go.
 		if err != nil {
-			slog.Warn("Failed to fetch gravatar", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Warn("Failed to fetch gravatar", "error", err, "user_id", userID)
 			http.Error(w, "Avatar unavailable", http.StatusBadGateway)
 			return
 		}
@@ -458,7 +457,7 @@ func (h *handler) handleGetUserAvatar() http.HandlerFunc {
 		w.Header().Set("Cache-Control", "public, max-age=86400")
 		w.WriteHeader(resp.StatusCode)
 		if _, err := io.Copy(w, resp.Body); err != nil {
-			slog.Warn("Failed to proxy gravatar response", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Warn("Failed to proxy gravatar response", "error", err, "user_id", userID)
 		}
 	}
 }
@@ -473,14 +472,14 @@ func (h *handler) handleGetUserPreferences() http.HandlerFunc {
 
 		prefs, err := h.userPreferencesResponse(r, userID)
 		if err != nil {
-			slog.Error("Failed to load user preferences", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load user preferences", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(prefs); err != nil {
-			slog.Error("Failed to encode user preferences", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode user preferences", "error", err, "user_id", userID)
 		}
 	}
 }
@@ -516,7 +515,7 @@ func (h *handler) handleGetCurrentIP() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("Failed to encode current IP response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode current IP response", "error", err)
 		}
 	}
 }
@@ -548,14 +547,14 @@ func (h *handler) handleUpdateUserPreferences() http.HandlerFunc {
 		}
 
 		if err := h.ctx.Store.UpsertUserPreferences(r.Context(), userID, prefs); err != nil {
-			slog.Error("Failed to update user preferences", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to update user preferences", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(prefs); err != nil {
-			slog.Error("Failed to encode user preferences", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode user preferences", "error", err, "user_id", userID)
 		}
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -674,6 +675,48 @@ func TestHandleTransferSiteTeam(t *testing.T) {
 	}
 	if entries[0].TargetID != site.ID.String() || !strings.Contains(entries[0].Details, "old_property_uri=sc-domain:move-me.test") || !strings.Contains(entries[0].Details, "reason=site_transfer") {
 		t.Fatalf("unexpected Search Console transfer audit: %+v", entries[0])
+	}
+}
+
+func TestHandleTransferSiteTeamLogsMappingFailureAtHTTPBoundary(t *testing.T) {
+	h, store, tenantStores, userID := setupFileBackedTransferEnv(t)
+	defer store.Close()
+	defer tenantStores.Close()
+
+	site, err := store.CreateSite(context.Background(), userID, "mapping-failure.test")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	sourceTeamID, err := store.GetSiteTenantID(context.Background(), site.ID)
+	if err != nil {
+		t.Fatalf("get source team: %v", err)
+	}
+	destinationTeam, err := store.CreateTenant(context.Background(), userID, "Destination", "")
+	if err != nil {
+		t.Fatalf("create destination team: %v", err)
+	}
+	if err := store.Exec(context.Background(), "DROP TABLE google_search_console_site_mappings"); err != nil {
+		t.Fatalf("drop Search Console mapping table: %v", err)
+	}
+
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	body, _ := json.Marshal(map[string]string{"team_id": destinationTeam.ID.String()})
+	req := httptest.NewRequest(http.MethodPost, "/api/sites/"+site.ID.String()+"/transfer-team", bytes.NewReader(body))
+	req.SetPathValue("id", site.ID.String())
+	ctx := context.WithValue(req.Context(), shared.UserIDKey, userID)
+	req = req.WithContext(shared.WithLogger(ctx, logger))
+	w := httptest.NewRecorder()
+
+	h.handleTransferSiteTeam().ServeHTTP(w, req)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusInternalServerError, w.Code, w.Body.String())
+	}
+	if count := strings.Count(logs.String(), "msg=\"Failed to load Search Console mapping before site transfer\""); count != 1 {
+		t.Fatalf("expected one boundary log entry, got %d: %s", count, logs.String())
+	}
+	if !strings.Contains(logs.String(), "site_id="+site.ID.String()) || !strings.Contains(logs.String(), "source_team_id="+sourceTeamID.String()) {
+		t.Fatalf("expected transfer identifiers in boundary log: %s", logs.String())
 	}
 }
 

@@ -3,6 +3,8 @@ package webhookdispatcher
 import (
 	"context"
 	"errors"
+	"io"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -33,7 +35,7 @@ func TestEmitterPersistsBeforePublishingAndIgnoresProducerFailure(t *testing.T) 
 	}
 
 	producer := &failingProducer{}
-	emitter := NewEmitter(store, producer, "2.10.2")
+	emitter := NewEmitter(store, producer, "2.10.2", testLogger())
 	emission, err := emitter.Emit(context.Background(), webhooks.Event{
 		Type:   webhooks.EventGoalCreated,
 		SiteID: &site.ID,
@@ -56,6 +58,10 @@ func TestEmitterPersistsBeforePublishingAndIgnoresProducerFailure(t *testing.T) 
 	if err != nil || len(dispatchable) != 1 {
 		t.Fatalf("failed publish must release its queue marker, dispatchable=%+v err=%v", dispatchable, err)
 	}
+}
+
+func testLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
 func setupDispatcherStore(t *testing.T) (*database.Store, string, api.Site) {

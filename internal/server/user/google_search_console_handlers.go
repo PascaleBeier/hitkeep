@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -49,7 +48,7 @@ func (h *handler) handleGetGoogleSearchConsoleStatus() http.HandlerFunc {
 		status := h.buildGoogleSearchConsoleStatus(r, teamID, role)
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(status); err != nil {
-			slog.Error("Failed to encode Google Search Console status", "error", err, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console status", "error", err, "team_id", teamID)
 		}
 	}
 }
@@ -72,7 +71,7 @@ func (h *handler) handleConnectGoogleSearchConsole() http.HandlerFunc {
 		}
 		if !h.googleSearchConsoleCredentialsConfigured() {
 			h.appendGoogleSearchConsoleAudit(r, teamID, userID, "google_search_console.connect_failed", "failure", "credentials_missing")
-			writeTeamActionError(w, http.StatusPreconditionFailed, "credentials_missing", "Google Search Console credentials are not configured")
+			writeTeamActionError(r.Context(), w, http.StatusPreconditionFailed, "credentials_missing", "Google Search Console credentials are not configured")
 			return
 		}
 
@@ -85,14 +84,14 @@ func (h *handler) handleConnectGoogleSearchConsole() http.HandlerFunc {
 		client := h.googleSearchConsoleClient()
 		authURL, err := client.AuthCodeURL(state, h.googleSearchConsoleRedirectURL())
 		if err != nil {
-			slog.Error("Failed to build Google Search Console OAuth URL", "error", err, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to build Google Search Console OAuth URL", "error", err, "team_id", teamID)
 			http.Error(w, "Could not start Google Search Console connection", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(api.GoogleSearchConsoleConnectResponse{AuthURL: authURL}); err != nil {
-			slog.Error("Failed to encode Google Search Console connect response", "error", err, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console connect response", "error", err, "team_id", teamID)
 		}
 	}
 }
@@ -115,34 +114,34 @@ func (h *handler) handleListGoogleSearchConsoleProperties() http.HandlerFunc {
 		}
 		conn, err := h.ctx.Store.GetGoogleSearchConsoleConnection(r.Context(), teamID)
 		if err != nil {
-			slog.Error("Failed to load Google Search Console connection for properties", "error", err, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load Google Search Console connection for properties", "error", err, "team_id", teamID)
 			http.Error(w, "Could not load Google Search Console connection", http.StatusInternalServerError)
 			return
 		}
 		if conn == nil || !conn.Connected {
-			writeTeamActionError(w, http.StatusPreconditionFailed, "not_connected", "Google Search Console is not connected")
+			writeTeamActionError(r.Context(), w, http.StatusPreconditionFailed, "not_connected", "Google Search Console is not connected")
 			return
 		}
 
 		properties, err := h.googleSearchConsoleClient().ListProperties(r.Context(), googleSearchConsoleConnectionToken(conn))
 		if err != nil {
 			category := searchconsole.ClassifyError(err)
-			slog.Warn("Failed to list Google Search Console properties", "category", category, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Warn("Failed to list Google Search Console properties", "category", category, "team_id", teamID)
 			h.appendGoogleSearchConsoleAudit(r, teamID, userID, "google_search_console.properties_refresh_failed", "failure", string(category))
-			writeTeamActionError(w, http.StatusBadGateway, string(category), "Could not list Google Search Console properties")
+			writeTeamActionError(r.Context(), w, http.StatusBadGateway, string(category), "Could not list Google Search Console properties")
 			return
 		}
 
 		resp, err := h.cacheGoogleSearchConsoleProperties(r, teamID, userID, properties)
 		if err != nil {
-			slog.Error("Failed to cache Google Search Console properties", "error", err, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to cache Google Search Console properties", "error", err, "team_id", teamID)
 			http.Error(w, "Could not cache Google Search Console properties", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("Failed to encode Google Search Console properties", "error", err, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console properties", "error", err, "team_id", teamID)
 		}
 	}
 }
@@ -192,13 +191,13 @@ func (h *handler) handleGetGoogleSearchConsoleSiteMapping() http.HandlerFunc {
 		role, _ := h.ctx.Store.GetSiteRole(r.Context(), userID, siteID)
 		resp, err := h.googleSearchConsoleSiteMappingResponse(r.Context(), siteID, teamID, googleSearchConsoleRoleCanManageSite(role))
 		if err != nil {
-			slog.Error("Failed to load Google Search Console site mapping", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load Google Search Console site mapping", "error", err, "site_id", siteID)
 			http.Error(w, "Could not load Google Search Console site mapping", http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("Failed to encode Google Search Console site mapping", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console site mapping", "error", err, "site_id", siteID)
 		}
 	}
 }
@@ -232,7 +231,7 @@ func (h *handler) handleMapGoogleSearchConsoleSiteProperty() http.HandlerFunc {
 		}
 		property, err := h.ctx.Store.GetGoogleSearchConsoleProperty(r.Context(), teamID, propertyURI)
 		if err != nil {
-			slog.Error("Failed to validate Google Search Console property", "error", err, "team_id", teamID, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to validate Google Search Console property", "error", err, "team_id", teamID, "site_id", siteID)
 			http.Error(w, "Could not validate Google Search Console property", http.StatusInternalServerError)
 			return
 		}
@@ -246,7 +245,7 @@ func (h *handler) handleMapGoogleSearchConsoleSiteProperty() http.HandlerFunc {
 
 		oldMapping, err := h.ctx.Store.GetGoogleSearchConsoleSiteMappingForTeam(r.Context(), siteID, teamID)
 		if err != nil {
-			slog.Error("Failed to load previous Google Search Console site mapping", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load previous Google Search Console site mapping", "error", err, "site_id", siteID)
 			http.Error(w, "Could not map Google Search Console property", http.StatusInternalServerError)
 			return
 		}
@@ -256,7 +255,7 @@ func (h *handler) handleMapGoogleSearchConsoleSiteProperty() http.HandlerFunc {
 		}
 		audit, err := h.googleSearchConsoleSiteAuditParams(r, teamID, siteID, userID, "google_search_console.property_mapped", "success", googleSearchConsoleMappingAuditDetails(oldPropertyURI, propertyURI))
 		if err != nil {
-			slog.Error("Failed to build Google Search Console map audit", "error", err, "team_id", teamID, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to build Google Search Console map audit", "error", err, "team_id", teamID, "site_id", siteID)
 			http.Error(w, "Could not map Google Search Console property", http.StatusInternalServerError)
 			return
 		}
@@ -267,20 +266,20 @@ func (h *handler) handleMapGoogleSearchConsoleSiteProperty() http.HandlerFunc {
 			MappedBy:    userID,
 			MappedAt:    time.Now().UTC(),
 		}, audit); err != nil {
-			slog.Error("Failed to map Google Search Console property", "error", err, "team_id", teamID, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to map Google Search Console property", "error", err, "team_id", teamID, "site_id", siteID)
 			http.Error(w, "Could not map Google Search Console property", http.StatusInternalServerError)
 			return
 		}
 
 		resp, err := h.googleSearchConsoleSiteMappingResponse(r.Context(), siteID, teamID, true)
 		if err != nil {
-			slog.Error("Failed to load mapped Google Search Console site mapping", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load mapped Google Search Console site mapping", "error", err, "site_id", siteID)
 			http.Error(w, "Could not load Google Search Console site mapping", http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("Failed to encode Google Search Console site mapping", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console site mapping", "error", err, "site_id", siteID)
 		}
 	}
 }
@@ -301,7 +300,7 @@ func (h *handler) handleUnmapGoogleSearchConsoleSiteProperty() http.HandlerFunc 
 		}
 		oldMapping, err := h.ctx.Store.GetGoogleSearchConsoleSiteMappingForTeam(r.Context(), siteID, teamID)
 		if err != nil {
-			slog.Error("Failed to load Google Search Console site mapping before unmap", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load Google Search Console site mapping before unmap", "error", err, "site_id", siteID)
 			http.Error(w, "Could not unmap Google Search Console property", http.StatusInternalServerError)
 			return
 		}
@@ -311,25 +310,25 @@ func (h *handler) handleUnmapGoogleSearchConsoleSiteProperty() http.HandlerFunc 
 		}
 		audit, err := h.googleSearchConsoleSiteAuditParams(r, teamID, siteID, userID, "google_search_console.property_unmapped", "success", googleSearchConsoleMappingAuditDetails(oldPropertyURI, ""))
 		if err != nil {
-			slog.Error("Failed to build Google Search Console unmap audit", "error", err, "team_id", teamID, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to build Google Search Console unmap audit", "error", err, "team_id", teamID, "site_id", siteID)
 			http.Error(w, "Could not unmap Google Search Console property", http.StatusInternalServerError)
 			return
 		}
 		if err := h.ctx.Store.DeleteGoogleSearchConsoleSiteMappingWithAudit(r.Context(), siteID, audit); err != nil {
-			slog.Error("Failed to unmap Google Search Console property", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to unmap Google Search Console property", "error", err, "site_id", siteID)
 			http.Error(w, "Could not unmap Google Search Console property", http.StatusInternalServerError)
 			return
 		}
 
 		resp, err := h.googleSearchConsoleSiteMappingResponse(r.Context(), siteID, teamID, true)
 		if err != nil {
-			slog.Error("Failed to load unmapped Google Search Console site mapping", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load unmapped Google Search Console site mapping", "error", err, "site_id", siteID)
 			http.Error(w, "Could not load Google Search Console site mapping", http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("Failed to encode Google Search Console site mapping", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console site mapping", "error", err, "site_id", siteID)
 		}
 	}
 }
@@ -350,19 +349,19 @@ func (h *handler) handleRequestGoogleSearchConsoleSiteSync() http.HandlerFunc {
 		}
 		mapping, err := h.ctx.Store.GetGoogleSearchConsoleSiteMappingForTeam(r.Context(), siteID, teamID)
 		if err != nil {
-			slog.Error("Failed to load Google Search Console mapping for sync", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load Google Search Console mapping for sync", "error", err, "site_id", siteID)
 			http.Error(w, "Could not request Google Search Console sync", http.StatusInternalServerError)
 			return
 		}
 		if mapping == nil {
-			writeTeamActionError(w, http.StatusPreconditionFailed, "not_mapped", "Google Search Console property is not mapped")
+			writeTeamActionError(r.Context(), w, http.StatusPreconditionFailed, "not_mapped", "Google Search Console property is not mapped")
 			return
 		}
 
 		now := time.Now().UTC()
 		previousState, err := h.ctx.Store.GetGoogleSearchConsoleSyncState(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to load previous Google Search Console sync state", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load previous Google Search Console sync state", "error", err, "site_id", siteID)
 			http.Error(w, "Could not request Google Search Console sync", http.StatusInternalServerError)
 			return
 		}
@@ -380,12 +379,12 @@ func (h *handler) handleRequestGoogleSearchConsoleSiteSync() http.HandlerFunc {
 		}
 		audit, err := h.googleSearchConsoleSiteAuditParams(r, teamID, siteID, userID, "google_search_console.sync_requested", "success", "sync_requested")
 		if err != nil {
-			slog.Error("Failed to build Google Search Console sync audit", "error", err, "team_id", teamID, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to build Google Search Console sync audit", "error", err, "team_id", teamID, "site_id", siteID)
 			http.Error(w, "Could not request Google Search Console sync", http.StatusInternalServerError)
 			return
 		}
 		if err := h.ctx.Store.UpsertGoogleSearchConsoleSyncStateWithAudit(r.Context(), input, audit); err != nil {
-			slog.Error("Failed to mark Google Search Console sync pending", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to mark Google Search Console sync pending", "error", err, "site_id", siteID)
 			http.Error(w, "Could not request Google Search Console sync", http.StatusInternalServerError)
 			return
 		}
@@ -396,18 +395,18 @@ func (h *handler) handleRequestGoogleSearchConsoleSiteSync() http.HandlerFunc {
 				"team_id", teamID,
 			)
 			logValues = append(logValues, worker.SearchConsoleSyncLogValues(err)...)
-			slog.Warn("Immediate Google Search Console sync failed", logValues...)
+			shared.LoggerFromContext(r.Context()).Warn("Immediate Google Search Console sync failed", logValues...)
 		}
 
 		resp, err := h.googleSearchConsoleSiteMappingResponse(r.Context(), siteID, teamID, true)
 		if err != nil {
-			slog.Error("Failed to load Google Search Console sync response", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load Google Search Console sync response", "error", err, "site_id", siteID)
 			http.Error(w, "Could not load Google Search Console site mapping", http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("Failed to encode Google Search Console sync response", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console sync response", "error", err, "site_id", siteID)
 		}
 	}
 }
@@ -499,25 +498,25 @@ func (h *handler) completeGoogleSearchConsoleConnection(w http.ResponseWriter, r
 	token, err := h.googleSearchConsoleClient().ExchangeCode(r.Context(), code, h.googleSearchConsoleRedirectURL())
 	if err != nil {
 		h.appendGoogleSearchConsoleAudit(r, teamID, userID, "google_search_console.connect_failed", "failure", "exchange_failed")
-		slog.Warn("Google Search Console OAuth exchange failed", "team_id", teamID)
+		shared.LoggerFromContext(r.Context()).Warn("Google Search Console OAuth exchange failed", "team_id", teamID)
 		http.Error(w, "Could not connect Google Search Console", http.StatusBadGateway)
 		return false
 	}
 	if strings.TrimSpace(token.RefreshToken) == "" {
 		h.appendGoogleSearchConsoleAudit(r, teamID, userID, "google_search_console.connect_failed", "failure", "refresh_token_missing")
-		slog.Warn("Google Search Console OAuth exchange did not return a refresh token", "team_id", teamID)
+		shared.LoggerFromContext(r.Context()).Warn("Google Search Console OAuth exchange did not return a refresh token", "team_id", teamID)
 		http.Error(w, "Could not connect Google Search Console", http.StatusBadGateway)
 		return false
 	}
 
 	audit, err := h.googleSearchConsoleAuditParams(r, teamID, userID, "google_search_console.connected", "success", "connected")
 	if err != nil {
-		slog.Error("Failed to build Google Search Console connection audit", "error", err, "team_id", teamID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to build Google Search Console connection audit", "error", err, "team_id", teamID)
 		http.Error(w, "Could not store Google Search Console connection", http.StatusInternalServerError)
 		return false
 	}
 	if err := h.ctx.Store.UpsertGoogleSearchConsoleConnectionWithAudit(r.Context(), databaseGoogleSearchConsoleConnectionInput(teamID, userID, token, time.Now().UTC()), audit); err != nil {
-		slog.Error("Failed to store Google Search Console connection", "error", err, "team_id", teamID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to store Google Search Console connection", "error", err, "team_id", teamID)
 		http.Error(w, "Could not store Google Search Console connection", http.StatusInternalServerError)
 		return false
 	}
@@ -543,19 +542,19 @@ func (h *handler) handleDisconnectGoogleSearchConsole() http.HandlerFunc {
 
 		audit, err := h.googleSearchConsoleAuditParams(r, teamID, userID, "google_search_console.disconnected", "success", "disconnected")
 		if err != nil {
-			slog.Error("Failed to build Google Search Console disconnect audit", "error", err, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to build Google Search Console disconnect audit", "error", err, "team_id", teamID)
 			http.Error(w, "Could not disconnect Google Search Console", http.StatusInternalServerError)
 			return
 		}
 		if err := h.ctx.Store.DisconnectGoogleSearchConsoleConnectionWithAudit(r.Context(), teamID, time.Now().UTC(), audit); err != nil {
-			slog.Error("Failed to disconnect Google Search Console", "error", err, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to disconnect Google Search Console", "error", err, "team_id", teamID)
 			http.Error(w, "Could not disconnect Google Search Console", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
-			slog.Error("Failed to encode Google Search Console disconnect response", "error", err, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console disconnect response", "error", err, "team_id", teamID)
 		}
 	}
 }
@@ -602,12 +601,12 @@ func (h *handler) resolveGoogleSearchConsoleSiteScope(w http.ResponseWriter, r *
 func (h *handler) requireGoogleSearchConsoleConnectedTeam(w http.ResponseWriter, r *http.Request, teamID uuid.UUID) bool {
 	conn, err := h.ctx.Store.GetGoogleSearchConsoleConnection(r.Context(), teamID)
 	if err != nil {
-		slog.Error("Failed to load Google Search Console connection", "error", err, "team_id", teamID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to load Google Search Console connection", "error", err, "team_id", teamID)
 		http.Error(w, "Could not load Google Search Console connection", http.StatusInternalServerError)
 		return false
 	}
 	if conn == nil || !conn.Connected {
-		writeTeamActionError(w, http.StatusPreconditionFailed, "not_connected", "Google Search Console is not connected")
+		writeTeamActionError(r.Context(), w, http.StatusPreconditionFailed, "not_connected", "Google Search Console is not connected")
 		return false
 	}
 	return true
@@ -616,7 +615,7 @@ func (h *handler) requireGoogleSearchConsoleConnectedTeam(w http.ResponseWriter,
 func (h *handler) requireGoogleSearchConsolePropertyMatchesSite(w http.ResponseWriter, r *http.Request, teamID, siteID uuid.UUID, propertyURI string) bool {
 	site, err := h.ctx.Store.GetSiteByID(r.Context(), siteID)
 	if err != nil {
-		slog.Error("Failed to load site for Google Search Console property validation", "error", err, "team_id", teamID, "site_id", siteID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to load site for Google Search Console property validation", "error", err, "team_id", teamID, "site_id", siteID)
 		http.Error(w, "Could not validate Google Search Console property", http.StatusInternalServerError)
 		return false
 	}
@@ -758,11 +757,11 @@ func newSearchConsoleClientFromHandler(h *handler) searchconsole.Client {
 func (h *handler) appendGoogleSearchConsoleAudit(r *http.Request, teamID, actorID uuid.UUID, action, outcome, detail string) {
 	params, err := h.googleSearchConsoleAuditParams(r, teamID, actorID, action, outcome, detail)
 	if err != nil {
-		slog.Error("Failed to build Google Search Console audit", "error", err, "action", action, "team_id", teamID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to build Google Search Console audit", "error", err, "action", action, "team_id", teamID)
 		return
 	}
 	if err := h.ctx.Store.AppendAuditEntry(r.Context(), params); err != nil {
-		slog.Error("Failed to append Google Search Console audit", "error", err, "action", action, "team_id", teamID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to append Google Search Console audit", "error", err, "action", action, "team_id", teamID)
 	}
 }
 

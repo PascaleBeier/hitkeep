@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	mrand "math/rand"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"hitkeep/internal/aianalytics"
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	"hitkeep/internal/hklog"
 )
 
 // seedDemoHostname is the hostname every seeded hit and fetch record carries.
@@ -124,7 +124,7 @@ func seedTraffic(ctx context.Context, store *database.Store, siteID uuid.UUID, g
 		}
 
 		if d%10 == 0 || d == numDays-1 {
-			slog.Info("Progress", "day", d+1, "of", numDays, "hits_so_far", stats.hits)
+			hklog.LoggerFromContext(ctx).Debug("Progress", "day", d+1, "of", numDays, "hits_so_far", stats.hits)
 		}
 	}
 
@@ -198,7 +198,7 @@ func seedAIVisibility(ctx context.Context, store *database.Store, siteID uuid.UU
 		}
 	}
 
-	slog.Info("AI visibility seeded", "fetches", stats.fetches, "ai_referred_sessions", stats.sessions, "ai_referred_hits", stats.hits, "ai_bot_hits", stats.botHits)
+	hklog.LoggerFromContext(ctx).Info("AI visibility seeded", "fetches", stats.fetches, "ai_referred_sessions", stats.sessions, "ai_referred_hits", stats.hits, "ai_bot_hits", stats.botHits)
 	return stats, nil
 }
 

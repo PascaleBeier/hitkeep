@@ -2,43 +2,42 @@ package realtime
 
 import (
 	"testing"
-	"time"
+	"testing/synctest"
 
 	"github.com/google/uuid"
 )
 
 func TestBrokerPublishesOnlyToSiteSubscribers(t *testing.T) {
-	broker := NewBroker()
-	siteID := uuid.New()
-	otherSiteID := uuid.New()
+	synctest.Test(t, func(t *testing.T) {
+		broker := NewBroker()
+		siteID := uuid.New()
+		otherSiteID := uuid.New()
 
-	sub, _, missed := broker.Subscribe(siteID, "")
-	if missed {
-		t.Fatal("new subscription should not report a missed replay")
-	}
-	defer sub.Close()
-	other, _, _ := broker.Subscribe(otherSiteID, "")
-	defer other.Close()
+		sub, _, missed := broker.Subscribe(siteID, "")
+		if missed {
+			t.Fatal("new subscription should not report a missed replay")
+		}
+		defer sub.Close()
+		other, _, _ := broker.Subscribe(otherSiteID, "")
+		defer other.Close()
 
-	broker.Publish(Event{SiteID: siteID, Kinds: []string{KindHits}, Counts: map[string]int{KindHits: 1}})
+		go broker.Publish(Event{SiteID: siteID, Kinds: []string{KindHits}, Counts: map[string]int{KindHits: 1}})
+		synctest.Wait()
 
-	select {
-	case event := <-sub.Events():
+		event := <-sub.Events()
 		if event.Name != EventAnalyticsChanged {
 			t.Fatalf("expected analytics changed event, got %q", event.Name)
 		}
 		if event.SiteID != siteID {
 			t.Fatalf("expected site %s, got %s", siteID, event.SiteID)
 		}
-	case <-time.After(time.Second):
-		t.Fatal("expected subscriber to receive event")
-	}
 
-	select {
-	case event := <-other.Events():
-		t.Fatalf("other site subscriber received unexpected event %+v", event)
-	default:
-	}
+		select {
+		case event := <-other.Events():
+			t.Fatalf("other site subscriber received unexpected event %+v", event)
+		default:
+		}
+	})
 }
 
 func TestBrokerReplaysEventsAfterLastEventID(t *testing.T) {

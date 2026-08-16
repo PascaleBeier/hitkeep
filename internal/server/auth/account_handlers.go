@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strings"
 
@@ -17,6 +16,7 @@ import (
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailables"
+	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/webhooks"
 )
@@ -35,7 +35,7 @@ func (h *handler) handleForgotPassword() http.HandlerFunc {
 
 		user, err := h.ctx.Store.GetUserByEmail(r.Context(), req.Email)
 		if err != nil {
-			slog.Error("Database error checking user", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Database error checking user", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -43,14 +43,14 @@ func (h *handler) handleForgotPassword() http.HandlerFunc {
 		if user == nil {
 			w.WriteHeader(http.StatusOK)
 			if err := json.NewEncoder(w).Encode(map[string]string{"message": "If an account exists, a reset link has been sent."}); err != nil {
-				slog.Error("Failed to encode response", "error", err)
+				shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 			}
 			return
 		}
 
 		token, err := h.ctx.Store.CreatePasswordResetToken(r.Context(), user.Email)
 		if err != nil {
-			slog.Error("Failed to create reset token", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to create reset token", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -60,16 +60,17 @@ func (h *handler) handleForgotPassword() http.HandlerFunc {
 
 		err = h.ctx.Mailer.Send(user.Email, mailables.NewPasswordReset(resetLink, locale))
 		if err != nil {
-			slog.Error("Failed to send password reset email", "error", err, "email", user.Email)
+			details := mailer.DescribeError(err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to send password reset email", "error_code", "smtp_send_failed", "error_stage", details.Stage, "error_kind", details.Kind, "error_message", details.Message, "smtp_code", details.SMTPCode)
 			http.Error(w, "Failed to send email. Check server logs.", http.StatusBadGateway)
 			return
 		}
 
-		slog.Info("Password reset requested", "email", user.Email)
+		shared.LoggerFromContext(r.Context()).Info("Password reset requested", "user_id", user.ID)
 
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(map[string]string{"message": "If an account exists, a reset link has been sent."}); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -95,7 +96,7 @@ func (h *handler) handleResetPassword() http.HandlerFunc {
 
 		hashedPassword, err := HashPassword(req.Password)
 		if err != nil {
-			slog.Error("Failed to hash password", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to hash password", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -107,17 +108,17 @@ func (h *handler) handleResetPassword() http.HandlerFunc {
 				return
 			}
 
-			slog.Error("Failed to complete password reset", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to complete password reset", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
-		slog.Info("Password reset successful", "token_mask", req.Token[:4]+"...")
+		shared.LoggerFromContext(r.Context()).Info("Password reset successful")
 
 		w.WriteHeader(http.StatusOK)
 		err = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "Password updated successfully"})
 		if err != nil {
-			slog.Error("Failed to complete password reset", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to complete password reset", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -148,14 +149,14 @@ func (h *handler) handleAcceptInvite() http.HandlerFunc {
 				http.Error(w, "Invalid or expired link", http.StatusBadRequest)
 				return
 			}
-			slog.Error("Failed to resolve invite token", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve invite token", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		user, err := h.ctx.Store.GetUserByEmail(r.Context(), email)
 		if err != nil {
-			slog.Error("Failed to load invited user", "error", err, "email", email)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load invited user", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -166,7 +167,7 @@ func (h *handler) handleAcceptInvite() http.HandlerFunc {
 
 		pendingInvites, err := h.ctx.Store.ListPendingTeamInvitesByEmail(r.Context(), email)
 		if err != nil {
-			slog.Error("Failed to list pending invites", "error", err, "email", email, "user_id", user.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to list pending invites", "error", err, "user_id", user.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -179,7 +180,7 @@ func (h *handler) handleAcceptInvite() http.HandlerFunc {
 		if authenticatedUserID != uuid.Nil {
 			authenticatedUser, err := h.ctx.Store.GetUserByID(r.Context(), authenticatedUserID)
 			if err != nil {
-				slog.Error("Failed to load authenticated invite user", "error", err, "user_id", authenticatedUserID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to load authenticated invite user", "error", err, "user_id", authenticatedUserID)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
@@ -193,22 +194,22 @@ func (h *handler) handleAcceptInvite() http.HandlerFunc {
 			}
 
 			if err := h.validateCloudInviteAcceptance(r.Context(), email, authenticatedUser.ID, pendingInvites); err != nil {
-				h.writeInviteAcceptanceError(w, err, email, authenticatedUser.ID)
+				h.writeInviteAcceptanceError(r.Context(), w, err, authenticatedUser.ID)
 				return
 			}
 
 			acceptedEmail, acceptedInvites, err := h.ctx.Store.AcceptInviteForAuthenticatedUser(r.Context(), req.Token, authenticatedUser.ID)
 			if err != nil {
-				h.writeInviteAcceptanceError(w, err, email, authenticatedUser.ID)
+				h.writeInviteAcceptanceError(r.Context(), w, err, authenticatedUser.ID)
 				return
 			}
 			h.appendInviteAcceptedAuditEvents(r, authenticatedUser.ID, acceptedEmail, acceptedInvites)
 
-			slog.Info("Invite accepted by existing user", "token_mask", req.Token[:4]+"...", "user_id", authenticatedUser.ID)
+			shared.LoggerFromContext(r.Context()).Info("Invite accepted by existing user", "user_id", authenticatedUser.ID)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			if err := json.NewEncoder(w).Encode(loginResponse{Status: "ok"}); err != nil {
-				slog.Error("Failed to encode response", "error", err)
+				shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 			}
 			return
 		}
@@ -231,37 +232,37 @@ func (h *handler) handleAcceptInvite() http.HandlerFunc {
 		}
 
 		if err := h.validateCloudInviteAcceptance(r.Context(), email, user.ID, pendingInvites); err != nil {
-			h.writeInviteAcceptanceError(w, err, email, user.ID)
+			h.writeInviteAcceptanceError(r.Context(), w, err, user.ID)
 			return
 		}
 
 		hashedPassword, err := HashPassword(req.Password)
 		if err != nil {
-			slog.Error("Failed to hash password", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to hash password", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		acceptedEmail, userID, acceptedInvites, err := h.ctx.Store.AcceptInviteWithPassword(r.Context(), req.Token, hashedPassword)
 		if err != nil {
-			h.writeInviteAcceptanceError(w, err, email, user.ID)
+			h.writeInviteAcceptanceError(r.Context(), w, err, user.ID)
 			return
 		}
 		h.appendInviteAcceptedAuditEvents(r, userID, acceptedEmail, acceptedInvites)
 
 		if err := h.issueLoginSession(r.Context(), w, userID, false); err != nil {
-			slog.Error("Failed to issue invite acceptance session", "error", err, "email", acceptedEmail, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to issue invite acceptance session", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		h.appendAuthAuditForUserTeams(r, userID, "auth.login_succeeded", "success", "Login succeeded after accepting an invitation", true)
 
-		slog.Info("Invite accepted", "token_mask", req.Token[:4]+"...")
+		shared.LoggerFromContext(r.Context()).Info("Invite accepted", "user_id", userID)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(loginResponse{Status: "ok"}); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -288,7 +289,7 @@ func (h *handler) validateCloudInviteAcceptance(ctx context.Context, email strin
 	return h.ctx.Limits().RequireTeamMembershipCapacity(ctx, userID, len(targetTeams))
 }
 
-func (h *handler) writeInviteAcceptanceError(w http.ResponseWriter, err error, email string, userID uuid.UUID) {
+func (h *handler) writeInviteAcceptanceError(ctx context.Context, w http.ResponseWriter, err error, userID uuid.UUID) {
 	switch {
 	case errors.Is(err, database.ErrPasswordResetInvalid), errors.Is(err, database.ErrPasswordResetExpired), errors.Is(err, database.ErrTeamInviteNotFound):
 		http.Error(w, "Invalid or expired link", http.StatusBadRequest)
@@ -299,7 +300,7 @@ func (h *handler) writeInviteAcceptanceError(w http.ResponseWriter, err error, e
 	case errors.Is(err, entitlements.ErrTeamMembershipLimitReached):
 		http.Error(w, "Managed cloud accounts are limited to one team", http.StatusForbidden)
 	default:
-		slog.Error("Failed to accept invite", "error", err, "email", email, "user_id", userID)
+		shared.LoggerFromContext(ctx).Error("Failed to accept invite", "error", err, "user_id", userID)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }
@@ -364,7 +365,7 @@ func (h *handler) handleChangePassword() http.HandlerFunc {
 
 		user, err := h.ctx.Store.GetUserByID(r.Context(), userID)
 		if err != nil {
-			slog.Error("Failed to fetch user", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to fetch user", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -375,7 +376,7 @@ func (h *handler) handleChangePassword() http.HandlerFunc {
 
 		match, err := verifyPassword(req.CurrentPassword, user.Password)
 		if err != nil {
-			slog.Error("Error verifying password", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Error verifying password", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -386,18 +387,18 @@ func (h *handler) handleChangePassword() http.HandlerFunc {
 
 		newHash, err := HashPassword(req.NewPassword)
 		if err != nil {
-			slog.Error("Failed to hash new password", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to hash new password", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		if err := h.ctx.Store.UpdatePasswordByID(r.Context(), userID.String(), newHash); err != nil {
-			slog.Error("Failed to update password", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to update password", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
-		slog.Info("User changed password", "user_id", userID)
+		shared.LoggerFromContext(r.Context()).Info("User changed password", "user_id", userID)
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	}
@@ -432,7 +433,7 @@ func (h *handler) handleLogout() http.HandlerFunc {
 
 		if cookie, err := r.Cookie(authcore.RememberMeCookieName); err == nil {
 			if err := h.ctx.Store.DeleteRememberMeToken(r.Context(), cookie.Value); err != nil {
-				slog.Error("Failed to delete remember me token", "error", err)
+				shared.LoggerFromContext(r.Context()).Error("Failed to delete remember me token", "error", err)
 			}
 		}
 

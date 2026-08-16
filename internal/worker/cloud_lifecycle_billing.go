@@ -4,13 +4,13 @@ package worker
 
 import (
 	"context"
-	"log/slog"
 	"strings"
 	"time"
 
 	"hitkeep/internal/appurl"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	"hitkeep/internal/hklog"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
 )
@@ -64,14 +64,14 @@ func (w *CloudLifecycleWorker) processKind(ctx context.Context, kind string, now
 		recipients, err = store.ListEligibleCloudLifecycleRecipients(ctx, kind, now, 100)
 	}
 	if err != nil {
-		slog.Error("CloudLifecycleWorker: failed to load recipients", "kind", kind, "error", err)
+		hklog.LoggerFromContext(ctx).Error("CloudLifecycleWorker: failed to load recipients", "kind", kind, "error", err)
 		return
 	}
 
 	links := cloudLifecycleLinks(w.conf)
 	for _, recipient := range recipients {
 		if ctx.Err() != nil {
-			slog.Warn("CloudLifecycleWorker: context cancelled, halting sends", "kind", kind)
+			hklog.LoggerFromContext(ctx).Warn("CloudLifecycleWorker: context cancelled, halting sends", "kind", kind)
 			return
 		}
 
@@ -81,15 +81,16 @@ func (w *CloudLifecycleWorker) processKind(ctx context.Context, kind string, now
 		}
 
 		if err := w.mailer.Send(recipient.Email, email); err != nil {
-			slog.Error("CloudLifecycleWorker: failed to send email", "kind", kind, "tenant_id", recipient.TenantID, "user_id", recipient.UserID, "error", err)
+			details := mailer.DescribeError(err)
+			hklog.LoggerFromContext(ctx).Error("CloudLifecycleWorker: failed to send email", "kind", kind, "tenant_id", recipient.TenantID, "user_id", recipient.UserID, "error_code", "smtp_send_failed", "error_stage", details.Stage, "error_kind", details.Kind, "error_message", details.Message, "smtp_code", details.SMTPCode)
 			if markErr := store.MarkCloudLifecycleMessageFailed(ctx, database.CloudLifecycleMessageUpdate{
 				TenantID: recipient.TenantID,
 				UserID:   recipient.UserID,
 				Kind:     kind,
-				Error:    err.Error(),
+				Error:    details.Message,
 				Now:      now,
 			}); markErr != nil {
-				slog.Error("CloudLifecycleWorker: failed to record send failure", "kind", kind, "tenant_id", recipient.TenantID, "user_id", recipient.UserID, "error", markErr)
+				hklog.LoggerFromContext(ctx).Error("CloudLifecycleWorker: failed to record send failure", "kind", kind, "tenant_id", recipient.TenantID, "user_id", recipient.UserID, "error", markErr)
 			}
 			continue
 		}
@@ -100,10 +101,10 @@ func (w *CloudLifecycleWorker) processKind(ctx context.Context, kind string, now
 			Kind:     kind,
 			Now:      now,
 		}); err != nil {
-			slog.Error("CloudLifecycleWorker: failed to record sent email", "kind", kind, "tenant_id", recipient.TenantID, "user_id", recipient.UserID, "error", err)
+			hklog.LoggerFromContext(ctx).Error("CloudLifecycleWorker: failed to record sent email", "kind", kind, "tenant_id", recipient.TenantID, "user_id", recipient.UserID, "error", err)
 			continue
 		}
-		slog.Info("CloudLifecycleWorker: sent email", "kind", kind, "tenant_id", recipient.TenantID, "user_id", recipient.UserID)
+		hklog.LoggerFromContext(ctx).Debug("CloudLifecycleWorker: sent email", "kind", kind, "tenant_id", recipient.TenantID, "user_id", recipient.UserID)
 	}
 }
 

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	mrand "math/rand"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	"hitkeep/internal/hklog"
 )
 
 type webVitalsProfile struct {
@@ -112,7 +112,7 @@ func seedWebVitals(ctx context.Context, store *database.Store, siteID uuid.UUID,
 			return total, fmt.Errorf("insert final web vitals batch: %w", err)
 		}
 	}
-	slog.Info("Web Vitals seeded", "samples", total)
+	hklog.LoggerFromContext(ctx).Info("Web Vitals seeded", "samples", total)
 	return total, nil
 }
 
@@ -123,7 +123,7 @@ func loadWebVitalHitContexts(ctx context.Context, store *database.Store, siteID 
 		WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?
 	`, siteID, start, end)
 	if err != nil {
-		slog.Warn("Failed to load hit context for Web Vitals seed", "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Failed to load hit context for Web Vitals seed", "error", err)
 		return nil
 	}
 	defer rows.Close()
@@ -137,7 +137,7 @@ func loadWebVitalHitContexts(ctx context.Context, store *database.Store, siteID 
 			timestamp time.Time
 		)
 		if err := rows.Scan(&sessionID, &pageID, &path, &timestamp); err != nil {
-			slog.Warn("Failed to scan hit context for Web Vitals seed", "error", err)
+			hklog.LoggerFromContext(ctx).Warn("Failed to scan hit context for Web Vitals seed", "error", err)
 			return contexts
 		}
 		if _, ok := webVitalsProfiles[path]; !ok {
@@ -150,7 +150,7 @@ func loadWebVitalHitContexts(ctx context.Context, store *database.Store, siteID 
 		})
 	}
 	if err := rows.Err(); err != nil {
-		slog.Warn("Failed to read hit context for Web Vitals seed", "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Failed to read hit context for Web Vitals seed", "error", err)
 	}
 	return contexts
 }

@@ -1,8 +1,11 @@
 package admin
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -37,6 +40,7 @@ type adminTestMailDriver struct {
 	subject    string
 	htmlBody   string
 	textBody   string
+	sendErr    error
 }
 
 func (d *adminTestMailDriver) Send(recipients []string, subject, htmlBody, textBody string) error {
@@ -44,7 +48,7 @@ func (d *adminTestMailDriver) Send(recipients []string, subject, htmlBody, textB
 	d.subject = subject
 	d.htmlBody = htmlBody
 	d.textBody = textBody
-	return nil
+	return d.sendErr
 }
 
 func (d *adminTestMailDriver) Close() error { return nil }
@@ -686,6 +690,38 @@ func TestHandleAddSiteMemberCreatesTeamInviteForNewUserOutsideSiteTeam(t *testin
 	}
 	if strings.Contains(drv.textBody, "/login?returnUrl=") {
 		t.Fatalf("expected new user link not to route through login, got:\n%s", drv.textBody)
+	}
+}
+
+func TestHandleAddSiteMemberDoesNotLogRawInviteMailError(t *testing.T) {
+	h, store, _, _, actorUserID, _ := setupAdminTestEnv(t)
+	ctx := context.Background()
+	site, err := store.CreateSite(ctx, actorUserID, "invite-mail-error.example")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+
+	rawMailError := "provider response password=super-secret token=top-secret https://mail.example.test/reject"
+	drv := &adminTestMailDriver{sendErr: errors.New(rawMailError)}
+	h.ctx.Mailer = mailer.NewWithDriver(drv, h.ctx.Config)
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+	body := strings.NewReader(`{"email":"invite-mail-error@example.com","role":"viewer"}`)
+	req := withAdminTestUser(httptest.NewRequest(http.MethodPost, "/api/admin/sites/"+site.ID.String()+"/members", body), actorUserID)
+	req = req.WithContext(shared.WithLogger(req.Context(), logger))
+	req.SetPathValue("id", site.ID.String())
+	w := httptest.NewRecorder()
+
+	h.handleAddSiteMember().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
+	}
+	if strings.Contains(logs.String(), rawMailError) {
+		t.Fatalf("raw invite mail error leaked into logs: %q", logs.String())
+	}
+	if !strings.Contains(logs.String(), "error_stage=transport") || !strings.Contains(logs.String(), "error_kind=transport") || !strings.Contains(logs.String(), "error_message=\"mail transport failed\"") {
+		t.Fatalf("expected safe invite mail diagnostics, got %q", logs.String())
 	}
 }
 

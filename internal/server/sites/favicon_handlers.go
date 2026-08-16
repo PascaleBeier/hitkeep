@@ -2,12 +2,13 @@ package sites
 
 import (
 	"fmt"
-	"log/slog"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"strings"
 	"time"
+
+	"hitkeep/internal/server/shared"
 )
 
 func (h *handler) handleGetFavicon() http.HandlerFunc {
@@ -57,7 +58,7 @@ func (h *handler) handleGetFavicon() http.HandlerFunc {
 				return nil
 			},
 			ErrorHandler: func(rw http.ResponseWriter, req *http.Request, proxyErr error) {
-				slog.Warn("Failed to fetch favicon upstream", "domain", domain, "error", proxyErr)
+				shared.LoggerFromContext(req.Context()).Warn("Failed to fetch favicon upstream", "domain", domain, "error", proxyErr)
 				rw.Header().Set("Cache-Control", "public, max-age=300")
 				rw.WriteHeader(http.StatusNoContent)
 			},

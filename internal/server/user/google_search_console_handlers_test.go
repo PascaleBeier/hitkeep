@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -607,7 +606,7 @@ func TestGoogleSearchConsoleManualSyncRunsImmediatelyAndAudits(t *testing.T) {
 	}
 }
 
-func TestGoogleSearchConsoleManualSyncFailureAuditsFullUpstreamResponseBody(t *testing.T) {
+func TestGoogleSearchConsoleManualSyncFailureDoesNotExposeUpstreamResponseBody(t *testing.T) {
 	responseBody := `{"error":{"code":400,"message":"Invalid Search Console request","status":"INVALID_ARGUMENT"}}`
 	h, store, userID := setupUserSecurityTestEnv(t)
 	defer store.Close()
@@ -641,8 +640,9 @@ func TestGoogleSearchConsoleManualSyncFailureAuditsFullUpstreamResponseBody(t *t
 	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
 		t.Fatalf("decode sync response: %v", err)
 	}
-	if response.SyncStatus == nil || response.SyncStatus.LastErrorMessage != responseBody {
-		t.Fatalf("expected full upstream response body in sync status, got %+v", response.SyncStatus)
+	wantErrorMessage := "Invalid Search Console request fallback"
+	if response.SyncStatus == nil || response.SyncStatus.LastErrorMessage != wantErrorMessage {
+		t.Fatalf("expected safe provider message in sync status, got %+v", response.SyncStatus)
 	}
 
 	entries := requireGoogleSearchConsoleAuditEntries(t, store, teamID, "google_search_console.sync_failed")
@@ -652,8 +652,11 @@ func TestGoogleSearchConsoleManualSyncFailureAuditsFullUpstreamResponseBody(t *t
 			t.Fatalf("expected %q in failure audit: %q", expected, details)
 		}
 	}
-	if !strings.Contains(details, strconv.Quote(responseBody)) {
-		t.Fatalf("failure audit did not include the full upstream response body: %q", details)
+	if !strings.Contains(details, `error_message="`+wantErrorMessage+`"`) {
+		t.Fatalf("failure audit did not include the safe provider message: %q", details)
+	}
+	if strings.Contains(details, responseBody) {
+		t.Fatalf("failure audit exposed the upstream response body: %q", details)
 	}
 }
 

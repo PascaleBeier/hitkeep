@@ -3,8 +3,8 @@
 package cloud
 
 import (
+	"context"
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"strings"
 
@@ -46,7 +46,7 @@ func (h *handler) handleCloudOpenAPI() http.HandlerFunc {
 		if !h.discoveryEnabled(w) {
 			return
 		}
-		writeDiscoveryJSON(w, system.OpenAPISpecV1(cloudPublicURL(h.ctx.Config)))
+		writeDiscoveryJSON(r.Context(), w, system.OpenAPISpecV1(cloudPublicURL(h.ctx.Config)))
 	}
 }
 
@@ -59,7 +59,7 @@ func (h *handler) handleCloudMCPServerCard() http.HandlerFunc {
 			http.NotFound(w, r)
 			return
 		}
-		writeDiscoveryJSON(w, h.mcpServerCard())
+		writeDiscoveryJSON(r.Context(), w, h.mcpServerCard())
 	}
 }
 
@@ -68,7 +68,7 @@ func (h *handler) handleCloudIntegrations() http.HandlerFunc {
 		if !h.discoveryEnabled(w) {
 			return
 		}
-		writeDiscoveryJSON(w, h.integrationsDeclaration())
+		writeDiscoveryJSON(r.Context(), w, h.integrationsDeclaration())
 	}
 }
 
@@ -77,7 +77,7 @@ func (h *handler) handleCloudAPICatalog() http.HandlerFunc {
 		if !h.discoveryEnabled(w) {
 			return
 		}
-		writeDiscoveryLinkset(w, h.apiCatalog())
+		writeDiscoveryLinkset(r.Context(), w, h.apiCatalog())
 	}
 }
 
@@ -277,17 +277,17 @@ func normalizedMCPPath(path string) string {
 	return path
 }
 
-func writeDiscoveryJSON(w http.ResponseWriter, body any) {
+func writeDiscoveryJSON(ctx context.Context, w http.ResponseWriter, body any) {
 	writeDiscoveryHeaders(w, "application/json")
 	if err := json.NewEncoder(w).Encode(body); err != nil {
-		slog.Error("Failed to encode cloud discovery response", "error", err)
+		shared.LoggerFromContext(ctx).Error("Failed to encode cloud discovery response", "error", err)
 	}
 }
 
-func writeDiscoveryLinkset(w http.ResponseWriter, body any) {
+func writeDiscoveryLinkset(ctx context.Context, w http.ResponseWriter, body any) {
 	writeDiscoveryHeaders(w, "application/linkset+json")
 	if err := json.NewEncoder(w).Encode(body); err != nil {
-		slog.Error("Failed to encode cloud discovery response", "error", err)
+		shared.LoggerFromContext(ctx).Error("Failed to encode cloud discovery response", "error", err)
 	}
 }
 

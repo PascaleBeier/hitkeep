@@ -2,11 +2,11 @@ package share
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/server/filterparams"
+	"hitkeep/internal/server/shared"
 )
 
 // handleGetShareAIActivity serves the unified AI activity report for a shared
@@ -53,7 +53,7 @@ func (h *handler) handleGetShareAIActivity() http.HandlerFunc {
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), site.ID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", site.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", site.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -70,14 +70,14 @@ func (h *handler) handleGetShareAIActivity() http.HandlerFunc {
 			CompareEnd:   compareEnd,
 		})
 		if err != nil {
-			slog.Error("Failed to get share AI activity report", "error", err, "site_id", site.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get share AI activity report", "error", err, "site_id", site.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(report); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }

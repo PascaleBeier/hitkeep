@@ -20,7 +20,8 @@ type SpamDecision struct {
 }
 
 type SpamFilter struct {
-	path string
+	path   string
+	logger *slog.Logger
 
 	mu            sync.RWMutex
 	data          SpamFeedData
@@ -28,8 +29,11 @@ type SpamFilter struct {
 	networks      []netip.Prefix
 }
 
-func NewSpamFilter(path string) *SpamFilter {
-	filter := &SpamFilter{path: path}
+func NewSpamFilter(path string, logger *slog.Logger) *SpamFilter {
+	if logger == nil {
+		panic("blocking: logger is required")
+	}
+	filter := &SpamFilter{path: path, logger: logger}
 	if embedded, err := LoadEmbeddedSpamFeedData(); err == nil {
 		filter.apply(embedded)
 	}
@@ -62,7 +66,7 @@ func (f *SpamFilter) StartRefreshLoop(ctx context.Context, autoUpdate bool, inte
 
 	if isLeader() {
 		if err := f.Update(ctx); err != nil && !errors.Is(err, context.Canceled) {
-			slog.Warn("Failed initial spam filter update", "error", err)
+			f.logger.Warn("Failed initial spam filter update", "error", err)
 		}
 	}
 
@@ -77,10 +81,10 @@ func (f *SpamFilter) StartRefreshLoop(ctx context.Context, autoUpdate bool, inte
 			case <-ticker.C:
 				if isLeader() {
 					if err := f.Update(ctx); err != nil && !errors.Is(err, context.Canceled) {
-						slog.Warn("Failed to refresh spam filter feeds", "error", err)
+						f.logger.Warn("Failed to refresh spam filter feeds", "error", err)
 					}
 				} else if err := f.RefreshFromDisk(); err != nil && !errors.Is(err, context.Canceled) {
-					slog.Warn("Failed to reload spam filter cache from disk", "error", err, "path", f.path)
+					f.logger.Warn("Failed to reload spam filter cache from disk", "error", err, "path", f.path)
 				}
 			}
 		}
@@ -88,7 +92,7 @@ func (f *SpamFilter) StartRefreshLoop(ctx context.Context, autoUpdate bool, inte
 }
 
 func (f *SpamFilter) Update(ctx context.Context) error {
-	data, err := FetchSpamFeedData(ctx, nil)
+	data, err := FetchSpamFeedData(ctx, nil, f.logger)
 	if err != nil {
 		return err
 	}
@@ -163,7 +167,7 @@ func (f *SpamFilter) apply(data SpamFeedData) {
 	for _, cidr := range data.NetworkDenylist {
 		prefix, err := netip.ParsePrefix(cidr)
 		if err != nil {
-			slog.Warn("Skipping invalid spam network prefix", "cidr", cidr, "error", err)
+			f.logger.Warn("Skipping invalid spam network prefix", "cidr", cidr, "error", err)
 			continue
 		}
 		networks = append(networks, prefix.Masked())

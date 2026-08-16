@@ -8,6 +8,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/google/uuid"
@@ -276,56 +277,46 @@ func TestAskAIAnswerDeltaExtractorStreamsOnlyAnswerMarkdown(t *testing.T) {
 }
 
 func TestRunAskAIStreamingGenerationStopsWhenTextStreamStallsPastTimeout(t *testing.T) {
-	streamCh := make(chan provider.StreamChunk)
-	var closeStreamOnce sync.Once
-	closeStream := func() {
-		closeStreamOnce.Do(func() {
-			close(streamCh)
-		})
-	}
-	defer closeStream()
-
-	service := &Service{
-		conf: Config{
-			Enabled:  true,
-			Provider: "openai",
-			Model:    "gpt-test",
-			Timeout:  20 * time.Millisecond,
-		},
-		model: &fakeLanguageModel{
-			id: "gpt-test",
-			streamFn: func(context.Context, provider.GenerateParams) (*provider.StreamResult, error) {
-				return &provider.StreamResult{Stream: streamCh}, nil
+	synctest.Test(t, func(t *testing.T) {
+		streamCh := make(chan provider.StreamChunk)
+		service := &Service{
+			conf: Config{
+				Enabled:  true,
+				Provider: "openai",
+				Model:    "gpt-test",
+				Timeout:  20 * time.Millisecond,
 			},
-		},
-	}
+			model: &fakeLanguageModel{
+				id: "gpt-test",
+				streamFn: func(context.Context, provider.GenerateParams) (*provider.StreamResult, error) {
+					return &provider.StreamResult{Stream: streamCh}, nil
+				},
+			},
+		}
 
-	done := make(chan askAIGeneration, 1)
-	go func() {
-		done <- service.runAskAIStreamingGeneration(context.Background(), AskAIRequest{
-			TeamID:     uuid.New(),
-			SiteID:     uuid.New(),
-			ActorID:    uuid.New(),
-			ActorType:  "user",
-			SiteDomain: "example.com",
-			Query:      "How many visits did I get from ChatGPT in the last 14 days?",
-			From:       time.Date(2026, 6, 19, 0, 0, 0, 0, time.UTC),
-			To:         time.Date(2026, 7, 3, 0, 0, 0, 0, time.UTC),
-		}, func(AskAIStreamDelta) error {
-			return nil
-		})
-	}()
+		done := make(chan askAIGeneration, 1)
+		go func() {
+			done <- service.runAskAIStreamingGeneration(t.Context(), AskAIRequest{
+				TeamID:     uuid.New(),
+				SiteID:     uuid.New(),
+				ActorID:    uuid.New(),
+				ActorType:  "user",
+				SiteDomain: "example.com",
+				Query:      "How many visits did I get from ChatGPT in the last 14 days?",
+				From:       time.Date(2026, 6, 19, 0, 0, 0, 0, time.UTC),
+				To:         time.Date(2026, 7, 3, 0, 0, 0, 0, time.UTC),
+			}, func(AskAIStreamDelta) error {
+				return nil
+			})
+		}()
 
-	select {
-	case generation := <-done:
-		closeStream()
+		synctest.Wait()
+		generation := <-done
+		close(streamCh)
 		if !errors.Is(generation.Err, context.DeadlineExceeded) {
 			t.Fatalf("expected stalled stream to return deadline exceeded, got %v", generation.Err)
 		}
-	case <-time.After(time.Second):
-		closeStream()
-		t.Fatal("stalled Ask AI text stream did not return after the configured timeout")
-	}
+	})
 }
 
 func TestRunAskAIStreamingGenerationReturnsProgressSinkError(t *testing.T) {
@@ -1111,7 +1102,7 @@ func TestGenerateOpportunityProposalBlocksBeforeProviderWhenBudgetExhausted(t *t
 
 func TestGenerateOpportunityProposalReservesBudgetBeforeProviderCall(t *testing.T) {
 	recorder := &recordingRecorder{}
-	var calls int32
+	var calls atomic.Int32
 	service := &Service{
 		conf: Config{
 			Enabled:             true,
@@ -1126,7 +1117,7 @@ func TestGenerateOpportunityProposalReservesBudgetBeforeProviderCall(t *testing.
 		model: &fakeLanguageModel{
 			id: "gpt-test",
 			generateFn: func(context.Context, provider.GenerateParams) (*provider.GenerateResult, error) {
-				atomic.AddInt32(&calls, 1)
+				calls.Add(1)
 				return &provider.GenerateResult{
 					Text:         validOpportunityProviderJSON(),
 					FinishReason: provider.FinishStop,
@@ -1159,8 +1150,8 @@ func TestGenerateOpportunityProposalReservesBudgetBeforeProviderCall(t *testing.
 	if !errors.Is(err, ErrBudgetExhausted) {
 		t.Fatalf("expected second call to be budget exhausted, got %v", err)
 	}
-	if atomic.LoadInt32(&calls) != 1 {
-		t.Fatalf("expected only one provider call after reservation, got %d", calls)
+	if calls.Load() != 1 {
+		t.Fatalf("expected only one provider call after reservation, got %d", calls.Load())
 	}
 	if len(recorder.runs) != 2 || recorder.runs[0].Status != "success" || recorder.runs[0].ID != first.RunID || recorder.runs[1].ErrorCategory != "budget_exhausted" {
 		t.Fatalf("expected finalized reservation plus safe budget-exhausted run, got %+v", recorder.runs)

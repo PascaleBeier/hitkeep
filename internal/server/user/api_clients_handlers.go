@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -55,14 +54,14 @@ func (h *handler) handleListAPIClients() http.HandlerFunc {
 
 		clients, err := h.ctx.Store.ListAPIClients(r.Context(), userID)
 		if err != nil {
-			slog.Error("Failed to list api clients", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to list api clients", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(clients); err != nil {
-			slog.Error("Failed to encode api clients response", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode api clients response", "error", err, "user_id", userID)
 		}
 	}
 }
@@ -104,7 +103,7 @@ func (h *handler) handleCreateAPIClient() http.HandlerFunc {
 
 		actorInstanceRole, err := h.ctx.Store.GetInstanceRole(r.Context(), userID)
 		if err != nil {
-			slog.Error("Failed to get actor instance role", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get actor instance role", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -115,7 +114,7 @@ func (h *handler) handleCreateAPIClient() http.HandlerFunc {
 
 		siteRoles, err := h.validateDelegatedSiteRoles(r, userID, actorInstanceRole, req.SiteRoles)
 		if err != nil {
-			slog.Warn("Invalid delegated site roles", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Warn("Invalid delegated site roles", "error", err, "user_id", userID)
 			http.Error(w, err.Error(), http.StatusForbidden)
 			return
 		}
@@ -130,13 +129,13 @@ func (h *handler) handleCreateAPIClient() http.HandlerFunc {
 			req.ExpiresAt,
 		)
 		if err != nil {
-			slog.Error("Failed to create api client", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to create api client", "error", err, "user_id", userID)
 			http.Error(w, "Failed to create api client", http.StatusInternalServerError)
 			return
 		}
 
 		if err := h.appendAPIClientAudit(r, userID, uuid.Nil, "api_client.created", client); err != nil {
-			slog.Error("Failed to audit api client create", "error", err, "user_id", userID, "client_id", client.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to audit api client create", "error", err, "user_id", userID, "client_id", client.ID)
 			http.Error(w, "Failed to audit api client action", http.StatusInternalServerError)
 			return
 		}
@@ -144,7 +143,7 @@ func (h *handler) handleCreateAPIClient() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		if err := json.NewEncoder(w).Encode(apiClientTokenResponse{Client: *client, Token: token}); err != nil {
-			slog.Error("Failed to encode create api client response", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode create api client response", "error", err, "user_id", userID)
 		}
 	}
 }
@@ -165,7 +164,7 @@ func (h *handler) handleUpdateAPIClient() http.HandlerFunc {
 
 		existing, err := h.ctx.Store.GetAPIClient(r.Context(), userID, clientID)
 		if err != nil {
-			slog.Error("Failed to load api client before update", "error", err, "user_id", userID, "client_id", clientID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load api client before update", "error", err, "user_id", userID, "client_id", clientID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -200,7 +199,7 @@ func (h *handler) handleUpdateAPIClient() http.HandlerFunc {
 
 		actorInstanceRole, err := h.ctx.Store.GetInstanceRole(r.Context(), userID)
 		if err != nil {
-			slog.Error("Failed to get actor instance role", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get actor instance role", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -211,7 +210,7 @@ func (h *handler) handleUpdateAPIClient() http.HandlerFunc {
 
 		siteRoles, err := h.validateDelegatedSiteRoles(r, userID, actorInstanceRole, req.SiteRoles)
 		if err != nil {
-			slog.Warn("Invalid delegated site roles for update", "error", err, "user_id", userID, "client_id", clientID)
+			shared.LoggerFromContext(r.Context()).Warn("Invalid delegated site roles for update", "error", err, "user_id", userID, "client_id", clientID)
 			http.Error(w, err.Error(), http.StatusForbidden)
 			return
 		}
@@ -233,7 +232,7 @@ func (h *handler) handleUpdateAPIClient() http.HandlerFunc {
 			revoked,
 		)
 		if err != nil {
-			slog.Error("Failed to update api client", "error", err, "user_id", userID, "client_id", clientID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to update api client", "error", err, "user_id", userID, "client_id", clientID)
 			http.Error(w, "Failed to update api client", http.StatusInternalServerError)
 			return
 		}
@@ -243,14 +242,14 @@ func (h *handler) handleUpdateAPIClient() http.HandlerFunc {
 		}
 
 		if err := h.appendAPIClientAudit(r, userID, uuid.Nil, apiClientUpdateAuditAction(existing, updated), updated); err != nil {
-			slog.Error("Failed to audit api client update", "error", err, "user_id", userID, "client_id", clientID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to audit api client update", "error", err, "user_id", userID, "client_id", clientID)
 			http.Error(w, "Failed to audit api client action", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(updated); err != nil {
-			slog.Error("Failed to encode api client update response", "error", err, "user_id", userID, "client_id", clientID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode api client update response", "error", err, "user_id", userID, "client_id", clientID)
 		}
 	}
 }
@@ -279,7 +278,7 @@ func (h *handler) handleRotateAPIClient() http.HandlerFunc {
 				http.Error(w, "API client is revoked or expired", http.StatusConflict)
 				return
 			}
-			slog.Error("Failed to rotate api client", "error", err, "user_id", userID, "client_id", clientID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to rotate api client", "error", err, "user_id", userID, "client_id", clientID)
 			http.Error(w, "Failed to rotate api client", http.StatusInternalServerError)
 			return
 		}
@@ -289,14 +288,14 @@ func (h *handler) handleRotateAPIClient() http.HandlerFunc {
 		}
 
 		if err := h.appendAPIClientAudit(r, userID, uuid.Nil, "api_client.rotated", client); err != nil {
-			slog.Error("Failed to audit api client rotation", "error", err, "user_id", userID, "client_id", clientID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to audit api client rotation", "error", err, "user_id", userID, "client_id", clientID)
 			http.Error(w, "Failed to audit api client action", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(apiClientTokenResponse{Client: *client, Token: token}); err != nil {
-			slog.Error("Failed to encode rotate api client response", "error", err, "user_id", userID, "client_id", clientID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode rotate api client response", "error", err, "user_id", userID, "client_id", clientID)
 		}
 	}
 }
@@ -317,7 +316,7 @@ func (h *handler) handleDeleteAPIClient() http.HandlerFunc {
 
 		existing, err := h.ctx.Store.GetAPIClient(r.Context(), userID, clientID)
 		if err != nil {
-			slog.Error("Failed to load api client before delete", "error", err, "user_id", userID, "client_id", clientID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load api client before delete", "error", err, "user_id", userID, "client_id", clientID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -332,13 +331,13 @@ func (h *handler) handleDeleteAPIClient() http.HandlerFunc {
 				http.Error(w, "API client not found", http.StatusNotFound)
 				return
 			}
-			slog.Error("Failed to delete api client", "error", err, "user_id", userID, "client_id", clientID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to delete api client", "error", err, "user_id", userID, "client_id", clientID)
 			http.Error(w, "Failed to delete api client", http.StatusInternalServerError)
 			return
 		}
 
 		if err := h.appendAPIClientAudit(r, userID, uuid.Nil, "api_client.deleted", existing); err != nil {
-			slog.Error("Failed to audit api client delete", "error", err, "user_id", userID, "client_id", clientID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to audit api client delete", "error", err, "user_id", userID, "client_id", clientID)
 			http.Error(w, "Failed to audit api client action", http.StatusInternalServerError)
 			return
 		}
@@ -355,14 +354,14 @@ func (h *handler) handleListTeamAPIClients() http.HandlerFunc {
 
 		clients, err := h.ctx.Store.ListTeamAPIClients(r.Context(), teamID)
 		if err != nil {
-			slog.Error("Failed to list team api clients", "error", err, "team_id", teamID, "actor_id", actorID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to list team api clients", "error", err, "team_id", teamID, "actor_id", actorID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(clients); err != nil {
-			slog.Error("Failed to encode team api clients response", "error", err, "team_id", teamID, "actor_id", actorID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode team api clients response", "error", err, "team_id", teamID, "actor_id", actorID)
 		}
 	}
 }
@@ -394,7 +393,7 @@ func (h *handler) handleCreateTeamAPIClient() http.HandlerFunc {
 
 		siteRoles, err := h.validateTeamDelegatedSiteRoles(r, teamID, req.SiteRoles)
 		if err != nil {
-			slog.Warn("Invalid delegated team site roles", "error", err, "team_id", teamID, "actor_id", actorID)
+			shared.LoggerFromContext(r.Context()).Warn("Invalid delegated team site roles", "error", err, "team_id", teamID, "actor_id", actorID)
 			http.Error(w, err.Error(), http.StatusForbidden)
 			return
 		}
@@ -408,13 +407,13 @@ func (h *handler) handleCreateTeamAPIClient() http.HandlerFunc {
 			req.ExpiresAt,
 		)
 		if err != nil {
-			slog.Error("Failed to create team api client", "error", err, "team_id", teamID, "actor_id", actorID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to create team api client", "error", err, "team_id", teamID, "actor_id", actorID)
 			http.Error(w, "Failed to create api client", http.StatusInternalServerError)
 			return
 		}
 
 		if err := h.appendAPIClientAudit(r, actorID, teamID, "api_client.created", client); err != nil {
-			slog.Error("Failed to audit team api client create", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", client.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to audit team api client create", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", client.ID)
 			http.Error(w, "Failed to audit api client action", http.StatusInternalServerError)
 			return
 		}
@@ -422,7 +421,7 @@ func (h *handler) handleCreateTeamAPIClient() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		if err := json.NewEncoder(w).Encode(apiClientTokenResponse{Client: *client, Token: token}); err != nil {
-			slog.Error("Failed to encode create team api client response", "error", err, "team_id", teamID, "actor_id", actorID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode create team api client response", "error", err, "team_id", teamID, "actor_id", actorID)
 		}
 	}
 }
@@ -442,7 +441,7 @@ func (h *handler) handleUpdateTeamAPIClient() http.HandlerFunc {
 
 		existing, err := h.ctx.Store.GetTeamAPIClient(r.Context(), teamID, clientID)
 		if err != nil {
-			slog.Error("Failed to load team api client before update", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load team api client before update", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -471,7 +470,7 @@ func (h *handler) handleUpdateTeamAPIClient() http.HandlerFunc {
 
 		siteRoles, err := h.validateTeamDelegatedSiteRoles(r, teamID, req.SiteRoles)
 		if err != nil {
-			slog.Warn("Invalid delegated team site roles for update", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
+			shared.LoggerFromContext(r.Context()).Warn("Invalid delegated team site roles for update", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
 			http.Error(w, err.Error(), http.StatusForbidden)
 			return
 		}
@@ -492,7 +491,7 @@ func (h *handler) handleUpdateTeamAPIClient() http.HandlerFunc {
 			revoked,
 		)
 		if err != nil {
-			slog.Error("Failed to update team api client", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to update team api client", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
 			http.Error(w, "Failed to update api client", http.StatusInternalServerError)
 			return
 		}
@@ -502,14 +501,14 @@ func (h *handler) handleUpdateTeamAPIClient() http.HandlerFunc {
 		}
 
 		if err := h.appendAPIClientAudit(r, actorID, teamID, apiClientUpdateAuditAction(existing, updated), updated); err != nil {
-			slog.Error("Failed to audit team api client update", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to audit team api client update", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
 			http.Error(w, "Failed to audit api client action", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(updated); err != nil {
-			slog.Error("Failed to encode team api client update response", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode team api client update response", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
 		}
 	}
 }
@@ -537,7 +536,7 @@ func (h *handler) handleRotateTeamAPIClient() http.HandlerFunc {
 				http.Error(w, "API client is revoked or expired", http.StatusConflict)
 				return
 			}
-			slog.Error("Failed to rotate team api client", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to rotate team api client", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
 			http.Error(w, "Failed to rotate api client", http.StatusInternalServerError)
 			return
 		}
@@ -547,14 +546,14 @@ func (h *handler) handleRotateTeamAPIClient() http.HandlerFunc {
 		}
 
 		if err := h.appendAPIClientAudit(r, actorID, teamID, "api_client.rotated", client); err != nil {
-			slog.Error("Failed to audit team api client rotation", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to audit team api client rotation", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
 			http.Error(w, "Failed to audit api client action", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(apiClientTokenResponse{Client: *client, Token: token}); err != nil {
-			slog.Error("Failed to encode rotate team api client response", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode rotate team api client response", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
 		}
 	}
 }
@@ -574,7 +573,7 @@ func (h *handler) handleDeleteTeamAPIClient() http.HandlerFunc {
 
 		existing, err := h.ctx.Store.GetTeamAPIClient(r.Context(), teamID, clientID)
 		if err != nil {
-			slog.Error("Failed to load team api client before delete", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load team api client before delete", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -589,13 +588,13 @@ func (h *handler) handleDeleteTeamAPIClient() http.HandlerFunc {
 				http.Error(w, "API client not found", http.StatusNotFound)
 				return
 			}
-			slog.Error("Failed to delete team api client", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to delete team api client", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
 			http.Error(w, "Failed to delete api client", http.StatusInternalServerError)
 			return
 		}
 
 		if err := h.appendAPIClientAudit(r, actorID, teamID, "api_client.deleted", existing); err != nil {
-			slog.Error("Failed to audit team api client delete", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to audit team api client delete", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
 			http.Error(w, "Failed to audit api client action", http.StatusInternalServerError)
 			return
 		}

@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"log/slog"
 	mrand "math/rand"
 	"strings"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/assetstore"
 	"hitkeep/internal/database"
+	"hitkeep/internal/hklog"
 )
 
 type qrCampaignSeedFixture struct {
@@ -110,7 +110,7 @@ func seedQRCampaigns(ctx context.Context, sharedStore, analyticsStore *database.
 		return stats, fmt.Errorf("flush QR campaign analytics: %w", err)
 	}
 
-	slog.Info("QR campaigns seeded", "codes", stats.qrCodes, "opens", stats.qrOpens, "attributed_hits", stats.hits, "attributed_sessions", stats.sessions)
+	hklog.LoggerFromContext(ctx).Info("QR campaigns seeded", "codes", stats.qrCodes, "opens", stats.qrOpens, "attributed_hits", stats.hits, "attributed_sessions", stats.sessions)
 	return stats, nil
 }
 

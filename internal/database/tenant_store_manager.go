@@ -38,6 +38,7 @@ type siteSyncKey struct {
 type TenantStoreManager struct {
 	shared   *Store
 	basePath string
+	logger   *slog.Logger
 
 	mu                 sync.RWMutex
 	stores             map[uuid.UUID]*Store
@@ -87,6 +88,7 @@ func NewTenantStoreManager(shared *Store, basePath string, opts ...TenantStoreMa
 	mgr := &TenantStoreManager{
 		shared:          shared,
 		basePath:        basePath,
+		logger:          shared.logger,
 		stores:          make(map[uuid.UUID]*Store),
 		attachedAliases: make(map[uuid.UUID]string),
 		recentSyncs:     lru.NewLRU[siteSyncKey, struct{}](siteSyncMemoSize, nil, siteSyncMemoTTL),
@@ -100,7 +102,7 @@ func NewTenantStoreManager(shared *Store, basePath string, opts ...TenantStoreMa
 	// exist yet (pre-migration) we'll resolve lazily.
 	defaultID, err := shared.GetDefaultTenantID(context.Background())
 	if err != nil {
-		slog.Debug("TenantStoreManager: could not resolve default tenant ID at init (will resolve lazily)", "error", err)
+		mgr.logger.Debug("TenantStoreManager: could not resolve default tenant ID at init (will resolve lazily)", "error", err)
 	} else {
 		mgr.defaultID = defaultID
 		if !mgr.dataPlaneOptionSet {
@@ -395,7 +397,7 @@ func (m *TenantStoreManager) PurgeArchivedTenant(ctx context.Context, tenantID u
 		return nil, err
 	}
 	if deleted != nil {
-		slog.Info("Purged archived tenant", "tenant_id", tenantID, "name", deleted.Name)
+		m.logger.Info("Purged archived tenant", "tenant_id", tenantID, "name", deleted.Name)
 	}
 
 	return deleted, nil
@@ -538,7 +540,7 @@ func (m *TenantStoreManager) Close() error {
 			continue
 		}
 		if err := store.Close(); err != nil {
-			slog.Error("Failed to close tenant store", "tenant_id", id, "error", err)
+			m.logger.Error("Failed to close tenant store", "tenant_id", id, "error", err)
 			if firstErr == nil {
 				firstErr = err
 			}
@@ -547,7 +549,7 @@ func (m *TenantStoreManager) Close() error {
 	if m.dataPlaneRoot != nil {
 		for id, alias := range m.attachedAliases {
 			if _, err := m.dataPlaneRoot.DB().ExecContext(context.Background(), "DETACH "+safeCatalogIdentifier(alias)); err != nil {
-				slog.Warn("Failed to detach tenant catalog during shutdown", "tenant_id", id, "error", err)
+				m.logger.Warn("Failed to detach tenant catalog during shutdown", "tenant_id", id, "error", err)
 			}
 		}
 		if err := m.dataPlaneRoot.Close(); err != nil && firstErr == nil {
@@ -580,9 +582,9 @@ func (m *TenantStoreManager) openDefaultTenantStore(ctx context.Context, tenantI
 	}
 	if m.compaction != nil {
 		if result, err := MaybeCompactDatabase(ctx, dbPath, *m.compaction, PrepareTenantSchema); err != nil {
-			slog.Warn("Skipping default tenant database compaction", "path", dbPath, "error", err)
+			m.logger.Warn("Skipping default tenant database compaction", "path", dbPath, "error", err)
 		} else if result.Compacted {
-			slog.Info("Compacted default tenant database", "path", dbPath, "bytes_before", result.BytesBefore, "bytes_after", result.BytesAfter)
+			m.logger.Info("Compacted default tenant database", "path", dbPath, "bytes_before", result.BytesBefore, "bytes_after", result.BytesAfter)
 		}
 	}
 	options := m.tenantStoreOptions(tenantID)
@@ -598,7 +600,7 @@ func (m *TenantStoreManager) openDefaultTenantStore(ctx context.Context, tenantI
 		store.StartMaintenance(m.maintenanceCtx)
 	}
 	m.dataPlaneRoot = store
-	slog.Info("Opened shared tenant data-plane root", "tenant_id", tenantID, "path", dbPath)
+	m.logger.Info("Opened shared tenant data-plane root", "tenant_id", tenantID, "path", dbPath)
 	return store, nil
 }
 
@@ -622,9 +624,9 @@ func (m *TenantStoreManager) openTenantStore(ctx context.Context, tenantID uuid.
 	// retains a recovery bundle and follows the configured recovery policy.
 	if m.compaction != nil {
 		if result, err := MaybeCompactDatabase(ctx, dbPath, *m.compaction, PrepareTenantSchema); err != nil {
-			slog.Warn("Skipping tenant database compaction", "tenant_id", tenantID, "path", dbPath, "error", err)
+			m.logger.Warn("Skipping tenant database compaction", "tenant_id", tenantID, "path", dbPath, "error", err)
 		} else if result.Compacted {
-			slog.Info("Compacted tenant database", "tenant_id", tenantID, "path", dbPath, "bytes_before", result.BytesBefore, "bytes_after", result.BytesAfter)
+			m.logger.Info("Compacted tenant database", "tenant_id", tenantID, "path", dbPath, "bytes_before", result.BytesBefore, "bytes_after", result.BytesAfter)
 		}
 	}
 
@@ -663,7 +665,7 @@ func (m *TenantStoreManager) openTenantStore(ctx context.Context, tenantID uuid.
 			store.StartMaintenance(m.maintenanceCtx)
 		}
 		m.attachedAliases[tenantID] = alias
-		slog.Info("Attached tenant database", "tenant_id", tenantID, "catalog", alias, "path", dbPath)
+		m.logger.Info("Attached tenant database", "tenant_id", tenantID, "catalog", alias, "path", dbPath)
 		return store, nil
 	}
 	store := NewStore(dbPath, storeOptions...)
@@ -682,7 +684,7 @@ func (m *TenantStoreManager) openTenantStore(ctx context.Context, tenantID uuid.
 		store.StartMaintenance(m.maintenanceCtx)
 	}
 
-	slog.Info("Opened per-tenant database", "tenant_id", tenantID, "path", dbPath)
+	m.logger.Info("Opened per-tenant database", "tenant_id", tenantID, "path", dbPath)
 	return store, nil
 }
 
@@ -920,7 +922,7 @@ func (m *TenantStoreManager) backfillLegacyGoals(ctx context.Context, tenantStor
 		}
 	}
 	if len(legacyGoals) > 0 {
-		slog.Info("Backfilled legacy goals into tenant analytics store", "tenant_id", tenantID, "site_id", siteID, "count", len(legacyGoals))
+		m.logger.Debug("Backfilled legacy goals into tenant analytics store", "tenant_id", tenantID, "site_id", siteID, "count", len(legacyGoals))
 	}
 	return nil
 }
@@ -945,7 +947,7 @@ func (m *TenantStoreManager) backfillLegacyFunnels(ctx context.Context, tenantSt
 		}
 	}
 	if len(legacyFunnels) > 0 {
-		slog.Info("Backfilled legacy funnels into tenant analytics store", "tenant_id", tenantID, "site_id", siteID, "count", len(legacyFunnels))
+		m.logger.Debug("Backfilled legacy funnels into tenant analytics store", "tenant_id", tenantID, "site_id", siteID, "count", len(legacyFunnels))
 	}
 	return nil
 }

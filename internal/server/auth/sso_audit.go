@@ -1,8 +1,8 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"strings"
 
@@ -79,7 +79,7 @@ func (h *handler) appendSSOAudit(r *http.Request, action, outcome string, teamID
 	if targetUserID != uuid.Nil {
 		targetID = targetUserID.String()
 	}
-	metadata := marshalSSOAuditMetadata(ssoAuditMetadata{
+	metadata := marshalSSOAuditMetadata(r.Context(), ssoAuditMetadata{
 		Flow:             flow,
 		Reason:           reason,
 		EmailDomain:      domain,
@@ -87,7 +87,7 @@ func (h *handler) appendSSOAudit(r *http.Request, action, outcome string, teamID
 		ConfiguredTeamID: configuredTeamID,
 	})
 
-	slog.Info("SSO outcome",
+	shared.LoggerFromContext(r.Context()).Info("SSO outcome",
 		"action", action,
 		"outcome", outcome,
 		"flow", flow,
@@ -95,7 +95,6 @@ func (h *handler) appendSSOAudit(r *http.Request, action, outcome string, teamID
 		"team_id", teamID,
 		"email_domain", domain,
 		"access_mode", ssoAccessModeName(mode),
-		"request_id", requestID(r),
 	)
 	h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
 		TeamID:       teamID,
@@ -119,14 +118,14 @@ func (h *handler) appendSSOAuditForUserTeams(r *http.Request, userID uuid.UUID, 
 	if configuredTeamID != uuid.Nil {
 		configuredTeamIDValue = configuredTeamID.String()
 	}
-	metadata := marshalSSOAuditMetadata(ssoAuditMetadata{
+	metadata := marshalSSOAuditMetadata(r.Context(), ssoAuditMetadata{
 		Flow:             flow,
 		Reason:           reason,
 		EmailDomain:      domain,
 		AccessMode:       ssoAccessModeName(mode),
 		ConfiguredTeamID: configuredTeamIDValue,
 	})
-	slog.Info("SSO outcome",
+	shared.LoggerFromContext(r.Context()).Info("SSO outcome",
 		"action", action,
 		"outcome", outcome,
 		"flow", flow,
@@ -134,7 +133,6 @@ func (h *handler) appendSSOAuditForUserTeams(r *http.Request, userID uuid.UUID, 
 		"team_id", configuredTeamID,
 		"email_domain", domain,
 		"access_mode", ssoAccessModeName(mode),
-		"request_id", requestID(r),
 	)
 	h.ctx.AppendAuditEventForUserTeams(r.Context(), r, userID, shared.AuditEvent{
 		TargetUserID: userID,
@@ -148,18 +146,11 @@ func (h *handler) appendSSOAuditForUserTeams(r *http.Request, userID uuid.UUID, 
 	})
 }
 
-func marshalSSOAuditMetadata(value ssoAuditMetadata) string {
+func marshalSSOAuditMetadata(ctx context.Context, value ssoAuditMetadata) string {
 	metadata, err := json.Marshal(value)
 	if err != nil {
-		slog.Error("Failed to encode SSO audit metadata", "error", err)
+		shared.LoggerFromContext(ctx).Error("Failed to encode SSO audit metadata", "error", err)
 		return "{}"
 	}
 	return string(metadata)
-}
-
-func requestID(r *http.Request) string {
-	if r == nil {
-		return ""
-	}
-	return strings.TrimSpace(r.Header.Get("X-Request-Id"))
 }

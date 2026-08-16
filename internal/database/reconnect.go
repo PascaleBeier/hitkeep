@@ -72,6 +72,7 @@ type duckdbConnUnwrapper interface {
 // naturally: every operation on them reports driver.ErrBadConn.
 type reconnectingConnector struct {
 	path    string
+	logger  *slog.Logger
 	factory func() (driver.Connector, error)
 	recover func(context.Context, error) error
 
@@ -122,8 +123,11 @@ func (g *connectionGate) release() {
 	}
 }
 
-func newReconnectingConnector(path string, factory func() (driver.Connector, error), recover func(context.Context, error) error) *reconnectingConnector {
-	return &reconnectingConnector{path: path, factory: factory, recover: recover}
+func newReconnectingConnector(path string, factory func() (driver.Connector, error), recover func(context.Context, error) error, logger *slog.Logger) *reconnectingConnector {
+	if logger == nil {
+		panic("database: reconnecting connector logger is required")
+	}
+	return &reconnectingConnector{path: path, logger: logger, factory: factory, recover: recover}
 }
 
 func (c *reconnectingConnector) Connect(ctx context.Context) (driver.Conn, error) {
@@ -218,7 +222,7 @@ func (c *reconnectingConnector) markDead(trigger error) {
 	c.dead = true
 	c.trigger = trigger
 	observer := c.onInvalidated
-	slog.Error("DuckDB database invalidated by a fatal error; reopening after connections drain",
+	c.logger.Error("DuckDB database invalidated by a fatal error; reopening after connections drain",
 		"path", c.path, "open_connections", c.openConns)
 	c.startDrainWatchdogLocked()
 	c.mu.Unlock()
@@ -289,11 +293,11 @@ func (c *reconnectingConnector) closeInnerLocked() {
 	}
 	if closer, ok := c.inner.(io.Closer); ok {
 		if err := closer.Close(); err != nil {
-			slog.Warn("Failed to close invalidated DuckDB instance", "path", c.path, "error", err)
+			c.logger.Warn("Failed to close invalidated DuckDB instance", "path", c.path, "error", err)
 		}
 	}
 	c.inner = nil
-	slog.Info("Closed invalidated DuckDB database before recovery", "path", c.path)
+	c.logger.Info("Closed invalidated DuckDB database before recovery", "path", c.path)
 }
 
 // observe inspects an operation error and flags the instance on invalidation.

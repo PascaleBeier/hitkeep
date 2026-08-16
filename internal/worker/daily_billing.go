@@ -4,8 +4,9 @@ package worker
 
 import (
 	"context"
-	"log/slog"
 	"time"
+
+	"hitkeep/internal/hklog"
 )
 
 // runDailyAtUTC waits until the next hour:00 UTC, invokes run, then keeps
@@ -14,7 +15,7 @@ import (
 func runDailyAtUTC(ctx context.Context, name string, hour int, run func(context.Context)) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			slog.Error(name+" panicked", "error", recovered)
+			hklog.LoggerFromContext(ctx).Error(name+" panicked", "error", recovered)
 		}
 	}()
 

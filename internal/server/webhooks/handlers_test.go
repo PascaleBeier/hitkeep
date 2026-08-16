@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -40,7 +42,7 @@ func TestSiteWebhookHandlerLifecycleAndAudit(t *testing.T) {
 	h := &handler{ctx: &shared.Context{
 		Store:    store,
 		Config:   &config.Config{WebhookAllowDevelopmentTargets: true},
-		Webhooks: webhookdispatcher.NewEmitter(store, &failingTestProducer{}, "2.10.2"),
+		Webhooks: webhookdispatcher.NewEmitter(store, &failingTestProducer{}, "2.10.2", testWebhookLogger()),
 	}}
 
 	createBody := `{"name":"Operations","description":"CRM notifications","url":"http://localhost:9900/hook","enabled":true,"events":["goal.created","import.completed"]}`
@@ -120,6 +122,10 @@ func TestSiteWebhookHandlerLifecycleAndAudit(t *testing.T) {
 			t.Errorf("expected audit action %q in %+v", action, actions)
 		}
 	}
+}
+
+func testWebhookLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
 type failingTestProducer struct{}

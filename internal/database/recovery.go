@@ -9,13 +9,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/klauspost/compress/zstd"
+
+	"hitkeep/internal/hklog"
 )
 
 const recoveryMarkerVersion = 1
@@ -99,7 +100,7 @@ func (r *databaseRecovery) recoverStartup(ctx context.Context) error {
 	if marker == nil {
 		return nil
 	}
-	slog.Warn("Resuming interrupted DuckDB recovery", "database_id", marker.DatabaseID, "kind", marker.Kind, "phase", marker.Phase)
+	hklog.LoggerFromContextOr(ctx, r.store.logger).Warn("Resuming interrupted DuckDB recovery", "database_id", marker.DatabaseID, "kind", marker.Kind, "phase", marker.Phase)
 	switch marker.Kind {
 	case "remove_unsafe_indexes":
 		return r.applyIndexRepair(ctx, marker)
@@ -248,7 +249,7 @@ func (r *databaseRecovery) applyIndexRepair(ctx context.Context, marker *recover
 		return err
 	}
 	r.status.recovered(removedUnsafeIndexes)
-	slog.Info("DuckDB unsafe-index recovery completed",
+	hklog.LoggerFromContextOr(ctx, r.store.logger).Info("DuckDB unsafe-index recovery completed",
 		"database_id", marker.DatabaseID,
 		"trigger", trigger,
 		"removed_unsafe_indexes", removedUnsafeIndexes)
@@ -379,7 +380,7 @@ func (r *databaseRecovery) applyWALRecovery(ctx context.Context, marker *recover
 				return err
 			}
 			r.status.recovered(0)
-			slog.Info("DuckDB WAL recovery completed after operator removed the replay-failing WAL", "database_id", marker.DatabaseID)
+			hklog.LoggerFromContextOr(ctx, r.store.logger).Info("DuckDB WAL recovery completed after operator removed the replay-failing WAL", "database_id", marker.DatabaseID)
 			return nil
 		}
 		if !marker.MigrationWAL && !r.opts.automaticWALRecovery {
@@ -442,7 +443,7 @@ func (r *databaseRecovery) applyWALRecovery(ctx context.Context, marker *recover
 				if !r.opts.automaticWALRecovery {
 					return r.restoreUnverifiedMigrationWAL(marker, walPath, asidePath, verifyErr)
 				}
-				slog.Warn("Migration WAL checkpoint verification failed; continuing because broad WAL recovery is explicitly enabled",
+				hklog.LoggerFromContextOr(ctx, r.store.logger).Warn("Migration WAL checkpoint verification failed; continuing because broad WAL recovery is explicitly enabled",
 					"database_id", marker.DatabaseID,
 					"error", verifyErr)
 				marker.MigrationWAL = false
@@ -484,7 +485,7 @@ func (r *databaseRecovery) applyWALRecovery(ctx context.Context, marker *recover
 		return err
 	}
 	r.status.recovered(0)
-	slog.Info("DuckDB WAL recovery completed", "database_id", marker.DatabaseID, "trigger", marker.Trigger)
+	hklog.LoggerFromContextOr(ctx, r.store.logger).Info("DuckDB WAL recovery completed", "database_id", marker.DatabaseID, "trigger", marker.Trigger)
 	return nil
 }
 
@@ -576,7 +577,7 @@ func (r *databaseRecovery) createBundle(trigger string) (string, error) {
 	}
 	keepTemp = false
 	r.status.bundleAvailable()
-	slog.Info("Created DuckDB recovery bundle",
+	r.store.logger.Info("Created DuckDB recovery bundle",
 		"database_id", manifest.DatabaseID,
 		"trigger", trigger,
 		"artifact_count", len(artifacts))
@@ -656,7 +657,7 @@ func (r *databaseRecovery) loadRecoveryHistory() {
 		return
 	}
 	if err != nil {
-		slog.Debug("Could not inspect DuckDB recovery history", "database_id", r.databaseID(), "error", err)
+		r.store.logger.Debug("Could not inspect DuckDB recovery history", "database_id", r.databaseID(), "error", err)
 		return
 	}
 

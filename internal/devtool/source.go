@@ -262,7 +262,7 @@ func (a *App) runGoFix(ctx context.Context, diff bool) ([]byte, error) {
 	args = append(args, packages...)
 	command := exec.CommandContext(ctx, "go", args...) //nolint:gosec // fixed executable and closed arguments
 	command.Dir = a.workspace.Root
-	command.Env = a.commandEnvironment([]string{"GOFLAGS=-tags=" + strings.Join(variant.BuildTags, ",")})
+	command.Env = a.commandEnvironment([]string{"GOFLAGS=" + goFlagsForTags(variant.BuildTags)})
 	buffer := &boundedBuffer{limit: maxFixOutputBytes}
 	command.Stdout = buffer
 	command.Stderr = buffer

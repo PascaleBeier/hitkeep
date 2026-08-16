@@ -57,23 +57,25 @@ const (
 )
 
 type Server struct {
-	httpServer     *http.Server
-	store          *database.Store
-	cluster        *cluster.Manager
-	producer       *nsq.Producer
-	mailer         *mailer.Mailer
-	conf           *config.Config
-	ingestLimiter  *shared.IPRateLimiter
-	apiLimiter     *shared.IPRateLimiter
-	authLimiter    *shared.IPRateLimiter
-	webhookLimiter *shared.IPRateLimiter
-	ipFilter       *blocking.IPFilter
-	ipFilterStop   context.CancelFunc
-	spamFilter     *blocking.SpamFilter
-	spamFilterStop context.CancelFunc
-	takeout        *takeout.TakeoutService
-	realtime       *realtime.Broker
-	ctx            *shared.Context
+	httpServer       *http.Server
+	logger           *slog.Logger
+	store            *database.Store
+	cluster          *cluster.Manager
+	producer         *nsq.Producer
+	mailer           *mailer.Mailer
+	conf             *config.Config
+	ingestLimiter    *shared.IPRateLimiter
+	apiLimiter       *shared.IPRateLimiter
+	authLimiter      *shared.IPRateLimiter
+	webhookLimiter   *shared.IPRateLimiter
+	ipFilter         *blocking.IPFilter
+	ipFilterStop     context.CancelFunc
+	spamFilter       *blocking.SpamFilter
+	spamFilterStop   context.CancelFunc
+	importRunnerStop func(context.Context) error
+	takeout          *takeout.TakeoutService
+	realtime         *realtime.Broker
+	ctx              *shared.Context
 
 	indexHTML   []byte
 	scalarIndex []byte
@@ -81,8 +83,11 @@ type Server struct {
 	publicBasePath string
 }
 
-func New(conf *config.Config, publicFS fs.FS, store *database.Store, tenantStores *database.TenantStoreManager, ent entitlements.Provider, cluster *cluster.Manager, producer *nsq.Producer, mailService *mailer.Mailer, realtimeBroker *realtime.Broker) *Server {
-	config.NormalizeMCPConfig(conf)
+func New(conf *config.Config, publicFS fs.FS, store *database.Store, tenantStores *database.TenantStoreManager, ent entitlements.Provider, cluster *cluster.Manager, producer *nsq.Producer, mailService *mailer.Mailer, realtimeBroker *realtime.Broker, logger *slog.Logger) *Server {
+	if logger == nil {
+		panic("server: logger is required")
+	}
+	config.NormalizeMCPConfig(conf, logger)
 
 	ingestLim := shared.NewIPRateLimiter(rate.Limit(conf.IngestRateLimit), conf.IngestBurst)
 	apiLim := shared.NewIPRateLimiter(rate.Limit(conf.ApiRateLimit), conf.ApiBurst)
@@ -101,7 +106,7 @@ func New(conf *config.Config, publicFS fs.FS, store *database.Store, tenantStore
 	var ipFilter *blocking.IPFilter
 	var ipFilterStop context.CancelFunc
 	if store != nil {
-		ipFilter = blocking.NewIPFilter(store)
+		ipFilter = blocking.NewIPFilter(store, logger)
 		filterCtx, cancel := context.WithCancel(context.Background())
 		ipFilter.StartRefreshLoop(filterCtx)
 		ipFilterStop = cancel
@@ -112,9 +117,9 @@ func New(conf *config.Config, publicFS fs.FS, store *database.Store, tenantStore
 		spamFilterPath = conf.DataPath + "/spam-filter.json"
 	}
 
-	spamFilter := blocking.NewSpamFilter(spamFilterPath)
+	spamFilter := blocking.NewSpamFilter(spamFilterPath, logger)
 	if err := spamFilter.RefreshFromDisk(); err != nil {
-		slog.Warn("Failed to load cached spam filter data; embedded defaults will be used", "error", err, "path", spamFilterPath)
+		logger.Warn("Failed to load cached spam filter data; embedded defaults will be used", "error", err, "path", spamFilterPath)
 	}
 
 	isLeader := func() bool {
@@ -126,6 +131,7 @@ func New(conf *config.Config, publicFS fs.FS, store *database.Store, tenantStore
 	spamFilterStop := spamFilterCancel
 
 	s := &Server{
+		logger:         logger,
 		store:          store,
 		cluster:        cluster,
 		producer:       producer,
@@ -169,9 +175,19 @@ func New(conf *config.Config, publicFS fs.FS, store *database.Store, tenantStore
 		ConfigMode:          aiConfigMode(conf),
 	}, hitai.StoreRecorder{Store: store})
 	if err != nil {
-		slog.Warn("AI provider is not configured", "error", err)
+		logger.Warn("AI provider configuration rejected",
+			"error_category", hitai.ClassifyError(err),
+			slog.Group("ai",
+				slog.Bool("enabled", conf.AIEnabled),
+				slog.Bool("provider_configured", strings.TrimSpace(conf.AIProvider) != ""),
+				slog.Bool("model_configured", strings.TrimSpace(conf.AIModel) != ""),
+				slog.Bool("base_url_configured", strings.TrimSpace(conf.AIBaseURL) != ""),
+				slog.Bool("api_key_configured", strings.TrimSpace(conf.AIAPIKey) != ""),
+				slog.Bool("region_configured", strings.TrimSpace(conf.AIRegion) != ""),
+			),
+		)
 		if aiService == nil {
-			slog.Warn("AI service disabled because provider setup returned no service")
+			logger.Warn("AI service disabled because provider setup returned no service")
 		}
 	}
 
@@ -181,6 +197,7 @@ func New(conf *config.Config, publicFS fs.FS, store *database.Store, tenantStore
 	}
 
 	s.ctx = &shared.Context{
+		Logger:         logger,
 		Store:          store,
 		TenantStores:   tenantStores,
 		Cluster:        clusterState,
@@ -203,7 +220,7 @@ func New(conf *config.Config, publicFS fs.FS, store *database.Store, tenantStore
 		Realtime:                 realtimeBroker,
 		IPFilter:                 ipFilter,
 		SpamFilter:               spamFilter,
-		Webhooks:                 webhookdispatcher.NewEmitter(store, producer, conf.Version),
+		Webhooks:                 webhookdispatcher.NewEmitter(store, producer, conf.Version, logger),
 		StartedAt:                time.Now().UTC(),
 		SystemCounters:           systemCounters,
 		BackupStatus:             backupStatus,
@@ -223,6 +240,7 @@ func New(conf *config.Config, publicFS fs.FS, store *database.Store, tenantStore
 		handler = s.stripPublicBasePath(rootHandler)
 	}
 	handler = s.customTrackingHostMiddleware(publicFS, rootHandler, handler)
+	handler = s.requestLoggingMiddleware(handler)
 
 	s.httpServer = &http.Server{
 		Addr:              conf.HTTPAddr,
@@ -233,7 +251,7 @@ func New(conf *config.Config, publicFS fs.FS, store *database.Store, tenantStore
 }
 
 func (s *Server) ListenAndServe() error {
-	slog.Info("HTTP server starting", "addr", s.httpServer.Addr)
+	s.logger.Info("HTTP server starting", "addr", s.httpServer.Addr)
 	return s.httpServer.ListenAndServe()
 }
 
@@ -254,7 +272,13 @@ func (s *Server) ImportStageCleanupStatus() *database.ImportStageCleanupStatusTr
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
-	slog.Info("HTTP server shutting down.")
+	s.logger.Info("HTTP server shutting down.")
+
+	if s.importRunnerStop != nil {
+		if err := s.importRunnerStop(ctx); err != nil {
+			s.logger.Warn("Import runner did not stop cleanly", "error", err)
+		}
+	}
 
 	if s.ipFilterStop != nil {
 		s.ipFilterStop()
@@ -276,7 +300,7 @@ func (s *Server) loadStaticAssets(publicFS fs.FS) {
 	// 1. Load Main SPA Index
 	indexData, err := fs.ReadFile(publicFS, "index.html")
 	if err != nil {
-		slog.Warn("Frontend index.html not found. Dashboard will not be available.")
+		s.logger.Warn("Frontend index.html not found. Dashboard will not be available.")
 	} else {
 		s.indexHTML = injectDashboardBasePath(indexData, s.publicBasePath)
 	}
@@ -284,7 +308,7 @@ func (s *Server) loadStaticAssets(publicFS fs.FS) {
 	// 2. Load Scalar Index (API Docs)
 	scalarData, err := fs.ReadFile(publicFS, "scalar/index.html")
 	if err != nil {
-		slog.Warn("Scalar index.html not found. API docs will not render.")
+		s.logger.Warn("Scalar index.html not found. API docs will not render.")
 	} else {
 		s.scalarIndex = scalarData
 	}
@@ -364,7 +388,7 @@ func (s *Server) setupRoutes(mux *http.ServeMux, publicFS fs.FS) {
 	sites.Register(mux, ctx)
 	goals.Register(mux, ctx)
 	webhookhandlers.Register(mux, ctx)
-	importhandlers.Register(mux, ctx)
+	s.importRunnerStop = importhandlers.Register(mux, ctx)
 	events.Register(mux, ctx)
 	askaihandlers.Register(mux, ctx)
 	opportunityhandlers.Register(mux, ctx)
@@ -374,8 +398,8 @@ func (s *Server) setupRoutes(mux *http.ServeMux, publicFS fs.FS) {
 	takeouthandlers.Register(mux, ctx)
 	sharehandlers.Register(mux, ctx)
 	if s.conf.MCPEnabled && s.store != nil && (s.cluster == nil || s.cluster.IsLeader()) {
-		slog.Info("MCP server route enabled", "path", s.conf.MCPPath)
-		mcpserver.Register(mux, ctx, slog.Default())
+		s.logger.Info("MCP server route enabled", "path", s.conf.MCPPath)
+		mcpserver.Register(mux, ctx, s.logger)
 	}
 
 	// Static & SPA Handling

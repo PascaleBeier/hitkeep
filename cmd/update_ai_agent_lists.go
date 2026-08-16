@@ -4,13 +4,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
 	"hitkeep/internal/aianalytics"
 )
 
-func UpdateAIAgentLists(args []string) {
+func UpdateAIAgentLists(args []string, logger *slog.Logger) {
 	fs := flag.NewFlagSet("update-ai-agent-lists", flag.ExitOnError)
 	fs.SetOutput(os.Stderr)
 
@@ -20,7 +21,7 @@ func UpdateAIAgentLists(args []string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	data, err := aianalytics.FetchAIAgentData(ctx, nil)
+	data, err := aianalytics.FetchAIAgentData(ctx, nil, logger)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: could not fetch AI agent lists: %v\n", err)
 		os.Exit(1)

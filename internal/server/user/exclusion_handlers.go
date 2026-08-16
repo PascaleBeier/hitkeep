@@ -3,7 +3,6 @@ package user
 import (
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -33,14 +32,14 @@ func (h *handler) handleListTeamExclusions() http.HandlerFunc {
 			rules, err = h.ctx.Store.ListTeamExclusions(r.Context(), teamID)
 		}
 		if err != nil {
-			slog.Error("Failed to list team exclusions", "error", err, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to list team exclusions", "error", err, "team_id", teamID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(rules); err != nil {
-			slog.Error("Failed to encode team exclusions response", "error", err, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode team exclusions response", "error", err, "team_id", teamID)
 		}
 	}
 }
@@ -71,7 +70,7 @@ func (h *handler) handleCreateTeamExclusion() http.HandlerFunc {
 			Description: input.Description,
 		}, userID)
 		if err != nil {
-			slog.Error("Failed to create team exclusion", "error", err, "team_id", teamID, "type", input.Type)
+			shared.LoggerFromContext(r.Context()).Error("Failed to create team exclusion", "error", err, "team_id", teamID, "type", input.Type)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -91,7 +90,7 @@ func (h *handler) handleCreateTeamExclusion() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		if err := json.NewEncoder(w).Encode(rule); err != nil {
-			slog.Error("Failed to encode team exclusion response", "error", err, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode team exclusion response", "error", err, "team_id", teamID)
 		}
 	}
 }
@@ -110,7 +109,7 @@ func (h *handler) handleDeleteTeamExclusion() http.HandlerFunc {
 
 		deleted, err := h.ctx.Store.DeleteTeamExclusion(r.Context(), teamID, ruleID)
 		if err != nil {
-			slog.Error("Failed to delete team exclusion", "error", err, "team_id", teamID, "rule_id", ruleID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to delete team exclusion", "error", err, "team_id", teamID, "rule_id", ruleID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -160,6 +159,6 @@ func (h *handler) refreshTeamTrafficExclusions(r *http.Request) {
 		return
 	}
 	if err := h.ctx.IPFilter.Refresh(r.Context()); err != nil {
-		slog.Warn("Failed to refresh traffic exclusions after team write", "error", err)
+		shared.LoggerFromContext(r.Context()).Warn("Failed to refresh traffic exclusions after team write", "error", err)
 	}
 }

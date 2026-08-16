@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/reporting"
+	"hitkeep/internal/server/shared"
 )
 
 type reportCaptureDriver struct {
@@ -410,6 +412,28 @@ func TestExternalReportInvitationFailureIsSafeAndResendable(t *testing.T) {
 		external.ID,
 	).Scan(&safeErrorCode, &externalLocale); err != nil || safeErrorCode != "smtp_send_failed" || externalLocale != "de" {
 		t.Fatalf("safe invitation state code=%q locale=%q err=%v", safeErrorCode, externalLocale, err)
+	}
+	if _, err := store.DB().ExecContext(ctx,
+		"UPDATE report_recipients SET confirmation_sent_at = ? WHERE id = ?",
+		time.Now().UTC().Add(-16*time.Minute), external.ID,
+	); err != nil {
+		t.Fatal(err)
+	}
+	var logs bytes.Buffer
+	failureRequest := withTestUser(httptest.NewRequest(http.MethodPost, "/api/reports/"+report.ID.String()+"/recipients/"+external.ID.String()+"/confirmation", nil), managerID)
+	failureRequest = failureRequest.WithContext(shared.WithLogger(failureRequest.Context(), slog.New(slog.NewTextHandler(&logs, nil))))
+	failureRequest.SetPathValue("report_id", report.ID.String())
+	failureRequest.SetPathValue("recipient_id", external.ID.String())
+	failureResponse := httptest.NewRecorder()
+	h.handleResendReportRecipientConfirmation().ServeHTTP(failureResponse, failureRequest)
+	if failureResponse.Code != http.StatusBadGateway {
+		t.Fatalf("failed resend status = %d, want %d: %s", failureResponse.Code, http.StatusBadGateway, failureResponse.Body.String())
+	}
+	if count := strings.Count(logs.String(), "Mail server did not accept report confirmation"); count != 1 {
+		t.Fatalf("expected one boundary confirmation failure log, got %d: %s", count, logs.String())
+	}
+	if strings.Contains(logs.String(), "raw provider 550 response") {
+		t.Fatalf("confirmation failure log leaked raw provider error: %s", logs.String())
 	}
 	if _, err := store.DB().ExecContext(ctx,
 		"UPDATE report_recipients SET confirmation_sent_at = ? WHERE id = ?",

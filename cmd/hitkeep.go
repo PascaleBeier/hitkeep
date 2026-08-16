@@ -40,8 +40,11 @@ func check(err error) {
 	}
 }
 
-func Run() {
-	conf := config.Load()
+func Run(logger *slog.Logger) {
+	if logger == nil {
+		panic("hitkeepcmd: logger is required")
+	}
+	conf := config.Load(logger)
 	conf.Version = Version
 
 	logLevel, err := hklog.ParseLevel(conf.LogLevel)
@@ -50,10 +53,9 @@ func Run() {
 		logLevel = slog.LevelInfo
 	}
 
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+	logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: logLevel,
 	}))
-	slog.SetDefault(logger)
 
 	if conf.Healthcheck {
 		if err := runHealthcheck(conf); err != nil {
@@ -65,15 +67,16 @@ func Run() {
 
 	defer func() {
 		if r := recover(); r != nil {
-			slog.Error("Application startup panicked", "error", r)
+			logger.Error("Application startup panicked", "error", r)
 			os.Exit(1)
 		}
 	}()
 
-	slog.Info("Starting HitKeep", "version", Version, "log_level", logLevel.String(), "config", conf)
+	logger.Info("Starting HitKeep", "version", Version, "log_level", logLevel.String(), "config", conf)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+	ctx = hklog.WithLogger(ctx, logger)
 
 	g, gCtx := errgroup.WithContext(ctx)
 
@@ -81,7 +84,7 @@ func Run() {
 	check(err)
 	defer func() {
 		if err := clusterManager.Shutdown(); err != nil {
-			slog.Error("Failed to shutdown cluster manager", "error", err)
+			logger.Error("Failed to shutdown cluster manager", "error", err)
 		}
 	}()
 
@@ -90,7 +93,7 @@ func Run() {
 
 	mailSvc, err := mailer.New(conf)
 	if err != nil {
-		slog.Warn("Mailer not configured, email features will not work", "error", err)
+		logMailerConfigurationError(logger, conf)
 	}
 
 	var store *database.Store
@@ -118,9 +121,9 @@ func Run() {
 				UseSSL:          conf.S3UseSSL,
 			}
 			if s3Conf.AccessKeyID != "" {
-				slog.Info("S3 archive enabled", "mode", "static credentials", "region", s3Conf.Region)
+				logger.Info("S3 archive enabled", "mode", "static credentials", "region", s3Conf.Region)
 			} else {
-				slog.Info("S3 archive enabled", "mode", "credential chain", "region", s3Conf.Region)
+				logger.Info("S3 archive enabled", "mode", "credential chain", "region", s3Conf.Region)
 			}
 		}
 		retentionWorker := worker.NewRetentionWorker(tenantMgr, conf.ArchivePath, conf.DataRetentionDays, s3Conf, conf.DataPath)
@@ -164,13 +167,13 @@ func Run() {
 			return nil
 		})
 	} else {
-		slog.Debug("Node is a follower, skipping stateful service initialization.")
+		logger.Debug("Node is a follower, skipping stateful service initialization.")
 		if conf.MCPEnabled {
-			slog.Info("MCP server is leader-only and will not start on this follower")
+			logger.Info("MCP server is leader-only and will not start on this follower")
 		}
 	}
 
-	httpServer := server.New(conf, publicFS, store, tenantMgr, ent, clusterManager, producer, mailSvc, realtimeBroker)
+	httpServer := server.New(conf, publicFS, store, tenantMgr, ent, clusterManager, producer, mailSvc, realtimeBroker, logger)
 	if store != nil {
 		importCleanupWorker := worker.NewImportStageCleanupWorker(store, conf.DataPath, conf.ImportStageRetentionDays, httpServer.ImportStageCleanupStatus())
 		go importCleanupWorker.Start(gCtx)
@@ -194,7 +197,7 @@ func Run() {
 	}
 
 	g.Go(func() error {
-		slog.Info("HTTP server starting", "addr", conf.HTTPAddr)
+		logger.Info("HTTP server starting", "addr", conf.HTTPAddr)
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			return err
 		}
@@ -203,15 +206,35 @@ func Run() {
 
 	g.Go(func() error {
 		<-gCtx.Done()
-		slog.Info("Shutdown signal received, shutting down HTTP server...")
+		logger.Info("Shutdown signal received, shutting down HTTP server...")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		return httpServer.Shutdown(shutdownCtx)
 	})
 
-	slog.Info("Application is running. Press Ctrl+C to exit.")
+	logger.Info("Application is running. Press Ctrl+C to exit.")
 
 	check(g.Wait())
+}
+
+func logMailerConfigurationError(logger *slog.Logger, conf *config.Config) {
+	driverKind := "unsupported"
+	switch strings.TrimSpace(conf.MailDriver) {
+	case "":
+		driverKind = "unset"
+	case "smtp":
+		driverKind = "smtp"
+	}
+
+	logger.Warn("Mailer configuration rejected",
+		"error_kind", "configuration",
+		slog.Group("mail",
+			slog.String("driver_kind", driverKind),
+			slog.Bool("host_configured", strings.TrimSpace(conf.MailHost) != ""),
+			slog.Bool("credentials_configured", strings.TrimSpace(conf.MailUsername) != "" || conf.MailPassword != ""),
+			slog.Bool("from_address_configured", strings.TrimSpace(conf.MailFromAddress) != ""),
+		),
+	)
 }
 
 func startSearchConsoleSyncWorker(ctx context.Context, conf *config.Config, tenantMgr *database.TenantStoreManager) {
@@ -226,7 +249,7 @@ func startSearchConsoleSyncWorker(ctx context.Context, conf *config.Config, tena
 }
 
 func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.Logger, logLevel slog.Level, realtimeBroker *realtime.Broker) (*database.Store, *database.TenantStoreManager, *nsq.Producer, func(), error) {
-	slog.Debug("(Leader) Starting stateful services...")
+	logger.Debug("(Leader) Starting stateful services...")
 	if err := validateLiveDatabasePaths(conf); err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -237,6 +260,7 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 			opener = database.OpenDefaultSplitControlStore
 		}
 		return opener(ctx, conf.DBPath,
+			database.WithLogger(logger),
 			database.WithMemoryLimit(conf.DuckDBMemoryLimit),
 			database.WithThreads(conf.DuckDBThreads),
 			database.WithCheckpointInterval(time.Duration(conf.DBCheckpointIntervalMinutes)*time.Minute),
@@ -267,6 +291,7 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 			return nil, nil, nil, nil, fmt.Errorf("close database before default tenant split: %w", err)
 		}
 		if err := database.RunDefaultTenantSplit(ctx, conf.DBPath, conf.DataPath,
+			database.WithLogger(logger),
 			database.WithMemoryLimit(conf.DuckDBMemoryLimit),
 			database.WithThreads(conf.DuckDBThreads),
 		); err != nil {
@@ -284,10 +309,11 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 		compaction := database.DefaultCompactionOptions()
 		compaction.MemoryLimit = conf.DuckDBMemoryLimit
 		compaction.Threads = conf.DuckDBThreads
+		compaction.Logger = logger
 		if result, err := database.MaybeCompactDatabase(ctx, conf.DBPath, compaction, database.PrepareSharedSchema); err != nil {
-			slog.Warn("Skipping database compaction at startup", "path", conf.DBPath, "error", err)
+			logger.Warn("Skipping database compaction at startup", "path", conf.DBPath, "error", err)
 		} else if result.Compacted {
-			slog.Info("Compacted database at startup", "path", conf.DBPath, "bytes_before", result.BytesBefore, "bytes_after", result.BytesAfter)
+			logger.Info("Compacted database at startup", "path", conf.DBPath, "bytes_before", result.BytesBefore, "bytes_after", result.BytesAfter)
 		}
 		store, err = openStore(false)
 		if err != nil {
@@ -301,16 +327,17 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 		compaction := database.DefaultCompactionOptions()
 		compaction.MemoryLimit = conf.DuckDBMemoryLimit
 		compaction.Threads = conf.DuckDBThreads
+		compaction.Logger = logger
 		tenantOpts = append(tenantOpts, database.WithTenantCompaction(compaction))
 	}
 	tenantOpts = append(tenantOpts, database.WithTenantDataPlane(true))
 	tenantMgr := database.NewTenantStoreManager(store, conf.DataPath, tenantOpts...)
 	closeStores := func() {
 		if err := tenantMgr.Close(); err != nil {
-			slog.Error("Failed to close tenant databases during startup cleanup", "error", err)
+			logger.Error("Failed to close tenant databases during startup cleanup", "error", err)
 		}
 		if err := store.Close(); err != nil {
-			slog.Error("Failed to close shared database during startup cleanup", "error", err)
+			logger.Error("Failed to close shared database during startup cleanup", "error", err)
 		}
 	}
 	tenantMgr.StartMaintenance(ctx)
@@ -338,7 +365,7 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 
 	go func() {
 		if err := nsqdServer.Main(); err != nil {
-			slog.Error("Embedded NSQD server exited", "error", err)
+			logger.Error("Embedded NSQD server exited", "error", err)
 		}
 	}()
 	// Listen for context cancellation to gracefully shut down NSQD.
@@ -371,7 +398,7 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 	}
 
 	consumer := ingest.NewConsumer(tenantMgr, logger, logLevel, realtimeBroker)
-	consumer.SetWebhookEmitter(webhookdispatcher.NewEmitter(store, producer, conf.Version))
+	consumer.SetWebhookEmitter(webhookdispatcher.NewEmitter(store, producer, conf.Version, logger))
 	if err := consumer.Connect(conf.NSQTCPAddress); err != nil {
 		producer.Stop()
 		closeStores()
@@ -386,15 +413,15 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 	}
 
 	shutdownFunc := func() {
-		slog.Debug("(Leader) Shutting down stateful services...")
+		logger.Debug("(Leader) Shutting down stateful services...")
 		webhookWorker.Stop()
 		consumer.Stop()
 		producer.Stop()
 		if err := tenantMgr.Close(); err != nil {
-			slog.Error("Failed to close tenant databases", "error", err)
+			logger.Error("Failed to close tenant databases", "error", err)
 		}
 		if err := store.Close(); err != nil {
-			slog.Error("Failed to close shared database cleanly", "error", err)
+			logger.Error("Failed to close shared database cleanly", "error", err)
 		}
 		os.RemoveAll(tmpDir)
 	}

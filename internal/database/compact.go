@@ -12,6 +12,8 @@ import (
 	"strings"
 
 	duckdb "github.com/duckdb/duckdb-go/v2"
+
+	"hitkeep/internal/hklog"
 )
 
 // CompactionOptions bound when MaybeCompactDatabase rewrites a database file.
@@ -25,6 +27,7 @@ type CompactionOptions struct {
 	// MemoryLimit and Threads optionally constrain rewrite workers.
 	MemoryLimit string
 	Threads     int
+	Logger      *slog.Logger
 }
 
 // DefaultCompactionOptions skip small or barely fragmented files: rewriting
@@ -34,6 +37,10 @@ func DefaultCompactionOptions() CompactionOptions {
 		MinReclaimableBytes: 64 << 20, // 64 MiB
 		MinFreeRatio:        0.25,
 	}
+}
+
+func compactionLogger(ctx context.Context, opts CompactionOptions) *slog.Logger {
+	return hklog.LoggerFromContextOr(ctx, opts.Logger)
 }
 
 // CompactionResult reports what MaybeCompactDatabase measured and did.
@@ -126,11 +133,11 @@ func MaybeCompactDatabase(ctx context.Context, path string, opts CompactionOptio
 		return result, fmt.Errorf("sync database directory after publishing compacted database: %w", err)
 	}
 	if err := os.Remove(backupPath); err != nil && !errors.Is(err, os.ErrNotExist) {
-		slog.Warn("Compaction succeeded but the pre-compaction backup could not be removed", "path", backupPath, "error", err)
+		compactionLogger(ctx, opts).Warn("Compaction succeeded but the pre-compaction backup could not be removed", "path", backupPath, "error", err)
 	}
 	// A stale WAL from the old file must not be replayed into the new one.
 	if err := os.Remove(path + ".wal"); err != nil && !errors.Is(err, os.ErrNotExist) {
-		slog.Warn("Could not remove stale WAL after compaction", "path", path+".wal", "error", err)
+		compactionLogger(ctx, opts).Warn("Could not remove stale WAL after compaction", "path", path+".wal", "error", err)
 	}
 
 	after, err := os.Stat(path)
@@ -344,6 +351,9 @@ func compactionStoreOptions(opts CompactionOptions) []StoreOption {
 	}
 	if opts.Threads > 0 {
 		storeOpts = append(storeOpts, WithThreads(opts.Threads))
+	}
+	if opts.Logger != nil {
+		storeOpts = append(storeOpts, WithLogger(opts.Logger))
 	}
 	return storeOpts
 }

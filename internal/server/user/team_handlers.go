@@ -1,11 +1,11 @@
 package user
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -19,6 +19,7 @@ import (
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailables"
+	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/webhooks"
 )
@@ -91,7 +92,7 @@ func (h *handler) appendTeamAudit(r *http.Request, teamID, actorID uuid.UUID, ac
 	}
 }
 
-func writeTeamActionError(w http.ResponseWriter, statusCode int, code string, message string) {
+func writeTeamActionError(ctx context.Context, w http.ResponseWriter, statusCode int, code string, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	if err := json.NewEncoder(w).Encode(map[string]string{
@@ -99,7 +100,7 @@ func writeTeamActionError(w http.ResponseWriter, statusCode int, code string, me
 		"code":    code,
 		"message": message,
 	}); err != nil {
-		slog.Error("Failed to encode team action error", "error", err, "code", code)
+		shared.LoggerFromContext(ctx).Error("Failed to encode team action error", "error", err, "code", code)
 	}
 }
 
@@ -167,7 +168,7 @@ func (h *handler) hydrateTeamSummaries(r *http.Request, teams []api.Team) []api.
 		if h.ctx.TenantStores != nil {
 			store, err := h.ctx.TenantStores.ForTenant(r.Context(), team.ID)
 			if err != nil {
-				slog.Warn("Failed to resolve analytics store for team usage", "error", err, "team_id", team.ID)
+				shared.LoggerFromContext(r.Context()).Warn("Failed to resolve analytics store for team usage", "error", err, "team_id", team.ID)
 				continue
 			}
 			analyticsStore = store
@@ -175,7 +176,7 @@ func (h *handler) hydrateTeamSummaries(r *http.Request, teams []api.Team) []api.
 
 		usage, err := h.ctx.Store.BuildTeamUsageSummary(r.Context(), team.ID, analyticsStore)
 		if err != nil {
-			slog.Warn("Failed to build team usage summary", "error", err, "team_id", team.ID)
+			shared.LoggerFromContext(r.Context()).Warn("Failed to build team usage summary", "error", err, "team_id", team.ID)
 			continue
 		}
 		enriched[idx].Usage = usage
@@ -191,7 +192,7 @@ func (h *handler) sendTeamInviteEmail(r *http.Request, teamID, actorID uuid.UUID
 
 	inviteToken, err := h.ctx.Store.CreatePasswordResetToken(r.Context(), invite.Email)
 	if err != nil {
-		slog.Warn("Failed to create invite token for team invite", "error", err, "email", invite.Email, "team_id", teamID)
+		shared.LoggerFromContext(r.Context()).Warn("Failed to create invite token for team invite", "error", err, "team_id", teamID)
 		return
 	}
 
@@ -220,7 +221,8 @@ func (h *handler) sendTeamInviteEmail(r *http.Request, teamID, actorID uuid.UUID
 		inviteLink = appurl.Path(h.ctx.Config.PublicURL, "/login?returnUrl="+url.QueryEscape(acceptPath))
 	}
 	if err := h.ctx.Mailer.Send(invite.Email, mailables.NewTeamInvite(inviteLink, teamName, inviterName, invite.Role, invite.RequiresPasswordSetup, locale)); err != nil {
-		slog.Warn("Failed to send team invite email", "error", err, "email", invite.Email, "team_id", teamID)
+		details := mailer.DescribeError(err)
+		shared.LoggerFromContext(r.Context()).Warn("Failed to send team invite email", "error_code", "smtp_send_failed", "error_stage", details.Stage, "error_kind", details.Kind, "error_message", details.Message, "smtp_code", details.SMTPCode, "team_id", teamID)
 	}
 }
 
@@ -275,7 +277,7 @@ func (h *handler) handleCreateTeam() http.HandlerFunc {
 			if errors.Is(err, entitlements.ErrTeamLimitReached) {
 				http.Error(w, "Team limit reached", http.StatusForbidden)
 			} else {
-				slog.Error("Failed to check team creation limit", "error", err, "actor_id", actorID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to check team creation limit", "error", err, "actor_id", actorID)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 			}
 			return
@@ -283,20 +285,20 @@ func (h *handler) handleCreateTeam() http.HandlerFunc {
 
 		team, err := h.ctx.Store.CreateTenant(r.Context(), actorID, name, logoURL)
 		if err != nil {
-			slog.Error("Failed to create team", "error", err, "actor_id", actorID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to create team", "error", err, "actor_id", actorID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		if err := h.ctx.Store.SetActiveTenantID(r.Context(), actorID, team.ID); err != nil {
-			slog.Warn("Failed to auto-activate new team", "error", err, "team_id", team.ID, "actor_id", actorID)
+			shared.LoggerFromContext(r.Context()).Warn("Failed to auto-activate new team", "error", err, "team_id", team.ID, "actor_id", actorID)
 		}
 		h.appendTeamAudit(r, team.ID, actorID, "team.created", fmt.Sprintf("Team %q created", team.Name), nil)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		if err := json.NewEncoder(w).Encode(map[string]any{"team": team}); err != nil {
-			slog.Error("Failed to encode create team response", "error", err, "actor_id", actorID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode create team response", "error", err, "actor_id", actorID)
 		}
 	}
 }
@@ -311,14 +313,14 @@ func (h *handler) handleGetTeams() http.HandlerFunc {
 
 		resp, err := h.userTeamsResponse(r, userID)
 		if err != nil {
-			slog.Error("Failed to list teams", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to list teams", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("Failed to encode teams response", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode teams response", "error", err, "user_id", userID)
 		}
 	}
 }
@@ -358,7 +360,7 @@ func (h *handler) handleSetActiveTeam() http.HandlerFunc {
 				http.Error(w, "Access denied", http.StatusForbidden)
 				return
 			}
-			slog.Error("Failed to set active team", "error", err, "user_id", userID, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to set active team", "error", err, "user_id", userID, "team_id", teamID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -366,7 +368,7 @@ func (h *handler) handleSetActiveTeam() http.HandlerFunc {
 
 		teams, activeTeamID, teamsErr := h.ctx.Store.ListUserTeams(r.Context(), userID)
 		if teamsErr != nil {
-			slog.Warn("Failed to load active team after active team update", "error", teamsErr, "user_id", userID, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Warn("Failed to load active team after active team update", "error", teamsErr, "user_id", userID, "team_id", teamID)
 			teams = nil
 			activeTeamID = teamID
 		}
@@ -377,7 +379,7 @@ func (h *handler) handleSetActiveTeam() http.HandlerFunc {
 			"active_team_id":  activeTeamID,
 			"recent_team_ids": orderedRecentTeamIDs(teams, activeTeamID),
 		}); err != nil {
-			slog.Error("Failed to encode active team response", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode active team response", "error", err, "user_id", userID)
 		}
 	}
 }
@@ -403,14 +405,14 @@ func (h *handler) handleGetTeamMembers() http.HandlerFunc {
 
 		members, err := h.ctx.Store.ListTeamMembers(r.Context(), teamID)
 		if err != nil {
-			slog.Error("Failed to list team members", "error", err, "user_id", userID, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to list team members", "error", err, "user_id", userID, "team_id", teamID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(members); err != nil {
-			slog.Error("Failed to encode team members response", "error", err, "user_id", userID, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode team members response", "error", err, "user_id", userID, "team_id", teamID)
 		}
 	}
 }
@@ -437,14 +439,14 @@ func (h *handler) handleGetTeamInvites() http.HandlerFunc {
 
 		invites, err := h.ctx.Store.ListTeamInvites(r.Context(), teamID)
 		if err != nil {
-			slog.Error("Failed to list team invites", "error", err, "user_id", userID, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to list team invites", "error", err, "user_id", userID, "team_id", teamID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(invites); err != nil {
-			slog.Error("Failed to encode team invites response", "error", err, "user_id", userID, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode team invites response", "error", err, "user_id", userID, "team_id", teamID)
 		}
 	}
 }
@@ -477,7 +479,7 @@ func (h *handler) handleGetTeamAudit() http.HandlerFunc {
 
 		entries, total, err := h.ctx.Store.ListTeamAuditEntriesFiltered(r.Context(), teamID, filter)
 		if err != nil {
-			slog.Error("Failed to list team audit entries", "error", err, "user_id", userID, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to list team audit entries", "error", err, "user_id", userID, "team_id", teamID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -491,7 +493,7 @@ func (h *handler) handleGetTeamAudit() http.HandlerFunc {
 			HasMore: filter.Offset+len(entries) < total,
 			Action:  filter.Action,
 		}); err != nil {
-			slog.Error("Failed to encode team audit response", "error", err, "user_id", userID, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode team audit response", "error", err, "user_id", userID, "team_id", teamID)
 		}
 	}
 }

@@ -14,7 +14,11 @@ type NSQDLogger struct {
 
 func (l NSQDLogger) Output(calldepth int, s string) error {
 	lvl := parseNSQLevel(s)
-	l.Logger.Log(context.Background(), lvl, s, "calldepth", calldepth)
+	logger := l.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+	logger.Log(context.Background(), lvl, s, "calldepth", calldepth)
 	return nil
 }
 
@@ -22,6 +26,9 @@ func (l NSQDLogger) Output(calldepth int, s string) error {
 // We use this helper because nsqd.Options.LogLevel uses an internal type that we cannot
 // reference directly in a function signature.
 func ApplyNSQDLogger(opts *nsqd.Options, logger *slog.Logger, lvl slog.Level) {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	opts.Logger = NSQDLogger{Logger: logger}
 
 	switch {

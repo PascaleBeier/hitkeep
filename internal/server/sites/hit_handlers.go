@@ -3,7 +3,6 @@ package sites
 import (
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -108,20 +107,20 @@ func (h *handler) handleGetSiteHits() http.HandlerFunc {
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		result, err := analyticsStore.GetHits(r.Context(), params)
 		if err != nil {
-			slog.Error("Failed to get hits", "error", err, "site_id", siteID, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get hits", "error", err, "site_id", siteID, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(result); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -194,7 +193,7 @@ func (h *handler) handleExportSiteHits() http.HandlerFunc {
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -205,14 +204,14 @@ func (h *handler) handleExportSiteHits() http.HandlerFunc {
 			w.Header().Set("Content-Disposition", "attachment; filename="+filename)
 
 			if err := analyticsStore.ExportHitsCSV(r.Context(), params, w); err != nil {
-				slog.Error("Failed to export hits", "error", err, "site_id", siteID, "user_id", userID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to export hits", "error", err, "site_id", siteID, "user_id", userID)
 			}
 			return
 		}
 
 		filename, err := analyticsStore.ExportHitsFile(r.Context(), params, format)
 		if err != nil {
-			slog.Error("Failed to export hits", "error", err, "site_id", siteID, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to export hits", "error", err, "site_id", siteID, "user_id", userID)
 			http.Error(w, "Failed to export hits", http.StatusInternalServerError)
 			return
 		}

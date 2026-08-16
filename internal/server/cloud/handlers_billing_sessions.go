@@ -42,7 +42,13 @@ func (h *handler) handleStripeWebhook() http.HandlerFunc {
 		}
 
 		if err := h.handleStripeEvent(r.Context(), event); err != nil {
-			slog.Error("Failed to process Stripe webhook", "error", err, "type", event.Type, "event_id", event.ID)
+			attrs := make([]any, 0, 12)
+			attrs = append(attrs,
+				"event_type", event.Type,
+				"event_id", event.ID,
+			)
+			attrs = append(attrs, stripeErrorLogAttrs(err)...)
+			shared.LoggerFromContext(r.Context()).Error("Failed to process Stripe webhook", slog.Group("stripe", attrs...))
 			http.Error(w, "Webhook processing failed", http.StatusInternalServerError)
 			return
 		}
@@ -83,14 +89,14 @@ func (h *handler) handleCreateBillingPortalSession() http.HandlerFunc {
 				SubscriptionStatus: database.CloudSubscriptionStatusFree,
 			}
 			if upsertErr := h.ctx.Store.UpsertCloudBillingAccount(r.Context(), newAccount); upsertErr != nil {
-				slog.Error("Failed to auto-create cloud billing account", "error", upsertErr, "team_id", activeTenantID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to auto-create cloud billing account", "error", upsertErr, "team_id", activeTenantID)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
 			account = &newAccount
 		}
 		if err != nil && !errors.Is(err, database.ErrCloudBillingAccountNotFound) {
-			slog.Error("Failed to load cloud billing account", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load cloud billing account", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -118,14 +124,14 @@ func (h *handler) handleCreateBillingPortalSession() http.HandlerFunc {
 			Locale:          normalizeStripeLocale(req.Locale),
 		})
 		if err != nil {
-			slog.Error("Failed to create Stripe billing portal session", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to create Stripe billing portal session", slog.Group("stripe", stripeErrorLogAttrs(err)...))
 			http.Error(w, "Unable to start billing portal", http.StatusBadGateway)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(billingPortalSessionResponse{URL: session.URL}); err != nil {
-			slog.Error("Failed to encode billing portal session response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode billing portal session response", "error", err)
 		}
 	}
 }
@@ -164,14 +170,14 @@ func (h *handler) handleCreateBillingCheckoutSession() http.HandlerFunc {
 				SubscriptionStatus: database.CloudSubscriptionStatusFree,
 			}
 			if upsertErr := h.ctx.Store.UpsertCloudBillingAccount(r.Context(), newAccount); upsertErr != nil {
-				slog.Error("Failed to auto-create cloud billing account", "error", upsertErr, "team_id", activeTenantID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to auto-create cloud billing account", "error", upsertErr, "team_id", activeTenantID)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
 			account = &newAccount
 		}
 		if err != nil && !errors.Is(err, database.ErrCloudBillingAccountNotFound) {
-			slog.Error("Failed to load cloud billing account", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load cloud billing account", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -202,14 +208,14 @@ func (h *handler) handleCreateBillingCheckoutSession() http.HandlerFunc {
 
 		user, err := h.ctx.Store.GetUserByID(r.Context(), userID)
 		if err != nil || user == nil {
-			slog.Error("Failed to load user for billing checkout", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load user for billing checkout", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		team, err := h.ctx.Store.GetTenant(r.Context(), activeTenantID)
 		if err != nil || team == nil {
-			slog.Error("Failed to load team for billing checkout", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load team for billing checkout", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -226,7 +232,7 @@ func (h *handler) handleCreateBillingCheckoutSession() http.HandlerFunc {
 				IdempotencyKey: stripeCustomerCreateIdempotencyKey(user.ID, activeTenantID, user.Email),
 			})
 			if err != nil {
-				slog.Error("Failed to create Stripe customer for billing checkout", "error", err)
+				shared.LoggerFromContext(r.Context()).Error("Failed to create Stripe customer for billing checkout", slog.Group("stripe", stripeErrorLogAttrs(err)...))
 				http.Error(w, "Unable to start checkout", http.StatusBadGateway)
 				return
 			}
@@ -252,7 +258,7 @@ func (h *handler) handleCreateBillingCheckoutSession() http.HandlerFunc {
 			Jurisdiction:    strings.TrimSpace(strings.ToUpper(h.ctx.Config.CloudJurisdiction)),
 		})
 		if err != nil {
-			slog.Error("Failed to create Stripe upgrade checkout session", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to create Stripe upgrade checkout session", slog.Group("stripe", stripeErrorLogAttrs(err)...))
 			http.Error(w, "Unable to start checkout", http.StatusBadGateway)
 			return
 		}
@@ -267,7 +273,7 @@ func (h *handler) handleCreateBillingCheckoutSession() http.HandlerFunc {
 			StripeSubscriptionID: "",
 			StripePriceID:        priceID,
 		}); err != nil {
-			slog.Error("Failed to persist Stripe upgrade checkout metadata", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to persist Stripe upgrade checkout metadata", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -278,12 +284,12 @@ func (h *handler) handleCreateBillingCheckoutSession() http.HandlerFunc {
 			BillingInterval: req.BillingInterval,
 			DedupeKey:       activeTenantID.String() + ":checkout:" + session.ID,
 		}); err != nil {
-			slog.Warn("Failed to record checkout conversion", "error", err, "team_id", activeTenantID, "checkout_session_id", session.ID)
+			shared.LoggerFromContext(r.Context()).Warn("Failed to record checkout conversion", "error", err, "team_id", activeTenantID, "checkout_session_id", session.ID)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(billingCheckoutSessionResponse{URL: session.URL}); err != nil {
-			slog.Error("Failed to encode billing checkout session response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode billing checkout session response", "error", err)
 		}
 	}
 }

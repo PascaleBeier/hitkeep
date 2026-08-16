@@ -167,9 +167,6 @@ func googleAPIErrorMessage(err *googleapi.Error) string {
 	if err == nil {
 		return ""
 	}
-	if body := strings.TrimSpace(err.Body); body != "" {
-		return body
-	}
 	message := strings.TrimSpace(err.Message)
 	if message == "" {
 		for _, item := range err.Errors {

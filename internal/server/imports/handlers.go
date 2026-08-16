@@ -5,9 +5,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -36,7 +36,7 @@ type handler struct {
 	runner   *importRunner
 }
 
-func Register(mux *http.ServeMux, ctx *shared.Context) {
+func Register(mux *http.ServeMux, ctx *shared.Context) func(context.Context) error {
 	h := &handler{
 		ctx: ctx,
 		registry: importables.NewRegistry(
@@ -88,6 +88,7 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		AllowAPIKey: true,
 		RateLimiter: ctx.ApiLimiter,
 	}, requireImportAccess(h.handleDeleteImport())))
+	return h.runner.Stop
 }
 
 func (h *handler) appendImportAudit(ctx context.Context, r *http.Request, siteID, importID, actorID uuid.UUID, provider, action, outcome, details string) {
@@ -103,7 +104,7 @@ func (h *handler) appendImportAudit(ctx context.Context, r *http.Request, siteID
 	}
 	teamID, err := h.ctx.Store.GetSiteTenantID(ctx, siteID)
 	if err != nil {
-		slog.Warn("Failed to resolve team for import audit", "error", err, "site_id", siteID, "import_id", importID, "action", action)
+		shared.LoggerFromContext(ctx).Warn("Failed to resolve team for import audit", "error", err, "site_id", siteID, "import_id", importID, "action", action)
 		return
 	}
 	siteLabel := siteID.String()
@@ -138,7 +139,7 @@ func importActorID(job *api.ImportJob) uuid.UUID {
 
 func (h *handler) handleListImporters() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, h.registry.Descriptors())
+		writeJSON(r.Context(), w, h.registry.Descriptors())
 	}
 }
 
@@ -214,19 +215,19 @@ func (h *handler) handleCreateUpload() http.HandlerFunc {
 		actorID := shared.GetUserIDFromContext(r)
 		job, err := h.ctx.Store.CreateSiteImportUpload(r.Context(), siteID, actorID, providerKey, files)
 		if err != nil {
-			slog.Error("Failed to create import upload", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to create import upload", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		// #nosec G703 -- siteID is parsed as a UUID and this path stays under HitKeep's configured data directory.
 		if err := os.MkdirAll(filepath.Join(h.ctx.Config.DataPath, "imports", siteID.String()), 0755); err != nil {
-			slog.Error("Failed to create import staging directory", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to create import staging directory", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		h.appendImportAudit(r.Context(), r, siteID, job.ID, actorID, job.Provider, "import.upload_created", "success", fmt.Sprintf("%s import upload created with %d file(s)", job.Provider, len(job.Files)))
 
-		writeJSON(w, api.ImportUploadCreateResponse{
+		writeJSON(r.Context(), w, api.ImportUploadCreateResponse{
 			ImportID:  job.ID,
 			Provider:  job.Provider,
 			Status:    job.Status,
@@ -282,7 +283,7 @@ func (h *handler) handleUploadChunk() http.HandlerFunc {
 			limited := &io.LimitedReader{R: r.Body, N: replayLimit + 1}
 			read, err := io.Copy(io.Discard, limited)
 			if err != nil {
-				slog.Error("Failed to read duplicate import chunk", "error", err, "import_id", importID, "file_id", fileID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to read duplicate import chunk", "error", err, "import_id", importID, "file_id", fileID)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
@@ -290,37 +291,37 @@ func (h *handler) handleUploadChunk() http.HandlerFunc {
 				http.Error(w, "Chunk overlaps uploaded boundary", http.StatusConflict)
 				return
 			}
-			writeJSON(w, api.ImportChunkResponse{ImportID: importID, FileID: fileID, BytesReceived: file.BytesReceived, Complete: file.BytesReceived >= file.SizeBytes})
+			writeJSON(r.Context(), w, api.ImportChunkResponse{ImportID: importID, FileID: fileID, BytesReceived: file.BytesReceived, Complete: file.BytesReceived >= file.SizeBytes})
 			return
 		}
 		remaining := file.SizeBytes - offset
 		if remaining <= 0 {
-			writeJSON(w, api.ImportChunkResponse{ImportID: importID, FileID: fileID, BytesReceived: file.BytesReceived, Complete: true})
+			writeJSON(r.Context(), w, api.ImportChunkResponse{ImportID: importID, FileID: fileID, BytesReceived: file.BytesReceived, Complete: true})
 			return
 		}
 
 		path := h.stagedPath(file.RelativePath)
 		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-			slog.Error("Failed to create import file directory", "error", err, "path", path)
+			shared.LoggerFromContext(r.Context()).Error("Failed to create import file directory", "error", err, "path", path)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		out, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0600)
 		if err != nil {
-			slog.Error("Failed to open staged import file", "error", err, "path", path)
+			shared.LoggerFromContext(r.Context()).Error("Failed to open staged import file", "error", err, "path", path)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		defer out.Close()
 		if _, err := out.Seek(offset, io.SeekStart); err != nil {
-			slog.Error("Failed to seek staged import file", "error", err, "path", path)
+			shared.LoggerFromContext(r.Context()).Error("Failed to seek staged import file", "error", err, "path", path)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		limited := &io.LimitedReader{R: r.Body, N: remaining + 1}
 		written, err := io.Copy(out, limited)
 		if err != nil {
-			slog.Error("Failed to write import chunk", "error", err, "path", path)
+			shared.LoggerFromContext(r.Context()).Error("Failed to write import chunk", "error", err, "path", path)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -332,7 +333,7 @@ func (h *handler) handleUploadChunk() http.HandlerFunc {
 
 		bytesReceived := offset + written
 		if err := h.ctx.Store.UpdateImportFileProgress(r.Context(), importID, fileID, bytesReceived, ""); err != nil {
-			slog.Error("Failed to update import upload progress", "error", err, "import_id", importID, "file_id", fileID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to update import upload progress", "error", err, "import_id", importID, "file_id", fileID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -343,7 +344,7 @@ func (h *handler) handleUploadChunk() http.HandlerFunc {
 			}
 			h.appendImportAudit(r.Context(), r, siteID, importID, actorID, job.Provider, "import.file_uploaded", "success", fmt.Sprintf("Import file %s uploaded", file.Filename))
 		}
-		writeJSON(w, api.ImportChunkResponse{ImportID: importID, FileID: fileID, BytesReceived: bytesReceived, Complete: bytesReceived >= file.SizeBytes})
+		writeJSON(r.Context(), w, api.ImportChunkResponse{ImportID: importID, FileID: fileID, BytesReceived: bytesReceived, Complete: bytesReceived >= file.SizeBytes})
 	}
 }
 
@@ -379,7 +380,7 @@ func (h *handler) handleValidateUpload() http.HandlerFunc {
 			h.appendImportAudit(r.Context(), r, siteID, importID, actorID, job.Provider, "import.validation_failed", "failure", message)
 		}
 		if err := h.ctx.Store.MarkImportValidating(r.Context(), siteID, importID); err != nil {
-			slog.Error("Failed to mark import validating", "error", err, "import_id", importID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to mark import validating", "error", err, "import_id", importID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -394,7 +395,7 @@ func (h *handler) handleValidateUpload() http.HandlerFunc {
 		}
 		duplicate, err := h.ctx.Store.CompletedImportExistsForSourceHash(r.Context(), siteID, job.Provider, sourceSet.SourceHash, importID)
 		if err != nil {
-			slog.Error("Failed to check duplicate import source", "error", err, "import_id", importID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to check duplicate import source", "error", err, "import_id", importID)
 			_ = h.ctx.Store.MarkImportValidationFailed(r.Context(), siteID, importID, "could not check duplicate imports")
 			appendValidationFailed("could not check duplicate imports")
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -417,27 +418,27 @@ func (h *handler) handleValidateUpload() http.HandlerFunc {
 		manifest.SourceHash = sourceSet.SourceHash
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
 			_ = h.ctx.Store.MarkImportValidationFailed(r.Context(), siteID, importID, "could not resolve analytics store")
 			appendValidationFailed("could not resolve analytics store")
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		if _, err := analyticsStore.AnnotateImportManifestOverlap(r.Context(), siteID, manifest); err != nil {
-			slog.Error("Failed to calculate import overlap", "error", err, "site_id", siteID, "import_id", importID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to calculate import overlap", "error", err, "site_id", siteID, "import_id", importID)
 			_ = h.ctx.Store.MarkImportValidationFailed(r.Context(), siteID, importID, "could not calculate native overlap")
 			appendValidationFailed("could not calculate native overlap")
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		if err := h.ctx.Store.MarkImportValidated(r.Context(), siteID, importID, sourceSet.SourceHash, manifest); err != nil {
-			slog.Error("Failed to save import validation", "error", err, "import_id", importID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to save import validation", "error", err, "import_id", importID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		h.appendImportAudit(r.Context(), r, siteID, importID, actorID, job.Provider, "import.validated", "success", fmt.Sprintf("%s import validated with %d accepted row(s)", job.Provider, manifest.RowsAccepted))
 		job, _ = h.ctx.Store.GetSiteImport(r.Context(), siteID, importID)
-		writeJSON(w, job)
+		writeJSON(r.Context(), w, job)
 	}
 }
 
@@ -456,7 +457,7 @@ func (h *handler) handleGetImport() http.HandlerFunc {
 			http.Error(w, "Import not found", http.StatusNotFound)
 			return
 		}
-		writeJSON(w, job)
+		writeJSON(r.Context(), w, job)
 	}
 }
 
@@ -468,11 +469,11 @@ func (h *handler) handleListImports() http.HandlerFunc {
 		}
 		imports, err := h.ctx.Store.ListSiteImports(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to list imports", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to list imports", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, api.ImportListResponse{Imports: imports})
+		writeJSON(r.Context(), w, api.ImportListResponse{Imports: imports})
 	}
 }
 
@@ -504,7 +505,7 @@ func (h *handler) handleStartImport() http.HandlerFunc {
 			return
 		}
 		if err := h.ctx.Store.MarkImportQueued(r.Context(), siteID, importID); err != nil {
-			slog.Error("Failed to queue import", "error", err, "import_id", importID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to queue import", "error", err, "import_id", importID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -514,10 +515,23 @@ func (h *handler) handleStartImport() http.HandlerFunc {
 		}
 		h.appendImportAudit(r.Context(), r, siteID, importID, actorID, job.Provider, "import.queued", "success", fmt.Sprintf("%s import queued", job.Provider))
 
-		h.runner.Enqueue(siteID, importID)
+		if err := h.runner.TryEnqueue(siteID, importID); err != nil {
+			failureCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			failureMessage := "import queue is unavailable"
+			if errors.Is(err, errImportQueueFull) {
+				failureMessage = "import queue is full"
+			}
+			if markErr := h.ctx.Store.MarkImportFailed(failureCtx, siteID, importID, failureMessage); markErr != nil {
+				shared.LoggerFromContext(r.Context()).Error("Failed to mark import queue failure", "error", markErr, "import_id", importID)
+			}
+			h.appendImportAudit(failureCtx, nil, siteID, importID, actorID, job.Provider, "import.failed", "failure", failureMessage)
+			http.Error(w, "Import queue is unavailable", http.StatusServiceUnavailable)
+			return
+		}
 
 		job, _ = h.ctx.Store.GetSiteImport(r.Context(), siteID, importID)
-		writeJSON(w, job)
+		writeJSON(r.Context(), w, job)
 	}
 }
 
@@ -542,13 +556,13 @@ func (h *handler) handleDeleteImport() http.HandlerFunc {
 		}
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		deletedRows, err := analyticsStore.DeleteImportedDataForImport(r.Context(), siteID, importID)
 		if err != nil {
-			slog.Error("Failed to delete imported analytics", "error", err, "site_id", siteID, "import_id", importID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to delete imported analytics", "error", err, "site_id", siteID, "import_id", importID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -560,7 +574,7 @@ func (h *handler) handleDeleteImport() http.HandlerFunc {
 			h.appendImportAudit(r.Context(), r, siteID, importID, actorID, job.Provider, "import.data_cleared", "success", fmt.Sprintf("Cleared %d imported row(s)", deletedRows))
 		}
 		if err := h.ctx.Store.MarkImportDeleted(r.Context(), siteID, importID); err != nil {
-			slog.Error("Failed to mark import deleted", "error", err, "import_id", importID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to mark import deleted", "error", err, "import_id", importID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -569,15 +583,15 @@ func (h *handler) handleDeleteImport() http.HandlerFunc {
 			h.publishImportChange(siteID, deletedRows)
 		}
 		h.cleanupStagedFiles(importID)
-		writeJSON(w, map[string]string{"status": "deleted"})
+		writeJSON(r.Context(), w, map[string]string{"status": "deleted"})
 	}
 }
 
-func (h *handler) runImport(siteID, importID uuid.UUID) {
-	ctx := contextWithoutCancel()
+func (h *handler) runImportContext(ctx context.Context, siteID, importID uuid.UUID) {
+	ctx = shared.WithLogger(ctx, h.ctx.Logger)
 	job, err := h.ctx.Store.GetSiteImport(ctx, siteID, importID)
 	if err != nil || job == nil {
-		slog.Error("Cannot start missing import", "error", err, "site_id", siteID, "import_id", importID)
+		shared.LoggerFromContext(ctx).Error("Cannot start missing import", "error", err, "site_id", siteID, "import_id", importID)
 		return
 	}
 	if job.Status != database.ImportStatusValidated &&
@@ -587,9 +601,15 @@ func (h *handler) runImport(siteID, importID uuid.UUID) {
 	}
 	actorID := importActorID(job)
 	markFailed := func(message string) {
-		_ = h.ctx.Store.MarkImportFailed(ctx, siteID, importID, message)
-		h.appendImportAudit(ctx, nil, siteID, importID, actorID, job.Provider, "import.failed", "failure", message)
-		h.ctx.EmitWebhookEvent(ctx, webhooks.Event{
+		failureCtx := ctx
+		cancel := func() {}
+		if ctx.Err() != nil {
+			failureCtx, cancel = context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		}
+		defer cancel()
+		_ = h.ctx.Store.MarkImportFailed(failureCtx, siteID, importID, message)
+		h.appendImportAudit(failureCtx, nil, siteID, importID, actorID, job.Provider, "import.failed", "failure", message)
+		h.ctx.EmitWebhookEvent(failureCtx, webhooks.Event{
 			Type:   webhooks.EventImportFailed,
 			SiteID: &siteID,
 			Data: map[string]any{
@@ -603,7 +623,7 @@ func (h *handler) runImport(siteID, importID uuid.UUID) {
 		return
 	}
 	if err := h.ctx.Store.MarkImportRunning(ctx, siteID, importID); err != nil {
-		slog.Error("Failed to mark import running", "error", err, "import_id", importID)
+		shared.LoggerFromContext(ctx).Error("Failed to mark import running", "error", err, "import_id", importID)
 		return
 	}
 	h.appendImportAudit(ctx, nil, siteID, importID, actorID, job.Provider, "import.started", "success", fmt.Sprintf("%s import started", job.Provider))
@@ -669,10 +689,10 @@ func (h *handler) runImport(siteID, importID uuid.UUID) {
 	if overlap != nil {
 		overlap.Annotate(manifest)
 	} else if _, err := analyticsStore.AnnotateImportManifestOverlap(ctx, siteID, manifest); err != nil {
-		slog.Error("Failed to annotate completed import overlap", "error", err, "site_id", siteID, "import_id", importID)
+		shared.LoggerFromContext(ctx).Error("Failed to annotate completed import overlap", "error", err, "site_id", siteID, "import_id", importID)
 	}
 	if err := h.ctx.Store.MarkImportCompleted(ctx, siteID, importID, sink.Rows(), manifest); err != nil {
-		slog.Error("Failed to mark import completed", "error", err, "import_id", importID)
+		shared.LoggerFromContext(ctx).Error("Failed to mark import completed", "error", err, "import_id", importID)
 		markFailed("could not mark import completed")
 		return
 	}
@@ -856,13 +876,9 @@ func parseUUIDPath(w http.ResponseWriter, r *http.Request, name, message string)
 	return id, true
 }
 
-func writeJSON(w http.ResponseWriter, value any) {
+func writeJSON(ctx context.Context, w http.ResponseWriter, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(value); err != nil {
-		slog.Error("Failed to encode response", "error", err)
+		shared.LoggerFromContext(ctx).Error("Failed to encode response", "error", err)
 	}
-}
-
-func contextWithoutCancel() context.Context {
-	return context.Background()
 }

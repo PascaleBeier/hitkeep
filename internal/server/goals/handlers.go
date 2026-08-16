@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -96,21 +95,21 @@ func (h *handler) handleListDefinitions(
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		definitions, err := fetch(r.Context(), analyticsStore, siteID)
 		if err != nil {
-			slog.Error(logMessage, "error", err)
+			shared.LoggerFromContext(r.Context()).Error(logMessage, "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(definitions); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -137,13 +136,13 @@ func (h *handler) handleDeleteDefinition(
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		if err := deleteDefinition(r.Context(), analyticsStore, definitionID, siteID); err != nil {
-			slog.Error(deleteLogMessage, "error", err)
+			shared.LoggerFromContext(r.Context()).Error(deleteLogMessage, "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -196,13 +195,13 @@ func (h *handler) handleCreateGoal() http.HandlerFunc {
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		if err := analyticsStore.CreateGoal(r.Context(), &req); err != nil {
-			slog.Error("Failed to create goal", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to create goal", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -273,7 +272,7 @@ func (h *handler) handleUpdateGoal() http.HandlerFunc {
 				http.Error(w, "Goal not found", http.StatusNotFound)
 				return
 			}
-			slog.Error("Failed to update goal", "error", err, "site_id", siteID, "goal_id", goalID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to update goal", "error", err, "site_id", siteID, "goal_id", goalID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -326,7 +325,7 @@ func (h *handler) handleTimeseries(
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -347,14 +346,14 @@ func (h *handler) handleTimeseries(
 
 		series, err := fetch(r.Context(), analyticsStore, params, ids)
 		if err != nil {
-			slog.Error(logMessage, "error", err)
+			shared.LoggerFromContext(r.Context()).Error(logMessage, "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(series); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -418,13 +417,13 @@ func (h *handler) handleCreateFunnel() http.HandlerFunc {
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		if err := analyticsStore.CreateFunnel(r.Context(), &req); err != nil {
-			slog.Error("Failed to create funnel", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to create funnel", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -468,7 +467,7 @@ func (h *handler) handleUpdateFunnel() http.HandlerFunc {
 				http.Error(w, "Funnel not found", http.StatusNotFound)
 				return
 			}
-			slog.Error("Failed to update funnel", "error", err, "site_id", siteID, "funnel_id", funnelID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to update funnel", "error", err, "site_id", siteID, "funnel_id", funnelID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -476,7 +475,7 @@ func (h *handler) handleUpdateFunnel() http.HandlerFunc {
 		h.publishDefinitionChange(siteID, realtime.KindFunnels)
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(input); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -562,14 +561,14 @@ func (h *handler) handleGetFunnelStats() http.HandlerFunc {
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		stats, err := analyticsStore.GetFunnelStats(r.Context(), funnelID, params)
 		if err != nil {
-			slog.Error("Failed to get funnel stats", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get funnel stats", "error", err)
 			if strings.Contains(err.Error(), "not found") {
 				http.Error(w, "Funnel not found", http.StatusNotFound)
 			} else {
@@ -580,7 +579,7 @@ func (h *handler) handleGetFunnelStats() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(stats); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }

@@ -35,15 +35,24 @@ type fakeStripeClient struct {
 	lastPortalInput   *createPortalSessionInput
 	lastChargeID      string
 	chargeCustomerID  string
+	createCustomerErr error
+	createCheckoutErr error
+	createPortalErr   error
 }
 
 func (f *fakeStripeClient) CreateCustomer(_ context.Context, input createCustomerInput) (string, error) {
 	f.lastCustomerInput = &input
+	if f.createCustomerErr != nil {
+		return "", f.createCustomerErr
+	}
 	return "cus_test", nil
 }
 
 func (f *fakeStripeClient) CreateCheckoutSession(_ context.Context, input createCheckoutSessionInput) (*checkoutSessionOutput, error) {
 	f.lastCheckoutInput = &input
+	if f.createCheckoutErr != nil {
+		return nil, f.createCheckoutErr
+	}
 	return &checkoutSessionOutput{
 		ID:  "cs_test",
 		URL: "https://checkout.stripe.test/session",
@@ -52,6 +61,9 @@ func (f *fakeStripeClient) CreateCheckoutSession(_ context.Context, input create
 
 func (f *fakeStripeClient) CreatePortalSession(_ context.Context, input createPortalSessionInput) (*portalSessionOutput, error) {
 	f.lastPortalInput = &input
+	if f.createPortalErr != nil {
+		return nil, f.createPortalErr
+	}
 	return &portalSessionOutput{
 		ID:  "bps_test",
 		URL: "https://billing.stripe.test/session",
@@ -360,6 +372,44 @@ func TestHandleSignupSendsVerificationEmail(t *testing.T) {
 	user, _ := store.GetUserByEmail(context.Background(), "free@example.com")
 	if user != nil {
 		t.Fatal("expected user NOT to exist before email verification")
+	}
+}
+
+func TestHandleSignupDoesNotLogRawVerificationMailError(t *testing.T) {
+	h, store := setupCloudTestHandler(t)
+	defer store.Close()
+
+	rawMailError := "provider response password=super-secret token=top-secret https://mail.example.test/reject"
+	h.ctx.Mailer = mailer.NewWithDriver(&captureMailDriver{err: errors.New(rawMailError)}, h.ctx.Config)
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+	body, err := json.Marshal(signupRequest{
+		Email:        "verification-mail-error@example.com",
+		Password:     "password123",
+		GivenName:    "Verification",
+		LastName:     "Failure",
+		TeamName:     "Verification Team",
+		PlanCode:     database.CloudPlanFree,
+		Jurisdiction: "EU",
+		AcceptedTos:  true,
+	})
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/cloud/signup", bytes.NewReader(body))
+	req = req.WithContext(shared.WithLogger(req.Context(), logger))
+	w := httptest.NewRecorder()
+	h.handleSignup().ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusInternalServerError, w.Code, w.Body.String())
+	}
+	if strings.Contains(logs.String(), rawMailError) || strings.Contains(w.Body.String(), rawMailError) {
+		t.Fatalf("raw verification mail error leaked into logs or response: logs=%q body=%q", logs.String(), w.Body.String())
+	}
+	if !strings.Contains(logs.String(), "error_stage=transport") || !strings.Contains(logs.String(), "error_kind=transport") {
+		t.Fatalf("expected safe verification mail diagnostics, got %q", logs.String())
 	}
 }
 
@@ -1683,6 +1733,68 @@ func TestHandleCreateBillingCheckoutSession(t *testing.T) {
 	}
 	if storedAccount.BillingInterval != database.CloudBillingIntervalAnnual {
 		t.Fatalf("expected persisted annual interval, got %q", storedAccount.BillingInterval)
+	}
+}
+
+func TestHandleCreateBillingCheckoutSessionDoesNotLogRawStripeError(t *testing.T) {
+	h, store := setupCloudTestHandler(t)
+	defer store.Close()
+
+	account, err := store.CreateManagedCloudAccount(context.Background(), database.CreateManagedCloudAccountInput{
+		Email:          "stripe-failure@example.com",
+		HashedPassword: "hashed",
+		GivenName:      "Ada",
+		LastName:       "Lovelace",
+		TeamName:       "Stripe Failure Team",
+	})
+	if err != nil {
+		t.Fatalf("create managed account: %v", err)
+	}
+	if err := store.UpsertCloudBillingAccount(context.Background(), database.CloudBillingAccount{
+		TenantID:           account.TenantID,
+		PlanCode:           database.CloudPlanFree,
+		PlanName:           "Free",
+		SubscriptionStatus: database.CloudSubscriptionStatusFree,
+		StripeCustomerID:   "cus_existing",
+	}); err != nil {
+		t.Fatalf("upsert cloud billing account: %v", err)
+	}
+
+	const rawStripeError = "stripe response contains sk_test_checkout_secret and https://billing.example.test/secret"
+	stripeClient, ok := h.stripe.(*fakeStripeClient)
+	if !ok {
+		t.Fatal("expected fake stripe client")
+	}
+	stripeClient.createCheckoutErr = fmt.Errorf("checkout failed: %w", &stripe.Error{
+		Type:           stripe.ErrorTypeAPI,
+		Code:           stripe.ErrorCodeCustomerSessionExpired,
+		Msg:            rawStripeError,
+		HTTPStatusCode: http.StatusBadGateway,
+	})
+
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	body := strings.NewReader(`{"plan_code":"pro","billing":"monthly","locale":"en-US"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/cloud/billing/checkout", body)
+	ctx := shared.WithLogger(req.Context(), logger)
+	ctx = context.WithValue(ctx, shared.UserIDKey, account.UserID)
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+
+	h.handleCreateBillingCheckoutSession().ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadGateway {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusBadGateway)
+	}
+	if strings.Contains(logs.String(), rawStripeError) {
+		t.Fatalf("raw Stripe error leaked into logs: %q", logs.String())
+	}
+	if !strings.Contains(logs.String(), "stripe.error_code=stripe_request_failed") ||
+		!strings.Contains(logs.String(), "stripe.error_kind=provider") ||
+		!strings.Contains(logs.String(), "stripe.stripe_error_type=api_error") ||
+		!strings.Contains(logs.String(), "stripe.stripe_error_code=customer_session_expired") ||
+		!strings.Contains(logs.String(), "stripe.stripe_http_status=502") {
+		t.Fatalf("expected safe Stripe diagnostics, got %q", logs.String())
 	}
 }
 

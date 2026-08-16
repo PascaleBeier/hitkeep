@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/netip"
 	"strings"
@@ -39,34 +41,42 @@ type httpDoer interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-func FetchSpamFeedData(ctx context.Context, client httpDoer) (SpamFeedData, error) {
+type spamFeedWarning struct {
+	source string
+	err    error
+}
+
+func FetchSpamFeedData(ctx context.Context, client httpDoer, logger *slog.Logger) (SpamFeedData, error) {
+	if logger == nil {
+		panic("blocking: logger is required")
+	}
 	if client == nil {
 		client = &http.Client{Timeout: 30 * time.Second}
 	}
 
-	var warnings []string
+	var warnings []spamFeedWarning
 
 	referrers, err := fetchMatomoReferrers(ctx, client)
 	if err != nil {
-		warnings = append(warnings, fmt.Sprintf("matomo referrer list: %v", err))
+		warnings = append(warnings, spamFeedWarning{source: "matomo_referrer_list", err: err})
 	}
 
 	dropv4, err := fetchSpamhausCIDRs(ctx, client, spamhausDropURL, 32)
 	if err != nil {
-		warnings = append(warnings, fmt.Sprintf("spamhaus drop: %v", err))
+		warnings = append(warnings, spamFeedWarning{source: "spamhaus_drop_v4", err: err})
 	}
 
 	dropv6, err := fetchSpamhausCIDRs(ctx, client, spamhausDropV6URL, 128)
 	if err != nil {
-		warnings = append(warnings, fmt.Sprintf("spamhaus dropv6: %v", err))
+		warnings = append(warnings, spamFeedWarning{source: "spamhaus_drop_v6", err: err})
 	}
 
 	if len(referrers) == 0 && len(dropv4.CIDRs) == 0 && len(dropv6.CIDRs) == 0 {
-		return SpamFeedData{}, fmt.Errorf("all spam feeds failed: %s", strings.Join(warnings, "; "))
+		return SpamFeedData{}, fmt.Errorf("all spam feeds failed: %s", spamFeedWarningSummary(warnings))
 	}
 
-	for _, w := range warnings {
-		slog.Warn("Partial spam feed failure, continuing with available data", "error", w)
+	for _, warning := range warnings {
+		logger.Warn("Partial spam feed failure, continuing with available data", "source", warning.source, "error_kind", spamFeedErrorKind(warning.err))
 	}
 
 	sourceMetadata := make(map[string]SpamFeedSourceMetadata, 2)
@@ -90,6 +100,32 @@ func FetchSpamFeedData(ctx context.Context, client httpDoer) (SpamFeedData, erro
 	}
 	data.normalize()
 	return data, nil
+}
+
+func spamFeedWarningSummary(warnings []spamFeedWarning) string {
+	parts := make([]string, 0, len(warnings))
+	for _, warning := range warnings {
+		parts = append(parts, fmt.Sprintf("%s (%s)", warning.source, spamFeedErrorKind(warning.err)))
+	}
+	return strings.Join(parts, "; ")
+}
+
+func spamFeedErrorKind(err error) string {
+	switch {
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "timeout"
+	default:
+		var networkErr net.Error
+		if errors.As(err, &networkErr) {
+			if networkErr.Timeout() {
+				return "timeout"
+			}
+			return "network"
+		}
+		return "invalid_response"
+	}
 }
 
 func fetchMatomoReferrers(ctx context.Context, client httpDoer) ([]string, error) {
@@ -218,7 +254,7 @@ func fetchURL(ctx context.Context, client httpDoer, sourceURL string) (io.ReadCl
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		defer resp.Body.Close()
-		return nil, fmt.Errorf("unexpected status %s", resp.Status)
+		return nil, fmt.Errorf("unexpected HTTP status %d", resp.StatusCode)
 	}
 	return io.NopCloser(io.LimitReader(resp.Body, maxFeedResponseBytes)), nil
 }

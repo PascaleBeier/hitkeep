@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"sort"
 	"strconv"
@@ -80,7 +79,7 @@ func (h *handler) handleAsk() http.HandlerFunc {
 			}) {
 				return
 			}
-			h.handleAskAIError(w, err, prepared.SiteID)
+			h.handleAskAIError(r.Context(), w, err, prepared.SiteID)
 			return
 		}
 		if !h.auditAskAIResponse(w, r, prepared.AuditContext, askAIResponseAuditInput{
@@ -92,7 +91,7 @@ func (h *handler) handleAsk() http.HandlerFunc {
 		}) {
 			return
 		}
-		writeJSON(w, http.StatusOK, apiAskAIResponse(result))
+		writeJSON(r.Context(), w, http.StatusOK, apiAskAIResponse(result))
 	}
 }
 
@@ -142,7 +141,7 @@ func (h *handler) handleAskEvents() http.HandlerFunc {
 		if !ok {
 			return
 		}
-		stream, ok := newAskAIEventStream(w)
+		stream, ok := newAskAIEventStream(r.Context(), w)
 		if !ok {
 			if !h.auditAskAIResponse(w, r, prepared.AuditContext, askAIResponseAuditInput{
 				RequestHash: prepared.RequestHash,
@@ -255,7 +254,7 @@ func (h *handler) handleHistory() http.HandlerFunc {
 		}
 		entries, total, err := h.ctx.Store.ListAskAIHistory(r.Context(), prepared.SiteID, limit, offset)
 		if err != nil {
-			slog.Error("Failed to list Ask AI history", "error", err, "site_id", prepared.SiteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to list Ask AI history", "error", err, "site_id", prepared.SiteID)
 			if !h.auditAskAIHistory(w, r, prepared.AuditContext, askAIHistoryAuditInput{
 				Outcome:    "failure",
 				Status:     "history_unavailable",
@@ -278,7 +277,7 @@ func (h *handler) handleHistory() http.HandlerFunc {
 		}) {
 			return
 		}
-		writeJSON(w, http.StatusOK, apiAskAIHistoryResponse(entries, total, limit, offset))
+		writeJSON(r.Context(), w, http.StatusOK, apiAskAIHistoryResponse(entries, total, limit, offset))
 	}
 }
 
@@ -331,7 +330,7 @@ func (h *handler) prepareAskAI(w http.ResponseWriter, r *http.Request) (askAIPre
 	}
 	site, err := h.ctx.Store.GetSiteByID(r.Context(), siteID)
 	if err != nil {
-		slog.Error("Failed to load Ask AI site", "error", err, "site_id", siteID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to load Ask AI site", "error", err, "site_id", siteID)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return prepared, false
 	}
@@ -341,7 +340,7 @@ func (h *handler) prepareAskAI(w http.ResponseWriter, r *http.Request) (askAIPre
 	}
 	teamID, err := h.ctx.Store.GetSiteTenantID(r.Context(), siteID)
 	if err != nil {
-		slog.Error("Failed to resolve Ask AI team", "error", err, "site_id", siteID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to resolve Ask AI team", "error", err, "site_id", siteID)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return prepared, false
 	}
@@ -363,7 +362,7 @@ func (h *handler) prepareAskAI(w http.ResponseWriter, r *http.Request) (askAIPre
 	}
 	hasSiteView, err := h.hasAskAISiteView(r.Context(), userID, siteID)
 	if err != nil {
-		slog.Error("Failed to resolve Ask AI site permission", "error", err, "site_id", siteID, "user_id", userID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to resolve Ask AI site permission", "error", err, "site_id", siteID, "user_id", userID)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return prepared, false
 	}
@@ -400,7 +399,7 @@ func (h *handler) prepareAskAI(w http.ResponseWriter, r *http.Request) (askAIPre
 		}) {
 			return prepared, false
 		}
-		writeJSON(w, code, status)
+		writeJSON(r.Context(), w, code, status)
 		return prepared, false
 	}
 	if h.ctx.AI == nil {
@@ -517,7 +516,7 @@ func (h *handler) prepareAskAI(w http.ResponseWriter, r *http.Request) (askAIPre
 	}
 	analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
 	if err != nil {
-		slog.Error("Failed to resolve Ask AI analytics store", "error", err, "site_id", siteID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to resolve Ask AI analytics store", "error", err, "site_id", siteID)
 		if !h.auditAskAIResponse(w, r, auditCtx, askAIResponseAuditInput{
 			RequestHash: requestHash,
 			Outcome:     "failure",
@@ -577,7 +576,7 @@ func (h *handler) prepareAskAIHistory(w http.ResponseWriter, r *http.Request) (a
 	}
 	site, err := h.ctx.Store.GetSiteByID(r.Context(), siteID)
 	if err != nil {
-		slog.Error("Failed to load Ask AI history site", "error", err, "site_id", siteID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to load Ask AI history site", "error", err, "site_id", siteID)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return prepared, false
 	}
@@ -587,7 +586,7 @@ func (h *handler) prepareAskAIHistory(w http.ResponseWriter, r *http.Request) (a
 	}
 	teamID, err := h.ctx.Store.GetSiteTenantID(r.Context(), siteID)
 	if err != nil {
-		slog.Error("Failed to resolve Ask AI history team", "error", err, "site_id", siteID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to resolve Ask AI history team", "error", err, "site_id", siteID)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return prepared, false
 	}
@@ -605,7 +604,7 @@ func (h *handler) prepareAskAIHistory(w http.ResponseWriter, r *http.Request) (a
 	}
 	hasSiteView, err := h.hasAskAISiteView(r.Context(), userID, siteID)
 	if err != nil {
-		slog.Error("Failed to resolve Ask AI history site permission", "error", err, "site_id", siteID, "user_id", userID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to resolve Ask AI history site permission", "error", err, "site_id", siteID, "user_id", userID)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return prepared, false
 	}
@@ -634,7 +633,7 @@ func (h *handler) prepareAskAIHistory(w http.ResponseWriter, r *http.Request) (a
 		}) {
 			return prepared, false
 		}
-		writeJSON(w, code, status)
+		writeJSON(r.Context(), w, code, status)
 		return prepared, false
 	}
 	return askAIHistoryPrepared{SiteID: siteID, AuditContext: auditCtx}, true
@@ -643,9 +642,10 @@ func (h *handler) prepareAskAIHistory(w http.ResponseWriter, r *http.Request) (a
 type askAIEventStream struct {
 	w       http.ResponseWriter
 	flusher http.Flusher
+	ctx     context.Context
 }
 
-func newAskAIEventStream(w http.ResponseWriter) (askAIEventStream, bool) {
+func newAskAIEventStream(ctx context.Context, w http.ResponseWriter) (askAIEventStream, bool) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		return askAIEventStream{}, false
@@ -655,17 +655,17 @@ func newAskAIEventStream(w http.ResponseWriter) (askAIEventStream, bool) {
 	header.Set("Cache-Control", "no-cache")
 	header.Set("Connection", "keep-alive")
 	header.Set("X-Accel-Buffering", "no")
-	return askAIEventStream{w: w, flusher: flusher}, true
+	return askAIEventStream{w: w, flusher: flusher, ctx: ctx}, true
 }
 
 func (s askAIEventStream) write(event string, payload api.AskAIStreamEvent) bool {
 	raw, err := json.Marshal(payload)
 	if err != nil {
-		slog.Error("Failed to encode Ask AI stream event", "error", err, "event", event)
+		shared.LoggerFromContext(s.ctx).Error("Failed to encode Ask AI stream event", "error", err, "event_type", event)
 		return false
 	}
 	if _, err := fmt.Fprintf(s.w, "event: %s\ndata: %s\n\n", event, raw); err != nil {
-		slog.Debug("Ask AI stream write failed", "error", err, "event", event)
+		shared.LoggerFromContext(s.ctx).Debug("Ask AI stream write failed", "error", err, "event_type", event)
 		return false
 	}
 	s.flusher.Flush()
@@ -999,7 +999,7 @@ func askAIErrorAuditStatus(err error) string {
 	}
 }
 
-func (h *handler) handleAskAIError(w http.ResponseWriter, err error, siteID uuid.UUID) {
+func (h *handler) handleAskAIError(ctx context.Context, w http.ResponseWriter, err error, siteID uuid.UUID) {
 	switch {
 	case errors.Is(err, hitai.ErrDisabled), errors.Is(err, hitai.ErrNotConfigured):
 		http.Error(w, "Ask AI is not configured", http.StatusConflict)
@@ -1008,7 +1008,7 @@ func (h *handler) handleAskAIError(w http.ResponseWriter, err error, siteID uuid
 	case errors.Is(err, hitai.ErrInvalidOutput):
 		http.Error(w, "Ask AI returned an invalid response", http.StatusBadGateway)
 	default:
-		slog.Error("Ask AI request failed", "error", err, "site_id", siteID)
+		shared.LoggerFromContext(ctx).Error("Ask AI request failed", "error_category", hitai.ClassifyError(err), "site_id", siteID)
 		http.Error(w, "Ask AI request failed", http.StatusBadGateway)
 	}
 }
@@ -1108,7 +1108,7 @@ func (h *handler) auditAskAIRequest(w http.ResponseWriter, r *http.Request, audi
 		MetadataJSON: mustAuditJSON(askAIRequestAuditMetadata(input)),
 	}
 	if err := h.ctx.AppendAuditEventChecked(r.Context(), r, event); err != nil {
-		slog.Error("Failed to append Ask AI request audit", "error", err, "site_id", auditCtx.SiteID, "status", input.Status)
+		shared.LoggerFromContext(r.Context()).Error("Failed to append Ask AI request audit", "error", err, "site_id", auditCtx.SiteID, "status", input.Status)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return false
 	}
@@ -1117,7 +1117,7 @@ func (h *handler) auditAskAIRequest(w http.ResponseWriter, r *http.Request, audi
 
 func (h *handler) auditAskAIResponse(w http.ResponseWriter, r *http.Request, auditCtx askAIAuditContext, input askAIResponseAuditInput) bool {
 	if err := h.appendAskAIResponseAudit(r.Context(), r, auditCtx, input); err != nil {
-		slog.Error("Failed to append Ask AI response audit", "error", err, "site_id", auditCtx.SiteID, "status", input.Status)
+		shared.LoggerFromContext(r.Context()).Error("Failed to append Ask AI response audit", "error", err, "site_id", auditCtx.SiteID, "status", input.Status)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return false
 	}
@@ -1137,7 +1137,7 @@ func (h *handler) auditAskAIHistory(w http.ResponseWriter, r *http.Request, audi
 		MetadataJSON: mustAuditJSON(askAIHistoryAuditMetadata(input)),
 	}
 	if err := h.ctx.AppendAuditEventChecked(r.Context(), r, event); err != nil {
-		slog.Error("Failed to append Ask AI history audit", "error", err, "site_id", auditCtx.SiteID, "status", input.Status)
+		shared.LoggerFromContext(r.Context()).Error("Failed to append Ask AI history audit", "error", err, "site_id", auditCtx.SiteID, "status", input.Status)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return false
 	}
@@ -1148,7 +1148,7 @@ func (h *handler) auditAskAIStreamResponse(r *http.Request, auditCtx askAIAuditC
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), askAIStreamAuditTTL)
 	defer cancel()
 	if err := h.appendAskAIResponseAudit(ctx, r, auditCtx, input); err != nil {
-		slog.Error("Failed to append Ask AI stream response audit", "error", err, "site_id", auditCtx.SiteID, "status", input.Status)
+		shared.LoggerFromContext(r.Context()).Error("Failed to append Ask AI stream response audit", "error", err, "site_id", auditCtx.SiteID, "status", input.Status)
 		return false
 	}
 	return true
@@ -1481,10 +1481,10 @@ func safeAuditValue(value string) string {
 	return strings.NewReplacer(" ", "_", "\n", "_", "\r", "_", "\t", "_").Replace(strings.TrimSpace(value))
 }
 
-func writeJSON(w http.ResponseWriter, status int, value any) {
+func writeJSON(ctx context.Context, w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(value); err != nil {
-		slog.Error("Failed to encode Ask AI response", "error", err)
+		shared.LoggerFromContext(ctx).Error("Failed to encode Ask AI response", "error", err)
 	}
 }

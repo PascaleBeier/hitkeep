@@ -92,14 +92,19 @@ func DescribeError(err error) ErrorDetails {
 	if errors.As(err, &sendErr) && sendErr != nil && sendErr.Stage != "" {
 		details.Stage = string(sendErr.Stage)
 	}
+	safeMessage := safeErrorMessage(err)
+	details.SMTPCode = smtpResponseCode(safeMessage)
 	if isRenderStage(details.Stage) {
 		// Template and MJML errors can include rendered content or user-provided
 		// report data. Keep the stage, but never put that payload in logs.
 		details.Message = "mail content rendering failed"
+	} else if details.Stage == string(SendStageTransport) {
+		// Transport errors can contain arbitrary provider response bodies. Keep
+		// the separately parsed SMTP code, but never log the provider text.
+		details.Message = "mail transport failed"
 	} else {
-		details.Message = safeErrorMessage(err)
+		details.Message = safeMessage
 	}
-	details.SMTPCode = smtpResponseCode(details.Message)
 
 	switch {
 	case details.SMTPCode != "":

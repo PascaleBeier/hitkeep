@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -38,7 +37,7 @@ func (h *handler) handleListSiteExclusions() http.HandlerFunc {
 		if effective {
 			teamID, resolveErr := h.ctx.Store.GetSiteTenantID(r.Context(), siteID)
 			if resolveErr != nil {
-				slog.Error("Failed to resolve site team for exclusions", "error", resolveErr, "site_id", siteID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to resolve site team for exclusions", "error", resolveErr, "site_id", siteID)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
@@ -47,14 +46,14 @@ func (h *handler) handleListSiteExclusions() http.HandlerFunc {
 			rules, err = h.ctx.Store.ListSiteExclusions(r.Context(), siteID)
 		}
 		if err != nil {
-			slog.Error("Failed to list site exclusions", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to list site exclusions", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(rules); err != nil {
-			slog.Error("Failed to encode site exclusions response", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode site exclusions response", "error", err, "site_id", siteID)
 		}
 	}
 }
@@ -92,7 +91,7 @@ func (h *handler) handleCreateSiteExclusion() http.HandlerFunc {
 			Description: input.Description,
 		}, userID)
 		if createErr != nil {
-			slog.Error("Failed to create site exclusion", "error", createErr, "site_id", siteID, "type", input.Type)
+			shared.LoggerFromContext(r.Context()).Error("Failed to create site exclusion", "error", createErr, "site_id", siteID, "type", input.Type)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -114,7 +113,7 @@ func (h *handler) handleCreateSiteExclusion() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		if err := json.NewEncoder(w).Encode(createdRule); err != nil {
-			slog.Error("Failed to encode site exclusion response", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode site exclusion response", "error", err, "site_id", siteID)
 		}
 	}
 }
@@ -140,7 +139,7 @@ func (h *handler) handleDeleteSiteExclusion() http.HandlerFunc {
 
 		deleted, err := h.ctx.Store.DeleteSiteExclusion(r.Context(), siteID, ruleID)
 		if err != nil {
-			slog.Error("Failed to delete site exclusion", "error", err, "site_id", siteID, "rule_id", ruleID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to delete site exclusion", "error", err, "site_id", siteID, "rule_id", ruleID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -184,6 +183,6 @@ func (h *handler) refreshIPFilter(ctx context.Context) {
 		return
 	}
 	if err := h.ctx.IPFilter.Refresh(ctx); err != nil {
-		slog.Warn("Failed to refresh IP filter after exclusion write", "error", err)
+		shared.LoggerFromContext(ctx).Warn("Failed to refresh IP filter after exclusion write", "error", err)
 	}
 }

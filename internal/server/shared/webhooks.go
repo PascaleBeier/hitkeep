@@ -3,7 +3,6 @@ package shared
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
 	"github.com/google/uuid"
 
@@ -16,7 +15,7 @@ func (c *Context) EmitWebhookEvent(ctx context.Context, event webhooks.Event) {
 		return
 	}
 	if _, err := c.Webhooks.Emit(ctx, event); err != nil {
-		slog.Warn("Operational action completed but webhook emission was deferred", "error", err, "event_type", event.Type)
+		LoggerFromContext(ctx).Warn("Operational action completed but webhook emission was deferred", "error", err, "event_type", event.Type)
 	}
 }
 

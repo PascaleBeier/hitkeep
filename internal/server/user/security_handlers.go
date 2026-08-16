@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -54,14 +53,14 @@ func (h *handler) handleGetUserSecurityStatus() http.HandlerFunc {
 
 		status, err := h.getUserSecurityStatus(r.Context(), userID)
 		if err != nil {
-			slog.Error("Failed to load user security status", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load user security status", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(status); err != nil {
-			slog.Error("Failed to encode user security status", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode user security status", "error", err, "user_id", userID)
 		}
 	}
 }
@@ -76,7 +75,7 @@ func (h *handler) handleStartTOTPSetup() http.HandlerFunc {
 
 		user, err := h.ctx.Store.GetUserByID(r.Context(), userID)
 		if err != nil {
-			slog.Error("Failed to load user for totp setup", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load user for totp setup", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -87,13 +86,13 @@ func (h *handler) handleStartTOTPSetup() http.HandlerFunc {
 
 		secret, err := appsecurity.GenerateTOTPSecret()
 		if err != nil {
-			slog.Error("Failed to generate totp secret", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to generate totp secret", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		if h.ctx.AuthState == nil {
-			slog.Error("TOTP auth state cache is not configured", "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("TOTP auth state cache is not configured", "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -110,7 +109,7 @@ func (h *handler) handleStartTOTPSetup() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		//nolint:gosec // TOTP bootstrap secret is intentionally returned to the authenticated user during setup.
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("Failed to encode pending totp setup", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode pending totp setup", "error", err, "user_id", userID)
 		}
 	}
 }
@@ -129,7 +128,7 @@ func (h *handler) handleVerifyTOTPSetup() http.HandlerFunc {
 		}
 
 		if h.ctx.AuthState == nil {
-			slog.Error("TOTP auth state cache is not configured", "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("TOTP auth state cache is not configured", "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -149,7 +148,7 @@ func (h *handler) handleVerifyTOTPSetup() http.HandlerFunc {
 		}
 
 		if err := h.ctx.Store.EnableUserTOTP(r.Context(), userID, secret); err != nil {
-			slog.Error("Failed to enable totp", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to enable totp", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -157,14 +156,14 @@ func (h *handler) handleVerifyTOTPSetup() http.HandlerFunc {
 
 		status, err := h.getUserSecurityStatus(r.Context(), userID)
 		if err != nil {
-			slog.Error("Failed to load user security status after enabling totp", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load user security status after enabling totp", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(status); err != nil {
-			slog.Error("Failed to encode security status after enabling totp", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode security status after enabling totp", "error", err, "user_id", userID)
 		}
 	}
 }
@@ -184,7 +183,7 @@ func (h *handler) handleDisableTOTP() http.HandlerFunc {
 
 		secret, found, err := h.ctx.Store.GetUserTOTPSecret(r.Context(), userID)
 		if err != nil {
-			slog.Error("Failed to get user totp secret", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get user totp secret", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -198,21 +197,21 @@ func (h *handler) handleDisableTOTP() http.HandlerFunc {
 		}
 
 		if err := h.ctx.Store.DisableUserTOTP(r.Context(), userID); err != nil {
-			slog.Error("Failed to disable user totp", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to disable user totp", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		status, err := h.getUserSecurityStatus(r.Context(), userID)
 		if err != nil {
-			slog.Error("Failed to load user security status after disabling totp", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load user security status after disabling totp", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(status); err != nil {
-			slog.Error("Failed to encode security status after disabling totp", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode security status after disabling totp", "error", err, "user_id", userID)
 		}
 	}
 }
@@ -232,21 +231,21 @@ func (h *handler) handleStartPasskeyRegistration() http.HandlerFunc {
 
 		passkeyUser, err := h.loadPasskeyUser(r.Context(), userID)
 		if err != nil {
-			slog.Error("Failed to load passkey user for registration", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load passkey user for registration", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		webAuthn, err := appsecurity.NewWebAuthn(h.ctx.Config.PublicURL, r)
 		if err != nil {
-			slog.Error("Failed to configure passkey registration", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to configure passkey registration", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		creation, session, err := webAuthn.BeginRegistration(passkeyUser, webauthnlib.WithExclusions(passkeyCredentialDescriptors(passkeyUser.Credentials)))
 		if err != nil {
-			slog.Error("Failed to begin passkey registration", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to begin passkey registration", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -256,7 +255,7 @@ func (h *handler) handleStartPasskeyRegistration() http.HandlerFunc {
 			expiresAt = time.Now().UTC().Add(passkeyChallengeTTL)
 		}
 		if h.ctx.AuthState == nil {
-			slog.Error("Passkey auth state cache is not configured", "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Passkey auth state cache is not configured", "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -268,7 +267,7 @@ func (h *handler) handleStartPasskeyRegistration() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("Failed to encode passkey registration start response", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode passkey registration start response", "error", err, "user_id", userID)
 		}
 	}
 }
@@ -293,7 +292,7 @@ func (h *handler) handleFinishPasskeyRegistration() http.HandlerFunc {
 		}
 
 		if h.ctx.AuthState == nil {
-			slog.Error("Passkey auth state cache is not configured", "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Passkey auth state cache is not configured", "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -314,21 +313,21 @@ func (h *handler) handleFinishPasskeyRegistration() http.HandlerFunc {
 
 		passkeyUser, err := h.loadPasskeyUser(r.Context(), userID)
 		if err != nil {
-			slog.Error("Failed to load passkey user for registration completion", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load passkey user for registration completion", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		webAuthn, err := appsecurity.NewWebAuthn(h.ctx.Config.PublicURL, r)
 		if err != nil {
-			slog.Error("Failed to configure passkey registration validation", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to configure passkey registration validation", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		credential, err := webAuthn.CreateCredential(passkeyUser, *session, parsedCredential)
 		if err != nil {
-			slog.Warn("Passkey registration verification failed", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Warn("Passkey registration verification failed", "error", err, "user_id", userID)
 			http.Error(w, "Invalid passkey registration", http.StatusBadRequest)
 			return
 		}
@@ -339,7 +338,7 @@ func (h *handler) handleFinishPasskeyRegistration() http.HandlerFunc {
 		}
 
 		if _, err := h.ctx.Store.CreateUserPasskeyCredential(r.Context(), userID, name, *credential); err != nil {
-			slog.Error("Failed to create user passkey", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to create user passkey", "error", err, "user_id", userID)
 			http.Error(w, "Failed to save passkey", http.StatusBadRequest)
 			return
 		}
@@ -348,14 +347,14 @@ func (h *handler) handleFinishPasskeyRegistration() http.HandlerFunc {
 
 		status, err := h.getUserSecurityStatus(r.Context(), userID)
 		if err != nil {
-			slog.Error("Failed to load user security status after passkey registration", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load user security status after passkey registration", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(status); err != nil {
-			slog.Error("Failed to encode security status after passkey registration", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode security status after passkey registration", "error", err, "user_id", userID)
 		}
 	}
 }
@@ -383,7 +382,7 @@ func (h *handler) handleDeleteUserPasskey() http.HandlerFunc {
 				http.Error(w, "Passkey is the last usable login method", http.StatusConflict)
 				return
 			}
-			slog.Error("Failed to delete user passkey", "error", err, "user_id", userID, "passkey_id", passkeyID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to delete user passkey", "error", err, "user_id", userID, "passkey_id", passkeyID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -402,7 +401,7 @@ func (h *handler) handleRegenerateRecoveryCodes() http.HandlerFunc {
 
 		status, err := h.getUserSecurityStatus(r.Context(), userID)
 		if err != nil {
-			slog.Error("Failed to load user security status before regenerating recovery codes", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load user security status before regenerating recovery codes", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -413,7 +412,7 @@ func (h *handler) handleRegenerateRecoveryCodes() http.HandlerFunc {
 
 		codes, err := appsecurity.GenerateRecoveryCodes()
 		if err != nil {
-			slog.Error("Failed to generate recovery codes", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to generate recovery codes", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -422,19 +421,19 @@ func (h *handler) handleRegenerateRecoveryCodes() http.HandlerFunc {
 		for _, code := range codes {
 			hash, err := appsecurity.HashRecoveryCode(code)
 			if err != nil {
-				slog.Error("Failed to hash recovery code", "error", err, "user_id", userID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to hash recovery code", "error", err, "user_id", userID)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
 			if hash == "" {
-				slog.Error("Failed to hash recovery code", "user_id", userID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to hash recovery code", "user_id", userID)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
 			hashes = append(hashes, hash)
 		}
 		if err := h.ctx.Store.ReplaceUserRecoveryCodes(r.Context(), userID, hashes); err != nil {
-			slog.Error("Failed to persist recovery codes", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to persist recovery codes", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -444,7 +443,7 @@ func (h *handler) handleRegenerateRecoveryCodes() http.HandlerFunc {
 			Codes:     codes,
 			Remaining: len(codes),
 		}); err != nil {
-			slog.Error("Failed to encode recovery code response", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode recovery code response", "error", err, "user_id", userID)
 		}
 	}
 }

@@ -5,12 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 	"sort"
 	"strings"
 	"time"
 
 	"hitkeep/internal/database/migrations"
+	"hitkeep/internal/hklog"
 )
 
 type migrationRunOptions struct {
@@ -137,7 +137,7 @@ func (s *Store) migrate(ctx context.Context, opts migrationRunOptions) error {
 	}
 
 	if len(pendingMigrations) == 0 {
-		slog.Info("Database schema is up to date. No migrations to apply.")
+		hklog.LoggerFromContextOr(ctx, s.logger).Info("Database schema is up to date. No migrations to apply.")
 		if opts.guarded {
 			if guard, err := s.recovery.loadMigrationGuard(); err != nil {
 				return err
@@ -167,7 +167,7 @@ func (s *Store) migrate(ctx context.Context, opts migrationRunOptions) error {
 			*opts.morePending = true
 		}
 	}
-	slog.Info("Applying pending database migrations...", "count", len(pendingMigrations))
+	hklog.LoggerFromContextOr(ctx, s.logger).Info("Applying pending database migrations...", "count", len(pendingMigrations))
 	if opts.guarded {
 		if err := s.prepareGuardedMigration(ctx, "shared", guardPendingMigrations, cleanBaseForChecksumGuard); err != nil {
 			return err
@@ -184,7 +184,7 @@ func (s *Store) migrate(ctx context.Context, opts migrationRunOptions) error {
 	}
 
 	for _, fileName := range pendingMigrations {
-		slog.Info("Applying migration", "file", fileName)
+		hklog.LoggerFromContextOr(ctx, s.logger).Info("Applying migration", "file", fileName)
 
 		fileContent, err := migrations.Fs.ReadFile(fileName)
 		if err != nil {
@@ -208,7 +208,7 @@ func (s *Store) migrate(ctx context.Context, opts migrationRunOptions) error {
 		}
 	}
 
-	slog.Info("Successfully applied all database migrations.")
+	hklog.LoggerFromContextOr(ctx, s.logger).Info("Successfully applied all database migrations.")
 	if morePending {
 		// Keep the guard while OpenMigratedStore releases the native allocator and
 		// continues the remaining migrations on a fresh instance.

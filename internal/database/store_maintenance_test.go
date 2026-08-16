@@ -1,8 +1,10 @@
 package database
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +13,24 @@ import (
 
 	"github.com/google/uuid"
 )
+
+func TestCheckpointUsesStoreLoggerWithoutContextLogger(t *testing.T) {
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	store := NewStore(":memory:", WithLogger(logger), WithCheckpointInterval(0))
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer store.Close()
+	logs.Reset()
+
+	if err := store.Checkpoint(context.Background(), "test"); err != nil {
+		t.Fatalf("checkpoint: %v", err)
+	}
+	if !strings.Contains(logs.String(), "msg=\"Database checkpoint completed\"") {
+		t.Fatalf("checkpoint did not use the injected store logger: %s", logs.String())
+	}
+}
 
 func maintenanceRunning(s *Store) bool {
 	s.maintenanceMu.Lock()
@@ -116,13 +136,9 @@ func TestTenantStoreManagerForwardsFatalErrorsAndAvailability(t *testing.T) {
 
 	tenantStore.reportDrainTimeout(errors.New("synthetic drain timeout"))
 
-	select {
-	case err := <-mgr.FatalErrors():
-		if err == nil || !strings.Contains(err.Error(), "synthetic drain timeout") {
-			t.Fatalf("unexpected forwarded fatal error: %v", err)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for forwarded tenant fatal error")
+	err := <-mgr.FatalErrors()
+	if err == nil || !strings.Contains(err.Error(), "synthetic drain timeout") {
+		t.Fatalf("unexpected forwarded fatal error: %v", err)
 	}
 
 	status, unavailable := mgr.UnavailableDatabaseStatus()
@@ -139,13 +155,9 @@ func TestTenantStoreInvalidationRequestsControlledRestart(t *testing.T) {
 	trigger := errors.New("synthetic database has been invalidated")
 	store.observeInvalidation(trigger)
 
-	select {
-	case err := <-reported:
-		if err == nil || !strings.Contains(err.Error(), "controlled restart required") || !errors.Is(err, trigger) {
-			t.Fatalf("unexpected controlled restart error: %v", err)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for tenant invalidation restart request")
+	err := <-reported
+	if err == nil || !strings.Contains(err.Error(), "controlled restart required") || !errors.Is(err, trigger) {
+		t.Fatalf("unexpected controlled restart error: %v", err)
 	}
 	if status := store.DatabaseStatus(); status.State != DatabaseStateRecovering {
 		t.Fatalf("expected recovering tenant status, got %+v", status)

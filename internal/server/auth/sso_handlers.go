@@ -5,7 +5,6 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"slices"
@@ -57,64 +56,64 @@ func (h *handler) handleSSOStart() http.HandlerFunc {
 		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 		decoder.DisallowUnknownFields()
 		if err := decoder.Decode(&req); err != nil {
-			writeSSOStartError(w, http.StatusBadRequest, "invalid_email")
+			writeSSOStartError(r.Context(), w, http.StatusBadRequest, "invalid_email")
 			return
 		}
 		email, err := h.resolveSSORequestEmail(r.Context(), req.Email, req.InviteToken)
 		if err != nil {
 			if strings.TrimSpace(req.InviteToken) != "" {
-				writeSSOStartError(w, http.StatusForbidden, "sso_access_denied")
+				writeSSOStartError(r.Context(), w, http.StatusForbidden, "sso_access_denied")
 			} else {
-				writeSSOStartError(w, http.StatusBadRequest, "invalid_email")
+				writeSSOStartError(r.Context(), w, http.StatusBadRequest, "invalid_email")
 			}
 			return
 		}
 		_, domain, _ := sso.NormalizeEmail(email)
 		config, err := h.ctx.Store.GetEnabledTeamSSOConfigByDomain(r.Context(), domain)
 		if err != nil {
-			slog.Error("Failed to resolve SSO provider", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve SSO provider", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		if config == nil {
 			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", uuid.Nil, uuid.Nil, email, ssoAuditFlowStart, ssoReasonProviderUnresolved, 0, "SSO login could not resolve an enabled provider")
-			writeSSOStartError(w, http.StatusBadRequest, "sso_unavailable")
+			writeSSOStartError(r.Context(), w, http.StatusBadRequest, "sso_unavailable")
 			return
 		}
 		if !h.ctx.Limits().AllowsSSO(r.Context(), uuid.Nil, config.TeamID) {
 			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, uuid.Nil, email, ssoAuditFlowStart, ssoReasonEntitlementDenied, 0, "SSO login is not entitled for the configured team")
-			writeSSOStartError(w, http.StatusBadRequest, "sso_unavailable")
+			writeSSOStartError(r.Context(), w, http.StatusBadRequest, "sso_unavailable")
 			return
 		}
 		decision, err := h.authorizeSSOAccess(r.Context(), config, email, req.InviteToken)
 		if err != nil {
 			if errors.Is(err, errSSOAccessDenied) {
 				h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, uuid.Nil, email, ssoAuditFlowStart, ssoReasonAccessDenied, 0, "SSO login was not authorized for the configured team")
-				writeSSOStartError(w, http.StatusForbidden, "sso_access_denied")
+				writeSSOStartError(r.Context(), w, http.StatusForbidden, "sso_access_denied")
 				return
 			}
-			slog.Error("Failed to authorize SSO login", "error", err, "team_id", config.TeamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to authorize SSO login", "error", err, "team_id", config.TeamID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		if err := h.requireSSOAccessCapacity(r.Context(), config.TeamID, decision); err != nil {
 			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, decision.UserID, email, ssoAuditFlowStart, ssoReasonCapacityDenied, decision.Mode, "SSO login exceeded a managed-cloud team or seat limit")
-			writeSSOStartError(w, http.StatusForbidden, "sso_access_denied")
+			writeSSOStartError(r.Context(), w, http.StatusForbidden, "sso_access_denied")
 			return
 		}
 
 		teamConfig, err := h.teamSSOConfig(config)
 		if err != nil {
-			slog.Warn("Failed to decrypt configured SSO provider", "team_id", config.TeamID)
+			shared.LoggerFromContext(r.Context()).Warn("Failed to decrypt configured SSO provider", "team_id", config.TeamID)
 			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, decision.UserID, email, ssoAuditFlowStart, ssoReasonProviderUnavailable, decision.Mode, "SSO provider configuration was unavailable")
-			writeSSOStartError(w, http.StatusServiceUnavailable, "sso_unavailable")
+			writeSSOStartError(r.Context(), w, http.StatusServiceUnavailable, "sso_unavailable")
 			return
 		}
 		authorization, err := h.ssoRelyingParty().Begin(r.Context(), teamConfig)
 		if err != nil {
-			slog.Warn("Failed to prepare configured SSO provider", "team_id", config.TeamID)
+			shared.LoggerFromContext(r.Context()).Warn("Failed to prepare configured SSO provider", "team_id", config.TeamID)
 			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, decision.UserID, email, ssoAuditFlowStart, ssoReasonProviderUnavailable, decision.Mode, "SSO provider configuration was unavailable")
-			writeSSOStartError(w, http.StatusServiceUnavailable, "sso_unavailable")
+			writeSSOStartError(r.Context(), w, http.StatusServiceUnavailable, "sso_unavailable")
 			return
 		}
 		state := h.ctx.AuthState.CreateSSOOAuthState(shared.SSOOAuthState{
@@ -132,7 +131,7 @@ func (h *handler) handleSSOStart() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(api.SSOStartResponse{AuthURL: authorization.URL(state)}); err != nil {
-			slog.Error("Failed to encode SSO start response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode SSO start response", "error", err)
 		}
 	}
 }
@@ -151,37 +150,37 @@ func (h *handler) handleSSOInviteAvailability() http.HandlerFunc {
 		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 		decoder.DisallowUnknownFields()
 		if err := decoder.Decode(&req); err != nil || strings.TrimSpace(req.InviteToken) == "" {
-			writeSSOAvailability(w, false)
+			writeSSOAvailability(r.Context(), w, false)
 			return
 		}
 
 		email, err := h.resolveSSORequestEmail(r.Context(), "", req.InviteToken)
 		if err != nil {
-			writeSSOAvailability(w, false)
+			writeSSOAvailability(r.Context(), w, false)
 			return
 		}
 		_, domain, _ := sso.NormalizeEmail(email)
 		config, err := h.ctx.Store.GetEnabledTeamSSOConfigByDomain(r.Context(), domain)
 		if err != nil {
-			slog.Error("Failed to resolve invitation SSO provider", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve invitation SSO provider", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		if config == nil || !h.ctx.Limits().AllowsSSO(r.Context(), uuid.Nil, config.TeamID) {
-			writeSSOAvailability(w, false)
+			writeSSOAvailability(r.Context(), w, false)
 			return
 		}
 		decision, err := h.authorizeSSOAccess(r.Context(), config, email, req.InviteToken)
 		if err != nil {
 			if errors.Is(err, errSSOAccessDenied) {
-				writeSSOAvailability(w, false)
+				writeSSOAvailability(r.Context(), w, false)
 				return
 			}
-			slog.Error("Failed to authorize invitation SSO", "error", err, "team_id", config.TeamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to authorize invitation SSO", "error", err, "team_id", config.TeamID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		writeSSOAvailability(w, decision.Mode == ssoAccessInvitation)
+		writeSSOAvailability(r.Context(), w, decision.Mode == ssoAccessInvitation)
 	}
 }
 
@@ -277,10 +276,10 @@ func (h *handler) requireSSOAccessCapacity(ctx context.Context, teamID uuid.UUID
 	return nil
 }
 
-func writeSSOAvailability(w http.ResponseWriter, enabled bool) {
+func writeSSOAvailability(ctx context.Context, w http.ResponseWriter, enabled bool) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(api.SSOAvailability{Enabled: enabled}); err != nil {
-		slog.Error("Failed to encode SSO availability", "error", err)
+		shared.LoggerFromContext(ctx).Error("Failed to encode SSO availability", "error", err)
 	}
 }
 
@@ -320,7 +319,7 @@ func (h *handler) handleSSOCallback() http.HandlerFunc {
 		}
 		teamConfig, err := h.teamSSOConfig(config)
 		if err != nil {
-			slog.Warn("Failed to decrypt SSO provider during callback", "team_id", state.TeamID)
+			shared.LoggerFromContext(r.Context()).Warn("Failed to decrypt SSO provider during callback", "team_id", state.TeamID)
 			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", state.TeamID, uuid.Nil, state.Email, ssoAuditFlowCallback, ssoReasonProviderUnavailable, 0, "SSO provider configuration was unavailable")
 			http.Redirect(w, r, h.ssoErrorRedirectURL(state, "sso_unavailable"), http.StatusSeeOther)
 			return
@@ -341,7 +340,7 @@ func (h *handler) handleSSOCallback() http.HandlerFunc {
 		decision, err := h.authorizeSSOAccess(r.Context(), config, identity.Email, state.InviteToken)
 		if err != nil {
 			if !errors.Is(err, errSSOAccessDenied) {
-				slog.Error("Failed to re-authorize SSO login", "error", err, "team_id", config.TeamID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to re-authorize SSO login", "error", err, "team_id", config.TeamID)
 			}
 			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, decision.UserID, identity.Email, ssoAuditFlowCallback, ssoReasonAccessDenied, decision.Mode, "SSO team access was removed during login")
 			http.Redirect(w, r, h.ssoErrorRedirectURL(state, "sso_access_denied"), http.StatusSeeOther)
@@ -377,7 +376,7 @@ func (h *handler) handleSSOCallback() http.HandlerFunc {
 			ExpectedUserID: decision.UserID,
 		})
 		if err != nil {
-			slog.Error("Failed to resolve SSO user", "error", err, "team_id", config.TeamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve SSO user", "error", err, "team_id", config.TeamID)
 			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, decision.UserID, identity.Email, ssoAuditFlowCallback, ssoReasonIdentityLinkFailed, decision.Mode, "SSO identity could not be linked")
 			http.Redirect(w, r, h.ssoErrorRedirectURL(state, "sso_failed"), http.StatusSeeOther)
 			return
@@ -388,13 +387,13 @@ func (h *handler) handleSSOCallback() http.HandlerFunc {
 			return
 		}
 		if err := h.completeSSOTeamAccess(r, config, decision, resolved.UserID, identity.Email, state.InviteToken); err != nil {
-			slog.Error("Failed to complete SSO team access", "error", err, "team_id", config.TeamID, "user_id", resolved.UserID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to complete SSO team access", "error", err, "team_id", config.TeamID, "user_id", resolved.UserID)
 			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, resolved.UserID, identity.Email, ssoAuditFlowCallback, ssoReasonMembershipFailed, decision.Mode, "SSO team access could not be completed")
 			http.Redirect(w, r, h.ssoErrorRedirectURL(state, "sso_access_denied"), http.StatusSeeOther)
 			return
 		}
 		if err := h.issueLoginSession(r.Context(), w, resolved.UserID, state.RememberMe); err != nil {
-			slog.Error("Failed to issue SSO login session", "error", err, "user_id", resolved.UserID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to issue SSO login session", "error", err, "user_id", resolved.UserID)
 			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, resolved.UserID, identity.Email, ssoAuditFlowCallback, ssoReasonSessionFailed, decision.Mode, "SSO login session could not be issued")
 			http.Redirect(w, r, h.ssoErrorRedirectURL(state, "sso_failed"), http.StatusSeeOther)
 			return
@@ -511,7 +510,7 @@ func splitSSODisplayName(displayName string) (string, string) {
 	return parts[0], strings.Join(parts[1:], " ")
 }
 
-func writeSSOStartError(w http.ResponseWriter, status int, code string) {
+func writeSSOStartError(ctx context.Context, w http.ResponseWriter, status int, code string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(map[string]string{
@@ -519,7 +518,7 @@ func writeSSOStartError(w http.ResponseWriter, status int, code string) {
 		"code":    code,
 		"message": "SSO login could not be started for this email address",
 	}); err != nil {
-		slog.Error("Failed to encode SSO start error response", "error", err)
+		shared.LoggerFromContext(ctx).Error("Failed to encode SSO start error response", "error", err)
 	}
 }
 
@@ -528,7 +527,7 @@ func (h *handler) handleSSOCompletionError(w http.ResponseWriter, r *http.Reques
 	reason := ssoReasonInternalError
 	switch {
 	case errors.Is(err, sso.ErrTokenExchange):
-		slog.Warn("SSO token exchange failed", "team_id", state.TeamID)
+		shared.LoggerFromContext(r.Context()).Warn("SSO token exchange failed", "team_id", state.TeamID)
 		reason = ssoReasonTokenExchangeFailed
 	case errors.Is(err, sso.ErrIDTokenMissing):
 		reason = ssoReasonIDTokenMissing
@@ -538,7 +537,7 @@ func (h *handler) handleSSOCompletionError(w http.ResponseWriter, r *http.Reques
 		reason = ssoReasonEmailUnverified
 		redirectCode = "sso_email_unverified"
 	default:
-		slog.Warn("Failed to prepare SSO provider during callback", "team_id", state.TeamID)
+		shared.LoggerFromContext(r.Context()).Warn("Failed to prepare SSO provider during callback", "team_id", state.TeamID)
 		redirectCode = "sso_unavailable"
 	}
 	h.appendSSOAudit(r, "auth.sso_login_failed", "failure", state.TeamID, uuid.Nil, state.Email, ssoAuditFlowCallback, reason, 0, "SSO provider completion failed")

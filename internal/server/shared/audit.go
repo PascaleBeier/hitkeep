@@ -3,7 +3,6 @@ package shared
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"net/netip"
 	"strings"
@@ -34,7 +33,7 @@ type AuditEvent struct {
 
 func (c *Context) AppendAuditEvent(ctx context.Context, r *http.Request, event AuditEvent) {
 	if err := c.AppendAuditEventChecked(ctx, r, event); err != nil {
-		slog.Error("Failed to append audit entry", "error", err, "action", event.Action)
+		LoggerFromContext(ctx).Error("Failed to append audit entry", "error", err, "action", event.Action)
 	}
 }
 
@@ -57,7 +56,7 @@ func (c *Context) AppendAuditEventForUserTeams(ctx context.Context, r *http.Requ
 
 	teams, _, err := c.Store.ListUserTeams(ctx, userID)
 	if err != nil {
-		slog.Error("Failed to list user teams for audit", "error", err, "user_id", userID, "action", event.Action)
+		LoggerFromContext(ctx).Error("Failed to list user teams for audit", "error", err, "user_id", userID, "action", event.Action)
 		c.AppendAuditEvent(ctx, r, event)
 		return
 	}

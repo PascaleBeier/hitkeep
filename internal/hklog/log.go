@@ -15,9 +15,62 @@ type Writer struct {
 	Level  slog.Level
 }
 
+type loggerContextKey struct{}
+
+// WithLogger attaches a logger to ctx for request or job-scoped logging.
+func WithLogger(ctx context.Context, logger *slog.Logger) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if logger == nil {
+		logger = slog.Default()
+	}
+	return context.WithValue(ctx, loggerContextKey{}, logger)
+}
+
+// WithLoggerIfAbsent preserves an existing context logger and otherwise adds logger.
+func WithLoggerIfAbsent(ctx context.Context, logger *slog.Logger) context.Context {
+	if ctx != nil {
+		if existing, ok := ctx.Value(loggerContextKey{}).(*slog.Logger); ok && existing != nil {
+			return ctx
+		}
+	}
+	return WithLogger(ctx, logger)
+}
+
+// WithLoggerAttrs derives the context logger with additional structured fields.
+func WithLoggerAttrs(ctx context.Context, args ...any) context.Context {
+	return WithLogger(ctx, LoggerFromContext(ctx).With(args...))
+}
+
+// LoggerFromContext returns the context logger or the default logger when none is attached.
+func LoggerFromContext(ctx context.Context) *slog.Logger {
+	return LoggerFromContextOr(ctx, nil)
+}
+
+// LoggerFromContextOr returns the context logger, the supplied fallback, or
+// the default logger when neither is available. Receivers with an injected
+// logger should use this instead of silently losing that dependency when a
+// caller supplies a plain context.
+func LoggerFromContextOr(ctx context.Context, fallback *slog.Logger) *slog.Logger {
+	if ctx != nil {
+		if logger, ok := ctx.Value(loggerContextKey{}).(*slog.Logger); ok && logger != nil {
+			return logger
+		}
+	}
+	if fallback != nil {
+		return fallback
+	}
+	return slog.Default()
+}
+
 func (w Writer) Write(p []byte) (int, error) {
 	msg := string(bytes.TrimRight(p, "\n"))
-	w.Logger.Log(context.Background(), w.Level, msg)
+	logger := w.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+	logger.Log(context.Background(), w.Level, msg)
 	return len(p), nil
 }
 
@@ -39,6 +92,9 @@ func (w LevelParsingWriter) Write(p []byte) (int, error) {
 	}
 
 	logger := w.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
 	if w.ComponentName != "" {
 		logger = logger.With("component", w.ComponentName)
 	}
@@ -48,11 +104,17 @@ func (w LevelParsingWriter) Write(p []byte) (int, error) {
 
 // StdLogger returns a *log.Logger that writes to the provided slog.Logger at the given level.
 func StdLogger(l *slog.Logger, level slog.Level) *log.Logger {
+	if l == nil {
+		l = slog.Default()
+	}
 	return log.New(Writer{Logger: l, Level: level}, "", 0)
 }
 
 // MemberlistLogger returns a *log.Logger that maps memberlist log levels to slog.
 func MemberlistLogger(l *slog.Logger) *log.Logger {
+	if l == nil {
+		l = slog.Default()
+	}
 	return log.New(LevelParsingWriter{
 		Logger:        l,
 		DefaultLevel:  slog.LevelInfo,

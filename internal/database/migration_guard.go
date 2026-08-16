@@ -6,12 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+
+	"hitkeep/internal/hklog"
 )
 
 const migrationWALGuardVersion = 1
@@ -152,7 +153,7 @@ func (r *databaseRecovery) checkpointMigrationGuard(ctx context.Context, db *sql
 	if clear {
 		message = "Completed interrupted DuckDB migration checkpoint"
 	}
-	slog.Info(message,
+	hklog.LoggerFromContextOr(ctx, r.store.logger).Info(message,
 		"database_id", guard.DatabaseID,
 		"scope", guard.Scope,
 		"pending_migration_count", len(guard.PendingMigrations))

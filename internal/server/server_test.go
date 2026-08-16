@@ -1,7 +1,10 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -14,8 +17,92 @@ import (
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
+	"hitkeep/internal/server/shared"
 	"hitkeep/internal/testutil/testdb"
 )
+
+func TestServerUsesInjectedLoggerForConfigurationWarnings(t *testing.T) {
+	conf := testServerConfig(t)
+	conf.MCPDocsURL = "not-a-valid-url"
+	store := testServerStore(t)
+	defer store.Close()
+
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, nil))
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil, logger)
+	defer func() { _ = srv.Shutdown(context.Background()) }()
+
+	if !strings.Contains(logs.String(), "Invalid MCP docs URL") {
+		t.Fatalf("injected logger did not receive configuration warning: %s", logs.String())
+	}
+}
+
+func TestServerDoesNotLogRawAIProviderSetupError(t *testing.T) {
+	conf := testServerConfig(t)
+	conf.AIEnabled = true
+	conf.AIProvider = "provider-secret"
+	conf.AIModel = "test-model"
+	store := testServerStore(t)
+	defer store.Close()
+
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, nil))
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil, logger)
+	defer func() { _ = srv.Shutdown(context.Background()) }()
+
+	if strings.Contains(logs.String(), conf.AIProvider) {
+		t.Fatalf("raw AI provider setup error leaked into logs: %s", logs.String())
+	}
+	if !strings.Contains(logs.String(), "error_category=not_configured") {
+		t.Fatalf("expected classified AI setup error, got: %s", logs.String())
+	}
+	for _, field := range []string{
+		"ai.enabled=true",
+		"ai.provider_configured=true",
+		"ai.model_configured=true",
+		"ai.base_url_configured=false",
+		"ai.api_key_configured=false",
+		"ai.region_configured=false",
+	} {
+		if !strings.Contains(logs.String(), field) {
+			t.Fatalf("expected %s in AI setup diagnostics, got: %s", field, logs.String())
+		}
+	}
+}
+
+func TestCustomTrackingHostLookupLogsOnlyAtHTTPBoundary(t *testing.T) {
+	store := database.NewStore(filepath.Join(t.TempDir(), "tracking.db"))
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect store: %v", err)
+	}
+	defer store.Close()
+
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, nil))
+	server := &Server{store: store, logger: logger}
+	request := httptest.NewRequest(http.MethodGet, "http://tracking.example.com/hk.js", nil)
+	request.Host = "tracking.example.com"
+	request = request.WithContext(shared.WithLogger(request.Context(), logger))
+
+	_, known, err := server.customTrackingDomainForRequest(request)
+	if err == nil || !known {
+		t.Fatalf("expected custom tracking lookup failure, known=%t err=%v", known, err)
+	}
+	if logs.Len() != 0 {
+		t.Fatalf("lookup helper logged before reaching the HTTP boundary: %s", logs.String())
+	}
+
+	recorder := httptest.NewRecorder()
+	server.customTrackingHostMiddleware(
+		testPublicFS(),
+		http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}),
+		http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}),
+	).ServeHTTP(recorder, request)
+
+	if count := strings.Count(logs.String(), "Failed to resolve custom tracking request host"); count != 1 {
+		t.Fatalf("expected one boundary log, got %d: %s", count, logs.String())
+	}
+}
 
 func TestServerMountsMCPRouteWhenEnabled(t *testing.T) {
 	conf := testServerConfig(t)
@@ -23,7 +110,7 @@ func TestServerMountsMCPRouteWhenEnabled(t *testing.T) {
 	store := testServerStore(t)
 	defer store.Close()
 
-	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil, testServerLogger())
 	defer func() {
 		_ = srv.Shutdown(context.Background())
 	}()
@@ -49,7 +136,7 @@ func TestServerNormalizesRootMCPPath(t *testing.T) {
 	store := testServerStore(t)
 	defer store.Close()
 
-	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil, testServerLogger())
 	defer func() {
 		_ = srv.Shutdown(context.Background())
 	}()
@@ -76,7 +163,7 @@ func TestServerDoesNotMountMCPRouteWhenDisabled(t *testing.T) {
 	store := testServerStore(t)
 	defer store.Close()
 
-	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil, testServerLogger())
 	defer func() {
 		_ = srv.Shutdown(context.Background())
 	}()
@@ -107,7 +194,7 @@ func TestServerSelectsSSONetworkPolicyForDeploymentMode(t *testing.T) {
 			store := testServerStore(t)
 			defer store.Close()
 
-			srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+			srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil, testServerLogger())
 			defer func() {
 				_ = srv.Shutdown(context.Background())
 			}()
@@ -152,7 +239,7 @@ func TestServerInjectsPublicBasePathIntoDashboardIndex(t *testing.T) {
 	store := testServerStore(t)
 	defer store.Close()
 
-	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil, testServerLogger())
 	defer func() {
 		_ = srv.Shutdown(context.Background())
 	}()
@@ -177,7 +264,7 @@ func TestServerPreservesRootBasePathInDashboardIndex(t *testing.T) {
 	store := testServerStore(t)
 	defer store.Close()
 
-	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil, testServerLogger())
 	defer func() {
 		_ = srv.Shutdown(context.Background())
 	}()
@@ -201,7 +288,7 @@ func TestServerRoutesPrefixedAPIRequests(t *testing.T) {
 	store := testServerStore(t)
 	defer store.Close()
 
-	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil, testServerLogger())
 	defer func() {
 		_ = srv.Shutdown(context.Background())
 	}()
@@ -230,7 +317,7 @@ func TestServerRejectsUnprefixedAPIRequestsWhenPublicURLHasPath(t *testing.T) {
 	store := testServerStore(t)
 	defer store.Close()
 
-	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil, testServerLogger())
 	defer func() {
 		_ = srv.Shutdown(context.Background())
 	}()
@@ -252,7 +339,7 @@ func TestServerPreservesRootHealthEndpointsForLocalChecksWhenPublicURLHasPath(t 
 	store := testServerStore(t)
 	defer store.Close()
 
-	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil, testServerLogger())
 	defer func() {
 		_ = srv.Shutdown(context.Background())
 	}()
@@ -277,7 +364,7 @@ func TestServerServesPrefixedStaticAssets(t *testing.T) {
 	store := testServerStore(t)
 	defer store.Close()
 
-	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil, testServerLogger())
 	defer func() {
 		_ = srv.Shutdown(context.Background())
 	}()
@@ -304,7 +391,7 @@ func TestServerReturnsNotFoundForMissingStaticAssets(t *testing.T) {
 	store := testServerStore(t)
 	defer store.Close()
 
-	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil, testServerLogger())
 	defer func() {
 		_ = srv.Shutdown(context.Background())
 	}()
@@ -328,7 +415,7 @@ func TestServerServesDashboardShellForHTMLNavigation(t *testing.T) {
 	store := testServerStore(t)
 	defer store.Close()
 
-	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil, testServerLogger())
 	defer func() {
 		_ = srv.Shutdown(context.Background())
 	}()
@@ -352,7 +439,7 @@ func TestServerSPAFallbackRequiresDocumentNavigation(t *testing.T) {
 	store := testServerStore(t)
 	defer store.Close()
 
-	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil, testServerLogger())
 	defer func() {
 		_ = srv.Shutdown(context.Background())
 	}()
@@ -408,7 +495,7 @@ func TestServerRoutesPrefixedIngestPreflight(t *testing.T) {
 	store := testServerStore(t)
 	defer store.Close()
 
-	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil, testServerLogger())
 	defer func() {
 		_ = srv.Shutdown(context.Background())
 	}()
@@ -436,7 +523,7 @@ func TestServerAppliesCrossOriginProtectionAfterPrefixStripping(t *testing.T) {
 	store := testServerStore(t)
 	defer store.Close()
 
-	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil, testServerLogger())
 	defer func() {
 		_ = srv.Shutdown(context.Background())
 	}()
@@ -459,7 +546,7 @@ func TestServerAllowsSafeCrossOriginRequestAfterPrefixStripping(t *testing.T) {
 	store := testServerStore(t)
 	defer store.Close()
 
-	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil, testServerLogger())
 	defer func() {
 		_ = srv.Shutdown(context.Background())
 	}()
@@ -481,7 +568,7 @@ func TestServerAllowsHeaderlessNonBrowserMutationToReachAuthentication(t *testin
 	store := testServerStore(t)
 	defer store.Close()
 
-	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil, testServerLogger())
 	defer func() {
 		_ = srv.Shutdown(context.Background())
 	}()
@@ -504,7 +591,7 @@ func TestServerBackupStatusReflectsConfig(t *testing.T) {
 	store := testServerStore(t)
 	defer store.Close()
 
-	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil, testServerLogger())
 	defer func() {
 		_ = srv.Shutdown(context.Background())
 	}()
@@ -535,7 +622,7 @@ func TestServerCustomTrackingHostServesOnlyTrackerRoutes(t *testing.T) {
 	defer store.Close()
 	createRouteableCustomTrackingDomain(t, store, "track.example.net")
 
-	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil, testServerLogger())
 	defer func() {
 		_ = srv.Shutdown(context.Background())
 	}()
@@ -593,7 +680,7 @@ func TestServerCaddyOnDemandTLSAsk(t *testing.T) {
 		t.Fatalf("disable custom tracking domain: %v", err)
 	}
 
-	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil)
+	srv := New(conf, testPublicFS(), store, nil, entitlements.NewProvider(conf), nil, nil, nil, nil, testServerLogger())
 	defer func() {
 		_ = srv.Shutdown(context.Background())
 	}()
@@ -651,6 +738,10 @@ func testServerConfig(t *testing.T) *config.Config {
 		WebhookBurst:     1000,
 		WebhookRateLimit: 1000,
 	}
+}
+
+func testServerLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
 func testServerStore(t *testing.T) *database.Store {

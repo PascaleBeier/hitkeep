@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/mail"
 	"net/url"
@@ -55,7 +54,7 @@ func (h *handler) handleAddTeamMember() http.HandlerFunc {
 
 		user, err := h.ctx.Store.GetUserByEmail(r.Context(), email)
 		if err != nil {
-			slog.Error("Failed to lookup invitee user", "error", err, "email", email, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to lookup invitee user", "error", err, "team_id", teamID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -69,7 +68,7 @@ func (h *handler) handleAddTeamMember() http.HandlerFunc {
 
 			isMember, err := h.ctx.Store.IsTenantMember(r.Context(), teamID, targetUserID)
 			if err != nil {
-				slog.Error("Failed to check team membership", "error", err, "email", email, "team_id", teamID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to check team membership", "error", err, "team_id", teamID)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
@@ -89,14 +88,14 @@ func (h *handler) handleAddTeamMember() http.HandlerFunc {
 			requiresPasswordSetup = true
 			if h.ctx.Config.CloudHosted && !limitsBypassed {
 				if err := h.ctx.Limits().RequireTeamMemberCapacity(r.Context(), teamID); err != nil {
-					h.writeCloudTeamMemberPreflightError(w, err, email, teamID, actorID)
+					h.writeCloudTeamMemberPreflightError(r.Context(), w, err, teamID, actorID)
 					return
 				}
 			}
 
 			targetUserID, err = h.createInviteeUser(r.Context(), email)
 			if err != nil {
-				slog.Error("Failed to create invitee user", "error", err, "email", email, "team_id", teamID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to create invitee user", "error", err, "team_id", teamID)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
@@ -105,7 +104,7 @@ func (h *handler) handleAddTeamMember() http.HandlerFunc {
 		if h.ctx.Config.CloudHosted && !wasMember {
 			err := h.validateHostedCloudInvitee(r.Context(), teamID, targetUserID, email, user != nil && !limitsBypassed)
 			if err != nil {
-				h.writeCloudTeamMemberPreflightError(w, err, email, teamID, actorID)
+				h.writeCloudTeamMemberPreflightError(r.Context(), w, err, teamID, actorID)
 				return
 			}
 		}
@@ -121,7 +120,7 @@ func (h *handler) handleAddTeamMember() http.HandlerFunc {
 
 func (h *handler) updateExistingTeamMember(w http.ResponseWriter, r *http.Request, teamID, actorID, targetUserID uuid.UUID, email, role, previousRole string) {
 	if err := h.ctx.Store.AddTeamMember(r.Context(), teamID, targetUserID, role, actorID); err != nil {
-		slog.Error("Failed to update team member", "error", err, "team_id", teamID, "target_user_id", targetUserID, "actor_id", actorID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to update team member", "error", err, "team_id", teamID, "target_user_id", targetUserID, "actor_id", actorID)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -134,7 +133,7 @@ func (h *handler) updateExistingTeamMember(w http.ResponseWriter, r *http.Reques
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]any{"status": "ok", "is_invite": false}); err != nil {
-		slog.Error("Failed to encode add team member response", "error", err, "team_id", teamID, "actor_id", actorID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to encode add team member response", "error", err, "team_id", teamID, "actor_id", actorID)
 	}
 }
 
@@ -145,7 +144,7 @@ func (h *handler) createPendingTeamInvite(w http.ResponseWriter, r *http.Request
 			http.Error(w, "Invite already pending", http.StatusConflict)
 			return
 		}
-		slog.Error("Failed to create team invite", "error", err, "team_id", teamID, "target_user_id", targetUserID, "actor_id", actorID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to create team invite", "error", err, "team_id", teamID, "target_user_id", targetUserID, "actor_id", actorID)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -157,7 +156,7 @@ func (h *handler) createPendingTeamInvite(w http.ResponseWriter, r *http.Request
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]any{"status": "ok", "is_invite": true, "invite": invite}); err != nil {
-		slog.Error("Failed to encode add team member response", "error", err, "team_id", teamID, "actor_id", actorID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to encode add team member response", "error", err, "team_id", teamID, "actor_id", actorID)
 	}
 }
 
@@ -172,7 +171,7 @@ func parseAddTeamMemberRequest(w http.ResponseWriter, r *http.Request, actorRole
 		return "", "", false
 	}
 
-	role, ok := normalizeAssignableTeamRole(w, req.Role, actorRole)
+	role, ok := normalizeAssignableTeamRole(r.Context(), w, req.Role, actorRole)
 	if !ok {
 		return "", "", false
 	}
@@ -204,7 +203,7 @@ func normalizeAddTeamMemberEmail(w http.ResponseWriter, value string) (string, b
 	return email, true
 }
 
-func normalizeAssignableTeamRole(w http.ResponseWriter, value, actorRole string) (string, bool) {
+func normalizeAssignableTeamRole(ctx context.Context, w http.ResponseWriter, value, actorRole string) (string, bool) {
 	role := strings.TrimSpace(strings.ToLower(value))
 	if role == "" {
 		role = database.TenantRoleMember
@@ -218,7 +217,7 @@ func normalizeAssignableTeamRole(w http.ResponseWriter, value, actorRole string)
 		return "", false
 	}
 	if role == database.TenantRoleOwner {
-		writeTeamActionError(w, http.StatusConflict, "ownership_transfer_required", "Use the ownership transfer action to assign the owner role")
+		writeTeamActionError(ctx, w, http.StatusConflict, "ownership_transfer_required", "Use the ownership transfer action to assign the owner role")
 		return "", false
 	}
 	return role, true
@@ -257,15 +256,15 @@ func (h *handler) validateHostedCloudInvitee(ctx context.Context, teamID, target
 	return h.ctx.Limits().RequireTeamMembershipCapacity(ctx, targetUserID, 1+pendingOutsideTeam)
 }
 
-func (h *handler) writeCloudTeamMemberPreflightError(w http.ResponseWriter, err error, email string, teamID, actorID uuid.UUID) {
+func (h *handler) writeCloudTeamMemberPreflightError(ctx context.Context, w http.ResponseWriter, err error, teamID, actorID uuid.UUID) {
 	switch {
 	case errors.Is(err, entitlements.ErrTeamMemberLimitReached):
-		slog.Warn("Cloud team member limit reached", "error", err, "email", email, "team_id", teamID, "actor_id", actorID)
+		shared.LoggerFromContext(ctx).Warn("Cloud team member limit reached", "error", err, "team_id", teamID, "actor_id", actorID)
 		http.Error(w, "Team member limit reached", http.StatusForbidden)
 	case errors.Is(err, entitlements.ErrTeamMembershipLimitReached):
 		http.Error(w, "Managed cloud accounts are limited to one team", http.StatusConflict)
 	default:
-		slog.Error("Failed to validate hosted cloud team member", "error", err, "email", email, "team_id", teamID, "actor_id", actorID)
+		shared.LoggerFromContext(ctx).Error("Failed to validate hosted cloud team member", "error", err, "team_id", teamID, "actor_id", actorID)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }
@@ -302,7 +301,7 @@ func (h *handler) handleResendTeamInvite() http.HandlerFunc {
 				http.Error(w, "Invite not found", http.StatusNotFound)
 				return
 			default:
-				slog.Error("Failed to resend team invite", "error", err, "team_id", teamID, "invite_id", inviteID, "actor_id", actorID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to resend team invite", "error", err, "team_id", teamID, "invite_id", inviteID, "actor_id", actorID)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
@@ -313,7 +312,7 @@ func (h *handler) handleResendTeamInvite() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(map[string]any{"status": "ok", "invite": invite}); err != nil {
-			slog.Error("Failed to encode resend invite response", "error", err, "team_id", teamID, "invite_id", inviteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode resend invite response", "error", err, "team_id", teamID, "invite_id", inviteID)
 		}
 	}
 }
@@ -350,7 +349,7 @@ func (h *handler) handleRevokeTeamInvite() http.HandlerFunc {
 				http.Error(w, "Invite not found", http.StatusNotFound)
 				return
 			default:
-				slog.Error("Failed to load team invite", "error", err, "team_id", teamID, "invite_id", inviteID, "actor_id", actorID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to load team invite", "error", err, "team_id", teamID, "invite_id", inviteID, "actor_id", actorID)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
@@ -362,7 +361,7 @@ func (h *handler) handleRevokeTeamInvite() http.HandlerFunc {
 				http.Error(w, "Invite not found", http.StatusNotFound)
 				return
 			default:
-				slog.Error("Failed to revoke team invite", "error", err, "team_id", teamID, "invite_id", inviteID, "actor_id", actorID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to revoke team invite", "error", err, "team_id", teamID, "invite_id", inviteID, "actor_id", actorID)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
@@ -372,7 +371,7 @@ func (h *handler) handleRevokeTeamInvite() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
-			slog.Error("Failed to encode revoke invite response", "error", err, "team_id", teamID, "invite_id", inviteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode revoke invite response", "error", err, "team_id", teamID, "invite_id", inviteID)
 		}
 	}
 }
@@ -437,7 +436,7 @@ func (h *handler) handleUpdateTeam() http.HandlerFunc {
 		}
 
 		if err := h.ctx.Store.UpdateTenant(r.Context(), teamID, name, logoURL); err != nil {
-			slog.Error("Failed to update team", "error", err, "team_id", teamID, "actor_id", actorID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to update team", "error", err, "team_id", teamID, "actor_id", actorID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -445,7 +444,7 @@ func (h *handler) handleUpdateTeam() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
-			slog.Error("Failed to encode update team response", "error", err, "team_id", teamID, "actor_id", actorID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode update team response", "error", err, "team_id", teamID, "actor_id", actorID)
 		}
 	}
 }
@@ -489,19 +488,19 @@ func (h *handler) handleTransferTeamOwnership() http.HandlerFunc {
 		if err := h.ctx.Store.TransferTeamOwnership(r.Context(), teamID, actorID, targetUserID); err != nil {
 			switch {
 			case errors.Is(err, database.ErrTenantMembershipRequired), errors.Is(err, database.ErrTeamTransferRequiresOwner):
-				writeTeamActionError(w, http.StatusForbidden, "ownership_transfer_forbidden", "Only team owners can transfer ownership")
+				writeTeamActionError(r.Context(), w, http.StatusForbidden, "ownership_transfer_forbidden", "Only team owners can transfer ownership")
 				return
 			case errors.Is(err, database.ErrTeamTransferTargetNotMember):
-				writeTeamActionError(w, http.StatusBadRequest, "ownership_transfer_target_invalid", "The selected user must already be a team member")
+				writeTeamActionError(r.Context(), w, http.StatusBadRequest, "ownership_transfer_target_invalid", "The selected user must already be a team member")
 				return
 			case errors.Is(err, database.ErrTeamTransferSelf):
-				writeTeamActionError(w, http.StatusConflict, "ownership_transfer_self", "Ownership transfer requires a different team member")
+				writeTeamActionError(r.Context(), w, http.StatusConflict, "ownership_transfer_self", "Ownership transfer requires a different team member")
 				return
 			case errors.Is(err, database.ErrTeamTransferTargetAlreadyOwner):
-				writeTeamActionError(w, http.StatusConflict, "ownership_transfer_already_owner", "The selected member is already an owner")
+				writeTeamActionError(r.Context(), w, http.StatusConflict, "ownership_transfer_already_owner", "The selected member is already an owner")
 				return
 			default:
-				slog.Error("Failed to transfer team ownership", "error", err, "team_id", teamID, "actor_id", actorID, "target_user_id", targetUserID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to transfer team ownership", "error", err, "team_id", teamID, "actor_id", actorID, "target_user_id", targetUserID)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
@@ -511,7 +510,7 @@ func (h *handler) handleTransferTeamOwnership() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
-			slog.Error("Failed to encode ownership transfer response", "error", err, "team_id", teamID, "actor_id", actorID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode ownership transfer response", "error", err, "team_id", teamID, "actor_id", actorID)
 		}
 	}
 }
@@ -531,23 +530,23 @@ func (h *handler) handleArchiveTeam() http.HandlerFunc {
 		}
 
 		if h.ctx.Config.CloudHosted {
-			writeTeamActionError(w, http.StatusForbidden, "team_archive_cloud_forbidden", "Managed cloud teams cannot be archived")
+			writeTeamActionError(r.Context(), w, http.StatusForbidden, "team_archive_cloud_forbidden", "Managed cloud teams cannot be archived")
 			return
 		}
 
 		if err := h.ctx.Store.ArchiveTenant(r.Context(), teamID, actorID); err != nil {
 			switch {
 			case errors.Is(err, database.ErrTenantMembershipRequired), errors.Is(err, database.ErrTeamArchiveRequiresOwner):
-				writeTeamActionError(w, http.StatusForbidden, "team_archive_forbidden", "Only team owners can archive this team")
+				writeTeamActionError(r.Context(), w, http.StatusForbidden, "team_archive_forbidden", "Only team owners can archive this team")
 				return
 			case errors.Is(err, database.ErrTeamArchiveDefaultTenant):
-				writeTeamActionError(w, http.StatusBadRequest, "team_archive_default_forbidden", "The default team cannot be archived")
+				writeTeamActionError(r.Context(), w, http.StatusBadRequest, "team_archive_default_forbidden", "The default team cannot be archived")
 				return
 			case errors.Is(err, database.ErrTeamArchiveHasSites):
-				writeTeamActionError(w, http.StatusBadRequest, "team_archive_has_sites", "Transfer or delete all sites before archiving this team")
+				writeTeamActionError(r.Context(), w, http.StatusBadRequest, "team_archive_has_sites", "Transfer or delete all sites before archiving this team")
 				return
 			default:
-				slog.Error("Failed to archive team", "error", err, "team_id", teamID, "actor_id", actorID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to archive team", "error", err, "team_id", teamID, "actor_id", actorID)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
@@ -557,7 +556,7 @@ func (h *handler) handleArchiveTeam() http.HandlerFunc {
 
 		teams, activeTeamID, teamsErr := h.ctx.Store.ListUserTeams(r.Context(), actorID)
 		if teamsErr != nil {
-			slog.Warn("Failed to load team list after archiving team", "error", teamsErr, "user_id", actorID, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Warn("Failed to load team list after archiving team", "error", teamsErr, "user_id", actorID, "team_id", teamID)
 			teams = nil
 			activeTeamID, _ = h.ctx.Store.GetActiveTenantID(r.Context(), actorID)
 		}
@@ -568,7 +567,7 @@ func (h *handler) handleArchiveTeam() http.HandlerFunc {
 			"active_team_id":  activeTeamID,
 			"recent_team_ids": orderedRecentTeamIDs(teams, activeTeamID),
 		}); err != nil {
-			slog.Error("Failed to encode archive team response", "error", err, "team_id", teamID, "actor_id", actorID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode archive team response", "error", err, "team_id", teamID, "actor_id", actorID)
 		}
 	}
 }
@@ -610,7 +609,7 @@ func (h *handler) handleRemoveTeamMember() http.HandlerFunc {
 
 		ownerCount, err := h.ctx.Store.CountTeamOwners(r.Context(), teamID)
 		if err != nil {
-			slog.Error("Failed to count team owners", "error", err, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to count team owners", "error", err, "team_id", teamID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -624,7 +623,7 @@ func (h *handler) handleRemoveTeamMember() http.HandlerFunc {
 				http.Error(w, "Team member not found", http.StatusNotFound)
 				return
 			}
-			slog.Error("Failed to remove team member", "error", err, "team_id", teamID, "target_user_id", targetUserID, "actor_id", actorID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to remove team member", "error", err, "team_id", teamID, "target_user_id", targetUserID, "actor_id", actorID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -633,7 +632,7 @@ func (h *handler) handleRemoveTeamMember() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
-			slog.Error("Failed to encode remove team member response", "error", err, "team_id", teamID, "actor_id", actorID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode remove team member response", "error", err, "team_id", teamID, "actor_id", actorID)
 		}
 	}
 }
@@ -656,16 +655,16 @@ func (h *handler) handleLeaveTeam() http.HandlerFunc {
 		if err != nil {
 			switch {
 			case errors.Is(err, database.ErrTenantMembershipRequired):
-				writeTeamActionError(w, http.StatusForbidden, "team_membership_required", "Access denied")
+				writeTeamActionError(r.Context(), w, http.StatusForbidden, "team_membership_required", "Access denied")
 				return
 			case errors.Is(err, database.ErrTeamLastOwner):
-				writeTeamActionError(w, http.StatusBadRequest, "team_last_owner", "Cannot leave as the last owner")
+				writeTeamActionError(r.Context(), w, http.StatusBadRequest, "team_last_owner", "Cannot leave as the last owner")
 				return
 			case errors.Is(err, database.ErrUserOnlyTeam):
-				writeTeamActionError(w, http.StatusBadRequest, "user_only_team", "Cannot leave your only team")
+				writeTeamActionError(r.Context(), w, http.StatusBadRequest, "user_only_team", "Cannot leave your only team")
 				return
 			default:
-				slog.Error("Failed to leave team", "error", err, "user_id", userID, "team_id", teamID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to leave team", "error", err, "user_id", userID, "team_id", teamID)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
@@ -676,7 +675,7 @@ func (h *handler) handleLeaveTeam() http.HandlerFunc {
 
 		teams, activeTeamID, teamsErr := h.ctx.Store.ListUserTeams(r.Context(), userID)
 		if teamsErr != nil {
-			slog.Warn("Failed to load team list after leaving team", "error", teamsErr, "user_id", userID, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Warn("Failed to load team list after leaving team", "error", teamsErr, "user_id", userID, "team_id", teamID)
 			teams = nil
 			activeTeamID = nextActiveTeamID
 		}
@@ -687,7 +686,7 @@ func (h *handler) handleLeaveTeam() http.HandlerFunc {
 			"active_team_id":  activeTeamID,
 			"recent_team_ids": orderedRecentTeamIDs(teams, activeTeamID),
 		}); err != nil {
-			slog.Error("Failed to encode leave team response", "error", err, "user_id", userID, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode leave team response", "error", err, "user_id", userID, "team_id", teamID)
 		}
 	}
 }

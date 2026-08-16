@@ -3,7 +3,6 @@ package worker
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"net/url"
 	"strconv"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/appurl"
 	"hitkeep/internal/database"
+	"hitkeep/internal/hklog"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
 	opportunitysvc "hitkeep/internal/opportunities"
@@ -65,21 +65,21 @@ func (w *ReportWorker) runScheduleScanner(ctx context.Context) {
 
 func (w *ReportWorker) RunAt(ctx context.Context, now time.Time) {
 	if w.mailer == nil {
-		slog.Debug("ReportWorker: mail delivery unavailable")
+		hklog.LoggerFromContext(ctx).Debug("ReportWorker: mail delivery unavailable")
 		return
 	}
 	shared := w.tenantMgr.Shared()
 	if err := shared.RecoverStaleReportDeliveries(ctx, now); err != nil {
-		slog.Error("ReportWorker: failed to recover interrupted deliveries", "error_code", "delivery_recovery_failed")
+		hklog.LoggerFromContext(ctx).Error("ReportWorker: failed to recover interrupted deliveries", "error_code", "delivery_recovery_failed")
 		return
 	}
 	if _, err := shared.ClaimDueReportRuns(ctx, now); err != nil {
-		slog.Error("ReportWorker: failed to claim due schedules", "error_code", "schedule_claim_failed")
+		hklog.LoggerFromContext(ctx).Error("ReportWorker: failed to claim due schedules", "error_code", "schedule_claim_failed")
 		return
 	}
 	deliveryIDs, err := shared.ListDueReportDeliveries(ctx, now, 100)
 	if err != nil {
-		slog.Error("ReportWorker: failed to list due deliveries", "error_code", "delivery_list_failed")
+		hklog.LoggerFromContext(ctx).Error("ReportWorker: failed to list due deliveries", "error_code", "delivery_list_failed")
 		return
 	}
 	for _, deliveryID := range deliveryIDs {
@@ -108,7 +108,7 @@ func (w *ReportWorker) processNamedDelivery(ctx context.Context, deliveryID uuid
 		if !w.allowsExternalReportRecipient(ctx, delivery.Report) {
 			_ = shared.MarkReportDeliverySkipped(ctx, deliveryID, "plan_upgrade_required", now)
 			_ = shared.FinalizeReportRun(ctx, delivery.RunID, now)
-			slog.Info("ReportWorker: skipped external recipient without plan entitlement", "report_id", delivery.ReportID, "delivery_id", deliveryID, "recipient_id", delivery.RecipientID)
+			hklog.LoggerFromContext(ctx).Debug("ReportWorker: skipped external recipient without plan entitlement", "report_id", delivery.ReportID, "delivery_id", deliveryID, "recipient_id", delivery.RecipientID)
 			return
 		}
 		canAccess, err = shared.ExternalRecipientCanAccessReportSites(ctx, delivery.Report)
@@ -116,7 +116,7 @@ func (w *ReportWorker) processNamedDelivery(ctx context.Context, deliveryID uuid
 	if err != nil || !canAccess {
 		_ = shared.MarkReportDeliverySkipped(ctx, deliveryID, "site_access_lost", now)
 		_ = shared.FinalizeReportRun(ctx, delivery.RunID, now)
-		slog.Info("ReportWorker: skipped ineligible recipient", "report_id", delivery.ReportID, "delivery_id", deliveryID, "recipient_id", delivery.RecipientID)
+		hklog.LoggerFromContext(ctx).Debug("ReportWorker: skipped ineligible recipient", "report_id", delivery.ReportID, "delivery_id", deliveryID, "recipient_id", delivery.RecipientID)
 		return
 	}
 
@@ -132,13 +132,13 @@ func (w *ReportWorker) processNamedDelivery(ctx context.Context, deliveryID uuid
 	if err != nil {
 		_ = shared.MarkReportDeliverySkipped(ctx, deliveryID, "content_unavailable", now)
 		_ = shared.FinalizeReportRun(ctx, delivery.RunID, now)
-		slog.Warn("ReportWorker: report content unavailable", "report_id", delivery.ReportID, "delivery_id", deliveryID, "error_code", "content_unavailable")
+		hklog.LoggerFromContext(ctx).Warn("ReportWorker: report content unavailable", "report_id", delivery.ReportID, "delivery_id", deliveryID, "error_code", "content_unavailable")
 		return
 	}
 	if !shouldSend {
 		_ = shared.MarkReportDeliverySkipped(ctx, deliveryID, "empty_report_suppressed", now)
 		_ = shared.FinalizeReportRun(ctx, delivery.RunID, now)
-		slog.Info("ReportWorker: suppressed empty report", "report_id", delivery.ReportID, "delivery_id", deliveryID)
+		hklog.LoggerFromContext(ctx).Debug("ReportWorker: suppressed empty report", "report_id", delivery.ReportID, "delivery_id", deliveryID)
 		return
 	}
 
@@ -167,12 +167,12 @@ func (w *ReportWorker) processNamedDelivery(ctx context.Context, deliveryID uuid
 		details := mailer.DescribeError(err)
 		_ = shared.MarkReportDeliveryFailed(ctx, deliveryID, delivery.AttemptCount, code, now)
 		_ = shared.FinalizeReportRun(ctx, delivery.RunID, now)
-		slog.Warn("ReportWorker: mail delivery failed", "report_id", delivery.ReportID, "run_id", delivery.RunID, "delivery_id", deliveryID, "recipient_id", delivery.RecipientID, "recipient_kind", delivery.RecipientKind, "message_id", delivery.MessageID, "attempt", delivery.AttemptCount, "error_code", code, "error_stage", details.Stage, "error_kind", details.Kind, "error_message", details.Message, "smtp_code", details.SMTPCode)
+		hklog.LoggerFromContext(ctx).Warn("ReportWorker: mail delivery failed", "report_id", delivery.ReportID, "run_id", delivery.RunID, "delivery_id", deliveryID, "recipient_id", delivery.RecipientID, "recipient_kind", delivery.RecipientKind, "message_id", delivery.MessageID, "attempt", delivery.AttemptCount, "error_code", code, "error_stage", details.Stage, "error_kind", details.Kind, "error_message", details.Message, "smtp_code", details.SMTPCode)
 		return
 	}
 	_ = shared.MarkReportDeliveryAccepted(ctx, deliveryID, now)
 	_ = shared.FinalizeReportRun(ctx, delivery.RunID, now)
-	slog.Info("ReportWorker: delivery accepted by mail server", "report_id", delivery.ReportID, "run_id", delivery.RunID, "delivery_id", deliveryID, "recipient_id", delivery.RecipientID)
+	hklog.LoggerFromContext(ctx).Debug("ReportWorker: delivery accepted by mail server", "report_id", delivery.ReportID, "run_id", delivery.RunID, "delivery_id", deliveryID, "recipient_id", delivery.RecipientID)
 }
 
 func (w *ReportWorker) allowsExternalReportRecipient(ctx context.Context, report *api.ReportDefinition) bool {

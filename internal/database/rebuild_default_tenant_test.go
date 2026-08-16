@@ -1,7 +1,9 @@
 package database
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -68,9 +70,14 @@ func TestRebuildDefaultTenantFileRebuildsMissingFile(t *testing.T) {
 		t.Fatalf("remove tenant file: %v", err)
 	}
 
-	rebuilt, err := RebuildDefaultTenantFile(ctx, sharedPath, dataPath)
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, nil))
+	rebuilt, err := RebuildDefaultTenantFile(ctx, sharedPath, dataPath, WithLogger(logger))
 	if err != nil {
 		t.Fatalf("rebuild default tenant file: %v", err)
+	}
+	if !strings.Contains(logs.String(), "Rebuilt an empty default tenant database") {
+		t.Fatalf("expected injected logger to receive rebuild event, got %q", logs.String())
 	}
 	if rebuilt != tenantPath {
 		t.Fatalf("rebuilt path = %s, want %s", rebuilt, tenantPath)

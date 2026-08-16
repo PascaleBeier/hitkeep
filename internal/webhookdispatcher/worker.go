@@ -31,7 +31,7 @@ type Worker struct {
 
 func NewWorker(store *database.Store, producer Producer, conf config.Config, logger *slog.Logger, logLevel slog.Level) *Worker {
 	if logger == nil {
-		logger = slog.Default()
+		panic("webhookdispatcher: logger is required")
 	}
 	return &Worker{
 		store:      store,
@@ -64,7 +64,7 @@ func (w *Worker) Connect(ctx context.Context, addr string) error {
 		return fmt.Errorf("connect webhook delivery consumer: %w", err)
 	}
 	w.consumer = consumer
-	go NewSweeper(w.store, w.producer, w.config).Start(ctx)
+	go NewSweeper(w.store, w.producer, w.config, w.logger).Start(ctx)
 	return nil
 }
 

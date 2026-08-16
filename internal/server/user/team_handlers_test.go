@@ -5,6 +5,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,6 +19,7 @@ import (
 	"hitkeep/internal/database"
 	"hitkeep/internal/mailer"
 	serverauth "hitkeep/internal/server/auth"
+	"hitkeep/internal/server/shared"
 	"hitkeep/internal/webhooks"
 )
 
@@ -33,13 +36,14 @@ type teamTestMailDriver struct {
 	subject  string
 	htmlBody string
 	textBody string
+	sendErr  error
 }
 
 func (d *teamTestMailDriver) Send(_ []string, subject, htmlBody, textBody string) error {
 	d.subject = subject
 	d.htmlBody = htmlBody
 	d.textBody = textBody
-	return nil
+	return d.sendErr
 }
 
 func (d *teamTestMailDriver) Close() error { return nil }
@@ -397,6 +401,36 @@ func TestSendTeamInviteEmailRoutesExistingUsersThroughLogin(t *testing.T) {
 	}
 	if strings.Contains(drv.textBody, "Passwort festlegen") {
 		t.Fatalf("expected existing user invite copy not to ask for password setup, got:\n%s", drv.textBody)
+	}
+}
+
+func TestSendTeamInviteEmailDoesNotLogRawMailError(t *testing.T) {
+	h, store, ownerID := setupUserSecurityTestEnv(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	teamID, err := store.GetActiveTenantID(ctx, ownerID)
+	if err != nil {
+		t.Fatalf("get active team: %v", err)
+	}
+	invite, err := store.CreateTeamInvite(ctx, teamID, "team-mail-error@example.com", database.TenantRoleMember, nil, ownerID, true)
+	if err != nil {
+		t.Fatalf("create team invite: %v", err)
+	}
+
+	rawMailError := "provider response password=super-secret token=top-secret https://mail.example.test/reject"
+	h.ctx.Mailer = mailer.NewWithDriver(&teamTestMailDriver{sendErr: errors.New(rawMailError)}, h.ctx.Config)
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	req := withTestUser(httptest.NewRequest(http.MethodPost, "/api/user/teams/"+teamID.String()+"/members", nil), ownerID)
+	req = req.WithContext(shared.WithLogger(req.Context(), logger))
+
+	h.sendTeamInviteEmail(req, teamID, ownerID, invite)
+	if strings.Contains(logs.String(), rawMailError) {
+		t.Fatalf("raw team invite mail error leaked into logs: %q", logs.String())
+	}
+	if !strings.Contains(logs.String(), "error_stage=transport") || !strings.Contains(logs.String(), "error_kind=transport") || !strings.Contains(logs.String(), "error_message=\"mail transport failed\"") {
+		t.Fatalf("expected safe team invite mail diagnostics, got %q", logs.String())
 	}
 }
 

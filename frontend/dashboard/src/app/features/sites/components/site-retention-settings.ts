@@ -20,16 +20,17 @@ import { Site } from '@models/analytics.types';
                     <div class="site-settings-card__title-row">
                         <span class="site-settings-card__icon"><i class="pi pi-history" aria-hidden="true"></i></span>
                         <div>
-                            <h3>{{ "sites.retention.infoTitle" | transloco }}</h3>
-                            <p>{{ "sites.retention.infoDescription" | transloco }}</p>
+                            <h3>{{ 'sites.retention.infoTitle' | transloco }}</h3>
+                            <p>{{ 'sites.retention.infoDescription' | transloco }}</p>
                         </div>
                     </div>
                 </header>
                 <div class="site-settings-card__body">
                     <div class="site-settings-field">
-                        <label for="retentionDays">{{ "sites.retention.periodLabel" | transloco }}</label>
+                        <label for="retentionDays">{{ 'sites.retention.periodLabel' | transloco }}</label>
                         <div class="site-settings-inline-control site-settings-inline-control--retention">
-                            <p-inputnumber inputId="retentionDays"
+                            <p-inputnumber
+                                inputId="retentionDays"
                                 [formControl]="retentionForm.retentionDays().control()"
                                 [min]="1"
                                 [max]="3650"
@@ -41,10 +42,10 @@ import { Site } from '@models/analytics.types';
                                 incrementButtonIcon="pi pi-plus"
                                 decrementButtonIcon="pi pi-minus"
                                 styleClass="site-settings-number-input"
-                             />
-                            <span class="site-settings-field-hint">{{ "sites.retention.hotDataSuffix" | transloco }}</span>
+                            />
+                            <span class="site-settings-field-hint">{{ 'sites.retention.hotDataSuffix' | transloco }}</span>
                         </div>
-                        <small class="site-settings-field-hint">{{ "sites.retention.defaultHint" | transloco }}</small>
+                        <small class="site-settings-field-hint">{{ 'sites.retention.defaultHint' | transloco }}</small>
                     </div>
                 </div>
                 <footer class="site-settings-card__footer">

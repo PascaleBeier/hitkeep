@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"math"
 	"net/http"
 	"net/url"
@@ -53,7 +52,7 @@ func (h *handler) preferredMailLocale(r *http.Request, userID uuid.UUID) string 
 	locale := fallbackMailLocale(r.Header.Get("Accept-Language"))
 	prefs, err := h.ctx.Store.GetUserPreferences(r.Context(), userID)
 	if err != nil {
-		slog.Warn("Failed to load user preferences for auth mail", "error", err, "user_id", userID)
+		shared.LoggerFromContext(r.Context()).Warn("Failed to load user preferences for auth mail", "error", err, "user_id", userID)
 		return locale
 	}
 	if prefs != nil && strings.TrimSpace(prefs.DefaultLocale) != "" {
@@ -223,7 +222,7 @@ func (h *handler) handleSSOAvailability() http.HandlerFunc {
 		}
 		teamIDs, err := h.ctx.Store.ListEnabledTeamSSOTeamIDs(r.Context())
 		if err != nil {
-			slog.Error("Failed to load SSO availability", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load SSO availability", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -240,10 +239,10 @@ func (h *handler) handleSSOAvailability() http.HandlerFunc {
 		if enabled {
 			reason = ssoReasonAvailabilityEnabled
 		}
-		slog.Info("SSO availability evaluated", "flow", ssoAuditFlowAvailability, "outcome", enabled, "reason", reason, "configured_teams", len(teamIDs), "eligible_teams", eligibleTeams, "request_id", r.Header.Get("X-Request-Id"))
+		shared.LoggerFromContext(r.Context()).Debug("SSO availability evaluated", "flow", ssoAuditFlowAvailability, "outcome", enabled, "reason", reason, "configured_teams", len(teamIDs), "eligible_teams", eligibleTeams)
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(api.SSOAvailability{Enabled: enabled}); err != nil {
-			slog.Error("Failed to encode SSO availability", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode SSO availability", "error", err)
 		}
 	}
 }
@@ -269,7 +268,7 @@ func (h *handler) handleCreateInitialUser() http.HandlerFunc {
 
 		userCount, err := h.ctx.Store.GetUserCount(r.Context())
 		if err != nil {
-			slog.Error("Failed to check user count during setup", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to check user count during setup", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -291,7 +290,7 @@ func (h *handler) handleCreateInitialUser() http.HandlerFunc {
 
 		hashedPassword, err := HashPassword(req.Password)
 		if err != nil {
-			slog.Error("Failed to hash password", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to hash password", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -300,7 +299,7 @@ func (h *handler) handleCreateInitialUser() http.HandlerFunc {
 		defaultTeamName := localization.DefaultTeamName(locale, req.GivenName)
 		userID, err := h.ctx.Store.CreateUserWithNamesAndDefaultTenantName(r.Context(), req.Email, hashedPassword, req.GivenName, req.LastName, defaultTeamName)
 		if err != nil {
-			slog.Error("Failed to create initial user", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to create initial user", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -308,7 +307,7 @@ func (h *handler) handleCreateInitialUser() http.HandlerFunc {
 		duration := h.ctx.Config.AuthSessionDuration()
 		token, _, err := authcore.GenerateTokenWithDuration(h.ctx.Config.JWTSecret, h.ctx.Config.PublicURL, userID, duration)
 		if err != nil {
-			slog.Error("Failed to generate auth token", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to generate auth token", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -316,15 +315,14 @@ func (h *handler) handleCreateInitialUser() http.HandlerFunc {
 		isSecure := strings.HasPrefix(h.ctx.Config.PublicURL, "https://")
 		authcore.SetTokenCookieWithDuration(w, token, isSecure, duration)
 
-		//nolint:gosec // email/user_id are expected audit fields after successful account setup.
-		slog.Info("Initial admin user created", "email", req.Email, "user_id", userID)
+		shared.LoggerFromContext(r.Context()).Info("Initial admin user created", "user_id", userID)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		if err := json.NewEncoder(w).Encode(map[string]string{
 			"token": token,
 		}); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -351,7 +349,7 @@ func (h *handler) handleLogin() http.HandlerFunc {
 
 		user, err := h.ctx.Store.GetUserByEmail(r.Context(), req.Email)
 		if err != nil {
-			slog.Error("Database error during login", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Database error during login", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -370,7 +368,7 @@ func (h *handler) handleLogin() http.HandlerFunc {
 
 		match, err := verifyPassword(req.Password, user.Password)
 		if err != nil {
-			slog.Error("Password verification error", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Password verification error", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -382,7 +380,7 @@ func (h *handler) handleLogin() http.HandlerFunc {
 
 		resp, err := h.beginUserLogin(r, w, user.ID, req.RememberMe, "")
 		if err != nil {
-			slog.Error("Failed to prepare login", "error", err, "user_id", user.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to prepare login", "error", err, "user_id", user.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -391,11 +389,11 @@ func (h *handler) handleLogin() http.HandlerFunc {
 		} else {
 			h.appendAuthAuditForUserTeams(r, user.ID, "auth.login_succeeded", "success", "Login succeeded", true)
 		}
-		slog.Info("User logged in", "user_id", user.ID)
+		shared.LoggerFromContext(r.Context()).Info("User logged in", "user_id", user.ID)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -421,7 +419,7 @@ func (h *handler) issueLoginSession(ctx context.Context, w http.ResponseWriter, 
 		rememberDuration := h.ctx.Config.AuthRememberMeDuration()
 		rememberToken, err := h.ctx.Store.CreateRememberMeTokenWithDuration(ctx, userID, rememberDuration)
 		if err != nil {
-			slog.Error("Failed to create remember me token", "error", err, "user_id", userID)
+			shared.LoggerFromContext(ctx).Error("Failed to create remember me token", "error", err, "user_id", userID)
 			return nil
 		}
 		authcore.SetRememberMeCookieWithDuration(w, rememberToken, isSecure, rememberDuration)
@@ -437,7 +435,7 @@ func (h *handler) handleGetSession() http.HandlerFunc {
 			return
 		}
 
-		writeSessionResponse(w, h.ctx.AuthSessionResponseForRequest(r, shared.GetUserIDFromContext(r), session))
+		writeSessionResponse(r.Context(), w, h.ctx.AuthSessionResponseForRequest(r, shared.GetUserIDFromContext(r), session))
 	}
 }
 
@@ -452,7 +450,7 @@ func (h *handler) handleExtendSession() http.HandlerFunc {
 		duration := h.ctx.Config.AuthSessionDuration()
 		token, expiresAt, err := authcore.GenerateTokenWithDuration(h.ctx.Config.JWTSecret, h.ctx.Config.PublicURL, userID, duration)
 		if err != nil {
-			slog.Error("Failed to extend auth session", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to extend auth session", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -468,7 +466,7 @@ func (h *handler) handleExtendSession() http.HandlerFunc {
 			resp.RememberExpiresAt = rememberExpiresAt
 		}
 		h.appendAuthAuditForUserTeams(r, userID, "auth.session_extended", "success", "Session extended", true)
-		writeSessionResponse(w, resp)
+		writeSessionResponse(r.Context(), w, resp)
 	}
 }
 
@@ -485,23 +483,23 @@ func (h *handler) renewRememberedSession(r *http.Request, w http.ResponseWriter,
 		return nil
 	}
 	if err := h.ctx.Store.DeleteRememberMeToken(r.Context(), cookie.Value); err != nil {
-		slog.Error("Failed to rotate remember me token during session extension", "error", err, "user_id", userID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to rotate remember me token during session extension", "error", err, "user_id", userID)
 		return &currentExpiresAt
 	}
 	rememberDuration := h.ctx.Config.AuthRememberMeDuration()
 	rememberToken, rememberExpiresAt, err := h.ctx.Store.CreateRememberMeSessionWithDuration(r.Context(), userID, rememberDuration)
 	if err != nil {
-		slog.Error("Failed to renew remember me token during session extension", "error", err, "user_id", userID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to renew remember me token during session extension", "error", err, "user_id", userID)
 		return &currentExpiresAt
 	}
 	authcore.SetRememberMeCookieWithDuration(w, rememberToken, isSecure, rememberDuration)
 	return &rememberExpiresAt
 }
 
-func writeSessionResponse(w http.ResponseWriter, resp api.AuthSession) {
+func writeSessionResponse(ctx context.Context, w http.ResponseWriter, resp api.AuthSession) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		slog.Error("Failed to encode auth session response", "error", err)
+		shared.LoggerFromContext(ctx).Error("Failed to encode auth session response", "error", err)
 	}
 }
 
@@ -576,8 +574,5 @@ func burnLoginKDF(secret string) {
 
 	// Deterministic salt keeps the operation stable and avoids external dependencies.
 	salt := []byte("0123456789abcdef")
-	hash := argon2.IDKey([]byte(secret), salt, timeCost, memoryCost, threads, keyLen)
-	if subtle.ConstantTimeCompare(hash, hash) != 1 {
-		slog.Warn("Unreachable login kdf comparison failure")
-	}
+	argon2.IDKey([]byte(secret), salt, timeCost, memoryCost, threads, keyLen)
 }

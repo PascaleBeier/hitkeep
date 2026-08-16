@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +14,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	"hitkeep/internal/hklog"
 )
 
 const importStageCleanupInterval = 24 * time.Hour
@@ -53,7 +53,7 @@ func (w *ImportStageCleanupWorker) Start(ctx context.Context) {
 	if w == nil || w.store == nil || w.retentionDays <= 0 {
 		return
 	}
-	slog.Info("Import staging cleanup enabled", "retention_days", w.retentionDays)
+	hklog.LoggerFromContext(ctx).Info("Import staging cleanup enabled", "retention_days", w.retentionDays)
 
 	go func() {
 		timer := time.NewTimer(30 * time.Second)
@@ -63,7 +63,7 @@ func (w *ImportStageCleanupWorker) Start(ctx context.Context) {
 			return
 		case <-timer.C:
 			if _, err := RunImportStageCleanup(ctx, w.store, w.dataPath, w.retentionDays, w.status); err != nil {
-				slog.Error("Initial import staging cleanup failed", "error", err)
+				hklog.LoggerFromContext(ctx).Error("Initial import staging cleanup failed", "error", err)
 			}
 		}
 	}()
@@ -76,7 +76,7 @@ func (w *ImportStageCleanupWorker) Start(ctx context.Context) {
 			return
 		case <-ticker.C:
 			if _, err := RunImportStageCleanup(ctx, w.store, w.dataPath, w.retentionDays, w.status); err != nil {
-				slog.Error("Import staging cleanup failed", "error", err)
+				hklog.LoggerFromContext(ctx).Error("Import staging cleanup failed", "error", err)
 			}
 		}
 	}
@@ -171,7 +171,7 @@ func (c *ImportStageCleaner) Run(ctx context.Context) (api.ImportStageCleanupRun
 
 	for siteID := range pruneSiteDirs {
 		if err := os.Remove(filepath.Join(c.dataPath, "imports", siteID.String())); err != nil && !errors.Is(err, os.ErrNotExist) && !errors.Is(err, syscall.ENOTEMPTY) {
-			slog.Debug("Could not prune import staging directory", "site_id", siteID, "error", err)
+			hklog.LoggerFromContext(ctx).Debug("Could not prune import staging directory", "site_id", siteID, "error", err)
 		}
 	}
 

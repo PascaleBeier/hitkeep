@@ -3,7 +3,6 @@ package aifetch
 import (
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -165,7 +164,7 @@ func (h *handler) handleCreateAIFetch() http.HandlerFunc {
 		if h.ctx.SpamFilter != nil {
 			decision := h.ctx.SpamFilter.Evaluate(site.Domain, userIP, nil)
 			if decision.Blocked {
-				slog.Info("Dropped spam ai fetch", "site_id", site.ID, "reason", decision.Reason)
+				shared.LoggerFromContext(r.Context()).Debug("Dropped spam ai fetch", "site_id", site.ID, "reason", decision.Reason)
 				h.recordSpamDrop()
 				w.WriteHeader(http.StatusAccepted)
 				return
@@ -380,7 +379,7 @@ func (h *handler) handleExportAIFetch() http.HandlerFunc {
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), params.SiteID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", params.SiteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", params.SiteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -391,14 +390,14 @@ func (h *handler) handleExportAIFetch() http.HandlerFunc {
 			w.Header().Set("Content-Disposition", "attachment; filename="+filename)
 
 			if err := analyticsStore.ExportAIFetchCSV(r.Context(), params, w); err != nil {
-				slog.Error("Failed to export ai fetches", "error", err, "site_id", params.SiteID, "user_id", userID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to export ai fetches", "error", err, "site_id", params.SiteID, "user_id", userID)
 			}
 			return
 		}
 
 		tmpFile, err := analyticsStore.ExportAIFetchFile(r.Context(), params, format)
 		if err != nil {
-			slog.Error("Failed to export ai fetches", "error", err, "site_id", params.SiteID, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to export ai fetches", "error", err, "site_id", params.SiteID, "user_id", userID)
 			http.Error(w, "Failed to export ai fetches", http.StatusInternalServerError)
 			return
 		}

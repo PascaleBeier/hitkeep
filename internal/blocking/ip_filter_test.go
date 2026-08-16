@@ -51,7 +51,7 @@ func TestIPFilterIsBlocked(t *testing.T) {
 		t.Fatalf("create site exclusion: %v", err)
 	}
 
-	filter := NewIPFilter(store)
+	filter := NewIPFilter(store, testBlockingLogger())
 	if err := filter.Refresh(ctx); err != nil {
 		t.Fatalf("refresh filter: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestIPFilterBlocksCountries(t *testing.T) {
 		t.Fatalf("create site country exclusion: %v", err)
 	}
 
-	filter := NewIPFilter(store)
+	filter := NewIPFilter(store, testBlockingLogger())
 	if err := filter.Refresh(ctx); err != nil {
 		t.Fatalf("refresh filter: %v", err)
 	}
@@ -124,7 +124,7 @@ func TestTrafficExclusionFilterMatchesContextAcrossScopes(t *testing.T) {
 		t.Fatalf("create site path exclusion: %v", err)
 	}
 
-	filter := NewIPFilter(store)
+	filter := NewIPFilter(store, testBlockingLogger())
 	if err := filter.Refresh(ctx); err != nil {
 		t.Fatalf("refresh filter: %v", err)
 	}
@@ -154,7 +154,7 @@ func TestTrafficExclusionFilterRefreshesNewRulesAndRootMatchesAllPaths(t *testin
 	store, userID, siteID, _ := setupFilterStore(t)
 	defer store.Close()
 	ctx := context.Background()
-	filter := NewIPFilter(store)
+	filter := NewIPFilter(store, testBlockingLogger())
 	if err := filter.Refresh(ctx); err != nil {
 		t.Fatalf("initial refresh: %v", err)
 	}
@@ -191,4 +191,14 @@ func TestNormalizeExclusionPath(t *testing.T) {
 			t.Fatalf("NormalizeExclusionPath(%q) = %q, %v; want %q, %v", test.input, got, ok, test.want, test.ok)
 		}
 	}
+}
+
+func TestNewIPFilterRequiresLogger(t *testing.T) {
+	t.Helper()
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected missing logger panic")
+		}
+	}()
+	_ = NewIPFilter(nil, nil)
 }

@@ -5,7 +5,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -24,6 +26,25 @@ import (
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
 )
+
+func TestHandleAskAIErrorDoesNotLogRawProviderError(t *testing.T) {
+	var logs bytes.Buffer
+	ctx := shared.WithLogger(context.Background(), slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	providerMessage := "provider response contained prompt=super-secret and raw response payload"
+	w := httptest.NewRecorder()
+
+	(&handler{}).handleAskAIError(ctx, w, errors.New(providerMessage), uuid.New())
+
+	if w.Code != http.StatusBadGateway {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusBadGateway)
+	}
+	if strings.Contains(logs.String(), providerMessage) {
+		t.Fatalf("Ask AI provider error was written to logs: %s", logs.String())
+	}
+	if !strings.Contains(logs.String(), "error_category=provider_error") {
+		t.Fatalf("expected classified provider error in logs: %s", logs.String())
+	}
+}
 
 func TestAskAIRejectsDisabledFeatureWithSafeStatus(t *testing.T) {
 	mux, store, siteID, userID, ai := setupAskAIHandlerTestEnv(t, &config.Config{

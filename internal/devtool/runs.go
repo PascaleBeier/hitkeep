@@ -600,7 +600,9 @@ func (a *App) executeBuild(ctx context.Context, request RunRequest, writer io.Wr
 		if err := os.MkdirAll(filepath.Dir(output), 0o700); err != nil {
 			return err
 		}
-		return a.runCommand(ctx, writer, commandSpec{Args: []string{"go", "build", "-tags", tags, "-ldflags=-w -s -X hitkeep/cmd.Version=snapshot", "-o", output, "./cmd/hitkeep/main.go"}})
+		buildArgs := append([]string{"go", "build"}, goBuildTagArgs(variant.BuildTags)...)
+		buildArgs = append(buildArgs, "-ldflags=-w -s -X hitkeep/cmd.Version=snapshot", "-o", output, "./cmd/hitkeep/main.go")
+		return a.runCommand(ctx, writer, commandSpec{Args: buildArgs})
 	}
 	toolchain, err := a.ToolchainConfig()
 	if err != nil {
@@ -680,8 +682,10 @@ func (a *App) VerifyVariantBuild(ctx context.Context, variantID string, writer i
 	}
 	defer os.RemoveAll(directory)
 	output := filepath.Join(directory, "hitkeep-"+variant.ID)
+	buildArgs := append([]string{"go", "build"}, goBuildTagArgs(variant.BuildTags)...)
+	buildArgs = append(buildArgs, "-o", output, "./cmd/hitkeep/main.go")
 	return a.runCommand(ctx, writer, commandSpec{
-		Args:    []string{"go", "build", "-tags", strings.Join(variant.BuildTags, " "), "-o", output, "./cmd/hitkeep/main.go"},
+		Args:    buildArgs,
 		Display: "go build [" + variant.ID + " variant; temporary workspace-state output]",
 	})
 }
@@ -747,9 +751,9 @@ func (a *App) executeQA(ctx context.Context, runID string, request RunRequest, w
 				_, _ = fmt.Fprintf(writer, "\n[%s] %s\n", gate.ID, gate.Description)
 				writerMu.Unlock()
 				target := io.MultiWriter(&lockedWriter{writer: writer, mu: &writerMu}, gateLog)
-				environment := append(a.ComposeEnvironment(variants[0]), "GOFLAGS=-tags="+strings.Join(variants[0].BuildTags, ","))
+				environment := append(a.ComposeEnvironment(variants[0]), "GOFLAGS="+goFlagsForTags(variants[0].BuildTags))
 				if strings.HasPrefix(gate.ID, "cloud-") {
-					environment = append(a.ComposeEnvironment(variants[1]), "GOFLAGS=-tags="+strings.Join(variants[1].BuildTags, ","))
+					environment = append(a.ComposeEnvironment(variants[1]), "GOFLAGS="+goFlagsForTags(variants[1].BuildTags))
 				}
 				persistProgress(id, "waiting", nil, nil, nil)
 				gateContext, finishGate, acquireErr := a.acquireQAGateContext(ctx, gate)

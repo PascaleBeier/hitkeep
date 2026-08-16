@@ -4,12 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log/slog"
 	"sort"
 	"strings"
 	"time"
 
 	tenant "hitkeep/internal/database/migrations/tenant"
+	"hitkeep/internal/hklog"
 )
 
 // MigrateTenant applies tenant-scoped analytics migrations to an already
@@ -84,7 +84,7 @@ func (s *Store) migrateTenant(ctx context.Context, opts migrationRunOptions) err
 	}
 
 	if len(pendingMigrations) == 0 {
-		slog.Debug("Tenant database schema is up to date.")
+		hklog.LoggerFromContextOr(ctx, s.logger).Debug("Tenant database schema is up to date.")
 		if opts.guarded {
 			if guard, err := s.recovery.loadMigrationGuard(); err != nil {
 				return err
@@ -114,7 +114,7 @@ func (s *Store) migrateTenant(ctx context.Context, opts migrationRunOptions) err
 			*opts.morePending = true
 		}
 	}
-	slog.Info("Applying pending tenant migrations...", "count", len(pendingMigrations), "path", s.path)
+	hklog.LoggerFromContextOr(ctx, s.logger).Info("Applying pending tenant migrations...", "count", len(pendingMigrations), "path", s.path)
 	if opts.guarded {
 		if err := s.prepareGuardedMigration(ctx, "tenant", guardPendingMigrations, cleanBaseForChecksumGuard); err != nil {
 			return err
@@ -126,7 +126,7 @@ func (s *Store) migrateTenant(ctx context.Context, opts migrationRunOptions) err
 	}
 
 	for _, fileName := range pendingMigrations {
-		slog.Info("Applying tenant migration", "file", fileName, "path", s.path)
+		hklog.LoggerFromContextOr(ctx, s.logger).Info("Applying tenant migration", "file", fileName, "path", s.path)
 
 		fileContent, err := tenant.Fs.ReadFile(fileName)
 		if err != nil {
@@ -150,7 +150,7 @@ func (s *Store) migrateTenant(ctx context.Context, opts migrationRunOptions) err
 		}
 	}
 
-	slog.Info("Successfully applied all tenant migrations.", "path", s.path)
+	hklog.LoggerFromContextOr(ctx, s.logger).Info("Successfully applied all tenant migrations.", "path", s.path)
 	if morePending {
 		return nil
 	}

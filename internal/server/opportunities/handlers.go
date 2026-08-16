@@ -1,9 +1,9 @@
 package opportunities
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -56,12 +56,12 @@ func (h *handler) handleList() http.HandlerFunc {
 		}
 		opps, err := h.ctx.Store.ListOpportunities(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to list opportunities", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to list opportunities", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		opps = opportunitysvc.RankOpportunities(opps)
-		writeJSON(w, http.StatusOK, api.OpportunityListResponse{Opportunities: opps})
+		writeJSON(r.Context(), w, http.StatusOK, api.OpportunityListResponse{Opportunities: opps})
 	}
 }
 
@@ -84,11 +84,11 @@ func (h *handler) handleDigestPreview() http.HandlerFunc {
 			Frequency: frequency,
 		})
 		if err != nil {
-			slog.Error("Failed to build opportunity digest preview", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to build opportunity digest preview", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, http.StatusOK, apiOpportunityDigestPreview(preview))
+		writeJSON(r.Context(), w, http.StatusOK, apiOpportunityDigestPreview(preview))
 	}
 }
 
@@ -109,7 +109,7 @@ func (h *handler) handleGenerate() http.HandlerFunc {
 		}
 		site, err := h.ctx.Store.GetSiteByID(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to load opportunity site", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load opportunity site", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -119,13 +119,13 @@ func (h *handler) handleGenerate() http.HandlerFunc {
 		}
 		teamID, err := h.ctx.Store.GetSiteTenantID(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to resolve opportunity team", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve opportunity team", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to resolve opportunity analytics store", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve opportunity analytics store", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -140,7 +140,7 @@ func (h *handler) handleGenerate() http.HandlerFunc {
 			Details:     "generated opportunities",
 		}))
 		if err != nil {
-			slog.Error("Failed to build opportunity generate audit", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to build opportunity generate audit", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -161,12 +161,12 @@ func (h *handler) handleGenerate() http.HandlerFunc {
 			EffectiveSiteRole:     permission.SiteRole,
 		})
 		if err != nil {
-			slog.Error("Failed to generate opportunities", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to generate opportunities", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		h.publishOpportunityChange(siteID, len(opps))
-		writeJSON(w, http.StatusOK, api.OpportunityGenerateResponse{Opportunities: opps, AIRunID: runID, AIStatus: aiStatus})
+		writeJSON(r.Context(), w, http.StatusOK, api.OpportunityGenerateResponse{Opportunities: opps, AIRunID: runID, AIStatus: aiStatus})
 	}
 }
 
@@ -188,7 +188,7 @@ func (h *handler) handleUpdateStatus() http.HandlerFunc {
 		status := strings.TrimSpace(req.Status)
 		existing, err := h.ctx.Store.GetOpportunity(r.Context(), siteID, opportunityID)
 		if err != nil {
-			slog.Error("Failed to load opportunity for status audit", "error", err, "site_id", siteID, "opportunity_id", opportunityID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load opportunity for status audit", "error", err, "site_id", siteID, "opportunity_id", opportunityID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -207,7 +207,7 @@ func (h *handler) handleUpdateStatus() http.HandlerFunc {
 			Details:     "status=" + status,
 		}))
 		if err != nil {
-			slog.Error("Failed to build opportunity status audit", "error", err, "site_id", siteID, "opportunity_id", opportunityID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to build opportunity status audit", "error", err, "site_id", siteID, "opportunity_id", opportunityID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -217,7 +217,7 @@ func (h *handler) handleUpdateStatus() http.HandlerFunc {
 				http.Error(w, "Unsupported opportunity status", http.StatusBadRequest)
 				return
 			}
-			slog.Error("Failed to update opportunity status", "error", err, "site_id", siteID, "opportunity_id", opportunityID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to update opportunity status", "error", err, "site_id", siteID, "opportunity_id", opportunityID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -226,7 +226,7 @@ func (h *handler) handleUpdateStatus() http.HandlerFunc {
 			return
 		}
 		h.publishOpportunityChange(siteID, 1)
-		writeJSON(w, http.StatusOK, opportunity)
+		writeJSON(r.Context(), w, http.StatusOK, opportunity)
 	}
 }
 
@@ -402,10 +402,10 @@ func parseOptionalTime(raw string, fallback time.Time) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("invalid time %q", raw)
 }
 
-func writeJSON(w http.ResponseWriter, status int, value any) {
+func writeJSON(ctx context.Context, w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(value); err != nil {
-		slog.Error("Failed to encode opportunities response", "error", err)
+		shared.LoggerFromContext(ctx).Error("Failed to encode opportunities response", "error", err)
 	}
 }

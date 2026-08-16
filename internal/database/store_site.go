@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
+	"hitkeep/internal/hklog"
 )
 
 // FindSiteByDomain resolves a site by its tracked domain. It runs once per
@@ -571,7 +571,7 @@ func (s *Store) DeleteSiteWithWebhookEvent(ctx context.Context, siteID uuid.UUID
 	}
 	jobs, err := s.CommitStagedSiteDeletionWebhookEvent(ctx, prepared.ID, now)
 	if err != nil {
-		slog.Warn("Site deleted with final webhook materialization deferred", "error", err, "site_id", siteID, "event_id", prepared.ID)
+		hklog.LoggerFromContextOr(ctx, s.logger).Warn("Site deleted with final webhook materialization deferred", "error", err, "site_id", siteID, "event_id", prepared.ID)
 		return []WebhookDeliveryJob{}, nil
 	}
 	return jobs, nil
@@ -596,7 +596,7 @@ func (s *Store) deleteSiteData(ctx context.Context, siteID uuid.UUID) error {
 
 func (s *Store) deleteSiteRow(ctx context.Context, siteID uuid.UUID) error {
 	if _, err := s.db.ExecContext(ctx, "DELETE FROM sites WHERE id = ?", siteID); err != nil {
-		refs, refErr := findSiteReferences(ctx, s.db, siteID)
+		refs, refErr := findSiteReferences(ctx, s.db, siteID, s.logger)
 		if refErr != nil {
 			return fmt.Errorf("could not delete site: %w (failed to resolve references: %v)", err, refErr)
 		}

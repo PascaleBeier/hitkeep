@@ -288,7 +288,7 @@ func listSiteIDTables(ctx context.Context, q queryer) ([]string, error) {
 	return tables, nil
 }
 
-func findSiteReferences(ctx context.Context, q queryer, siteID uuid.UUID) ([]string, error) {
+func findSiteReferences(ctx context.Context, q queryer, siteID uuid.UUID, logger *slog.Logger) ([]string, error) {
 	tables, err := listSiteIDTables(ctx, q)
 	if err != nil {
 		return nil, err
@@ -309,7 +309,7 @@ func findSiteReferences(ctx context.Context, q queryer, siteID uuid.UUID) ([]str
 			return nil, fmt.Errorf("could not count references in %s: %w", table, err)
 		}
 		if count > 0 {
-			slog.Warn("Site references remain", "table", table, "site_id", siteID, "count", count)
+			logger.Warn("Site references remain", "table", table, "site_id", siteID, "count", count)
 			refs = append(refs, fmt.Sprintf("%s(%d)", table, count))
 		}
 	}

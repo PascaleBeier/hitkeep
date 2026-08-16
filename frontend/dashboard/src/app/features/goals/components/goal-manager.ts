@@ -19,15 +19,7 @@ import { injectActiveLang } from '@core/i18n/active-lang';
     imports: [CrudDialog, InputGroupAddonModule, InputGroupModule, InputTextModule, MessageModule, ReactiveFormsModule, SelectButtonModule, TranslocoPipe],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-        <app-crud-dialog
-            [title]="dialogTitle()"
-            [visible]="visible()"
-            (visibleChange)="onVisibleChange($event)"
-            [submitLabel]="submitLabel()"
-            [cancelLabel]="'common.actions.cancel' | transloco"
-            [saving]="saving()"
-            (submitted)="saveGoal()"
-        >
+        <app-crud-dialog [title]="dialogTitle()" [visible]="visible()" (visibleChange)="onVisibleChange($event)" [submitLabel]="submitLabel()" [cancelLabel]="'common.actions.cancel' | transloco" [saving]="saving()" (submitted)="saveGoal()">
             <form class="flex flex-col gap-4" (ngSubmit)="saveGoal()">
                 <div class="flex flex-col gap-1">
                     <label for="goal-name" class="text-sm font-medium">{{ 'common.columns.name' | transloco }}</label>
@@ -52,11 +44,21 @@ import { injectActiveLang } from '@core/i18n/active-lang';
                             autocomplete="off"
                         />
                     </p-inputgroup>
-                    <datalist id="goal-path-suggestions">@for (value of pathSuggestions(); track value) { <option [value]="value"></option> }</datalist>
-                    <datalist id="goal-event-suggestions">@for (value of eventSuggestions(); track value) { <option [value]="value"></option> }</datalist>
+                    <datalist id="goal-path-suggestions">
+                        @for (value of pathSuggestions(); track value) {
+                            <option [value]="value"></option>
+                        }
+                    </datalist>
+                    <datalist id="goal-event-suggestions">
+                        @for (value of eventSuggestions(); track value) {
+                            <option [value]="value"></option>
+                        }
+                    </datalist>
                     <small class="text-xs text-muted-color">{{ 'goals.manager.suggestionsHelp' | transloco }}</small>
                 </div>
-                @if (errorKey()) { <p-message severity="error" [text]="errorKey()! | transloco" /> }
+                @if (errorKey()) {
+                    <p-message severity="error" [text]="errorKey()! | transloco" />
+                }
             </form>
         </app-crud-dialog>
     `

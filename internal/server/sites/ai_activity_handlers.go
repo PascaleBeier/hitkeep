@@ -2,7 +2,6 @@ package sites
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -56,7 +55,7 @@ func (h *handler) handleGetSiteAIActivity() http.HandlerFunc {
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -73,14 +72,14 @@ func (h *handler) handleGetSiteAIActivity() http.HandlerFunc {
 			CompareEnd:   compareEnd,
 		})
 		if err != nil {
-			slog.Error("Failed to get AI activity report", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get AI activity report", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(report); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }

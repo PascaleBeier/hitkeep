@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -51,6 +53,10 @@ func TestGeoNetworkFromVisitorIPLooksUpMetadataOnce(t *testing.T) {
 	if metadata.City != "Mountain View" || metadata.ASN != 15169 {
 		t.Fatalf("unexpected metadata: %+v", metadata)
 	}
+}
+
+func testServerIngestLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
 func TestMetadataFromVisitorIPWithCountryReusesResolvedCountry(t *testing.T) {
@@ -289,7 +295,7 @@ func TestHandleIngestLeaderDropsCountryExclusionBeforePublish(t *testing.T) {
 		if _, err := ctx.Store.CreateInstanceCountryExclusion(context.Background(), "US", "United States", uuid.Nil); err != nil {
 			t.Fatalf("CreateInstanceCountryExclusion: %v", err)
 		}
-		filter := blocking.NewIPFilter(ctx.Store)
+		filter := blocking.NewIPFilter(ctx.Store, testServerIngestLogger())
 		if err := filter.Refresh(context.Background()); err != nil {
 			t.Fatalf("Refresh IP filter: %v", err)
 		}
@@ -331,7 +337,7 @@ func TestBrowserIngestContextExclusionsDropPageviewsEventsAndWebVitals(t *testin
 		if _, err := ctx.Store.CreateSiteTrafficExclusion(context.Background(), site.ID, database.TrafficExclusionValues{Type: "user_agent", UserAgent: "blocked-agent"}, uuid.Nil); err != nil {
 			t.Fatalf("create user-agent exclusion: %v", err)
 		}
-		filter := blocking.NewIPFilter(ctx.Store)
+		filter := blocking.NewIPFilter(ctx.Store, testServerIngestLogger())
 		if err := filter.Refresh(context.Background()); err != nil {
 			t.Fatalf("refresh traffic exclusions: %v", err)
 		}
@@ -783,7 +789,7 @@ func TestHandleIngestWebVitalsLeaderDropsCountryExclusionBeforePublish(t *testin
 		if _, err := ctx.Store.CreateInstanceCountryExclusion(context.Background(), "US", "United States", uuid.Nil); err != nil {
 			t.Fatalf("CreateInstanceCountryExclusion: %v", err)
 		}
-		filter := blocking.NewIPFilter(ctx.Store)
+		filter := blocking.NewIPFilter(ctx.Store, testServerIngestLogger())
 		if err := filter.Refresh(context.Background()); err != nil {
 			t.Fatalf("Refresh IP filter: %v", err)
 		}
@@ -997,7 +1003,7 @@ func TestTrustedServerIngestContextExclusionsDropPageviewsAndEvents(t *testing.T
 	if _, err := store.CreateSiteTrafficExclusion(context.Background(), siteID, database.TrafficExclusionValues{Type: "user_agent", UserAgent: "server-blocked-agent"}, userID); err != nil {
 		t.Fatalf("create server user-agent exclusion: %v", err)
 	}
-	filter := blocking.NewIPFilter(store)
+	filter := blocking.NewIPFilter(store, testServerIngestLogger())
 	if err := filter.Refresh(context.Background()); err != nil {
 		t.Fatalf("refresh traffic exclusions: %v", err)
 	}
@@ -1241,7 +1247,7 @@ func TestHandleServerPageviewIngestUsesVisitorIPForExclusionsBeforePublish(t *te
 	if _, err := store.CreateSiteExclusion(context.Background(), siteID, "198.51.100.0/24", "replay block", userID); err != nil {
 		t.Fatalf("CreateSiteExclusion: %v", err)
 	}
-	filter := blocking.NewIPFilter(store)
+	filter := blocking.NewIPFilter(store, testServerIngestLogger())
 	if err := filter.Refresh(context.Background()); err != nil {
 		t.Fatalf("Refresh IP filter: %v", err)
 	}
@@ -1283,7 +1289,7 @@ func TestHandleServerPageviewIngestUsesVisitorCountryForExclusionsBeforePublish(
 	if _, err := store.CreateInstanceCountryExclusion(context.Background(), "US", "United States", userID); err != nil {
 		t.Fatalf("CreateInstanceCountryExclusion: %v", err)
 	}
-	filter := blocking.NewIPFilter(store)
+	filter := blocking.NewIPFilter(store, testServerIngestLogger())
 	if err := filter.Refresh(context.Background()); err != nil {
 		t.Fatalf("Refresh IP filter: %v", err)
 	}
@@ -1656,7 +1662,7 @@ func mustNewTestSpamFilter(t *testing.T, data blocking.SpamFeedData) *blocking.S
 		t.Fatalf("save spam filter data: %v", err)
 	}
 
-	filter := blocking.NewSpamFilter(path)
+	filter := blocking.NewSpamFilter(path, testServerIngestLogger())
 	if err := filter.RefreshFromDisk(); err != nil {
 		t.Fatalf("refresh spam filter from disk: %v", err)
 	}

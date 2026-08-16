@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"regexp"
 	"strings"
@@ -206,7 +205,7 @@ func (h *handler) handleGetSites() http.HandlerFunc {
 			return
 		}
 		if err != nil {
-			slog.Error("Failed to get sites", "error", err, "user_id", userID, "tenant_id", apiClientAuthTenantID(apiClientAuth))
+			shared.LoggerFromContext(r.Context()).Error("Failed to get sites", "error", err, "user_id", userID, "tenant_id", apiClientAuthTenantID(apiClientAuth))
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -223,7 +222,7 @@ func (h *handler) handleGetSites() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(sites); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -266,20 +265,20 @@ func (h *handler) handleCreateSite() http.HandlerFunc {
 
 		site, err := h.ctx.Store.CreateSite(r.Context(), userID, domain)
 		if err != nil {
-			slog.Error("Failed to create site", "error", err, "domain", domain)
+			shared.LoggerFromContext(r.Context()).Error("Failed to create site", "error", err, "domain", domain)
 			http.Error(w, "Failed to create site (domain might already exist)", http.StatusConflict)
 			return
 		}
 
 		if h.ctx.Config.DataRetentionDays > 0 {
 			if err := h.ctx.Store.UpdateSiteRetention(r.Context(), site.ID, userID, h.ctx.Config.DataRetentionDays, true); err != nil {
-				slog.Warn("Failed to set default data retention policy", "site_id", site.ID, "error", err)
+				shared.LoggerFromContext(r.Context()).Warn("Failed to set default data retention policy", "site_id", site.ID, "error", err)
 			}
 		}
 
 		if h.ctx.TenantStores != nil {
 			if err := h.ctx.TenantStores.SyncSite(r.Context(), site.ID); err != nil {
-				slog.Error("Failed to sync tenant site mirror after create", "error", err, "site_id", site.ID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to sync tenant site mirror after create", "error", err, "site_id", site.ID)
 				http.Error(w, "Failed to create site", http.StatusInternalServerError)
 				return
 			}
@@ -291,7 +290,7 @@ func (h *handler) handleCreateSite() http.HandlerFunc {
 				TenantID:  teamID,
 				EventName: database.CloudConversionFirstSiteCreated,
 			}); conversionErr != nil {
-				slog.Warn("Failed to record first site conversion", "error", conversionErr, "team_id", teamID, "site_id", site.ID)
+				shared.LoggerFromContext(r.Context()).Warn("Failed to record first site conversion", "error", conversionErr, "team_id", teamID, "site_id", site.ID)
 			}
 			h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
 				ActorID:     userID,
@@ -305,7 +304,7 @@ func (h *handler) handleCreateSite() http.HandlerFunc {
 			})
 		}
 
-		slog.Info("Site created", "id", site.ID, "domain", domain, "user_id", userID)
+		shared.LoggerFromContext(r.Context()).Info("Site created", "id", site.ID, "domain", domain, "user_id", userID)
 		h.ctx.EmitWebhookEvent(r.Context(), webhooks.Event{
 			Type:   webhooks.EventSiteCreated,
 			SiteID: &site.ID,
@@ -313,7 +312,7 @@ func (h *handler) handleCreateSite() http.HandlerFunc {
 		})
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(site); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -340,13 +339,13 @@ func (h *handler) handleDeleteSite() http.HandlerFunc {
 		}
 		teamID, teamErr := h.ctx.Store.GetSiteTenantID(r.Context(), siteID)
 		if err := h.ctx.DeleteSiteWithWebhookEvent(r.Context(), siteID, map[string]any{"site_id": siteID.String(), "domain": siteLabel}); err != nil {
-			slog.Error("Failed to delete site", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to delete site", "error", err, "site_id", siteID)
 			http.Error(w, "Failed to delete site", http.StatusInternalServerError)
 			return
 		}
 		if h.ctx.Config != nil {
 			if err := assetstore.New(h.ctx.Config.DataPath).DeleteQRCodeAssetsForSite(siteID); err != nil {
-				slog.Warn("Failed to delete QR asset files for deleted site", "error", err, "site_id", siteID)
+				shared.LoggerFromContext(r.Context()).Warn("Failed to delete QR asset files for deleted site", "error", err, "site_id", siteID)
 			}
 		}
 
@@ -365,7 +364,7 @@ func (h *handler) handleDeleteSite() http.HandlerFunc {
 
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -389,7 +388,7 @@ func (h *handler) handleResetSiteStats() http.HandlerFunc {
 
 		site, err := h.ctx.Store.GetSiteByID(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to get site for stats reset", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get site for stats reset", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -416,14 +415,14 @@ func (h *handler) handleResetSiteStats() http.HandlerFunc {
 			result, err = h.ctx.Store.ResetSiteStats(r.Context(), siteID)
 		}
 		if err != nil {
-			slog.Error("Failed to reset site stats", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to reset site stats", "error", err, "site_id", siteID)
 			http.Error(w, "Failed to reset site stats", http.StatusInternalServerError)
 			return
 		}
 
 		teamID, err := h.ctx.Store.GetSiteTenantID(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to resolve site team for stats reset audit", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve site team for stats reset audit", "error", err, "site_id", siteID)
 			http.Error(w, "Failed to audit site stats reset", http.StatusInternalServerError)
 			return
 		}
@@ -444,14 +443,14 @@ func (h *handler) handleResetSiteStats() http.HandlerFunc {
 				strings.Join(result.FamiliesCleared, ","),
 			),
 		}); err != nil {
-			slog.Error("Failed to append site stats reset audit", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to append site stats reset audit", "error", err, "site_id", siteID)
 			http.Error(w, "Failed to audit site stats reset", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(result); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -475,7 +474,7 @@ func (h *handler) handleRenameSiteDomain() http.HandlerFunc {
 
 		site, err := h.ctx.Store.GetSiteByID(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to get site for domain rename", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get site for domain rename", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -500,7 +499,7 @@ func (h *handler) handleRenameSiteDomain() http.HandlerFunc {
 		if domain != oldDomain {
 			existing, err := h.ctx.Store.FindSiteByDomain(r.Context(), domain)
 			if err != nil {
-				slog.Error("Failed to check domain availability", "error", err, "domain", domain)
+				shared.LoggerFromContext(r.Context()).Error("Failed to check domain availability", "error", err, "domain", domain)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
@@ -510,14 +509,14 @@ func (h *handler) handleRenameSiteDomain() http.HandlerFunc {
 			}
 
 			if err := h.ctx.Store.UpdateSiteDomain(r.Context(), siteID, domain); err != nil {
-				slog.Error("Failed to rename site domain", "error", err, "site_id", siteID, "domain", domain)
+				shared.LoggerFromContext(r.Context()).Error("Failed to rename site domain", "error", err, "site_id", siteID, "domain", domain)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
 
 			if h.ctx.TenantStores != nil {
 				if err := h.ctx.TenantStores.SyncSite(r.Context(), siteID); err != nil {
-					slog.Error("Failed to sync tenant site mirror after domain rename", "error", err, "site_id", siteID)
+					shared.LoggerFromContext(r.Context()).Error("Failed to sync tenant site mirror after domain rename", "error", err, "site_id", siteID)
 					http.Error(w, "Internal server error", http.StatusInternalServerError)
 					return
 				}
@@ -537,7 +536,7 @@ func (h *handler) handleRenameSiteDomain() http.HandlerFunc {
 				})
 			}
 
-			slog.Info("Site domain renamed", "site_id", siteID, "old_domain", oldDomain, "new_domain", domain, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Info("Site domain renamed", "site_id", siteID, "old_domain", oldDomain, "new_domain", domain, "user_id", userID)
 			h.ctx.EmitWebhookEvent(r.Context(), webhooks.Event{
 				Type:   webhooks.EventSiteUpdated,
 				SiteID: &siteID,
@@ -550,7 +549,7 @@ func (h *handler) handleRenameSiteDomain() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(site); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -592,14 +591,14 @@ func (h *handler) handleUpdateSiteRetention() http.HandlerFunc {
 		}
 
 		if err := h.ctx.Store.UpdateSiteRetention(r.Context(), siteID, userID, req.Days, false); err != nil {
-			slog.Error("Failed to update site retention", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to update site retention", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		if h.ctx.TenantStores != nil {
 			if err := h.ctx.TenantStores.SyncSite(r.Context(), siteID); err != nil {
-				slog.Error("Failed to sync tenant site mirror after retention update", "error", err, "site_id", siteID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to sync tenant site mirror after retention update", "error", err, "site_id", siteID)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
@@ -678,12 +677,13 @@ func (h *handler) handleTransferSiteTeam() http.HandlerFunc {
 
 		sourceTeamID, err := h.ctx.Store.GetSiteTenantID(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to resolve source team for site transfer", "error", err, "site_id", siteID, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve source team for site transfer", "error", err, "site_id", siteID, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		searchConsoleMapping, err := h.googleSearchConsoleMappingForTransfer(r, siteID, sourceTeamID)
 		if err != nil {
+			shared.LoggerFromContext(r.Context()).Error("Failed to load Search Console mapping before site transfer", "error", err, "site_id", siteID, "source_team_id", sourceTeamID, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -695,13 +695,13 @@ func (h *handler) handleTransferSiteTeam() http.HandlerFunc {
 		}
 		auditEntries, err := h.siteTransferAuditEntries(r, userID, sourceTeamID, destinationTeamID, siteID, siteLabel, searchConsoleMapping)
 		if err != nil {
-			slog.Error("Failed to build site transfer audit entries", "error", err, "site_id", siteID, "source_team_id", sourceTeamID, "destination_team_id", destinationTeamID, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to build site transfer audit entries", "error", err, "site_id", siteID, "source_team_id", sourceTeamID, "destination_team_id", destinationTeamID, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		if err := h.ctx.TenantStores.TransferSite(r.Context(), siteID, destinationTeamID, auditEntries...); err != nil {
-			slog.Error("Failed to transfer site to team", "error", err, "site_id", siteID, "source_team_id", sourceTeamID, "destination_team_id", destinationTeamID, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to transfer site to team", "error", err, "site_id", siteID, "source_team_id", sourceTeamID, "destination_team_id", destinationTeamID, "user_id", userID)
 			http.Error(w, "Failed to transfer site", http.StatusInternalServerError)
 			return
 		}
@@ -714,7 +714,7 @@ func (h *handler) handleTransferSiteTeam() http.HandlerFunc {
 			"source_team_id":      sourceTeamID,
 			"destination_team_id": destinationTeamID,
 		}); err != nil {
-			slog.Error("Failed to encode site transfer response", "error", err, "site_id", siteID, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode site transfer response", "error", err, "site_id", siteID, "user_id", userID)
 		}
 	}
 }
@@ -722,7 +722,6 @@ func (h *handler) handleTransferSiteTeam() http.HandlerFunc {
 func (h *handler) googleSearchConsoleMappingForTransfer(r *http.Request, siteID, sourceTeamID uuid.UUID) (*database.GoogleSearchConsoleSiteMapping, error) {
 	mapping, err := h.ctx.Store.GetGoogleSearchConsoleSiteMappingForTeam(r.Context(), siteID, sourceTeamID)
 	if err != nil {
-		slog.Error("Failed to load Search Console mapping before site transfer", "error", err, "site_id", siteID, "source_team_id", sourceTeamID)
 		return nil, err
 	}
 	return mapping, nil

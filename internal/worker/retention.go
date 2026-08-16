@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +13,7 @@ import (
 
 	"hitkeep/internal/assetstore"
 	"hitkeep/internal/database"
+	"hitkeep/internal/hklog"
 )
 
 type S3Config = database.S3SecretConfig
@@ -100,9 +100,11 @@ func (w *RetentionWorker) archiveFilename(siteID, tenantID, defaultTenantID uuid
 func (w *RetentionWorker) Start(ctx context.Context) {
 	// Run once on startup after a short delay to let DB settle
 	go func() {
-		time.Sleep(10 * time.Second)
+		if !waitForDelay(ctx, 10*time.Second) {
+			return
+		}
 		if err := w.Run(ctx); err != nil {
-			slog.Error("Initial retention run failed", "error", err)
+			hklog.LoggerFromContext(ctx).Error("Initial retention run failed", "error", err)
 		}
 	}()
 
@@ -116,14 +118,14 @@ func (w *RetentionWorker) Start(ctx context.Context) {
 			return
 		case <-ticker.C:
 			if err := w.Run(ctx); err != nil {
-				slog.Error("Retention worker failed", "error", err)
+				hklog.LoggerFromContext(ctx).Error("Retention worker failed", "error", err)
 			}
 		}
 	}
 }
 
 func (w *RetentionWorker) Run(ctx context.Context) error {
-	slog.Debug("Checking for data retention cleanup...")
+	hklog.LoggerFromContext(ctx).Debug("Checking for data retention cleanup...")
 
 	if err := w.prepareArchiveDestination(ctx); err != nil {
 		return err
@@ -161,9 +163,9 @@ func (w *RetentionWorker) resolveDefaultTenantID(ctx context.Context) uuid.UUID 
 		return defaultTenantID
 	}
 	if isBinderError(err) {
-		slog.Debug("Tenant schema not ready, using nil default tenant ID", "error", err)
+		hklog.LoggerFromContext(ctx).Debug("Tenant schema not ready, using nil default tenant ID", "error", err)
 	} else {
-		slog.Warn("Failed to resolve default tenant for retention archive layout", "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Failed to resolve default tenant for retention archive layout", "error", err)
 	}
 	return uuid.Nil
 }
@@ -173,48 +175,48 @@ func (w *RetentionWorker) processSitePolicy(ctx context.Context, policy retentio
 
 	tenantStore, err := w.tenantMgr.ForTenant(ctx, policy.TenantID)
 	if err != nil {
-		slog.Error("Failed to resolve tenant store for retention", "error", err, "site_id", policy.ID, "tenant_id", policy.TenantID)
+		hklog.LoggerFromContext(ctx).Error("Failed to resolve tenant store for retention", "error", err, "site_id", policy.ID, "tenant_id", policy.TenantID)
 		return
 	}
 
 	db := tenantStore.DB()
 	counts, err := countRetainedRows(ctx, db, policy.ID, cutoff)
 	if err != nil {
-		slog.Error("Failed to count rows for retention", "error", err, "site_id", policy.ID)
+		hklog.LoggerFromContext(ctx).Error("Failed to count rows for retention", "error", err, "site_id", policy.ID)
 		return
 	}
 	if err := w.pruneArchivedQRAssets(ctx, policy.ID, cutoff); err != nil {
-		slog.Error("Failed to prune archived QR assets", "error", err, "site_id", policy.ID)
+		hklog.LoggerFromContext(ctx).Error("Failed to prune archived QR assets", "error", err, "site_id", policy.ID)
 		return
 	}
 	if !counts.hasColdData() {
 		if counts.DirtyRollupBuckets > 0 {
 			if _, err := db.ExecContext(ctx, "DELETE FROM rollup_dirty_buckets WHERE site_id = ? AND bucket < ?", policy.ID, cutoff); err != nil {
-				slog.Error("Failed to prune expired dirty rollup buckets", "error", err, "site_id", policy.ID)
+				hklog.LoggerFromContext(ctx).Error("Failed to prune expired dirty rollup buckets", "error", err, "site_id", policy.ID)
 			}
 		}
 		return
 	}
 
-	slog.Info("Archiving old data", counts.logAttrs(policy.ID, cutoff)...)
+	hklog.LoggerFromContext(ctx).Debug("Archiving old data", counts.logAttrs(policy.ID, cutoff)...)
 
 	filename := w.archiveFilename(policy.ID, policy.TenantID, defaultTenantID)
 	if err := ensureArchiveParent(filename); err != nil {
-		slog.Error("Failed to create archive destination", "error", err, "site_id", policy.ID, "tenant_id", policy.TenantID, "path", filename)
+		hklog.LoggerFromContext(ctx).Error("Failed to create archive destination", "error", err, "site_id", policy.ID, "tenant_id", policy.TenantID, "path", filename)
 		return
 	}
 
 	if err := w.exportSiteArchive(ctx, db, policy.ID, cutoff, filename); err != nil {
-		slog.Error("Failed to export data to parquet", "error", err, "site_id", policy.ID)
+		hklog.LoggerFromContext(ctx).Error("Failed to export data to parquet", "error", err, "site_id", policy.ID)
 		return
 	}
 
 	if err := pruneRetainedRows(ctx, db, policy.ID, cutoff, counts); err != nil {
-		slog.Error("Failed to prune retained rows", "error", err, "site_id", policy.ID)
+		hklog.LoggerFromContext(ctx).Error("Failed to prune retained rows", "error", err, "site_id", policy.ID)
 		return
 	}
 
-	slog.Info("Retention process completed", "site_id", policy.ID, "tenant_id", policy.TenantID, "archive", filename)
+	hklog.LoggerFromContext(ctx).Debug("Retention process completed", "site_id", policy.ID, "tenant_id", policy.TenantID, "archive", filename)
 }
 
 func (w *RetentionWorker) pruneArchivedQRAssets(ctx context.Context, siteID uuid.UUID, cutoff time.Time) error {
@@ -231,12 +233,12 @@ func (w *RetentionWorker) pruneArchivedQRAssets(ctx context.Context, siteID uuid
 	for _, asset := range assets {
 		if asset.StorageKey != "" && w.assets != nil {
 			if err := w.assets.Delete(asset.StorageKey); err != nil {
-				slog.Warn("Failed to delete retained QR asset file", "error", err, "site_id", asset.SiteID, "qr_code_id", asset.QRCodeID, "storage_key", asset.StorageKey)
+				hklog.LoggerFromContext(ctx).Warn("Failed to delete retained QR asset file", "error", err, "site_id", asset.SiteID, "qr_code_id", asset.QRCodeID, "storage_key", asset.StorageKey)
 			}
 		}
 		if w.assets != nil {
 			if err := w.assets.DeleteQRCodeAssetDir(asset.SiteID, asset.QRCodeID); err != nil {
-				slog.Warn("Failed to delete retained QR asset directory", "error", err, "site_id", asset.SiteID, "qr_code_id", asset.QRCodeID)
+				hklog.LoggerFromContext(ctx).Warn("Failed to delete retained QR asset directory", "error", err, "site_id", asset.SiteID, "qr_code_id", asset.QRCodeID)
 			}
 		}
 		if _, err := w.tenantMgr.Shared().DeleteQRCodeAsset(ctx, asset.SiteID, asset.QRCodeID); err != nil {
@@ -475,7 +477,7 @@ func (w *RetentionWorker) loadRetentionPolicies(ctx context.Context, defaultTena
 			return nil, fmt.Errorf("failed to query retention policies: %w", err)
 		}
 
-		slog.Warn("Tenant mapping table not available; falling back to legacy retention layout", "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Tenant mapping table not available; falling back to legacy retention layout", "error", err)
 		return w.loadLegacyRetentionPolicies(ctx, defaultTenantID)
 	}
 	defer rows.Close()
@@ -487,7 +489,7 @@ func (w *RetentionWorker) loadRetentionPolicies(ctx context.Context, defaultTena
 			tenantIDRaw sql.NullString
 		)
 		if err := rows.Scan(&policy.ID, &policy.Days, &tenantIDRaw); err != nil {
-			slog.Error("Failed to scan tenant-aware site policy", "error", err)
+			hklog.LoggerFromContext(ctx).Error("Failed to scan tenant-aware site policy", "error", err)
 			continue
 		}
 
@@ -495,7 +497,7 @@ func (w *RetentionWorker) loadRetentionPolicies(ctx context.Context, defaultTena
 		if tenantIDRaw.Valid && strings.TrimSpace(tenantIDRaw.String) != "" {
 			tenantID, parseErr := uuid.Parse(strings.TrimSpace(tenantIDRaw.String))
 			if parseErr != nil {
-				slog.Error("Invalid tenant ID in site_tenants mapping", "error", parseErr, "site_id", policy.ID, "raw_tenant_id", tenantIDRaw.String)
+				hklog.LoggerFromContext(ctx).Error("Invalid tenant ID in site_tenants mapping", "error", parseErr, "site_id", policy.ID, "raw_tenant_id", tenantIDRaw.String)
 				continue
 			}
 			policy.TenantID = tenantID
@@ -521,7 +523,7 @@ func (w *RetentionWorker) loadLegacyRetentionPolicies(ctx context.Context, defau
 	for rows.Next() {
 		var policy retentionSitePolicy
 		if err := rows.Scan(&policy.ID, &policy.Days); err != nil {
-			slog.Error("Failed to scan legacy site policy", "error", err)
+			hklog.LoggerFromContext(ctx).Error("Failed to scan legacy site policy", "error", err)
 			continue
 		}
 		policy.TenantID = defaultTenantID

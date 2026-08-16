@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -322,7 +324,7 @@ func TestHandleCreateAIFetchDropsBlockedSiteExclusion(t *testing.T) {
 	if _, err := store.CreateSiteExclusion(context.Background(), siteID, "198.51.100.0/24", "blocked", userID); err != nil {
 		t.Fatalf("CreateSiteExclusion: %v", err)
 	}
-	ipFilter := blocking.NewIPFilter(store)
+	ipFilter := blocking.NewIPFilter(store, testAIFetchLogger())
 	if err := ipFilter.Refresh(context.Background()); err != nil {
 		t.Fatalf("Refresh ip filter: %v", err)
 	}
@@ -371,7 +373,7 @@ func TestHandleCreateAIFetchDropsCountryExclusion(t *testing.T) {
 	if _, err := store.CreateInstanceCountryExclusion(context.Background(), "US", "United States", userID); err != nil {
 		t.Fatalf("CreateInstanceCountryExclusion: %v", err)
 	}
-	ipFilter := blocking.NewIPFilter(store)
+	ipFilter := blocking.NewIPFilter(store, testAIFetchLogger())
 	if err := ipFilter.Refresh(context.Background()); err != nil {
 		t.Fatalf("Refresh ip filter: %v", err)
 	}
@@ -437,7 +439,7 @@ func TestHandleCreateAIFetchDropsPathAndUserAgentExclusions(t *testing.T) {
 			if _, err := store.CreateSiteTrafficExclusion(context.Background(), siteID, test.rule, userID); err != nil {
 				t.Fatalf("create contextual exclusion: %v", err)
 			}
-			filter := blocking.NewIPFilter(store)
+			filter := blocking.NewIPFilter(store, testAIFetchLogger())
 			if err := filter.Refresh(context.Background()); err != nil {
 				t.Fatalf("refresh traffic exclusions: %v", err)
 			}
@@ -653,10 +655,14 @@ func mustNewAIFetchSpamFilter(t *testing.T, data blocking.SpamFeedData) *blockin
 		t.Fatalf("save spam filter data: %v", err)
 	}
 
-	filter := blocking.NewSpamFilter(path)
+	filter := blocking.NewSpamFilter(path, testAIFetchLogger())
 	if err := filter.RefreshFromDisk(); err != nil {
 		t.Fatalf("refresh spam filter from disk: %v", err)
 	}
 
 	return filter
+}
+
+func testAIFetchLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }

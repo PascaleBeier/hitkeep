@@ -29,10 +29,10 @@ import { PermissionService } from '@services/permission.service';
         >
             <form (submit)="onSubmit($event)" class="flex flex-col gap-6 pt-2" novalidate>
                 <div class="flex flex-col gap-2">
-                    <label for="team-name" class="font-semibold text-sm text-[var(--p-text-color)]">{{ "teams.createDialog.nameLabel" | transloco }}</label>
+                    <label for="team-name" class="font-semibold text-sm text-[var(--p-text-color)]">{{ 'teams.createDialog.nameLabel' | transloco }}</label>
                     <input pInputText id="team-name" [formControl]="form.name().control()" [placeholder]="'teams.createDialog.namePlaceholder' | transloco" class="w-full" [class.ng-invalid]="isInvalid()" [class.ng-dirty]="form.name().dirty()" />
-                    @if (isInvalid() && form.name().control().hasError("required")) {
-                        <small class="text-red-500">{{ "teams.createDialog.nameRequired" | transloco }}</small>
+                    @if (isInvalid() && form.name().control().hasError('required')) {
+                        <small class="text-red-500">{{ 'teams.createDialog.nameRequired' | transloco }}</small>
                     }
                     @if (createError()) {
                         <small class="text-red-500">{{ createError()! | transloco }}</small>

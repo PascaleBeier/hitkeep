@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -99,21 +98,21 @@ func (h *handler) handleGetEventNames() http.HandlerFunc {
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		names, err := analyticsStore.GetEventNames(r.Context(), params)
 		if err != nil {
-			slog.Error("Failed to get event names", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get event names", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(names); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -144,21 +143,21 @@ func (h *handler) handleGetEventPropertyKeys() http.HandlerFunc {
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		keys, err := analyticsStore.GetEventPropertyKeys(r.Context(), params, eventName)
 		if err != nil {
-			slog.Error("Failed to get event property keys", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get event property keys", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(keys); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -193,21 +192,21 @@ func (h *handler) handleGetEventPropertyBreakdown() http.HandlerFunc {
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		breakdown, err := analyticsStore.GetEventPropertyBreakdown(r.Context(), params)
 		if err != nil {
-			slog.Error("Failed to get event property breakdown", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get event property breakdown", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(breakdown); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -335,7 +334,7 @@ func (h *handler) handleExportAIChatbots() http.HandlerFunc {
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), params.SiteID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", params.SiteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", params.SiteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -346,14 +345,14 @@ func (h *handler) handleExportAIChatbots() http.HandlerFunc {
 			w.Header().Set("Content-Disposition", "attachment; filename="+filename)
 
 			if err := analyticsStore.ExportChatbotEventsCSV(r.Context(), params, w); err != nil {
-				slog.Error("Failed to export chatbot events", "error", err, "site_id", params.SiteID, "user_id", userID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to export chatbot events", "error", err, "site_id", params.SiteID, "user_id", userID)
 			}
 			return
 		}
 
 		filename, err := analyticsStore.ExportChatbotEventsFile(r.Context(), params, format)
 		if err != nil {
-			slog.Error("Failed to export chatbot events", "error", err, "site_id", params.SiteID, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to export chatbot events", "error", err, "site_id", params.SiteID, "user_id", userID)
 			http.Error(w, "Failed to export chatbot events", http.StatusInternalServerError)
 			return
 		}
@@ -380,21 +379,21 @@ func (h *handler) eventQueryHandler(label string, query func(context.Context, *d
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), p.SiteID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", p.SiteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", p.SiteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		result, err := query(r.Context(), analyticsStore, p)
 		if err != nil {
-			slog.Error("Failed to get "+label, "error", err, "site_id", p.SiteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get "+label, "error", err, "site_id", p.SiteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(result); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }

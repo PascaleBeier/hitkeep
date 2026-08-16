@@ -9,7 +9,7 @@ import (
 )
 
 func TestWorkerEndpointAdmissionDoesNotBlock(t *testing.T) {
-	worker := NewWorker(nil, nil, config.Config{WebhookPerEndpointConcurrency: 1}, nil, 0)
+	worker := NewWorker(nil, nil, config.Config{WebhookPerEndpointConcurrency: 1}, testLogger(), 0)
 	webhookID := uuid.New()
 	release, ok := worker.tryAcquire(webhookID)
 	if !ok {

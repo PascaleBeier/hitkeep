@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -9,6 +8,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	"hitkeep/internal/server/shared"
 )
 
 func (h *handler) handleGetActivation() http.HandlerFunc {
@@ -44,7 +44,7 @@ func (h *handler) handleGetActivation() http.HandlerFunc {
 			resp, err = h.ctx.Store.ListSystemActivation(r.Context(), activationQuery)
 		}
 		if err != nil {
-			slog.Error("Failed to load activation view", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load activation view", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -52,7 +52,7 @@ func (h *handler) handleGetActivation() http.HandlerFunc {
 			resp.Rows[i].CloudRegion = h.ctx.Config.CloudRegion
 		}
 
-		writeJSON(w, http.StatusOK, resp)
+		writeJSON(r.Context(), w, http.StatusOK, resp)
 	}
 }
 

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -29,7 +28,7 @@ func (h *handler) handleSetActivationTeamPlan() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		teamID, err := uuid.Parse(r.PathValue("team_id"))
 		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{
+			writeJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
 				"status": "error", "message": "Invalid team_id",
 			})
 			return
@@ -37,7 +36,7 @@ func (h *handler) handleSetActivationTeamPlan() http.HandlerFunc {
 
 		var req request
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{
+			writeJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
 				"status": "error", "message": "Invalid request body",
 			})
 			return
@@ -46,7 +45,7 @@ func (h *handler) handleSetActivationTeamPlan() http.HandlerFunc {
 		switch req.PlanCode {
 		case database.CloudPlanFree, database.CloudPlanPro, database.CloudPlanBusiness:
 		default:
-			writeJSON(w, http.StatusBadRequest, map[string]string{
+			writeJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
 				"status": "error", "message": "Invalid plan_code",
 			})
 			return
@@ -54,9 +53,9 @@ func (h *handler) handleSetActivationTeamPlan() http.HandlerFunc {
 
 		account, err := h.ctx.Store.GetCloudBillingAccount(r.Context(), teamID)
 		if err != nil && !errors.Is(err, database.ErrCloudBillingAccountNotFound) {
-			slog.Error("Failed to load cloud billing account", "team_id", teamID, "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load cloud billing account", "team_id", teamID, "error", err)
 			h.appendAudit(r, "cloud_billing.plan_override", "team", teamID.String(), "", "failure", err.Error())
-			writeJSON(w, http.StatusInternalServerError, map[string]string{
+			writeJSON(r.Context(), w, http.StatusInternalServerError, map[string]string{
 				"status": "error", "message": "Failed to load billing account",
 			})
 			return
@@ -84,9 +83,9 @@ func (h *handler) handleSetActivationTeamPlan() http.HandlerFunc {
 		}
 
 		if err := h.ctx.Store.UpsertCloudBillingAccount(r.Context(), *account); err != nil {
-			slog.Error("Failed to set cloud billing plan", "team_id", teamID, "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to set cloud billing plan", "team_id", teamID, "error", err)
 			h.appendAudit(r, "cloud_billing.plan_override", "team", teamID.String(), teamName, "failure", err.Error())
-			writeJSON(w, http.StatusInternalServerError, map[string]string{
+			writeJSON(r.Context(), w, http.StatusInternalServerError, map[string]string{
 				"status": "error", "message": "Failed to set plan",
 			})
 			return
@@ -96,7 +95,7 @@ func (h *handler) handleSetActivationTeamPlan() http.HandlerFunc {
 			ent := h.ctx.Limits().TeamEntitlements(r.Context(), teamID)
 			if ent != nil {
 				if _, err := h.ctx.TenantStores.SyncTeamRetention(r.Context(), teamID, ent.MaxRetentionDays); err != nil {
-					slog.Error("Failed to sync team retention after plan override", "team_id", teamID, "error", err)
+					shared.LoggerFromContext(r.Context()).Error("Failed to sync team retention after plan override", "team_id", teamID, "error", err)
 				}
 			}
 		}
@@ -113,7 +112,7 @@ func (h *handler) handleSetActivationTeamPlan() http.HandlerFunc {
 			Details:     fmt.Sprintf("Plan changed from %s to %s", previousPlanCode, req.PlanCode),
 		})
 
-		writeJSON(w, http.StatusOK, map[string]string{
+		writeJSON(r.Context(), w, http.StatusOK, map[string]string{
 			"status":    "ok",
 			"plan_code": account.PlanCode,
 			"plan_name": account.PlanName,

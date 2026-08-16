@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -21,6 +20,7 @@ import (
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
+	"hitkeep/internal/server/shared"
 )
 
 func (h *handler) handleStripeEvent(ctx context.Context, event stripe.Event) error {
@@ -154,7 +154,7 @@ func (h *handler) handleStripeEvent(ctx context.Context, event stripe.Event) err
 				BillingInterval: account.BillingInterval,
 				DedupeKey:       tenantID.String() + ":subscription_activated:" + account.StripeSubscriptionID,
 			}); err != nil {
-				slog.Error("failed to record subscription activation conversion", "tenant_id", tenantID, "stripe_event_id", event.ID, "error", err)
+				shared.LoggerFromContext(ctx).Error("failed to record subscription activation conversion", "tenant_id", tenantID, "stripe_event_id", event.ID, "error", err)
 			}
 		}
 		h.syncTeamRetentionAfterBillingChange(ctx, tenantID)
@@ -179,7 +179,7 @@ func (h *handler) syncTeamRetentionAfterBillingChange(ctx context.Context, tenan
 		return
 	}
 	if _, err := h.ctx.TenantStores.SyncTeamRetention(ctx, tenantID, ent.MaxRetentionDays); err != nil {
-		slog.Error("failed to sync team retention after billing event", "tenant_id", tenantID, "error", err)
+		shared.LoggerFromContext(ctx).Error("failed to sync team retention after billing event", "tenant_id", tenantID, "error", err)
 	}
 }
 

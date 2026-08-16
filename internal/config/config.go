@@ -38,7 +38,7 @@ type Config struct {
 
 	DataPath       string `env:"HITKEEP_DATA_PATH"          default:"data"           desc:"Local writable base directory for per-tenant database files"`
 	ArchivePath    string `env:"HITKEEP_ARCHIVE_PATH"       default:"archive"        desc:"Data archive path"`
-	PublicURL      string `env:"HITKEEP_PUBLIC_URL"         default:"http://localhost:8080" desc:"Public URL"`
+	PublicURL      string `env:"HITKEEP_PUBLIC_URL"         default:"http://localhost:8080" desc:"Public URL" sensitive:"url"`
 	LogLevel       string `env:"HITKEEP_LOG_LEVEL"          default:"info"           desc:"Log level (debug/info/warn/error)"`
 	JWTSecret      string `env:"HITKEEP_JWT_SECRET"         default:""               docdefault:"randomly generated" desc:"Secret key for JWT"                                                     sensitive:"redact"`
 	Healthcheck    bool   `flag:"healthcheck"               default:"false"          desc:"Run as healthcheck client"`
@@ -93,9 +93,9 @@ type Config struct {
 
 	GoogleSearchConsoleClientID     string `env:"HITKEEP_GOOGLE_SEARCH_CONSOLE_CLIENT_ID"     default:"" desc:"Google Search Console OAuth client ID"`
 	GoogleSearchConsoleClientSecret string `env:"HITKEEP_GOOGLE_SEARCH_CONSOLE_CLIENT_SECRET" default:"" desc:"Google Search Console OAuth client secret" sensitive:"redact"`
-	GoogleSearchConsoleRedirectURL  string `env:"HITKEEP_GOOGLE_SEARCH_CONSOLE_REDIRECT_URL"  default:"" desc:"Google Search Console OAuth callback URL override"`
+	GoogleSearchConsoleRedirectURL  string `env:"HITKEEP_GOOGLE_SEARCH_CONSOLE_REDIRECT_URL"  default:"" desc:"Google Search Console OAuth callback URL override" sensitive:"url"`
 
-	BackupPath            string `env:"HITKEEP_BACKUP_PATH"      default:""   desc:"Backup snapshot destination (local directory or s3://); live databases remain on the local data path"`
+	BackupPath            string `env:"HITKEEP_BACKUP_PATH"      default:""   desc:"Backup snapshot destination (local directory or s3://); live databases remain on the local data path" sensitive:"url"`
 	BackupIntervalMinutes int    `env:"HITKEEP_BACKUP_INTERVAL"  default:"60" desc:"Minutes between backups"`
 	BackupRetentionCount  int    `env:"HITKEEP_BACKUP_RETENTION" default:"24" desc:"Number of backup snapshots to keep"`
 
@@ -103,7 +103,7 @@ type Config struct {
 	S3SecretAccessKey string `env:"HITKEEP_S3_SECRET_ACCESS_KEY" default:""         desc:"S3 secret access key (static credentials)"              sensitive:"redact"`
 	S3SessionToken    string `env:"HITKEEP_S3_SESSION_TOKEN"     default:""         desc:"S3 session token (STS temporary credentials)"           sensitive:"redact"`
 	S3Region          string `env:"HITKEEP_S3_REGION"            default:"us-east-1" desc:"S3 region"`
-	S3Endpoint        string `env:"HITKEEP_S3_ENDPOINT"          default:""         desc:"S3 custom endpoint (MinIO, R2, Spaces)"`
+	S3Endpoint        string `env:"HITKEEP_S3_ENDPOINT"          default:""         desc:"S3 custom endpoint (MinIO, R2, Spaces)" sensitive:"url"`
 	S3URLStyle        string `env:"HITKEEP_S3_URL_STYLE"         default:""         desc:"S3 URL style: path or vhost"`
 	S3UseSSL          bool   `env:"HITKEEP_S3_USE_SSL"           default:"true"     desc:"S3 use SSL (set false for local MinIO over HTTP)"`
 
@@ -111,7 +111,7 @@ type Config struct {
 	MCPPath             string `env:"HITKEEP_MCP_PATH"               default:"/mcp"   desc:"MCP server HTTP path on the main HitKeep HTTP server"`
 	MCPMaxRangeDays     int    `env:"HITKEEP_MCP_MAX_RANGE_DAYS"     default:"366"    desc:"Maximum analytics date range in days for MCP tools"`
 	MCPDocsEnabled      bool   `env:"HITKEEP_MCP_DOCS_ENABLED"       default:"true"   desc:"Enable MCP tools and resources that read official HitKeep docs"`
-	MCPDocsURL          string `env:"HITKEEP_MCP_DOCS_URL"           default:"https://hitkeep.com" desc:"Base URL for official HitKeep docs used by MCP docs tools"`
+	MCPDocsURL          string `env:"HITKEEP_MCP_DOCS_URL"           default:"https://hitkeep.com" desc:"Base URL for official HitKeep docs used by MCP docs tools" sensitive:"url"`
 	MCPDocsCacheMinutes int    `env:"HITKEEP_MCP_DOCS_CACHE_MINUTES" default:"60"     desc:"Minutes to cache fetched docs for MCP tools"`
 
 	CustomTrackingDNSTarget string `env:"HITKEEP_CUSTOM_TRACKING_DNS_TARGET" default:""         desc:"DNS host or IP custom tracking domains must point at; defaults to public URL host"`
@@ -122,7 +122,7 @@ type Config struct {
 	AskAIEnabled          bool   `env:"HITKEEP_ASK_AI_ENABLED"         default:"false" desc:"Enable the optional dashboard Ask AI assistant; requires HITKEEP_AI_ENABLED and a configured AI model"`
 	AIProvider            string `env:"HITKEEP_AI_PROVIDER"            default:""      desc:"AI provider key supported by HitKeep's GoAI router"`
 	AIModel               string `env:"HITKEEP_AI_MODEL"               default:""      desc:"AI model identifier for the configured provider"`
-	AIBaseURL             string `env:"HITKEEP_AI_BASE_URL"            default:""      desc:"Optional explicit AI provider or gateway base URL"`
+	AIBaseURL             string `env:"HITKEEP_AI_BASE_URL"            default:""      desc:"Optional explicit AI provider or gateway base URL" sensitive:"url"`
 	AIRegion              string `env:"HITKEEP_AI_REGION"              default:""      desc:"Optional explicit AI provider region override"`
 	AIAPIKey              string `env:"HITKEEP_AI_API_KEY"             default:""      desc:"Optional explicit AI provider API key, bearer token, or gateway key; provider-native goAI env vars are preferred" sensitive:"redact"`
 	AITimeoutSeconds      int    `env:"HITKEEP_AI_TIMEOUT_SECONDS"     default:"30"    desc:"AI provider request timeout in seconds"`
@@ -194,19 +194,23 @@ func (c *Config) AuthRememberMeDuration() time.Duration {
 	return time.Duration(c.AuthRememberMeDays) * 24 * time.Hour
 }
 
-func Load() *Config {
+func Load(loggerArgs ...*slog.Logger) *Config {
 	return load(os.Args[1:], func(key, fallback string) string {
 		if val := os.Getenv(key); val != "" {
 			return val
 		}
 		return fallback
-	})
+	}, loggerArgs...)
 }
 
-func load(args []string, getEnv func(string, string) string) *Config {
+func load(args []string, getEnv func(string, string) string, loggerArgs ...*slog.Logger) *Config {
+	logger := slog.Default()
+	if len(loggerArgs) > 0 && loggerArgs[0] != nil {
+		logger = loggerArgs[0]
+	}
 	var conf Config
 	loadEnvDefaults(&conf)
-	loadEnvOverrides(&conf, getEnv)
+	loadEnvOverrides(&conf, getEnv, logger)
 
 	fs := flag.NewFlagSet("hitkeep", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
@@ -218,7 +222,7 @@ func load(args []string, getEnv func(string, string) string) *Config {
 		return &conf
 	}
 
-	normalizeConfig(&conf)
+	normalizeConfig(&conf, logger)
 	return &conf
 }
 
@@ -262,7 +266,11 @@ func setDefault(fv reflect.Value, def string) {
 	}
 }
 
-func loadEnvOverrides(conf *Config, getEnv func(string, string) string) {
+func loadEnvOverrides(conf *Config, getEnv func(string, string) string, loggerArgs ...*slog.Logger) {
+	logger := slog.Default()
+	if len(loggerArgs) > 0 && loggerArgs[0] != nil {
+		logger = loggerArgs[0]
+	}
 	v := reflect.ValueOf(conf).Elem()
 	t := v.Type()
 	for i := range t.NumField() {
@@ -280,7 +288,7 @@ func loadEnvOverrides(conf *Config, getEnv func(string, string) string) {
 		}
 		fv := v.Field(i)
 		if !setEnvValue(fv, val) {
-			slog.Warn("Invalid value in env var, using default", "key", env, "val", val)
+			logger.Warn("Invalid value in env var, using default", "key", env)
 		}
 	}
 }
@@ -370,7 +378,11 @@ func registerFlagVar(fs *flag.FlagSet, fv reflect.Value, name, desc string) {
 	}
 }
 
-func normalizeConfig(conf *Config) {
+func normalizeConfig(conf *Config, loggerArgs ...*slog.Logger) {
+	logger := slog.Default()
+	if len(loggerArgs) > 0 && loggerArgs[0] != nil {
+		logger = loggerArgs[0]
+	}
 	if conf.JWTSecret == "" {
 		bytes := make([]byte, 32)
 		if _, err := rand.Read(bytes); err == nil {
@@ -386,16 +398,16 @@ func normalizeConfig(conf *Config) {
 	}
 
 	if conf.TrustedProxies != "" {
-		conf.trustedProxyNets = parseTrustedProxies(conf.TrustedProxies)
+		conf.trustedProxyNets = parseTrustedProxies(conf.TrustedProxies, logger)
 		if len(conf.trustedProxyNets) > 0 {
-			slog.Debug("Loaded trusted proxy networks", "count", len(conf.trustedProxyNets))
+			logger.Debug("Loaded trusted proxy networks", "count", len(conf.trustedProxyNets))
 		}
 	}
 
 	resolveDuckDBDefaults(conf)
 	NormalizeDatabaseRecoveryConfig(conf)
 
-	NormalizeMCPConfig(conf)
+	NormalizeMCPConfig(conf, logger)
 	NormalizeAuthSessionConfig(conf)
 	NormalizeCustomTrackingConfig(conf)
 }
@@ -430,7 +442,11 @@ func NormalizeAuthSessionConfig(conf *Config) {
 	}
 }
 
-func NormalizeMCPConfig(conf *Config) {
+func NormalizeMCPConfig(conf *Config, loggerArgs ...*slog.Logger) {
+	logger := slog.Default()
+	if len(loggerArgs) > 0 && loggerArgs[0] != nil {
+		logger = loggerArgs[0]
+	}
 	conf.MCPPath = strings.TrimSpace(conf.MCPPath)
 	if conf.MCPPath == "" || conf.MCPPath == "/" {
 		conf.MCPPath = "/mcp"
@@ -449,7 +465,7 @@ func NormalizeMCPConfig(conf *Config) {
 	docsURL := strings.TrimRight(strings.TrimSpace(conf.MCPDocsURL), "/")
 	parsed, err := url.Parse(docsURL)
 	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-		slog.Warn("Invalid MCP docs URL, using default", "value", conf.MCPDocsURL)
+		logger.Warn("Invalid MCP docs URL, using default")
 		docsURL = "https://hitkeep.com"
 	}
 	conf.MCPDocsURL = docsURL
@@ -496,7 +512,11 @@ func publicURLHost(value string) string {
 	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(parsed.Hostname())), ".")
 }
 
-func parseTrustedProxies(cidrs string) []netip.Prefix {
+func parseTrustedProxies(cidrs string, loggerArgs ...*slog.Logger) []netip.Prefix {
+	logger := slog.Default()
+	if len(loggerArgs) > 0 && loggerArgs[0] != nil {
+		logger = loggerArgs[0]
+	}
 	if cidrs == "" {
 		return nil
 	}
@@ -508,11 +528,11 @@ func parseTrustedProxies(cidrs string) []netip.Prefix {
 			continue
 		}
 		if cidr == "*" {
-			return trustAllProxyNetworks()
+			return trustAllProxyNetworks(logger)
 		}
 		network, err := netip.ParsePrefix(cidr)
 		if err != nil {
-			slog.Warn("Invalid trusted proxy CIDR, skipping", "cidr", cidr, "error", err)
+			logger.Warn("Invalid trusted proxy CIDR, skipping", "cidr", cidr, "error", err)
 			continue
 		}
 		networks = append(networks, network.Masked())
@@ -520,11 +540,15 @@ func parseTrustedProxies(cidrs string) []netip.Prefix {
 	return networks
 }
 
-func trustAllProxyNetworks() []netip.Prefix {
+func trustAllProxyNetworks(loggerArgs ...*slog.Logger) []netip.Prefix {
+	logger := slog.Default()
+	if len(loggerArgs) > 0 && loggerArgs[0] != nil {
+		logger = loggerArgs[0]
+	}
 	allV4, errV4 := netip.ParsePrefix("0.0.0.0/0")
 	allV6, errV6 := netip.ParsePrefix("::/0")
 	if errV4 != nil || errV6 != nil {
-		slog.Warn("Failed to parse trust-all proxy CIDRs", "ipv4_error", errV4, "ipv6_error", errV6)
+		logger.Warn("Failed to parse trust-all proxy CIDRs", "ipv4_error", errV4, "ipv6_error", errV6)
 		return nil
 	}
 	return []netip.Prefix{allV4.Masked(), allV6.Masked()}
@@ -561,6 +585,8 @@ func (c *Config) LogValue() slog.Value {
 				}
 			case "mask":
 				attrs = append(attrs, slog.String(name, maskKey(s)))
+			case "url":
+				attrs = append(attrs, slog.String(name, redactURLForLog(s)))
 			default:
 				attrs = append(attrs, slog.String(name, s))
 			}
@@ -573,4 +599,18 @@ func (c *Config) LogValue() slog.Value {
 		}
 	}
 	return slog.GroupValue(attrs...)
+}
+
+func redactURLForLog(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return ""
+	}
+	u, err := url.Parse(value)
+	if err != nil {
+		return "[redacted]"
+	}
+	u.User = nil
+	u.RawQuery = ""
+	u.Fragment = ""
+	return u.String()
 }

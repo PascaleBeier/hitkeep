@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"regexp"
 	"slices"
@@ -52,11 +51,11 @@ func (h *handler) handleGetTeamSSO() http.HandlerFunc {
 		}
 		config, err := h.ctx.Store.GetTeamSSOConfig(r.Context(), teamID)
 		if err != nil {
-			slog.Error("Failed to load team SSO configuration", "error", err, "team_id", teamID, "user_id", actorID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load team SSO configuration", "error", err, "team_id", teamID, "user_id", actorID)
 			http.Error(w, "Could not load SSO configuration", http.StatusInternalServerError)
 			return
 		}
-		writeTeamSSOConfig(w, h.teamSSOResponse(config))
+		writeTeamSSOConfig(r.Context(), w, h.teamSSOResponse(config))
 	}
 }
 
@@ -70,13 +69,13 @@ func (h *handler) handleUpsertTeamSSO() http.HandlerFunc {
 		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 		decoder.DisallowUnknownFields()
 		if err := decoder.Decode(&req); err != nil {
-			writeTeamActionError(w, http.StatusBadRequest, "invalid_request", "Enter a valid SSO configuration")
+			writeTeamActionError(r.Context(), w, http.StatusBadRequest, "invalid_request", "Enter a valid SSO configuration")
 			return
 		}
 
 		normalized, existing, err := h.normalizeTeamSSORequest(r.Context(), teamID, req)
 		if err != nil {
-			h.writeTeamSSOValidationError(w, err)
+			h.writeTeamSSOValidationError(r.Context(), w, err)
 			return
 		}
 		discoveryCtx, cancel := context.WithTimeout(r.Context(), teamSSODiscoveryTimeout)
@@ -84,8 +83,8 @@ func (h *handler) handleUpsertTeamSSO() http.HandlerFunc {
 		if _, err := h.ssoClient().Discover(discoveryCtx, normalized.IssuerURL); err != nil {
 			// Discovery errors can contain upstream response bodies. Keep provider
 			// details out of logs and return a stable operator-facing error instead.
-			slog.Warn("Team SSO provider discovery failed", "team_id", teamID)
-			writeTeamActionError(w, http.StatusBadGateway, "discovery_failed", "HitKeep could not validate the OIDC issuer. Check the issuer URL and try again.")
+			shared.LoggerFromContext(r.Context()).Warn("Team SSO provider discovery failed", "team_id", teamID)
+			writeTeamActionError(r.Context(), w, http.StatusBadGateway, "discovery_failed", "HitKeep could not validate the OIDC issuer. Check the issuer URL and try again.")
 			return
 		}
 
@@ -96,19 +95,19 @@ func (h *handler) handleUpsertTeamSSO() http.HandlerFunc {
 		if strings.TrimSpace(req.ClientSecret) != "" {
 			box, err := sso.NewSecretBox(h.ctx.Config.JWTSecret)
 			if err != nil {
-				slog.Error("Failed to initialize SSO secret encryption", "error", err, "team_id", teamID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to initialize SSO secret encryption", "error", err, "team_id", teamID)
 				http.Error(w, "Could not save SSO configuration", http.StatusInternalServerError)
 				return
 			}
 			secretCiphertext, err = box.Seal(req.ClientSecret)
 			if err != nil {
-				slog.Error("Failed to encrypt SSO client secret", "error", err, "team_id", teamID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to encrypt SSO client secret", "error", err, "team_id", teamID)
 				http.Error(w, "Could not save SSO configuration", http.StatusInternalServerError)
 				return
 			}
 		}
 		if secretCiphertext == "" {
-			writeTeamActionError(w, http.StatusBadRequest, "client_secret_required", "Enter the OIDC client secret")
+			writeTeamActionError(r.Context(), w, http.StatusBadRequest, "client_secret_required", "Enter the OIDC client secret")
 			return
 		}
 
@@ -126,21 +125,21 @@ func (h *handler) handleUpsertTeamSSO() http.HandlerFunc {
 		}
 		if err := h.ctx.Store.UpsertTeamSSOConfig(r.Context(), config); err != nil {
 			if errors.Is(err, database.ErrTeamSSODomainConflict) {
-				writeTeamActionError(w, http.StatusConflict, "domain_conflict", "One of these email domains is already assigned to another team's SSO provider")
+				writeTeamActionError(r.Context(), w, http.StatusConflict, "domain_conflict", "One of these email domains is already assigned to another team's SSO provider")
 				return
 			}
-			slog.Error("Failed to save team SSO configuration", "error", err, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to save team SSO configuration", "error", err, "team_id", teamID)
 			http.Error(w, "Could not save SSO configuration", http.StatusInternalServerError)
 			return
 		}
 		stored, err := h.ctx.Store.GetTeamSSOConfig(r.Context(), teamID)
 		if err != nil {
-			slog.Error("Failed to reload team SSO configuration", "error", err, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to reload team SSO configuration", "error", err, "team_id", teamID)
 			http.Error(w, "Could not load SSO configuration", http.StatusInternalServerError)
 			return
 		}
 		h.appendTeamSSOAudit(r, teamID, actorID, "sso.configuration_updated", "success", fmt.Sprintf("SSO configuration updated (enabled=%t, domains=%d)", config.Enabled, len(config.AllowedDomains)))
-		writeTeamSSOConfig(w, h.teamSSOResponse(stored))
+		writeTeamSSOConfig(r.Context(), w, h.teamSSOResponse(stored))
 	}
 }
 
@@ -152,7 +151,7 @@ func (h *handler) handleTestTeamSSO() http.HandlerFunc {
 		}
 		config, err := h.ctx.Store.GetTeamSSOConfig(r.Context(), teamID)
 		if err != nil || config == nil {
-			writeTeamActionError(w, http.StatusNotFound, "not_configured", "Configure SSO before testing the connection")
+			writeTeamActionError(r.Context(), w, http.StatusNotFound, "not_configured", "Configure SSO before testing the connection")
 			return
 		}
 		box, err := sso.NewSecretBox(h.ctx.Config.JWTSecret)
@@ -161,7 +160,7 @@ func (h *handler) handleTestTeamSSO() http.HandlerFunc {
 			return
 		}
 		if _, err := box.Open(config.ClientSecretEncrypted); err != nil {
-			slog.Error("Stored SSO client secret could not be decrypted", "error", err, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Stored SSO client secret could not be decrypted", "error", err, "team_id", teamID)
 			http.Error(w, "Could not test SSO configuration", http.StatusInternalServerError)
 			return
 		}
@@ -169,7 +168,7 @@ func (h *handler) handleTestTeamSSO() http.HandlerFunc {
 		defer cancel()
 		if _, err := h.ssoClient().Discover(discoveryCtx, config.IssuerURL); err != nil {
 			h.appendTeamSSOAudit(r, teamID, actorID, "sso.connection_tested", "failure", "SSO discovery test failed")
-			writeTeamActionError(w, http.StatusBadGateway, "discovery_failed", "HitKeep could not reach the configured OIDC issuer")
+			writeTeamActionError(r.Context(), w, http.StatusBadGateway, "discovery_failed", "HitKeep could not reach the configured OIDC issuer")
 			return
 		}
 		h.appendTeamSSOAudit(r, teamID, actorID, "sso.connection_tested", "success", "SSO discovery test succeeded")
@@ -186,10 +185,10 @@ func (h *handler) handleDeleteTeamSSO() http.HandlerFunc {
 		}
 		if err := h.ctx.Store.DeleteTeamSSOConfig(r.Context(), teamID); err != nil {
 			if errors.Is(err, database.ErrTeamSSONotFound) {
-				writeTeamActionError(w, http.StatusNotFound, "not_configured", "SSO is not configured for this team")
+				writeTeamActionError(r.Context(), w, http.StatusNotFound, "not_configured", "SSO is not configured for this team")
 				return
 			}
-			slog.Error("Failed to delete team SSO configuration", "error", err, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to delete team SSO configuration", "error", err, "team_id", teamID)
 			http.Error(w, "Could not delete SSO configuration", http.StatusInternalServerError)
 			return
 		}
@@ -207,7 +206,7 @@ func (h *handler) resolveTeamSSOAccess(w http.ResponseWriter, r *http.Request) (
 	}
 	limits := h.ctx.Limits()
 	if !limits.AllowsSSO(r.Context(), actorID, teamID) {
-		writeTeamActionError(w, http.StatusForbidden, "sso_not_available", "SSO is not available for this team")
+		writeTeamActionError(r.Context(), w, http.StatusForbidden, "sso_not_available", "SSO is not available for this team")
 		return uuid.Nil, uuid.Nil, false
 	}
 	return teamID, actorID, true
@@ -305,12 +304,12 @@ func validSSODomain(domain string) bool {
 	return true
 }
 
-func (h *handler) writeTeamSSOValidationError(w http.ResponseWriter, err error) {
+func (h *handler) writeTeamSSOValidationError(ctx context.Context, w http.ResponseWriter, err error) {
 	message := strings.TrimSpace(err.Error())
 	if message == "" {
 		message = "Enter a valid SSO configuration"
 	}
-	writeTeamActionError(w, http.StatusBadRequest, "invalid_configuration", message)
+	writeTeamActionError(ctx, w, http.StatusBadRequest, "invalid_configuration", message)
 }
 
 func (h *handler) teamSSOResponse(config *database.TeamSSOConfig) api.TeamSSOConfig {
@@ -337,10 +336,10 @@ func (h *handler) teamSSOResponse(config *database.TeamSSOConfig) api.TeamSSOCon
 	return resp
 }
 
-func writeTeamSSOConfig(w http.ResponseWriter, config api.TeamSSOConfig) {
+func writeTeamSSOConfig(ctx context.Context, w http.ResponseWriter, config api.TeamSSOConfig) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(config); err != nil {
-		slog.Error("Failed to encode team SSO response", "error", err)
+		shared.LoggerFromContext(ctx).Error("Failed to encode team SSO response", "error", err)
 	}
 }
 
@@ -355,10 +354,10 @@ func (h *handler) appendTeamSSOAudit(r *http.Request, teamID, actorID uuid.UUID,
 		"team_id": teamID.String(),
 	})
 	if err != nil {
-		slog.Error("Failed to encode SSO configuration audit metadata", "error", err, "team_id", teamID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to encode SSO configuration audit metadata", "error", err, "team_id", teamID)
 		metadata = []byte("{}")
 	}
-	slog.Info("SSO configuration outcome", "action", action, "outcome", outcome, "flow", "configuration", "team_id", teamID, "request_id", r.Header.Get("X-Request-Id"))
+	shared.LoggerFromContext(r.Context()).Info("SSO configuration outcome", "action", action, "outcome", outcome, "flow", "configuration", "team_id", teamID)
 	h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
 		ActorID:      actorID,
 		TeamID:       teamID,

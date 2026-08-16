@@ -14,7 +14,7 @@ import (
 func TestMCPPublishedSurfaceAudit(t *testing.T) {
 	store, _, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -133,7 +133,7 @@ func TestMCPDocsDisabledSurfaceAudit(t *testing.T) {
 	store, _, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
 	conf.MCPDocsEnabled = false
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 

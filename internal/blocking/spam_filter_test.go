@@ -1,15 +1,19 @@
 package blocking
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestNormalizeReferrerHost(t *testing.T) {
@@ -97,7 +101,7 @@ func TestIsSameSiteHost(t *testing.T) {
 }
 
 func TestSpamFilterEvaluate(t *testing.T) {
-	filter := NewSpamFilter("")
+	filter := NewSpamFilter("", testBlockingLogger())
 	filter.apply(SpamFeedData{
 		ReferrerHostDenylist: []string{
 			"buttons-for-website.example",
@@ -186,6 +190,16 @@ func TestSpamFilterEvaluate(t *testing.T) {
 	}
 }
 
+func TestNewSpamFilterRequiresLogger(t *testing.T) {
+	t.Helper()
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected missing logger panic")
+		}
+	}()
+	_ = NewSpamFilter("", nil)
+}
+
 func TestSaveAndLoadSpamFeedData(t *testing.T) {
 	tempDir := t.TempDir()
 	path := filepath.Join(tempDir, "spam-filter.json")
@@ -220,8 +234,8 @@ func TestSaveAndLoadSpamFeedData(t *testing.T) {
 	if len(loaded.NetworkDenylist) != 1 || loaded.NetworkDenylist[0] != "203.0.113.0/24" {
 		t.Fatalf("unexpected network list: %+v", loaded.NetworkDenylist)
 	}
-	if !reflect.DeepEqual(loaded.SourceMetadata, input.SourceMetadata) {
-		t.Fatalf("unexpected source metadata: %+v", loaded.SourceMetadata)
+	if diff := cmp.Diff(input.SourceMetadata, loaded.SourceMetadata); diff != "" {
+		t.Fatalf("unexpected source metadata (-want +got):\n%s", diff)
 	}
 }
 
@@ -316,9 +330,13 @@ func TestEmbeddedSpamFeedDataIsComplete(t *testing.T) {
 
 type fakeHTTPClient struct {
 	responses map[string]string
+	failures  map[string]error
 }
 
 func (f fakeHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	if err, ok := f.failures[req.URL.String()]; ok {
+		return nil, err
+	}
 	body, ok := f.responses[req.URL.String()]
 	if !ok {
 		return &http.Response{
@@ -379,7 +397,7 @@ func TestFetchSpamFeedData(t *testing.T) {
 		},
 	}
 
-	data, err := FetchSpamFeedData(context.Background(), client)
+	data, err := FetchSpamFeedData(context.Background(), client, testBlockingLogger())
 	if err != nil {
 		t.Fatalf("fetch spam feed data: %v", err)
 	}
@@ -397,6 +415,10 @@ func TestFetchSpamFeedData(t *testing.T) {
 	}
 }
 
+func testBlockingLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
+
 func TestFetchSpamFeedDataPartialFailure(t *testing.T) {
 	client := fakeHTTPClient{
 		responses: map[string]string{
@@ -405,7 +427,7 @@ func TestFetchSpamFeedDataPartialFailure(t *testing.T) {
 		},
 	}
 
-	data, err := FetchSpamFeedData(context.Background(), client)
+	data, err := FetchSpamFeedData(context.Background(), client, testBlockingLogger())
 	if err != nil {
 		t.Fatalf("partial failure should not return error, got: %v", err)
 	}
@@ -420,17 +442,48 @@ func TestFetchSpamFeedDataPartialFailure(t *testing.T) {
 	}
 }
 
+func TestFetchSpamFeedDataDoesNotLogRawFailureDetails(t *testing.T) {
+	const rawFailure = "provider response password=do-not-log"
+	client := fakeHTTPClient{
+		responses: map[string]string{
+			matomoReferrerSpamURL: "spam.example\n",
+		},
+		failures: map[string]error{
+			spamhausDropURL: fmt.Errorf("upstream returned %s", rawFailure),
+		},
+	}
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+	if _, err := FetchSpamFeedData(context.Background(), client, logger); err != nil {
+		t.Fatalf("partial failure should not return error: %v", err)
+	}
+	if strings.Contains(logs.String(), rawFailure) {
+		t.Fatalf("raw upstream failure appeared in logs: %s", logs.String())
+	}
+	if !strings.Contains(logs.String(), "source=spamhaus_drop_v4") || !strings.Contains(logs.String(), "error_kind=invalid_response") {
+		t.Fatalf("expected safe source and error kind in logs: %s", logs.String())
+	}
+}
+
 func TestFetchSpamFeedDataAllFeedsFail(t *testing.T) {
+	const rawFailure = "provider response password=do-not-return"
 	client := fakeHTTPClient{
 		responses: map[string]string{},
+		failures: map[string]error{
+			matomoReferrerSpamURL: fmt.Errorf("upstream returned %s", rawFailure),
+		},
 	}
 
-	_, err := FetchSpamFeedData(context.Background(), client)
+	_, err := FetchSpamFeedData(context.Background(), client, testBlockingLogger())
 	if err == nil {
 		t.Fatal("expected error when all feeds fail")
 	}
 	if !strings.Contains(err.Error(), "all spam feeds failed") {
 		t.Fatalf("unexpected error message: %v", err)
+	}
+	if strings.Contains(err.Error(), rawFailure) {
+		t.Fatalf("raw upstream failure appeared in returned error: %v", err)
 	}
 }
 

@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"hitkeep/internal/database"
+	"hitkeep/internal/hklog"
 )
 
 // BackupWorker periodically exports all DuckDB databases to Parquet snapshots.
@@ -55,17 +55,19 @@ func (w *BackupWorker) Start(ctx context.Context) {
 	}
 
 	if IsS3ArchivePath(w.backupPath) {
-		slog.Info("S3 backup enabled", "path", w.backupPath, "interval_min", w.intervalMin, "retention", w.retentionCount)
+		hklog.LoggerFromContext(ctx).Info("S3 backup enabled", "path", w.backupPath, "interval_min", w.intervalMin, "retention", w.retentionCount)
 	} else {
-		slog.Info("Local backup enabled", "path", w.backupPath, "interval_min", w.intervalMin, "retention", w.retentionCount)
+		hklog.LoggerFromContext(ctx).Info("Local backup enabled", "path", w.backupPath, "interval_min", w.intervalMin, "retention", w.retentionCount)
 	}
 	w.setNextBackup(time.Now().UTC().Add(30 * time.Second))
 
 	// Initial run after a short delay to let DB settle.
 	go func() {
-		time.Sleep(30 * time.Second)
+		if !waitForDelay(ctx, 30*time.Second) {
+			return
+		}
 		if err := w.Run(ctx); err != nil {
-			slog.Error("Initial backup run failed", "error", err)
+			hklog.LoggerFromContext(ctx).Error("Initial backup run failed", "error", err)
 		}
 	}()
 
@@ -79,7 +81,7 @@ func (w *BackupWorker) Start(ctx context.Context) {
 			return
 		case <-ticker.C:
 			if err := w.Run(ctx); err != nil {
-				slog.Error("Backup worker failed", "error", err)
+				hklog.LoggerFromContext(ctx).Error("Backup worker failed", "error", err)
 			}
 		}
 	}
@@ -98,17 +100,17 @@ func (w *BackupWorker) Run(ctx context.Context) (err error) {
 	}()
 
 	timestamp := time.Now().UTC().Format("2006-01-02T150405Z")
-	slog.Info("Starting database backup", "timestamp", timestamp)
+	hklog.LoggerFromContext(ctx).Debug("Starting database backup", "timestamp", timestamp)
 
 	isS3 := IsS3ArchivePath(w.backupPath)
 
 	// Backup shared DB.
 	sharedDest := joinArchivePath(w.backupPath, "shared", timestamp)
 	if err := w.exportDatabase(ctx, w.tenantMgr.Shared(), sharedDest, isS3); err != nil {
-		w.removeIncompleteLocalSnapshot(sharedDest, isS3)
+		w.removeIncompleteLocalSnapshot(sharedDest, isS3, ctx)
 		return fmt.Errorf("backup shared database: %w", err)
 	}
-	slog.Info("Shared database backed up", "dest", sharedDest)
+	hklog.LoggerFromContext(ctx).Debug("Shared database backed up", "dest", sharedDest)
 
 	// Discover every active tenant, including the default tenant. The shared
 	// snapshot above remains control-plane-only; tenant snapshots live under
@@ -116,10 +118,10 @@ func (w *BackupWorker) Run(ctx context.Context) (err error) {
 	tenantIDs, err := w.tenantMgr.Control().ListActiveTenantIDs(ctx)
 	if err != nil {
 		if isMissingRelationError(err, "tenants") || isBinderError(err) {
-			slog.Debug("Tenants schema not ready, skipping tenant backups", "error", err)
+			hklog.LoggerFromContext(ctx).Debug("Tenants schema not ready, skipping tenant backups", "error", err)
 			tenantIDs = nil
 		} else {
-			slog.Error("Failed to list tenant IDs for backup", "error", err)
+			hklog.LoggerFromContext(ctx).Error("Failed to list tenant IDs for backup", "error", err)
 			tenantIDs = nil
 		}
 	}
@@ -129,7 +131,7 @@ func (w *BackupWorker) Run(ctx context.Context) (err error) {
 	for _, tenantID := range tenantIDs {
 		tenantStore, err := w.tenantMgr.ForTenant(ctx, tenantID)
 		if err != nil {
-			slog.Error("Failed to open tenant store for backup", "tenant_id", tenantID, "error", err)
+			hklog.LoggerFromContext(ctx).Error("Failed to open tenant store for backup", "tenant_id", tenantID, "error", err)
 			tenantErrors = append(tenantErrors, fmt.Errorf("open tenant %s database for backup: %w", tenantID, err))
 			continue
 		}
@@ -142,37 +144,41 @@ func (w *BackupWorker) Run(ctx context.Context) (err error) {
 
 		tenantDest := joinArchivePath(w.backupPath, "tenants", tenantID.String(), timestamp)
 		if err := w.exportDatabase(ctx, tenantStore, tenantDest, isS3); err != nil {
-			slog.Error("Failed to backup tenant database", "tenant_id", tenantID, "error", err)
-			w.removeIncompleteLocalSnapshot(tenantDest, isS3)
+			hklog.LoggerFromContext(ctx).Error("Failed to backup tenant database", "tenant_id", tenantID, "error", err)
+			w.removeIncompleteLocalSnapshot(tenantDest, isS3, ctx)
 			tenantErrors = append(tenantErrors, fmt.Errorf("backup tenant %s database: %w", tenantID, err))
 			continue
 		}
-		slog.Info("Tenant database backed up", "tenant_id", tenantID, "dest", tenantDest)
+		hklog.LoggerFromContext(ctx).Debug("Tenant database backed up", "tenant_id", tenantID, "dest", tenantDest)
 	}
 
 	// Prune old snapshots.
 	if !isS3 {
-		w.pruneLocalSnapshots(filepath.Join(w.backupPath, "shared"))
+		w.pruneLocalSnapshots(filepath.Join(w.backupPath, "shared"), ctx)
 		for _, tenantID := range tenantIDs {
-			w.pruneLocalSnapshots(filepath.Join(w.backupPath, "tenants", tenantID.String()))
+			w.pruneLocalSnapshots(filepath.Join(w.backupPath, "tenants", tenantID.String()), ctx)
 		}
 	} else {
-		slog.Debug("S3 backup pruning: configure S3 lifecycle policies to manage snapshot retention")
+		hklog.LoggerFromContext(ctx).Debug("S3 backup pruning: configure S3 lifecycle policies to manage snapshot retention")
 	}
 	if len(tenantErrors) > 0 {
 		return fmt.Errorf("backup incomplete: %w", errors.Join(tenantErrors...))
 	}
 
-	slog.Info("Database backup completed", "timestamp", timestamp)
+	hklog.LoggerFromContext(ctx).Info("Database backup completed", "timestamp", timestamp)
 	return nil
 }
 
-func (w *BackupWorker) removeIncompleteLocalSnapshot(path string, isS3 bool) {
+func (w *BackupWorker) removeIncompleteLocalSnapshot(path string, isS3 bool, ctxArgs ...context.Context) {
 	if isS3 || strings.TrimSpace(path) == "" {
 		return
 	}
 	if err := os.RemoveAll(path); err != nil {
-		slog.Warn("Could not remove incomplete backup snapshot", "path", path, "error", err)
+		ctx := context.Background()
+		if len(ctxArgs) > 0 && ctxArgs[0] != nil {
+			ctx = ctxArgs[0]
+		}
+		hklog.LoggerFromContext(ctx).Warn("Could not remove incomplete backup snapshot", "path", path, "error", err)
 	}
 }
 
@@ -240,11 +246,15 @@ func (w *BackupWorker) exportDatabase(ctx context.Context, store *database.Store
 // pruneLocalSnapshots removes the oldest snapshot directories in dir,
 // keeping at most retentionCount. Snapshot dirs are ISO timestamp names
 // that sort lexicographically.
-func (w *BackupWorker) pruneLocalSnapshots(dir string) {
+func (w *BackupWorker) pruneLocalSnapshots(dir string, ctxArgs ...context.Context) {
+	ctx := context.Background()
+	if len(ctxArgs) > 0 && ctxArgs[0] != nil {
+		ctx = ctxArgs[0]
+	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			slog.Warn("Could not read backup directory for pruning", "dir", dir, "error", err)
+			hklog.LoggerFromContext(ctx).Warn("Could not read backup directory for pruning", "dir", dir, "error", err)
 		}
 		return
 	}
@@ -267,9 +277,9 @@ func (w *BackupWorker) pruneLocalSnapshots(dir string) {
 	for _, name := range toRemove {
 		path := filepath.Join(dir, name)
 		if err := os.RemoveAll(path); err != nil {
-			slog.Error("Failed to prune old backup snapshot", "path", path, "error", err)
+			hklog.LoggerFromContext(ctx).Error("Failed to prune old backup snapshot", "path", path, "error", err)
 		} else {
-			slog.Info("Pruned old backup snapshot", "path", path)
+			hklog.LoggerFromContext(ctx).Debug("Pruned old backup snapshot", "path", path)
 		}
 	}
 }

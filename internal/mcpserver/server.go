@@ -44,7 +44,7 @@ func Register(mux *http.ServeMux, ctx *shared.Context, logger *slog.Logger) {
 
 func NewHandler(conf *config.Config, store *database.Store, tenantStores *database.TenantStoreManager, apiLimiter *shared.IPRateLimiter, logger *slog.Logger) http.Handler {
 	if logger == nil {
-		logger = slog.Default()
+		panic("mcpserver: logger is required")
 	}
 	svc := &service{
 		conf:         conf,
@@ -393,22 +393,30 @@ func (s *service) logMiddleware() mcp.Middleware {
 				}
 			}
 			if err != nil {
-				attrs = append(attrs, "outcome", "protocol_error", "error", err)
-				s.logger.Warn("MCP request failed", attrs...)
+				attrs = append(attrs, "outcome", "protocol_error", "error_kind", mcpProtocolErrorKind(err))
+				s.logger.Warn("MCP request failed", slog.Group("mcp", attrs...))
 				return result, err
 			}
 			if toolResult, ok := result.(*mcp.CallToolResult); ok && toolResult.IsError {
-				attrs = append(attrs, "outcome", "tool_error")
-				if toolErr := toolResult.GetError(); toolErr != nil {
-					attrs = append(attrs, "error", toolErr)
-				}
-				s.logger.Warn("MCP request completed with tool error", attrs...)
+				attrs = append(attrs, "outcome", "tool_error", "error_kind", "tool_error")
+				s.logger.Warn("MCP request completed with tool error", slog.Group("mcp", attrs...))
 				return result, nil
 			}
 			attrs = append(attrs, "outcome", "success")
-			s.logger.Info("MCP request completed", attrs...)
+			s.logger.Debug("MCP request completed", slog.Group("mcp", attrs...))
 			return result, nil
 		}
+	}
+}
+
+func mcpProtocolErrorKind(err error) string {
+	switch {
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "timeout"
+	default:
+		return "protocol_error"
 	}
 }
 

@@ -3,13 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	"hitkeep/internal/hklog"
 	"hitkeep/internal/opportunities"
 )
 
@@ -38,6 +38,6 @@ func seedOpportunities(ctx context.Context, sharedStore, analyticsStore *databas
 	if err != nil {
 		return 0, fmt.Errorf("generate demo opportunities: %w", err)
 	}
-	slog.Info("Opportunities seeded", "count", len(items), "ai_status", status)
+	hklog.LoggerFromContext(ctx).Info("Opportunities seeded", "count", len(items), "ai_status", status)
 	return len(items), nil
 }

@@ -1,9 +1,9 @@
 package server
 
 import (
+	"context"
 	"crypto/subtle"
 	"io/fs"
-	"log/slog"
 	"net"
 	"net/http"
 	"regexp"
@@ -12,6 +12,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	"hitkeep/internal/server/shared"
 )
 
 var serverCustomTrackingHostnameRegex = regexp.MustCompile(`^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$`)
@@ -21,7 +22,8 @@ func (s *Server) customTrackingHostMiddleware(publicFS fs.FS, rootHandler, norma
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		domain, known, err := s.customTrackingDomainForRequest(r)
 		if err != nil {
-			s.writeDatabaseQueryFailure(w)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve custom tracking request host", "error", err)
+			s.writeDatabaseQueryFailure(r.Context(), w)
 			return
 		}
 		if !known {
@@ -54,7 +56,6 @@ func (s *Server) customTrackingDomainForRequest(r *http.Request) (*api.CustomTra
 	}
 	domain, err := s.store.FindCustomTrackingDomainByHostname(r.Context(), hostname)
 	if err != nil {
-		slog.Error("Failed to resolve custom tracking request host", "error", err)
 		return nil, true, err
 	}
 	return domain, domain != nil, nil
@@ -152,8 +153,8 @@ func (s *Server) handleCaddyOnDemandTLSAsk() http.HandlerFunc {
 
 		domain, err := s.store.FindCustomTrackingDomainByHostname(r.Context(), hostname)
 		if err != nil {
-			slog.Error("Failed to resolve Caddy on-demand TLS domain", "error", err)
-			s.writeDatabaseQueryFailure(w)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve Caddy on-demand TLS domain", "error", err)
+			s.writeDatabaseQueryFailure(r.Context(), w)
 			return
 		}
 		if domain == nil || !customTrackingDomainCanRoute(*domain) {
@@ -162,16 +163,16 @@ func (s *Server) handleCaddyOnDemandTLSAsk() http.HandlerFunc {
 		}
 
 		if err := s.store.RecordCustomTrackingDomainTLSAsk(r.Context(), hostname, time.Now().UTC()); err != nil {
-			slog.Warn("Failed to record Caddy on-demand TLS ask", "error", err, "hostname", hostname)
+			shared.LoggerFromContext(r.Context()).Warn("Failed to record Caddy on-demand TLS ask", "error", err, "hostname", hostname)
 		}
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
 
-func (s *Server) writeDatabaseQueryFailure(w http.ResponseWriter) {
+func (s *Server) writeDatabaseQueryFailure(ctx context.Context, w http.ResponseWriter) {
 	if s != nil && s.store != nil {
 		if status := s.store.DatabaseStatus(); status.State != database.DatabaseStateHealthy {
-			writeDatabaseUnavailable(w, status.State)
+			writeDatabaseUnavailable(ctx, w, status.State)
 			return
 		}
 	}

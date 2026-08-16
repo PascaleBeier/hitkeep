@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -47,7 +46,7 @@ func (h *handler) handleGetSystem() http.HandlerFunc {
 			ConfigFlags:     map[string]any{},
 		}
 
-		writeJSON(w, http.StatusOK, info)
+		writeJSON(r.Context(), w, http.StatusOK, info)
 	}
 }
 
@@ -64,7 +63,7 @@ func (h *handler) socialFeatureStatuses(ctx context.Context) []api.SystemFeature
 		if h.ctx.Store != nil {
 			soleUsers, err := h.ctx.Store.CountSoleSocialProviderUsers(ctx, status.Provider)
 			if err != nil {
-				slog.Warn("Failed to count sole social login methods", "error", err, "provider", status.Provider)
+				shared.LoggerFromContext(ctx).Warn("Failed to count sole social login methods", "error", err, "provider", status.Provider)
 			} else {
 				detail += fmt.Sprintf(";sole_method_users=%d", soleUsers)
 			}
@@ -223,7 +222,7 @@ func (h *handler) handleGetHealth() http.HandlerFunc {
 			}
 		}
 
-		writeJSON(w, http.StatusOK, health)
+		writeJSON(r.Context(), w, http.StatusOK, health)
 	}
 }
 
@@ -236,20 +235,20 @@ func (h *handler) handleGetSearchConsole() http.HandlerFunc {
 
 		storeStatus, err := h.ctx.Store.GetGoogleSearchConsoleSystemStatus(r.Context())
 		if err != nil {
-			slog.Error("Failed to read Google Search Console system status", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to read Google Search Console system status", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		status := googleSearchConsoleSystemStatus(h.ctx.Config, h.ctx.TenantStores != nil, storeStatus)
-		writeJSON(w, http.StatusOK, status)
+		writeJSON(r.Context(), w, http.StatusOK, status)
 	}
 }
 
 func (h *handler) handleGetAI() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		status := aiSystemStatus(h.ctx.Config, h.ctx.Store)
-		writeJSON(w, http.StatusOK, status)
+		writeJSON(r.Context(), w, http.StatusOK, status)
 	}
 }
 
@@ -431,7 +430,7 @@ func (h *handler) handleGetStorage() http.HandlerFunc {
 		if memoryStats, err := h.ctx.Store.GetDuckDBMemoryStats(ctx); err == nil {
 			storage.DuckDBMemory = memoryStats
 		} else {
-			slog.Debug("Failed to read DuckDB memory stats", "error", err)
+			shared.LoggerFromContext(ctx).Debug("Failed to read DuckDB memory stats", "error", err)
 		}
 
 		spamCachePath := cfg.SpamFilterPath
@@ -451,10 +450,10 @@ func (h *handler) handleGetStorage() http.HandlerFunc {
 			storage.DiskAvailable = available
 			storage.DiskTotal = total
 		} else {
-			slog.Debug("Failed to read filesystem usage", "path", diskPath, "error", err)
+			shared.LoggerFromContext(ctx).Debug("Failed to read filesystem usage", "path", diskPath, "error", err)
 		}
 
-		writeJSON(w, http.StatusOK, storage)
+		writeJSON(r.Context(), w, http.StatusOK, storage)
 	}
 }
 
@@ -471,10 +470,10 @@ func (h *handler) handleGetIngestStats() http.HandlerFunc {
 				stats.RecentHits = counts.Hits
 				stats.RecentEvents = counts.Events
 			} else {
-				slog.Warn("Failed to read tenant ingest counts", "error", err)
+				shared.LoggerFromContext(ctx).Warn("Failed to read tenant ingest counts", "error", err)
 			}
 		} else {
-			slog.Warn("Tenant analytics data plane is unavailable; ingest counts omitted")
+			shared.LoggerFromContext(ctx).Warn("Tenant analytics data plane is unavailable; ingest counts omitted")
 		}
 
 		if h.ctx.SystemCounters != nil {
@@ -487,7 +486,7 @@ func (h *handler) handleGetIngestStats() http.HandlerFunc {
 			stats.HitsPerSecond = float64(stats.RecentHits) / secs
 		}
 
-		writeJSON(w, http.StatusOK, stats)
+		writeJSON(r.Context(), w, http.StatusOK, stats)
 	}
 }
 
@@ -498,7 +497,7 @@ func (h *handler) handleGetBackups() http.HandlerFunc {
 			status = h.ctx.BackupStatus.Status()
 		}
 
-		writeJSON(w, http.StatusOK, status)
+		writeJSON(r.Context(), w, http.StatusOK, status)
 	}
 }
 
@@ -508,7 +507,7 @@ func (h *handler) handleGetDatabase() http.HandlerFunc {
 			http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
 			return
 		}
-		writeJSON(w, http.StatusOK, systemDatabaseStatus(h.ctx.Store.DatabaseStatus()))
+		writeJSON(r.Context(), w, http.StatusOK, systemDatabaseStatus(h.ctx.Store.DatabaseStatus()))
 	}
 }
 
@@ -518,12 +517,12 @@ func (h *handler) handleRunDatabaseCheckpoint() http.HandlerFunc {
 			http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
 			return
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
 		defer cancel()
 		if err := h.ctx.Store.Checkpoint(ctx, "manual"); err != nil {
-			slog.Error("Manual database checkpoint failed", "error", err)
+			shared.LoggerFromContext(ctx).Error("Manual database checkpoint failed", "error", err)
 			h.appendAudit(r, "database.checkpoint_requested", "database", "", "shared", "failure", "checkpoint_failed")
-			writeJSON(w, http.StatusInternalServerError, api.SystemActionResponse{
+			writeJSON(r.Context(), w, http.StatusInternalServerError, api.SystemActionResponse{
 				Status:  "error",
 				Message: "Database checkpoint failed",
 			})
@@ -531,7 +530,7 @@ func (h *handler) handleRunDatabaseCheckpoint() http.HandlerFunc {
 		}
 
 		h.appendAudit(r, "database.checkpoint_requested", "database", "", "shared", "success", "checkpoint_completed")
-		writeJSON(w, http.StatusOK, api.SystemActionResponse{
+		writeJSON(r.Context(), w, http.StatusOK, api.SystemActionResponse{
 			Status:  "ok",
 			Message: "Database checkpoint completed",
 		})
@@ -568,7 +567,7 @@ func (h *handler) handleGetSpamFilter() http.HandlerFunc {
 			status.LastRefresh = h.ctx.SpamFilter.LastRefresh()
 		}
 
-		writeJSON(w, http.StatusOK, status)
+		writeJSON(r.Context(), w, http.StatusOK, status)
 	}
 }
 
@@ -586,7 +585,7 @@ func (h *handler) handleGetImportStageCleanup() http.HandlerFunc {
 			var err error
 			estimate, err = cleaner.Estimate(r.Context())
 			if err != nil {
-				slog.Error("Failed to estimate import stage cleanup", "error", err)
+				shared.LoggerFromContext(r.Context()).Error("Failed to estimate import stage cleanup", "error", err)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
@@ -603,7 +602,7 @@ func (h *handler) handleGetImportStageCleanup() http.HandlerFunc {
 			status = h.ctx.ImportStageCleanupStatus.Status(estimate)
 		}
 
-		writeJSON(w, http.StatusOK, status)
+		writeJSON(r.Context(), w, http.StatusOK, status)
 	}
 }
 
@@ -643,7 +642,7 @@ func (h *handler) handleGetCaches() http.HandlerFunc {
 			status.RateLimiterCache.Size = h.ctx.ApiLimiter.Len()
 		}
 
-		writeJSON(w, http.StatusOK, status)
+		writeJSON(r.Context(), w, http.StatusOK, status)
 	}
 }
 
@@ -673,7 +672,7 @@ func (h *handler) handleGetMail() http.HandlerFunc {
 			status.LastTestAt, status.LastTestOK = h.ctx.MailTestTracker.Status()
 		}
 
-		writeJSON(w, http.StatusOK, status)
+		writeJSON(r.Context(), w, http.StatusOK, status)
 	}
 }
 
@@ -738,7 +737,7 @@ func (h *handler) handleListAudit() http.HandlerFunc {
 
 		entries, total, err := h.ctx.Store.ListInstanceAuditEntries(ctx, filter)
 		if err != nil {
-			slog.Error("Failed to list instance audit entries", "error", err)
+			shared.LoggerFromContext(ctx).Error("Failed to list instance audit entries", "error", err)
 			http.Error(w, "Internal error", http.StatusInternalServerError)
 			return
 		}
@@ -757,7 +756,7 @@ func (h *handler) handleListAudit() http.HandlerFunc {
 			HasMore: offset+len(entries) < total,
 		}
 
-		writeJSON(w, http.StatusOK, resp)
+		writeJSON(r.Context(), w, http.StatusOK, resp)
 	}
 }
 
@@ -774,7 +773,7 @@ func (h *handler) handleExportAudit() http.HandlerFunc {
 
 		entries, err := h.ctx.Store.ExportInstanceAuditEntries(ctx, filter)
 		if err != nil {
-			slog.Error("Failed to export instance audit entries", "error", err)
+			shared.LoggerFromContext(ctx).Error("Failed to export instance audit entries", "error", err)
 			http.Error(w, "Internal error", http.StatusInternalServerError)
 			return
 		}
@@ -786,7 +785,7 @@ func (h *handler) handleExportAudit() http.HandlerFunc {
 
 			writer := csv.NewWriter(w)
 			if err := writer.Write([]string{"id", "created_at", "actor_id", "team_id", "target_user_id", "actor_email", "actor_role", "action", "target_type", "target_id", "target_label", "outcome", "ip_address", "ip_country_code", "request_id", "user_agent", "details"}); err != nil {
-				slog.Error("Failed to write instance audit CSV header", "error", err)
+				shared.LoggerFromContext(ctx).Error("Failed to write instance audit CSV header", "error", err)
 				return
 			}
 
@@ -822,13 +821,13 @@ func (h *handler) handleExportAudit() http.HandlerFunc {
 					entry.UserAgent,
 					entry.Details,
 				}); err != nil {
-					slog.Error("Failed to write instance audit CSV row", "error", err, "audit_id", entry.ID)
+					shared.LoggerFromContext(ctx).Error("Failed to write instance audit CSV row", "error", err, "audit_id", entry.ID)
 					return
 				}
 			}
 			writer.Flush()
 			if err := writer.Error(); err != nil {
-				slog.Error("Failed to flush instance audit CSV", "error", err)
+				shared.LoggerFromContext(ctx).Error("Failed to flush instance audit CSV", "error", err)
 			}
 			return
 		}
@@ -836,15 +835,15 @@ func (h *handler) handleExportAudit() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Content-Disposition", "attachment; filename=instance-audit-export.json")
 		if err := json.NewEncoder(w).Encode(entries); err != nil {
-			slog.Error("Failed to encode instance audit export", "error", err)
+			shared.LoggerFromContext(ctx).Error("Failed to encode instance audit export", "error", err)
 		}
 	}
 }
 
-func writeJSON(w http.ResponseWriter, status int, data any) {
+func writeJSON(ctx context.Context, w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(data); err != nil {
-		slog.Error("Failed to encode response", "error", err)
+		shared.LoggerFromContext(ctx).Error("Failed to encode response", "error", err)
 	}
 }

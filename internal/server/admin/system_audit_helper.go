@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"log/slog"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -12,7 +11,7 @@ import (
 func (h *handler) appendAudit(r *http.Request, action, targetType, targetID, targetLabel, outcome, details string) {
 	actorID := shared.GetUserIDFromContext(r)
 	if actorID == uuid.Nil {
-		slog.Warn("Instance audit without actor ID", "action", action)
+		shared.LoggerFromContext(r.Context()).Warn("Instance audit without actor ID", "action", action)
 		return
 	}
 

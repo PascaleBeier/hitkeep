@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -17,6 +16,7 @@ import (
 
 	"hitkeep/internal/database"
 	appsecurity "hitkeep/internal/security"
+	"hitkeep/internal/server/shared"
 )
 
 const (
@@ -43,14 +43,14 @@ func (h *handler) handlePasskeyLoginStart() http.HandlerFunc {
 
 		webAuthn, err := appsecurity.NewWebAuthn(h.ctx.Config.PublicURL, r)
 		if err != nil {
-			slog.Error("Failed to configure passkey login", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to configure passkey login", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		assertion, session, err := webAuthn.BeginDiscoverableLogin()
 		if err != nil {
-			slog.Error("Failed to begin passkey login", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to begin passkey login", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -75,7 +75,7 @@ func (h *handler) handlePasskeyLoginStart() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("Failed to encode passkey login start response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode passkey login start response", "error", err)
 		}
 	}
 }
@@ -120,7 +120,7 @@ func (h *handler) handlePasskeyLoginFinish() http.HandlerFunc {
 
 		webAuthn, err := appsecurity.NewWebAuthn(h.ctx.Config.PublicURL, r)
 		if err != nil {
-			slog.Error("Failed to configure passkey login validation", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to configure passkey login validation", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -145,14 +145,14 @@ func (h *handler) handlePasskeyLoginFinish() http.HandlerFunc {
 				parsedCredential.Response.AuthenticatorData.Flags,
 			)
 			if err != nil {
-				slog.Error("Failed to load passkey user for MFA login", "error", err, "user_id", challenge.UserID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to load passkey user for MFA login", "error", err, "user_id", challenge.UserID)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
 
 			validatedCredential, err = webAuthn.ValidateLogin(user, *challenge.Session, parsedCredential)
 			if err != nil {
-				slog.Warn("Passkey assertion verification failed", "error", err)
+				shared.LoggerFromContext(r.Context()).Warn("Passkey assertion verification failed", "error_kind", "assertion_invalid")
 				http.Error(w, "Invalid passkey assertion", http.StatusUnauthorized)
 				return
 			}
@@ -172,14 +172,14 @@ func (h *handler) handlePasskeyLoginFinish() http.HandlerFunc {
 				parsedCredential,
 			)
 			if err != nil {
-				slog.Warn("Passkey assertion verification failed", "error", err)
+				shared.LoggerFromContext(r.Context()).Warn("Passkey assertion verification failed", "error_kind", "assertion_invalid")
 				http.Error(w, "Invalid passkey assertion", http.StatusUnauthorized)
 				return
 			}
 
 			passkeyUser, ok := validatedUser.(*appsecurity.WebAuthnUser)
 			if !ok {
-				slog.Error("Validated passkey user has unexpected type")
+				shared.LoggerFromContext(r.Context()).Error("Validated passkey user has unexpected type")
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
@@ -187,7 +187,7 @@ func (h *handler) handlePasskeyLoginFinish() http.HandlerFunc {
 		}
 
 		if err := h.persistValidatedPasskey(r.Context(), *validatedCredential); err != nil {
-			slog.Error("Failed to persist validated passkey", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to persist validated passkey", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -197,7 +197,7 @@ func (h *handler) handlePasskeyLoginFinish() http.HandlerFunc {
 			rememberMe = challenge.RememberMe
 		}
 		if err := h.issueLoginSession(r.Context(), w, userID, rememberMe); err != nil {
-			slog.Error("Failed to issue login session after passkey verification", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to issue login session after passkey verification", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -210,7 +210,7 @@ func (h *handler) handlePasskeyLoginFinish() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
-			slog.Error("Failed to encode passkey login response", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode passkey login response", "error", err, "user_id", userID)
 		}
 	}
 }

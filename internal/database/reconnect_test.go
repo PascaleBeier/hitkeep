@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
+	"io"
+	"log/slog"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -13,6 +15,20 @@ import (
 )
 
 const fakeInvalidationMessage = "FATAL Error: Failed: database has been invalidated because of a previous fatal error. The database must be restarted prior to being used again."
+
+func reconnectingTestLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
+
+func TestReconnectingConnectorRequiresLogger(t *testing.T) {
+	t.Helper()
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected a nil logger to panic")
+		}
+	}()
+	newReconnectingConnector("fake.db", nil, nil, nil)
+}
 
 type fakeInstance struct {
 	id          int
@@ -86,7 +102,7 @@ func (f *fakeFactory) instance(i int) *fakeInstance {
 func TestReconnectingConnectorHealsAfterInvalidation(t *testing.T) {
 	ctx := context.Background()
 	factory := &fakeFactory{}
-	db := sql.OpenDB(newReconnectingConnector("fake.db", factory.new, nil))
+	db := sql.OpenDB(newReconnectingConnector("fake.db", factory.new, nil, reconnectingTestLogger()))
 	t.Cleanup(func() { _ = db.Close() })
 
 	if _, err := db.ExecContext(ctx, "SELECT 1"); err != nil {
@@ -125,7 +141,7 @@ func TestReconnectingConnectorRunsRecoveryAfterConnectionsDrain(t *testing.T) {
 		}
 		recoveryCalls.Add(1)
 		return nil
-	}))
+	}, reconnectingTestLogger()))
 	t.Cleanup(func() { _ = db.Close() })
 
 	if _, err := db.ExecContext(ctx, "SELECT 1"); err != nil {
@@ -152,7 +168,7 @@ func TestReconnectingConnectorRecoversInitialIndexFatalWithMutationTable(t *test
 		recoveryCalls.Add(1)
 		repairTable = repairTableFromError(trigger)
 		return nil
-	}))
+	}, reconnectingTestLogger()))
 	t.Cleanup(func() { _ = db.Close() })
 
 	if _, err := db.ExecContext(ctx, "SELECT 1"); err != nil {
@@ -175,7 +191,7 @@ func TestReconnectingConnectorRecoversInitialIndexFatalWithMutationTable(t *test
 }
 
 func TestReconnectingConnectorPrefersTargetedTriggerAfterGenericInvalidation(t *testing.T) {
-	connector := newReconnectingConnector("fake.db", nil, nil)
+	connector := newReconnectingConnector("fake.db", nil, nil, reconnectingTestLogger())
 	connector.markDead(errors.New(fakeInvalidationMessage))
 	connector.markDead(&databaseOperationError{
 		err:   errors.New("FATAL Error: Invalid Input Error: Failed to delete all rows from index. Only deleted 0 out of 1 rows"),
@@ -193,7 +209,7 @@ func TestReconnectingConnectorDoesNotReopenAfterRecoveryFailure(t *testing.T) {
 	recoveryErr := errors.New("synthetic recovery failure")
 	db := sql.OpenDB(newReconnectingConnector("fake.db", factory.new, func(context.Context, error) error {
 		return recoveryErr
-	}))
+	}, reconnectingTestLogger()))
 	t.Cleanup(func() { _ = db.Close() })
 
 	if _, err := db.ExecContext(ctx, "SELECT 1"); err != nil {
@@ -214,7 +230,7 @@ func TestReconnectingConnectorDoesNotReopenAfterRecoveryFailure(t *testing.T) {
 func TestReconnectingConnectorFailsFastWhileDraining(t *testing.T) {
 	ctx := context.Background()
 	factory := &fakeFactory{}
-	db := sql.OpenDB(newReconnectingConnector("fake.db", factory.new, nil))
+	db := sql.OpenDB(newReconnectingConnector("fake.db", factory.new, nil, reconnectingTestLogger()))
 	t.Cleanup(func() { _ = db.Close() })
 
 	pinned, err := db.Conn(ctx)
@@ -251,7 +267,7 @@ func TestReconnectingConnectorFailsFastWhileDraining(t *testing.T) {
 func TestReconnectingConnectorReportsDrainTimeout(t *testing.T) {
 	ctx := context.Background()
 	factory := &fakeFactory{}
-	connector := newReconnectingConnector("fake.db", factory.new, nil)
+	connector := newReconnectingConnector("fake.db", factory.new, nil, reconnectingTestLogger())
 	timedOut := make(chan error, 1)
 	connector.configureDrainWatchdog(10*time.Millisecond, func(err error) {
 		timedOut <- err

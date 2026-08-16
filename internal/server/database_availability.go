@@ -1,12 +1,13 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"strings"
 
 	"hitkeep/internal/database"
+	"hitkeep/internal/server/shared"
 )
 
 func (s *Server) databaseAvailabilityMiddleware(next http.Handler) http.Handler {
@@ -16,7 +17,7 @@ func (s *Server) databaseAvailabilityMiddleware(next http.Handler) http.Handler 
 			return
 		}
 		if status := s.databaseAvailabilityStatus(); status.State != database.DatabaseStateHealthy {
-			writeDatabaseUnavailable(w, status.State)
+			writeDatabaseUnavailable(r.Context(), w, status.State)
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -51,7 +52,7 @@ func databaseIndependentRoute(path string) bool {
 		path != "/ingest/web-vitals"
 }
 
-func writeDatabaseUnavailable(w http.ResponseWriter, state string) {
+func writeDatabaseUnavailable(ctx context.Context, w http.ResponseWriter, state string) {
 	code, message := databaseUnavailableResponse(state)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Retry-After", "5")
@@ -62,7 +63,7 @@ func writeDatabaseUnavailable(w http.ResponseWriter, state string) {
 		"message":             message,
 		"retry_after_seconds": 5,
 	}); err != nil {
-		slog.Error("Failed to encode database recovery response", "error", err)
+		shared.LoggerFromContext(ctx).Error("Failed to encode database recovery response", "error", err)
 	}
 }
 

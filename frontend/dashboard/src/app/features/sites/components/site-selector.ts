@@ -20,7 +20,7 @@ import { ShareService } from '@services/share.service';
     template: `
         <div class="flex flex-col gap-2 w-full" role="region" [attr.aria-label]="'sites.selector.regionAria' | transloco">
             <div class="flex items-center justify-between">
-                <label for="site-dropdown" class="text-xs font-semibold text-[var(--p-text-muted-color)] uppercase"> {{ "sites.selector.sitesLabel" | transloco }} </label>
+                <label for="site-dropdown" class="text-xs font-semibold text-[var(--p-text-muted-color)] uppercase"> {{ 'sites.selector.sitesLabel' | transloco }} </label>
                 @if (!shareService.isShareMode()) {
                     <button
                         type="button"

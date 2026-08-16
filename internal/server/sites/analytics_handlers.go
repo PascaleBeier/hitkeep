@@ -3,7 +3,6 @@ package sites
 import (
 	"context"
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -38,7 +37,7 @@ func (h *handler) handleGetSitesOverviewStats() http.HandlerFunc {
 
 		sites, err := h.listAccessibleSites(r.Context(), userID, apiClientAuth)
 		if err != nil {
-			slog.Error("Failed to get overview sites", "error", err, "user_id", userID, "tenant_id", apiClientAuthTenantID(apiClientAuth))
+			shared.LoggerFromContext(r.Context()).Error("Failed to get overview sites", "error", err, "user_id", userID, "tenant_id", apiClientAuthTenantID(apiClientAuth))
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -51,7 +50,7 @@ func (h *handler) handleGetSitesOverviewStats() http.HandlerFunc {
 		for _, site := range sites {
 			analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), site.ID)
 			if err != nil {
-				slog.Error("Failed to resolve overview analytics store", "error", err, "site_id", site.ID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to resolve overview analytics store", "error", err, "site_id", site.ID)
 				response.Sites = append(response.Sites, overviewStatsError(site.ID))
 				continue
 			}
@@ -63,7 +62,7 @@ func (h *handler) handleGetSitesOverviewStats() http.HandlerFunc {
 				End:    end,
 			})
 			if err != nil {
-				slog.Error("Failed to get overview site stats", "error", err, "site_id", site.ID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to get overview site stats", "error", err, "site_id", site.ID)
 				response.Sites = append(response.Sites, overviewStatsError(site.ID))
 				continue
 			}
@@ -72,7 +71,7 @@ func (h *handler) handleGetSitesOverviewStats() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(response); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -195,14 +194,14 @@ func (h *handler) handleGetSiteStats() http.HandlerFunc {
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		stats, err := analyticsStore.GetSiteStats(r.Context(), params)
 		if err != nil {
-			slog.Error("Failed to get site stats", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get site stats", "error", err, "site_id", siteID)
 			if strings.Contains(err.Error(), "not found") {
 				http.Error(w, "Site not found", http.StatusNotFound)
 			} else {
@@ -213,7 +212,7 @@ func (h *handler) handleGetSiteStats() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(stats); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -307,21 +306,21 @@ func (h *handler) handleGetSiteEcommerce(load func(context.Context, *database.St
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), params.SiteID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", params.SiteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", params.SiteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		payload, err := load(r.Context(), analyticsStore, params)
 		if err != nil {
-			slog.Error("Failed to get ecommerce "+label, "error", err, "site_id", params.SiteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get ecommerce "+label, "error", err, "site_id", params.SiteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(payload); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }

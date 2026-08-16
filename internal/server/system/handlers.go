@@ -1,8 +1,8 @@
 package system
 
 import (
+	"context"
 	"encoding/json"
-	"log/slog"
 	"net/http"
 
 	"hitkeep/internal/database"
@@ -26,7 +26,7 @@ func (h *handler) handleHealthz() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte("ok")); err != nil {
-			slog.Error("Failed to write healthcheck response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to write healthcheck response", "error", err)
 		}
 	}
 }
@@ -34,12 +34,12 @@ func (h *handler) handleHealthz() http.HandlerFunc {
 func (h *handler) handleReadyz() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if h.ctx.Cluster != nil && !h.ctx.Cluster.IsLeader() {
-			writeNotReady(w, "not_leader")
+			writeNotReady(r.Context(), w, "not_leader")
 			return
 		}
 
 		if h.ctx.Store == nil {
-			writeNotReady(w, "database_unavailable")
+			writeNotReady(r.Context(), w, "database_unavailable")
 			return
 		}
 
@@ -50,19 +50,19 @@ func (h *handler) handleReadyz() http.HandlerFunc {
 			}
 		}
 		if status.State != database.DatabaseStateHealthy {
-			writeNotReady(w, databaseReadinessReason(status.State))
+			writeNotReady(r.Context(), w, databaseReadinessReason(status.State))
 			return
 		}
 
 		if err := h.ctx.Store.DB().Ping(); err != nil {
-			slog.Error("Readiness check failed: database unreachable", "error", err)
-			writeNotReady(w, "database_unavailable")
+			shared.LoggerFromContext(r.Context()).Error("Readiness check failed: database unreachable", "error", err)
+			writeNotReady(r.Context(), w, "database_unavailable")
 			return
 		}
 
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte("ok")); err != nil {
-			slog.Error("Failed to write readiness response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to write readiness response", "error", err)
 		}
 	}
 }
@@ -78,7 +78,7 @@ func databaseReadinessReason(state string) string {
 	}
 }
 
-func writeNotReady(w http.ResponseWriter, reason string) {
+func writeNotReady(ctx context.Context, w http.ResponseWriter, reason string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Retry-After", "5")
 	w.WriteHeader(http.StatusServiceUnavailable)
@@ -87,7 +87,7 @@ func writeNotReady(w http.ResponseWriter, reason string) {
 		"reason":              reason,
 		"retry_after_seconds": 5,
 	}); err != nil {
-		slog.Error("Failed to encode readiness response", "error", err)
+		shared.LoggerFromContext(ctx).Error("Failed to encode readiness response", "error", err)
 	}
 }
 
@@ -100,14 +100,14 @@ func (h *handler) handleGetStatus() http.HandlerFunc {
 
 		response, err := h.ctx.SystemStatusResponse(r.Context())
 		if err != nil {
-			slog.Error("Failed to get user count", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get user count", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(response); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }

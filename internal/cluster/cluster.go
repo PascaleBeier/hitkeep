@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"fmt"
 	"log/slog"
 	"net"
 	"sort"
@@ -17,6 +18,7 @@ import (
 
 type Manager struct {
 	list   *memberlist.Memberlist
+	logger *slog.Logger
 	lock   sync.RWMutex
 	self   string
 	leader string
@@ -28,13 +30,13 @@ type eventDelegate struct {
 }
 
 func (d *eventDelegate) NotifyJoin(node *memberlist.Node) {
-	slog.Debug("Node joined cluster", "name", node.Name, "addr", node.Address())
+	d.m.logger.Debug("Node joined cluster", "name", node.Name, "addr", node.Address())
 	d.m.peers[node.Name] = node.Address()
 	d.m.reElectLeader()
 }
 
 func (d *eventDelegate) NotifyLeave(node *memberlist.Node) {
-	slog.Warn("Node left cluster", "name", node.Name)
+	d.m.logger.Warn("Node left cluster", "name", node.Name)
 	delete(d.m.peers, node.Name)
 	d.m.reElectLeader()
 }
@@ -42,9 +44,13 @@ func (d *eventDelegate) NotifyLeave(node *memberlist.Node) {
 func (d *eventDelegate) NotifyUpdate(node *memberlist.Node) {}
 
 func NewManager(conf *config.Config, logger *slog.Logger) (*Manager, error) {
+	if logger == nil {
+		return nil, fmt.Errorf("cluster: logger is required")
+	}
 	m := &Manager{
-		self:  conf.NodeName,
-		peers: make(map[string]string),
+		self:   conf.NodeName,
+		logger: logger,
+		peers:  make(map[string]string),
 	}
 
 	mlConfig := memberlist.DefaultWANConfig()
@@ -125,12 +131,12 @@ func (m *Manager) reElectLeader() {
 
 	if len(members) > 0 && m.leader != members[0] {
 		m.leader = members[0]
-		slog.Debug("New leader elected", "leader", m.leader)
+		m.logger.Debug("New leader elected", "leader", m.leader)
 	}
 
 	if m.leader == m.self {
-		slog.Debug("This node is now the LEADER.")
+		m.logger.Debug("This node is now the LEADER.")
 	} else {
-		slog.Debug("This node is a FOLLOWER.", "current_leader", m.leader)
+		m.logger.Debug("This node is a FOLLOWER.", "current_leader", m.leader)
 	}
 }

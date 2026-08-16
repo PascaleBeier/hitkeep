@@ -1,10 +1,13 @@
 package admin
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -845,7 +848,7 @@ func TestHandleGetSpamFilter(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("save spam feed data: %v", err)
 	}
-	filter := blocking.NewSpamFilter(spamPath)
+	filter := blocking.NewSpamFilter(spamPath, testAdminLogger())
 	if err := filter.RefreshFromDisk(); err != nil {
 		t.Fatalf("refresh spam filter: %v", err)
 	}
@@ -1298,7 +1301,7 @@ func TestHandleMailTestRejectsInvalidRecipient(t *testing.T) {
 type failMailDriver struct{}
 
 func (d *failMailDriver) Send(_ []string, _, _, _ string) error {
-	return errors.New("simulated mail transport failure")
+	return errors.New("provider response password=super-secret token=top-secret https://mail.example.test/reject")
 }
 func (d *failMailDriver) Close() error { return nil }
 
@@ -1306,13 +1309,23 @@ func TestHandleMailTestFailure(t *testing.T) {
 	h, _, _, ownerID, _, _ := setupSystemTestEnv(t)
 
 	h.ctx.Mailer = mailer.NewWithDriver(&failMailDriver{}, h.ctx.Config)
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	body := strings.NewReader(`{}`)
 	req := withAdminTestUser(httptest.NewRequest(http.MethodPost, "/api/admin/system/mail/test", body), ownerID)
+	req = req.WithContext(shared.WithLogger(req.Context(), logger))
 	w := httptest.NewRecorder()
 	h.handleTestMail().ServeHTTP(w, req)
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d: %s", w.Code, w.Body.String())
+	}
+	rawError := "provider response password=super-secret token=top-secret https://mail.example.test/reject"
+	if strings.Contains(w.Body.String(), rawError) || strings.Contains(logs.String(), rawError) {
+		t.Fatalf("raw mail error leaked into response or logs: body=%q logs=%q", w.Body.String(), logs.String())
+	}
+	if !strings.Contains(w.Body.String(), "mail transport failed") || !strings.Contains(logs.String(), "error_stage=transport") || !strings.Contains(logs.String(), "error_kind=transport") {
+		t.Fatalf("expected safe mail diagnostics, body=%q logs=%q", w.Body.String(), logs.String())
 	}
 }
 
@@ -1351,4 +1364,8 @@ func TestSystemMailRedaction(t *testing.T) {
 	if strings.Contains(status.Username, "super-secret") {
 		t.Fatal("username should not leak full value")
 	}
+}
+
+func testAdminLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }

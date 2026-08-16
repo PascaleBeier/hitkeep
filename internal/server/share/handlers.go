@@ -3,7 +3,6 @@ package share
 import (
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -159,14 +158,14 @@ func (h *handler) handleListShareLinks() http.HandlerFunc {
 		links, err := h.ctx.Store.ListShareLinks(r.Context(), siteID)
 		if err != nil {
 			//nolint:gosec // IDs are parsed as UUIDs before logging; structured logging is intentional.
-			slog.Error("Failed to list share links", "error", err, "site_id", siteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to list share links", "error", err, "site_id", siteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(links); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -200,7 +199,7 @@ func (h *handler) handleCreateShareLink() http.HandlerFunc {
 		link, token, err := h.ctx.Store.CreateShareLink(r.Context(), siteID, userID)
 		if err != nil {
 			//nolint:gosec // IDs are sourced from auth context/path UUID parsing; structured logging is intentional.
-			slog.Error("Failed to create share link", "error", err, "site_id", siteID, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to create share link", "error", err, "site_id", siteID, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -215,7 +214,7 @@ func (h *handler) handleCreateShareLink() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -240,7 +239,7 @@ func (h *handler) handleDeleteShareLink() http.HandlerFunc {
 		revoked, err := h.ctx.Store.RevokeShareLink(r.Context(), siteID, shareID)
 		if err != nil {
 			//nolint:gosec // IDs are parsed as UUIDs before logging; structured logging is intentional.
-			slog.Error("Failed to delete share link", "error", err, "site_id", siteID, "share_id", shareID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to delete share link", "error", err, "site_id", siteID, "share_id", shareID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -262,7 +261,7 @@ func (h *handler) handleGetShareSite() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(site); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -309,7 +308,7 @@ func (h *handler) handleGetShareSiteStats() http.HandlerFunc {
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), site.ID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", site.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", site.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -317,7 +316,7 @@ func (h *handler) handleGetShareSiteStats() http.HandlerFunc {
 		stats, err := analyticsStore.GetSiteStats(r.Context(), params)
 		if err != nil {
 			//nolint:gosec // site_id comes from a validated share-site association and is logged for diagnostics.
-			slog.Error("Failed to get share stats", "error", err, "site_id", site.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get share stats", "error", err, "site_id", site.ID)
 			if strings.Contains(err.Error(), "not found") {
 				http.Error(w, "Not found", http.StatusNotFound)
 			} else {
@@ -328,7 +327,7 @@ func (h *handler) handleGetShareSiteStats() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(stats); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -345,7 +344,7 @@ func (h *handler) handleGetShareOpportunities() http.HandlerFunc {
 
 		opportunities, err := h.ctx.Store.ListOpportunities(r.Context(), site.ID)
 		if err != nil {
-			slog.Error("Failed to get share opportunities", "error", err, "site_id", site.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get share opportunities", "error", err, "site_id", site.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -353,7 +352,7 @@ func (h *handler) handleGetShareOpportunities() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(api.SharedOpportunityListResponse{Opportunities: sharedOpportunities(opportunities)}); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -473,7 +472,7 @@ func (h *handler) handleGetShareHits() http.HandlerFunc {
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), site.ID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", site.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", site.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -481,14 +480,14 @@ func (h *handler) handleGetShareHits() http.HandlerFunc {
 		result, err := analyticsStore.GetHits(r.Context(), params)
 		if err != nil {
 			//nolint:gosec // site_id comes from a validated share-site association and is logged for diagnostics.
-			slog.Error("Failed to get share hits", "error", err, "site_id", site.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get share hits", "error", err, "site_id", site.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(result); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -551,7 +550,7 @@ func (h *handler) handleExportShareHits() http.HandlerFunc {
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), site.ID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", site.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", site.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -563,7 +562,7 @@ func (h *handler) handleExportShareHits() http.HandlerFunc {
 
 			if err := analyticsStore.ExportHitsCSV(r.Context(), params, w); err != nil {
 				//nolint:gosec // site_id comes from a validated share-site association and is logged for diagnostics.
-				slog.Error("Failed to export share hits", "error", err, "site_id", site.ID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to export share hits", "error", err, "site_id", site.ID)
 			}
 			return
 		}
@@ -571,7 +570,7 @@ func (h *handler) handleExportShareHits() http.HandlerFunc {
 		filename, err := analyticsStore.ExportHitsFile(r.Context(), params, format)
 		if err != nil {
 			//nolint:gosec // site_id comes from a validated share-site association and is logged for diagnostics.
-			slog.Error("Failed to export share hits", "error", err, "site_id", site.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to export share hits", "error", err, "site_id", site.ID)
 			http.Error(w, "Failed to export hits", http.StatusInternalServerError)
 			return
 		}

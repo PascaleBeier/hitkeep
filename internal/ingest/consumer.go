@@ -32,6 +32,9 @@ type Consumer struct {
 }
 
 func NewConsumer(tenantMgr *database.TenantStoreManager, logger *slog.Logger, level slog.Level, realtimeBroker *realtime.Broker) *Consumer {
+	if logger == nil {
+		panic("ingest: logger is required")
+	}
 	consumer := &Consumer{
 		tenantMgr: tenantMgr,
 		logger:    logger,
@@ -308,7 +311,7 @@ func processMessage[T siteIdentifiable](
 
 	var v T
 	if err := json.Unmarshal(m.Body, &v); err != nil {
-		slog.Error("Failed to unmarshal "+kind+" from NSQ", "error", err, "body", string(m.Body))
+		c.logger.Error("Failed to unmarshal "+kind+" from NSQ", "error", err, "body_bytes", len(m.Body))
 		m.Finish()
 		return nil
 	}
@@ -320,7 +323,7 @@ func processMessage[T siteIdentifiable](
 
 	store, err := c.resolveStore(ctx, siteID)
 	if err != nil {
-		slog.Error("Failed to resolve tenant store for "+kind, "error", err, "site_id", siteID)
+		c.logger.Error("Failed to resolve tenant store for "+kind, "error", err, "site_id", siteID)
 		m.Requeue(-1)
 		return nil
 	}
@@ -333,19 +336,19 @@ func processMessage[T siteIdentifiable](
 		logAttrs: logAttrs,
 	})
 	if err != nil {
-		slog.Error("Failed to enqueue "+kind+" for batched persistence", "error", err, "site_id", siteID)
+		c.logger.Error("Failed to enqueue "+kind+" for batched persistence", "error", err, "site_id", siteID)
 		m.Requeue(-1)
 		return nil
 	}
 
 	if err := <-result; err != nil {
-		slog.Error("Failed to persist "+kind+" batch", "error", err, "site_id", siteID)
+		c.logger.Error("Failed to persist "+kind+" batch", "error", err, "site_id", siteID)
 		m.Requeue(-1)
 		return nil
 	}
 
 	m.Finish()
-	slog.Debug("Successfully processed "+kind, append([]any{"site_id", siteID}, logAttrs...)...)
+	c.logger.Debug("Successfully processed "+kind, append([]any{"site_id", siteID}, logAttrs...)...)
 	return nil
 }
 

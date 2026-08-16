@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -37,14 +36,14 @@ func (h *handler) handleGetUserBootstrap() http.HandlerFunc {
 				http.Error(w, "User not found", http.StatusNotFound)
 				return
 			}
-			slog.Error("Failed to build user bootstrap", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to build user bootstrap", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(bootstrap); err != nil {
-			slog.Error("Failed to encode user bootstrap", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode user bootstrap", "error", err, "user_id", userID)
 		}
 	}
 }

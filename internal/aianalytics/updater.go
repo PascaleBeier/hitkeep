@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"slices"
 	"strings"
@@ -37,19 +39,27 @@ type agentHTTPDoer interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
+type aiFeedWarning struct {
+	source string
+	err    error
+}
+
 // FetchAIAgentData assembles the AI agent master list from the upstream
 // sources plus the curated overlay. Secondary source failures degrade to
 // warnings; only a failing primary source aborts the fetch.
-func FetchAIAgentData(ctx context.Context, client agentHTTPDoer) (AIAgentData, error) {
+func FetchAIAgentData(ctx context.Context, client agentHTTPDoer, logger *slog.Logger) (AIAgentData, error) {
+	if logger == nil {
+		panic("aianalytics: logger is required")
+	}
 	if client == nil {
 		client = &http.Client{Timeout: 30 * time.Second}
 	}
 
-	var warnings []string
+	var warnings []aiFeedWarning
 
 	primary, err := fetchAIRobotsTxtAgents(ctx, client)
 	if err != nil {
-		return AIAgentData{}, fmt.Errorf("primary AI agent source failed: %w", err)
+		return AIAgentData{}, fmt.Errorf("primary AI agent source failed: %s", aiFeedErrorKind(err))
 	}
 	if len(primary) == 0 {
 		return AIAgentData{}, fmt.Errorf("primary AI agent source %s returned no usable entries", aiRobotsTxtURL)
@@ -57,14 +67,14 @@ func FetchAIAgentData(ctx context.Context, client agentHTTPDoer) (AIAgentData, e
 
 	deviceDetector, err := fetchDeviceDetectorAgents(ctx, client)
 	if err != nil {
-		warnings = append(warnings, fmt.Sprintf("device detector bots: %v", err))
+		warnings = append(warnings, aiFeedWarning{source: "device_detector_bots", err: err})
 	}
 	crawlerAgents, err := fetchCrawlerUserAgents(ctx, client)
 	if err != nil {
-		warnings = append(warnings, fmt.Sprintf("crawler user agents: %v", err))
+		warnings = append(warnings, aiFeedWarning{source: "crawler_user_agents", err: err})
 	}
-	for _, w := range warnings {
-		slog.Warn("Partial AI agent feed failure, continuing with available data", "error", w)
+	for _, warning := range warnings {
+		logger.Warn("Partial AI agent feed failure, continuing with available data", "source", warning.source, "error_kind", aiFeedErrorKind(warning.err))
 	}
 
 	merged := mergeAgentEntries(slices.Concat(curatedAgents, primary, deviceDetector, crawlerAgents))
@@ -100,6 +110,24 @@ func FetchAIAgentData(ctx context.Context, client agentHTTPDoer) (AIAgentData, e
 	}
 	data.normalize()
 	return data, nil
+}
+
+func aiFeedErrorKind(err error) string {
+	switch {
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "timeout"
+	default:
+		var networkErr net.Error
+		if errors.As(err, &networkErr) {
+			if networkErr.Timeout() {
+				return "timeout"
+			}
+			return "network"
+		}
+		return "invalid_response"
+	}
 }
 
 func mergeAgentEntries(entries []AIAgentEntry) []AIAgentEntry {
@@ -478,7 +506,7 @@ func fetchAgentFeed(ctx context.Context, client agentHTTPDoer, sourceURL string)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		defer resp.Body.Close()
-		return nil, fmt.Errorf("unexpected status %s", resp.Status)
+		return nil, fmt.Errorf("unexpected HTTP status %d", resp.StatusCode)
 	}
 	return io.NopCloser(io.LimitReader(resp.Body, maxAgentFeedResponseBytes)), nil
 }

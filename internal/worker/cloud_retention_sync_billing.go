@@ -4,12 +4,12 @@ package worker
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
+	"hitkeep/internal/hklog"
 )
 
 // CloudRetentionSyncWorker keeps every cloud team's site retention in line
@@ -48,13 +48,13 @@ func (w *CloudRetentionSyncWorker) RunAt(ctx context.Context, now time.Time) {
 
 	teamIDs, err := w.tenantMgr.Shared().ListNonDefaultTenantIDs(ctx)
 	if err != nil {
-		slog.Error("CloudRetentionSyncWorker: failed to list teams", "error", err)
+		hklog.LoggerFromContext(ctx).Error("CloudRetentionSyncWorker: failed to list teams", "error", err)
 		return
 	}
 
 	for _, teamID := range teamIDs {
 		if ctx.Err() != nil {
-			slog.Warn("CloudRetentionSyncWorker: context cancelled, halting sync")
+			hklog.LoggerFromContext(ctx).Warn("CloudRetentionSyncWorker: context cancelled, halting sync")
 			return
 		}
 
@@ -64,7 +64,7 @@ func (w *CloudRetentionSyncWorker) RunAt(ctx context.Context, now time.Time) {
 		}
 
 		if _, err := w.tenantMgr.SyncTeamRetention(ctx, teamID, ent.MaxRetentionDays); err != nil {
-			slog.Error("CloudRetentionSyncWorker: failed to sync team retention", "team_id", teamID, "error", err)
+			hklog.LoggerFromContext(ctx).Error("CloudRetentionSyncWorker: failed to sync team retention", "team_id", teamID, "error", err)
 		}
 	}
 }

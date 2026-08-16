@@ -3,7 +3,6 @@ package ingest
 import (
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -183,7 +182,7 @@ func (h *handler) handleServerPageviewIngestLeader() http.HandlerFunc {
 		if h.ctx.SpamFilter != nil {
 			decision := h.ctx.SpamFilter.Evaluate(ingestCtx.site.Domain, ingestCtx.visitorIP, payload.Referrer)
 			if decision.Blocked {
-				slog.Info("Dropped spam server-side hit", "site_id", ingestCtx.site.ID, "reason", decision.Reason)
+				shared.LoggerFromContext(r.Context()).Debug("Dropped spam server-side hit", "site_id", ingestCtx.site.ID, "reason", decision.Reason)
 				h.recordSpamDrop()
 				w.WriteHeader(http.StatusAccepted)
 				return
@@ -228,7 +227,7 @@ func (h *handler) handleServerPageviewIngestLeader() http.HandlerFunc {
 			QRCodeID:       queryUUIDPtr(ingestCtx.utm, "hk_qr"),
 		}
 		if err := h.publishJSON("hits", hit); err != nil {
-			slog.Error("Failed to publish server-side hit to NSQ", "error", err, "site_id", ingestCtx.site.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to publish server-side hit to NSQ", "error", err, "site_id", ingestCtx.site.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -289,7 +288,7 @@ func (h *handler) handleServerEventIngestLeader() http.HandlerFunc {
 		if h.ctx.SpamFilter != nil {
 			decision := h.ctx.SpamFilter.Evaluate(ingestCtx.site.Domain, ingestCtx.visitorIP, payload.Referrer)
 			if decision.Blocked {
-				slog.Info("Dropped spam server-side event", "site_id", ingestCtx.site.ID, "reason", decision.Reason)
+				shared.LoggerFromContext(r.Context()).Debug("Dropped spam server-side event", "site_id", ingestCtx.site.ID, "reason", decision.Reason)
 				h.recordSpamDrop()
 				w.WriteHeader(http.StatusAccepted)
 				return
@@ -312,7 +311,7 @@ func (h *handler) handleServerEventIngestLeader() http.HandlerFunc {
 			Timestamp:  ingestCtx.timestamp.UTC(),
 		}
 		if err := h.publishJSON("events", event); err != nil {
-			slog.Error("Failed to publish server-side event to NSQ", "error", err, "site_id", ingestCtx.site.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to publish server-side event to NSQ", "error", err, "site_id", ingestCtx.site.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -400,7 +399,7 @@ func (h *handler) resolveServerIngestContext(w http.ResponseWriter, r *http.Requ
 
 	site, err := h.ctx.Store.FindSiteByDomain(r.Context(), domain)
 	if err != nil {
-		slog.Error("Failed to find site", "error", err)
+		shared.LoggerFromContext(r.Context()).Error("Failed to find site", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return serverIngestContext{}, false
 	}
@@ -557,12 +556,12 @@ func (h *handler) handleIngestLeader(w http.ResponseWriter, r *http.Request) {
 
 	site, err := h.ctx.Store.FindSiteByDomain(r.Context(), domain)
 	if err != nil {
-		slog.Error("Failed to find site", "error", err)
+		shared.LoggerFromContext(r.Context()).Error("Failed to find site", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	if site == nil {
-		slog.Warn("Dropped hit for unknown site")
+		shared.LoggerFromContext(r.Context()).Warn("Dropped hit for unknown site")
 		h.recordRejection()
 		w.WriteHeader(http.StatusAccepted)
 		return
@@ -602,7 +601,7 @@ func (h *handler) handleIngestLeader(w http.ResponseWriter, r *http.Request) {
 	if h.ctx.SpamFilter != nil {
 		decision := h.ctx.SpamFilter.Evaluate(site.Domain, userIP, payload.Referrer)
 		if decision.Blocked {
-			slog.Info("Dropped spam hit", "site_id", site.ID, "reason", decision.Reason)
+			shared.LoggerFromContext(r.Context()).Debug("Dropped spam hit", "site_id", site.ID, "reason", decision.Reason)
 			h.recordSpamDrop()
 			w.WriteHeader(http.StatusAccepted)
 			return
@@ -648,13 +647,13 @@ func (h *handler) handleIngestLeader(w http.ResponseWriter, r *http.Request) {
 
 	body, err := json.Marshal(hit)
 	if err != nil {
-		slog.Error("Failed to encode hit for NSQ", "error", err)
+		shared.LoggerFromContext(r.Context()).Error("Failed to encode hit for NSQ", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	if err := h.ctx.Producer.Publish("hits", body); err != nil {
-		slog.Error("Failed to publish hit to NSQ", "error", err)
+		shared.LoggerFromContext(r.Context()).Error("Failed to publish hit to NSQ", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -683,7 +682,7 @@ func (h *handler) forwardToLeader(w http.ResponseWriter, r *http.Request, target
 		},
 		Transport: leaderForwardTransport,
 		ErrorHandler: func(rw http.ResponseWriter, req *http.Request, proxyErr error) {
-			slog.Error("Follower failed to forward request", "error", proxyErr, "target_path", targetPath)
+			shared.LoggerFromContext(r.Context()).Error("Follower failed to forward request", "error", proxyErr, "target_path", targetPath)
 			http.Error(rw, "Failed to forward request", http.StatusBadGateway)
 		},
 	}
@@ -723,12 +722,12 @@ func (h *handler) handleIngestWebVitalsLeader(w http.ResponseWriter, r *http.Req
 
 	site, err := h.ctx.Store.FindSiteByDomain(r.Context(), domain)
 	if err != nil {
-		slog.Error("Failed to find site", "error", err)
+		shared.LoggerFromContext(r.Context()).Error("Failed to find site", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	if site == nil {
-		slog.Warn("Dropped web vital for unknown site")
+		shared.LoggerFromContext(r.Context()).Warn("Dropped web vital for unknown site")
 		h.recordRejection()
 		w.WriteHeader(http.StatusAccepted)
 		return
@@ -750,7 +749,7 @@ func (h *handler) handleIngestWebVitalsLeader(w http.ResponseWriter, r *http.Req
 	if h.ctx.SpamFilter != nil {
 		decision := h.ctx.SpamFilter.Evaluate(site.Domain, userIP, nil)
 		if decision.Blocked {
-			slog.Info("Dropped spam web vital", "site_id", site.ID, "reason", decision.Reason)
+			shared.LoggerFromContext(r.Context()).Debug("Dropped spam web vital", "site_id", site.ID, "reason", decision.Reason)
 			h.recordSpamDrop()
 			w.WriteHeader(http.StatusAccepted)
 			return
@@ -782,7 +781,7 @@ func (h *handler) handleIngestWebVitalsLeader(w http.ResponseWriter, r *http.Req
 	}
 
 	if err := h.publishJSON("web_vitals", vital); err != nil {
-		slog.Error("Failed to publish web vital to NSQ", "error", err, "site_id", site.ID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to publish web vital to NSQ", "error", err, "site_id", site.ID)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -888,12 +887,12 @@ func (h *handler) handleIngestEventLeader(w http.ResponseWriter, r *http.Request
 
 	site, err := h.ctx.Store.FindSiteByDomain(r.Context(), domain)
 	if err != nil {
-		slog.Error("Failed to find site", "error", err)
+		shared.LoggerFromContext(r.Context()).Error("Failed to find site", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	if site == nil {
-		slog.Warn("Dropped event for unknown site")
+		shared.LoggerFromContext(r.Context()).Warn("Dropped event for unknown site")
 		h.recordRejection()
 		w.WriteHeader(http.StatusAccepted)
 		return
@@ -944,7 +943,7 @@ func (h *handler) handleIngestEventLeader(w http.ResponseWriter, r *http.Request
 	if h.ctx.SpamFilter != nil {
 		decision := h.ctx.SpamFilter.Evaluate(site.Domain, userIP, payload.Referrer)
 		if decision.Blocked {
-			slog.Info("Dropped spam event", "site_id", site.ID, "reason", decision.Reason)
+			shared.LoggerFromContext(r.Context()).Debug("Dropped spam event", "site_id", site.ID, "reason", decision.Reason)
 			h.recordSpamDrop()
 			w.WriteHeader(http.StatusAccepted)
 			return
@@ -963,13 +962,13 @@ func (h *handler) handleIngestEventLeader(w http.ResponseWriter, r *http.Request
 
 	body, err := json.Marshal(event)
 	if err != nil {
-		slog.Error("Failed to encode event for NSQ", "error", err)
+		shared.LoggerFromContext(r.Context()).Error("Failed to encode event for NSQ", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	if err := h.ctx.Producer.Publish("events", body); err != nil {
-		slog.Error("Failed to publish event to NSQ", "error", err)
+		shared.LoggerFromContext(r.Context()).Error("Failed to publish event to NSQ", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -1073,24 +1072,24 @@ func (h *handler) allowCustomTrackingHostForSite(r *http.Request, siteID uuid.UU
 
 	domain, err := h.ctx.Store.FindCustomTrackingDomainByHostname(r.Context(), hostname)
 	if err != nil {
-		slog.Error("Failed to resolve custom tracking ingest host", "error", err, "hostname", hostname, "site_id", siteID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to resolve custom tracking ingest host", "error", err, "hostname", hostname, "site_id", siteID)
 		return false
 	}
 	if domain == nil {
 		return true
 	}
 	if !database.CustomTrackingDomainIsActive(*domain) {
-		slog.Warn("Dropped ingest through inactive custom tracking domain", "hostname", hostname, "site_id", siteID)
+		shared.LoggerFromContext(r.Context()).Warn("Dropped ingest through inactive custom tracking domain", "hostname", hostname, "site_id", siteID)
 		return false
 	}
 
 	teamID, err := h.ctx.Store.GetSiteTenantID(r.Context(), siteID)
 	if err != nil {
-		slog.Error("Failed to resolve ingest site team for custom tracking host guard", "error", err, "hostname", hostname, "site_id", siteID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to resolve ingest site team for custom tracking host guard", "error", err, "hostname", hostname, "site_id", siteID)
 		return false
 	}
 	if domain.TeamID != teamID {
-		slog.Warn("Dropped cross-team custom tracking domain ingest", "hostname", hostname, "site_id", siteID, "site_team_id", teamID, "domain_team_id", domain.TeamID)
+		shared.LoggerFromContext(r.Context()).Warn("Dropped cross-team custom tracking domain ingest", "hostname", hostname, "site_id", siteID, "site_team_id", teamID, "domain_team_id", domain.TeamID)
 		return false
 	}
 	return true

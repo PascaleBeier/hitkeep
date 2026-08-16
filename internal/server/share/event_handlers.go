@@ -3,7 +3,6 @@ package share
 import (
 	"context"
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/filterparams"
+	"hitkeep/internal/server/shared"
 )
 
 func (h *handler) handleGetShareEventNames() http.HandlerFunc {
@@ -30,7 +30,7 @@ func (h *handler) handleGetShareEventNames() http.HandlerFunc {
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), site.ID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", site.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", site.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -41,14 +41,14 @@ func (h *handler) handleGetShareEventNames() http.HandlerFunc {
 			End:    end,
 		})
 		if err != nil {
-			slog.Error("Failed to get share event names", "error", err, "site_id", site.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get share event names", "error", err, "site_id", site.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(names); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -74,7 +74,7 @@ func (h *handler) handleGetShareEventPropertyKeys() http.HandlerFunc {
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), site.ID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", site.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", site.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -85,14 +85,14 @@ func (h *handler) handleGetShareEventPropertyKeys() http.HandlerFunc {
 			End:    end,
 		}, eventName)
 		if err != nil {
-			slog.Error("Failed to get share event property keys", "error", err, "site_id", site.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get share event property keys", "error", err, "site_id", site.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(keys); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -119,7 +119,7 @@ func (h *handler) handleGetShareEventPropertyBreakdown() http.HandlerFunc {
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), site.ID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", site.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", site.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -132,14 +132,14 @@ func (h *handler) handleGetShareEventPropertyBreakdown() http.HandlerFunc {
 			PropertyKey: propertyKey,
 		})
 		if err != nil {
-			slog.Error("Failed to get share event property breakdown", "error", err, "site_id", site.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get share event property breakdown", "error", err, "site_id", site.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(breakdown); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -241,21 +241,21 @@ func (h *handler) shareEventQueryHandler(
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), site.ID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", site.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", site.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		result, err := query(r.Context(), analyticsStore, p)
 		if err != nil {
-			slog.Error("Failed to get share "+label, "error", err, "site_id", site.ID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get share "+label, "error", err, "site_id", site.ID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(result); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -335,21 +335,21 @@ func (h *handler) handleGetShareEcommerce(
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), params.SiteID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", params.SiteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", params.SiteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		payload, err := load(r.Context(), analyticsStore, params)
 		if err != nil {
-			slog.Error("Failed to get share ecommerce "+label, "error", err, "site_id", params.SiteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get share ecommerce "+label, "error", err, "site_id", params.SiteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(payload); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }

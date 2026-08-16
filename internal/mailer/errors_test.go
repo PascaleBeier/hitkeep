@@ -41,10 +41,8 @@ func TestDescribeErrorRedactsSensitiveDetails(t *testing.T) {
 			t.Fatalf("redacted message contains %q: %q", secret, details.Message)
 		}
 	}
-	for _, marker := range []string{"[redacted-email]", "[redacted-url]", "token=[redacted]"} {
-		if !strings.Contains(details.Message, marker) {
-			t.Fatalf("redacted message missing %q: %q", marker, details.Message)
-		}
+	if details.Message != "mail transport failed" {
+		t.Fatalf("transport message = %q, want stable generic message", details.Message)
 	}
 }
 

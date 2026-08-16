@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -29,13 +31,14 @@ type authTestMailDriver struct {
 	subject  string
 	htmlBody string
 	textBody string
+	sendErr  error
 }
 
 func (d *authTestMailDriver) Send(_ []string, subject, htmlBody, textBody string) error {
 	d.subject = subject
 	d.htmlBody = htmlBody
 	d.textBody = textBody
-	return nil
+	return d.sendErr
 }
 
 func (d *authTestMailDriver) Close() error { return nil }
@@ -685,6 +688,44 @@ func TestHandleForgotPasswordFallsBackToAcceptLanguageLocale(t *testing.T) {
 	}
 }
 
+func TestHandleForgotPasswordDoesNotLogRawMailError(t *testing.T) {
+	h, store := setupAuthTestEnv(t)
+	defer store.Close()
+
+	hashed, err := HashPassword("password123")
+	if err != nil {
+		t.Fatalf("failed to hash password: %v", err)
+	}
+	if _, err := store.CreateUser(context.Background(), "reset-mail-error@example.com", hashed); err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
+
+	rawMailError := "provider response password=super-secret token=top-secret https://mail.example.test/reject"
+	drv := &authTestMailDriver{sendErr: errors.New(rawMailError)}
+	h.ctx.Mailer = mailer.NewWithDriver(drv, h.ctx.Config)
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+	body, err := json.Marshal(map[string]string{"email": "reset-mail-error@example.com"})
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/forgot-password", bytes.NewReader(body))
+	req = req.WithContext(shared.WithLogger(req.Context(), logger))
+	w := httptest.NewRecorder()
+
+	h.handleForgotPassword().ServeHTTP(w, req)
+	if w.Code != http.StatusBadGateway {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusBadGateway, w.Code, w.Body.String())
+	}
+	if strings.Contains(logs.String(), rawMailError) || strings.Contains(w.Body.String(), rawMailError) {
+		t.Fatalf("raw password reset mail error leaked into logs or response: logs=%q body=%q", logs.String(), w.Body.String())
+	}
+	if !strings.Contains(logs.String(), "error_stage=transport") || !strings.Contains(logs.String(), "error_kind=transport") {
+		t.Fatalf("expected safe password reset mail diagnostics, got %q", logs.String())
+	}
+}
+
 func TestHandleLoginIncludesEmailLinkFactorWhenMailerConfigured(t *testing.T) {
 	h, store := setupAuthTestEnv(t)
 	defer store.Close()
@@ -822,6 +863,48 @@ func TestHandleMFAEmailLinkRequestAndVerify(t *testing.T) {
 	}
 	if _, found := h.ctx.AuthState.GetPasskeyLoginChallenge(challengeID); found {
 		t.Fatal("expected mfa challenge to be deleted after email-link verification")
+	}
+}
+
+func TestHandleMFAEmailLinkRequestDoesNotLogRawMailError(t *testing.T) {
+	h, store := setupAuthTestEnv(t)
+	defer store.Close()
+
+	hashed, err := HashPassword("password123")
+	if err != nil {
+		t.Fatalf("failed to hash password: %v", err)
+	}
+	userID, err := store.CreateUser(context.Background(), "mfa-mail-error@example.com", hashed)
+	if err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
+
+	rawMailError := "provider response password=super-secret token=top-secret https://mail.example.test/reject"
+	h.ctx.Mailer = mailer.NewWithDriver(&authTestMailDriver{sendErr: errors.New(rawMailError)}, h.ctx.Config)
+	challengeID := h.ctx.AuthState.CreatePasskeyLoginChallenge("test-challenge", database.CreateLoginChallengeInput{
+		UserID: &userID,
+		Flow:   "mfa",
+	}, time.Now().UTC().Add(time.Minute), nil)
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+	body, err := json.Marshal(mfaEmailLinkRequest{ChallengeToken: challengeID.String()})
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/mfa/email-link/request", bytes.NewReader(body))
+	req = req.WithContext(shared.WithLogger(req.Context(), logger))
+	w := httptest.NewRecorder()
+
+	h.handleMFAEmailLinkRequest().ServeHTTP(w, req)
+	if w.Code != http.StatusBadGateway {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusBadGateway, w.Code, w.Body.String())
+	}
+	if strings.Contains(logs.String(), rawMailError) || strings.Contains(w.Body.String(), rawMailError) {
+		t.Fatalf("raw MFA mail error leaked into logs or response: logs=%q body=%q", logs.String(), w.Body.String())
+	}
+	if !strings.Contains(logs.String(), "error_stage=transport") || !strings.Contains(logs.String(), "error_kind=transport") {
+		t.Fatalf("expected safe MFA mail diagnostics, got %q", logs.String())
 	}
 }
 
@@ -1090,10 +1173,19 @@ func TestHandlePasskeyLoginRejectsMissingUserVerification(t *testing.T) {
 		"remember_me":     false,
 	})
 	finishReq := httptest.NewRequest(http.MethodPost, "/api/auth/passkey/login/finish", bytes.NewReader(finishBody))
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	finishReq = finishReq.WithContext(shared.WithLogger(finishReq.Context(), logger))
 	finishW := httptest.NewRecorder()
 	h.handlePasskeyLoginFinish().ServeHTTP(finishW, finishReq)
 	if finishW.Code != http.StatusUnauthorized {
 		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, finishW.Code)
+	}
+	if strings.Contains(logs.String(), "error=") {
+		t.Fatalf("raw passkey assertion error leaked into logs: %s", logs.String())
+	}
+	if !strings.Contains(logs.String(), "error_kind=assertion_invalid") {
+		t.Fatalf("expected stable passkey assertion error category, got: %s", logs.String())
 	}
 }
 

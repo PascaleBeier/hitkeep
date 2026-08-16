@@ -298,7 +298,7 @@ func TestSearchConsoleSyncWorkerAuthFailuresNeedAttentionAndAuditSafeCategories(
 	}
 }
 
-func TestSearchConsoleSyncLogValuesIncludeFullUpstreamResponseBody(t *testing.T) {
+func TestSearchConsoleSyncLogValuesDoNotIncludeUpstreamResponseBody(t *testing.T) {
 	responseBody := `{"error":{"code":403,"message":"Property access denied","status":"PERMISSION_DENIED"}}`
 	err := &searchConsoleSyncError{stage: searchConsoleSyncStageQuery, err: fmt.Errorf("query failed: %w", &googleapi.Error{
 		Code:    http.StatusForbidden,
@@ -323,8 +323,8 @@ func TestSearchConsoleSyncLogValuesIncludeFullUpstreamResponseBody(t *testing.T)
 		t.Fatalf("expected provider status and reason, got %+v", fields)
 	}
 	message, _ := fields["error_message"].(string)
-	if message != responseBody {
-		t.Fatalf("expected full upstream response body, got %q", message)
+	if message == responseBody || message != "Property access denied fallback" {
+		t.Fatalf("expected safe provider message without upstream response body, got %q", message)
 	}
 }
 

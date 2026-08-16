@@ -15,6 +15,8 @@ import (
 
 	duckdb "github.com/duckdb/duckdb-go/v2"
 	"github.com/google/uuid"
+
+	"hitkeep/internal/hklog"
 )
 
 const (
@@ -25,8 +27,9 @@ const (
 var duckDBCoreExtensions = [...]string{"httpfs", "aws", "excel"}
 
 type Store struct {
-	db   *sql.DB
-	path string
+	db     *sql.DB
+	path   string
+	logger *slog.Logger
 	// connectorPath identifies the physical DuckDB instance. Attached tenant
 	// stores retain their own path for recovery/status but share this root.
 	connectorPath                   string
@@ -76,6 +79,34 @@ func WithMemoryLimit(limit string) StoreOption {
 	return func(s *Store) {
 		s.memoryLimit = strings.TrimSpace(limit)
 	}
+}
+
+// WithLogger supplies the logger used by database lifecycle diagnostics.
+func WithLogger(logger *slog.Logger) StoreOption {
+	return func(s *Store) {
+		if logger != nil {
+			s.logger = logger
+		}
+	}
+}
+
+// storeLoggerFromOptions extracts an explicitly injected logger without
+// constructing a database. Top-level database operations use this to seed
+// their context before opening any Store values.
+func storeLoggerFromOptions(optionSets ...[]StoreOption) *slog.Logger {
+	for _, options := range optionSets {
+		for _, option := range options {
+			if option == nil {
+				continue
+			}
+			candidate := &Store{}
+			option(candidate)
+			if candidate.logger != nil {
+				return candidate.logger
+			}
+		}
+	}
+	return nil
 }
 
 // WithThreads sets the number of DuckDB worker threads for this database.
@@ -172,6 +203,7 @@ func parseMemoryLimitBytes(limit string) (int64, bool) {
 func NewStore(path string, opts ...StoreOption) *Store {
 	store := &Store{
 		path:               path,
+		logger:             slog.Default(),
 		checkpointInterval: defaultMaintenanceCheckpointInterval,
 		checkpointGate:     &sync.Mutex{},
 		connectionGate:     newConnectionGate(16),
@@ -201,6 +233,7 @@ func (s *Store) duckDBOptions() []StoreOption {
 		opts = append(opts, WithThreads(s.threads))
 	}
 	opts = append(opts,
+		WithLogger(s.logger),
 		WithCheckpointInterval(s.checkpointInterval),
 		WithAutomaticRecovery(s.recoveryOptions.enabled, s.recoveryOptions.root),
 		WithAutomaticWALRecovery(s.recoveryOptions.automaticWALRecovery),
@@ -228,7 +261,7 @@ func (s *Store) Connect() error {
 		return fmt.Errorf("resume database recovery: %w", err)
 	}
 
-	slog.Info("Connecting to database...", "path", s.path)
+	s.logger.Info("Connecting to database...", "path", s.path)
 	db, err := s.openReconnectingDB(ctx)
 	if err != nil && isKnownWALReplayError(err) && s.recovery.available() {
 		var recoveryErr error
@@ -264,9 +297,9 @@ func (s *Store) Connect() error {
 	s.closeMu.Unlock()
 	s.recoveredOnConnect = recoveryTimestampChanged(recoveryBeforeConnect, s.DatabaseStatus().LastRecoveryAt)
 	if err := s.bootstrapCoreExtensions(); err != nil {
-		slog.Warn("DuckDB core extension bootstrap incomplete; XLSX exports and S3-backed flows may fail", "error", err)
+		s.logger.Warn("DuckDB core extension bootstrap incomplete; XLSX exports and S3-backed flows may fail", "error", err)
 	}
-	slog.Debug("Database connection established successfully.")
+	s.logger.Debug("Database connection established successfully.")
 	return nil
 }
 
@@ -290,7 +323,7 @@ func (s *Store) openReconnectingDB(ctx context.Context) (*sql.DB, error) {
 			s.reportFatal(fmt.Errorf("automatic database recovery failed: %w", err))
 		}
 		return err
-	})
+	}, s.logger)
 	connector.connectionGate = s.connectionGate
 	connector.configureDrainWatchdog(10*time.Second, s.reportDrainTimeout)
 	connector.configureInvalidationObserver(s.observeInvalidation)
@@ -393,7 +426,7 @@ func (s *Store) initConnection(execer driver.ExecerContext) error {
 		return fmt.Errorf("configure database allocator flushing: %w", err)
 	}
 	if _, err := execer.ExecContext(context.Background(), fmt.Sprintf("PRAGMA wal_autocheckpoint='%s';", walAutoCheckpointSize), nil); err != nil {
-		slog.Warn("Failed to set wal_autocheckpoint", "size", walAutoCheckpointSize, "error", err)
+		s.logger.Warn("Failed to set wal_autocheckpoint", "size", walAutoCheckpointSize, "error", err)
 	}
 	if s.memoryLimit != "" {
 		if _, err := execer.ExecContext(context.Background(), fmt.Sprintf("SET memory_limit='%s';", s.memoryLimit), nil); err != nil {
@@ -440,13 +473,13 @@ func (s *Store) bootstrapCoreExtensions() error {
 func (s *Store) loadInstalledExtension(ctx context.Context, execer driver.ExecerContext, name string) {
 	query := fmt.Sprintf("LOAD %s;", name)
 	if _, err := execer.ExecContext(ctx, query, nil); err != nil {
-		slog.Debug("DuckDB core extension not yet available on new connection", "extension", name, "error", err)
+		hklog.LoggerFromContextOr(ctx, s.logger).Debug("DuckDB core extension not yet available on new connection", "extension", name, "error", err)
 	}
 }
 
 func (s *Store) StartMaintenance(ctx context.Context) {
 	if s.db == nil {
-		slog.Warn("Skipping database maintenance loop because database is not connected")
+		hklog.LoggerFromContextOr(ctx, s.logger).Warn("Skipping database maintenance loop because database is not connected")
 		return
 	}
 	if s.checkpointInterval <= 0 {
@@ -471,7 +504,7 @@ func (s *Store) StartMaintenance(ctx context.Context) {
 				return
 			case <-ticker.C:
 				if err := s.Checkpoint(maintenanceCtx, "periodic"); err != nil && !errors.Is(err, context.Canceled) {
-					slog.Error("Periodic database checkpoint failed", "error", err)
+					hklog.LoggerFromContextOr(maintenanceCtx, s.logger).Error("Periodic database checkpoint failed", "error", err)
 					retry := time.NewTimer(30 * time.Second)
 					select {
 					case <-maintenanceCtx.Done():
@@ -481,7 +514,7 @@ func (s *Store) StartMaintenance(ctx context.Context) {
 						return
 					case <-retry.C:
 						if retryErr := s.Checkpoint(maintenanceCtx, "periodic_retry"); retryErr != nil && !errors.Is(retryErr, context.Canceled) {
-							slog.Error("Periodic database checkpoint retry failed", "error", retryErr)
+							hklog.LoggerFromContextOr(maintenanceCtx, s.logger).Error("Periodic database checkpoint retry failed", "error", retryErr)
 						}
 					}
 				}
@@ -508,7 +541,7 @@ func (s *Store) Checkpoint(ctx context.Context, reason string) error {
 		return fmt.Errorf("checkpoint database (%s): %w", strings.TrimSpace(reason), err)
 	}
 	s.status.checkpointSucceeded(time.Now().UTC())
-	slog.Debug("Database checkpoint completed", "reason", strings.TrimSpace(reason))
+	hklog.LoggerFromContextOr(ctx, s.logger).Debug("Database checkpoint completed", "reason", strings.TrimSpace(reason))
 	return nil
 }
 
@@ -528,7 +561,7 @@ func (s *Store) Close() error {
 		return nil
 	}
 
-	slog.Debug("Closing database connection...")
+	s.logger.Debug("Closing database connection...")
 	s.stopMaintenance()
 	s.analyticsMu.Lock()
 	if s.analyticsStatements != nil {

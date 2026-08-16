@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -11,12 +12,16 @@ import (
 )
 
 type fakeFeedClient struct {
-	files    map[string]string
-	failures map[string]bool
+	files          map[string]string
+	failures       map[string]bool
+	providerErrors map[string]error
 }
 
 func (c *fakeFeedClient) Do(req *http.Request) (*http.Response, error) {
 	url := req.URL.String()
+	if err, ok := c.providerErrors[url]; ok {
+		return nil, err
+	}
 	if c.failures[url] {
 		return &http.Response{StatusCode: http.StatusBadGateway, Status: "502 Bad Gateway", Body: http.NoBody}, nil
 	}
@@ -38,8 +43,13 @@ func newFakeFeedClient() *fakeFeedClient {
 			deviceDetectorURL:    "testdata/device_detector_bots_fixture.yml",
 			crawlerUserAgentsURL: "testdata/crawler_user_agents_fixture.json",
 		},
-		failures: map[string]bool{},
+		failures:       map[string]bool{},
+		providerErrors: map[string]error{},
 	}
+}
+
+func testAIAgentLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
 func findAgent(t *testing.T, data AIAgentData, token string) AIAgentEntry {
@@ -63,7 +73,7 @@ func hasAgent(data AIAgentData, token string) bool {
 }
 
 func TestFetchAIAgentDataMergesAllSources(t *testing.T) {
-	data, err := FetchAIAgentData(context.Background(), newFakeFeedClient())
+	data, err := FetchAIAgentData(context.Background(), newFakeFeedClient(), testAIAgentLogger())
 	if err != nil {
 		t.Fatalf("fetch: %v", err)
 	}
@@ -157,7 +167,7 @@ func TestFetchAIAgentDataToleratesSecondaryFailures(t *testing.T) {
 	client.failures[deviceDetectorURL] = true
 	client.failures[crawlerUserAgentsURL] = true
 
-	data, err := FetchAIAgentData(context.Background(), client)
+	data, err := FetchAIAgentData(context.Background(), client, testAIAgentLogger())
 	if err != nil {
 		t.Fatalf("secondary feed failures must not abort the fetch: %v", err)
 	}
@@ -172,12 +182,35 @@ func TestFetchAIAgentDataToleratesSecondaryFailures(t *testing.T) {
 	}
 }
 
-func TestFetchAIAgentDataFailsWhenPrimarySourceIsEmpty(t *testing.T) {
+func TestFetchAIAgentDataDoesNotLogRawFailureDetails(t *testing.T) {
+	const rawFailure = "provider response password=do-not-log"
 	client := newFakeFeedClient()
-	client.failures[aiRobotsTxtURL] = true
+	client.providerErrors[deviceDetectorURL] = fmt.Errorf("upstream returned %s", rawFailure)
+	var logs strings.Builder
+	logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
-	if _, err := FetchAIAgentData(context.Background(), client); err == nil {
+	if _, err := FetchAIAgentData(context.Background(), client, logger); err != nil {
+		t.Fatalf("partial failure should not return error: %v", err)
+	}
+	if strings.Contains(logs.String(), rawFailure) {
+		t.Fatalf("raw upstream failure appeared in logs: %s", logs.String())
+	}
+	if !strings.Contains(logs.String(), "source=device_detector_bots") || !strings.Contains(logs.String(), "error_kind=invalid_response") {
+		t.Fatalf("expected safe source and error kind in logs: %s", logs.String())
+	}
+}
+
+func TestFetchAIAgentDataFailsWhenPrimarySourceIsEmpty(t *testing.T) {
+	const rawFailure = "provider response password=do-not-return"
+	client := newFakeFeedClient()
+	client.providerErrors[aiRobotsTxtURL] = fmt.Errorf("upstream returned %s", rawFailure)
+
+	_, err := FetchAIAgentData(context.Background(), client, testAIAgentLogger())
+	if err == nil {
 		t.Fatal("expected error when the primary source fails")
+	}
+	if strings.Contains(err.Error(), rawFailure) {
+		t.Fatalf("raw upstream failure appeared in returned error: %v", err)
 	}
 }
 

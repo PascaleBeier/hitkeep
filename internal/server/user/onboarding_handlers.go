@@ -2,7 +2,6 @@ package user
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -27,14 +26,14 @@ func (h *handler) handleGetUserOnboarding() http.HandlerFunc {
 			onboarding, err = h.ctx.Store.GetUserOnboarding(r.Context(), userID)
 		}
 		if err != nil {
-			slog.Error("Failed to load user onboarding", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load user onboarding", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(onboarding); err != nil {
-			slog.Error("Failed to encode user onboarding response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode user onboarding response", "error", err)
 		}
 	}
 }
@@ -48,7 +47,7 @@ func (h *handler) handleDismissUserOnboarding() http.HandlerFunc {
 		}
 
 		if err := h.ctx.Store.DismissUserOnboarding(r.Context(), userID); err != nil {
-			slog.Error("Failed to dismiss user onboarding", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to dismiss user onboarding", "error", err, "user_id", userID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}

@@ -29,7 +29,10 @@ import (
 // Recover handles the "hitkeep recover <subcommand>" family of commands.
 // These are offline recovery operations that require HitKeep to be stopped
 // (DuckDB allows only one writer at a time).
-func Recover() {
+func Recover(logger *slog.Logger) {
+	if logger == nil {
+		panic("hitkeepcmd: logger is required")
+	}
 	if len(os.Args) < 3 {
 		fmt.Fprintln(os.Stderr, recoverUsage)
 		os.Exit(1)
@@ -37,15 +40,15 @@ func Recover() {
 
 	switch os.Args[2] {
 	case "disable-2fa":
-		recoverDisable2FA(os.Args[3:])
+		recoverDisable2FA(os.Args[3:], logger)
 	case "restore-backup":
-		recoverRestoreBackup(os.Args[3:])
+		recoverRestoreBackup(os.Args[3:], logger)
 	case "restore-database-bundle":
-		recoverRestoreDatabaseBundle(os.Args[3:])
+		recoverRestoreDatabaseBundle(os.Args[3:], logger)
 	case "rebuild-default-tenant":
-		recoverRebuildDefaultTenant(os.Args[3:])
+		recoverRebuildDefaultTenant(os.Args[3:], logger)
 	case "import-archives":
-		recoverImportArchives(os.Args[3:])
+		recoverImportArchives(os.Args[3:], logger)
 	default:
 		//nolint:gosec // G705: writes to stderr, not an HTTP response; %q safely quotes the argument.
 		fmt.Fprintf(os.Stderr, "Unknown recover subcommand: %q\n\n%s\n", os.Args[2], recoverUsage)
@@ -115,7 +118,7 @@ type databaseRecoveryBundleArtifact struct {
 	SHA256       string `json:"sha256"`
 }
 
-func recoverDisable2FA(args []string) {
+func recoverDisable2FA(args []string, logger *slog.Logger) {
 	fs := flag.NewFlagSet("disable-2fa", flag.ExitOnError)
 	email := fs.String("email", "", "User email address (required)")
 	dbPath := fs.String("db", "", "Path to hitkeep.db (defaults to server config value)")
@@ -133,7 +136,7 @@ func recoverDisable2FA(args []string) {
 
 	// Resolve DB path: flag overrides config default
 	if *dbPath == "" {
-		conf := config.Load()
+		conf := config.Load(logger)
 		*dbPath = conf.DBPath
 	}
 
@@ -267,7 +270,7 @@ func recoverDisable2FA(args []string) {
 	os.Exit(0)
 }
 
-func recoverRestoreDatabaseBundle(args []string) {
+func recoverRestoreDatabaseBundle(args []string, logger *slog.Logger) {
 	fs := flag.NewFlagSet("restore-database-bundle", flag.ExitOnError)
 	from := fs.String("from", "", "Recovery bundle directory containing manifest.json (required)")
 	dbPath := fs.String("db", "", "Target hitkeep.db path (defaults to server config value)")
@@ -281,7 +284,7 @@ func recoverRestoreDatabaseBundle(args []string) {
 		os.Exit(1)
 	}
 	if strings.TrimSpace(*dbPath) == "" {
-		*dbPath = config.Load().DBPath
+		*dbPath = config.Load(logger).DBPath
 	}
 
 	manifest, err := readDatabaseRecoveryBundle(*from)
@@ -469,7 +472,7 @@ func fileExistsForRestore(path string) bool {
 	return err == nil
 }
 
-func recoverRestoreBackup(args []string) {
+func recoverRestoreBackup(args []string, logger *slog.Logger) {
 	fs := flag.NewFlagSet("restore-backup", flag.ExitOnError)
 	from := fs.String("from", "", "Backup source path (required) — local dir or s3://")
 	snapshot := fs.String("snapshot", "", "Specific snapshot timestamp (default: latest)")
@@ -503,7 +506,7 @@ func recoverRestoreBackup(args []string) {
 	}
 
 	// Resolve defaults from config.
-	conf := config.Load()
+	conf := config.Load(logger)
 	if *dbPath == "" {
 		*dbPath = conf.DBPath
 	}
@@ -534,7 +537,7 @@ func recoverRestoreBackup(args []string) {
 		var err error
 		tenantIDs, err = discoverLocalTenantBackups(*from, snapshotName)
 		if err != nil {
-			slog.Warn("Could not discover tenant backups", "error", err)
+			logger.Warn("Could not discover tenant backups", "error", err)
 		}
 	}
 
@@ -916,7 +919,7 @@ func joinRestorePath(parts ...string) string {
 	return filepath.Join(parts...)
 }
 
-func recoverRebuildDefaultTenant(args []string) {
+func recoverRebuildDefaultTenant(args []string, logger *slog.Logger) {
 	fs := flag.NewFlagSet("rebuild-default-tenant", flag.ExitOnError)
 	dbPath := fs.String("db", "", "Path to hitkeep.db (defaults to server config value)")
 	dataPath := fs.String("data-path", "", "Tenant data directory (defaults to server config value)")
@@ -924,7 +927,7 @@ func recoverRebuildDefaultTenant(args []string) {
 	if err := fs.Parse(args); err != nil {
 		os.Exit(1)
 	}
-	conf := config.Load()
+	conf := config.Load(logger)
 	if *dbPath == "" {
 		*dbPath = conf.DBPath
 	}
@@ -953,6 +956,7 @@ func recoverRebuildDefaultTenant(args []string) {
 	}
 
 	tenantPath, err := database.RebuildDefaultTenantFile(context.Background(), *dbPath, *dataPath,
+		database.WithLogger(logger),
 		database.WithMemoryLimit(conf.DuckDBMemoryLimit),
 		database.WithThreads(conf.DuckDBThreads),
 	)
@@ -965,7 +969,7 @@ func recoverRebuildDefaultTenant(args []string) {
 	fmt.Println("Start HitKeep to begin collecting analytics again.")
 }
 
-func recoverImportArchives(args []string) {
+func recoverImportArchives(args []string, logger *slog.Logger) {
 	fs := flag.NewFlagSet("import-archives", flag.ExitOnError)
 	dbPath := fs.String("db", "", "Path to hitkeep.db (defaults to server config value)")
 	dataPath := fs.String("data-path", "", "Tenant data directory (defaults to server config value)")
@@ -975,7 +979,7 @@ func recoverImportArchives(args []string) {
 	if err := fs.Parse(args); err != nil {
 		os.Exit(1)
 	}
-	conf := config.Load()
+	conf := config.Load(logger)
 	if *dbPath == "" {
 		*dbPath = conf.DBPath
 	}

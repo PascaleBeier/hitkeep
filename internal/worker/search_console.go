@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strconv"
 	"strings"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/database"
+	"hitkeep/internal/hklog"
 	"hitkeep/internal/searchconsole"
 )
 
@@ -85,11 +85,11 @@ func NewSearchConsoleSyncWorker(tenantMgr *database.TenantStoreManager, source s
 
 func (w *SearchConsoleSyncWorker) Start(ctx context.Context) {
 	if w == nil || w.tenantMgr == nil || w.source == nil {
-		slog.Debug("Search Console sync worker is not configured")
+		hklog.LoggerFromContext(ctx).Debug("Search Console sync worker is not configured")
 		return
 	}
 	interval, limit := w.startConfig()
-	slog.Info("Search Console sync worker enabled", "interval", interval.String(), "limit", limit)
+	hklog.LoggerFromContext(ctx).Info("Search Console sync worker enabled", "interval", interval.String(), "limit", limit)
 	w.runDueAndLog(ctx, limit, "Initial Search Console sync run")
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -118,11 +118,11 @@ func (w *SearchConsoleSyncWorker) startConfig() (time.Duration, int) {
 func (w *SearchConsoleSyncWorker) runDueAndLog(ctx context.Context, limit int, label string) {
 	summary, err := w.RunDue(ctx, limit)
 	if err != nil {
-		slog.Error(label+" failed", "error", err)
+		hklog.LoggerFromContext(ctx).Error(label+" failed", "error", err)
 		return
 	}
 	if summary.Attempted > 0 {
-		slog.Info(label+" completed", "attempted", summary.Attempted, "succeeded", summary.Succeeded, "failed", summary.Failed)
+		hklog.LoggerFromContext(ctx).Info(label+" completed", "attempted", summary.Attempted, "succeeded", summary.Succeeded, "failed", summary.Failed)
 	}
 }
 
@@ -133,9 +133,9 @@ func (w *SearchConsoleSyncWorker) RunDue(ctx context.Context, limit int) (Search
 	now := w.now().UTC()
 	pruned, pruneErr := w.tenantMgr.Shared().PruneGoogleSearchConsoleErrorMessages(ctx, now.Add(-database.GoogleSearchConsoleErrorMessageRetention))
 	if pruneErr != nil {
-		slog.Error("Failed to prune retained Google Search Console error messages", "error", pruneErr)
+		hklog.LoggerFromContext(ctx).Error("Failed to prune retained Google Search Console error messages", "error", pruneErr)
 	} else if pruned > 0 {
-		slog.Info("Pruned retained Google Search Console error messages", "audit_entries", pruned)
+		hklog.LoggerFromContext(ctx).Info("Pruned retained Google Search Console error messages", "audit_entries", pruned)
 	}
 	candidates, err := w.tenantMgr.Shared().ListGoogleSearchConsoleSyncCandidates(ctx, now, limit)
 	if err != nil {
@@ -152,7 +152,7 @@ func (w *SearchConsoleSyncWorker) RunDue(ctx context.Context, limit int) (Search
 				"team_id", candidate.TeamID,
 			)
 			logValues = append(logValues, SearchConsoleSyncLogValues(err)...)
-			slog.Warn("Search Console site sync failed", logValues...)
+			hklog.LoggerFromContext(ctx).Warn("Search Console site sync failed", logValues...)
 			continue
 		}
 		summary.Succeeded++

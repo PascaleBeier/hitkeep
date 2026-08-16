@@ -15,7 +15,11 @@ type GoNSQLogger struct {
 
 func (l GoNSQLogger) Output(calldepth int, s string) error {
 	lvl := parseNSQLevel(s)
-	l.Logger.Log(context.Background(), lvl, s, "calldepth", calldepth)
+	logger := l.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+	logger.Log(context.Background(), lvl, s, "calldepth", calldepth)
 	return nil
 }
 

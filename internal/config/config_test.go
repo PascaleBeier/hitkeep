@@ -1,12 +1,34 @@
 package config
 
 import (
+	"bytes"
 	"flag"
+	"log/slog"
 	"net/netip"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestConfigValidationLogsDoNotIncludeRawValues(t *testing.T) {
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, nil))
+	env := map[string]string{
+		"HITKEEP_MAIL_PORT":    "secret-value",
+		"HITKEEP_MCP_DOCS_URL": "secret-value",
+	}
+
+	load(nil, func(key, fallback string) string {
+		if value, ok := env[key]; ok {
+			return value
+		}
+		return fallback
+	}, logger)
+
+	if strings.Contains(logs.String(), "secret-value") {
+		t.Fatalf("config validation logs raw environment values: %s", logs.String())
+	}
+}
 
 func TestLoadConfig(t *testing.T) {
 	tests := []struct {
@@ -596,6 +618,26 @@ func TestLogValueRedactsSecrets(t *testing.T) {
 	}
 	if !strings.Contains(got, "[redacted]") {
 		t.Fatal("LogValue should contain [redacted] markers")
+	}
+}
+
+func TestLogValueRedactsURLCredentialsAndQueries(t *testing.T) {
+	conf := &Config{
+		PublicURL:  "https://operator:public-secret@example.com/hitkeep?token=query-secret",
+		AIBaseURL:  "https://gateway.example/v1?api_key=base-secret",
+		S3Endpoint: "https://access:s3-secret@storage.example",
+	}
+	output := conf.LogValue().String()
+
+	for _, secret := range []string{"public-secret", "query-secret", "base-secret", "s3-secret", "operator", "access"} {
+		if strings.Contains(output, secret) {
+			t.Fatalf("LogValue leaked URL credential or query value %q: %s", secret, output)
+		}
+	}
+	for _, safeURL := range []string{"https://example.com/hitkeep", "https://gateway.example/v1", "https://storage.example"} {
+		if !strings.Contains(output, safeURL) {
+			t.Fatalf("LogValue should preserve safe URL %q: %s", safeURL, output)
+		}
 	}
 }
 

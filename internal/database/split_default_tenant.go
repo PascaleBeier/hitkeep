@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -16,6 +15,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/database/migrations"
+	"hitkeep/internal/hklog"
 )
 
 const (
@@ -58,6 +58,7 @@ func runDefaultTenantSplitWithOptions(ctx context.Context, sharedPath, dataPath 
 }
 
 func runDefaultTenantSplitWithFaults(ctx context.Context, sharedPath, dataPath string, controlOpts, dataOpts []StoreOption, fault defaultTenantSplitFaultHook) error {
+	ctx = hklog.WithLoggerIfAbsent(ctx, storeLoggerFromOptions(controlOpts, dataOpts))
 	if strings.TrimSpace(sharedPath) == "" || strings.TrimSpace(dataPath) == "" {
 		return errors.New("default tenant split requires shared and data paths")
 	}
@@ -86,7 +87,7 @@ func runDefaultTenantSplitWithFaults(ctx context.Context, sharedPath, dataPath s
 			if !errors.Is(err, os.ErrNotExist) {
 				return fmt.Errorf("stat default tenant file %s: %w", finalPath, err)
 			}
-			restored, restoreErr := restoreSplitControlBackupForMissingTenantFile(sharedPath, finalPath)
+			restored, restoreErr := restoreSplitControlBackupForMissingTenantFile(ctx, sharedPath, finalPath)
 			if restoreErr != nil {
 				return restoreErr
 			}
@@ -148,7 +149,7 @@ func runDefaultTenantSplitWithFaults(ctx context.Context, sharedPath, dataPath s
 		}
 	}
 
-	slog.Info("Default tenant split is complete", "tenant_id", defaultID, "tenant_path", finalPath)
+	hklog.LoggerFromContext(ctx).Info("Default tenant split is complete", "tenant_id", defaultID, "tenant_path", finalPath)
 	return nil
 }
 
@@ -196,7 +197,7 @@ func restorePreCompactControlBackup(sharedPath string) error {
 // restoring it and re-running the whole split loses nothing. The published
 // control never served application writes in this state: startup finishes the
 // split before the application starts.
-func restoreSplitControlBackupForMissingTenantFile(sharedPath, tenantPath string) (bool, error) {
+func restoreSplitControlBackupForMissingTenantFile(ctx context.Context, sharedPath, tenantPath string) (bool, error) {
 	if _, err := os.Stat(sharedPath + preCompactBackupSuffix); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return false, nil
@@ -206,7 +207,7 @@ func restoreSplitControlBackupForMissingTenantFile(sharedPath, tenantPath string
 	if err := restorePreCompactControlBackup(sharedPath); err != nil {
 		return false, err
 	}
-	slog.Warn("Restored pre-split control database because the split tenant file is missing; the default tenant split will run again",
+	hklog.LoggerFromContext(ctx).Warn("Restored pre-split control database because the split tenant file is missing; the default tenant split will run again",
 		"tenant_path", tenantPath, "control_path", sharedPath)
 	return true, nil
 }
@@ -311,7 +312,7 @@ func prepareDefaultTenantFile(ctx context.Context, sharedPath, finalPath, workPa
 		if err := syncParentDirectory(stray); err != nil {
 			return fmt.Errorf("sync preserved default tenant file: %w", err)
 		}
-		slog.Warn("Preserved unsentinelled default tenant file and will rebuild it", "path", stray)
+		hklog.LoggerFromContext(ctx).Warn("Preserved unsentinelled default tenant file and will rebuild it", "path", stray)
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("stat default tenant file: %w", err)
 	}

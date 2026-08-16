@@ -1,7 +1,6 @@
 package shared
 
 import (
-	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,19 +17,19 @@ func ServeTempExportFile(w http.ResponseWriter, r *http.Request, filename, downl
 
 	file, err := os.Open(cleaned) //nolint:gosec // cleaned path is constrained to an app-owned temp export with the expected prefix.
 	if err != nil {
-		slog.Error("Failed to open export file", "error", err, "filename", filepath.Base(cleaned))
+		LoggerFromContext(r.Context()).Error("Failed to open export file", "error", err, "filename", filepath.Base(cleaned))
 		http.Error(w, "Failed to export file", http.StatusInternalServerError)
 		return false
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			slog.Warn("Failed to close export file", "error", err, "filename", filepath.Base(cleaned))
+			LoggerFromContext(r.Context()).Warn("Failed to close export file", "error", err, "filename", filepath.Base(cleaned))
 		}
 	}()
 
 	info, err := file.Stat()
 	if err != nil {
-		slog.Error("Failed to stat export file", "error", err, "filename", filepath.Base(cleaned))
+		LoggerFromContext(r.Context()).Error("Failed to stat export file", "error", err, "filename", filepath.Base(cleaned))
 		http.Error(w, "Failed to export file", http.StatusInternalServerError)
 		return false
 	}

@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -21,6 +20,7 @@ import (
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/localization"
 	"hitkeep/internal/mailables"
+	"hitkeep/internal/mailer"
 	serverauth "hitkeep/internal/server/auth"
 	"hitkeep/internal/server/shared"
 )
@@ -238,7 +238,7 @@ func (h *handler) handleSignup() http.HandlerFunc {
 
 		hashedPassword, err := serverauth.HashPassword(req.Password)
 		if err != nil {
-			slog.Error("Failed to hash cloud signup password", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to hash cloud signup password", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -262,14 +262,15 @@ func (h *handler) handleSignup() http.HandlerFunc {
 			AcceptedTosAt:   time.Now().UTC(),
 		})
 		if err != nil {
-			slog.Error("Failed to create pending signup token", "error", err, "email", req.Email)
+			shared.LoggerFromContext(r.Context()).Error("Failed to create pending signup token", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		verifyLink := signupVerificationLink(h.ctx.Config.PublicURL, token)
 		if err := h.ctx.Mailer.Send(req.Email, mailables.NewEmailVerification(verifyLink, req.TeamName, req.Locale)); err != nil {
-			slog.Error("Failed to send verification email", "error", err, "email", req.Email)
+			details := mailer.DescribeError(err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to send verification email", "error_code", "smtp_send_failed", "error_stage", details.Stage, "error_kind", details.Kind, "error_message", details.Message, "smtp_code", details.SMTPCode)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -284,7 +285,7 @@ func (h *handler) handleSignup() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("Failed to encode cloud signup response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode cloud signup response", "error", err)
 		}
 	}
 }
@@ -307,25 +308,25 @@ func (h *handler) handleResendSignupVerification() http.HandlerFunc {
 		}
 
 		if h.ctx.Mailer == nil {
-			writeResendSignupVerificationAccepted(w)
+			writeResendSignupVerificationAccepted(r.Context(), w)
 			return
 		}
 
 		prepared, err := h.ctx.Store.PreparePendingSignupVerificationResend(r.Context(), req.Email, time.Now().UTC())
 		if err != nil {
 			if !errors.Is(err, database.ErrPendingSignupResendUnavailable) {
-				slog.Warn("Unable to prepare signup verification resend", "error_code", "store_unavailable")
+				shared.LoggerFromContext(r.Context()).Warn("Unable to prepare signup verification resend", "error_code", "store_unavailable")
 			}
-			writeResendSignupVerificationAccepted(w)
+			writeResendSignupVerificationAccepted(r.Context(), w)
 			return
 		}
 
 		verifyLink := signupVerificationLink(h.ctx.Config.PublicURL, prepared.Token)
 		if err := h.ctx.Mailer.Send(prepared.Email, mailables.NewEmailVerification(verifyLink, prepared.TeamName, prepared.Locale)); err != nil {
-			slog.Warn("Unable to resend signup verification email", "error_code", "mail_send_failed")
+			shared.LoggerFromContext(r.Context()).Warn("Unable to resend signup verification email", "error_code", "mail_send_failed")
 		}
 
-		writeResendSignupVerificationAccepted(w)
+		writeResendSignupVerificationAccepted(r.Context(), w)
 	}
 }
 
@@ -333,14 +334,14 @@ func signupVerificationLink(publicURL, token string) string {
 	return appurl.Path(publicURL, "/api/cloud/signup/verify?token="+token)
 }
 
-func writeResendSignupVerificationAccepted(w http.ResponseWriter) {
+func writeResendSignupVerificationAccepted(ctx context.Context, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
 	if err := json.NewEncoder(w).Encode(resendSignupVerificationResponse{
 		Status:            "accepted",
 		RetryAfterSeconds: int(database.PendingSignupVerificationResendCooldown / time.Second),
 	}); err != nil {
-		slog.Error("Failed to encode signup verification resend response", "error_code", "response_encode_failed")
+		shared.LoggerFromContext(ctx).Error("Failed to encode signup verification resend response", "error_code", "response_encode_failed")
 	}
 }
 
@@ -367,7 +368,7 @@ func (h *handler) handleVerifySignup() http.HandlerFunc {
 
 		entry, err := h.ctx.Store.CompletePendingSignup(r.Context(), token)
 		if err != nil {
-			slog.Warn("Signup verification failed", "error", err, "token_prefix", safeTokenPrefix(token))
+			shared.LoggerFromContext(r.Context()).Warn("Signup verification failed", "error", err)
 			http.Redirect(w, r, signupURL("expired"), http.StatusFound)
 			return
 		}
@@ -390,7 +391,7 @@ func (h *handler) handleVerifySignup() http.HandlerFunc {
 			return
 		}
 		if err != nil {
-			slog.Error("Failed to create managed cloud account during verification", "error", err, "email", entry.Email)
+			shared.LoggerFromContext(r.Context()).Error("Failed to create managed cloud account during verification", "error", err)
 			http.Redirect(w, r, signupURL("expired"), http.StatusFound)
 			return
 		}
@@ -402,7 +403,7 @@ func (h *handler) handleVerifySignup() http.HandlerFunc {
 			BillingInterval:    normalizeBillingInterval(entry.BillingInterval),
 			SubscriptionStatus: database.CloudSubscriptionStatusFree,
 		}); err != nil {
-			slog.Error("Failed to initialize cloud billing account", "error", err, "team_id", account.TenantID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to initialize cloud billing account", "error", err, "team_id", account.TenantID)
 			http.Redirect(w, r, signupURL("expired"), http.StatusFound)
 			return
 		}
@@ -412,11 +413,11 @@ func (h *handler) handleVerifySignup() http.HandlerFunc {
 			PlanCode:        entry.PlanCode,
 			BillingInterval: entry.BillingInterval,
 		}); err != nil {
-			slog.Warn("Failed to record verified signup conversion", "error", err, "team_id", account.TenantID)
+			shared.LoggerFromContext(r.Context()).Warn("Failed to record verified signup conversion", "error", err, "team_id", account.TenantID)
 		}
 
 		if err := issueLoginSession(w, h.ctx.Config, account.UserID); err != nil {
-			slog.Error("Failed to issue cloud signup login session", "error", err, "user_id", account.UserID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to issue cloud signup login session", "error", err, "user_id", account.UserID)
 			http.Redirect(w, r, signupURL("expired"), http.StatusFound)
 			return
 		}
@@ -461,14 +462,7 @@ func (h *handler) handleListCloudPlans() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(plans); err != nil {
-			slog.Error("Failed to encode cloud plans response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode cloud plans response", "error", err)
 		}
 	}
-}
-
-func safeTokenPrefix(token string) string {
-	if len(token) > 8 {
-		return token[:8] + "..."
-	}
-	return "***"
 }

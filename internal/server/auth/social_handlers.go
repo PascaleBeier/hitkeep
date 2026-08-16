@@ -1,11 +1,11 @@
 package auth
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -72,14 +72,14 @@ type socialCloudSignupRequest struct {
 }
 
 func (h *handler) handleSocialProviders() http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		providers := make([]api.SocialProvider, 0, 3)
 		for _, status := range socialauth.ProviderStatuses(h.ctx.Config) {
 			if status.Configured {
 				providers = append(providers, api.SocialProvider{ID: status.Provider, DisplayName: status.DisplayName})
 			}
 		}
-		writeSocialJSON(w, http.StatusOK, api.SocialProvidersResponse{
+		writeSocialJSON(r.Context(), w, http.StatusOK, api.SocialProvidersResponse{
 			Providers: providers, SignupEnabled: h.socialSignupEnabled(),
 		})
 	}
@@ -88,13 +88,13 @@ func (h *handler) handleSocialProviders() http.HandlerFunc {
 func (h *handler) handleSocialStart(linkFlow bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if h.ctx.Store == nil || h.ctx.AuthState == nil || h.ctx.SocialAuth == nil {
-			writeSocialError(w, http.StatusServiceUnavailable, "social_unavailable")
+			writeSocialError(r.Context(), w, http.StatusServiceUnavailable, "social_unavailable")
 			return
 		}
 		providerName := strings.ToLower(strings.TrimSpace(r.PathValue("provider")))
 		providerConfig, err := socialauth.ConfigForProvider(h.ctx.Config, providerName)
 		if err != nil {
-			writeSocialError(w, http.StatusNotFound, "social_provider_unavailable")
+			writeSocialError(r.Context(), w, http.StatusNotFound, "social_provider_unavailable")
 			return
 		}
 
@@ -108,7 +108,7 @@ func (h *handler) handleSocialStart(linkFlow bool) http.HandlerFunc {
 			flow = "link"
 			userID = shared.GetUserIDFromContext(r)
 			if userID == uuid.Nil {
-				writeSocialError(w, http.StatusUnauthorized, "unauthorized")
+				writeSocialError(r.Context(), w, http.StatusUnauthorized, "unauthorized")
 				return
 			}
 		} else {
@@ -116,28 +116,28 @@ func (h *handler) handleSocialStart(linkFlow bool) http.HandlerFunc {
 			case "login":
 			case "signup":
 				if !h.socialSignupEnabled() {
-					writeSocialError(w, http.StatusNotFound, "social_signup_disabled")
+					writeSocialError(r.Context(), w, http.StatusNotFound, "social_signup_disabled")
 					return
 				}
 			case "invite":
 				if strings.TrimSpace(req.InviteToken) == "" {
-					writeSocialError(w, http.StatusBadRequest, "invite_token_required")
+					writeSocialError(r.Context(), w, http.StatusBadRequest, "invite_token_required")
 					return
 				}
 				if _, err := h.ctx.Store.ResolvePasswordResetEmail(r.Context(), req.InviteToken); err != nil {
-					writeSocialError(w, http.StatusForbidden, "invite_invalid")
+					writeSocialError(r.Context(), w, http.StatusForbidden, "invite_invalid")
 					return
 				}
 			default:
-				writeSocialError(w, http.StatusBadRequest, "social_flow_invalid")
+				writeSocialError(r.Context(), w, http.StatusBadRequest, "social_flow_invalid")
 				return
 			}
 		}
 
 		authorization, err := h.ctx.SocialAuth.Begin(r.Context(), providerConfig)
 		if err != nil {
-			slog.Warn("Social provider authorization could not be prepared", "provider", providerName, "category", socialErrorCategory(err))
-			writeSocialError(w, http.StatusServiceUnavailable, "social_provider_unavailable")
+			shared.LoggerFromContext(r.Context()).Warn("Social provider authorization could not be prepared", "provider", providerName, "category", socialErrorCategory(err))
+			writeSocialError(r.Context(), w, http.StatusServiceUnavailable, "social_provider_unavailable")
 			return
 		}
 		state := h.ctx.AuthState.CreateSocialOAuthState(shared.SocialOAuthState{
@@ -147,7 +147,7 @@ func (h *handler) handleSocialStart(linkFlow bool) http.HandlerFunc {
 			ExpiresAt: time.Now().UTC().Add(socialFlowTTL),
 		})
 		h.setSocialStateCookie(w, state)
-		writeSocialJSON(w, http.StatusOK, map[string]string{"auth_url": authorization.URL(state)})
+		writeSocialJSON(r.Context(), w, http.StatusOK, map[string]string{"auth_url": authorization.URL(state)})
 	}
 }
 
@@ -183,7 +183,7 @@ func (h *handler) handleSocialCallback() http.HandlerFunc {
 			Nonce: state.Nonce, CodeVerifier: state.CodeVerifier,
 		}, r.URL.Query().Get("code"))
 		if err != nil {
-			slog.Warn("Social provider callback failed", "provider", providerName, "category", socialErrorCategory(err))
+			shared.LoggerFromContext(r.Context()).Warn("Social provider callback failed", "provider", providerName, "category", socialErrorCategory(err))
 			h.appendAuthAuditSystem(r, "auth.social_login_failed", "failure", providerName, "provider="+providerName+";reason="+socialErrorCategory(err))
 			http.Redirect(w, r, h.socialErrorRedirectURL(state, socialCallbackErrorCode(err)), http.StatusSeeOther)
 			return
@@ -192,7 +192,7 @@ func (h *handler) handleSocialCallback() http.HandlerFunc {
 		if state.Flow == "link" {
 			if err := h.completeAuthenticatedSocialLink(r, state.UserID, identity); err != nil {
 				category := socialDatabaseErrorCategory(err)
-				slog.Warn("Social identity link failed", "provider", providerName, "category", category, "user_id", state.UserID)
+				shared.LoggerFromContext(r.Context()).Warn("Social identity link failed", "provider", providerName, "category", category, "user_id", state.UserID)
 				h.appendAuthAuditForUserTeams(r, state.UserID, "auth.social_identity_link_failed", "failure", "provider="+providerName+";reason="+category, true)
 				http.Redirect(w, r, h.socialErrorRedirectURL(state, "social_identity_conflict"), http.StatusSeeOther)
 				return
@@ -293,7 +293,7 @@ func (h *handler) completeAuthenticatedSocialLink(r *http.Request, userID uuid.U
 func (h *handler) handleSocialPreview() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if h.ctx == nil || h.ctx.AuthState == nil || h.ctx.Store == nil {
-			writeSocialError(w, http.StatusServiceUnavailable, "social_unavailable")
+			writeSocialError(r.Context(), w, http.StatusServiceUnavailable, "social_unavailable")
 			return
 		}
 		var req socialCompletionRequest
@@ -302,24 +302,24 @@ func (h *handler) handleSocialPreview() http.HandlerFunc {
 		}
 		completion, ok := h.ctx.AuthState.GetSocialCompletion(req.CompletionToken)
 		if !ok {
-			writeSocialError(w, http.StatusConflict, "social_completion_invalid")
+			writeSocialError(r.Context(), w, http.StatusConflict, "social_completion_invalid")
 			return
 		}
 		config, err := socialauth.ConfigForProvider(h.ctx.Config, completion.Provider)
 		if err != nil {
-			writeSocialError(w, http.StatusServiceUnavailable, "social_provider_unavailable")
+			writeSocialError(r.Context(), w, http.StatusServiceUnavailable, "social_provider_unavailable")
 			return
 		}
 		emailConfirmationRequired := false
 		if completion.Provider == socialauth.ProviderMicrosoft {
 			identity, err := h.ctx.Store.GetSocialIdentity(r.Context(), completion.Provider, completion.Subject)
 			if err != nil {
-				writeSocialError(w, http.StatusInternalServerError, "social_login_failed")
+				writeSocialError(r.Context(), w, http.StatusInternalServerError, "social_login_failed")
 				return
 			}
 			emailConfirmationRequired = identity == nil
 		}
-		writeSocialJSON(w, http.StatusOK, socialPreviewResponse{
+		writeSocialJSON(r.Context(), w, http.StatusOK, socialPreviewResponse{
 			Provider: completion.Provider, DisplayName: config.DisplayName, ObservedEmail: completion.ObservedEmail,
 			EmailVerified: completion.EmailVerified, EmailConfirmationRequired: emailConfirmationRequired, Flow: completion.Flow,
 		})
@@ -329,7 +329,7 @@ func (h *handler) handleSocialPreview() http.HandlerFunc {
 func (h *handler) handleSocialComplete() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if h.ctx == nil || h.ctx.AuthState == nil || h.ctx.Store == nil {
-			writeSocialError(w, http.StatusServiceUnavailable, "social_unavailable")
+			writeSocialError(r.Context(), w, http.StatusServiceUnavailable, "social_unavailable")
 			return
 		}
 		var req socialCompletionRequest
@@ -338,7 +338,7 @@ func (h *handler) handleSocialComplete() http.HandlerFunc {
 		}
 		completion, ok := h.ctx.AuthState.ConsumeSocialCompletion(req.CompletionToken)
 		if !ok {
-			writeSocialError(w, http.StatusConflict, "social_completion_invalid")
+			writeSocialError(r.Context(), w, http.StatusConflict, "social_completion_invalid")
 			return
 		}
 		switch completion.Flow {
@@ -347,7 +347,7 @@ func (h *handler) handleSocialComplete() http.HandlerFunc {
 		case "login":
 			h.completeSocialLogin(w, r, req, completion)
 		default:
-			writeSocialError(w, http.StatusBadRequest, "social_flow_invalid")
+			writeSocialError(r.Context(), w, http.StatusBadRequest, "social_flow_invalid")
 		}
 	}
 }
@@ -355,13 +355,13 @@ func (h *handler) handleSocialComplete() http.HandlerFunc {
 func (h *handler) completeSocialLogin(w http.ResponseWriter, r *http.Request, req socialCompletionRequest, completion shared.SocialCompletion) {
 	user, identity, err := h.ctx.Store.GetUserBySocialIdentity(r.Context(), completion.Provider, completion.Subject)
 	if err != nil {
-		writeSocialError(w, http.StatusInternalServerError, "social_login_failed")
+		writeSocialError(r.Context(), w, http.StatusInternalServerError, "social_login_failed")
 		return
 	}
 	if identity == nil && completion.EmailVerified && completion.Provider != socialauth.ProviderMicrosoft {
 		user, err = h.ctx.Store.GetUserByEmail(r.Context(), completion.ObservedEmail)
 		if err != nil {
-			writeSocialError(w, http.StatusInternalServerError, "social_login_failed")
+			writeSocialError(r.Context(), w, http.StatusInternalServerError, "social_login_failed")
 			return
 		}
 		if user != nil {
@@ -371,7 +371,7 @@ func (h *handler) completeSocialLogin(w http.ResponseWriter, r *http.Request, re
 			})
 			if err != nil {
 				h.appendAuthAuditSystem(r, "auth.social_login_failed", "failure", completion.Provider, "provider="+completion.Provider+";reason=identity_conflict")
-				writeSocialError(w, http.StatusConflict, "social_identity_conflict")
+				writeSocialError(r.Context(), w, http.StatusConflict, "social_identity_conflict")
 				return
 			}
 			h.appendAuthAuditForUserTeams(r, user.ID, "auth.social_identity_linked", "success", "provider="+completion.Provider+";reason=verified_email_match", true)
@@ -383,7 +383,7 @@ func (h *handler) completeSocialLogin(w http.ResponseWriter, r *http.Request, re
 			ObservedEmail: completion.ObservedEmail, MarkUsed: true,
 		})
 		if err != nil {
-			writeSocialError(w, http.StatusConflict, "social_identity_conflict")
+			writeSocialError(r.Context(), w, http.StatusConflict, "social_identity_conflict")
 			return
 		}
 		h.writeCompletedSocialLogin(w, r, user.ID, completion)
@@ -397,78 +397,78 @@ func (h *handler) completeSocialLogin(w http.ResponseWriter, r *http.Request, re
 		}
 		targetEmail, _, err = sso.NormalizeEmail(targetEmail)
 		if err != nil {
-			writeSocialError(w, http.StatusBadRequest, "social_email_required")
+			writeSocialError(r.Context(), w, http.StatusBadRequest, "social_email_required")
 			return
 		}
 		targetUser, err := h.ctx.Store.GetUserByEmail(r.Context(), targetEmail)
 		if err != nil {
-			writeSocialError(w, http.StatusInternalServerError, "social_login_failed")
+			writeSocialError(r.Context(), w, http.StatusInternalServerError, "social_login_failed")
 			return
 		}
 		if targetUser == nil {
 			if h.socialSignupEnabled() {
-				writeSocialJSON(w, http.StatusOK, h.socialSignupRequiredResponse(completion))
+				writeSocialJSON(r.Context(), w, http.StatusOK, h.socialSignupRequiredResponse(completion))
 				return
 			}
 			h.appendAuthAuditSystem(r, "auth.social_login_failed", "failure", completion.Provider, "provider="+completion.Provider+";reason=account_not_found")
-			writeSocialError(w, http.StatusForbidden, "social_account_not_found")
+			writeSocialError(r.Context(), w, http.StatusForbidden, "social_account_not_found")
 			return
 		}
 		if err := h.sendSocialConfirmation(r, completion, targetEmail, &targetUser.ID, socialCloudSignupRequest{}); err != nil {
-			writeSocialError(w, http.StatusBadGateway, "social_confirmation_failed")
+			writeSocialError(r.Context(), w, http.StatusBadGateway, "social_confirmation_failed")
 			return
 		}
-		writeSocialJSON(w, http.StatusOK, socialCompleteResponse{Status: "verification_sent"})
+		writeSocialJSON(r.Context(), w, http.StatusOK, socialCompleteResponse{Status: "verification_sent"})
 		return
 	}
 
 	if h.socialSignupEnabled() {
-		writeSocialJSON(w, http.StatusOK, h.socialSignupRequiredResponse(completion))
+		writeSocialJSON(r.Context(), w, http.StatusOK, h.socialSignupRequiredResponse(completion))
 		return
 	}
-	writeSocialError(w, http.StatusForbidden, "social_account_not_found")
+	writeSocialError(r.Context(), w, http.StatusForbidden, "social_account_not_found")
 	h.appendAuthAuditSystem(r, "auth.social_login_failed", "failure", completion.Provider, "provider="+completion.Provider+";reason=account_not_found")
 }
 
 func (h *handler) completeSocialInvite(w http.ResponseWriter, r *http.Request, completion shared.SocialCompletion) {
 	email, err := h.ctx.Store.ResolvePasswordResetEmail(r.Context(), completion.InviteToken)
 	if err != nil {
-		writeSocialError(w, http.StatusBadRequest, "invite_invalid")
+		writeSocialError(r.Context(), w, http.StatusBadRequest, "invite_invalid")
 		return
 	}
 	if completion.Provider != socialauth.ProviderMicrosoft {
 		providerEmail, _, normalizeErr := sso.NormalizeEmail(completion.ObservedEmail)
 		if normalizeErr != nil || !completion.EmailVerified || !strings.EqualFold(providerEmail, email) {
 			h.appendAuthAuditSystem(r, "auth.social_login_failed", "failure", completion.Provider, "provider="+completion.Provider+";reason=invite_email_mismatch")
-			writeSocialError(w, http.StatusForbidden, "social_invite_email_mismatch")
+			writeSocialError(r.Context(), w, http.StatusForbidden, "social_invite_email_mismatch")
 			return
 		}
 	}
 	user, err := h.ctx.Store.GetUserByEmail(r.Context(), email)
 	if err != nil || user == nil {
-		writeSocialError(w, http.StatusBadRequest, "invite_invalid")
+		writeSocialError(r.Context(), w, http.StatusBadRequest, "invite_invalid")
 		return
 	}
 	pendingInvites, err := h.ctx.Store.ListPendingTeamInvitesByEmail(r.Context(), email)
 	if err != nil || len(pendingInvites) == 0 {
-		writeSocialError(w, http.StatusBadRequest, "invite_invalid")
+		writeSocialError(r.Context(), w, http.StatusBadRequest, "invite_invalid")
 		return
 	}
 	if err := h.validateCloudInviteAcceptance(r.Context(), email, user.ID, pendingInvites); err != nil {
-		h.writeInviteAcceptanceError(w, err, email, user.ID)
+		h.writeInviteAcceptanceError(r.Context(), w, err, user.ID)
 		return
 	}
 	if _, err := h.ctx.Store.LinkSocialIdentity(r.Context(), database.LinkSocialIdentityInput{
 		UserID: user.ID, Provider: completion.Provider, Subject: completion.Subject,
 		ObservedEmail: completion.ObservedEmail, MarkUsed: true,
 	}); err != nil {
-		writeSocialError(w, http.StatusConflict, "social_identity_conflict")
+		writeSocialError(r.Context(), w, http.StatusConflict, "social_identity_conflict")
 		return
 	}
 	h.appendAuthAuditForUserTeams(r, user.ID, "auth.social_identity_linked", "success", "provider="+completion.Provider+";reason=valid_invite", true)
 	acceptedEmail, acceptedInvites, err := h.ctx.Store.AcceptInviteForAuthenticatedUser(r.Context(), completion.InviteToken, user.ID)
 	if err != nil {
-		h.writeInviteAcceptanceError(w, err, email, user.ID)
+		h.writeInviteAcceptanceError(r.Context(), w, err, user.ID)
 		return
 	}
 	h.appendInviteAcceptedAuditEvents(r, user.ID, acceptedEmail, acceptedInvites)
@@ -478,8 +478,8 @@ func (h *handler) completeSocialInvite(w http.ResponseWriter, r *http.Request, c
 func (h *handler) writeCompletedSocialLogin(w http.ResponseWriter, r *http.Request, userID uuid.UUID, completion shared.SocialCompletion) {
 	response, err := h.beginUserLogin(r, w, userID, completion.RememberMe, completion.Provider)
 	if err != nil {
-		slog.Error("Failed to complete social login", "error", err, "provider", completion.Provider, "user_id", userID)
-		writeSocialError(w, http.StatusInternalServerError, "social_login_failed")
+		shared.LoggerFromContext(r.Context()).Error("Failed to complete social login", "error", err, "provider", completion.Provider, "user_id", userID)
+		writeSocialError(r.Context(), w, http.StatusInternalServerError, "social_login_failed")
 		return
 	}
 	if response.Status == "mfa_required" {
@@ -487,7 +487,7 @@ func (h *handler) writeCompletedSocialLogin(w http.ResponseWriter, r *http.Reque
 	} else {
 		h.appendAuthAuditForUserTeams(r, userID, "auth.social_login_succeeded", "success", "provider="+completion.Provider+";reason=success", true)
 	}
-	writeSocialJSON(w, http.StatusOK, socialCompleteResponse{
+	writeSocialJSON(r.Context(), w, http.StatusOK, socialCompleteResponse{
 		Status: response.Status, RedirectURL: completion.ReturnPath, ChallengeToken: response.ChallengeToken,
 		Factors: response.Factors, Passkey: response.Passkey,
 	})
@@ -496,11 +496,11 @@ func (h *handler) writeCompletedSocialLogin(w http.ResponseWriter, r *http.Reque
 func (h *handler) handleSocialCloudSignupComplete() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if h.ctx == nil || h.ctx.AuthState == nil || h.ctx.Store == nil {
-			writeSocialError(w, http.StatusServiceUnavailable, "social_unavailable")
+			writeSocialError(r.Context(), w, http.StatusServiceUnavailable, "social_unavailable")
 			return
 		}
 		if !h.socialSignupEnabled() {
-			writeSocialError(w, http.StatusNotFound, "social_signup_disabled")
+			writeSocialError(r.Context(), w, http.StatusNotFound, "social_signup_disabled")
 			return
 		}
 		var req socialCloudSignupRequest
@@ -509,7 +509,7 @@ func (h *handler) handleSocialCloudSignupComplete() http.HandlerFunc {
 		}
 		completion, ok := h.ctx.AuthState.GetSocialCompletion(req.CompletionToken)
 		if !ok || (completion.Flow != "signup" && completion.Flow != "login") {
-			writeSocialError(w, http.StatusConflict, "social_completion_invalid")
+			writeSocialError(r.Context(), w, http.StatusConflict, "social_completion_invalid")
 			return
 		}
 
@@ -522,12 +522,12 @@ func (h *handler) handleSocialCloudSignupComplete() http.HandlerFunc {
 			req.TeamName = localization.DefaultTeamName(req.Locale, "")
 		}
 		if !req.AcceptedTOS || req.TeamName == "" || req.PlanCode == "" || req.BillingInterval == "" || (req.Jurisdiction != "EU" && req.Jurisdiction != "US") {
-			writeSocialError(w, http.StatusBadRequest, "social_signup_invalid")
+			writeSocialError(r.Context(), w, http.StatusBadRequest, "social_signup_invalid")
 			return
 		}
 		configuredJurisdiction := strings.ToUpper(strings.TrimSpace(h.ctx.Config.CloudJurisdiction))
 		if configuredJurisdiction != "" && req.Jurisdiction != "" && configuredJurisdiction != req.Jurisdiction {
-			writeSocialError(w, http.StatusBadRequest, "jurisdiction_mismatch")
+			writeSocialError(r.Context(), w, http.StatusBadRequest, "jurisdiction_mismatch")
 			return
 		}
 
@@ -538,31 +538,31 @@ func (h *handler) handleSocialCloudSignupComplete() http.HandlerFunc {
 		var err error
 		targetEmail, _, err = sso.NormalizeEmail(targetEmail)
 		if err != nil {
-			writeSocialError(w, http.StatusBadRequest, "social_email_required")
+			writeSocialError(r.Context(), w, http.StatusBadRequest, "social_email_required")
 			return
 		}
 		existing, err := h.ctx.Store.GetUserByEmail(r.Context(), targetEmail)
 		if err != nil {
-			writeSocialError(w, http.StatusInternalServerError, "social_signup_failed")
+			writeSocialError(r.Context(), w, http.StatusInternalServerError, "social_signup_failed")
 			return
 		}
 		if existing != nil {
-			writeSocialError(w, http.StatusConflict, "social_account_exists")
+			writeSocialError(r.Context(), w, http.StatusConflict, "social_account_exists")
 			return
 		}
 		consumed, ok := h.ctx.AuthState.ConsumeSocialCompletion(req.CompletionToken)
 		if !ok {
-			writeSocialError(w, http.StatusConflict, "social_completion_invalid")
+			writeSocialError(r.Context(), w, http.StatusConflict, "social_completion_invalid")
 			return
 		}
 		completion = consumed
 
 		if completion.Provider == socialauth.ProviderMicrosoft {
 			if err := h.sendSocialConfirmation(r, completion, targetEmail, nil, req); err != nil {
-				writeSocialError(w, http.StatusBadGateway, "social_confirmation_failed")
+				writeSocialError(r.Context(), w, http.StatusBadGateway, "social_confirmation_failed")
 				return
 			}
-			writeSocialJSON(w, http.StatusCreated, map[string]any{
+			writeSocialJSON(r.Context(), w, http.StatusCreated, map[string]any{
 				"status": "verification_sent", "plan_code": req.PlanCode, "billing": req.BillingInterval,
 			})
 			return
@@ -576,15 +576,15 @@ func (h *handler) handleSocialCloudSignupComplete() http.HandlerFunc {
 				status = http.StatusConflict
 				code = "social_account_exists"
 			}
-			writeSocialError(w, status, code)
+			writeSocialError(r.Context(), w, status, code)
 			return
 		}
 		if err := h.issueLoginSession(r.Context(), w, account.UserID, false); err != nil {
-			writeSocialError(w, http.StatusInternalServerError, "social_signup_failed")
+			writeSocialError(r.Context(), w, http.StatusInternalServerError, "social_signup_failed")
 			return
 		}
 		h.appendAuthAuditForUserTeams(r, account.UserID, "auth.social_signup_succeeded", "success", "provider="+completion.Provider+";reason=verified_provider_email", true)
-		writeSocialJSON(w, http.StatusCreated, map[string]any{
+		writeSocialJSON(r.Context(), w, http.StatusCreated, map[string]any{
 			"status": "ok", "plan_code": req.PlanCode, "billing": req.BillingInterval,
 			"redirect_url": socialSignupRedirect(req.PlanCode, req.BillingInterval),
 		})
@@ -719,7 +719,7 @@ func (h *handler) createSocialCloudAccount(r *http.Request, completion shared.So
 		TenantID: account.TenantID, EventName: database.CloudConversionSignupVerified,
 		PlanCode: req.PlanCode, BillingInterval: req.BillingInterval,
 	}); err != nil {
-		slog.Warn("Failed to record social signup conversion", "error", err, "team_id", account.TenantID, "provider", completion.Provider)
+		shared.LoggerFromContext(r.Context()).Warn("Failed to record social signup conversion", "error", err, "team_id", account.TenantID, "provider", completion.Provider)
 	}
 	return account, nil
 }
@@ -739,7 +739,7 @@ func (h *handler) handleSocialUnlink() http.HandlerFunc {
 		if req.CurrentPassword != "" {
 			user, err := h.ctx.Store.GetUserByID(r.Context(), userID)
 			if err != nil || user == nil {
-				writeSocialError(w, http.StatusInternalServerError, "social_unlink_failed")
+				writeSocialError(r.Context(), w, http.StatusInternalServerError, "social_unlink_failed")
 				return
 			}
 			if user.PasswordLoginEnabled {
@@ -753,12 +753,12 @@ func (h *handler) handleSocialUnlink() http.HandlerFunc {
 			switch {
 			case errors.Is(err, database.ErrSocialIdentityNotFound):
 				reason = "identity_not_found"
-				writeSocialError(w, http.StatusNotFound, "social_identity_not_found")
+				writeSocialError(r.Context(), w, http.StatusNotFound, "social_identity_not_found")
 			case errors.Is(err, database.ErrSocialLastLoginMethod):
 				reason = "last_login_method"
-				writeSocialError(w, http.StatusConflict, "social_last_login_method")
+				writeSocialError(r.Context(), w, http.StatusConflict, "social_last_login_method")
 			default:
-				writeSocialError(w, http.StatusInternalServerError, "social_unlink_failed")
+				writeSocialError(r.Context(), w, http.StatusInternalServerError, "social_unlink_failed")
 			}
 			h.appendAuthAuditForUserTeams(r, userID, "auth.social_identity_unlink_failed", "failure", "provider="+provider+";reason="+reason, true)
 			return
@@ -867,15 +867,15 @@ func socialDatabaseErrorCategory(err error) string {
 	}
 }
 
-func writeSocialError(w http.ResponseWriter, status int, code string) {
-	writeSocialJSON(w, status, map[string]string{"status": "error", "code": code})
+func writeSocialError(ctx context.Context, w http.ResponseWriter, status int, code string) {
+	writeSocialJSON(ctx, w, status, map[string]string{"status": "error", "code": code})
 }
 
-func writeSocialJSON(w http.ResponseWriter, status int, value any) {
+func writeSocialJSON(ctx context.Context, w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(value); err != nil {
-		slog.Error("Failed to encode social auth response", "error", err)
+		shared.LoggerFromContext(ctx).Error("Failed to encode social auth response", "error", err)
 	}
 }
 
@@ -886,11 +886,11 @@ func decodeSocialJSON(w http.ResponseWriter, r *http.Request, dest any, allowEmp
 		if allowEmpty && err == io.EOF {
 			return true
 		}
-		writeSocialError(w, http.StatusBadRequest, "social_request_invalid")
+		writeSocialError(r.Context(), w, http.StatusBadRequest, "social_request_invalid")
 		return false
 	}
 	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		writeSocialError(w, http.StatusBadRequest, "social_request_invalid")
+		writeSocialError(r.Context(), w, http.StatusBadRequest, "social_request_invalid")
 		return false
 	}
 	return true

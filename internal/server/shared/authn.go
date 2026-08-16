@@ -2,7 +2,6 @@ package shared
 
 import (
 	"context"
-	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -31,7 +30,7 @@ func (c *Context) RequireAPIClientAuth(next http.HandlerFunc) http.HandlerFunc {
 
 		apiClientAuth, err := c.Store.GetAPIClientAuth(r.Context(), token)
 		if err != nil {
-			slog.Error("Failed to validate api client token", "error", err)
+			LoggerFromContext(r.Context()).Error("Failed to validate api client token", "error", err)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -42,6 +41,7 @@ func (c *Context) RequireAPIClientAuth(next http.HandlerFunc) http.HandlerFunc {
 
 		ctx := context.WithValue(r.Context(), UserIDKey, apiClientAuth.UserID)
 		ctx = context.WithValue(ctx, APIClientAuthKey, apiClientAuth)
+		ctx = WithLoggerAttrs(ctx, "user_id", apiClientAuth.UserID.String())
 		next(w, r.WithContext(ctx))
 	}
 }
@@ -89,7 +89,7 @@ func (c *Context) RequireAuth(allowAPIKey bool, next http.HandlerFunc) http.Hand
 			if token != "" {
 				apiClientAuth, err = c.Store.GetAPIClientAuth(r.Context(), token)
 				if err != nil {
-					slog.Error("Failed to validate api client token", "error", err)
+					LoggerFromContext(r.Context()).Error("Failed to validate api client token", "error", err)
 				} else if apiClientAuth != nil {
 					userID = apiClientAuth.UserID
 				}
@@ -108,6 +108,7 @@ func (c *Context) RequireAuth(allowAPIKey bool, next http.HandlerFunc) http.Hand
 		if sessionCtx != nil {
 			ctx = context.WithValue(ctx, AuthSessionKey, *sessionCtx)
 		}
+		ctx = WithLoggerAttrs(ctx, "user_id", userID.String())
 		next(w, r.WithContext(ctx))
 	}
 }

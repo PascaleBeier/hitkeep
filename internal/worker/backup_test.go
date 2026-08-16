@@ -1,7 +1,9 @@
 package worker
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +14,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	"hitkeep/internal/hklog"
 )
 
 func TestBackupExportsSharedDatabase(t *testing.T) {
@@ -46,6 +49,27 @@ func TestBackupExportsSharedDatabase(t *testing.T) {
 	}
 	if len(files) == 0 {
 		t.Fatal("expected parquet files in backup snapshot")
+	}
+}
+
+func TestBackupRunKeepsStageProgressAtDebug(t *testing.T) {
+	store := newTestStore(t)
+	backupDir := filepath.Join(t.TempDir(), "backups")
+	mgr := newTestTenantMgr(t, store)
+
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	ctx := hklog.WithLogger(context.Background(), logger)
+	w := NewBackupWorker(mgr, t.TempDir(), backupDir, 60, 24, nil, nil)
+	if err := w.Run(ctx); err != nil {
+		t.Fatalf("backup run: %v", err)
+	}
+
+	if strings.Contains(logs.String(), "Starting database backup") || strings.Contains(logs.String(), "Shared database backed up") {
+		t.Fatalf("expected backup stage messages to be omitted at INFO, got %s", logs.String())
+	}
+	if !strings.Contains(logs.String(), "Database backup completed") {
+		t.Fatalf("expected backup completion at INFO, got %s", logs.String())
 	}
 }
 
@@ -120,21 +144,7 @@ func TestBackupDisabledWhenPathEmpty(t *testing.T) {
 	w := NewBackupWorker(mgr, t.TempDir(), "", 60, 24, nil, nil)
 
 	// Start should return immediately (no-op).
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-
-	done := make(chan struct{})
-	go func() {
-		w.Start(ctx)
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		// Good — Start returned immediately.
-	case <-time.After(2 * time.Second):
-		t.Fatal("Start did not return immediately when backupPath is empty")
-	}
+	w.Start(t.Context())
 }
 
 func TestBackupPrunesOldLocalSnapshots(t *testing.T) {

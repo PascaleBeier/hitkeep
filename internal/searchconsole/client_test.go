@@ -139,7 +139,7 @@ func TestClassifyErrorDetectsDisabledSearchConsoleAPI(t *testing.T) {
 	}
 }
 
-func TestDiagnoseErrorExtractsFullGoogleAPIResponseBody(t *testing.T) {
+func TestDiagnoseErrorDoesNotExposeGoogleAPIResponseBody(t *testing.T) {
 	responseBody := `{"error":{"code":400,"message":"Invalid request","status":"INVALID_ARGUMENT"}}`
 	err := fmt.Errorf("wrapped query failure: %w", &googleapi.Error{
 		Code:    http.StatusBadRequest,
@@ -157,14 +157,14 @@ func TestDiagnoseErrorExtractsFullGoogleAPIResponseBody(t *testing.T) {
 	if diagnostic.HTTPStatus != http.StatusBadRequest || diagnostic.ProviderReason != "invalidArgument" {
 		t.Fatalf("unexpected Google API diagnostic: %+v", diagnostic)
 	}
-	if diagnostic.Message != responseBody {
-		t.Fatalf("expected full upstream response body, got %q", diagnostic.Message)
+	if diagnostic.Message == responseBody || diagnostic.Message != "Invalid request fallback" {
+		t.Fatalf("expected safe provider message without upstream response body, got %q", diagnostic.Message)
 	}
 }
 
-func TestDiagnoseErrorBoundsPathologicalResponseBodiesWithoutBreakingUTF8(t *testing.T) {
-	body := strings.Repeat("é", MaxErrorDiagnosticBytes)
-	diagnostic := DiagnoseError(&googleapi.Error{Code: http.StatusBadRequest, Body: body})
+func TestDiagnoseErrorBoundsPathologicalMessagesWithoutBreakingUTF8(t *testing.T) {
+	message := strings.Repeat("é", MaxErrorDiagnosticBytes)
+	diagnostic := DiagnoseError(&googleapi.Error{Code: http.StatusBadRequest, Message: message})
 
 	if len(diagnostic.Message) > MaxErrorDiagnosticBytes {
 		t.Fatalf("expected diagnostic at most %d bytes, got %d", MaxErrorDiagnosticBytes, len(diagnostic.Message))

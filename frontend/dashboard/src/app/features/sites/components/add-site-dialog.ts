@@ -31,13 +31,13 @@ import { domainValidator, sanitizeDomainInput } from '@features/sites/utils/doma
                 <div class="bg-[var(--p-surface-50)] dark:bg-[var(--p-surface-800)] p-3 rounded-md border border-[var(--p-surface-border)] flex gap-3">
                     <i class="pi pi-info-circle text-[var(--p-primary-color)] mt-0.5"></i>
                     <div class="text-sm text-[var(--p-text-muted-color)] leading-relaxed">
-                        {{ "sites.addDialog.instructionsLine1" | transloco: { apex: "example.com", subdomain: "blog.example.com" } }}<br />
-                        {{ "sites.addDialog.instructionsLine2" | transloco: { www: "www" } }}
+                        {{ 'sites.addDialog.instructionsLine1' | transloco: { apex: 'example.com', subdomain: 'blog.example.com' } }}<br />
+                        {{ 'sites.addDialog.instructionsLine2' | transloco: { www: 'www' } }}
                     </div>
                 </div>
 
                 <div class="flex flex-col gap-2">
-                    <label for="domain" class="font-semibold text-sm text-[var(--p-text-color)]">{{ "sites.addDialog.domainLabel" | transloco }}</label>
+                    <label for="domain" class="font-semibold text-sm text-[var(--p-text-color)]">{{ 'sites.addDialog.domainLabel' | transloco }}</label>
                     <input
                         pInputText
                         id="domain"
@@ -51,17 +51,17 @@ import { domainValidator, sanitizeDomainInput } from '@features/sites/utils/doma
 
                     <!-- Validation Messages -->
                     @if (isInvalid()) {
-                        @if (form.domain().control().hasError("required")) {
-                            <small class="text-red-500">{{ "sites.addDialog.errors.domainRequired" | transloco }}</small>
+                        @if (form.domain().control().hasError('required')) {
+                            <small class="text-red-500">{{ 'sites.addDialog.errors.domainRequired' | transloco }}</small>
                         }
-                        @if (form.domain().control().hasError("pattern")) {
-                            <small class="text-red-500">{{ "sites.addDialog.errors.domainInvalid" | transloco }}</small>
+                        @if (form.domain().control().hasError('pattern')) {
+                            <small class="text-red-500">{{ 'sites.addDialog.errors.domainInvalid' | transloco }}</small>
                         }
-                        @if (form.domain().control().hasError("containsProtocol")) {
-                            <small class="text-red-500">{{ "sites.addDialog.errors.removeProtocol" | transloco }}</small>
+                        @if (form.domain().control().hasError('containsProtocol')) {
+                            <small class="text-red-500">{{ 'sites.addDialog.errors.removeProtocol' | transloco }}</small>
                         }
-                        @if (form.domain().control().hasError("containsWww")) {
-                            <small class="text-red-500">{{ "sites.addDialog.errors.removeWww" | transloco }}</small>
+                        @if (form.domain().control().hasError('containsWww')) {
+                            <small class="text-red-500">{{ 'sites.addDialog.errors.removeWww' | transloco }}</small>
                         }
                     }
                     @if (createError()) {

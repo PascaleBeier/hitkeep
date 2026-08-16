@@ -3,7 +3,6 @@ package sites
 import (
 	"context"
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/filterparams"
+	"hitkeep/internal/server/shared"
 )
 
 func (h *handler) parseWebVitalsParams(w http.ResponseWriter, r *http.Request, requireMetric bool, defaultLimit int) (api.WebVitalsParams, bool) {
@@ -109,21 +109,21 @@ func (h *handler) handleGetSiteWebVitalsBreakdown() http.HandlerFunc {
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), params.SiteID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", params.SiteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", params.SiteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		payload, err := analyticsStore.GetWebVitalsBreakdown(r.Context(), params, dimension)
 		if err != nil {
-			slog.Error("Failed to get web vitals breakdown", "error", err, "site_id", params.SiteID, "dimension", dimension)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get web vitals breakdown", "error", err, "site_id", params.SiteID, "dimension", dimension)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(payload); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }
@@ -142,21 +142,21 @@ func (h *handler) handleGetSiteWebVitals(
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), params.SiteID)
 		if err != nil {
-			slog.Error("Failed to resolve analytics store", "error", err, "site_id", params.SiteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve analytics store", "error", err, "site_id", params.SiteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		payload, err := load(r.Context(), analyticsStore, params)
 		if err != nil {
-			slog.Error("Failed to get web vitals "+label, "error", err, "site_id", params.SiteID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to get web vitals "+label, "error", err, "site_id", params.SiteID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(payload); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
 }

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net"
 	"net/http"
 	"net/netip"
@@ -66,14 +65,14 @@ func (h *handler) handleListCustomTrackingDomains() http.HandlerFunc {
 		}
 		domains, err := h.ctx.Store.ListCustomTrackingDomains(r.Context(), teamID)
 		if err != nil {
-			slog.Error("Failed to list custom tracking domains", "error", err, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to list custom tracking domains", "error", err, "team_id", teamID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		domains = decorateCustomTrackingDomains(domains, h.ctx.Config.CustomTrackingDNSTargetValue())
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(domains); err != nil {
-			slog.Error("Failed to encode custom tracking domains response", "error", err, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode custom tracking domains response", "error", err, "team_id", teamID)
 		}
 	}
 }
@@ -105,7 +104,7 @@ func (h *handler) handleCreateCustomTrackingDomain() http.HandlerFunc {
 			return
 		}
 		if site, err := h.ctx.Store.FindSiteByDomain(r.Context(), hostname); err != nil {
-			slog.Error("Failed to check site domain conflict", "error", err, "hostname", hostname)
+			shared.LoggerFromContext(r.Context()).Error("Failed to check site domain conflict", "error", err, "hostname", hostname)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		} else if site != nil {
@@ -113,7 +112,7 @@ func (h *handler) handleCreateCustomTrackingDomain() http.HandlerFunc {
 			return
 		}
 		if existing, err := h.ctx.Store.FindCustomTrackingDomainByHostname(r.Context(), hostname); err != nil {
-			slog.Error("Failed to check custom tracking domain conflict", "error", err, "hostname", hostname)
+			shared.LoggerFromContext(r.Context()).Error("Failed to check custom tracking domain conflict", "error", err, "hostname", hostname)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		} else if existing != nil {
@@ -127,7 +126,7 @@ func (h *handler) handleCreateCustomTrackingDomain() http.HandlerFunc {
 			TLSMode: h.ctx.Config.CustomTrackingTLSMode,
 		})
 		if err != nil {
-			slog.Error("Failed to create custom tracking domain", "error", err, "team_id", teamID, "hostname", hostname)
+			shared.LoggerFromContext(r.Context()).Error("Failed to create custom tracking domain", "error", err, "team_id", teamID, "hostname", hostname)
 			http.Error(w, "Failed to create custom tracking domain", http.StatusConflict)
 			return
 		}
@@ -136,7 +135,7 @@ func (h *handler) handleCreateCustomTrackingDomain() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		if err := json.NewEncoder(w).Encode(domain); err != nil {
-			slog.Error("Failed to encode custom tracking domain response", "error", err, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode custom tracking domain response", "error", err, "team_id", teamID)
 		}
 	}
 }
@@ -154,7 +153,7 @@ func (h *handler) handleVerifyCustomTrackingDomain() http.HandlerFunc {
 		userID := shared.GetUserIDFromContext(r)
 		domain, err := h.ctx.Store.GetCustomTrackingDomainForTeam(r.Context(), teamID, domainID)
 		if err != nil {
-			slog.Error("Failed to load custom tracking domain", "error", err, "team_id", teamID, "domain_id", domainID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load custom tracking domain", "error", err, "team_id", teamID, "domain_id", domainID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -165,7 +164,7 @@ func (h *handler) handleVerifyCustomTrackingDomain() http.HandlerFunc {
 
 		verified, err := h.verifyCustomTrackingDomain(r.Context(), *domain)
 		if err != nil {
-			slog.Error("Failed to verify custom tracking domain", "error", err, "team_id", teamID, "domain_id", domainID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to verify custom tracking domain", "error", err, "team_id", teamID, "domain_id", domainID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -173,7 +172,7 @@ func (h *handler) handleVerifyCustomTrackingDomain() http.HandlerFunc {
 		*verified = decorateCustomTrackingDomain(*verified, h.ctx.Config.CustomTrackingDNSTargetValue())
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(verified); err != nil {
-			slog.Error("Failed to encode verified custom tracking domain response", "error", err, "team_id", teamID, "domain_id", domainID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode verified custom tracking domain response", "error", err, "team_id", teamID, "domain_id", domainID)
 		}
 	}
 }
@@ -200,7 +199,7 @@ func (h *handler) handleUpdateCustomTrackingDomain() http.HandlerFunc {
 			return
 		}
 		if err != nil {
-			slog.Error("Failed to update custom tracking domain", "error", err, "team_id", teamID, "domain_id", domainID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to update custom tracking domain", "error", err, "team_id", teamID, "domain_id", domainID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -214,7 +213,7 @@ func (h *handler) handleUpdateCustomTrackingDomain() http.HandlerFunc {
 		*domain = decorateCustomTrackingDomain(*domain, h.ctx.Config.CustomTrackingDNSTargetValue())
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(domain); err != nil {
-			slog.Error("Failed to encode updated custom tracking domain response", "error", err, "team_id", teamID, "domain_id", domainID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode updated custom tracking domain response", "error", err, "team_id", teamID, "domain_id", domainID)
 		}
 	}
 }
@@ -228,7 +227,7 @@ func (h *handler) handleDeleteCustomTrackingDomain() http.HandlerFunc {
 		userID := shared.GetUserIDFromContext(r)
 		domain, err := h.ctx.Store.GetCustomTrackingDomainForTeam(r.Context(), teamID, domainID)
 		if err != nil {
-			slog.Error("Failed to load custom tracking domain before delete", "error", err, "team_id", teamID, "domain_id", domainID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to load custom tracking domain before delete", "error", err, "team_id", teamID, "domain_id", domainID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -240,7 +239,7 @@ func (h *handler) handleDeleteCustomTrackingDomain() http.HandlerFunc {
 			http.Error(w, "Custom tracking domain not found", http.StatusNotFound)
 			return
 		} else if err != nil {
-			slog.Error("Failed to delete custom tracking domain", "error", err, "team_id", teamID, "domain_id", domainID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to delete custom tracking domain", "error", err, "team_id", teamID, "domain_id", domainID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}

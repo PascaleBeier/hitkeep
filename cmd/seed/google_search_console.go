@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"strings"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	"hitkeep/internal/hklog"
 	"hitkeep/internal/searchconsole"
 )
 
@@ -31,7 +31,7 @@ type googleSearchConsoleFixture struct {
 func seedGoogleSearchConsoleFixtures(ctx context.Context, store *database.Store, tenantMgr *database.TenantStoreManager, userID, primarySiteID uuid.UUID, days int) searchConsoleSeedStats {
 	teamID, err := store.GetSiteTenantID(ctx, primarySiteID)
 	if err != nil {
-		slog.Warn("Skipping Search Console fixtures; primary site tenant unavailable", "site_id", primarySiteID, "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Skipping Search Console fixtures; primary site tenant unavailable", "site_id", primarySiteID, "error", err)
 		return searchConsoleSeedStats{}
 	}
 
@@ -45,7 +45,7 @@ func seedGoogleSearchConsoleFixtures(ctx context.Context, store *database.Store,
 	stats.sites += statusStats.sites
 	stats.facts += statusStats.facts
 
-	slog.Info("Google Search Console fixtures seeded", "sites", stats.sites, "facts", stats.facts)
+	hklog.LoggerFromContext(ctx).Info("Google Search Console fixtures seeded", "sites", stats.sites, "facts", stats.facts)
 	return stats
 }
 
@@ -71,7 +71,7 @@ func seedGoogleSearchConsoleConnection(ctx context.Context, store *database.Stor
 		Outcome:    "success",
 		Details:    "outcome=connected;google_account_email=demo-search-console@example.com;seed_fixture=true",
 	}); err != nil {
-		slog.Warn("Failed to seed Search Console connection", "team_id", teamID, "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Failed to seed Search Console connection", "team_id", teamID, "error", err)
 		return false
 	}
 	return true
@@ -81,11 +81,11 @@ func seedPrimaryGoogleSearchConsoleFixture(ctx context.Context, store *database.
 	stats := searchConsoleSeedStats{}
 	primaryProperty := "sc-domain:acme-analytics.io"
 	if err := seedGoogleSearchConsoleProperty(ctx, store, teamID, primaryProperty, now); err != nil {
-		slog.Warn("Failed to seed primary Search Console property", "property_uri", primaryProperty, "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Failed to seed primary Search Console property", "property_uri", primaryProperty, "error", err)
 		return stats
 	}
 	if err := seedGoogleSearchConsoleMappedSite(ctx, store, primarySiteID, teamID, primaryProperty, userID, now); err != nil {
-		slog.Warn("Failed to seed primary Search Console mapping", "site_id", primarySiteID, "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Failed to seed primary Search Console mapping", "site_id", primarySiteID, "error", err)
 		return stats
 	}
 	stats.sites++
@@ -120,7 +120,7 @@ func seedGoogleSearchConsoleStatusFixture(ctx context.Context, store *database.S
 		return false
 	}
 	if err := seedGoogleSearchConsoleProperty(ctx, store, teamID, fixture.property, now); err != nil {
-		slog.Warn("Failed to seed Search Console fixture property", "property_uri", fixture.property, "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Failed to seed Search Console fixture property", "property_uri", fixture.property, "error", err)
 		return false
 	}
 	return seedGoogleSearchConsoleFixtureMappingIfNeeded(ctx, store, site.ID, teamID, userID, now, fixture)
@@ -129,11 +129,11 @@ func seedGoogleSearchConsoleStatusFixture(ctx context.Context, store *database.S
 func ensureGoogleSearchConsoleFixtureSite(ctx context.Context, store *database.Store, tenantMgr *database.TenantStoreManager, userID uuid.UUID, domain string) (*api.Site, bool) {
 	site, err := ensureSiteInActiveTeam(ctx, store, userID, domain)
 	if err != nil {
-		slog.Warn("Failed to ensure Search Console fixture site", "domain", domain, "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Failed to ensure Search Console fixture site", "domain", domain, "error", err)
 		return nil, false
 	}
 	if err := tenantMgr.SyncSite(ctx, site.ID); err != nil {
-		slog.Warn("Failed to sync Search Console fixture site", "domain", domain, "site_id", site.ID, "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Failed to sync Search Console fixture site", "domain", domain, "site_id", site.ID, "error", err)
 		return nil, false
 	}
 	return site, true
@@ -141,7 +141,7 @@ func ensureGoogleSearchConsoleFixtureSite(ctx context.Context, store *database.S
 
 func seedGoogleSearchConsoleMappedFixture(ctx context.Context, store *database.Store, siteID, teamID, userID uuid.UUID, now time.Time, fixture googleSearchConsoleFixture) bool {
 	if err := seedGoogleSearchConsoleMappedSite(ctx, store, siteID, teamID, fixture.property, userID, now); err != nil {
-		slog.Warn("Failed to seed Search Console fixture mapping", "domain", fixture.domain, "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Failed to seed Search Console fixture mapping", "domain", fixture.domain, "error", err)
 		return false
 	}
 	seedGoogleSearchConsoleSyncState(ctx, store, siteID, teamID, userID, fixture.state, fixture.category, fixture.manual, now)
@@ -190,7 +190,7 @@ func seedGoogleSearchConsoleMappedSite(ctx context.Context, store *database.Stor
 func seedGoogleSearchConsoleFacts(ctx context.Context, tenantMgr *database.TenantStoreManager, siteID, teamID uuid.UUID, propertyURI string, userID uuid.UUID, days int, now time.Time) int {
 	tenantStore, _, err := tenantMgr.ResolveSiteStore(ctx, siteID)
 	if err != nil {
-		slog.Warn("Failed to resolve tenant store for Search Console facts", "site_id", siteID, "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Failed to resolve tenant store for Search Console facts", "site_id", siteID, "error", err)
 		return 0
 	}
 	if !prepareGoogleSearchConsoleFactSeed(ctx, tenantMgr.Shared(), tenantStore, siteID, teamID, propertyURI, userID) {
@@ -202,11 +202,11 @@ func seedGoogleSearchConsoleFacts(ctx context.Context, tenantMgr *database.Tenan
 
 func prepareGoogleSearchConsoleFactSeed(ctx context.Context, shared *database.Store, tenantStore *database.Store, siteID, teamID uuid.UUID, propertyURI string, userID uuid.UUID) bool {
 	if err := auditSeededGoogleSearchConsoleFacts(ctx, shared, siteID, teamID, propertyURI, userID); err != nil {
-		slog.Warn("Failed to audit seeded Search Console fact refresh", "site_id", siteID, "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Failed to audit seeded Search Console fact refresh", "site_id", siteID, "error", err)
 		return false
 	}
 	if _, err := tenantStore.DB().ExecContext(ctx, "DELETE FROM search_console_facts WHERE site_id = ?", siteID); err != nil {
-		slog.Warn("Failed to reset seeded Search Console facts", "site_id", siteID, "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Failed to reset seeded Search Console facts", "site_id", siteID, "error", err)
 		return false
 	}
 	return true
@@ -229,7 +229,7 @@ func upsertGoogleSearchConsoleSeedFacts(ctx context.Context, tenantStore *databa
 	if err := tenantStore.ReplaceSearchConsoleFacts(ctx, database.SearchConsoleFactScope{
 		SiteID: siteID, PropertyURI: rows[0].PropertyURI, StartDate: startDate, EndDate: endDate, DataState: rows[0].DataState,
 	}, rows); err != nil {
-		slog.Warn("Failed to seed Search Console facts", "site_id", siteID, "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Failed to seed Search Console facts", "site_id", siteID, "error", err)
 		return 0
 	}
 	return len(rows)
@@ -313,7 +313,7 @@ func googleSearchConsoleSeedFact(siteID uuid.UUID, propertyURI string, date time
 func seedGoogleSearchConsoleSyncState(ctx context.Context, store *database.Store, siteID, teamID, userID uuid.UUID, state string, category string, manual bool, now time.Time) {
 	input := googleSearchConsoleSyncStateInput(siteID, teamID, state, category, manual, now)
 	err := store.UpsertGoogleSearchConsoleSyncStateWithAudit(ctx, input, seedGoogleSearchConsoleSyncAudit(siteID, teamID, userID, input.State, category))
-	logGoogleSearchConsoleSyncSeedError(err, siteID, state)
+	logGoogleSearchConsoleSyncSeedError(ctx, err, siteID, state)
 }
 
 func googleSearchConsoleSyncStateInput(siteID, teamID uuid.UUID, state string, category string, manual bool, now time.Time) database.GoogleSearchConsoleSyncStateInput {
@@ -355,9 +355,9 @@ func googleSearchConsoleNextRetry(category string, now time.Time) *time.Time {
 	return &retry
 }
 
-func logGoogleSearchConsoleSyncSeedError(err error, siteID uuid.UUID, state string) {
+func logGoogleSearchConsoleSyncSeedError(ctx context.Context, err error, siteID uuid.UUID, state string) {
 	if err != nil {
-		slog.Warn("Failed to seed Search Console sync state", "site_id", siteID, "state", state, "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Failed to seed Search Console sync state", "site_id", siteID, "state", state, "error", err)
 	}
 }
 

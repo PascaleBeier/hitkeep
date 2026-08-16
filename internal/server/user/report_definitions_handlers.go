@@ -1,11 +1,11 @@
 package user
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/mail"
 	"net/url"
@@ -37,11 +37,11 @@ func decodeReportJSON(w http.ResponseWriter, r *http.Request, target any) error 
 	return nil
 }
 
-func writeReportError(w http.ResponseWriter, status int, code, message string) {
+func writeReportError(ctx context.Context, w http.ResponseWriter, status int, code, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(map[string]string{"code": code, "message": message}); err != nil {
-		slog.Debug("Failed to encode report error response", "error_code", code)
+		shared.LoggerFromContext(ctx).Debug("Failed to encode report error response", "error_code", code)
 	}
 }
 
@@ -88,7 +88,7 @@ func (h *handler) handleListReports() http.HandlerFunc {
 		userID := shared.GetUserIDFromContext(r)
 		reports, err := h.ctx.Store.ListReportDefinitions(r.Context(), userID)
 		if err != nil {
-			slog.Error("Failed to list reports", "user_id", userID, "error_code", "report_list_failed")
+			shared.LoggerFromContext(r.Context()).Error("Failed to list reports", "user_id", userID, "error_code", "report_list_failed")
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -108,26 +108,26 @@ func (h *handler) handleCreateReport() http.HandlerFunc {
 		userID := shared.GetUserIDFromContext(r)
 		var req api.CreateReportRequest
 		if err := decodeReportJSON(w, r, &req); err != nil {
-			writeReportError(w, http.StatusBadRequest, "invalid_request", "Invalid report definition")
+			writeReportError(r.Context(), w, http.StatusBadRequest, "invalid_request", "Invalid report definition")
 			return
 		}
 		var err error
 		req, err = h.canonicalizeReportRecipients(r, req)
 		if err != nil {
-			writeReportAuthorizationError(w, err)
+			writeReportAuthorizationError(r.Context(), w, err)
 			return
 		}
 		if req.Status == api.ReportStatusActive && h.ctx.Mailer == nil {
-			writeReportError(w, http.StatusConflict, "mail_unavailable", "Mail delivery is unavailable; save this report as a draft")
+			writeReportError(r.Context(), w, http.StatusConflict, "mail_unavailable", "Mail delivery is unavailable; save this report as a draft")
 			return
 		}
 		if err := h.authorizeReportRequest(r, userID, req); err != nil {
-			writeReportAuthorizationError(w, err)
+			writeReportAuthorizationError(r.Context(), w, err)
 			return
 		}
 		report, err := h.ctx.Store.CreateReportDefinition(r.Context(), userID, req, h.ctx.Config.JWTSecret)
 		if err != nil {
-			writeReportError(w, http.StatusBadRequest, "invalid_report", err.Error())
+			writeReportError(r.Context(), w, http.StatusBadRequest, "invalid_report", err.Error())
 			return
 		}
 		if report.TenantID != nil {
@@ -183,7 +183,7 @@ func (h *handler) handleUpdateReport() http.HandlerFunc {
 		}
 		var patch api.UpdateReportRequest
 		if err := decodeReportJSON(w, r, &patch); err != nil {
-			writeReportError(w, http.StatusBadRequest, "invalid_request", "Invalid report update")
+			writeReportError(r.Context(), w, http.StatusBadRequest, "invalid_request", "Invalid report update")
 			return
 		}
 		current, err := h.ctx.Store.GetReportDefinition(r.Context(), reportID)
@@ -192,13 +192,13 @@ func (h *handler) handleUpdateReport() http.HandlerFunc {
 			return
 		}
 		if patch.Status != nil && *patch.Status == api.ReportStatusActive && h.ctx.Mailer == nil {
-			writeReportError(w, http.StatusConflict, "mail_unavailable", "Mail delivery is unavailable; keep this report as a draft")
+			writeReportError(r.Context(), w, http.StatusConflict, "mail_unavailable", "Mail delivery is unavailable; keep this report as a draft")
 			return
 		}
 		merged := mergeReportPatch(current, patch)
 		merged, err = h.canonicalizeReportRecipients(r, merged)
 		if err != nil {
-			writeReportAuthorizationError(w, err)
+			writeReportAuthorizationError(r.Context(), w, err)
 			return
 		}
 		externalRecipientsAllowed := true
@@ -206,7 +206,7 @@ func (h *handler) handleUpdateReport() http.HandlerFunc {
 		if len(merged.ExternalRecipientEmails) > 0 && merged.TenantID != nil && !h.ctx.Limits().AllowsExternalReportRecipients(r.Context(), userID, *merged.TenantID) {
 			externalRecipientsAllowed = false
 			if !reportUpdatePreservesExistingExternalScope(current, merged) {
-				writeReportAuthorizationError(w, errReportPlanUpgradeRequired)
+				writeReportAuthorizationError(r.Context(), w, errReportPlanUpgradeRequired)
 				return
 			}
 			// Existing external recipients may be retained while the manager
@@ -215,14 +215,14 @@ func (h *handler) handleUpdateReport() http.HandlerFunc {
 			authorizationRequest.ExternalRecipientEmails = nil
 		}
 		if err := h.authorizeReportRequest(r, userID, authorizationRequest); err != nil {
-			writeReportAuthorizationError(w, err)
+			writeReportAuthorizationError(r.Context(), w, err)
 			return
 		}
 		patch.RecipientUserIDs = &merged.RecipientUserIDs
 		patch.ExternalRecipientEmails = &merged.ExternalRecipientEmails
 		report, err := h.ctx.Store.UpdateReportDefinition(r.Context(), userID, reportID, patch, h.ctx.Config.JWTSecret)
 		if err != nil {
-			writeReportError(w, http.StatusBadRequest, "invalid_report", err.Error())
+			writeReportError(r.Context(), w, http.StatusBadRequest, "invalid_report", err.Error())
 			return
 		}
 		if report.TenantID != nil {
@@ -268,27 +268,27 @@ func (h *handler) handlePreviewReport() http.HandlerFunc {
 		userID := shared.GetUserIDFromContext(r)
 		var req api.ReportPreviewRequest
 		if err := decodeReportJSON(w, r, &req); err != nil {
-			writeReportError(w, http.StatusBadRequest, "invalid_request", "Invalid preview request")
+			writeReportError(r.Context(), w, http.StatusBadRequest, "invalid_request", "Invalid preview request")
 			return
 		}
 		var err error
 		req.Definition, err = h.canonicalizeReportRecipients(r, req.Definition)
 		if err != nil {
-			writeReportAuthorizationError(w, err)
+			writeReportAuthorizationError(r.Context(), w, err)
 			return
 		}
 		if err := h.authorizeReportRequest(r, userID, req.Definition); err != nil {
-			writeReportAuthorizationError(w, err)
+			writeReportAuthorizationError(r.Context(), w, err)
 			return
 		}
 		next, err := reporting.NextOccurrence(req.Definition.Schedule, time.Now().UTC())
 		if err != nil {
-			writeReportError(w, http.StatusBadRequest, "invalid_schedule", "Invalid report schedule")
+			writeReportError(r.Context(), w, http.StatusBadRequest, "invalid_schedule", "Invalid report schedule")
 			return
 		}
 		start, end, _, _, err := reporting.PeriodBounds(req.Definition.Schedule, next)
 		if err != nil {
-			writeReportError(w, http.StatusBadRequest, "invalid_schedule", "Invalid report schedule")
+			writeReportError(r.Context(), w, http.StatusBadRequest, "invalid_schedule", "Invalid report schedule")
 			return
 		}
 		report := &api.ReportDefinition{
@@ -298,7 +298,7 @@ func (h *handler) handlePreviewReport() http.HandlerFunc {
 		for _, siteID := range req.Definition.SiteIDs {
 			site, siteErr := h.ctx.Store.GetSiteByID(r.Context(), siteID)
 			if siteErr != nil || site == nil {
-				writeReportError(w, http.StatusBadRequest, "invalid_site", "Invalid report site")
+				writeReportError(r.Context(), w, http.StatusBadRequest, "invalid_site", "Invalid report site")
 				return
 			}
 			report.Sites = append(report.Sites, api.ReportSite{ID: site.ID, Domain: site.Domain})
@@ -309,7 +309,7 @@ func (h *handler) handlePreviewReport() http.HandlerFunc {
 			ScheduledFor: next, PeriodStart: start, PeriodEnd: end,
 		})
 		if err != nil {
-			writeReportError(w, http.StatusUnprocessableEntity, "content_unavailable", "Report content is unavailable")
+			writeReportError(r.Context(), w, http.StatusUnprocessableEntity, "content_unavailable", "Report content is unavailable")
 			return
 		}
 		subject := req.Definition.Name
@@ -358,7 +358,7 @@ func (h *handler) handlePreviewReport() http.HandlerFunc {
 func (h *handler) handleTestSendReport() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if h.ctx.Mailer == nil {
-			writeReportError(w, http.StatusConflict, "mail_unavailable", "Mail delivery is unavailable")
+			writeReportError(r.Context(), w, http.StatusConflict, "mail_unavailable", "Mail delivery is unavailable")
 			return
 		}
 		reportID, ok := reportIDFromPath(w, r)
@@ -383,12 +383,12 @@ func (h *handler) handleTestSendReport() http.HandlerFunc {
 		}
 		next, err := reporting.NextOccurrence(report.Schedule, time.Now().UTC())
 		if err != nil {
-			writeReportError(w, http.StatusUnprocessableEntity, "invalid_schedule", "Report schedule is invalid")
+			writeReportError(r.Context(), w, http.StatusUnprocessableEntity, "invalid_schedule", "Report schedule is invalid")
 			return
 		}
 		start, end, _, _, err := reporting.PeriodBounds(report.Schedule, next)
 		if err != nil {
-			writeReportError(w, http.StatusUnprocessableEntity, "invalid_schedule", "Report schedule is invalid")
+			writeReportError(r.Context(), w, http.StatusUnprocessableEntity, "invalid_schedule", "Report schedule is invalid")
 			return
 		}
 		email, shouldSend, err := h.reportContentBuilder().Build(r.Context(), worker.ReportContentRequest{
@@ -396,18 +396,18 @@ func (h *handler) handleTestSendReport() http.HandlerFunc {
 			ScheduledFor: next, PeriodStart: start, PeriodEnd: end,
 		})
 		if err != nil {
-			writeReportError(w, http.StatusUnprocessableEntity, "content_unavailable", "Report content is unavailable")
+			writeReportError(r.Context(), w, http.StatusUnprocessableEntity, "content_unavailable", "Report content is unavailable")
 			return
 		}
 		if !shouldSend || email == nil {
-			writeReportError(w, http.StatusUnprocessableEntity, "empty_report_suppressed", "This report has no content to send")
+			writeReportError(r.Context(), w, http.StatusUnprocessableEntity, "empty_report_suppressed", "This report has no content to send")
 			return
 		}
 		messageID := fmt.Sprintf("<report-test.%s@hitkeep>", uuid.New())
 		if err := h.ctx.Mailer.SendWithOptions(user.Email, email, mailer.SendOptions{MessageID: messageID, Headers: map[string]string{"Auto-Submitted": "auto-generated"}}); err != nil {
 			details := mailer.DescribeError(err)
-			slog.Warn("Report test send failed", "report_id", report.ID, "user_id", userID, "message_id", messageID, "error_code", "smtp_send_failed", "error_stage", details.Stage, "error_kind", details.Kind, "error_message", details.Message, "smtp_code", details.SMTPCode)
-			writeReportError(w, http.StatusBadGateway, "smtp_send_failed", "Mail server did not accept the test message")
+			shared.LoggerFromContext(r.Context()).Warn("Report test send failed", "report_id", report.ID, "user_id", userID, "message_id", messageID, "error_code", "smtp_send_failed", "error_stage", details.Stage, "error_kind", details.Kind, "error_message", details.Message, "smtp_code", details.SMTPCode)
+			writeReportError(r.Context(), w, http.StatusBadGateway, "smtp_send_failed", "Mail server did not accept the test message")
 			return
 		}
 		if report.TenantID != nil {
@@ -477,7 +477,7 @@ func (h *handler) handleRetryReportRun() http.HandlerFunc {
 			return
 		}
 		if h.ctx.Mailer == nil {
-			writeReportError(w, http.StatusConflict, "mail_unavailable", "Mail delivery is unavailable")
+			writeReportError(r.Context(), w, http.StatusConflict, "mail_unavailable", "Mail delivery is unavailable")
 			return
 		}
 		if err := h.ctx.Store.RetryReportRun(r.Context(), runID, time.Now().UTC()); err != nil {
@@ -517,10 +517,10 @@ func (h *handler) handleGetReportRecipientConfirmation() http.HandlerFunc {
 		confirmation, err := h.ctx.Store.GetReportRecipientConfirmation(r.Context(), r.PathValue("opaque_token"), time.Now().UTC())
 		if err != nil {
 			if errors.Is(err, database.ErrReportConfirmationExpired) {
-				writeReportError(w, http.StatusGone, "confirmation_expired", "This confirmation link has expired")
+				writeReportError(r.Context(), w, http.StatusGone, "confirmation_expired", "This confirmation link has expired")
 				return
 			}
-			writeReportError(w, http.StatusBadRequest, "confirmation_invalid", "This confirmation link is invalid")
+			writeReportError(r.Context(), w, http.StatusBadRequest, "confirmation_invalid", "This confirmation link is invalid")
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -535,7 +535,7 @@ func (h *handler) handleConfirmReportRecipient() http.HandlerFunc {
 		var req api.ReportRecipientConfirmationRequest
 		if r.ContentLength > 0 {
 			if err := decodeReportJSON(w, r, &req); err != nil {
-				writeReportError(w, http.StatusBadRequest, "invalid_request", "Invalid confirmation action")
+				writeReportError(r.Context(), w, http.StatusBadRequest, "invalid_request", "Invalid confirmation action")
 				return
 			}
 		}
@@ -546,15 +546,15 @@ func (h *handler) handleConfirmReportRecipient() http.HandlerFunc {
 		case "", "confirm":
 			err = h.ctx.Store.ConfirmReportRecipient(r.Context(), token, time.Now().UTC())
 		default:
-			writeReportError(w, http.StatusBadRequest, "invalid_request", "Invalid confirmation action")
+			writeReportError(r.Context(), w, http.StatusBadRequest, "invalid_request", "Invalid confirmation action")
 			return
 		}
 		if err != nil {
 			if errors.Is(err, database.ErrReportConfirmationExpired) {
-				writeReportError(w, http.StatusGone, "confirmation_expired", "This confirmation link has expired")
+				writeReportError(r.Context(), w, http.StatusGone, "confirmation_expired", "This confirmation link has expired")
 				return
 			}
-			writeReportError(w, http.StatusBadRequest, "confirmation_invalid", "This confirmation link is invalid")
+			writeReportError(r.Context(), w, http.StatusBadRequest, "confirmation_invalid", "This confirmation link is invalid")
 			return
 		}
 		if auditTarget != nil {
@@ -571,7 +571,7 @@ func (h *handler) handleConfirmReportRecipient() http.HandlerFunc {
 func (h *handler) handleResendReportRecipientConfirmation() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if h.ctx.Mailer == nil {
-			writeReportError(w, http.StatusConflict, "mail_unavailable", "Mail delivery is unavailable")
+			writeReportError(r.Context(), w, http.StatusConflict, "mail_unavailable", "Mail delivery is unavailable")
 			return
 		}
 		reportID, ok := reportIDFromPath(w, r)
@@ -580,7 +580,7 @@ func (h *handler) handleResendReportRecipientConfirmation() http.HandlerFunc {
 		}
 		recipientID, err := uuid.Parse(r.PathValue("recipient_id"))
 		if err != nil {
-			writeReportError(w, http.StatusBadRequest, "invalid_recipient", "Invalid report recipient")
+			writeReportError(r.Context(), w, http.StatusBadRequest, "invalid_recipient", "Invalid report recipient")
 			return
 		}
 		actorID := shared.GetUserIDFromContext(r)
@@ -595,7 +595,7 @@ func (h *handler) handleResendReportRecipientConfirmation() http.HandlerFunc {
 			return
 		}
 		if !h.ctx.Limits().AllowsExternalReportRecipients(r.Context(), actorID, *report.TenantID) {
-			writeReportError(w, http.StatusForbidden, "plan_upgrade_required", "External report recipients require the Pro plan or higher")
+			writeReportError(r.Context(), w, http.StatusForbidden, "plan_upgrade_required", "External report recipients require the Pro plan or higher")
 			return
 		}
 		prepared, err := h.ctx.Store.PrepareReportRecipientConfirmation(
@@ -604,7 +604,7 @@ func (h *handler) handleResendReportRecipientConfirmation() http.HandlerFunc {
 		if err != nil {
 			switch {
 			case errors.Is(err, database.ErrReportConfirmationCooldown):
-				writeReportError(w, http.StatusTooManyRequests, "confirmation_recently_sent", "A confirmation email was sent recently")
+				writeReportError(r.Context(), w, http.StatusTooManyRequests, "confirmation_recently_sent", "A confirmation email was sent recently")
 			case errors.Is(err, database.ErrReportConfirmationInvalid):
 				http.Error(w, "Not found", http.StatusNotFound)
 			default:
@@ -613,7 +613,9 @@ func (h *handler) handleResendReportRecipientConfirmation() http.HandlerFunc {
 			return
 		}
 		if err := h.sendPreparedReportConfirmation(r, prepared); err != nil {
-			writeReportError(w, http.StatusBadGateway, "smtp_send_failed", "Mail server did not accept the confirmation email")
+			details := mailer.DescribeError(err)
+			shared.LoggerFromContext(r.Context()).Warn("Mail server did not accept report confirmation", "recipient_id", prepared.RecipientID, "error_code", "smtp_send_failed", "error_stage", details.Stage, "error_kind", details.Kind, "error_message", details.Message, "smtp_code", details.SMTPCode)
+			writeReportError(r.Context(), w, http.StatusBadGateway, "smtp_send_failed", "Mail server did not accept the confirmation email")
 			return
 		}
 		h.appendReportRecipientAudit(r, *report.TenantID, actorID, reportID, recipientID, "report.recipient_confirmation_resent", "pending")
@@ -623,23 +625,26 @@ func (h *handler) handleResendReportRecipientConfirmation() http.HandlerFunc {
 
 func (h *handler) sendUnsentReportConfirmations(r *http.Request, reportID uuid.UUID, locale string) {
 	if err := h.ctx.Store.CaptureExternalReportRecipientLocale(r.Context(), reportID, locale, time.Now().UTC()); err != nil {
-		slog.Warn("Failed to capture report recipient locale", "report_id", reportID, "error_code", "confirmation_locale_failed")
+		shared.LoggerFromContext(r.Context()).Warn("Failed to capture report recipient locale", "report_id", reportID, "error_code", "confirmation_locale_failed")
 	}
 	if h.ctx.Mailer == nil {
 		return
 	}
 	recipientIDs, err := h.ctx.Store.ListUnsentExternalReportRecipients(r.Context(), reportID)
 	if err != nil {
-		slog.Warn("Failed to list pending report confirmations", "report_id", reportID, "error_code", "confirmation_list_failed")
+		shared.LoggerFromContext(r.Context()).Warn("Failed to list pending report confirmations", "report_id", reportID, "error_code", "confirmation_list_failed")
 		return
 	}
 	for _, recipientID := range recipientIDs {
 		prepared, err := h.ctx.Store.PrepareReportRecipientConfirmation(r.Context(), reportID, recipientID, locale, time.Now().UTC(), false)
 		if err != nil {
-			slog.Warn("Failed to prepare report confirmation", "report_id", reportID, "recipient_id", recipientID, "error_code", "confirmation_prepare_failed")
+			shared.LoggerFromContext(r.Context()).Warn("Failed to prepare report confirmation", "report_id", reportID, "recipient_id", recipientID, "error_code", "confirmation_prepare_failed")
 			continue
 		}
-		_ = h.sendPreparedReportConfirmation(r, prepared)
+		if err := h.sendPreparedReportConfirmation(r, prepared); err != nil {
+			details := mailer.DescribeError(err)
+			shared.LoggerFromContext(r.Context()).Warn("Mail server did not accept report confirmation", "recipient_id", prepared.RecipientID, "error_code", "smtp_send_failed", "error_stage", details.Stage, "error_kind", details.Kind, "error_message", details.Message, "smtp_code", details.SMTPCode)
+		}
 	}
 }
 
@@ -651,8 +656,6 @@ func (h *handler) sendPreparedReportConfirmation(r *http.Request, prepared *data
 	email := mailables.NewReportRecipientConfirmation(link, prepared.Locale, prepared.Metadata)
 	if err := h.ctx.Mailer.Send(prepared.Email, email); err != nil {
 		_ = h.ctx.Store.RecordReportConfirmationSendResult(r.Context(), prepared.RecipientID, "smtp_send_failed", time.Now().UTC())
-		details := mailer.DescribeError(err)
-		slog.Warn("Mail server did not accept report confirmation", "recipient_id", prepared.RecipientID, "error_code", "smtp_send_failed", "error_stage", details.Stage, "error_kind", details.Kind, "error_message", details.Message, "smtp_code", details.SMTPCode)
 		return err
 	}
 	return h.ctx.Store.RecordReportConfirmationSendResult(r.Context(), prepared.RecipientID, "", time.Now().UTC())
@@ -883,20 +886,20 @@ func (h *handler) authorizeReportRequest(r *http.Request, actorID uuid.UUID, req
 	return nil
 }
 
-func writeReportAuthorizationError(w http.ResponseWriter, err error) {
+func writeReportAuthorizationError(ctx context.Context, w http.ResponseWriter, err error) {
 	if errors.Is(err, errReportPlanUpgradeRequired) {
-		writeReportError(w, http.StatusForbidden, "plan_upgrade_required", "External report recipients require the Pro plan or higher")
+		writeReportError(ctx, w, http.StatusForbidden, "plan_upgrade_required", "External report recipients require the Pro plan or higher")
 		return
 	}
 	if errors.Is(err, errReportForbidden) {
-		writeReportError(w, http.StatusForbidden, "forbidden", "You cannot manage this report")
+		writeReportError(ctx, w, http.StatusForbidden, "forbidden", "You cannot manage this report")
 		return
 	}
 	if errors.Is(err, errReportInvalidRecipient) {
-		writeReportError(w, http.StatusBadRequest, "invalid_recipient", "Recipients must be eligible team members or valid external addresses on a team report")
+		writeReportError(ctx, w, http.StatusBadRequest, "invalid_recipient", "Recipients must be eligible team members or valid external addresses on a team report")
 		return
 	}
-	writeReportError(w, http.StatusBadRequest, "invalid_report", "Invalid report definition")
+	writeReportError(ctx, w, http.StatusBadRequest, "invalid_report", "Invalid report definition")
 }
 
 func (h *handler) appendReportAudit(r *http.Request, teamID, actorID, reportID uuid.UUID, action, details string) {

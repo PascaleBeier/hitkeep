@@ -3,7 +3,6 @@ package shared
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strings"
 
@@ -34,7 +33,7 @@ func (c *Context) RequirePermission(perm auth.Permission) func(http.HandlerFunc)
 
 			instanceRole, err := c.resolveInstanceRole(r.Context(), userID, apiClientAuth)
 			if err != nil {
-				slog.Error("Failed to get instance role", "error", err)
+				LoggerFromContext(r.Context()).Error("Failed to get instance role", "error", err)
 				http.Error(w, "Internal error", http.StatusInternalServerError)
 				return
 			}
@@ -178,7 +177,7 @@ func (c *Context) RequireSiteOrInstancePermission(sitePerm, instancePerm auth.Pe
 
 			instanceRole, err := c.resolveInstanceRole(r.Context(), userID, apiClientAuth)
 			if err != nil {
-				slog.Error("Failed to get instance role", "error", err)
+				LoggerFromContext(r.Context()).Error("Failed to get instance role", "error", err)
 				http.Error(w, "Internal error", http.StatusInternalServerError)
 				return
 			}

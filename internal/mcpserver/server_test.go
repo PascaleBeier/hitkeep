@@ -1,9 +1,12 @@
 package mcpserver
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -28,10 +31,49 @@ import (
 	"hitkeep/internal/server/filterparams"
 )
 
+func TestMCPLogMiddlewareDoesNotLogRawErrors(t *testing.T) {
+	const rawError = "provider response authorization=Bearer do-not-log"
+	var logs bytes.Buffer
+	service := &service{logger: slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))}
+	next := func(context.Context, string, mcp.Request) (mcp.Result, error) {
+		return nil, errors.New(rawError)
+	}
+
+	_, err := service.logMiddleware()(next)(context.Background(), "tools/call", nil)
+	if err == nil {
+		t.Fatal("expected protocol error")
+	}
+	if strings.Contains(logs.String(), rawError) {
+		t.Fatalf("raw protocol error appeared in logs: %s", logs.String())
+	}
+	if !strings.Contains(logs.String(), "outcome=protocol_error") || !strings.Contains(logs.String(), "error_kind=protocol_error") {
+		t.Fatalf("expected safe protocol error fields: %s", logs.String())
+	}
+	if !strings.Contains(logs.String(), "mcp.method=tools/call") {
+		t.Fatalf("expected MCP request fields to be grouped: %s", logs.String())
+	}
+
+	logs.Reset()
+	toolResult := &mcp.CallToolResult{}
+	toolResult.SetError(errors.New(rawError))
+	toolNext := func(context.Context, string, mcp.Request) (mcp.Result, error) {
+		return toolResult, nil
+	}
+	if _, err := service.logMiddleware()(toolNext)(context.Background(), "tools/call", nil); err != nil {
+		t.Fatalf("tool result should not return protocol error: %v", err)
+	}
+	if strings.Contains(logs.String(), rawError) {
+		t.Fatalf("raw tool error appeared in logs: %s", logs.String())
+	}
+	if !strings.Contains(logs.String(), "outcome=tool_error") || !strings.Contains(logs.String(), "error_kind=tool_error") {
+		t.Fatalf("expected safe tool error fields: %s", logs.String())
+	}
+}
+
 func TestMCPServerRequiresBearerToken(t *testing.T) {
 	store, _, _ := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -50,7 +92,7 @@ func TestMCPServerRequiresBearerToken(t *testing.T) {
 func TestMCPServerSupportsSessionlessDiscoveryAndCacheHints(t *testing.T) {
 	store, _, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -174,7 +216,7 @@ func TestMCPServerInitializesWithConfiguredPublicHostBehindLoopback(t *testing.T
 	store, _, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
 	conf.PublicURL = "https://analytics.example.com"
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -196,7 +238,7 @@ func TestMCPServerReturnsUnauthorizedForValidPublicHostWithoutBearer(t *testing.
 	store, _, _ := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
 	conf.PublicURL = "https://analytics.example.com"
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -218,7 +260,7 @@ func TestMCPServerRejectsUnexpectedHostBeforeAuth(t *testing.T) {
 	store, _, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
 	conf.PublicURL = "https://analytics.example.com"
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -350,7 +392,7 @@ func TestMCPParseFiltersAllowsAIVisibilityDimensions(t *testing.T) {
 func TestMCPSiteOverviewAcceptsAIVisibilityFilters(t *testing.T) {
 	store, site, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -558,7 +600,7 @@ func TestMCPHostValidationNormalizesPublicURLAndLoopbackHosts(t *testing.T) {
 func TestMCPServerRejectsMalformedAndRevokedBearerToken(t *testing.T) {
 	store, _, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -606,7 +648,7 @@ func TestMCPToolsListAndSiteOverview(t *testing.T) {
 		t.Fatalf("CreateFunnel: %v", err)
 	}
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -721,7 +763,7 @@ func TestMCPEcommerceReturnsGeoNetworkAggregatesOnly(t *testing.T) {
 	}
 
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -764,7 +806,7 @@ func TestMCPEcommerceReturnsGeoNetworkAggregatesOnly(t *testing.T) {
 func TestMCPWebVitalsReturnsAggregateOnly(t *testing.T) {
 	store, site, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -805,7 +847,7 @@ func TestMCPWebVitalsReturnsAggregateOnly(t *testing.T) {
 func TestMCPWebVitalsReturnsGeoNetworkBreakdown(t *testing.T) {
 	store, site, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -846,7 +888,7 @@ func TestMCPToolDeniesUnscopedSite(t *testing.T) {
 	}
 
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -880,7 +922,7 @@ func TestMCPToolRequiresExplicitSiteGrantEvenForOwnerAPIClient(t *testing.T) {
 	}
 
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -909,7 +951,7 @@ func TestMCPOpportunitiesReturnsSafeFinalData(t *testing.T) {
 	seedMCPOpportunity(t, ctx, store, site)
 
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -933,7 +975,7 @@ func TestMCPOpportunitiesReturnsSafeFinalData(t *testing.T) {
 func TestMCPOpportunitiesReturnsEmptyArrayWhenNoRowsExist(t *testing.T) {
 	store, site, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -982,7 +1024,7 @@ func TestMCPOpportunitiesExposeOnlyCitedEvidence(t *testing.T) {
 	}
 
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -1041,7 +1083,7 @@ func TestMCPOpportunitiesReturnsRankedFinalData(t *testing.T) {
 	}
 
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -1200,7 +1242,7 @@ func TestMCPToolRejectsRangeBeyondConfiguredLimit(t *testing.T) {
 	store, site, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
 	conf.MCPMaxRangeDays = 1
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -1227,7 +1269,7 @@ func TestMCPToolRejectsComparisonRangeBeyondConfiguredLimit(t *testing.T) {
 	store, site, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
 	conf.MCPMaxRangeDays = 1
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -1259,7 +1301,7 @@ func TestMCPSearchConsoleStatusReportsMappedSite(t *testing.T) {
 	seedSearchConsoleSyncState(t, store, site.ID, teamID, "succeeded")
 
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -1289,7 +1331,7 @@ func TestMCPSearchConsoleReturnsOverviewAndSeriesFromImportedFacts(t *testing.T)
 	seedSearchConsoleFact(t, tenantStore, tenantFact)
 
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, tenantStores, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -1322,7 +1364,7 @@ func TestMCPSearchConsoleReturnsExplicitSectionsWithFiltersAndCappedLimit(t *tes
 	}
 
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, tenantStores, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -1356,7 +1398,7 @@ func TestMCPSearchConsoleDeniesUnscopedSite(t *testing.T) {
 	seedSearchConsoleMapping(t, store, otherSite)
 
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -1380,7 +1422,7 @@ func TestMCPSearchConsoleDeniesUnscopedSite(t *testing.T) {
 func TestMCPSearchConsoleReportRequiresMappedSite(t *testing.T) {
 	store, site, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -1407,7 +1449,7 @@ func TestMCPSearchConsoleRejectsRangeBeyondConfiguredLimit(t *testing.T) {
 	seedSearchConsoleMapping(t, store, site)
 	conf := testMCPConfig(t, "")
 	conf.MCPMaxRangeDays = 1
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -1455,7 +1497,7 @@ func TestMCPSearchConsoleReturnsImportedDataWithSyncWarnings(t *testing.T) {
 	seedSearchConsoleFact(t, tenantStore, searchConsoleFact(site, 7, 70))
 
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, tenantStores, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -1496,7 +1538,7 @@ func TestMCPSearchConsoleWarnsWhenSyncFailedButImportedDataExists(t *testing.T) 
 	seedSearchConsoleFact(t, tenantStore, searchConsoleFact(site, 7, 70))
 
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, tenantStores, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -1537,7 +1579,7 @@ func TestMCPSearchConsoleReturnsEmptyWarningsArrayWhenHealthy(t *testing.T) {
 	seedSearchConsoleFact(t, tenantStore, searchConsoleFact(site, 7, 70))
 
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, tenantStores, nil, nil)
+	handler := NewHandler(conf, store, tenantStores, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -1561,7 +1603,7 @@ func TestMCPSearchConsoleReturnsEmptyWarningsArrayWhenHealthy(t *testing.T) {
 func TestMCPResourcesListAndReadHelp(t *testing.T) {
 	store, _, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -1624,7 +1666,7 @@ func TestMCPDocsToolsFetchMarkdown(t *testing.T) {
 	store, _, token := setupMCPStore(t)
 	conf := testMCPConfig(t, docsTS.URL)
 	conf.MCPDocsCacheMinutes = 7
-	handler := NewHandler(conf, store, nil, nil, nil)
+	handler := NewHandler(conf, store, nil, nil, testMCPLogger())
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -2231,4 +2273,8 @@ func mcpToolErrorText(res *mcp.CallToolResult) string {
 		return ""
 	}
 	return string(raw)
+}
+
+func testMCPLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }

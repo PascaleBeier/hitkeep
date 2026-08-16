@@ -203,7 +203,7 @@ func TestImportUploadValidateRunAndDeleteLifecycle(t *testing.T) {
 		t.Fatalf("validation should not commit imported analytics rows, got names %v", names)
 	}
 
-	h.runImport(site.ID, upload.ImportID)
+	h.runImportContext(context.Background(), site.ID, upload.ImportID)
 	completed, err := store.GetSiteImport(context.Background(), site.ID, upload.ImportID)
 	if err != nil {
 		t.Fatalf("get completed import: %v", err)
@@ -257,7 +257,7 @@ func TestSimpleAnalyticsUploadValidateRunLifecycle(t *testing.T) {
 		t.Fatalf("unexpected simple analytics manifest: %+v", validated.Manifest)
 	}
 
-	h.runImport(site.ID, upload.ImportID)
+	h.runImportContext(context.Background(), site.ID, upload.ImportID)
 	completed, err := store.GetSiteImport(context.Background(), site.ID, upload.ImportID)
 	if err != nil {
 		t.Fatalf("get completed import: %v", err)
@@ -326,7 +326,7 @@ func TestRunImportIgnoresCompletedDuplicateQueueItem(t *testing.T) {
 		t.Fatalf("validate status = %d, body = %s", validateW.Code, validateW.Body.String())
 	}
 
-	h.runImport(site.ID, upload.ImportID)
+	h.runImportContext(context.Background(), site.ID, upload.ImportID)
 	completed, err := store.GetSiteImport(context.Background(), site.ID, upload.ImportID)
 	if err != nil {
 		t.Fatalf("get completed import: %v", err)
@@ -335,7 +335,7 @@ func TestRunImportIgnoresCompletedDuplicateQueueItem(t *testing.T) {
 		t.Fatalf("expected first run to complete import, got %+v", completed)
 	}
 
-	h.runImport(site.ID, upload.ImportID)
+	h.runImportContext(context.Background(), site.ID, upload.ImportID)
 	stillCompleted, err := store.GetSiteImport(context.Background(), site.ID, upload.ImportID)
 	if err != nil {
 		t.Fatalf("get duplicate import status: %v", err)
@@ -536,7 +536,7 @@ func TestRunImportFailsWhenStagedFileChangesAfterValidation(t *testing.T) {
 		t.Fatalf("mutate staged file: %v", err)
 	}
 
-	h.runImport(site.ID, upload.ImportID)
+	h.runImportContext(context.Background(), site.ID, upload.ImportID)
 	job, err := store.GetSiteImport(context.Background(), site.ID, upload.ImportID)
 	if err != nil {
 		t.Fatalf("get import: %v", err)
@@ -563,7 +563,7 @@ func TestValidateRejectsDuplicateCompletedSourceHash(t *testing.T) {
 	if validateW.Code != http.StatusOK {
 		t.Fatalf("first validate status = %d, body = %s", validateW.Code, validateW.Body.String())
 	}
-	h.runImport(site.ID, firstUpload.ImportID)
+	h.runImportContext(context.Background(), site.ID, firstUpload.ImportID)
 	firstJob, err := store.GetSiteImport(context.Background(), site.ID, firstUpload.ImportID)
 	if err != nil {
 		t.Fatalf("get first import: %v", err)
@@ -602,7 +602,7 @@ func TestRunImportSkipsOverlappingAggregateRows(t *testing.T) {
 	if validateW.Code != http.StatusOK {
 		t.Fatalf("first validate status = %d, body = %s", validateW.Code, validateW.Body.String())
 	}
-	h.runImport(site.ID, firstUpload.ImportID)
+	h.runImportContext(context.Background(), site.ID, firstUpload.ImportID)
 	firstJob, err := store.GetSiteImport(context.Background(), site.ID, firstUpload.ImportID)
 	if err != nil {
 		t.Fatalf("get first import: %v", err)
@@ -618,7 +618,7 @@ func TestRunImportSkipsOverlappingAggregateRows(t *testing.T) {
 	if validateW.Code != http.StatusOK {
 		t.Fatalf("second validate status = %d, body = %s", validateW.Code, validateW.Body.String())
 	}
-	h.runImport(site.ID, secondUpload.ImportID)
+	h.runImportContext(context.Background(), site.ID, secondUpload.ImportID)
 	secondJob, err := store.GetSiteImport(context.Background(), site.ID, secondUpload.ImportID)
 	if err != nil {
 		t.Fatalf("get second import: %v", err)
