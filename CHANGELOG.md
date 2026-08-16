@@ -7,6 +7,20 @@
 * Split default-tenant analytics into `data/tenants/<tenant-id>/hitkeep.db` and run tenant files through one attached DuckDB data plane. This migration is mandatory in 2.13.0. Downgrading a split installation to 2.12 or older is unsupported because those releases do not understand the tenant file or split markers; restore a complete pre-upgrade backup instead.
 * Restore every tenant database from S3 backup snapshots by deriving tenant object prefixes from the restored control snapshot, including temporary STS credentials and non-TLS S3-compatible endpoints.
 
+## [2.13.8](https://github.com/PascaleBeier/hitkeep/compare/v2.13.7...v2.13.8) (2026-08-16)
+
+
+### Bug Fixes
+
+* **backend:** Correct logging via linters ([1a0bca6](https://github.com/PascaleBeier/hitkeep/commit/1a0bca61e9be8db41c9b040431250f6e42227c00))
+* **backend:** Correct logging via linters ([754d0bf](https://github.com/PascaleBeier/hitkeep/commit/754d0bf2d23a06918c98c014020ba73924b7c04f))
+* **ci:** add -trimpath ([94cf015](https://github.com/PascaleBeier/hitkeep/commit/94cf015151939a8c6e0dd89c16b0c8a32acc2fd2))
+* **ci:** enforce go build flags ([71b07f1](https://github.com/PascaleBeier/hitkeep/commit/71b07f1563f86836f8caea42b5860f4ff7b52a40))
+* **deps:** Bump frontend dependencies ([25d6a4b](https://github.com/PascaleBeier/hitkeep/commit/25d6a4bd91eec76c002ca66751afa7fef4014f1b))
+* **deps:** bump go and deps to 1.26.6 ([963f4e7](https://github.com/PascaleBeier/hitkeep/commit/963f4e7a0c7ac0823becef8c6a5bcc08b24c5f95))
+* **frontend:** implement chained scrolling behavior in metric cards and update tests, fixes [#284](https://github.com/PascaleBeier/hitkeep/issues/284) ([cdd2a4a](https://github.com/PascaleBeier/hitkeep/commit/cdd2a4a3c88517551b46449b4ee6b5d0cba8e38f))
+* **frontend:** use .node-version instead of .nvmrc ([9241051](https://github.com/PascaleBeier/hitkeep/commit/924105181de8ff171c61f0fc41fb99cd2d3690b7))
+
 ## [2.13.7](https://github.com/PascaleBeier/hitkeep/compare/v2.13.6...v2.13.7) (2026-08-11)
 
 
