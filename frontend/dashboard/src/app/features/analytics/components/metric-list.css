@@ -58,7 +58,6 @@
 .metric-list__scroll-frame {
     height: 100%;
     overflow-y: auto;
-    overscroll-behavior: contain;
     padding-right: 0.85rem;
     scrollbar-gutter: stable;
     scrollbar-width: none;

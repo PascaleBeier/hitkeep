@@ -161,7 +161,36 @@ async function expectMetricCardGroupPolish(page, expectedCardCount = 5) {
     expect(new Set(result.cards.map((card) => card.height)).size).toBe(1);
     expect(Math.min(...result.cards.map((card) => card.width))).toBeGreaterThan(280);
     expect(result.cards.some((card) => card.tabCount > 0)).toBeTruthy();
+    expect(result.cards.every((card) => card.scrollFrameCount === card.chainedScrollFrameCount)).toBeTruthy();
     expect(result.cards.some((card) => card.scrollableCount > 0 && card.visibleScrollbarCount > 0 && card.visibleFadeCount > 0)).toBeTruthy();
+}
+
+async function expectMetricCardScrollChaining(page) {
+    const frame = page.locator(".metric-card-group__card .metric-list__scroll-shell--scrollable .metric-list__scroll-frame").first();
+    await expect(frame).toBeVisible();
+
+    await frame.evaluate((element) => {
+        element.scrollIntoView({ block: "center" });
+        element.scrollTop = 0;
+    });
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+
+    const bounds = await frame.boundingBox();
+    expect(bounds).not.toBeNull();
+    await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+
+    const innerScrollDelta = await frame.evaluate((element) => Math.max(1, Math.min(40, Math.floor((element.scrollHeight - element.clientHeight) / 2))));
+    const pageBeforeInnerScroll = await page.evaluate(() => window.scrollY);
+    await page.mouse.wheel(0, innerScrollDelta);
+    await expect.poll(() => frame.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+    expect(await page.evaluate(() => window.scrollY)).toBe(pageBeforeInnerScroll);
+
+    await frame.evaluate((element) => {
+        element.scrollTop = 0;
+    });
+    const pageBeforeChainedScroll = await page.evaluate(() => window.scrollY);
+    await page.mouse.wheel(0, -160);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(pageBeforeChainedScroll);
 }
 
 async function collectMetricCardGroupState(page) {
@@ -169,12 +198,15 @@ async function collectMetricCardGroupState(page) {
         const cards = [...document.querySelectorAll(".metric-card-group__card")].map((card) => {
             const rect = card.getBoundingClientRect();
             const scrollShells = [...card.querySelectorAll(".metric-list__scroll-shell")];
+            const scrollFrames = [...card.querySelectorAll(".metric-list__scroll-frame")];
             const scrollableShells = scrollShells.filter((shell) => shell.classList.contains("metric-list__scroll-shell--scrollable"));
             return {
                 title: card.querySelector(".metric-card-group__title")?.textContent?.trim() || "",
                 height: Math.round(rect.height),
                 width: Math.round(rect.width),
                 tabCount: card.querySelectorAll("p-tab").length,
+                scrollFrameCount: scrollFrames.length,
+                chainedScrollFrameCount: scrollFrames.filter((frame) => getComputedStyle(frame).overscrollBehaviorY === "auto").length,
                 scrollableCount: scrollableShells.length,
                 visibleScrollbarCount: scrollableShells.filter((shell) => {
                     const scrollbar = shell.querySelector(".metric-list__scrollbar");
@@ -202,6 +234,7 @@ function metricCardGroupHasPolish(result, expectedCardCount) {
         new Set(result.cards.map((card) => card.height)).size === 1 &&
         Math.min(...result.cards.map((card) => card.width)) > 280 &&
         result.cards.some((card) => card.tabCount > 0) &&
+        result.cards.every((card) => card.scrollFrameCount === card.chainedScrollFrameCount) &&
         result.cards.some((card) => card.scrollableCount > 0 && card.visibleScrollbarCount > 0 && card.visibleFadeCount > 0)
     );
 }
@@ -389,13 +422,14 @@ test("events page filters by seeded audience geography and network metrics", asy
     await expect(page.getByText(/ASN: (AS15169|AS701|AS7922|AS3320|AS3209|AS2856|AS3215|AS1136)/)).toBeVisible();
 });
 
-test("secondary analytics metric cards keep equal-height tabbed surfaces and scroll affordances", async ({ page }) => {
+test("secondary analytics metric cards keep equal-height tabbed surfaces and chained scrolling", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await login(page, "/events");
     await selectSeededSite(page);
     const selectedEvent = await selectSeededEvent(page);
     expect(selectedEvent).toBe(SEEDED_EVENT_NAME);
     await expectMetricCardGroupPolish(page);
+    await expectMetricCardScrollChaining(page);
 
     await page.setViewportSize({ width: 390, height: 900 });
     await login(page, "/ai-chatbots");
