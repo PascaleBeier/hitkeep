@@ -1,190 +1,115 @@
-# HitKeep
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./frontend/dashboard/public/hitkeep-wordmark-white.png">
+    <source media="(prefers-color-scheme: light)" srcset="./frontend/dashboard/public/hitkeep-wordmark-blue.png">
+    <img src="./frontend/dashboard/public/hitkeep-wordmark-blue.png" alt="HitKeep" width="352">
+  </picture>
+</p>
 
-> Privacy-first web analytics with conversion reporting, AI visibility, and optional Ask AI, self-hosted or in EU/US cloud.
+<h1 align="center">AI native, sovereign, privacy-first web analytics in one binary.</h1>
 
-[![Continuous Integration](https://github.com/PascaleBeier/hitkeep/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/PascaleBeier/hitkeep/actions/workflows/ci.yml)
-[![Latest Release](https://img.shields.io/github/v/release/PascaleBeier/hitkeep?sort=semver)](https://github.com/PascaleBeier/hitkeep/releases)
-[![License](https://img.shields.io/github/license/PascaleBeier/hitkeep)](./LICENSE)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/PascaleBeier/hitkeep?logo=go)](https://github.com/PascaleBeier/hitkeep/blob/main/go.mod)
-[![Angular Version](https://img.shields.io/github/package-json/dependency-version/PascaleBeier/hitkeep/%40angular%2Fcore?filename=frontend%2Fdashboard%2Fpackage.json&logo=angular&label=Angular)](https://github.com/PascaleBeier/hitkeep/blob/main/frontend/dashboard/package.json)
-[![Docker Pulls](https://img.shields.io/docker/pulls/pascalebeier/hitkeep?logo=docker&label=docker%20pulls)](https://hub.docker.com/r/pascalebeier/hitkeep)
-[![Documentation](https://img.shields.io/website?url=https%3A%2F%2Fhitkeep.com%2Fguides%2Fintroduction%2F&label=docs)](https://hitkeep.com/guides/introduction/)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/11990/badge)](https://www.bestpractices.dev/projects/11990)
-[![HitKeep MCP server](https://glama.ai/mcp/servers/PascaleBeier/hitkeep/badges/score.svg)](https://glama.ai/mcp/servers/PascaleBeier/hitkeep)
+<p align="center">
+  100% open source under MIT, HitKeep unifies traffic, conversions, Search Console, and AI visibility with custom tracking domains, SSO, open exports, and no separate database, queue, or cache.
+</p>
 
-HitKeep is open source web analytics for teams that want useful product reporting, conversion analytics, and AI-era search visibility without running PostgreSQL, Redis, ClickHouse, or a separate queue. It ships as a single Go binary with an embedded Angular dashboard, DuckDB storage, and in-process NSQ queueing.
+<p align="center">
+  <a href="https://hitkeep.com/guides/installation/">Self-host</a> ·
+  <a href="https://hitkeep.com/guides/introduction/">Documentation</a> ·
+  <a href="https://hitkeep.com/cloud">Cloud</a> ·
+  <a href="https://hitkeep.com">Website</a>
+</p>
 
-[Website](https://hitkeep.com) · [Live Demo](https://demo.hitkeep.com/share/7a55968bb42df256512fbe7ff73ab88f29dd45c236eddc818bd66420b4ffbaad) · [Docs](https://hitkeep.com/guides/introduction/) · [Cloud](https://hitkeep.com/cloud) · [AI Performance](https://hitkeep.com/ai-performance/) · [API](https://hitkeep.com/api/) · [Releases](https://github.com/PascaleBeier/hitkeep/releases)
+<p align="center">
+  <a href="https://github.com/PascaleBeier/hitkeep/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/PascaleBeier/hitkeep?sort=semver"></a>
+  <a href="https://github.com/PascaleBeier/hitkeep/actions/workflows/ci.yml"><img alt="Continuous integration status" src="https://github.com/PascaleBeier/hitkeep/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="./LICENSE"><img alt="MIT license" src="https://img.shields.io/github/license/PascaleBeier/hitkeep"></a>
+  <a href="https://hub.docker.com/r/pascalebeier/hitkeep"><img alt="Docker pulls" src="https://img.shields.io/docker/pulls/pascalebeier/hitkeep?logo=docker&label=docker%20pulls"></a>
+  <a href="https://www.bestpractices.dev/projects/11990"><img alt="OpenSSF Best Practices badge" src="https://www.bestpractices.dev/projects/11990/badge"></a>
+</p>
 
-![HitKeep analytics dashboard with traffic overview, geographic breakdown, goals, funnels, and UTM attribution](./.github/assets/dashboard-overview.png)
+![HitKeep dashboard showing setup progress, traffic metrics, conversion reports, and analytics navigation](./.github/assets/dashboard-overview.png)
 
 ## Why HitKeep
 
-- **Low-ops self-hosting:** one binary, one data directory, embedded DuckDB and NSQ — no external services to run
-- **Useful reports:** multi-site Overview, top pages, landing and exit pages, events, goals, funnels, ecommerce, UTM attribution, QR campaigns, Web Vitals, email reports, and Google Search Console aggregates
-- **Privacy defaults:** cookie-less tracking, Do Not Track support, and focused data collection
-- **AI visibility:** server-side crawler fetch analytics, AI-referred visits, on-site chatbot outcomes, and correlation reports
-- **Ask AI:** optional dashboard assistant that answers site-scoped aggregate questions with citations, small charts, and safe dashboard actions
-- **Team controls:** passkeys, TOTP, site and team permissions, share links, audit logs, scoped API clients, and a read-only MCP analytics server
-- **Deployment choice:** run it yourself or use managed cloud in the EU or US
+- **100% open source.** The complete product is MIT-licensed. Custom tracking domains and team SSO live in the same public codebase—not in a separate proprietary edition.
+- **Full data sovereignty.** Self-host one Go binary with embedded DuckDB and NSQ, or export your data in open formats. Complete takeout, APIs, webhooks, share links, and permissions keep the data useful outside HitKeep.
+- **AI-native analytics.** HitKeep treats AI as a first-class traffic channel: crawler fetches, AI-referred visits, and chatbot outcomes remain distinct. Ask AI uses cited aggregate evidence, while read-only MCP gives approved assistants governed analytics access.
+- **Privacy by default.** The browser tracker sets no analytics cookies, respects Do Not Track, and collects focused website analytics without building a cross-site identity.
+- **Reporting that reaches the outcome.** Follow acquisition through pages, automatic and custom events, goals, funnels, ecommerce revenue, UTM and QR campaigns, Search Console, and Web Vitals.
+
+Self-host the complete open-source product, or use [HitKeep Cloud](https://hitkeep.com/cloud) in a managed EU or US region when you do not want to operate it yourself.
+
+HitKeep is web-focused. It favors aggregate traffic and conversion evidence over visitor profiles, session replay, mobile SDKs, or built-in experimentation. The result is a smaller collection boundary and operating surface without stopping at a basic pageview counter.
 
 ## Quick Start
 
-### Docker
+Download the Docker Compose file and environment template:
 
-Save this as `compose.yml`:
-
-```yaml
-services:
-  hitkeep:
-    image: pascalebeier/hitkeep:latest
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    volumes:
-      - hitkeep_data:/var/lib/hitkeep/data
-    environment:
-      # any flag can also be set as an environment variable
-      HITKEEP_JWT_SECRET: replace-this-with-a-long-random-string
-    command:
-      - "-public-url=http://localhost:8080"
-
-volumes:
-  hitkeep_data: {}
+```bash
+mkdir hitkeep && cd hitkeep
+curl -fsSLo compose.yml https://raw.githubusercontent.com/PascaleBeier/hitkeep/main/examples/compose.yml
+curl -fsSLo .env https://raw.githubusercontent.com/PascaleBeier/hitkeep/main/examples/.env.example
 ```
 
-Then start it:
+Open `.env` and replace `paste-the-generated-value-here` with a long random value from your password manager. Then start HitKeep:
 
 ```bash
 docker compose up -d
 ```
 
-Open `http://localhost:8080` and create your first account. More compose examples — including Caddy, nginx, and Traefik setups — live in [`examples/`](./examples/).
+Open [http://localhost:8080](http://localhost:8080) and create the first account. Keep `.env` private and retain the same secret across restarts.
 
-### Binary
+Before exposing an instance publicly, follow the [Docker Compose guide](https://hitkeep.com/guides/installation/docker-compose/) for HTTPS and trusted proxies, then review [backups](https://hitkeep.com/guides/data/backups-and-restore/) and the [configuration reference](https://hitkeep.com/reference/configuration/). Prefer a native service? Download the Linux AMD64 or ARM64 binary from [GitHub Releases](https://github.com/PascaleBeier/hitkeep/releases) and follow the [binary installation guide](https://hitkeep.com/guides/installation/binary/).
 
-Download the latest release for your platform (`hitkeep-linux-amd64` or `hitkeep-linux-arm64`) and run it:
-
-```bash
-curl -LO https://github.com/PascaleBeier/hitkeep/releases/latest/download/hitkeep-linux-amd64
-chmod +x hitkeep-linux-amd64
-export HITKEEP_JWT_SECRET="$(openssl rand -hex 32)" # keep this stable across restarts
-./hitkeep-linux-amd64 -public-url="http://localhost:8080"
-```
-
-Open `http://localhost:8080` and create your first account.
-
-### Going to production
-
-For reverse proxies, SMTP, systemd, Kubernetes, S3 archiving, and every configuration flag, use the docs instead of this README:
-
-- [Installation guides](https://hitkeep.com/guides/installation/)
-- [Configuration reference](https://hitkeep.com/reference/configuration/)
-- [Cloud documentation](https://hitkeep.com/cloud)
-
-## Track Your Site
+## Track Your First Site
 
 Create a site in the dashboard, then add the tracker to your pages:
 
 ```html
-<script async src="https://your-hitkeep-instance.com/hk.js"></script>
+<script async src="https://analytics.example.com/hk.js"></script>
 ```
 
-Send a custom event:
+Pageviews and supported automatic interaction events—outbound clicks, file downloads, and form submissions—start flowing immediately. Use the [custom events guide](https://hitkeep.com/guides/tracking/custom-events/) for product-specific actions such as signups, purchases, or qualified leads.
 
-```html
-<script>
-  window.hk = window.hk || {};
-  window.hk.event?.("signup", { plan: "pro", source: "landing-page" });
-</script>
-```
-
-Teams can also serve the tracker from their own verified domains, for example `https://analytics.example.com/hk.js`, via **Team Settings → Tracking domains**. DNS verification, TLS options, and ready-made Caddy, nginx, Traefik, and Helm configurations are covered in the [custom tracking domains guide](https://hitkeep.com/guides/tracking/custom-tracking-domains/) and [`examples/`](./examples/).
-
-More tracking guides:
-
-- [Tracking docs](https://hitkeep.com/guides/tracking/)
-- [Custom events](https://hitkeep.com/guides/tracking/custom-events/)
-- [Ecommerce analytics](https://hitkeep.com/guides/analytics/ecommerce/)
-- [AI visibility analytics](https://hitkeep.com/guides/analytics/ai-visibility/)
-- [CloudFront AI crawler tracking](https://hitkeep.com/guides/tracking/cloudfront-ai-crawler-tracking/)
-- [WordPress integration](https://hitkeep.com/guides/integrations/wordpress/)
-
-## Product Tour
+## Explore HitKeep
 
 <details>
-<summary>See six product screenshots</summary>
+<summary>See AI visibility, ecommerce, Search Console, and Ask AI</summary>
 
-### AI dashboard
-![HitKeep AI Agents dashboard with AI request, referral, crawl, and pageview analytics](./.github/assets/analytics-ai-agents-traffic.png)
+### AI visibility
+
+![HitKeep AI visibility report separating crawler fetches, AI referrals, and related activity](./.github/assets/analytics-ai-visibility.png)
 
 ### Ecommerce
-![HitKeep ecommerce analytics with revenue KPIs, chart, top products, and revenue sources](./.github/assets/analytics-ecommerce.png)
+
+![HitKeep ecommerce analytics showing revenue KPIs, trends, top products, and revenue sources](./.github/assets/analytics-ecommerce.png)
 
 ### Search Console
-![HitKeep Search Console drilldown with clicks, impressions, CTR, position, trends, top queries, pages, countries, and devices](./.github/assets/analytics-search-console.png)
 
-### AI Visibility
-![HitKeep AI visibility analytics with fetch KPIs, assistant filters, and fetch volume chart](./.github/assets/analytics-ai-visibility.png)
+![HitKeep Search Console report showing clicks, impressions, click-through rate, position, and query trends](./.github/assets/analytics-search-console.png)
 
 ### Ask AI
-![HitKeep Ask AI answer with completed analytics tool chips, citations, a table, and a safe dashboard action](./.github/assets/feature-ask-ai-answer.png)
 
-### MCP Access
-![HitKeep MCP integration overview for read-only analytics access](./.github/assets/mcp.png)
+![HitKeep Ask AI answer with completed analytics tools, cited evidence, a table, and a safe dashboard action](./.github/assets/feature-ask-ai-answer.png)
 
 </details>
 
-## Documentation
+## Documentation, Community, and Support
 
-The maintained reference lives on `hitkeep.com`.
+Find answers in the documentation, report reproducible bugs through GitHub Issues, and disclose vulnerabilities privately through the security policy.
 
-- [Getting started](https://hitkeep.com/guides/introduction/)
-- [Installation](https://hitkeep.com/guides/installation/)
-- [Configuration](https://hitkeep.com/reference/configuration/)
-- [REST API reference](https://hitkeep.com/api/)
-- [Ask AI analytics assistant](https://hitkeep.com/guides/analytics/ask-ai/)
-- [Google Search Console integration](https://hitkeep.com/guides/integrations/google-search-console/)
-- [AI chatbot analytics](https://hitkeep.com/guides/analytics/ai-chatbot-analytics/)
-- [Read-only MCP server for web analytics](https://hitkeep.com/use-cases/read-only-mcp-server-web-analytics/)
-- [Compliance](https://hitkeep.com/compliance/overview/)
-- [Comparison pages](https://hitkeep.com/vs/)
-- [Analytics Agent Skills](./skills/)
-- [Contributor Agent Skills](./.agents/skills/)
+<details>
+<summary>Contributor quick path</summary>
 
-## Cloud
+Run `./hk setup`, then start seeded development with `./hk dev --seed` or use `./hk dev --detach`. Capture product proof with `./hk screenshot`; inspect `./hk catalog commands --output json` and `./hk catalog configuration --output json` instead of copying mutable workflow facts. Validate with `./hk qa pr`. The Compose stack and complete workflow live in [CONTRIBUTING.md](./CONTRIBUTING.md).
 
-If you want the same product without running it yourself, start here:
+</details>
 
-- [Start in the EU](https://cloud.hitkeep.eu/signup)
-- [Start in the US](https://cloud.hitkeep.com/signup)
-- [Cloud overview](https://hitkeep.com/cloud)
-
-## Development
-
-The repository-owned developer CLI provides a small default development workflow, with isolated worktrees, cloud-parity builds, and the same QA contract available when needed.
-
-The checked-in `./hk` file is a POSIX launcher, not a compiled binary. It builds the current worktree's developer CLI into a content-addressed host cache; developer CLI binaries are neither committed nor attached to HitKeep releases.
-
-Start with:
-
-```bash
-./hk setup
-./hk dev --seed
-```
-
-`./hk dev` runs the workspace's Compose stack in the foreground, prints URLs, and streams component logs; `Ctrl+C` stops the complete stack. Use `./hk dev --detach` for an explicit background session, `./hk dev logs` to follow it, `./hk dev restart` to preserve data while restarting, `./hk dev stop` to stop it, and `./hk dev reset --seed` for a fresh seeded data volume. Add `--variant cloud` for local managed-cloud parity. Concurrent Git worktrees remain isolated automatically.
-
-Capture one or several local routes for visual QA with `./hk screenshot /dashboard /admin/status`. The routes share one browser and authenticated seeded session, and the PNGs stay in the workspace's managed artifact state instead of entering the repository.
-
-Run `./hk help` for human guidance, `./hk catalog commands --output json` for the complete machine-readable command surface, `./hk catalog configuration --output json` for the runtime configuration documentation contract, `./hk doctor` for prerequisites, and `./hk qa pr` before review. `hk` is the sole supported developer workflow entry point.
-
-Contributor docs and local development guides:
-
-- [Contributing guide](./CONTRIBUTING.md)
-- [Dashboard development notes](./frontend/dashboard/README.md)
-- [Changelog](./CHANGELOG.md)
+- **Operate:** [Installation](https://hitkeep.com/guides/installation/) · [Configuration](https://hitkeep.com/reference/configuration/) · [REST API](https://hitkeep.com/api/) · [Goals](https://hitkeep.com/guides/analytics/goals/) · [Funnels](https://hitkeep.com/guides/analytics/funnels/)
+- **Evaluate:** [Comparison library](https://hitkeep.com/vs/) · [Compliance](https://hitkeep.com/compliance/overview/) · [Releases](https://github.com/PascaleBeier/hitkeep/releases) · [Changelog](./CHANGELOG.md)
+- **Contribute:** [Contributor guide](./CONTRIBUTING.md) · [Security policy](./SECURITY.md) · [Issues](https://github.com/PascaleBeier/hitkeep/issues)
+- **Support open source:** [Fund HitKeep on GitHub Sponsors](https://github.com/sponsors/PascaleBeier) or [make a one-time contribution](https://www.paypal.me/kreuztal).
 
 ## License
 
-Distributed under the MIT License. See [LICENSE](./LICENSE).
+HitKeep is distributed under the [MIT License](./LICENSE).
