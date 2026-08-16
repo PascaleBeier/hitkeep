@@ -206,7 +206,7 @@ func TestRestoreDatabaseDoesNotLeaveWal(t *testing.T) {
 	}
 
 	targetPath := filepath.Join(tmpDir, "restored.db")
-	if err := restoreDatabase(ctx, targetPath, sourceSnapshotPath, false, nil); err != nil {
+	if err := restoreDatabase(ctx, nil, targetPath, sourceSnapshotPath, false, nil); err != nil {
 		t.Fatalf("restoreDatabase: %v", err)
 	}
 
@@ -330,7 +330,7 @@ func TestDiscoverS3TenantBackupsFromRestoredControl(t *testing.T) {
 		t.Fatalf("insert non-default tenant: %v", err)
 	}
 
-	legacyIDs, err := discoverS3TenantBackupsFromControl(ctx, controlPath)
+	legacyIDs, err := discoverS3TenantBackupsFromControl(ctx, nil, controlPath)
 	if err != nil {
 		t.Fatalf("discover legacy tenant backups: %v", err)
 	}
@@ -345,7 +345,7 @@ func TestDiscoverS3TenantBackupsFromRestoredControl(t *testing.T) {
 		t.Fatalf("mark default tenant split: %v", err)
 	}
 
-	splitIDs, err := discoverS3TenantBackupsFromControl(ctx, controlPath)
+	splitIDs, err := discoverS3TenantBackupsFromControl(ctx, nil, controlPath)
 	if err != nil {
 		t.Fatalf("discover split tenant backups: %v", err)
 	}
@@ -370,7 +370,7 @@ func TestDiscoverS3TenantBackupsSupportsPreTenantControlSnapshot(t *testing.T) {
 		t.Fatalf("close legacy control store: %v", err)
 	}
 
-	ids, err := discoverS3TenantBackupsFromControl(ctx, controlPath)
+	ids, err := discoverS3TenantBackupsFromControl(ctx, nil, controlPath)
 	if err != nil {
 		t.Fatalf("discover tenants in pre-tenant control snapshot: %v", err)
 	}
@@ -419,7 +419,7 @@ func restoreLatestSharedSnapshot(t *testing.T, ctx context.Context, backupDir st
 		t.Fatal("expected shared backup snapshot")
 	}
 	snapshotPath := filepath.Join(backupDir, "shared", entries[0].Name())
-	if err := restoreDatabase(ctx, targetPath, snapshotPath, false, nil); err != nil {
+	if err := restoreDatabase(ctx, nil, targetPath, snapshotPath, false, nil); err != nil {
 		t.Fatalf("restoreDatabase: %v", err)
 	}
 }
@@ -502,7 +502,7 @@ func TestRestoreDatabasePreservesExistingBrokenWalWithoutOpeningTarget(t *testin
 		t.Fatalf("write target wal: %v", err)
 	}
 
-	if err := restoreDatabase(ctx, targetPath, sourceSnapshotPath, false, nil); err != nil {
+	if err := restoreDatabase(ctx, nil, targetPath, sourceSnapshotPath, false, nil); err != nil {
 		t.Fatalf("restoreDatabase with existing wal: %v", err)
 	}
 

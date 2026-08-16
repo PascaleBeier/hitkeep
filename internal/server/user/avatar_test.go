@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"testing"
 )
@@ -29,5 +30,23 @@ func TestNewGravatarRequestUsesFixedOrigin(t *testing.T) {
 	}
 	if got := req.URL.Query().Get("d"); got != "mp" {
 		t.Fatalf("expected default query to be mp, got %q", got)
+	}
+}
+
+func TestGravatarErrorKindUsesStableCategories(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		err  error
+		want string
+	}{
+		{name: "canceled", err: context.Canceled, want: "canceled"},
+		{name: "timeout", err: context.DeadlineExceeded, want: "timeout"},
+		{name: "upstream", err: errors.New(`GET "https://www.gravatar.com/avatar/email-hash": provider response email=person@example.com`), want: "upstream_request_failed"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := gravatarErrorKind(test.err); got != test.want {
+				t.Fatalf("gravatarErrorKind() = %q, want %q", got, test.want)
+			}
+		})
 	}
 }

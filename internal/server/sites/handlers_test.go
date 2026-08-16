@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -155,6 +156,24 @@ func TestHandleGetFaviconGracefullyFallsBackWhenUpstreamHasNoIcon(t *testing.T) 
 	}
 	if w.Body.Len() != 0 {
 		t.Fatalf("expected empty fallback response, got %q", w.Body.String())
+	}
+}
+
+func TestFaviconProxyErrorKindUsesStableCategories(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		err  error
+		want string
+	}{
+		{name: "canceled", err: context.Canceled, want: "canceled"},
+		{name: "timeout", err: context.DeadlineExceeded, want: "timeout"},
+		{name: "upstream", err: errors.New("upstream response included internal transport details"), want: "upstream_request_failed"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := faviconProxyErrorKind(test.err); got != test.want {
+				t.Fatalf("faviconProxyErrorKind() = %q, want %q", got, test.want)
+			}
+		})
 	}
 }
 

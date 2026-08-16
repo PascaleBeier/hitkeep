@@ -71,7 +71,7 @@ func (h *handler) handleSSOStart() http.HandlerFunc {
 		_, domain, _ := sso.NormalizeEmail(email)
 		config, err := h.ctx.Store.GetEnabledTeamSSOConfigByDomain(r.Context(), domain)
 		if err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to resolve SSO provider", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve SSO provider", "error_kind", ssoErrorKind(err, "provider_lookup_failed"))
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -92,7 +92,7 @@ func (h *handler) handleSSOStart() http.HandlerFunc {
 				writeSSOStartError(r.Context(), w, http.StatusForbidden, "sso_access_denied")
 				return
 			}
-			shared.LoggerFromContext(r.Context()).Error("Failed to authorize SSO login", "error", err, "team_id", config.TeamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to authorize SSO login", "error_kind", ssoErrorKind(err, "access_authorization_failed"), "team_id", config.TeamID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -162,7 +162,7 @@ func (h *handler) handleSSOInviteAvailability() http.HandlerFunc {
 		_, domain, _ := sso.NormalizeEmail(email)
 		config, err := h.ctx.Store.GetEnabledTeamSSOConfigByDomain(r.Context(), domain)
 		if err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to resolve invitation SSO provider", "error", err)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve invitation SSO provider", "error_kind", ssoErrorKind(err, "provider_lookup_failed"))
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -176,7 +176,7 @@ func (h *handler) handleSSOInviteAvailability() http.HandlerFunc {
 				writeSSOAvailability(r.Context(), w, false)
 				return
 			}
-			shared.LoggerFromContext(r.Context()).Error("Failed to authorize invitation SSO", "error", err, "team_id", config.TeamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to authorize invitation SSO", "error_kind", ssoErrorKind(err, "access_authorization_failed"), "team_id", config.TeamID)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -340,7 +340,7 @@ func (h *handler) handleSSOCallback() http.HandlerFunc {
 		decision, err := h.authorizeSSOAccess(r.Context(), config, identity.Email, state.InviteToken)
 		if err != nil {
 			if !errors.Is(err, errSSOAccessDenied) {
-				shared.LoggerFromContext(r.Context()).Error("Failed to re-authorize SSO login", "error", err, "team_id", config.TeamID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to re-authorize SSO login", "error_kind", ssoErrorKind(err, "access_reauthorization_failed"), "team_id", config.TeamID)
 			}
 			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, decision.UserID, identity.Email, ssoAuditFlowCallback, ssoReasonAccessDenied, decision.Mode, "SSO team access was removed during login")
 			http.Redirect(w, r, h.ssoErrorRedirectURL(state, "sso_access_denied"), http.StatusSeeOther)
@@ -376,7 +376,7 @@ func (h *handler) handleSSOCallback() http.HandlerFunc {
 			ExpectedUserID: decision.UserID,
 		})
 		if err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to resolve SSO user", "error", err, "team_id", config.TeamID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve SSO user", "error_kind", ssoErrorKind(err, "identity_resolution_failed"), "team_id", config.TeamID)
 			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, decision.UserID, identity.Email, ssoAuditFlowCallback, ssoReasonIdentityLinkFailed, decision.Mode, "SSO identity could not be linked")
 			http.Redirect(w, r, h.ssoErrorRedirectURL(state, "sso_failed"), http.StatusSeeOther)
 			return
@@ -387,13 +387,13 @@ func (h *handler) handleSSOCallback() http.HandlerFunc {
 			return
 		}
 		if err := h.completeSSOTeamAccess(r, config, decision, resolved.UserID, identity.Email, state.InviteToken); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to complete SSO team access", "error", err, "team_id", config.TeamID, "user_id", resolved.UserID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to complete SSO team access", "error_kind", ssoErrorKind(err, "membership_update_failed"), "team_id", config.TeamID, "user_id", resolved.UserID)
 			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, resolved.UserID, identity.Email, ssoAuditFlowCallback, ssoReasonMembershipFailed, decision.Mode, "SSO team access could not be completed")
 			http.Redirect(w, r, h.ssoErrorRedirectURL(state, "sso_access_denied"), http.StatusSeeOther)
 			return
 		}
 		if err := h.issueLoginSession(r.Context(), w, resolved.UserID, state.RememberMe); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to issue SSO login session", "error", err, "user_id", resolved.UserID)
+			shared.LoggerFromContext(r.Context()).Error("Failed to issue SSO login session", "error_kind", ssoErrorKind(err, "session_issue_failed"), "user_id", resolved.UserID)
 			h.appendSSOAudit(r, "auth.sso_login_failed", "failure", config.TeamID, resolved.UserID, identity.Email, ssoAuditFlowCallback, ssoReasonSessionFailed, decision.Mode, "SSO login session could not be issued")
 			http.Redirect(w, r, h.ssoErrorRedirectURL(state, "sso_failed"), http.StatusSeeOther)
 			return
@@ -546,6 +546,17 @@ func (h *handler) handleSSOCompletionError(w http.ResponseWriter, r *http.Reques
 
 func (h *handler) ssoRelyingParty() *sso.RelyingParty {
 	return sso.NewRelyingParty(h.ssoClient())
+}
+
+func ssoErrorKind(err error, fallback string) string {
+	switch {
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "timeout"
+	default:
+		return fallback
+	}
 }
 
 func (h *handler) ssoClient() *sso.Client {

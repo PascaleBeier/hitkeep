@@ -1,7 +1,9 @@
 package ingest
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -682,12 +684,23 @@ func (h *handler) forwardToLeader(w http.ResponseWriter, r *http.Request, target
 		},
 		Transport: leaderForwardTransport,
 		ErrorHandler: func(rw http.ResponseWriter, req *http.Request, proxyErr error) {
-			shared.LoggerFromContext(r.Context()).Error("Follower failed to forward request", "error", proxyErr, "target_path", targetPath)
+			shared.LoggerFromContext(r.Context()).Error("Follower failed to forward request", "error_kind", leaderForwardErrorKind(proxyErr), "target_path", targetPath)
 			http.Error(rw, "Failed to forward request", http.StatusBadGateway)
 		},
 	}
 
 	proxy.ServeHTTP(w, r)
+}
+
+func leaderForwardErrorKind(err error) string {
+	switch {
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "timeout"
+	default:
+		return "leader_request_failed"
+	}
 }
 
 func (h *handler) handleIngestFollower(w http.ResponseWriter, r *http.Request) {

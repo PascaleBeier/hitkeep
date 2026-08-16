@@ -1,9 +1,11 @@
 package worker
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"testing"
@@ -14,8 +16,25 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	"hitkeep/internal/hklog"
 	"hitkeep/internal/searchconsole"
 )
+
+func TestSearchConsoleSyncWorkerRunDueFailureUsesStructuredDiagnostics(t *testing.T) {
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	ctx := hklog.WithLogger(context.Background(), logger)
+	worker := NewSearchConsoleSyncWorker(nil, nil)
+
+	worker.runDueAndLog(ctx, 10, "Search Console sync run")
+
+	if strings.Contains(logs.String(), "error=") {
+		t.Fatalf("run-level sync failure logged raw error: %q", logs.String())
+	}
+	if !strings.Contains(logs.String(), "stage=orchestration") || !strings.Contains(logs.String(), "category=unknown") {
+		t.Fatalf("expected structured Search Console failure diagnostics, got %q", logs.String())
+	}
+}
 
 func TestSearchConsoleSyncWorkerInitialSyncImportsRecentFinalizedRows(t *testing.T) {
 	ctx := context.Background()

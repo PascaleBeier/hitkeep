@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -57,6 +58,24 @@ func TestGeoNetworkFromVisitorIPLooksUpMetadataOnce(t *testing.T) {
 
 func testServerIngestLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
+
+func TestLeaderForwardErrorKindUsesStableCategories(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		err  error
+		want string
+	}{
+		{name: "canceled", err: context.Canceled, want: "canceled"},
+		{name: "timeout", err: context.DeadlineExceeded, want: "timeout"},
+		{name: "leader request", err: errors.New("dial tcp 10.0.0.8:8080: internal transport details"), want: "leader_request_failed"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := leaderForwardErrorKind(test.err); got != test.want {
+				t.Fatalf("leaderForwardErrorKind() = %q, want %q", got, test.want)
+			}
+		})
+	}
 }
 
 func TestMetadataFromVisitorIPWithCountryReusesResolvedCountry(t *testing.T) {

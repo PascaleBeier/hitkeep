@@ -20,11 +20,7 @@ func TestDetachedCLIActionOutlivesLauncher(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds the hk command")
 	}
-	_, source, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("resolve source path")
-	}
-	projectRoot := filepath.Clean(filepath.Join(filepath.Dir(source), "..", ".."))
+	projectRoot := repositoryRoot(t)
 	binary := filepath.Join(t.TempDir(), "hk")
 	build := exec.Command("go", "build", "-o", binary, "./cmd/hk")
 	build.Dir = projectRoot
@@ -115,11 +111,7 @@ func TestMCPStdioWritesNoNonProtocolOutput(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds the hk command")
 	}
-	_, source, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("resolve source path")
-	}
-	root := filepath.Clean(filepath.Join(filepath.Dir(source), "..", ".."))
+	root := repositoryRoot(t)
 	command := exec.Command("go", "run", "./cmd/hk", "mcp", "serve", "--workspace", root)
 	command.Dir = root
 	command.Stdin = bytes.NewReader(nil)
@@ -142,11 +134,7 @@ func TestMCPStdioWithoutWorkspaceUsesConfiguredFallback(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds the hk command")
 	}
-	_, source, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("resolve source path")
-	}
-	projectRoot := filepath.Clean(filepath.Join(filepath.Dir(source), "..", ".."))
+	projectRoot := repositoryRoot(t)
 	binary := filepath.Join(t.TempDir(), "hk")
 	build := exec.Command("go", "build", "-o", binary, "./cmd/hk")
 	build.Dir = projectRoot
@@ -203,11 +191,7 @@ func TestMCPStdioActionRunLifecycle(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds the hk command")
 	}
-	_, source, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("resolve source path")
-	}
-	projectRoot := filepath.Clean(filepath.Join(filepath.Dir(source), "..", ".."))
+	projectRoot := repositoryRoot(t)
 	binary := filepath.Join(t.TempDir(), "hk")
 	build := exec.Command("go", "build", "-o", binary, "./cmd/hk")
 	build.Dir = projectRoot

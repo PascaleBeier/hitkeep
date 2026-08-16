@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -62,9 +61,20 @@ func TestDockerBootstrapUsesWritableHostCaches(t *testing.T) {
 
 func repositoryRoot(t *testing.T) string {
 	t.Helper()
-	_, filename, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("resolve test source path")
+	root, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("resolve test working directory: %v", err)
 	}
-	return filepath.Clean(filepath.Join(filepath.Dir(filename), "..", ".."))
+	for {
+		if _, err := os.Stat(filepath.Join(root, "go.mod")); err == nil {
+			return root
+		}
+		parent := filepath.Dir(root)
+		if parent == root {
+			break
+		}
+		root = parent
+	}
+	t.Fatal("resolve repository root")
+	return ""
 }

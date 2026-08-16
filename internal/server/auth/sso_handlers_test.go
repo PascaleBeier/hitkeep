@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -27,6 +28,25 @@ import (
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/sso"
 )
+
+func TestSSOErrorKindUsesStableCategories(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		err      error
+		fallback string
+		want     string
+	}{
+		{name: "canceled", err: context.Canceled, fallback: "provider_lookup_failed", want: "canceled"},
+		{name: "timeout", err: context.DeadlineExceeded, fallback: "provider_lookup_failed", want: "timeout"},
+		{name: "internal provider detail", err: errors.New("OIDC response included issuer and transport details"), fallback: "provider_lookup_failed", want: "provider_lookup_failed"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := ssoErrorKind(test.err, test.fallback); got != test.want {
+				t.Fatalf("ssoErrorKind() = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
 
 func TestSSOLoginUsesPKCENonceAndCreatesNormalSession(t *testing.T) {
 	h, store := setupAuthTestEnv(t)

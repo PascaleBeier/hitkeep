@@ -67,7 +67,7 @@ func (w *BackupWorker) Start(ctx context.Context) {
 			return
 		}
 		if err := w.Run(ctx); err != nil {
-			hklog.LoggerFromContext(ctx).Error("Initial backup run failed", "error", err)
+			logBackupFailure(ctx, "Initial backup run failed", err)
 		}
 	}()
 
@@ -81,7 +81,7 @@ func (w *BackupWorker) Start(ctx context.Context) {
 			return
 		case <-ticker.C:
 			if err := w.Run(ctx); err != nil {
-				hklog.LoggerFromContext(ctx).Error("Backup worker failed", "error", err)
+				logBackupFailure(ctx, "Backup worker failed", err)
 			}
 		}
 	}
@@ -118,10 +118,10 @@ func (w *BackupWorker) Run(ctx context.Context) (err error) {
 	tenantIDs, err := w.tenantMgr.Control().ListActiveTenantIDs(ctx)
 	if err != nil {
 		if isMissingRelationError(err, "tenants") || isBinderError(err) {
-			hklog.LoggerFromContext(ctx).Debug("Tenants schema not ready, skipping tenant backups", "error", err)
+			hklog.LoggerFromContext(ctx).Debug("Tenants schema not ready, skipping tenant backups", "error_kind", backupErrorKind(err))
 			tenantIDs = nil
 		} else {
-			hklog.LoggerFromContext(ctx).Error("Failed to list tenant IDs for backup", "error", err)
+			hklog.LoggerFromContext(ctx).Error("Failed to list tenant IDs for backup", "error_kind", backupErrorKind(err))
 			tenantIDs = nil
 		}
 	}
@@ -131,7 +131,7 @@ func (w *BackupWorker) Run(ctx context.Context) (err error) {
 	for _, tenantID := range tenantIDs {
 		tenantStore, err := w.tenantMgr.ForTenant(ctx, tenantID)
 		if err != nil {
-			hklog.LoggerFromContext(ctx).Error("Failed to open tenant store for backup", "tenant_id", tenantID, "error", err)
+			hklog.LoggerFromContext(ctx).Error("Failed to open tenant store for backup", "tenant_id", tenantID, "error_kind", backupErrorKind(err))
 			tenantErrors = append(tenantErrors, fmt.Errorf("open tenant %s database for backup: %w", tenantID, err))
 			continue
 		}
@@ -144,7 +144,7 @@ func (w *BackupWorker) Run(ctx context.Context) (err error) {
 
 		tenantDest := joinArchivePath(w.backupPath, "tenants", tenantID.String(), timestamp)
 		if err := w.exportDatabase(ctx, tenantStore, tenantDest, isS3); err != nil {
-			hklog.LoggerFromContext(ctx).Error("Failed to backup tenant database", "tenant_id", tenantID, "error", err)
+			hklog.LoggerFromContext(ctx).Error("Failed to backup tenant database", "tenant_id", tenantID, "error_kind", backupErrorKind(err))
 			w.removeIncompleteLocalSnapshot(tenantDest, isS3, ctx)
 			tenantErrors = append(tenantErrors, fmt.Errorf("backup tenant %s database: %w", tenantID, err))
 			continue
@@ -178,7 +178,7 @@ func (w *BackupWorker) removeIncompleteLocalSnapshot(path string, isS3 bool, ctx
 		if len(ctxArgs) > 0 && ctxArgs[0] != nil {
 			ctx = ctxArgs[0]
 		}
-		hklog.LoggerFromContext(ctx).Warn("Could not remove incomplete backup snapshot", "path", path, "error", err)
+		hklog.LoggerFromContext(ctx).Warn("Could not remove incomplete backup snapshot", "path", path, "error_kind", backupErrorKind(err))
 	}
 }
 
@@ -254,7 +254,7 @@ func (w *BackupWorker) pruneLocalSnapshots(dir string, ctxArgs ...context.Contex
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			hklog.LoggerFromContext(ctx).Warn("Could not read backup directory for pruning", "dir", dir, "error", err)
+			hklog.LoggerFromContext(ctx).Warn("Could not read backup directory for pruning", "dir", dir, "error_kind", backupErrorKind(err))
 		}
 		return
 	}
@@ -277,9 +277,28 @@ func (w *BackupWorker) pruneLocalSnapshots(dir string, ctxArgs ...context.Contex
 	for _, name := range toRemove {
 		path := filepath.Join(dir, name)
 		if err := os.RemoveAll(path); err != nil {
-			hklog.LoggerFromContext(ctx).Error("Failed to prune old backup snapshot", "path", path, "error", err)
+			hklog.LoggerFromContext(ctx).Error("Failed to prune old backup snapshot", "path", path, "error_kind", backupErrorKind(err))
 		} else {
 			hklog.LoggerFromContext(ctx).Debug("Pruned old backup snapshot", "path", path)
 		}
 	}
+}
+
+func backupErrorKind(err error) string {
+	switch {
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "timeout"
+	case errors.Is(err, os.ErrNotExist):
+		return "not_found"
+	case errors.Is(err, os.ErrPermission):
+		return "permission_denied"
+	default:
+		return "backup_failed"
+	}
+}
+
+func logBackupFailure(ctx context.Context, message string, err error) {
+	hklog.LoggerFromContext(ctx).Error(message, "error_kind", backupErrorKind(err))
 }

@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"maps"
 	"strings"
 	"testing"
@@ -19,6 +20,24 @@ import (
 	"hitkeep/internal/reporting"
 	"hitkeep/internal/testutil/testdb"
 )
+
+func TestReportMailFailureFieldsAreGrouped(t *testing.T) {
+	attr := reportMailFailureLogAttr("external", "message-123", 2, "smtp_send_failed", mailer.ErrorDetails{
+		Stage: "transport", Kind: "temporary_rejection", Message: "mail transport failed", SMTPCode: "421",
+	})
+	if attr.Key != "mail" || attr.Value.Kind() != slog.KindGroup {
+		t.Fatalf("expected mail group, got %#v", attr)
+	}
+	fields := make(map[string]slog.Value)
+	for _, field := range attr.Value.Group() {
+		fields[field.Key] = field.Value
+	}
+	for _, key := range []string{"recipient_kind", "message_id", "attempt", "error_code", "error_stage", "error_kind", "error_message", "smtp_code"} {
+		if _, ok := fields[key]; !ok {
+			t.Fatalf("mail group is missing %q: %#v", key, fields)
+		}
+	}
+}
 
 type capturedScheduledReport struct {
 	to        []string

@@ -3,6 +3,8 @@ package worker
 import (
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -16,6 +18,43 @@ import (
 	"hitkeep/internal/database"
 	"hitkeep/internal/hklog"
 )
+
+func TestBackupErrorKindUsesStableCategories(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{name: "canceled", err: context.Canceled, want: "canceled"},
+		{name: "timeout", err: context.DeadlineExceeded, want: "timeout"},
+		{name: "not found", err: fmt.Errorf("open snapshot: %w", os.ErrNotExist), want: "not_found"},
+		{name: "permission denied", err: fmt.Errorf("write snapshot: %w", os.ErrPermission), want: "permission_denied"},
+		{name: "storage failure", err: errors.New("provider returned credentials=secret"), want: "backup_failed"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := backupErrorKind(tt.err); got != tt.want {
+				t.Fatalf("backupErrorKind() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBackupFailureLogDoesNotIncludeRawError(t *testing.T) {
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	ctx := hklog.WithLogger(context.Background(), logger)
+	rawError := errors.New("provider response credentials=secret")
+
+	logBackupFailure(ctx, "Backup worker failed", rawError)
+
+	if strings.Contains(logs.String(), rawError.Error()) || strings.Contains(logs.String(), "error=") {
+		t.Fatalf("backup failure log included raw error: %q", logs.String())
+	}
+	if !strings.Contains(logs.String(), "error_kind=backup_failed") {
+		t.Fatalf("expected stable backup failure kind, got %q", logs.String())
+	}
+}
 
 func TestBackupExportsSharedDatabase(t *testing.T) {
 	ctx := context.Background()

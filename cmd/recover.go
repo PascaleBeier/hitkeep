@@ -592,7 +592,7 @@ func recoverRestoreBackup(args []string, logger *slog.Logger) {
 	// Restore shared DB.
 	sharedSource := joinRestorePath(*from, "shared", snapshotName)
 	sharedRestored := false
-	if err := restoreDatabase(ctx, *dbPath, sharedSource, isS3Source, s3Conf); err != nil {
+	if err := restoreDatabase(ctx, logger, *dbPath, sharedSource, isS3Source, s3Conf); err != nil {
 		fmt.Fprintf(os.Stderr, "Error restoring shared database: %v\n", err)
 		exitCode = 1
 	} else {
@@ -601,7 +601,7 @@ func recoverRestoreBackup(args []string, logger *slog.Logger) {
 	}
 	if isS3Source && sharedRestored {
 		var err error
-		tenantIDs, err = discoverS3TenantBackupsFromControl(ctx, *dbPath)
+		tenantIDs, err = discoverS3TenantBackupsFromControl(ctx, logger, *dbPath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error discovering tenant backups from restored control database: %v\n", err)
 			exitCode = 1
@@ -622,7 +622,7 @@ func recoverRestoreBackup(args []string, logger *slog.Logger) {
 
 		tenantDBPath := filepath.Join(tenantDir, "hitkeep.db")
 		tenantSource := joinRestorePath(*from, "tenants", tenantID, snapshotName)
-		if err := restoreDatabase(ctx, tenantDBPath, tenantSource, isS3Source, s3Conf); err != nil {
+		if err := restoreDatabase(ctx, logger, tenantDBPath, tenantSource, isS3Source, s3Conf); err != nil {
 			fmt.Fprintf(os.Stderr, "Error restoring tenant %s: %v\n", tenantID, err)
 			exitCode = 1
 		} else {
@@ -640,7 +640,7 @@ func recoverRestoreBackup(args []string, logger *slog.Logger) {
 
 // restoreDatabase imports a backup snapshot into a fresh DuckDB at targetPath.
 // If targetPath already exists, it is renamed as a safety net.
-func restoreDatabase(ctx context.Context, targetPath, sourcePath string, isS3 bool, s3Conf *worker.S3Config) error {
+func restoreDatabase(ctx context.Context, logger *slog.Logger, targetPath, sourcePath string, isS3 bool, s3Conf *worker.S3Config) error {
 	targetDir := filepath.Dir(targetPath)
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		return fmt.Errorf("create target directory %s: %w", targetDir, err)
@@ -655,7 +655,7 @@ func restoreDatabase(ctx context.Context, targetPath, sourcePath string, isS3 bo
 
 	// Import into a temporary database first so the final restored DB does not
 	// depend on a WAL created by the recovery command itself.
-	store := database.NewStore(tempPath)
+	store := database.NewStore(tempPath, database.WithLogger(logger))
 	if err := store.Connect(); err != nil {
 		return fmt.Errorf("could not create target database: %w", err)
 	}
@@ -860,8 +860,8 @@ func discoverLocalTenantBackups(fromPath, snapshotName string) ([]string, error)
 // buckets. Split snapshots contain every active tenant, including the default;
 // legacy snapshots contain only non-default tenant exports because the default
 // tenant still lived in the shared database.
-func discoverS3TenantBackupsFromControl(ctx context.Context, controlPath string) ([]string, error) {
-	control := database.NewStore(controlPath)
+func discoverS3TenantBackupsFromControl(ctx context.Context, logger *slog.Logger, controlPath string) ([]string, error) {
+	control := database.NewStore(controlPath, database.WithLogger(logger))
 	if err := control.Connect(); err != nil {
 		return nil, fmt.Errorf("open restored control database: %w", err)
 	}

@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -200,6 +202,47 @@ func TestPasskeyRegistrationLifecycle(t *testing.T) {
 	}
 	if len(status.Passkeys) != 0 {
 		t.Fatalf("expected 0 passkeys after delete, got %d", len(status.Passkeys))
+	}
+}
+
+func TestPasskeyRegistrationRejectsInvalidCredentialWithoutRawError(t *testing.T) {
+	h, store, userID := setupUserSecurityTestEnv(t)
+	defer store.Close()
+
+	startBody, _ := json.Marshal(map[string]string{"name": "Invalid registration"})
+	startReq := withTestUser(httptest.NewRequest(http.MethodPost, "/api/user/security/passkeys/register/start", bytes.NewReader(startBody)), userID)
+	startW := httptest.NewRecorder()
+	h.handleStartPasskeyRegistration().ServeHTTP(startW, startReq)
+	if startW.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, startW.Code)
+	}
+	var begin passkeyRegistrationStartResponse
+	if err := json.NewDecoder(startW.Body).Decode(&begin); err != nil {
+		t.Fatalf("decode passkey registration start: %v", err)
+	}
+
+	fixture, err := testutil.NewPasskeyFixture()
+	if err != nil {
+		t.Fatalf("create passkey fixture: %v", err)
+	}
+	registration, err := fixture.RegistrationResponse(begin.PublicKey.Challenge, "http://localhost:8080", "localhost")
+	if err != nil {
+		t.Fatalf("create registration response: %v", err)
+	}
+	registration.AttestationResponse.ClientDataJSON = []byte(`{"type":"webauthn.create","challenge":"wrong-challenge","origin":"http://localhost:8080"}`)
+	finishBody, _ := json.Marshal(registration)
+	finishReq := withTestUser(httptest.NewRequest(http.MethodPost, "/api/user/security/passkeys/register/finish", bytes.NewReader(finishBody)), userID)
+	var logs strings.Builder
+	logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	finishReq = finishReq.WithContext(shared.WithLogger(finishReq.Context(), logger))
+	finishW := httptest.NewRecorder()
+	h.handleFinishPasskeyRegistration().ServeHTTP(finishW, finishReq)
+
+	if finishW.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusBadRequest, finishW.Code, finishW.Body.String())
+	}
+	if strings.Contains(logs.String(), "error=") || !strings.Contains(logs.String(), "error_kind=registration_invalid") {
+		t.Fatalf("expected stable passkey registration diagnostics without raw error, got %q", logs.String())
 	}
 }
 

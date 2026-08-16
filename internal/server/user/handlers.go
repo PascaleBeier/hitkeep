@@ -440,7 +440,7 @@ func (h *handler) handleGetUserAvatar() http.HandlerFunc {
 		client := &http.Client{Timeout: 5 * time.Second}
 		resp, err := client.Do(req) //nolint:gosec // Request target is pinned to the Gravatar origin by newGravatarRequest; see avatar_test.go.
 		if err != nil {
-			shared.LoggerFromContext(r.Context()).Warn("Failed to fetch gravatar", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Warn("Failed to fetch gravatar", "error_kind", gravatarErrorKind(err), "user_id", userID)
 			http.Error(w, "Avatar unavailable", http.StatusBadGateway)
 			return
 		}
@@ -457,7 +457,7 @@ func (h *handler) handleGetUserAvatar() http.HandlerFunc {
 		w.Header().Set("Cache-Control", "public, max-age=86400")
 		w.WriteHeader(resp.StatusCode)
 		if _, err := io.Copy(w, resp.Body); err != nil {
-			shared.LoggerFromContext(r.Context()).Warn("Failed to proxy gravatar response", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Warn("Failed to proxy gravatar response", "error_kind", gravatarErrorKind(err), "user_id", userID)
 		}
 	}
 }
@@ -580,6 +580,17 @@ func gravatarHash(email string) string {
 	normalized := strings.TrimSpace(strings.ToLower(email))
 	sum := md5.Sum([]byte(normalized)) //nolint:gosec // Gravatar requires MD5 hashes for avatar lookups.
 	return hex.EncodeToString(sum[:])
+}
+
+func gravatarErrorKind(err error) string {
+	switch {
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "timeout"
+	default:
+		return "upstream_request_failed"
+	}
 }
 
 func clampAvatarSize(raw string) int {

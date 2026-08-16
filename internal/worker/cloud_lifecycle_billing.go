@@ -4,6 +4,7 @@ package worker
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -82,7 +83,13 @@ func (w *CloudLifecycleWorker) processKind(ctx context.Context, kind string, now
 
 		if err := w.mailer.Send(recipient.Email, email); err != nil {
 			details := mailer.DescribeError(err)
-			hklog.LoggerFromContext(ctx).Error("CloudLifecycleWorker: failed to send email", "kind", kind, "tenant_id", recipient.TenantID, "user_id", recipient.UserID, "error_code", "smtp_send_failed", "error_stage", details.Stage, "error_kind", details.Kind, "error_message", details.Message, "smtp_code", details.SMTPCode)
+			hklog.LoggerFromContext(ctx).Error("CloudLifecycleWorker: failed to send email", "kind", kind, "tenant_id", recipient.TenantID, "user_id", recipient.UserID, slog.Group("mail",
+				"error_code", "smtp_send_failed",
+				"error_stage", details.Stage,
+				"error_kind", details.Kind,
+				"error_message", details.Message,
+				"smtp_code", details.SMTPCode,
+			))
 			if markErr := store.MarkCloudLifecycleMessageFailed(ctx, database.CloudLifecycleMessageUpdate{
 				TenantID: recipient.TenantID,
 				UserID:   recipient.UserID,

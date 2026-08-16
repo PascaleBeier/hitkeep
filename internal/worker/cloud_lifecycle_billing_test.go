@@ -144,7 +144,7 @@ func TestCloudLifecycleWorkerRetriesFailedSend(t *testing.T) {
 	if strings.Contains(logs.String(), rawMailError) || strings.Contains(message.ProcessingError, rawMailError) {
 		t.Fatalf("raw mail error leaked into logs or persisted state: logs=%q message=%q", logs.String(), message.ProcessingError)
 	}
-	if !strings.Contains(logs.String(), "error_stage=transport") || !strings.Contains(logs.String(), "error_kind=transport") || !strings.Contains(logs.String(), "error_message=\"mail transport failed\"") {
+	if !strings.Contains(logs.String(), "mail.error_stage=transport") || !strings.Contains(logs.String(), "mail.error_kind=transport") || !strings.Contains(logs.String(), "mail.error_message=\"mail transport failed\"") {
 		t.Fatalf("expected redacted mail diagnostics in logs, got %q", logs.String())
 	}
 

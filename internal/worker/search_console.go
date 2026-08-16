@@ -118,7 +118,7 @@ func (w *SearchConsoleSyncWorker) startConfig() (time.Duration, int) {
 func (w *SearchConsoleSyncWorker) runDueAndLog(ctx context.Context, limit int, label string) {
 	summary, err := w.RunDue(ctx, limit)
 	if err != nil {
-		hklog.LoggerFromContext(ctx).Error(label+" failed", "error", err)
+		hklog.LoggerFromContext(ctx).Error(label+" failed", SearchConsoleSyncLogValues(err)...)
 		return
 	}
 	if summary.Attempted > 0 {

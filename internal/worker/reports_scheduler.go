@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/url"
 	"strconv"
 	"time"
@@ -167,12 +168,25 @@ func (w *ReportWorker) processNamedDelivery(ctx context.Context, deliveryID uuid
 		details := mailer.DescribeError(err)
 		_ = shared.MarkReportDeliveryFailed(ctx, deliveryID, delivery.AttemptCount, code, now)
 		_ = shared.FinalizeReportRun(ctx, delivery.RunID, now)
-		hklog.LoggerFromContext(ctx).Warn("ReportWorker: mail delivery failed", "report_id", delivery.ReportID, "run_id", delivery.RunID, "delivery_id", deliveryID, "recipient_id", delivery.RecipientID, "recipient_kind", delivery.RecipientKind, "message_id", delivery.MessageID, "attempt", delivery.AttemptCount, "error_code", code, "error_stage", details.Stage, "error_kind", details.Kind, "error_message", details.Message, "smtp_code", details.SMTPCode)
+		hklog.LoggerFromContext(ctx).Warn("ReportWorker: mail delivery failed", "report_id", delivery.ReportID, "run_id", delivery.RunID, "delivery_id", deliveryID, "recipient_id", delivery.RecipientID, reportMailFailureLogAttr(delivery.RecipientKind, delivery.MessageID, delivery.AttemptCount, code, details))
 		return
 	}
 	_ = shared.MarkReportDeliveryAccepted(ctx, deliveryID, now)
 	_ = shared.FinalizeReportRun(ctx, delivery.RunID, now)
 	hklog.LoggerFromContext(ctx).Debug("ReportWorker: delivery accepted by mail server", "report_id", delivery.ReportID, "run_id", delivery.RunID, "delivery_id", deliveryID, "recipient_id", delivery.RecipientID)
+}
+
+func reportMailFailureLogAttr(recipientKind api.ReportRecipientKind, messageID string, attempt int, code string, details mailer.ErrorDetails) slog.Attr {
+	return slog.Group("mail",
+		"recipient_kind", recipientKind,
+		"message_id", messageID,
+		"attempt", attempt,
+		"error_code", code,
+		"error_stage", details.Stage,
+		"error_kind", details.Kind,
+		"error_message", details.Message,
+		"smtp_code", details.SMTPCode,
+	)
 }
 
 func (w *ReportWorker) allowsExternalReportRecipient(ctx context.Context, report *api.ReportDefinition) bool {

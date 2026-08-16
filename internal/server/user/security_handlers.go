@@ -327,7 +327,7 @@ func (h *handler) handleFinishPasskeyRegistration() http.HandlerFunc {
 
 		credential, err := webAuthn.CreateCredential(passkeyUser, *session, parsedCredential)
 		if err != nil {
-			shared.LoggerFromContext(r.Context()).Warn("Passkey registration verification failed", "error", err, "user_id", userID)
+			shared.LoggerFromContext(r.Context()).Warn("Passkey registration verification failed", "error_kind", "registration_invalid", "user_id", userID)
 			http.Error(w, "Invalid passkey registration", http.StatusBadRequest)
 			return
 		}

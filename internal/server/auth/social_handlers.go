@@ -478,7 +478,7 @@ func (h *handler) completeSocialInvite(w http.ResponseWriter, r *http.Request, c
 func (h *handler) writeCompletedSocialLogin(w http.ResponseWriter, r *http.Request, userID uuid.UUID, completion shared.SocialCompletion) {
 	response, err := h.beginUserLogin(r, w, userID, completion.RememberMe, completion.Provider)
 	if err != nil {
-		shared.LoggerFromContext(r.Context()).Error("Failed to complete social login", "error", err, "provider", completion.Provider, "user_id", userID)
+		shared.LoggerFromContext(r.Context()).Error("Failed to complete social login", "error_kind", socialLoginErrorCategory(err), "provider", completion.Provider, "user_id", userID)
 		writeSocialError(r.Context(), w, http.StatusInternalServerError, "social_login_failed")
 		return
 	}
@@ -864,6 +864,19 @@ func socialDatabaseErrorCategory(err error) string {
 		return "provider_conflict"
 	default:
 		return "storage"
+	}
+}
+
+func socialLoginErrorCategory(err error) string {
+	switch {
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "timeout"
+	case errors.Is(err, errAuthStateUnavailable):
+		return "auth_state_unavailable"
+	default:
+		return "login_preparation_failed"
 	}
 }
 

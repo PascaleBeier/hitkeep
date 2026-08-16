@@ -95,13 +95,13 @@ func (h *handler) handleUpsertTeamSSO() http.HandlerFunc {
 		if strings.TrimSpace(req.ClientSecret) != "" {
 			box, err := sso.NewSecretBox(h.ctx.Config.JWTSecret)
 			if err != nil {
-				shared.LoggerFromContext(r.Context()).Error("Failed to initialize SSO secret encryption", "error", err, "team_id", teamID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to initialize SSO secret encryption", "error_kind", "secret_box_unavailable", "team_id", teamID)
 				http.Error(w, "Could not save SSO configuration", http.StatusInternalServerError)
 				return
 			}
 			secretCiphertext, err = box.Seal(req.ClientSecret)
 			if err != nil {
-				shared.LoggerFromContext(r.Context()).Error("Failed to encrypt SSO client secret", "error", err, "team_id", teamID)
+				shared.LoggerFromContext(r.Context()).Error("Failed to encrypt SSO client secret", "error_kind", "secret_encryption_failed", "team_id", teamID)
 				http.Error(w, "Could not save SSO configuration", http.StatusInternalServerError)
 				return
 			}
@@ -160,7 +160,7 @@ func (h *handler) handleTestTeamSSO() http.HandlerFunc {
 			return
 		}
 		if _, err := box.Open(config.ClientSecretEncrypted); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Stored SSO client secret could not be decrypted", "error", err, "team_id", teamID)
+			shared.LoggerFromContext(r.Context()).Error("Stored SSO client secret could not be decrypted", "error_kind", "secret_decryption_failed", "team_id", teamID)
 			http.Error(w, "Could not test SSO configuration", http.StatusInternalServerError)
 			return
 		}

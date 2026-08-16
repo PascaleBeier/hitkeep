@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"hitkeep/internal/api"
+	"hitkeep/internal/database"
+	"hitkeep/internal/server/shared"
 	"hitkeep/internal/sso"
 )
 
@@ -126,6 +129,41 @@ func TestTeamSSOConfigurationRejectsUnknownIssuer(t *testing.T) {
 	}
 	if strings.Contains(w.Body.String(), "super-secret-value") {
 		t.Fatal("provider validation error exposed the client secret")
+	}
+}
+
+func TestTeamSSOSecretDecryptionFailureDoesNotLogRawError(t *testing.T) {
+	h, store, userID := setupUserSecurityTestEnv(t)
+	defer store.Close()
+	teamID, err := store.GetActiveTenantID(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("get active team: %v", err)
+	}
+	if err := store.UpsertTeamSSOConfig(context.Background(), database.TeamSSOConfig{
+		TeamID:                teamID,
+		ProviderType:          "oidc",
+		IssuerURL:             "https://issuer.example.test/",
+		ClientID:              "hitkeep-dashboard",
+		ClientSecretEncrypted: "not-a-valid-ciphertext",
+		AllowedDomains:        []string{"example.com"},
+		Enabled:               true,
+	}); err != nil {
+		t.Fatalf("store invalid SSO configuration: %v", err)
+	}
+
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	req := withTestUser(httptest.NewRequest(http.MethodPost, "/api/user/teams/"+teamID.String()+"/sso/test", nil), userID)
+	req.SetPathValue("id", teamID.String())
+	req = req.WithContext(shared.WithLogger(req.Context(), logger))
+	w := httptest.NewRecorder()
+
+	h.handleTestTeamSSO().ServeHTTP(w, req)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusInternalServerError, w.Code, w.Body.String())
+	}
+	if strings.Contains(logs.String(), "error=") || !strings.Contains(logs.String(), "error_kind=secret_decryption_failed") {
+		t.Fatalf("expected stable secret decryption diagnostics without raw error, got %q", logs.String())
 	}
 }
 

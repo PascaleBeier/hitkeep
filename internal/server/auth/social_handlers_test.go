@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -18,6 +19,31 @@ import (
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/socialauth"
 )
+
+func TestSocialLoginFailureDoesNotLogRawError(t *testing.T) {
+	h, store := setupAuthTestEnv(t)
+	if err := store.Close(); err != nil {
+		t.Fatalf("close store: %v", err)
+	}
+
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	r := httptest.NewRequest(http.MethodPost, "/api/auth/social/google/complete", nil)
+	r = r.WithContext(shared.WithLogger(r.Context(), logger))
+	w := httptest.NewRecorder()
+
+	h.writeCompletedSocialLogin(w, r, uuid.New(), shared.SocialCompletion{Provider: "google"})
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusInternalServerError, w.Code, w.Body.String())
+	}
+	if strings.Contains(logs.String(), "error=") {
+		t.Fatalf("social login failure logged raw error: %q", logs.String())
+	}
+	if !strings.Contains(logs.String(), "error_kind=login_preparation_failed") {
+		t.Fatalf("expected stable social login error kind, got %q", logs.String())
+	}
+}
 
 func TestSocialProvidersExposeOnlyCompleteConfigurationAndGateSignup(t *testing.T) {
 	h, store := setupAuthTestEnv(t)

@@ -3,7 +3,6 @@ package devtool
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -142,11 +141,22 @@ func assertSkillContract(t *testing.T, skillPath, name string, required, trigger
 
 func repositoryRoot(t *testing.T) string {
 	t.Helper()
-	_, source, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("resolve test path")
+	root, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("resolve test working directory: %v", err)
 	}
-	return filepath.Clean(filepath.Join(filepath.Dir(source), "..", ".."))
+	for {
+		if _, err := os.Stat(filepath.Join(root, "go.mod")); err == nil {
+			return root
+		}
+		parent := filepath.Dir(root)
+		if parent == root {
+			break
+		}
+		root = parent
+	}
+	t.Fatal("resolve repository root")
+	return ""
 }
 
 func yamlQuotedValue(raw, key string) string {
