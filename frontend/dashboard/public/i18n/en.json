@@ -1552,7 +1552,7 @@
         "domainRequired": "Domain is required.",
         "domainInvalid": "Invalid domain format.",
         "removeProtocol": "Please remove http:// or https://",
-        "removeWww": "Please remove 'www.'. Enter the root domain only.",
+        "removeWww": "Please remove 'www.'. Enter the domain without the 'www.' prefix.",
         "createFailed": "Failed to create site. Domain might already exist."
       }
     },

@@ -98,4 +98,27 @@ describe('SiteGeneralSettings', () => {
 
         expect(renameSiteDomain).toHaveBeenCalledWith('site-1', 'renamed.example.com');
     });
+
+    it('accepts hyphenated multi-level domains when renaming', async () => {
+        canSite = true;
+        fixture = TestBed.createComponent(SiteGeneralSettings);
+        fixture.componentRef.setInput('site', {
+            id: 'site-1',
+            domain: 'example.com',
+            created_at: '2026-05-05T00:00:00Z'
+        });
+        await fixture.whenStable();
+
+        const input = fixture.nativeElement.querySelector('#siteDomain') as HTMLInputElement;
+        input.value = 'sub.example-app.com.br';
+        input.dispatchEvent(new Event('input'));
+        await fixture.whenStable();
+
+        const saveButton = fixture.nativeElement.querySelector('p-button button') as HTMLButtonElement;
+        expect(saveButton.disabled).toBe(false);
+        saveButton.click();
+        await fixture.whenStable();
+
+        expect(renameSiteDomain).toHaveBeenCalledWith('site-1', 'sub.example-app.com.br');
+    });
 });

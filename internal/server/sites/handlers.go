@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"regexp"
 	"strings"
@@ -147,7 +148,7 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 	}, requireExclusionAccess(h.handleDeleteSiteExclusion())))
 }
 
-var domainRegex = regexp.MustCompile(`^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$`)
+var domainRegex = regexp.MustCompile(`^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$`)
 
 // normalizeSiteDomain lowercases and validates a user-supplied site domain.
 // It returns the normalized domain, or a user-facing error message.
@@ -162,7 +163,7 @@ func normalizeSiteDomain(raw string) (string, string) {
 	if strings.HasPrefix(domain, "www.") {
 		return "", "Domain must not start with 'www.' (we track subdomains automatically)"
 	}
-	if len(domain) > 253 || !domainRegex.MatchString(domain) {
+	if len(domain) > 253 || net.ParseIP(domain) != nil || !domainRegex.MatchString(domain) {
 		return "", "Invalid domain format (e.g. example.com)"
 	}
 	return domain, ""

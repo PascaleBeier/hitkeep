@@ -1475,7 +1475,7 @@
         "domainRequired": "Domein is vereist.",
         "domainInvalid": "Ongeldig domeinformaat.",
         "removeProtocol": "Verwijder http:// of https://",
-        "removeWww": "Verwijder 'www.'. Voer alleen het hoofddomein in.",
+        "removeWww": "Verwijder 'www.'. Voer het domein in zonder het voorvoegsel 'www.'.",
         "createFailed": "Kan site niet maken. Domein bestaat mogelijk al."
       }
     },

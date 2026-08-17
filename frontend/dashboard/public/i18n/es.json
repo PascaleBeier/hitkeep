@@ -1487,7 +1487,7 @@
         "domainRequired": "El dominio es obligatorio.",
         "domainInvalid": "Formato de dominio inválido.",
         "removeProtocol": "Elimina http:// o https://",
-        "removeWww": "Elimina 'www.'. Ingresa solo el dominio raíz.",
+        "removeWww": "Elimina 'www.'. Ingresa el dominio sin el prefijo 'www.'.",
         "createFailed": "No se pudo crear el sitio. El dominio puede existir ya."
       }
     },

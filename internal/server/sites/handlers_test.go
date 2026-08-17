@@ -57,6 +57,64 @@ func setupTestEnv(t *testing.T) (*handler, *database.Store, uuid.UUID) {
 	return &handler{ctx: ctx}, store, userID
 }
 
+func TestNormalizeSiteDomain(t *testing.T) {
+	tooLongLabel := strings.Repeat("a", 64) + ".example"
+	tooLongDomain := strings.Repeat("a.", 126) + "a.com"
+	tests := []struct {
+		name       string
+		raw        string
+		wantDomain string
+		wantError  bool
+	}{
+		{name: "apex domain", raw: "example.com", wantDomain: "example.com"},
+		{name: "hyphenated multi-level domain", raw: "sub.example-app.com.br", wantDomain: "sub.example-app.com.br"},
+		{name: "staged service domain", raw: "app-staging.example-service.co.uk", wantDomain: "app-staging.example-service.co.uk"},
+		{name: "single-character label", raw: "a.example.com", wantDomain: "a.example.com"},
+		{name: "digits and interior hyphens", raw: "api2.service-3.example.com", wantDomain: "api2.service-3.example.com"},
+		{name: "punycode final label", raw: "example.xn--p1ai", wantDomain: "example.xn--p1ai"},
+		{name: "uppercase and whitespace", raw: "  EXAMPLE.COM  ", wantDomain: "example.com"},
+		{name: "www2 is not www", raw: "www2.example.com", wantDomain: "www2.example.com"},
+		{name: "www subdomain is not first label", raw: "blog.www.example.com", wantDomain: "blog.www.example.com"},
+		{name: "empty", raw: "", wantError: true},
+		{name: "www prefix", raw: "www.example.com", wantError: true},
+		{name: "uppercase www prefix", raw: "WWW.example.com", wantError: true},
+		{name: "http protocol", raw: "http://example.com", wantError: true},
+		{name: "https protocol", raw: "https://example.com", wantError: true},
+		{name: "path", raw: "example.com/path", wantError: true},
+		{name: "port", raw: "example.com:443", wantError: true},
+		{name: "query", raw: "example.com?query=1", wantError: true},
+		{name: "fragment", raw: "example.com#section", wantError: true},
+		{name: "wildcard", raw: "*.example.com", wantError: true},
+		{name: "ipv4", raw: "192.0.2.1", wantError: true},
+		{name: "ipv6", raw: "2001:db8::1", wantError: true},
+		{name: "localhost", raw: "localhost", wantError: true},
+		{name: "unicode", raw: "münich.de", wantError: true},
+		{name: "leading dot", raw: ".example.com", wantError: true},
+		{name: "trailing dot", raw: "example.com.", wantError: true},
+		{name: "empty label", raw: "example..com", wantError: true},
+		{name: "leading hyphen", raw: "-example.com", wantError: true},
+		{name: "trailing hyphen", raw: "example-.com", wantError: true},
+		{name: "invalid character", raw: "inva lid.com", wantError: true},
+		{name: "label too long", raw: tooLongLabel, wantError: true},
+		{name: "hostname too long", raw: tooLongDomain, wantError: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotDomain, gotError := normalizeSiteDomain(tt.raw)
+			if tt.wantError {
+				if gotDomain != "" || gotError == "" {
+					t.Fatalf("expected validation error, got domain=%q error=%q", gotDomain, gotError)
+				}
+				return
+			}
+			if gotError != "" || gotDomain != tt.wantDomain {
+				t.Fatalf("expected domain=%q without error, got domain=%q error=%q", tt.wantDomain, gotDomain, gotError)
+			}
+		})
+	}
+}
+
 func setupFileBackedTransferEnv(t *testing.T) (*handler, *database.Store, *database.TenantStoreManager, uuid.UUID) {
 	t.Helper()
 
@@ -281,6 +339,18 @@ func TestHandleCreateSite(t *testing.T) {
 		{
 			name:           "Success",
 			body:           map[string]string{"domain": "sub.sub.example.com"},
+			injectAuth:     true,
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "Success - Hyphenated Multi-Level Domain",
+			body:           map[string]string{"domain": "sub.example-app.com.br"},
+			injectAuth:     true,
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "Success - Hyphenated Staging Domain",
+			body:           map[string]string{"domain": "app-staging.example-service.co.uk"},
 			injectAuth:     true,
 			expectedStatus: http.StatusOK,
 		},
@@ -1663,6 +1733,40 @@ func TestHandleRenameSiteDomainValidatesRequest(t *testing.T) {
 				t.Fatalf("expected status %d, got %d: %s", tt.expectedStatus, w.Code, w.Body.String())
 			}
 		})
+	}
+}
+
+func TestHandleRenameSiteDomainAcceptsIssueDomains(t *testing.T) {
+	ctx := context.Background()
+	h, store, userID := setupTestEnv(t)
+	defer store.Close()
+
+	tests := []string{
+		"sub.example-app.com.br",
+		"app-staging.example-service.co.uk",
+	}
+	for i, domain := range tests {
+		site, err := store.CreateSite(ctx, userID, fmt.Sprintf("rename-issue-%d.test", i))
+		if err != nil {
+			t.Fatalf("create site: %v", err)
+		}
+
+		req := newRenameSiteDomainRequest(site.ID.String(), fmt.Sprintf(`{"domain":%q}`, domain))
+		req = req.WithContext(context.WithValue(req.Context(), shared.UserIDKey, userID))
+		w := httptest.NewRecorder()
+
+		h.handleRenameSiteDomain().ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("domain %q: expected status %d, got %d: %s", domain, http.StatusOK, w.Code, w.Body.String())
+		}
+		stored, err := store.GetSiteByID(ctx, site.ID)
+		if err != nil || stored == nil {
+			t.Fatalf("domain %q: get renamed site: %v", domain, err)
+		}
+		if stored.Domain != domain {
+			t.Fatalf("domain %q: expected stored domain %q, got %q", domain, domain, stored.Domain)
+		}
 	}
 }
 

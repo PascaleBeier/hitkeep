@@ -1517,7 +1517,7 @@
         "domainRequired": "Domain ist erforderlich.",
         "domainInvalid": "Ungültiges Domain-Format.",
         "removeProtocol": "Bitte entferne http:// oder https://",
-        "removeWww": "Bitte entferne 'www.'. Gib nur die Hauptdomain ein.",
+        "removeWww": "Bitte entferne 'www.'. Gib die Domain ohne das 'www.'-Präfix ein.",
         "createFailed": "Seite konnte nicht erstellt werden. Die Domain existiert möglicherweise bereits."
       }
     },

@@ -203,9 +203,9 @@ func openAPIV1AdminSitePaths() map[string]any {
 
 		"/api/sites": map[string]any{
 			"get": op([]string{"Sites"}, "List accessible sites", "Lists sites visible to caller (session or API key scope).", secAnyAuth(), nil, nil, map[string]any{"200": jsonSchemaResp("Sites", map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/Site"}})}),
-			"post": op([]string{"Sites"}, "Create site", "Creates new tracked site.", secCookie(), nil,
-				jsonBody(map[string]any{"type": "object", "properties": map[string]any{"domain": map[string]any{"type": "string"}}, "required": []string{"domain"}}),
-				map[string]any{"200": jsonRefResp("Site", "#/components/schemas/Site"), "409": errResp("Domain exists")}),
+			"post": op([]string{"Sites"}, "Create site", "Creates a new tracked site using an apex domain or subdomain without protocol, port, path, query, fragment, or www prefix.", secCookie(), nil,
+				jsonBody(map[string]any{"type": "object", "properties": map[string]any{"domain": map[string]any{"type": "string", "description": "Apex domain or subdomain without protocol, port, path, query, fragment, or www prefix (e.g. example.com or blog.example.com)."}}, "required": []string{"domain"}}),
+				map[string]any{"200": jsonRefResp("Site", "#/components/schemas/Site"), "400": errResp("Invalid domain"), "409": errResp("Domain exists")}),
 		},
 		"/api/sites/overview": map[string]any{
 			"get": op([]string{"Sites"}, "Get sites overview stats", "Returns lightweight overview metrics and chart data for all sites visible to the caller.", secAnyAuth(), []any{
@@ -522,7 +522,7 @@ func openAPIV1AdminSitePaths() map[string]any {
 			"put": op([]string{"Sites"}, "Rename site domain", "Renames the tracked domain of a site while keeping its analytics history. Requires site.manage_data (site admin or higher). The tracker only matches hits for the new domain after the rename.", secAnyAuth(), []any{paramRef("#/components/parameters/siteID")},
 				jsonBody(map[string]any{
 					"type":       "object",
-					"properties": map[string]any{"domain": map[string]any{"type": "string", "description": "New apex domain without protocol or www prefix (e.g. example.com)."}},
+					"properties": map[string]any{"domain": map[string]any{"type": "string", "description": "Apex domain or subdomain without protocol, port, path, query, fragment, or www prefix (e.g. example.com or blog.example.com)."}},
 					"required":   []string{"domain"},
 				}),
 				map[string]any{
