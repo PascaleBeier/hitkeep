@@ -7,6 +7,14 @@
 * Split default-tenant analytics into `data/tenants/<tenant-id>/hitkeep.db` and run tenant files through one attached DuckDB data plane. This migration is mandatory in 2.13.0. Downgrading a split installation to 2.12 or older is unsupported because those releases do not understand the tenant file or split markers; restore a complete pre-upgrade backup instead.
 * Restore every tenant database from S3 backup snapshots by deriving tenant object prefixes from the restored control snapshot, including temporary STS credentials and non-TLS S3-compatible endpoints.
 
+## [2.13.9](https://github.com/PascaleBeier/hitkeep/compare/v2.13.8...v2.13.9) (2026-08-17)
+
+
+### Bug Fixes
+
+* **ci:** isolate docs sync and harden scroll test ([bfda899](https://github.com/PascaleBeier/hitkeep/commit/bfda8995335b8492a5cab26f9fd50b982d4e4d70))
+* **sites:** align domain validation across clients ([#306](https://github.com/PascaleBeier/hitkeep/issues/306)) ([ffb92b8](https://github.com/PascaleBeier/hitkeep/commit/ffb92b891d46872c81dc8a510144749e218b518c))
+
 ## [2.13.8](https://github.com/PascaleBeier/hitkeep/compare/v2.13.7...v2.13.8) (2026-08-16)
 
 
