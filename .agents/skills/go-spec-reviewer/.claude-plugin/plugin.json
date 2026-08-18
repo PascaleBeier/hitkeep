@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "go-spec-reviewer",
+  "displayName": "Go Spec Reviewer",
+  "description": "Review Go design documents before implementation begins — catches over-engineering, missing error paths, interface misuse, and Cobra/Viper convention violations while a plan is still cheap to change.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Steve Francia",
+    "email": "steve.francia@gmail.com"
+  },
+  "homepage": "https://github.com/spf13/go-skills",
+  "repository": "https://github.com/spf13/go-skills",
+  "license": "MIT",
+  "keywords": ["go", "golang", "spec", "review", "design"]
+}

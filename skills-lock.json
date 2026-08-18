@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "skills": {
+    "angular-developer": {
+      "source": "angular/angular",
+      "sourceType": "github",
+      "skillPath": "skills/dev-skills/angular-developer/SKILL.md",
+      "computedHash": "6e210de5ff3122ed27bd17def7afcfa9ce64fd7530c136e929d2f3c8d544d957"
+    },
+    "cobra-viper": {
+      "source": "spf13/go-skills",
+      "sourceType": "github",
+      "skillPath": "cobra-viper/SKILL.md",
+      "computedHash": "904d925297ebc6499917bfe10061f8177801364ae7d7ce89071db5036e477e07"
+    },
+    "fileflow-pathologize": {
+      "source": "spf13/go-skills",
+      "sourceType": "github",
+      "skillPath": "fileflow-pathologize/SKILL.md",
+      "computedHash": "438258926c692054bf3d2f37586a59c37ee38c4b528572b65c4dd8a1d4fa93f9"
+    },
+    "go": {
+      "source": "spf13/go-skills",
+      "sourceType": "github",
+      "skillPath": "go/SKILL.md",
+      "computedHash": "e651ec9fdfa9b241f3636e3ad8513e8b9833b684af1d6b3390f34a1531d8fe45"
+    },
+    "go-spec-reviewer": {
+      "source": "spf13/go-skills",
+      "sourceType": "github",
+      "skillPath": "go-spec-reviewer/SKILL.md",
+      "computedHash": "e7f787b4eafbbe3541ea4c654b1666361325b108ec75d15d27ea3e5673fa049f"
+    },
+    "wails": {
+      "source": "spf13/go-skills",
+      "sourceType": "github",
+      "skillPath": "wails/SKILL.md",
+      "computedHash": "2525c86faaf8aa549e733f5725deaa8afd63e0a4df4a2c8b0a3dfe016f6eb75c"
+    }
+  }
+}
