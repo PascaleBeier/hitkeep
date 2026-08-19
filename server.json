@@ -17,7 +17,7 @@
     "url": "https://github.com/pascalebeier/hitkeep",
     "source": "github"
   },
-  "version": "2.13.9",
+  "version": "2.13.10",
   "remotes": [
     {
       "type": "streamable-http",
