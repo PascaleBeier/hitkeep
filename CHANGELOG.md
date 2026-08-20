@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.13.11](https://github.com/PascaleBeier/hitkeep/compare/v2.13.10...v2.13.11) (2026-08-20)
+
+
+### Bug Fixes
+
+* **deps:** upgrade Go to 1.27.0 ([1b4b2d2](https://github.com/PascaleBeier/hitkeep/commit/1b4b2d213abe0f70d0029a1115793eaf080ae34b))
+
 ## [2.13.10](https://github.com/PascaleBeier/hitkeep/compare/v2.13.9...v2.13.10) (2026-08-19)
 
 
