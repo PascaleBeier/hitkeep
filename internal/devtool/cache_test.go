@@ -10,7 +10,7 @@ import (
 
 func TestCachePruneIsDryRunFirstAndManaged(t *testing.T) {
 	workspace := t.TempDir()
-	if output, err := exec.Command("git", "init", "--quiet", workspace).CombinedOutput(); err != nil {
+	if output, err := exec.CommandContext(t.Context(), "git", "init", "--quiet", workspace).CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v: %s", err, output)
 	}
 	stateRoot := filepath.Join(t.TempDir(), "state")

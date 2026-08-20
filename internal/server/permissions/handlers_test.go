@@ -2,7 +2,6 @@ package permissions
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -14,6 +13,7 @@ import (
 	"hitkeep/internal/auth"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -67,7 +67,7 @@ func TestHandleGetUserPermissions(t *testing.T) {
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
 				var resp api.PermissionContext
-				if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+				if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 					t.Fatalf("failed to decode response: %v", err)
 				}
 

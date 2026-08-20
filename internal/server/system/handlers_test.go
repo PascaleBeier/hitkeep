@@ -1,12 +1,12 @@
 package system
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -44,7 +44,7 @@ func TestReadyzReturnsStructuredRetryResponseWhenDatabaseUnavailable(t *testing.
 		t.Fatalf("expected Retry-After 5, got %q", w.Header().Get("Retry-After"))
 	}
 	var body map[string]any
-	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+	if err := json.UnmarshalRead(w.Body, &body); err != nil {
 		t.Fatalf("decode readiness response: %v", err)
 	}
 	if body["reason"] != "database_unavailable" {

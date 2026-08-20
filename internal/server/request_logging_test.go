@@ -2,13 +2,13 @@ package server
 
 import (
 	"bytes"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 

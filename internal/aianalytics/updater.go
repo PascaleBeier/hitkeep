@@ -3,7 +3,6 @@ package aianalytics
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +12,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 const maxAgentFeedResponseBytes = 10 << 20 // 10 MB
@@ -119,8 +120,7 @@ func aiFeedErrorKind(err error) string {
 	case errors.Is(err, context.DeadlineExceeded):
 		return "timeout"
 	default:
-		var networkErr net.Error
-		if errors.As(err, &networkErr) {
+		if networkErr, ok := errors.AsType[net.Error](err); ok {
 			if networkErr.Timeout() {
 				return "timeout"
 			}
@@ -191,7 +191,7 @@ func fetchAIRobotsTxtAgents(ctx context.Context, client agentHTTPDoer) ([]AIAgen
 	defer body.Close()
 
 	var raw map[string]aiRobotsTxtEntry
-	if err := json.NewDecoder(body).Decode(&raw); err != nil {
+	if err := json.UnmarshalRead(body, &raw); err != nil {
 		return nil, fmt.Errorf("decode ai.robots.txt list: %w", err)
 	}
 
@@ -433,7 +433,7 @@ func fetchCrawlerUserAgents(ctx context.Context, client agentHTTPDoer) ([]AIAgen
 	defer body.Close()
 
 	var raw []crawlerUserAgentEntry
-	if err := json.NewDecoder(body).Decode(&raw); err != nil {
+	if err := json.UnmarshalRead(body, &raw); err != nil {
 		return nil, fmt.Errorf("decode crawler user agents: %w", err)
 	}
 

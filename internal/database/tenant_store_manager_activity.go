@@ -1,9 +1,10 @@
 package database
 
 import (
+	"cmp"
 	"context"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -104,8 +105,7 @@ func (m *TenantStoreManager) ListSystemActivation(ctx context.Context, q Activat
 	for i := range filtered {
 		filtered[i].row.SitesCount = siteCountByTenant[filtered[i].tenantID]
 	}
-	sort.SliceStable(filtered, func(i, j int) bool {
-		left, right := filtered[i], filtered[j]
+	slices.SortStableFunc(filtered, func(left, right activationSiteMetadata) int {
 		leftSort, rightSort := left.createdAt, right.createdAt
 		if left.row.LastHitAt != nil {
 			leftSort = *left.row.LastHitAt
@@ -114,9 +114,9 @@ func (m *TenantStoreManager) ListSystemActivation(ctx context.Context, q Activat
 			rightSort = *right.row.LastHitAt
 		}
 		if !leftSort.Equal(rightSort) {
-			return leftSort.After(rightSort)
+			return rightSort.Compare(leftSort)
 		}
-		return left.row.SiteDomain < right.row.SiteDomain
+		return cmp.Compare(left.row.SiteDomain, right.row.SiteDomain)
 	})
 	resp := &api.SystemActivationResponse{Rows: make([]api.SystemActivationRow, 0), Total: len(filtered), Limit: q.Limit, Offset: q.Offset}
 	if q.Offset < len(filtered) {

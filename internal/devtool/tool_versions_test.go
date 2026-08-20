@@ -9,10 +9,10 @@ import (
 
 func TestDevelopmentToolVersionsAreCanonical(t *testing.T) {
 	want := map[string]string{
-		"golangci-lint": "2.12.2",
+		"golangci-lint": "2.13.0",
 		"govulncheck":   "1.6.0",
-		"staticcheck":   "0.7.0",
-		"zizmor":        "1.28.0",
+		"staticcheck":   "0.8.0-rc.1",
+		"zizmor":        "1.29.0",
 	}
 	for name, version := range want {
 		if got := ToolVersion(name); got != version {
@@ -26,6 +26,13 @@ func TestDevelopmentToolVersionsAreCanonical(t *testing.T) {
 	}
 	if !strings.Contains(strings.Join(staticcheck.Command, " "), "@v"+want["staticcheck"]) {
 		t.Fatalf("staticcheck gate does not use canonical version: %v", staticcheck.Command)
+	}
+	golangci, err := GateByID("go-lint")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(strings.Join(golangci.Command, " "), "@v"+want["golangci-lint"]) {
+		t.Fatalf("golangci-lint gate does not use canonical version: %v", golangci.Command)
 	}
 	govulncheck, err := GateByID("govulncheck")
 	if err != nil {

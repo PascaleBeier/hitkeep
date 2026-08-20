@@ -17,7 +17,7 @@ const developerPackagePrefix = "hitkeep/internal/devtool"
 func (a *App) ValidateProductionBoundary(ctx context.Context) error {
 	for _, variant := range CatalogSnapshot().Variants {
 		arguments := []string{"list", "-deps", goTrimpathFlag, "-tags", strings.Join(variant.BuildTags, ","), productionCommandPackage}
-		command := exec.CommandContext(ctx, "go", arguments...) //nolint:gosec // Arguments come from the closed variant catalog.
+		command := exec.CommandContext(ctx, a.commandExecutable("go"), arguments...) //nolint:gosec // The executable and arguments come from closed catalogs.
 		command.Dir = a.workspace.Root
 		command.Env = a.commandEnvironment(nil)
 		output, err := command.CombinedOutput()

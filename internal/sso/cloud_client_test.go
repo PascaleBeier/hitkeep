@@ -94,12 +94,16 @@ func TestCloudRoundTripperRejectsNonHTTPSEndpoints(t *testing.T) {
 		baseCalled = true
 		return nil, errors.New("unexpected round trip")
 	})}
-	req, err := http.NewRequest(http.MethodGet, "http://public.example/token", nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://public.example/token", nil)
 	if err != nil {
 		t.Fatalf("build request: %v", err)
 	}
 
-	if _, err := transport.RoundTrip(req); !errors.Is(err, errUnsafeOIDCEndpoint) {
+	resp, err := transport.RoundTrip(req)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+	if !errors.Is(err, errUnsafeOIDCEndpoint) {
 		t.Fatalf("expected non-HTTPS endpoint rejection, got %v", err)
 	}
 	if baseCalled {
@@ -108,11 +112,14 @@ func TestCloudRoundTripperRejectsNonHTTPSEndpoints(t *testing.T) {
 }
 
 func TestCloudRedirectPolicyRejectsHTTPSDowngrade(t *testing.T) {
-	req, err := http.NewRequest(http.MethodGet, "http://metadata.internal/latest", nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://metadata.internal/latest", nil)
 	if err != nil {
 		t.Fatalf("build request: %v", err)
 	}
-	via, _ := http.NewRequest(http.MethodGet, "https://issuer.example/.well-known/openid-configuration", nil)
+	via, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://issuer.example/.well-known/openid-configuration", nil)
+	if err != nil {
+		t.Fatalf("build prior request: %v", err)
+	}
 
 	if err := cloudRedirectPolicy(req, []*http.Request{via}); !errors.Is(err, errUnsafeOIDCEndpoint) {
 		t.Fatalf("expected HTTPS downgrade rejection, got %v", err)
@@ -130,7 +137,10 @@ func TestCloudRoundTripperCapsResponseBodies(t *testing.T) {
 		}),
 		maxResponseBytes: 4,
 	}
-	req, _ := http.NewRequest(http.MethodGet, "https://issuer.example/.well-known/openid-configuration", nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://issuer.example/.well-known/openid-configuration", nil)
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
 
 	resp, err := transport.RoundTrip(req)
 	if err != nil {

@@ -886,6 +886,7 @@ func TestTenantStoreManagerUsesOneAttachedDataPlane(t *testing.T) {
 		_ = control.Close()
 		t.Fatal(err)
 	}
+	defer func() { _ = prepared.Close() }()
 	if _, err := prepared.ExecContext(ctx, defaultSite.ID, "other-prepared"); err != nil {
 		_ = prepared.Close()
 		_ = mgr.Close()

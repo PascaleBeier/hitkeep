@@ -61,6 +61,9 @@ func TestCreateHitsBulkMarksDirtyRollupBuckets(t *testing.T) {
 		}
 		actual[fmt.Sprintf("%s|%s|%s", rollupType, bucketUnit, bucket.UTC().Format(time.RFC3339))] = struct{}{}
 	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate dirty buckets: %v", err)
+	}
 
 	if len(actual) != len(expected) {
 		t.Fatalf("expected %d dirty buckets, got %d", len(expected), len(actual))

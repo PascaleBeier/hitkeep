@@ -2,7 +2,6 @@ package askai
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -18,6 +17,7 @@ import (
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 	publicskills "hitkeep/skills"
 )
@@ -686,7 +686,7 @@ func askAIStreamErrorMessageKey(err error) string {
 func decodeAskAIRequest(w http.ResponseWriter, r *http.Request) (api.AskAIRequest, error) {
 	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 	var req api.AskAIRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.UnmarshalRead(r.Body, &req); err != nil {
 		return api.AskAIRequest{}, errors.New("invalid request body")
 	}
 	req.Query = strings.TrimSpace(req.Query)
@@ -1484,7 +1484,7 @@ func safeAuditValue(value string) string {
 func writeJSON(ctx context.Context, w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(value); err != nil {
+	if err := json.MarshalWrite(w, value); err != nil {
 		shared.LoggerFromContext(ctx).Error("Failed to encode Ask AI response", "error", err)
 	}
 }

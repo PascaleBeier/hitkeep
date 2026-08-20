@@ -1,8 +1,9 @@
 package importables
 
 import (
+	"cmp"
 	"context"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -135,8 +136,8 @@ func (r *Registry) Descriptors() []api.ImportProviderDescriptor {
 	for _, provider := range r.providers {
 		descriptors = append(descriptors, provider.Descriptor())
 	}
-	sort.Slice(descriptors, func(i, j int) bool {
-		return descriptors[i].Name < descriptors[j].Name
+	slices.SortFunc(descriptors, func(left, right api.ImportProviderDescriptor) int {
+		return cmp.Compare(left.Name, right.Name)
 	})
 	return descriptors
 }

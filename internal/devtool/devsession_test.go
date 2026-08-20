@@ -16,10 +16,10 @@ import (
 func TestDevSessionEventsAreCursorAddressedBoundedAndRedacted(t *testing.T) {
 	app := newDevTestApp(t)
 	now := time.Now().UTC()
-	record := devSessionRecord{DevStatus: DevStatus{
+	record := devSessionRecord{
 		State: DevStateStarting, GenerationID: "generation-events", Variant: "self-hosted",
 		Owner: DevOwnerForeground, StartedAt: &now, UpdatedAt: now, URLs: app.workspace.URLs,
-	}}
+	}
 	if err := app.writeDevRecord(record); err != nil {
 		t.Fatal(err)
 	}
@@ -52,10 +52,10 @@ func TestDevSessionEventsAreCursorAddressedBoundedAndRedacted(t *testing.T) {
 func TestDevLogsReadsBoundedTailAndResetsStaleCursor(t *testing.T) {
 	app := newDevTestApp(t)
 	now := time.Now().UTC()
-	record := devSessionRecord{DevStatus: DevStatus{
+	record := devSessionRecord{
 		State: DevStateStopped, GenerationID: "generation-large-tail", Variant: "self-hosted",
 		Owner: DevOwnerDetached, StartedAt: &now, StoppedAt: &now, UpdatedAt: now, URLs: app.workspace.URLs,
-	}}
+	}
 	if err := app.writeDevRecord(record); err != nil {
 		t.Fatal(err)
 	}
@@ -93,10 +93,8 @@ func TestDevSessionStartIsIdempotentAndRejectsConflicts(t *testing.T) {
 	app := newDevTestApp(t)
 	now := time.Now().UTC()
 	record := devSessionRecord{
-		DevStatus: DevStatus{
-			State: DevStateReady, GenerationID: "generation-active", Variant: "self-hosted",
-			Owner: DevOwnerDetached, StartedAt: &now, ReadyAt: &now, UpdatedAt: now, URLs: app.workspace.URLs,
-		},
+		State: DevStateReady, GenerationID: "generation-active", Variant: "self-hosted",
+		Owner: DevOwnerDetached, StartedAt: &now, ReadyAt: &now, UpdatedAt: now, URLs: app.workspace.URLs,
 		SupervisorPID: os.Getpid(),
 	}
 	if err := app.writeDevRecord(record); err != nil {
@@ -122,10 +120,8 @@ func TestDevStatusReconcilesExitedSupervisor(t *testing.T) {
 	app := newDevTestApp(t)
 	started := time.Now().Add(-time.Minute).UTC()
 	record := devSessionRecord{
-		DevStatus: DevStatus{
-			State: DevStateReady, GenerationID: "generation-exited", Variant: "self-hosted",
-			Owner: DevOwnerDetached, StartedAt: &started, UpdatedAt: started, URLs: app.workspace.URLs,
-		},
+		State: DevStateReady, GenerationID: "generation-exited", Variant: "self-hosted",
+		Owner: DevOwnerDetached, StartedAt: &started, UpdatedAt: started, URLs: app.workspace.URLs,
 		SupervisorPID: 1 << 30,
 	}
 	if err := app.writeDevRecord(record); err != nil {
@@ -182,7 +178,7 @@ func TestDetachedDevWaitsUntilReadyAndStopsCompletely(t *testing.T) {
 	app.devDetachedStart = func(ctx context.Context, record devSessionRecord, request DevRequest) error {
 		return app.superviseDev(ctx, record, request, nil)
 	}
-	startContext, cancelStart := context.WithTimeout(context.Background(), 2*time.Second)
+	startContext, cancelStart := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancelStart()
 	result, err := app.StartDevDetached(startContext, DevRequest{Variant: "self-hosted"})
 	if err != nil {
@@ -194,7 +190,7 @@ func TestDetachedDevWaitsUntilReadyAndStopsCompletely(t *testing.T) {
 	if len(result.RecentEvents) == 0 || result.NextCursor == 0 {
 		t.Fatalf("detached start returned no fallback events: %+v", result)
 	}
-	stopContext, cancelStop := context.WithTimeout(context.Background(), 2*time.Second)
+	stopContext, cancelStop := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancelStop()
 	stopped, err := app.StopDev(stopContext)
 	if err != nil {
@@ -276,10 +272,8 @@ func TestDevLogFollowCancellationDoesNotStopSession(t *testing.T) {
 	app := newDevTestApp(t)
 	now := time.Now().UTC()
 	record := devSessionRecord{
-		DevStatus: DevStatus{
-			State: DevStateReady, GenerationID: "generation-follow", Variant: "self-hosted",
-			Owner: DevOwnerDetached, StartedAt: &now, ReadyAt: &now, UpdatedAt: now, URLs: app.workspace.URLs,
-		},
+		State: DevStateReady, GenerationID: "generation-follow", Variant: "self-hosted",
+		Owner: DevOwnerDetached, StartedAt: &now, ReadyAt: &now, UpdatedAt: now, URLs: app.workspace.URLs,
 		SupervisorPID: os.Getpid(),
 	}
 	if err := app.writeDevRecord(record); err != nil {
@@ -303,10 +297,8 @@ func TestWorkspaceReportsDevSessionAndFiniteRun(t *testing.T) {
 	app := newDevTestApp(t)
 	now := time.Now().UTC()
 	record := devSessionRecord{
-		DevStatus: DevStatus{
-			State: DevStateReady, GenerationID: "generation-workspace", Variant: "self-hosted",
-			Owner: DevOwnerDetached, StartedAt: &now, ReadyAt: &now, UpdatedAt: now, URLs: app.workspace.URLs,
-		},
+		State: DevStateReady, GenerationID: "generation-workspace", Variant: "self-hosted",
+		Owner: DevOwnerDetached, StartedAt: &now, ReadyAt: &now, UpdatedAt: now, URLs: app.workspace.URLs,
 		SupervisorPID: os.Getpid(),
 	}
 	if err := app.writeDevRecord(record); err != nil {

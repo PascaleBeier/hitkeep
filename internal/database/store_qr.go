@@ -3,13 +3,13 @@ package database
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	json "hitkeep/internal/jsonapi"
 )
 
 func (s *Store) CreateQRCode(ctx context.Context, siteID, createdBy uuid.UUID, req api.QRCodeCreateRequest) (*api.QRCode, string, error) {

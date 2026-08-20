@@ -2,7 +2,6 @@ package webhookdispatcher
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -14,6 +13,7 @@ import (
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/hklog"
+	json "hitkeep/internal/jsonapi"
 )
 
 const Channel = "dispatcher"

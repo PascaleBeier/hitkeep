@@ -1,10 +1,10 @@
 package imports
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -12,7 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +23,7 @@ import (
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/importables"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/realtime"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/webhooks"
@@ -161,8 +162,7 @@ func (h *handler) handleCreateUpload() http.HandlerFunc {
 		}
 
 		var req api.ImportUploadCreateRequest
-		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-		if err := decoder.Decode(&req); err != nil {
+		if err := json.UnmarshalRead(http.MaxBytesReader(w, r.Body, 1<<20), &req); err != nil {
 			http.Error(w, "Invalid request", http.StatusBadRequest)
 			return
 		}
@@ -759,11 +759,11 @@ func (h *handler) sourceSet(ctx context.Context, siteID, importID uuid.UUID, has
 			SHA256:    file.SHA256,
 		})
 	}
-	sort.Slice(sourceFiles, func(i, j int) bool {
-		if sourceFiles[i].Name == sourceFiles[j].Name {
-			return sourceFiles[i].ID.String() < sourceFiles[j].ID.String()
+	slices.SortFunc(sourceFiles, func(left, right importables.SourceFile) int {
+		if left.Name == right.Name {
+			return cmp.Compare(left.ID.String(), right.ID.String())
 		}
-		return sourceFiles[i].Name < sourceFiles[j].Name
+		return cmp.Compare(left.Name, right.Name)
 	})
 	var sourceHash string
 	if hashFiles {
@@ -818,11 +818,11 @@ func hashFile(path string) (string, error) {
 
 func combinedSourceHash(files []importables.SourceFile) string {
 	files = append([]importables.SourceFile(nil), files...)
-	sort.Slice(files, func(i, j int) bool {
-		if files[i].SHA256 == files[j].SHA256 {
-			return files[i].SizeBytes < files[j].SizeBytes
+	slices.SortFunc(files, func(left, right importables.SourceFile) int {
+		if left.SHA256 == right.SHA256 {
+			return cmp.Compare(left.SizeBytes, right.SizeBytes)
 		}
-		return files[i].SHA256 < files[j].SHA256
+		return cmp.Compare(left.SHA256, right.SHA256)
 	})
 	hash := sha256.New()
 	for _, file := range files {
@@ -878,7 +878,7 @@ func parseUUIDPath(w http.ResponseWriter, r *http.Request, name, message string)
 
 func writeJSON(ctx context.Context, w http.ResponseWriter, value any) {
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(value); err != nil {
+	if err := json.MarshalWrite(w, value); err != nil {
 		shared.LoggerFromContext(ctx).Error("Failed to encode response", "error", err)
 	}
 }

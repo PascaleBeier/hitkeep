@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -13,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/hklog"
+	json "hitkeep/internal/jsonapi"
 )
 
 const migrationWALGuardVersion = 1

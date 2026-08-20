@@ -12,7 +12,7 @@ import (
 
 func TestFormatGoChecksAndWritesWorkspaceSources(t *testing.T) {
 	workspace := t.TempDir()
-	if output, err := exec.Command("git", "init", "--quiet", workspace).CombinedOutput(); err != nil {
+	if output, err := exec.CommandContext(t.Context(), "git", "init", "--quiet", workspace).CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v: %s", err, output)
 	}
 	unformatted := []byte("package example\n\nfunc Value( )int{return 1}\n")
@@ -36,8 +36,7 @@ func TestFormatGoChecksAndWritesWorkspaceSources(t *testing.T) {
 	if err == nil {
 		t.Fatal("format check unexpectedly passed")
 	}
-	var dataError interface{ ErrorData() any }
-	if !errors.As(err, &dataError) {
+	if _, ok := errors.AsType[errorDataCarrier](err); !ok {
 		t.Fatalf("format check error has no structured result: %T", err)
 	}
 	if checked.Current || checked.ChangedFileCount != 1 || !reflect.DeepEqual(checked.ChangedFiles, []string{"value.go"}) {

@@ -217,15 +217,15 @@ func NormalizeEmail(raw string) (string, string, error) {
 		return "", "", errors.New("valid email is required")
 	}
 	email := strings.ToLower(address.Address)
-	at := strings.LastIndexByte(email, '@')
-	if at <= 0 || at == len(email)-1 {
+	local, domain, ok := strings.CutLast(email, "@")
+	if !ok || local == "" || domain == "" {
 		return "", "", errors.New("valid email is required")
 	}
-	domain := strings.TrimSuffix(email[at+1:], ".")
+	domain = strings.TrimSuffix(domain, ".")
 	if domain == "" {
 		return "", "", errors.New("valid email is required")
 	}
-	return email[:at+1] + domain, domain, nil
+	return local + "@" + domain, domain, nil
 }
 
 func idTokenNonce(idToken *oidc.IDToken) string {

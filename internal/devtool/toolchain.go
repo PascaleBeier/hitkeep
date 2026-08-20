@@ -6,7 +6,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -17,6 +16,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 const (
@@ -31,6 +32,7 @@ type managedToolchainPaths struct {
 	GoExecutable     string
 	NodeExecutable   string
 	NPMExecutable    string
+	NPXExecutable    string
 	NPMCLI           string
 	GoBuildCache     string
 	GoModuleCache    string
@@ -69,6 +71,7 @@ func (a *App) managedToolchainPaths() (managedToolchainPaths, error) {
 		GoExecutable:     filepath.Join(goRoot, "bin", "go"),
 		NodeExecutable:   filepath.Join(nodeRoot, "bin", "node"),
 		NPMExecutable:    filepath.Join(nodeRoot, "bin", "npm"),
+		NPXExecutable:    filepath.Join(nodeRoot, "bin", "npx"),
 		NPMCLI:           filepath.Join(nodeRoot, "lib", "node_modules", "npm", "bin", "npm-cli.js"),
 		GoBuildCache:     filepath.Join(root, "go-build"),
 		GoModuleCache:    filepath.Join(root, "go-mod"),
@@ -96,6 +99,8 @@ func (a *App) preferredDeveloperExecutable(name string) string {
 		candidate = paths.NodeExecutable
 	case "npm":
 		candidate = paths.NPMExecutable
+	case "npx":
+		candidate = paths.NPXExecutable
 	}
 	if candidate != "" {
 		if info, statErr := os.Stat(candidate); statErr == nil && info.Mode().IsRegular() && info.Mode()&0o111 != 0 {
@@ -103,6 +108,15 @@ func (a *App) preferredDeveloperExecutable(name string) string {
 		}
 	}
 	return name
+}
+
+func (a *App) commandExecutable(name string) string {
+	switch name {
+	case "go", "node", "npm", "npx":
+		return a.preferredDeveloperExecutable(name)
+	default:
+		return name
+	}
 }
 
 func (a *App) preferredNPMProbe() (string, []string) {

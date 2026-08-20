@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -18,6 +17,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/appurl"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/reporting"
@@ -26,21 +26,13 @@ import (
 )
 
 func decodeReportJSON(w http.ResponseWriter, r *http.Request, target any) error {
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(target); err != nil {
-		return err
-	}
-	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		return errors.New("multiple JSON values")
-	}
-	return nil
+	return json.UnmarshalReadStrict(http.MaxBytesReader(w, r.Body, 1<<20), target)
 }
 
 func writeReportError(ctx context.Context, w http.ResponseWriter, status int, code, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(map[string]string{"code": code, "message": message}); err != nil {
+	if err := json.MarshalWrite(w, map[string]string{"code": code, "message": message}); err != nil {
 		shared.LoggerFromContext(ctx).Debug("Failed to encode report error response", "error_code", code)
 	}
 }
@@ -99,7 +91,7 @@ func (h *handler) handleListReports() http.HandlerFunc {
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(reports)
+		_ = json.MarshalWrite(w, reports)
 	}
 }
 
@@ -139,7 +131,7 @@ func (h *handler) handleCreateReport() http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(report)
+		_ = json.MarshalWrite(w, report)
 	}
 }
 
@@ -165,7 +157,7 @@ func (h *handler) handleGetReport() http.HandlerFunc {
 			report.Recipients = currentReportRecipient(report.Recipients, userID)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(report)
+		_ = json.MarshalWrite(w, report)
 	}
 }
 
@@ -235,7 +227,7 @@ func (h *handler) handleUpdateReport() http.HandlerFunc {
 			report = refreshed
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(report)
+		_ = json.MarshalWrite(w, report)
 	}
 }
 
@@ -351,7 +343,7 @@ func (h *handler) handlePreviewReport() http.HandlerFunc {
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(preview)
+		_ = json.MarshalWrite(w, preview)
 	}
 }
 
@@ -414,7 +406,7 @@ func (h *handler) handleTestSendReport() http.HandlerFunc {
 			h.appendReportAudit(r, *report.TenantID, userID, report.ID, "report.test_sent", "Report test accepted by mail server")
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(api.ReportTestSendResponse{Status: "accepted", MessageID: messageID, SentAt: time.Now().UTC()})
+		_ = json.MarshalWrite(w, api.ReportTestSendResponse{Status: "accepted", MessageID: messageID, SentAt: time.Now().UTC()})
 	}
 }
 
@@ -454,7 +446,7 @@ func (h *handler) handleListReportRuns() http.HandlerFunc {
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(runs)
+		_ = json.MarshalWrite(w, runs)
 	}
 }
 
@@ -524,7 +516,7 @@ func (h *handler) handleGetReportRecipientConfirmation() http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(confirmation)
+		_ = json.MarshalWrite(w, confirmation)
 	}
 }
 

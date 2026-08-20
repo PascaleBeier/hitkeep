@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -26,6 +25,7 @@ import (
 	appauth "hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/sso"
 )
 
@@ -366,7 +366,7 @@ func TestSSOInvitationFlowPreservesTokenAndRequestedRole(t *testing.T) {
 		t.Fatalf("start invited SSO login: status=%d body=%s", startResponse.Code, startResponse.Body.String())
 	}
 	var started api.SSOStartResponse
-	if err := json.NewDecoder(startResponse.Body).Decode(&started); err != nil {
+	if err := json.UnmarshalRead(startResponse.Body, &started); err != nil {
 		t.Fatalf("decode invited SSO response: %v", err)
 	}
 	authURL, _ := url.Parse(started.AuthURL)
@@ -414,7 +414,7 @@ func TestSSOInvitationProviderErrorReturnsToInvitationWithoutConsumingToken(t *t
 	startResponse := httptest.NewRecorder()
 	h.handleSSOStart().ServeHTTP(startResponse, startRequest)
 	var started api.SSOStartResponse
-	if err := json.NewDecoder(startResponse.Body).Decode(&started); err != nil {
+	if err := json.UnmarshalRead(startResponse.Body, &started); err != nil {
 		t.Fatalf("decode SSO start: %v", err)
 	}
 	authURL, _ := url.Parse(started.AuthURL)
@@ -498,7 +498,7 @@ func startTestSSOLogin(t *testing.T, h *handler, email, returnURL string, rememb
 		t.Fatalf("start SSO login: status=%d body=%s", w.Code, w.Body.String())
 	}
 	var response api.SSOStartResponse
-	if err := json.NewDecoder(w.Body).Decode(&response); err != nil || response.AuthURL == "" {
+	if err := json.UnmarshalRead(w.Body, &response); err != nil || response.AuthURL == "" {
 		t.Fatalf("decode SSO start response: response=%+v err=%v", response, err)
 	}
 	return response.AuthURL
@@ -577,7 +577,7 @@ func (p *fakeOIDCProvider) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.URL.Path == strings.TrimSuffix(p.issuerPath, "/")+"/.well-known/openid-configuration" {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		_ = json.MarshalWrite(w, map[string]any{
 			"issuer":                                p.issuerURL(),
 			"authorization_endpoint":                p.server.URL + "/authorize",
 			"token_endpoint":                        p.server.URL + "/token",
@@ -586,13 +586,14 @@ func (p *fakeOIDCProvider) serveHTTP(w http.ResponseWriter, r *http.Request) {
 			"subject_types_supported":               []string{"public"},
 			"id_token_signing_alg_values_supported": []string{"RS256"},
 		})
+
 		return
 	}
 
 	switch r.URL.Path {
 	case "/keys":
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"keys": []jose.JSONWebKey{{Key: &p.privateKey.PublicKey, KeyID: "test-key", Algorithm: string(jose.RS256), Use: "sig"}}})
+		_ = json.MarshalWrite(w, map[string]any{"keys": []jose.JSONWebKey{{Key: &p.privateKey.PublicKey, KeyID: "test-key", Algorithm: string(jose.RS256), Use: "sig"}}})
 	case "/token":
 		p.serveToken(w, r)
 	default:
@@ -612,7 +613,7 @@ func (p *fakeOIDCProvider) serveToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	_ = json.MarshalWrite(w, map[string]any{
 		"access_token": "ephemeral-access-token",
 		"token_type":   "Bearer",
 		"expires_in":   300,

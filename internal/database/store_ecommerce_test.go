@@ -10,6 +10,27 @@ import (
 	"hitkeep/internal/api"
 )
 
+type testFloatNumber float64
+
+func (n testFloatNumber) Float64() (float64, error) {
+	return float64(n), nil
+}
+
+type testIntNumber int64
+
+func (n testIntNumber) Int64() (int64, error) {
+	return int64(n), nil
+}
+
+func TestEcommerceNumericHelpersUseCapabilities(t *testing.T) {
+	if got, ok := firstFloat(testFloatNumber(12.5)); !ok || got != 12.5 {
+		t.Fatalf("firstFloat capability = (%v, %v), want (12.5, true)", got, ok)
+	}
+	if got, ok := firstInt(testIntNumber(7)); !ok || got != 7 {
+		t.Fatalf("firstInt capability = (%v, %v), want (7, true)", got, ok)
+	}
+}
+
 func TestGetEcommerceSummaryAndBreakdowns(t *testing.T) {
 	store := newSharedTestFixtureStore(t)
 

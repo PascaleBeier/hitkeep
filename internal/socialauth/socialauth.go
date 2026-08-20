@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/subtle"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -20,6 +19,7 @@ import (
 
 	"hitkeep/internal/appurl"
 	"hitkeep/internal/config"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/security"
 	"hitkeep/internal/sso"
 )
@@ -412,7 +412,7 @@ func (c *Client) validateMicrosoftSigningKeyIssuer(ctx context.Context, provider
 			Issuer string `json:"issuer"`
 		} `json:"keys"`
 	}
-	if err := json.NewDecoder(io.LimitReader(response.Body, maxProviderBody)).Decode(&keySet); err != nil {
+	if err := json.UnmarshalRead(io.LimitReader(response.Body, maxProviderBody), &keySet); err != nil {
 		return ErrTokenValidation
 	}
 	foundKey := false
@@ -507,8 +507,7 @@ func (c *Client) githubGetJSON(ctx context.Context, cfg ProviderConfig, accessTo
 		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, maxProviderBody))
 		return ErrProviderUnavailable
 	}
-	decoder := json.NewDecoder(io.LimitReader(response.Body, maxProviderBody))
-	if err := decoder.Decode(dest); err != nil {
+	if err := json.UnmarshalRead(io.LimitReader(response.Body, maxProviderBody), dest); err != nil {
 		return ErrProviderUnavailable
 	}
 	return nil

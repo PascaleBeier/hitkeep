@@ -575,7 +575,7 @@ func createRecoveryTestDatabase(t *testing.T, dir string) string {
 	if err := store.Connect(); err != nil {
 		t.Fatalf("connect recovery test database: %v", err)
 	}
-	if _, err := store.DB().Exec("CREATE TABLE recovery_base (id BIGINT); INSERT INTO recovery_base VALUES (1);"); err != nil {
+	if _, err := store.DB().ExecContext(t.Context(), "CREATE TABLE recovery_base (id BIGINT); INSERT INTO recovery_base VALUES (1);"); err != nil {
 		t.Fatalf("seed recovery test database: %v", err)
 	}
 	if err := store.Close(); err != nil {
@@ -781,7 +781,7 @@ func TestMigrationCheckpointMismatchRestoresApplicationWAL(t *testing.T) {
 		if err != nil {
 			t.Fatalf("open application WAL helper: %v", err)
 		}
-		if _, err := db.Exec("INSERT INTO application_writes VALUES (1)"); err != nil {
+		if _, err := db.ExecContext(t.Context(), "INSERT INTO application_writes VALUES (1)"); err != nil {
 			t.Fatalf("write application WAL row: %v", err)
 		}
 		os.Exit(0)

@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"crypto/subtle"
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -16,6 +15,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/appurl"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/localization"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
@@ -887,22 +887,16 @@ func writeSocialError(ctx context.Context, w http.ResponseWriter, status int, co
 func writeSocialJSON(ctx context.Context, w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(value); err != nil {
+	if err := json.MarshalWrite(w, value); err != nil {
 		shared.LoggerFromContext(ctx).Error("Failed to encode social auth response", "error", err)
 	}
 }
 
 func decodeSocialJSON(w http.ResponseWriter, r *http.Request, dest any, allowEmpty bool) bool {
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxAuthPayloadBytes))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(dest); err != nil {
+	if err := json.UnmarshalReadOptionalStrict(http.MaxBytesReader(w, r.Body, maxAuthPayloadBytes), dest); err != nil {
 		if allowEmpty && err == io.EOF {
 			return true
 		}
-		writeSocialError(r.Context(), w, http.StatusBadRequest, "social_request_invalid")
-		return false
-	}
-	if err := decoder.Decode(&struct{}{}); err != io.EOF {
 		writeSocialError(r.Context(), w, http.StatusBadRequest, "social_request_invalid")
 		return false
 	}

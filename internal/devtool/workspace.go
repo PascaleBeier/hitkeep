@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -16,6 +15,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 const (
@@ -283,7 +284,7 @@ func setWorkspaceURLs(workspace *Workspace) {
 	}
 }
 
-func probeWorkspaceServices(workspace Workspace) []Service {
+func probeWorkspaceServices(ctx context.Context, workspace Workspace) []Service {
 	if workspace.Ports.Backend == 0 {
 		return nil
 	}
@@ -300,7 +301,7 @@ func probeWorkspaceServices(workspace Workspace) []Service {
 	for _, definition := range definitions {
 		address := net.JoinHostPort("127.0.0.1", strconv.Itoa(definition.port))
 		dialer := net.Dialer{Timeout: 100 * time.Millisecond}
-		connection, err := dialer.DialContext(context.Background(), "tcp", address)
+		connection, err := dialer.DialContext(ctx, "tcp", address)
 		if err == nil {
 			_ = connection.Close()
 		}

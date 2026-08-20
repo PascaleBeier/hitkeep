@@ -4,6 +4,8 @@ run:
   tests: false
 linters:
   default: none
+  # Staticcheck (including U1000) runs in the separately pinned go-staticcheck
+  # gate so its analyzer version can track the repository's Go language level.
   enable:
     - asasalint
     - asciicheck
@@ -30,11 +32,9 @@ linters:
     - promlinter
     - rowserrcheck
     - sqlclosecheck
-    - staticcheck
     - testableexamples
     - tparallel
     - unconvert
-    - unused
     - usetesting
     - wastedassign
     - whitespace

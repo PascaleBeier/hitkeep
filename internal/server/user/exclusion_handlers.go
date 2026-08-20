@@ -1,7 +1,6 @@
 package user
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -10,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -38,7 +38,7 @@ func (h *handler) handleListTeamExclusions() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(rules); err != nil {
+		if err := json.MarshalWrite(w, rules); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode team exclusions response", "error", err, "team_id", teamID)
 		}
 	}
@@ -89,7 +89,7 @@ func (h *handler) handleCreateTeamExclusion() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(rule); err != nil {
+		if err := json.MarshalWrite(w, rule); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode team exclusion response", "error", err, "team_id", teamID)
 		}
 	}

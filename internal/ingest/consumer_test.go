@@ -2,7 +2,6 @@ package ingest
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -16,6 +15,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/realtime"
 	"hitkeep/internal/webhooks"
 )
@@ -129,7 +129,9 @@ func TestConsumerRetryAfterConversionOutboxFailureDoesNotDuplicateSourceEvent(t 
 func TestConsumerSkipsGoalLookupWithoutConversionSubscribers(t *testing.T) {
 	emitter := &conversionBatchEmitter{hasSubscribers: false}
 	consumer := &Consumer{logger: testBatchLogger(), webhookEmitter: emitter}
-	consumer.emitHitGoalConversions(context.Background(), &database.Store{}, []*api.Hit{{SiteID: uuid.New(), Path: "/signup"}})
+	if err := consumer.emitHitGoalConversions(t.Context(), &database.Store{}, []*api.Hit{{SiteID: uuid.New(), Path: "/signup"}}); err != nil {
+		t.Fatalf("emit hit goal conversions without subscribers: %v", err)
+	}
 
 	if emitter.checks != 1 || emitter.emitCalls != 0 || emitter.batchCalls != 0 {
 		t.Fatalf("unexpected emission work: %+v", emitter)
@@ -153,10 +155,12 @@ func TestConsumerBulkEmitsGoalConversions(t *testing.T) {
 	}
 	emitter := &conversionBatchEmitter{hasSubscribers: true}
 	consumer := &Consumer{logger: testBatchLogger(), webhookEmitter: emitter}
-	consumer.emitEventGoalConversions(ctx, store, []*api.Event{
+	if err := consumer.emitEventGoalConversions(ctx, store, []*api.Event{
 		{ID: uuid.New(), SiteID: siteID, Name: "signup", Timestamp: time.Now()},
 		{ID: uuid.New(), SiteID: siteID, Name: "signup", Timestamp: time.Now()},
-	})
+	}); err != nil {
+		t.Fatalf("emit event goal conversions: %v", err)
+	}
 
 	if emitter.checks != 1 || emitter.batchCalls != 1 || emitter.emitCalls != 0 || len(emitter.events) != 2 {
 		t.Fatalf("expected one batch emission for two conversions, got %+v", emitter)

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/csv"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -18,6 +17,7 @@ import (
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/exportfmt"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -287,7 +287,7 @@ func TestHandleGetEventTimeseriesAcceptsMultipleFilters(t *testing.T) {
 	}
 
 	var series []api.EventSeriesPoint
-	if err := json.NewDecoder(rec.Body).Decode(&series); err != nil {
+	if err := json.UnmarshalRead(rec.Body, &series); err != nil {
 		t.Fatalf("decode series: %v", err)
 	}
 	total := 0

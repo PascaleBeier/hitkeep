@@ -1,8 +1,9 @@
 package opportunities
 
 import (
+	"cmp"
 	"maps"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -28,8 +29,8 @@ func RankOpportunities(opportunities []api.Opportunity) []api.Opportunity {
 	for i, opportunity := range opportunities {
 		out[i] = normalizeRankedOpportunity(opportunity)
 	}
-	sort.SliceStable(out, func(i, j int) bool {
-		return ranksBefore(rankOpportunity(out[i]), rankOpportunity(out[j]))
+	slices.SortStableFunc(out, func(left, right api.Opportunity) int {
+		return compareOpportunityRanks(rankOpportunity(left), rankOpportunity(right))
 	})
 	return out
 }
@@ -39,8 +40,8 @@ func rankOpportunityInputs(opportunities []database.OpportunityInput) []database
 	for i, opportunity := range opportunities {
 		out[i] = normalizeRankedOpportunityInput(opportunity)
 	}
-	sort.SliceStable(out, func(i, j int) bool {
-		return ranksBefore(rankOpportunityInput(out[i]), rankOpportunityInput(out[j]))
+	slices.SortStableFunc(out, func(left, right database.OpportunityInput) int {
+		return compareOpportunityRanks(rankOpportunityInput(left), rankOpportunityInput(right))
 	})
 	return out
 }
@@ -120,32 +121,35 @@ func rankOpportunityInput(opportunity database.OpportunityInput) opportunityRank
 	}
 }
 
-func ranksBefore(left, right opportunityRank) bool {
+func compareOpportunityRanks(left, right opportunityRank) int {
 	if leftActionable, rightActionable := opportunityStatusActionable(left.status), opportunityStatusActionable(right.status); leftActionable != rightActionable {
-		return leftActionable
+		if leftActionable {
+			return -1
+		}
+		return 1
 	}
 	if left.score != right.score {
-		return left.score > right.score
+		return cmp.Compare(right.score, left.score)
 	}
 	if left.impact != right.impact {
-		return left.impact > right.impact
+		return cmp.Compare(right.impact, left.impact)
 	}
 	if left.actionability != right.actionability {
-		return left.actionability > right.actionability
+		return cmp.Compare(right.actionability, left.actionability)
 	}
 	if left.evidenceFit != right.evidenceFit {
-		return left.evidenceFit > right.evidenceFit
+		return cmp.Compare(right.evidenceFit, left.evidenceFit)
 	}
 	if left.urgency != right.urgency {
-		return left.urgency > right.urgency
+		return cmp.Compare(right.urgency, left.urgency)
 	}
 	if !left.updatedAt.Equal(right.updatedAt) {
-		return left.updatedAt.After(right.updatedAt)
+		return right.updatedAt.Compare(left.updatedAt)
 	}
 	if !left.generatedAt.Equal(right.generatedAt) {
-		return left.generatedAt.After(right.generatedAt)
+		return right.generatedAt.Compare(left.generatedAt)
 	}
-	return left.id.String() < right.id.String()
+	return cmp.Compare(left.id.String(), right.id.String())
 }
 
 func opportunityStatusActionable(status string) bool {

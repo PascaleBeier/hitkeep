@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -17,6 +16,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	appsecurity "hitkeep/internal/security"
 	"hitkeep/internal/server/shared"
 )
@@ -59,7 +59,7 @@ func (h *handler) handleGetUserSecurityStatus() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(status); err != nil {
+		if err := json.MarshalWrite(w, status); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode user security status", "error", err, "user_id", userID)
 		}
 	}
@@ -108,7 +108,7 @@ func (h *handler) handleStartTOTPSetup() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		//nolint:gosec // TOTP bootstrap secret is intentionally returned to the authenticated user during setup.
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
+		if err := json.MarshalWrite(w, resp); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode pending totp setup", "error", err, "user_id", userID)
 		}
 	}
@@ -162,7 +162,7 @@ func (h *handler) handleVerifyTOTPSetup() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(status); err != nil {
+		if err := json.MarshalWrite(w, status); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode security status after enabling totp", "error", err, "user_id", userID)
 		}
 	}
@@ -210,7 +210,7 @@ func (h *handler) handleDisableTOTP() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(status); err != nil {
+		if err := json.MarshalWrite(w, status); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode security status after disabling totp", "error", err, "user_id", userID)
 		}
 	}
@@ -266,7 +266,7 @@ func (h *handler) handleStartPasskeyRegistration() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
+		if err := json.MarshalWrite(w, resp); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode passkey registration start response", "error", err, "user_id", userID)
 		}
 	}
@@ -353,7 +353,7 @@ func (h *handler) handleFinishPasskeyRegistration() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(status); err != nil {
+		if err := json.MarshalWrite(w, status); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode security status after passkey registration", "error", err, "user_id", userID)
 		}
 	}
@@ -439,7 +439,7 @@ func (h *handler) handleRegenerateRecoveryCodes() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(api.UserRecoveryCodesResponse{
+		if err := json.MarshalWrite(w, api.UserRecoveryCodesResponse{
 			Codes:     codes,
 			Remaining: len(codes),
 		}); err != nil {
@@ -525,16 +525,10 @@ func passkeyCredentialDescriptors(credentials []webauthnlib.Credential) []protoc
 }
 
 func decodeSecurityJSON(w http.ResponseWriter, r *http.Request, dest any, allowEmpty bool) bool {
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxSecurityPayloadBytes))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(dest); err != nil {
+	if err := json.UnmarshalReadOptionalStrict(http.MaxBytesReader(w, r.Body, maxSecurityPayloadBytes), dest); err != nil {
 		if allowEmpty && err == io.EOF {
 			return true
 		}
-		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
-		return false
-	}
-	if err := decoder.Decode(&struct{}{}); err != io.EOF {
 		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
 		return false
 	}

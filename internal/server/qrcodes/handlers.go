@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"image"
 	_ "image/jpeg"
@@ -30,6 +29,7 @@ import (
 	"hitkeep/internal/blocking"
 	"hitkeep/internal/exportfmt"
 	"hitkeep/internal/ipmeta"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -929,7 +929,7 @@ func applyCustomQueryParams(query url.Values, params map[string]string) {
 func decodeQRRequest(w http.ResponseWriter, r *http.Request) (api.QRCodeCreateRequest, bool) {
 	r.Body = http.MaxBytesReader(w, r.Body, 128<<10)
 	var req api.QRCodeCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.UnmarshalRead(r.Body, &req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return req, false
 	}
@@ -1175,7 +1175,7 @@ func (h *handler) ensureStore(w http.ResponseWriter) bool {
 
 func writeJSON(ctx context.Context, w http.ResponseWriter, value any) {
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(value); err != nil {
+	if err := json.MarshalWrite(w, value); err != nil {
 		shared.LoggerFromContext(ctx).Error("Failed to encode response", "error", err)
 	}
 }

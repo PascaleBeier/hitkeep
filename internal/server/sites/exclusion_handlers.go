@@ -2,7 +2,6 @@ package sites
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -11,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -52,7 +52,7 @@ func (h *handler) handleListSiteExclusions() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(rules); err != nil {
+		if err := json.MarshalWrite(w, rules); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode site exclusions response", "error", err, "site_id", siteID)
 		}
 	}
@@ -112,7 +112,7 @@ func (h *handler) handleCreateSiteExclusion() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(createdRule); err != nil {
+		if err := json.MarshalWrite(w, createdRule); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode site exclusion response", "error", err, "site_id", siteID)
 		}
 	}

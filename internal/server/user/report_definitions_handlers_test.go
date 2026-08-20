@@ -3,7 +3,6 @@ package user
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -17,6 +16,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/entitlements"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/reporting"
 	"hitkeep/internal/server/shared"
@@ -75,7 +75,7 @@ func TestCreateReportValidatesQuarterHourAndMailAvailability(t *testing.T) {
 		t.Fatalf("draft report status = %d, want %d: %s", response.Code, http.StatusCreated, response.Body.String())
 	}
 	var report api.ReportDefinition
-	if err := json.NewDecoder(response.Body).Decode(&report); err != nil {
+	if err := json.UnmarshalRead(response.Body, &report); err != nil {
 		t.Fatal(err)
 	}
 	if report.Schedule.Timezone != "Europe/Berlin" || report.Schedule.LocalTime != "08:15" {
@@ -174,7 +174,7 @@ func TestExternalReportRecipientsRequireTeamManagerAndCanonicalizeMembers(t *tes
 		t.Fatalf("canonical report status = %d: %s", response.Code, response.Body.String())
 	}
 	var report api.ReportDefinition
-	if err := json.NewDecoder(response.Body).Decode(&report); err != nil {
+	if err := json.UnmarshalRead(response.Body, &report); err != nil {
 		t.Fatal(err)
 	}
 	if len(report.Recipients) != 1 || report.Recipients[0].Kind != api.ReportRecipientKindMember || report.Recipients[0].UserID == nil || *report.Recipients[0].UserID != memberID {
@@ -268,7 +268,7 @@ func TestExternalReportRecipientsRequirePaidCloudPlan(t *testing.T) {
 		t.Fatalf("Pro external recipient status = %d, want 201: %s", response.Code, response.Body.String())
 	}
 	var report api.ReportDefinition
-	if err := json.NewDecoder(response.Body).Decode(&report); err != nil {
+	if err := json.UnmarshalRead(response.Body, &report); err != nil {
 		t.Fatal(err)
 	}
 	var external api.ReportRecipient
@@ -394,7 +394,7 @@ func TestExternalReportInvitationFailureIsSafeAndResendable(t *testing.T) {
 		t.Fatalf("failed invitation response = %d %s", response.Code, response.Body.String())
 	}
 	var report api.ReportDefinition
-	if err := json.NewDecoder(response.Body).Decode(&report); err != nil {
+	if err := json.UnmarshalRead(response.Body, &report); err != nil {
 		t.Fatal(err)
 	}
 	var external api.ReportRecipient
@@ -532,7 +532,7 @@ func TestReportPreviewUsesTheActualLocalizedReportContent(t *testing.T) {
 		t.Fatalf("preview status = %d, want %d: %s", response.Code, http.StatusOK, response.Body.String())
 	}
 	var preview api.ReportPreview
-	if err := json.NewDecoder(response.Body).Decode(&preview); err != nil {
+	if err := json.UnmarshalRead(response.Body, &preview); err != nil {
 		t.Fatal(err)
 	}
 	if preview.Subject == "Internal report name" || !strings.Contains(preview.Subject, site.Domain) {

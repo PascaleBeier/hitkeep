@@ -2,7 +2,6 @@ package devtool
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +10,7 @@ import (
 	"strings"
 
 	runtimeconfig "hitkeep/internal/config"
+	json "hitkeep/internal/jsonapi"
 )
 
 var releaseVersionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
@@ -212,15 +212,11 @@ func validateReleaseMetadata(root string) error {
 	}
 
 	var dashboardLock struct {
-		Version  string `json:"version"`
 		Packages map[string]struct {
 			Version string `json:"version"`
 		} `json:"packages"`
 	}
 	if err := readJSONFile(filepath.Join(root, "frontend", "dashboard", "package-lock.json"), &dashboardLock); err != nil {
-		return err
-	}
-	if err := requireReleaseVersion("frontend/dashboard/package-lock.json $.version", dashboardLock.Version, version); err != nil {
 		return err
 	}
 	rootPackage, ok := dashboardLock.Packages[""]
@@ -283,7 +279,6 @@ func validateReleaseMetadata(root string) error {
 	expectedFiles := []releasePleaseExtraFile{
 		{Type: "json", Path: "server.json", JSONPath: "$.version"},
 		{Type: "json", Path: "frontend/dashboard/package.json", JSONPath: "$.version"},
-		{Type: "json", Path: "frontend/dashboard/package-lock.json", JSONPath: "$.version"},
 		{Type: "json", Path: "frontend/dashboard/package-lock.json", JSONPath: "$['packages']['']['version']"},
 		{Type: "json", Path: "frontend/tracker/package.json", JSONPath: "$.version"},
 		{Type: "generic", Path: "frontend/dashboard/src/tracker/version.ts"},

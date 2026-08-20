@@ -3,7 +3,7 @@ package blocking
 import (
 	"bufio"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +13,8 @@ import (
 	"net/netip"
 	"strings"
 	"time"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 const maxFeedResponseBytes = 10 << 20 // 10 MB
@@ -117,8 +119,7 @@ func spamFeedErrorKind(err error) string {
 	case errors.Is(err, context.DeadlineExceeded):
 		return "timeout"
 	default:
-		var networkErr net.Error
-		if errors.As(err, &networkErr) {
+		if networkErr, ok := errors.AsType[net.Error](err); ok {
 			if networkErr.Timeout() {
 				return "timeout"
 			}
@@ -165,7 +166,7 @@ func fetchSpamhausCIDRs(ctx context.Context, client httpDoer, sourceURL string, 
 		expectedFamily = "IPv6"
 	}
 
-	decoder := json.NewDecoder(body)
+	decoder := jsontext.NewDecoder(body)
 	var (
 		out             []string
 		metadata        SpamFeedSourceMetadata
@@ -174,7 +175,7 @@ func fetchSpamhausCIDRs(ctx context.Context, client httpDoer, sourceURL string, 
 	)
 	for recordNumber := 1; ; recordNumber++ {
 		var record spamhausDROPRecord
-		if err := decoder.Decode(&record); err != nil {
+		if err := json.UnmarshalDecode(decoder, &record); err != nil {
 			if err == io.EOF {
 				break
 			}

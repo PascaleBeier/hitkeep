@@ -2,7 +2,6 @@ package share
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"strings"
@@ -12,6 +11,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/filterparams"
 	"hitkeep/internal/server/shared"
 )
@@ -69,7 +69,7 @@ func (h *handler) handleGetShareDefinitions(
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(definitions); err != nil {
+		if err := json.MarshalWrite(w, definitions); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -127,7 +127,7 @@ func (h *handler) handleGetShareFunnelStats() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(stats); err != nil {
+		if err := json.MarshalWrite(w, stats); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -223,7 +223,7 @@ func (h *handler) handleTimeseries(
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(series); err != nil {
+		if err := json.MarshalWrite(w, series); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}

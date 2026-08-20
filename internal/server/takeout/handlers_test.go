@@ -5,7 +5,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,6 +22,7 @@ import (
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/exportfmt"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 	takeoutsvc "hitkeep/internal/takeout"
 )

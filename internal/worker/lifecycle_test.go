@@ -16,7 +16,7 @@ func TestWaitForDelayStopsWhenContextTimesOut(t *testing.T) {
 		go func() {
 			result <- waitForDelay(ctx, 10*time.Second)
 		}()
-		time.Sleep(2 * time.Second)
+		synctest.Sleep(2 * time.Second)
 
 		if ctx.Err() == nil {
 			t.Fatal("expected timeout")

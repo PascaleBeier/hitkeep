@@ -2,13 +2,14 @@ package mcpserver
 
 import (
 	"context"
-	"encoding/json"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 func TestMCPPublishedSurfaceAudit(t *testing.T) {

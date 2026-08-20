@@ -217,8 +217,8 @@ func buildGeneratedFrames(starts, metadata []byte, addressSize, metadataSize, ta
 			rawLen:      frameRawLen,
 			compressed:  compressed,
 			crc:         crc32.ChecksumIEEE(rawBytes),
+			first:       framedAddress(rawBytes[:addressSize], ipv4),
 		}
-		frame.first = framedAddress(rawBytes[:addressSize], ipv4)
 		frames = append(frames, frame)
 	}
 	return frames, nil

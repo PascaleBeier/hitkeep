@@ -1,7 +1,6 @@
 package sso
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -10,6 +9,8 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/coreos/go-oidc/v3/oidc/oidctest"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 func TestNormalizeIssuerURLPreservesExactIssuerIdentifier(t *testing.T) {
@@ -109,7 +110,7 @@ func TestDiscoverSupportsPathBasedIssuerWithTrailingSlash(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		_ = json.MarshalWrite(w, map[string]any{
 			"issuer":                                issuer,
 			"authorization_endpoint":                server.URL + "/authorize",
 			"token_endpoint":                        server.URL + "/token",
@@ -134,7 +135,7 @@ func TestDiscoverRejectsTrailingSlashIssuerMismatch(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		_ = json.MarshalWrite(w, map[string]any{
 			"issuer":                                server.URL,
 			"authorization_endpoint":                server.URL + "/authorize",
 			"token_endpoint":                        server.URL + "/token",

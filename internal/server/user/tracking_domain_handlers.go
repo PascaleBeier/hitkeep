@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -18,6 +17,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -71,7 +71,7 @@ func (h *handler) handleListCustomTrackingDomains() http.HandlerFunc {
 		}
 		domains = decorateCustomTrackingDomains(domains, h.ctx.Config.CustomTrackingDNSTargetValue())
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(domains); err != nil {
+		if err := json.MarshalWrite(w, domains); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode custom tracking domains response", "error", err, "team_id", teamID)
 		}
 	}
@@ -90,7 +90,7 @@ func (h *handler) handleCreateCustomTrackingDomain() http.HandlerFunc {
 		userID := shared.GetUserIDFromContext(r)
 
 		var req api.CreateCustomTrackingDomainRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.UnmarshalRead(r.Body, &req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -134,7 +134,7 @@ func (h *handler) handleCreateCustomTrackingDomain() http.HandlerFunc {
 		*domain = decorateCustomTrackingDomain(*domain, h.ctx.Config.CustomTrackingDNSTargetValue())
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(domain); err != nil {
+		if err := json.MarshalWrite(w, domain); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode custom tracking domain response", "error", err, "team_id", teamID)
 		}
 	}
@@ -171,7 +171,7 @@ func (h *handler) handleVerifyCustomTrackingDomain() http.HandlerFunc {
 		h.appendCustomTrackingDomainAudit(r, teamID, userID, *verified, "tracking_domain.verified", "Custom tracking domain "+verified.Hostname+" verification checked")
 		*verified = decorateCustomTrackingDomain(*verified, h.ctx.Config.CustomTrackingDNSTargetValue())
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(verified); err != nil {
+		if err := json.MarshalWrite(w, verified); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode verified custom tracking domain response", "error", err, "team_id", teamID, "domain_id", domainID)
 		}
 	}
@@ -185,7 +185,7 @@ func (h *handler) handleUpdateCustomTrackingDomain() http.HandlerFunc {
 		}
 		userID := shared.GetUserIDFromContext(r)
 		var req api.UpdateCustomTrackingDomainRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.UnmarshalRead(r.Body, &req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -212,7 +212,7 @@ func (h *handler) handleUpdateCustomTrackingDomain() http.HandlerFunc {
 		h.appendCustomTrackingDomainAudit(r, teamID, userID, *domain, action, details)
 		*domain = decorateCustomTrackingDomain(*domain, h.ctx.Config.CustomTrackingDNSTargetValue())
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(domain); err != nil {
+		if err := json.MarshalWrite(w, domain); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode updated custom tracking domain response", "error", err, "team_id", teamID, "domain_id", domainID)
 		}
 	}

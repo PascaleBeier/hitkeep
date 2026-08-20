@@ -2,10 +2,8 @@ package user
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -18,6 +16,7 @@ import (
 	"hitkeep/internal/appurl"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
@@ -95,7 +94,7 @@ func (h *handler) appendTeamAudit(r *http.Request, teamID, actorID uuid.UUID, ac
 func writeTeamActionError(ctx context.Context, w http.ResponseWriter, statusCode int, code string, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	if err := json.NewEncoder(w).Encode(map[string]string{
+	if err := json.MarshalWrite(w, map[string]string{
 		"status":  "error",
 		"code":    code,
 		"message": message,
@@ -240,13 +239,7 @@ func (h *handler) handleCreateTeam() http.HandlerFunc {
 		}
 
 		var req request
-		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&req); err != nil {
-			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
-			return
-		}
-		if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err := json.UnmarshalReadStrict(http.MaxBytesReader(w, r.Body, 1<<20), &req); err != nil {
 			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
 			return
 		}
@@ -297,7 +290,7 @@ func (h *handler) handleCreateTeam() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(map[string]any{"team": team}); err != nil {
+		if err := json.MarshalWrite(w, map[string]any{"team": team}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode create team response", "error", err, "actor_id", actorID)
 		}
 	}
@@ -319,7 +312,7 @@ func (h *handler) handleGetTeams() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
+		if err := json.MarshalWrite(w, resp); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode teams response", "error", err, "user_id", userID)
 		}
 	}
@@ -338,13 +331,7 @@ func (h *handler) handleSetActiveTeam() http.HandlerFunc {
 		}
 
 		var req request
-		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&req); err != nil {
-			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
-			return
-		}
-		if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err := json.UnmarshalReadStrict(http.MaxBytesReader(w, r.Body, 1<<20), &req); err != nil {
 			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
 			return
 		}
@@ -374,7 +361,7 @@ func (h *handler) handleSetActiveTeam() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]any{
+		if err := json.MarshalWrite(w, map[string]any{
 			"status":          "ok",
 			"active_team_id":  activeTeamID,
 			"recent_team_ids": orderedRecentTeamIDs(teams, activeTeamID),
@@ -411,7 +398,7 @@ func (h *handler) handleGetTeamMembers() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(members); err != nil {
+		if err := json.MarshalWrite(w, members); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode team members response", "error", err, "user_id", userID, "team_id", teamID)
 		}
 	}
@@ -445,7 +432,7 @@ func (h *handler) handleGetTeamInvites() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(invites); err != nil {
+		if err := json.MarshalWrite(w, invites); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode team invites response", "error", err, "user_id", userID, "team_id", teamID)
 		}
 	}
@@ -485,7 +472,7 @@ func (h *handler) handleGetTeamAudit() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(api.TeamAuditListResponse{
+		if err := json.MarshalWrite(w, api.TeamAuditListResponse{
 			Entries: entries,
 			Total:   total,
 			Limit:   normalizedTeamAuditLimit(filter.Limit),

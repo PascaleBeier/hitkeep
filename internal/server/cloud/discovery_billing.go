@@ -4,12 +4,12 @@ package cloud
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strings"
 
 	"hitkeep/internal/appurl"
 	"hitkeep/internal/config"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/server/system"
 )
@@ -279,14 +279,14 @@ func normalizedMCPPath(path string) string {
 
 func writeDiscoveryJSON(ctx context.Context, w http.ResponseWriter, body any) {
 	writeDiscoveryHeaders(w, "application/json")
-	if err := json.NewEncoder(w).Encode(body); err != nil {
+	if err := json.MarshalWrite(w, body); err != nil {
 		shared.LoggerFromContext(ctx).Error("Failed to encode cloud discovery response", "error", err)
 	}
 }
 
 func writeDiscoveryLinkset(ctx context.Context, w http.ResponseWriter, body any) {
 	writeDiscoveryHeaders(w, "application/linkset+json")
-	if err := json.NewEncoder(w).Encode(body); err != nil {
+	if err := json.MarshalWrite(w, body); err != nil {
 		shared.LoggerFromContext(ctx).Error("Failed to encode cloud discovery response", "error", err)
 	}
 }

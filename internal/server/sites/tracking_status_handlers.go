@@ -1,12 +1,12 @@
 package sites
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -41,7 +41,7 @@ func (h *handler) handleGetSiteTrackingStatus() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(status); err != nil {
+		if err := json.MarshalWrite(w, status); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode tracking status response", "error", err)
 		}
 	}
@@ -78,7 +78,7 @@ func (h *handler) handleGetSiteSetupState() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(state); err != nil {
+		if err := json.MarshalWrite(w, state); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode setup state response", "error", err)
 		}
 	}

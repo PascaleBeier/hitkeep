@@ -2,13 +2,14 @@ package mailer
 
 import (
 	"embed"
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"path"
 	"slices"
 	"strings"
 	"time"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 const defaultMailLocale = "en"

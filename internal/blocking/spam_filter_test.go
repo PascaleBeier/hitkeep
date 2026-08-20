@@ -502,6 +502,18 @@ func TestFetchSpamhausCIDRsRejectsInvalidJSONFeeds(t *testing.T) {
 			wantErr:        "decode spamhaus JSON",
 		},
 		{
+			name:           "duplicate object name",
+			body:           `{"cidr":"203.0.113.0/24","cidr":"198.51.100.0/24"}` + "\n" + metadata,
+			expectedBitLen: 32,
+			wantErr:        "decode spamhaus JSON",
+		},
+		{
+			name:           "invalid UTF-8",
+			body:           string(append([]byte(`{"cidr":"`), append([]byte{0xff}, []byte(`"}`)...)...)),
+			expectedBitLen: 32,
+			wantErr:        "decode spamhaus JSON",
+		},
+		{
 			name:           "invalid CIDR",
 			body:           `{"cidr":"invalid"}` + "\n" + metadata,
 			expectedBitLen: 32,

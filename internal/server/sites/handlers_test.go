@@ -3,7 +3,6 @@ package sites
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -24,6 +23,7 @@ import (
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/exportfmt"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -304,7 +304,7 @@ func TestHandleCreateSite(t *testing.T) {
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
 				var site api.Site
-				if err := json.NewDecoder(w.Body).Decode(&site); err != nil {
+				if err := json.UnmarshalRead(w.Body, &site); err != nil {
 					t.Fatalf("failed to decode response: %v", err)
 				}
 				if site.Domain != "example.com" {
@@ -322,7 +322,7 @@ func TestHandleCreateSite(t *testing.T) {
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
 				var site api.Site
-				if err := json.NewDecoder(w.Body).Decode(&site); err != nil {
+				if err := json.UnmarshalRead(w.Body, &site); err != nil {
 					t.Fatalf("failed to decode response: %v", err)
 				}
 				if site.Domain != "uppercase.com" {
@@ -432,7 +432,7 @@ func TestHandleGetSites(t *testing.T) {
 
 			if tc.expectedStatus == http.StatusOK {
 				var sites []api.Site
-				if err := json.NewDecoder(w.Body).Decode(&sites); err != nil {
+				if err := json.UnmarshalRead(w.Body, &sites); err != nil {
 					t.Fatalf("failed to decode sites: %v", err)
 				}
 				if len(sites) != tc.expectedCount {
@@ -492,7 +492,7 @@ func TestHandleGetSitesOverviewStats(t *testing.T) {
 	}
 
 	var response api.SitesOverviewStatsResponse
-	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+	if err := json.UnmarshalRead(w.Body, &response); err != nil {
 		t.Fatalf("decode overview response: %v", err)
 	}
 	if len(response.Sites) != 2 {
@@ -523,7 +523,7 @@ func TestHandleGetSitesOverviewStats(t *testing.T) {
 	}
 
 	response = api.SitesOverviewStatsResponse{}
-	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+	if err := json.UnmarshalRead(w.Body, &response); err != nil {
 		t.Fatalf("decode API client overview response: %v", err)
 	}
 	if len(response.Sites) != 1 || response.Sites[0].SiteID != siteBeta.ID {
@@ -608,7 +608,7 @@ func TestSiteExclusionCountryRules(t *testing.T) {
 		t.Fatalf("expected country create status %d, got %d: %s", http.StatusCreated, w.Code, w.Body.String())
 	}
 	var created api.IPExclusion
-	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
+	if err := json.UnmarshalRead(w.Body, &created); err != nil {
 		t.Fatalf("decode created country exclusion: %v", err)
 	}
 	if created.Type != "country" || created.CountryCode != "DE" || created.CIDR != "" {
@@ -624,7 +624,7 @@ func TestSiteExclusionCountryRules(t *testing.T) {
 		t.Fatalf("expected list status %d, got %d: %s", http.StatusOK, listW.Code, listW.Body.String())
 	}
 	var rules []api.IPExclusion
-	if err := json.NewDecoder(listW.Body).Decode(&rules); err != nil {
+	if err := json.UnmarshalRead(listW.Body, &rules); err != nil {
 		t.Fatalf("decode list: %v", err)
 	}
 	if len(rules) != 1 || rules[0].Type != "country" || rules[0].CountryCode != "DE" {
@@ -974,7 +974,7 @@ func TestHandleResetSiteStatsSuccessClearsRowsAndAudits(t *testing.T) {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
 	}
 	var response api.SiteStatsResetResponse
-	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+	if err := json.UnmarshalRead(w.Body, &response); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if response.Status != "reset" || response.RowsCleared == 0 || response.ImportsMarkedDeleted != 1 {
@@ -1122,7 +1122,7 @@ func TestHandleGetSiteStatsIncludesPageModes(t *testing.T) {
 	}
 
 	var stats api.SiteStats
-	if err := json.NewDecoder(w.Body).Decode(&stats); err != nil {
+	if err := json.UnmarshalRead(w.Body, &stats); err != nil {
 		t.Fatalf("decode stats: %v", err)
 	}
 
@@ -1235,7 +1235,7 @@ func TestHandleGetSiteEcommerceSummary(t *testing.T) {
 	}
 
 	var summary api.EcommerceSummary
-	if err := json.NewDecoder(w.Body).Decode(&summary); err != nil {
+	if err := json.UnmarshalRead(w.Body, &summary); err != nil {
 		t.Fatalf("decode summary: %v", err)
 	}
 	if summary.Orders != 1 || summary.CheckoutStarts != 1 || summary.Revenue != 79 {
@@ -1272,7 +1272,7 @@ func TestHandleGetSiteWebVitalsSummary(t *testing.T) {
 	}
 
 	var summary []api.WebVitalSummaryMetric
-	if err := json.NewDecoder(w.Body).Decode(&summary); err != nil {
+	if err := json.UnmarshalRead(w.Body, &summary); err != nil {
 		t.Fatalf("decode summary: %v", err)
 	}
 	lcp := findWebVitalSummaryMetric(summary, api.WebVitalLCP)
@@ -1336,7 +1336,7 @@ func TestHandleGetSiteWebVitalsPagesSupportsFilters(t *testing.T) {
 	}
 
 	var rows []api.WebVitalPageRow
-	if err := json.NewDecoder(w.Body).Decode(&rows); err != nil {
+	if err := json.UnmarshalRead(w.Body, &rows); err != nil {
 		t.Fatalf("decode pages: %v", err)
 	}
 	if len(rows) != 1 || rows[0].Path != "/checkout" || rows[0].Rating != api.WebVitalRatingPoor {
@@ -1394,7 +1394,7 @@ func TestHandleGetSiteWebVitalsBreakdownReturnsVisitorContext(t *testing.T) {
 	}
 
 	var rows []api.WebVitalDimensionRow
-	if err := json.NewDecoder(w.Body).Decode(&rows); err != nil {
+	if err := json.UnmarshalRead(w.Body, &rows); err != nil {
 		t.Fatalf("decode breakdown: %v", err)
 	}
 	if len(rows) != 1 || rows[0].Name != "Chrome" || rows[0].Samples != 1 {
@@ -1460,7 +1460,7 @@ func TestHandleGetSiteEcommerceProductsSupportsItemFilter(t *testing.T) {
 	}
 
 	var products []api.EcommerceProductStat
-	if err := json.NewDecoder(w.Body).Decode(&products); err != nil {
+	if err := json.UnmarshalRead(w.Body, &products); err != nil {
 		t.Fatalf("decode products: %v", err)
 	}
 	if len(products) != 2 {
@@ -1790,7 +1790,7 @@ func TestHandleRenameSiteDomainSuccessUpdatesAndAudits(t *testing.T) {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
 	}
 	var response api.Site
-	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+	if err := json.UnmarshalRead(w.Body, &response); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if response.ID != site.ID || response.Domain != "rename-new.test" {
@@ -1878,7 +1878,7 @@ func TestHandleGetSiteSetupStateReportsRecordedSurfaces(t *testing.T) {
 	}
 
 	var state map[string]any
-	if err := json.NewDecoder(w.Body).Decode(&state); err != nil {
+	if err := json.UnmarshalRead(w.Body, &state); err != nil {
 		t.Fatalf("decode setup state: %v", err)
 	}
 	want := map[string]any{

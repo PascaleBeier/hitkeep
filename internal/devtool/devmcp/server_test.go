@@ -2,7 +2,6 @@ package devmcp
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -19,6 +18,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"hitkeep/internal/devtool"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mcptest"
 )
 
@@ -165,6 +165,21 @@ func TestCentralDeveloperMCPForwardsJSONProgressToken(t *testing.T) {
 	result, err = clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "hk_workspace_status", Arguments: map[string]any{}})
 	if err != nil || result.IsError {
 		t.Fatalf("transport did not survive progress-token call: %v %#v", err, result)
+	}
+}
+
+type progressTokenStringer string
+
+func (token progressTokenStringer) String() string { return string(token) }
+
+func TestDelegatedProgressTokenValidatesStringerAsJSONNumber(t *testing.T) {
+	if got, ok := delegatedProgressToken(progressTokenStringer("1.25e2")); !ok || got != "1.25e2" {
+		t.Fatalf("numeric stringer = (%v, %v), want (1.25e2, true)", got, ok)
+	}
+	for _, token := range []progressTokenStringer{"not-a-number", `"string"`, "1 2"} {
+		if got, ok := delegatedProgressToken(token); ok {
+			t.Fatalf("invalid numeric stringer %q = (%v, true), want rejected", token, got)
+		}
 	}
 }
 
@@ -444,7 +459,7 @@ func testRepository(t *testing.T) string {
 	if err := os.WriteFile(filepath.Join(root, "CONTRIBUTING.md"), []byte("# Contributing\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module hitkeep\n\ngo 1.26.6\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module hitkeep\n\ngo 1.27.0\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return root

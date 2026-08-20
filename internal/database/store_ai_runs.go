@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -11,6 +10,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 var ErrAIBudgetExhausted = errors.New("ai budget exhausted")

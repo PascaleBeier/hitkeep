@@ -3,7 +3,6 @@ package database
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"io"
 	"os"
 	"os/exec"
@@ -16,6 +15,8 @@ import (
 	"time"
 
 	"github.com/klauspost/compress/zstd"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 // TestLargeDefaultTenantSplitFixture is deliberately opt-in. It accepts a
@@ -276,7 +277,7 @@ func fixturePeakRSS() int64 {
 	if err := syscall.Getrusage(syscall.RUSAGE_SELF, usage); err != nil {
 		return 0
 	}
-	maxRSS := int64(usage.Maxrss)
+	maxRSS := usage.Maxrss
 	if maxRSS > 0 && runtime.GOOS == "linux" {
 		maxRSS *= 1024
 	}

@@ -1,12 +1,12 @@
 package user
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -32,7 +32,7 @@ func (h *handler) handleGetUserOnboarding() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(onboarding); err != nil {
+		if err := json.MarshalWrite(w, onboarding); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode user onboarding response", "error", err)
 		}
 	}

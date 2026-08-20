@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/md5" //nolint:gosec // Gravatar requires MD5 hashes for avatar lookups.
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -20,6 +19,7 @@ import (
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -317,7 +317,7 @@ func (h *handler) handleGetUserProfile() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
+		if err := json.MarshalWrite(w, resp); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode user profile", "error", err, "user_id", userID)
 		}
 	}
@@ -338,13 +338,7 @@ func (h *handler) handleUpdateUserProfile() http.HandlerFunc {
 		}
 
 		var req request
-		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&req); err != nil {
-			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
-			return
-		}
-		if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err := json.UnmarshalReadStrict(http.MaxBytesReader(w, r.Body, 1<<20), &req); err != nil {
 			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
 			return
 		}
@@ -405,7 +399,7 @@ func (h *handler) handleUpdateUserProfile() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
+		if err := json.MarshalWrite(w, resp); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode updated user profile", "error", err, "user_id", userID)
 		}
 	}
@@ -478,7 +472,7 @@ func (h *handler) handleGetUserPreferences() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(prefs); err != nil {
+		if err := json.MarshalWrite(w, prefs); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode user preferences", "error", err, "user_id", userID)
 		}
 	}
@@ -514,7 +508,7 @@ func (h *handler) handleGetCurrentIP() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
+		if err := json.MarshalWrite(w, resp); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode current IP response", "error", err)
 		}
 	}
@@ -529,13 +523,7 @@ func (h *handler) handleUpdateUserPreferences() http.HandlerFunc {
 		}
 
 		var payload api.UserPreferences
-		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&payload); err != nil {
-			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
-			return
-		}
-		if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err := json.UnmarshalReadStrict(http.MaxBytesReader(w, r.Body, 1<<20), &payload); err != nil {
 			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
 			return
 		}
@@ -553,7 +541,7 @@ func (h *handler) handleUpdateUserPreferences() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(prefs); err != nil {
+		if err := json.MarshalWrite(w, prefs); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode user preferences", "error", err, "user_id", userID)
 		}
 	}
@@ -611,7 +599,7 @@ func clampAvatarSize(raw string) int {
 }
 
 func displayNameFromEmail(email string) string {
-	local := strings.SplitN(strings.TrimSpace(email), "@", 2)[0]
+	local, _, _ := strings.Cut(strings.TrimSpace(email), "@")
 	if local == "" {
 		return "User"
 	}

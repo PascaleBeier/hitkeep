@@ -3,7 +3,6 @@ package sso
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -13,6 +12,8 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/coreos/go-oidc/v3/oidc/oidctest"
 	"golang.org/x/oauth2"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 func TestRelyingPartyBeginUsesPKCES256(t *testing.T) {
@@ -92,12 +93,13 @@ func TestRelyingPartyCompleteExchangesAndVerifiesIdentity(t *testing.T) {
 			})
 			rawIDToken := oidctest.SignIDToken(privateKey, "test-key", oidc.RS256, string(claims))
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]any{
+			_ = json.MarshalWrite(w, map[string]any{
 				"access_token": "ephemeral-access-token",
 				"token_type":   "Bearer",
 				"expires_in":   300,
 				"id_token":     rawIDToken,
 			})
+
 		default:
 			providerHandler.ServeHTTP(w, r)
 		}

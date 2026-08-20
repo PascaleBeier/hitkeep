@@ -3,7 +3,6 @@ package aifetch
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -19,6 +18,7 @@ import (
 	"hitkeep/internal/blocking"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -545,7 +545,7 @@ func TestHandleGetOverviewAndTimeseries(t *testing.T) {
 	}
 
 	var overview api.AIFetchOverview
-	if err := json.NewDecoder(overviewRec.Body).Decode(&overview); err != nil {
+	if err := json.UnmarshalRead(overviewRec.Body, &overview); err != nil {
 		t.Fatalf("decode overview: %v", err)
 	}
 	if overview.TotalRequests != 1 {
@@ -561,7 +561,7 @@ func TestHandleGetOverviewAndTimeseries(t *testing.T) {
 	}
 
 	var points []api.AIFetchSeriesPoint
-	if err := json.NewDecoder(seriesRec.Body).Decode(&points); err != nil {
+	if err := json.UnmarshalRead(seriesRec.Body, &points); err != nil {
 		t.Fatalf("decode timeseries: %v", err)
 	}
 	if len(points) == 0 {
@@ -611,7 +611,7 @@ func TestHandleGetCorrelation(t *testing.T) {
 	}
 
 	var report api.AIFetchCorrelationReport
-	if err := json.NewDecoder(rec.Body).Decode(&report); err != nil {
+	if err := json.UnmarshalRead(rec.Body, &report); err != nil {
 		t.Fatalf("decode correlation: %v", err)
 	}
 	if report.Summary.TotalFetches != 1 {

@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 
 	hitkeepcmd "hitkeep/cmd"
 )
@@ -22,7 +25,9 @@ func main() {
 		return
 	}
 	if len(os.Args) > 1 && os.Args[1] == "import" {
-		hitkeepcmd.Import(os.Args[2:])
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		hitkeepcmd.Import(ctx, os.Args[2:])
 		return
 	}
 	hitkeepcmd.Run(logger)

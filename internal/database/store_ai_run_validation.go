@@ -1,10 +1,11 @@
 package database
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 var rawPayloadPromptFields = map[string]bool{

@@ -3,7 +3,6 @@ package auth
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +14,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/socialauth"
@@ -68,7 +68,7 @@ func TestSocialProvidersExposeOnlyCompleteConfigurationAndGateSignup(t *testing.
 		} `json:"providers"`
 		SignupEnabled bool `json:"signup_enabled"`
 	}
-	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+	if err := json.UnmarshalRead(w.Body, &response); err != nil {
 		t.Fatalf("decode providers: %v", err)
 	}
 	if !response.SignupEnabled || len(response.Providers) != 2 || response.Providers[0].ID != "google" || response.Providers[1].ID != "microsoft" {
@@ -123,7 +123,7 @@ func TestSocialOAuthStateIsBoundToTheBrowserThatStartedAuthorization(t *testing.
 	var started struct {
 		AuthURL string `json:"auth_url"`
 	}
-	if err := json.NewDecoder(startResponse.Body).Decode(&started); err != nil {
+	if err := json.UnmarshalRead(startResponse.Body, &started); err != nil {
 		t.Fatalf("decode social start: %v", err)
 	}
 	authURL, err := url.Parse(started.AuthURL)
@@ -214,7 +214,7 @@ func TestSocialCloudSignupCreatesFreeAndPaidAccounts(t *testing.T) {
 				Status      string `json:"status"`
 				RedirectURL string `json:"redirect_url"`
 			}
-			if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+			if err := json.UnmarshalRead(w.Body, &response); err != nil {
 				t.Fatalf("decode social signup response: %v", err)
 			}
 			if response.Status != "ok" || response.RedirectURL != testCase.expectedRedirect {
@@ -318,7 +318,7 @@ func TestSocialLoginAutoLinksVerifiedEmailAndRequiresExistingMFA(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
 	}
 	var response socialCompleteResponse
-	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+	if err := json.UnmarshalRead(w.Body, &response); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if response.Status != "mfa_required" || response.ChallengeToken == "" || len(response.Factors) != 1 || response.Factors[0] != "totp" {
@@ -476,7 +476,7 @@ func TestSocialPreviewRequiresMicrosoftEmailConfirmationOnlyBeforeFirstLink(t *t
 			t.Fatalf("preview Microsoft identity: %d %s", w.Code, w.Body.String())
 		}
 		var response map[string]any
-		if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+		if err := json.UnmarshalRead(w.Body, &response); err != nil {
 			t.Fatalf("decode Microsoft preview: %v", err)
 		}
 		required, ok := response["email_confirmation_required"].(bool)

@@ -2,7 +2,6 @@ package opportunities
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	opportunitysvc "hitkeep/internal/opportunities"
 	"hitkeep/internal/realtime"
 	"hitkeep/internal/server/shared"
@@ -181,7 +181,7 @@ func (h *handler) handleUpdateStatus() http.HandlerFunc {
 			return
 		}
 		var req api.OpportunityStatusUpdateRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.UnmarshalRead(r.Body, &req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -405,7 +405,7 @@ func parseOptionalTime(raw string, fallback time.Time) (time.Time, error) {
 func writeJSON(ctx context.Context, w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(value); err != nil {
+	if err := json.MarshalWrite(w, value); err != nil {
 		shared.LoggerFromContext(ctx).Error("Failed to encode opportunities response", "error", err)
 	}
 }

@@ -1,9 +1,7 @@
 package sites
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"regexp"
@@ -16,6 +14,7 @@ import (
 	"hitkeep/internal/assetstore"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/webhooks"
 )
@@ -222,7 +221,7 @@ func (h *handler) handleGetSites() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(sites); err != nil {
+		if err := json.MarshalWrite(w, sites); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -253,7 +252,7 @@ func (h *handler) handleCreateSite() http.HandlerFunc {
 		}
 
 		var req request
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.UnmarshalRead(r.Body, &req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -312,7 +311,7 @@ func (h *handler) handleCreateSite() http.HandlerFunc {
 			Data:   map[string]any{"site_id": site.ID.String(), "domain": site.Domain},
 		})
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(site); err != nil {
+		if err := json.MarshalWrite(w, site); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -364,7 +363,7 @@ func (h *handler) handleDeleteSite() http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+		if err := json.MarshalWrite(w, map[string]string{"status": "ok"}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -399,8 +398,7 @@ func (h *handler) handleResetSiteStats() http.HandlerFunc {
 		}
 
 		var req api.SiteStatsResetRequest
-		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-		if err := decoder.Decode(&req); err != nil {
+		if err := json.UnmarshalRead(http.MaxBytesReader(w, r.Body, 1<<20), &req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -450,7 +448,7 @@ func (h *handler) handleResetSiteStats() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(result); err != nil {
+		if err := json.MarshalWrite(w, result); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -485,7 +483,7 @@ func (h *handler) handleRenameSiteDomain() http.HandlerFunc {
 		}
 
 		var req request
-		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&req); err != nil {
+		if err := json.UnmarshalRead(http.MaxBytesReader(w, r.Body, 1<<20), &req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -549,7 +547,7 @@ func (h *handler) handleRenameSiteDomain() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(site); err != nil {
+		if err := json.MarshalWrite(w, site); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -581,7 +579,7 @@ func (h *handler) handleUpdateSiteRetention() http.HandlerFunc {
 		}
 
 		var req request
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.UnmarshalRead(r.Body, &req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -653,13 +651,7 @@ func (h *handler) handleTransferSiteTeam() http.HandlerFunc {
 		}
 
 		var req request
-		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&req); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
-			return
-		}
-		if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err := json.UnmarshalReadStrict(http.MaxBytesReader(w, r.Body, 1<<20), &req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -709,7 +701,7 @@ func (h *handler) handleTransferSiteTeam() http.HandlerFunc {
 		h.refreshIPFilter(r.Context())
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]any{
+		if err := json.MarshalWrite(w, map[string]any{
 			"status":              "ok",
 			"site_id":             siteID,
 			"source_team_id":      sourceTeamID,

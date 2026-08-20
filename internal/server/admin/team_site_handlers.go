@@ -2,7 +2,6 @@ package admin
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -17,6 +16,7 @@ import (
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
 	serverauth "hitkeep/internal/server/auth"
@@ -39,7 +39,7 @@ func (h *handler) handleAdminListTeams() http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(teams); err != nil {
+		if err := json.MarshalWrite(w, teams); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode teams response", "error", err)
 		}
 	}
@@ -74,7 +74,7 @@ func (h *handler) handleAdminArchiveTeam() http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+		if err := json.MarshalWrite(w, map[string]string{"status": "ok"}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode archive team response", "error", err)
 		}
 	}
@@ -180,7 +180,7 @@ func (h *handler) handleAdminDeleteTeam() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(api.AdminDeleteTeamResponse{
+		if err := json.MarshalWrite(w, api.AdminDeleteTeamResponse{
 			Status: "ok",
 			TeamID: deleted.ID,
 			Name:   deleted.Name,
@@ -223,7 +223,7 @@ func (h *handler) handleAdminListSites() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(sites); err != nil {
+		if err := json.MarshalWrite(w, sites); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -246,7 +246,7 @@ func (h *handler) handleAdminDeleteSite() http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+		if err := json.MarshalWrite(w, map[string]string{"status": "ok"}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -269,7 +269,7 @@ func (h *handler) handleGetSiteMembers() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(members); err != nil {
+		if err := json.MarshalWrite(w, members); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -290,7 +290,7 @@ func (h *handler) handleAddSiteMember() http.HandlerFunc {
 		}
 
 		var req request
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.UnmarshalRead(r.Body, &req); err != nil {
 			http.Error(w, "Invalid request", http.StatusBadRequest)
 			return
 		}
@@ -391,7 +391,7 @@ func (h *handler) handleAddSiteMember() http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+		if err := json.MarshalWrite(w, map[string]string{"status": "ok"}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -613,7 +613,7 @@ func (h *handler) handleRemoveSiteMember() http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+		if err := json.MarshalWrite(w, map[string]string{"status": "ok"}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}

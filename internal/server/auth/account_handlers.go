@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -15,6 +14,7 @@ import (
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
@@ -28,7 +28,7 @@ func (h *handler) handleForgotPassword() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req request
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.UnmarshalRead(r.Body, &req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -42,7 +42,7 @@ func (h *handler) handleForgotPassword() http.HandlerFunc {
 
 		if user == nil {
 			w.WriteHeader(http.StatusOK)
-			if err := json.NewEncoder(w).Encode(map[string]string{"message": "If an account exists, a reset link has been sent."}); err != nil {
+			if err := json.MarshalWrite(w, map[string]string{"message": "If an account exists, a reset link has been sent."}); err != nil {
 				shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 			}
 			return
@@ -69,7 +69,7 @@ func (h *handler) handleForgotPassword() http.HandlerFunc {
 		shared.LoggerFromContext(r.Context()).Info("Password reset requested", "user_id", user.ID)
 
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(map[string]string{"message": "If an account exists, a reset link has been sent."}); err != nil {
+		if err := json.MarshalWrite(w, map[string]string{"message": "If an account exists, a reset link has been sent."}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -84,7 +84,7 @@ func (h *handler) handleResetPassword() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req request
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.UnmarshalRead(r.Body, &req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -116,7 +116,7 @@ func (h *handler) handleResetPassword() http.HandlerFunc {
 		shared.LoggerFromContext(r.Context()).Info("Password reset successful")
 
 		w.WriteHeader(http.StatusOK)
-		err = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "Password updated successfully"})
+		err = json.MarshalWrite(w, map[string]string{"status": "ok", "message": "Password updated successfully"})
 		if err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to complete password reset", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -133,7 +133,7 @@ func (h *handler) handleAcceptInvite() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req request
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.UnmarshalRead(r.Body, &req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -208,7 +208,7 @@ func (h *handler) handleAcceptInvite() http.HandlerFunc {
 			shared.LoggerFromContext(r.Context()).Info("Invite accepted by existing user", "user_id", authenticatedUser.ID)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			if err := json.NewEncoder(w).Encode(loginResponse{Status: "ok"}); err != nil {
+			if err := json.MarshalWrite(w, loginResponse{Status: "ok"}); err != nil {
 				shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 			}
 			return
@@ -261,7 +261,7 @@ func (h *handler) handleAcceptInvite() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(loginResponse{Status: "ok"}); err != nil {
+		if err := json.MarshalWrite(w, loginResponse{Status: "ok"}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -353,7 +353,7 @@ func (h *handler) handleChangePassword() http.HandlerFunc {
 		}
 
 		var req request
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.UnmarshalRead(r.Body, &req); err != nil {
 			http.Error(w, "Invalid request", http.StatusBadRequest)
 			return
 		}
@@ -400,7 +400,7 @@ func (h *handler) handleChangePassword() http.HandlerFunc {
 
 		shared.LoggerFromContext(r.Context()).Info("User changed password", "user_id", userID)
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		_ = json.MarshalWrite(w, map[string]string{"status": "ok"})
 	}
 }
 
@@ -442,6 +442,6 @@ func (h *handler) handleLogout() http.HandlerFunc {
 			h.appendAuthAuditForUserTeams(r, userID, "auth.logout", "success", "User logged out", true)
 		}
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		_ = json.MarshalWrite(w, map[string]string{"status": "ok"})
 	}
 }

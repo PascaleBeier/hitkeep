@@ -3,7 +3,6 @@ package auth
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -20,6 +19,7 @@ import (
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/security"
 	"hitkeep/internal/server/shared"
@@ -109,7 +109,7 @@ func TestHandleCreateInitialUser(t *testing.T) {
 	}
 
 	var resp map[string]string
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 	if resp["token"] == "" {
@@ -492,7 +492,7 @@ func TestHandleGetSession(t *testing.T) {
 	}
 
 	var resp api.AuthSession
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if resp.DurationSeconds != 1800 {
@@ -538,7 +538,7 @@ func TestHandleGetSessionReflectsRememberMe(t *testing.T) {
 	}
 
 	var resp api.AuthSession
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if !resp.Remembered {
@@ -574,7 +574,7 @@ func TestHandleExtendSessionIssuesConfiguredCookie(t *testing.T) {
 	}
 
 	var resp api.AuthSession
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if resp.DurationSeconds != 1800 || resp.WarningSeconds != 90 {
@@ -618,7 +618,7 @@ func TestHandleExtendSessionRenewsRememberMeCookie(t *testing.T) {
 	}
 
 	var resp api.AuthSession
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if !resp.Remembered || resp.RememberExpiresAt == nil {
@@ -756,7 +756,7 @@ func TestHandleLoginIncludesEmailLinkFactorWhenMailerConfigured(t *testing.T) {
 	}
 
 	var resp loginResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode login response: %v", err)
 	}
 	if !containsFactor(resp.Factors, "email_link") {
@@ -799,7 +799,7 @@ func TestHandleMFAEmailLinkRequestAndVerify(t *testing.T) {
 	}
 
 	var loginResp loginResponse
-	if err := json.NewDecoder(loginW.Body).Decode(&loginResp); err != nil {
+	if err := json.UnmarshalRead(loginW.Body, &loginResp); err != nil {
 		t.Fatalf("decode login response: %v", err)
 	}
 	if !containsFactor(loginResp.Factors, "email_link") || loginResp.ChallengeToken == "" {
@@ -958,7 +958,7 @@ func TestHandlePasskeyLogin(t *testing.T) {
 	}
 
 	var startResp passkeyLoginStartResponse
-	if err := json.NewDecoder(startW.Body).Decode(&startResp); err != nil {
+	if err := json.UnmarshalRead(startW.Body, &startResp); err != nil {
 		t.Fatalf("failed to decode passkey start response: %v", err)
 	}
 	if startResp.ChallengeToken == "" || len(startResp.PublicKey.Challenge) == 0 {
@@ -1039,7 +1039,7 @@ func TestHandlePasskeyLoginWithLegacyStoredCredential(t *testing.T) {
 	}
 
 	var startResp passkeyLoginStartResponse
-	if err := json.NewDecoder(startW.Body).Decode(&startResp); err != nil {
+	if err := json.UnmarshalRead(startW.Body, &startResp); err != nil {
 		t.Fatalf("failed to decode passkey start response: %v", err)
 	}
 
@@ -1096,7 +1096,7 @@ func TestHandlePasskeyLoginWithLegacyStoredCredentialAndBackupFlags(t *testing.T
 	}
 
 	var startResp passkeyLoginStartResponse
-	if err := json.NewDecoder(startW.Body).Decode(&startResp); err != nil {
+	if err := json.UnmarshalRead(startW.Body, &startResp); err != nil {
 		t.Fatalf("failed to decode passkey start response: %v", err)
 	}
 
@@ -1158,7 +1158,7 @@ func TestHandlePasskeyLoginRejectsMissingUserVerification(t *testing.T) {
 	}
 
 	var startResp passkeyLoginStartResponse
-	if err := json.NewDecoder(startW.Body).Decode(&startResp); err != nil {
+	if err := json.UnmarshalRead(startW.Body, &startResp); err != nil {
 		t.Fatalf("failed to decode passkey start response: %v", err)
 	}
 
@@ -1220,7 +1220,7 @@ func TestHandleLoginMFARequiredWithTOTPOnly(t *testing.T) {
 	}
 
 	var resp loginResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("failed to decode login response: %v", err)
 	}
 	if resp.Status != "mfa_required" {
@@ -1278,7 +1278,7 @@ func TestHandleLoginMFARequiredWithPasskeyOnly(t *testing.T) {
 	}
 
 	var resp loginResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("failed to decode login response: %v", err)
 	}
 	if resp.Status != "mfa_required" {
@@ -1333,7 +1333,7 @@ func TestHandleMFATOTPVerify(t *testing.T) {
 	}
 
 	var loginResp loginResponse
-	if err := json.NewDecoder(loginW.Body).Decode(&loginResp); err != nil {
+	if err := json.UnmarshalRead(loginW.Body, &loginResp); err != nil {
 		t.Fatalf("failed to decode login response: %v", err)
 	}
 	if loginResp.Status != "mfa_required" || loginResp.ChallengeToken == "" {
@@ -1358,7 +1358,7 @@ func TestHandleMFATOTPVerify(t *testing.T) {
 	}
 
 	var verifyResp loginResponse
-	if err := json.NewDecoder(verifyW.Body).Decode(&verifyResp); err != nil {
+	if err := json.UnmarshalRead(verifyW.Body, &verifyResp); err != nil {
 		t.Fatalf("failed to decode mfa verify response: %v", err)
 	}
 	if verifyResp.Status != "ok" {
@@ -1416,7 +1416,7 @@ func TestHandleMFATOTPVerifyKeepsChallengeAfterInvalidCode(t *testing.T) {
 	}
 
 	var loginResp loginResponse
-	if err := json.NewDecoder(loginW.Body).Decode(&loginResp); err != nil {
+	if err := json.UnmarshalRead(loginW.Body, &loginResp); err != nil {
 		t.Fatalf("failed to decode login response: %v", err)
 	}
 	if loginResp.Status != "mfa_required" || loginResp.ChallengeToken == "" {
@@ -1503,7 +1503,7 @@ func TestHandleMFAPasskeyLoginFinish(t *testing.T) {
 	}
 
 	var loginResp loginResponse
-	if err := json.NewDecoder(loginW.Body).Decode(&loginResp); err != nil {
+	if err := json.UnmarshalRead(loginW.Body, &loginResp); err != nil {
 		t.Fatalf("failed to decode login response: %v", err)
 	}
 	if loginResp.Status != "mfa_required" || loginResp.ChallengeToken == "" {
@@ -1613,7 +1613,7 @@ func TestHandleAcceptInviteActivatesPendingTeamInvite(t *testing.T) {
 		t.Fatalf("expected auth cookie to be set after accepting invite")
 	}
 	var resp loginResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode invite acceptance response: %v", err)
 	}
 	if resp.Status != "ok" {
@@ -1723,7 +1723,7 @@ func TestHandleAcceptInviteLetsExistingAuthenticatedUserAcceptWithoutPassword(t 
 	}
 
 	var resp loginResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode invite acceptance response: %v", err)
 	}
 	if resp.Status != "ok" {
@@ -1951,7 +1951,7 @@ func TestHandleLoginIncludesRecoveryCodeFactor(t *testing.T) {
 	}
 
 	var resp loginResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode login response: %v", err)
 	}
 	if resp.Status != "mfa_required" {
@@ -2015,7 +2015,7 @@ func TestHandleMFARecoveryCodeVerify(t *testing.T) {
 	}
 
 	var loginResp loginResponse
-	if err := json.NewDecoder(loginW.Body).Decode(&loginResp); err != nil {
+	if err := json.UnmarshalRead(loginW.Body, &loginResp); err != nil {
 		t.Fatalf("decode login response: %v", err)
 	}
 	if loginResp.ChallengeToken == "" {

@@ -401,8 +401,7 @@ func prepareDefaultTenantFile(ctx context.Context, sharedPath, finalPath, workPa
 	plans := make([]splitCopyPlan, 0, len(tables))
 	// orderChildrenFirst returns children before their parents. Copy in the
 	// opposite direction so tenant foreign keys are satisfied.
-	for i := len(tables) - 1; i >= 0; i-- {
-		table := tables[i]
+	for _, table := range slices.Backward(tables) {
 		targetColumns, err := listCatalogColumns(ctx, worker, "split_target", table)
 		if err != nil {
 			return err

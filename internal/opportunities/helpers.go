@@ -1,13 +1,13 @@
 package opportunities
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	json "hitkeep/internal/jsonapi"
 )
 
 func safeJSON(value any) (string, error) {

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,11 +16,11 @@ func TestProductionBuildsExcludeDeveloperPlatform(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := app.ValidateProductionBoundary(context.Background()); err != nil {
+	if err := app.ValidateProductionBoundary(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 
-	command := exec.Command("go", "list", "-deps", "./cmd/hk")
+	command := exec.CommandContext(t.Context(), "go", "list", "-deps", "./cmd/hk")
 	command.Dir = root
 	output, err := command.Output()
 	if err != nil {

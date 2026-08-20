@@ -2,7 +2,6 @@ package opportunities
 
 import (
 	"context"
-	"encoding/json"
 	"slices"
 	"strings"
 	"testing"
@@ -12,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	json "hitkeep/internal/jsonapi"
 )
 
 func TestBuildSetupEvidenceSnapshotIncludesConfiguredAndAggregateSignals(t *testing.T) {

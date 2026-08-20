@@ -2,7 +2,6 @@ package ai
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -16,6 +15,8 @@ import (
 	"github.com/google/uuid"
 	goaisdk "github.com/zendev-sh/goai"
 	"github.com/zendev-sh/goai/provider"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 type AskAIRequest struct {
@@ -496,8 +497,8 @@ func finalizeAskAIGeneration(result *goaisdk.ObjectResult[AskAIOutput], usage Us
 }
 
 func strictAskAIResult(result *goaisdk.ObjectResult[AskAIOutput]) (AskAIOutput, error) {
-	for i := len(result.Steps) - 1; i >= 0; i-- {
-		if text := strings.TrimSpace(result.Steps[i].Text); text != "" {
+	for _, v := range slices.Backward(result.Steps) {
+		if text := strings.TrimSpace(v.Text); text != "" {
 			return decodeAskAIOutputText(text)
 		}
 	}
@@ -531,8 +532,8 @@ func decodeAskAIOutputText(text string) (AskAIOutput, error) {
 	if start := strings.Index(text, "{"); start > 0 {
 		text = text[start:]
 	}
-	if end := strings.LastIndex(text, "}"); end >= 0 && end < len(text)-1 {
-		text = text[:end+1]
+	if before, after, ok := strings.CutLast(text, "}"); ok && after != "" {
+		text = before + "}"
 	}
 	var output AskAIOutput
 	if err := json.Unmarshal([]byte(text), &output); err != nil {

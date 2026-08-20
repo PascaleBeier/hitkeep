@@ -1,7 +1,6 @@
 package aifetch
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -18,6 +17,7 @@ import (
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/blocking"
 	"hitkeep/internal/exportfmt"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/realtime"
 	"hitkeep/internal/server/shared"
 )
@@ -173,7 +173,7 @@ func (h *handler) handleCreateAIFetch() http.HandlerFunc {
 
 		r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 		var payload ingestPayload
-		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		if err := json.UnmarshalRead(r.Body, &payload); err != nil {
 			h.recordRejection()
 			http.Error(w, "Bad request body", http.StatusBadRequest)
 			return
@@ -297,7 +297,7 @@ func (h *handler) handleGetOverview() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(result)
+		_ = json.MarshalWrite(w, result)
 	}
 }
 
@@ -325,7 +325,7 @@ func (h *handler) handleGetTimeseries() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(result)
+		_ = json.MarshalWrite(w, result)
 	}
 }
 
@@ -353,7 +353,7 @@ func (h *handler) handleGetCorrelation() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(result)
+		_ = json.MarshalWrite(w, result)
 	}
 }
 

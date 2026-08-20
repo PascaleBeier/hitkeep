@@ -2,7 +2,6 @@ package admin
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -13,6 +12,7 @@ import (
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/webhooks"
 )
@@ -183,7 +183,7 @@ func (h *handler) handleListUsers() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(users); err != nil {
+		if err := json.MarshalWrite(w, users); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -204,7 +204,7 @@ func (h *handler) handleListInstanceExclusions() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(rules); err != nil {
+		if err := json.MarshalWrite(w, rules); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode instance exclusions response", "error", err)
 		}
 	}
@@ -255,7 +255,7 @@ func (h *handler) handleCreateInstanceExclusion() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(createdRule); err != nil {
+		if err := json.MarshalWrite(w, createdRule); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode instance exclusion response", "error", err)
 		}
 	}
@@ -391,7 +391,7 @@ func (h *handler) handleDisableUser2FA() http.HandlerFunc {
 		)
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(api.AdminDisableUserMFAResponse{
+		if err := json.MarshalWrite(w, api.AdminDisableUserMFAResponse{
 			Status:              "ok",
 			TOTPDisabled:        result.TOTPDisabled,
 			PasskeysDeleted:     result.PasskeysDeleted,
@@ -416,7 +416,7 @@ func (h *handler) handleUpdateUserRole() http.HandlerFunc {
 		}
 
 		var req request
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.UnmarshalRead(r.Body, &req); err != nil {
 			http.Error(w, "Invalid request", http.StatusBadRequest)
 			return
 		}
@@ -453,7 +453,7 @@ func (h *handler) handleUpdateUserRole() http.HandlerFunc {
 		})
 
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+		if err := json.MarshalWrite(w, map[string]string{"status": "ok"}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -536,8 +536,7 @@ func (h *handler) handleDeleteUser() http.HandlerFunc {
 
 		err = h.ctx.Store.DeleteUser(r.Context(), targetUserID)
 		if err != nil {
-			var ownsTeamsErr *database.UserOwnsTeamsError
-			if errors.As(err, &ownsTeamsErr) {
+			if ownsTeamsErr, ok := errors.AsType[*database.UserOwnsTeamsError](err); ok {
 				writeDeleteUserBlocked(r.Context(), w, targetUserID, ownsTeamsErr.Teams)
 				return
 			}
@@ -551,7 +550,7 @@ func (h *handler) handleDeleteUser() http.HandlerFunc {
 		})
 
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+		if err := json.MarshalWrite(w, map[string]string{"status": "ok"}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -560,7 +559,7 @@ func (h *handler) handleDeleteUser() http.HandlerFunc {
 func writeDeleteUserBlocked(ctx context.Context, w http.ResponseWriter, targetUserID uuid.UUID, teams []api.Team) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusConflict)
-	if encodeErr := json.NewEncoder(w).Encode(api.AdminDeleteUserBlockedResponse{
+	if encodeErr := json.MarshalWrite(w, api.AdminDeleteUserBlockedResponse{
 		Status:  "error",
 		Code:    "user_owns_teams",
 		Message: "Transfer ownership before deleting this user, or use ?force=true to archive their teams.",

@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -24,6 +23,7 @@ import (
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -61,7 +61,7 @@ func TestAskAIRejectsDisabledFeatureWithSafeStatus(t *testing.T) {
 		t.Fatalf("expected disabled feature status %d, got %d: %s", http.StatusConflict, rec.Code, rec.Body.String())
 	}
 	var status api.AskAIStatus
-	if err := json.NewDecoder(rec.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(rec.Body, &status); err != nil {
 		t.Fatalf("decode status: %v", err)
 	}
 	if status.Enabled || status.Available || status.Status != "disabled" {
@@ -154,7 +154,7 @@ func TestAskAIHistoryListsSafeRunsForHumanSession(t *testing.T) {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
 	}
 	var response api.AskAIHistoryResponse
-	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+	if err := json.UnmarshalRead(rec.Body, &response); err != nil {
 		t.Fatalf("decode history response: %v", err)
 	}
 	if response.Total != 1 || len(response.Entries) != 1 || response.Entries[0].RunID != runID.String() {
@@ -261,7 +261,7 @@ func TestAskAIHumanSessionUsesScopedToolsAndSkills(t *testing.T) {
 	}
 
 	var response api.AskAIResponse
-	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+	if err := json.UnmarshalRead(rec.Body, &response); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if response.AnswerMarkdown == "" || len(response.Actions) != 1 || response.Actions[0].Target != "/events" {

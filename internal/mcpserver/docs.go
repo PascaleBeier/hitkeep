@@ -1,13 +1,14 @@
 package mcpserver
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -110,11 +111,11 @@ func (c *docsClient) Search(ctx context.Context, query string, limit int) ([]doc
 		}
 	}
 
-	sort.SliceStable(results, func(i, j int) bool {
-		if results[i].Score == results[j].Score {
-			return results[i].Path < results[j].Path
+	slices.SortStableFunc(results, func(left, right docSearchResult) int {
+		if left.Score == right.Score {
+			return cmp.Compare(left.Path, right.Path)
 		}
-		return results[i].Score > results[j].Score
+		return cmp.Compare(right.Score, left.Score)
 	})
 	return limitSlice(results, limit), nil
 }
@@ -301,9 +302,8 @@ func titleFromMarkdown(markdown, fallback string) string {
 
 func pathBase(path string) string {
 	path = strings.TrimRight(path, "/")
-	idx := strings.LastIndex(path, "/")
-	if idx >= 0 {
-		return path[idx+1:]
+	if _, base, ok := strings.CutLast(path, "/"); ok {
+		return base
 	}
 	return path
 }

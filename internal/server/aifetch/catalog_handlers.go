@@ -1,12 +1,12 @@
 package aifetch
 
 import (
-	"encoding/json"
 	"net/http"
 	"sync"
 
 	"hitkeep/internal/aianalytics"
 	"hitkeep/internal/api"
+	json "hitkeep/internal/jsonapi"
 )
 
 // aiAgentCatalog derives the dashboard-facing catalog from the embedded AI

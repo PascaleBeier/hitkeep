@@ -1,9 +1,10 @@
 package api
 
 import (
-	"encoding/json"
 	"testing"
 	"time"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 func TestGoogleSearchConsoleSyncStatusImportedDatesEncodeAsDateOnly(t *testing.T) {

@@ -23,13 +23,7 @@ var (
 func (f *databaseFixture) build(t *testing.T, migrate func(*Store) error) {
 	t.Helper()
 	f.once.Do(func() {
-		dir, err := os.MkdirTemp("", "hitkeep-database-fixture-")
-		if err != nil {
-			f.err = err
-			return
-		}
-		defer os.RemoveAll(dir)
-
+		dir := t.TempDir()
 		path := filepath.Join(dir, "fixture.db")
 		store := NewStore(path, WithThreads(1), WithCheckpointInterval(0))
 		if err := store.Connect(); err != nil {

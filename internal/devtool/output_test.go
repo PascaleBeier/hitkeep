@@ -23,6 +23,7 @@ func TestAgentOptimizedCommandUsesSupportedStructuredFlags(t *testing.T) {
 		{name: "staticcheck", in: []string{"go", "run", "honnef.co/go/tools/cmd/staticcheck@v1", "./..."}, want: []string{"go", "run", "honnef.co/go/tools/cmd/staticcheck@v1", "-f=json", "./..."}},
 		{name: "govulncheck", in: []string{"go", "run", "golang.org/x/vuln/cmd/govulncheck@v1", "./..."}, want: []string{"go", "run", "golang.org/x/vuln/cmd/govulncheck@v1", "-format=json", "./..."}},
 		{name: "golangci", in: []string{"golangci-lint", "run"}, want: []string{"golangci-lint", "run", "--output.text.path=", "--output.json.path=stdout", "--show-stats=false", "--color=never"}},
+		{name: "golangci via go run", in: []string{"go", "run", "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2", "run"}, want: []string{"go", "run", "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2", "run", "--output.text.path=", "--output.json.path=stdout", "--show-stats=false", "--color=never"}},
 		{name: "zizmor", in: []string{"zizmor", ".github"}, want: []string{"zizmor", ".github", "--format=json", "--no-progress", "--color=never"}},
 		{name: "buildx", in: []string{"docker", "buildx", "build", "."}, want: []string{"docker", "buildx", "build", ".", "--progress=rawjson"}},
 		{name: "compose", in: []string{"docker", "compose", "up", "-d"}, want: []string{"docker", "compose", "--progress=json", "up", "-d"}},
@@ -56,7 +57,7 @@ func TestCatalogAdvertisesAgentCommandWhenItDiffers(t *testing.T) {
 
 func TestRunCommandAppliesAgentArgumentsAndEnvironment(t *testing.T) {
 	workspace := t.TempDir()
-	if output, err := exec.Command("git", "init", "--quiet", workspace).CombinedOutput(); err != nil {
+	if output, err := exec.CommandContext(t.Context(), "git", "init", "--quiet", workspace).CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v: %s", err, output)
 	}
 	fakeGo := filepath.Join(t.TempDir(), "go")

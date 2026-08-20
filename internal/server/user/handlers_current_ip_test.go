@@ -1,10 +1,11 @@
 package user
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 func TestGetCurrentIPIPv4(t *testing.T) {
@@ -24,7 +25,7 @@ func TestGetCurrentIPIPv4(t *testing.T) {
 		IP   string `json:"ip"`
 		CIDR string `json:"cidr"`
 	}
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 
@@ -53,7 +54,7 @@ func TestGetCurrentIPIPv6(t *testing.T) {
 		IP   string `json:"ip"`
 		CIDR string `json:"cidr"`
 	}
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 

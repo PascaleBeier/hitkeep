@@ -8,7 +8,7 @@ import (
 	"math/big"
 	"net/netip"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -110,7 +110,7 @@ func readGeoRecords(inputs []CSVInput) ([]geoRecord, error) {
 		}
 		records = append(records, next...)
 	}
-	sort.Slice(records, func(i, j int) bool { return records[i].first.Compare(records[j].first) < 0 })
+	slices.SortFunc(records, func(left, right geoRecord) int { return left.first.Compare(right.first) })
 	return records, nil
 }
 
@@ -131,7 +131,7 @@ func readNetworkRecords(inputs []CSVInput) ([]networkRecord, error) {
 		}
 		records = append(records, next...)
 	}
-	sort.Slice(records, func(i, j int) bool { return records[i].first.Compare(records[j].first) < 0 })
+	slices.SortFunc(records, func(left, right networkRecord) int { return left.first.Compare(right.first) })
 	return records, nil
 }
 

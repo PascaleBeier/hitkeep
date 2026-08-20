@@ -4,7 +4,6 @@ package cloud
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
@@ -18,6 +17,7 @@ import (
 	"hitkeep/internal/appurl"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/localization"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
@@ -198,7 +198,7 @@ func (h *handler) handleSignup() http.HandlerFunc {
 		}
 
 		var req signupRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.UnmarshalRead(r.Body, &req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -284,7 +284,7 @@ func (h *handler) handleSignup() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
+		if err := json.MarshalWrite(w, resp); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode cloud signup response", "error", err)
 		}
 	}
@@ -302,7 +302,7 @@ func (h *handler) handleResendSignupVerification() http.HandlerFunc {
 		}
 
 		var req resendSignupVerificationRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.UnmarshalRead(r.Body, &req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -337,7 +337,7 @@ func signupVerificationLink(publicURL, token string) string {
 func writeResendSignupVerificationAccepted(ctx context.Context, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
-	if err := json.NewEncoder(w).Encode(resendSignupVerificationResponse{
+	if err := json.MarshalWrite(w, resendSignupVerificationResponse{
 		Status:            "accepted",
 		RetryAfterSeconds: int(database.PendingSignupVerificationResendCooldown / time.Second),
 	}); err != nil {
@@ -461,7 +461,7 @@ func (h *handler) handleListCloudPlans() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(plans); err != nil {
+		if err := json.MarshalWrite(w, plans); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode cloud plans response", "error", err)
 		}
 	}

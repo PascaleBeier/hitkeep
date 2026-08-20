@@ -1,7 +1,6 @@
 package smokegate
 
 import (
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
@@ -11,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	json "hitkeep/internal/jsonapi"
 )
 
 type Report struct {

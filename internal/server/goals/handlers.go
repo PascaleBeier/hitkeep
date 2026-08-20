@@ -2,7 +2,6 @@ package goals
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
@@ -14,6 +13,7 @@ import (
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/realtime"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/webhooks"
@@ -108,7 +108,7 @@ func (h *handler) handleListDefinitions(
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(definitions); err != nil {
+		if err := json.MarshalWrite(w, definitions); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -180,7 +180,7 @@ func (h *handler) handleCreateGoal() http.HandlerFunc {
 		}
 
 		var req api.Goal
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.UnmarshalRead(r.Body, &req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -252,7 +252,7 @@ func (h *handler) handleUpdateGoal() http.HandlerFunc {
 			return
 		}
 		var input api.Goal
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		if err := json.UnmarshalRead(r.Body, &input); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -285,7 +285,7 @@ func (h *handler) handleUpdateGoal() http.HandlerFunc {
 			},
 		})
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(input)
+		_ = json.MarshalWrite(w, input)
 	}
 }
 
@@ -352,7 +352,7 @@ func (h *handler) handleTimeseries(
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(series); err != nil {
+		if err := json.MarshalWrite(w, series); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -402,7 +402,7 @@ func (h *handler) handleCreateFunnel() http.HandlerFunc {
 		}
 
 		var req api.Funnel
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.UnmarshalRead(r.Body, &req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -446,7 +446,7 @@ func (h *handler) handleUpdateFunnel() http.HandlerFunc {
 		}
 
 		var input api.Funnel
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		if err := json.UnmarshalRead(r.Body, &input); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -474,7 +474,7 @@ func (h *handler) handleUpdateFunnel() http.HandlerFunc {
 
 		h.publishDefinitionChange(siteID, realtime.KindFunnels)
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(input); err != nil {
+		if err := json.MarshalWrite(w, input); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -578,7 +578,7 @@ func (h *handler) handleGetFunnelStats() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(stats); err != nil {
+		if err := json.MarshalWrite(w, stats); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}

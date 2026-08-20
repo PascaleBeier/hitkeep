@@ -2,6 +2,7 @@ package devtool
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,10 +10,33 @@ import (
 	"time"
 )
 
+func TestWorkspacePropagatesCallerContextToDevProbe(t *testing.T) {
+	root := initTestRepository(t)
+	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	app, err := NewApp(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	var probeErr error
+	app.devProbe = func(ctx context.Context) []DevService {
+		probeErr = ctx.Err()
+		return nil
+	}
+	if _, err := app.Workspace(ctx); err != nil {
+		t.Fatalf("workspace status: %v", err)
+	}
+	if !errors.Is(probeErr, context.Canceled) {
+		t.Fatalf("dev probe context error = %v, want canceled", probeErr)
+	}
+}
+
 func TestDoctorRequiresDockerComposeForDevelopment(t *testing.T) {
 	root := initTestRepository(t)
 	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
-	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.test\n\ngo 1.26.6\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.test\n\ngo 1.27.0\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	dashboard := filepath.Join(root, "frontend", "dashboard")
@@ -32,7 +56,7 @@ func TestDoctorRequiresDockerComposeForDevelopment(t *testing.T) {
 	fakeBin := t.TempDir()
 	commands := map[string]string{
 		"git":  "git version 2.50.0",
-		"go":   "go version go1.26.6 test/arch",
+		"go":   "go version go1.27.0 test/arch",
 		"node": "v24.19.0",
 		"npm":  "12.0.2",
 		"cc":   "cc 1.0",
@@ -61,13 +85,13 @@ func TestDoctorBoundsSlowChecksAndRunsThemInParallel(t *testing.T) {
 		t.Fatal(err)
 	}
 	fakeBin := t.TempDir()
-	if err := os.WriteFile(filepath.Join(fakeBin, "docker"), []byte("#!/bin/sh\n/bin/sleep 10\n"), 0o700); err != nil {
+	if err := os.WriteFile(filepath.Join(fakeBin, "docker"), []byte("#!/bin/sh\n/bin/sleep 30\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", fakeBin)
 	started := time.Now()
 	report := app.Doctor(context.Background())
-	if elapsed := time.Since(started); elapsed > 7*time.Second {
+	if elapsed := time.Since(started); elapsed > doctorCommandTimeout+5*time.Second {
 		t.Fatalf("parallel bounded doctor took %s", elapsed)
 	}
 	for _, name := range []string{"docker", "compose", "buildx"} {
@@ -117,11 +141,10 @@ func TestDoctorUsesManagedToolchainsWithoutHostGoOrNode(t *testing.T) {
 	}
 	fakeBin := t.TempDir()
 	hostCommands := map[string]string{
-		"git":           "git version 2.50.0",
-		"cc":            "cc 1.0",
-		"docker":        "27.0.0",
-		"golangci-lint": ToolVersion("golangci-lint"),
-		"zizmor":        ToolVersion("zizmor"),
+		"git":    "git version 2.50.0",
+		"cc":     "cc 1.0",
+		"docker": "27.0.0",
+		"zizmor": ToolVersion("zizmor"),
 	}
 	for name, output := range hostCommands {
 		if err := os.WriteFile(filepath.Join(fakeBin, name), []byte("#!/bin/sh\nprintf '%s\\n' '"+output+"'\n"), 0o700); err != nil {
@@ -162,7 +185,7 @@ func TestCommandEnvironmentPrefersManagedToolchains(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, executable := range []string{paths.GoExecutable, paths.NodeExecutable} {
+	for _, executable := range []string{paths.GoExecutable, paths.NodeExecutable, paths.NPMExecutable, paths.NPXExecutable} {
 		if err := os.MkdirAll(filepath.Dir(executable), 0o700); err != nil {
 			t.Fatal(err)
 		}
@@ -174,6 +197,19 @@ func TestCommandEnvironmentPrefersManagedToolchains(t *testing.T) {
 	wantPath := strings.Join([]string{filepath.Dir(paths.GoExecutable), filepath.Dir(paths.NodeExecutable), "/host/bin"}, string(os.PathListSeparator))
 	if got := environmentValue(environment, "PATH"); got != wantPath {
 		t.Fatalf("managed toolchains were not preferred in PATH: got %q want %q", got, wantPath)
+	}
+	for name, want := range map[string]string{
+		"go":   paths.GoExecutable,
+		"node": paths.NodeExecutable,
+		"npm":  paths.NPMExecutable,
+		"npx":  paths.NPXExecutable,
+	} {
+		if got := app.commandExecutable(name); got != want {
+			t.Fatalf("command executable %s = %q, want %q", name, got, want)
+		}
+	}
+	if got := app.commandExecutable("git"); got != "git" {
+		t.Fatalf("unmanaged command executable = %q, want git", got)
 	}
 	for name, want := range map[string]string{
 		"GOCACHE":                  paths.GoBuildCache,
@@ -190,7 +226,7 @@ func TestCommandEnvironmentPrefersManagedToolchains(t *testing.T) {
 func writeTestToolchainConfig(t *testing.T, root string) {
 	t.Helper()
 	for path, content := range map[string]string{
-		"go.mod":                           "module example.test\n\ngo 1.26.6\n",
+		"go.mod":                           "module example.test\n\ngo 1.27.0\n",
 		"frontend/dashboard/.node-version": "24.19.0\n",
 		"frontend/dashboard/package.json":  `{"packageManager":"npm@12.0.2"}`,
 	} {

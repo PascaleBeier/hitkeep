@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/mail"
@@ -12,6 +11,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/appurl"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/worker"
@@ -130,7 +130,7 @@ func (h *handler) handleTestMail() http.HandlerFunc {
 
 		var req request
 		if r.Body != nil && r.ContentLength != 0 {
-			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			if err := json.UnmarshalRead(r.Body, &req); err != nil {
 				writeJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
 					"status": "error", "message": "Invalid request body",
 				})

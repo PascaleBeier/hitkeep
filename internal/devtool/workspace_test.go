@@ -2,7 +2,7 @@ package devtool
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"io"
 	"os"
@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 func TestRunCommandPreservesContextCancellation(t *testing.T) {
@@ -265,13 +267,13 @@ func TestTailLogIsBoundedAndRedacted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	encoder := json.NewEncoder(file)
+	encoder := jsontext.NewEncoder(file)
 	for index := range 250 {
 		value := map[string]any{"line": index}
 		if index == 249 {
 			value["message"] = "TOKEN=secret"
 		}
-		if err := encoder.Encode(value); err != nil {
+		if err := json.MarshalEncode(encoder, value); err != nil {
 			t.Fatal(err)
 		}
 	}

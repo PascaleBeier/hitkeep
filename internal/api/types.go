@@ -1,11 +1,12 @@
 package api
 
 import (
-	"encoding/json"
 	"strconv"
 	"time"
 
 	"github.com/google/uuid"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 type DateOnly time.Time

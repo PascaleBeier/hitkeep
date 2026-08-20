@@ -2,12 +2,11 @@ package ai
 
 import (
 	"bytes"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"slices"
 	"strings"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 func decodeOpportunityCandidateProposalJSON(raw []byte) (OpportunityCandidateProposal, error) {
@@ -19,17 +18,9 @@ func decodeOpportunityCatalogCandidateProposalJSON(raw []byte) (OpportunityCandi
 }
 
 func decodeStrictOpportunityProposalJSON(raw []byte) (OpportunityCandidateProposal, error) {
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
 	var copy OpportunityCandidateProposal
-	if err := decoder.Decode(&copy); err != nil {
+	if err := json.UnmarshalStrict(raw, &copy); err != nil {
 		return OpportunityCandidateProposal{}, fmt.Errorf("%w: unsupported output field", ErrInvalidOutput)
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); err == nil {
-		return OpportunityCandidateProposal{}, fmt.Errorf("%w: trailing output after JSON object", ErrInvalidOutput)
-	} else if !errors.Is(err, io.EOF) {
-		return OpportunityCandidateProposal{}, fmt.Errorf("%w: trailing output after JSON object", ErrInvalidOutput)
 	}
 	return copy, nil
 }

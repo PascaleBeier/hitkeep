@@ -2,7 +2,6 @@ package devmcp
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -18,6 +17,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"hitkeep/internal/devtool"
+	json "hitkeep/internal/jsonapi"
 )
 
 const (
@@ -231,8 +231,12 @@ func delegatedProgressToken(token any) (any, bool) {
 		return strconv.FormatFloat(float64(token), 'g', -1, 32), true
 	case float64:
 		return strconv.FormatFloat(token, 'g', -1, 64), true
-	case json.Number:
-		return token.String(), true
+	case fmt.Stringer:
+		raw := json.RawMessage(token.String())
+		if !raw.IsValid() || raw.Kind() != '0' {
+			return nil, false
+		}
+		return string(raw), true
 	default:
 		return nil, false
 	}
@@ -515,7 +519,7 @@ func registerTools(server *mcp.Server, resolver appResolver) {
 		return batch, nil
 	}))
 	mcp.AddTool(server, tool("hk_dev_stop", "Stop only the selected workspace's development session and stream shutdown progress.", destructiveAction), routedRequestHandler(resolver, "dev stop", func(ctx context.Context, request *mcp.CallToolRequest, app *devtool.App, _ devInput) (any, error) {
-		before, _ := app.DevStatus(context.Background())
+		before, _ := app.DevStatus(ctx)
 		cursor := before.NextEventCursor
 		type stopResult struct {
 			status devtool.DevStatus
@@ -539,7 +543,7 @@ func registerTools(server *mcp.Server, resolver appResolver) {
 				}
 				return result.status, result.err
 			case <-ctx.Done():
-				return app.DevStatus(context.Background())
+				return app.DevStatus(context.WithoutCancel(ctx))
 			case <-ticker.C:
 				batch, batchErr := app.DevLogs(cursor, maxRequestedLogLines)
 				if batchErr != nil {

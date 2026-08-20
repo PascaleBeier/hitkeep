@@ -1,17 +1,18 @@
 package database
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/webhooks"
 )
 
@@ -573,7 +574,9 @@ func (s *Store) listWebhookDeliveryJobs(ctx context.Context, dueAt time.Time, qu
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate due webhook deliveries: %w", err)
 	}
-	sort.SliceStable(jobs, func(i, j int) bool { return jobs[i].DeliveryID.String() < jobs[j].DeliveryID.String() })
+	slices.SortStableFunc(jobs, func(left, right WebhookDeliveryJob) int {
+		return cmp.Compare(left.DeliveryID.String(), right.DeliveryID.String())
+	})
 	return jobs, nil
 }
 

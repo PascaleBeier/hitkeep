@@ -2,13 +2,13 @@ package webhookdispatcher
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"time"
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/webhooks"
 )
 

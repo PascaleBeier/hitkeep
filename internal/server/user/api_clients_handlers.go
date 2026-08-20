@@ -1,7 +1,6 @@
 package user
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +13,7 @@ import (
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -60,7 +60,7 @@ func (h *handler) handleListAPIClients() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(clients); err != nil {
+		if err := json.MarshalWrite(w, clients); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode api clients response", "error", err, "user_id", userID)
 		}
 	}
@@ -142,7 +142,7 @@ func (h *handler) handleCreateAPIClient() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(apiClientTokenResponse{Client: *client, Token: token}); err != nil {
+		if err := json.MarshalWrite(w, apiClientTokenResponse{Client: *client, Token: token}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode create api client response", "error", err, "user_id", userID)
 		}
 	}
@@ -248,7 +248,7 @@ func (h *handler) handleUpdateAPIClient() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(updated); err != nil {
+		if err := json.MarshalWrite(w, updated); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode api client update response", "error", err, "user_id", userID, "client_id", clientID)
 		}
 	}
@@ -294,7 +294,7 @@ func (h *handler) handleRotateAPIClient() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(apiClientTokenResponse{Client: *client, Token: token}); err != nil {
+		if err := json.MarshalWrite(w, apiClientTokenResponse{Client: *client, Token: token}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode rotate api client response", "error", err, "user_id", userID, "client_id", clientID)
 		}
 	}
@@ -360,7 +360,7 @@ func (h *handler) handleListTeamAPIClients() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(clients); err != nil {
+		if err := json.MarshalWrite(w, clients); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode team api clients response", "error", err, "team_id", teamID, "actor_id", actorID)
 		}
 	}
@@ -420,7 +420,7 @@ func (h *handler) handleCreateTeamAPIClient() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(apiClientTokenResponse{Client: *client, Token: token}); err != nil {
+		if err := json.MarshalWrite(w, apiClientTokenResponse{Client: *client, Token: token}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode create team api client response", "error", err, "team_id", teamID, "actor_id", actorID)
 		}
 	}
@@ -507,7 +507,7 @@ func (h *handler) handleUpdateTeamAPIClient() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(updated); err != nil {
+		if err := json.MarshalWrite(w, updated); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode team api client update response", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
 		}
 	}
@@ -552,7 +552,7 @@ func (h *handler) handleRotateTeamAPIClient() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(apiClientTokenResponse{Client: *client, Token: token}); err != nil {
+		if err := json.MarshalWrite(w, apiClientTokenResponse{Client: *client, Token: token}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode rotate team api client response", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
 		}
 	}
@@ -743,13 +743,5 @@ func (h *handler) resolveTeamAPIClientScope(w http.ResponseWriter, r *http.Reque
 }
 
 func decodeJSON(r *http.Request, dst any) error {
-	decoder := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(dst); err != nil {
-		return err
-	}
-	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		return errors.New("unexpected trailing JSON content")
-	}
-	return nil
+	return json.UnmarshalReadStrict(io.LimitReader(r.Body, 1<<20), dst)
 }

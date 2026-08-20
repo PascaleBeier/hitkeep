@@ -4,15 +4,17 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	goaisdk "github.com/zendev-sh/goai"
 	"github.com/zendev-sh/goai/provider"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 const OpportunityTemplateVersion = "opportunities-v1"
@@ -538,8 +540,8 @@ func strictOpportunityCatalogCandidateProposalResult(result *goaisdk.ObjectResul
 }
 
 func strictOpportunityProposalResult(result *goaisdk.ObjectResult[OpportunityCandidateProposal], decode func([]byte) (OpportunityCandidateProposal, error)) (OpportunityCandidateProposal, error) {
-	for i := len(result.Steps) - 1; i >= 0; i-- {
-		if text := strings.TrimSpace(result.Steps[i].Text); text != "" {
+	for _, v := range slices.Backward(result.Steps) {
+		if text := strings.TrimSpace(v.Text); text != "" {
 			return decode([]byte(text))
 		}
 	}

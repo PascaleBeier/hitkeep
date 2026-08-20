@@ -3,7 +3,6 @@ package user
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,6 +13,7 @@ import (
 	"hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
+	json "hitkeep/internal/jsonapi"
 )
 
 func TestRegisteredTrackingDomainRoutesAllowTeamAdminsAndOwners(t *testing.T) {
@@ -50,7 +50,7 @@ func TestRegisteredTrackingDomainRoutesAllowTeamAdminsAndOwners(t *testing.T) {
 			}
 
 			var resp api.CustomTrackingDomain
-			if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 				t.Fatalf("decode response: %v", err)
 			}
 			if resp.TeamID != teamID {

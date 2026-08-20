@@ -3,11 +3,12 @@
 package cloud
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 func TestDiscoveryOpenAPIAliases(t *testing.T) {

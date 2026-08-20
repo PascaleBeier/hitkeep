@@ -4,6 +4,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"slices"
 	"strings"
 	"time"
 
@@ -87,8 +88,8 @@ func GetRealIP(r *http.Request, trustedProxies []netip.Prefix) string {
 
 	if len(trustedProxies) > 0 {
 		parts := allHeaderTokens(r.Header.Values("X-Forwarded-For"))
-		for i := len(parts) - 1; i >= 0; i-- {
-			parsedIP, ok := ParseAddr(parts[i])
+		for _, part := range slices.Backward(parts) {
+			parsedIP, ok := ParseAddr(part)
 			if !ok {
 				continue
 			}
@@ -148,8 +149,8 @@ func IsTrustedProxy(ip netip.Addr, trustedProxies []netip.Prefix) bool {
 
 func firstValidHeaderIP(header http.Header, name string) (netip.Addr, bool) {
 	values := header.Values(name)
-	for i := len(values) - 1; i >= 0; i-- {
-		for _, token := range reverseTokens(allHeaderTokens([]string{values[i]})) {
+	for _, value := range slices.Backward(values) {
+		for _, token := range reverseTokens(allHeaderTokens([]string{value})) {
 			if parsed, ok := ParseAddr(token); ok {
 				return parsed, true
 			}

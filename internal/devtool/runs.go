@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -21,6 +20,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 const maxLogLines = 200
@@ -1024,7 +1025,7 @@ func (a *App) runCommand(ctx context.Context, writer io.Writer, spec commandSpec
 	}
 	_, _ = fmt.Fprintln(writer, "$ "+display)
 	// Commands are selected from the closed catalog; user-controlled fields are enum or pattern validated.
-	command := exec.CommandContext(ctx, args[0], args[1:]...) //nolint:gosec
+	command := exec.CommandContext(ctx, a.commandExecutable(args[0]), args[1:]...) //nolint:gosec
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	command.Cancel = func() error {
 		if command.Process == nil {
