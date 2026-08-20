@@ -118,8 +118,7 @@ func DescribeError(err error) ErrorDetails {
 	case errors.Is(err, context.DeadlineExceeded):
 		details.Kind = "timeout"
 	default:
-		var networkErr net.Error
-		if errors.As(err, &networkErr) {
+		if networkErr, ok := errors.AsType[net.Error](err); ok {
 			if networkErr.Timeout() {
 				details.Kind = "timeout"
 			} else {

@@ -1,8 +1,9 @@
 package hitkeepcmd
 
 import (
+	"context"
 	"crypto/sha256"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,7 +18,29 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	json "hitkeep/internal/jsonapi"
 )
+
+func TestImportAPIClientCancelsInFlightRequest(t *testing.T) {
+	requestStarted := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		close(requestStarted)
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	client := newImportAPIClient(server.URL, "test-token")
+	done := make(chan error, 1)
+	go func() {
+		done <- client.doJSON(ctx, http.MethodGet, "/wait", nil, nil)
+	}()
+	<-requestStarted
+	cancel()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled request error = %v, want context canceled", err)
+	}
+}
 
 func TestImportAPIClientUploadAndValidateStreamsRepeatedFiles(t *testing.T) {
 	dir := t.TempDir()
@@ -47,7 +70,7 @@ func TestImportAPIClientUploadAndValidateStreamsRepeatedFiles(t *testing.T) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/api/sites/"+siteID+"/imports/plausible/uploads":
 			var req api.ImportUploadCreateRequest
-			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			if err := json.UnmarshalRead(r.Body, &req); err != nil {
 				t.Fatalf("decode create upload request: %v", err)
 			}
 			if len(req.Files) != 2 {
@@ -111,7 +134,7 @@ func TestImportAPIClientUploadAndValidateStreamsRepeatedFiles(t *testing.T) {
 	defer server.Close()
 
 	client := newImportAPIClient(server.URL, "test-token")
-	job, err := client.uploadAndValidate("plausible", siteID, []string{firstPath, secondPath})
+	job, err := client.uploadAndValidate(t.Context(), "plausible", siteID, []string{firstPath, secondPath})
 	if err != nil {
 		t.Fatalf("upload and validate: %v", err)
 	}
@@ -166,7 +189,7 @@ func writeTestJSON(t *testing.T, w http.ResponseWriter, value any) {
 	t.Helper()
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(value); err != nil {
+	if err := json.MarshalWrite(w, value); err != nil {
 		t.Fatalf("encode response: %v", err)
 	}
 }

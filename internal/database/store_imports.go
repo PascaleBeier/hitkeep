@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	json "hitkeep/internal/jsonapi"
 )
 
 const (

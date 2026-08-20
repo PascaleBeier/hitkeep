@@ -5,7 +5,6 @@ package auth
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,6 +14,7 @@ import (
 
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
+	json "hitkeep/internal/jsonapi"
 )
 
 func TestHandleAcceptInviteRejectsSecondHostedCloudTeam(t *testing.T) {

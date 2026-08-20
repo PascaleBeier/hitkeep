@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -23,6 +22,7 @@ import (
 
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/worker"
 )
 

@@ -1,10 +1,10 @@
 package database
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
-	"sort"
 	"strings"
 )
 
@@ -271,11 +271,11 @@ func buildScopedDeletePlan(ctx context.Context, q queryer, spec scopedDeleteSpec
 
 func sortedEdges(edges []fkEdge) []fkEdge {
 	sorted := slices.Clone(edges)
-	sort.Slice(sorted, func(i, j int) bool {
-		if sorted[i].table != sorted[j].table {
-			return sorted[i].table < sorted[j].table
+	slices.SortFunc(sorted, func(left, right fkEdge) int {
+		if left.table != right.table {
+			return cmp.Compare(left.table, right.table)
 		}
-		return sorted[i].referencedTable < sorted[j].referencedTable
+		return cmp.Compare(left.referencedTable, right.referencedTable)
 	})
 	return sorted
 }
@@ -421,7 +421,7 @@ func orderChildrenFirst(members map[string]struct{}, edges []fkEdge) ([]string, 
 			ready = append(ready, table)
 		}
 	}
-	sort.Strings(ready)
+	slices.Sort(ready)
 
 	order := make([]string, 0, len(members))
 	for len(ready) > 0 {
@@ -429,14 +429,14 @@ func orderChildrenFirst(members map[string]struct{}, edges []fkEdge) ([]string, 
 		ready = ready[1:]
 		order = append(order, table)
 		released := childrenOf[table]
-		sort.Strings(released)
+		slices.Sort(released)
 		for _, parent := range released {
 			pendingChildren[parent]--
 			if pendingChildren[parent] == 0 {
 				ready = append(ready, parent)
 			}
 		}
-		sort.Strings(ready)
+		slices.Sort(ready)
 	}
 	if len(order) != len(members) {
 		remaining := make([]string, 0)
@@ -445,7 +445,7 @@ func orderChildrenFirst(members map[string]struct{}, edges []fkEdge) ([]string, 
 				remaining = append(remaining, table)
 			}
 		}
-		sort.Strings(remaining)
+		slices.Sort(remaining)
 		return nil, fmt.Errorf("foreign key cycle among tables: %s", strings.Join(remaining, ", "))
 	}
 	return order, nil

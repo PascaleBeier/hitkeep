@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -10,6 +9,7 @@ import (
 
 	"hitkeep/internal/appurl"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/security"
@@ -108,7 +108,7 @@ func (h *handler) handleMFATOTPVerify() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(loginResponse{Status: "ok"}); err != nil {
+		if err := json.MarshalWrite(w, loginResponse{Status: "ok"}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode mfa totp verification response", "error", err, "user_id", challenge.UserID)
 		}
 	}
@@ -154,7 +154,7 @@ func (h *handler) handleMFARecoveryCodeVerify() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(loginResponse{Status: "ok"}); err != nil {
+		if err := json.MarshalWrite(w, loginResponse{Status: "ok"}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode recovery code verification response", "error", err, "user_id", challenge.UserID)
 		}
 	}
@@ -207,7 +207,7 @@ func (h *handler) handleMFAEmailLinkRequest() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(map[string]string{"status": "sent"}); err != nil {
+		if err := json.MarshalWrite(w, map[string]string{"status": "sent"}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode mfa email link response", "error", err, "user_id", user.ID)
 		}
 	}

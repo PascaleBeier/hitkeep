@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -10,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/access"
 	"hitkeep/internal/server/shared"
 )
@@ -42,7 +42,7 @@ func (h *handler) handleGetUserBootstrap() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(bootstrap); err != nil {
+		if err := json.MarshalWrite(w, bootstrap); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode user bootstrap", "error", err, "user_id", userID)
 		}
 	}

@@ -1,12 +1,12 @@
 package sites
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/filterparams"
 	"hitkeep/internal/server/shared"
 )
@@ -78,7 +78,7 @@ func (h *handler) handleGetSiteAIActivity() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(report); err != nil {
+		if err := json.MarshalWrite(w, report); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}

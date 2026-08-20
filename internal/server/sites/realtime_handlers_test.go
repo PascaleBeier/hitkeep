@@ -25,7 +25,11 @@ func TestHandleGetSiteRealtimeStreamsSiteEvents(t *testing.T) {
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
-	resp, err := server.Client().Get(server.URL + "/api/sites/" + siteID.String() + "/realtime")
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL+"/api/sites/"+siteID.String()+"/realtime", nil)
+	if err != nil {
+		t.Fatalf("build realtime request: %v", err)
+	}
+	resp, err := server.Client().Do(req)
 	if err != nil {
 		t.Fatalf("failed to connect to realtime stream: %v", err)
 	}

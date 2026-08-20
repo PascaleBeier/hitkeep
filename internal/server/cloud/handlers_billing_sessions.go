@@ -3,7 +3,6 @@
 package cloud
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -15,6 +14,7 @@ import (
 	"hitkeep/internal/appurl"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -111,7 +111,7 @@ func (h *handler) handleCreateBillingPortalSession() http.HandlerFunc {
 
 		var req billingPortalSessionRequest
 		if r.Body != nil {
-			if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+			if err := json.UnmarshalReadOptional(r.Body, &req); err != nil && !errors.Is(err, io.EOF) {
 				http.Error(w, "Invalid request body", http.StatusBadRequest)
 				return
 			}
@@ -130,7 +130,7 @@ func (h *handler) handleCreateBillingPortalSession() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(billingPortalSessionResponse{URL: session.URL}); err != nil {
+		if err := json.MarshalWrite(w, billingPortalSessionResponse{URL: session.URL}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode billing portal session response", "error", err)
 		}
 	}
@@ -187,7 +187,7 @@ func (h *handler) handleCreateBillingCheckoutSession() http.HandlerFunc {
 		}
 
 		var req billingCheckoutSessionRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.UnmarshalRead(r.Body, &req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -288,7 +288,7 @@ func (h *handler) handleCreateBillingCheckoutSession() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(billingCheckoutSessionResponse{URL: session.URL}); err != nil {
+		if err := json.MarshalWrite(w, billingCheckoutSessionResponse{URL: session.URL}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode billing checkout session response", "error", err)
 		}
 	}

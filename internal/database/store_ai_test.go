@@ -15,6 +15,23 @@ import (
 	"hitkeep/internal/database/migrations"
 )
 
+func TestCanonicalOpportunityJSONUsesRFC8785AndRejectsAmbiguity(t *testing.T) {
+	left, err := canonicalOpportunityJSON(`{"z":1.0,"a":{"b":2,"a":1}}`)
+	if err != nil {
+		t.Fatalf("canonicalize left: %v", err)
+	}
+	right, err := canonicalOpportunityJSON(`{ "a": { "a": 1, "b": 2 }, "z": 1 }`)
+	if err != nil {
+		t.Fatalf("canonicalize right: %v", err)
+	}
+	if left != right {
+		t.Fatalf("canonical JSON differs:\nleft  %s\nright %s", left, right)
+	}
+	if _, err := canonicalOpportunityJSON(`{"id":1,"id":2}`); err == nil {
+		t.Fatal("canonicalOpportunityJSON unexpectedly accepted a duplicate object name")
+	}
+}
+
 func setupAIStore(t *testing.T) (*Store, uuid.UUID, uuid.UUID, uuid.UUID) {
 	t.Helper()
 	store := newSharedTestFixtureStore(t)
@@ -1018,11 +1035,12 @@ func TestOpportunityPersistenceAndStatus(t *testing.T) {
 }
 
 func TestEncodeOpportunityJSONUsesEmptyCollections(t *testing.T) {
-	input := OpportunityInput{}
-	input.CopyParams = nil
-	input.RouteParams = nil
-	input.Evidence = nil
-	input.CitedEvidenceIDs = nil
+	input := OpportunityInput{
+		CopyParams:       nil,
+		RouteParams:      nil,
+		Evidence:         nil,
+		CitedEvidenceIDs: nil,
+	}
 
 	encoded, err := encodeOpportunityJSON(input)
 	if err != nil {

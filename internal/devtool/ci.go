@@ -3,7 +3,7 @@ package devtool
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +12,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 var releaseValuePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]{0,99}$`)
@@ -161,7 +163,7 @@ func (a *App) RunCloudTests(ctx context.Context, writer io.Writer) (GoTestResult
 }
 
 func (a *App) listGoPackages(ctx context.Context, variant Variant) ([]string, error) {
-	list := exec.CommandContext(ctx, "go", "list", "-json", "./...") //nolint:gosec // fixed command and arguments
+	list := exec.CommandContext(ctx, a.commandExecutable("go"), "list", "-json", "./...") //nolint:gosec // fixed managed executable and arguments
 	list.Dir = a.workspace.Root
 	list.Env = a.commandEnvironment([]string{"GOFLAGS=" + goFlagsForTags(variant.BuildTags)})
 	output, err := list.Output()
@@ -178,11 +180,11 @@ type goPackageJSON struct {
 }
 
 func testBearingGoPackages(output []byte, variantID string) ([]string, error) {
-	decoder := json.NewDecoder(bytes.NewReader(output))
+	decoder := jsontext.NewDecoder(bytes.NewReader(output))
 	packages := make([]string, 0)
 	for {
 		var packageInfo goPackageJSON
-		if err := decoder.Decode(&packageInfo); err != nil {
+		if err := json.UnmarshalDecode(decoder, &packageInfo); err != nil {
 			if errors.Is(err, io.EOF) {
 				break
 			}

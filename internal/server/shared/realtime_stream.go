@@ -2,14 +2,15 @@ package shared
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/google/uuid"
 
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/realtime"
 )
 
@@ -102,7 +103,14 @@ func writeRealtimeEvent(w http.ResponseWriter, controller *http.ResponseControll
 		LoggerFromContext(ctx).Error("Failed to encode realtime event", "error", err, "site_id", event.SiteID)
 		return false
 	}
-	if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
+	if _, err := io.WriteString(w, "data: "); err != nil {
+		return false
+	}
+	// json.Marshal escapes JSON control characters, so data cannot inject SSE fields.
+	if _, err := w.Write(data); err != nil { //nolint:gosec // G705 is a false positive for encoded JSON.
+		return false
+	}
+	if _, err := io.WriteString(w, "\n\n"); err != nil {
 		return false
 	}
 	return controller.Flush() == nil

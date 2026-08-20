@@ -3,7 +3,6 @@ package admin
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -20,6 +19,7 @@ import (
 	"hitkeep/internal/auth"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/testutil/testdb"
@@ -125,7 +125,7 @@ func TestHandleCreateInstanceCountryExclusion(t *testing.T) {
 	}
 
 	var created api.IPExclusion
-	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
+	if err := json.UnmarshalRead(w.Body, &created); err != nil {
 		t.Fatalf("decode created exclusion: %v", err)
 	}
 	if created.Type != "country" || created.CountryCode != "US" || created.CIDR != "" {
@@ -140,7 +140,7 @@ func TestHandleCreateInstanceCountryExclusion(t *testing.T) {
 		t.Fatalf("expected list status %d, got %d: %s", http.StatusOK, listW.Code, listW.Body.String())
 	}
 	var rules []api.IPExclusion
-	if err := json.NewDecoder(listW.Body).Decode(&rules); err != nil {
+	if err := json.UnmarshalRead(listW.Body, &rules); err != nil {
 		t.Fatalf("decode list: %v", err)
 	}
 	if len(rules) != 1 || rules[0].Type != "country" || rules[0].CountryCode != "US" {
@@ -178,7 +178,7 @@ func TestHandleDeleteUserReturnsConflictForSoleOwner(t *testing.T) {
 	}
 
 	var resp api.AdminDeleteUserBlockedResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if resp.Code != "user_owns_teams" {
@@ -349,7 +349,7 @@ func TestHandleDisableUser2FADisablesTargetFactors(t *testing.T) {
 	}
 
 	var resp api.AdminDisableUserMFAResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if resp.Status != "ok" {
@@ -421,7 +421,7 @@ func TestHandleDeleteTeamPurgesArchivedTenantData(t *testing.T) {
 	}
 
 	var resp api.AdminDeleteTeamResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if resp.TeamID != team.ID {

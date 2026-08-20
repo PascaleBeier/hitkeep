@@ -27,10 +27,10 @@ func ValidateSkillLayout(root string) error {
 			return fmt.Errorf("skill %q appears in both product and contributor catalogs", name)
 		}
 	}
-	if err := validateSkillRoot(filepath.Join(root, "skills"), productAnalyticsSkills, true); err != nil {
+	if err := validateSkillRoot(filepath.Join(root, "skills"), productAnalyticsSkills, true, false); err != nil {
 		return fmt.Errorf("product analytics skill pack: %w", err)
 	}
-	if err := validateSkillRoot(filepath.Join(root, ".agents", "skills"), contributorSkills, false); err != nil {
+	if err := validateSkillRoot(filepath.Join(root, ".agents", "skills"), contributorSkills, false, true); err != nil {
 		return fmt.Errorf("contributor skill pack: %w", err)
 	}
 	ignore, err := os.ReadFile(filepath.Join(root, ".gitignore"))
@@ -46,7 +46,7 @@ func ValidateSkillLayout(root string) error {
 	return nil
 }
 
-func validateSkillRoot(root string, expected []string, requireProcedure bool) error {
+func validateSkillRoot(root string, expected []string, requireProcedure, allowAdditional bool) error {
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		return err
@@ -55,7 +55,7 @@ func validateSkillRoot(root string, expected []string, requireProcedure bool) er
 		if !entry.IsDir() {
 			continue
 		}
-		if !containsSkill(expected, entry.Name()) {
+		if !allowAdditional && !containsSkill(expected, entry.Name()) {
 			return fmt.Errorf("unexpected skill entry %q", entry.Name())
 		}
 	}
@@ -101,7 +101,7 @@ func validateSkillRoot(root string, expected []string, requireProcedure bool) er
 			return relErr
 		}
 		parts := strings.Split(filepath.ToSlash(relative), "/")
-		if len(parts) != 2 || parts[1] != "SKILL.md" || !containsSkill(expected, parts[0]) {
+		if len(parts) != 2 || parts[1] != "SKILL.md" || (!allowAdditional && !containsSkill(expected, parts[0])) {
 			return fmt.Errorf("nested or unexpected skill body: %s", relative)
 		}
 		return nil

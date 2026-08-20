@@ -2,7 +2,6 @@ package searchconsole
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,6 +12,8 @@ import (
 	"unicode/utf8"
 
 	"google.golang.org/api/googleapi"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 func TestGoogleClientAuthCodeURLUsesReadOnlyScope(t *testing.T) {
@@ -54,7 +55,7 @@ func TestGoogleClientExchangeCodeUsesConfiguredTokenEndpoint(t *testing.T) {
 			t.Fatalf("token exchange should not request extra scopes, got %q", r.Form.Get("scope"))
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		_ = json.MarshalWrite(w, map[string]any{
 			"access_token":  "access-token",
 			"refresh_token": "refresh-token",
 			"token_type":    "Bearer",
@@ -94,7 +95,7 @@ func TestGoogleClientListPropertiesUsesOfficialSitesEndpoint(t *testing.T) {
 			t.Fatalf("expected bearer token, got %q", got)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		_ = json.MarshalWrite(w, map[string]any{
 			"siteEntry": []map[string]string{
 				{"siteUrl": "sc-domain:example.com", "permissionLevel": "SITE_OWNER"},
 				{"siteUrl": "https://www.example.com/", "permissionLevel": "SITE_FULL_USER"},
@@ -192,7 +193,7 @@ func TestGoogleClientQuerySearchAnalyticsUsesFinalDataState(t *testing.T) {
 		}
 		requestBody = string(body)
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		_ = json.MarshalWrite(w, map[string]any{
 			"responseAggregationType": "AUTO",
 			"rows": []map[string]any{
 				{
@@ -258,7 +259,7 @@ func TestGoogleClientQuerySearchAnalyticsPaginatesRows(t *testing.T) {
 				{"keys": []string{"2026-05-03"}, "clicks": 3, "impressions": 30},
 			}
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		_ = json.MarshalWrite(w, map[string]any{
 			"responseAggregationType": "AUTO",
 			"rows":                    rows,
 		})

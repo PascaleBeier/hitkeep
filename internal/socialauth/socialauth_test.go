@@ -3,7 +3,6 @@ package socialauth
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -18,6 +17,7 @@ import (
 	"golang.org/x/oauth2"
 
 	"hitkeep/internal/config"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/sso"
 )
 
@@ -90,7 +90,7 @@ func TestGoogleOIDCUsesPKCEAndValidatesNonceAudienceIssuerAndVerifiedEmail(t *te
 			})
 			rawIDToken := oidctest.SignIDToken(privateKey, "social-key", oidc.RS256, string(claims))
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "discard-me", "token_type": "Bearer", "id_token": rawIDToken})
+			_ = json.MarshalWrite(w, map[string]any{"access_token": "discard-me", "token_type": "Bearer", "id_token": rawIDToken})
 		default:
 			providerHandler.ServeHTTP(w, r)
 		}
@@ -205,15 +205,15 @@ func TestGitHubUsesMinimalScopesPKCEAndPrimaryVerifiedEmail(t *testing.T) {
 			}
 			receivedVerifier = r.Form.Get("code_verifier")
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "ephemeral-token", "token_type": "Bearer"})
+			_ = json.MarshalWrite(w, map[string]any{"access_token": "ephemeral-token", "token_type": "Bearer"})
 		case "/user":
 			if r.Header.Get("Authorization") != "Bearer ephemeral-token" {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
-			_ = json.NewEncoder(w).Encode(map[string]any{"id": 42, "login": "octo", "name": "Octo Cat"})
+			_ = json.MarshalWrite(w, map[string]any{"id": 42, "login": "octo", "name": "Octo Cat"})
 		case "/user/emails":
-			_ = json.NewEncoder(w).Encode(emails)
+			_ = json.MarshalWrite(w, emails)
 		default:
 			http.NotFound(w, r)
 		}
@@ -306,12 +306,13 @@ func TestMicrosoftOIDCValidatesPKCENonceAudienceTenantAndSigningKeyIssuer(t *tes
 		switch r.URL.Path {
 		case "/.well-known/openid-configuration":
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]any{
+			_ = json.MarshalWrite(w, map[string]any{
 				"issuer": microsoftIssuerBase + "/{tenantid}/v2.0", "authorization_endpoint": server.URL + "/authorize",
 				"token_endpoint": server.URL + "/token", "jwks_uri": server.URL + "/keys",
 				"response_types_supported": []string{"code"}, "subject_types_supported": []string{"public"},
 				"id_token_signing_alg_values_supported": []string{oidc.RS256},
 			})
+
 		case "/token":
 			if err := r.ParseForm(); err != nil {
 				http.Error(w, "invalid token request", http.StatusBadRequest)
@@ -324,10 +325,11 @@ func TestMicrosoftOIDCValidatesPKCENonceAudienceTenantAndSigningKeyIssuer(t *tes
 				"tid": tokenTenant, "oid": objectID, "preferred_username": "Mutable@Example.com",
 			})
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]any{
+			_ = json.MarshalWrite(w, map[string]any{
 				"access_token": "discard-me", "token_type": "Bearer",
 				"id_token": oidctest.SignIDToken(privateKey, keyID, oidc.RS256, string(claims)),
 			})
+
 		case "/keys":
 			payload, _ := json.Marshal(jose.JSONWebKey{
 				Key: &privateKey.PublicKey, KeyID: keyID, Algorithm: oidc.RS256, Use: "sig",
@@ -336,7 +338,7 @@ func TestMicrosoftOIDCValidatesPKCENonceAudienceTenantAndSigningKeyIssuer(t *tes
 			_ = json.Unmarshal(payload, &key)
 			key["issuer"] = keyIssuer
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]any{"keys": []any{key}})
+			_ = json.MarshalWrite(w, map[string]any{"keys": []any{key}})
 		default:
 			http.NotFound(w, r)
 		}

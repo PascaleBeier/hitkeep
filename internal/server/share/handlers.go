@@ -1,7 +1,6 @@
 package share
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -16,6 +15,7 @@ import (
 	"hitkeep/internal/appurl"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/exportfmt"
+	json "hitkeep/internal/jsonapi"
 	opportunitysvc "hitkeep/internal/opportunities"
 	"hitkeep/internal/server/shared"
 )
@@ -164,7 +164,7 @@ func (h *handler) handleListShareLinks() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(links); err != nil {
+		if err := json.MarshalWrite(w, links); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -213,7 +213,7 @@ func (h *handler) handleCreateShareLink() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
+		if err := json.MarshalWrite(w, resp); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -260,7 +260,7 @@ func (h *handler) handleGetShareSite() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(site); err != nil {
+		if err := json.MarshalWrite(w, site); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -326,7 +326,7 @@ func (h *handler) handleGetShareSiteStats() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(stats); err != nil {
+		if err := json.MarshalWrite(w, stats); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -351,7 +351,7 @@ func (h *handler) handleGetShareOpportunities() http.HandlerFunc {
 		opportunities = opportunitysvc.RankOpportunities(opportunities)
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(api.SharedOpportunityListResponse{Opportunities: sharedOpportunities(opportunities)}); err != nil {
+		if err := json.MarshalWrite(w, api.SharedOpportunityListResponse{Opportunities: sharedOpportunities(opportunities)}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -486,7 +486,7 @@ func (h *handler) handleGetShareHits() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(result); err != nil {
+		if err := json.MarshalWrite(w, result); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}

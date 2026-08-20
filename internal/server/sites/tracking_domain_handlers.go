@@ -1,7 +1,6 @@
 package sites
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -10,6 +9,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/appurl"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -20,7 +20,7 @@ func (h *handler) handleGetSiteTrackingDomainOptions() http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(options); err != nil {
+		if err := json.MarshalWrite(w, options); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode site tracking domain options", "error", err, "site_id", options.SiteID)
 		}
 	}

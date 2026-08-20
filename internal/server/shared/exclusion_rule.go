@@ -1,11 +1,11 @@
 package shared
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
 	"hitkeep/internal/blocking"
+	json "hitkeep/internal/jsonapi"
 )
 
 const (
@@ -49,7 +49,7 @@ func DecodeTrafficExclusionRequest(r *http.Request) (TrafficExclusionInput, stri
 
 func decodeTrafficExclusionJSON(r *http.Request) (trafficExclusionRequest, string, int, bool) {
 	var req trafficExclusionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.UnmarshalRead(r.Body, &req); err != nil {
 		return trafficExclusionRequest{}, "Invalid request body", http.StatusBadRequest, false
 	}
 	return req, "", 0, true

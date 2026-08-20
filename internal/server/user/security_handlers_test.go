@@ -3,7 +3,6 @@ package user
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -18,6 +17,7 @@ import (
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/security"
 	serverauth "hitkeep/internal/server/auth"
 	"hitkeep/internal/server/shared"
@@ -75,7 +75,7 @@ func TestTOTPSetupLifecycle(t *testing.T) {
 	}
 
 	var setup api.UserTOTPSetup
-	if err := json.NewDecoder(startW.Body).Decode(&setup); err != nil {
+	if err := json.UnmarshalRead(startW.Body, &setup); err != nil {
 		t.Fatalf("failed to decode totp setup response: %v", err)
 	}
 	if setup.Secret == "" {
@@ -98,7 +98,7 @@ func TestTOTPSetupLifecycle(t *testing.T) {
 	}
 
 	var status api.UserSecurityStatus
-	if err := json.NewDecoder(verifyW.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(verifyW.Body, &status); err != nil {
 		t.Fatalf("failed to decode security status: %v", err)
 	}
 	if !status.TOTPEnabled {
@@ -123,7 +123,7 @@ func TestTOTPSetupLifecycle(t *testing.T) {
 	if statusW.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, statusW.Code)
 	}
-	if err := json.NewDecoder(statusW.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(statusW.Body, &status); err != nil {
 		t.Fatalf("failed to decode security status response: %v", err)
 	}
 	if status.TOTPEnabled {
@@ -144,7 +144,7 @@ func TestPasskeyRegistrationLifecycle(t *testing.T) {
 	}
 
 	var begin passkeyRegistrationStartResponse
-	if err := json.NewDecoder(startW.Body).Decode(&begin); err != nil {
+	if err := json.UnmarshalRead(startW.Body, &begin); err != nil {
 		t.Fatalf("failed to decode passkey registration start response: %v", err)
 	}
 	if len(begin.PublicKey.Challenge) == 0 {
@@ -173,7 +173,7 @@ func TestPasskeyRegistrationLifecycle(t *testing.T) {
 	}
 
 	var status api.UserSecurityStatus
-	if err := json.NewDecoder(finishW.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(finishW.Body, &status); err != nil {
 		t.Fatalf("failed to decode security status after passkey finish: %v", err)
 	}
 	if len(status.Passkeys) != 1 {
@@ -197,7 +197,7 @@ func TestPasskeyRegistrationLifecycle(t *testing.T) {
 	if statusW.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, statusW.Code)
 	}
-	if err := json.NewDecoder(statusW.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(statusW.Body, &status); err != nil {
 		t.Fatalf("failed to decode final security status response: %v", err)
 	}
 	if len(status.Passkeys) != 0 {
@@ -217,7 +217,7 @@ func TestPasskeyRegistrationRejectsInvalidCredentialWithoutRawError(t *testing.T
 		t.Fatalf("expected status %d, got %d", http.StatusOK, startW.Code)
 	}
 	var begin passkeyRegistrationStartResponse
-	if err := json.NewDecoder(startW.Body).Decode(&begin); err != nil {
+	if err := json.UnmarshalRead(startW.Body, &begin); err != nil {
 		t.Fatalf("decode passkey registration start: %v", err)
 	}
 
@@ -274,7 +274,7 @@ func TestGetUserSecurityStatusIncludesRecoveryCodes(t *testing.T) {
 	}
 
 	var status api.UserSecurityStatus
-	if err := json.NewDecoder(statusW.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(statusW.Body, &status); err != nil {
 		t.Fatalf("decode security status: %v", err)
 	}
 	if !status.RecoveryCodesGenerated {
@@ -318,7 +318,7 @@ func TestRegenerateRecoveryCodes(t *testing.T) {
 	}
 
 	var resp api.UserRecoveryCodesResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode recovery code response: %v", err)
 	}
 	if len(resp.Codes) != 10 {
@@ -336,7 +336,7 @@ func TestRegenerateRecoveryCodes(t *testing.T) {
 	}
 
 	var status api.UserSecurityStatus
-	if err := json.NewDecoder(statusW.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(statusW.Body, &status); err != nil {
 		t.Fatalf("decode security status: %v", err)
 	}
 	if !status.RecoveryCodesGenerated {

@@ -1,15 +1,16 @@
 package database
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
 	"hitkeep/internal/api"
+	json "hitkeep/internal/jsonapi"
 )
 
 type ecommerceEventRecord struct {
@@ -211,14 +212,14 @@ func (s *Store) GetEcommerceTopProducts(ctx context.Context, params api.Ecommerc
 		})
 	}
 
-	sort.Slice(stats, func(i, j int) bool {
-		if stats[i].Revenue == stats[j].Revenue {
-			if stats[i].Orders == stats[j].Orders {
-				return stats[i].ItemName < stats[j].ItemName
+	slices.SortFunc(stats, func(left, right api.EcommerceProductStat) int {
+		if left.Revenue == right.Revenue {
+			if left.Orders == right.Orders {
+				return cmp.Compare(left.ItemName, right.ItemName)
 			}
-			return stats[i].Orders > stats[j].Orders
+			return cmp.Compare(right.Orders, left.Orders)
 		}
-		return stats[i].Revenue > stats[j].Revenue
+		return cmp.Compare(right.Revenue, left.Revenue)
 	})
 
 	limit := normalizeEcommerceLimit(params.Limit)
@@ -267,17 +268,17 @@ func (s *Store) GetEcommerceSources(ctx context.Context, params api.EcommercePar
 		})
 	}
 
-	sort.Slice(stats, func(i, j int) bool {
-		if stats[i].Revenue == stats[j].Revenue {
-			if stats[i].Orders == stats[j].Orders {
-				if stats[i].UTMSource == stats[j].UTMSource {
-					return stats[i].UTMCampaign < stats[j].UTMCampaign
+	slices.SortFunc(stats, func(left, right api.EcommerceSourceStat) int {
+		if left.Revenue == right.Revenue {
+			if left.Orders == right.Orders {
+				if left.UTMSource == right.UTMSource {
+					return cmp.Compare(left.UTMCampaign, right.UTMCampaign)
 				}
-				return stats[i].UTMSource < stats[j].UTMSource
+				return cmp.Compare(left.UTMSource, right.UTMSource)
 			}
-			return stats[i].Orders > stats[j].Orders
+			return cmp.Compare(right.Orders, left.Orders)
 		}
-		return stats[i].Revenue > stats[j].Revenue
+		return cmp.Compare(right.Revenue, left.Revenue)
 	})
 
 	limit := normalizeEcommerceLimit(params.Limit)
@@ -590,11 +591,11 @@ func ecommerceMetricStats(counts map[string]int, limit int) []api.MetricStat {
 	for name, value := range counts {
 		stats = append(stats, api.MetricStat{Name: name, Value: value})
 	}
-	sort.Slice(stats, func(i, j int) bool {
-		if stats[i].Value == stats[j].Value {
-			return stats[i].Name < stats[j].Name
+	slices.SortFunc(stats, func(left, right api.MetricStat) int {
+		if left.Value == right.Value {
+			return cmp.Compare(left.Name, right.Name)
 		}
-		return stats[i].Value > stats[j].Value
+		return cmp.Compare(right.Value, left.Value)
 	})
 	limit = normalizeEcommerceLimit(limit)
 	if len(stats) > limit {
@@ -637,6 +638,14 @@ func firstString(values ...any) (string, bool) {
 	return "", false
 }
 
+type float64Provider interface {
+	Float64() (float64, error)
+}
+
+type int64Provider interface {
+	Int64() (int64, error)
+}
+
 func firstFloat(values ...any) (float64, bool) {
 	for _, value := range values {
 		switch typed := value.(type) {
@@ -650,7 +659,7 @@ func firstFloat(values ...any) (float64, bool) {
 			return float64(typed), true
 		case int32:
 			return float64(typed), true
-		case json.Number:
+		case float64Provider:
 			parsed, err := typed.Float64()
 			if err == nil {
 				return parsed, true
@@ -673,7 +682,7 @@ func firstInt(values ...any) (int, bool) {
 			return int(typed), true
 		case float32:
 			return int(typed), true
-		case json.Number:
+		case int64Provider:
 			parsed, err := typed.Int64()
 			if err == nil {
 				return int(parsed), true

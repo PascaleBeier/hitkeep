@@ -1,6 +1,6 @@
 {
-  "golangci-lint": "2.12.2",
+  "golangci-lint": "2.13.0",
   "govulncheck": "1.6.0",
-  "staticcheck": "0.7.0",
-  "zizmor": "1.28.0"
+  "staticcheck": "0.8.0-rc.1",
+  "zizmor": "1.29.0"
 }

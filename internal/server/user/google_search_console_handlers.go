@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -17,6 +16,7 @@ import (
 	"hitkeep/internal/appurl"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/searchconsole"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/worker"
@@ -47,7 +47,7 @@ func (h *handler) handleGetGoogleSearchConsoleStatus() http.HandlerFunc {
 
 		status := h.buildGoogleSearchConsoleStatus(r, teamID, role)
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(status); err != nil {
+		if err := json.MarshalWrite(w, status); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console status", "error", err, "team_id", teamID)
 		}
 	}
@@ -90,7 +90,7 @@ func (h *handler) handleConnectGoogleSearchConsole() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(api.GoogleSearchConsoleConnectResponse{AuthURL: authURL}); err != nil {
+		if err := json.MarshalWrite(w, api.GoogleSearchConsoleConnectResponse{AuthURL: authURL}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console connect response", "error", err, "team_id", teamID)
 		}
 	}
@@ -140,7 +140,7 @@ func (h *handler) handleListGoogleSearchConsoleProperties() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
+		if err := json.MarshalWrite(w, resp); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console properties", "error", err, "team_id", teamID)
 		}
 	}
@@ -196,7 +196,7 @@ func (h *handler) handleGetGoogleSearchConsoleSiteMapping() http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
+		if err := json.MarshalWrite(w, resp); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console site mapping", "error", err, "site_id", siteID)
 		}
 	}
@@ -218,9 +218,7 @@ func (h *handler) handleMapGoogleSearchConsoleSiteProperty() http.HandlerFunc {
 		}
 
 		var req api.GoogleSearchConsoleMapPropertyRequest
-		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&req); err != nil {
+		if err := json.UnmarshalReadStrict(http.MaxBytesReader(w, r.Body, 1<<20), &req); err != nil {
 			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
 			return
 		}
@@ -278,7 +276,7 @@ func (h *handler) handleMapGoogleSearchConsoleSiteProperty() http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
+		if err := json.MarshalWrite(w, resp); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console site mapping", "error", err, "site_id", siteID)
 		}
 	}
@@ -327,7 +325,7 @@ func (h *handler) handleUnmapGoogleSearchConsoleSiteProperty() http.HandlerFunc 
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
+		if err := json.MarshalWrite(w, resp); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console site mapping", "error", err, "site_id", siteID)
 		}
 	}
@@ -405,7 +403,7 @@ func (h *handler) handleRequestGoogleSearchConsoleSiteSync() http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
+		if err := json.MarshalWrite(w, resp); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console sync response", "error", err, "site_id", siteID)
 		}
 	}
@@ -439,9 +437,7 @@ func decodeGoogleSearchConsoleConnectReturnPath(w http.ResponseWriter, r *http.R
 	if r.Body == nil {
 		return sanitizeGoogleSearchConsoleReturnPath(req.ReturnPath), true
 	}
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+	if err := json.UnmarshalReadOptionalStrict(http.MaxBytesReader(w, r.Body, 1<<20), &req); err != nil && !errors.Is(err, io.EOF) {
 		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
 		return "", false
 	}
@@ -553,7 +549,7 @@ func (h *handler) handleDisconnectGoogleSearchConsole() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+		if err := json.MarshalWrite(w, map[string]string{"status": "ok"}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console disconnect response", "error", err, "team_id", teamID)
 		}
 	}

@@ -2,7 +2,6 @@ package blocking
 
 import (
 	"embed"
-	"encoding/json"
 	"fmt"
 	"net/netip"
 	"os"
@@ -10,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 //go:embed default_spam_filter.json

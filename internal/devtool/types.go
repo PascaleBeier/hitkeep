@@ -249,6 +249,11 @@ type SourceChangeResult struct {
 	Truncated        bool     `json:"changed_files_truncated,omitempty"`
 }
 
+type errorDataCarrier interface {
+	error
+	ErrorData() any
+}
+
 type CacheEntry struct {
 	Kind       string    `json:"kind"`
 	Key        string    `json:"key"`
@@ -318,8 +323,7 @@ func ErrorEnvelope(command, workspaceID string, err error) Envelope {
 		Error:         redactError(err.Error()),
 		Timestamp:     time.Now().UTC(),
 	}
-	var dataCarrier interface{ ErrorData() any }
-	if errors.As(err, &dataCarrier) {
+	if dataCarrier, ok := errors.AsType[errorDataCarrier](err); ok {
 		envelope.Data = dataCarrier.ErrorData()
 	}
 	return envelope

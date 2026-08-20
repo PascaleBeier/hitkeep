@@ -1,7 +1,6 @@
 package sites
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -15,6 +14,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/exportfmt"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -119,7 +119,7 @@ func (h *handler) handleGetSiteHits() http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(result); err != nil {
+		if err := json.MarshalWrite(w, result); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}

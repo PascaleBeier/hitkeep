@@ -2,8 +2,9 @@ package devtool
 
 import (
 	_ "embed"
-	"encoding/json"
 	"fmt"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 // toolVersionsJSON is the single source of truth for development tools which

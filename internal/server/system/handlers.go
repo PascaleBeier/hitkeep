@@ -2,10 +2,10 @@ package system
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -82,7 +82,7 @@ func writeNotReady(ctx context.Context, w http.ResponseWriter, reason string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Retry-After", "5")
 	w.WriteHeader(http.StatusServiceUnavailable)
-	if err := json.NewEncoder(w).Encode(map[string]any{
+	if err := json.MarshalWrite(w, map[string]any{
 		"status":              "not_ready",
 		"reason":              reason,
 		"retry_after_seconds": 5,
@@ -106,7 +106,7 @@ func (h *handler) handleGetStatus() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(response); err != nil {
+		if err := json.MarshalWrite(w, response); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}

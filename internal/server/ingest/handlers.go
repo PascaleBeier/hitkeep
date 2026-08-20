@@ -2,7 +2,6 @@ package ingest
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -22,6 +21,7 @@ import (
 	"hitkeep/internal/blocking"
 	"hitkeep/internal/database"
 	"hitkeep/internal/ipmeta"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -154,7 +154,7 @@ func (h *handler) handleServerPageviewIngestLeader() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 		var payload api.ServerPageviewIngestRequest
-		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		if err := json.UnmarshalRead(r.Body, &payload); err != nil {
 			h.recordRejection()
 			http.Error(w, "Bad request body", http.StatusBadRequest)
 			return
@@ -253,7 +253,7 @@ func (h *handler) handleServerEventIngestLeader() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 		var payload api.ServerEventIngestRequest
-		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		if err := json.UnmarshalRead(r.Body, &payload); err != nil {
 			h.recordRejection()
 			http.Error(w, "Bad request body", http.StatusBadRequest)
 			return
@@ -584,7 +584,7 @@ func (h *handler) handleIngestLeader(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var payload browserIngestPayload
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+	if err := json.UnmarshalRead(r.Body, &payload); err != nil {
 		h.recordRejection()
 		http.Error(w, "Bad request body", http.StatusBadRequest)
 		return
@@ -770,7 +770,7 @@ func (h *handler) handleIngestWebVitalsLeader(w http.ResponseWriter, r *http.Req
 	}
 
 	var payload webVitalPayload
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+	if err := json.UnmarshalRead(r.Body, &payload); err != nil {
 		h.recordRejection()
 		http.Error(w, "Bad request body", http.StatusBadRequest)
 		return
@@ -937,7 +937,7 @@ func (h *handler) handleIngestEventLeader(w http.ResponseWriter, r *http.Request
 	}
 
 	var payload eventPayload
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+	if err := json.UnmarshalRead(r.Body, &payload); err != nil {
 		h.recordRejection()
 		http.Error(w, "Bad request body", http.StatusBadRequest)
 		return

@@ -1,6 +1,7 @@
 package importables
 
 import (
+	"cmp"
 	"context"
 	"encoding/csv"
 	"errors"
@@ -9,7 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -462,7 +463,7 @@ func (b *simpleAnalyticsManifestBuilder) emitTraffic(ctx context.Context, sink S
 	for key := range b.daily {
 		dateKeys = append(dateKeys, key)
 	}
-	sort.Strings(dateKeys)
+	slices.Sort(dateKeys)
 	for _, key := range dateKeys {
 		day := b.daily[key]
 		if err := sink.PutTraffic(ctx, TrafficRow{
@@ -484,19 +485,17 @@ func (b *simpleAnalyticsManifestBuilder) emitDimensions(ctx context.Context, sin
 	for key := range b.dimensions {
 		dimensionKeys = append(dimensionKeys, key)
 	}
-	sort.Slice(dimensionKeys, func(i, j int) bool {
-		a := dimensionKeys[i]
-		c := dimensionKeys[j]
-		if a.date != c.date {
-			return a.date < c.date
+	slices.SortFunc(dimensionKeys, func(left, right simpleAnalyticsDimensionKey) int {
+		if left.date != right.date {
+			return cmp.Compare(left.date, right.date)
 		}
-		if a.dimension != c.dimension {
-			return a.dimension < c.dimension
+		if left.dimension != right.dimension {
+			return cmp.Compare(left.dimension, right.dimension)
 		}
-		if a.name != c.name {
-			return a.name < c.name
+		if left.name != right.name {
+			return cmp.Compare(left.name, right.name)
 		}
-		return a.detail < c.detail
+		return cmp.Compare(left.detail, right.detail)
 	})
 	for _, key := range dimensionKeys {
 		dim := b.dimensions[key]
@@ -518,9 +517,9 @@ func (b *simpleAnalyticsManifestBuilder) emitDimensions(ctx context.Context, sin
 }
 
 func (b *simpleAnalyticsManifestBuilder) build() *api.ImportManifest {
-	sort.Strings(b.manifest.Files)
-	sort.Strings(b.manifest.IgnoredFiles)
-	sort.Strings(b.dataset.Files)
+	slices.Sort(b.manifest.Files)
+	slices.Sort(b.manifest.IgnoredFiles)
+	slices.Sort(b.dataset.Files)
 	b.manifest.Datasets = []api.ImportDatasetSummary{*b.dataset}
 	b.populateOverlapCandidates()
 	if b.manifest.RowsAccepted > 0 {

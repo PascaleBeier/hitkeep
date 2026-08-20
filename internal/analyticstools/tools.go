@@ -2,7 +2,6 @@ package analyticstools
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"hitkeep/internal/analyticscatalog"
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 )
 
 type Config struct {

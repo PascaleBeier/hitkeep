@@ -43,20 +43,14 @@ func agentOptimizedCommand(args []string) []string {
 			if len(result) > 2 && strings.Contains(result[2], "govulncheck") && !hasArgument(result[3:], "-format") && !hasExactArgument(result[3:], "-json") {
 				result = slices.Insert(result, 3, "-format=json")
 			}
+			if len(result) > 2 && strings.Contains(result[2], "golangci-lint") {
+				result = appendGolangCIOutputArguments(result)
+			}
 		}
 		return result
 	}
 	if strings.Contains(filepath.Base(result[0]), "golangci-lint") {
-		if !hasArgument(result, "--output.json.path") {
-			result = append(result, "--output.text.path=", "--output.json.path=stdout")
-		}
-		if !hasArgument(result, "--show-stats") {
-			result = append(result, "--show-stats=false")
-		}
-		if !hasArgument(result, "--color") {
-			result = append(result, "--color=never")
-		}
-		return result
+		return appendGolangCIOutputArguments(result)
 	}
 	if filepath.Base(result[0]) == "zizmor" {
 		if !hasArgument(result, "--format") {
@@ -79,6 +73,19 @@ func agentOptimizedCommand(args []string) []string {
 		}
 	}
 	return result
+}
+
+func appendGolangCIOutputArguments(args []string) []string {
+	if !hasArgument(args, "--output.json.path") {
+		args = append(args, "--output.text.path=", "--output.json.path=stdout")
+	}
+	if !hasArgument(args, "--show-stats") {
+		args = append(args, "--show-stats=false")
+	}
+	if !hasArgument(args, "--color") {
+		args = append(args, "--color=never")
+	}
+	return args
 }
 
 func hasExactArgument(args []string, name string) bool {

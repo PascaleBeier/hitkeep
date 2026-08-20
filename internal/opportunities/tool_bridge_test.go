@@ -2,7 +2,6 @@ package opportunities
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -14,6 +13,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 )
 
 func setupToolBridgeStore(t *testing.T) (*database.Store, uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID) {

@@ -2,7 +2,6 @@ package opportunities
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,6 +14,7 @@ import (
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 

@@ -2,7 +2,6 @@ package searchconsolereports
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,6 +14,7 @@ import (
 	"hitkeep/internal/auth"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -51,7 +51,7 @@ func TestSearchConsoleOverviewReturnsMappedSiteMetrics(t *testing.T) {
 		t.Fatalf("expected status %d, got %d body=%s", http.StatusOK, rec.Code, rec.Body.String())
 	}
 	var overview api.SearchConsoleOverview
-	if err := json.NewDecoder(rec.Body).Decode(&overview); err != nil {
+	if err := json.UnmarshalRead(rec.Body, &overview); err != nil {
 		t.Fatalf("decode overview: %v", err)
 	}
 	if overview.DataSource != "google_search_console" {
@@ -119,7 +119,7 @@ func TestSearchConsoleSeriesReturnsDailyRowsSortedByDate(t *testing.T) {
 	}
 	body := rec.Body.String()
 	var resp api.SearchConsoleSeriesResponse
-	if err := json.NewDecoder(strings.NewReader(body)).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(strings.NewReader(body), &resp); err != nil {
 		t.Fatalf("decode series: %v", err)
 	}
 	if resp.DataSource != "google_search_console" || len(resp.Series) != 2 {
@@ -150,7 +150,7 @@ func TestSearchConsoleSeriesReturnsEmptyArrayWhenNoRowsMatch(t *testing.T) {
 	}
 	body := rec.Body.String()
 	var resp api.SearchConsoleSeriesResponse
-	if err := json.NewDecoder(strings.NewReader(body)).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(strings.NewReader(body), &resp); err != nil {
 		t.Fatalf("decode series: %v", err)
 	}
 	if resp.Series == nil || len(resp.Series) != 0 {
@@ -201,7 +201,7 @@ func TestSearchConsoleQueriesHonorDateFilters(t *testing.T) {
 	}
 	body := rec.Body.String()
 	var resp api.SearchConsoleDimensionResponse
-	if err := json.NewDecoder(strings.NewReader(body)).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(strings.NewReader(body), &resp); err != nil {
 		t.Fatalf("decode query rows: %v", err)
 	}
 	if resp.DataSource != "google_search_console" || resp.Dimension != "query" || len(resp.Rows) != 1 {
@@ -256,7 +256,7 @@ func TestSearchConsolePagesApplyCountryAndDeviceFilters(t *testing.T) {
 	}
 	body := rec.Body.String()
 	var resp api.SearchConsoleDimensionResponse
-	if err := json.NewDecoder(strings.NewReader(body)).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(strings.NewReader(body), &resp); err != nil {
 		t.Fatalf("decode page rows: %v", err)
 	}
 	if resp.Dimension != "page" || len(resp.Rows) != 1 {
@@ -305,7 +305,7 @@ func TestSearchConsoleOverviewAppliesPathFilterToPageURLs(t *testing.T) {
 		t.Fatalf("expected status %d, got %d body=%s", http.StatusOK, rec.Code, rec.Body.String())
 	}
 	var overview api.SearchConsoleOverview
-	if err := json.NewDecoder(rec.Body).Decode(&overview); err != nil {
+	if err := json.UnmarshalRead(rec.Body, &overview); err != nil {
 		t.Fatalf("decode overview: %v", err)
 	}
 	if overview.Clicks != 6 || overview.Impressions != 60 {
@@ -330,7 +330,7 @@ func TestSearchConsoleQueriesReturnEmptyRowsArrayWhenNoRowsMatch(t *testing.T) {
 	}
 	body := rec.Body.String()
 	var resp api.SearchConsoleDimensionResponse
-	if err := json.NewDecoder(strings.NewReader(body)).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(strings.NewReader(body), &resp); err != nil {
 		t.Fatalf("decode query rows: %v", err)
 	}
 	if resp.Rows == nil || len(resp.Rows) != 0 {
@@ -398,7 +398,7 @@ func TestSearchConsoleBreakdownsReturnCountryRows(t *testing.T) {
 		t.Fatalf("expected status %d, got %d body=%s", http.StatusOK, rec.Code, rec.Body.String())
 	}
 	var resp api.SearchConsoleDimensionResponse
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(rec.Body, &resp); err != nil {
 		t.Fatalf("decode country rows: %v", err)
 	}
 	if resp.Dimension != "country" || len(resp.Rows) != 2 {
@@ -518,7 +518,7 @@ func TestSearchConsoleReportsReadTenantScopedFacts(t *testing.T) {
 		t.Fatalf("expected status %d, got %d body=%s", http.StatusOK, rec.Code, rec.Body.String())
 	}
 	var overview api.SearchConsoleOverview
-	if err := json.NewDecoder(rec.Body).Decode(&overview); err != nil {
+	if err := json.UnmarshalRead(rec.Body, &overview); err != nil {
 		t.Fatalf("decode overview: %v", err)
 	}
 	if overview.Clicks != 4 || overview.Impressions != 40 {

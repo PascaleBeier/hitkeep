@@ -3,16 +3,18 @@ package devtool
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
 
 	"github.com/google/uuid"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 const (
@@ -246,8 +248,8 @@ func environmentOrDefault(name, fallback string) string {
 
 func screenshotCommandDetail(log string) string {
 	lines := strings.Split(strings.TrimSpace(log), "\n")
-	for index := len(lines) - 1; index >= 0; index-- {
-		line := strings.TrimSpace(lines[index])
+	for _, line := range slices.Backward(lines) {
+		line := strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "$") {
 			continue
 		}

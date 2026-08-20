@@ -4,13 +4,13 @@ package system
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -52,7 +52,7 @@ func TestHandleGetStatusIncludesCloudMetadata(t *testing.T) {
 		Version    string          `json:"version"`
 		Cloud      *map[string]any `json:"cloud"`
 	}
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode status response: %v", err)
 	}
 	if resp.Cloud == nil {

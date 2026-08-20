@@ -89,7 +89,7 @@ func releaseMetadataFixture(t *testing.T) string {
 	writeFixtureFile(t, root, ".release-please-manifest.json", `{ ".": "2.12.0" }`)
 	writeFixtureFile(t, root, "server.json", `{"version":"2.12.0"}`)
 	writeFixtureFile(t, root, "frontend/dashboard/package.json", `{"version":"2.12.0"}`)
-	writeFixtureFile(t, root, "frontend/dashboard/package-lock.json", `{"version":"2.12.0","packages":{"":{"version":"2.12.0"}}}`)
+	writeFixtureFile(t, root, "frontend/dashboard/package-lock.json", `{"lockfileVersion":4,"packages":{"":{"version":"2.12.0"}}}`)
 	writeFixtureFile(t, root, "frontend/tracker/package.json", `{"version":"2.12.0"}`)
 	writeFixtureFile(t, root, "frontend/dashboard/src/tracker/version.ts", "export const TRACKER_VERSION = '2.12.0'; // x-release-please-version\n")
 	writeFixtureFile(t, root, "charts/hitkeep/Chart.yaml", "version: 2.12.0\nappVersion: 2.12.0\n")
@@ -101,7 +101,7 @@ func releaseMetadataFixture(t *testing.T) string {
 }
 
 func fixtureReleasePleaseConfig() string {
-	return `{"packages":{".":{"extra-files":[{"type":"json","path":"server.json","jsonpath":"$.version"},{"type":"json","path":"frontend/dashboard/package.json","jsonpath":"$.version"},{"type":"json","path":"frontend/dashboard/package-lock.json","jsonpath":"$.version"},{"type":"json","path":"frontend/dashboard/package-lock.json","jsonpath":"$['packages']['']['version']"},{"type":"json","path":"frontend/tracker/package.json","jsonpath":"$.version"},{"type":"generic","path":"frontend/dashboard/src/tracker/version.ts"},{"type":"yaml","path":"charts/hitkeep/Chart.yaml","jsonpath":"$.version"},{"type":"yaml","path":"charts/hitkeep/Chart.yaml","jsonpath":"$.appVersion"},{"type":"generic","path":"charts/hitkeep/README.md"}]}}}`
+	return `{"packages":{".":{"extra-files":[{"type":"json","path":"server.json","jsonpath":"$.version"},{"type":"json","path":"frontend/dashboard/package.json","jsonpath":"$.version"},{"type":"json","path":"frontend/dashboard/package-lock.json","jsonpath":"$['packages']['']['version']"},{"type":"json","path":"frontend/tracker/package.json","jsonpath":"$.version"},{"type":"generic","path":"frontend/dashboard/src/tracker/version.ts"},{"type":"yaml","path":"charts/hitkeep/Chart.yaml","jsonpath":"$.version"},{"type":"yaml","path":"charts/hitkeep/Chart.yaml","jsonpath":"$.appVersion"},{"type":"generic","path":"charts/hitkeep/README.md"}]}}}`
 }
 
 func writeFixtureFile(t *testing.T, root, name, contents string) {

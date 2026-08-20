@@ -7,7 +7,6 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -25,6 +24,7 @@ import (
 
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
 )
@@ -355,7 +355,7 @@ func TestHandleSignupSendsVerificationEmail(t *testing.T) {
 	}
 
 	var resp signupResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if resp.Status != "verification_sent" {
@@ -637,7 +637,7 @@ func assertSignupVerificationResendAccepted(t *testing.T, w *httptest.ResponseRe
 		t.Fatalf("status = %d, want %d: %s", w.Code, http.StatusAccepted, w.Body.String())
 	}
 	var response resendSignupVerificationResponse
-	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+	if err := json.UnmarshalRead(w.Body, &response); err != nil {
 		t.Fatalf("decode resend response: %v", err)
 	}
 	if response.Status != "accepted" || response.RetryAfterSeconds != int(database.PendingSignupVerificationResendCooldown/time.Second) {
@@ -966,7 +966,7 @@ func TestHandleSignupPreservesPaidAnnualIntentWithoutStartingCheckout(t *testing
 	}
 
 	var resp signupResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if resp.Status != "verification_sent" {
@@ -1612,7 +1612,7 @@ func TestHandleCreateBillingPortalSession(t *testing.T) {
 	}
 
 	var resp billingPortalSessionResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if resp.URL != "https://billing.stripe.test/session" {
@@ -1676,7 +1676,7 @@ func TestHandleCreateBillingCheckoutSession(t *testing.T) {
 	}
 
 	var resp billingCheckoutSessionResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if resp.URL != "https://checkout.stripe.test/session" {

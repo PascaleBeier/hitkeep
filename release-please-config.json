@@ -17,11 +17,6 @@
         {
           "type": "json",
           "path": "frontend/dashboard/package-lock.json",
-          "jsonpath": "$.version"
-        },
-        {
-          "type": "json",
-          "path": "frontend/dashboard/package-lock.json",
           "jsonpath": "$['packages']['']['version']"
         },
         {

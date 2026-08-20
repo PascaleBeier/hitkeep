@@ -2,7 +2,6 @@ package events
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -16,6 +15,7 @@ import (
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/exportfmt"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/filterparams"
 	"hitkeep/internal/server/shared"
 )
@@ -111,7 +111,7 @@ func (h *handler) handleGetEventNames() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(names); err != nil {
+		if err := json.MarshalWrite(w, names); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -156,7 +156,7 @@ func (h *handler) handleGetEventPropertyKeys() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(keys); err != nil {
+		if err := json.MarshalWrite(w, keys); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -205,7 +205,7 @@ func (h *handler) handleGetEventPropertyBreakdown() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(breakdown); err != nil {
+		if err := json.MarshalWrite(w, breakdown); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -392,7 +392,7 @@ func (h *handler) eventQueryHandler(label string, query func(context.Context, *d
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(result); err != nil {
+		if err := json.MarshalWrite(w, result); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}

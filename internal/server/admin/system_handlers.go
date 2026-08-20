@@ -3,7 +3,6 @@ package admin
 import (
 	"context"
 	"encoding/csv"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -21,6 +20,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/socialauth"
 	"hitkeep/internal/worker"
@@ -247,12 +247,12 @@ func (h *handler) handleGetSearchConsole() http.HandlerFunc {
 
 func (h *handler) handleGetAI() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		status := aiSystemStatus(h.ctx.Config, h.ctx.Store)
+		status := aiSystemStatus(r.Context(), h.ctx.Config, h.ctx.Store)
 		writeJSON(r.Context(), w, http.StatusOK, status)
 	}
 }
 
-func aiSystemStatus(cfg *config.Config, store *database.Store) api.SystemAIStatus {
+func aiSystemStatus(ctx context.Context, cfg *config.Config, store *database.Store) api.SystemAIStatus {
 	status := api.SystemAIStatus{
 		ConfigMode: "self_hosted",
 	}
@@ -288,7 +288,7 @@ func aiSystemStatus(cfg *config.Config, store *database.Store) api.SystemAIStatu
 		window = 24 * time.Hour
 	}
 	since := time.Now().UTC().Add(-window)
-	if usage, err := store.GetAIUsageSince(context.Background(), since); err == nil {
+	if usage, err := store.GetAIUsageSince(ctx, since); err == nil {
 		status.RequestsUsed = usage.Requests
 		status.TokensUsed = usage.Tokens
 		status.BudgetExhausted = (status.RequestLimit > 0 && status.RequestsUsed >= status.RequestLimit) || (status.TokenLimit > 0 && status.TokensUsed >= status.TokenLimit)
@@ -296,7 +296,7 @@ func aiSystemStatus(cfg *config.Config, store *database.Store) api.SystemAIStatu
 			status.Status = "budget_exhausted"
 		}
 	}
-	if summary, err := store.GetAIRunSummarySince(context.Background(), since); err == nil {
+	if summary, err := store.GetAIRunSummarySince(ctx, since); err == nil {
 		status.LastSuccessAt = summary.LastSuccessAt
 		status.LastAttemptAt = summary.LastAttemptAt
 		status.LastErrorCategory = summary.LastErrorCategory
@@ -304,7 +304,7 @@ func aiSystemStatus(cfg *config.Config, store *database.Store) api.SystemAIStatu
 			status.Status = "needs_attention"
 		}
 	}
-	askAI := shared.AskAIStatus(context.Background(), cfg, store)
+	askAI := shared.AskAIStatus(ctx, cfg, store)
 	status.AskAIAvailable = askAI.Available
 	return status
 }
@@ -834,7 +834,7 @@ func (h *handler) handleExportAudit() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Content-Disposition", "attachment; filename=instance-audit-export.json")
-		if err := json.NewEncoder(w).Encode(entries); err != nil {
+		if err := json.MarshalWrite(w, entries); err != nil {
 			shared.LoggerFromContext(ctx).Error("Failed to encode instance audit export", "error", err)
 		}
 	}
@@ -843,7 +843,7 @@ func (h *handler) handleExportAudit() http.HandlerFunc {
 func writeJSON(ctx context.Context, w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(data); err != nil {
+	if err := json.MarshalWrite(w, data); err != nil {
 		shared.LoggerFromContext(ctx).Error("Failed to encode response", "error", err)
 	}
 }

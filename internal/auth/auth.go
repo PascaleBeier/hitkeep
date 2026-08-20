@@ -35,13 +35,11 @@ func GenerateTokenWithDuration(secret string, issuer string, userID uuid.UUID, d
 	now := time.Now()
 	expiresAt := now.Add(duration)
 	claims := Claims{
-		UserID: userID,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expiresAt),
-			IssuedAt:  jwt.NewNumericDate(now),
-			Issuer:    issuer,
-			Audience:  jwt.ClaimStrings{issuer},
-		},
+		UserID:    userID,
+		ExpiresAt: jwt.NewNumericDate(expiresAt),
+		IssuedAt:  jwt.NewNumericDate(now),
+		Issuer:    issuer,
+		Audience:  jwt.ClaimStrings{issuer},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

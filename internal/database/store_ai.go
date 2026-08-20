@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	json "hitkeep/internal/jsonapi"
 )
 
 type sqlQueryExecContext interface {
@@ -256,12 +256,8 @@ func sameOpportunityJSON(left, right string) bool {
 }
 
 func canonicalOpportunityJSON(value string) (string, error) {
-	var decoded any
-	if err := json.Unmarshal([]byte(value), &decoded); err != nil {
-		return "", err
-	}
-	raw, err := json.Marshal(decoded)
-	if err != nil {
+	raw := json.RawMessage(value)
+	if err := raw.Canonicalize(); err != nil {
 		return "", err
 	}
 	return string(raw), nil

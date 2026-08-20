@@ -104,8 +104,7 @@ func deleteSiteAnalyticsOnly(ctx context.Context, store *Store, siteID uuid.UUID
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	for i := len(tables) - 1; i >= 0; i-- {
-		table := tables[i]
+	for _, table := range slices.Backward(tables) {
 		if !isSafeIdentifier(table) {
 			return fmt.Errorf("unsafe table name %q", table)
 		}

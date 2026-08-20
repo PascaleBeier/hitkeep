@@ -3,7 +3,6 @@ package admin
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -23,6 +22,7 @@ import (
 	"hitkeep/internal/blocking"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/testutil/testdb"
@@ -162,7 +162,7 @@ func TestHandleGetSystem(t *testing.T) {
 
 	responseBody := w.Body.String()
 	var info api.SystemInfo
-	if err := json.NewDecoder(strings.NewReader(responseBody)).Decode(&info); err != nil {
+	if err := json.UnmarshalRead(strings.NewReader(responseBody), &info); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if info.PublicURL != "http://localhost:8080" {
@@ -250,7 +250,7 @@ func TestHandleGetAIStatusIsNonSecret(t *testing.T) {
 	}
 
 	var status api.SystemAIStatus
-	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(w.Body, &status); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if !status.Enabled || !status.Configured {
@@ -299,7 +299,7 @@ func TestHandleGetAIStatusIgnoresStaleProviderErrorsOutsideBudgetWindow(t *testi
 	}
 
 	var status api.SystemAIStatus
-	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(w.Body, &status); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if status.Status != "configured" {
@@ -332,7 +332,7 @@ func TestHandleGetAIStatusReportsCloudManagedMode(t *testing.T) {
 	}
 
 	var status api.SystemAIStatus
-	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(w.Body, &status); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if status.ConfigMode != "cloud_managed" {
@@ -356,7 +356,7 @@ func TestHandleGetAIStatusReportsAskAIAvailability(t *testing.T) {
 	}
 
 	var status api.SystemAIStatus
-	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(w.Body, &status); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if !status.AskAIEnabled || !status.AskAIAvailable {
@@ -382,7 +382,7 @@ func TestAIStatusRejectsUnsupportedProviderConfig(t *testing.T) {
 	}
 
 	var status api.SystemAIStatus
-	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(w.Body, &status); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if status.Configured || status.Status != "not_configured" {
@@ -396,7 +396,7 @@ func TestAIStatusRejectsUnsupportedProviderConfig(t *testing.T) {
 		t.Fatalf("expected system 200, got %d: %s", systemW.Code, systemW.Body.String())
 	}
 	var info api.SystemInfo
-	if err := json.NewDecoder(systemW.Body).Decode(&info); err != nil {
+	if err := json.UnmarshalRead(systemW.Body, &info); err != nil {
 		t.Fatalf("decode system response: %v", err)
 	}
 	features := featureStatusByKey(info.EnabledFeatures)
@@ -421,7 +421,7 @@ func TestAIStatusAllowsGoAIProviderCredentialEnvironment(t *testing.T) {
 	}
 
 	var status api.SystemAIStatus
-	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(w.Body, &status); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if !status.Configured || status.Status != "configured" {
@@ -447,7 +447,7 @@ func TestAIStatusReportsMissingGatewayRouteAsNotConfigured(t *testing.T) {
 	}
 
 	var status api.SystemAIStatus
-	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(w.Body, &status); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if status.Configured || status.Status != "not_configured" || status.BaseURLConfigured {
@@ -471,7 +471,7 @@ func TestAIStatusReportsBedrockMantleInstanceRoleMissingRegionAsNotConfigured(t 
 	}
 
 	var status api.SystemAIStatus
-	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(w.Body, &status); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if status.Configured || status.AskAIAvailable || status.Status != "not_configured" {
@@ -493,7 +493,7 @@ func TestAIStatusAllowsKeylessLocalProviderConfig(t *testing.T) {
 	}
 
 	var status api.SystemAIStatus
-	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(w.Body, &status); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if !status.Configured || status.Status != "configured" {
@@ -527,7 +527,7 @@ func TestHandleGetHealth(t *testing.T) {
 	}
 
 	var health api.SystemHealth
-	if err := json.NewDecoder(w.Body).Decode(&health); err != nil {
+	if err := json.UnmarshalRead(w.Body, &health); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if health.Database != "ok" {
@@ -549,7 +549,7 @@ func TestHandleGetSearchConsoleReportsCredentialAndSyncHealth(t *testing.T) {
 	}
 
 	var status api.SystemSearchConsoleStatus
-	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(w.Body, &status); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if status.Status != "needs_attention" {
@@ -627,7 +627,7 @@ func TestHandleGetSearchConsoleReportsMissingCredentialsWithoutSecrets(t *testin
 	}
 
 	var status api.SystemSearchConsoleStatus
-	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(w.Body, &status); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if status.Status != "not_configured" || status.CredentialsStatus != "missing" || status.WorkerStatus != "disabled" {
@@ -681,7 +681,7 @@ func TestHandleGetStorage(t *testing.T) {
 	}
 
 	var storage api.SystemStorage
-	if err := json.NewDecoder(w.Body).Decode(&storage); err != nil {
+	if err := json.UnmarshalRead(w.Body, &storage); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if storage.SharedDBPath == "" {
@@ -719,7 +719,7 @@ func TestHandleGetIngestStats(t *testing.T) {
 	}
 
 	var stats api.SystemIngestStats
-	if err := json.NewDecoder(w.Body).Decode(&stats); err != nil {
+	if err := json.UnmarshalRead(w.Body, &stats); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	// Should have zero values but not error
@@ -778,7 +778,7 @@ func TestHandleGetIngestStatsAggregatesTenantStores(t *testing.T) {
 	}
 
 	var stats api.SystemIngestStats
-	if err := json.NewDecoder(w.Body).Decode(&stats); err != nil {
+	if err := json.UnmarshalRead(w.Body, &stats); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if stats.RecentHits < 1 {
@@ -800,7 +800,7 @@ func TestHandleGetBackups(t *testing.T) {
 	}
 
 	var status api.SystemBackupStatus
-	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(w.Body, &status); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	// Backups disabled by default
@@ -819,7 +819,7 @@ func TestHandleGetDatabaseAndRunCheckpoint(t *testing.T) {
 		t.Fatalf("expected database status 200, got %d: %s", getRecorder.Code, getRecorder.Body.String())
 	}
 	var before api.SystemDatabaseStatus
-	if err := json.NewDecoder(getRecorder.Body).Decode(&before); err != nil {
+	if err := json.UnmarshalRead(getRecorder.Body, &before); err != nil {
 		t.Fatalf("decode database status: %v", err)
 	}
 	if before.CheckpointIntervalMinutes <= 0 {
@@ -863,7 +863,7 @@ func TestHandleGetSpamFilter(t *testing.T) {
 	}
 
 	var status api.SystemSpamStatus
-	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(w.Body, &status); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if status.DBPath == "" {
@@ -888,7 +888,7 @@ func TestHandleGetCaches(t *testing.T) {
 	}
 
 	var status api.SystemCacheStatus
-	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(w.Body, &status); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if status.PermissionsCache.MaxSize != 8192 {
@@ -907,7 +907,7 @@ func TestHandleGetMail(t *testing.T) {
 	}
 
 	var status api.SystemMailStatus
-	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(w.Body, &status); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if status.Configured {
@@ -968,7 +968,7 @@ func TestHandleGetImportStageCleanup(t *testing.T) {
 	}
 
 	var status api.SystemImportStageCleanupStatus
-	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(w.Body, &status); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if !status.Enabled || status.RetentionDays != 7 || status.StaleImports != 1 || status.StaleFiles != 1 || status.StaleBytes != 42 {
@@ -1028,7 +1028,7 @@ func TestHandleRunImportStageCleanup(t *testing.T) {
 	}
 
 	var resp api.SystemImportStageCleanupRunResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if resp.Result.FilesCleaned != 1 || resp.Result.ImportsMarkedFailed != 1 {
@@ -1070,7 +1070,7 @@ func TestHandleListAudit(t *testing.T) {
 	}
 
 	var resp api.InstanceAuditListResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	// Empty audit log is valid
@@ -1098,7 +1098,7 @@ func TestHandleExportAuditJSON(t *testing.T) {
 	}
 
 	var entries []api.InstanceAuditEntry
-	if err := json.NewDecoder(w.Body).Decode(&entries); err != nil {
+	if err := json.UnmarshalRead(w.Body, &entries); err != nil {
 		t.Fatalf("decode export: %v", err)
 	}
 	if len(entries) == 0 {
@@ -1152,7 +1152,7 @@ func TestHandleAuditAppendsAndListsEntries(t *testing.T) {
 	}
 
 	var resp api.InstanceAuditListResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if resp.Total < 1 {
@@ -1196,7 +1196,7 @@ func TestHandleExportAuditHonorsLimit(t *testing.T) {
 	}
 
 	var entries []api.InstanceAuditEntry
-	if err := json.NewDecoder(w.Body).Decode(&entries); err != nil {
+	if err := json.UnmarshalRead(w.Body, &entries); err != nil {
 		t.Fatalf("decode export: %v", err)
 	}
 	if len(entries) != 2 {
@@ -1345,7 +1345,7 @@ func TestSystemMailRedaction(t *testing.T) {
 	}
 
 	var status api.SystemMailStatus
-	if err := json.NewDecoder(w.Body).Decode(&status); err != nil {
+	if err := json.UnmarshalRead(w.Body, &status); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if !status.Configured {

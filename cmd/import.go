@@ -6,7 +6,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -18,6 +17,7 @@ import (
 	"time"
 
 	"hitkeep/internal/api"
+	json "hitkeep/internal/jsonapi"
 )
 
 const importCLIChunkSize = 8 << 20
@@ -34,7 +34,7 @@ func (r *repeatedStrings) Set(value string) error {
 	return nil
 }
 
-func Import(args []string) {
+func Import(ctx context.Context, args []string) {
 	if len(args) == 0 {
 		printImportUsage()
 		os.Exit(2)
@@ -42,19 +42,19 @@ func Import(args []string) {
 
 	switch args[0] {
 	case "validate":
-		runImportValidate(args[1:])
+		runImportValidate(ctx, args[1:])
 	case "plausible":
-		runImportProvider("plausible", args[1:])
+		runImportProvider(ctx, "plausible", args[1:])
 	case "simpleanalytics":
-		runImportProvider("simpleanalytics", args[1:])
+		runImportProvider(ctx, "simpleanalytics", args[1:])
 	case "start":
-		runImportStart(args[1:])
+		runImportStart(ctx, args[1:])
 	case "status":
-		runImportStatus(args[1:])
+		runImportStatus(ctx, args[1:])
 	case "list":
-		runImportList(args[1:])
+		runImportList(ctx, args[1:])
 	case "delete":
-		runImportDelete(args[1:])
+		runImportDelete(ctx, args[1:])
 	default:
 		printImportUsage()
 		os.Exit(2)
@@ -80,7 +80,7 @@ Environment:
   HITKEEP_API_URL    optional compatibility override for remote API targets`)
 }
 
-func runImportValidate(args []string) {
+func runImportValidate(ctx context.Context, args []string) {
 	if len(args) == 0 {
 		fmt.Fprintln(os.Stderr, "validate requires an importer")
 		os.Exit(2)
@@ -88,76 +88,76 @@ func runImportValidate(args []string) {
 	provider := args[0]
 	opts := parseImportOptions(args[1:])
 	client := newImportAPIClient(opts.apiURL, opts.token)
-	job, err := client.uploadAndValidate(provider, opts.siteID, opts.paths())
+	job, err := client.uploadAndValidate(ctx, provider, opts.siteID, opts.paths())
 	checkCLI(err)
 	printImportJob(job)
 }
 
-func runImportProvider(provider string, args []string) {
+func runImportProvider(ctx context.Context, provider string, args []string) {
 	opts := parseImportOptions(args)
 	client := newImportAPIClient(opts.apiURL, opts.token)
-	job, err := client.uploadAndValidate(provider, opts.siteID, opts.paths())
+	job, err := client.uploadAndValidate(ctx, provider, opts.siteID, opts.paths())
 	checkCLI(err)
 	printImportJob(job)
 	if !opts.yes && !confirmImport() {
 		fmt.Fprintln(os.Stderr, "Import left validated but not started.")
 		return
 	}
-	job, err = client.start(opts.siteID, job.ID.String())
+	job, err = client.start(ctx, opts.siteID, job.ID.String())
 	checkCLI(err)
 	if opts.wait {
-		job, err = client.wait(opts.siteID, job.ID.String())
+		job, err = client.wait(ctx, opts.siteID, job.ID.String())
 		checkCLI(err)
 	}
 	printImportJob(job)
 }
 
-func runImportStart(args []string) {
+func runImportStart(ctx context.Context, args []string) {
 	opts := parseImportOptions(args)
 	if opts.importID == "" {
 		fmt.Fprintln(os.Stderr, "--import-id is required")
 		os.Exit(2)
 	}
 	client := newImportAPIClient(opts.apiURL, opts.token)
-	job, err := client.start(opts.siteID, opts.importID)
+	job, err := client.start(ctx, opts.siteID, opts.importID)
 	checkCLI(err)
 	if opts.wait {
-		job, err = client.wait(opts.siteID, opts.importID)
+		job, err = client.wait(ctx, opts.siteID, opts.importID)
 		checkCLI(err)
 	}
 	printImportJob(job)
 }
 
-func runImportStatus(args []string) {
+func runImportStatus(ctx context.Context, args []string) {
 	opts := parseImportOptions(args)
 	if opts.importID == "" {
 		fmt.Fprintln(os.Stderr, "--import-id is required")
 		os.Exit(2)
 	}
 	client := newImportAPIClient(opts.apiURL, opts.token)
-	job, err := client.get(opts.siteID, opts.importID)
+	job, err := client.get(ctx, opts.siteID, opts.importID)
 	checkCLI(err)
 	printImportJob(job)
 }
 
-func runImportList(args []string) {
+func runImportList(ctx context.Context, args []string) {
 	opts := parseImportOptions(args)
 	client := newImportAPIClient(opts.apiURL, opts.token)
-	list, err := client.list(opts.siteID)
+	list, err := client.list(ctx, opts.siteID)
 	checkCLI(err)
 	for _, job := range list.Imports {
 		fmt.Printf("%s  %-16s  %-10s  %s\n", job.ID, job.Provider, job.Status, job.CreatedAt.Format(time.RFC3339))
 	}
 }
 
-func runImportDelete(args []string) {
+func runImportDelete(ctx context.Context, args []string) {
 	opts := parseImportOptions(args)
 	if opts.importID == "" {
 		fmt.Fprintln(os.Stderr, "--import-id is required")
 		os.Exit(2)
 	}
 	client := newImportAPIClient(opts.apiURL, opts.token)
-	checkCLI(client.delete(opts.siteID, opts.importID))
+	checkCLI(client.delete(ctx, opts.siteID, opts.importID))
 	fmt.Println("Import deleted.")
 }
 
@@ -234,34 +234,34 @@ func newImportAPIClient(baseURL, token string) *importAPIClient {
 	return &importAPIClient{
 		baseURL: strings.TrimRight(baseURL, "/"),
 		token:   token,
-		client:  &http.Client{Timeout: 0},
+		client:  &http.Client{},
 	}
 }
 
-func (c *importAPIClient) uploadAndValidate(provider, siteID string, paths []string) (*api.ImportJob, error) {
+func (c *importAPIClient) uploadAndValidate(ctx context.Context, provider, siteID string, paths []string) (*api.ImportJob, error) {
 	files := make([]api.ImportUploadFileInput, 0, len(paths))
 	for _, path := range paths {
 		stat, err := os.Stat(path)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("stat import file %s: %w", path, err)
 		}
 		sum, err := hashLocalImportFile(path)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("hash import file %s: %w", path, err)
 		}
 		files = append(files, api.ImportUploadFileInput{Filename: filepath.Base(path), SizeBytes: stat.Size(), SHA256: sum})
 	}
 	var upload api.ImportUploadCreateResponse
-	if err := c.doJSON(http.MethodPost, fmt.Sprintf("/api/sites/%s/imports/%s/uploads", siteID, provider), api.ImportUploadCreateRequest{Files: files}, &upload); err != nil {
+	if err := c.doJSON(ctx, http.MethodPost, fmt.Sprintf("/api/sites/%s/imports/%s/uploads", siteID, provider), api.ImportUploadCreateRequest{Files: files}, &upload); err != nil {
 		return nil, err
 	}
 	for idx, file := range upload.Files {
-		if err := c.uploadFile(siteID, upload.ImportID.String(), file.ID.String(), paths[idx], upload.ChunkSize); err != nil {
+		if err := c.uploadFile(ctx, siteID, upload.ImportID.String(), file.ID.String(), paths[idx], upload.ChunkSize); err != nil {
 			return nil, err
 		}
 	}
 	var job api.ImportJob
-	if err := c.doJSON(http.MethodPost, fmt.Sprintf("/api/sites/%s/imports/uploads/%s/validate", siteID, upload.ImportID), nil, &job); err != nil {
+	if err := c.doJSON(ctx, http.MethodPost, fmt.Sprintf("/api/sites/%s/imports/uploads/%s/validate", siteID, upload.ImportID), nil, &job); err != nil {
 		return nil, err
 	}
 	return &job, nil
@@ -270,29 +270,29 @@ func (c *importAPIClient) uploadAndValidate(provider, siteID string, paths []str
 func hashLocalImportFile(path string) (string, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("open file: %w", err)
 	}
 	defer file.Close()
 
 	hash := sha256.New()
 	if _, err := io.Copy(hash, file); err != nil {
-		return "", err
+		return "", fmt.Errorf("read file: %w", err)
 	}
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
-func (c *importAPIClient) uploadFile(siteID, importID, fileID, path string, chunkSize int64) error {
+func (c *importAPIClient) uploadFile(ctx context.Context, siteID, importID, fileID, path string, chunkSize int64) error {
 	if chunkSize <= 0 {
 		chunkSize = importCLIChunkSize
 	}
 	file, err := os.Open(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("open import file %s: %w", path, err)
 	}
 	defer file.Close()
 	stat, err := file.Stat()
 	if err != nil {
-		return err
+		return fmt.Errorf("stat import file %s: %w", path, err)
 	}
 	for offset := int64(0); offset < stat.Size(); offset += chunkSize {
 		size := chunkSize
@@ -300,49 +300,51 @@ func (c *importAPIClient) uploadFile(siteID, importID, fileID, path string, chun
 			size = remaining
 		}
 		section := io.NewSectionReader(file, offset, size)
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodPut, fmt.Sprintf("%s/api/sites/%s/imports/uploads/%s/files/%s/chunks?offset=%d", c.baseURL, siteID, importID, fileID, offset), section)
+		req, err := http.NewRequestWithContext(ctx, http.MethodPut, fmt.Sprintf("%s/api/sites/%s/imports/uploads/%s/files/%s/chunks?offset=%d", c.baseURL, siteID, importID, fileID, offset), section)
 		if err != nil {
-			return err
+			return fmt.Errorf("build import chunk request: %w", err)
 		}
 		req.ContentLength = size
 		c.authorize(req)
 		resp, err := c.client.Do(req)
 		if err != nil {
-			return err
+			return fmt.Errorf("upload import file %s at offset %d: %w", path, offset, err)
 		}
 		if err := checkResponse(resp); err != nil {
-			return err
+			return fmt.Errorf("upload import file %s at offset %d: %w", path, offset, err)
 		}
 		_ = resp.Body.Close()
 	}
 	return nil
 }
 
-func (c *importAPIClient) start(siteID, importID string) (*api.ImportJob, error) {
+func (c *importAPIClient) start(ctx context.Context, siteID, importID string) (*api.ImportJob, error) {
 	var job api.ImportJob
-	err := c.doJSON(http.MethodPost, fmt.Sprintf("/api/sites/%s/imports/%s/start", siteID, importID), nil, &job)
+	err := c.doJSON(ctx, http.MethodPost, fmt.Sprintf("/api/sites/%s/imports/%s/start", siteID, importID), nil, &job)
 	return &job, err
 }
 
-func (c *importAPIClient) get(siteID, importID string) (*api.ImportJob, error) {
+func (c *importAPIClient) get(ctx context.Context, siteID, importID string) (*api.ImportJob, error) {
 	var job api.ImportJob
-	err := c.doJSON(http.MethodGet, fmt.Sprintf("/api/sites/%s/imports/%s", siteID, importID), nil, &job)
+	err := c.doJSON(ctx, http.MethodGet, fmt.Sprintf("/api/sites/%s/imports/%s", siteID, importID), nil, &job)
 	return &job, err
 }
 
-func (c *importAPIClient) list(siteID string) (*api.ImportListResponse, error) {
+func (c *importAPIClient) list(ctx context.Context, siteID string) (*api.ImportListResponse, error) {
 	var list api.ImportListResponse
-	err := c.doJSON(http.MethodGet, fmt.Sprintf("/api/sites/%s/imports", siteID), nil, &list)
+	err := c.doJSON(ctx, http.MethodGet, fmt.Sprintf("/api/sites/%s/imports", siteID), nil, &list)
 	return &list, err
 }
 
-func (c *importAPIClient) delete(siteID, importID string) error {
-	return c.doJSON(http.MethodDelete, fmt.Sprintf("/api/sites/%s/imports/%s", siteID, importID), nil, nil)
+func (c *importAPIClient) delete(ctx context.Context, siteID, importID string) error {
+	return c.doJSON(ctx, http.MethodDelete, fmt.Sprintf("/api/sites/%s/imports/%s", siteID, importID), nil, nil)
 }
 
-func (c *importAPIClient) wait(siteID, importID string) (*api.ImportJob, error) {
+func (c *importAPIClient) wait(ctx context.Context, siteID, importID string) (*api.ImportJob, error) {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
 	for {
-		job, err := c.get(siteID, importID)
+		job, err := c.get(ctx, siteID, importID)
 		if err != nil {
 			return nil, err
 		}
@@ -350,22 +352,26 @@ func (c *importAPIClient) wait(siteID, importID string) (*api.ImportJob, error) 
 		case "completed", "failed", "validation_failed", "deleted":
 			return job, nil
 		}
-		time.Sleep(2 * time.Second)
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-ticker.C:
+		}
 	}
 }
 
-func (c *importAPIClient) doJSON(method, path string, body any, out any) error {
+func (c *importAPIClient) doJSON(ctx context.Context, method, path string, body any, out any) error {
 	var reader io.Reader
 	if body != nil {
 		payload, err := json.Marshal(body)
 		if err != nil {
-			return err
+			return fmt.Errorf("encode %s %s request: %w", method, path, err)
 		}
 		reader = bytes.NewReader(payload)
 	}
-	req, err := http.NewRequestWithContext(context.Background(), method, c.baseURL+path, reader)
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, reader)
 	if err != nil {
-		return err
+		return fmt.Errorf("build %s %s request: %w", method, path, err)
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
@@ -373,14 +379,16 @@ func (c *importAPIClient) doJSON(method, path string, body any, out any) error {
 	c.authorize(req)
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("send %s %s request: %w", method, path, err)
 	}
 	if err := checkResponse(resp); err != nil {
-		return err
+		return fmt.Errorf("%s %s: %w", method, path, err)
 	}
 	defer resp.Body.Close()
 	if out != nil {
-		return json.NewDecoder(resp.Body).Decode(out)
+		if err := json.UnmarshalRead(resp.Body, out); err != nil {
+			return fmt.Errorf("decode %s %s response: %w", method, path, err)
+		}
 	}
 	return nil
 }

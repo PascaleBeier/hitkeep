@@ -4,13 +4,13 @@ package admin
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 )
 
 func TestHandleSetActivationTeamPlanPreservesStripeFields(t *testing.T) {
@@ -81,7 +81,7 @@ func TestHandleSetActivationTeamPlanCreatesFreshAccount(t *testing.T) {
 	}
 
 	var resp map[string]string
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if resp["plan_code"] != "business" || resp["plan_name"] != "Business" {

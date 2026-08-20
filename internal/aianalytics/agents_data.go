@@ -2,7 +2,6 @@ package aianalytics
 
 import (
 	"embed"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -11,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 //go:embed default_ai_agents.json

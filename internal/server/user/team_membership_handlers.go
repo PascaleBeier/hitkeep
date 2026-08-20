@@ -2,10 +2,8 @@ package user
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/mail"
 	"net/url"
@@ -16,6 +14,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
+	json "hitkeep/internal/jsonapi"
 	serverauth "hitkeep/internal/server/auth"
 	"hitkeep/internal/server/shared"
 )
@@ -132,7 +131,7 @@ func (h *handler) updateExistingTeamMember(w http.ResponseWriter, r *http.Reques
 	h.appendTeamAudit(r, teamID, actorID, "member.role_updated", details, &targetID)
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]any{"status": "ok", "is_invite": false}); err != nil {
+	if err := json.MarshalWrite(w, map[string]any{"status": "ok", "is_invite": false}); err != nil {
 		shared.LoggerFromContext(r.Context()).Error("Failed to encode add team member response", "error", err, "team_id", teamID, "actor_id", actorID)
 	}
 }
@@ -155,7 +154,7 @@ func (h *handler) createPendingTeamInvite(w http.ResponseWriter, r *http.Request
 	h.sendTeamInviteEmail(r, teamID, actorID, invite)
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]any{"status": "ok", "is_invite": true, "invite": invite}); err != nil {
+	if err := json.MarshalWrite(w, map[string]any{"status": "ok", "is_invite": true, "invite": invite}); err != nil {
 		shared.LoggerFromContext(r.Context()).Error("Failed to encode add team member response", "error", err, "team_id", teamID, "actor_id", actorID)
 	}
 }
@@ -180,13 +179,7 @@ func parseAddTeamMemberRequest(w http.ResponseWriter, r *http.Request, actorRole
 
 func decodeAddTeamMemberRequest(w http.ResponseWriter, r *http.Request) (addTeamMemberRequest, bool) {
 	var req addTeamMemberRequest
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
-		return addTeamMemberRequest{}, false
-	}
-	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+	if err := json.UnmarshalReadStrict(http.MaxBytesReader(w, r.Body, 1<<20), &req); err != nil {
 		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
 		return addTeamMemberRequest{}, false
 	}
@@ -311,7 +304,7 @@ func (h *handler) handleResendTeamInvite() http.HandlerFunc {
 		h.appendTeamAudit(r, teamID, actorID, "member.invite_resent", fmt.Sprintf("Invitation resent to %s", invite.Email), invite.InvitedUserID)
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]any{"status": "ok", "invite": invite}); err != nil {
+		if err := json.MarshalWrite(w, map[string]any{"status": "ok", "invite": invite}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode resend invite response", "error", err, "team_id", teamID, "invite_id", inviteID)
 		}
 	}
@@ -370,7 +363,7 @@ func (h *handler) handleRevokeTeamInvite() http.HandlerFunc {
 		h.appendTeamAudit(r, teamID, actorID, "member.invite_revoked", fmt.Sprintf("Invitation revoked for %s", invite.Email), invite.InvitedUserID)
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+		if err := json.MarshalWrite(w, map[string]string{"status": "ok"}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode revoke invite response", "error", err, "team_id", teamID, "invite_id", inviteID)
 		}
 	}
@@ -402,13 +395,7 @@ func (h *handler) handleUpdateTeam() http.HandlerFunc {
 		}
 
 		var req request
-		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&req); err != nil {
-			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
-			return
-		}
-		if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err := json.UnmarshalReadStrict(http.MaxBytesReader(w, r.Body, 1<<20), &req); err != nil {
 			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
 			return
 		}
@@ -443,7 +430,7 @@ func (h *handler) handleUpdateTeam() http.HandlerFunc {
 		h.appendTeamAudit(r, teamID, actorID, "team.updated", fmt.Sprintf("Team settings updated (name=%q)", name), nil)
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+		if err := json.MarshalWrite(w, map[string]string{"status": "ok"}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode update team response", "error", err, "team_id", teamID, "actor_id", actorID)
 		}
 	}
@@ -468,13 +455,7 @@ func (h *handler) handleTransferTeamOwnership() http.HandlerFunc {
 		}
 
 		var req request
-		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&req); err != nil {
-			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
-			return
-		}
-		if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err := json.UnmarshalReadStrict(http.MaxBytesReader(w, r.Body, 1<<20), &req); err != nil {
 			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
 			return
 		}
@@ -509,7 +490,7 @@ func (h *handler) handleTransferTeamOwnership() http.HandlerFunc {
 		h.appendTeamAudit(r, teamID, actorID, "ownership.transferred", fmt.Sprintf("Ownership transferred to %s", targetUserID), &targetUserID)
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+		if err := json.MarshalWrite(w, map[string]string{"status": "ok"}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode ownership transfer response", "error", err, "team_id", teamID, "actor_id", actorID)
 		}
 	}
@@ -562,7 +543,7 @@ func (h *handler) handleArchiveTeam() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]any{
+		if err := json.MarshalWrite(w, map[string]any{
 			"status":          "ok",
 			"active_team_id":  activeTeamID,
 			"recent_team_ids": orderedRecentTeamIDs(teams, activeTeamID),
@@ -631,7 +612,7 @@ func (h *handler) handleRemoveTeamMember() http.HandlerFunc {
 		h.appendTeamAudit(r, teamID, actorID, "member.removed", fmt.Sprintf("Member %s removed", targetUserID), &removedUserID)
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+		if err := json.MarshalWrite(w, map[string]string{"status": "ok"}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode remove team member response", "error", err, "team_id", teamID, "actor_id", actorID)
 		}
 	}
@@ -681,7 +662,7 @@ func (h *handler) handleLeaveTeam() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]any{
+		if err := json.MarshalWrite(w, map[string]any{
 			"status":          "ok",
 			"active_team_id":  activeTeamID,
 			"recent_team_ids": orderedRecentTeamIDs(teams, activeTeamID),

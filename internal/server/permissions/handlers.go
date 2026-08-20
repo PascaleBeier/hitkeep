@@ -2,11 +2,11 @@ package permissions
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 
 	"github.com/google/uuid"
 
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/access"
 	"hitkeep/internal/server/shared"
 )
@@ -57,7 +57,7 @@ func (h *handler) accessBuilder(w http.ResponseWriter) (access.Builder, bool) {
 
 func writeJSON(ctx context.Context, w http.ResponseWriter, resp any) {
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+	if err := json.MarshalWrite(w, resp); err != nil {
 		shared.LoggerFromContext(ctx).Error("Failed to encode response", "error", err)
 	}
 }

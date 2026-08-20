@@ -6,7 +6,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -22,6 +21,7 @@ import (
 	"hitkeep/internal/database"
 	"hitkeep/internal/exportfmt"
 	"hitkeep/internal/importables"
+	json "hitkeep/internal/jsonapi"
 )
 
 func TestTakeoutWebhookExportsExcludeSecretsAndPayloadBodies(t *testing.T) {
@@ -963,7 +963,7 @@ func TestExportSiteDataJSONIncludesUTMFields(t *testing.T) {
 	defer f.Close()
 
 	var rows []map[string]any
-	if err := json.NewDecoder(f).Decode(&rows); err != nil {
+	if err := json.UnmarshalRead(f, &rows); err != nil {
 		t.Fatalf("decode json export: %v", err)
 	}
 	if len(rows) == 0 {
@@ -1015,7 +1015,7 @@ func TestExportUserDataJSONIncludesAIFetchesAndAIChatbotEvents(t *testing.T) {
 	defer f.Close()
 
 	var rows []map[string]any
-	if err := json.NewDecoder(f).Decode(&rows); err != nil {
+	if err := json.UnmarshalRead(f, &rows); err != nil {
 		t.Fatalf("decode json export: %v", err)
 	}
 	if len(rows) == 0 {
@@ -1068,7 +1068,7 @@ func TestExportSiteDataJSONIncludesWebVitals(t *testing.T) {
 	defer f.Close()
 
 	var rows []map[string]any
-	if err := json.NewDecoder(f).Decode(&rows); err != nil {
+	if err := json.UnmarshalRead(f, &rows); err != nil {
 		t.Fatalf("decode json export: %v", err)
 	}
 
@@ -1102,7 +1102,7 @@ func TestExportUserDataJSONIncludesWebVitals(t *testing.T) {
 	defer f.Close()
 
 	var rows []map[string]any
-	if err := json.NewDecoder(f).Decode(&rows); err != nil {
+	if err := json.UnmarshalRead(f, &rows); err != nil {
 		t.Fatalf("decode json export: %v", err)
 	}
 
@@ -1526,7 +1526,7 @@ func readJSONTakeoutRows(t *testing.T, filename string) []map[string]any {
 	defer f.Close()
 
 	var rows []map[string]any
-	if err := json.NewDecoder(f).Decode(&rows); err != nil {
+	if err := json.UnmarshalRead(f, &rows); err != nil {
 		t.Fatalf("decode json takeout: %v", err)
 	}
 	return rows

@@ -1,13 +1,14 @@
 package cli
 
 import (
+	"cmp"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"io"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	runtimeconfig "hitkeep/internal/config"
 	"hitkeep/internal/devtool"
 	"hitkeep/internal/devtool/devmcp"
+	json "hitkeep/internal/jsonapi"
 )
 
 type options struct {
@@ -46,8 +48,7 @@ func (e exitError) Error() string { return e.cause.Error() }
 func (e exitError) Unwrap() error { return e.cause }
 
 func ExitCode(err error) int {
-	var coded exitError
-	if errors.As(err, &coded) {
+	if coded, ok := errors.AsType[exitError](err); ok {
 		return coded.code
 	}
 	return 1
@@ -226,7 +227,9 @@ func buildCommandCatalog(root *cobra.Command) commandCatalog {
 		}
 	}
 	visit(root)
-	sort.Slice(catalog.Commands, func(left, right int) bool { return catalog.Commands[left].Path < catalog.Commands[right].Path })
+	slices.SortFunc(catalog.Commands, func(left, right commandCatalogItem) int {
+		return cmp.Compare(left.Path, right.Path)
+	})
 	return catalog
 }
 
@@ -240,7 +243,9 @@ func commandFlags(flags *pflag.FlagSet) []commandCatalogFlag {
 			Name: flag.Name, Shorthand: flag.Shorthand, Type: flag.Value.Type(), Default: flag.DefValue, Usage: flag.Usage,
 		})
 	})
-	sort.Slice(result, func(left, right int) bool { return result[left].Name < result[right].Name })
+	slices.SortFunc(result, func(left, right commandCatalogFlag) int {
+		return cmp.Compare(left.Name, right.Name)
+	})
 	return result
 }
 
@@ -859,11 +864,9 @@ func withArgsApp(options *options, command string, handler func(context.Context,
 func render(options *options, envelope devtool.Envelope) error {
 	switch options.output {
 	case "json":
-		encoder := json.NewEncoder(options.stdout)
-		encoder.SetEscapeHTML(false)
-		return encoder.Encode(envelope)
+		return json.MarshalEncode(jsontext.NewEncoder(options.stdout), envelope, jsontext.EscapeForHTML(false))
 	case "ndjson":
-		return json.NewEncoder(options.stdout).Encode(envelope)
+		return json.MarshalEncode(jsontext.NewEncoder(options.stdout), envelope)
 	case "plain":
 		if envelope.Status == "error" {
 			if envelope.Data != nil {

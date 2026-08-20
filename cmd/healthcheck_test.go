@@ -15,7 +15,7 @@ func TestRunHealthcheckUsesHeadRequest(t *testing.T) {
 		path   string
 	}, 1)
 
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}

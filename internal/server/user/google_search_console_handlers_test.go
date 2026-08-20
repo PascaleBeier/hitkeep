@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -17,6 +16,7 @@ import (
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/searchconsole"
 )
 
@@ -42,7 +42,7 @@ func TestGoogleSearchConsoleStatusReportsMissingSelfHostedCredentials(t *testing
 	}
 
 	var resp api.GoogleSearchConsoleStatus
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if resp.Status != "credentials_missing" {
@@ -104,7 +104,7 @@ func TestGoogleSearchConsoleConnectReturnsStateBoundOAuthURL(t *testing.T) {
 	}
 
 	var resp api.GoogleSearchConsoleConnectResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if !strings.Contains(resp.AuthURL, "https://accounts.example.test/oauth") {
@@ -159,7 +159,7 @@ func TestGoogleSearchConsolePropertiesUseConnectedTeamOnly(t *testing.T) {
 	}
 
 	var resp api.GoogleSearchConsolePropertiesResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if len(resp.Properties) != 2 {
@@ -295,7 +295,7 @@ func TestGoogleSearchConsoleAdminCanMapAndReadSiteProperty(t *testing.T) {
 	}
 
 	var mapResp api.GoogleSearchConsoleSiteMappingResponse
-	if err := json.NewDecoder(mapW.Body).Decode(&mapResp); err != nil {
+	if err := json.UnmarshalRead(mapW.Body, &mapResp); err != nil {
 		t.Fatalf("decode map response: %v", err)
 	}
 	if !mapResp.Mapped || mapResp.PropertyURI != "sc-domain:example.com" || mapResp.TeamID != teamID {
@@ -309,7 +309,7 @@ func TestGoogleSearchConsoleAdminCanMapAndReadSiteProperty(t *testing.T) {
 		t.Fatalf("expected read status %d, got %d: %s", http.StatusOK, getW.Code, getW.Body.String())
 	}
 	var getResp api.GoogleSearchConsoleSiteMappingResponse
-	if err := json.NewDecoder(getW.Body).Decode(&getResp); err != nil {
+	if err := json.UnmarshalRead(getW.Body, &getResp); err != nil {
 		t.Fatalf("decode get response: %v", err)
 	}
 	if !getResp.Mapped || getResp.PropertyURI != "sc-domain:example.com" {
@@ -560,7 +560,7 @@ func TestGoogleSearchConsoleManualSyncRunsImmediatelyAndAudits(t *testing.T) {
 	}
 
 	var resp api.GoogleSearchConsoleSiteMappingResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode sync response: %v", err)
 	}
 	if resp.SyncStatus == nil || resp.SyncStatus.State != "succeeded" || resp.SyncStatus.Manual {
@@ -985,7 +985,7 @@ func requireGoogleSearchConsoleSiteUnmapped(t *testing.T, mux *http.ServeMux, si
 		t.Fatalf("expected read status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
 	}
 	var resp api.GoogleSearchConsoleSiteMappingResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode get response: %v", err)
 	}
 	if resp.Mapped || resp.PropertyURI != "" || resp.TeamID != teamID {

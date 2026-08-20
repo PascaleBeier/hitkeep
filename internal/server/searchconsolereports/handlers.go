@@ -2,7 +2,6 @@ package searchconsolereports
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -68,7 +68,7 @@ func reportHandler[T any](h *handler, reportName string, load func(context.Conte
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(result); err != nil {
+		if err := json.MarshalWrite(w, result); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode Search Console "+reportName, "error", err, "site_id", params.SiteID)
 		}
 	}
@@ -88,7 +88,7 @@ func (h *handler) handleGetDimension(dimension string) http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(rows); err != nil {
+		if err := json.MarshalWrite(w, rows); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode Search Console dimension rows", "error", err, "site_id", params.SiteID, "dimension", dimension)
 		}
 	}

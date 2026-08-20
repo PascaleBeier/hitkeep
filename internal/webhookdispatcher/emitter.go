@@ -2,7 +2,6 @@ package webhookdispatcher
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/webhooks"
 )
 

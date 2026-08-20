@@ -1,8 +1,9 @@
 package config
 
 import (
+	"cmp"
 	"reflect"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -68,11 +69,11 @@ func Catalog() ConfigurationCatalog {
 		}
 		settings = append(settings, setting)
 	}
-	sort.Slice(settings, func(left, right int) bool {
-		if settings[left].Category != settings[right].Category {
-			return configurationCategoryIndex(settings[left].Category) < configurationCategoryIndex(settings[right].Category)
+	slices.SortFunc(settings, func(left, right ConfigurationSetting) int {
+		if left.Category != right.Category {
+			return cmp.Compare(configurationCategoryIndex(left.Category), configurationCategoryIndex(right.Category))
 		}
-		return settings[left].Flag < settings[right].Flag
+		return cmp.Compare(left.Flag, right.Flag)
 	})
 	return ConfigurationCatalog{
 		SchemaVersion: ConfigurationCatalogSchemaVersion,

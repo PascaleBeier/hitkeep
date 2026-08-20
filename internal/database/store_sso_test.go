@@ -105,8 +105,8 @@ func TestTeamSSODomainsCannotRouteToMultipleTeams(t *testing.T) {
 		EmailClaim:            "email",
 		DisplayNameClaim:      "name",
 		Enabled:               true,
+		TeamID:                firstTeamID,
 	}
-	config.TeamID = firstTeamID
 	if err := store.UpsertTeamSSOConfig(ctx, config); err != nil {
 		t.Fatalf("save first config: %v", err)
 	}

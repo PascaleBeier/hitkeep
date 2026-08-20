@@ -3,7 +3,6 @@
 package admin
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,6 +11,7 @@ import (
 
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -35,7 +35,7 @@ func (h *handler) handleSetActivationTeamPlan() http.HandlerFunc {
 		}
 
 		var req request
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.UnmarshalRead(r.Body, &req); err != nil {
 			writeJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
 				"status": "error", "message": "Invalid request body",
 			})

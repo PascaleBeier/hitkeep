@@ -8,7 +8,6 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
@@ -21,6 +20,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/security"
 )
 
@@ -578,22 +578,18 @@ func convertLegacyPublicKeyToCOSE(rawPublicKey []byte) ([]byte, error) {
 			return nil, fmt.Errorf("unexpected ecdsa public key encoding length: %d", len(publicKeyBytes))
 		}
 		return webauthncbor.Marshal(webauthncose.EC2PublicKeyData{
-			PublicKeyData: webauthncose.PublicKeyData{
-				KeyType:   int64(webauthncose.EllipticKey),
-				Algorithm: int64(webauthncose.AlgES256),
-			},
-			Curve:  int64(webauthncose.P256),
-			XCoord: append([]byte(nil), publicKeyBytes[1:33]...),
-			YCoord: append([]byte(nil), publicKeyBytes[33:65]...),
+			KeyType:   int64(webauthncose.EllipticKey),
+			Algorithm: int64(webauthncose.AlgES256),
+			Curve:     int64(webauthncose.P256),
+			XCoord:    append([]byte(nil), publicKeyBytes[1:33]...),
+			YCoord:    append([]byte(nil), publicKeyBytes[33:65]...),
 		})
 	case *rsa.PublicKey:
 		return webauthncbor.Marshal(webauthncose.RSAPublicKeyData{
-			PublicKeyData: webauthncose.PublicKeyData{
-				KeyType:   int64(webauthncose.RSAKey),
-				Algorithm: int64(webauthncose.AlgRS256),
-			},
-			Modulus:  append([]byte(nil), key.N.Bytes()...),
-			Exponent: encodeRSAPublicExponent(key.E),
+			KeyType:   int64(webauthncose.RSAKey),
+			Algorithm: int64(webauthncose.AlgRS256),
+			Modulus:   append([]byte(nil), key.N.Bytes()...),
+			Exponent:  encodeRSAPublicExponent(key.E),
 		})
 	default:
 		return nil, fmt.Errorf("unsupported legacy passkey public key type %T", publicKey)

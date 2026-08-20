@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -17,6 +16,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 
 	"hitkeep/internal/hklog"
+	json "hitkeep/internal/jsonapi"
 )
 
 const recoveryMarkerVersion = 1

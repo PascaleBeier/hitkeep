@@ -11,7 +11,7 @@ func openAPISpecV1(publicURL string) map[string]any {
 		"info": map[string]any{
 			"title":       "HitKeep REST API",
 			"version":     "v1",
-			"description": "Complete HTTP API for HitKeep (session, API key, and public share-token endpoints). While the shared database or an open tenant database is unavailable, database-dependent API and ingest routes return HTTP 503 using components.responses.DatabaseUnavailable.",
+			"description": "Complete HTTP API for HitKeep (session, API key, and public share-token endpoints). JSON request bodies must contain exactly one value, use valid UTF-8, and use unique, case-sensitive object member names; schema-closed operations also reject unknown members. While the shared database or an open tenant database is unavailable, database-dependent API and ingest routes return HTTP 503 using components.responses.DatabaseUnavailable.",
 		},
 		"servers": []map[string]string{{"url": publicURL}},
 		"tags": []map[string]string{

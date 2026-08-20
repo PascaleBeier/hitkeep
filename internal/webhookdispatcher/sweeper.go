@@ -2,7 +2,6 @@ package webhookdispatcher
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -10,6 +9,7 @@ import (
 
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 )
 
 type Sweeper struct {

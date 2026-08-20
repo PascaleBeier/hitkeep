@@ -1,10 +1,11 @@
 package database
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"fmt"
-	"sort"
+	"slices"
 	"time"
 
 	"hitkeep/internal/api"
@@ -305,11 +306,11 @@ func mergeMetricList(native []api.MetricStat, imported []api.MetricStat, limit i
 	for name, value := range values {
 		merged = append(merged, api.MetricStat{Name: name, Value: value})
 	}
-	sort.Slice(merged, func(i, j int) bool {
-		if merged[i].Value == merged[j].Value {
-			return merged[i].Name < merged[j].Name
+	slices.SortFunc(merged, func(left, right api.MetricStat) int {
+		if left.Value == right.Value {
+			return cmp.Compare(left.Name, right.Name)
 		}
-		return merged[i].Value > merged[j].Value
+		return cmp.Compare(right.Value, left.Value)
 	})
 	if limit > 0 && len(merged) > limit {
 		return merged[:limit]

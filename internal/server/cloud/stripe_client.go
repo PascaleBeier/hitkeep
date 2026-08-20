@@ -4,7 +4,6 @@ package cloud
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -12,6 +11,8 @@ import (
 	"github.com/google/uuid"
 	stripe "github.com/stripe/stripe-go/v86"
 	"github.com/stripe/stripe-go/v86/webhook"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 func (c *stripeSDKClient) CreateCustomer(ctx context.Context, input createCustomerInput) (string, error) {

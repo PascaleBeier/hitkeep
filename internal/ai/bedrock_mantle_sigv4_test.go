@@ -106,7 +106,11 @@ func TestBedrockMantleSigV4TransportRequiresRegion(t *testing.T) {
 		t.Fatalf("new request: %v", err)
 	}
 
-	if _, err := client.Do(req); err == nil || !strings.Contains(err.Error(), "region is not configured") {
+	resp, err := client.Do(req)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+	if err == nil || !strings.Contains(err.Error(), "region is not configured") {
 		t.Fatalf("error = %v, want region error", err)
 	}
 }

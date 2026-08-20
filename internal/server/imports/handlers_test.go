@@ -3,7 +3,6 @@ package imports
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -20,6 +19,7 @@ import (
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/importables"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -100,7 +100,7 @@ func createImportUploadForProvider(t *testing.T, h *handler, site *api.Site, pro
 	}
 
 	var upload api.ImportUploadCreateResponse
-	if err := json.NewDecoder(createW.Body).Decode(&upload); err != nil {
+	if err := json.UnmarshalRead(createW.Body, &upload); err != nil {
 		t.Fatalf("decode upload response: %v", err)
 	}
 	return upload
@@ -147,7 +147,7 @@ func validateImportUpload(t *testing.T, h *handler, site *api.Site, importID fmt
 		return validateW, nil
 	}
 	var validated api.ImportJob
-	if err := json.NewDecoder(validateW.Body).Decode(&validated); err != nil {
+	if err := json.UnmarshalRead(validateW.Body, &validated); err != nil {
 		t.Fatalf("decode validated import: %v", err)
 	}
 	return validateW, &validated
@@ -298,6 +298,7 @@ func TestStartImportUsesRunnerQueue(t *testing.T) {
 	runnerCtx := t.Context()
 	h.runner = newImportRunner(h)
 	h.runner.Start(runnerCtx)
+	defer stopTestImportRunner(t, h.runner)
 
 	startReq := httptest.NewRequest(http.MethodPost, "/api/sites/"+site.ID.String()+"/imports/"+upload.ImportID.String()+"/start", nil)
 	startReq.SetPathValue("id", site.ID.String())
@@ -370,10 +371,20 @@ func TestImportRunnerFailsRecoveredJobWithMissingStagedFiles(t *testing.T) {
 	runnerCtx := t.Context()
 	h.runner = newImportRunner(h)
 	h.runner.Start(runnerCtx)
+	defer stopTestImportRunner(t, h.runner)
 
 	failed := waitForImportStatus(t, store, site.ID, upload.ImportID, database.ImportStatusFailed)
 	if !strings.Contains(failed.Error, "missing") {
 		t.Fatalf("expected missing staged file error, got %+v", failed)
+	}
+}
+
+func stopTestImportRunner(t *testing.T, runner *importRunner) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := runner.Stop(ctx); err != nil {
+		t.Errorf("stop import runner: %v", err)
 	}
 }
 
@@ -436,7 +447,7 @@ func TestUploadChunkAllowsDuplicatePrefixRetry(t *testing.T) {
 		t.Fatalf("duplicate chunk status = %d body=%s", duplicate.Code, duplicate.Body.String())
 	}
 	var duplicateResp api.ImportChunkResponse
-	if err := json.NewDecoder(duplicate.Body).Decode(&duplicateResp); err != nil {
+	if err := json.UnmarshalRead(duplicate.Body, &duplicateResp); err != nil {
 		t.Fatalf("decode duplicate response: %v", err)
 	}
 	if duplicateResp.BytesReceived != int64(half) || duplicateResp.Complete {
@@ -448,7 +459,7 @@ func TestUploadChunkAllowsDuplicatePrefixRetry(t *testing.T) {
 		t.Fatalf("second chunk status = %d body=%s", second.Code, second.Body.String())
 	}
 	var secondResp api.ImportChunkResponse
-	if err := json.NewDecoder(second.Body).Decode(&secondResp); err != nil {
+	if err := json.UnmarshalRead(second.Body, &secondResp); err != nil {
 		t.Fatalf("decode second response: %v", err)
 	}
 	if !secondResp.Complete || secondResp.BytesReceived != int64(len(visitorsCSV)) {

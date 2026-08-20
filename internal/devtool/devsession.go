@@ -3,7 +3,6 @@ package devtool
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -20,6 +19,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 const (
@@ -267,7 +268,7 @@ func (a *App) prepareDevSession(request DevRequest, owner DevOwner) (devSessionR
 		return devSessionRecord{}, false, fmt.Errorf("development is already %s with variant %s; run ./hk dev stop or ./hk dev reset", status.State, status.Variant)
 	}
 	now := time.Now().UTC()
-	record := devSessionRecord{DevStatus: DevStatus{
+	record := devSessionRecord{
 		State:        DevStateStarting,
 		GenerationID: time.Now().UTC().Format("20060102T150405") + "-" + uuid.NewString()[:8],
 		Variant:      request.Variant,
@@ -276,7 +277,7 @@ func (a *App) prepareDevSession(request DevRequest, owner DevOwner) (devSessionR
 		UpdatedAt:    now,
 		URLs:         a.workspace.URLs,
 		Services:     a.probeDevServices(context.Background()),
-	}}
+	}
 	if err := os.MkdirAll(a.devEventsDir(), 0o700); err != nil {
 		return devSessionRecord{}, false, err
 	}
@@ -425,7 +426,7 @@ func (a *App) startDevProcess(ctx context.Context, sink *devEventSink, component
 		environment = append(slices.Clone(environment), "HK_AGENT_OUTPUT=json", "NO_COLOR=1", "TERM=dumb")
 	}
 	sink.Event("log", component, "info", "", "$ "+strings.Join(args, " "))
-	command := exec.CommandContext(ctx, args[0], args[1:]...) //nolint:gosec
+	command := exec.CommandContext(ctx, a.commandExecutable(args[0]), args[1:]...) //nolint:gosec
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	command.Cancel = func() error {
 		if command.Process == nil {
@@ -515,7 +516,10 @@ func (a *App) runDevCommand(ctx context.Context, sink *devEventSink, component s
 	if contextErr := ctx.Err(); contextErr != nil {
 		return contextErr
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (a *App) openDevEventSink(record devSessionRecord, observer func(DevEvent)) (*devEventSink, error) {
@@ -640,7 +644,7 @@ func (a *App) WaitDevStartup(ctx context.Context) (DevStatus, error) {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 	for {
-		status, err := a.DevStatus(context.Background())
+		status, err := a.DevStatus(ctx)
 		if err != nil {
 			return DevStatus{}, err
 		}
@@ -662,7 +666,7 @@ func (a *App) WaitDevStartup(ctx context.Context) (DevStatus, error) {
 }
 
 func (a *App) StopDev(ctx context.Context) (DevStatus, error) {
-	status, err := a.DevStatus(context.Background())
+	status, err := a.DevStatus(ctx)
 	if err != nil {
 		return DevStatus{}, err
 	}
@@ -675,7 +679,7 @@ func (a *App) StopDev(ctx context.Context) (DevStatus, error) {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 	for {
-		current, statusErr := a.DevStatus(context.Background())
+		current, statusErr := a.DevStatus(ctx)
 		if statusErr != nil {
 			return status, statusErr
 		}
@@ -790,7 +794,7 @@ func visitLinesReverse(file *os.File, visit func([]byte) (bool, error)) error {
 		combined = append(combined, chunk...)
 		combined = append(combined, suffix...)
 		lineEnd := len(combined)
-		for index := len(chunk) - 1; index >= 0; index-- {
+		for index := range slices.Backward(chunk) {
 			if combined[index] != '\n' {
 				continue
 			}

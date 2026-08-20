@@ -95,6 +95,8 @@ func TestReportDefinitionMigrationPreservesLegacyUTC0800Subscriptions(t *testing
 			if len(report.Sites) != 1 || report.Sites[0].ID != site.ID {
 				t.Fatalf("site migration has unexpected sites: %+v", report.Sites)
 			}
+		case api.ReportPresetOpportunityBrief:
+			t.Fatalf("legacy migration unexpectedly created opportunity brief: %+v", report)
 		default:
 			t.Fatalf("unexpected migrated preset %q", report.Preset)
 		}
@@ -257,7 +259,7 @@ func rebuildNamedReportTablesWithHistoricalForeignKeys(t *testing.T, store *Stor
 			UNIQUE (run_id, recipient_user_id)
 		);
 	`
-	if _, err := store.DB().Exec(historicalSchema); err != nil {
+	if _, err := store.DB().ExecContext(t.Context(), historicalSchema); err != nil {
 		t.Fatalf("rebuild historical named-report schema: %v", err)
 	}
 }

@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -16,6 +15,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/appurl"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/sso"
 )
@@ -66,9 +66,7 @@ func (h *handler) handleUpsertTeamSSO() http.HandlerFunc {
 			return
 		}
 		var req teamSSORequest
-		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&req); err != nil {
+		if err := json.UnmarshalReadStrict(http.MaxBytesReader(w, r.Body, 1<<20), &req); err != nil {
 			writeTeamActionError(r.Context(), w, http.StatusBadRequest, "invalid_request", "Enter a valid SSO configuration")
 			return
 		}
@@ -173,7 +171,7 @@ func (h *handler) handleTestTeamSSO() http.HandlerFunc {
 		}
 		h.appendTeamSSOAudit(r, teamID, actorID, "sso.connection_tested", "success", "SSO discovery test succeeded")
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		_ = json.MarshalWrite(w, map[string]string{"status": "ok"})
 	}
 }
 
@@ -338,7 +336,7 @@ func (h *handler) teamSSOResponse(config *database.TeamSSOConfig) api.TeamSSOCon
 
 func writeTeamSSOConfig(ctx context.Context, w http.ResponseWriter, config api.TeamSSOConfig) {
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(config); err != nil {
+	if err := json.MarshalWrite(w, config); err != nil {
 		shared.LoggerFromContext(ctx).Error("Failed to encode team SSO response", "error", err)
 	}
 }

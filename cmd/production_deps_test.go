@@ -10,7 +10,7 @@ import (
 )
 
 func TestProductionCommandDoesNotDependOnGenerators(t *testing.T) {
-	out, err := exec.Command("go", "list", "-deps", "hitkeep/cmd/hitkeep").CombinedOutput()
+	out, err := exec.CommandContext(t.Context(), "go", "list", "-deps", "hitkeep/cmd/hitkeep").CombinedOutput()
 	if err != nil {
 		t.Fatalf("go list production deps: %v\n%s", err, out)
 	}
@@ -34,7 +34,7 @@ func TestProductionCommandDoesNotDependOnGenerators(t *testing.T) {
 
 func TestProductionBinaryDoesNotContainGeneratorTokenPlumbing(t *testing.T) {
 	binaryPath := filepath.Join(t.TempDir(), "hitkeep")
-	out, err := exec.Command("go", "build", "-o", binaryPath, "hitkeep/cmd/hitkeep").CombinedOutput()
+	out, err := exec.CommandContext(t.Context(), "go", "build", "-o", binaryPath, "hitkeep/cmd/hitkeep").CombinedOutput()
 	if err != nil {
 		t.Fatalf("build production command: %v\n%s", err, out)
 	}

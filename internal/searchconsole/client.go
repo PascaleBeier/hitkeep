@@ -102,8 +102,7 @@ func ClassifyError(err error) ErrorCategory {
 	if errors.As(err, &classified) && classified.Category != "" {
 		return classified.Category
 	}
-	var googleErr *googleapi.Error
-	if errors.As(err, &googleErr) {
+	if googleErr, ok := errors.AsType[*googleapi.Error](err); ok {
 		return classifyGoogleAPIError(googleErr)
 	}
 	msg := strings.ToLower(err.Error())
@@ -127,8 +126,7 @@ func DiagnoseError(err error) ErrorDiagnostic {
 		return diagnostic
 	}
 
-	var googleErr *googleapi.Error
-	if errors.As(err, &googleErr) {
+	if googleErr, ok := errors.AsType[*googleapi.Error](err); ok {
 		diagnostic.HTTPStatus = googleErr.Code
 		diagnostic.ProviderReason = googleAPIErrorReason(googleErr)
 		diagnostic.Message = boundErrorDiagnostic(googleAPIErrorMessage(googleErr))

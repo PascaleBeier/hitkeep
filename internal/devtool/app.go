@@ -2,7 +2,6 @@ package devtool
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -15,9 +14,11 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	json "hitkeep/internal/jsonapi"
 )
 
-const doctorCommandTimeout = 5 * time.Second
+const doctorCommandTimeout = 15 * time.Second
 
 type App struct {
 	workspace        Workspace
@@ -44,17 +45,17 @@ func NewApp(workspacePath string) (*App, error) {
 	}, nil
 }
 
-func (a *App) Workspace(context.Context) (Workspace, error) {
+func (a *App) Workspace(ctx context.Context) (Workspace, error) {
 	workspace, err := ResolveWorkspace(a.workspace.Root)
 	if err == nil {
-		workspace.Services = probeWorkspaceServices(workspace)
+		workspace.Services = probeWorkspaceServices(ctx, workspace)
 		runs, _ := a.ListRuns(100)
 		for _, run := range runs {
 			if !isTerminal(run.Status) {
 				workspace.ActiveRuns = append(workspace.ActiveRuns, summarizeRun(run))
 			}
 		}
-		if status, statusErr := a.DevStatus(context.Background()); statusErr == nil {
+		if status, statusErr := a.DevStatus(ctx); statusErr == nil {
 			workspace.Dev = &status
 		}
 	}
@@ -79,7 +80,7 @@ func (a *App) RecentRuns(limit int) ([]RunSummary, error) {
 	return summaries, nil
 }
 
-func (a *App) Workspaces(context.Context) ([]Workspace, error) {
+func (a *App) Workspaces(_ context.Context) ([]Workspace, error) {
 	return ListWorkspaces(a.workspace.Root)
 }
 
@@ -129,9 +130,6 @@ func (a *App) Doctor(ctx context.Context) DoctorReport {
 		},
 		func(ctx context.Context) Check { return checkCommand(ctx, "buildx", "docker", "buildx", "version") },
 		func(ctx context.Context) Check {
-			return checkExactCommand(ctx, "golangci", ToolVersion("golangci-lint"), ToolVersion("golangci-lint"), "golangci-lint", "--version")
-		},
-		func(ctx context.Context) Check {
 			return checkExactCommand(ctx, "zizmor", ToolVersion("zizmor"), ToolVersion("zizmor"), "zizmor", "--version")
 		},
 	}
@@ -147,7 +145,7 @@ func (a *App) Doctor(ctx context.Context) DoctorReport {
 	}
 	toolchainReady := statuses["go"] && statuses["node"] && statuses["npm"] && statuses["c-compiler"]
 	containerReady := statuses["docker"] && statuses["compose"]
-	prQA := toolchainReady && statuses["golangci"] && statuses["zizmor"]
+	prQA := toolchainReady && statuses["zizmor"]
 	fullQA := prQA && statuses["docker"] && statuses["buildx"]
 	ready := statuses["git"] && containerReady
 	return DoctorReport{Ready: ready, Capabilities: DoctorCapabilities{ContainerDevelopment: containerReady, PRQA: prQA, FullQA: fullQA}, Checks: checks}

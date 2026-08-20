@@ -48,8 +48,10 @@ func TestHitQueriesAndExportsUseConversionSessionCohorts(t *testing.T) {
 		t.Fatalf("create funnel: %v", err)
 	}
 
-	base := api.HitQueryParams{SiteID: site.ID, UserID: userID, Start: now.Add(-time.Hour), End: now.Add(time.Hour), Limit: 10}
-	base.GoalIDs = []uuid.UUID{goal.ID}
+	base := api.HitQueryParams{
+		SiteID: site.ID, UserID: userID, Start: now.Add(-time.Hour), End: now.Add(time.Hour), Limit: 10,
+		GoalIDs: []uuid.UUID{goal.ID},
+	}
 	goalHits, err := store.GetHits(ctx, base)
 	if err != nil {
 		t.Fatalf("get goal cohort hits: %v", err)

@@ -4,7 +4,6 @@ package user
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,6 +13,7 @@ import (
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/testutil/testdb"
 )
@@ -78,7 +78,7 @@ func TestHandleGetTeamsIncludesPlanMetadata(t *testing.T) {
 	var resp struct {
 		Teams []api.Team `json:"teams"`
 	}
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode teams response: %v", err)
 	}
 	if len(resp.Teams) == 0 {
@@ -157,7 +157,7 @@ func TestHandleGetTeamsTreatsPendingCheckoutAsFreePlan(t *testing.T) {
 	var resp struct {
 		Teams []api.Team `json:"teams"`
 	}
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode teams response: %v", err)
 	}
 	if len(resp.Teams) == 0 {

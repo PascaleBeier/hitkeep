@@ -3,7 +3,6 @@ package user
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +10,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 )
 
 func TestRegisteredTeamExclusionRoutesEnforceSettingsCapabilityAndEffectiveMetadata(t *testing.T) {
@@ -53,7 +53,7 @@ func TestRegisteredTeamExclusionRoutesEnforceSettingsCapabilityAndEffectiveMetad
 		t.Fatalf("expected create status %d, got %d: %s", http.StatusCreated, createW.Code, createW.Body.String())
 	}
 	var created api.IPExclusion
-	if err := json.NewDecoder(createW.Body).Decode(&created); err != nil {
+	if err := json.UnmarshalRead(createW.Body, &created); err != nil {
 		t.Fatalf("decode created exclusion: %v", err)
 	}
 	if created.Scope != "team" || created.TeamID == nil || *created.TeamID != teamID || created.Type != "path" || created.Path != "/admin" || created.Inherited {
@@ -67,7 +67,7 @@ func TestRegisteredTeamExclusionRoutesEnforceSettingsCapabilityAndEffectiveMetad
 		t.Fatalf("expected admin effective list status %d, got %d: %s", http.StatusOK, listW.Code, listW.Body.String())
 	}
 	var rules []api.IPExclusion
-	if err := json.NewDecoder(listW.Body).Decode(&rules); err != nil {
+	if err := json.UnmarshalRead(listW.Body, &rules); err != nil {
 		t.Fatalf("decode effective exclusions: %v", err)
 	}
 	if len(rules) != 2 || rules[0].ID != instanceRule.ID || !rules[0].Inherited || rules[0].CreatedBy != nil || rules[1].ID != created.ID || rules[1].Inherited {

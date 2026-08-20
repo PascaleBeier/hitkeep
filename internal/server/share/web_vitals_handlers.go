@@ -2,13 +2,13 @@ package share
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/filterparams"
 	"hitkeep/internal/server/shared"
 )
@@ -117,7 +117,7 @@ func (h *handler) handleGetShareWebVitalsBreakdown() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(payload); err != nil {
+		if err := json.MarshalWrite(w, payload); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -158,7 +158,7 @@ func (h *handler) handleGetShareWebVitals(
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(payload); err != nil {
+		if err := json.MarshalWrite(w, payload); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}

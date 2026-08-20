@@ -3,7 +3,6 @@ package goals
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +14,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/webhooks"
 )
@@ -98,7 +98,7 @@ func TestHandleGoalCRUDUsesTenantAnalyticsStore(t *testing.T) {
 		t.Fatalf("marshal request: %v", err)
 	}
 
-	createReq := httptest.NewRequest(http.MethodPost, "/api/sites/"+siteID.String()+"/goals", bytes.NewReader(body))
+	createReq := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/sites/"+siteID.String()+"/goals", bytes.NewReader(body))
 	createReq.SetPathValue("id", siteID.String())
 	createResp := httptest.NewRecorder()
 	h.handleCreateGoal().ServeHTTP(createResp, createReq)
@@ -126,7 +126,7 @@ func TestHandleGoalCRUDUsesTenantAnalyticsStore(t *testing.T) {
 		t.Fatalf("expected 1 goal in tenant store, got %d", len(tenantGoals))
 	}
 
-	getReq := httptest.NewRequest(http.MethodGet, "/api/sites/"+siteID.String()+"/goals", nil)
+	getReq := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/sites/"+siteID.String()+"/goals", nil)
 	getReq.SetPathValue("id", siteID.String())
 	getResp := httptest.NewRecorder()
 	h.handleGetGoals().ServeHTTP(getResp, getReq)
@@ -136,7 +136,7 @@ func TestHandleGoalCRUDUsesTenantAnalyticsStore(t *testing.T) {
 	}
 
 	var gotGoals []api.Goal
-	if err := json.NewDecoder(getResp.Body).Decode(&gotGoals); err != nil {
+	if err := json.UnmarshalRead(getResp.Body, &gotGoals); err != nil {
 		t.Fatalf("decode goals response: %v", err)
 	}
 	if len(gotGoals) != 1 || gotGoals[0].Name != "Signup" {
@@ -144,7 +144,7 @@ func TestHandleGoalCRUDUsesTenantAnalyticsStore(t *testing.T) {
 	}
 
 	updateBody, _ := json.Marshal(api.Goal{Name: "Activated", Type: "event", Value: "account_activated"})
-	updateReq := httptest.NewRequest(http.MethodPut, "/api/sites/"+siteID.String()+"/goals/"+gotGoals[0].ID.String(), bytes.NewReader(updateBody))
+	updateReq := httptest.NewRequestWithContext(t.Context(), http.MethodPut, "/api/sites/"+siteID.String()+"/goals/"+gotGoals[0].ID.String(), bytes.NewReader(updateBody))
 	updateReq.SetPathValue("id", siteID.String())
 	updateReq.SetPathValue("goalID", gotGoals[0].ID.String())
 	updateResp := httptest.NewRecorder()
@@ -153,7 +153,7 @@ func TestHandleGoalCRUDUsesTenantAnalyticsStore(t *testing.T) {
 		t.Fatalf("expected update status %d, got %d: %s", http.StatusOK, updateResp.Code, updateResp.Body.String())
 	}
 	var updatedGoal api.Goal
-	if err := json.NewDecoder(updateResp.Body).Decode(&updatedGoal); err != nil {
+	if err := json.UnmarshalRead(updateResp.Body, &updatedGoal); err != nil {
 		t.Fatalf("decode updated goal: %v", err)
 	}
 	if updatedGoal.ID != gotGoals[0].ID || !updatedGoal.CreatedAt.Equal(gotGoals[0].CreatedAt) || updatedGoal.Value != "account_activated" {
@@ -227,7 +227,7 @@ func TestHandleGetFunnelsUsesTenantAnalyticsStore(t *testing.T) {
 	}
 
 	var gotFunnels []api.Funnel
-	if err := json.NewDecoder(getResp.Body).Decode(&gotFunnels); err != nil {
+	if err := json.UnmarshalRead(getResp.Body, &gotFunnels); err != nil {
 		t.Fatalf("decode funnels response: %v", err)
 	}
 	if len(gotFunnels) != 1 || gotFunnels[0].Name != "Checkout Funnel" {
@@ -274,7 +274,7 @@ func TestHandleUpdateFunnelPreservesIdentityAndReturnsNotFound(t *testing.T) {
 		t.Fatalf("expected update status %d, got %d: %s", http.StatusOK, resp.Code, resp.Body.String())
 	}
 	var updated api.Funnel
-	if err := json.NewDecoder(resp.Body).Decode(&updated); err != nil {
+	if err := json.UnmarshalRead(resp.Body, &updated); err != nil {
 		t.Fatalf("decode updated funnel: %v", err)
 	}
 	if updated.ID != funnel.ID || !updated.CreatedAt.Equal(persistedCreatedAt) || updated.Name != "Updated checkout" || updated.Steps[0].Type != "event" {

@@ -2,13 +2,13 @@ package database
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/webhooks"
 )
 

@@ -2,11 +2,11 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strings"
 
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -57,7 +57,7 @@ func writeDatabaseUnavailable(ctx context.Context, w http.ResponseWriter, state 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Retry-After", "5")
 	w.WriteHeader(http.StatusServiceUnavailable)
-	if err := json.NewEncoder(w).Encode(map[string]any{
+	if err := json.MarshalWrite(w, map[string]any{
 		"status":              "error",
 		"code":                code,
 		"message":             message,

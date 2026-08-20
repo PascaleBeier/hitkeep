@@ -2,7 +2,6 @@ package share
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,6 +14,7 @@ import (
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/exportfmt"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/testutil/testdb"
 )
@@ -97,7 +97,7 @@ func TestHandleGetShareSiteStatsIncludesGeoNetworkAggregates(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	var stats api.SiteStats
-	if err := json.NewDecoder(w.Body).Decode(&stats); err != nil {
+	if err := json.UnmarshalRead(w.Body, &stats); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	assertMetricStat(t, "shared stats city", stats.TopCities, "Mountain View", 1)
@@ -141,7 +141,7 @@ func TestShareOpportunitiesListIsScopedToShareTokenSite(t *testing.T) {
 			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 		}
 		var body map[string][]map[string]any
-		if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		if err := json.UnmarshalRead(w.Body, &body); err != nil {
 			t.Fatalf("decode: %v", err)
 		}
 		opportunities := body["opportunities"]
@@ -200,7 +200,7 @@ func TestShareOpportunitiesListReturnsEmptyArrayWhenNoRowsExist(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	var body map[string]any
-	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+	if err := json.UnmarshalRead(w.Body, &body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	opportunities, ok := body["opportunities"].([]any)
@@ -350,7 +350,7 @@ func TestHandleGetShareEventNames(t *testing.T) {
 			}
 
 			var names []string
-			if err := json.NewDecoder(w.Body).Decode(&names); err != nil {
+			if err := json.UnmarshalRead(w.Body, &names); err != nil {
 				t.Fatalf("decode: %v", err)
 			}
 			if len(names) < 2 {
@@ -377,7 +377,7 @@ func TestHandleGetShareEventPropertyKeys(t *testing.T) {
 		}
 
 		var keys []string
-		if err := json.NewDecoder(w.Body).Decode(&keys); err != nil {
+		if err := json.UnmarshalRead(w.Body, &keys); err != nil {
 			t.Fatalf("decode: %v", err)
 		}
 		if len(keys) < 1 {
@@ -498,7 +498,7 @@ func TestHandleGetShareEventTimeseries(t *testing.T) {
 			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 		}
 		var series []api.EventSeriesPoint
-		if err := json.NewDecoder(w.Body).Decode(&series); err != nil {
+		if err := json.UnmarshalRead(w.Body, &series); err != nil {
 			t.Fatalf("decode timeseries: %v", err)
 		}
 		total := 0
@@ -570,7 +570,7 @@ func TestHandleGetShareEventAudience(t *testing.T) {
 		}
 
 		var audience api.EventAudience
-		if err := json.NewDecoder(w.Body).Decode(&audience); err != nil {
+		if err := json.UnmarshalRead(w.Body, &audience); err != nil {
 			t.Fatalf("decode audience: %v", err)
 		}
 		if len(audience.TopPages) != 1 || audience.TopPages[0].Name != "/pricing" {
@@ -708,7 +708,7 @@ func TestHandleGetShareEcommerceSummary(t *testing.T) {
 			}
 
 			var summary api.EcommerceSummary
-			if err := json.NewDecoder(w.Body).Decode(&summary); err != nil {
+			if err := json.UnmarshalRead(w.Body, &summary); err != nil {
 				t.Fatalf("decode: %v", err)
 			}
 			if summary.Orders != 1 {
@@ -755,7 +755,7 @@ func TestHandleGetShareEcommerceTimeseries(t *testing.T) {
 	}
 
 	var series []api.EcommerceSeriesPoint
-	if err := json.NewDecoder(w.Body).Decode(&series); err != nil {
+	if err := json.UnmarshalRead(w.Body, &series); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if len(series) == 0 {
@@ -779,7 +779,7 @@ func TestHandleGetShareEcommerceProducts(t *testing.T) {
 	}
 
 	var products []api.EcommerceProductStat
-	if err := json.NewDecoder(w.Body).Decode(&products); err != nil {
+	if err := json.UnmarshalRead(w.Body, &products); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if len(products) == 0 {
@@ -806,7 +806,7 @@ func TestHandleGetShareEcommerceSources(t *testing.T) {
 	}
 
 	var sources []api.EcommerceSourceStat
-	if err := json.NewDecoder(w.Body).Decode(&sources); err != nil {
+	if err := json.UnmarshalRead(w.Body, &sources); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if len(sources) == 0 {
@@ -954,7 +954,7 @@ func requireShareStatus(t *testing.T, w *httptest.ResponseRecorder, expected int
 
 func decodeShareResponse(t *testing.T, w *httptest.ResponseRecorder, target any) {
 	t.Helper()
-	if err := json.NewDecoder(w.Body).Decode(target); err != nil {
+	if err := json.UnmarshalRead(w.Body, target); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 }

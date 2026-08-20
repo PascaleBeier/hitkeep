@@ -3,7 +3,6 @@ package cli
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"hitkeep/internal/devtool"
+	json "hitkeep/internal/jsonapi"
 )
 
 func TestJSONOutputUsesVersionedEnvelope(t *testing.T) {

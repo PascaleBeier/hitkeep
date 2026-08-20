@@ -1,9 +1,10 @@
 package system
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 func (h *handler) handleGetAPIDocVersions() http.HandlerFunc {
@@ -30,7 +31,7 @@ func (h *handler) handleGetAPIDocVersions() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		_ = json.MarshalWrite(w, resp)
 	}
 }
 

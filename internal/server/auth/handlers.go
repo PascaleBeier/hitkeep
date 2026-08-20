@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -22,6 +21,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/appurl"
 	authcore "hitkeep/internal/auth"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/localization"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
@@ -241,7 +241,7 @@ func (h *handler) handleSSOAvailability() http.HandlerFunc {
 		}
 		shared.LoggerFromContext(r.Context()).Debug("SSO availability evaluated", "flow", ssoAuditFlowAvailability, "outcome", enabled, "reason", reason, "configured_teams", len(teamIDs), "eligible_teams", eligibleTeams)
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(api.SSOAvailability{Enabled: enabled}); err != nil {
+		if err := json.MarshalWrite(w, api.SSOAvailability{Enabled: enabled}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode SSO availability", "error", err)
 		}
 	}
@@ -278,7 +278,7 @@ func (h *handler) handleCreateInitialUser() http.HandlerFunc {
 		}
 
 		var req request
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.UnmarshalRead(r.Body, &req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -319,7 +319,7 @@ func (h *handler) handleCreateInitialUser() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(map[string]string{
+		if err := json.MarshalWrite(w, map[string]string{
 			"token": token,
 		}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
@@ -342,7 +342,7 @@ func (h *handler) handleLogin() http.HandlerFunc {
 		}
 
 		var req request
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.UnmarshalRead(r.Body, &req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -392,7 +392,7 @@ func (h *handler) handleLogin() http.HandlerFunc {
 		shared.LoggerFromContext(r.Context()).Info("User logged in", "user_id", user.ID)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
+		if err := json.MarshalWrite(w, resp); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
@@ -498,7 +498,7 @@ func (h *handler) renewRememberedSession(r *http.Request, w http.ResponseWriter,
 
 func writeSessionResponse(ctx context.Context, w http.ResponseWriter, resp api.AuthSession) {
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+	if err := json.MarshalWrite(w, resp); err != nil {
 		shared.LoggerFromContext(ctx).Error("Failed to encode auth session response", "error", err)
 	}
 }

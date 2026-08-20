@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -17,6 +16,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailer"
 	serverauth "hitkeep/internal/server/auth"
 	"hitkeep/internal/server/shared"
@@ -76,7 +76,7 @@ func TestHandleGetTeams(t *testing.T) {
 		RecentTeamIDs []uuid.UUID `json:"recent_team_ids"`
 		Teams         []api.Team  `json:"teams"`
 	}
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if resp.ActiveTeamID == uuid.Nil {
@@ -167,7 +167,7 @@ func TestHandleSetActiveTeam(t *testing.T) {
 		ActiveTeamID  uuid.UUID   `json:"active_team_id"`
 		RecentTeamIDs []uuid.UUID `json:"recent_team_ids"`
 	}
-	if err := json.NewDecoder(w.Body).Decode(&setResp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &setResp); err != nil {
 		t.Fatalf("decode set active response: %v", err)
 	}
 	if setResp.Status != "ok" {
@@ -540,7 +540,7 @@ func TestHandleAddTeamMemberCreatesPendingInvite(t *testing.T) {
 		IsInvite bool           `json:"is_invite"`
 		Invite   api.TeamInvite `json:"invite"`
 	}
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if !resp.IsInvite {
@@ -600,7 +600,7 @@ func TestHandleGetAndRevokeTeamInvites(t *testing.T) {
 	}
 
 	var invites []api.TeamInvite
-	if err := json.NewDecoder(listW.Body).Decode(&invites); err != nil {
+	if err := json.UnmarshalRead(listW.Body, &invites); err != nil {
 		t.Fatalf("decode invites response: %v", err)
 	}
 	if len(invites) != 1 || invites[0].ID != invite.ID {
@@ -672,7 +672,7 @@ func TestHandleCreateTeamSuccess(t *testing.T) {
 	var resp struct {
 		Team api.Team `json:"team"`
 	}
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if resp.Team.Name != "My New Team" {
@@ -747,7 +747,7 @@ func TestHandleLeaveTeamSuccess(t *testing.T) {
 		ActiveTeamID  uuid.UUID   `json:"active_team_id"`
 		RecentTeamIDs []uuid.UUID `json:"recent_team_ids"`
 	}
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode leave response: %v", err)
 	}
 	if resp.Status != "ok" {
@@ -777,7 +777,7 @@ func TestHandleLeaveTeamReturnsStructuredError(t *testing.T) {
 	}
 
 	var resp map[string]string
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode leave error response: %v", err)
 	}
 	if resp["code"] != "user_only_team" {
@@ -855,7 +855,7 @@ func TestHandleArchiveTeam(t *testing.T) {
 		ActiveTeamID  uuid.UUID   `json:"active_team_id"`
 		RecentTeamIDs []uuid.UUID `json:"recent_team_ids"`
 	}
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode archive response: %v", err)
 	}
 	if resp.Status != "ok" {
@@ -901,7 +901,7 @@ func TestHandleArchiveTeamReturnsStructuredErrorWhenSitesRemain(t *testing.T) {
 	}
 
 	var resp map[string]string
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode archive error response: %v", err)
 	}
 	if resp["code"] != "team_archive_has_sites" {
@@ -951,7 +951,7 @@ func TestHandleGetTeamAudit(t *testing.T) {
 	}
 
 	var response api.TeamAuditListResponse
-	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+	if err := json.UnmarshalRead(w.Body, &response); err != nil {
 		t.Fatalf("decode audit response: %v", err)
 	}
 	if len(response.Entries) == 0 {
@@ -1065,7 +1065,7 @@ func TestHandleTeamAPIClientLifecycle(t *testing.T) {
 		Client api.APIClient `json:"client"`
 		Token  string        `json:"token"`
 	}
-	if err := json.NewDecoder(createW.Body).Decode(&createResp); err != nil {
+	if err := json.UnmarshalRead(createW.Body, &createResp); err != nil {
 		t.Fatalf("decode create response: %v", err)
 	}
 	if createResp.Token == "" {
@@ -1087,7 +1087,7 @@ func TestHandleTeamAPIClientLifecycle(t *testing.T) {
 	}
 
 	var clients []api.APIClient
-	if err := json.NewDecoder(listW.Body).Decode(&clients); err != nil {
+	if err := json.UnmarshalRead(listW.Body, &clients); err != nil {
 		t.Fatalf("decode list response: %v", err)
 	}
 	if len(clients) != 1 || clients[0].ID != createResp.Client.ID {
@@ -1112,7 +1112,7 @@ func TestHandleTeamAPIClientLifecycle(t *testing.T) {
 	}
 
 	var updated api.APIClient
-	if err := json.NewDecoder(updateW.Body).Decode(&updated); err != nil {
+	if err := json.UnmarshalRead(updateW.Body, &updated); err != nil {
 		t.Fatalf("decode update response: %v", err)
 	}
 	if updated.RevokedAt == nil {
@@ -1157,7 +1157,7 @@ func TestHandlePersonalAPIClientRotateAndAudit(t *testing.T) {
 		Client api.APIClient `json:"client"`
 		Token  string        `json:"token"`
 	}
-	if err := json.NewDecoder(createW.Body).Decode(&createResp); err != nil {
+	if err := json.UnmarshalRead(createW.Body, &createResp); err != nil {
 		t.Fatalf("decode create response: %v", err)
 	}
 	if createResp.Token == "" {
@@ -1176,7 +1176,7 @@ func TestHandlePersonalAPIClientRotateAndAudit(t *testing.T) {
 		Client api.APIClient `json:"client"`
 		Token  string        `json:"token"`
 	}
-	if err := json.NewDecoder(rotateW.Body).Decode(&rotateResp); err != nil {
+	if err := json.UnmarshalRead(rotateW.Body, &rotateResp); err != nil {
 		t.Fatalf("decode rotate response: %v", err)
 	}
 	if rotateResp.Token == "" || rotateResp.Token == createResp.Token {
@@ -1262,7 +1262,7 @@ func TestHandleTeamAPIClientRotateRejectsRevokedAndAudits(t *testing.T) {
 		Client api.APIClient `json:"client"`
 		Token  string        `json:"token"`
 	}
-	if err := json.NewDecoder(createW.Body).Decode(&createResp); err != nil {
+	if err := json.UnmarshalRead(createW.Body, &createResp); err != nil {
 		t.Fatalf("decode create response: %v", err)
 	}
 
@@ -1278,7 +1278,7 @@ func TestHandleTeamAPIClientRotateRejectsRevokedAndAudits(t *testing.T) {
 		Client api.APIClient `json:"client"`
 		Token  string        `json:"token"`
 	}
-	if err := json.NewDecoder(rotateW.Body).Decode(&rotateResp); err != nil {
+	if err := json.UnmarshalRead(rotateW.Body, &rotateResp); err != nil {
 		t.Fatalf("decode rotate response: %v", err)
 	}
 	if rotateResp.Token == "" || rotateResp.Token == createResp.Token {

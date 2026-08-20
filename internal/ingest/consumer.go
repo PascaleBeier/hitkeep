@@ -2,7 +2,6 @@ package ingest
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
 	"hitkeep/internal/hklog"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/realtime"
 	"hitkeep/internal/webhooks"
 )

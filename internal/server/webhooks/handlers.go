@@ -2,7 +2,6 @@ package webhooks
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +13,7 @@ import (
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 	webhookcore "hitkeep/internal/webhooks"
 )
@@ -255,9 +255,7 @@ func (h *handler) handleDeliveries(siteID *uuid.UUID) http.HandlerFunc {
 
 func (h *handler) decodeAndValidateInput(w http.ResponseWriter, r *http.Request, siteID *uuid.UUID) (api.WebhookInput, bool) {
 	var input api.WebhookInput
-	decoder := json.NewDecoder(io.LimitReader(r.Body, 64<<10))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil {
+	if err := json.UnmarshalReadStrict(io.LimitReader(r.Body, 64<<10), &input); err != nil {
 		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
 		return input, false
 	}
@@ -324,7 +322,7 @@ func parseWebhookID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
 func writeJSON(ctx context.Context, w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(value); err != nil {
+	if err := json.MarshalWrite(w, value); err != nil {
 		shared.LoggerFromContext(ctx).Error("Failed to encode webhook response", "error", err)
 	}
 }

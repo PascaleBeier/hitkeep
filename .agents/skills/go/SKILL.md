@@ -3,7 +3,7 @@ name: go
 description: >
   Expert Go programming skill authored by spf13 (former Go team lead, author of Cobra, Viper, Hugo, Afero).
   Covers idiomatic Go — package design, error handling, interfaces, concurrency, testing, and
-  project layout, current through Go 1.25. Use whenever Go code is written, reviewed, debugged, or
+  project layout, current through Go 1.27. Use whenever Go code is written, reviewed, debugged, or
   refactored — any .go file, go.mod, CLI tool, or web service, and whenever the user mentions
   Go or golang, even if they don't ask for "idiomatic" code.
 ---
@@ -377,6 +377,8 @@ func TestTimeout(t *testing.T) {
 
 Never write `time.Sleep(100 * time.Millisecond)` to "wait for a goroutine" in a test. Use synctest, channels, or explicit synchronization.
 
+With Go 1.27, use `synctest.Sleep(d)` when a test needs to advance fake time and then wait for the bubble to become durably blocked.
+
 ## Generics (Go 1.18+)
 
 Generics exist to eliminate duplicated algorithms, not to create type hierarchies. If you are thinking about generics in terms of inheritance or polymorphism, stop — you are writing Java.
@@ -426,6 +428,23 @@ type UserStore interface {
 - **Do** use `cmp.Ordered` when you need `<`, `>`, `<=`, `>=`.
 - Start with a concrete implementation. Generify only when you have the same logic repeated across 3+ types.
 - Generic type aliases are fully supported since Go 1.24.
+
+### Generic Methods (Go 1.27)
+
+Concrete methods may declare their own type parameters when the operation naturally belongs to the receiver:
+
+```go
+func (c *Cache) Transform[T any](key string, f func([]byte) (T, error)) (T, error) {
+    data, err := c.Load(key)
+    if err != nil {
+        var zero T
+        return zero, err
+    }
+    return f(data)
+}
+```
+
+Interface methods cannot declare type parameters, and a generic method does not implement a non-generic interface method. Keep a package-level generic function when the operation is not receiver-specific or must participate in interface dispatch.
 
 ## Standard Library: Use the New Packages
 
@@ -549,6 +568,13 @@ type Event struct {
     StartedAt time.Time `json:"started_at,omitzero"` // omitempty would emit "0001-01-01T..."
 }
 ```
+
+### Go 1.27 Standard Library
+
+- Use `strings.CutLast` and `bytes.CutLast` instead of combining `LastIndex` with manual slicing.
+- Use `(*url.URL).Clone` and `url.Values.Clone` for independent copies instead of hand-copying their internal maps and slices.
+- Prefer the standard `uuid` package for new UUID generation and parsing. Before replacing an established UUID dependency, check for APIs the standard type intentionally does not provide, such as name-based generation or database-specific scanner/value behavior.
+- Go 1.27's `encoding/json` implementation uses the new engine while preserving the existing API's behavior. Adopt `encoding/json/v2` directly only after testing its stricter defaults, especially invalid UTF-8 and duplicate object-name rejection, at the affected contract boundary.
 
 ## Concurrency: Modern Patterns
 

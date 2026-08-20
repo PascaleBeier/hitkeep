@@ -2,7 +2,6 @@ package sites
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -12,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 )
 
@@ -90,7 +90,7 @@ func TestHandleGetSiteAIActivity(t *testing.T) {
 		}
 
 		var report api.AIActivityReport
-		if err := json.NewDecoder(w.Body).Decode(&report); err != nil {
+		if err := json.UnmarshalRead(w.Body, &report); err != nil {
 			t.Fatalf("decode report: %v", err)
 		}
 		if report.TrackedHits != 1 || report.FetchCount != 1 || report.AIRequests != 2 {
@@ -119,7 +119,7 @@ func TestHandleGetSiteAIActivity(t *testing.T) {
 		}
 
 		var report api.AIActivityReport
-		if err := json.NewDecoder(w.Body).Decode(&report); err != nil {
+		if err := json.UnmarshalRead(w.Body, &report); err != nil {
 			t.Fatalf("decode report: %v", err)
 		}
 		if report.Comparison == nil {
@@ -137,7 +137,7 @@ func TestHandleGetSiteAIActivity(t *testing.T) {
 		}
 
 		var report api.AIActivityReport
-		if err := json.NewDecoder(w.Body).Decode(&report); err != nil {
+		if err := json.UnmarshalRead(w.Body, &report); err != nil {
 			t.Fatalf("decode report: %v", err)
 		}
 		if report.TrackedHits != 1 || report.FetchCount != 1 {

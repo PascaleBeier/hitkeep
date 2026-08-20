@@ -3,7 +3,6 @@ package webhooks
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -16,6 +15,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/webhookdispatcher"
 	webhookcore "hitkeep/internal/webhooks"
@@ -53,7 +53,7 @@ func TestSiteWebhookHandlerLifecycleAndAudit(t *testing.T) {
 		t.Fatalf("create status=%d body=%q", createW.Code, createW.Body.String())
 	}
 	var created api.WebhookSecretResponse
-	if err := json.NewDecoder(createW.Body).Decode(&created); err != nil {
+	if err := json.UnmarshalRead(createW.Body, &created); err != nil {
 		t.Fatalf("decode create: %v", err)
 	}
 	if created.Webhook.ID == uuid.Nil || !strings.HasPrefix(created.Secret, "whsec_") {
@@ -82,7 +82,7 @@ func TestSiteWebhookHandlerLifecycleAndAudit(t *testing.T) {
 		t.Fatalf("rotate status=%d body=%q", rotateW.Code, rotateW.Body.String())
 	}
 	var rotated api.WebhookSecretResponse
-	if err := json.NewDecoder(rotateW.Body).Decode(&rotated); err != nil {
+	if err := json.UnmarshalRead(rotateW.Body, &rotated); err != nil {
 		t.Fatalf("decode rotate: %v", err)
 	}
 	if rotated.Secret == created.Secret || !strings.HasPrefix(rotated.Secret, "whsec_") {
@@ -156,6 +156,44 @@ func TestWebhookHandlerRejectsInvalidDestinationAndEventScope(t *testing.T) {
 		if w.Code != http.StatusBadRequest {
 			t.Errorf("body=%s status=%d response=%q", body, w.Code, w.Body.String())
 		}
+	}
+}
+
+func TestWebhookHandlerRejectsAmbiguousJSON(t *testing.T) {
+	h := &handler{ctx: &shared.Context{Config: &config.Config{WebhookAllowDevelopmentTargets: true}}}
+	tests := []struct {
+		name string
+		body []byte
+	}{
+		{
+			name: "duplicate object name",
+			body: []byte(`{"name":"first","name":"second","url":"http://localhost:9900/hook","events":["goal.created"]}`),
+		},
+		{
+			name: "invalid UTF-8",
+			body: append([]byte(`{"name":"`), append([]byte{0xff}, []byte(`","url":"http://localhost:9900/hook","events":["goal.created"]}`)...)...),
+		},
+		{
+			name: "case-mismatched member",
+			body: []byte(`{"Name":"Operations","url":"http://localhost:9900/hook","events":["goal.created"]}`),
+		},
+		{
+			name: "trailing value",
+			body: []byte(`{"name":"Operations","url":"http://localhost:9900/hook","events":["goal.created"]} {}`),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/api/sites/site/webhooks", bytes.NewReader(tt.body))
+			w := httptest.NewRecorder()
+			if _, ok := h.decodeAndValidateInput(w, req, nil); ok {
+				t.Fatal("decodeAndValidateInput unexpectedly accepted ambiguous JSON")
+			}
+			if w.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d", w.Code, http.StatusBadRequest)
+			}
+		})
 	}
 }
 

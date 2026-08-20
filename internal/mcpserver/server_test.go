@@ -3,7 +3,6 @@ package mcpserver
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -27,6 +26,7 @@ import (
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mcptest"
 	"hitkeep/internal/server/filterparams"
 )
@@ -77,7 +77,7 @@ func TestMCPServerRequiresBearerToken(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	req := httptest.NewRequest(http.MethodPost, ts.URL+conf.MCPPath, strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`))
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, ts.URL+conf.MCPPath, strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`))
 	req.Header.Set("Accept", "application/json, text/event-stream")
 	req.Header.Set("Content-Type", "application/json")
 	req.RemoteAddr = "127.0.0.1:12345"
@@ -111,7 +111,7 @@ func TestMCPServerSupportsSessionlessDiscoveryAndCacheHints(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		req, err := http.NewRequest(http.MethodPost, ts.URL+conf.MCPPath, strings.NewReader(string(body)))
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, ts.URL+conf.MCPPath, strings.NewReader(string(body)))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -196,7 +196,7 @@ func TestMCPServerSupportsSessionlessDiscoveryAndCacheHints(t *testing.T) {
 	}
 
 	for _, method := range []string{http.MethodGet, http.MethodDelete} {
-		req, err := http.NewRequest(method, ts.URL+conf.MCPPath, nil)
+		req, err := http.NewRequestWithContext(t.Context(), method, ts.URL+conf.MCPPath, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -279,7 +279,7 @@ func TestMCPServerRejectsUnexpectedHostBeforeAuth(t *testing.T) {
 }
 
 func TestMCPRequestHostUsesForwardedHostFromTrustedProxy(t *testing.T) {
-	req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:8080/mcp", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "http://127.0.0.1:8080/mcp", nil)
 	req.Host = "127.0.0.1:8080"
 	req.RemoteAddr = "10.0.0.5:44321"
 	req.Header.Set("X-Forwarded-Host", "analytics.example.com")
@@ -294,7 +294,7 @@ func TestMCPRequestHostUsesForwardedHostFromTrustedProxy(t *testing.T) {
 }
 
 func TestMCPRequestHostIgnoresForwardedHostFromUntrustedProxy(t *testing.T) {
-	req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:8080/mcp", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "http://127.0.0.1:8080/mcp", nil)
 	req.Host = "127.0.0.1:8080"
 	req.RemoteAddr = "198.51.100.10:44321"
 	req.Header.Set("X-Forwarded-Host", "analytics.example.com")
@@ -2215,7 +2215,7 @@ func connectMCPClient(t *testing.T, endpoint, token string) *mcp.ClientSession {
 func newMCPInitializeHTTPRequest(t *testing.T, endpoint, token string) *http.Request {
 	t.Helper()
 	body := strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test-client","version":"test"}}}`)
-	req, err := http.NewRequest(http.MethodPost, endpoint, body)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, endpoint, body)
 	if err != nil {
 		t.Fatalf("new initialize request: %v", err)
 	}

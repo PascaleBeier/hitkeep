@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"crypto/subtle"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
@@ -16,6 +15,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/appurl"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/security"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/sso"
@@ -53,9 +53,7 @@ func (h *handler) handleSSOStart() http.HandlerFunc {
 			return
 		}
 		var req ssoStartRequest
-		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&req); err != nil {
+		if err := json.UnmarshalReadStrict(http.MaxBytesReader(w, r.Body, 1<<20), &req); err != nil {
 			writeSSOStartError(r.Context(), w, http.StatusBadRequest, "invalid_email")
 			return
 		}
@@ -130,7 +128,7 @@ func (h *handler) handleSSOStart() http.HandlerFunc {
 		})
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(api.SSOStartResponse{AuthURL: authorization.URL(state)}); err != nil {
+		if err := json.MarshalWrite(w, api.SSOStartResponse{AuthURL: authorization.URL(state)}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode SSO start response", "error", err)
 		}
 	}
@@ -147,9 +145,7 @@ func (h *handler) handleSSOInviteAvailability() http.HandlerFunc {
 			return
 		}
 		var req request
-		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&req); err != nil || strings.TrimSpace(req.InviteToken) == "" {
+		if err := json.UnmarshalReadStrict(http.MaxBytesReader(w, r.Body, 1<<20), &req); err != nil || strings.TrimSpace(req.InviteToken) == "" {
 			writeSSOAvailability(r.Context(), w, false)
 			return
 		}
@@ -278,7 +274,7 @@ func (h *handler) requireSSOAccessCapacity(ctx context.Context, teamID uuid.UUID
 
 func writeSSOAvailability(ctx context.Context, w http.ResponseWriter, enabled bool) {
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(api.SSOAvailability{Enabled: enabled}); err != nil {
+	if err := json.MarshalWrite(w, api.SSOAvailability{Enabled: enabled}); err != nil {
 		shared.LoggerFromContext(ctx).Error("Failed to encode SSO availability", "error", err)
 	}
 }
@@ -513,7 +509,7 @@ func splitSSODisplayName(displayName string) (string, string) {
 func writeSSOStartError(ctx context.Context, w http.ResponseWriter, status int, code string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(map[string]string{
+	if err := json.MarshalWrite(w, map[string]string{
 		"status":  "error",
 		"code":    code,
 		"message": "SSO login could not be started for this email address",

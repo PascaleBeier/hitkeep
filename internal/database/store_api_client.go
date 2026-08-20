@@ -1,6 +1,7 @@
 package database
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -8,7 +9,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -615,8 +616,8 @@ func replaceAPIClientSiteRolesTx(ctx context.Context, tx *sql.Tx, clientID uuid.
 	for siteID := range siteRoles {
 		siteIDs = append(siteIDs, siteID)
 	}
-	sort.Slice(siteIDs, func(i, j int) bool {
-		return siteIDs[i].String() < siteIDs[j].String()
+	slices.SortFunc(siteIDs, func(left, right uuid.UUID) int {
+		return cmp.Compare(left.String(), right.String())
 	})
 
 	for _, siteID := range siteIDs {
@@ -697,8 +698,8 @@ func flattenSiteRoles(siteRoles map[uuid.UUID]auth.SiteRole) []api.APIClientSite
 	for siteID := range siteRoles {
 		siteIDs = append(siteIDs, siteID)
 	}
-	sort.Slice(siteIDs, func(i, j int) bool {
-		return siteIDs[i].String() < siteIDs[j].String()
+	slices.SortFunc(siteIDs, func(left, right uuid.UUID) int {
+		return cmp.Compare(left.String(), right.String())
 	})
 
 	roles := make([]api.APIClientSiteRole, 0, len(siteIDs))

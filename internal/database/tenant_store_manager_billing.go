@@ -3,9 +3,10 @@
 package database
 
 import (
+	"cmp"
 	"context"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -118,11 +119,11 @@ func (m *TenantStoreManager) ListEligibleCloudLifecycleRecipients(ctx context.Co
 	for _, candidate := range selected {
 		result = append(result, candidate.recipient)
 	}
-	sort.Slice(result, func(i, j int) bool {
-		if !result[i].FirstHitAt.Equal(result[j].FirstHitAt) {
-			return result[i].FirstHitAt.Before(result[j].FirstHitAt)
+	slices.SortFunc(result, func(left, right CloudLifecycleRecipient) int {
+		if !left.FirstHitAt.Equal(right.FirstHitAt) {
+			return left.FirstHitAt.Compare(right.FirstHitAt)
 		}
-		return strings.ToLower(result[i].Email) < strings.ToLower(result[j].Email)
+		return cmp.Compare(strings.ToLower(left.Email), strings.ToLower(right.Email))
 	})
 	if len(result) > limit {
 		result = result[:limit]

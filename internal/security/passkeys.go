@@ -131,7 +131,7 @@ func userDisplayName(user *api.User) string {
 }
 
 func displayNameFromEmail(email string) string {
-	local := strings.SplitN(strings.TrimSpace(email), "@", 2)[0]
+	local, _, _ := strings.Cut(strings.TrimSpace(email), "@")
 	if local == "" {
 		return "User"
 	}

@@ -72,8 +72,7 @@ func TestRepositorySkillLayout(t *testing.T) {
 		t.Fatal(err)
 	}
 	for path, expected := range map[string]int{
-		filepath.Join(root, "skills"):            len(productAnalyticsSkills),
-		filepath.Join(root, ".agents", "skills"): len(contributorSkills),
+		filepath.Join(root, "skills"): len(productAnalyticsSkills),
 	} {
 		entries, err := os.ReadDir(path)
 		if err != nil {

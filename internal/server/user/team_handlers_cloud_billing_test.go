@@ -5,7 +5,6 @@ package user
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -17,6 +16,7 @@ import (
 	"hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
+	json "hitkeep/internal/jsonapi"
 	serverauth "hitkeep/internal/server/auth"
 )
 
@@ -111,7 +111,7 @@ func TestHandleGetTeamsReturnsOperatorPlanForHostedCloudOwnerTeams(t *testing.T)
 	var resp struct {
 		Teams []api.Team `json:"teams"`
 	}
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if len(resp.Teams) == 0 {
@@ -169,7 +169,7 @@ func TestHandleGetTeamsDoesNotReturnOperatorPlanForHostedCloudNonOwner(t *testin
 	var resp struct {
 		Teams []api.Team `json:"teams"`
 	}
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+	if err := json.UnmarshalRead(w.Body, &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if len(resp.Teams) == 0 {

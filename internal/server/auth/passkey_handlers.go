@@ -3,7 +3,6 @@ package auth
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,6 +14,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	appsecurity "hitkeep/internal/security"
 	"hitkeep/internal/server/shared"
 )
@@ -74,7 +74,7 @@ func (h *handler) handlePasskeyLoginStart() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
+		if err := json.MarshalWrite(w, resp); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode passkey login start response", "error", err)
 		}
 	}
@@ -209,7 +209,7 @@ func (h *handler) handlePasskeyLoginFinish() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+		if err := json.MarshalWrite(w, map[string]string{"status": "ok"}); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode passkey login response", "error", err, "user_id", userID)
 		}
 	}
@@ -284,16 +284,10 @@ func (h *handler) persistValidatedPasskey(ctx context.Context, credential webaut
 }
 
 func decodeAuthJSON(w http.ResponseWriter, r *http.Request, dest any, allowEmpty bool) bool {
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxAuthPayloadBytes))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(dest); err != nil {
+	if err := json.UnmarshalReadOptionalStrict(http.MaxBytesReader(w, r.Body, maxAuthPayloadBytes), dest); err != nil {
 		if allowEmpty && err == io.EOF {
 			return true
 		}
-		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
-		return false
-	}
-	if err := decoder.Decode(&struct{}{}); err != io.EOF {
 		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
 		return false
 	}

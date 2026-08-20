@@ -1,6 +1,6 @@
 module hitkeep
 
-go 1.26.6
+go 1.27.0
 
 exclude (
 	github.com/armon/go-metrics v0.4.2
@@ -15,10 +15,18 @@ exclude (
 
 require (
 	github.com/Boostport/mjml-go v0.16.0
+	github.com/DataDog/zstd v1.5.7
+	github.com/aws/aws-sdk-go-v2 v1.43.6
+	github.com/aws/aws-sdk-go-v2/config v1.32.37
+	github.com/aws/aws-sdk-go-v2/credentials v1.19.36
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.84.0
+	github.com/coreos/go-oidc/v3 v3.20.0
 	github.com/duckdb/duckdb-go/v2 v2.10505.0
+	github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/go-cmp v0.7.0
+	github.com/google/jsonschema-go v0.4.3
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/hashicorp/memberlist v0.6.0
@@ -28,6 +36,8 @@ require (
 	github.com/nsqio/nsq v1.3.0
 	github.com/pquerna/otp v1.5.0
 	github.com/rs/cors v1.11.1
+	github.com/spf13/cobra v1.10.2
+	github.com/spf13/pflag v1.0.10
 	github.com/stripe/stripe-go/v86 v86.3.0
 	github.com/wneessen/go-mail v0.8.1
 	github.com/zendev-sh/goai v0.9.5
@@ -38,19 +48,6 @@ require (
 	golang.org/x/text v0.41.0
 	golang.org/x/time v0.15.0
 	google.golang.org/api v0.293.0
-)
-
-require (
-	github.com/DataDog/zstd v1.5.7
-	github.com/aws/aws-sdk-go-v2 v1.43.6
-	github.com/aws/aws-sdk-go-v2/config v1.32.37
-	github.com/aws/aws-sdk-go-v2/credentials v1.19.36
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.84.0
-	github.com/coreos/go-oidc/v3 v3.20.0
-	github.com/go-jose/go-jose/v4 v4.1.4
-	github.com/google/jsonschema-go v0.4.3
-	github.com/spf13/cobra v1.10.2
-	github.com/spf13/pflag v1.0.10
 )
 
 require (
@@ -120,7 +117,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/miekg/dns v1.1.72 // indirect
+	github.com/miekg/dns v1.1.73 // indirect
 	github.com/nsqio/go-diskqueue v1.1.0 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
@@ -146,8 +143,8 @@ require (
 	golang.org/x/mod v0.40.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/tools v0.49.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260818201246-1b0934165a6f // indirect
-	google.golang.org/grpc v1.83.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260819154853-08b0e4226688 // indirect
+	google.golang.org/grpc v1.83.1 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 )
 

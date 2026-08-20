@@ -8,7 +8,6 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"math"
 
@@ -16,6 +15,8 @@ import (
 	"github.com/go-webauthn/webauthn/protocol/webauthncbor"
 	"github.com/go-webauthn/webauthn/protocol/webauthncose"
 	webauthnlib "github.com/go-webauthn/webauthn/webauthn"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 type PasskeyFixture struct {
@@ -43,13 +44,11 @@ func NewPasskeyFixture() (*PasskeyFixture, error) {
 	}
 
 	coseKey, err := webauthncbor.Marshal(webauthncose.EC2PublicKeyData{
-		PublicKeyData: webauthncose.PublicKeyData{
-			KeyType:   int64(webauthncose.EllipticKey),
-			Algorithm: int64(webauthncose.AlgES256),
-		},
-		Curve:  int64(webauthncose.P256),
-		XCoord: append([]byte(nil), publicKeyBytes[1:33]...),
-		YCoord: append([]byte(nil), publicKeyBytes[33:65]...),
+		KeyType:   int64(webauthncose.EllipticKey),
+		Algorithm: int64(webauthncose.AlgES256),
+		Curve:     int64(webauthncose.P256),
+		XCoord:    append([]byte(nil), publicKeyBytes[1:33]...),
+		YCoord:    append([]byte(nil), publicKeyBytes[33:65]...),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("marshal credential public key: %w", err)
@@ -113,13 +112,9 @@ func (f *PasskeyFixture) RegistrationResponse(challenge protocol.URLEncodedBase6
 	}
 
 	return protocol.CredentialCreationResponse{
-		PublicKeyCredential: protocol.PublicKeyCredential{
-			Credential: protocol.Credential{
-				ID:   f.CredentialID(),
-				Type: string(protocol.PublicKeyCredentialType),
-			},
-			RawID: f.credential.ID,
-		},
+		ID:    f.CredentialID(),
+		Type:  string(protocol.PublicKeyCredentialType),
+		RawID: f.credential.ID,
 		AttestationResponse: protocol.AuthenticatorAttestationResponse{
 			AuthenticatorResponse: protocol.AuthenticatorResponse{
 				ClientDataJSON: clientDataJSON,
@@ -159,13 +154,9 @@ func (f *PasskeyFixture) AssertionResponseWithFlags(
 	}
 
 	return protocol.CredentialAssertionResponse{
-		PublicKeyCredential: protocol.PublicKeyCredential{
-			Credential: protocol.Credential{
-				ID:   f.CredentialID(),
-				Type: string(protocol.PublicKeyCredentialType),
-			},
-			RawID: f.credential.ID,
-		},
+		ID:    f.CredentialID(),
+		Type:  string(protocol.PublicKeyCredentialType),
+		RawID: f.credential.ID,
 		AssertionResponse: protocol.AuthenticatorAssertionResponse{
 			AuthenticatorResponse: protocol.AuthenticatorResponse{
 				ClientDataJSON: clientDataJSON,

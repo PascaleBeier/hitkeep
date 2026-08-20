@@ -2,7 +2,6 @@ package ai
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"strings"
 	"sync"
@@ -14,6 +13,8 @@ import (
 	"github.com/google/uuid"
 	goaisdk "github.com/zendev-sh/goai"
 	"github.com/zendev-sh/goai/provider"
+
+	json "hitkeep/internal/jsonapi"
 )
 
 type recordingRecorder struct {

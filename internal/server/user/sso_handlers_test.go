@@ -3,7 +3,6 @@ package user
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +11,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
+	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/sso"
 )
@@ -51,7 +51,7 @@ func TestTeamSSOConfigurationIsValidatedEncryptedAndRedacted(t *testing.T) {
 		t.Fatalf("response exposed the client secret: %s", w.Body.String())
 	}
 	var response api.TeamSSOConfig
-	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+	if err := json.UnmarshalRead(w.Body, &response); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if !response.Enabled || !response.AutoProvision || !response.ClientSecretConfigured || response.CallbackURL != "http://localhost:8080/api/auth/sso/callback" {
@@ -176,7 +176,7 @@ func newOIDCDiscoveryServer(t *testing.T) *httptest.Server {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		_ = json.MarshalWrite(w, map[string]any{
 			"issuer":                                server.URL + "/",
 			"authorization_endpoint":                server.URL + "/authorize",
 			"token_endpoint":                        server.URL + "/token",
