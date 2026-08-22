@@ -226,7 +226,15 @@ func (a *App) prepareQARequest(ctx context.Context, request RunRequest) (RunRequ
 		return RunRequest{}, fmt.Errorf("qa_plan_stale: source changed after planning")
 	}
 	request.Profile = plan.Profile
-	request.GateIDs = slices.Clone(plan.GateIDs)
+	if len(request.GateIDs) == 0 {
+		request.GateIDs = slices.Clone(plan.GateIDs)
+		return request, nil
+	}
+	for _, gateID := range request.GateIDs {
+		if !slices.Contains(plan.GateIDs, gateID) {
+			return RunRequest{}, fmt.Errorf("qa gate %q is not selected by plan %s", gateID, plan.PlanID)
+		}
+	}
 	return request, nil
 }
 

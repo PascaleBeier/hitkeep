@@ -84,6 +84,7 @@ func TestDoctorBoundsSlowChecksAndRunsThemInParallel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	app.doctorProbeTimeout = 100 * time.Millisecond
 	fakeBin := t.TempDir()
 	if err := os.WriteFile(filepath.Join(fakeBin, "docker"), []byte("#!/bin/sh\n/bin/sleep 30\n"), 0o700); err != nil {
 		t.Fatal(err)
@@ -91,7 +92,7 @@ func TestDoctorBoundsSlowChecksAndRunsThemInParallel(t *testing.T) {
 	t.Setenv("PATH", fakeBin)
 	started := time.Now()
 	report := app.Doctor(context.Background())
-	if elapsed := time.Since(started); elapsed > doctorCommandTimeout+5*time.Second {
+	if elapsed := time.Since(started); elapsed > 2*time.Second {
 		t.Fatalf("parallel bounded doctor took %s", elapsed)
 	}
 	for _, name := range []string{"docker", "compose", "buildx"} {

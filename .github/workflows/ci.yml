@@ -25,6 +25,7 @@ jobs:
   qa-contract:
     name: Plan canonical QA contract
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       race_gates: ${{ steps.plan.outputs.race_gates }}
     steps:
@@ -44,6 +45,7 @@ jobs:
   lint:
     name: Lint Golang codebase
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -78,6 +80,7 @@ jobs:
     name: Test API (${{ matrix.gate }})
     needs: qa-contract
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -119,6 +122,7 @@ jobs:
   mcp-audit:
     name: Audit MCP surface
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -138,6 +142,7 @@ jobs:
   lint-dashboard:
     name: Lint Dashboard (Angular)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -146,7 +151,7 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-          cache: false
+          cache-dependency-path: go.sum
       - uses: ./.github/actions/setup-node-npm
       - name: Install dependencies
         working-directory: frontend/dashboard
@@ -160,36 +165,7 @@ jobs:
   test-dashboard:
     name: Test Dashboard (Angular)
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Setup Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: false
-      - uses: ./.github/actions/setup-node-npm
-      - name: Restore Playwright browser cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('frontend/dashboard/package-lock.json') }}
-      - name: Install dependencies
-        working-directory: frontend/dashboard
-        run: npm ci --no-audit --no-fund
-      - name: Install Playwright Browsers
-        working-directory: frontend/dashboard
-        run: npx playwright install --with-deps chromium
-      - name: Test dashboard
-        run: |
-          gates="$(./hk ci qa-matrix --profile pr --group frontend-unit --output json | jq -r '.data.gate_ids | join(",")')"
-          plan_id="$(./hk qa plan pr --output json | jq -r '.data.plan_id')"
-          ./hk qa pr --plan-id "$plan_id" --gate "$gates"
-
-  e2e-dashboard:
-    name: E2E Dashboard
-    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -201,6 +177,43 @@ jobs:
           cache-dependency-path: go.sum
       - uses: ./.github/actions/setup-node-npm
       - name: Restore Playwright browser cache
+        id: playwright-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('frontend/dashboard/package-lock.json') }}
+      - name: Install dependencies
+        working-directory: frontend/dashboard
+        run: npm ci --no-audit --no-fund
+      - name: Install Playwright system dependencies
+        working-directory: frontend/dashboard
+        run: npx playwright install-deps chromium
+      - name: Install Playwright browser
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        working-directory: frontend/dashboard
+        run: npx playwright install chromium
+      - name: Test dashboard
+        run: |
+          gates="$(./hk ci qa-matrix --profile pr --group frontend-unit --output json | jq -r '.data.gate_ids | join(",")')"
+          plan_id="$(./hk qa plan pr --output json | jq -r '.data.plan_id')"
+          ./hk qa pr --plan-id "$plan_id" --gate "$gates"
+
+  e2e-dashboard:
+    name: E2E Dashboard
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - uses: ./.github/actions/setup-node-npm
+      - name: Restore Playwright browser cache
+        id: playwright-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
@@ -208,9 +221,13 @@ jobs:
       - name: Install dashboard dependencies
         working-directory: frontend/dashboard
         run: npm ci --no-audit --no-fund
-      - name: Install Playwright Browsers
+      - name: Install Playwright system dependencies
         working-directory: frontend/dashboard
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install-deps chromium
+      - name: Install Playwright browser
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        working-directory: frontend/dashboard
+        run: npx playwright install chromium
       - name: Run dashboard e2e suite
         run: |
           gates="$(./hk ci qa-matrix --profile pr --group frontend-e2e --output json | jq -r '.data.gate_ids | join(",")')"

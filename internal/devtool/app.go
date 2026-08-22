@@ -21,13 +21,14 @@ import (
 const doctorCommandTimeout = 15 * time.Second
 
 type App struct {
-	workspace        Workspace
-	executable       string
-	devProbe         func(context.Context) []DevService
-	devDetachedStart func(context.Context, devSessionRecord, DevRequest) error
-	devReadyTimeout  time.Duration
-	devProbeInterval time.Duration
-	devGracePeriod   time.Duration
+	workspace          Workspace
+	executable         string
+	devProbe           func(context.Context) []DevService
+	devDetachedStart   func(context.Context, devSessionRecord, DevRequest) error
+	devReadyTimeout    time.Duration
+	devProbeInterval   time.Duration
+	devGracePeriod     time.Duration
+	doctorProbeTimeout time.Duration
 }
 
 func NewApp(workspacePath string) (*App, error) {
@@ -42,6 +43,7 @@ func NewApp(workspacePath string) (*App, error) {
 	return &App{
 		workspace: workspace, executable: executable,
 		devReadyTimeout: devReadyTimeout, devProbeInterval: devProbeInterval, devGracePeriod: devGracePeriod,
+		doctorProbeTimeout: doctorCommandTimeout,
 	}, nil
 }
 
@@ -106,6 +108,13 @@ func (a *App) Handoff(ctx context.Context) (Handoff, error) {
 }
 
 func (a *App) Doctor(ctx context.Context) DoctorReport {
+	timeout := a.doctorProbeTimeout
+	if timeout <= 0 {
+		timeout = doctorCommandTimeout
+	}
+	probeContext, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	goVersion := requiredVersion(a.workspace.Root, "go.mod", "go ")
 	nodeVersion := requiredVersion(a.workspace.Root, filepath.Join("frontend", "dashboard", ".node-version"), "")
 	npmVersion := requiredPackageManagerVersion(a.workspace.Root)
@@ -136,7 +145,7 @@ func (a *App) Doctor(ctx context.Context) DoctorReport {
 	checks := make([]Check, len(probes))
 	var wait sync.WaitGroup
 	for index, probe := range probes {
-		wait.Go(func() { checks[index] = probe(ctx) })
+		wait.Go(func() { checks[index] = probe(probeContext) })
 	}
 	wait.Wait()
 	statuses := map[string]bool{}

@@ -39,42 +39,10 @@ type runInput struct {
 	workspaceInput
 	RunID string `json:"run_id" jsonschema:"Validated hk run identifier"`
 }
-type logsInput struct {
-	workspaceInput
-	RunID  string `json:"run_id" jsonschema:"Validated hk run identifier"`
-	Limit  int    `json:"limit,omitempty" jsonschema:"Maximum lines to return, from 1 through 200"`
-	Cursor int    `json:"cursor,omitempty" jsonschema:"Previous next_cursor for incremental reads"`
-	GateID string `json:"gate_id,omitempty" jsonschema:"Optional canonical gate identifier"`
-}
-type runListInput struct {
-	workspaceInput
-	Limit int `json:"limit,omitempty" jsonschema:"Maximum recent runs to return, from 1 through 100"`
-}
-type variantInput struct {
-	workspaceInput
-	Variant string `json:"variant,omitempty" jsonschema:"Build variant: self-hosted or cloud"`
-}
-type devInput struct{ workspaceInput }
 type devStartInput struct {
 	workspaceInput
 	Variant string `json:"variant,omitempty" jsonschema:"Build variant: self-hosted or cloud"`
 	Seed    bool   `json:"seed,omitempty" jsonschema:"Seed isolated demo data before starting"`
-}
-type devLogsInput struct {
-	workspaceInput
-	Cursor int64 `json:"cursor,omitempty" jsonschema:"Next event cursor for incremental reads"`
-	Limit  int   `json:"limit,omitempty" jsonschema:"Maximum events to return, from 1 through 200"`
-	Follow bool  `json:"follow,omitempty" jsonschema:"Continue streaming events until cancellation or session termination"`
-}
-type qaStartInput struct {
-	workspaceInput
-	Profile string   `json:"profile,omitempty" jsonschema:"QA profile: changed, pr, or full"`
-	GateIDs []string `json:"gate_ids,omitempty" jsonschema:"Optional canonical gate identifiers"`
-}
-type buildInput struct {
-	workspaceInput
-	Variant string `json:"variant,omitempty" jsonschema:"Build variant: self-hosted or cloud"`
-	Target  string `json:"target,omitempty" jsonschema:"Build target: binary or image"`
 }
 type screenshotInput struct {
 	workspaceInput
@@ -100,14 +68,6 @@ func (input workspaceInput) workspaceSelector() string { return strings.TrimSpac
 
 type appResolver interface {
 	Resolve(context.Context, string) (*devtool.App, error)
-}
-
-type toolDelegatingResolver interface {
-	DelegateTool(context.Context, *mcp.CallToolRequest, string, workspaceScoped) (*mcp.CallToolResult, envelopeOutput, error)
-}
-
-type resourceDelegatingResolver interface {
-	DelegateResource(context.Context, *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error)
 }
 
 type staticAppResolver struct{ app *devtool.App }
@@ -581,21 +541,6 @@ func localFileURI(path string) string {
 	return (&url.URL{Scheme: "file", Path: filepath.ToSlash(path)}).String()
 }
 
-func devEventNotifier(ctx context.Context, request *mcp.CallToolRequest) func(devtool.DevEvent) {
-	return func(event devtool.DevEvent) {
-		if request == nil || request.Session == nil || request.Params == nil {
-			return
-		}
-		if progressToken := request.Params.GetProgressToken(); progressToken != nil {
-			_ = request.Session.NotifyProgress(ctx, &mcp.ProgressNotificationParams{
-				ProgressToken: progressToken,
-				Progress:      float64(event.Cursor),
-				Message:       event.Message,
-			})
-		}
-	}
-}
-
 func startHandler[In workspaceScoped](resolver appResolver, command string, request func(In) devtool.RunRequest) func(context.Context, *mcp.CallToolRequest, In) (*mcp.CallToolResult, envelopeOutput, error) {
 	return routedHandler(resolver, command, func(ctx context.Context, app *devtool.App, input In) (any, error) {
 		return app.StartRun(devtool.WithAgentOutput(ctx), request(input))
@@ -710,95 +655,6 @@ func runIDSchema() *jsonschema.Schema {
 
 func annotations(readOnly, idempotent, openWorld, destructive bool) *mcp.ToolAnnotations {
 	return &mcp.ToolAnnotations{ReadOnlyHint: readOnly, IdempotentHint: idempotent, OpenWorldHint: &openWorld, DestructiveHint: &destructive}
-}
-
-func registerResources(server *mcp.Server, resolver appResolver) {
-	server.AddResource(resource("Current workspace", "hitkeep-dev://workspace/current", "Current secret-free fallback worktree state."), resourceHandler(resolver))
-	server.AddResource(resource("Build variants", "hitkeep-dev://catalog/variants", "Canonical self-hosted and cloud variant catalog for the fallback worktree."), resourceHandler(resolver))
-	server.AddResource(resource("QA catalog", "hitkeep-dev://catalog/qa", "Canonical QA profiles and gate catalog for the fallback worktree."), resourceHandler(resolver))
-	server.AddResource(resource("Contributing guide", "hitkeep-dev://docs/contributing", "Repository contributor onboarding guidance for the fallback worktree."), resourceHandler(resolver))
-	server.AddResourceTemplate(&mcp.ResourceTemplate{Name: "Workspace current state", Description: "Current state for an explicitly selected worktree.", MIMEType: "application/json", URITemplate: "hitkeep-dev://workspaces/{workspace}/workspace/current"}, resourceHandler(resolver))
-	server.AddResourceTemplate(&mcp.ResourceTemplate{Name: "Workspace build variants", Description: "Build variants for an explicitly selected worktree.", MIMEType: "application/json", URITemplate: "hitkeep-dev://workspaces/{workspace}/catalog/variants"}, resourceHandler(resolver))
-	server.AddResourceTemplate(&mcp.ResourceTemplate{Name: "Workspace QA catalog", Description: "QA catalog for an explicitly selected worktree.", MIMEType: "application/json", URITemplate: "hitkeep-dev://workspaces/{workspace}/catalog/qa"}, resourceHandler(resolver))
-	server.AddResourceTemplate(&mcp.ResourceTemplate{Name: "Workspace contributing guide", Description: "Contributor guidance for an explicitly selected worktree.", MIMEType: "application/json", URITemplate: "hitkeep-dev://workspaces/{workspace}/docs/contributing"}, resourceHandler(resolver))
-	server.AddResourceTemplate(&mcp.ResourceTemplate{Name: "Run summary", Description: "One asynchronous hk run summary.", MIMEType: "application/json", URITemplate: "hitkeep-dev://runs/{run_id}/summary"}, resourceHandler(resolver))
-	server.AddResourceTemplate(&mcp.ResourceTemplate{Name: "Run logs", Description: "Bounded and redacted run log tail.", MIMEType: "application/json", URITemplate: "hitkeep-dev://runs/{run_id}/logs/{gate}"}, resourceHandler(resolver))
-	server.AddResourceTemplate(&mcp.ResourceTemplate{Name: "Workspace run summary", Description: "One asynchronous hk run summary for an explicitly selected worktree.", MIMEType: "application/json", URITemplate: "hitkeep-dev://workspaces/{workspace}/runs/{run_id}/summary"}, resourceHandler(resolver))
-	server.AddResourceTemplate(&mcp.ResourceTemplate{Name: "Workspace run logs", Description: "Bounded and redacted run log tail for an explicitly selected worktree.", MIMEType: "application/json", URITemplate: "hitkeep-dev://workspaces/{workspace}/runs/{run_id}/logs/{gate}"}, resourceHandler(resolver))
-}
-
-func resource(name, uri, description string) *mcp.Resource {
-	return &mcp.Resource{Name: name, URI: uri, Description: description, MIMEType: "application/json"}
-}
-
-func resourceHandler(resolver appResolver) mcp.ResourceHandler {
-	return func(ctx context.Context, request *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
-		selector, uri, err := workspaceResourceURI(request.Params.URI)
-		if err != nil {
-			return nil, err
-		}
-		if delegate, ok := resolver.(resourceDelegatingResolver); ok {
-			return delegate.DelegateResource(ctx, request)
-		}
-		app, err := resolver.Resolve(ctx, selector)
-		if err != nil {
-			return nil, err
-		}
-		var value any
-		var readErr error
-		switch uri {
-		case "hitkeep-dev://workspace/current":
-			value, readErr = app.Workspace(ctx)
-		case "hitkeep-dev://catalog/variants":
-			value = map[string]any{"schema_version": devtool.SchemaVersion, "variants": app.Catalog().Variants}
-		case "hitkeep-dev://catalog/qa":
-			catalog := app.Catalog()
-			value = map[string]any{"schema_version": devtool.SchemaVersion, "profiles": catalog.Profiles, "gates": catalog.Gates}
-		case "hitkeep-dev://docs/contributing":
-			value, readErr = contributingResource(app.Root())
-		default:
-			value, readErr = runResource(app, uri)
-		}
-		if readErr != nil {
-			return nil, readErr
-		}
-		raw, err := json.Marshal(value)
-		if err != nil {
-			return nil, err
-		}
-		return &mcp.ReadResourceResult{Contents: []*mcp.ResourceContents{{URI: request.Params.URI, MIMEType: "application/json", Text: string(raw)}}}, nil
-	}
-}
-
-func contributingResource(root string) (map[string]any, error) {
-	raw, err := os.ReadFile(filepath.Join(root, "CONTRIBUTING.md"))
-	if err != nil {
-		return nil, err
-	}
-	const maxBytes = 64 * 1024
-	truncated := len(raw) > maxBytes
-	if truncated {
-		raw = raw[:maxBytes]
-	}
-	return map[string]any{"schema_version": devtool.SchemaVersion, "markdown": string(raw), "truncated": truncated}, nil
-}
-
-func runResource(app *devtool.App, rawURI string) (any, error) {
-	parsed, err := url.Parse(rawURI)
-	if err != nil || parsed.Scheme != "hitkeep-dev" || parsed.Host != "runs" {
-		return nil, errors.New("unknown developer resource")
-	}
-	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
-	if len(parts) == 2 && parts[1] == "summary" {
-		return app.GetRun(parts[0])
-	}
-	if len(parts) == 3 && parts[1] == "logs" {
-		if parts[2] != "all" {
-			return app.TailGateLog(parts[0], parts[2], 80)
-		}
-		return app.TailLog(parts[0], 80)
-	}
-	return nil, fmt.Errorf("unknown run resource %q", rawURI)
 }
 
 func RunStdio(ctx context.Context, app *devtool.App, version string) error {

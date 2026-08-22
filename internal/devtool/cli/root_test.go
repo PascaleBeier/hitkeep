@@ -66,6 +66,34 @@ func TestHumanRendererUsesColorForQA(t *testing.T) {
 	}
 }
 
+func TestTerminalQARendererWritesGitHubStepSummary(t *testing.T) {
+	summaryPath := filepath.Join(t.TempDir(), "summary.md")
+	t.Setenv("GITHUB_ACTIONS", "true")
+	t.Setenv("GITHUB_STEP_SUMMARY", summaryPath)
+	started := time.Now().Add(-2 * time.Second)
+	finished := started.Add(1500 * time.Millisecond)
+	run := devtool.Run{
+		Request:    devtool.RunRequest{Kind: "qa", Profile: "pr"},
+		Status:     "passed",
+		StartedAt:  started,
+		FinishedAt: &finished,
+		GateResults: []devtool.GateResult{
+			{GateID: "go-lint", Status: "passed", DurationMS: 1250},
+		},
+	}
+	var stdout bytes.Buffer
+	renderTerminalRun(&stdout, humanStyle{}, run)
+	summary, err := os.ReadFile(summaryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"### hk QA: passed", "**Profile:** `pr`", "| `go-lint` | passed | 1.25s |"} {
+		if !strings.Contains(string(summary), expected) {
+			t.Fatalf("GitHub summary missing %q: %s", expected, summary)
+		}
+	}
+}
+
 func TestHumanRendererUsesPlainFallbackForAdministrativeOutput(t *testing.T) {
 	envelope := devtool.SuccessEnvelope("catalog", "workspace", devtool.Catalog{
 		Variants: []devtool.Variant{{ID: "self-hosted", Description: "Public self-hosted build", Publishable: true}},

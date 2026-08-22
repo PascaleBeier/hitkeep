@@ -89,6 +89,9 @@ func (a *App) StartRun(ctx context.Context, request RunRequest) (RunStart, error
 		fingerprint = "legacy"
 	}
 	childEnvironment := []string{"HK_CHILD_RUN=1", "HK_STATE_DIR=" + stateRoot, "HK_EXPECTED_SCHEMA=" + SchemaVersion, "HK_WORKER_PROTOCOL=1", "HK_WORKSPACE_ID=" + a.workspace.ID, "HK_SOURCE_FINGERPRINT=" + fingerprint}
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		childEnvironment = append(childEnvironment, "GITHUB_ACTIONS=true")
+	}
 	if agentOutputEnabled(ctx) {
 		childEnvironment = append(childEnvironment, "HK_CHILD_OUTPUT=json")
 	}
@@ -717,6 +720,7 @@ func (a *App) VerifyVariantBuild(ctx context.Context, variantID string, writer i
 }
 
 func (a *App) executeQA(ctx context.Context, runID string, request RunRequest, writer io.Writer) ([]GateResult, error) {
+	githubActions := os.Getenv("GITHUB_ACTIONS") == "true"
 	gateIDs := request.GateIDs
 	if len(gateIDs) == 0 {
 		gateIDs = profileGateIDs(request.Profile)
@@ -786,9 +790,16 @@ func (a *App) executeQA(ctx context.Context, runID string, request RunRequest, w
 					continue
 				}
 				writerMu.Lock()
-				_, _ = fmt.Fprintf(writer, "\n[%s] %s\n", gate.ID, gate.Description)
+				if githubActions {
+					_, _ = fmt.Fprintf(writer, "\n→ %s — %s\n", gate.ID, gate.Description)
+				} else {
+					_, _ = fmt.Fprintf(writer, "\n[%s] %s\n", gate.ID, gate.Description)
+				}
 				writerMu.Unlock()
-				target := io.MultiWriter(&lockedWriter{writer: writer, mu: &writerMu}, gateLog)
+				var target io.Writer = gateLog
+				if !githubActions {
+					target = io.MultiWriter(&lockedWriter{writer: writer, mu: &writerMu}, gateLog)
+				}
 				environment := append(a.ComposeEnvironment(variants[0]), "GOFLAGS="+goFlagsForTags(variants[0].BuildTags))
 				if strings.HasPrefix(gate.ID, "cloud-") {
 					environment = append(a.ComposeEnvironment(variants[1]), "GOFLAGS="+goFlagsForTags(variants[1].BuildTags))
@@ -839,6 +850,21 @@ func (a *App) executeQA(ctx context.Context, runID string, request RunRequest, w
 				finishGate()
 				_ = gateLog.Close()
 				finished := time.Now().UTC()
+				if githubActions {
+					writerMu.Lock()
+					if err == nil {
+						_, _ = fmt.Fprintf(writer, "✓ %s (%s)\n", gate.ID, finished.Sub(started).Round(time.Millisecond))
+					} else {
+						_, _ = fmt.Fprintf(writer, "::error title=QA gate failed: %s::%s\n", githubCommandValue(gate.ID), githubCommandValue(redactError(err.Error())))
+						if tail, tailErr := a.TailGateLog(runID, gate.ID, 80); tailErr == nil {
+							_, _ = fmt.Fprintf(writer, "Failure tail for %s (%d/%d lines):\n", gate.ID, len(tail.Lines), tail.LineCount)
+							for _, line := range tail.Lines {
+								_, _ = fmt.Fprintln(writer, line)
+							}
+						}
+					}
+					writerMu.Unlock()
+				}
 				status := "passed"
 				recordedErr := err
 				if errors.Is(ctx.Err(), context.Canceled) {
@@ -889,6 +915,10 @@ func (a *App) executeQA(ctx context.Context, runID string, request RunRequest, w
 		return gateResults, errors.New(strings.Join(failures, "; "))
 	}
 	return gateResults, nil
+}
+
+func githubCommandValue(value string) string {
+	return strings.NewReplacer("%", "%25", "\r", "%0D", "\n", "%0A").Replace(value)
 }
 
 // acquireQAGateContext keeps scheduler wait time outside the gate's execution

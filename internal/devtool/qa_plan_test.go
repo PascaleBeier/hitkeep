@@ -60,6 +60,40 @@ func TestUnknownPathRequiresDecision(t *testing.T) {
 	}
 }
 
+func TestPrepareQARequestPreservesValidatedGateSubset(t *testing.T) {
+	root := initTestRepository(t)
+	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	app, err := NewApp(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := app.QAPlan(context.Background(), "pr", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.GateIDs) < 2 {
+		t.Fatalf("PR plan needs multiple gates for subset coverage: %+v", plan)
+	}
+
+	selected := []string{plan.GateIDs[0]}
+	request, err := app.prepareQARequest(context.Background(), RunRequest{
+		Kind: "qa", Profile: "pr", PlanID: plan.PlanID, GateIDs: selected,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(request.GateIDs, selected) {
+		t.Fatalf("gate subset expanded from %v to %v", selected, request.GateIDs)
+	}
+
+	_, err = app.prepareQARequest(context.Background(), RunRequest{
+		Kind: "qa", Profile: "pr", PlanID: plan.PlanID, GateIDs: []string{"not-in-plan"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "not selected by plan") {
+		t.Fatalf("out-of-plan gate was not rejected: %v", err)
+	}
+}
+
 func TestFullProfileBypassesEvidenceReuse(t *testing.T) {
 	app := &App{workspace: Workspace{StateDir: t.TempDir()}}
 	gate := Gate{ID: "go-vet", ContractVersion: "1", ReuseTTL: "24h", Volatility: "deterministic"}

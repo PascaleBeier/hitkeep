@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"strings"
 )
 
 var variants = []Variant{
@@ -146,21 +145,6 @@ func profileGateIDs(profile string) []string {
 		}
 	}
 	return ids
-}
-
-func gateMatchesPath(gate Gate, path string) bool {
-	for _, pattern := range gate.Paths {
-		if strings.HasSuffix(pattern, "/") && strings.HasPrefix(path, pattern) {
-			return true
-		}
-		if strings.HasPrefix(pattern, "*.") && strings.HasSuffix(path, strings.TrimPrefix(pattern, "*")) {
-			return true
-		}
-		if path == pattern {
-			return true
-		}
-	}
-	return false
 }
 
 func cloneVariants() []Variant {

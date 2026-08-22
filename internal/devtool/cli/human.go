@@ -192,6 +192,37 @@ func renderTerminalRun(writer io.Writer, style humanStyle, run devtool.Run) {
 			_, _ = fmt.Fprintf(writer, "  %s %s\n", style.red("✗"), gate.GateID)
 		}
 	}
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		_ = appendGitHubRunSummary(run, duration)
+	}
+}
+
+func appendGitHubRunSummary(run devtool.Run, duration time.Duration) error {
+	path := os.Getenv("GITHUB_STEP_SUMMARY")
+	if path == "" || run.Request.Kind != "qa" {
+		return nil
+	}
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600) //nolint:gosec // GitHub provides the step-summary path to the runner process.
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	_, err = fmt.Fprintf(file, "### hk QA: %s\n\n**Profile:** `%s` · **Duration:** %s\n\n| Gate | Status | Duration |\n| --- | --- | ---: |\n", githubMarkdown(run.Status), githubMarkdown(run.Request.Profile), duration.Round(time.Millisecond))
+	if err != nil {
+		return err
+	}
+	for _, gate := range run.GateResults {
+		gateDuration := time.Duration(gate.DurationMS) * time.Millisecond
+		if _, err = fmt.Fprintf(file, "| `%s` | %s | %s |\n", githubMarkdown(gate.GateID), githubMarkdown(gate.Status), gateDuration.Round(time.Millisecond)); err != nil {
+			return err
+		}
+	}
+	_, err = fmt.Fprintln(file)
+	return err
+}
+
+func githubMarkdown(value string) string {
+	return strings.NewReplacer("|", "\\|", "\r", " ", "\n", " ").Replace(value)
 }
 
 func renderDetachedRun(writer io.Writer, style humanStyle, run devtool.Run) {

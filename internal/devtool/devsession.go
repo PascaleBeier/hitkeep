@@ -343,6 +343,15 @@ func (a *App) superviseDev(ctx context.Context, record devSessionRecord, request
 			Env:  a.ComposeEnvironment(variant),
 		})
 	}
+	stopSession := func(message string, result error) error {
+		sink.Transition(DevStateStopping, "stopping", message)
+		if cleanupErr := cleanup(); cleanupErr != nil {
+			return sink.Fail(fmt.Errorf("stop development: %w", cleanupErr))
+		}
+		sink.Services(a.probeDevServices(context.Background()))
+		sink.Transition(DevStateStopped, "stopped", "development stopped")
+		return result
+	}
 
 	if request.Seed {
 		if err := a.runDevCommand(ctx, sink, "seed", commandSpec{
@@ -381,6 +390,9 @@ func (a *App) superviseDev(ctx context.Context, record devSessionRecord, request
 		for _, process := range processes {
 			select {
 			case processErr := <-process.done:
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					return stopSession("foreground development interrupted", ctxErr)
+				}
 				if processErr == nil {
 					processErr = fmt.Errorf("%s process exited", process.component)
 				}
@@ -391,23 +403,11 @@ func (a *App) superviseDev(ctx context.Context, record devSessionRecord, request
 		}
 		select {
 		case <-ctx.Done():
-			sink.Transition(DevStateStopping, "stopping", "foreground development interrupted")
-			if cleanupErr := cleanup(); cleanupErr != nil {
-				return sink.Fail(fmt.Errorf("stop development: %w", cleanupErr))
-			}
-			sink.Services(a.probeDevServices(context.Background()))
-			sink.Transition(DevStateStopped, "stopped", "development stopped")
-			return ctx.Err()
+			return stopSession("foreground development interrupted", ctx.Err())
 		case <-cancelTicker.C:
 			if _, statErr := os.Stat(a.devCancelPath()); statErr == nil {
-				sink.Transition(DevStateStopping, "stopping", "development stop requested")
-				if cleanupErr := cleanup(); cleanupErr != nil {
-					return sink.Fail(fmt.Errorf("stop development: %w", cleanupErr))
-				}
 				_ = os.Remove(a.devCancelPath())
-				sink.Services(a.probeDevServices(context.Background()))
-				sink.Transition(DevStateStopped, "stopped", "development stopped")
-				return nil
+				return stopSession("development stop requested", nil)
 			}
 		case <-readyTimer.C:
 			if !ready {
@@ -767,82 +767,6 @@ func (a *App) DevLogs(cursor int64, limit int) (DevLogBatch, error) {
 		Status: status, Events: events, NextCursor: nextCursor, EarliestCursor: earliest, DroppedEventCount: earliest, Truncated: truncated,
 		Complete: devStateTerminal(status.State) && nextCursor >= status.NextEventCursor,
 	}, nil
-}
-
-func readDevEventTail(file *os.File, cursor int64, limit int, observedNext int64) ([]DevEvent, int64, bool, error) {
-	events := make([]DevEvent, 0, min(limit+1, maxDevEvents+1))
-	err := visitLinesReverse(file, func(line []byte) (bool, error) {
-		if len(line) > maxDevEventBytes {
-			return false, errors.New("development event exceeds 1 MiB")
-		}
-		var event DevEvent
-		if json.Unmarshal(line, &event) != nil {
-			return true, nil
-		}
-		observedNext = max(observedNext, event.Cursor+1)
-		if event.Cursor < cursor {
-			return false, nil
-		}
-		events = append(events, event)
-		return len(events) <= limit, nil
-	})
-	if err != nil {
-		return nil, observedNext, false, err
-	}
-	truncated := len(events) > limit
-	if truncated {
-		events = events[:limit]
-	}
-	slices.Reverse(events)
-	return events, observedNext, truncated, nil
-}
-
-func visitLinesReverse(file *os.File, visit func([]byte) (bool, error)) error {
-	info, err := file.Stat()
-	if err != nil {
-		return err
-	}
-	offset := info.Size()
-	var suffix []byte
-	for offset > 0 {
-		chunkSize := min(int64(devEventReadChunk), offset)
-		offset -= chunkSize
-		chunk := make([]byte, int(chunkSize))
-		n, readErr := file.ReadAt(chunk, offset)
-		if readErr != nil && !errors.Is(readErr, io.EOF) {
-			return readErr
-		}
-		chunk = chunk[:n]
-		combined := make([]byte, 0, len(chunk)+len(suffix))
-		combined = append(combined, chunk...)
-		combined = append(combined, suffix...)
-		lineEnd := len(combined)
-		for index := range slices.Backward(chunk) {
-			if combined[index] != '\n' {
-				continue
-			}
-			line := combined[index+1 : lineEnd]
-			if len(line) > 0 {
-				keepGoing, visitErr := visit(line)
-				if visitErr != nil {
-					return visitErr
-				}
-				if !keepGoing {
-					return nil
-				}
-			}
-			lineEnd = index
-		}
-		if lineEnd > maxDevEventBytes {
-			return errors.New("development event exceeds 1 MiB")
-		}
-		suffix = append(suffix[:0], combined[:lineEnd]...)
-	}
-	if len(suffix) == 0 {
-		return nil
-	}
-	_, err = visit(suffix)
-	return err
 }
 
 func (a *App) FollowDevEvents(ctx context.Context, cursor int64, limit int, observer func(DevEvent)) (DevLogBatch, error) {
