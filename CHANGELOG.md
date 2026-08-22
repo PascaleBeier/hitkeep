@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.13.12](https://github.com/PascaleBeier/hitkeep/compare/v2.13.11...v2.13.12) (2026-08-22)
+
+
+### Bug Fixes
+
+* **deps:** update Go module dependencies to latest versions ([8209d67](https://github.com/PascaleBeier/hitkeep/commit/8209d676b1421768f889da7707d6862065344754))
+* **frontend:** Bump OptimusUI and angular ([d85aac1](https://github.com/PascaleBeier/hitkeep/commit/d85aac129d0c4135d051018bf29c32a152a6b3d8))
+
 ## [2.13.11](https://github.com/PascaleBeier/hitkeep/compare/v2.13.10...v2.13.11) (2026-08-20)
 
 
