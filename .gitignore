@@ -16,19 +16,3 @@
 
 # @hitkeep/tracker npm package build output.
 /frontend/tracker/dist/
-
-# Canonical contributor skills are versioned source, even with a global ignore.
-!/.agents/
-!/.agents/**
-
-# Portable project MCP registrations override common global ignore rules.
-!/.mcp.json
-!/.codex/
-!/.codex/config.toml
-!/.gemini/
-!/.gemini/settings.json
-!/.vscode/
-!/.vscode/mcp.json
-!/.cursor/
-/.cursor/*
-!/.cursor/mcp.json
