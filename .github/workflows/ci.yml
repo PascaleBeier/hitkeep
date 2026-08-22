@@ -71,7 +71,8 @@ jobs:
       - name: Run canonical Go and developer-platform checks
         run: |
           gates="$(./hk ci qa-matrix --profile pr --group go-checks --output json | jq -r '.data.gate_ids | join(",")')"
-          ./hk qa pr --gate "$gates"
+          plan_id="$(./hk qa plan pr --output json | jq -r '.data.plan_id')"
+          ./hk qa pr --plan-id "$plan_id" --gate "$gates"
 
   test:
     name: Test API (${{ matrix.gate }})
@@ -103,7 +104,9 @@ jobs:
       - name: Test API
         env:
           GATE_ID: ${{ matrix.gate }}
-        run: ./hk qa pr --gate "$GATE_ID"
+        run: |
+          plan_id="$(./hk qa plan pr --output json | jq -r '.data.plan_id')"
+          ./hk qa pr --plan-id "$plan_id" --gate "$GATE_ID"
       - name: Save race shard Go cache
         if: success() && steps.race-cache-restore.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -129,7 +132,8 @@ jobs:
       - name: Run canonical MCP contract gates
         run: |
           gates="$(./hk ci qa-matrix --profile pr --group production-mcp --output json | jq -r '.data.gate_ids | join(",")')"
-          ./hk qa pr --gate "$gates"
+          plan_id="$(./hk qa plan pr --output json | jq -r '.data.plan_id')"
+          ./hk qa pr --plan-id "$plan_id" --gate "$gates"
 
   lint-dashboard:
     name: Lint Dashboard (Angular)
@@ -150,7 +154,8 @@ jobs:
       - name: Run canonical dashboard static checks
         run: |
           gates="$(./hk ci qa-matrix --profile pr --group frontend-static --output json | jq -r '.data.gate_ids | join(",")')"
-          ./hk qa pr --gate "$gates"
+          plan_id="$(./hk qa plan pr --output json | jq -r '.data.plan_id')"
+          ./hk qa pr --plan-id "$plan_id" --gate "$gates"
 
   test-dashboard:
     name: Test Dashboard (Angular)
@@ -179,7 +184,8 @@ jobs:
       - name: Test dashboard
         run: |
           gates="$(./hk ci qa-matrix --profile pr --group frontend-unit --output json | jq -r '.data.gate_ids | join(",")')"
-          ./hk qa pr --gate "$gates"
+          plan_id="$(./hk qa plan pr --output json | jq -r '.data.plan_id')"
+          ./hk qa pr --plan-id "$plan_id" --gate "$gates"
 
   e2e-dashboard:
     name: E2E Dashboard
@@ -208,7 +214,8 @@ jobs:
       - name: Run dashboard e2e suite
         run: |
           gates="$(./hk ci qa-matrix --profile pr --group frontend-e2e --output json | jq -r '.data.gate_ids | join(",")')"
-          ./hk qa pr --gate "$gates"
+          plan_id="$(./hk qa plan pr --output json | jq -r '.data.plan_id')"
+          ./hk qa pr --plan-id "$plan_id" --gate "$gates"
       - name: Upload Playwright artifacts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
