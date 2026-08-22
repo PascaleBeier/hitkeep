@@ -77,8 +77,10 @@ func applyGateMetadata(gate *Gate) {
 func classifyChangedPath(path string) ([]string, bool) {
 	path = filepath.ToSlash(strings.TrimSpace(path))
 	switch {
-	case path == "go.mod" || path == "go.sum" || path == "frontend/dashboard/package.json" || path == "frontend/dashboard/package-lock.json":
+	case path == "go.mod" || path == "go.sum":
 		return []string{changeDependencies}, true
+	case path == "frontend/dashboard/package.json" || path == "frontend/dashboard/package-lock.json":
+		return []string{changeDependencies, changeDashboard}, true
 	case strings.HasPrefix(path, "internal/database/"):
 		return []string{changeDatabase}, true
 	case strings.HasPrefix(path, "internal/mcpserver/") || strings.HasPrefix(path, "internal/analyticstools/") || strings.HasPrefix(path, "skills/") || path == "server.json":

@@ -60,6 +60,19 @@ func TestUnknownPathRequiresDecision(t *testing.T) {
 	}
 }
 
+func TestFrontendManifestsSelectDependencyAndDashboardAreas(t *testing.T) {
+	want := []string{changeDependencies, changeDashboard}
+	for _, path := range []string{"frontend/dashboard/package.json", "frontend/dashboard/package-lock.json"} {
+		got, known := classifyChangedPath(path)
+		if !known {
+			t.Fatalf("classifyChangedPath(%q) reported an unknown path", path)
+		}
+		if !slices.Equal(got, want) {
+			t.Fatalf("classifyChangedPath(%q) = %v, want %v", path, got, want)
+		}
+	}
+}
+
 func TestPrepareQARequestPreservesValidatedGateSubset(t *testing.T) {
 	root := initTestRepository(t)
 	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
