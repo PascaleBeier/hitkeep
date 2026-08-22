@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 )
 
-const DeveloperMCPManifestSchemaVersion = "hk.dev/mcp-manifest/v4"
+const DeveloperMCPManifestSchemaVersion = "hk.dev/mcp-manifest/v5"
 
 const developerMCPServerName = "hitkeep-dev"
 
@@ -54,7 +54,7 @@ func (a *App) MCPManifest() (DeveloperMCPManifest, error) {
 		Transport:        "stdio",
 		Scope:            "central",
 		WorkspaceRouting: "server-catalog",
-		Delegation:       "workspace-mcp",
+		Delegation:       "in-process",
 		ProtocolMode:     "stateless",
 		Notifications:    []string{"progress"},
 		Command:          definition.Command,

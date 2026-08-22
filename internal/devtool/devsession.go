@@ -39,11 +39,13 @@ type devSessionRecord struct {
 }
 
 type devEventSink struct {
-	app      *App
-	record   devSessionRecord
-	file     *os.File
-	observer func(DevEvent)
-	mu       sync.Mutex
+	app          *App
+	record       devSessionRecord
+	file         *os.File
+	observer     func(DevEvent)
+	segmentBytes int64
+	segmentCount int
+	mu           sync.Mutex
 }
 
 type devProcess struct {
@@ -72,6 +74,9 @@ func (a *App) StartDevDetached(ctx context.Context, request DevRequest) (DevStar
 }
 
 func (a *App) StartDevDetachedObserved(ctx context.Context, request DevRequest, observer func(DevEvent)) (DevStartResult, error) {
+	if err := VerifyDeveloperSource(a.workspace.Root); err != nil {
+		return DevStartResult{}, err
+	}
 	request = normalizeDevRequest(request)
 	if err := ValidateDevRequest(request); err != nil {
 		return DevStartResult{}, err
@@ -117,9 +122,13 @@ func (a *App) StartDevDetachedObserved(ctx context.Context, request DevRequest, 
 		return result, resultErr
 	}
 
+	launcher := filepath.Join(a.workspace.Root, "hk")
+	if info, statErr := os.Stat(launcher); statErr != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
+		launcher = a.executable // compatibility for legacy/test workers; real worktrees always use ./hk
+	}
 	command := exec.CommandContext( //nolint:gosec
 		context.WithoutCancel(ctx),
-		a.executable,
+		launcher,
 		"__dev",
 		"--workspace", a.workspace.Root,
 		"--generation-id", record.GenerationID,
@@ -130,7 +139,14 @@ func (a *App) StartDevDetachedObserved(ctx context.Context, request DevRequest, 
 	}
 	command.Dir = a.workspace.Root
 	stateRoot := filepath.Dir(filepath.Dir(a.workspace.StateDir))
-	childEnvironment := []string{"HK_CHILD_DEV=1", "HK_STATE_DIR=" + stateRoot}
+	fingerprint, err := DeveloperSourceFingerprint(a.workspace.Root)
+	if err != nil {
+		if launcher != a.executable {
+			return DevStartResult{}, a.failPreparedDev(record, fmt.Errorf("fingerprint development worker source: %w", err))
+		}
+		fingerprint = "legacy"
+	}
+	childEnvironment := []string{"HK_CHILD_DEV=1", "HK_STATE_DIR=" + stateRoot, "HK_EXPECTED_SCHEMA=" + SchemaVersion, "HK_WORKER_PROTOCOL=1", "HK_WORKSPACE_ID=" + a.workspace.ID, "HK_SOURCE_FINGERPRINT=" + fingerprint}
 	if agentOutputEnabled(ctx) {
 		childEnvironment = append(childEnvironment, "HK_CHILD_OUTPUT=json")
 	}
@@ -224,8 +240,8 @@ func (a *App) StartDevForeground(ctx context.Context, request DevRequest, observ
 }
 
 func (a *App) ExecuteDevSession(ctx context.Context, generationID string, request DevRequest) error {
-	if os.Getenv("HK_CHILD_DEV") != "1" {
-		return errors.New("development worker is internal")
+	if err := a.validateDevWorkerProtocol(); err != nil {
+		return err
 	}
 	if os.Getenv("HK_CHILD_OUTPUT") == "json" {
 		ctx = WithAgentOutput(ctx)
@@ -530,7 +546,12 @@ func (a *App) openDevEventSink(record devSessionRecord, observer func(DevEvent))
 	if err != nil {
 		return nil, err
 	}
-	return &devEventSink{app: a, record: record, file: file, observer: observer}, nil
+	segmentBytes, segmentCount, err := devEventSegmentStats(file)
+	if err != nil {
+		_ = file.Close()
+		return nil, err
+	}
+	return &devEventSink{app: a, record: record, file: file, observer: observer, segmentBytes: segmentBytes, segmentCount: segmentCount}, nil
 }
 
 func (sink *devEventSink) Close() {
@@ -553,9 +574,15 @@ func (sink *devEventSink) Event(eventType, component, level, phase, message stri
 	if err != nil {
 		return
 	}
-	if _, err := sink.file.Write(append(raw, '\n')); err != nil {
+	if err := sink.rotateIfNeeded(len(raw) + 1); err != nil {
 		return
 	}
+	written, err := sink.file.Write(append(raw, '\n'))
+	if err != nil {
+		return
+	}
+	sink.segmentBytes += int64(written)
+	sink.segmentCount++
 	sink.record.NextEventCursor++
 	sink.record.UpdatedAt = event.Timestamp
 	if eventType == "phase" {
@@ -704,7 +731,7 @@ func (a *App) DevLogs(cursor int64, limit int) (DevLogBatch, error) {
 		return DevLogBatch{}, errors.New("cursor must be non-negative")
 	}
 	if limit <= 0 {
-		limit = 40
+		limit = 50
 	}
 	limit = min(limit, maxDevEvents)
 	status, err := a.DevStatus(context.Background())
@@ -714,21 +741,17 @@ func (a *App) DevLogs(cursor int64, limit int) (DevLogBatch, error) {
 	if status.GenerationID == "" {
 		return DevLogBatch{Status: status, Events: []DevEvent{}, NextCursor: cursor, Complete: true}, nil
 	}
-	file, err := os.Open(a.devEventsPath(status.GenerationID))
-	if err != nil {
-		if os.IsNotExist(err) {
-			return DevLogBatch{Status: status, Events: []DevEvent{}, NextCursor: cursor, Complete: devStateTerminal(status.State)}, nil
-		}
-		return DevLogBatch{}, err
+	paths := devEventSegmentPaths(a.devEventsPath(status.GenerationID))
+	if len(paths) == 0 {
+		return DevLogBatch{Status: status, Events: []DevEvent{}, NextCursor: cursor, Complete: devStateTerminal(status.State)}, nil
 	}
-	defer file.Close()
-	events, observedNext, truncated, err := readDevEventTail(file, cursor, limit, status.NextEventCursor)
+	events, observedNext, truncated, earliest, err := readDevEventSegments(paths, cursor, limit, status.NextEventCursor)
 	if err != nil {
 		return DevLogBatch{}, err
 	}
 	if cursor > observedNext {
-		cursor = 0
-		events, observedNext, truncated, err = readDevEventTail(file, cursor, limit, observedNext)
+		cursor = earliest
+		events, observedNext, truncated, earliest, err = readDevEventSegments(paths, cursor, limit, observedNext)
 		if err != nil {
 			return DevLogBatch{}, err
 		}
@@ -741,7 +764,7 @@ func (a *App) DevLogs(cursor int64, limit int) (DevLogBatch, error) {
 		nextCursor = status.NextEventCursor
 	}
 	return DevLogBatch{
-		Status: status, Events: events, NextCursor: nextCursor, Truncated: truncated,
+		Status: status, Events: events, NextCursor: nextCursor, EarliestCursor: earliest, DroppedEventCount: earliest, Truncated: truncated,
 		Complete: devStateTerminal(status.State) && nextCursor >= status.NextEventCursor,
 	}, nil
 }

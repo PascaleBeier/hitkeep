@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-const SchemaVersion = "hk.dev/v2"
+const SchemaVersion = "hk.dev/v3"
 
 type Variant struct {
 	ID                  string            `json:"id"`
@@ -18,25 +18,38 @@ type Variant struct {
 }
 
 type Gate struct {
-	ID           string   `json:"id"`
-	Description  string   `json:"description"`
-	CIGroup      string   `json:"ci_group,omitempty"`
-	Command      []string `json:"command"`
-	AgentCommand []string `json:"agent_command,omitempty"`
-	WorkingDir   string   `json:"working_dir,omitempty"`
-	Profiles     []string `json:"profiles"`
-	Paths        []string `json:"paths,omitempty"`
-	Weight       int      `json:"weight"`
-	Timeout      string   `json:"timeout"`
+	ID              string   `json:"id"`
+	Description     string   `json:"description"`
+	CIGroup         string   `json:"ci_group,omitempty"`
+	Command         []string `json:"command"`
+	AgentCommand    []string `json:"agent_command,omitempty"`
+	WorkingDir      string   `json:"working_dir,omitempty"`
+	Profiles        []string `json:"profiles"`
+	Paths           []string `json:"watched_inputs,omitempty"`
+	ChangeAreas     []string `json:"change_areas,omitempty"`
+	Depth           string   `json:"depth,omitempty"`
+	Dependencies    []string `json:"dependencies,omitempty"`
+	ContractVersion string   `json:"contract_version,omitempty"`
+	Volatility      string   `json:"volatility,omitempty"`
+	ReuseTTL        string   `json:"reuse_ttl,omitempty"`
+	Weight          int      `json:"weight"`
+	Timeout         string   `json:"timeout"`
 }
 
 type QAPlan struct {
+	PlanID                string   `json:"plan_id"`
 	Profile               string   `json:"profile"`
 	BaseRef               string   `json:"base_ref,omitempty"`
+	SourceSnapshot        string   `json:"source_snapshot"`
+	PlannerVersion        string   `json:"planner_version"`
+	CatalogVersion        string   `json:"catalog_version"`
 	ChangedPaths          []string `json:"changed_paths,omitempty"`
 	ChangedPathCount      int      `json:"changed_path_count,omitempty"`
 	ChangedPathsTruncated bool     `json:"changed_paths_truncated,omitempty"`
-	GateIDs               []string `json:"gate_ids"`
+	GateIDs               []string `json:"selected_gates"`
+	SkippedGateIDs        []string `json:"skipped_gates,omitempty"`
+	DecisionRequired      bool     `json:"decision_required"`
+	DecisionReason        string   `json:"decision_reason,omitempty"`
 	Escalated             bool     `json:"escalated"`
 	EscalationWhy         string   `json:"escalation_reason,omitempty"`
 }
@@ -144,11 +157,13 @@ type DevStartResult struct {
 }
 
 type DevLogBatch struct {
-	Status     DevStatus  `json:"status"`
-	Events     []DevEvent `json:"events"`
-	NextCursor int64      `json:"next_cursor"`
-	Truncated  bool       `json:"truncated"`
-	Complete   bool       `json:"complete"`
+	Status            DevStatus  `json:"status"`
+	Events            []DevEvent `json:"events"`
+	NextCursor        int64      `json:"next_cursor"`
+	EarliestCursor    int64      `json:"earliest_cursor"`
+	DroppedEventCount int64      `json:"dropped_event_count"`
+	Truncated         bool       `json:"truncated"`
+	Complete          bool       `json:"complete"`
 }
 
 type Handoff struct {
@@ -183,6 +198,7 @@ type RunRequest struct {
 	Kind    string   `json:"kind"`
 	Variant string   `json:"variant,omitempty"`
 	Profile string   `json:"profile,omitempty"`
+	PlanID  string   `json:"plan_id,omitempty"`
 	Target  string   `json:"target,omitempty"`
 	GateIDs []string `json:"gate_ids,omitempty"`
 }
@@ -213,13 +229,15 @@ type RunSummary struct {
 }
 
 type GateResult struct {
-	GateID     string     `json:"gate_id"`
-	Status     string     `json:"status"`
-	Error      string     `json:"error,omitempty"`
-	LogPath    string     `json:"log_path"`
-	StartedAt  *time.Time `json:"started_at,omitempty"`
-	FinishedAt *time.Time `json:"finished_at,omitempty"`
-	DurationMS int64      `json:"duration_ms,omitempty"`
+	GateID              string     `json:"gate_id"`
+	Status              string     `json:"status"`
+	Error               string     `json:"error,omitempty"`
+	LogPath             string     `json:"log_path"`
+	StartedAt           *time.Time `json:"started_at,omitempty"`
+	FinishedAt          *time.Time `json:"finished_at,omitempty"`
+	DurationMS          int64      `json:"duration_ms,omitempty"`
+	OriginatingRunID    string     `json:"originating_run_id,omitempty"`
+	EvidenceFingerprint string     `json:"evidence_fingerprint,omitempty"`
 }
 
 type RunStart struct {

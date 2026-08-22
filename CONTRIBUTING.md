@@ -61,7 +61,7 @@ Choose the cloud variant only for local managed-cloud parity work:
 ./hk dev --variant cloud
 ```
 
-Automation and coding agents must use callable central MCP tools for covered operations. A configured or enabled host entry is not proof that MCP is available: verify discovery with an actual read-only call. `hk_dev_start`, `hk_dev_stop`, and `hk_dev_logs` stream lifecycle progress; `hk_dev_status` needs only the optional workspace selector. Development never uses a run ID. If MCP is unavailable, report the registration, startup, workspace-routing, or task-reload blocker and obtain explicit user approval before choosing an equivalent CLI output contract. JSON and NDJSON use the versioned `hk.dev/v2` envelope; `plain` is the uncolored scalar/text mode:
+Automation and coding agents must use callable central MCP tools for covered operations. A configured or enabled host entry is not proof that MCP is available: verify discovery with an actual read-only call. `hk_dev_start` accepts or reuses a generation immediately; `hk_dev_status` returns state and optional bounded cursor-addressed events; `hk_dev_stop` requires the exact observed generation ID. Development never uses a run ID. If MCP is unavailable, report the registration, startup, workspace-routing, or task-reload blocker and obtain explicit user approval before choosing an equivalent CLI output contract. JSON and NDJSON use the versioned `hk.dev/v3` envelope; `plain` is the uncolored scalar/text mode:
 
 ```bash
 ./hk dev --detach --output json
@@ -136,10 +136,11 @@ The cloud image is local-only and cannot be published by `hk`. Local image refer
 
 ## Validate
 
-Use the change-aware profile while iterating, the PR profile before review, and the full profile for exhaustive self-hosted, cloud, and image coverage:
+Use `changed` while iterating, `complete` as the default before declaring work complete, `pr` only for exact CI parity, and `full` for exhaustive self-hosted, cloud, and image coverage:
 
 ```bash
-./hk qa
+./hk qa changed
+./hk qa complete
 ./hk qa pr
 ./hk qa full
 ```
@@ -175,9 +176,9 @@ The live one-time registration comes from:
 ./hk mcp manifest
 ```
 
-Human output prints a copyable generic `mcpServers` object. `./hk mcp manifest --output json` returns the same registration in the standard `hk.dev/v2` envelope, with the `hk.dev/mcp-manifest/v4` schema, stateless protocol mode, central scope, server-catalog routing, workspace-MCP delegation, progress-only notifications, stable server name, absolute local launcher, transport, and pinned `--fallback-workspace` argument. Treat this output as authoritative instead of copying host-specific config paths into agent instructions. Regenerate existing registrations after this manifest change.
+Human output prints a copyable generic `mcpServers` object. `./hk mcp manifest --output json` returns the same registration in the standard `hk.dev/v3` envelope, with the `hk.dev/mcp-manifest/v5` schema, stateless protocol mode, central scope, cached server-catalog routing, in-process dispatch, progress-only notifications, stable server name, absolute local launcher, transport, and pinned `--fallback-workspace` argument. Treat this output as authoritative instead of copying host-specific config paths into agent instructions. Regenerate existing registrations after this manifest change.
 
-Add that object to the host's user-level MCP configuration, approve the local binary when the host asks, then restart or reload the host. Confirm the registered server name, absolute executable, and arguments against the manifest, then verify discovery with an actual read-only call such as `hk_workspace_status`; a configured or enabled status alone is insufficient. Existing conversations generally do not dynamically acquire newly added MCP configuration. This one-time safety decision belongs to the host and is deliberately not bypassed by `hk`.
+Add that object to the host's user-level MCP configuration, approve the local binary when the host asks, then restart or reload the host. Confirm the registered server name, absolute executable, and arguments against the manifest, then verify discovery with an actual read-only call such as `hk_context`; a configured or enabled status alone is insufficient. Existing conversations generally do not dynamically acquire newly added MCP configuration. This one-time safety decision belongs to the host and is deliberately not bypassed by `hk`.
 
 The generated central registration is equivalent to:
 
@@ -192,9 +193,9 @@ The generated central registration is equivalent to:
 }
 ```
 
-The central `./hk mcp serve --fallback-workspace <path>` resolves each request from immutable server configuration and the fallback clone's live HitKeep workspace catalog, then delegates through a request-scoped child stdio connection to that workspace's own `./hk --workspace <path> mcp serve`. The optional `workspace` selector accepts a catalogued workspace ID or absolute path and defaults to the configured fallback. `./hk --workspace <path> mcp serve` remains the fixed-worktree compatibility form; no-flag `./hk mcp serve` uses the current directory as the fallback.
+The central `./hk mcp serve --fallback-workspace <path>` resolves each request through an immutable five-second workspace-catalog snapshot and cached in-process `devtool.App` instances. It refreshes synchronously on misses, never launches a nested MCP server, and revalidates source freshness before planning or starting work. The optional `workspace` selector accepts a catalogued workspace ID or absolute path and defaults to the configured fallback. `./hk --workspace <path> mcp serve` remains the fixed-worktree compatibility form; no-flag `./hk mcp serve` uses the current directory as the fallback.
 
-The central MCP uses local stdio only. It forwards cancellation and progress to the selected workspace MCP, then closes that request's child connection. Use `hk_dev_status` and development event cursors for services; use `hk_run_list` and finite-run log cursors for setup, QA, build, and smoke work. Visual QA uses the bounded synchronous `hk_screenshot` operation against the selected workspace's active local session. It is separate from HitKeep's production analytics `/mcp` endpoint and exposes only bounded workspace, setup, development, screenshot, build, smoke, QA, run-status, cancellation, and log operations. It cannot execute arbitrary commands, rewrite source, mutate Git, publish artifacts, manage credentials, delete worktrees, perform cleanup, or deploy infrastructure. Stdout is reserved for JSON-RPC.
+The central MCP uses local stdio only and exposes exactly ten compact tools with no resources or resource templates. Use `hk_context` for bounded workspace/catalog/runtime views, `hk_dev_status` and development event cursors for services, and `hk_run_status` with finite-run or gate-log cursors for setup, QA, build, and smoke work. Visual QA uses the bounded synchronous `hk_screenshot` operation against the selected workspace's active local session. It is separate from HitKeep's production analytics `/mcp` endpoint and exposes only bounded workspace, setup, development, screenshot, build, smoke, QA, run-status, cancellation, and log operations. It cannot execute arbitrary commands, rewrite source, mutate Git, publish artifacts, manage credentials, delete worktrees, perform cleanup, or deploy infrastructure. Stdout is reserved for JSON-RPC.
 
 The canonical contributor skills live under [`.agents/skills`](./.agents/skills):
 

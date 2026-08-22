@@ -91,7 +91,7 @@ func TestCentralDeveloperMCPUsesConfiguredFallback(t *testing.T) {
 	if init == nil || init.ProtocolVersion != "2026-07-28" {
 		t.Fatalf("expected 2026-07-28 stateless negotiation, got %+v", init)
 	}
-	if init.Capabilities == nil || init.Capabilities.Tools == nil || init.Capabilities.Resources == nil {
+	if init.Capabilities == nil || init.Capabilities.Tools == nil || init.Capabilities.Resources != nil {
 		t.Fatalf("unexpected advertised capabilities: %+v", init.Capabilities)
 	}
 	var capabilityFields map[string]json.RawMessage
@@ -105,10 +105,10 @@ func TestCentralDeveloperMCPUsesConfiguredFallback(t *testing.T) {
 	if _, advertised := capabilityFields["logging"]; advertised {
 		t.Fatalf("deprecated logging capability advertised: %s", capabilityJSON)
 	}
-	if init.Capabilities.Tools.ListChanged || init.Capabilities.Resources.ListChanged || init.Capabilities.Resources.Subscribe {
+	if init.Capabilities.Tools.ListChanged {
 		t.Fatalf("stateful capabilities advertised: %+v", init.Capabilities)
 	}
-	result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "hk_workspace_status", Arguments: map[string]any{}})
+	result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "hk_context", Arguments: map[string]any{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,23 +116,14 @@ func TestCentralDeveloperMCPUsesConfiguredFallback(t *testing.T) {
 	if result.IsError || structured["workspace_id"] != app.WorkspaceID() {
 		t.Fatalf("configured fallback routing failed: %#v", structured)
 	}
-	result, err = clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "hk_workspace_status", Arguments: map[string]any{}})
+	result, err = clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "hk_context", Arguments: map[string]any{}})
 	if err != nil || result.IsError {
 		t.Fatalf("second request failed: %v %#v", err, result)
 	}
-	if got := connector.connects.Load(); got != 2 {
-		t.Fatalf("request-scoped child connections = %d, want 2", got)
+	if got := connector.connects.Load(); got != 0 {
+		t.Fatalf("in-process routing opened %d child connections", got)
 	}
 
-	read, err := clientSession.ReadResource(ctx, &mcp.ReadResourceParams{
-		URI: "hitkeep-dev://workspaces/" + url.PathEscape(app.WorkspaceID()) + "/catalog/variants",
-	})
-	if err != nil || len(read.Contents) != 1 || read.Contents[0].Text == "" {
-		t.Fatalf("explicit workspace resource failed: %v %#v", err, read)
-	}
-	if got := connector.connects.Load(); got != 3 {
-		t.Fatalf("explicit resource did not use a request-scoped child connection: %d", got)
-	}
 }
 
 func TestCentralDeveloperMCPForwardsJSONProgressToken(t *testing.T) {
@@ -155,14 +146,14 @@ func TestCentralDeveloperMCPForwardsJSONProgressToken(t *testing.T) {
 
 	params := &mcp.CallToolParams{
 		Meta:      mcp.Meta{"progressToken": float64(1)},
-		Name:      "hk_workspace_status",
+		Name:      "hk_context",
 		Arguments: map[string]any{},
 	}
 	result, err := clientSession.CallTool(ctx, params)
 	if err != nil || result.IsError {
 		t.Fatalf("JSON numeric progress token failed: %v %#v", err, result)
 	}
-	result, err = clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "hk_workspace_status", Arguments: map[string]any{}})
+	result, err = clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "hk_context", Arguments: map[string]any{}})
 	if err != nil || result.IsError {
 		t.Fatalf("transport did not survive progress-token call: %v %#v", err, result)
 	}
@@ -203,7 +194,7 @@ func TestCentralDeveloperMCPRejectsUncataloguedWorkspace(t *testing.T) {
 	}
 	defer clientSession.Close()
 	result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{
-		Name: "hk_workspace_status", Arguments: map[string]any{"workspace": other},
+		Name: "hk_context", Arguments: map[string]any{"workspace": other},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -238,17 +229,13 @@ func TestCentralDeveloperMCPCommandTransportSurvivesChildClose(t *testing.T) {
 	defer clientSession.Close()
 
 	for range 2 {
-		result, callErr := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "hk_workspace_status", Arguments: map[string]any{}})
+		result, callErr := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "hk_context", Arguments: map[string]any{}})
 		if callErr != nil || result.IsError {
 			t.Fatalf("command-transport request failed after child lifecycle: %v %#v", callErr, result)
 		}
 		if got := result.StructuredContent.(map[string]any)["workspace_id"]; got == "" {
 			t.Fatalf("command-transport response omitted workspace ID: %#v", result.StructuredContent)
 		}
-	}
-	read, err := clientSession.ReadResource(ctx, &mcp.ReadResourceParams{URI: "hitkeep-dev://catalog/variants"})
-	if err != nil || len(read.Contents) != 1 {
-		t.Fatalf("command-transport resource request failed after child lifecycle: %v %#v", err, read)
 	}
 }
 
@@ -292,8 +279,7 @@ func TestDeveloperMCPContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{
-		"hk_build_start", "hk_dev_logs", "hk_dev_start", "hk_dev_status", "hk_dev_stop", "hk_doctor", "hk_logs_tail", "hk_qa_plan", "hk_qa_start",
-		"hk_run_cancel", "hk_run_list", "hk_run_status", "hk_screenshot", "hk_setup_start", "hk_smoke_start", "hk_workspace_handoff", "hk_workspace_list", "hk_workspace_status",
+		"hk_context", "hk_dev_start", "hk_dev_status", "hk_dev_stop", "hk_doctor", "hk_qa_plan", "hk_run_cancel", "hk_run_start", "hk_run_status", "hk_screenshot",
 	}
 	var got []string
 	for _, tool := range listed.Tools {
@@ -321,7 +307,7 @@ func TestDeveloperMCPContract(t *testing.T) {
 		}
 	}
 
-	result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "hk_workspace_status", Arguments: map[string]any{}})
+	result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "hk_context", Arguments: map[string]any{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,35 +319,8 @@ func TestDeveloperMCPContract(t *testing.T) {
 		t.Fatalf("unexpected structured envelope: %#v", structured)
 	}
 
-	resources, err := clientSession.ListResources(ctx, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(resources.Resources) != 4 {
-		t.Fatalf("resources: got %d, want 4", len(resources.Resources))
-	}
-	templates, err := clientSession.ListResourceTemplates(ctx, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(templates.ResourceTemplates) != 8 {
-		t.Fatalf("resource templates: got %d, want 8", len(templates.ResourceTemplates))
-	}
-	if listed.TTLMs != int(mcpListCacheTTL/time.Millisecond) || listed.CacheScope != "private" {
-		t.Fatalf("tools/list cache = ttl %d scope %q, want 300000/private", listed.TTLMs, listed.CacheScope)
-	}
-	if resources.TTLMs != int(mcpListCacheTTL/time.Millisecond) || resources.CacheScope != "private" {
-		t.Fatalf("resources/list cache = ttl %d scope %q, want 300000/private", resources.TTLMs, resources.CacheScope)
-	}
-	if templates.TTLMs != int(mcpListCacheTTL/time.Millisecond) || templates.CacheScope != "private" {
-		t.Fatalf("resources/templates cache = ttl %d scope %q, want 300000/private", templates.TTLMs, templates.CacheScope)
-	}
-	read, err := clientSession.ReadResource(ctx, &mcp.ReadResourceParams{URI: "hitkeep-dev://catalog/variants"})
-	if err != nil || len(read.Contents) != 1 || read.Contents[0].Text == "" {
-		t.Fatalf("read catalog: %#v, %v", read, err)
-	}
-	if read.TTLMs != 0 || read.CacheScope != "private" {
-		t.Fatalf("mutable catalog resource cache = ttl %d scope %q, want 0/private", read.TTLMs, read.CacheScope)
+	if listed.TTLMs != int(mcpListCacheTTL/time.Millisecond) || listed.CacheScope != "public" {
+		t.Fatalf("tools/list cache = ttl %d scope %q, want 24h/public", listed.TTLMs, listed.CacheScope)
 	}
 	prompts, err := clientSession.ListPrompts(ctx, nil)
 	if err != nil {
@@ -408,7 +367,7 @@ func TestDeveloperMCPRejectsOversizedLogs(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer clientSession.Close()
-	result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "hk_logs_tail", Arguments: map[string]any{"run_id": "not-present", "limit": 1000}})
+	result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "hk_run_status", Arguments: map[string]any{"run_id": "not-present", "limit": 1000}})
 	if err != nil {
 		t.Fatal(err)
 	}

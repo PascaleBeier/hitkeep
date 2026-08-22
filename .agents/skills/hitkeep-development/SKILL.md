@@ -22,13 +22,13 @@ Reserve direct `./hk` use for MCP bootstrap or repair, an explicitly approved fa
 
 Use the typed MCP surface rather than translating an action into shell yourself:
 
-- Diagnose with `hk_doctor`; start setup with `hk_setup_start` only when needed.
-- Start, inspect, observe, or stop the workspace development session with `hk_dev_start`, `hk_dev_status`, `hk_dev_logs`, and `hk_dev_stop`.
+- Read bounded workspace, catalog, configuration, handoff, and runtime/cache views with `hk_context`; diagnose prerequisites with `hk_doctor`.
+- Start, inspect with bounded cursor-addressed events, or stop an exact observed development generation with `hk_dev_start`, `hk_dev_status`, and `hk_dev_stop`.
 - Capture local visual-QA routes with `hk_screenshot`; batch related routes so they share one browser session, and use returned resource links rather than copying images into the repository.
-- Start deterministic builds and image smokes with `hk_build_start` and `hk_smoke_start`.
-- Observe or cancel finite returned runs with `hk_run_status`, `hk_logs_tail`, and `hk_run_cancel`.
+- Start setup, QA, deterministic builds, and image smokes asynchronously with `hk_run_start`.
+- Observe runs and bounded gate logs with `hk_run_status`; cancel one exact observed run with `hk_run_cancel`.
 
-Development start and stop stream progress until they reach a stable result. Development log following ends on client cancellation without stopping the session; bounded logs remain available through tools and resources. Finite MCP actions return run handles immediately; equivalent CLI actions use `--detach --output json`.
+Start operations return accepted or reused state immediately. Poll `hk_dev_status` or `hk_run_status` with the returned cursor or identifier for readiness, bounded progress, and failure logs. Equivalent approved CLI actions use `--detach --output json`.
 
 ## Route the Work
 

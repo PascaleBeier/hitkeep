@@ -11,20 +11,21 @@ Treat `AGENTS.md` as repository policy and the live `hk` QA catalog as workflow 
 
 Use `hk_qa_plan` whenever it is callable. If it is absent or fails, report whether registration, startup, workspace routing, or task reload is blocking MCP and obtain explicit user approval before using an equivalent CLI action. After approval, discover the planning command through `./hk qa --help` and request `--output json`.
 
-- Use the change-aware profile while iterating.
-- Use the PR-parity profile before review.
-- Use the exhaustive profile when release risk, cloud-tagged behavior, container behavior, or the request explicitly requires it.
+- Use `changed` while iterating.
+- Use `complete` before declaring contributor work complete; it runs the deepest locally appropriate gates for affected areas.
+- Use `pr` only for exact unchanged CI parity.
+- Use `full` when release risk, cloud-tagged behavior, container behavior, or the request explicitly requires exhaustive validation.
 
 Honor planner escalation. Query `hitkeep-dev://catalog/qa` or the structured CLI catalog for current profiles and gate definitions rather than guessing or copying commands.
 
-Use `hk_run_status` to observe the returned run, `hk_logs_tail` for bounded diagnosis, and `hk_run_cancel` only for the intended active run. Gate-specific run resources provide deeper bounded failure context without loading complete logs.
+Use `hk_run_status` to observe the returned run and request bounded cursor-addressed run or gate logs. Use `hk_run_cancel` only for the intended exact observed active run.
 
 ## Run and Observe
 
-1. Inspect workspace status for an equivalent active QA run before starting another.
-2. Start through `hk_qa_start`. Use the structured CLI action discovered from help with `--detach --output json` only after the MCP blocker has been reported and the user has approved fallback. Keep the returned workspace ID and run ID.
-3. Poll status rather than restarting a slow run or assuming client disconnect stopped it.
-4. On failure, read the bounded run tail, then the gate-specific bounded resource. Open the complete local artifact only when the tail is insufficient.
+1. Inspect `hk_context` and known run status for equivalent active QA work before starting another.
+2. Persist a source-bound plan with `hk_qa_plan`, then pass its required `plan_id` to `hk_run_start`. Use a structured CLI action with `--detach --output json` only after the MCP blocker has been reported and the user has approved fallback. Keep the returned workspace ID and run ID.
+3. Poll `hk_run_status` rather than restarting a slow run or assuming client disconnect stopped it.
+4. On failure, request the bounded run tail, then a bounded gate-specific view from `hk_run_status`. Open the complete local artifact only when that context is insufficient.
 5. Fix the root cause and rerun the smallest relevant selection from the live catalog before rerunning the required profile.
 6. Let all selected gates finish; one failure must not hide independent results. Cancel only the intended validated run.
 

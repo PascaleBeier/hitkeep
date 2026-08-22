@@ -508,41 +508,36 @@ func attachRunLog(ctx context.Context, options *options, app *devtool.App, runID
 
 func qaCommand(options *options) *cobra.Command {
 	request := func(cmd *cobra.Command, args []string) devtool.RunRequest {
-		profile := "changed"
+		profile := "complete"
 		if len(args) > 0 {
 			profile = args[0]
 		}
 		gates, _ := cmd.Flags().GetStringSlice("gate")
-		return devtool.RunRequest{Kind: "qa", Profile: profile, GateIDs: gates}
+		planID, _ := cmd.Flags().GetString("plan-id")
+		return devtool.RunRequest{Kind: "qa", Profile: profile, PlanID: planID, GateIDs: gates}
 	}
 	configure := func(cmd *cobra.Command) {
 		cmd.Args = cobra.MaximumNArgs(1)
 		cmd.Flags().StringSlice("gate", nil, "run only canonical gate IDs")
+		cmd.Flags().String("plan-id", "", "required source-bound QA plan identifier")
 	}
-	command := startCommand(options, "qa [changed|pr|full]", "qa start", "Plan and run canonical QA profiles", request, configure)
+	command := startCommand(options, "qa [changed|complete|pr|full]", "qa start", "Run one persisted source-bound QA plan", request, configure)
 	var baseRef string
-	plan := &cobra.Command{Use: "plan [changed|pr|full]", Args: cobra.MaximumNArgs(1), RunE: withApp(options, "qa plan", func(ctx context.Context, app *devtool.App) (any, error) {
-		profile := "changed"
-		if len(planArgs(ctx)) > 0 { // populated below through command context
-			profile = planArgs(ctx)[0]
-		}
-		return app.QAPlan(ctx, profile, baseRef)
-	})}
-	// Cobra does not expose args to a closure nested in withApp, so capture them here.
+	plan := &cobra.Command{Use: "plan [changed|complete|pr|full]", Args: cobra.MaximumNArgs(1)}
 	plan.RunE = func(cmd *cobra.Command, args []string) error {
 		ctx := context.WithValue(cmd.Context(), argsKey{}, args)
 		cmd.SetContext(ctx)
 		return withApp(options, "qa plan", func(ctx context.Context, app *devtool.App) (any, error) {
-			profile := "changed"
+			profile := "complete"
 			if values := planArgs(ctx); len(values) > 0 {
 				profile = values[0]
 			}
 			return app.QAPlan(ctx, profile, baseRef)
 		})(cmd, args)
 	}
-	plan.Flags().StringVar(&baseRef, "base", "", "base ref for changed planning")
+	plan.Flags().StringVar(&baseRef, "base", "", "base ref for change-aware planning")
 	command.AddCommand(plan)
-	command.AddCommand(startCommand(options, "start [changed|pr|full]", "qa start", "Run selected QA profile", request, configure))
+	command.AddCommand(startCommand(options, "start [changed|complete|pr|full]", "qa start", "Run one persisted source-bound QA plan", request, configure))
 	return command
 }
 

@@ -67,8 +67,9 @@ var gates = []Gate{
 }
 
 func CatalogSnapshot() Catalog {
-	catalog := Catalog{SchemaVersion: SchemaVersion, Variants: cloneVariants(), Gates: cloneGates(), Profiles: []string{"changed", "pr", "full"}}
+	catalog := Catalog{SchemaVersion: SchemaVersion, Variants: cloneVariants(), Gates: cloneGates(), Profiles: []string{"changed", "complete", "pr", "full"}}
 	for index := range catalog.Gates {
+		applyGateMetadata(&catalog.Gates[index])
 		agentCommand := agentOptimizedCommand(catalog.Gates[index].Command)
 		if !slices.Equal(agentCommand, catalog.Gates[index].Command) {
 			catalog.Gates[index].AgentCommand = agentCommand
@@ -111,8 +112,11 @@ func ValidateRunRequest(request RunRequest) error {
 		}
 		return nil
 	case "qa":
-		if !slices.Contains([]string{"changed", "pr", "full"}, request.Profile) {
-			return errors.New("qa profile must be changed, pr, or full")
+		if !slices.Contains([]string{"changed", "complete", "pr", "full"}, request.Profile) {
+			return errors.New("qa profile must be changed, complete, pr, or full")
+		}
+		if request.PlanID == "" {
+			return errors.New("qa plan_id is required")
 		}
 		for _, id := range request.GateIDs {
 			if _, err := GateByID(id); err != nil {
@@ -186,6 +190,8 @@ func cloneGate(gate Gate) Gate {
 	gate.AgentCommand = slices.Clone(gate.AgentCommand)
 	gate.Profiles = slices.Clone(gate.Profiles)
 	gate.Paths = slices.Clone(gate.Paths)
+	gate.ChangeAreas = slices.Clone(gate.ChangeAreas)
+	gate.Dependencies = slices.Clone(gate.Dependencies)
 	return gate
 }
 

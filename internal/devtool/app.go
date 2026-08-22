@@ -152,60 +152,10 @@ func (a *App) Doctor(ctx context.Context) DoctorReport {
 }
 
 func (a *App) QAPlan(ctx context.Context, profile, baseRef string) (QAPlan, error) {
-	if !slices.Contains([]string{"changed", "pr", "full"}, profile) {
-		return QAPlan{}, fmt.Errorf("unknown QA profile %q", profile)
+	if err := VerifyDeveloperSource(a.workspace.Root); err != nil {
+		return QAPlan{}, err
 	}
-	plan := QAPlan{Profile: profile, BaseRef: baseRef}
-	if profile != "changed" {
-		plan.GateIDs = profileGateIDs(profile)
-		return plan, nil
-	}
-	if baseRef == "" {
-		baseRef = "origin/main"
-		plan.BaseRef = baseRef
-	}
-	changed, err := changedPaths(a.workspace.Root, baseRef)
-	if err != nil {
-		changed, err = workingTreeChangedPaths(a.workspace.Root)
-		if err != nil {
-			return QAPlan{}, err
-		}
-	}
-	plan.ChangedPathCount = len(changed)
-	plan.ChangedPaths, plan.ChangedPathsTruncated = boundedStrings(changed, maxStructuredPaths)
-	selected := map[string]bool{}
-	unknown := false
-	for _, path := range changed {
-		matched := false
-		for _, gate := range gates {
-			if gateMatchesPath(gate, path) {
-				selected[gate.ID] = true
-				matched = true
-			}
-		}
-		if strings.HasPrefix(path, "scripts/") || strings.HasPrefix(path, ".github/") || path == "Dockerfile" || path == "compose.dev.yaml" || path == "compose.dev-cloud.yaml" {
-			unknown = true
-			matched = true
-		}
-		if !matched {
-			unknown = true
-		}
-	}
-	if unknown {
-		plan.GateIDs = profileGateIDs("pr")
-		plan.Escalated = true
-		plan.EscalationWhy = "tooling or unclassified paths changed"
-		return plan, nil
-	}
-	for _, gate := range gates {
-		if selected[gate.ID] && slices.Contains(gate.Profiles, "pr") {
-			plan.GateIDs = append(plan.GateIDs, gate.ID)
-		}
-	}
-	if len(plan.GateIDs) == 0 {
-		plan.GateIDs = []string{"go-vet"}
-	}
-	return plan, nil
+	return a.buildQAPlan(ctx, profile, baseRef)
 }
 
 func (a *App) Catalog() Catalog {

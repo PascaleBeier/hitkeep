@@ -69,7 +69,7 @@ if [ ! -x "$binary" ]; then
   temporary="$binary.tmp.$$"
   trap 'rm -f "$temporary"; rmdir "$lock" 2>/dev/null || true' EXIT HUP INT TERM
   if command -v go >/dev/null 2>&1 && [ "$(go env GOVERSION 2>/dev/null || true)" = "go$go_version" ]; then
-    (cd "$root" && go build -trimpath -ldflags "-X main.version=dev-$key" -o "$temporary" ./cmd/hk)
+    (cd "$root" && go build -trimpath -ldflags "-X main.version=dev-$key -X hitkeep/internal/devtool.EmbeddedDeveloperSourceFingerprint=$key" -o "$temporary" ./cmd/hk)
   elif command -v docker >/dev/null 2>&1; then
     docker run --rm \
       --user "$(id -u):$(id -g)" \
@@ -85,7 +85,7 @@ if [ ! -x "$binary" ]; then
       -v "$bootstrap_build_cache:/cache/go-build" \
       -w /src \
       "golang:$go_version" \
-      go build -trimpath -ldflags "-X main.version=dev-$key" -o "/out/$(basename "$temporary")" ./cmd/hk
+      go build -trimpath -ldflags "-X main.version=dev-$key -X hitkeep/internal/devtool.EmbeddedDeveloperSourceFingerprint=$key" -o "/out/$(basename "$temporary")" ./cmd/hk
   else
     echo "hk requires Docker for its first bootstrap when no cached developer binary or exact optional host Go $go_version is available" >&2
     exit 1

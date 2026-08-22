@@ -236,6 +236,15 @@ func (a *App) CaptureScreenshots(ctx context.Context, request ScreenshotRequest)
 		return ScreenshotResult{}, err
 	}
 	keepArtifacts = true
+	paths := []string{result.ManifestPath}
+	for _, artifact := range result.Artifacts {
+		paths = append(paths, artifact.Path)
+	}
+	fingerprint, _ := DeveloperSourceFingerprint(a.workspace.Root)
+	if err := a.registerArtifactPaths("screenshot", captureID, fingerprint, paths); err != nil {
+		return ScreenshotResult{}, fmt.Errorf("index screenshot artifacts: %w", err)
+	}
+	_ = a.maintainArtifacts()
 	return result, nil
 }
 

@@ -174,7 +174,7 @@ func TestMCPStdioWithoutWorkspaceUsesConfiguredFallback(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer session.Close()
-	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "hk_workspace_status", Arguments: map[string]any{}})
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "hk_context", Arguments: map[string]any{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,8 +182,8 @@ func TestMCPStdioWithoutWorkspaceUsesConfiguredFallback(t *testing.T) {
 	if result.IsError || envelope["workspace_id"] != wantApp.WorkspaceID() {
 		t.Fatalf("central stdio server did not route by client root: %#v", envelope)
 	}
-	if _, err := os.Stat(delegated); err != nil {
-		t.Fatalf("central server did not delegate to the workspace MCP: %v", err)
+	if _, err := os.Stat(delegated); !os.IsNotExist(err) {
+		t.Fatalf("central server unexpectedly launched a nested workspace MCP: %v", err)
 	}
 }
 
@@ -250,9 +250,12 @@ func TestMCPStdioActionRunLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer session.Close()
-	started, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "hk_setup_start", Arguments: map[string]any{}})
+	started, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "hk_run_start", Arguments: map[string]any{"kind": "setup"}})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if started.IsError {
+		t.Fatalf("run start failed: %s", started.Content[0].(*mcp.TextContent).Text)
 	}
 	envelope := started.StructuredContent.(map[string]any)
 	data := envelope["data"].(map[string]any)
@@ -281,7 +284,7 @@ func TestMCPStdioActionRunLifecycle(t *testing.T) {
 	if err := os.WriteFile(slowFile, []byte("slow\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	started, err = session.CallTool(ctx, &mcp.CallToolParams{Name: "hk_setup_start", Arguments: map[string]any{}})
+	started, err = session.CallTool(ctx, &mcp.CallToolParams{Name: "hk_run_start", Arguments: map[string]any{"kind": "setup"}})
 	if err != nil {
 		t.Fatal(err)
 	}

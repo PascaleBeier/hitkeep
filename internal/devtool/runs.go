@@ -28,21 +28,23 @@ const maxLogLines = 200
 
 func (a *App) StartRun(ctx context.Context, request RunRequest) (RunStart, error) {
 	request = normalizeRunRequest(request)
-	if err := ValidateRunRequest(request); err != nil {
+	if err := VerifyDeveloperSource(a.workspace.Root); err != nil {
 		return RunStart{}, err
 	}
-	if request.Kind == "qa" && len(request.GateIDs) == 0 {
-		plan, err := a.QAPlan(ctx, request.Profile, "")
-		if err != nil {
-			return RunStart{}, err
-		}
-		request.GateIDs = plan.GateIDs
+	if err := ValidateRunRequest(request); err != nil {
+		return RunStart{}, err
 	}
 	startLock, err := lockStateRoot(a.workspace.StateDir, "run-start")
 	if err != nil {
 		return RunStart{}, fmt.Errorf("lock run creation: %w", err)
 	}
 	defer unlockStateRoot(startLock)
+	if request.Kind == "qa" {
+		request, err = a.prepareQARequest(ctx, request)
+		if err != nil {
+			return RunStart{}, err
+		}
+	}
 	runs, err := a.ListRuns(100)
 	if err != nil {
 		return RunStart{}, fmt.Errorf("inspect active runs: %w", err)
@@ -71,11 +73,22 @@ func (a *App) StartRun(ctx context.Context, request RunRequest) (RunStart, error
 		return RunStart{}, err
 	}
 
-	// The executable and worktree are resolved internally, and the run ID is generated above.
-	command := exec.CommandContext(context.WithoutCancel(ctx), a.executable, "__run", "--workspace", a.workspace.Root, "--run-id", id) //nolint:gosec
+	// Launch through the selected worktree so every durable worker uses source-fresh hk logic.
+	launcher := filepath.Join(a.workspace.Root, "hk")
+	if info, statErr := os.Stat(launcher); statErr != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
+		launcher = a.executable // compatibility for legacy/test workers; real worktrees always use ./hk
+	}
+	command := exec.CommandContext(context.WithoutCancel(ctx), launcher, "__run", "--workspace", a.workspace.Root, "--run-id", id) //nolint:gosec
 	command.Dir = a.workspace.Root
 	stateRoot := filepath.Dir(filepath.Dir(a.workspace.StateDir))
-	childEnvironment := []string{"HK_CHILD_RUN=1", "HK_STATE_DIR=" + stateRoot}
+	fingerprint, err := DeveloperSourceFingerprint(a.workspace.Root)
+	if err != nil {
+		if launcher != a.executable {
+			return RunStart{}, fmt.Errorf("fingerprint run worker source: %w", err)
+		}
+		fingerprint = "legacy"
+	}
+	childEnvironment := []string{"HK_CHILD_RUN=1", "HK_STATE_DIR=" + stateRoot, "HK_EXPECTED_SCHEMA=" + SchemaVersion, "HK_WORKER_PROTOCOL=1", "HK_WORKSPACE_ID=" + a.workspace.ID, "HK_SOURCE_FINGERPRINT=" + fingerprint}
 	if agentOutputEnabled(ctx) {
 		childEnvironment = append(childEnvironment, "HK_CHILD_OUTPUT=json")
 	}
@@ -129,6 +142,9 @@ func runStart(run Run) RunStart {
 }
 
 func (a *App) ExecuteRun(ctx context.Context, runID string) error {
+	if err := a.validateWorkerProtocol(); err != nil {
+		return err
+	}
 	if os.Getenv("HK_CHILD_OUTPUT") == "json" {
 		ctx = WithAgentOutput(ctx)
 	}
@@ -179,6 +195,15 @@ func (a *App) ExecuteRun(ctx context.Context, runID string) error {
 	if err := a.writeRun(run); err != nil {
 		return err
 	}
+	paths := append([]string{run.LogPath}, run.Artifacts...)
+	for _, gate := range run.GateResults {
+		if gate.LogPath != "" {
+			paths = append(paths, gate.LogPath)
+		}
+	}
+	fingerprint, _ := DeveloperSourceFingerprint(a.workspace.Root)
+	_ = a.registerArtifactPaths("run", run.ID, fingerprint, paths)
+	_ = a.maintainArtifacts()
 	_ = os.Remove(a.runCancellationPath(run.ID))
 	return execErr
 }
@@ -740,6 +765,18 @@ func (a *App) executeQA(ctx context.Context, runID string, request RunRequest, w
 		for id := range jobs {
 			gate, err := GateByID(id)
 			if err == nil {
+				if evidence, ok := a.reusableGateEvidence(gate, request); ok {
+					progressMu.Lock()
+					value := progress[id]
+					value.OriginatingRunID = evidence.RunID
+					value.EvidenceFingerprint = evidence.Fingerprint
+					progress[id] = value
+					progressMu.Unlock()
+					completed := evidence.CompletedAt
+					persistProgress(id, "reused", nil, &completed, &completed)
+					results <- gateExecution{id: id}
+					continue
+				}
 				gateLogPath := filepath.Join(a.workspace.StateDir, "runs", runID+"."+gate.ID+".log")
 				gateLog, openErr := os.OpenFile(gateLogPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 				if openErr != nil {
@@ -809,6 +846,9 @@ func (a *App) executeQA(ctx context.Context, runID string, request RunRequest, w
 					recordedErr = nil
 				} else if err != nil {
 					status = "failed"
+				}
+				if status == "passed" {
+					_ = a.storeGateEvidence(gate, request, runID, finished)
 				}
 				persistProgress(id, status, recordedErr, &started, &finished)
 			} else {
@@ -1100,7 +1140,7 @@ func normalizeRunRequest(request RunRequest) RunRequest {
 		request.Variant = "self-hosted"
 	}
 	if request.Profile == "" && request.Kind == "qa" {
-		request.Profile = "changed"
+		request.Profile = "complete"
 	}
 	if request.Target == "" && request.Kind == "build" {
 		request.Target = "binary"
@@ -1110,7 +1150,7 @@ func normalizeRunRequest(request RunRequest) RunRequest {
 }
 
 func runRequestsEqual(left, right RunRequest) bool {
-	return left.Kind == right.Kind && left.Variant == right.Variant && left.Profile == right.Profile && left.Target == right.Target && slices.Equal(left.GateIDs, right.GateIDs)
+	return left.Kind == right.Kind && left.Variant == right.Variant && left.Profile == right.Profile && left.PlanID == right.PlanID && left.Target == right.Target && slices.Equal(left.GateIDs, right.GateIDs)
 }
 
 func summarizeRun(run Run) RunSummary {

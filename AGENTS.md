@@ -7,7 +7,7 @@ This file is public guidance for AI-assisted contributions to HitKeep. It is wri
 ## Start Here
 
 - Treat the current repository as the source of truth. If an issue, prompt, or older document disagrees with the code, inspect the code first.
-- Use `./hk` as the workflow source of truth, but consume that truth through callable central developer MCP tools and resources whenever they cover the task. Reserve direct CLI discovery for MCP bootstrap or repair, explicitly approved fallback, and workflows intentionally absent from MCP such as source rewrites; never copy commands, runtime configuration facts, build tags, cloud defaults, ports, tool versions, or QA gates into instructions.
+- Use `./hk` as the workflow source of truth, but consume that truth through the callable central developer MCP tools on its compact surface whenever they cover the task. Reserve direct CLI discovery for MCP bootstrap or repair, explicitly approved fallback, and workflows intentionally absent from MCP such as source rewrites; never copy commands, runtime configuration facts, build tags, cloud defaults, ports, tool versions, or QA gates into instructions.
 - Treat developer MCP as available only when the relevant `hk_*` tools are exposed and a read-only call succeeds; a configured or enabled host entry is not proof. Register one long-lived clone's locally built `./hk` launcher once, query `./hk mcp manifest --output json` only for the live bootstrap contract, and verify the returned workspace ID against the configured fallback or server catalog. If tools are absent or fail, inspect host MCP health, compare the registration with the manifest, report whether registration, startup, workspace routing, or task reload is blocking use, and obtain explicit user approval before invoking an equivalent versioned `./hk --output json` action. When that fallback is approved, `./hk catalog configuration --output json` is the structured runtime configuration documentation contract. Existing tasks may require a host reload before newly registered tools appear; reserve human output for people.
 - Inspect the current workspace before setup, services, builds, or QA. Reuse an active run instead of starting duplicate work.
 - Development is one container-only session per workspace. It has status and event cursors, not a run ID. Setup, QA, builds, and smokes remain finite runs.
@@ -78,8 +78,8 @@ HitKeep MCP is an optional, leader-only Streamable HTTP route for approved assis
 - Every MCP tool must set `ReadOnlyHint: true`.
 - Analytics tools should use closed-world behavior. Only official docs lookup tools should declare open-world docs fetching.
 - MCP must authenticate with API client bearer tokens. Do not accept dashboard cookies.
-- Both MCP transports are stateless at the protocol layer. The production route supports sessionless `2026-07-28` discovery with legacy negotiation retained; the developer broker resolves each request from its configured fallback and server workspace catalog. Durable development sessions and finite runs remain explicit filesystem-backed application state.
-- Do not advertise or implement deprecated roots or logging capabilities, session-keyed routing, or list-change/subscription notifications. Forward developer progress only; return bounded logs through tools and resources.
+- Both MCP transports are stateless at the protocol layer. The production route supports sessionless `2026-07-28` discovery with legacy negotiation retained; the developer broker resolves each request in process from its configured fallback and cached workspace catalog; it never opens a nested MCP connection. Durable development sessions and finite runs remain explicit filesystem-backed application state.
+- Do not advertise or implement deprecated roots or logging capabilities, session-keyed routing, or list-change/subscription notifications. Return bounded cursor-addressed progress and logs through the consolidated status tools; the developer MCP exposes no resources or resource templates.
 - Site analytics access must pass the same site-scoped permission checks as the REST and dashboard surfaces.
 - Do not add MCP tools for write workflows, raw hit exports, token management, billing, site administration, goal mutation, exclusions, takeout, or dashboard session access.
 - If a tool is added, renamed, removed, or changes behavior, update the MCP audit expectations, docs, public skills, and any registry metadata that changed.
@@ -140,6 +140,6 @@ Use the delivery reference under `$hitkeep-development` for adjacent documentati
 
 ## Testing Expectations
 
-Use `$hitkeep-qa` to plan the smallest useful checks while iterating, the PR-parity profile before review, and the exhaustive profile for release risk, cloud behavior, or image behavior. Query live `hk` catalogs; do not maintain a second command matrix here.
+Use `$hitkeep-qa` with `changed` for the smallest useful checks while iterating, `complete` as the default before declaring work complete, `pr` only for exact CI parity, and `full` for release risk, cloud behavior, or image behavior. Query live `hk` catalogs; do not maintain a second command matrix here.
 
 Before opening a PR, report the QA profile, stable gate IDs, and final run status, plus anything that could not run and why. AI-assisted changes receive the same review standard as human-written changes.

@@ -22,7 +22,7 @@ import (
 
 const (
 	maxRequestedLogLines = 200
-	mcpListCacheTTL      = 5 * time.Minute
+	mcpListCacheTTL      = 24 * time.Hour
 	centralMCPConnectTTL = 30 * time.Second
 )
 
@@ -123,12 +123,15 @@ type workspaceMCPConnector func(context.Context, context.Context, *devtool.App, 
 
 type centralAppResolver struct {
 	fallback string
-	connect  workspaceMCPConnector
+	connect  workspaceMCPConnector // retained for compatibility tests; normal dispatch is in-process
 	loadApp  func(string) (*devtool.App, error)
+	registry *workspaceRegistry
 }
 
 func newCentralAppResolver(fallback string, connect workspaceMCPConnector) *centralAppResolver {
-	return &centralAppResolver{fallback: fallback, connect: connect}
+	resolver := &centralAppResolver{fallback: fallback, connect: connect}
+	resolver.registry = newWorkspaceRegistry(fallback)
+	return resolver
 }
 
 func (resolver *centralAppResolver) connector() workspaceMCPConnector {
@@ -139,41 +142,23 @@ func (resolver *centralAppResolver) connector() workspaceMCPConnector {
 }
 
 func (resolver *centralAppResolver) Resolve(ctx context.Context, selector string) (*devtool.App, error) {
-	if resolver.fallback == "" {
-		return nil, errors.New("no configured fallback HitKeep workspace is available")
-	}
-	fallback, err := resolver.appForPath(resolver.fallback)
-	if err != nil {
-		return nil, fmt.Errorf("resolve fallback workspace: %w", err)
-	}
-	if selector == "" {
-		return fallback, nil
-	}
+	app, _, err := resolver.registry.resolve(ctx, selector, resolver.appForPath)
+	return app, err
+}
 
-	base, err := fallback.Workspace(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("inspect fallback workspace: %w", err)
+func (resolver *centralAppResolver) ResolveFresh(ctx context.Context, selector string) (*devtool.App, error) {
+	return resolver.registry.resolveFresh(ctx, selector, resolver.appForPath)
+}
+
+type freshAppResolver struct {
+	appResolver
+}
+
+func (resolver freshAppResolver) Resolve(ctx context.Context, selector string) (*devtool.App, error) {
+	if central, ok := resolver.appResolver.(*centralAppResolver); ok {
+		return central.ResolveFresh(ctx, selector)
 	}
-	workspaces, err := fallback.Workspaces(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("list HitKeep workspaces: %w", err)
-	}
-	workspaces = append(workspaces, base)
-	seen := map[string]bool{}
-	for _, workspace := range workspaces {
-		if seen[workspace.ID] || workspace.ID == "" || workspace.GitCommonDir != base.GitCommonDir {
-			continue
-		}
-		seen[workspace.ID] = true
-		app, appErr := resolver.appForPath(workspace.Root)
-		if appErr != nil {
-			continue
-		}
-		if selector == app.WorkspaceID() || samePath(selector, app.Root()) {
-			return app, nil
-		}
-	}
-	return nil, fmt.Errorf("workspace %q is not one of the configured fallback clone's HitKeep workspaces", selector)
+	return resolver.appResolver.Resolve(ctx, selector)
 }
 
 func (resolver *centralAppResolver) appForPath(path string) (*devtool.App, error) {
@@ -403,18 +388,16 @@ func newServer(resolver appResolver, version string) *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:        "hitkeep-developer",
 		Title:       "HitKeep Developer MCP",
-		Description: "Stateless, worktree-confined HitKeep development operations.",
+		Description: "Compact, stateless, worktree-confined HitKeep development broker.",
 		Version:     version,
 	}, &mcp.ServerOptions{
-		Instructions: "Local, stateless and worktree-confined HitKeep development operations. Each request resolves its configured fallback or explicit workspace selector, while development sessions and finite runs remain explicit filesystem-backed application state. Progress notifications are available during active requests; logs are returned through bounded tools and resources. No arbitrary commands are available.",
+		Instructions: "Resolve each request in-process against the configured fallback or explicit catalogued workspace. Durable development sessions and finite runs remain filesystem-backed. Starts are asynchronous; poll bounded status views for progress. No arbitrary commands or repository mutation are available.",
 		Capabilities: &mcp.ServerCapabilities{
-			Tools:     &mcp.ToolCapabilities{ListChanged: false},
-			Resources: &mcp.ResourceCapabilities{ListChanged: false, Subscribe: false},
+			Tools: &mcp.ToolCapabilities{ListChanged: false},
 		},
 	})
 	server.AddReceivingMiddleware(devCacheMiddleware())
 	registerTools(server, resolver)
-	registerResources(server, resolver)
 	return server
 }
 
@@ -427,7 +410,7 @@ func devCacheMiddleware() mcp.Middleware {
 			}
 			setCache := func(cache *mcp.Cacheable, ttl time.Duration) {
 				cache.TTLMs = int(ttl / time.Millisecond)
-				cache.CacheScope = "private"
+				cache.CacheScope = "public"
 			}
 			switch typed := result.(type) {
 			case *mcp.DiscoverResult:
@@ -447,135 +430,100 @@ func devCacheMiddleware() mcp.Middleware {
 }
 
 func registerTools(server *mcp.Server, resolver appResolver) {
+	freshResolver := freshAppResolver{appResolver: resolver}
 	readOnly := annotations(true, true, false, false)
 	action := annotations(false, false, false, false)
 	idempotentAction := annotations(false, true, false, false)
 	destructiveAction := annotations(false, true, false, true)
 
-	mcp.AddTool(server, tool("hk_workspace_status", "Inspect the selected Git worktree, allocated ports, URLs, and change count.", readOnly), routedHandler(resolver, "workspace status", func(ctx context.Context, app *devtool.App, _ emptyInput) (any, error) {
-		return app.Workspace(ctx)
+	mcp.AddTool(server, tool("hk_context", "Read one compact workspace, catalog, configuration, handoff, or runtime view.", readOnly), routedHandler(resolver, "context", func(ctx context.Context, app *devtool.App, input contextInput) (any, error) {
+		switch input.View {
+		case "", "current":
+			return app.Workspace(ctx)
+		case "workspaces":
+			return app.Workspaces(ctx)
+		case "catalog", "configuration":
+			return app.Catalog(), nil
+		case "handoff":
+			return app.Handoff(ctx)
+		case "runtime":
+			if central, ok := resolver.(*centralAppResolver); ok {
+				return central.registry.health(), nil
+			}
+			return registryHealth{WorkspaceCount: 1}, nil
+		default:
+			return nil, fmt.Errorf("unknown context view %q", input.View)
+		}
 	}))
-	mcp.AddTool(server, tool("hk_workspace_list", "List HitKeep worktrees with their isolated workspace identifiers, ports, and state.", readOnly), routedHandler(resolver, "workspace list", func(ctx context.Context, app *devtool.App, _ emptyInput) (any, error) {
-		return app.Workspaces(ctx)
-	}))
-	mcp.AddTool(server, tool("hk_workspace_handoff", "Return compact, secret-free handoff context for the selected worktree.", readOnly), routedHandler(resolver, "workspace handoff", func(ctx context.Context, app *devtool.App, _ emptyInput) (any, error) {
-		return app.Handoff(ctx)
-	}))
-	mcp.AddTool(server, tool("hk_doctor", "Check the managed toolchain and container runtime prerequisites.", readOnly), routedHandler(resolver, "doctor", func(ctx context.Context, app *devtool.App, _ emptyInput) (any, error) {
+	mcp.AddTool(server, tool("hk_doctor", "Run workspace and managed-toolchain diagnostics.", readOnly), routedHandler(resolver, "doctor", func(ctx context.Context, app *devtool.App, _ emptyInput) (any, error) {
 		return app.Doctor(ctx), nil
 	}))
-	mcp.AddTool(server, tool("hk_qa_plan", "Select canonical QA gates without running them.", readOnly), routedHandler(resolver, "qa plan", func(ctx context.Context, app *devtool.App, input qaPlanInput) (any, error) {
+	mcp.AddTool(server, tool("hk_qa_plan", "Persist a source-bound change-aware QA plan; complete is the completion default.", readOnly), routedHandler(freshResolver, "qa plan", func(ctx context.Context, app *devtool.App, input qaPlanInput) (any, error) {
 		if input.Profile == "" {
-			input.Profile = "changed"
+			input.Profile = "complete"
 		}
 		return app.QAPlan(ctx, input.Profile, input.BaseRef)
 	}))
-	mcp.AddTool(server, tool("hk_run_status", "Inspect one asynchronous hk run.", readOnly), routedHandler(resolver, "run status", func(_ context.Context, app *devtool.App, input runInput) (any, error) {
-		return app.GetRun(input.RunID)
+	mcp.AddTool(server, tool("hk_dev_start", "Accept or reuse an asynchronous development generation.", idempotentAction), routedRequestHandler(freshResolver, "dev start", func(ctx context.Context, _ *mcp.CallToolRequest, app *devtool.App, input devStartInput) (any, error) {
+		return app.StartDevDetachedObserved(devtool.WithAgentOutput(ctx), devtool.DevRequest{Variant: input.Variant, Seed: input.Seed}, nil)
 	}))
-	mcp.AddTool(server, tool("hk_run_list", "List bounded recent runs for the selected worktree.", readOnly), routedHandler(resolver, "run list", func(_ context.Context, app *devtool.App, input runListInput) (any, error) {
-		if input.Limit == 0 {
-			input.Limit = 20
-		}
-		if input.Limit < 1 || input.Limit > 100 {
-			return nil, errors.New("limit must be between 1 and 100")
-		}
-		return app.RecentRuns(input.Limit)
-	}))
-	mcp.AddTool(server, tool("hk_logs_tail", "Read a bounded, redacted tail of one hk run log.", readOnly), routedHandler(resolver, "logs tail", func(_ context.Context, app *devtool.App, input logsInput) (any, error) {
-		if input.Limit < 0 || input.Limit > maxRequestedLogLines || input.Cursor < 0 {
-			return nil, errors.New("limit must be between 1 and 200")
-		}
-		if input.GateID != "" {
-			return app.TailGateLogAfter(input.RunID, input.GateID, input.Limit, input.Cursor)
-		}
-		return app.TailLogAfter(input.RunID, input.Limit, input.Cursor)
-	}))
-
-	mcp.AddTool(server, tool("hk_setup_start", "Start reproducible dependency setup and return a run ID immediately.", action), startHandler(resolver, "setup start", func(emptyInput) devtool.RunRequest {
-		return devtool.RunRequest{Kind: "setup"}
-	}))
-	mcp.AddTool(server, tool("hk_dev_start", "Start or reuse the selected workspace's development session and stream progress until ready.", idempotentAction), routedRequestHandler(resolver, "dev start", func(ctx context.Context, request *mcp.CallToolRequest, app *devtool.App, input devStartInput) (any, error) {
-		return app.StartDevDetachedObserved(devtool.WithAgentOutput(ctx), devtool.DevRequest{Variant: input.Variant, Seed: input.Seed}, devEventNotifier(ctx, request))
-	}))
-	mcp.AddTool(server, tool("hk_dev_status", "Inspect the selected workspace's development session.", readOnly), routedHandler(resolver, "dev status", func(ctx context.Context, app *devtool.App, _ devInput) (any, error) {
-		return app.DevStatus(ctx)
-	}))
-	mcp.AddTool(server, tool("hk_dev_logs", "Read or follow cursor-addressed development events without changing the session.", readOnly), routedRequestHandler(resolver, "dev logs", func(ctx context.Context, request *mcp.CallToolRequest, app *devtool.App, input devLogsInput) (any, error) {
+	mcp.AddTool(server, tool("hk_dev_status", "Read generation state and optional bounded cursor-based events.", readOnly), routedHandler(resolver, "dev status", func(ctx context.Context, app *devtool.App, input devStatusInput) (any, error) {
 		if input.Cursor < 0 || input.Limit < 0 || input.Limit > maxRequestedLogLines {
 			return nil, errors.New("cursor must be non-negative and limit must be between 1 and 200")
 		}
-		notify := devEventNotifier(ctx, request)
-		if input.Follow {
-			return app.FollowDevEvents(ctx, input.Cursor, input.Limit, notify)
+		status, err := app.DevStatus(ctx)
+		if err != nil || input.Cursor == 0 && input.Limit == 0 {
+			return status, err
 		}
-		batch, err := app.DevLogs(input.Cursor, input.Limit)
+		if input.Limit == 0 {
+			input.Limit = 50
+		}
+		events, eventErr := app.DevLogs(input.Cursor, input.Limit)
+		return struct {
+			Status devtool.DevStatus   `json:"status"`
+			Events devtool.DevLogBatch `json:"events"`
+		}{Status: status, Events: events}, eventErr
+	}))
+	mcp.AddTool(server, tool("hk_dev_stop", "Stop one exact observed development generation.", destructiveAction), routedHandler(resolver, "dev stop", func(ctx context.Context, app *devtool.App, input devStopInput) (any, error) {
+		status, err := app.DevStatus(ctx)
 		if err != nil {
-			return batch, err
+			return nil, err
 		}
-		for _, event := range batch.Events {
-			notify(event)
+		if input.GenerationID == "" || input.GenerationID != status.GenerationID {
+			return nil, errors.New("generation_id must match the currently observed generation")
 		}
-		return batch, nil
+		return app.StopDev(ctx)
 	}))
-	mcp.AddTool(server, tool("hk_dev_stop", "Stop only the selected workspace's development session and stream shutdown progress.", destructiveAction), routedRequestHandler(resolver, "dev stop", func(ctx context.Context, request *mcp.CallToolRequest, app *devtool.App, _ devInput) (any, error) {
-		before, _ := app.DevStatus(ctx)
-		cursor := before.NextEventCursor
-		type stopResult struct {
-			status devtool.DevStatus
-			err    error
+	mcp.AddTool(server, tool("hk_run_start", "Start setup, QA, build, or smoke work asynchronously.", action), startHandler(freshResolver, "run start", func(input runStartInput) devtool.RunRequest {
+		return devtool.RunRequest{Kind: input.Kind, Profile: input.Profile, PlanID: input.PlanID, GateIDs: input.GateIDs, Variant: input.Variant, Target: input.Target}
+	}))
+	mcp.AddTool(server, tool("hk_run_status", "Get one run and optionally retrieve bounded gate logs by cursor.", readOnly), routedHandler(resolver, "run status", func(_ context.Context, app *devtool.App, input runStatusInput) (any, error) {
+		if input.Cursor < 0 || input.Limit < 0 || input.Limit > maxRequestedLogLines {
+			return nil, errors.New("cursor must be non-negative and limit must be between 1 and 200")
 		}
-		done := make(chan stopResult, 1)
-		stopContext := context.WithoutCancel(ctx)
-		go func() {
-			status, err := app.StopDev(stopContext)
-			done <- stopResult{status: status, err: err}
-		}()
-		notify := devEventNotifier(ctx, request)
-		ticker := time.NewTicker(100 * time.Millisecond)
-		defer ticker.Stop()
-		for {
-			select {
-			case result := <-done:
-				batch, _ := app.DevLogs(cursor, maxRequestedLogLines)
-				for _, event := range batch.Events {
-					notify(event)
-				}
-				return result.status, result.err
-			case <-ctx.Done():
-				return app.DevStatus(context.WithoutCancel(ctx))
-			case <-ticker.C:
-				batch, batchErr := app.DevLogs(cursor, maxRequestedLogLines)
-				if batchErr != nil {
-					continue
-				}
-				for _, event := range batch.Events {
-					notify(event)
-				}
-				cursor = batch.NextCursor
-			}
+		run, err := app.GetRun(input.RunID)
+		if err != nil || input.GateID == "" && input.Cursor == 0 && input.Limit == 0 {
+			return run, err
 		}
+		if input.Limit == 0 {
+			input.Limit = 50
+		}
+		var logs any
+		if input.GateID != "" {
+			logs, err = app.TailGateLogAfter(input.RunID, input.GateID, input.Limit, input.Cursor)
+		} else {
+			logs, err = app.TailLogAfter(input.RunID, input.Limit, input.Cursor)
+		}
+		return map[string]any{"run": run, "logs": logs}, err
 	}))
-	mcp.AddTool(server, tool("hk_screenshot", "Capture up to eight local dashboard routes in one browser session and return managed PNG resource links.", action), screenshotHandler(resolver))
-	mcp.AddTool(server, tool("hk_qa_start", "Start canonical QA gates asynchronously and return a run ID.", action), startHandler(resolver, "qa start", func(input qaStartInput) devtool.RunRequest {
-		return devtool.RunRequest{Kind: "qa", Profile: input.Profile, GateIDs: input.GateIDs}
-	}))
-	mcp.AddTool(server, tool("hk_build_start", "Start a deterministic binary or local image build and return a run ID.", action), startHandler(resolver, "build start", func(input buildInput) devtool.RunRequest {
-		return devtool.RunRequest{Kind: "build", Variant: input.Variant, Target: input.Target}
-	}))
-	mcp.AddTool(server, tool("hk_smoke_start", "Start a local production-image smoke test and return a run ID.", action), startHandler(resolver, "smoke start", func(input variantInput) devtool.RunRequest {
-		return devtool.RunRequest{Kind: "smoke", Variant: input.Variant}
-	}))
-	mcp.AddTool(server, tool("hk_run_cancel", "Request cancellation of one active hk run.", destructiveAction), routedHandler(resolver, "run cancel", func(_ context.Context, app *devtool.App, input runInput) (any, error) {
+	mcp.AddTool(server, tool("hk_run_cancel", "Cancel one exact observed finite run.", destructiveAction), routedHandler(resolver, "run cancel", func(_ context.Context, app *devtool.App, input runInput) (any, error) {
 		return app.CancelRun(input.RunID)
 	}))
+	mcp.AddTool(server, tool("hk_screenshot", "Capture and register bounded local screenshot artifacts.", action), screenshotHandler(resolver))
 }
 
 func routedHandler[In workspaceScoped](resolver appResolver, command string, handler func(context.Context, *devtool.App, In) (any, error)) func(context.Context, *mcp.CallToolRequest, In) (*mcp.CallToolResult, envelopeOutput, error) {
-	return func(ctx context.Context, request *mcp.CallToolRequest, input In) (*mcp.CallToolResult, envelopeOutput, error) {
-		if delegate, ok := resolver.(toolDelegatingResolver); ok {
-			return delegate.DelegateTool(ctx, request, command, input)
-		}
+	return func(ctx context.Context, _ *mcp.CallToolRequest, input In) (*mcp.CallToolResult, envelopeOutput, error) {
 		app, err := resolver.Resolve(ctx, input.workspaceSelector())
 		if err != nil {
 			return output(nil, command, nil, err)
@@ -587,9 +535,6 @@ func routedHandler[In workspaceScoped](resolver appResolver, command string, han
 
 func routedRequestHandler[In workspaceScoped](resolver appResolver, command string, handler func(context.Context, *mcp.CallToolRequest, *devtool.App, In) (any, error)) func(context.Context, *mcp.CallToolRequest, In) (*mcp.CallToolResult, envelopeOutput, error) {
 	return func(ctx context.Context, request *mcp.CallToolRequest, input In) (*mcp.CallToolResult, envelopeOutput, error) {
-		if delegate, ok := resolver.(toolDelegatingResolver); ok {
-			return delegate.DelegateTool(ctx, request, command, input)
-		}
 		app, err := resolver.Resolve(ctx, input.workspaceSelector())
 		if err != nil {
 			return output(nil, command, nil, err)
@@ -600,10 +545,7 @@ func routedRequestHandler[In workspaceScoped](resolver appResolver, command stri
 }
 
 func screenshotHandler(resolver appResolver) func(context.Context, *mcp.CallToolRequest, screenshotInput) (*mcp.CallToolResult, envelopeOutput, error) {
-	return func(ctx context.Context, request *mcp.CallToolRequest, input screenshotInput) (*mcp.CallToolResult, envelopeOutput, error) {
-		if delegate, ok := resolver.(toolDelegatingResolver); ok {
-			return delegate.DelegateTool(ctx, request, "screenshot", input)
-		}
+	return func(ctx context.Context, _ *mcp.CallToolRequest, input screenshotInput) (*mcp.CallToolResult, envelopeOutput, error) {
 		app, err := resolver.Resolve(ctx, input.workspaceSelector())
 		if err != nil {
 			return output(nil, "screenshot", nil, err)
@@ -694,31 +636,41 @@ var envelopeOutputSchema = sync.OnceValue(func() *jsonschema.Schema {
 
 func inputSchema(name string) *jsonschema.Schema {
 	properties := map[string]*jsonschema.Schema{
-		"workspace": {Type: "string", MaxLength: new(4096), Description: "Optional, defaults to configured fallback; accepts a catalogued workspace ID or absolute path."},
+		"workspace": {Type: "string", MaxLength: new(4096), Description: "Optional configured workspace ID or absolute catalogued path."},
 	}
 	required := []string{}
 	switch name {
+	case "hk_context":
+		properties["view"] = enum("current", "workspaces", "catalog", "configuration", "handoff", "runtime")
 	case "hk_qa_plan":
-		properties["profile"] = enum("changed", "pr", "full")
+		properties["profile"] = enum("changed", "complete", "pr", "full")
 		properties["base_ref"] = &jsonschema.Schema{Type: "string", MaxLength: new(200)}
-	case "hk_run_status", "hk_run_cancel":
-		properties["run_id"] = runIDSchema()
-		required = []string{"run_id"}
-	case "hk_logs_tail":
+	case "hk_run_status":
 		properties["run_id"] = runIDSchema()
 		properties["limit"] = &jsonschema.Schema{Type: "integer", Minimum: new(1.0), Maximum: new(float64(maxRequestedLogLines))}
 		properties["cursor"] = &jsonschema.Schema{Type: "integer", Minimum: new(0.0)}
 		properties["gate_id"] = gateEnum()
 		required = []string{"run_id"}
-	case "hk_run_list":
-		properties["limit"] = &jsonschema.Schema{Type: "integer", Minimum: new(1.0), Maximum: new(100.0)}
+	case "hk_run_cancel":
+		properties["run_id"] = runIDSchema()
+		required = []string{"run_id"}
+	case "hk_run_start":
+		properties["kind"] = enum("setup", "qa", "build", "smoke")
+		properties["plan_id"] = &jsonschema.Schema{Type: "string", MaxLength: new(100)}
+		properties["profile"] = enum("changed", "complete", "pr", "full")
+		properties["gate_ids"] = &jsonschema.Schema{Type: "array", Items: gateEnum(), UniqueItems: true, MaxItems: new(len(devtool.CatalogSnapshot().Gates))}
+		properties["variant"] = enum("self-hosted", "cloud")
+		properties["target"] = enum("binary", "image")
+		required = []string{"kind"}
 	case "hk_dev_start":
 		properties["variant"] = enum("self-hosted", "cloud")
 		properties["seed"] = &jsonschema.Schema{Type: "boolean"}
-	case "hk_dev_logs":
+	case "hk_dev_status":
 		properties["cursor"] = &jsonschema.Schema{Type: "integer", Minimum: new(0.0)}
 		properties["limit"] = &jsonschema.Schema{Type: "integer", Minimum: new(1.0), Maximum: new(float64(maxRequestedLogLines))}
-		properties["follow"] = &jsonschema.Schema{Type: "boolean"}
+	case "hk_dev_stop":
+		properties["generation_id"] = &jsonschema.Schema{Type: "string", MinLength: new(1), MaxLength: new(100)}
+		required = []string{"generation_id"}
 	case "hk_screenshot":
 		properties["routes"] = &jsonschema.Schema{
 			Type: "array", MinItems: new(1), MaxItems: new(devtool.MaxScreenshotRoutes), UniqueItems: true,
@@ -731,14 +683,6 @@ func inputSchema(name string) *jsonschema.Schema {
 		properties["full_page"] = &jsonschema.Schema{Type: "boolean"}
 		properties["selector"] = &jsonschema.Schema{Type: "string", MaxLength: new(500)}
 		properties["anonymous"] = &jsonschema.Schema{Type: "boolean"}
-	case "hk_smoke_start":
-		properties["variant"] = enum("self-hosted", "cloud")
-	case "hk_qa_start":
-		properties["profile"] = enum("changed", "pr", "full")
-		properties["gate_ids"] = &jsonschema.Schema{Type: "array", Items: gateEnum(), UniqueItems: true, MaxItems: new(len(devtool.CatalogSnapshot().Gates))}
-	case "hk_build_start":
-		properties["variant"] = enum("self-hosted", "cloud")
-		properties["target"] = enum("binary", "image")
 	}
 	return &jsonschema.Schema{Type: "object", Properties: properties, Required: required, AdditionalProperties: &jsonschema.Schema{Not: &jsonschema.Schema{}}}
 }
