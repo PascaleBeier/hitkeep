@@ -201,7 +201,7 @@ func TestSelfHostedImageGateCoversContainerRecreation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, required := range []string{"--recreate", "docker volume create", "docker rm -f", "docker cp", "cmp ", "recreated.db"} {
+	for _, required := range []string{"--recreate", "HITKEEP_PREVIOUS_IMAGE", "@sha256:", "docker volume create", "docker rm -f", "docker cp", "cmp ", "recreated.db", "start_container \"$image\""} {
 		if !bytes.Contains(raw, []byte(required)) {
 			t.Fatalf("docker smoke script is missing recreation contract %q", required)
 		}

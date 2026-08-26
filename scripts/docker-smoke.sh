@@ -3,6 +3,11 @@
 set -euo pipefail
 
 image="${1:?usage: docker-smoke.sh IMAGE EXPECTED_VARIANT [--cloud|--recreate]}"
+previous_image="${HITKEEP_PREVIOUS_IMAGE:-}"
+if [[ "${3:-}" == "--recreate" && -z "$previous_image" ]]; then
+  printf 'HITKEEP_PREVIOUS_IMAGE must name an immutable supported 2.x image digest for --recreate\n' >&2
+  exit 2
+fi
 expected_variant="${2:?usage: docker-smoke.sh IMAGE EXPECTED_VARIANT [--cloud|--recreate]}"
 mode="${3:-}"
 container="hitkeep-smoke-$$"
@@ -48,8 +53,21 @@ elif [[ -n "$mode" ]]; then
 fi
 
 start_container() {
-  docker run -d --name "$container" "${docker_args[@]}" "$image" >/dev/null
+  local selected_image="${1:-$image}"
+  docker run -d --name "$container" "${docker_args[@]}" "$selected_image" >/dev/null
 }
+
+if [[ "$mode" == "--recreate" ]]; then
+  if [[ "$previous_image" != *@sha256:* ]]; then
+    printf 'HITKEEP_PREVIOUS_IMAGE must be an immutable @sha256 digest: %s\n' "$previous_image" >&2
+    exit 2
+  fi
+  previous_variant="$(docker image inspect "$previous_image" --format '{{ index .Config.Labels "io.hitkeep.variant" }}')"
+  if [[ "$previous_variant" != "$expected_variant" ]]; then
+    printf 'Expected previous image %s to have variant %s, got %s\n' "$previous_image" "$expected_variant" "$previous_variant" >&2
+    exit 1
+  fi
+fi
 
 await_healthy() {
   for _ in $(seq 1 45); do
@@ -67,7 +85,12 @@ await_healthy() {
   return 1
 }
 
-start_container
+if [[ "$mode" == "--recreate" ]]; then
+  start_container "$previous_image"
+  await_healthy
+  docker rm -f "$container" >/dev/null
+fi
+start_container "$image"
 await_healthy
 
 if [[ "$mode" == "--recreate" ]]; then
@@ -77,7 +100,10 @@ if [[ "$mode" == "--recreate" ]]; then
   test -s "$temp_dir/initial.db"
 
   docker rm -f "$container" >/dev/null
-  start_container
+  start_container "$image"
+  await_healthy
+  docker rm -f "$container" >/dev/null
+  start_container "$image"
   await_healthy
 
   docker cp "$container:/var/lib/hitkeep/data/.recreation-marker" "$temp_dir/actual-marker"
