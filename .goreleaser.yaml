@@ -42,12 +42,22 @@ builds:
       - -w -s -X hitkeep/cmd.Version={{ .Env.HITKEEP_VERSION }}
 
 archives:
-  - formats:
-      - binary
+  - id: self-hosted
+    ids:
+      - self-hosted
+    formats:
+      - tar.gz
+    name_template: "hitkeep_{{ .Version }}_Linux_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - hitkeep.example.yaml
 
 checksum:
   name_template: SHA256SUMS
   algorithm: sha256
+  ids:
+    - self-hosted
 
 changelog:
   disable: true
