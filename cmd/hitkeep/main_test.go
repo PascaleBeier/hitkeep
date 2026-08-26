@@ -51,6 +51,31 @@ func TestExecuteHealthcheckSubprocess(t *testing.T) {
 	}
 }
 
+func TestExecuteExitErrorDoesNotEmitAgain(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	root := &cobra.Command{
+		Use:           "hitkeep",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		RunE: func(*cobra.Command, []string) error {
+			return &hitkeepcmd.ExitError{Code: 2}
+		},
+	}
+	root.SetOut(&stdout)
+	root.SetErr(&stderr)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	if got := execute(t.Context(), root, logger); got != 2 {
+		t.Fatalf("execute exit code = %d, want 2", got)
+	}
+	if got := stdout.String(); got != "" {
+		t.Errorf("stdout = %q, want empty", got)
+	}
+	if got := stderr.String(); got != "" {
+		t.Errorf("stderr = %q, want empty", got)
+	}
+}
+
 func TestExecuteHealthcheckFailureUsesCommandStreams(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	root := &cobra.Command{

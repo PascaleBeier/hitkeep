@@ -16,12 +16,17 @@ import (
 	runtimeconfig "hitkeep/config"
 )
 
+// ExitError tells the executable that a command already wrote its user-facing error.
+type ExitError struct{ Code int }
+
+func (*ExitError) Error() string { return "command failed" }
+
 type rootActions struct {
 	run                func([]string, string) error
 	runContext         func(context.Context, []string, string) error
 	recover            func(context.Context, []string, io.Reader, io.Writer, io.Writer) error
-	updateSpamLists    func([]string)
-	updateAIAgentLists func([]string)
+	updateSpamLists    func(context.Context, []string, io.Writer, io.Writer) error
+	updateAIAgentLists func(context.Context, []string, io.Writer, io.Writer) error
 	importData         func([]string)
 }
 
@@ -47,11 +52,11 @@ func NewRootCommand(logger *slog.Logger) *cobra.Command {
 		recover: func(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer) error {
 			return Recover(ctx, args, in, out, errOut, logger)
 		},
-		updateSpamLists: func(args []string) {
-			UpdateSpamLists(args, logger)
+		updateSpamLists: func(ctx context.Context, args []string, out, errOut io.Writer) error {
+			return UpdateSpamLists(ctx, args, out, errOut, logger)
 		},
-		updateAIAgentLists: func(args []string) {
-			UpdateAIAgentLists(args, logger)
+		updateAIAgentLists: func(ctx context.Context, args []string, out, errOut io.Writer) error {
+			return UpdateAIAgentLists(ctx, args, out, errOut, logger)
 		},
 		importData: func(args []string) {
 			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -163,9 +168,9 @@ func newRootCommand(actions rootActions) *cobra.Command {
 			case "recover":
 				return actions.recover(command.Context(), args[1:], command.InOrStdin(), command.OutOrStdout(), command.ErrOrStderr())
 			case "update-spam-lists":
-				actions.updateSpamLists(args[1:])
+				return actions.updateSpamLists(command.Context(), args[1:], command.OutOrStdout(), command.ErrOrStderr())
 			case "update-ai-agent-lists":
-				actions.updateAIAgentLists(args[1:])
+				return actions.updateAIAgentLists(command.Context(), args[1:], command.OutOrStdout(), command.ErrOrStderr())
 			case "import":
 				actions.importData(args[1:])
 			default:

@@ -41,10 +41,11 @@ func TestRootCommandPreservesFirstArgumentRouting(t *testing.T) {
 			var called string
 			var gotArgs []string
 			var gotConfig string
-			record := func(name string) func([]string) {
-				return func(args []string) {
+			record := func(name string) func(context.Context, []string, io.Writer, io.Writer) error {
+				return func(_ context.Context, args []string, _, _ io.Writer) error {
 					called = name
 					gotArgs = append([]string(nil), args...)
+					return nil
 				}
 			}
 			recordRecover := func(_ context.Context, args []string, _ io.Reader, _, _ io.Writer) error {
@@ -62,7 +63,10 @@ func TestRootCommandPreservesFirstArgumentRouting(t *testing.T) {
 				recover:            recordRecover,
 				updateSpamLists:    record("spam"),
 				updateAIAgentLists: record("ai"),
-				importData:         record("import"),
+				importData: func(args []string) {
+					called = "import"
+					gotArgs = append([]string(nil), args...)
+				},
 			})
 			root.SetArgs(tt.args)
 			root.SetOut(io.Discard)

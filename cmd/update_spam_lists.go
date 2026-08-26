@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"time"
@@ -11,9 +12,9 @@ import (
 	"hitkeep/internal/blocking"
 )
 
-func UpdateSpamLists(args []string, logger *slog.Logger) {
-	fs := flag.NewFlagSet("update-spam-lists", flag.ExitOnError)
-	fs.SetOutput(os.Stderr)
+func UpdateSpamLists(ctx context.Context, args []string, out, errOut io.Writer, logger *slog.Logger) error {
+	fs := flag.NewFlagSet("update-spam-lists", flag.ContinueOnError)
+	fs.SetOutput(errOut)
 
 	defaultOutput := os.Getenv("HITKEEP_SPAM_FILTER_PATH")
 	if defaultOutput == "" {
@@ -25,26 +26,29 @@ func UpdateSpamLists(args []string, logger *slog.Logger) {
 	}
 
 	outputPath := fs.String("output", defaultOutput, "Output path for the compiled spam filter cache")
-	_ = fs.Parse(args)
+	if err := fs.Parse(args); err != nil {
+		return &ExitError{Code: 2}
+	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
 	data, err := blocking.FetchSpamFeedData(ctx, nil, logger)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: could not fetch spam feeds: %v\n", err)
-		os.Exit(1)
+		_, _ = fmt.Fprintf(errOut, "Error: could not fetch spam feeds: %v\n", err)
+		return &ExitError{Code: 1}
 	}
 	if err := blocking.ValidateEmbeddedSpamFeedData(data); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: refusing to write incomplete embedded spam data: %v\n", err)
-		os.Exit(1)
+		_, _ = fmt.Fprintf(errOut, "Error: refusing to write incomplete embedded spam data: %v\n", err)
+		return &ExitError{Code: 1}
 	}
 	if err := blocking.SaveSpamFeedData(*outputPath, data); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: could not write spam cache: %v\n", err)
-		os.Exit(1)
+		_, _ = fmt.Fprintf(errOut, "Error: could not write spam cache: %v\n", err)
+		return &ExitError{Code: 1}
 	}
 
-	fmt.Printf("Wrote spam filter cache to %s\n", *outputPath)
-	fmt.Printf("Referrer hosts: %d\n", len(data.ReferrerHostDenylist))
-	fmt.Printf("Blocked networks: %d\n", len(data.NetworkDenylist))
+	_, _ = fmt.Fprintf(out, "Wrote spam filter cache to %s\n", *outputPath)
+	_, _ = fmt.Fprintf(out, "Referrer hosts: %d\n", len(data.ReferrerHostDenylist))
+	_, _ = fmt.Fprintf(out, "Blocked networks: %d\n", len(data.NetworkDenylist))
+	return nil
 }
