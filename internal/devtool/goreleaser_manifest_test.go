@@ -119,6 +119,55 @@ func TestGoReleaserBranchArchiveWorkflowContract(t *testing.T) {
 	}
 }
 
+func TestGoReleaserReleaseArchiveAssetsStayInWorkspace(t *testing.T) {
+	path := filepath.Join("..", "..", ".github", "workflows", "pipeline.yml")
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workflow := string(contents)
+	start := strings.Index(workflow, "  build-release-archives:\n")
+	if start == -1 {
+		t.Fatal("release archive job missing")
+	}
+	archiveJob := workflow[start:]
+	if end := strings.Index(archiveJob, "\n  upload-release-binaries:"); end != -1 {
+		archiveJob = archiveJob[:end]
+	}
+	for _, want := range []string{
+		"path: ${{ runner.temp }}/public-assets",
+		"PUBLIC_ASSETS_DIR: ${{ runner.temp }}/public-assets",
+		"PUBLIC_ASSETS_ARCHIVE: public/.public-assets.tar.gz",
+		"cp \"$archive\" \"$PUBLIC_ASSETS_ARCHIVE\"",
+		"./hk ci restore-dashboard --archive \"$PUBLIC_ASSETS_ARCHIVE\"",
+		"rm -f \"$PUBLIC_ASSETS_ARCHIVE\"",
+	} {
+		if !strings.Contains(archiveJob, want) {
+			t.Errorf("release archive assets setup missing %q", want)
+		}
+	}
+	if strings.Contains(archiveJob, "artifacts/public") {
+		t.Error("release archive job must not stage public assets in artifacts/public")
+	}
+}
+
+func TestGoReleaserSnapshotBuildCallsSetArchiveVersion(t *testing.T) {
+	path := filepath.Join("..", "..", ".github", "workflows", "pipeline.yml")
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workflow := string(contents)
+	const snapshotBuild = "goreleaser/v2@v2.18.0 build \\\n            --snapshot"
+	const versionedSnapshotBuild = "HITKEEP_ARCHIVE_VERSION=\"${HITKEEP_VERSION#v}\" env -u GOROOT go run github.com/goreleaser/goreleaser/v2@v2.18.0 build"
+	if got := strings.Count(workflow, snapshotBuild); got != 2 {
+		t.Errorf("snapshot GoReleaser build calls = %d, want 2", got)
+	}
+	if got := strings.Count(workflow, versionedSnapshotBuild); got != 2 {
+		t.Errorf("snapshot GoReleaser build calls with an archive version = %d, want 2", got)
+	}
+}
+
 func TestGoReleaserReleaseCallSitePinsImmutableSource(t *testing.T) {
 	path := filepath.Join("..", "..", ".github", "workflows", "release.yml")
 	contents, err := os.ReadFile(path)

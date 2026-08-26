@@ -175,13 +175,13 @@ jobs:
           export CC=gcc
           export CXX=g++
 
-          env -u GOROOT go run github.com/goreleaser/goreleaser/v2@v2.18.0 build \
+          HITKEEP_ARCHIVE_VERSION="${HITKEEP_VERSION#v}" env -u GOROOT go run github.com/goreleaser/goreleaser/v2@v2.18.0 build \
             --snapshot \
             --clean \
             --single-target \
             --id self-hosted \
             --output "hitkeep-${{ matrix.artifact_suffix }}"
-          env -u GOROOT go run github.com/goreleaser/goreleaser/v2@v2.18.0 build \
+          HITKEEP_ARCHIVE_VERSION="${HITKEEP_VERSION#v}" env -u GOROOT go run github.com/goreleaser/goreleaser/v2@v2.18.0 build \
             --snapshot \
             --single-target \
             --id cloud \
@@ -231,12 +231,16 @@ jobs:
       - name: Restore embedded public assets
         env:
           PUBLIC_ASSETS_DIR: ${{ runner.temp }}/public-assets
+          PUBLIC_ASSETS_ARCHIVE: public/.public-assets.tar.gz
         shell: bash
         run: |
           set -euo pipefail
           archive="$(find "$PUBLIC_ASSETS_DIR" -name 'public-assets.tar.gz' -print -quit)"
           test -n "$archive"
-          ./hk ci restore-dashboard --archive "$archive"
+          mkdir -p "$(dirname "$PUBLIC_ASSETS_ARCHIVE")"
+          cp "$archive" "$PUBLIC_ASSETS_ARCHIVE"
+          ./hk ci restore-dashboard --archive "$PUBLIC_ASSETS_ARCHIVE"
+          rm -f "$PUBLIC_ASSETS_ARCHIVE"
 
       - name: Install Linux arm64 cross compiler
         shell: bash
