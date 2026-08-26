@@ -244,37 +244,35 @@ jobs:
     needs: release-please
   upgrade-from-v2-12:
     needs: build-release
+    strategy:
+      matrix:
+        include:
+          - surface: docker
+          - surface: compose
+          - surface: helm
     steps:
-      - name: Smoke upgrade from supported floor
+      - name: Resolve immutable upgrade fixture
+        id: fixture
         env:
           CANDIDATE_DIGEST: ${{ needs.build-release.outputs.image_digest }}
         run: |
           manifest="tests/fixtures/release-fixtures.json"
           previous_version="2.12.0"
-          candidate="${{ needs.build-release.outputs.image_digest }}"
-          ./scripts/docker-smoke.sh "$candidate" self-hosted --recreate
-  upgrade-compose-from-v2-12:
-    needs: build-release
-    steps:
+      - name: Smoke Docker upgrade from supported floor
+        env:
+          CANDIDATE_IMAGE: ${{ steps.fixture.outputs.candidate }}
+          HITKEEP_PREVIOUS_IMAGE: ${{ steps.fixture.outputs.previous }}
+        run: ./scripts/docker-smoke.sh "$CANDIDATE_IMAGE" self-hosted --recreate
       - name: Smoke Compose upgrade from supported floor
         env:
-          CANDIDATE_DIGEST: ${{ needs.build-release.outputs.image_digest }}
-        run: |
-          manifest="tests/fixtures/release-fixtures.json"
-          previous_version="2.12.0"
-          candidate="${{ needs.build-release.outputs.image_digest }}"
-          ./scripts/compose-smoke.sh "$candidate" self-hosted
-  upgrade-helm-from-v2-12:
-    needs: build-release
-    steps:
+          CANDIDATE_IMAGE: ${{ steps.fixture.outputs.candidate }}
+          HITKEEP_PREVIOUS_IMAGE: ${{ steps.fixture.outputs.previous }}
+        run: ./scripts/compose-smoke.sh "$CANDIDATE_IMAGE" self-hosted
       - name: Smoke Helm upgrade from supported floor
         env:
-          CANDIDATE_DIGEST: ${{ needs.build-release.outputs.image_digest }}
-        run: |
-          manifest="tests/fixtures/release-fixtures.json"
-          previous_version="2.12.0"
-          candidate="${{ needs.build-release.outputs.image_digest }}"
-          ./scripts/helm-smoke.sh "$candidate" self-hosted
+          CANDIDATE_IMAGE: ${{ steps.fixture.outputs.candidate }}
+          HITKEEP_PREVIOUS_IMAGE: ${{ steps.fixture.outputs.previous }}
+        run: ./scripts/helm-smoke.sh "$CANDIDATE_IMAGE" self-hosted
   publish-helm:
     needs: build-release
   verify-tracker-package:
@@ -288,8 +286,6 @@ jobs:
       - release-please
       - build-release
       - upgrade-from-v2-12
-      - upgrade-compose-from-v2-12
-      - upgrade-helm-from-v2-12
       - publish-helm
       - verify-tracker-package
     steps:

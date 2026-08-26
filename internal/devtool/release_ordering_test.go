@@ -12,37 +12,34 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
     needs: release-please
   upgrade-from-v2-12:
     needs: build-release
+    strategy:
+      matrix:
+        include:
+          - surface: docker
+          - surface: compose
+          - surface: helm
     steps:
-      - name: Smoke upgrade from supported floor
+      - name: Resolve immutable upgrade fixture
         env:
           CANDIDATE_DIGEST: ${{ needs.build-release.outputs.image_digest }}
         run: |
           manifest="tests/fixtures/release-fixtures.json"
           previous_version="2.12.0"
-          candidate="${{ needs.build-release.outputs.image_digest }}"
-          ./scripts/docker-smoke.sh "$candidate" self-hosted --recreate
-  upgrade-compose-from-v2-12:
-    needs: build-release
-    steps:
+      - name: Smoke Docker upgrade from supported floor
+        env:
+          CANDIDATE_IMAGE: ${{ steps.fixture.outputs.candidate }}
+          HITKEEP_PREVIOUS_IMAGE: ${{ steps.fixture.outputs.previous }}
+        run: ./scripts/docker-smoke.sh "$CANDIDATE_IMAGE" self-hosted --recreate
       - name: Smoke Compose upgrade from supported floor
         env:
-          CANDIDATE_DIGEST: ${{ needs.build-release.outputs.image_digest }}
-        run: |
-          manifest="tests/fixtures/release-fixtures.json"
-          previous_version="2.12.0"
-          candidate="${{ needs.build-release.outputs.image_digest }}"
-          ./scripts/compose-smoke.sh "$candidate" self-hosted
-  upgrade-helm-from-v2-12:
-    needs: build-release
-    steps:
+          CANDIDATE_IMAGE: ${{ steps.fixture.outputs.candidate }}
+          HITKEEP_PREVIOUS_IMAGE: ${{ steps.fixture.outputs.previous }}
+        run: ./scripts/compose-smoke.sh "$CANDIDATE_IMAGE" self-hosted
       - name: Smoke Helm upgrade from supported floor
         env:
-          CANDIDATE_DIGEST: ${{ needs.build-release.outputs.image_digest }}
-        run: |
-          manifest="tests/fixtures/release-fixtures.json"
-          previous_version="2.12.0"
-          candidate="${{ needs.build-release.outputs.image_digest }}"
-          ./scripts/helm-smoke.sh "$candidate" self-hosted
+          CANDIDATE_IMAGE: ${{ steps.fixture.outputs.candidate }}
+          HITKEEP_PREVIOUS_IMAGE: ${{ steps.fixture.outputs.previous }}
+        run: ./scripts/helm-smoke.sh "$CANDIDATE_IMAGE" self-hosted
   publish-helm:
     needs: build-release
   verify-tracker-package:
@@ -58,8 +55,6 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
       - release-please
       - build-release
       - upgrade-from-v2-12
-      - upgrade-compose-from-v2-12
-      - upgrade-helm-from-v2-12
       - publish-helm
       - verify-tracker-package
     steps:
@@ -91,9 +86,9 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
 		t.Fatal("validateReleaseWorkflowGraph() accepted a finalizer that can run before the upgrade smoke")
 	}
 
-	missingComposeUpgrade := strings.Replace(workflow, "      - upgrade-compose-from-v2-12\n", "", 1)
-	if err := validateReleaseWorkflowGraph([]byte(missingComposeUpgrade)); err == nil {
-		t.Fatal("validateReleaseWorkflowGraph() accepted a finalizer that can run before the Compose upgrade smoke")
+	missingComposeSurface := strings.Replace(workflow, "          - surface: compose\n", "", 1)
+	if err := validateReleaseWorkflowGraph([]byte(missingComposeSurface)); err == nil {
+		t.Fatal("validateReleaseWorkflowGraph() accepted an upgrade matrix without the Compose surface")
 	}
 
 	missingComposeUpgradeSmoke := strings.Replace(workflow, "./scripts/compose-smoke.sh", "echo skipped", 1)
@@ -101,9 +96,9 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
 		t.Fatal("validateReleaseWorkflowGraph() accepted a Compose upgrade job that does not invoke the smoke fixture")
 	}
 
-	missingHelmUpgrade := strings.Replace(workflow, "      - upgrade-helm-from-v2-12\n", "", 1)
-	if err := validateReleaseWorkflowGraph([]byte(missingHelmUpgrade)); err == nil {
-		t.Fatal("validateReleaseWorkflowGraph() accepted a finalizer that can run before the Helm upgrade smoke")
+	missingHelmSurface := strings.Replace(workflow, "          - surface: helm\n", "", 1)
+	if err := validateReleaseWorkflowGraph([]byte(missingHelmSurface)); err == nil {
+		t.Fatal("validateReleaseWorkflowGraph() accepted an upgrade matrix without the Helm surface")
 	}
 
 	missingHelmUpgradeSmoke := strings.Replace(workflow, "./scripts/helm-smoke.sh", "echo skipped", 1)

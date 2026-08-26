@@ -88,13 +88,13 @@ func TestReleaseWorkflowGatesHelmUpgradeFromSupportedFloor(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, required := range []string{
-		"upgrade-helm-from-v2-12:",
+		"name: Helm upgrade from v2.12.0",
 		"name: Helm upgrade from v2.12.0",
 		"go install sigs.k8s.io/kind@v0.29.0",
 		"create cluster --name \"$cluster\"",
-		"HITKEEP_PREVIOUS_IMAGE=\"$previous\" ./scripts/helm-smoke.sh \"$candidate\" self-hosted",
-		"- upgrade-helm-from-v2-12",
-		"needs.upgrade-helm-from-v2-12.result == 'success'",
+		"./scripts/helm-smoke.sh \"$CANDIDATE_IMAGE\" self-hosted",
+		"- surface: helm",
+		"needs.upgrade-from-v2-12.result == 'success'",
 	} {
 		if !bytes.Contains(raw, []byte(required)) {
 			t.Fatalf("release workflow is missing Helm upgrade contract %q", required)

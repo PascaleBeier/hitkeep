@@ -82,15 +82,13 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 		return fmt.Errorf("decode release workflow: %w", err)
 	}
 	for job, required := range map[string][]string{
-		"build-release":              {"release-please"},
-		"upgrade-from-v2-12":         {"build-release"},
-		"upgrade-compose-from-v2-12": {"build-release"},
-		"upgrade-helm-from-v2-12":    {"build-release"},
-		"publish-helm":               {"build-release"},
-		"verify-tracker-package":     {"build-release"},
-		"finalize-release":           {"release-please", "build-release", "upgrade-from-v2-12", "upgrade-compose-from-v2-12", "upgrade-helm-from-v2-12", "publish-helm", "verify-tracker-package"},
-		"sync-docs-release":          {"finalize-release"},
-		"deploy-cloud":               {"finalize-release"},
+		"build-release":          {"release-please"},
+		"upgrade-from-v2-12":     {"build-release"},
+		"publish-helm":           {"build-release"},
+		"verify-tracker-package": {"build-release"},
+		"finalize-release":       {"release-please", "build-release", "upgrade-from-v2-12", "publish-helm", "verify-tracker-package"},
+		"sync-docs-release":      {"finalize-release"},
+		"deploy-cloud":           {"finalize-release"},
 	} {
 		definition, ok := workflow.Jobs[job]
 		if !ok {
@@ -102,44 +100,35 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 			}
 		}
 	}
-	upgradeSmoke := false
+	fixtureResolved := false
+	upgradeSmokes := map[string]bool{}
+	smokeScripts := map[string]string{
+		"docker":  "./scripts/docker-smoke.sh",
+		"compose": "./scripts/compose-smoke.sh",
+		"helm":    "./scripts/helm-smoke.sh",
+	}
 	for _, step := range workflow.Jobs["upgrade-from-v2-12"].Steps {
-		if step.Name == "Smoke upgrade from supported floor" &&
-			strings.Contains(step.Run, "tests/fixtures/release-fixtures.json") &&
+		if strings.Contains(step.Run, "tests/fixtures/release-fixtures.json") &&
 			strings.Contains(step.Run, "2.12.0") &&
-			strings.Contains(step.Env["CANDIDATE_DIGEST"], "needs.build-release.outputs.image_digest") &&
-			strings.Contains(step.Run, "./scripts/docker-smoke.sh") {
-			upgradeSmoke = true
+			strings.Contains(step.Env["CANDIDATE_DIGEST"], "needs.build-release.outputs.image_digest") {
+			fixtureResolved = true
+		}
+		for surface, script := range smokeScripts {
+			if strings.Contains(step.Run, script) &&
+				strings.Contains(step.Env["CANDIDATE_IMAGE"], "steps.fixture.outputs.candidate") &&
+				strings.Contains(step.Env["HITKEEP_PREVIOUS_IMAGE"], "steps.fixture.outputs.previous") {
+				upgradeSmokes[surface] = true
+			}
 		}
 	}
-	if !upgradeSmoke {
-		return fmt.Errorf("release workflow upgrade-from-v2-12 must smoke the v2.12.0 fixture against the candidate digest")
+	if !fixtureResolved {
+		return fmt.Errorf("release workflow upgrade-from-v2-12 must resolve the v2.12.0 fixture against the candidate digest")
 	}
-	composeUpgradeSmoke := false
-	for _, step := range workflow.Jobs["upgrade-compose-from-v2-12"].Steps {
-		if step.Name == "Smoke Compose upgrade from supported floor" &&
-			strings.Contains(step.Run, "tests/fixtures/release-fixtures.json") &&
-			strings.Contains(step.Run, "2.12.0") &&
-			strings.Contains(step.Env["CANDIDATE_DIGEST"], "needs.build-release.outputs.image_digest") &&
-			strings.Contains(step.Run, "./scripts/compose-smoke.sh") {
-			composeUpgradeSmoke = true
+	workflowText := string(raw)
+	for _, surface := range []string{"docker", "compose", "helm"} {
+		if !strings.Contains(workflowText, "- surface: "+surface) || !upgradeSmokes[surface] {
+			return fmt.Errorf("release workflow upgrade-from-v2-12 must smoke the %s matrix surface", surface)
 		}
-	}
-	if !composeUpgradeSmoke {
-		return fmt.Errorf("release workflow upgrade-compose-from-v2-12 must smoke the v2.12.0 fixture against the candidate digest")
-	}
-	helmUpgradeSmoke := false
-	for _, step := range workflow.Jobs["upgrade-helm-from-v2-12"].Steps {
-		if step.Name == "Smoke Helm upgrade from supported floor" &&
-			strings.Contains(step.Run, "tests/fixtures/release-fixtures.json") &&
-			strings.Contains(step.Run, "2.12.0") &&
-			strings.Contains(step.Env["CANDIDATE_DIGEST"], "needs.build-release.outputs.image_digest") &&
-			strings.Contains(step.Run, "./scripts/helm-smoke.sh") {
-			helmUpgradeSmoke = true
-		}
-	}
-	if !helmUpgradeSmoke {
-		return fmt.Errorf("release workflow upgrade-helm-from-v2-12 must smoke the v2.12.0 fixture against the candidate digest")
 	}
 
 	trackerArtifact := map[string]bool{}

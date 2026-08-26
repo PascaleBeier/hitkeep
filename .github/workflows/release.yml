@@ -54,7 +54,7 @@ jobs:
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
   upgrade-from-v2-12:
-    name: Upgrade from v2.12.0
+    name: ${{ matrix.name }}
     needs:
       - release-please
       - build-release
@@ -63,6 +63,16 @@ jobs:
     permissions:
       contents: read
       packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - surface: docker
+            name: Upgrade from v2.12.0
+          - surface: compose
+            name: Compose upgrade from v2.12.0
+          - surface: helm
+            name: Helm upgrade from v2.12.0
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -74,111 +84,13 @@ jobs:
           go-version-file: go.mod
           cache: false
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-
-      - name: Smoke upgrade from supported floor
-        env:
-          CANDIDATE_DIGEST: ${{ needs.build-release.outputs.image_digest }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          manifest="tests/fixtures/release-fixtures.json"
-          if [[ ! "$CANDIDATE_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]; then
-            echo "invalid candidate image digest" >&2
-            exit 1
-          fi
-          candidate="ghcr.io/${GITHUB_REPOSITORY}@${CANDIDATE_DIGEST}"
-          docker pull "$candidate"
-          platform="linux/$(docker image inspect "$candidate" --format '{{.Architecture}}')"
-          previous="$(jq -r --arg platform "$platform" '.fixtures[] | select(.previous_version == "2.12.0" and .platform == $platform) | .previous_image' "$manifest")"
-          if [[ -z "$previous" || "$previous" == "null" || "$previous" != *@sha256:* ]]; then
-            echo "release fixture has no immutable v2.12.0 image for ${platform}" >&2
-            exit 1
-          fi
-          HITKEEP_PREVIOUS_IMAGE="$previous" ./scripts/docker-smoke.sh "$candidate" self-hosted --recreate
-
-  upgrade-compose-from-v2-12:
-    name: Compose upgrade from v2.12.0
-    needs:
-      - release-please
-      - build-release
-    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' }}
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      packages: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          ref: ${{ needs.release-please.outputs.tag_name }}
-
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: false
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-
-      - name: Smoke Compose upgrade from supported floor
-        env:
-          CANDIDATE_DIGEST: ${{ needs.build-release.outputs.image_digest }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          manifest="tests/fixtures/release-fixtures.json"
-          if [[ ! "$CANDIDATE_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]; then
-            echo "invalid candidate image digest" >&2
-            exit 1
-          fi
-          candidate="ghcr.io/${GITHUB_REPOSITORY}@${CANDIDATE_DIGEST}"
-          docker pull "$candidate"
-          platform="linux/$(docker image inspect "$candidate" --format '{{.Architecture}}')"
-          previous="$(jq -r --arg platform "$platform" '.fixtures[] | select(.previous_version == "2.12.0" and .platform == $platform) | .previous_image' "$manifest")"
-          if [[ -z "$previous" || "$previous" == "null" || "$previous" != *@sha256:* ]]; then
-            echo "release fixture has no immutable v2.12.0 image for ${platform}" >&2
-            exit 1
-          fi
-          HITKEEP_PREVIOUS_IMAGE="$previous" ./scripts/compose-smoke.sh "$candidate" self-hosted
-
-  upgrade-helm-from-v2-12:
-    name: Helm upgrade from v2.12.0
-    needs:
-      - release-please
-      - build-release
-    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' }}
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      packages: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          ref: ${{ needs.release-please.outputs.tag_name }}
-
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: false
-
-      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+      - if: ${{ matrix.surface == 'helm' }}
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
 
       - name: Install kind
+        if: ${{ matrix.surface == 'helm' }}
         shell: bash
-        run: |
-          set -euo pipefail
-          go install sigs.k8s.io/kind@v0.29.0
+        run: go install sigs.k8s.io/kind@v0.29.0
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -187,7 +99,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      - name: Smoke Helm upgrade from supported floor
+      - name: Resolve immutable upgrade fixture
+        id: fixture
         env:
           CANDIDATE_DIGEST: ${{ needs.build-release.outputs.image_digest }}
         shell: bash
@@ -206,10 +119,35 @@ jobs:
             echo "release fixture has no immutable v2.12.0 image for ${platform}" >&2
             exit 1
           fi
+          printf 'candidate=%s\n' "$candidate" >> "$GITHUB_OUTPUT"
+          printf 'previous=%s\n' "$previous" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke Docker upgrade from supported floor
+        if: ${{ matrix.surface == 'docker' }}
+        env:
+          CANDIDATE_IMAGE: ${{ steps.fixture.outputs.candidate }}
+          HITKEEP_PREVIOUS_IMAGE: ${{ steps.fixture.outputs.previous }}
+        run: ./scripts/docker-smoke.sh "$CANDIDATE_IMAGE" self-hosted --recreate
+
+      - name: Smoke Compose upgrade from supported floor
+        if: ${{ matrix.surface == 'compose' }}
+        env:
+          CANDIDATE_IMAGE: ${{ steps.fixture.outputs.candidate }}
+          HITKEEP_PREVIOUS_IMAGE: ${{ steps.fixture.outputs.previous }}
+        run: ./scripts/compose-smoke.sh "$CANDIDATE_IMAGE" self-hosted
+
+      - name: Smoke Helm upgrade from supported floor
+        if: ${{ matrix.surface == 'helm' }}
+        env:
+          CANDIDATE_IMAGE: ${{ steps.fixture.outputs.candidate }}
+          HITKEEP_PREVIOUS_IMAGE: ${{ steps.fixture.outputs.previous }}
+        shell: bash
+        run: |
+          set -euo pipefail
           cluster="hitkeep-helm-upgrade-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           trap '"$(go env GOPATH)/bin/kind" delete cluster --name "$cluster"' EXIT
           "$(go env GOPATH)/bin/kind" create cluster --name "$cluster"
-          HITKEEP_PREVIOUS_IMAGE="$previous" ./scripts/helm-smoke.sh "$candidate" self-hosted
+          ./scripts/helm-smoke.sh "$CANDIDATE_IMAGE" self-hosted
 
   link-release-blog:
     name: Link release blog
@@ -370,11 +308,9 @@ jobs:
       - release-please
       - build-release
       - upgrade-from-v2-12
-      - upgrade-compose-from-v2-12
-      - upgrade-helm-from-v2-12
       - publish-helm
       - verify-tracker-package
-    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' && needs.upgrade-from-v2-12.result == 'success' && needs.upgrade-compose-from-v2-12.result == 'success' && needs.upgrade-helm-from-v2-12.result == 'success' && needs.publish-helm.result == 'success' && needs.verify-tracker-package.result == 'success' }}
+    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' && needs.upgrade-from-v2-12.result == 'success' && needs.publish-helm.result == 'success' && needs.verify-tracker-package.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
