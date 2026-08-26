@@ -237,6 +237,17 @@ jobs:
           previous_version="2.12.0"
           candidate="${{ needs.build-release.outputs.image_digest }}"
           ./scripts/compose-smoke.sh "$candidate" self-hosted
+  upgrade-helm-from-v2-12:
+    needs: build-release
+    steps:
+      - name: Smoke Helm upgrade from supported floor
+        env:
+          CANDIDATE_DIGEST: ${{ needs.build-release.outputs.image_digest }}
+        run: |
+          manifest="tests/fixtures/release-fixtures.json"
+          previous_version="2.12.0"
+          candidate="${{ needs.build-release.outputs.image_digest }}"
+          ./scripts/helm-smoke.sh "$candidate" self-hosted
   publish-helm:
     needs: build-release
   verify-tracker-package:
@@ -251,6 +262,7 @@ jobs:
       - build-release
       - upgrade-from-v2-12
       - upgrade-compose-from-v2-12
+      - upgrade-helm-from-v2-12
       - publish-helm
       - verify-tracker-package
     steps:

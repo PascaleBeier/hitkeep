@@ -32,6 +32,17 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
           previous_version="2.12.0"
           candidate="${{ needs.build-release.outputs.image_digest }}"
           ./scripts/compose-smoke.sh "$candidate" self-hosted
+  upgrade-helm-from-v2-12:
+    needs: build-release
+    steps:
+      - name: Smoke Helm upgrade from supported floor
+        env:
+          CANDIDATE_DIGEST: ${{ needs.build-release.outputs.image_digest }}
+        run: |
+          manifest="tests/fixtures/release-fixtures.json"
+          previous_version="2.12.0"
+          candidate="${{ needs.build-release.outputs.image_digest }}"
+          ./scripts/helm-smoke.sh "$candidate" self-hosted
   publish-helm:
     needs: build-release
   verify-tracker-package:
@@ -48,6 +59,7 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
       - build-release
       - upgrade-from-v2-12
       - upgrade-compose-from-v2-12
+      - upgrade-helm-from-v2-12
       - publish-helm
       - verify-tracker-package
     steps:
@@ -87,6 +99,16 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
 	missingComposeUpgradeSmoke := strings.Replace(workflow, "./scripts/compose-smoke.sh", "echo skipped", 1)
 	if err := validateReleaseWorkflowGraph([]byte(missingComposeUpgradeSmoke)); err == nil {
 		t.Fatal("validateReleaseWorkflowGraph() accepted a Compose upgrade job that does not invoke the smoke fixture")
+	}
+
+	missingHelmUpgrade := strings.Replace(workflow, "      - upgrade-helm-from-v2-12\n", "", 1)
+	if err := validateReleaseWorkflowGraph([]byte(missingHelmUpgrade)); err == nil {
+		t.Fatal("validateReleaseWorkflowGraph() accepted a finalizer that can run before the Helm upgrade smoke")
+	}
+
+	missingHelmUpgradeSmoke := strings.Replace(workflow, "./scripts/helm-smoke.sh", "echo skipped", 1)
+	if err := validateReleaseWorkflowGraph([]byte(missingHelmUpgradeSmoke)); err == nil {
+		t.Fatal("validateReleaseWorkflowGraph() accepted a Helm upgrade job that does not invoke the smoke fixture")
 	}
 
 	missingUpgradeSmoke := strings.Replace(workflow, "./scripts/docker-smoke.sh", "echo skipped", 1)

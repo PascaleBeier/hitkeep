@@ -9,6 +9,8 @@ image:
   pullPolicy: IfNotPresent
   # Defaults to the chart appVersion, normalized without a leading "v".
   tag: ""
+  # Optional immutable image digest. When set, it takes precedence over tag.
+  digest: ""
 
 imagePullSecrets: []
 

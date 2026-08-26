@@ -83,9 +83,10 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 		"build-release":              {"release-please"},
 		"upgrade-from-v2-12":         {"build-release"},
 		"upgrade-compose-from-v2-12": {"build-release"},
+		"upgrade-helm-from-v2-12":    {"build-release"},
 		"publish-helm":               {"build-release"},
 		"verify-tracker-package":     {"build-release"},
-		"finalize-release":           {"release-please", "build-release", "upgrade-from-v2-12", "upgrade-compose-from-v2-12", "publish-helm", "verify-tracker-package"},
+		"finalize-release":           {"release-please", "build-release", "upgrade-from-v2-12", "upgrade-compose-from-v2-12", "upgrade-helm-from-v2-12", "publish-helm", "verify-tracker-package"},
 		"sync-docs-release":          {"finalize-release"},
 		"deploy-cloud":               {"finalize-release"},
 	} {
@@ -124,6 +125,19 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 	}
 	if !composeUpgradeSmoke {
 		return fmt.Errorf("release workflow upgrade-compose-from-v2-12 must smoke the v2.12.0 fixture against the candidate digest")
+	}
+	helmUpgradeSmoke := false
+	for _, step := range workflow.Jobs["upgrade-helm-from-v2-12"].Steps {
+		if step.Name == "Smoke Helm upgrade from supported floor" &&
+			strings.Contains(step.Run, "tests/fixtures/release-fixtures.json") &&
+			strings.Contains(step.Run, "2.12.0") &&
+			strings.Contains(step.Env["CANDIDATE_DIGEST"], "needs.build-release.outputs.image_digest") &&
+			strings.Contains(step.Run, "./scripts/helm-smoke.sh") {
+			helmUpgradeSmoke = true
+		}
+	}
+	if !helmUpgradeSmoke {
+		return fmt.Errorf("release workflow upgrade-helm-from-v2-12 must smoke the v2.12.0 fixture against the candidate digest")
 	}
 
 	trackerArtifact := map[string]bool{}
