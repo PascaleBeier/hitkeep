@@ -341,8 +341,15 @@ func validateReleaseMetadata(root string) error {
 	}
 	workflowContracts := map[string][]string{
 		".github/workflows/pipeline.yml": {
+			"github.com/goreleaser/goreleaser/v2@v2.18.0",
+			"--snapshot",
+			"--clean",
+			"--single-target",
+			"--id self-hosted",
+			"--id cloud",
 			"./hk catalog configuration --output json",
 			"hitkeep-configuration.json",
+			"hitkeep.example.yaml",
 			"release_tag: $tag",
 			"release_version: $version",
 		},
@@ -361,6 +368,9 @@ func validateReleaseMetadata(root string) error {
 			if !bytes.Contains(raw, []byte(fragment)) {
 				return fmt.Errorf("%s is missing release metadata contract %q", name, fragment)
 			}
+		}
+		if name == ".github/workflows/pipeline.yml" && bytes.Contains(raw, []byte("./hk ci build-binaries")) {
+			return fmt.Errorf(".github/workflows/pipeline.yml must not run ./hk ci build-binaries")
 		}
 	}
 	releaseWorkflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "release.yml"))

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -25,6 +26,7 @@ func TestReleaseArtifactChecksumsAndPublicImageBoundary(t *testing.T) {
 		"hitkeep-cloud-linux-amd64", "hitkeep-cloud-linux-arm64",
 		"hitkeep-linux-amd64", "hitkeep-linux-arm64",
 		"hitkeep-configuration.json",
+		"hitkeep.example.yaml",
 	} {
 		if err := os.WriteFile(filepath.Join(root, name), []byte(name+"\n"), 0o755); err != nil {
 			t.Fatal(err)
@@ -34,8 +36,21 @@ func TestReleaseArtifactChecksumsAndPublicImageBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if generated.Count != 6 {
-		t.Fatalf("generated artifact count = %d, want 6", generated.Count)
+	if generated.Count != 7 {
+		t.Fatalf("generated artifact count = %d, want 7", generated.Count)
+	}
+	checksums, err := os.ReadFile(filepath.Join(root, "SHA256SUMS"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{
+		"hitkeep-cloud-linux-amd64", "hitkeep-cloud-linux-arm64",
+		"hitkeep-linux-amd64", "hitkeep-linux-arm64",
+		"hitkeep-configuration.json", "hitkeep.example.yaml",
+	} {
+		if !strings.Contains(string(checksums), "  "+name+"\n") {
+			t.Fatalf("SHA256SUMS does not include %s", name)
+		}
 	}
 	if _, err := app.VerifyReleaseArtifacts(); err != nil {
 		t.Fatal(err)

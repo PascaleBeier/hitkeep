@@ -147,7 +147,7 @@ jobs:
           test -n "$archive"
           ./hk ci restore-dashboard --archive "$archive"
 
-      - name: Build native Linux binaries on Ubuntu ${{ matrix.glibc_baseline }}
+      - name: Build native Linux binaries with GoReleaser on Ubuntu ${{ matrix.glibc_baseline }}
         shell: bash
         env:
           CGO_ENABLED: 1
@@ -161,10 +161,17 @@ jobs:
           export CC=gcc
           export CXX=g++
 
-          ./hk ci build-binaries \
-            --version "${HITKEEP_VERSION}" \
-            --goos "${{ matrix.goos }}" \
-            --goarch "${{ matrix.goarch }}"
+          env -u GOROOT go run github.com/goreleaser/goreleaser/v2@v2.18.0 build \
+            --snapshot \
+            --clean \
+            --single-target \
+            --id self-hosted \
+            --output "hitkeep-${{ matrix.artifact_suffix }}"
+          env -u GOROOT go run github.com/goreleaser/goreleaser/v2@v2.18.0 build \
+            --snapshot \
+            --single-target \
+            --id cloud \
+            --output "hitkeep-cloud-${{ matrix.artifact_suffix }}"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -237,9 +244,18 @@ jobs:
           RELEASE_TITLE: ${{ inputs.release_title }}
         run: |
           set -euo pipefail
-          mapfile -t files < <(find . -maxdepth 1 -type f -name 'hitkeep*' -print | sort)
-          test "${#files[@]}" -gt 0
-          files+=(SHA256SUMS)
+          files=(
+            hitkeep-cloud-linux-amd64
+            hitkeep-cloud-linux-arm64
+            hitkeep-linux-amd64
+            hitkeep-linux-arm64
+            hitkeep-configuration.json
+            hitkeep.example.yaml
+            SHA256SUMS
+          )
+          for file in "${files[@]}"; do
+            test -f "$file"
+          done
 
           if [[ "${RELEASE_PRERELEASE}" == "true" ]]; then
             short_sha="${RELEASE_TARGET_SHA::7}"

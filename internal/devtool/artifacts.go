@@ -190,6 +190,7 @@ func (a *App) requiredReleaseArtifacts() ([]string, error) {
 		"hitkeep-cloud-linux-amd64", "hitkeep-cloud-linux-arm64",
 		"hitkeep-linux-amd64", "hitkeep-linux-arm64",
 		"hitkeep-configuration.json",
+		"hitkeep.example.yaml",
 	} {
 		path := filepath.Join(a.workspace.Root, name)
 		info, err := os.Stat(path)

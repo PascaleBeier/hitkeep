@@ -53,6 +53,33 @@ func TestValidateReleaseMetadata(t *testing.T) {
 		}
 	})
 
+	t.Run("missing GoReleaser release build", func(t *testing.T) {
+		root := releaseMetadataFixture(t)
+		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", "./hk catalog configuration --output json\nhitkeep-configuration.json\nhitkeep.example.yaml\nrelease_tag: $tag\nrelease_version: $version\n")
+		err := validateReleaseMetadata(root)
+		if err == nil || !strings.Contains(err.Error(), `.github/workflows/pipeline.yml is missing release metadata contract "github.com/goreleaser/goreleaser/v2@v2.18.0"`) {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("manual release build is rejected", func(t *testing.T) {
+		root := releaseMetadataFixture(t)
+		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", "github.com/goreleaser/goreleaser/v2@v2.18.0\n--snapshot\n--clean\n--single-target\n--id self-hosted\n--id cloud\n./hk catalog configuration --output json\nhitkeep-configuration.json\nhitkeep.example.yaml\nrelease_tag: $tag\nrelease_version: $version\n./hk ci build-binaries\n")
+		err := validateReleaseMetadata(root)
+		if err == nil || !strings.Contains(err.Error(), ".github/workflows/pipeline.yml must not run ./hk ci build-binaries") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("missing example configuration release asset", func(t *testing.T) {
+		root := releaseMetadataFixture(t)
+		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", "github.com/goreleaser/goreleaser/v2@v2.18.0\n--snapshot\n--clean\n--single-target\n--id self-hosted\n--id cloud\n./hk catalog configuration --output json\nhitkeep-configuration.json\nrelease_tag: $tag\nrelease_version: $version\n")
+		err := validateReleaseMetadata(root)
+		if err == nil || !strings.Contains(err.Error(), `.github/workflows/pipeline.yml is missing release metadata contract "hitkeep.example.yaml"`) {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
 	t.Run("downstream docs failure isolation", func(t *testing.T) {
 		root := releaseMetadataFixture(t)
 		writeFixtureFile(t, root, ".github/workflows/release.yml", "sync-docs-release:\nneeds.build-release.result == 'success'\nsync-hitkeep-release.yml\ngh run watch\n")
@@ -107,7 +134,7 @@ func releaseMetadataFixture(t *testing.T) string {
 	writeFixtureFile(t, root, "charts/hitkeep/Chart.yaml", "version: 2.12.0\nappVersion: 2.12.0\n")
 	writeFixtureFile(t, root, "charts/hitkeep/README.md", "tag: 2.12.0 # x-release-please-version\n")
 	writeFixtureFile(t, root, "release-please-config.json", fixtureReleasePleaseConfig())
-	writeFixtureFile(t, root, ".github/workflows/pipeline.yml", "./hk catalog configuration --output json\nhitkeep-configuration.json\nrelease_tag: $tag\nrelease_version: $version\n")
+	writeFixtureFile(t, root, ".github/workflows/pipeline.yml", "github.com/goreleaser/goreleaser/v2@v2.18.0\n--snapshot\n--clean\n--single-target\n--id self-hosted\n--id cloud\n./hk catalog configuration --output json\nhitkeep-configuration.json\nhitkeep.example.yaml\nrelease_tag: $tag\nrelease_version: $version\n")
 	writeFixtureFile(t, root, ".github/workflows/release.yml", "sync-docs-release:\nneeds.build-release.result == 'success'\nsync-hitkeep-release.yml\n")
 	return root
 }
