@@ -53,6 +53,22 @@ func NewRootCommand(logger *slog.Logger) *cobra.Command {
 	return root
 }
 
+func newHealthcheckCommand(run func([]string, string) error) *cobra.Command {
+	return &cobra.Command{
+		Use:                "healthcheck",
+		Short:              "Check whether HitKeep is healthy",
+		Args:               cobra.ArbitraryArgs,
+		DisableFlagParsing: true,
+		RunE: func(_ *cobra.Command, args []string) error {
+			configFile, serverArgs, err := splitRootConfig(args)
+			if err != nil {
+				return err
+			}
+			return run(append(serverArgs, "--healthcheck"), configFile)
+		},
+	}
+}
+
 func newConfigCommand(fs afero.Fs, logger *slog.Logger, fallback func([]string) error) *cobra.Command {
 	command := &cobra.Command{
 		Use:                "config",
@@ -142,12 +158,29 @@ func newRootCommand(actions rootActions) *cobra.Command {
 				if err != nil {
 					return err
 				}
+				if len(serverArgs) > 0 && serverArgs[0] == "healthcheck" {
+					return actions.run(append(serverArgs[1:], "--healthcheck"), configFile)
+				}
 				return actions.run(serverArgs, configFile)
 			}
 			return nil
 		},
 		CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
 	}
+	root.AddCommand(newHealthcheckCommand(actions.run))
+	root.SetHelpCommand(&cobra.Command{
+		Use:                "help",
+		Hidden:             true,
+		Args:               cobra.ArbitraryArgs,
+		DisableFlagParsing: true,
+		RunE: func(_ *cobra.Command, args []string) error {
+			configFile, serverArgs, err := splitRootConfig(args)
+			if err != nil {
+				return err
+			}
+			return actions.run(append([]string{"help"}, serverArgs...), configFile)
+		},
+	})
 	return root
 }
 
