@@ -41,10 +41,13 @@ jobs:
       artifact-metadata: write
     with:
       version: ${{ needs.release-please.outputs.tag_name }}
+      checkout_ref: ${{ github.sha }}
       meta_config: |
         type=semver,pattern={{version}},value=${{ needs.release-please.outputs.tag_name }}
       upload_to_release: true
       release_tag_name: ${{ needs.release-please.outputs.tag_name }}
+      release_source_tag: ${{ needs.release-please.outputs.tag_name }}
+      release_source_sha: ${{ github.sha }}
     secrets:
       token: ${{ secrets.GHT }}
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}

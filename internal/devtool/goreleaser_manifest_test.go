@@ -94,15 +94,37 @@ func TestGoReleaserBranchArchiveWorkflowContract(t *testing.T) {
 	for _, want := range []string{
 		"if: ${{ !cancelled() }}",
 		"fetch-depth: 0",
-		"ref: ${{ inputs.release_tag_name || inputs.checkout_ref || github.sha }}",
-		"git rev-parse --verify \"refs/tags/${RELEASE_TAG_NAME}^{commit}\"",
+		"release_source_tag",
+		"release_source_sha",
+		"ref: ${{ inputs.release_source_tag || inputs.checkout_ref || github.sha }}",
+		"git rev-parse --verify \"refs/tags/${RELEASE_SOURCE_TAG}^{commit}\"",
+		"test \"$tag_commit\" = \"$RELEASE_SOURCE_SHA\"",
 		"--snapshot",
 		"runner.temp",
+		"runner.temp }}/public-assets",
 		"go version -m \"$binary\"",
 		"\"$binary\" --version",
 	} {
 		if !strings.Contains(workflow, want) {
 			t.Errorf("branch archive workflow missing %q", want)
+		}
+	}
+}
+
+func TestGoReleaserReleaseCallSitePinsImmutableSource(t *testing.T) {
+	path := filepath.Join("..", "..", ".github", "workflows", "release.yml")
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workflow := string(contents)
+	for _, want := range []string{
+		"checkout_ref: ${{ github.sha }}",
+		"release_source_tag: ${{ needs.release-please.outputs.tag_name }}",
+		"release_source_sha: ${{ github.sha }}",
+	} {
+		if !strings.Contains(workflow, want) {
+			t.Errorf("release call site missing %q", want)
 		}
 	}
 }
