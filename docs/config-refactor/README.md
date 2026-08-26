@@ -27,12 +27,13 @@ This folder is the durable progress ledger for the migration. Update it in the s
 | 2 | Completed | Add instance-based Viper assembler in shadow parity | Viper 1.21.0 + Afero explicit YAML; full catalog types, strict keys, normalization, warnings, and precedence proven |
 | 3 | Completed | Production Cobra root with legacy leaf parsers | Factory-built Cobra root owns execution while preserving exact first-argument routing and all legacy leaf parsers |
 | 4 | Completed | Switch production assembly to parity-proven Viper | `config.Load` uses instance-based Viper through an OS-backed Afero boundary; leading `--config PATH`/`--config=PATH` selection is explicit-only and returns bounded startup errors |
+| 4A | Completed | Add production configuration-file UX | Cobra-owned `config init --output` writes the canonical catalog-derived example without overwrite; `config validate --config` uses the strict explicit Viper loader without starting services or exposing values |
 | 5 | Completed | Normalize `hk` Cobra factories and preserve MCP/JSON contracts | No rewrite required: `hk` already has one factory root, centralized render/envelope handling, deterministic command catalog, and guarded production boundary |
 | 6 | Completed | Project catalog into Docker, Compose, Helm, examples, and docs artifact | Catalog-derived root example plus repository-wide env/default validation covers Dockerfile, Compose, charts, examples, and reader-facing Markdown/YAML |
 | 7 | Completed | Enforce issue #288 container recreation and migration interruption gates | Existing self-hosted image smoke now recreates a container on the same named volume and verifies marker/database persistence; full profile pairs it with fault-injected migration resume acceptance |
 | 8 | Completed | GoReleaser artifact parity and build cutover; Homebrew/Scoop-ready artifact layout | GoReleaser v2.18.0 snapshots produced all four legacy binary names; existing checksum/verification commands accepted the complete six-file release contract |
 | 9 | Completed | Afero/fileflow/pathologize migration by operation risk | Runtime config already uses injected Afero; the one real cross-filesystem release relocation now uses fileflow; fixed trusted names need no pathologize; database/WAL/fsync/lock operations remain native |
-| 10 | In progress | Flatten `internal/` in dependency-order move-only slices | Pure leaves moved: `internal/appurl` → `appurl`, `internal/exportfmt` → `exportfmt`, `internal/hklog` → `hklog`, and `internal/analyticscatalog` → `analyticscatalog`; no compatibility shims because Go already prohibited external imports |
+| 10 | In progress | Flatten `internal/` in dependency-order move-only slices | Pure foundations moved: `internal/appurl` → `appurl`, `internal/exportfmt` → `exportfmt`, `internal/hklog` → `hklog`, `internal/analyticscatalog` → `analyticscatalog`, and `internal/jsonapi` → `jsonapi`; no compatibility shims because Go already prohibited external imports |
 | 11 | Pending | Stabilize, full QA, CI, docs validation, completion audit | — |
 
 ## Completed discovery
@@ -117,6 +118,8 @@ Record focused commands as stable test targets or `hk` gate IDs, not pasted succ
 | 2026-08-26 | 10 | `internal/exportfmt` → `exportfmt` guarded file move | Passed Gortex-prescribed race suite across seed, export formats, AI analytics, config, database, server takeout, and takeout; old import path absent |
 | 2026-08-26 | 10 | `internal/hklog` → `hklog` guarded package move | Passed `go test -race ./hklog` plus affected command, seed, cluster, database, ingest, shared server, webhook dispatcher, and worker package tests; old import path absent |
 | 2026-08-26 | 10 | `internal/analyticscatalog` → `analyticscatalog` guarded package move | Passed race tests across the catalog consumers in analytics tools, MCP, opportunities, and Ask AI; old import path absent |
+| 2026-08-26 | 10 | `internal/jsonapi` → `jsonapi` guarded high-fanout package move | Full-module compile and focused race tests passed across commands, AI, database, MCP, every server package, social auth, SSO, takeout, webhook dispatch, and workers; all 160 old imports removed |
+| 2026-08-26 | 4A | Production `config init` and `config validate` | Canonical-byte, exclusive no-overwrite, strict missing/malformed/unknown-key, and sensitive-value redaction tests passed; Gortex-prescribed startup/config race suite passed |
 
 ## Next update
 
