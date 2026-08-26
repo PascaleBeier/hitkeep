@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -206,7 +207,7 @@ func TestRestoreDatabaseDoesNotLeaveWal(t *testing.T) {
 	}
 
 	targetPath := filepath.Join(tmpDir, "restored.db")
-	if err := restoreDatabase(ctx, nil, targetPath, sourceSnapshotPath, false, nil); err != nil {
+	if err := restoreDatabase(ctx, io.Discard, nil, targetPath, sourceSnapshotPath, false, nil); err != nil {
 		t.Fatalf("restoreDatabase: %v", err)
 	}
 
@@ -419,7 +420,7 @@ func restoreLatestSharedSnapshot(t *testing.T, ctx context.Context, backupDir st
 		t.Fatal("expected shared backup snapshot")
 	}
 	snapshotPath := filepath.Join(backupDir, "shared", entries[0].Name())
-	if err := restoreDatabase(ctx, nil, targetPath, snapshotPath, false, nil); err != nil {
+	if err := restoreDatabase(ctx, io.Discard, nil, targetPath, snapshotPath, false, nil); err != nil {
 		t.Fatalf("restoreDatabase: %v", err)
 	}
 }
@@ -502,7 +503,7 @@ func TestRestoreDatabasePreservesExistingBrokenWalWithoutOpeningTarget(t *testin
 		t.Fatalf("write target wal: %v", err)
 	}
 
-	if err := restoreDatabase(ctx, nil, targetPath, sourceSnapshotPath, false, nil); err != nil {
+	if err := restoreDatabase(ctx, io.Discard, nil, targetPath, sourceSnapshotPath, false, nil); err != nil {
 		t.Fatalf("restoreDatabase with existing wal: %v", err)
 	}
 

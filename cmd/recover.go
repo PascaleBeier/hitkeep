@@ -26,33 +26,62 @@ import (
 	json "hitkeep/jsonapi"
 )
 
+// RecoveryError signals a recovery command that has already written its
+// operator-facing failure to the command's error stream.
+type RecoveryError struct{ Code int }
+
+func (*RecoveryError) Error() string { return "recovery command failed" }
+
+func recoveryExit(code int) error {
+	if code == 0 {
+		return nil
+	}
+	return &RecoveryError{Code: code}
+}
+
+func recoveryFlagExit(err error) error {
+	if errors.Is(err, flag.ErrHelp) {
+		return nil
+	}
+	return recoveryExit(2)
+}
+
+type recoveryCommand struct {
+	ctx    context.Context
+	in     io.Reader
+	out    io.Writer
+	errOut io.Writer
+	logger *slog.Logger
+}
+
 // Recover handles the "hitkeep recover <subcommand>" family of commands.
 // These are offline recovery operations that require HitKeep to be stopped
 // (DuckDB allows only one writer at a time).
-func Recover(logger *slog.Logger) {
+func Recover(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer, logger *slog.Logger) error {
 	if logger == nil {
 		panic("hitkeepcmd: logger is required")
 	}
-	if len(os.Args) < 3 {
-		fmt.Fprintln(os.Stderr, recoverUsage)
-		os.Exit(1)
+	if len(args) == 0 {
+		fmt.Fprintln(errOut, recoverUsage)
+		return recoveryExit(1)
 	}
 
-	switch os.Args[2] {
+	r := recoveryCommand{ctx: ctx, in: in, out: out, errOut: errOut, logger: logger}
+	switch args[0] {
 	case "disable-2fa":
-		recoverDisable2FA(os.Args[3:], logger)
+		return r.recoverDisable2FA(args[1:])
 	case "restore-backup":
-		recoverRestoreBackup(os.Args[3:], logger)
+		return r.recoverRestoreBackup(args[1:])
 	case "restore-database-bundle":
-		recoverRestoreDatabaseBundle(os.Args[3:], logger)
+		return r.recoverRestoreDatabaseBundle(args[1:])
 	case "rebuild-default-tenant":
-		recoverRebuildDefaultTenant(os.Args[3:], logger)
+		return r.recoverRebuildDefaultTenant(args[1:])
 	case "import-archives":
-		recoverImportArchives(os.Args[3:], logger)
+		return r.recoverImportArchives(args[1:])
 	default:
 		//nolint:gosec // G705: writes to stderr, not an HTTP response; %q safely quotes the argument.
-		fmt.Fprintf(os.Stderr, "Unknown recover subcommand: %q\n\n%s\n", os.Args[2], recoverUsage)
-		os.Exit(1)
+		fmt.Fprintf(errOut, "Unknown recover subcommand: %q\n\n%s\n", args[0], recoverUsage)
+		return recoveryExit(1)
 	}
 }
 
@@ -118,204 +147,205 @@ type databaseRecoveryBundleArtifact struct {
 	SHA256       string `json:"sha256"`
 }
 
-func recoverDisable2FA(args []string, logger *slog.Logger) {
-	fs := flag.NewFlagSet("disable-2fa", flag.ExitOnError)
+func (r recoveryCommand) recoverDisable2FA(args []string) error {
+	fs := flag.NewFlagSet("disable-2fa", flag.ContinueOnError)
+	fs.SetOutput(r.errOut)
 	email := fs.String("email", "", "User email address (required)")
 	dbPath := fs.String("db", "", "Path to hitkeep.db (defaults to server config value)")
 	yes := fs.Bool("yes", false, "Skip confirmation prompt")
 	if err := fs.Parse(args); err != nil {
-		os.Exit(1)
+		return recoveryFlagExit(err)
 	}
 
 	if *email == "" {
-		fmt.Fprintln(os.Stderr, "Error: -email is required")
-		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(r.errOut, "Error: -email is required")
+		fmt.Fprintln(r.errOut)
 		fs.Usage()
-		os.Exit(1)
+		return recoveryExit(1)
 	}
 
 	// Resolve DB path: flag overrides config default
 	if *dbPath == "" {
-		conf := config.Load(logger)
+		conf := config.Load(r.logger)
 		*dbPath = conf.DBPath
 	}
 
-	ctx := context.Background()
+	ctx := r.ctx
 
 	// ---- Connect --------------------------------------------------------
-	fmt.Printf("HitKeep Recovery — Disable 2FA\n")
-	fmt.Printf("================================\n")
-	fmt.Printf("DB:    %s\n", *dbPath)
-	fmt.Printf("User:  %s\n\n", *email)
+	fmt.Fprintf(r.out, "HitKeep Recovery — Disable 2FA\n")
+	fmt.Fprintf(r.out, "================================\n")
+	fmt.Fprintf(r.out, "DB:    %s\n", *dbPath)
+	fmt.Fprintf(r.out, "User:  %s\n\n", *email)
 
 	store, err := database.OpenMigratedStore(ctx, *dbPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: could not open database: %v\n", err)
-		fmt.Fprintln(os.Stderr, "Make sure HitKeep is stopped before running recovery commands.")
-		os.Exit(1)
+		fmt.Fprintf(r.errOut, "Error: could not open database: %v\n", err)
+		fmt.Fprintln(r.errOut, "Make sure HitKeep is stopped before running recovery commands.")
+		return recoveryExit(1)
 	}
 	defer store.Close()
 
 	// ---- Look up user ---------------------------------------------------
 	user, err := store.GetUserByEmail(ctx, *email)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: database lookup failed: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(r.errOut, "Error: database lookup failed: %v\n", err)
+		return recoveryExit(1)
 	}
 	if user == nil {
-		fmt.Fprintf(os.Stderr, "Error: no user found with email %q\n", *email)
-		os.Exit(1)
-		return
+		fmt.Fprintf(r.errOut, "Error: no user found with email %q\n", *email)
+		return recoveryExit(1)
 	}
 
 	name := strings.TrimSpace(user.GivenName + " " + user.LastName)
 	if name == "" {
 		name = "(no name set)"
 	}
-	fmt.Printf("Found user: %s (%s)\n\n", name, user.Email)
+	fmt.Fprintf(r.out, "Found user: %s (%s)\n\n", name, user.Email)
 
 	// ---- Inventory active 2FA ------------------------------------------
 	hasTOTP, err := store.HasEnabledTOTP(ctx, user.ID)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: could not check TOTP status: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(r.errOut, "Error: could not check TOTP status: %v\n", err)
+		return recoveryExit(1)
 	}
 
 	passkeys, err := store.ListUserPasskeys(ctx, user.ID)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: could not list passkeys: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(r.errOut, "Error: could not list passkeys: %v\n", err)
+		return recoveryExit(1)
 	}
 	recoveryCodesRemaining, err := store.CountActiveRecoveryCodes(ctx, user.ID)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: could not count recovery codes: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(r.errOut, "Error: could not count recovery codes: %v\n", err)
+		return recoveryExit(1)
 	}
 
 	if !hasTOTP && len(passkeys) == 0 && recoveryCodesRemaining == 0 {
-		fmt.Println("No 2FA methods are active for this user. Nothing to do.")
-		os.Exit(0)
+		fmt.Fprintln(r.out, "No 2FA methods are active for this user. Nothing to do.")
+		return nil
 	}
 
-	fmt.Println("Active 2FA methods:")
+	fmt.Fprintln(r.out, "Active 2FA methods:")
 	if hasTOTP {
-		fmt.Println("  TOTP:     enabled")
+		fmt.Fprintln(r.out, "  TOTP:     enabled")
 	} else {
-		fmt.Println("  TOTP:     not enabled")
+		fmt.Fprintln(r.out, "  TOTP:     not enabled")
 	}
 	if len(passkeys) > 0 {
-		fmt.Printf("  Passkeys: %d\n", len(passkeys))
+		fmt.Fprintf(r.out, "  Passkeys: %d\n", len(passkeys))
 		for _, pk := range passkeys {
-			fmt.Printf("    - %s\n", pk.Name)
+			fmt.Fprintf(r.out, "    - %s\n", pk.Name)
 		}
 	} else {
-		fmt.Println("  Passkeys: none")
+		fmt.Fprintln(r.out, "  Passkeys: none")
 	}
 	if recoveryCodesRemaining > 0 {
-		fmt.Printf("  Recovery codes: %d active\n", recoveryCodesRemaining)
+		fmt.Fprintf(r.out, "  Recovery codes: %d active\n", recoveryCodesRemaining)
 	} else {
-		fmt.Println("  Recovery codes: none")
+		fmt.Fprintln(r.out, "  Recovery codes: none")
 	}
 
-	fmt.Println()
-	fmt.Println("This will:")
+	fmt.Fprintln(r.out)
+	fmt.Fprintln(r.out, "This will:")
 	if hasTOTP {
-		fmt.Println("  • Disable TOTP authenticator")
+		fmt.Fprintln(r.out, "  • Disable TOTP authenticator")
 	}
 	if len(passkeys) > 0 {
-		fmt.Printf("  • Delete %d passkey(s)\n", len(passkeys))
+		fmt.Fprintf(r.out, "  • Delete %d passkey(s)\n", len(passkeys))
 	}
 	if recoveryCodesRemaining > 0 {
-		fmt.Printf("  • Invalidate %d recovery code(s)\n", recoveryCodesRemaining)
+		fmt.Fprintf(r.out, "  • Invalidate %d recovery code(s)\n", recoveryCodesRemaining)
 	}
-	fmt.Println("  • Invalidate all remember-me sessions")
-	fmt.Println()
+	fmt.Fprintln(r.out, "  • Invalidate all remember-me sessions")
+	fmt.Fprintln(r.out)
 
 	// ---- Confirm -------------------------------------------------------
 	if !*yes {
-		fmt.Print(`Type "yes" to confirm: `)
-		scanner := bufio.NewScanner(os.Stdin)
+		fmt.Fprint(r.out, `Type "yes" to confirm: `)
+		scanner := bufio.NewScanner(r.in)
 		scanner.Scan()
 		answer := strings.TrimSpace(scanner.Text())
 		if answer != "yes" {
-			fmt.Println("Aborted.")
-			os.Exit(0)
+			fmt.Fprintln(r.out, "Aborted.")
+			return nil
 		}
-		fmt.Println()
+		fmt.Fprintln(r.out)
 	}
 
 	// ---- Execute -------------------------------------------------------
 	result, err := store.DisableUserMFA(ctx, user.ID)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: could not disable MFA: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(r.errOut, "Error: could not disable MFA: %v\n", err)
+		return recoveryExit(1)
 	}
 
 	if result.TOTPDisabled {
-		fmt.Println("✓ TOTP disabled")
+		fmt.Fprintln(r.out, "✓ TOTP disabled")
 	}
 	if result.PasskeysDeleted > 0 {
-		fmt.Printf("✓ Deleted %d passkey(s)\n", result.PasskeysDeleted)
+		fmt.Fprintf(r.out, "✓ Deleted %d passkey(s)\n", result.PasskeysDeleted)
 	}
 	if recoveryCodesRemaining > 0 {
-		fmt.Printf("✓ Invalidated %d recovery code(s)\n", recoveryCodesRemaining)
+		fmt.Fprintf(r.out, "✓ Invalidated %d recovery code(s)\n", recoveryCodesRemaining)
 	}
 	if result.SessionsInvalidated > 0 {
-		fmt.Printf("✓ Invalidated %d remember-me session(s)\n", result.SessionsInvalidated)
+		fmt.Fprintf(r.out, "✓ Invalidated %d remember-me session(s)\n", result.SessionsInvalidated)
 	} else {
-		fmt.Println("✓ Remember-me sessions invalidated")
+		fmt.Fprintln(r.out, "✓ Remember-me sessions invalidated")
 	}
 
-	fmt.Printf("\nDone. %s can now log in with email and password.\n", user.Email)
-	os.Exit(0)
+	fmt.Fprintf(r.out, "\nDone. %s can now log in with email and password.\n", user.Email)
+	return nil
 }
 
-func recoverRestoreDatabaseBundle(args []string, logger *slog.Logger) {
-	fs := flag.NewFlagSet("restore-database-bundle", flag.ExitOnError)
+func (r recoveryCommand) recoverRestoreDatabaseBundle(args []string) error {
+	fs := flag.NewFlagSet("restore-database-bundle", flag.ContinueOnError)
+	fs.SetOutput(r.errOut)
 	from := fs.String("from", "", "Recovery bundle directory containing manifest.json (required)")
 	dbPath := fs.String("db", "", "Target hitkeep.db path (defaults to server config value)")
 	yes := fs.Bool("yes", false, "Skip confirmation prompt")
 	if err := fs.Parse(args); err != nil {
-		os.Exit(1)
+		return recoveryFlagExit(err)
 	}
 	if strings.TrimSpace(*from) == "" {
-		fmt.Fprintln(os.Stderr, "Error: -from is required")
+		fmt.Fprintln(r.errOut, "Error: -from is required")
 		fs.Usage()
-		os.Exit(1)
+		return recoveryExit(1)
 	}
 	if strings.TrimSpace(*dbPath) == "" {
-		*dbPath = config.Load(logger).DBPath
+		*dbPath = config.Load(r.logger).DBPath
 	}
 
 	manifest, err := readDatabaseRecoveryBundle(*from)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: invalid recovery bundle: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(r.errOut, "Error: invalid recovery bundle: %v\n", err)
+		return recoveryExit(1)
 	}
-	fmt.Println("HitKeep Recovery — Restore Database Bundle")
-	fmt.Println("==========================================")
-	fmt.Printf("Source:    %s\n", *from)
-	fmt.Printf("Target DB: %s\n", *dbPath)
-	fmt.Println()
-	fmt.Println("This restores the exact pre-recovery database and WAL state.")
-	fmt.Println("It may intentionally restore the original DuckDB failure for rollback or forensic work.")
-	fmt.Println()
+	fmt.Fprintln(r.out, "HitKeep Recovery — Restore Database Bundle")
+	fmt.Fprintln(r.out, "==========================================")
+	fmt.Fprintf(r.out, "Source:    %s\n", *from)
+	fmt.Fprintf(r.out, "Target DB: %s\n", *dbPath)
+	fmt.Fprintln(r.out)
+	fmt.Fprintln(r.out, "This restores the exact pre-recovery database and WAL state.")
+	fmt.Fprintln(r.out, "It may intentionally restore the original DuckDB failure for rollback or forensic work.")
+	fmt.Fprintln(r.out)
 	if !*yes {
-		fmt.Print(`Type "yes" to confirm: `)
-		scanner := bufio.NewScanner(os.Stdin)
+		fmt.Fprint(r.out, `Type "yes" to confirm: `)
+		scanner := bufio.NewScanner(r.in)
 		scanner.Scan()
 		if strings.TrimSpace(scanner.Text()) != "yes" {
-			fmt.Println("Aborted.")
-			os.Exit(0)
+			fmt.Fprintln(r.out, "Aborted.")
+			return nil
 		}
 	}
 
 	if err := restoreDatabaseRecoveryBundle(*from, *dbPath, manifest); err != nil {
-		fmt.Fprintf(os.Stderr, "Error restoring database recovery bundle: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(r.errOut, "Error restoring database recovery bundle: %v\n", err)
+		return recoveryExit(1)
 	}
-	fmt.Println("Database recovery bundle restored successfully.")
-	os.Exit(0)
+	fmt.Fprintln(r.out, "Database recovery bundle restored successfully.")
+	return nil
 }
 
 func readDatabaseRecoveryBundle(bundleDir string) (databaseRecoveryBundleManifest, error) {
@@ -472,8 +502,9 @@ func fileExistsForRestore(path string) bool {
 	return err == nil
 }
 
-func recoverRestoreBackup(args []string, logger *slog.Logger) {
-	fs := flag.NewFlagSet("restore-backup", flag.ExitOnError)
+func (r recoveryCommand) recoverRestoreBackup(args []string) error {
+	fs := flag.NewFlagSet("restore-backup", flag.ContinueOnError)
+	fs.SetOutput(r.errOut)
 	from := fs.String("from", "", "Backup source path (required) — local dir or s3://")
 	snapshot := fs.String("snapshot", "", "Specific snapshot timestamp (default: latest)")
 	dbPath := fs.String("db", "", "Target hitkeep.db path (defaults to server config value)")
@@ -489,7 +520,7 @@ func recoverRestoreBackup(args []string, logger *slog.Logger) {
 	s3UseSSL := fs.Bool("s3-use-ssl", true, "S3 use SSL")
 
 	if err := fs.Parse(args); err != nil {
-		os.Exit(1)
+		return recoveryFlagExit(err)
 	}
 	s3UseSSLSet := false
 	fs.Visit(func(f *flag.Flag) {
@@ -499,14 +530,14 @@ func recoverRestoreBackup(args []string, logger *slog.Logger) {
 	})
 
 	if *from == "" {
-		fmt.Fprintln(os.Stderr, "Error: -from is required")
-		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(r.errOut, "Error: -from is required")
+		fmt.Fprintln(r.errOut)
 		fs.Usage()
-		os.Exit(1)
+		return recoveryExit(1)
 	}
 
 	// Resolve defaults from config.
-	conf := config.Load(logger)
+	conf := config.Load(r.logger)
 	if *dbPath == "" {
 		*dbPath = conf.DBPath
 	}
@@ -520,14 +551,14 @@ func recoverRestoreBackup(args []string, logger *slog.Logger) {
 	snapshotName := *snapshot
 	if snapshotName == "" {
 		if isS3Source {
-			fmt.Fprintln(os.Stderr, "Error: -snapshot is required when restoring from S3 (directory listing not supported)")
-			os.Exit(1)
+			fmt.Fprintln(r.errOut, "Error: -snapshot is required when restoring from S3 (directory listing not supported)")
+			return recoveryExit(1)
 		}
 		var err error
 		snapshotName, err = findLatestLocalSnapshot(filepath.Join(*from, "shared"))
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: could not find latest snapshot: %v\n", err)
-			os.Exit(1)
+			fmt.Fprintf(r.errOut, "Error: could not find latest snapshot: %v\n", err)
+			return recoveryExit(1)
 		}
 	}
 
@@ -537,41 +568,41 @@ func recoverRestoreBackup(args []string, logger *slog.Logger) {
 		var err error
 		tenantIDs, err = discoverLocalTenantBackups(*from, snapshotName)
 		if err != nil {
-			logger.Warn("Could not discover tenant backups", "error", err)
+			r.logger.Warn("Could not discover tenant backups", "error", err)
 		}
 	}
 
 	// Print summary.
-	fmt.Printf("HitKeep Recovery — Restore Backup\n")
-	fmt.Printf("====================================\n")
-	fmt.Printf("Source:     %s\n", *from)
-	fmt.Printf("Snapshot:   %s\n", snapshotName)
-	fmt.Printf("Target DB:  %s\n", *dbPath)
-	fmt.Printf("Data Path:  %s\n", *dataPath)
+	fmt.Fprintf(r.out, "HitKeep Recovery — Restore Backup\n")
+	fmt.Fprintf(r.out, "====================================\n")
+	fmt.Fprintf(r.out, "Source:     %s\n", *from)
+	fmt.Fprintf(r.out, "Snapshot:   %s\n", snapshotName)
+	fmt.Fprintf(r.out, "Target DB:  %s\n", *dbPath)
+	fmt.Fprintf(r.out, "Data Path:  %s\n", *dataPath)
 	if len(tenantIDs) > 0 {
-		fmt.Printf("Tenants:    %d tenant database(s)\n", len(tenantIDs))
+		fmt.Fprintf(r.out, "Tenants:    %d tenant database(s)\n", len(tenantIDs))
 		for _, id := range tenantIDs {
-			fmt.Printf("  - %s\n", id)
+			fmt.Fprintf(r.out, "  - %s\n", id)
 		}
 	} else if isS3Source {
-		fmt.Println("Tenants:    discovered from the restored control snapshot")
+		fmt.Fprintln(r.out, "Tenants:    discovered from the restored control snapshot")
 	}
-	fmt.Println()
+	fmt.Fprintln(r.out)
 
 	// Confirm.
 	if !*yes {
-		fmt.Print(`Type "yes" to confirm restore: `)
-		scanner := bufio.NewScanner(os.Stdin)
+		fmt.Fprint(r.out, `Type "yes" to confirm restore: `)
+		scanner := bufio.NewScanner(r.in)
 		scanner.Scan()
 		answer := strings.TrimSpace(scanner.Text())
 		if answer != "yes" {
-			fmt.Println("Aborted.")
-			os.Exit(0)
+			fmt.Fprintln(r.out, "Aborted.")
+			return nil
 		}
-		fmt.Println()
+		fmt.Fprintln(r.out)
 	}
 
-	ctx := context.Background()
+	ctx := r.ctx
 	exitCode := 0
 
 	// Build S3 config if source is S3.
@@ -592,22 +623,22 @@ func recoverRestoreBackup(args []string, logger *slog.Logger) {
 	// Restore shared DB.
 	sharedSource := joinRestorePath(*from, "shared", snapshotName)
 	sharedRestored := false
-	if err := restoreDatabase(ctx, logger, *dbPath, sharedSource, isS3Source, s3Conf); err != nil {
-		fmt.Fprintf(os.Stderr, "Error restoring shared database: %v\n", err)
+	if err := restoreDatabase(ctx, r.out, r.logger, *dbPath, sharedSource, isS3Source, s3Conf); err != nil {
+		fmt.Fprintf(r.errOut, "Error restoring shared database: %v\n", err)
 		exitCode = 1
 	} else {
 		sharedRestored = true
-		fmt.Printf("Shared database restored to %s\n", *dbPath)
+		fmt.Fprintf(r.out, "Shared database restored to %s\n", *dbPath)
 	}
 	if isS3Source && sharedRestored {
 		var err error
-		tenantIDs, err = discoverS3TenantBackupsFromControl(ctx, logger, *dbPath)
+		tenantIDs, err = discoverS3TenantBackupsFromControl(ctx, r.logger, *dbPath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error discovering tenant backups from restored control database: %v\n", err)
+			fmt.Fprintf(r.errOut, "Error discovering tenant backups from restored control database: %v\n", err)
 			exitCode = 1
 			tenantIDs = nil
 		} else {
-			fmt.Printf("Discovered %d tenant database(s) from restored control snapshot.\n", len(tenantIDs))
+			fmt.Fprintf(r.out, "Discovered %d tenant database(s) from restored control snapshot.\n", len(tenantIDs))
 		}
 	}
 
@@ -615,32 +646,32 @@ func recoverRestoreBackup(args []string, logger *slog.Logger) {
 	for _, tenantID := range tenantIDs {
 		tenantDir := filepath.Join(*dataPath, "tenants", tenantID)
 		if err := os.MkdirAll(tenantDir, 0755); err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating tenant directory %s: %v\n", tenantDir, err)
+			fmt.Fprintf(r.errOut, "Error creating tenant directory %s: %v\n", tenantDir, err)
 			exitCode = 1
 			continue
 		}
 
 		tenantDBPath := filepath.Join(tenantDir, "hitkeep.db")
 		tenantSource := joinRestorePath(*from, "tenants", tenantID, snapshotName)
-		if err := restoreDatabase(ctx, logger, tenantDBPath, tenantSource, isS3Source, s3Conf); err != nil {
-			fmt.Fprintf(os.Stderr, "Error restoring tenant %s: %v\n", tenantID, err)
+		if err := restoreDatabase(ctx, r.out, r.logger, tenantDBPath, tenantSource, isS3Source, s3Conf); err != nil {
+			fmt.Fprintf(r.errOut, "Error restoring tenant %s: %v\n", tenantID, err)
 			exitCode = 1
 		} else {
-			fmt.Printf("Tenant %s restored to %s\n", tenantID, tenantDBPath)
+			fmt.Fprintf(r.out, "Tenant %s restored to %s\n", tenantID, tenantDBPath)
 		}
 	}
 
 	if exitCode == 0 {
-		fmt.Println("\nRestore completed successfully.")
+		fmt.Fprintln(r.out, "\nRestore completed successfully.")
 	} else {
-		fmt.Fprintln(os.Stderr, "\nRestore completed with errors (see above).")
+		fmt.Fprintln(r.errOut, "\nRestore completed with errors (see above).")
 	}
-	os.Exit(exitCode)
+	return recoveryExit(exitCode)
 }
 
 // restoreDatabase imports a backup snapshot into a fresh DuckDB at targetPath.
 // If targetPath already exists, it is renamed as a safety net.
-func restoreDatabase(ctx context.Context, logger *slog.Logger, targetPath, sourcePath string, isS3 bool, s3Conf *worker.S3Config) error {
+func restoreDatabase(ctx context.Context, out io.Writer, logger *slog.Logger, targetPath, sourcePath string, isS3 bool, s3Conf *worker.S3Config) error {
 	targetDir := filepath.Dir(targetPath)
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		return fmt.Errorf("create target directory %s: %w", targetDir, err)
@@ -687,7 +718,7 @@ func restoreDatabase(ctx context.Context, logger *slog.Logger, targetPath, sourc
 		return err
 	}
 	if backupPath != "" {
-		fmt.Printf("  Existing DB renamed to %s\n", backupPath)
+		fmt.Fprintf(out, "  Existing DB renamed to %s\n", backupPath)
 	}
 	return activateRestoredDatabase(tempPath, tempWalPath, targetPath, backupPath)
 }
@@ -919,15 +950,16 @@ func joinRestorePath(parts ...string) string {
 	return filepath.Join(parts...)
 }
 
-func recoverRebuildDefaultTenant(args []string, logger *slog.Logger) {
-	fs := flag.NewFlagSet("rebuild-default-tenant", flag.ExitOnError)
+func (r recoveryCommand) recoverRebuildDefaultTenant(args []string) error {
+	fs := flag.NewFlagSet("rebuild-default-tenant", flag.ContinueOnError)
+	fs.SetOutput(r.errOut)
 	dbPath := fs.String("db", "", "Path to hitkeep.db (defaults to server config value)")
 	dataPath := fs.String("data-path", "", "Tenant data directory (defaults to server config value)")
 	yes := fs.Bool("yes", false, "Skip confirmation prompt")
 	if err := fs.Parse(args); err != nil {
-		os.Exit(1)
+		return recoveryFlagExit(err)
 	}
-	conf := config.Load(logger)
+	conf := config.Load(r.logger)
 	if *dbPath == "" {
 		*dbPath = conf.DBPath
 	}
@@ -935,51 +967,53 @@ func recoverRebuildDefaultTenant(args []string, logger *slog.Logger) {
 		*dataPath = conf.DataPath
 	}
 
-	fmt.Printf("HitKeep Recovery — Rebuild Default Tenant Database\n")
-	fmt.Printf("===================================================\n")
-	fmt.Printf("Control DB: %s\n", *dbPath)
-	fmt.Printf("Data path:  %s\n\n", *dataPath)
-	fmt.Println("This recreates the default tenant's database as an EMPTY, schema-migrated")
-	fmt.Println("file with fresh site mirrors. Its analytics history is NOT restored; use a")
-	fmt.Println("backup restore instead whenever one exists. HitKeep must be stopped.")
-	fmt.Println()
+	fmt.Fprintf(r.out, "HitKeep Recovery — Rebuild Default Tenant Database\n")
+	fmt.Fprintf(r.out, "===================================================\n")
+	fmt.Fprintf(r.out, "Control DB: %s\n", *dbPath)
+	fmt.Fprintf(r.out, "Data path:  %s\n\n", *dataPath)
+	fmt.Fprintln(r.out, "This recreates the default tenant's database as an EMPTY, schema-migrated")
+	fmt.Fprintln(r.out, "file with fresh site mirrors. Its analytics history is NOT restored; use a")
+	fmt.Fprintln(r.out, "backup restore instead whenever one exists. HitKeep must be stopped.")
+	fmt.Fprintln(r.out)
 
 	if !*yes {
-		fmt.Print(`Type "yes" to confirm: `)
-		scanner := bufio.NewScanner(os.Stdin)
+		fmt.Fprint(r.out, `Type "yes" to confirm: `)
+		scanner := bufio.NewScanner(r.in)
 		scanner.Scan()
 		if strings.TrimSpace(scanner.Text()) != "yes" {
-			fmt.Println("Aborted.")
-			os.Exit(0)
+			fmt.Fprintln(r.out, "Aborted.")
+			return nil
 		}
-		fmt.Println()
+		fmt.Fprintln(r.out)
 	}
 
-	tenantPath, err := database.RebuildDefaultTenantFile(context.Background(), *dbPath, *dataPath,
-		database.WithLogger(logger),
+	tenantPath, err := database.RebuildDefaultTenantFile(r.ctx, *dbPath, *dataPath,
+		database.WithLogger(r.logger),
 		database.WithMemoryLimit(conf.DuckDBMemoryLimit),
 		database.WithThreads(conf.DuckDBThreads),
 	)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		fmt.Fprintln(os.Stderr, "Make sure HitKeep is stopped before running recovery commands.")
-		os.Exit(1)
+		fmt.Fprintf(r.errOut, "Error: %v\n", err)
+		fmt.Fprintln(r.errOut, "Make sure HitKeep is stopped before running recovery commands.")
+		return recoveryExit(1)
 	}
-	fmt.Printf("✓ Rebuilt empty default tenant database at %s\n", tenantPath)
-	fmt.Println("Start HitKeep to begin collecting analytics again.")
+	fmt.Fprintf(r.out, "✓ Rebuilt empty default tenant database at %s\n", tenantPath)
+	fmt.Fprintln(r.out, "Start HitKeep to begin collecting analytics again.")
+	return nil
 }
 
-func recoverImportArchives(args []string, logger *slog.Logger) {
-	fs := flag.NewFlagSet("import-archives", flag.ExitOnError)
+func (r recoveryCommand) recoverImportArchives(args []string) error {
+	fs := flag.NewFlagSet("import-archives", flag.ContinueOnError)
+	fs.SetOutput(r.errOut)
 	dbPath := fs.String("db", "", "Path to hitkeep.db (defaults to server config value)")
 	dataPath := fs.String("data-path", "", "Tenant data directory (defaults to server config value)")
 	archivePath := fs.String("archive-path", "", "Local retention archive directory (defaults to server config value)")
 	tenantFlag := fs.String("tenant", "", "Tenant ID to import into (defaults to the default tenant)")
 	yes := fs.Bool("yes", false, "Skip confirmation prompt")
 	if err := fs.Parse(args); err != nil {
-		os.Exit(1)
+		return recoveryFlagExit(err)
 	}
-	conf := config.Load(logger)
+	conf := config.Load(r.logger)
 	if *dbPath == "" {
 		*dbPath = conf.DBPath
 	}
@@ -990,62 +1024,62 @@ func recoverImportArchives(args []string, logger *slog.Logger) {
 		*archivePath = conf.ArchivePath
 	}
 	if worker.IsS3ArchivePath(*archivePath) {
-		fmt.Fprintln(os.Stderr, "Error: import-archives reads local archives only; download the s3:// archive directory first and pass it via -archive-path")
-		os.Exit(1)
+		fmt.Fprintln(r.errOut, "Error: import-archives reads local archives only; download the s3:// archive directory first and pass it via -archive-path")
+		return recoveryExit(1)
 	}
 
-	ctx := context.Background()
+	ctx := r.ctx
 	control, err := database.OpenMigratedStore(ctx, *dbPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: could not open database: %v\n", err)
-		fmt.Fprintln(os.Stderr, "Make sure HitKeep is stopped before running recovery commands.")
-		os.Exit(1)
+		fmt.Fprintf(r.errOut, "Error: could not open database: %v\n", err)
+		fmt.Fprintln(r.errOut, "Make sure HitKeep is stopped before running recovery commands.")
+		return recoveryExit(1)
 	}
 	defaultID, err := control.GetDefaultTenantID(ctx)
 	if closeErr := control.Close(); err == nil {
 		err = closeErr
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: could not resolve default tenant: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(r.errOut, "Error: could not resolve default tenant: %v\n", err)
+		return recoveryExit(1)
 	}
 	tenantID := defaultID
 	if *tenantFlag != "" {
 		tenantID, err = uuid.Parse(*tenantFlag)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: invalid -tenant %q: %v\n", *tenantFlag, err)
-			os.Exit(1)
+			fmt.Fprintf(r.errOut, "Error: invalid -tenant %q: %v\n", *tenantFlag, err)
+			return recoveryExit(1)
 		}
 	}
 
 	files, err := database.DiscoverLocalRetentionArchives(*archivePath, tenantID, tenantID == defaultID)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(r.errOut, "Error: %v\n", err)
+		return recoveryExit(1)
 	}
 	if len(files) == 0 {
-		fmt.Printf("No retention archives found for tenant %s under %s. Nothing to do.\n", tenantID, *archivePath)
-		os.Exit(0)
+		fmt.Fprintf(r.out, "No retention archives found for tenant %s under %s. Nothing to do.\n", tenantID, *archivePath)
+		return nil
 	}
 	tenantPath := filepath.Join(*dataPath, "tenants", tenantID.String(), "hitkeep.db")
 
-	fmt.Printf("HitKeep Recovery — Import Retention Archives\n")
-	fmt.Printf("=============================================\n")
-	fmt.Printf("Tenant DB: %s\n", tenantPath)
-	fmt.Printf("Archives:  %d parquet file(s) under %s\n\n", len(files), *archivePath)
-	fmt.Println("Rows already present are kept once; rows whose parent row no longer")
-	fmt.Println("exists are skipped. HitKeep must be stopped.")
-	fmt.Println()
+	fmt.Fprintf(r.out, "HitKeep Recovery — Import Retention Archives\n")
+	fmt.Fprintf(r.out, "=============================================\n")
+	fmt.Fprintf(r.out, "Tenant DB: %s\n", tenantPath)
+	fmt.Fprintf(r.out, "Archives:  %d parquet file(s) under %s\n\n", len(files), *archivePath)
+	fmt.Fprintln(r.out, "Rows already present are kept once; rows whose parent row no longer")
+	fmt.Fprintln(r.out, "exists are skipped. HitKeep must be stopped.")
+	fmt.Fprintln(r.out)
 
 	if !*yes {
-		fmt.Print(`Type "yes" to confirm: `)
-		scanner := bufio.NewScanner(os.Stdin)
+		fmt.Fprint(r.out, `Type "yes" to confirm: `)
+		scanner := bufio.NewScanner(r.in)
 		scanner.Scan()
 		if strings.TrimSpace(scanner.Text()) != "yes" {
-			fmt.Println("Aborted.")
-			os.Exit(0)
+			fmt.Fprintln(r.out, "Aborted.")
+			return nil
 		}
-		fmt.Println()
+		fmt.Fprintln(r.out)
 	}
 
 	summary, err := database.ImportRetentionArchives(ctx, tenantPath, files,
@@ -1053,8 +1087,8 @@ func recoverImportArchives(args []string, logger *slog.Logger) {
 		database.WithThreads(conf.DuckDBThreads),
 	)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(r.errOut, "Error: %v\n", err)
+		return recoveryExit(1)
 	}
 
 	tables := make([]string, 0, len(summary.Imported))
@@ -1062,11 +1096,12 @@ func recoverImportArchives(args []string, logger *slog.Logger) {
 		tables = append(tables, table)
 	}
 	sort.Strings(tables)
-	fmt.Printf("✓ Imported %d archive file(s)\n", summary.Files)
+	fmt.Fprintf(r.out, "✓ Imported %d archive file(s)\n", summary.Files)
 	for _, table := range tables {
 		if summary.Imported[table] == 0 && summary.Skipped[table] == 0 {
 			continue
 		}
-		fmt.Printf("  %-32s %8d imported %8d skipped\n", table, summary.Imported[table], summary.Skipped[table])
+		fmt.Fprintf(r.out, "  %-32s %8d imported %8d skipped\n", table, summary.Imported[table], summary.Skipped[table])
 	}
+	return nil
 }

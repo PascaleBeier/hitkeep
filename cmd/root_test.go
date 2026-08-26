@@ -1,6 +1,7 @@
 package hitkeepcmd
 
 import (
+	"context"
 	"io"
 	"reflect"
 	"testing"
@@ -46,6 +47,11 @@ func TestRootCommandPreservesFirstArgumentRouting(t *testing.T) {
 					gotArgs = append([]string(nil), args...)
 				}
 			}
+			recordRecover := func(_ context.Context, args []string, _ io.Reader, _, _ io.Writer) error {
+				called = "recover"
+				gotArgs = append([]string(nil), args...)
+				return nil
+			}
 			root := newRootCommand(rootActions{
 				run: func(args []string, configFile string) error {
 					called = "run"
@@ -53,7 +59,7 @@ func TestRootCommandPreservesFirstArgumentRouting(t *testing.T) {
 					gotConfig = configFile
 					return nil
 				},
-				recover:            record("recover"),
+				recover:            recordRecover,
 				updateSpamLists:    record("spam"),
 				updateAIAgentLists: record("ai"),
 				importData:         record("import"),

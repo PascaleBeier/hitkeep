@@ -3,6 +3,7 @@ package hitkeepcmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -18,7 +19,7 @@ import (
 type rootActions struct {
 	run                func([]string, string) error
 	runContext         func(context.Context, []string, string) error
-	recover            func([]string)
+	recover            func(context.Context, []string, io.Reader, io.Writer, io.Writer) error
 	updateSpamLists    func([]string)
 	updateAIAgentLists func([]string)
 	importData         func([]string)
@@ -43,8 +44,8 @@ func NewRootCommand(logger *slog.Logger) *cobra.Command {
 		runContext: func(ctx context.Context, args []string, configFile string) error {
 			return runContext(ctx, logger, args, configFile)
 		},
-		recover: func(_ []string) {
-			Recover(logger)
+		recover: func(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer) error {
+			return Recover(ctx, args, in, out, errOut, logger)
 		},
 		updateSpamLists: func(args []string) {
 			UpdateSpamLists(args, logger)
@@ -160,7 +161,7 @@ func newRootCommand(actions rootActions) *cobra.Command {
 			}
 			switch args[0] {
 			case "recover":
-				actions.recover(args[1:])
+				return actions.recover(command.Context(), args[1:], command.InOrStdin(), command.OutOrStdout(), command.ErrOrStderr())
 			case "update-spam-lists":
 				actions.updateSpamLists(args[1:])
 			case "update-ai-agent-lists":
