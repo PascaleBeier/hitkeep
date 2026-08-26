@@ -32,7 +32,7 @@ This folder is the durable progress ledger for the migration. Update it in the s
 | 7 | Completed | Enforce issue #288 container recreation and migration interruption gates | Existing self-hosted image smoke now recreates a container on the same named volume and verifies marker/database persistence; full profile pairs it with fault-injected migration resume acceptance |
 | 8 | Completed | GoReleaser artifact parity and build cutover; Homebrew/Scoop-ready artifact layout | GoReleaser v2.18.0 snapshots produced all four legacy binary names; existing checksum/verification commands accepted the complete six-file release contract |
 | 9 | Completed | Afero/fileflow/pathologize migration by operation risk | Runtime config already uses injected Afero; the one real cross-filesystem release relocation now uses fileflow; fixed trusted names need no pathologize; database/WAL/fsync/lock operations remain native |
-| 10 | Pending | Flatten `internal/` in dependency-order move-only slices | — |
+| 10 | In progress | Flatten `internal/` in dependency-order move-only slices | First pure leaf moved: `internal/appurl` → `appurl`; 61 references rewritten; no compatibility shim because Go already prohibited external imports |
 | 11 | Pending | Stabilize, full QA, CI, docs validation, completion audit | — |
 
 ## Completed discovery
@@ -113,7 +113,8 @@ Record focused commands as stable test targets or `hk` gate IDs, not pasted succ
 | 2026-08-26 | 8 | Changed QA planning | Blocked before gate execution: persisted plan snapshot remains stale after deterministic replanning; focused race and release checks above passed and the guard was not bypassed |
 | 2026-08-26 | 9 | `go test -race ./internal/devtool ./internal/devtool/cli` | Passed; public-image isolation, release artifacts, CLI routing, and developer boundary remain covered |
 | 2026-08-26 | 9 | Gortex filesystem impact/contract review | One tested cross-filesystem candidate changed; database/native atomic operations explicitly excluded; no guard violations |
+| 2026-08-26 | 10 | `internal/appurl` → `appurl` semantic move | Passed `go test -race ./appurl ./internal/server/auth`, all affected server/social/worker package tests, and `go test -race ./cmd/hk`; old import path absent |
 
 ## Next update
 
-Move the pure `internal/appurl` leaf first, then continue dependency-ordered move-only waves without mixing package relocation with behavior changes.
+Continue pure leaf move-only waves, re-running import-path and affected-package proofs after each; move `config`, `database`, and `devtool` only after their dependency boundaries are isolated.

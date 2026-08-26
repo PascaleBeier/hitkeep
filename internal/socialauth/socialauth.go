@@ -17,7 +17,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 
-	"hitkeep/internal/appurl"
+	"hitkeep/appurl"
 	"hitkeep/internal/config"
 	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/security"

@@ -18,8 +18,8 @@ import (
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/text/language"
 
+	"hitkeep/appurl"
 	"hitkeep/internal/api"
-	"hitkeep/internal/appurl"
 	authcore "hitkeep/internal/auth"
 	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/localization"

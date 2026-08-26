@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"hitkeep/internal/appurl"
+	"hitkeep/appurl"
 	"hitkeep/internal/config"
 	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"

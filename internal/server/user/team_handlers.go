@@ -12,8 +12,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/appurl"
 	"hitkeep/internal/api"
-	"hitkeep/internal/appurl"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	json "hitkeep/internal/jsonapi"
