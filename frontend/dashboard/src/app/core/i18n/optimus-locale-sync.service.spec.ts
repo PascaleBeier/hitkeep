@@ -62,9 +62,7 @@ describe('OptimusLocaleSyncService', () => {
         for (const language of DASHBOARD_LANGUAGE_CODES as DashboardLanguage[]) {
             transloco.setActiveLang(language);
             TestBed.flushEffects();
-            expect(optimus.translation.dateFormat)
-                .withContext(language)
-                .toMatch(/^(dd|mm).*yy$/);
+            expect(optimus.translation.dateFormat, language).toMatch(/^(dd|mm).*yy$/);
         }
     });
 

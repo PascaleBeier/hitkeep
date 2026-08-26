@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-15T20:27:06.166492269Z",
+  "generated_at": "2026-08-26T01:53:41.56089Z",
   "sources": {
     "ai_robots_txt": "https://raw.githubusercontent.com/ai-robots-txt/ai.robots.txt/main/robots.json",
     "crawler_user_agents": "https://raw.githubusercontent.com/monperrus/crawler-user-agents/master/crawler-user-agents.json",
@@ -105,9 +105,10 @@
     {
       "token": "aiwebindex",
       "name": "AIWebIndex",
-      "family": "Lyrenth that builds an AI-readable index of web content for AI systems",
-      "category": "other_ai",
-      "respects_robots_txt": "unclear",
+      "family": "Lyrenth",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "yes",
+      "url": "https://lyrenth.com",
       "sources": [
         "ai_robots_txt"
       ]
@@ -783,6 +784,17 @@
       ]
     },
     {
+      "token": "exasearchbot",
+      "name": "ExaSearchBot",
+      "family": "Exa",
+      "category": "ai_search_indexer",
+      "respects_robots_txt": "unclear",
+      "url": "https://exa.ai",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
       "token": "extecontextcrawl",
       "name": "ExteContextCrawl",
       "family": "ExteContextCrawl",
@@ -1384,6 +1396,16 @@
       ]
     },
     {
+      "token": "lightpanda",
+      "name": "Lightpanda",
+      "family": "Anyone who downloads the Lightpanda client. Possibly being used by a [Grok-adjacent](https://github.com/lightpanda-io/browser/issues/3156#issuecomment-5217843616) organization's botnet.",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
       "token": "linerbot",
       "name": "LinerBot",
       "family": "LinerBot",
@@ -1536,10 +1558,9 @@
     {
       "token": "mozilla-tabstack",
       "name": "Mozilla-Tabstack",
-      "family": "Mozilla",
+      "family": "Mozilla that performs programmatic, AI-driven interactions with web content through Tabstack",
       "category": "other_ai",
       "respects_robots_txt": "yes",
-      "url": "https://docs.tabstack.ai/trust/controlling-access",
       "sources": [
         "ai_robots_txt"
       ]
@@ -1890,6 +1911,17 @@
       ]
     },
     {
+      "token": "reflectionbot",
+      "name": "Reflectionbot",
+      "family": "Reflection",
+      "category": "ai_agent",
+      "respects_robots_txt": "unclear",
+      "url": "https://reflection.ai/",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
       "token": "replicate-bot",
       "name": "Replicate-Bot",
       "family": "Replicate, Inc.",
@@ -2232,8 +2264,8 @@
     },
     {
       "token": "webzio-extended",
-      "name": "Webzio-Extended",
-      "family": "Webzio-Extended",
+      "name": "webzio-extended",
+      "family": "webzio-extended",
       "category": "ai_training_crawler",
       "respects_robots_txt": "unclear",
       "url": "https://docs.webz.io/reference/how-it-works-video",
@@ -2259,8 +2291,10 @@
       "family": "WRTNBot",
       "category": "ai_agent",
       "respects_robots_txt": "unclear",
+      "url": "https://wrtn.ai/",
       "sources": [
-        "ai_robots_txt"
+        "ai_robots_txt",
+        "device_detector_bots"
       ]
     },
     {

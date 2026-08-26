@@ -37,7 +37,7 @@ describe('TakeoutDownloadService', () => {
             next: (filename) => {
                 downloadedFilename = filename;
             },
-            error: (error: unknown) => fail(`unexpected error: ${String(error)}`)
+            error: (error: unknown) => expect.fail(`unexpected error: ${String(error)}`)
         });
 
         const req = httpMock.expectOne('/api/user/takeout?format=json');
@@ -62,7 +62,7 @@ describe('TakeoutDownloadService', () => {
             next: (filename) => {
                 downloadedFilename = filename;
             },
-            error: (error: unknown) => fail(`unexpected error: ${String(error)}`)
+            error: (error: unknown) => expect.fail(`unexpected error: ${String(error)}`)
         });
 
         const req = httpMock.expectOne('/api/sites/site-123/takeout?format=csv');
@@ -81,7 +81,7 @@ describe('TakeoutDownloadService', () => {
             next: (filename) => {
                 downloadedFilename = filename;
             },
-            error: (error: unknown) => fail(`unexpected error: ${String(error)}`)
+            error: (error: unknown) => expect.fail(`unexpected error: ${String(error)}`)
         });
 
         const req = httpMock.expectOne('/api/user/takeout?format=ndjson');
@@ -104,7 +104,7 @@ describe('TakeoutDownloadService', () => {
             next: (filename) => {
                 downloadedFilename = filename;
             },
-            error: (error: unknown) => fail(`unexpected error: ${String(error)}`)
+            error: (error: unknown) => expect.fail(`unexpected error: ${String(error)}`)
         });
 
         const req = httpMock.expectOne('/api/sites/site-1/hits/export?format=csv');
@@ -126,7 +126,7 @@ describe('TakeoutDownloadService', () => {
             next: (filename) => {
                 downloadedFilename = filename;
             },
-            error: (error: unknown) => fail(`unexpected error: ${String(error)}`)
+            error: (error: unknown) => expect.fail(`unexpected error: ${String(error)}`)
         });
 
         const req = httpMock.expectOne('/api/user/takeout?format=ndjson');
@@ -146,7 +146,7 @@ describe('TakeoutDownloadService', () => {
             next: (filename) => {
                 downloadedFilename = filename;
             },
-            error: (error: unknown) => fail(`unexpected error: ${String(error)}`)
+            error: (error: unknown) => expect.fail(`unexpected error: ${String(error)}`)
         });
 
         const req = httpMock.expectOne('/api/sites/site-1/ai-chatbots/export?format=csv');
@@ -165,7 +165,7 @@ describe('TakeoutDownloadService', () => {
         const clickCallsBefore = clickSpy.mock.calls.length;
 
         service.downloadFromUrl('/api/sites/site-1/ai-fetch/export?format=csv', 'fallback.csv').subscribe({
-            next: () => fail('expected html response to be rejected'),
+            next: () => expect.fail('expected html response to be rejected'),
             error: (error: unknown) => {
                 downloadError = error;
             }
