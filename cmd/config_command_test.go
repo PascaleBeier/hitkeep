@@ -2,12 +2,15 @@ package hitkeepcmd
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/spf13/afero"
 
 	runtimeconfig "hitkeep/internal/config"
 )
@@ -85,6 +88,9 @@ func TestConfigValidateUsesStrictExplicitFileLoader(t *testing.T) {
 		{name: "missing", path: filepath.Join(directory, "missing.yaml"), want: "read configuration file"},
 		{name: "malformed", path: filepath.Join(directory, "malformed.yaml"), contents: "server: [", want: "invalid YAML"},
 		{name: "unknown key", path: filepath.Join(directory, "unknown.yaml"), contents: "not_a_hitkeep_setting: true\n", want: "unknown configuration key"},
+		{name: "uppercase key", path: filepath.Join(directory, "uppercase.yaml"), contents: "DATA-PATH: /tmp/hitkeep\n", want: "unknown configuration key"},
+		{name: "mixed-case key", path: filepath.Join(directory, "mixed-case.yaml"), contents: "Data-Path: /tmp/hitkeep\n", want: "unknown configuration key"},
+		{name: "nested key", path: filepath.Join(directory, "nested.yaml"), contents: "data:\n  path: /tmp/hitkeep\n", want: "unknown configuration key"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -98,5 +104,81 @@ func TestConfigValidateUsesStrictExplicitFileLoader(t *testing.T) {
 				t.Fatalf("config validate error = %v, want substring %q", err, test.want)
 			}
 		})
+	}
+}
+
+func TestConfigCommandPreservesLegacyFallback(t *testing.T) {
+	tests := [][]string{{}, {"foo"}, {"--legacy-flag"}}
+	for _, args := range tests {
+		t.Run(strings.Join(args, "_"), func(t *testing.T) {
+			var got []string
+			command := newConfigCommand(
+				afero.NewMemMapFs(),
+				slog.New(slog.NewTextHandler(io.Discard, nil)),
+				func(args []string) error {
+					got = append([]string(nil), args...)
+					return nil
+				},
+			)
+			command.SetOut(io.Discard)
+			command.SetErr(io.Discard)
+			command.SetArgs(args)
+			if _, err := command.ExecuteC(); err != nil {
+				t.Fatalf("execute config fallback: %v", err)
+			}
+			want := append([]string{"config"}, args...)
+			if strings.Join(got, "\x00") != strings.Join(want, "\x00") {
+				t.Fatalf("fallback args = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+type replacingWriteFS struct {
+	afero.Fs
+	replacement []byte
+}
+
+func (fs *replacingWriteFS) OpenFile(name string, flag int, perm os.FileMode) (afero.File, error) {
+	file, err := fs.Fs.OpenFile(name, flag, perm)
+	if err != nil {
+		return nil, err
+	}
+	return &replacingWriteFile{File: file, fs: fs.Fs, path: name, replacement: fs.replacement}, nil
+}
+
+type replacingWriteFile struct {
+	afero.File
+	fs          afero.Fs
+	path        string
+	replacement []byte
+}
+
+func (file *replacingWriteFile) Write([]byte) (int, error) {
+	_ = file.File.Close()
+	_ = file.fs.Remove(file.path)
+	if err := afero.WriteFile(file.fs, file.path, file.replacement, 0o600); err != nil {
+		return 0, err
+	}
+	return 0, errors.New("injected write failure")
+}
+
+func TestConfigInitWriteFailurePreservesReplacementPath(t *testing.T) {
+	base := afero.NewMemMapFs()
+	const outputPath = "hitkeep.yaml"
+	replacement := []byte("replacement-owned\n")
+	command := newConfigInitCommand(&replacingWriteFS{Fs: base, replacement: replacement})
+	command.SetOut(io.Discard)
+	command.SetErr(io.Discard)
+	command.SetArgs([]string{"--output", outputPath})
+	if _, err := command.ExecuteC(); err == nil {
+		t.Fatal("config init unexpectedly succeeded after an injected write failure")
+	}
+	contents, err := afero.ReadFile(base, outputPath)
+	if err != nil {
+		t.Fatalf("read replacement path: %v", err)
+	}
+	if !bytes.Equal(contents, replacement) {
+		t.Fatalf("replacement contents = %q, want %q", contents, replacement)
 	}
 }

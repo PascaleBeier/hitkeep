@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
+	"go.yaml.in/yaml/v3"
 )
 
 func loadViper(
@@ -55,6 +56,9 @@ func loadViper(
 		contents, err := afero.ReadFile(fs, configFile)
 		if err != nil {
 			return nil, fmt.Errorf("read configuration file %q: %w", configFile, err)
+		}
+		if err := validateRawConfigFileKeys(contents, knownKeys); err != nil {
+			return nil, err
 		}
 		values.SetConfigType("yaml")
 		if err := values.ReadConfig(bytes.NewReader(contents)); err != nil {
@@ -109,4 +113,28 @@ func loadViper(
 	}
 	normalizeConfig(&conf, logger)
 	return &conf, nil
+}
+
+func validateRawConfigFileKeys(contents []byte, knownKeys map[string]ConfigurationSetting) error {
+	var document yaml.Node
+	if err := yaml.Unmarshal(contents, &document); err != nil {
+		return fmt.Errorf("parse configuration file: invalid YAML")
+	}
+	if len(document.Content) == 0 {
+		return nil
+	}
+	mapping := document.Content[0]
+	if mapping.Kind != yaml.MappingNode {
+		return fmt.Errorf("configuration file must contain a top-level mapping")
+	}
+	for index := 0; index < len(mapping.Content); index += 2 {
+		key := mapping.Content[index]
+		if key.Kind != yaml.ScalarNode || key.Tag != "!!str" {
+			return fmt.Errorf("unknown configuration key %q", key.Value)
+		}
+		if _, ok := knownKeys[key.Value]; !ok {
+			return fmt.Errorf("unknown configuration key %q", key.Value)
+		}
+	}
+	return nil
 }

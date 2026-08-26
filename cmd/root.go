@@ -47,15 +47,21 @@ func NewRootCommand(logger *slog.Logger) *cobra.Command {
 			Import(ctx, args)
 		},
 	})
-	root.AddCommand(newConfigCommand(afero.NewOsFs(), logger))
+	root.AddCommand(newConfigCommand(afero.NewOsFs(), logger, func(args []string) error {
+		return run(logger, args, "")
+	}))
 	return root
 }
 
-func newConfigCommand(fs afero.Fs, logger *slog.Logger) *cobra.Command {
+func newConfigCommand(fs afero.Fs, logger *slog.Logger, fallback func([]string) error) *cobra.Command {
 	command := &cobra.Command{
-		Use:   "config",
-		Short: "Create and validate HitKeep configuration files",
-		Args:  cobra.NoArgs,
+		Use:                "config",
+		Short:              "Create and validate HitKeep configuration files",
+		Args:               cobra.ArbitraryArgs,
+		DisableFlagParsing: true,
+		RunE: func(_ *cobra.Command, args []string) error {
+			return fallback(append([]string{"config"}, args...))
+		},
 	}
 	command.AddCommand(newConfigInitCommand(fs), newConfigValidateCommand(logger))
 	return command
@@ -72,16 +78,14 @@ func newConfigInitCommand(fs afero.Fs) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("create configuration file %q: %w", outputPath, err)
 			}
-			removePartial := func() {
+			closeFile := func() {
 				_ = file.Close()
-				_ = fs.Remove(outputPath)
 			}
 			if _, err := file.Write(runtimeconfig.RenderExampleYAML()); err != nil {
-				removePartial()
+				closeFile()
 				return fmt.Errorf("write configuration file %q: %w", outputPath, err)
 			}
 			if err := file.Close(); err != nil {
-				_ = fs.Remove(outputPath)
 				return fmt.Errorf("close configuration file %q: %w", outputPath, err)
 			}
 			command.Printf("Created configuration file %s\n", outputPath)

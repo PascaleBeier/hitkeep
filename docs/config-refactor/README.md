@@ -28,6 +28,7 @@ This folder is the durable progress ledger for the migration. Update it in the s
 | 3 | Completed | Production Cobra root with legacy leaf parsers | Factory-built Cobra root owns execution while preserving exact first-argument routing and all legacy leaf parsers |
 | 4 | Completed | Switch production assembly to parity-proven Viper | `config.Load` uses instance-based Viper through an OS-backed Afero boundary; leading `--config PATH`/`--config=PATH` selection is explicit-only and returns bounded startup errors |
 | 4A | Completed | Add production configuration-file UX | Cobra-owned `config init --output` writes the canonical catalog-derived example without overwrite; `config validate --config` uses the strict explicit Viper loader without starting services or exposing values |
+| 4B | Completed | Harden production configuration commands and raw-key validation | Only exact `config init` and `config validate` use Cobra; all other `config` argv falls back unchanged; write/close failures retain their pathname; raw YAML keys must exactly match catalog kebab-case names before Viper normalization |
 | 5 | Completed | Normalize `hk` Cobra factories and preserve MCP/JSON contracts | No rewrite required: `hk` already has one factory root, centralized render/envelope handling, deterministic command catalog, and guarded production boundary |
 | 6 | Completed | Project catalog into Docker, Compose, Helm, examples, and docs artifact | Catalog-derived root example plus repository-wide env/default validation covers Dockerfile, Compose, charts, examples, and reader-facing Markdown/YAML |
 | 7 | Completed | Enforce issue #288 container recreation and migration interruption gates | Existing self-hosted image smoke now recreates a container on the same named volume and verifies marker/database persistence; full profile pairs it with fault-injected migration resume acceptance |
@@ -120,6 +121,7 @@ Record focused commands as stable test targets or `hk` gate IDs, not pasted succ
 | 2026-08-26 | 10 | `internal/analyticscatalog` → `analyticscatalog` guarded package move | Passed race tests across the catalog consumers in analytics tools, MCP, opportunities, and Ask AI; old import path absent |
 | 2026-08-26 | 10 | `internal/jsonapi` → `jsonapi` guarded high-fanout package move | Full-module compile and focused race tests passed across commands, AI, database, MCP, every server package, social auth, SSO, takeout, webhook dispatch, and workers; all 160 old imports removed |
 | 2026-08-26 | 4A | Production `config init` and `config validate` | Canonical-byte, exclusive no-overwrite, strict missing/malformed/unknown-key, and sensitive-value redaction tests passed; Gortex-prescribed startup/config race suite passed |
+| 2026-08-26 | 4B | Config command and Viper raw-key hardening | Focused command/config race suite passed; exact fallback, replacement-safe write errors, and pre-normalization underscore/uppercase-key rejection are covered |
 
 ## Next update
 

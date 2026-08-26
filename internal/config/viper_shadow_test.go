@@ -163,6 +163,19 @@ func TestViperShadowRejectsInvalidExplicitFilesWithoutValues(t *testing.T) {
 	}
 }
 
+func TestViperShadowRejectsNonCanonicalTopLevelKeys(t *testing.T) {
+	for _, key := range []string{"mail_port", "MAIL-PORT", "Mail-Port"} {
+		t.Run(key, func(t *testing.T) {
+			fs := afero.NewMemMapFs()
+			writeShadowConfig(t, fs, "config.yaml", key+": 2525\n")
+			_, err := loadViper(nil, mapEnv(nil), fs, "config.yaml")
+			if err == nil || !strings.Contains(err.Error(), `unknown configuration key "`+key+`"`) {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
 func TestViperShadowDoesNotDiscoverFilesImplicitly(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	writeShadowConfig(t, fs, "hitkeep.yaml", "http-addr: ':6060'\nhealthcheck: true\n")
