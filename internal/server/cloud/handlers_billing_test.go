@@ -24,9 +24,9 @@ import (
 
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 type fakeStripeClient struct {

@@ -14,7 +14,7 @@ import (
 
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 func TestHandleAcceptInviteRejectsSecondHostedCloudTeam(t *testing.T) {

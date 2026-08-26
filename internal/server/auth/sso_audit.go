@@ -7,9 +7,9 @@ import (
 
 	"github.com/google/uuid"
 
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/sso"
+	json "hitkeep/jsonapi"
 )
 
 type ssoAuditFlow string

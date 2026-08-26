@@ -16,11 +16,11 @@ import (
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
 	serverauth "hitkeep/internal/server/auth"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 type resolvedSiteMemberUser struct {

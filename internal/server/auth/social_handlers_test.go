@@ -14,10 +14,10 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/socialauth"
+	json "hitkeep/jsonapi"
 )
 
 func TestSocialLoginFailureDoesNotLogRawError(t *testing.T) {

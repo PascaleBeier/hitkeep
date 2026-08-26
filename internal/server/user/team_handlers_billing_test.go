@@ -13,9 +13,9 @@ import (
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/testutil/testdb"
+	json "hitkeep/jsonapi"
 )
 
 func TestHandleGetTeamsIncludesPlanMetadata(t *testing.T) {

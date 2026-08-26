@@ -16,7 +16,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 
 	"hitkeep/hklog"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 const recoveryMarkerVersion = 1

@@ -13,7 +13,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 func setupToolBridgeStore(t *testing.T) (*database.Store, uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID) {

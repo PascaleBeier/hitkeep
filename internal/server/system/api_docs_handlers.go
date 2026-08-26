@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 func (h *handler) handleGetAPIDocVersions() http.HandlerFunc {

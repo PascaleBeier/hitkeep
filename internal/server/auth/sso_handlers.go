@@ -15,11 +15,11 @@ import (
 	"hitkeep/appurl"
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/security"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/sso"
 	"hitkeep/internal/webhooks"
+	json "hitkeep/jsonapi"
 )
 
 const ssoFlowTTL = 10 * time.Minute

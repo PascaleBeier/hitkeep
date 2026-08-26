@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	runtimeconfig "hitkeep/internal/config"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 var releaseVersionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)

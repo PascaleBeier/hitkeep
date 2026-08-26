@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"hitkeep/internal/devtool"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 func TestJSONOutputUsesVersionedEnvelope(t *testing.T) {

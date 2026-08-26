@@ -14,9 +14,9 @@ import (
 	"hitkeep/internal/assetstore"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/webhooks"
+	json "hitkeep/jsonapi"
 )
 
 type handler struct {

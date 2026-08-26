@@ -13,7 +13,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc/oidctest"
 	"golang.org/x/oauth2"
 
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 func TestRelyingPartyBeginUsesPKCES256(t *testing.T) {

@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 type handler struct {

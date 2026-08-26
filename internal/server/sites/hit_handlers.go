@@ -14,8 +14,8 @@ import (
 
 	"hitkeep/exportfmt"
 	"hitkeep/internal/api"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 func (h *handler) handleGetSiteHits() http.HandlerFunc {

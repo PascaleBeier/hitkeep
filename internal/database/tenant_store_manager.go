@@ -16,7 +16,7 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2/expirable"
 
 	"hitkeep/internal/api"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 const (

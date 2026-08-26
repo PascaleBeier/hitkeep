@@ -13,8 +13,8 @@ import (
 	"hitkeep/internal/auth"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 func setupTestEnv(t *testing.T) (*shared.Context, *database.Store, uuid.UUID) {

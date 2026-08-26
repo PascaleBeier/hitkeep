@@ -17,12 +17,12 @@ import (
 	"hitkeep/appurl"
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/reporting"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/worker"
+	json "hitkeep/jsonapi"
 )
 
 func decodeReportJSON(w http.ResponseWriter, r *http.Request, target any) error {

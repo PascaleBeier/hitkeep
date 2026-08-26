@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 func TestHealthzIsLivenessOnly(t *testing.T) {

@@ -15,10 +15,10 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/webhookdispatcher"
 	webhookcore "hitkeep/internal/webhooks"
+	json "hitkeep/jsonapi"
 )
 
 func TestSiteWebhookHandlerLifecycleAndAudit(t *testing.T) {

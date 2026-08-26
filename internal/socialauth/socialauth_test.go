@@ -17,8 +17,8 @@ import (
 	"golang.org/x/oauth2"
 
 	"hitkeep/internal/config"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/sso"
+	json "hitkeep/jsonapi"
 )
 
 func TestProviderStatusesRequireCompleteConfiguration(t *testing.T) {

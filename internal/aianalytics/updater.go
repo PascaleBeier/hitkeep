@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 const maxAgentFeedResponseBytes = 10 << 20 // 10 MB

@@ -18,7 +18,7 @@ import (
 	runtimeconfig "hitkeep/internal/config"
 	"hitkeep/internal/devtool"
 	"hitkeep/internal/devtool/devmcp"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 type options struct {

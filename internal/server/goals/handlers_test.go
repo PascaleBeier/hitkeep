@@ -14,9 +14,9 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/webhooks"
+	json "hitkeep/jsonapi"
 )
 
 type recordingWebhookEmitter struct {

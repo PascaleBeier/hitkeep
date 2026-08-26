@@ -19,9 +19,9 @@ import (
 
 	"hitkeep/appurl"
 	"hitkeep/internal/config"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/security"
 	"hitkeep/internal/sso"
+	json "hitkeep/jsonapi"
 )
 
 const (

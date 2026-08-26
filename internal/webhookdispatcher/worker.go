@@ -13,7 +13,7 @@ import (
 	"hitkeep/hklog"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 const Channel = "dispatcher"

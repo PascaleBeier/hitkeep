@@ -10,9 +10,9 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/filterparams"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 func (h *handler) parseWebVitalsParams(w http.ResponseWriter, r *http.Request, requireMetric bool, defaultLimit int) (api.WebVitalsParams, bool) {

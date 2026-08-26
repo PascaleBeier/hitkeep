@@ -21,7 +21,7 @@ import (
 	"hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/importables"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 func TestTakeoutWebhookExportsExcludeSecretsAndPayloadBodies(t *testing.T) {

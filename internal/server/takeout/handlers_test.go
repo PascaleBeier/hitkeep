@@ -22,9 +22,9 @@ import (
 	"hitkeep/internal/auth"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 	takeoutsvc "hitkeep/internal/takeout"
+	json "hitkeep/jsonapi"
 )
 
 type takeoutSentinel struct {

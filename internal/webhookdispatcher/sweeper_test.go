@@ -8,8 +8,8 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/webhooks"
+	json "hitkeep/jsonapi"
 )
 
 type recordingProducer struct {

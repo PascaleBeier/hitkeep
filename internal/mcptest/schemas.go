@@ -5,7 +5,7 @@ package mcptest
 import (
 	"testing"
 
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 // RequireObjectFormPropertySchemas guards a tool contract against boolean-form

@@ -13,7 +13,7 @@ import (
 
 	"google.golang.org/api/googleapi"
 
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 func TestGoogleClientAuthCodeURLUsesReadOnlyScope(t *testing.T) {

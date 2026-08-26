@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 func TestRunCommandPreservesContextCancellation(t *testing.T) {

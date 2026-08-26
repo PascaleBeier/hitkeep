@@ -24,8 +24,8 @@ import (
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/ipmeta"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 func TestGeoNetworkFromVisitorIPLooksUpMetadataOnce(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 //go:embed default_ai_agents.json

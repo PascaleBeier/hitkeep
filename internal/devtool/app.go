@@ -15,7 +15,7 @@ import (
 	"syscall"
 	"time"
 
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 const doctorCommandTimeout = 15 * time.Second

@@ -16,10 +16,10 @@ import (
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/searchconsole"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/worker"
+	json "hitkeep/jsonapi"
 )
 
 const (

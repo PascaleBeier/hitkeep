@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/uuid"
 
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/realtime"
+	json "hitkeep/jsonapi"
 )
 
 const realtimeHeartbeatInterval = 15 * time.Second

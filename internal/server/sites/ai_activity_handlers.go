@@ -6,9 +6,9 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/filterparams"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 // handleGetSiteAIActivity serves the unified AI activity report: one merged view

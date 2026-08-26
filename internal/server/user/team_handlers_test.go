@@ -16,11 +16,11 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailer"
 	serverauth "hitkeep/internal/server/auth"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/webhooks"
+	json "hitkeep/jsonapi"
 )
 
 type teamRecordingWebhookEmitter struct {

@@ -12,7 +12,7 @@ import (
 	"hitkeep/analyticscatalog"
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 type Config struct {

@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 func decodeOpportunityCandidateProposalJSON(raw []byte) (OpportunityCandidateProposal, error) {

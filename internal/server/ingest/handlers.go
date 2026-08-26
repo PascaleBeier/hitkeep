@@ -21,8 +21,8 @@ import (
 	"hitkeep/internal/blocking"
 	"hitkeep/internal/database"
 	"hitkeep/internal/ipmeta"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 type handler struct {

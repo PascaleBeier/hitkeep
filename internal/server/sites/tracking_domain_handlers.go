@@ -9,8 +9,8 @@ import (
 	"hitkeep/appurl"
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 func (h *handler) handleGetSiteTrackingDomainOptions() http.HandlerFunc {

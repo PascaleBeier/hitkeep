@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 //go:embed default_spam_filter.json

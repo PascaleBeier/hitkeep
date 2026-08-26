@@ -25,8 +25,8 @@ import (
 	appauth "hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/sso"
+	json "hitkeep/jsonapi"
 )
 
 func TestSSOErrorKindUsesStableCategories(t *testing.T) {

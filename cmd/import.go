@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"hitkeep/internal/api"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 const importCLIChunkSize = 8 << 20

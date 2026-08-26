@@ -22,8 +22,8 @@ import (
 
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/worker"
+	json "hitkeep/jsonapi"
 )
 
 // Recover handles the "hitkeep recover <subcommand>" family of commands.
