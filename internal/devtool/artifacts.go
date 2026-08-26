@@ -19,6 +19,8 @@ import (
 	"time"
 
 	"github.com/spf13/fileflow"
+
+	runtimeconfig "hitkeep/config"
 )
 
 const (
@@ -202,8 +204,9 @@ func (a *App) requiredReleaseArtifacts() ([]string, error) {
 	for _, name := range []string{
 		"hitkeep-cloud-linux-amd64", "hitkeep-cloud-linux-arm64",
 		"hitkeep-linux-amd64", "hitkeep-linux-arm64",
-		"hitkeep-configuration.json",
-		"hitkeep.example.yaml",
+		runtimeconfig.ConfigurationCatalogFilename,
+		runtimeconfig.ConfigurationExampleFilename,
+		runtimeconfig.ConfigurationReleaseManifestFilename,
 	} {
 		path := filepath.Join(a.workspace.Root, name)
 		info, err := os.Stat(path)
@@ -216,7 +219,7 @@ func (a *App) requiredReleaseArtifacts() ([]string, error) {
 	return artifacts, nil
 }
 
-func verifySelfHostedReleaseArchive(path, version, arch string, example []byte) error {
+func verifySelfHostedReleaseArchive(path, version, arch string, catalog, example, manifest []byte) error {
 	name := fmt.Sprintf("hitkeep_%s_Linux_%s.tar.gz", version, arch)
 	if filepath.Base(path) != name {
 		return fmt.Errorf("unexpected release archive name %q", filepath.Base(path))
@@ -238,7 +241,9 @@ func verifySelfHostedReleaseArchive(path, version, arch string, example []byte) 
 		"hitkeep-linux-" + arch: {mode: 0o755},
 		"LICENSE":               {mode: 0o644},
 		"README.md":             {mode: 0o644},
-		"hitkeep.example.yaml":  {mode: 0o644, data: example},
+		runtimeconfig.ConfigurationCatalogFilename:         {mode: 0o644, data: catalog},
+		runtimeconfig.ConfigurationExampleFilename:         {mode: 0o644, data: example},
+		runtimeconfig.ConfigurationReleaseManifestFilename: {mode: 0o644, data: manifest},
 	}
 	reader := tar.NewReader(gzipReader)
 	for {
@@ -259,13 +264,16 @@ func verifySelfHostedReleaseArchive(path, version, arch string, example []byte) 
 				return err
 			}
 			if !bytes.Equal(contents, member.data) {
-				return errors.New("release archive example configuration differs from checked-in file")
+				return fmt.Errorf("release archive %s differs from the generated release input", header.Name)
 			}
 		}
 		delete(expected, header.Name)
 	}
 	if len(expected) != 0 {
 		return errors.New("release archive is missing required members")
+	}
+	if err := runtimeconfig.ValidateConfigurationReleaseManifest(manifest, catalog, example); err != nil {
+		return fmt.Errorf("validate release archive configuration manifest: %w", err)
 	}
 	return nil
 }
@@ -281,7 +289,15 @@ func (a *App) selfHostedReleaseArchives() ([]string, error) {
 	if len(paths) != 2 {
 		return nil, errors.New("expected exactly two self-hosted release archives")
 	}
-	example, err := os.ReadFile(filepath.Join(a.workspace.Root, "hitkeep.example.yaml"))
+	catalog, err := os.ReadFile(filepath.Join(a.workspace.Root, runtimeconfig.ConfigurationCatalogFilename))
+	if err != nil {
+		return nil, err
+	}
+	example, err := os.ReadFile(filepath.Join(a.workspace.Root, runtimeconfig.ConfigurationExampleFilename))
+	if err != nil {
+		return nil, err
+	}
+	manifest, err := os.ReadFile(filepath.Join(a.workspace.Root, runtimeconfig.ConfigurationReleaseManifestFilename))
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +310,7 @@ func (a *App) selfHostedReleaseArchives() ([]string, error) {
 		if seen[arch] {
 			return nil, fmt.Errorf("duplicate self-hosted release archive for %s", arch)
 		}
-		if err := verifySelfHostedReleaseArchive(path, version, arch, example); err != nil {
+		if err := verifySelfHostedReleaseArchive(path, version, arch, catalog, example, manifest); err != nil {
 			return nil, err
 		}
 		seen[arch] = true

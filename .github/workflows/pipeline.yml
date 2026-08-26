@@ -277,6 +277,14 @@ jobs:
             > "$release_inputs/hitkeep-configuration.json"
           env -u GOROOT go run ./cmd/hitkeep config init --output "$release_inputs/hitkeep.example.yaml"
           cmp "$release_inputs/hitkeep.example.yaml" hitkeep.example.yaml
+          ./hk catalog configuration-manifest \
+            --catalog "$release_inputs/hitkeep-configuration.json" \
+            --example "$release_inputs/hitkeep.example.yaml" \
+            --output json \
+            | jq -c '.data' > "$release_inputs/hitkeep-configuration-manifest.json"
+          cp "$release_inputs/hitkeep-configuration.json" .
+          cp "$release_inputs/hitkeep.example.yaml" .
+          cp "$release_inputs/hitkeep-configuration-manifest.json" .
 
       - name: Build and verify GoReleaser release archives
         id: release-artifacts
@@ -315,12 +323,12 @@ jobs:
             test -n "$source"
             cp "$source" "$release_dir/$archive"
             archive="$release_dir/$archive"
-            diff -u <(printf '%s\n' LICENSE README.md hitkeep.example.yaml "hitkeep-linux-${arch}" | LC_ALL=C sort) <(tar -tzf "$archive" | LC_ALL=C sort)
+            diff -u <(printf '%s\n' LICENSE README.md hitkeep-configuration.json hitkeep.example.yaml hitkeep-configuration-manifest.json "hitkeep-linux-${arch}" | LC_ALL=C sort) <(tar -tzf "$archive" | LC_ALL=C sort)
             test "$(tar -tvzf "$archive" "hitkeep-linux-${arch}" | awk '{print $1}')" = "-rwxr-xr-x"
-            for file in LICENSE README.md hitkeep.example.yaml; do
+            for file in LICENSE README.md hitkeep-configuration.json hitkeep.example.yaml hitkeep-configuration-manifest.json; do
               test "$(tar -tvzf "$archive" "$file" | awk '{print $1}')" = "-rw-r--r--"
+              cmp <(tar -xOzf "$archive" "$file") "$file"
             done
-            cmp <(tar -xOzf "$archive" hitkeep.example.yaml) hitkeep.example.yaml
             binary_dir="$(mktemp -d)"
             tar -xzf "$archive" -C "$binary_dir" "hitkeep-linux-${arch}"
             binary="$binary_dir/hitkeep-linux-${arch}"
@@ -409,6 +417,11 @@ jobs:
             | jq --arg tag "$RELEASE_TAG_NAME" --arg version "$release_version" \
               '.data + {release_tag: $tag, release_version: $version}' \
             > hitkeep-configuration.json
+          ./hk catalog configuration-manifest \
+            --catalog hitkeep-configuration.json \
+            --example hitkeep.example.yaml \
+            --output json \
+            | jq -c '.data' > hitkeep-configuration-manifest.json
 
       - name: Generate and verify release checksums
         run: |
@@ -439,6 +452,7 @@ jobs:
             "hitkeep_${release_version}_Linux_arm64.tar.gz"
             hitkeep-configuration.json
             hitkeep.example.yaml
+            hitkeep-configuration-manifest.json
             SHA256SUMS
           )
           for file in "${files[@]}"; do

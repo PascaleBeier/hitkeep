@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	runtimeconfig "hitkeep/config"
 )
 
 type archiveMember struct {
@@ -15,47 +17,34 @@ type archiveMember struct {
 }
 
 func TestVerifySelfHostedReleaseArchive(t *testing.T) {
-	example := []byte("http_addr: ':8080'\n")
+	catalog, example, manifest := releaseConfigurationInputs()
 	archive := filepath.Join(t.TempDir(), "hitkeep_2.12.0_Linux_amd64.tar.gz")
-	writeReleaseArchive(t, archive, []archiveMember{
-		{name: "hitkeep-linux-amd64", mode: 0o755, data: []byte("binary")},
-		{name: "LICENSE", mode: 0o644, data: []byte("license")},
-		{name: "README.md", mode: 0o644, data: []byte("readme")},
-		{name: "hitkeep.example.yaml", mode: 0o644, data: example},
-	})
+	writeReleaseArchive(t, archive, releaseArchiveMembers("amd64", catalog, example, manifest))
 
-	if err := verifySelfHostedReleaseArchive(archive, "2.12.0", "amd64", example); err != nil {
+	if err := verifySelfHostedReleaseArchive(archive, "2.12.0", "amd64", catalog, example, manifest); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestVerifySelfHostedReleaseArchiveRejectsCloudMember(t *testing.T) {
-	example := []byte("http_addr: ':8080'\n")
+	catalog, example, manifest := releaseConfigurationInputs()
 	archive := filepath.Join(t.TempDir(), "hitkeep_2.12.0_Linux_amd64.tar.gz")
-	writeReleaseArchive(t, archive, []archiveMember{
-		{name: "hitkeep-linux-amd64", mode: 0o755, data: []byte("binary")},
-		{name: "LICENSE", mode: 0o644, data: []byte("license")},
-		{name: "README.md", mode: 0o644, data: []byte("readme")},
-		{name: "hitkeep.example.yaml", mode: 0o644, data: example},
-		{name: "hitkeep-cloud-linux-amd64", mode: 0o755, data: []byte("cloud")},
-	})
+	members := append(releaseArchiveMembers("amd64", catalog, example, manifest), archiveMember{name: "hitkeep-cloud-linux-amd64", mode: 0o755, data: []byte("cloud")})
+	writeReleaseArchive(t, archive, members)
 
-	if err := verifySelfHostedReleaseArchive(archive, "2.12.0", "amd64", example); err == nil {
+	if err := verifySelfHostedReleaseArchive(archive, "2.12.0", "amd64", catalog, example, manifest); err == nil {
 		t.Fatal("expected cloud member rejection")
 	}
 }
 
 func TestVerifySelfHostedReleaseArchiveRejectsAlteredExample(t *testing.T) {
-	example := []byte("http_addr: ':8080'\n")
+	catalog, example, manifest := releaseConfigurationInputs()
 	archive := filepath.Join(t.TempDir(), "hitkeep_2.12.0_Linux_arm64.tar.gz")
-	writeReleaseArchive(t, archive, []archiveMember{
-		{name: "hitkeep-linux-arm64", mode: 0o755, data: []byte("binary")},
-		{name: "LICENSE", mode: 0o644, data: []byte("license")},
-		{name: "README.md", mode: 0o644, data: []byte("readme")},
-		{name: "hitkeep.example.yaml", mode: 0o644, data: []byte("changed")},
-	})
+	members := releaseArchiveMembers("arm64", catalog, example, manifest)
+	members[4].data = []byte("changed")
+	writeReleaseArchive(t, archive, members)
 
-	if err := verifySelfHostedReleaseArchive(archive, "2.12.0", "arm64", example); err == nil {
+	if err := verifySelfHostedReleaseArchive(archive, "2.12.0", "arm64", catalog, example, manifest); err == nil {
 		t.Fatal("expected example mismatch rejection")
 	}
 }
@@ -67,6 +56,23 @@ func TestReleaseArchiveMetadata(t *testing.T) {
 	}
 	if version != "2.12.0" || arch != "arm64" {
 		t.Fatalf("metadata = %q, %q", version, arch)
+	}
+}
+
+func releaseConfigurationInputs() ([]byte, []byte, []byte) {
+	catalog := []byte("{\"schema_version\":\"hitkeep.config/v2\"}\n")
+	example := []byte("http_addr: ':8080'\n")
+	return catalog, example, runtimeconfig.RenderConfigurationReleaseManifest(catalog, example)
+}
+
+func releaseArchiveMembers(arch string, catalog, example, manifest []byte) []archiveMember {
+	return []archiveMember{
+		{name: "hitkeep-linux-" + arch, mode: 0o755, data: []byte("binary")},
+		{name: "LICENSE", mode: 0o644, data: []byte("license")},
+		{name: "README.md", mode: 0o644, data: []byte("readme")},
+		{name: runtimeconfig.ConfigurationCatalogFilename, mode: 0o644, data: catalog},
+		{name: runtimeconfig.ConfigurationExampleFilename, mode: 0o644, data: example},
+		{name: runtimeconfig.ConfigurationReleaseManifestFilename, mode: 0o644, data: manifest},
 	}
 }
 

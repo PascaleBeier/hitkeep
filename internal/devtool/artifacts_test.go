@@ -6,6 +6,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	runtimeconfig "hitkeep/config"
 )
 
 func TestNPMCommandUsesCanonicalInstalledBinary(t *testing.T) {
@@ -25,19 +27,30 @@ func TestReleaseArtifactChecksumsAndPublicImageBoundary(t *testing.T) {
 	for _, name := range []string{
 		"hitkeep-cloud-linux-amd64", "hitkeep-cloud-linux-arm64",
 		"hitkeep-linux-amd64", "hitkeep-linux-arm64",
-		"hitkeep-configuration.json",
-		"hitkeep.example.yaml",
+		runtimeconfig.ConfigurationCatalogFilename,
+		runtimeconfig.ConfigurationExampleFilename,
 	} {
 		if err := os.WriteFile(filepath.Join(root, name), []byte(name+"\n"), 0o755); err != nil {
 			t.Fatal(err)
 		}
 	}
+	catalog, err := os.ReadFile(filepath.Join(root, runtimeconfig.ConfigurationCatalogFilename))
+	if err != nil {
+		t.Fatal(err)
+	}
+	example, err := os.ReadFile(filepath.Join(root, runtimeconfig.ConfigurationExampleFilename))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, runtimeconfig.ConfigurationReleaseManifestFilename), runtimeconfig.RenderConfigurationReleaseManifest(catalog, example), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	generated, err := app.GenerateReleaseChecksums()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if generated.Count != 7 {
-		t.Fatalf("generated artifact count = %d, want 7", generated.Count)
+	if generated.Count != 8 {
+		t.Fatalf("generated artifact count = %d, want 8", generated.Count)
 	}
 	checksums, err := os.ReadFile(filepath.Join(root, "SHA256SUMS"))
 	if err != nil {
@@ -46,7 +59,9 @@ func TestReleaseArtifactChecksumsAndPublicImageBoundary(t *testing.T) {
 	for _, name := range []string{
 		"hitkeep-cloud-linux-amd64", "hitkeep-cloud-linux-arm64",
 		"hitkeep-linux-amd64", "hitkeep-linux-arm64",
-		"hitkeep-configuration.json", "hitkeep.example.yaml",
+		runtimeconfig.ConfigurationCatalogFilename,
+		runtimeconfig.ConfigurationExampleFilename,
+		runtimeconfig.ConfigurationReleaseManifestFilename,
 	} {
 		if !strings.Contains(string(checksums), "  "+name+"\n") {
 			t.Fatalf("SHA256SUMS does not include %s", name)

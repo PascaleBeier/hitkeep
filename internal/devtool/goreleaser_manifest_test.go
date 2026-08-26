@@ -18,7 +18,9 @@ func TestGoReleaserTaggedSelfHostedArchiveManifest(t *testing.T) {
 		`name_template: "hitkeep_{{ .Version }}_Linux_{{ .Arch }}"`,
 		"- LICENSE",
 		"- README.md",
+		"- hitkeep-configuration.json",
 		"- hitkeep.example.yaml",
+		"- hitkeep-configuration-manifest.json",
 	} {
 		if !strings.Contains(archive, want) {
 			t.Errorf("self-hosted archive manifest missing %q", want)
@@ -81,6 +83,8 @@ func TestGoReleaserReleaseWorkflowContract(t *testing.T) {
 		"goreleaser-SHA256SUMS",
 		"hitkeep-cloud-linux-amd64",
 		"hitkeep-linux-amd64",
+		"./hk catalog configuration-manifest",
+		"hitkeep-configuration-manifest.json",
 		"release-archives-${{ inputs.version }}",
 		"hitkeep_${release_version}_Linux_amd64.tar.gz",
 		"hitkeep_${release_version}_Linux_arm64.tar.gz",

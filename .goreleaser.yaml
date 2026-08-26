@@ -55,7 +55,9 @@ archives:
     files:
       - LICENSE
       - README.md
+      - hitkeep-configuration.json
       - hitkeep.example.yaml
+      - hitkeep-configuration-manifest.json
 
 checksum:
   name_template: SHA256SUMS

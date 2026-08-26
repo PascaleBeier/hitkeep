@@ -665,8 +665,10 @@ func validateReleaseMetadata(root string) error {
 			"--id self-hosted",
 			"--id cloud",
 			"./hk catalog configuration --output json",
+			"./hk catalog configuration-manifest",
 			"hitkeep-configuration.json",
 			"hitkeep.example.yaml",
+			"hitkeep-configuration-manifest.json",
 			"release_tag: $tag",
 			"release_version: $version",
 		},
@@ -687,6 +689,15 @@ func validateReleaseMetadata(root string) error {
 		}
 		if name == ".github/workflows/pipeline.yml" && bytes.Contains(raw, []byte("./hk ci build-binaries")) {
 			return fmt.Errorf(".github/workflows/pipeline.yml must not run ./hk ci build-binaries")
+		}
+	}
+	goreleaserManifest, err := os.ReadFile(filepath.Join(root, ".goreleaser.yaml"))
+	if err != nil {
+		return err
+	}
+	for _, artifact := range []string{runtimeconfig.ConfigurationCatalogFilename, runtimeconfig.ConfigurationExampleFilename, runtimeconfig.ConfigurationReleaseManifestFilename} {
+		if !bytes.Contains(goreleaserManifest, []byte(artifact)) {
+			return fmt.Errorf(".goreleaser.yaml is missing release configuration artifact %q", artifact)
 		}
 	}
 	releaseWorkflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "release.yml"))
