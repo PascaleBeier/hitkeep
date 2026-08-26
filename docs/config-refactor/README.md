@@ -4,6 +4,8 @@ Branch: `feat/config_refactor`
 
 Implementation plan: [Cobra, Viper, configuration, filesystem, release, and layout migration](../architecture/cobra-viper-config-go-layout-migration.md)
 
+Evidence manifests: [filesystem and package layout](filesystem-layout-manifest.md)
+
 This folder is the durable progress ledger for the migration. Update it in the same slice that changes implementation state. Do not use it as a second command, configuration, dependency, or QA catalog; those remain owned by code and `hk`.
 
 ## Compatibility invariants
@@ -22,7 +24,7 @@ This folder is the durable progress ledger for the migration. Update it in the s
 |---|---|---|---|
 | 0A | Completed | Characterize current config/catalog/flag contracts; inventory CLI and release surfaces | `go test -race ./internal/config`; table-driven canonical/deprecated order contract; Gortex CLI/release discovery |
 | 0B | Completed | Add configuration-surface drift fixture and issue #288 failure-shaped upgrade fixture | Dockerfile data path must be image-defined beneath a declared volume; `go test -race ./internal/devtool` |
-| 0C | In progress | Inventory filesystem operations and dependency-ordered `internal/` move manifest | Initial semantic classification and completed move list exist; further Phase 9/10 waves are frozen until every remaining direct child and filesystem operation has an owner, dependency/cycle assessment, and native/Afero/fileflow/pathologize decision |
+| 0C | In progress | Inventory filesystem operations and dependency-ordered `internal/` move manifest | The durable filesystem/package manifest records remaining families, classifications, native exclusions, and four rejected move candidates; further Phase 9/10 waves remain frozen until every remaining direct child and operation has complete dependency/owner/build-tag/generated-file evidence |
 | 1 | Completed | Make catalog authoritative and generate neutral `hitkeep.example.yaml` | Catalog `config_file_key` added; schema `hitkeep.config/v2`; deterministic example covers each self-hosted key once |
 | 2 | Completed | Add instance-based Viper assembler in shadow parity | Viper 1.21.0 + Afero explicit YAML; full catalog types, strict keys, normalization, warnings, and precedence proven |
 | 3 | In progress | Production Cobra root with legacy-compatible routing | Factory-built Cobra root owns top-level execution and exact first-argument routing; healthcheck now inherits Cobra context and returns a typed result to the executable boundary with exact subprocess parity; recovery and remaining actions still need context/error/stream ownership |
@@ -34,7 +36,7 @@ This folder is the durable progress ledger for the migration. Update it in the s
 | 6 | In progress | Project catalog into Docker, Compose, Helm, examples, and docs artifact | Catalog-owned data-path policy now rejects missing files, omitted declarations, and default drift across exact Docker, all root/example Compose, real Helm template/values, and canonical-example paths; remaining-setting classification, identical artifact distribution, and private-doc attestation remain pending |
 | 7 | In progress | Enforce issue #288 upgrade, rollback, recreation, and migration interruption gates | Digest-pinned v2.12 migration, two candidate recreations, quiescent fresh-volume rollback, and forced process-kill/restart recovery across all 19 durable split boundaries are proven; release finalization now transitively requires the reusable interruption acceptance workflow; authenticated Helm lifecycle execution remains pending |
 | 8 | In progress | GoReleaser release ownership while preserving future package-manager compatibility | Tagged Linux amd64/arm64 archives, checksums, raw cloud assets, version metadata, and exact-SHA snapshot publication are proven; a stabilization release plus Darwin/Windows CGO feasibility remain pending |
-| 8A | Completed | Review and simplify the release process with Ponytail and spf13 Go guidance | One parallel Docker/Compose/Helm upgrade matrix replaces three duplicated job definitions; finalization depends on the aggregate gate; exact-SHA snapshot `33017615814` passed on `c09d2c6d` |
+| 8A | In progress | Review and simplify the release process with Ponytail and spf13 Go guidance | Interim review removed three duplicated upgrade job definitions and exact-SHA snapshot `33017615814` passed on `c09d2c6d`; the requested whole-release review must be repeated after docs attestation, Helm lifecycle proof, final graph assembly, and stabilization evidence |
 | 9 | In progress | Afero/fileflow/pathologize migration by operation risk | Runtime config uses injected Afero and one cross-filesystem release relocation uses fileflow; the complete operation inventory and remaining justified waves are pending, while database/WAL/fsync/lock operations stay native |
 | 10 | In progress | Flatten `internal/` in dependency-order move-only slices | Pure foundations moved: `internal/appurl` → `appurl`, `internal/exportfmt` → `exportfmt`, `internal/hklog` → `hklog`, `internal/analyticscatalog` → `analyticscatalog`, `internal/jsonapi` → `jsonapi`, `internal/localization` → `localization`, `internal/mcptest` → `mcptest`, and stabilized `internal/config` → `config`; no compatibility shims because Go already prohibited external imports |
 | 11 | Pending | Stabilize, full QA, CI, docs validation, completion audit | — |
@@ -144,7 +146,7 @@ Record focused commands as stable test targets or `hk` gate IDs, not pasted succ
 | 2026-08-27 | 8A | Changed QA `20260826T215429-d0a8cfa3` | Passed: `go-format`, `go-fix`, `go-lint`, `go-vet`, `go-staticcheck`, `developer-mcp`, `developer-docs` |
 | 2026-08-27 | 8A | Exact-SHA snapshot `33017615814` | Passed on `c09d2c6d`: deterministic dashboard, native Linux amd64/arm64 binaries and version checks, multi-architecture GoReleaser archives, multi-platform image, attestations, and release upload |
 
-## Most recently completed slice: 8A
+## Interim release simplification: 8A
 
 - Reused the existing release workflow and smoke scripts; no new reusable workflow, helper service, or release orchestrator was added.
 - Collapsed three duplicated v2.12 upgrade job definitions into one fail-independent matrix while retaining distinct surface names and parallel execution.
