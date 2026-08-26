@@ -189,6 +189,8 @@ jobs:
             --output "hitkeep-cloud-${{ matrix.artifact_suffix }}"
 
       - name: Verify native binary versions
+        env:
+          HITKEEP_VERSION: ${{ inputs.version }}
         shell: bash
         run: |
           set -euo pipefail

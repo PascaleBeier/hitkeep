@@ -215,16 +215,25 @@ func TestGoReleaserNativeBuildsVerifyRawBinaryVersions(t *testing.T) {
 	if end := strings.Index(nativeJob, "\n  build-release-archives:"); end != -1 {
 		nativeJob = nativeJob[:end]
 	}
+	verificationStart := strings.Index(nativeJob, "      - name: Verify native binary versions\n")
+	if verificationStart == -1 {
+		t.Fatal("native binary version verification step missing")
+	}
+	verificationStep := nativeJob[verificationStart:]
+	if end := strings.Index(verificationStep, "\n      - uses: actions/upload-artifact"); end != -1 {
+		verificationStep = verificationStep[:end]
+	}
 	for _, want := range []string{
+		"HITKEEP_VERSION: ${{ inputs.version }}",
 		"for binary in \"hitkeep-${{ matrix.artifact_suffix }}\" \"hitkeep-cloud-${{ matrix.artifact_suffix }}\"; do",
 		"version_output=\"$(\"./$binary\" --version)\"",
 		"test \"$version_output\" = \"$HITKEEP_VERSION\"",
 	} {
-		if !strings.Contains(nativeJob, want) {
+		if !strings.Contains(verificationStep, want) {
 			t.Errorf("native binary version verification missing %q", want)
 		}
 	}
-	if strings.Contains(nativeJob, "qemu-") || strings.Contains(nativeJob, "strings \"$binary\"") {
+	if strings.Contains(verificationStep, "qemu-") || strings.Contains(verificationStep, "strings \"$binary\"") {
 		t.Error("native binary version verification must execute the matching runner binaries")
 	}
 }
