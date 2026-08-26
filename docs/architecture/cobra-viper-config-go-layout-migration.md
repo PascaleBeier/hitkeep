@@ -1,6 +1,6 @@
 # HitKeep 2.x Cobra, Viper, Configuration, Filesystem, and Go Layout Migration
 
-Status: implementation plan
+Status: implementation in progress
 
 Target: backward-compatible HitKeep 2.x releases
 
@@ -20,6 +20,18 @@ Migrate HitKeep to:
 - flat, domain-named Go packages instead of the `internal/` directory tree, without coupling the structural move to runtime behavior changes.
 
 This is not one large refactor. It is a sequence of independently releasable 2.x changes. Every phase must leave the repository buildable, deployable, downgradeable within the limits stated below, and behaviorally compatible with the previous phase.
+
+### Implementation baseline
+
+| Area | State on `feat/config_refactor` | Remaining proof |
+|---|---|---|
+| Catalog, example YAML, Viper assembly | Implemented | stabilization window and final legacy-oracle contraction only |
+| Production Cobra routing and config commands | Implemented with 2.x compatibility routing | subprocess exit/stream grammar and final help/version contract |
+| Distribution drift validation | Implemented for checked surfaces | private-docs attestation and semantic Compose/Helm upgrade gates |
+| Issue #288 | Partial | immutable v2.12.0 pre-split fixture, recognizable API data, rollback snapshot, and release prerequisite |
+| GoReleaser | Partial | tagged archive/checksum ownership and target-platform feasibility |
+| Filesystem policy | Operation inventory and bounded migrations implemented | continue only where Afero/fileflow/pathologize semantics fit |
+| Flat Go layout | In progress | dependency-ordered move-only waves and final active-path audit |
 
 ## 2. Why this work is necessary
 
@@ -51,6 +63,8 @@ Before implementation, encode these rules as tests and keep them green through e
 - Every existing `hk` command path, flag, structured JSON envelope, workspace routing rule, MCP manifest, and finite-run/development-session behavior remains compatible.
 - Cobra commands use fresh factories, `RunE`, command contexts, `SilenceUsage`, and `SilenceErrors`; business packages never import Cobra.
 - Help may be reorganized, but existing accepted invocations cannot change meaning in 2.x.
+- The 2.x bootstrap grammar recognizes an explicit config file only when `--config PATH` or `--config=PATH` is the leading argv element. It consumes that selector before handing the remaining argv to the legacy-compatible server parser. A later `--config`, `--`, positional arguments, duplicate selectors, and all non-leading flags retain their characterized legacy meaning.
+- Only exact `config init` and `config validate` command paths claim the formerly server-routed `config` namespace. Bare `config`, unknown children, and legacy flags under `config` fall back unchanged. Subprocess tests, not only in-memory Cobra tests, own exit-code and stdout/stderr compatibility.
 
 ### 3.2 Configuration compatibility
 
@@ -71,9 +85,9 @@ Config files are additive in 2.x. They must improve first-run UX without alterin
 
 - Generate one canonical, comment-rich `hitkeep.example.yaml` from the configuration catalog. Ship the identical artifact in source releases, binary archives, the container image, Helm chart material, and public docs.
 - The file contains every self-hosted setting in stable catalog order, its current literal default, accepted values/units, restart behavior, and a concise description. Derived/runtime-generated defaults such as `GOMAXPROCS`, `hostname-timestamp`, `<data-path>/recovery`, or `randomly generated` appear only in comments while the YAML key remains unset/commented, so the file preserves derivation. Sensitive fields are present only as empty/commented placeholders; no credential is ever generated into the artifact.
-- Config-file keys are exact lowercase kebab-case canonical keys in one flat namespace, for example `data-path`. Nested keys, alternate casing, underscore aliases, and deprecated config-file aliases are not introduced in 2.x. Validate raw file keys before Viper decoding so strict spelling and unknown-key errors are deterministic.
+- Config-file keys are exact lowercase kebab-case canonical keys in one flat namespace, for example `data-path`. The file is exactly one YAML document containing one top-level mapping whose values are scalars. Nested keys, duplicate keys, aliases, merge keys, nulls, mappings, sequences, alternate casing, underscore aliases, and deprecated config-file aliases are rejected before Viper decoding. Quoted empty strings remain explicit scalar values and follow the field’s existing decode/validation behavior.
 - Add `hitkeep config init --output <path>` to write the embedded/generated canonical file without overwriting an existing path, and `hitkeep config validate --config <path>` to run the same strict decode, validation, and redaction path as startup. These commands perform no runtime or database mutation.
-- Add an explicit root-persistent `--config` path, with an optional canonical `HITKEEP_CONFIG` equivalent only if the catalog can represent and test it without colliding with runtime configuration.
+- Add the explicit leading bootstrap selector `--config PATH` / `--config=PATH`. It is intentionally not a Cobra root-persistent flag in 2.x because interspersed parsing would change legacy server argv behavior. `HITKEEP_CONFIG` is deferred; adding it later requires a separately characterized bootstrap-precedence contract and it must not enter the runtime-key namespace.
 - Do not silently search the home directory or working directory in 2.x. A missing explicitly requested file is an error; no requested file means no file read and preserves legacy behavior. Packagers may install the example under a shared documentation path, but must not create or overwrite an operator-owned active config.
 - YAML is the documented and generated format. Support another Viper format only after it has the same strict-key and parity coverage. Do not add remote providers or live reload.
 - Older binaries preserve environment behavior because environment variables remain the 2.x deployment contract. Operators who adopt config-file-only settings must translate them back to environment variables before downgrading to a pre-file-support release.
@@ -85,6 +99,8 @@ Config files are additive in 2.x. They must improve first-run UX without alterin
 - The same image must survive stop, container deletion, recreation with the same mounted volume, restart, and repeated restart without losing or relocating state.
 - Automatic update tooling is a supported upgrade shape for non-breaking 2.x releases. Release validation must recreate the container rather than merely restart the same container.
 - A migration that cannot satisfy these conditions is a major-version change or must be made opt-in until the next major.
+- The supported upgrade floor is explicit in a checked release-fixture manifest. Every release gate tests the oldest supported floor plus the immediate predecessor of each storage-layout transition; issue #288 specifically requires immutable v2.12.0 → candidate coverage because v2.12 was the last pre-split layout.
+- Directly running a previous binary on a completed newer layout is unsupported unless a dedicated compatibility test proves it. The required 2.x rollback contract is a quiescent full-volume snapshot before migration, restore into a fresh volume, then previous-image data/readiness verification across restart.
 
 ## 4. Target architecture
 
@@ -267,7 +283,7 @@ Rollback: command factories can be reverted without changing workspace state for
 1. Generate or validate a marked configuration block in the Dockerfile, including the container-specific persistent data root.
 2. Generate the environment/config sections of `compose.yaml`, `compose.cluster.yaml`, `compose.dev.yaml`, and every example Compose file. Preserve hand-written service topology outside marked blocks.
 3. Generate or validate Helm values, templates, schema descriptions, persistence mounts, and upgrade-safe defaults from the same descriptors. Preserve chart-specific templating as a thin projection, not another inventory.
-4. Emit a versioned, redacted reference artifact for `hitkeep-docs`. The docs repository consumes it and adds guides/explanations. CI compares the docs artifact version to the application catalog version.
+4. Emit a versioned, redacted reference artifact for `hitkeep-docs`, including catalog schema, content hash, and application release identity. The private docs repository verifies that exact artifact and reports a required commit status/attestation back to release preparation. A missing or stale attestation leaves the release draft pending; `continue-on-error` documentation dispatch is not synchronization.
 5. Project the canonical `hitkeep.example.yaml` unchanged and generate any `.env` example from the same descriptors. Images and packages place the example in a documented read-only/share path; startup and upgrades never copy it over an operator-owned active config. Never emit secrets.
 6. Make release preparation fail if a persistence-sensitive option lacks all required surface projections or an upgrade test.
 7. Update contributor skills to point at the catalog/generator workflow, not copied option lists.
@@ -278,7 +294,7 @@ Do not generate whole Docker, Compose, Helm, or prose files when only a bounded 
 
 Add a release-grade container upgrade test with this exact shape:
 
-1. Start a release-fixture manifest’s previous supported 2.x image by immutable digest, with recorded platform and fixture schema, using the documented plain-Docker defaults and one named/bind-mounted persistent data volume. Retain every digest referenced by a supported upgrade fixture; never resolve a mutable tag during the gate.
+1. Read the checked release-fixture manifest and test every required predecessor: the oldest supported floor plus the immediate predecessor of each storage-layout transition. For issue #288 the required floor is v2.12.0, pinned by immutable per-platform image digest and expected version. Reject mutable, same-version, newer, wrong-platform, or post-transition substitutes. Start it with documented plain-Docker defaults and one named/bind-mounted persistent data volume.
 2. Seed recognizable control-plane and default-tenant analytics data.
 3. Stop and delete the container.
 4. Start the candidate image with the same volume, deliberately omitting `HITKEEP_DATA_PATH` and other newly introduced variables.
@@ -288,8 +304,9 @@ Add a release-grade container upgrade test with this exact shape:
 8. Repeat startup to prove idempotency.
 9. Exercise an injected interruption at every durable migration boundary and verify either safe resume or safe rollback with an actionable, non-secret error.
 10. Parse/inspect the candidate image and assert every persistence-sensitive container default resolves under the declared mounted persistence root.
+11. Before candidate migration, take a quiescent complete volume snapshot. After candidate verification, restore it into a fresh volume, start the pinned previous image with its original arguments, and verify the same control-plane and analytics identities across another restart. Never test rollback by running the previous binary directly on the migrated volume unless that downgrade path is separately proven.
 
-Run the same semantic check for Compose and Helm. A Watchtower-specific dependency is unnecessary: container deletion and recreation with unchanged image arguments and volume is the behavior that matters.
+Run the same semantic check for Compose and Helm. Static rendered-value checks are necessary but do not replace old deployment → candidate upgrade → workload deletion/recreation → API data verification. A Watchtower-specific dependency is unnecessary: container deletion and recreation with unchanged image arguments and volume is the behavior that matters.
 
 Release policy:
 
@@ -308,13 +325,13 @@ GoReleaser replaces hand-rolled binary/archive/checksum assembly only after it c
 4. Use `-trimpath`. Strip symbols only if the existing debugging/core-dump policy allows it; artifact size is not worth losing required production diagnostics.
 5. Bundle `LICENSE`, the minimal install/readme material, and the generated `hitkeep.example.yaml` in every binary archive. The config artifact hash must match the catalog-generated source artifact.
 6. Run GoReleaser snapshot builds in CI with publication disabled and compare the artifact manifest against the legacy builder for every supported target. Keep the legacy builder authoritative until names, formats, executable modes, version output, and checksum coverage match exactly.
-7. Cut over the release workflow so one job builds/uploads each artifact once. Preserve Release Please’s changelog and tag behavior, existing image publication, Helm sequencing, and release metadata. Remove the legacy binary/checksum assembly only after one successful stabilization release.
+7. Cut over the release workflow so Release Please creates the immutable version/tag and a draft release. Build binaries and a SHA-addressed candidate image, then run artifact, issue #288, Compose, and Helm verification against exact immutable inputs. Upload exact-version artifacts first. One final job that transitively depends on every required gate publishes the GitHub release and promotes mutable image/npm pointers. A failure leaves an unpublished draft and never advances `latest`, major/minor image tags, Helm, or npm dist-tags. Remove the legacy binary/checksum assembly only after GoReleaser owns tagged archives/checksums and one stabilization release succeeds.
 8. Verify `go install` at the existing `cmd/hitkeep` package path if it is currently supported; otherwise document it as unsupported rather than accidentally promising it during this migration. Never ship `replace` directives or depend on `go.work`.
 9. Treat tags and published module versions as immutable. A failed pre-publication run falls back to the legacy builder; a bad published release rolls forward with a fixed patch release and, when module consumers are affected, a `retract` directive—never delete or retag it.
 
 Future package-manager enablement:
 
-- Keep archive names, checksums, version output, config-file location guidance, and install layout stable so GoReleaser can later generate Homebrew and Scoop metadata without repackaging the binary.
+- Keep archive names, checksums, version output, config-file location guidance, and install layout stable, but do not call this package-manager-ready until native snapshot builds and install/upgrade/uninstall smokes pass for the intended Darwin/Linux Homebrew and Windows Scoop targets. DuckDB CGO/platform feasibility is an explicit prerequisite.
 - After the core GoReleaser pipeline is stable, use separate reviewed changes to add a Homebrew tap and Scoop bucket. Those changes require explicit authorization for repository creation, credentials/tokens, and publication.
 - Package-manager formulas/manifests must reference immutable release artifacts and checksums, install the example config without overwriting operator state, expose the same service/config invocation contract, and pass install/upgrade/uninstall smoke tests.
 - Add deb/rpm, signing, provenance, or further package managers only when there is an actual distribution requirement; they are not prerequisites for this migration.
@@ -452,7 +469,7 @@ The migration is complete when:
 - both binaries are factory-built Cobra applications with context-aware, in-memory-tested routing;
 - all runtime configuration is assembled by a fresh Viper instance into the typed config with legacy parity proven;
 - the canonical catalog drives runtime registration, the clear/generated `hitkeep.example.yaml`, and mechanical validation of every required publishing surface;
-- GoReleaser reproducibly owns the established self-hosted binary archives and checksums without changing artifact contracts, and the release layout is ready for separately authorized Homebrew/Scoop publishers;
+- GoReleaser reproducibly owns tagged self-hosted archives and checksums without changing artifact contracts; Homebrew/Scoop enablement remains incomplete until supported Darwin/Windows CGO builds and package-manager lifecycle smokes pass;
 - the issue #288 container recreation test is a required release gate and fails on any missing persistent default;
 - filesystem operations use Afero, fileflow, pathologize, or OS primitives according to their actual semantics, with no duplicated unsafe move/path code;
 - no Go source, generator, workflow, skill, or documentation path depends on the `internal/` directory tree;
