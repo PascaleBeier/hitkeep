@@ -25,13 +25,13 @@ This is not one large refactor. It is a sequence of independently releasable 2.x
 
 | Area | State on `feat/config_refactor` | Remaining proof |
 |---|---|---|
-| Catalog, example YAML, Viper assembly | Runtime cutover, strict explicit YAML, and self-hosted descriptor parity implemented | cloud/build-variant parity, stabilization, and final legacy-oracle contraction |
+| Catalog, example YAML, Viper assembly | Runtime cutover, strict explicit YAML, and catalog-wide self-hosted/cloud build-variant parity implemented | stabilization and final legacy-oracle contraction |
 | Production Cobra routing and config commands | 2.x compatibility router and config commands implemented | full Cobra flag ownership, command-context propagation, subprocess stream/exit grammar, and final help/version contract |
 | Distribution drift validation | Data-path publication policy enforces exact Docker, Compose, Helm, example, and canonical-example paths/defaults | classify remaining settings, identical example distribution, private-docs attestation, and semantic Compose/Helm upgrade gates |
-| Issue #288 | Candidate recreation and quiescent legacy rollback implemented and release-gated | amd64/arm64 matrix execution, migration-interruption prerequisite, and Compose/Helm semantic gates |
-| GoReleaser | Snapshot raw-binary builds plus self-hosted archive/checksum manifest implemented | tagged workflow ownership, multi-architecture assembly, and target-platform feasibility |
+| Issue #288 | Candidate recreation, quiescent legacy rollback, all-19-boundary forced process-kill recovery, and parallel Docker/Compose/Helm release wiring implemented | transitive release-finalizer interruption dependency and authenticated disposable-cluster Helm execution |
+| GoReleaser | Tagged Linux amd64/arm64 archives, checksums, raw cloud assets, native version checks, and exact-SHA snapshot publication proven | one stabilization release plus Darwin/Windows CGO and package-manager lifecycle feasibility |
 | Filesystem policy | Bounded Afero/fileflow adoption implemented | complete operation inventory and further waves only where semantics fit |
-| Flat Go layout | In progress | dependency-ordered move-only waves and final active-path audit |
+| Flat Go layout | Eight move-only foundations completed (`appurl`, `exportfmt`, `hklog`, `analyticscatalog`, `jsonapi`, `localization`, `config`, `mcptest`); approximately 30 direct `internal/` domain families remain | complete the owner/dependency/filesystem manifests before another wave, then resume dependency-ordered moves and final active-path audit |
 
 ## 2. Why this work is necessary
 
@@ -122,15 +122,15 @@ Proposed end state:
 
 ```text
 cmd/
+  root.go               # production Cobra routing; retain the existing package
   hitkeep/main.go       # signal context, NewRootCommand, print one error, exit
-  hk/main.go            # signal context, NewRootCommand, print one error, exit
-hitkeepcmd/             # production Cobra routing only
-hkcmd/                  # developer Cobra routing only
+  hk/main.go            # signal context, developer root factory, print one error, exit
+devtool/cli/            # developer Cobra routing after its move-only internal/ wave
 config/                 # typed config, Viper assembly, catalog, validation
 server/ database/ ...   # domain behavior
 ```
 
-The exact package names should be confirmed against import-cycle analysis before the first move. Do not create generic `cli`, `common`, `utils`, `service`, or `repository` packages. Command packages may define small function fields for test seams; do not introduce single-implementation interfaces.
+Retain the existing production `cmd` package; renaming it to `hitkeepcmd` adds no ownership or cycle benefit. Confirm the developer routing destination against import-cycle analysis before its move-only wave. Do not create generic `cli`, `common`, `utils`, `service`, or `repository` packages. Command packages may define small function fields for test seams; do not introduce single-implementation interfaces.
 
 The production root must preserve no-subcommand startup. Every existing production configuration flag and deprecated alias remains a root persistent flag so `hitkeep --flag`, healthcheck, and recovery compatibility invocations retain the same reach and sequential last-occurrence-wins behavior; only truly command-specific operational flags are local. Recovery and healthcheck become explicit Cobra commands or compatibility flags only where their current invocation contract requires it. Cobra built-ins should own help, version, completion, argument validation, flag relationships, and error propagation when doing so preserves output compatibility.
 
@@ -187,7 +187,7 @@ Use the narrowest appropriate implementation:
 - Use `afero.Fs` injection for components whose ordinary file reads/writes/directories need isolation and in-memory tests. Construct `afero.NewOsFs()` at binary composition roots and pass it down. Use `afero.NewMemMapFs()` in focused tests.
 - `fileflow` is always an OS-backed boundary; it does not operate on virtual Afero paths. A component that reaches this boundary either receives a small injected move/copy function for unit tests or uses a real temporary filesystem integration test. Never pass a path that exists only in `afero.NewMemMapFs()` to fileflow.
 - Use `fileflow.Move`, `Copy`, or `Rename` for user-visible moves/copies/renames where cross-filesystem behavior, atomic destination writes, or collision safety matters. Always use the returned final path and handle partial-success errors such as destination success plus source cleanup failure.
-- Canonical state paths such as `hitkeep.db`, tenant databases, markers, and recovery bundles must never accept fileflow’s suffix fallback. Retain the proven OS commit primitive or use a configured `fileflow.Flow` whose conflict callback returns an error, whose `NoCreateDirs` is true when a mount must already exist, and whose caller syncs the destination file and parent directory before advancing durable state.
+- Canonical state paths such as `hitkeep.db`, tenant databases, markers, and recovery bundles retain the proven OS no-replace commit primitive by default. They must never accept fileflow suffix fallback, implicit identical-destination success, or source deletion merely because equal destination bytes already exist. Use fileflow at this boundary only when identical-destination success and source removal are explicit idempotent state-machine transitions, `NoCreateDirs` protects required mounts, and real-filesystem crash/fault tests prove file and parent-directory sync ordering before durable state advances.
 - Use `pathologize.Join` when untrusted path segments are placed under a trusted configured root. Configured roots must be operator-controlled and not attacker-writable. Because lexical containment does not prevent symlink redirection, security-sensitive writes must resolve/check the real parent beneath the trusted root at the OS boundary or reject writable/symlinked intermediates. Do not use `CleanPath` as a traversal defense.
 - Keep `os`/`io/fs` where the operating-system primitive is the behavior: process environment, signals, executable lookup, file descriptors, locks, durability `Sync`, ownership/permissions not modeled by an abstraction, memory mapping, and DuckDB paths passed to the native database engine.
 - Do not wrap Afero in a repository-wide custom filesystem interface. Inject the concrete small dependency a domain needs.
@@ -200,6 +200,8 @@ This distinction prevents “move all filesystem access” from weakening the ex
 Each phase is one or more small pull requests. Never combine a package move with a configuration semantic change or a storage migration.
 
 ### Phase 0 — Freeze and inventory the current contracts
+
+Status: partially complete. Retain the already-landed, behavior-preserving leaf moves and bounded filesystem substitutions, but freeze further Phase 9 filesystem waves and Phase 10 package moves until the operation inventory and direct-child package-move manifest have no unknown owners.
 
 1. Export the current schema-versioned configuration catalog as a checked test fixture with secrets redacted.
 2. Build a table-driven legacy loader characterization suite covering every descriptor and every source: absent, valid env, empty env, invalid env, current flag, deprecated flag, both flags, and build variant.
@@ -257,7 +259,7 @@ Rollback: restore the former entrypoint/router. Config and data are unchanged.
 
 ### Phase 4 — Switch production configuration assembly to Viper
 
-1. Expose the explicit `--config` path on the production root.
+1. Preserve the characterized leading-only bootstrap grammar outside Cobra: extract only `argv[0]` forms `--config PATH` and `--config=PATH`, remove that selector before legacy-compatible routing, and pass the selected path into the fresh root factory/config loader. Do not register `--config` as a Cobra persistent flag in 2.x. Subprocess tests must cover split/equal leading forms plus later, duplicate, positional, and post-`--` cases.
 2. Bind root persistent flags and the active command’s local flags after Cobra parsing.
 3. Switch the production root from the legacy loader to the parity-proven Viper assembler.
 4. Retain the legacy loader only as a test oracle for one stabilization window; do not add a user-facing “config engine” toggle.
@@ -283,7 +285,7 @@ Rollback: command factories can be reverted without changing workspace state for
 1. Generate or validate a marked configuration block in the Dockerfile, including the container-specific persistent data root.
 2. Generate the environment/config sections of `compose.yaml`, `compose.cluster.yaml`, `compose.dev.yaml`, and every example Compose file. Preserve hand-written service topology outside marked blocks.
 3. Generate or validate Helm values, templates, schema descriptions, persistence mounts, and upgrade-safe defaults from the same descriptors. Preserve chart-specific templating as a thin projection, not another inventory.
-4. Emit a versioned, redacted reference artifact for `hitkeep-docs`, including catalog schema, content hash, and application release identity. The private docs repository verifies that exact artifact and reports a required commit status/attestation back to release preparation. A missing or stale attestation leaves the release draft pending; `continue-on-error` documentation dispatch is not synchronization.
+4. Emit a versioned, redacted JSON attestation subject for `hitkeep-docs` with exactly: manifest schema version, HitKeep source commit, immutable release tag, SHA-256 of the catalog JSON bytes, SHA-256 of the canonical example-YAML bytes, and the docs commit. Do not trust a generic commit status or matching check name. Release preparation dispatches `PascaleBeier/hitkeep-docs/.github/workflows/sync-hitkeep-release.yml` on `refs/heads/main`, captures the exact run ID, and accepts only an artifact produced by that run after verifying through GitHub metadata that the repository and workflow path match, the event is `workflow_dispatch`, the run head SHA equals the attested docs commit, the check-suite producer is GitHub Actions App ID `15368`, the workflow file at that docs commit has the SHA-256 pinned by HitKeep release policy, and the run concluded successfully. A wrong source commit/tag, schema/hash, app, repository, workflow, ref, workflow-file hash, run ID, timeout, missing artifact, or stale success leaves the release draft unpublished; contract fixtures reject every case. A best-effort `continue-on-error` dispatch is notification only and never satisfies synchronization.
 5. Project the canonical `hitkeep.example.yaml` unchanged and generate any `.env` example from the same descriptors. Images and packages place the example in a documented read-only/share path; startup and upgrades never copy it over an operator-owned active config. Never emit secrets.
 6. Make release preparation fail if a persistence-sensitive option lacks all required surface projections or an upgrade test.
 7. Update contributor skills to point at the catalog/generator workflow, not copied option lists.
@@ -325,8 +327,8 @@ GoReleaser replaces hand-rolled binary/archive/checksum assembly only after it c
 4. Use `-trimpath`. Strip symbols only if the existing debugging/core-dump policy allows it; artifact size is not worth losing required production diagnostics.
 5. Bundle `LICENSE`, the minimal install/readme material, and the generated `hitkeep.example.yaml` in every binary archive. The config artifact hash must match the catalog-generated source artifact.
 6. Run GoReleaser snapshot builds in CI with publication disabled and compare the artifact manifest against the legacy builder for every supported target. Keep the legacy builder authoritative until names, formats, executable modes, version output, and checksum coverage match exactly.
-7. Cut over the release workflow so Release Please creates the immutable version/tag and a draft release. Build binaries and a SHA-addressed candidate image, then run artifact, issue #288, Compose, and Helm verification against exact immutable inputs. Upload exact-version artifacts first. One final job that transitively depends on every required gate publishes the GitHub release and promotes mutable image/npm pointers. A failure leaves an unpublished draft and never advances `latest`, major/minor image tags, Helm, or npm dist-tags. Remove the legacy binary/checksum assembly only after GoReleaser owns tagged archives/checksums and one stabilization release succeeds.
-8. Verify `go install` at the existing `cmd/hitkeep` package path if it is currently supported; otherwise document it as unsupported rather than accidentally promising it during this migration. Never ship `replace` directives or depend on `go.work`.
+7. Cut over the release workflow so Release Please creates the immutable version/tag and a draft release. Build binaries and a SHA-addressed candidate image, then run artifact, issue #288 Docker/Compose/Helm, real-filesystem migration-interruption, and exact-source docs-attestation gates against immutable inputs. Upload exact-version artifacts first. One final job that transitively depends on every required gate publishes the GitHub release and promotes mutable image/npm pointers. A failure leaves an unpublished draft and never advances `latest`, major/minor image tags, Helm, or npm dist-tags. The branch must not land its release cutover until the interruption and attestation prerequisites are wired; remove the legacy binary/checksum assembly only after GoReleaser owns tagged archives/checksums and one stabilization release succeeds.
+8. `go install .../cmd/hitkeep` is not a documented or promised HitKeep 2.x distribution contract. Keep the package buildable and retain `debug.ReadBuildInfo` as a best-effort version fallback, but do not advertise or gate Homebrew/Scoop work on `go install`. Never ship `replace` directives or depend on `go.work`.
 9. Treat tags and published module versions as immutable. A failed pre-publication run falls back to the legacy builder; a bad published release rolls forward with a fixed patch release and, when module consumers are affected, a `retract` directive—never delete or retag it.
 
 Future package-manager enablement:
@@ -336,7 +338,7 @@ Future package-manager enablement:
 - Package-manager formulas/manifests must reference immutable release artifacts and checksums, install the example config without overwriting operator state, expose the same service/config invocation contract, and pass install/upgrade/uninstall smoke tests.
 - Add deb/rpm, signing, provenance, or further package managers only when there is an actual distribution requirement; they are not prerequisites for this migration.
 
-Implementation checkpoint (2026-08-26): the compatibility foothold now includes an explicit `hitkeep healthcheck` Cobra command with legacy routing/stream/exit parity; descriptor-driven self-hosted Viper parity; catalog-enforced Docker, Compose, example, and structurally parsed Helm data-path publication; immutable v2.12 Docker and root-Compose upgrade/recreation/fresh-volume rollback gates; a structurally reviewed real-chart Helm upgrade/recreation/rollback gate; and pinned GoReleaser v2.18 Linux amd64/arm64 self-hosted archives that preserve all legacy raw cloud/self-hosted/config assets. Independent reviews passed after closing source-tag, clean-worktree, snapshot-name, in-place Helm upgrade, and graceful-shutdown false-pass paths. The full Compose smoke passed locally. GoReleaser cross-CGO and the Helm lifecycle still require real Ubuntu CI and an authenticated disposable Kubernetes cluster respectively; neither is considered complete from structural tests alone.
+Implementation checkpoint (2026-08-27): the compatibility foothold includes an explicit `hitkeep healthcheck` Cobra command with legacy routing/stream/exit parity; descriptor-driven self-hosted Viper parity; catalog-enforced Docker, Compose, example, and structurally parsed Helm data-path publication; immutable v2.12 Docker and root-Compose upgrade/recreation/fresh-volume rollback gates; and a structurally reviewed real-chart Helm upgrade/recreation/rollback gate. Pinned GoReleaser v2.18 now owns Linux amd64/arm64 self-hosted archives and checksums while preserving legacy raw cloud/self-hosted/config assets. Exact-SHA snapshot run `33017615814` proved deterministic dashboard assets, native amd64/arm64 binaries and version output, multi-architecture archives, the multi-platform image, attestations, and release upload on commit `c09d2c6d`. The tagged release definition uses one parallel Docker/Compose/Helm v2.12 upgrade matrix and finalization depends on its aggregate result. A production stabilization release, process-crash interruption proof, and authenticated disposable-cluster Helm lifecycle remain incomplete; structural contracts and snapshot publication do not substitute for those proofs.
 
 Rollback: before publication, switch the workflow back to the retained legacy builder. After publication, preserve the tag and artifacts and roll forward; never mutate an immutable release.
 
