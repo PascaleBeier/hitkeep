@@ -195,7 +195,7 @@ func (c *Config) AuthRememberMeDuration() time.Duration {
 }
 
 func Load(loggerArgs ...*slog.Logger) *Config {
-	return load(os.Args[1:], func(key, fallback string) string {
+	return mustLoadViper(os.Args[1:], func(key, fallback string) string {
 		if val := os.Getenv(key); val != "" {
 			return val
 		}

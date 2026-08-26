@@ -24,9 +24,9 @@ This folder is the durable progress ledger for the migration. Update it in the s
 | 0B | Completed | Add configuration-surface drift fixture and issue #288 failure-shaped upgrade fixture | Dockerfile data path must be image-defined beneath a declared volume; `go test -race ./internal/devtool` |
 | 0C | In progress | Inventory filesystem operations and dependency-ordered `internal/` move manifest | Initial domain/risk classification complete; full bounded per-domain manifest pending |
 | 1 | Completed | Make catalog authoritative and generate neutral `hitkeep.example.yaml` | Catalog `config_file_key` added; schema `hitkeep.config/v2`; deterministic example covers each self-hosted key once |
-| 2 | Completed | Add instance-based Viper assembler in shadow parity | Viper 1.21.0 + Afero explicit YAML; full catalog types, strict keys, normalization, warnings, and precedence proven; runtime remains legacy |
-| 3 | In progress | Production Cobra root with legacy config loader | Factory-built Cobra root now owns execution while preserving exact first-argument routing and all legacy leaf parsers |
-| 4 | Pending | Switch production assembly to parity-proven Viper | — |
+| 2 | Completed | Add instance-based Viper assembler in shadow parity | Viper 1.21.0 + Afero explicit YAML; full catalog types, strict keys, normalization, warnings, and precedence proven |
+| 3 | Completed | Production Cobra root with legacy leaf parsers | Factory-built Cobra root owns execution while preserving exact first-argument routing and all legacy leaf parsers |
+| 4 | Completed | Switch production assembly to parity-proven Viper | `config.Load` now uses instance-based Viper through an OS-backed Afero boundary; direct legacy parity and affected runtime race suites pass |
 | 5 | Pending | Normalize `hk` Cobra factories and preserve MCP/JSON contracts | — |
 | 6 | Pending | Project catalog into Docker, Compose, Helm, examples, and docs artifact | — |
 | 7 | Pending | Enforce issue #288 container recreation and migration interruption gates | — |
@@ -47,19 +47,19 @@ This folder is the durable progress ledger for the migration. Update it in the s
 - Filesystem migration separates ordinary injectable reads/writes from native DuckDB/WAL/fsync/lock durability; fileflow never receives Afero-only paths.
 - `internal/appurl` is the leading first move-only leaf candidate; `config`, `database`, and `devtool` move only after their behavioral boundaries stabilize.
 
-## Current slice: 3
+## Current slice: 4
 
 ### Test-first work
 
-1. Characterized the exact first-argument dispatcher, including unknown input and existing `help`, `--help`, and `--version` fallthrough.
-2. Replaced `main` dispatch with a factory-built Cobra root and an injected action seam.
-3. Kept `config.Load`, global `os.Args`, recovery/import/update stdlib flag parsers, output, confirmations, signals, and exit behavior unchanged.
-4. Keep Cobra flag parsing disabled until leaf command behavior has focused parity coverage.
+1. Kept the legacy loader as a test oracle and added direct exported `config.Load` parity coverage.
+2. Switched only the production assembly boundary to the local Viper instance with the existing non-empty environment semantics.
+3. Kept explicit config-file loading separate from runtime selection, so 2.x still performs no implicit discovery.
+4. Preserved global `os.Args`, recovery/import/update stdlib flag parsers, output, confirmations, signals, and exit behavior.
 
 ### Decisions
 
 - Extend the existing configuration catalog; do not create a parallel schema.
-- Viper is instance-based and remains shadow-only until old/new typed results, warnings, and normalization match across the full catalog.
+- Viper is instance-based; the legacy loader remains only as a parity oracle while runtime assembly uses Viper.
 - The initial Cobra root is a routing boundary only; leaf stdlib parsers remain authoritative until migrated with exit/output parity tests.
 - No `internal/` moves in behavioral slices.
 - The generated example config must validate and remain behaviorally neutral versus no config file, excluding intentionally generated runtime values.
@@ -83,7 +83,9 @@ Record focused commands as stable test targets or `hk` gate IDs, not pasted succ
 | 2026-08-26 | 2 | Changed QA `20260826T115108-06b63ed6` | Passed; completed explicit-file/full-catalog shadow slice with the same seven gates |
 | 2026-08-26 | 3 | `go test -race ./cmd ./cmd/hitkeep -count=1` | Passed; Cobra root preserves first-argument routing and existing command/server fallthrough |
 | 2026-08-26 | 3 | Changed QA `20260826T115948-eb201dc1` | Passed: `go-format`, `go-fix`, `go-lint`, `go-vet`, `go-staticcheck`, `developer-mcp`, `developer-docs` |
+| 2026-08-26 | 4 | `go test -race ./cmd ./cmd/hitkeep ./internal/config ./internal/database ./internal/devtool/devmcp ./internal/mcpserver ./internal/server/admin ./internal/server/aifetch ./internal/server/ingest` | Passed; production Viper cutover preserves typed runtime behavior across affected startup consumers |
+| 2026-08-26 | 4 | Changed QA `20260826T121008-9708c7a2` | Passed: `go-format`, `go-fix`, `go-lint`, `go-vet`, `go-staticcheck`, `developer-mcp`, `developer-docs` |
 
 ## Next update
 
-Run changed QA and push the initial Cobra root slice, then migrate leaf command routing only where exit, output, flag, and confirmation parity can be proven.
+Expose explicit config-file selection at the Cobra assembly boundary without implicit discovery, then migrate leaf command routing only where exit, output, flag, and confirmation parity can be proven.

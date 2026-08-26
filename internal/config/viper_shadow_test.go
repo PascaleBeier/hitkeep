@@ -3,6 +3,7 @@ package config
 import (
 	"bytes"
 	"log/slog"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -10,6 +11,22 @@ import (
 
 	"github.com/spf13/afero"
 )
+
+func TestLoadUsesViperWithLegacyParity(t *testing.T) {
+	originalArgs := os.Args
+	t.Cleanup(func() { os.Args = originalArgs })
+	os.Args = []string{"hitkeep", "--healthcheck"}
+
+	getEnv := func(key, fallback string) string {
+		if value := os.Getenv(key); value != "" {
+			return value
+		}
+		return fallback
+	}
+	if got, want := Load(), load(os.Args[1:], getEnv); !reflect.DeepEqual(got, want) {
+		t.Fatalf("Load() differs from legacy loader:\n got: %#v\nwant: %#v", got, want)
+	}
+}
 
 func TestViperShadowMatchesLegacyLoader(t *testing.T) {
 	tests := []struct {
@@ -74,7 +91,7 @@ func TestViperShadowMatchesLegacyLoader(t *testing.T) {
 				return attr
 			}}
 			legacy := load(tt.args, getEnv, slog.New(slog.NewTextHandler(&legacyLog, logOptions)))
-			shadow, err := loadViperShadow(tt.args, getEnv, afero.NewMemMapFs(), "", slog.New(slog.NewTextHandler(&shadowLog, logOptions)))
+			shadow, err := loadViper(tt.args, getEnv, afero.NewMemMapFs(), "", slog.New(slog.NewTextHandler(&shadowLog, logOptions)))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -91,7 +108,7 @@ func TestViperShadowMatchesLegacyLoader(t *testing.T) {
 func TestViperShadowExplicitFilePrecedence(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	writeShadowConfig(t, fs, "config.yaml", "http-addr: ':7070'\nmail-port: 2020\napi-rate-limit: 7.5\nhealthcheck: true\n")
-	conf, err := loadViperShadow(
+	conf, err := loadViper(
 		[]string{"--http-addr=:9090"},
 		mapEnv(map[string]string{"HITKEEP_MAIL_PORT": "3030"}),
 		fs,
@@ -118,7 +135,7 @@ func TestViperShadowRejectsInvalidExplicitFilesWithoutValues(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			fs := afero.NewMemMapFs()
 			writeShadowConfig(t, fs, "config.yaml", tt.content)
-			_, err := loadViperShadow(nil, mapEnv(nil), fs, "config.yaml")
+			_, err := loadViper(nil, mapEnv(nil), fs, "config.yaml")
 			if err == nil {
 				t.Fatal("expected configuration error")
 			}
@@ -134,7 +151,7 @@ func TestViperShadowRejectsInvalidExplicitFilesWithoutValues(t *testing.T) {
 func TestViperShadowDoesNotDiscoverFilesImplicitly(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	writeShadowConfig(t, fs, "hitkeep.yaml", "http-addr: ':6060'\nhealthcheck: true\n")
-	conf, err := loadViperShadow([]string{"--healthcheck"}, mapEnv(nil), fs, "")
+	conf, err := loadViper([]string{"--healthcheck"}, mapEnv(nil), fs, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +185,7 @@ func TestViperShadowLoadsEveryCatalogType(t *testing.T) {
 
 	fs := afero.NewMemMapFs()
 	writeShadowConfig(t, fs, "all.yaml", contents.String())
-	conf, err := loadViperShadow(nil, mapEnv(nil), fs, "all.yaml")
+	conf, err := loadViper(nil, mapEnv(nil), fs, "all.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
