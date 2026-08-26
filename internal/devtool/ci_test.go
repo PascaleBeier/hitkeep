@@ -229,6 +229,44 @@ func TestSelfHostedImageGateCoversContainerRecreation(t *testing.T) {
 	}
 }
 
+func TestComposeUpgradeSmokeUsesSupportedSurface(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "scripts", "compose-smoke.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{
+		"docker compose --project-name \"$compose_project\" -f compose.yaml -f \"$override\"",
+		"build: !reset null",
+		"container_name: ${container}",
+		"ports: !override",
+		"127.0.0.1::8080",
+		"compose down --remove-orphans",
+		"compose down -v --remove-orphans",
+		"fixture --seed",
+		"fixture --verify",
+		"verify_stopped_storage verify-storage",
+		"verify_stopped_storage verify-legacy-storage",
+		"write_override \"$previous_image\" primary",
+		"write_override \"$image\" primary",
+		"restore_data_volume \"$legacy_archive\"",
+		"HITKEEP_PREVIOUS_IMAGE",
+		"@sha256:",
+	} {
+		if !bytes.Contains(raw, []byte(required)) {
+			t.Fatalf("compose upgrade smoke is missing contract %q", required)
+		}
+	}
+	candidateStart := bytes.Index(raw, []byte(`write_override "$image" primary`))
+	if candidateStart < 0 {
+		t.Fatal("compose upgrade smoke must start the candidate on the shared primary volume")
+	}
+	candidateStorage := bytes.Index(raw[candidateStart:], []byte("verify_stopped_storage verify-storage"))
+	rollbackReset := bytes.Index(raw[candidateStart:], []byte("compose down -v --remove-orphans"))
+	if candidateStorage < 0 || rollbackReset < candidateStorage {
+		t.Fatal("compose upgrade smoke must retain shared volumes until candidate storage verification completes")
+	}
+}
+
 func TestDefaultTenantMigrationAcceptanceIsFullProfileOnly(t *testing.T) {
 	gate, err := GateByID("default-tenant-migration-acceptance")
 	if err != nil {

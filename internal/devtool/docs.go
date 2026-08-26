@@ -80,13 +80,14 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 		return fmt.Errorf("decode release workflow: %w", err)
 	}
 	for job, required := range map[string][]string{
-		"build-release":          {"release-please"},
-		"upgrade-from-v2-12":     {"build-release"},
-		"publish-helm":           {"build-release"},
-		"verify-tracker-package": {"build-release"},
-		"finalize-release":       {"release-please", "build-release", "upgrade-from-v2-12", "publish-helm", "verify-tracker-package"},
-		"sync-docs-release":      {"finalize-release"},
-		"deploy-cloud":           {"finalize-release"},
+		"build-release":              {"release-please"},
+		"upgrade-from-v2-12":         {"build-release"},
+		"upgrade-compose-from-v2-12": {"build-release"},
+		"publish-helm":               {"build-release"},
+		"verify-tracker-package":     {"build-release"},
+		"finalize-release":           {"release-please", "build-release", "upgrade-from-v2-12", "upgrade-compose-from-v2-12", "publish-helm", "verify-tracker-package"},
+		"sync-docs-release":          {"finalize-release"},
+		"deploy-cloud":               {"finalize-release"},
 	} {
 		definition, ok := workflow.Jobs[job]
 		if !ok {
@@ -110,6 +111,19 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 	}
 	if !upgradeSmoke {
 		return fmt.Errorf("release workflow upgrade-from-v2-12 must smoke the v2.12.0 fixture against the candidate digest")
+	}
+	composeUpgradeSmoke := false
+	for _, step := range workflow.Jobs["upgrade-compose-from-v2-12"].Steps {
+		if step.Name == "Smoke Compose upgrade from supported floor" &&
+			strings.Contains(step.Run, "tests/fixtures/release-fixtures.json") &&
+			strings.Contains(step.Run, "2.12.0") &&
+			strings.Contains(step.Env["CANDIDATE_DIGEST"], "needs.build-release.outputs.image_digest") &&
+			strings.Contains(step.Run, "./scripts/compose-smoke.sh") {
+			composeUpgradeSmoke = true
+		}
+	}
+	if !composeUpgradeSmoke {
+		return fmt.Errorf("release workflow upgrade-compose-from-v2-12 must smoke the v2.12.0 fixture against the candidate digest")
 	}
 
 	trackerArtifact := map[string]bool{}

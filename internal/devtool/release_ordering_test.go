@@ -21,6 +21,17 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
           previous_version="2.12.0"
           candidate="${{ needs.build-release.outputs.image_digest }}"
           ./scripts/docker-smoke.sh "$candidate" self-hosted --recreate
+  upgrade-compose-from-v2-12:
+    needs: build-release
+    steps:
+      - name: Smoke Compose upgrade from supported floor
+        env:
+          CANDIDATE_DIGEST: ${{ needs.build-release.outputs.image_digest }}
+        run: |
+          manifest="tests/fixtures/release-fixtures.json"
+          previous_version="2.12.0"
+          candidate="${{ needs.build-release.outputs.image_digest }}"
+          ./scripts/compose-smoke.sh "$candidate" self-hosted
   publish-helm:
     needs: build-release
   verify-tracker-package:
@@ -36,6 +47,7 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
       - release-please
       - build-release
       - upgrade-from-v2-12
+      - upgrade-compose-from-v2-12
       - publish-helm
       - verify-tracker-package
     steps:
@@ -65,6 +77,16 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
 	missingUpgrade := strings.Replace(workflow, "      - upgrade-from-v2-12\n", "", 1)
 	if err := validateReleaseWorkflowGraph([]byte(missingUpgrade)); err == nil {
 		t.Fatal("validateReleaseWorkflowGraph() accepted a finalizer that can run before the upgrade smoke")
+	}
+
+	missingComposeUpgrade := strings.Replace(workflow, "      - upgrade-compose-from-v2-12\n", "", 1)
+	if err := validateReleaseWorkflowGraph([]byte(missingComposeUpgrade)); err == nil {
+		t.Fatal("validateReleaseWorkflowGraph() accepted a finalizer that can run before the Compose upgrade smoke")
+	}
+
+	missingComposeUpgradeSmoke := strings.Replace(workflow, "./scripts/compose-smoke.sh", "echo skipped", 1)
+	if err := validateReleaseWorkflowGraph([]byte(missingComposeUpgradeSmoke)); err == nil {
+		t.Fatal("validateReleaseWorkflowGraph() accepted a Compose upgrade job that does not invoke the smoke fixture")
 	}
 
 	missingUpgradeSmoke := strings.Replace(workflow, "./scripts/docker-smoke.sh", "echo skipped", 1)
