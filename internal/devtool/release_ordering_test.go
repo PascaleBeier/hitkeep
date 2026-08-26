@@ -50,4 +50,9 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
 	if err := validateReleaseWorkflowGraph([]byte(latestBeforeCandidate)); err == nil {
 		t.Fatal("validateReleaseWorkflowGraph() accepted a latest dist-tag promotion before retry-safe candidate publication")
 	}
+
+	patFinalizer := strings.Replace(workflow, "      - name: Publish draft GitHub release", "      - name: Publish draft GitHub release\n        env:\n          GH_TOKEN: ${{ secrets.GHT }}", 1)
+	if err := validateReleaseWorkflowGraph([]byte(patFinalizer)); err == nil {
+		t.Fatal("validateReleaseWorkflowGraph() accepted secrets.GHT in the finalizer")
+	}
 }

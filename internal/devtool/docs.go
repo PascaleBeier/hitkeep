@@ -59,7 +59,9 @@ func (needs *workflowNeeds) UnmarshalYAML(value *yaml.Node) error {
 }
 
 type workflowStep struct {
-	Name string `yaml:"name"`
+	Name string            `yaml:"name"`
+	Env  map[string]string `yaml:"env"`
+	With map[string]string `yaml:"with"`
 }
 
 type workflowJob struct {
@@ -95,6 +97,15 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 		}
 	}
 	finalizer := workflow.Jobs["finalize-release"]
+	for _, step := range finalizer.Steps {
+		for _, values := range []map[string]string{step.Env, step.With} {
+			for _, value := range values {
+				if strings.Contains(value, "secrets.GHT") {
+					return fmt.Errorf("release workflow finalizer must not use secrets.GHT")
+				}
+			}
+		}
+	}
 	positions := make(map[string]int, len(finalizer.Steps))
 	for index, step := range finalizer.Steps {
 		positions[step.Name] = index

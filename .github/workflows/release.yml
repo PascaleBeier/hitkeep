@@ -232,7 +232,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GHT }}
+          password: ${{ github.token }}
 
       - name: Login to Docker Hub
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -268,7 +268,7 @@ jobs:
 
       - name: Publish draft GitHub release
         env:
-          GH_TOKEN: ${{ secrets.GHT }}
+          GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.release-please.outputs.tag_name }}
         run: gh release edit "$TAG" --draft=false --latest
 
