@@ -214,13 +214,15 @@ func TestHealthcheckCommandHonorsCanceledContext(t *testing.T) {
 }
 
 func TestHealthcheckCommandPassesCommandContext(t *testing.T) {
-	ctx := context.WithValue(t.Context(), "healthcheck-context", "present")
+	type contextKey struct{}
+	key := contextKey{}
+	ctx := context.WithValue(t.Context(), key, "present")
 	called := false
 	root := newRootCommand(rootActions{
 		runContext: func(got context.Context, args []string, configFile string) error {
 			called = true
-			if got.Value("healthcheck-context") != "present" {
-				t.Errorf("healthcheck context value = %v, want present", got.Value("healthcheck-context"))
+			if got.Value(key) != "present" {
+				t.Errorf("healthcheck context value = %v, want present", got.Value(key))
 			}
 			if configFile != "" {
 				t.Errorf("healthcheck config file = %q, want empty", configFile)

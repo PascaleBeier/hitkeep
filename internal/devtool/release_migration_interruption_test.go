@@ -23,11 +23,11 @@ func TestValidateReleaseWorkflowGraphRequiresMigrationInterruptionGate(t *testin
 	}
 
 	tests := []struct {
-		name    string
+		name     string
 		workflow string
 	}{
 		{
-			name:    "missing release job",
+			name:     "missing release job",
 			workflow: strings.Replace(string(raw), "migration-interruption:", "# migration-interruption:", 1),
 		},
 		{

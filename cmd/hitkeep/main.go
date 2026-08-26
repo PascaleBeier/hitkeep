@@ -7,9 +7,9 @@ import (
 	"log/slog"
 	"os"
 
-	hitkeepcmd "hitkeep/cmd"
-
 	"github.com/spf13/cobra"
+
+	hitkeepcmd "hitkeep/cmd"
 )
 
 func main() {
@@ -22,8 +22,7 @@ func main() {
 
 func execute(ctx context.Context, root *cobra.Command, logger *slog.Logger) int {
 	if err := root.ExecuteContext(ctx); err != nil {
-		var healthcheckErr *hitkeepcmd.HealthcheckError
-		if errors.As(err, &healthcheckErr) {
+		if healthcheckErr, ok := errors.AsType[*hitkeepcmd.HealthcheckError](err); ok {
 			_, _ = fmt.Fprintln(root.ErrOrStderr(), healthcheckErr)
 		} else {
 			logger.Error("Command failed", "error", err)
