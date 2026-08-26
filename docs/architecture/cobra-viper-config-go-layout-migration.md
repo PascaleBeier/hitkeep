@@ -25,12 +25,12 @@ This is not one large refactor. It is a sequence of independently releasable 2.x
 
 | Area | State on `feat/config_refactor` | Remaining proof |
 |---|---|---|
-| Catalog, example YAML, Viper assembly | Implemented | stabilization window and final legacy-oracle contraction only |
-| Production Cobra routing and config commands | Implemented with 2.x compatibility routing | subprocess exit/stream grammar and final help/version contract |
-| Distribution drift validation | Implemented for checked surfaces | private-docs attestation and semantic Compose/Helm upgrade gates |
-| Issue #288 | Partial | immutable v2.12.0 pre-split fixture, recognizable API data, rollback snapshot, and release prerequisite |
-| GoReleaser | Partial | tagged archive/checksum ownership and target-platform feasibility |
-| Filesystem policy | Operation inventory and bounded migrations implemented | continue only where Afero/fileflow/pathologize semantics fit |
+| Catalog, example YAML, Viper assembly | Runtime cutover, strict explicit YAML, and self-hosted descriptor parity implemented | cloud/build-variant parity, stabilization, and final legacy-oracle contraction |
+| Production Cobra routing and config commands | 2.x compatibility router and config commands implemented | full Cobra flag ownership, command-context propagation, subprocess stream/exit grammar, and final help/version contract |
+| Distribution drift validation | Data-path publication policy enforces exact Docker, Compose, Helm, example, and canonical-example paths/defaults | classify remaining settings, identical example distribution, private-docs attestation, and semantic Compose/Helm upgrade gates |
+| Issue #288 | Candidate recreation and quiescent legacy rollback implemented and release-gated | amd64/arm64 matrix execution, migration-interruption prerequisite, and Compose/Helm semantic gates |
+| GoReleaser | Snapshot raw-binary builds plus self-hosted archive/checksum manifest implemented | tagged workflow ownership, multi-architecture assembly, and target-platform feasibility |
+| Filesystem policy | Bounded Afero/fileflow adoption implemented | complete operation inventory and further waves only where semantics fit |
 | Flat Go layout | In progress | dependency-ordered move-only waves and final active-path audit |
 
 ## 2. Why this work is necessary
@@ -320,7 +320,7 @@ Release policy:
 GoReleaser replaces hand-rolled binary/archive/checksum assembly only after it can reproduce the current release contract. Release Please may continue to own version/changelog/tag orchestration; GoReleaser consumes the immutable tag and must not create a second version source.
 
 1. Record the current release artifact manifest from `BuildReleaseBinaries`, `GenerateReleaseChecksums`, release workflows, and published releases: binary/archive names, formats, OS/architecture matrix, build tags, cgo requirements, permissions, version output, checksum filename/algorithm, bundled files, and GitHub release attachment behavior.
-2. Add one `.goreleaser.yaml` using the pinned GoReleaser configuration schema for the publishable self-hosted binary, and independently pin the GoReleaser executable/action version under the repository’s dependency policy. The config schema cannot pin the tool. Do not copy the common `CGO_ENABLED=0` example blindly: DuckDB/native dependencies and existing build tags determine the supported target matrix. Keep cloud-tagged artifacts local-only unless separately authorized for publication.
+2. Add one `.goreleaser.yaml` using the pinned GoReleaser configuration schema for the publishable self-hosted binary, and independently pin the GoReleaser executable/action version under the repository’s dependency policy. The config schema cannot pin the tool. Do not copy the common `CGO_ENABLED=0` example blindly: DuckDB/native dependencies and existing build tags determine the supported target matrix. Preserve the existing raw `hitkeep-cloud-linux-{amd64,arm64}` release assets because current deployment automation consumes them; keep new install archives and package-manager publishers self-hosted-only unless cloud distribution is separately authorized.
 3. Feed GoReleaser’s version, commit, and build date into the same Cobra version surface used by ordinary builds. Prefer `debug.ReadBuildInfo` as the fallback for `go install`; use ldflags only for release metadata the runtime cannot obtain reliably.
 4. Use `-trimpath`. Strip symbols only if the existing debugging/core-dump policy allows it; artifact size is not worth losing required production diagnostics.
 5. Bundle `LICENSE`, the minimal install/readme material, and the generated `hitkeep.example.yaml` in every binary archive. The config artifact hash must match the catalog-generated source artifact.
@@ -335,6 +335,8 @@ Future package-manager enablement:
 - After the core GoReleaser pipeline is stable, use separate reviewed changes to add a Homebrew tap and Scoop bucket. Those changes require explicit authorization for repository creation, credentials/tokens, and publication.
 - Package-manager formulas/manifests must reference immutable release artifacts and checksums, install the example config without overwriting operator state, expose the same service/config invocation contract, and pass install/upgrade/uninstall smoke tests.
 - Add deb/rpm, signing, provenance, or further package managers only when there is an actual distribution requirement; they are not prerequisites for this migration.
+
+Implementation checkpoint (2026-08-26): the compatibility foothold now includes an explicit `hitkeep healthcheck` Cobra command with legacy routing/stream/exit parity; descriptor-driven self-hosted Viper parity; catalog-enforced Docker, Compose, example, and structurally parsed Helm data-path publication; immutable v2.12 Docker and root-Compose upgrade/recreation/fresh-volume rollback gates; a structurally reviewed real-chart Helm upgrade/recreation/rollback gate; and pinned GoReleaser v2.18 Linux amd64/arm64 self-hosted archives that preserve all legacy raw cloud/self-hosted/config assets. Independent reviews passed after closing source-tag, clean-worktree, snapshot-name, in-place Helm upgrade, and graceful-shutdown false-pass paths. The full Compose smoke passed locally. GoReleaser cross-CGO and the Helm lifecycle still require real Ubuntu CI and an authenticated disposable Kubernetes cluster respectively; neither is considered complete from structural tests alone.
 
 Rollback: before publication, switch the workflow back to the retained legacy builder. After publication, preserve the tag and artifacts and roll forward; never mutate an immutable release.
 
