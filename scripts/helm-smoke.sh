@@ -89,25 +89,27 @@ stop_port_forward() {
 }
 
 graceful_shutdown() {
-  local restarts exit_code
+  local restarts current_restarts exit_code
   restarts="$(kubectl -n "$namespace" get pod "${release}-0" -o jsonpath='{.status.containerStatuses[0].restartCount}')"
   kubectl -n "$namespace" exec "${release}-0" -- /bin/sh -c 'kill -TERM 1'
   for _ in {1..60}; do
+    current_restarts="$(kubectl -n "$namespace" get pod "${release}-0" -o jsonpath='{.status.containerStatuses[0].restartCount}' 2>/dev/null || true)"
     exit_code="$(kubectl -n "$namespace" get pod "${release}-0" -o jsonpath='{.status.containerStatuses[0].lastState.terminated.exitCode}' 2>/dev/null || true)"
-    if [[ "$exit_code" == "0" ]]; then
-      kubectl -n "$namespace" rollout status statefulset/"$release" --timeout=5m
+    if [[ "$current_restarts" =~ ^[0-9]+$ ]] && (( current_restarts > restarts )) && [[ "$exit_code" == "0" ]]; then
+      kubectl -n "$namespace" wait --for=condition=Ready pod/"${release}-0" --timeout=5m
       return
     fi
     sleep 1
   done
-  printf 'HitKeep did not exit cleanly after SIGTERM (initial restart count %s)\n' "$restarts" >&2
+  printf 'HitKeep did not restart cleanly after SIGTERM (initial restart count %s)\n' "$restarts" >&2
   return 1
 }
 
-stop_release() {
+quiesce_release() {
   stop_port_forward
   graceful_shutdown
-  helm uninstall "$release" --namespace "$namespace" --wait
+  kubectl -n "$namespace" scale statefulset/"$release" --replicas=0
+  kubectl -n "$namespace" wait --for=delete pod/"${release}-0" --timeout=5m
 }
 
 mount_pvc() {
@@ -178,7 +180,7 @@ YAML
 deploy "$previous_image"
 await_healthy
 fixture --seed --manifest "$fixture_manifest" --previous-image "$previous_image" --platform "$platform" --url "$service_url"
-stop_release
+quiesce_release
 verify_stopped_storage verify-legacy-storage
 legacy_archive="$temp_dir/legacy-pvc.tar"
 archive_pvc "$legacy_archive"
@@ -186,26 +188,26 @@ archive_pvc "$legacy_archive"
 deploy "$image"
 await_healthy
 fixture --verify --manifest "$fixture_manifest" --previous-image "$previous_image" --platform "$platform" --url "$service_url"
-stop_release
+quiesce_release
 verify_stopped_storage verify-storage
 
 deploy "$image"
 await_healthy
 fixture --verify --manifest "$fixture_manifest" --previous-image "$previous_image" --platform "$platform" --url "$service_url"
-stop_release
+quiesce_release
 verify_stopped_storage verify-storage
 
 restore_pvc "$legacy_archive"
 deploy "$previous_image"
 await_healthy
 fixture --verify --manifest "$fixture_manifest" --previous-image "$previous_image" --platform "$platform" --url "$service_url"
-stop_release
+quiesce_release
 verify_stopped_storage verify-legacy-storage
 
 deploy "$image"
 await_healthy
 fixture --verify --manifest "$fixture_manifest" --previous-image "$previous_image" --platform "$platform" --url "$service_url"
-stop_release
+quiesce_release
 verify_stopped_storage verify-storage
 
 printf 'Helm upgrade, recreation, and rollback preserved release fixture data: %s (%s)\n' "$image" "$expected_variant"

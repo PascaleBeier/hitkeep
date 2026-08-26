@@ -23,6 +23,10 @@ func TestHelmUpgradeSmokeUsesChartPersistenceAndImmutableImages(t *testing.T) {
 		"kubectl -n \"$namespace\" port-forward --address 127.0.0.1 service/\"$release\" 0:8080",
 		"fixture --seed",
 		"fixture --verify",
+		"quiesce_release",
+		"kubectl -n \"$namespace\" scale statefulset/\"$release\" --replicas=0",
+		"(( current_restarts > restarts ))",
+		"kubectl -n \"$namespace\" wait --for=condition=Ready pod/\"${release}-0\" --timeout=5m",
 		"verify_stopped_storage verify-storage",
 		"verify_stopped_storage verify-legacy-storage",
 		"archive_pvc \"$legacy_archive\"",
@@ -35,9 +39,19 @@ func TestHelmUpgradeSmokeUsesChartPersistenceAndImmutableImages(t *testing.T) {
 			t.Fatalf("helm upgrade smoke is missing contract %q", required)
 		}
 	}
+	legacySeed := bytes.Index(raw, []byte("fixture --seed"))
 	candidate := bytes.Index(raw, []byte(`deploy "$image"`))
-	if candidate < 0 {
-		t.Fatal("helm upgrade smoke does not install the candidate image")
+	if legacySeed < 0 || candidate < 0 {
+		t.Fatal("helm upgrade smoke does not install the candidate image after the legacy fixture seed")
+	}
+	legacyToCandidate := raw[legacySeed:candidate]
+	if bytes.Contains(legacyToCandidate, []byte("helm uninstall")) {
+		t.Fatal("helm upgrade smoke must retain the legacy Helm release until the first candidate upgrade")
+	}
+	quiesce := bytes.Index(legacyToCandidate, []byte("quiesce_release"))
+	archive := bytes.Index(legacyToCandidate, []byte(`archive_pvc "$legacy_archive"`))
+	if quiesce < 0 || archive < quiesce {
+		t.Fatal("helm upgrade smoke must quiesce and snapshot the legacy PVC before the first candidate upgrade")
 	}
 	if bytes.Index(raw[candidate:], []byte("verify_stopped_storage verify-storage")) < 0 {
 		t.Fatal("helm upgrade smoke must verify candidate storage before rollback")
