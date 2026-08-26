@@ -392,7 +392,7 @@ func configurationPublicationSurface(path string) runtimeconfig.ConfigurationPub
 }
 
 func configurationPublicationDefault(contents string, requirement runtimeconfig.ConfigurationPublication, surface runtimeconfig.ConfigurationPublicationSurface) (string, bool) {
-	for _, line := range strings.Split(contents, "\n") {
+	for line := range strings.SplitSeq(contents, "\n") {
 		line = strings.TrimSpace(line)
 		switch surface {
 		case runtimeconfig.ConfigurationPublicationDocker:
@@ -768,7 +768,7 @@ func validateGovulncheckWorkflowContract(workflow []byte) error {
 	if !bytes.Contains(workflow, []byte(plan)) {
 		return fmt.Errorf(".github/workflows/govulncheck.yml must obtain a PR QA plan ID through %q", plan)
 	}
-	for _, line := range bytes.Split(workflow, []byte{'\n'}) {
+	for line := range bytes.SplitSeq(workflow, []byte{'\n'}) {
 		if bytes.Contains(line, []byte("./hk qa ")) && !bytes.Contains(line, []byte("./hk qa plan ")) && !bytes.Contains(line, []byte("--plan-id")) {
 			return fmt.Errorf(".github/workflows/govulncheck.yml QA invocation must pass --plan-id")
 		}

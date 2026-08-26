@@ -3,6 +3,7 @@ package config
 import (
 	"bytes"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -139,7 +140,7 @@ func TestViperShadowCatalogEnvironmentAndFlagParity(t *testing.T) {
 			emptyEnv[setting.Environment] = ""
 			var empty *Config
 			if hasGeneratedValue(setting) {
-				empty, _ = loadViperShadowParity(t, args, emptyEnv, setting.Field)
+				loadViperShadowParity(t, args, emptyEnv, setting.Field)
 			} else {
 				empty, _ = loadViperShadowParity(t, args, emptyEnv)
 				assertSameConfigSetting(t, setting, empty, absent)
@@ -380,9 +381,7 @@ func catalogParityInputs(setting ConfigurationSetting) ([]string, map[string]str
 
 func cloneEnv(values map[string]string) map[string]string {
 	clone := make(map[string]string, len(values)+1)
-	for key, value := range values {
-		clone[key] = value
-	}
+	maps.Copy(clone, values)
 	return clone
 }
 

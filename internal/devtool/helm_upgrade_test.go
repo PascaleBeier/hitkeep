@@ -53,14 +53,14 @@ func TestHelmUpgradeSmokeUsesChartPersistenceAndImmutableImages(t *testing.T) {
 	if quiesce < 0 || archive < quiesce {
 		t.Fatal("helm upgrade smoke must quiesce and snapshot the legacy PVC before the first candidate upgrade")
 	}
-	if bytes.Index(raw[candidate:], []byte("verify_stopped_storage verify-storage")) < 0 {
+	if !bytes.Contains(raw[candidate:], []byte("verify_stopped_storage verify-storage")) {
 		t.Fatal("helm upgrade smoke must verify candidate storage before rollback")
 	}
 	rollback := bytes.Index(raw[candidate:], []byte(`deploy "$previous_image"`))
 	if rollback < 0 {
 		t.Fatal("helm upgrade smoke must install the historical image on the restored PVC")
 	}
-	if bytes.Index(raw[candidate+rollback:], []byte(`deploy "$image"`)) < 0 {
+	if !bytes.Contains(raw[candidate+rollback:], []byte(`deploy "$image"`)) {
 		t.Fatal("helm upgrade smoke must resume the candidate after rollback verification")
 	}
 }

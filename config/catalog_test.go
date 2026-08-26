@@ -2,6 +2,7 @@ package config
 
 import (
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -62,13 +63,7 @@ func TestConfigurationPublicationRequirementsCoverPersistentDataPath(t *testing.
 		ConfigurationPublicationExample,
 		ConfigurationPublicationCanonicalExample,
 	} {
-		declared := false
-		for _, actual := range requirement.Surfaces {
-			if actual == surface {
-				declared = true
-				break
-			}
-		}
+		declared := slices.Contains(requirement.Surfaces, surface)
 		if !declared {
 			t.Errorf("publication requirement does not require %s", surface)
 		}
