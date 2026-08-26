@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"hitkeep/internal/hklog"
+	"hitkeep/hklog"
 )
 
 // WithLogger attaches a request-scoped logger to ctx.

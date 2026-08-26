@@ -14,9 +14,9 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/api/googleapi"
 
+	"hitkeep/hklog"
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
-	"hitkeep/internal/hklog"
 	"hitkeep/internal/searchconsole"
 )
 

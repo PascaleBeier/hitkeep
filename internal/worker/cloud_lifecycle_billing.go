@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"hitkeep/appurl"
+	"hitkeep/hklog"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
-	"hitkeep/internal/hklog"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
 )

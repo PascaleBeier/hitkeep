@@ -6,7 +6,7 @@ import (
 	"context"
 	"time"
 
-	"hitkeep/internal/hklog"
+	"hitkeep/hklog"
 )
 
 // runDailyAtUTC waits until the next hour:00 UTC, invokes run, then keeps

@@ -5,8 +5,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/hklog"
 	"hitkeep/internal/api"
-	"hitkeep/internal/hklog"
 )
 
 // SyncTeamRetention brings every plan-managed site owned by teamID in line

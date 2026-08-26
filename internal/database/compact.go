@@ -13,7 +13,7 @@ import (
 
 	duckdb "github.com/duckdb/duckdb-go/v2"
 
-	"hitkeep/internal/hklog"
+	"hitkeep/hklog"
 )
 
 // CompactionOptions bound when MaybeCompactDatabase rewrites a database file.

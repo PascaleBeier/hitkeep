@@ -15,7 +15,7 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 
-	"hitkeep/internal/hklog"
+	"hitkeep/hklog"
 	json "hitkeep/internal/jsonapi"
 )
 

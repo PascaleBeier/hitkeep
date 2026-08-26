@@ -17,11 +17,11 @@ import (
 	"github.com/nsqio/nsq/nsqd"
 	"golang.org/x/sync/errgroup"
 
+	"hitkeep/hklog"
 	"hitkeep/internal/cluster"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
-	"hitkeep/internal/hklog"
 	"hitkeep/internal/ingest"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/realtime"

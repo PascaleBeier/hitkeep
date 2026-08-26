@@ -16,7 +16,7 @@ import (
 	duckdb "github.com/duckdb/duckdb-go/v2"
 	"github.com/google/uuid"
 
-	"hitkeep/internal/hklog"
+	"hitkeep/hklog"
 )
 
 const (

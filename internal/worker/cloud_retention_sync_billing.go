@@ -6,10 +6,10 @@ import (
 	"context"
 	"time"
 
+	"hitkeep/hklog"
 	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
-	"hitkeep/internal/hklog"
 )
 
 // CloudRetentionSyncWorker keeps every cloud team's site retention in line
