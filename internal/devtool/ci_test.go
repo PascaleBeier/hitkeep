@@ -201,10 +201,13 @@ func TestSelfHostedImageGateCoversContainerRecreation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, required := range []string{"--recreate", "HITKEEP_PREVIOUS_IMAGE", "@sha256:", "docker volume create", "docker pull --platform \"$platform\"", "docker stop -t 15", "release-fixtures.json", "upgrade-fixture", "--platform \"$platform\"", "fixture --verify-image", "fixture --verify-storage", "fixture --verify-legacy-storage", "fixture --seed", "fixture --verify", "verify_stopped_storage", "verify_legacy_stopped_storage", "snapshot_volume()", "restore_snapshot()", "type=volume,src=$volume,dst=/source,readonly", "type=volume,src=$rollback_volume,dst=/target", "start_container \"$previous_image\" \"$rollback_volume\"", "start_container \"$image\""} {
+	for _, required := range []string{"--recreate", "HITKEEP_PREVIOUS_IMAGE", "@sha256:", "docker volume create", "docker pull --platform \"$platform\"", "docker stop -t 15", "release-fixtures.json", "upgrade-fixture", "--platform \"$platform\"", "fixture --verify-image", "fixture --verify-storage", "fixture --verify-legacy-storage", "fixture --seed", "fixture --verify", "verify_stopped_storage", "verify_legacy_stopped_storage", "snapshot_volume()", "restore_snapshot()", "type=volume,src=$volume,dst=/source,readonly", "type=volume,src=$rollback_volume,dst=/target", "rollback_helper_image=\"busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662\"", "\"$rollback_helper_image\" tar", "start_container \"$previous_image\" \"$rollback_volume\"", "start_container \"$image\""} {
 		if !bytes.Contains(raw, []byte(required)) {
 			t.Fatalf("docker smoke script is missing recreation contract %q", required)
 		}
+	}
+	if bytes.Contains(raw, []byte("busybox:")) {
+		t.Fatal("docker smoke rollback helper must not use a mutable BusyBox tag")
 	}
 	rollbackStart := bytes.Index(raw, []byte(`start_container "$previous_image" "$rollback_volume"`))
 	if rollbackStart < 0 {

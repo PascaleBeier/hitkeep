@@ -17,6 +17,7 @@ rollback_archive=""
 platform=""
 temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/hitkeep-smoke.XXXXXX")"
 fixture_manifest="tests/fixtures/release-fixtures.json"
+rollback_helper_image="busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662"
 
 fixture() {
   env -u GOROOT go run ./tests/fixtures/upgrade-fixture "$@"
@@ -86,7 +87,7 @@ snapshot_volume() {
   docker run --rm --platform "$platform" \
     --mount "type=volume,src=$volume,dst=/source,readonly" \
     --mount "type=bind,src=$temp_dir,dst=/backup" \
-    busybox:1.36 tar -C /source -cpf /backup/rollback-volume.tar .
+    "$rollback_helper_image" tar -C /source -cpf /backup/rollback-volume.tar .
 }
 
 restore_snapshot() {
@@ -95,7 +96,7 @@ restore_snapshot() {
   docker run --rm --platform "$platform" \
     --mount "type=volume,src=$rollback_volume,dst=/target" \
     --mount "type=bind,src=$temp_dir,dst=/backup,readonly" \
-    busybox:1.36 tar -C /target -xpf /backup/rollback-volume.tar
+    "$rollback_helper_image" tar -C /target -xpf /backup/rollback-volume.tar
 }
 
 remove_container() {
