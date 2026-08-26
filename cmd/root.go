@@ -59,7 +59,10 @@ func newHealthcheckCommand(run func([]string, string) error) *cobra.Command {
 		Short:              "Check whether HitKeep is healthy",
 		Args:               cobra.ArbitraryArgs,
 		DisableFlagParsing: true,
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(command *cobra.Command, args []string) error {
+			if err := command.Context().Err(); err != nil {
+				return err
+			}
 			configFile, serverArgs, err := splitRootConfig(args)
 			if err != nil {
 				return err
