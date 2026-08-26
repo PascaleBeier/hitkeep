@@ -45,6 +45,39 @@ func TestConfigurationCatalogCoversRuntimeAnnotations(t *testing.T) {
 	}
 }
 
+func TestConfigurationPublicationRequirementsCoverPersistentDataPath(t *testing.T) {
+	requirements := PublicationRequirements()
+	if len(requirements) != 1 {
+		t.Fatalf("publication requirements = %d, want exactly the persistent data path", len(requirements))
+	}
+
+	requirement := requirements[0]
+	if requirement.Environment != "HITKEEP_DATA_PATH" {
+		t.Fatalf("publication requirement environment = %q, want HITKEEP_DATA_PATH", requirement.Environment)
+	}
+	for _, surface := range []ConfigurationPublicationSurface{
+		ConfigurationPublicationDocker,
+		ConfigurationPublicationCompose,
+		ConfigurationPublicationHelm,
+		ConfigurationPublicationExample,
+		ConfigurationPublicationCanonicalExample,
+	} {
+		declared := false
+		for _, actual := range requirement.Surfaces {
+			if actual == surface {
+				declared = true
+				break
+			}
+		}
+		if !declared {
+			t.Errorf("publication requirement does not require %s", surface)
+		}
+		if requirement.Defaults[surface] == "" {
+			t.Errorf("publication requirement has no default for %s", surface)
+		}
+	}
+}
+
 func TestConfigurationCatalogConfigFileKeys(t *testing.T) {
 	catalog := Catalog()
 	if catalog.SchemaVersion != "hitkeep.config/v2" {

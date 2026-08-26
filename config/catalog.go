@@ -84,6 +84,59 @@ func Catalog() ConfigurationCatalog {
 	}
 }
 
+// ConfigurationPublicationSurface is a published configuration surface whose
+// default must remain aligned with the runtime catalog.
+type ConfigurationPublicationSurface string
+
+const (
+	ConfigurationPublicationDocker           ConfigurationPublicationSurface = "docker"
+	ConfigurationPublicationCompose          ConfigurationPublicationSurface = "compose"
+	ConfigurationPublicationHelm             ConfigurationPublicationSurface = "helm"
+	ConfigurationPublicationExample          ConfigurationPublicationSurface = "example"
+	ConfigurationPublicationCanonicalExample ConfigurationPublicationSurface = "canonical-example"
+)
+
+// ConfigurationPublication declares where a persistence-sensitive setting must
+// be published and the default required by each surface.
+type ConfigurationPublication struct {
+	Environment   string
+	ConfigFileKey string
+	Surfaces      []ConfigurationPublicationSurface
+	Defaults      map[ConfigurationPublicationSurface]string
+}
+
+// PublicationRequirements returns the delivery contract for state that must
+// survive container replacement. Credentials and ephemeral paths stay out of
+// this list deliberately.
+func PublicationRequirements() []ConfigurationPublication {
+	canonicalDefault := ""
+	for _, setting := range Catalog().Settings {
+		if setting.Environment == "HITKEEP_DATA_PATH" {
+			canonicalDefault = setting.Default
+			break
+		}
+	}
+
+	return []ConfigurationPublication{{
+		Environment:   "HITKEEP_DATA_PATH",
+		ConfigFileKey: "data-path",
+		Surfaces: []ConfigurationPublicationSurface{
+			ConfigurationPublicationDocker,
+			ConfigurationPublicationCompose,
+			ConfigurationPublicationHelm,
+			ConfigurationPublicationExample,
+			ConfigurationPublicationCanonicalExample,
+		},
+		Defaults: map[ConfigurationPublicationSurface]string{
+			ConfigurationPublicationDocker:           "/var/lib/hitkeep/data",
+			ConfigurationPublicationCompose:          "/var/lib/hitkeep/data",
+			ConfigurationPublicationHelm:             "/var/lib/hitkeep/data",
+			ConfigurationPublicationExample:          "/var/lib/hitkeep/data",
+			ConfigurationPublicationCanonicalExample: canonicalDefault,
+		},
+	}}
+}
+
 func configFileKey(environment, flag string) string {
 	if environment == "" {
 		return flag

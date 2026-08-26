@@ -229,6 +229,10 @@ func validateConfigurationDocumentation(root string) error {
 		"HITKEEP_VERSION":       true,
 	}
 
+	if err := validateConfigurationPublication("config.example.yaml", string(runtimeconfig.RenderExampleYAML()), runtimeconfig.PublicationRequirements()); err != nil {
+		return err
+	}
+
 	paths := []string{
 		filepath.Join(root, "README.md"),
 		filepath.Join(root, "Dockerfile"),
@@ -273,11 +277,83 @@ func validateConfigurationDocumentation(root string) error {
 			}
 		}
 		checkDefaults := filepath.Base(path) != "compose.dev.yaml"
-		if err := validateConfigurationDocument(filepath.ToSlash(relative), string(raw), known, nonRuntime, checkDefaults); err != nil {
+		relativePath := filepath.ToSlash(relative)
+		if err := validateConfigurationDocument(relativePath, string(raw), known, nonRuntime, checkDefaults); err != nil {
+			return err
+		}
+		if err := validateConfigurationPublication(relativePath, string(raw), runtimeconfig.PublicationRequirements()); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func validateConfigurationPublication(path, contents string, requirements []runtimeconfig.ConfigurationPublication) error {
+	surface := configurationPublicationSurface(path)
+	if surface == "" {
+		return nil
+	}
+	for _, requirement := range requirements {
+		if !slices.Contains(requirement.Surfaces, surface) {
+			continue
+		}
+		actual, found := configurationPublicationDefault(contents, requirement, surface)
+		if !found {
+			return fmt.Errorf("%s omits required published configuration setting %s", path, requirement.Environment)
+		}
+		if expected := requirement.Defaults[surface]; actual != expected {
+			return fmt.Errorf("%s gives %s published default %q; catalog default is %q", path, requirement.Environment, actual, expected)
+		}
+	}
+	return nil
+}
+
+func configurationPublicationSurface(path string) runtimeconfig.ConfigurationPublicationSurface {
+	base := filepath.Base(path)
+	switch {
+	case path == "Dockerfile":
+		return runtimeconfig.ConfigurationPublicationDocker
+	case strings.HasPrefix(base, "compose") && strings.HasSuffix(base, ".yaml"):
+		return runtimeconfig.ConfigurationPublicationCompose
+	case path == "charts/hitkeep/templates/statefulset.yaml":
+		return runtimeconfig.ConfigurationPublicationHelm
+	case strings.HasPrefix(path, "examples/") && strings.HasPrefix(base, "compose") && strings.HasSuffix(base, ".yaml"):
+		return runtimeconfig.ConfigurationPublicationExample
+	case base == "config.example.yaml":
+		return runtimeconfig.ConfigurationPublicationCanonicalExample
+	default:
+		return ""
+	}
+}
+
+func configurationPublicationDefault(contents string, requirement runtimeconfig.ConfigurationPublication, surface runtimeconfig.ConfigurationPublicationSurface) (string, bool) {
+	for _, line := range strings.Split(contents, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "# config-publication: ") {
+			value, found := strings.CutPrefix(strings.TrimSpace(strings.TrimPrefix(line, "# config-publication: ")), requirement.Environment+"=")
+			if found {
+				return strings.Trim(value, "\\\"'"), true
+			}
+		}
+		switch surface {
+		case runtimeconfig.ConfigurationPublicationDocker:
+			value, found := strings.CutPrefix(line, "ENV "+requirement.Environment+"=")
+			if found {
+				return strings.Trim(value, "\\\"'"), true
+			}
+		case runtimeconfig.ConfigurationPublicationCompose, runtimeconfig.ConfigurationPublicationExample:
+			value, found := strings.CutPrefix(line, requirement.Environment+":")
+			if found {
+				return strings.Trim(strings.TrimSpace(value), "\\\"'"), true
+			}
+		case runtimeconfig.ConfigurationPublicationCanonicalExample:
+			value, found := strings.CutPrefix(line, requirement.ConfigFileKey+":")
+			if found {
+				return strings.Trim(strings.TrimSpace(value), "\\\"'"), true
+			}
+		}
+	}
+	return "", false
 }
 
 func validateContainerDataPath(path, contents string) error {

@@ -116,6 +116,38 @@ func TestValidateContainerDataPath(t *testing.T) {
 	}
 }
 
+func TestValidateConfigurationPublicationRejectsMissingAndDefaultDrift(t *testing.T) {
+	requirements := runtimeconfig.PublicationRequirements()
+	if len(requirements) != 1 {
+		t.Fatalf("publication requirements = %d, want one", len(requirements))
+	}
+	requirement := requirements[0]
+
+	for _, test := range []struct {
+		path    string
+		content string
+	}{
+		{"Dockerfile", "ENV HITKEEP_DATA_PATH=\"" + requirement.Defaults[runtimeconfig.ConfigurationPublicationDocker] + "\""},
+		{"compose.yaml", "HITKEEP_DATA_PATH: " + requirement.Defaults[runtimeconfig.ConfigurationPublicationCompose]},
+		{"charts/hitkeep/templates/statefulset.yaml", "# config-publication: HITKEEP_DATA_PATH=" + requirement.Defaults[runtimeconfig.ConfigurationPublicationHelm]},
+		{"examples/compose.yaml", "HITKEEP_DATA_PATH: " + requirement.Defaults[runtimeconfig.ConfigurationPublicationExample]},
+		{"config.example.yaml", "data-path: " + requirement.Defaults[runtimeconfig.ConfigurationPublicationCanonicalExample]},
+	} {
+		t.Run(test.path, func(t *testing.T) {
+			if err := validateConfigurationPublication(test.path, test.content, requirements); err != nil {
+				t.Fatalf("validateConfigurationPublication() error = %v", err)
+			}
+		})
+	}
+
+	if err := validateConfigurationPublication("Dockerfile", "FROM scratch", requirements); err == nil {
+		t.Fatal("validateConfigurationPublication() accepted an omitted required setting")
+	}
+	if err := validateConfigurationPublication("compose.yaml", "HITKEEP_DATA_PATH: /tmp/hitkeep", requirements); err == nil {
+		t.Fatal("validateConfigurationPublication() accepted a default drift")
+	}
+}
+
 func TestValidateConfigurationDocument(t *testing.T) {
 	known := map[string]runtimeconfig.ConfigurationSetting{
 		"HITKEEP_LOG_LEVEL": {Environment: "HITKEEP_LOG_LEVEL", Default: "info"},
