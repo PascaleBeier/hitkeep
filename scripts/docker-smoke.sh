@@ -73,7 +73,13 @@ start_container() {
 }
 
 remove_container() {
+  local exit_code
   docker stop -t 15 "$container" >/dev/null
+  exit_code="$(docker inspect "$container" --format '{{.State.ExitCode}}')"
+  if [[ "$exit_code" != "0" ]]; then
+    printf 'Container %s exited with %s during graceful stop\n' "$container" "$exit_code" >&2
+    return 1
+  fi
   docker rm "$container" >/dev/null
 }
 

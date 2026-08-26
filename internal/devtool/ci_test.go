@@ -209,6 +209,9 @@ func TestSelfHostedImageGateCoversContainerRecreation(t *testing.T) {
 	if bytes.Contains(raw, []byte("remove_container() {\n  docker rm -f")) || bytes.Contains(raw, []byte("verify_stopped_storage() {\n  docker rm -f")) {
 		t.Fatal("docker smoke normal recreation lifecycle must not force-remove containers")
 	}
+	if !bytes.Contains(raw, []byte("remove_container() {\n  local exit_code\n  docker stop -t 15 \"$container\" >/dev/null\n  exit_code=\"$(docker inspect \"$container\" --format '{{.State.ExitCode}}')\"\n  if [[ \"$exit_code\" != \"0\" ]]")) {
+		t.Fatal("docker smoke normal removal must require a clean graceful-stop exit code before removal")
+	}
 }
 
 func TestDefaultTenantMigrationAcceptanceIsFullProfileOnly(t *testing.T) {
