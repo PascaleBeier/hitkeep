@@ -1,11 +1,9 @@
 package devtool
 
 import (
-	"github.com/spf13/fileflow"
-
 	"archive/tar"
-	"bytes"
 	"bufio"
+	"bytes"
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
@@ -19,6 +17,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/spf13/fileflow"
 )
 
 const (
@@ -236,9 +236,9 @@ func verifySelfHostedReleaseArchive(path, version, arch string, example []byte) 
 		data []byte
 	}{
 		"hitkeep-linux-" + arch: {mode: 0o755},
-		"LICENSE":             {mode: 0o644},
-		"README.md":           {mode: 0o644},
-		"hitkeep.example.yaml": {mode: 0o644, data: example},
+		"LICENSE":               {mode: 0o644},
+		"README.md":             {mode: 0o644},
+		"hitkeep.example.yaml":  {mode: 0o644, data: example},
 	}
 	reader := tar.NewReader(gzipReader)
 	for {
