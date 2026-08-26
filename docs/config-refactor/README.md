@@ -25,7 +25,7 @@ This folder is the durable progress ledger for the migration. Update it in the s
 | 0C | In progress | Inventory filesystem operations and dependency-ordered `internal/` move manifest | Initial domain/risk classification complete; full bounded per-domain manifest pending |
 | 1 | Completed | Make catalog authoritative and generate neutral `hitkeep.example.yaml` | Catalog `config_file_key` added; schema `hitkeep.config/v2`; deterministic example covers each self-hosted key once |
 | 2 | Completed | Add instance-based Viper assembler in shadow parity | Viper 1.21.0 + Afero explicit YAML; full catalog types, strict keys, normalization, warnings, and precedence proven; runtime remains legacy |
-| 3 | Pending | Production Cobra root with legacy config loader | — |
+| 3 | In progress | Production Cobra root with legacy config loader | Factory-built Cobra root now owns execution while preserving exact first-argument routing and all legacy leaf parsers |
 | 4 | Pending | Switch production assembly to parity-proven Viper | — |
 | 5 | Pending | Normalize `hk` Cobra factories and preserve MCP/JSON contracts | — |
 | 6 | Pending | Project catalog into Docker, Compose, Helm, examples, and docs artifact | — |
@@ -47,19 +47,20 @@ This folder is the durable progress ledger for the migration. Update it in the s
 - Filesystem migration separates ordinary injectable reads/writes from native DuckDB/WAL/fsync/lock durability; fileflow never receives Afero-only paths.
 - `internal/appurl` is the leading first move-only leaf candidate; `config`, `database`, and `devtool` move only after their behavioral boundaries stabilize.
 
-## Current slice: 2
+## Current slice: 3
 
 ### Test-first work
 
-1. Added a package-local `viper.New()` shadow assembler; no global Viper state and no implicit file discovery.
-2. Compared typed output and warning text against the legacy loader for defaults, environment overrides, invalid values, canonical flags, deprecated aliases in both orders, and runtime normalization.
-3. Loaded explicit YAML only through injected Afero; proved every catalog scalar type and precedence `defaults < file < env < flags`.
-4. Rejected unreadable, malformed, unknown-key, and wrong-type files without echoing configured values; `Config.Load` remains on the legacy path.
+1. Characterized the exact first-argument dispatcher, including unknown input and existing `help`, `--help`, and `--version` fallthrough.
+2. Replaced `main` dispatch with a factory-built Cobra root and an injected action seam.
+3. Kept `config.Load`, global `os.Args`, recovery/import/update stdlib flag parsers, output, confirmations, signals, and exit behavior unchanged.
+4. Keep Cobra flag parsing disabled until leaf command behavior has focused parity coverage.
 
 ### Decisions
 
 - Extend the existing configuration catalog; do not create a parallel schema.
 - Viper is instance-based and remains shadow-only until old/new typed results, warnings, and normalization match across the full catalog.
+- The initial Cobra root is a routing boundary only; leaf stdlib parsers remain authoritative until migrated with exit/output parity tests.
 - No `internal/` moves in behavioral slices.
 - The generated example config must validate and remain behaviorally neutral versus no config file, excluding intentionally generated runtime values.
 - GoReleaser must reproduce the existing artifact manifest before replacing the legacy builder.
@@ -80,7 +81,9 @@ Record focused commands as stable test targets or `hk` gate IDs, not pasted succ
 | 2026-08-26 | 2 | `go build ./internal/config/... && go test -race ./internal/config/...` | Passed; explicit Afero YAML, strict errors, no discovery, full catalog types, and four-layer precedence proven |
 | 2026-08-26 | 2 | Changed QA `20260826T114130-28c942a4` | Passed: `go-format`, `go-fix`, `go-lint`, `go-vet`, `go-staticcheck`, `developer-mcp`, `developer-docs` |
 | 2026-08-26 | 2 | Changed QA `20260826T115108-06b63ed6` | Passed; completed explicit-file/full-catalog shadow slice with the same seven gates |
+| 2026-08-26 | 3 | `go test -race ./cmd ./cmd/hitkeep -count=1` | Passed; Cobra root preserves first-argument routing and existing command/server fallthrough |
+| 2026-08-26 | 3 | Changed QA `20260826T115948-eb201dc1` | Passed: `go-format`, `go-fix`, `go-lint`, `go-vet`, `go-staticcheck`, `developer-mcp`, `developer-docs` |
 
 ## Next update
 
-Run changed QA and push the completed Viper shadow slice, then begin the production Cobra root while keeping the legacy loader authoritative.
+Run changed QA and push the initial Cobra root slice, then migrate leaf command routing only where exit, output, flag, and confirmation parity can be proven.
