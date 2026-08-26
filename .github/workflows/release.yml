@@ -153,7 +153,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -206,9 +205,25 @@ jobs:
 
       - uses: ./.github/actions/setup-node-npm
 
-      - name: Publish @hitkeep/tracker
+      - name: Publish immutable tracker candidate
         working-directory: frontend/tracker
-        run: npm publish
+        env:
+          VERSION: ${{ needs.release-please.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          existing="$(npm view "@hitkeep/tracker@${VERSION}" version 2>/dev/null || true)"
+          if [[ "$existing" != "$VERSION" ]]; then
+            npm publish --tag "release-${VERSION}"
+            existing="$(npm view "@hitkeep/tracker@${VERSION}" version)"
+          fi
+          test "$existing" = "$VERSION"
+
+      - name: Promote tracker latest dist-tag
+        working-directory: frontend/tracker
+        env:
+          VERSION: ${{ needs.release-please.outputs.version }}
+        run: npm dist-tag add "@hitkeep/tracker@${VERSION}" latest
 
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 

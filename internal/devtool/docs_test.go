@@ -53,6 +53,16 @@ func TestValidateReleaseMetadata(t *testing.T) {
 		}
 	})
 
+	t.Run("root package draft override", func(t *testing.T) {
+		root := releaseMetadataFixture(t)
+		config := strings.Replace(fixtureReleasePleaseConfig(), `".":{`, `".":{"draft":false,`, 1)
+		writeFixtureFile(t, root, "release-please-config.json", config)
+		err := validateReleaseMetadata(root)
+		if err == nil || !strings.Contains(err.Error(), "effective packages['.'].draft must be true") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
 	t.Run("missing GoReleaser release build", func(t *testing.T) {
 		root := releaseMetadataFixture(t)
 		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", "./hk catalog configuration --output json\nhitkeep-configuration.json\nhitkeep.example.yaml\nrelease_tag: $tag\nrelease_version: $version\n")
@@ -154,6 +164,11 @@ jobs:
       - build-release
       - publish-helm
       - verify-tracker-package
+    steps:
+      - name: Publish immutable tracker candidate
+      - name: Promote tracker latest dist-tag
+      - name: Promote immutable image to mutable tags
+      - name: Publish draft GitHub release
   sync-docs-release:
     needs: finalize-release
   deploy-cloud:

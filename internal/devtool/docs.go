@@ -25,6 +25,7 @@ var dockerfileQuotedPathPattern = regexp.MustCompile(`"([^"]+)"`)
 type releasePleaseConfig struct {
 	Draft    bool `json:"draft"`
 	Packages map[string]struct {
+		Draft      *bool                    `json:"draft"`
 		ExtraFiles []releasePleaseExtraFile `json:"extra-files"`
 	} `json:"packages"`
 }
@@ -57,8 +58,13 @@ func (needs *workflowNeeds) UnmarshalYAML(value *yaml.Node) error {
 	}
 }
 
+type workflowStep struct {
+	Name string `yaml:"name"`
+}
+
 type workflowJob struct {
-	Needs workflowNeeds `yaml:"needs"`
+	Needs workflowNeeds  `yaml:"needs"`
+	Steps []workflowStep `yaml:"steps"`
 }
 
 type releaseWorkflow struct {
@@ -87,6 +93,28 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 				return fmt.Errorf("release workflow job %s must need %s", job, dependency)
 			}
 		}
+	}
+	finalizer := workflow.Jobs["finalize-release"]
+	positions := make(map[string]int, len(finalizer.Steps))
+	for index, step := range finalizer.Steps {
+		positions[step.Name] = index
+	}
+	orderedSteps := []string{
+		"Publish immutable tracker candidate",
+		"Promote tracker latest dist-tag",
+		"Promote immutable image to mutable tags",
+		"Publish draft GitHub release",
+	}
+	previous := -1
+	for _, name := range orderedSteps {
+		position, ok := positions[name]
+		if !ok {
+			return fmt.Errorf("release workflow finalizer is missing step %q", name)
+		}
+		if position <= previous {
+			return fmt.Errorf("release workflow finalizer must run %q before %q", orderedSteps[previous], name)
+		}
+		previous = position
 	}
 	return nil
 }
@@ -379,12 +407,16 @@ func validateReleaseMetadata(root string) error {
 	if err := readJSONFile(filepath.Join(root, "release-please-config.json"), &config); err != nil {
 		return err
 	}
-	if !config.Draft {
-		return fmt.Errorf("release-please-config.json must create draft releases")
-	}
 	rootPackageConfig, ok := config.Packages["."]
 	if !ok {
 		return fmt.Errorf("release-please-config.json is missing packages['.']")
+	}
+	effectiveDraft := config.Draft
+	if rootPackageConfig.Draft != nil {
+		effectiveDraft = *rootPackageConfig.Draft
+	}
+	if !effectiveDraft {
+		return fmt.Errorf("release-please-config.json effective packages['.'].draft must be true")
 	}
 	expectedFiles := []releasePleaseExtraFile{
 		{Type: "json", Path: "server.json", JSONPath: "$.version"},
