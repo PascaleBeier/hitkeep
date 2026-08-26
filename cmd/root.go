@@ -143,7 +143,7 @@ func newRootCommand(actions rootActions) *cobra.Command {
 		DisableFlagParsing: true,
 		DisableSuggestions: true,
 		Args:               cobra.ArbitraryArgs,
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(command *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				return actions.run(args, "")
 			}
@@ -159,6 +159,10 @@ func newRootCommand(actions rootActions) *cobra.Command {
 			default:
 				configFile, serverArgs, err := splitRootConfig(args)
 				if err != nil {
+					return err
+				}
+				if len(serverArgs) == 1 && serverArgs[0] == "--version" {
+					_, err := fmt.Fprintln(command.OutOrStdout(), Version)
 					return err
 				}
 				if len(serverArgs) > 0 && serverArgs[0] == "healthcheck" {
