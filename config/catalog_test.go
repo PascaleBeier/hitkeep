@@ -75,6 +75,9 @@ func TestConfigurationPublicationRequirementsCoverPersistentDataPath(t *testing.
 		if requirement.Defaults[surface] == "" {
 			t.Errorf("publication requirement has no default for %s", surface)
 		}
+		if len(requirement.Paths[surface]) == 0 {
+			t.Errorf("publication requirement has no paths for %s", surface)
+		}
 	}
 }
 

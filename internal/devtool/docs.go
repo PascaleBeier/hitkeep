@@ -229,7 +229,25 @@ func validateConfigurationDocumentation(root string) error {
 		"HITKEEP_VERSION":       true,
 	}
 
-	if err := validateConfigurationPublication("config.example.yaml", string(runtimeconfig.RenderExampleYAML()), runtimeconfig.PublicationRequirements()); err != nil {
+	requirements := runtimeconfig.PublicationRequirements()
+	if err := validateRequiredConfigurationPublications(requirements, func(path string) string {
+		if path == "config.example.yaml" {
+			return string(runtimeconfig.RenderExampleYAML())
+		}
+		raw, readErr := os.ReadFile(filepath.Join(root, path))
+		if readErr != nil {
+			return ""
+		}
+		contents := string(raw)
+		if path == "charts/hitkeep/templates/statefulset.yaml" {
+			values, valuesErr := os.ReadFile(filepath.Join(root, "charts/hitkeep/values.yaml"))
+			if valuesErr != nil {
+				return ""
+			}
+			contents += "\n" + string(values)
+		}
+		return contents
+	}); err != nil {
 		return err
 	}
 
@@ -281,8 +299,24 @@ func validateConfigurationDocumentation(root string) error {
 		if err := validateConfigurationDocument(relativePath, string(raw), known, nonRuntime, checkDefaults); err != nil {
 			return err
 		}
-		if err := validateConfigurationPublication(relativePath, string(raw), runtimeconfig.PublicationRequirements()); err != nil {
-			return err
+	}
+	return nil
+}
+
+var helmDataPathTemplatePattern = regexp.MustCompile(`(?ms)- name:\s*HITKEEP_DATA_PATH\s*\n\s*value:\s*\{\{\s*\.Values\.persistence\.mountPath\s*\|\s*quote\s*\}\}`)
+var helmMountPathPattern = regexp.MustCompile(`(?m)^\s*mountPath:\s*(?:\"([^\"]+)\"|'([^']+)'|([^\s#]+))`)
+
+func validateRequiredConfigurationPublications(requirements []runtimeconfig.ConfigurationPublication, contents func(string) string) error {
+	for _, requirement := range requirements {
+		for _, surface := range requirement.Surfaces {
+			for _, path := range requirement.Paths[surface] {
+				if actual := configurationPublicationSurface(path); actual != surface {
+					return fmt.Errorf("%s maps to publication surface %q, want %q", path, actual, surface)
+				}
+				if err := validateConfigurationPublication(path, contents(path), []runtimeconfig.ConfigurationPublication{requirement}); err != nil {
+					return err
+				}
+			}
 		}
 	}
 	return nil
@@ -313,12 +347,12 @@ func configurationPublicationSurface(path string) runtimeconfig.ConfigurationPub
 	switch {
 	case path == "Dockerfile":
 		return runtimeconfig.ConfigurationPublicationDocker
+	case strings.HasPrefix(path, "examples/") && strings.HasPrefix(base, "compose") && (strings.HasSuffix(base, ".yaml") || strings.HasSuffix(base, ".yml")):
+		return runtimeconfig.ConfigurationPublicationExample
 	case strings.HasPrefix(base, "compose") && strings.HasSuffix(base, ".yaml"):
 		return runtimeconfig.ConfigurationPublicationCompose
 	case path == "charts/hitkeep/templates/statefulset.yaml":
 		return runtimeconfig.ConfigurationPublicationHelm
-	case strings.HasPrefix(path, "examples/") && strings.HasPrefix(base, "compose") && strings.HasSuffix(base, ".yaml"):
-		return runtimeconfig.ConfigurationPublicationExample
 	case base == "config.example.yaml":
 		return runtimeconfig.ConfigurationPublicationCanonicalExample
 	default:
@@ -329,12 +363,6 @@ func configurationPublicationSurface(path string) runtimeconfig.ConfigurationPub
 func configurationPublicationDefault(contents string, requirement runtimeconfig.ConfigurationPublication, surface runtimeconfig.ConfigurationPublicationSurface) (string, bool) {
 	for _, line := range strings.Split(contents, "\n") {
 		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "# config-publication: ") {
-			value, found := strings.CutPrefix(strings.TrimSpace(strings.TrimPrefix(line, "# config-publication: ")), requirement.Environment+"=")
-			if found {
-				return strings.Trim(value, "\\\"'"), true
-			}
-		}
 		switch surface {
 		case runtimeconfig.ConfigurationPublicationDocker:
 			value, found := strings.CutPrefix(line, "ENV "+requirement.Environment+"=")
@@ -351,6 +379,15 @@ func configurationPublicationDefault(contents string, requirement runtimeconfig.
 			if found {
 				return strings.Trim(strings.TrimSpace(value), "\\\"'"), true
 			}
+		}
+	}
+	if surface != runtimeconfig.ConfigurationPublicationHelm || !helmDataPathTemplatePattern.MatchString(contents) {
+		return "", false
+	}
+	for _, match := range helmMountPathPattern.FindAllStringSubmatch(contents, -1) {
+		value := strings.Trim(strings.Join(match[1:], ""), "\\\"'")
+		if value != "" && !strings.HasPrefix(value, "{") {
+			return value, true
 		}
 	}
 	return "", false

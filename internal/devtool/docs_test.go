@@ -118,33 +118,58 @@ func TestValidateContainerDataPath(t *testing.T) {
 
 func TestValidateConfigurationPublicationRejectsMissingAndDefaultDrift(t *testing.T) {
 	requirements := runtimeconfig.PublicationRequirements()
-	if len(requirements) != 1 {
-		t.Fatalf("publication requirements = %d, want one", len(requirements))
-	}
-	requirement := requirements[0]
-
 	for _, test := range []struct {
 		path    string
+		surface runtimeconfig.ConfigurationPublicationSurface
 		content string
+		drift   string
 	}{
-		{"Dockerfile", "ENV HITKEEP_DATA_PATH=\"" + requirement.Defaults[runtimeconfig.ConfigurationPublicationDocker] + "\""},
-		{"compose.yaml", "HITKEEP_DATA_PATH: " + requirement.Defaults[runtimeconfig.ConfigurationPublicationCompose]},
-		{"charts/hitkeep/templates/statefulset.yaml", "# config-publication: HITKEEP_DATA_PATH=" + requirement.Defaults[runtimeconfig.ConfigurationPublicationHelm]},
-		{"examples/compose.yaml", "HITKEEP_DATA_PATH: " + requirement.Defaults[runtimeconfig.ConfigurationPublicationExample]},
-		{"config.example.yaml", "data-path: " + requirement.Defaults[runtimeconfig.ConfigurationPublicationCanonicalExample]},
+		{"Dockerfile", runtimeconfig.ConfigurationPublicationDocker, "ENV HITKEEP_DATA_PATH=\"/var/lib/hitkeep/data\"", "ENV HITKEEP_DATA_PATH=\"/tmp/hitkeep\""},
+		{"compose.yaml", runtimeconfig.ConfigurationPublicationCompose, "HITKEEP_DATA_PATH: /var/lib/hitkeep/data", "HITKEEP_DATA_PATH: /tmp/hitkeep"},
+		{"charts/hitkeep/templates/statefulset.yaml", runtimeconfig.ConfigurationPublicationHelm, "- name: HITKEEP_DATA_PATH\n  value: {{ .Values.persistence.mountPath | quote }}\nmountPath: /var/lib/hitkeep/data", "- name: HITKEEP_DATA_PATH\n  value: {{ .Values.persistence.mountPath | quote }}\nmountPath: /tmp/hitkeep"},
+		{"examples/compose.yml", runtimeconfig.ConfigurationPublicationExample, "HITKEEP_DATA_PATH: /var/lib/hitkeep/data", "HITKEEP_DATA_PATH: /tmp/hitkeep"},
+		{"config.example.yaml", runtimeconfig.ConfigurationPublicationCanonicalExample, "data-path: data", "data-path: /tmp/hitkeep"},
 	} {
 		t.Run(test.path, func(t *testing.T) {
+			if actual := configurationPublicationSurface(test.path); actual != test.surface {
+				t.Fatalf("configurationPublicationSurface(%q) = %q, want %q", test.path, actual, test.surface)
+			}
 			if err := validateConfigurationPublication(test.path, test.content, requirements); err != nil {
 				t.Fatalf("validateConfigurationPublication() error = %v", err)
+			}
+			if err := validateConfigurationPublication(test.path, "", requirements); err == nil {
+				t.Fatal("validateConfigurationPublication() accepted an omitted required setting")
+			}
+			if err := validateConfigurationPublication(test.path, test.drift, requirements); err == nil {
+				t.Fatal("validateConfigurationPublication() accepted a default drift")
 			}
 		})
 	}
 
-	if err := validateConfigurationPublication("Dockerfile", "FROM scratch", requirements); err == nil {
-		t.Fatal("validateConfigurationPublication() accepted an omitted required setting")
+}
+
+func TestValidateRequiredConfigurationPublicationsRejectsDeletedPath(t *testing.T) {
+	requirements := runtimeconfig.PublicationRequirements()
+	contents := map[string]string{
+		"Dockerfile":           "ENV HITKEEP_DATA_PATH=\"/var/lib/hitkeep/data\"",
+		"compose.yaml":         "HITKEEP_DATA_PATH: /var/lib/hitkeep/data",
+		"compose.cluster.yaml": "HITKEEP_DATA_PATH: /var/lib/hitkeep/data",
+		"compose.dev.yaml":     "HITKEEP_DATA_PATH: /var/lib/hitkeep/data",
+		"charts/hitkeep/templates/statefulset.yaml":    "- name: HITKEEP_DATA_PATH\n  value: {{ .Values.persistence.mountPath | quote }}\nmountPath: /var/lib/hitkeep/data",
+		"examples/compose.yml":                         "HITKEEP_DATA_PATH: /var/lib/hitkeep/data",
+		"examples/compose.caddy-on-demand.yml":         "HITKEEP_DATA_PATH: /var/lib/hitkeep/data",
+		"examples/compose.caddy.yml":                   "HITKEEP_DATA_PATH: /var/lib/hitkeep/data",
+		"examples/compose.nginx-custom-tracking.yml":   "HITKEEP_DATA_PATH: /var/lib/hitkeep/data",
+		"examples/compose.traefik-custom-tracking.yml": "HITKEEP_DATA_PATH: /var/lib/hitkeep/data",
+		"config.example.yaml":                          "data-path: data",
 	}
-	if err := validateConfigurationPublication("compose.yaml", "HITKEEP_DATA_PATH: /tmp/hitkeep", requirements); err == nil {
-		t.Fatal("validateConfigurationPublication() accepted a default drift")
+	load := func(path string) string { return contents[path] }
+	if err := validateRequiredConfigurationPublications(requirements, load); err != nil {
+		t.Fatalf("validateRequiredConfigurationPublications() error = %v", err)
+	}
+	delete(contents, "examples/compose.yml")
+	if err := validateRequiredConfigurationPublications(requirements, load); err == nil {
+		t.Fatal("validateRequiredConfigurationPublications() accepted a deleted required path")
 	}
 }
 

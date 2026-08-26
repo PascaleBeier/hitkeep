@@ -102,6 +102,7 @@ type ConfigurationPublication struct {
 	Environment   string
 	ConfigFileKey string
 	Surfaces      []ConfigurationPublicationSurface
+	Paths         map[ConfigurationPublicationSurface][]string
 	Defaults      map[ConfigurationPublicationSurface]string
 }
 
@@ -126,6 +127,19 @@ func PublicationRequirements() []ConfigurationPublication {
 			ConfigurationPublicationHelm,
 			ConfigurationPublicationExample,
 			ConfigurationPublicationCanonicalExample,
+		},
+		Paths: map[ConfigurationPublicationSurface][]string{
+			ConfigurationPublicationDocker:  {"Dockerfile"},
+			ConfigurationPublicationCompose: {"compose.yaml", "compose.cluster.yaml", "compose.dev.yaml"},
+			ConfigurationPublicationHelm:    {"charts/hitkeep/templates/statefulset.yaml"},
+			ConfigurationPublicationExample: {
+				"examples/compose.yml",
+				"examples/compose.caddy-on-demand.yml",
+				"examples/compose.caddy.yml",
+				"examples/compose.nginx-custom-tracking.yml",
+				"examples/compose.traefik-custom-tracking.yml",
+			},
+			ConfigurationPublicationCanonicalExample: {"config.example.yaml"},
 		},
 		Defaults: map[ConfigurationPublicationSurface]string{
 			ConfigurationPublicationDocker:           "/var/lib/hitkeep/data",
