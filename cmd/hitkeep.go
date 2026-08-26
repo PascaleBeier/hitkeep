@@ -41,10 +41,19 @@ func check(err error) {
 }
 
 func Run(logger *slog.Logger) {
+	if err := run(logger, os.Args[1:], ""); err != nil {
+		panic(err)
+	}
+}
+
+func run(logger *slog.Logger, args []string, configFile string) error {
 	if logger == nil {
 		panic("hitkeepcmd: logger is required")
 	}
-	conf := config.Load(logger)
+	conf, err := config.LoadArgs(args, configFile, logger)
+	if err != nil {
+		return fmt.Errorf("load configuration: %w", err)
+	}
 	conf.Version = Version
 
 	logLevel, err := hklog.ParseLevel(conf.LogLevel)
@@ -215,6 +224,7 @@ func Run(logger *slog.Logger) {
 	logger.Info("Application is running. Press Ctrl+C to exit.")
 
 	check(g.Wait())
+	return nil
 }
 
 func logMailerConfigurationError(logger *slog.Logger, conf *config.Config) {
@@ -460,11 +470,13 @@ func runHealthcheck(conf *config.Config) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
+	//nolint:gosec // The healthcheck target is trusted operator configuration.
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
 	if err != nil {
 		return fmt.Errorf("build healthcheck request: %w", err)
 	}
 
+	//nolint:gosec // The healthcheck target is trusted operator configuration.
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("healthcheck request: %w", err)

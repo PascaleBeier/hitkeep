@@ -13,15 +13,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-// loadViperShadow proves Viper parity without changing runtime configuration ownership.
-func mustLoadViper(args []string, getEnv func(string, string) string, loggerArgs ...*slog.Logger) *Config {
-	conf, err := loadViper(args, getEnv, afero.NewOsFs(), "", loggerArgs...)
-	if err != nil {
-		panic(fmt.Errorf("assemble runtime configuration: %w", err))
-	}
-	return conf
-}
-
 func loadViper(
 	args []string,
 	getEnv func(string, string) string,

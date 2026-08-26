@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -25,6 +26,20 @@ func TestLoadUsesViperWithLegacyParity(t *testing.T) {
 	}
 	if got, want := Load(), load(os.Args[1:], getEnv); !reflect.DeepEqual(got, want) {
 		t.Fatalf("Load() differs from legacy loader:\n got: %#v\nwant: %#v", got, want)
+	}
+}
+
+func TestLoadArgsReadsExplicitOSFile(t *testing.T) {
+	configFile := filepath.Join(t.TempDir(), "hitkeep.yaml")
+	if err := os.WriteFile(configFile, []byte("http-addr: ':7070'\nhealthcheck: true\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	conf, err := LoadArgs(nil, configFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if conf.HTTPAddr != ":7070" || !conf.Healthcheck {
+		t.Fatalf("explicit config was not loaded: %#v", conf)
 	}
 }
 

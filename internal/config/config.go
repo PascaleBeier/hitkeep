@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/spf13/afero"
 )
 
 type Config struct {
@@ -195,12 +197,20 @@ func (c *Config) AuthRememberMeDuration() time.Duration {
 }
 
 func Load(loggerArgs ...*slog.Logger) *Config {
-	return mustLoadViper(os.Args[1:], func(key, fallback string) string {
+	conf, err := LoadArgs(os.Args[1:], "", loggerArgs...)
+	if err != nil {
+		panic(fmt.Errorf("assemble runtime configuration: %w", err))
+	}
+	return conf
+}
+
+func LoadArgs(args []string, configFile string, loggerArgs ...*slog.Logger) (*Config, error) {
+	return loadViper(args, func(key, fallback string) string {
 		if val := os.Getenv(key); val != "" {
 			return val
 		}
 		return fallback
-	}, loggerArgs...)
+	}, afero.NewOsFs(), configFile, loggerArgs...)
 }
 
 func load(args []string, getEnv func(string, string) string, loggerArgs ...*slog.Logger) *Config {

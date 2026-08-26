@@ -26,7 +26,7 @@ This folder is the durable progress ledger for the migration. Update it in the s
 | 1 | Completed | Make catalog authoritative and generate neutral `hitkeep.example.yaml` | Catalog `config_file_key` added; schema `hitkeep.config/v2`; deterministic example covers each self-hosted key once |
 | 2 | Completed | Add instance-based Viper assembler in shadow parity | Viper 1.21.0 + Afero explicit YAML; full catalog types, strict keys, normalization, warnings, and precedence proven |
 | 3 | Completed | Production Cobra root with legacy leaf parsers | Factory-built Cobra root owns execution while preserving exact first-argument routing and all legacy leaf parsers |
-| 4 | Completed | Switch production assembly to parity-proven Viper | `config.Load` now uses instance-based Viper through an OS-backed Afero boundary; direct legacy parity and affected runtime race suites pass |
+| 4 | Completed | Switch production assembly to parity-proven Viper | `config.Load` uses instance-based Viper through an OS-backed Afero boundary; leading `--config PATH`/`--config=PATH` selection is explicit-only and returns bounded startup errors |
 | 5 | Pending | Normalize `hk` Cobra factories and preserve MCP/JSON contracts | — |
 | 6 | Pending | Project catalog into Docker, Compose, Helm, examples, and docs artifact | — |
 | 7 | Pending | Enforce issue #288 container recreation and migration interruption gates | — |
@@ -47,7 +47,7 @@ This folder is the durable progress ledger for the migration. Update it in the s
 - Filesystem migration separates ordinary injectable reads/writes from native DuckDB/WAL/fsync/lock durability; fileflow never receives Afero-only paths.
 - `internal/appurl` is the leading first move-only leaf candidate; `config`, `database`, and `devtool` move only after their behavioral boundaries stabilize.
 
-## Current slice: 4
+## Most recently completed slice: 4
 
 ### Test-first work
 
@@ -55,6 +55,8 @@ This folder is the durable progress ledger for the migration. Update it in the s
 2. Switched only the production assembly boundary to the local Viper instance with the existing non-empty environment semantics.
 3. Kept explicit config-file loading separate from runtime selection, so 2.x still performs no implicit discovery.
 4. Preserved global `os.Args`, recovery/import/update stdlib flag parsers, output, confirmations, signals, and exit behavior.
+5. Added leading `--config PATH` and `--config=PATH` server selection at the Cobra boundary; config after another legacy flag remains legacy server input.
+6. Returned malformed paths and YAML as normal Cobra startup errors without exposing configuration values.
 
 ### Decisions
 
@@ -85,7 +87,9 @@ Record focused commands as stable test targets or `hk` gate IDs, not pasted succ
 | 2026-08-26 | 3 | Changed QA `20260826T115948-eb201dc1` | Passed: `go-format`, `go-fix`, `go-lint`, `go-vet`, `go-staticcheck`, `developer-mcp`, `developer-docs` |
 | 2026-08-26 | 4 | `go test -race ./cmd ./cmd/hitkeep ./internal/config ./internal/database ./internal/devtool/devmcp ./internal/mcpserver ./internal/server/admin ./internal/server/aifetch ./internal/server/ingest` | Passed; production Viper cutover preserves typed runtime behavior across affected startup consumers |
 | 2026-08-26 | 4 | Changed QA `20260826T121008-9708c7a2` | Passed: `go-format`, `go-fix`, `go-lint`, `go-vet`, `go-staticcheck`, `developer-mcp`, `developer-docs` |
+| 2026-08-26 | 4 | `go test -race ./cmd ./internal/config` | Passed; leading explicit config selection, OS-file loading, missing-path errors, and legacy routing parity proven |
+| 2026-08-26 | 4 | Changed QA `20260826T122352-73c142f6` | Passed: `go-format`, `go-fix`, `go-lint`, `go-vet`, `go-staticcheck`, `developer-mcp`, `developer-docs` |
 
 ## Next update
 
-Expose explicit config-file selection at the Cobra assembly boundary without implicit discovery, then migrate leaf command routing only where exit, output, flag, and confirmation parity can be proven.
+Normalize the existing `hk` Cobra factories without changing MCP or JSON contracts, then migrate production leaf routing only where exit, output, flag, and confirmation parity can be proven.

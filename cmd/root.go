@@ -2,16 +2,18 @@ package hitkeepcmd
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/spf13/cobra"
 )
 
 type rootActions struct {
-	run                func([]string)
+	run                func([]string, string) error
 	recover            func([]string)
 	updateSpamLists    func([]string)
 	updateAIAgentLists func([]string)
@@ -24,8 +26,8 @@ func NewRootCommand(logger *slog.Logger) *cobra.Command {
 		logger = slog.Default()
 	}
 	return newRootCommand(rootActions{
-		run: func(_ []string) {
-			Run(logger)
+		run: func(args []string, configFile string) error {
+			return run(logger, args, configFile)
 		},
 		recover: func(_ []string) {
 			Recover(logger)
@@ -52,10 +54,9 @@ func newRootCommand(actions rootActions) *cobra.Command {
 		DisableFlagParsing: true,
 		DisableSuggestions: true,
 		Args:               cobra.ArbitraryArgs,
-		Run: func(_ *cobra.Command, args []string) {
+		RunE: func(_ *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				actions.run(args)
-				return
+				return actions.run(args, "")
 			}
 			switch args[0] {
 			case "recover":
@@ -67,10 +68,34 @@ func newRootCommand(actions rootActions) *cobra.Command {
 			case "import":
 				actions.importData(args[1:])
 			default:
-				actions.run(args)
+				configFile, serverArgs, err := splitRootConfig(args)
+				if err != nil {
+					return err
+				}
+				return actions.run(serverArgs, configFile)
 			}
+			return nil
 		},
 		CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
 	}
 	return root
+}
+
+func splitRootConfig(args []string) (string, []string, error) {
+	if len(args) == 0 {
+		return "", args, nil
+	}
+	if args[0] == "--config" {
+		if len(args) < 2 || args[1] == "" {
+			return "", nil, fmt.Errorf("--config requires a path")
+		}
+		return args[1], args[2:], nil
+	}
+	if configFile, ok := strings.CutPrefix(args[0], "--config="); ok {
+		if configFile == "" {
+			return "", nil, fmt.Errorf("--config requires a path")
+		}
+		return configFile, args[1:], nil
+	}
+	return "", args, nil
 }
