@@ -1,6 +1,8 @@
 package devtool
 
 import (
+	"github.com/spf13/fileflow"
+
 	"archive/tar"
 	"bufio"
 	"compress/gzip"
@@ -84,6 +86,7 @@ func (a *App) PreparePublicImageContext() (CIArtifactResult, error) {
 	if err := os.MkdirAll(quarantine, 0o700); err != nil {
 		return CIArtifactResult{}, err
 	}
+	flow := fileflow.Flow{NoCreateDirs: true}
 	for _, arch := range []string{"amd64", "arm64"} {
 		name := "hitkeep-cloud-linux-" + arch
 		source := filepath.Join(a.workspace.Root, name)
@@ -94,8 +97,12 @@ func (a *App) PreparePublicImageContext() (CIArtifactResult, error) {
 		}
 		destination := filepath.Join(quarantine, name)
 		_ = os.Remove(destination)
-		if err := os.Rename(source, destination); err != nil {
+		final, err := flow.Move(source, destination)
+		if err != nil {
 			return CIArtifactResult{}, fmt.Errorf("isolate cloud binary %s: %w", name, err)
+		}
+		if filepath.Dir(final) != quarantine {
+			return CIArtifactResult{}, fmt.Errorf("isolated cloud binary escaped quarantine: %s", name)
 		}
 	}
 	cloud, _ := filepath.Glob(filepath.Join(a.workspace.Root, "hitkeep-cloud-linux-*"))

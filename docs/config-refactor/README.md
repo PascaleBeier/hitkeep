@@ -31,7 +31,7 @@ This folder is the durable progress ledger for the migration. Update it in the s
 | 6 | Completed | Project catalog into Docker, Compose, Helm, examples, and docs artifact | Catalog-derived root example plus repository-wide env/default validation covers Dockerfile, Compose, charts, examples, and reader-facing Markdown/YAML |
 | 7 | Completed | Enforce issue #288 container recreation and migration interruption gates | Existing self-hosted image smoke now recreates a container on the same named volume and verifies marker/database persistence; full profile pairs it with fault-injected migration resume acceptance |
 | 8 | Completed | GoReleaser artifact parity and build cutover; Homebrew/Scoop-ready artifact layout | GoReleaser v2.18.0 snapshots produced all four legacy binary names; existing checksum/verification commands accepted the complete six-file release contract |
-| 9 | Pending | Afero/fileflow/pathologize migration by operation risk | — |
+| 9 | Completed | Afero/fileflow/pathologize migration by operation risk | Runtime config already uses injected Afero; the one real cross-filesystem release relocation now uses fileflow; fixed trusted names need no pathologize; database/WAL/fsync/lock operations remain native |
 | 10 | Pending | Flatten `internal/` in dependency-order move-only slices | — |
 | 11 | Pending | Stabilize, full QA, CI, docs validation, completion audit | — |
 
@@ -47,11 +47,14 @@ This folder is the durable progress ledger for the migration. Update it in the s
 - Filesystem migration separates ordinary injectable reads/writes from native DuckDB/WAL/fsync/lock durability; fileflow never receives Afero-only paths.
 - `internal/appurl` is the leading first move-only leaf candidate; `config`, `database`, and `devtool` move only after their behavioral boundaries stabilize.
 
-## Most recently completed slice: 8
+## Most recently completed slice: 9
 
 ### Test-first work
 
-1. Added one GoReleaser v2 configuration with separate self-hosted and cloud build IDs, preserving Linux architectures, CGO, build tags, version injection, raw binary names, and Release Please ownership.
+1. Reused the Afero boundary already established by the Viper runtime loader instead of adding a repository-wide virtual filesystem wrapper.
+2. Replaced the developer release-context `os.Rename` with `fileflow.Flow{NoCreateDirs: true}.Move`, preserving explicit quarantine ownership while supporting cross-filesystem workspace state.
+3. Kept fixed trusted artifact names out of pathologize and retained native OS operations for database swaps, WAL recovery, fsync, locks, cache quarantine, atomic generated output, and log rotation.
+4. Added one GoReleaser v2 configuration with separate self-hosted and cloud build IDs, preserving Linux architectures, CGO, build tags, version injection, raw binary names, and Release Please ownership.
 2. Reused the existing `BuildReleaseBinaries` API and native-architecture runners; only its build implementation now delegates to the pinned GoReleaser release contract.
 3. Added a PR/full `goreleaser-check` gate and delivery-path classification without creating a second release orchestrator.
 4. Built both variants on Linux amd64 and arm64, generated the public configuration catalog, and passed the existing sorted SHA-256 release verifier over all six required artifacts.
@@ -108,7 +111,9 @@ Record focused commands as stable test targets or `hk` gate IDs, not pasted succ
 | 2026-08-26 | 8 | GoReleaser v2.18.0 `check` plus Linux amd64/arm64 snapshots | Passed; self-hosted/cloud tags, CGO, version linker value, and exact four binary names preserved |
 | 2026-08-26 | 8 | `hk ci release-checksums` and `hk ci verify-release` | Passed over four binaries, `hitkeep-configuration.json`, and sorted `SHA256SUMS` |
 | 2026-08-26 | 8 | Changed QA planning | Blocked before gate execution: persisted plan snapshot remains stale after deterministic replanning; focused race and release checks above passed and the guard was not bypassed |
+| 2026-08-26 | 9 | `go test -race ./internal/devtool ./internal/devtool/cli` | Passed; public-image isolation, release artifacts, CLI routing, and developer boundary remain covered |
+| 2026-08-26 | 9 | Gortex filesystem impact/contract review | One tested cross-filesystem candidate changed; database/native atomic operations explicitly excluded; no guard violations |
 
 ## Next update
 
-Migrate ordinary injectable filesystem operations to Afero and reserve fileflow/pathologize for safe native cross-filesystem and untrusted-path operations; keep DuckDB/WAL/fsync/lock durability OS-backed.
+Move the pure `internal/appurl` leaf first, then continue dependency-ordered move-only waves without mixing package relocation with behavior changes.
