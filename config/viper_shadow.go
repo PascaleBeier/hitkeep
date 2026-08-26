@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"reflect"
@@ -116,9 +117,17 @@ func loadViper(
 }
 
 func validateRawConfigFileKeys(contents []byte, knownKeys map[string]ConfigurationSetting) error {
+	decoder := yaml.NewDecoder(bytes.NewReader(contents))
 	var document yaml.Node
-	if err := yaml.Unmarshal(contents, &document); err != nil {
+	if err := decoder.Decode(&document); err != nil {
 		return fmt.Errorf("parse configuration file: invalid YAML")
+	}
+	var extra yaml.Node
+	if err := decoder.Decode(&extra); err != io.EOF {
+		if err != nil {
+			return fmt.Errorf("parse configuration file: invalid YAML")
+		}
+		return fmt.Errorf("configuration file must contain exactly one YAML document")
 	}
 	if len(document.Content) == 0 {
 		return nil
@@ -127,13 +136,28 @@ func validateRawConfigFileKeys(contents []byte, knownKeys map[string]Configurati
 	if mapping.Kind != yaml.MappingNode {
 		return fmt.Errorf("configuration file must contain a top-level mapping")
 	}
+	seen := make(map[string]struct{}, len(mapping.Content)/2)
 	for index := 0; index < len(mapping.Content); index += 2 {
 		key := mapping.Content[index]
+		value := mapping.Content[index+1]
+		if key.Kind == yaml.AliasNode || value.Kind == yaml.AliasNode {
+			return fmt.Errorf("configuration file aliases are not supported")
+		}
+		if key.Tag == "!!merge" || key.Value == "<<" {
+			return fmt.Errorf("configuration file merge keys are not supported")
+		}
 		if key.Kind != yaml.ScalarNode || key.Tag != "!!str" {
 			return fmt.Errorf("unknown configuration key %q", key.Value)
 		}
+		if _, ok := seen[key.Value]; ok {
+			return fmt.Errorf("duplicate configuration key %q", key.Value)
+		}
+		seen[key.Value] = struct{}{}
 		if _, ok := knownKeys[key.Value]; !ok {
 			return fmt.Errorf("unknown configuration key %q", key.Value)
+		}
+		if value.Kind != yaml.ScalarNode || value.Tag == "!!null" {
+			return fmt.Errorf("configuration value for %q must be a scalar", key.Value)
 		}
 	}
 	return nil
