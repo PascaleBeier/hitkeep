@@ -72,7 +72,7 @@ func TestGoReleaserReleaseWorkflowContract(t *testing.T) {
 	for _, want := range []string{
 		"build-release-archives:",
 		"runs-on: ubuntu-22.04",
-		"gcc-aarch64-linux-gnu g++-aarch64-linux-gnu qemu-user",
+		"gcc-aarch64-linux-gnu g++-aarch64-linux-gnu",
 		"goreleaser/v2@v2.18.0 release --clean --skip=publish --config .goreleaser.yaml",
 		"--clean",
 		"--skip=publish",
@@ -113,13 +113,16 @@ func TestGoReleaserBranchArchiveWorkflowContract(t *testing.T) {
 		"build_metadata=\"$(go version -m \"$binary\")\"",
 		"GOOS=linux",
 		"GOARCH=${arch}",
-		"qemu-aarch64 -L /usr/aarch64-linux-gnu \"$binary\" --version",
-		"\"$binary\" --version",
+		"amd64)\n                version_output=\"$(\"$binary\" --version)\"",
+		"arm64)\n                if ! strings \"$binary\" | grep -Fxq \"$HITKEEP_VERSION\"; then",
 		"binary version mismatch for %s: got %q, want %q",
 	} {
 		if !strings.Contains(workflow, want) {
 			t.Errorf("branch archive workflow missing %q", want)
 		}
+	}
+	if strings.Contains(workflow, "qemu-aarch64") {
+		t.Error("release archive verification must not rely on QEMU runtime execution")
 	}
 }
 
@@ -194,6 +197,35 @@ func TestGoReleaserSnapshotBuildCallsSetArchiveVersion(t *testing.T) {
 	}
 	if got := strings.Count(workflow, cleanSnapshotBuild); got != 2 {
 		t.Errorf("snapshot GoReleaser build calls that clean dist first = %d, want 2", got)
+	}
+}
+
+func TestGoReleaserNativeBuildsVerifyRawBinaryVersions(t *testing.T) {
+	path := filepath.Join("..", "..", ".github", "workflows", "pipeline.yml")
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workflow := string(contents)
+	start := strings.Index(workflow, "  build-binaries:\n")
+	if start == -1 {
+		t.Fatal("native binary build job missing")
+	}
+	nativeJob := workflow[start:]
+	if end := strings.Index(nativeJob, "\n  build-release-archives:"); end != -1 {
+		nativeJob = nativeJob[:end]
+	}
+	for _, want := range []string{
+		"for binary in \"hitkeep-${{ matrix.artifact_suffix }}\" \"hitkeep-cloud-${{ matrix.artifact_suffix }}\"; do",
+		"version_output=\"$(\"./$binary\" --version)\"",
+		"test \"$version_output\" = \"$HITKEEP_VERSION\"",
+	} {
+		if !strings.Contains(nativeJob, want) {
+			t.Errorf("native binary version verification missing %q", want)
+		}
+	}
+	if strings.Contains(nativeJob, "qemu-") || strings.Contains(nativeJob, "strings \"$binary\"") {
+		t.Error("native binary version verification must execute the matching runner binaries")
 	}
 }
 

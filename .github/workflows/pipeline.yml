@@ -188,6 +188,15 @@ jobs:
             --id cloud \
             --output "hitkeep-cloud-${{ matrix.artifact_suffix }}"
 
+      - name: Verify native binary versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          for binary in "hitkeep-${{ matrix.artifact_suffix }}" "hitkeep-cloud-${{ matrix.artifact_suffix }}"; do
+            version_output="$("./$binary" --version)"
+            test "$version_output" = "$HITKEEP_VERSION"
+          done
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: binaries-${{ matrix.id }}
@@ -248,7 +257,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install --yes gcc-aarch64-linux-gnu g++-aarch64-linux-gnu qemu-user
+          sudo apt-get install --yes gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 
       - name: Generate release configuration inputs
         env:
@@ -322,14 +331,21 @@ jobs:
               fi
             done
             case "$arch" in
-              amd64) version_output="$("$binary" --version)" ;;
-              arm64) version_output="$(qemu-aarch64 -L /usr/aarch64-linux-gnu "$binary" --version)" ;;
+              amd64)
+                version_output="$("$binary" --version)"
+                if [[ "$version_output" != "$HITKEEP_VERSION" ]]; then
+                  printf 'binary version mismatch for %s: got %q, want %q\n' "$arch" "$version_output" "$HITKEEP_VERSION" >&2
+                  exit 1
+                fi
+                ;;
+              arm64)
+                if ! strings "$binary" | grep -Fxq "$HITKEEP_VERSION"; then
+                  echo "arm64 archive binary does not embed expected HitKeep version: ${HITKEEP_VERSION}" >&2
+                  exit 1
+                fi
+                ;;
               *) echo "unsupported release archive architecture: ${arch}" >&2; exit 1 ;;
             esac
-            if [[ "$version_output" != "$HITKEEP_VERSION" ]]; then
-              printf 'binary version mismatch for %s: got %q, want %q\n' "$arch" "$version_output" "$HITKEEP_VERSION" >&2
-              exit 1
-            fi
             if tar -tzf "$archive" | grep -q 'cloud'; then
               exit 1
             fi
