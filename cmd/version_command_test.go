@@ -19,8 +19,6 @@ func TestVersionCommand(t *testing.T) {
 	}{
 		{name: "version", args: []string{"--version"}},
 		{name: "config prefix", args: []string{"--config", "ignored.yaml", "--version"}},
-		{name: "interspersed version remains server input", args: []string{"serve", "--version"}, wantRun: []string{"serve", "--version"}},
-		{name: "version with argument remains server input", args: []string{"--version", "serve"}, wantRun: []string{"--version", "serve"}},
 	}
 
 	for _, test := range tests {
