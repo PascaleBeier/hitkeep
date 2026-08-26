@@ -120,6 +120,69 @@ func TestViperShadowMatchesLegacyLoader(t *testing.T) {
 	}
 }
 
+func TestViperShadowCatalogEnvironmentAndFlagParity(t *testing.T) {
+	for _, setting := range Catalog().Settings {
+		if setting.CloudOnly && !includeCloudConfigFields() {
+			continue
+		}
+		t.Run(setting.Field, func(t *testing.T) {
+			args, baseEnv := catalogParityInputs(setting)
+			absent, _ := loadViperShadowParity(t, args, baseEnv)
+			if setting.Environment == "" {
+				flagValue := alternateConfigValue(t, setting, absent)
+				flagged, _ := loadViperShadowParity(t, append(args, "--"+canonicalFlag(t, setting)+"="+flagValue), baseEnv)
+				assertConfigSetting(t, setting, flagged, flagValue)
+				return
+			}
+
+			emptyEnv := cloneEnv(baseEnv)
+			emptyEnv[setting.Environment] = ""
+			empty, _ := loadViperShadowParity(t, args, emptyEnv)
+			assertSameConfigSetting(t, setting, empty, absent)
+
+			envValue := alternateConfigValue(t, setting, absent)
+			configuredEnv := cloneEnv(baseEnv)
+			configuredEnv[setting.Environment] = envValue
+			configured, _ := loadViperShadowParity(t, args, configuredEnv)
+			assertConfigSetting(t, setting, configured, envValue)
+
+			flagValue := alternateConfigValue(t, setting, configured)
+			flagged, _ := loadViperShadowParity(t, append(args, "--"+canonicalFlag(t, setting)+"="+flagValue), configuredEnv)
+			assertConfigSetting(t, setting, flagged, flagValue)
+
+			if setting.Type == "integer" || setting.Type == "number" || setting.Type == "boolean" {
+				invalidValue := "not-a-number"
+				if setting.Type == "boolean" {
+					invalidValue = "not-a-bool"
+				}
+				invalidEnv := cloneEnv(baseEnv)
+				invalidEnv[setting.Environment] = invalidValue
+				invalid, log := loadViperShadowParity(t, args, invalidEnv)
+				assertSameConfigSetting(t, setting, invalid, absent)
+				if !strings.Contains(log, setting.Environment) {
+					t.Errorf("invalid %s warning does not identify %s: %q", setting.Type, setting.Environment, log)
+				}
+				if strings.Contains(log, invalidValue) {
+					t.Errorf("invalid %s warning exposes configured value %q: %q", setting.Type, invalidValue, log)
+				}
+			}
+
+			for _, alias := range setting.DeprecatedFlags {
+				aliasValue := alternateConfigValue(t, setting, absent)
+				aliased, _ := loadViperShadowParity(t, append(args, "--"+alias+"="+aliasValue), baseEnv)
+				assertConfigSetting(t, setting, aliased, aliasValue)
+
+				canonicalValue := alternateConfigValue(t, setting, aliased)
+				deprecatedThenCanonical, _ := loadViperShadowParity(t, append(args, "--"+alias+"="+aliasValue, "--"+canonicalFlag(t, setting)+"="+canonicalValue), baseEnv)
+				assertConfigSetting(t, setting, deprecatedThenCanonical, canonicalValue)
+
+				canonicalThenDeprecated, _ := loadViperShadowParity(t, append(args, "--"+canonicalFlag(t, setting)+"="+canonicalValue, "--"+alias+"="+aliasValue), baseEnv)
+				assertConfigSetting(t, setting, canonicalThenDeprecated, aliasValue)
+			}
+		})
+	}
+}
+
 func TestViperShadowExplicitFilePrecedence(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	writeShadowConfig(t, fs, "config.yaml", "http-addr: ':7070'\nmail-port: 2020\napi-rate-limit: 7.5\nhealthcheck: true\n")
@@ -242,6 +305,145 @@ func TestViperShadowLoadsEveryCatalogType(t *testing.T) {
 			}
 		}
 	}
+}
+
+func loadViperShadowParity(t *testing.T, args []string, env map[string]string) (*Config, string) {
+	t.Helper()
+	getEnv := mapEnv(env)
+	var legacyLog, shadowLog bytes.Buffer
+	logOptions := &slog.HandlerOptions{ReplaceAttr: func(_ []string, attr slog.Attr) slog.Attr {
+		if attr.Key == slog.TimeKey {
+			return slog.Attr{}
+		}
+		return attr
+	}}
+	legacy := load(args, getEnv, slog.New(slog.NewTextHandler(&legacyLog, logOptions)))
+	shadow, err := loadViper(args, getEnv, afero.NewMemMapFs(), "", slog.New(slog.NewTextHandler(&shadowLog, logOptions)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(shadow, legacy) {
+		t.Fatalf("shadow config differs from legacy\nshadow: %#v\nlegacy: %#v", shadow, legacy)
+	}
+	if shadowLog.String() != legacyLog.String() {
+		t.Fatalf("shadow logs differ from legacy\nshadow: %q\nlegacy: %q", shadowLog.String(), legacyLog.String())
+	}
+	return shadow, shadowLog.String()
+}
+
+func catalogParityInputs(setting ConfigurationSetting) ([]string, map[string]string) {
+	if setting.Field != "Healthcheck" {
+		return []string{"--healthcheck"}, nil
+	}
+	return nil, map[string]string{
+		"HITKEEP_JWT_SECRET":          "fixed-secret",
+		"HITKEEP_NODE_NAME":           "fixed-node",
+		"HITKEEP_DUCKDB_MEMORY_LIMIT": "none",
+		"HITKEEP_DUCKDB_THREADS":      "2",
+		"HITKEEP_TRUSTED_PROXIES":     "127.0.0.1/32",
+		"HITKEEP_MCP_DOCS_URL":        "https://example.com/",
+		"HITKEEP_DB_RECOVERY_PATH":    "/recovery",
+	}
+}
+
+func cloneEnv(values map[string]string) map[string]string {
+	clone := make(map[string]string, len(values)+1)
+	for key, value := range values {
+		clone[key] = value
+	}
+	return clone
+}
+
+func canonicalFlag(t *testing.T, setting ConfigurationSetting) string {
+	t.Helper()
+	if setting.Environment != "" {
+		return strings.ToLower(strings.ReplaceAll(strings.TrimPrefix(setting.Environment, "HITKEEP_"), "_", "-"))
+	}
+	field, ok := reflect.TypeOf(Config{}).FieldByName(setting.Field)
+	if !ok || field.Tag.Get("flag") == "" {
+		t.Fatalf("catalog field %q has no canonical flag", setting.Field)
+	}
+	return field.Tag.Get("flag")
+}
+
+func alternateConfigValue(t *testing.T, setting ConfigurationSetting, conf *Config) string {
+	t.Helper()
+	field := configSettingValue(t, setting, conf)
+	switch setting.Type {
+	case "string":
+		if field.String() == "configured-viper-parity" {
+			return "configured-viper-parity-next"
+		}
+		return "configured-viper-parity"
+	case "integer":
+		if field.Int() == 42 {
+			return "43"
+		}
+		return "42"
+	case "boolean":
+		return strconv.FormatBool(!field.Bool())
+	case "number":
+		if field.Float() == 12.5 {
+			return "13.5"
+		}
+		return "12.5"
+	default:
+		t.Fatalf("unsupported catalog type %q", setting.Type)
+		return ""
+	}
+}
+
+func assertConfigSetting(t *testing.T, setting ConfigurationSetting, conf *Config, want string) {
+	t.Helper()
+	field := configSettingValue(t, setting, conf)
+	switch setting.Type {
+	case "string":
+		if field.String() != want {
+			t.Errorf("%s = %q, want %q", setting.Field, field.String(), want)
+		}
+	case "integer":
+		wantValue, err := strconv.ParseInt(want, 10, 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if field.Int() != wantValue {
+			t.Errorf("%s = %d, want %d", setting.Field, field.Int(), wantValue)
+		}
+	case "boolean":
+		wantValue, err := strconv.ParseBool(want)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if field.Bool() != wantValue {
+			t.Errorf("%s = %t, want %t", setting.Field, field.Bool(), wantValue)
+		}
+	case "number":
+		wantValue, err := strconv.ParseFloat(want, 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if field.Float() != wantValue {
+			t.Errorf("%s = %f, want %f", setting.Field, field.Float(), wantValue)
+		}
+	default:
+		t.Fatalf("unsupported catalog type %q", setting.Type)
+	}
+}
+
+func assertSameConfigSetting(t *testing.T, setting ConfigurationSetting, got, want *Config) {
+	t.Helper()
+	if gotValue, wantValue := configSettingValue(t, setting, got).Interface(), configSettingValue(t, setting, want).Interface(); !reflect.DeepEqual(gotValue, wantValue) {
+		t.Errorf("%s = %#v, want %#v", setting.Field, gotValue, wantValue)
+	}
+}
+
+func configSettingValue(t *testing.T, setting ConfigurationSetting, conf *Config) reflect.Value {
+	t.Helper()
+	field := reflect.ValueOf(conf).Elem().FieldByName(setting.Field)
+	if !field.IsValid() {
+		t.Fatalf("catalog field %q does not exist", setting.Field)
+	}
+	return field
 }
 
 func mapEnv(values map[string]string) func(string, string) string {
