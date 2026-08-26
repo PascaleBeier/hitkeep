@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/fileflow"
 
 	"archive/tar"
+	"bytes"
 	"bufio"
 	"compress/gzip"
 	"context"
@@ -117,6 +118,12 @@ func (a *App) GenerateReleaseChecksums() (CIArtifactResult, error) {
 	if err != nil {
 		return CIArtifactResult{}, err
 	}
+	releaseArchives, err := a.selfHostedReleaseArchives()
+	if err != nil {
+		return CIArtifactResult{}, err
+	}
+	artifacts = append(artifacts, releaseArchives...)
+	slices.Sort(artifacts)
 	checksumPath := filepath.Join(a.workspace.Root, "SHA256SUMS")
 	temporary, err := os.CreateTemp(a.workspace.Root, ".hk-checksums-*")
 	if err != nil {
@@ -149,6 +156,12 @@ func (a *App) VerifyReleaseArtifacts() (CIArtifactResult, error) {
 	if err != nil {
 		return CIArtifactResult{}, err
 	}
+	releaseArchives, err := a.selfHostedReleaseArchives()
+	if err != nil {
+		return CIArtifactResult{}, err
+	}
+	artifacts = append(artifacts, releaseArchives...)
+	slices.Sort(artifacts)
 	checksumPath := filepath.Join(a.workspace.Root, "SHA256SUMS")
 	file, err := os.Open(checksumPath)
 	if err != nil {
@@ -201,6 +214,110 @@ func (a *App) requiredReleaseArtifacts() ([]string, error) {
 	}
 	slices.Sort(artifacts)
 	return artifacts, nil
+}
+
+func verifySelfHostedReleaseArchive(path, version, arch string, example []byte) error {
+	name := fmt.Sprintf("hitkeep_%s_Linux_%s.tar.gz", version, arch)
+	if filepath.Base(path) != name {
+		return fmt.Errorf("unexpected release archive name %q", filepath.Base(path))
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	gzipReader, err := gzip.NewReader(file)
+	if err != nil {
+		return err
+	}
+	defer gzipReader.Close()
+	expected := map[string]struct {
+		mode int64
+		data []byte
+	}{
+		"hitkeep-linux-" + arch: {mode: 0o755},
+		"LICENSE":             {mode: 0o644},
+		"README.md":           {mode: 0o644},
+		"hitkeep.example.yaml": {mode: 0o644, data: example},
+	}
+	reader := tar.NewReader(gzipReader)
+	for {
+		header, err := reader.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		member, ok := expected[header.Name]
+		if !ok || header.Typeflag != tar.TypeReg || header.Mode&0o777 != member.mode {
+			return fmt.Errorf("unexpected release archive member %q", header.Name)
+		}
+		if len(member.data) != 0 {
+			contents, err := io.ReadAll(reader)
+			if err != nil {
+				return err
+			}
+			if !bytes.Equal(contents, member.data) {
+				return errors.New("release archive example configuration differs from checked-in file")
+			}
+		}
+		delete(expected, header.Name)
+	}
+	if len(expected) != 0 {
+		return errors.New("release archive is missing required members")
+	}
+	return nil
+}
+
+func (a *App) selfHostedReleaseArchives() ([]string, error) {
+	paths, err := filepath.Glob(filepath.Join(a.workspace.Root, "hitkeep_*_Linux_*.tar.gz"))
+	if err != nil {
+		return nil, err
+	}
+	if len(paths) == 0 {
+		return nil, nil
+	}
+	if len(paths) != 2 {
+		return nil, errors.New("expected exactly two self-hosted release archives")
+	}
+	example, err := os.ReadFile(filepath.Join(a.workspace.Root, "hitkeep.example.yaml"))
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	for _, path := range paths {
+		version, arch, err := releaseArchiveMetadata(filepath.Base(path))
+		if err != nil {
+			return nil, err
+		}
+		if seen[arch] {
+			return nil, fmt.Errorf("duplicate self-hosted release archive for %s", arch)
+		}
+		if err := verifySelfHostedReleaseArchive(path, version, arch, example); err != nil {
+			return nil, err
+		}
+		seen[arch] = true
+	}
+	if !seen["amd64"] || !seen["arm64"] {
+		return nil, errors.New("missing self-hosted release architecture")
+	}
+	slices.Sort(paths)
+	return paths, nil
+}
+
+func releaseArchiveMetadata(name string) (string, string, error) {
+	for _, arch := range []string{"amd64", "arm64"} {
+		prefix := "hitkeep_"
+		suffix := "_Linux_" + arch + ".tar.gz"
+		if strings.HasPrefix(name, prefix) && strings.HasSuffix(name, suffix) {
+			version := strings.TrimSuffix(strings.TrimPrefix(name, prefix), suffix)
+			if version != "" {
+				return version, arch, nil
+			}
+		}
+	}
+	return "", "", fmt.Errorf("invalid self-hosted release archive %q", name)
 }
 
 func writeDeterministicTarGzip(source, destination string) (int, int64, error) {

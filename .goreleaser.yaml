@@ -8,6 +8,8 @@ builds:
     binary: hitkeep-linux-{{ .Arch }}
     env:
       - CGO_ENABLED=1
+      - CC={{ if eq .Arch "arm64" }}aarch64-linux-gnu-gcc{{ else }}gcc{{ end }}
+      - CXX={{ if eq .Arch "arm64" }}aarch64-linux-gnu-g++{{ else }}g++{{ end }}
     goos:
       - linux
     goarch:
@@ -25,6 +27,8 @@ builds:
     binary: hitkeep-cloud-linux-{{ .Arch }}
     env:
       - CGO_ENABLED=1
+      - CC={{ if eq .Arch "arm64" }}aarch64-linux-gnu-gcc{{ else }}gcc{{ end }}
+      - CXX={{ if eq .Arch "arm64" }}aarch64-linux-gnu-g++{{ else }}g++{{ end }}
     goos:
       - linux
     goarch:

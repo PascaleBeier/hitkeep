@@ -29,6 +29,18 @@ func TestGoReleaserTaggedSelfHostedArchiveManifest(t *testing.T) {
 	}
 }
 
+func TestGoReleaserCrossCompilerTemplates(t *testing.T) {
+	manifest := readGoReleaserManifest(t)
+	for _, want := range []string{
+		`CC={{ if eq .Arch "arm64" }}aarch64-linux-gnu-gcc{{ else }}gcc{{ end }}`,
+		`CXX={{ if eq .Arch "arm64" }}aarch64-linux-gnu-g++{{ else }}g++{{ end }}`,
+	} {
+		if strings.Count(manifest, want) != 2 {
+			t.Errorf("expected both Linux builds to define %q", want)
+		}
+	}
+}
+
 func TestGoReleaserTaggedArchiveChecksums(t *testing.T) {
 	manifest := readGoReleaserManifest(t)
 	checksum := manifest[strings.Index(manifest, "checksum:\n"):]
@@ -39,6 +51,35 @@ func TestGoReleaserTaggedArchiveChecksums(t *testing.T) {
 	} {
 		if !strings.Contains(checksum, want) {
 			t.Errorf("checksum manifest missing %q", want)
+		}
+	}
+}
+
+func TestGoReleaserReleaseWorkflowContract(t *testing.T) {
+	path := filepath.Join("..", "..", ".github", "workflows", "pipeline.yml")
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workflow := string(contents)
+	for _, want := range []string{
+		"build-release-archives:",
+		"runs-on: ubuntu-22.04",
+		"gcc-aarch64-linux-gnu g++-aarch64-linux-gnu",
+		"goreleaser/v2@v2.18.0 release",
+		"--clean",
+		"--skip=publish",
+		"sha256sum --check goreleaser-SHA256SUMS",
+		"./hk ci release-checksums",
+		"goreleaser-SHA256SUMS",
+		"hitkeep-cloud-linux-amd64",
+		"hitkeep-linux-amd64",
+		"release-archives-${{ inputs.version }}",
+		"hitkeep_${release_version}_Linux_amd64.tar.gz",
+		"hitkeep_${release_version}_Linux_arm64.tar.gz",
+	} {
+		if !strings.Contains(workflow, want) {
+			t.Errorf("release workflow missing %q", want)
 		}
 	}
 }
