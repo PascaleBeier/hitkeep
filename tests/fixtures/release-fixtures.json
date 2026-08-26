@@ -6,23 +6,29 @@
     {
       "previous_image": "ghcr.io/pascalebeier/hitkeep:2.12.0@sha256:4c1ece6cb9a953847e2e2ff1414a540b107a223d59d2ad2aab1cbe68de6fadde",
       "platform": "linux/amd64",
+      "previous_version": "2.12.0",
       "fixture": {
         "email": "fixture-288@example.invalid",
         "password": "fixture-288-password",
         "domain": "issue-288-upgrade-fixture.invalid",
         "path": "/issue-288-upgrade-fixture",
-        "minimum_hits": 1
+        "expected_hits": 1,
+        "session_id": "10000000-0000-4000-8000-000000000288",
+        "page_id": "20000000-0000-4000-8000-000000000288"
       }
     },
     {
       "previous_image": "ghcr.io/pascalebeier/hitkeep:2.12.0@sha256:4c1ece6cb9a953847e2e2ff1414a540b107a223d59d2ad2aab1cbe68de6fadde",
       "platform": "linux/arm64",
+      "previous_version": "2.12.0",
       "fixture": {
         "email": "fixture-288@example.invalid",
         "password": "fixture-288-password",
         "domain": "issue-288-upgrade-fixture.invalid",
         "path": "/issue-288-upgrade-fixture",
-        "minimum_hits": 1
+        "expected_hits": 1,
+        "session_id": "10000000-0000-4000-8000-000000000288",
+        "page_id": "20000000-0000-4000-8000-000000000288"
       }
     }
   ]

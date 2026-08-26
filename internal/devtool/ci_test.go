@@ -201,10 +201,13 @@ func TestSelfHostedImageGateCoversContainerRecreation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, required := range []string{"--recreate", "HITKEEP_PREVIOUS_IMAGE", "@sha256:", "docker volume create", "docker stop -t 15", "release-fixtures.json", "upgrade-fixture", "--platform \"$platform\"", "fixture --seed", "fixture --verify", "start_container \"$image\""} {
+	for _, required := range []string{"--recreate", "HITKEEP_PREVIOUS_IMAGE", "@sha256:", "docker volume create", "docker pull --platform \"$platform\"", "docker stop -t 15", "release-fixtures.json", "upgrade-fixture", "--platform \"$platform\"", "fixture --verify-image", "fixture --verify-storage", "fixture --seed", "fixture --verify", "verify_stopped_storage", "start_container \"$image\""} {
 		if !bytes.Contains(raw, []byte(required)) {
 			t.Fatalf("docker smoke script is missing recreation contract %q", required)
 		}
+	}
+	if bytes.Contains(raw, []byte("remove_container() {\n  docker rm -f")) || bytes.Contains(raw, []byte("verify_stopped_storage() {\n  docker rm -f")) {
+		t.Fatal("docker smoke normal recreation lifecycle must not force-remove containers")
 	}
 }
 

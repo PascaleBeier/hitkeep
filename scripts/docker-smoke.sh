@@ -61,6 +61,7 @@ elif [[ "$mode" == "--recreate" ]]; then
     --mount "type=volume,src=$volume,dst=/var/lib/hitkeep/data"
     -p 127.0.0.1::8080
   )
+  docker pull --platform "$platform" "$previous_image" >/dev/null
 elif [[ -n "$mode" ]]; then
   printf 'Unknown option: %s\n' "$mode" >&2
   exit 2
@@ -76,6 +77,23 @@ remove_container() {
   docker rm "$container" >/dev/null
 }
 
+verify_stopped_storage() {
+  local snapshot tarball exit_code
+  docker stop -t 15 "$container" >/dev/null
+  exit_code="$(docker inspect "$container" --format '{{.State.ExitCode}}')"
+  if [[ "$exit_code" != "0" ]]; then
+    printf 'Container %s exited with %s during graceful stop\n' "$container" "$exit_code" >&2
+    return 1
+  fi
+  snapshot="$temp_dir/storage-$RANDOM"
+  tarball="$snapshot.tar"
+  mkdir -p "$snapshot"
+  docker cp "$container:/var/lib/hitkeep/data" "$snapshot"
+  docker cp "$container:/var/lib/hitkeep/data" - > "$tarball"
+  fixture --verify-storage --manifest "$fixture_manifest" --previous-image "$previous_image" --platform "$platform" --data-path "$snapshot/data" --metadata "$tarball"
+  docker rm "$container" >/dev/null
+}
+
 container_url() {
   local published
   published="$(docker port "$container" 8080/tcp | head -n 1)"
@@ -87,6 +105,7 @@ if [[ "$mode" == "--recreate" ]]; then
     printf 'HITKEEP_PREVIOUS_IMAGE must be an immutable @sha256 digest: %s\n' "$previous_image" >&2
     exit 2
   fi
+  fixture --verify-image --manifest "$fixture_manifest" --previous-image "$previous_image" --platform "$platform" --image "$previous_image"
   previous_variant="$(docker image inspect "$previous_image" --format '{{ index .Config.Labels "io.hitkeep.variant" }}')"
   if [[ "$previous_variant" != "$expected_variant" ]]; then
     printf 'Expected previous image %s to have variant %s, got %s\n' "$previous_image" "$expected_variant" "$previous_variant" >&2
@@ -121,13 +140,14 @@ await_healthy
 
 if [[ "$mode" == "--recreate" ]]; then
   fixture --verify --manifest "$fixture_manifest" --previous-image "$previous_image" --platform "$platform" --url "$(container_url)"
-  remove_container
+  verify_stopped_storage
   start_container "$image"
   await_healthy
   remove_container
   start_container "$image"
   await_healthy
   fixture --verify --manifest "$fixture_manifest" --previous-image "$previous_image" --platform "$platform" --url "$(container_url)"
+  verify_stopped_storage
   printf 'Container recreation preserved release fixture data: %s (%s)\n' "$image" "$expected_variant"
 else
   printf 'Container smoke check passed: %s (%s)\n' "$image" "$expected_variant"
