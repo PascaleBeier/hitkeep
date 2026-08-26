@@ -41,6 +41,13 @@ func TestGoReleaserCrossCompilerTemplates(t *testing.T) {
 	}
 }
 
+func TestGoReleaserSnapshotVersionTemplate(t *testing.T) {
+	manifest := readGoReleaserManifest(t)
+	if !strings.Contains(manifest, "snapshot:\n  version_template: \"{{ .Env.HITKEEP_ARCHIVE_VERSION }}\"") {
+		t.Fatal("GoReleaser snapshot version is not mapped from HITKEEP_ARCHIVE_VERSION")
+	}
+}
+
 func TestGoReleaserTaggedArchiveChecksums(t *testing.T) {
 	manifest := readGoReleaserManifest(t)
 	checksum := manifest[strings.Index(manifest, "checksum:\n"):]
@@ -100,8 +107,7 @@ func TestGoReleaserBranchArchiveWorkflowContract(t *testing.T) {
 		"git rev-parse --verify \"refs/tags/${RELEASE_SOURCE_TAG}^{commit}\"",
 		"test \"$tag_commit\" = \"$RELEASE_SOURCE_SHA\"",
 		"--snapshot",
-		"GORELEASER_CURRENT_TAG=\"$RELEASE_TAG_NAME\"",
-		"release_version=\"${RELEASE_TAG_NAME#v}\"",
+		"HITKEEP_ARCHIVE_VERSION=\"${RELEASE_TAG_NAME#v}\"",
 		"runner.temp",
 		"runner.temp }}/public-assets",
 		"go version -m \"$binary\"",

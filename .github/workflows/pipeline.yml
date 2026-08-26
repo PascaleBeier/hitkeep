@@ -286,7 +286,7 @@ jobs:
           else
             test -n "$RELEASE_TAG_NAME"
             release_version="${RELEASE_TAG_NAME#v}"
-            GORELEASER_CURRENT_TAG="$RELEASE_TAG_NAME" env -u GOROOT go run github.com/goreleaser/goreleaser/v2@v2.18.0 release --snapshot --clean --skip=publish --config .goreleaser.yaml
+            HITKEEP_ARCHIVE_VERSION="${RELEASE_TAG_NAME#v}" env -u GOROOT go run github.com/goreleaser/goreleaser/v2@v2.18.0 release --snapshot --clean --skip=publish --config .goreleaser.yaml
           fi
           for arch in amd64 arm64; do
             if [[ -n "$RELEASE_TAG_NAME" ]]; then

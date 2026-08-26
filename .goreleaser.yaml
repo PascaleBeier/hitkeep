@@ -63,6 +63,9 @@ checksum:
   ids:
     - self-hosted
 
+snapshot:
+  version_template: "{{ .Env.HITKEEP_ARCHIVE_VERSION }}"
+
 changelog:
   disable: true
 
