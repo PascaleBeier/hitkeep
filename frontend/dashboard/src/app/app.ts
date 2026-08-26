@@ -2,14 +2,13 @@ import { Location } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationCancel, NavigationCancellationCode, NavigationEnd, NavigationError, NavigationStart, Router, RouterOutlet } from '@angular/router';
-
-import { ApplicationShellState } from '@core/components/application-shell-state/application-shell-state';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { RouteProgressBar } from '@layout/route-progress-bar';
 import { isApplicationErrorUrl } from '@services/application-error-navigation.service';
 
 @Component({
     selector: 'app-root',
-    imports: [RouterOutlet, RouteProgressBar, ApplicationShellState],
+    imports: [RouterOutlet, RouteProgressBar, TranslocoPipe],
     templateUrl: './app.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
     styleUrl: './app.css'

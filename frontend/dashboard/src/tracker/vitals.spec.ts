@@ -1,25 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { Metric } from 'web-vitals';
-
-const webVitalsMock = vi.hoisted(() => {
-    const callbacks: Record<string, ((metric: Metric) => void)[]> = {
-        CLS: [],
-        FCP: [],
-        INP: [],
-        LCP: [],
-        TTFB: []
-    };
-
-    return {
-        callbacks,
-        onCLS: vi.fn((callback: (metric: Metric) => void) => callbacks['CLS'].push(callback)),
-        onFCP: vi.fn((callback: (metric: Metric) => void) => callbacks['FCP'].push(callback)),
-        onINP: vi.fn((callback: (metric: Metric) => void) => callbacks['INP'].push(callback)),
-        onLCP: vi.fn((callback: (metric: Metric) => void) => callbacks['LCP'].push(callback)),
-        onTTFB: vi.fn((callback: (metric: Metric) => void) => callbacks['TTFB'].push(callback))
-    };
-});
+const webVitalsMock = vi.hoisted(() => ({
+    onCLS: vi.fn(),
+    onFCP: vi.fn(),
+    onINP: vi.fn(),
+    onLCP: vi.fn(),
+    onTTFB: vi.fn()
+}));
 
 vi.mock('web-vitals', () => ({
     onCLS: webVitalsMock.onCLS,
@@ -48,8 +35,12 @@ describe('web vitals tracker bundle', () => {
             }
         } as unknown as Window & typeof globalThis;
 
+        webVitalsMock.onLCP.mockClear();
         bootstrapWebVitals(win);
-        webVitalsMock.callbacks['LCP'][0]?.({
+
+        const report = webVitalsMock.onLCP.mock.calls.at(-1)?.[0];
+        expect(report).toBeTypeOf('function');
+        report!({
             name: 'LCP',
             value: 1842.3,
             rating: 'good',

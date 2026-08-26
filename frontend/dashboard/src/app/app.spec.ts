@@ -21,7 +21,6 @@ describe('App', () => {
                     langs: {
                         en: {
                             applicationError: {
-                                loading: { title: 'Loading HitKeep', message: 'Preparing your workspace.' },
                                 routeUnavailable: { title: 'Page unavailable', message: 'Reload HitKeep.' },
                                 actions: { reloadApplication: 'Reload HitKeep' }
                             }
@@ -35,16 +34,14 @@ describe('App', () => {
         }).compileComponents();
     });
 
-    it('renders a useful loading state before the first route activates', async () => {
+    it('leaves the static bootstrap visible before the first route activates', async () => {
         const fixture = TestBed.createComponent(App);
         await fixture.whenStable();
 
         const element = fixture.nativeElement as HTMLElement;
-        expect(fixture.componentInstance).toBeTruthy();
         expect(element.querySelector('router-outlet')).toBeTruthy();
-        expect(element.textContent).toContain('Loading HitKeep');
-        expect(element.textContent).toContain('Preparing your workspace.');
-        expect(element.querySelector('section')?.getAttribute('role')).toBe('status');
+        expect(element.textContent?.trim()).toBe('');
+        expect(element.querySelector('[role="status"]')).toBeFalsy();
     });
 
     it('recognizes terminal initial-navigation cancellations but not follow-up navigations', () => {

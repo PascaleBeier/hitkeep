@@ -1,16 +1,9 @@
 <app-route-progress-bar />
 @if (routeUnavailable()) {
-<app-application-shell-state
-    titleKey="applicationError.routeUnavailable.title"
-    messageKey="applicationError.routeUnavailable.message"
-    icon="pi pi-exclamation-triangle"
-    [danger]="true"
-    primaryActionLabelKey="applicationError.actions.reloadApplication"
-    primaryActionIcon="pi pi-refresh"
-    (primaryAction)="reloadApplication()"
-/>
-} @else { @if (!initialNavigationCompleted()) {
-<app-application-shell-state titleKey="applicationError.loading.title" messageKey="applicationError.loading.message" icon="pi pi-spin pi-spinner" />
-}
-<router-outlet />
+<main class="application-state" role="alert" aria-labelledby="route-unavailable-title">
+    <h1 id="route-unavailable-title">{{ 'applicationError.routeUnavailable.title' | transloco }}</h1>
+    <p>{{ 'applicationError.routeUnavailable.message' | transloco }}</p>
+    <button type="button" (click)="reloadApplication()">{{ 'applicationError.actions.reloadApplication' | transloco }}</button>
+</main>
+} @else { <router-outlet />
 }

@@ -1,0 +1,39 @@
+:host {
+    display: block;
+}
+
+.application-state {
+    box-sizing: border-box;
+    min-height: 100dvh;
+    padding: 1rem;
+}
+
+.application-state {
+    align-content: center;
+    display: grid;
+    gap: 1rem;
+    justify-items: center;
+    text-align: center;
+}
+
+.application-state > * {
+    margin: 0;
+    max-width: 34rem;
+}
+
+.application-state button {
+    background: var(--p-primary-color);
+    border: 0;
+    border-radius: var(--p-button-border-radius);
+    color: var(--p-primary-contrast-color);
+    cursor: pointer;
+    font: inherit;
+    font-weight: 600;
+    min-height: 2.75rem;
+    padding: 0.625rem 1rem;
+}
+
+.application-state button:focus-visible {
+    outline: 2px solid var(--p-focus-ring-color, currentColor);
+    outline-offset: 2px;
+}
