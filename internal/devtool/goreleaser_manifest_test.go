@@ -72,7 +72,7 @@ func TestGoReleaserReleaseWorkflowContract(t *testing.T) {
 	for _, want := range []string{
 		"build-release-archives:",
 		"runs-on: ubuntu-22.04",
-		"gcc-aarch64-linux-gnu g++-aarch64-linux-gnu",
+		"gcc-aarch64-linux-gnu g++-aarch64-linux-gnu qemu-user",
 		"goreleaser/v2@v2.18.0 release --clean --skip=publish --config .goreleaser.yaml",
 		"--clean",
 		"--skip=publish",
@@ -111,9 +111,11 @@ func TestGoReleaserBranchArchiveWorkflowContract(t *testing.T) {
 		"runner.temp",
 		"runner.temp }}/public-assets",
 		"build_metadata=\"$(go version -m \"$binary\")\"",
-		"binary build metadata is missing expected HitKeep version",
-		"grep -E '^[[:space:]]*(path|build.*(-ldflags|GOOS|GOARCH))'",
+		"GOOS=linux",
+		"GOARCH=${arch}",
+		"qemu-aarch64 -L /usr/aarch64-linux-gnu \"$binary\" --version",
 		"\"$binary\" --version",
+		"binary version mismatch for %s: got %q, want %q",
 	} {
 		if !strings.Contains(workflow, want) {
 			t.Errorf("branch archive workflow missing %q", want)

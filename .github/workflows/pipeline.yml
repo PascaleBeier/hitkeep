@@ -248,7 +248,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install --yes gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          sudo apt-get install --yes gcc-aarch64-linux-gnu g++-aarch64-linux-gnu qemu-user
 
       - name: Generate release configuration inputs
         env:
@@ -314,13 +314,21 @@ jobs:
             tar -xzf "$archive" -C "$binary_dir" "hitkeep-linux-${arch}"
             binary="$binary_dir/hitkeep-linux-${arch}"
             build_metadata="$(go version -m "$binary")"
-            if ! grep -Fq "hitkeep/cmd.Version=${HITKEEP_VERSION}" <<<"$build_metadata"; then
-              echo "binary build metadata is missing expected HitKeep version: ${HITKEEP_VERSION}" >&2
-              printf '%s\n' "$build_metadata" | grep -E '^[[:space:]]*(path|build.*(-ldflags|GOOS|GOARCH))' >&2 || true
+            for setting in "GOOS=linux" "GOARCH=${arch}"; do
+              if ! grep -Fq "$setting" <<<"$build_metadata"; then
+                echo "binary build metadata is missing expected target setting: ${setting}" >&2
+                printf '%s\n' "$build_metadata" | grep -E '^[[:space:]]*(path|build.*(GOOS|GOARCH))' >&2 || true
+                exit 1
+              fi
+            done
+            case "$arch" in
+              amd64) version_output="$("$binary" --version)" ;;
+              arm64) version_output="$(qemu-aarch64 -L /usr/aarch64-linux-gnu "$binary" --version)" ;;
+              *) echo "unsupported release archive architecture: ${arch}" >&2; exit 1 ;;
+            esac
+            if [[ "$version_output" != "$HITKEEP_VERSION" ]]; then
+              printf 'binary version mismatch for %s: got %q, want %q\n' "$arch" "$version_output" "$HITKEEP_VERSION" >&2
               exit 1
-            fi
-            if [[ "$arch" == "amd64" ]]; then
-              "$binary" --version | grep -F "$HITKEEP_VERSION"
             fi
             if tar -tzf "$archive" | grep -q 'cloud'; then
               exit 1
