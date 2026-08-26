@@ -28,7 +28,7 @@ This folder is the durable progress ledger for the migration. Update it in the s
 | 3 | Completed | Production Cobra root with legacy leaf parsers | Factory-built Cobra root owns execution while preserving exact first-argument routing and all legacy leaf parsers |
 | 4 | Completed | Switch production assembly to parity-proven Viper | `config.Load` uses instance-based Viper through an OS-backed Afero boundary; leading `--config PATH`/`--config=PATH` selection is explicit-only and returns bounded startup errors |
 | 5 | Completed | Normalize `hk` Cobra factories and preserve MCP/JSON contracts | No rewrite required: `hk` already has one factory root, centralized render/envelope handling, deterministic command catalog, and guarded production boundary |
-| 6 | Pending | Project catalog into Docker, Compose, Helm, examples, and docs artifact | — |
+| 6 | Completed | Project catalog into Docker, Compose, Helm, examples, and docs artifact | Catalog-derived root example plus repository-wide env/default validation covers Dockerfile, Compose, charts, examples, and reader-facing Markdown/YAML |
 | 7 | Pending | Enforce issue #288 container recreation and migration interruption gates | — |
 | 8 | Pending | GoReleaser artifact parity, then cutover; Homebrew/Scoop-ready layout | — |
 | 9 | Pending | Afero/fileflow/pathologize migration by operation risk | — |
@@ -47,11 +47,13 @@ This folder is the durable progress ledger for the migration. Update it in the s
 - Filesystem migration separates ordinary injectable reads/writes from native DuckDB/WAL/fsync/lock durability; fileflow never receives Afero-only paths.
 - `internal/appurl` is the leading first move-only leaf candidate; `config`, `database`, and `devtool` move only after their behavioral boundaries stabilize.
 
-## Most recently completed slice: 5
+## Most recently completed slice: 6
 
 ### Test-first work
 
-1. Audited `hk` before editing and retained its existing factory-built Cobra root, avoiding a behavior-neutral rewrite.
+1. Reused the existing catalog-derived example generator and configuration documentation validator instead of adding a second projection system.
+2. Verified every published `HITKEEP_*` name is catalog-known, Compose-style defaults match runtime defaults unless explicitly justified, and the image data path remains beneath a declared volume.
+3. Audited `hk` before editing and retained its existing factory-built Cobra root, avoiding a behavior-neutral rewrite.
 2. Verified centralized JSON/NDJSON envelopes, invalid-output rejection, command-catalog generation, MCP manifest routing, and production/developer dependency separation.
 3. Kept the legacy loader as a test oracle and added direct exported `config.Load` parity coverage.
 2. Switched only the production assembly boundary to the local Viper instance with the existing non-empty environment semantics.
@@ -92,7 +94,8 @@ Record focused commands as stable test targets or `hk` gate IDs, not pasted succ
 | 2026-08-26 | 4 | `go test -race ./cmd ./internal/config` | Passed; leading explicit config selection, OS-file loading, missing-path errors, and legacy routing parity proven |
 | 2026-08-26 | 4 | Changed QA `20260826T122352-73c142f6` | Passed: `go-format`, `go-fix`, `go-lint`, `go-vet`, `go-staticcheck`, `developer-mcp`, `developer-docs` |
 | 2026-08-26 | 5 | `go test -race ./internal/devtool/cli ./cmd/hk`; structured command catalog and MCP manifest smoke | Passed; existing Cobra factories and machine contracts retained without source changes |
+| 2026-08-26 | 6 | `go test -race ./internal/config ./internal/devtool`; `./hk docs check --output json` | Passed; generated example and Docker/Compose/chart/example/docs drift contracts are current |
 
 ## Next update
 
-Project the authoritative configuration catalog into Docker, Compose, Helm, example, and documentation artifacts with drift checks.
+Add the issue #288 container deletion/recreation and interrupted-migration acceptance gates, reusing the existing image-volume invariant as the fast preflight.
