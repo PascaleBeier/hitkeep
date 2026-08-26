@@ -12,7 +12,13 @@ expected_variant="${2:?usage: docker-smoke.sh IMAGE EXPECTED_VARIANT [--cloud|--
 mode="${3:-}"
 container="hitkeep-smoke-$$"
 volume=""
+platform=""
 temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/hitkeep-smoke.XXXXXX")"
+fixture_manifest="tests/fixtures/release-fixtures.json"
+
+fixture() {
+  env -u GOROOT go run ./tests/fixtures/upgrade-fixture "$@"
+}
 
 cleanup() {
   docker rm -f "$container" >/dev/null 2>&1 || true
@@ -46,7 +52,15 @@ if [[ "$mode" == "--cloud" ]]; then
 elif [[ "$mode" == "--recreate" ]]; then
   volume="hitkeep-smoke-data-$$"
   docker volume create "$volume" >/dev/null
-  docker_args+=(--mount "type=volume,src=$volume,dst=/var/lib/hitkeep/data")
+  case "$(docker image inspect "$image" --format '{{.Architecture}}')" in
+    amd64|arm64) platform="linux/$(docker image inspect "$image" --format '{{.Architecture}}')" ;;
+    *) printf 'Unsupported candidate image architecture\n' >&2; exit 2 ;;
+  esac
+  docker_args+=(
+    --platform "$platform"
+    --mount "type=volume,src=$volume,dst=/var/lib/hitkeep/data"
+    -p 127.0.0.1::8080
+  )
 elif [[ -n "$mode" ]]; then
   printf 'Unknown option: %s\n' "$mode" >&2
   exit 2
@@ -55,6 +69,17 @@ fi
 start_container() {
   local selected_image="${1:-$image}"
   docker run -d --name "$container" "${docker_args[@]}" "$selected_image" >/dev/null
+}
+
+remove_container() {
+  docker stop -t 15 "$container" >/dev/null
+  docker rm "$container" >/dev/null
+}
+
+container_url() {
+  local published
+  published="$(docker port "$container" 8080/tcp | head -n 1)"
+  printf 'http://%s' "$published"
 }
 
 if [[ "$mode" == "--recreate" ]]; then
@@ -88,29 +113,22 @@ await_healthy() {
 if [[ "$mode" == "--recreate" ]]; then
   start_container "$previous_image"
   await_healthy
-  docker rm -f "$container" >/dev/null
+  fixture --seed --manifest "$fixture_manifest" --previous-image "$previous_image" --platform "$platform" --url "$(container_url)"
+  remove_container
 fi
 start_container "$image"
 await_healthy
 
 if [[ "$mode" == "--recreate" ]]; then
-  printf 'hitkeep-recreation-acceptance\n' >"$temp_dir/expected-marker"
-  docker cp "$temp_dir/expected-marker" "$container:/var/lib/hitkeep/data/.recreation-marker"
-  docker cp "$container:/var/lib/hitkeep/data/hitkeep.db" "$temp_dir/initial.db"
-  test -s "$temp_dir/initial.db"
-
-  docker rm -f "$container" >/dev/null
+  fixture --verify --manifest "$fixture_manifest" --previous-image "$previous_image" --platform "$platform" --url "$(container_url)"
+  remove_container
   start_container "$image"
   await_healthy
-  docker rm -f "$container" >/dev/null
+  remove_container
   start_container "$image"
   await_healthy
-
-  docker cp "$container:/var/lib/hitkeep/data/.recreation-marker" "$temp_dir/actual-marker"
-  docker cp "$container:/var/lib/hitkeep/data/hitkeep.db" "$temp_dir/recreated.db"
-  cmp "$temp_dir/expected-marker" "$temp_dir/actual-marker"
-  test -s "$temp_dir/recreated.db"
-  printf 'Container recreation preserved HitKeep data: %s (%s)\n' "$image" "$expected_variant"
+  fixture --verify --manifest "$fixture_manifest" --previous-image "$previous_image" --platform "$platform" --url "$(container_url)"
+  printf 'Container recreation preserved release fixture data: %s (%s)\n' "$image" "$expected_variant"
 else
   printf 'Container smoke check passed: %s (%s)\n' "$image" "$expected_variant"
 fi
