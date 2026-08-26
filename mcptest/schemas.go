@@ -1,5 +1,3 @@
-// Package mcptest holds assertions shared by the MCP server test suites. It is
-// test-support code only: nothing outside a _test.go file may import it.
 package mcptest
 
 import (

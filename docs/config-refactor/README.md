@@ -35,7 +35,7 @@ This folder is the durable progress ledger for the migration. Update it in the s
 | 7 | In progress | Enforce issue #288 upgrade, recreation, and migration interruption gates | Docker smoke requires an immutable previous-image digest, runs previous → candidate → recreated candidate twice with newly introduced env omitted, and verifies marker/database/readiness; recognizable control-plane/default-tenant row seeding still needs a versioned cross-release fixture protocol, and Compose/Helm semantic gates remain pending |
 | 8 | Completed | GoReleaser artifact parity and build cutover; Homebrew/Scoop-ready artifact layout | Tagged builds use pinned GoReleaser v2.18.0 and preserve all four legacy binary names; checksum/verification accepts the fixed seven-asset release including `hitkeep.example.yaml`; future tap/bucket publishing can use GoReleaser without renaming current artifacts |
 | 9 | Completed | Afero/fileflow/pathologize migration by operation risk | Runtime config already uses injected Afero; the one real cross-filesystem release relocation now uses fileflow; fixed trusted names need no pathologize; database/WAL/fsync/lock operations remain native |
-| 10 | In progress | Flatten `internal/` in dependency-order move-only slices | Pure foundations moved: `internal/appurl` → `appurl`, `internal/exportfmt` → `exportfmt`, `internal/hklog` → `hklog`, `internal/analyticscatalog` → `analyticscatalog`, `internal/jsonapi` → `jsonapi`, `internal/localization` → `localization`, and stabilized `internal/config` → `config`; no compatibility shims because Go already prohibited external imports |
+| 10 | In progress | Flatten `internal/` in dependency-order move-only slices | Pure foundations moved: `internal/appurl` → `appurl`, `internal/exportfmt` → `exportfmt`, `internal/hklog` → `hklog`, `internal/analyticscatalog` → `analyticscatalog`, `internal/jsonapi` → `jsonapi`, `internal/localization` → `localization`, `internal/mcptest` → `mcptest`, and stabilized `internal/config` → `config`; no compatibility shims because Go already prohibited external imports |
 | 11 | Pending | Stabilize, full QA, CI, docs validation, completion audit | — |
 
 ## Completed discovery
@@ -126,6 +126,7 @@ Record focused commands as stable test targets or `hk` gate IDs, not pasted succ
 | 2026-08-26 | 4C | Explicit YAML grammar hardening | TDD red/green coverage and `go test -race ./config ./cmd` passed for duplicate, multi-document, alias, merge, null, mapping, and sequence rejection |
 | 2026-08-26 | 10 | `internal/localization` → `localization` guarded pure-leaf move | Passed package/auth race tests plus OSS and `billing`-tag cloud race tests; old import path absent; the package has no filesystem operations and needs neither Afero nor fileflow |
 | 2026-08-26 | 10 | `internal/config` → `config` guarded stabilized-boundary move | Full default race suite plus affected `billing`-tag race suite passed; all 73 import consumers use `hitkeep/config`; old import path absent; no shim or dependency added |
+| 2026-08-26 | 10 | `internal/mcptest` → `mcptest` guarded test-helper move | Focused MCP contract tests and both affected package race suites passed; old import path absent; no filesystem operations, so Afero, fileflow, and pathologize do not apply |
 
 ## Next update
 

@@ -26,9 +26,9 @@ import (
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
-	"hitkeep/internal/mcptest"
 	"hitkeep/internal/server/filterparams"
 	json "hitkeep/jsonapi"
+	"hitkeep/mcptest"
 )
 
 func TestMCPLogMiddlewareDoesNotLogRawErrors(t *testing.T) {
