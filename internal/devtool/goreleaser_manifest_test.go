@@ -151,6 +151,27 @@ func TestGoReleaserReleaseArchiveAssetsStayInWorkspace(t *testing.T) {
 	}
 }
 
+func TestGoReleaserReleaseConfigUsesProductionCommand(t *testing.T) {
+	path := filepath.Join("..", "..", ".github", "workflows", "pipeline.yml")
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workflow := string(contents)
+	for _, want := range []string{
+		"./hk catalog configuration --output json",
+		"env -u GOROOT go run ./cmd/hitkeep config init --output \"$release_inputs/hitkeep.example.yaml\"",
+		"cmp \"$release_inputs/hitkeep.example.yaml\" hitkeep.example.yaml",
+	} {
+		if !strings.Contains(workflow, want) {
+			t.Errorf("release configuration generation missing %q", want)
+		}
+	}
+	if strings.Contains(workflow, "./hk config init") {
+		t.Error("release configuration generation must use the production Cobra config init command")
+	}
+}
+
 func TestGoReleaserSnapshotBuildCallsSetArchiveVersion(t *testing.T) {
 	path := filepath.Join("..", "..", ".github", "workflows", "pipeline.yml")
 	contents, err := os.ReadFile(path)
@@ -160,11 +181,15 @@ func TestGoReleaserSnapshotBuildCallsSetArchiveVersion(t *testing.T) {
 	workflow := string(contents)
 	const snapshotBuild = "goreleaser/v2@v2.18.0 build \\\n            --snapshot"
 	const versionedSnapshotBuild = "HITKEEP_ARCHIVE_VERSION=\"${HITKEEP_VERSION#v}\" env -u GOROOT go run github.com/goreleaser/goreleaser/v2@v2.18.0 build"
+	const cleanSnapshotBuild = "--snapshot \\\n            --clean \\\n            --single-target"
 	if got := strings.Count(workflow, snapshotBuild); got != 2 {
 		t.Errorf("snapshot GoReleaser build calls = %d, want 2", got)
 	}
 	if got := strings.Count(workflow, versionedSnapshotBuild); got != 2 {
 		t.Errorf("snapshot GoReleaser build calls with an archive version = %d, want 2", got)
+	}
+	if got := strings.Count(workflow, cleanSnapshotBuild); got != 2 {
+		t.Errorf("snapshot GoReleaser build calls that clean dist first = %d, want 2", got)
 	}
 }
 

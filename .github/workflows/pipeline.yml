@@ -183,6 +183,7 @@ jobs:
             --output "hitkeep-${{ matrix.artifact_suffix }}"
           HITKEEP_ARCHIVE_VERSION="${HITKEEP_VERSION#v}" env -u GOROOT go run github.com/goreleaser/goreleaser/v2@v2.18.0 build \
             --snapshot \
+            --clean \
             --single-target \
             --id cloud \
             --output "hitkeep-cloud-${{ matrix.artifact_suffix }}"
@@ -263,7 +264,7 @@ jobs:
             | jq --arg tag "$RELEASE_TAG_NAME" --arg version "$release_version" \
               '.data + {release_tag: $tag, release_version: $version}' \
             > "$release_inputs/hitkeep-configuration.json"
-          ./hk config init --output "$release_inputs/hitkeep.example.yaml"
+          env -u GOROOT go run ./cmd/hitkeep config init --output "$release_inputs/hitkeep.example.yaml"
           cmp "$release_inputs/hitkeep.example.yaml" hitkeep.example.yaml
 
       - name: Build and verify GoReleaser release archives
