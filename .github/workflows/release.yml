@@ -53,6 +53,16 @@ jobs:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
+  migration-interruption:
+    name: Verify migration interruption safety
+    needs:
+      - release-please
+      - build-release
+    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' }}
+    uses: ./.github/workflows/default-tenant-migration-acceptance.yml
+    permissions:
+      contents: read
+
   upgrade-from-v2-12:
     name: ${{ matrix.name }}
     needs:
@@ -307,10 +317,11 @@ jobs:
     needs:
       - release-please
       - build-release
+      - migration-interruption
       - upgrade-from-v2-12
       - publish-helm
       - verify-tracker-package
-    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' && needs.upgrade-from-v2-12.result == 'success' && needs.publish-helm.result == 'success' && needs.verify-tracker-package.result == 'success' }}
+    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' && needs.migration-interruption.result == 'success' && needs.upgrade-from-v2-12.result == 'success' && needs.publish-helm.result == 'success' && needs.verify-tracker-package.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

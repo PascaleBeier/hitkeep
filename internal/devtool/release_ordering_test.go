@@ -10,6 +10,12 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
   release-please: {}
   build-release:
     needs: release-please
+  migration-interruption:
+    needs:
+      - release-please
+      - build-release
+    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' }}
+    uses: ./.github/workflows/default-tenant-migration-acceptance.yml
   upgrade-from-v2-12:
     needs: build-release
     strategy:
@@ -54,6 +60,7 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
     needs:
       - release-please
       - build-release
+      - migration-interruption
       - upgrade-from-v2-12
       - publish-helm
       - verify-tracker-package
@@ -84,6 +91,16 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
 	missingUpgrade := strings.Replace(workflow, "      - upgrade-from-v2-12\n", "", 1)
 	if err := validateReleaseWorkflowGraph([]byte(missingUpgrade)); err == nil {
 		t.Fatal("validateReleaseWorkflowGraph() accepted a finalizer that can run before the upgrade smoke")
+	}
+
+	missingMigrationInterruption := strings.Replace(workflow, "      - migration-interruption\n", "", 1)
+	if err := validateReleaseWorkflowGraph([]byte(missingMigrationInterruption)); err == nil {
+		t.Fatal("validateReleaseWorkflowGraph() accepted a finalizer that can run before migration interruption acceptance")
+	}
+
+	missingMigrationGate := strings.Replace(workflow, "  migration-interruption:\n", "  migration-interruption-removed:\n", 1)
+	if err := validateReleaseWorkflowGraph([]byte(missingMigrationGate)); err == nil {
+		t.Fatal("validateReleaseWorkflowGraph() accepted a release without migration interruption acceptance")
 	}
 
 	missingComposeSurface := strings.Replace(workflow, "          - surface: compose\n", "", 1)

@@ -69,11 +69,28 @@ type workflowStep struct {
 
 type workflowJob struct {
 	Needs workflowNeeds  `yaml:"needs"`
+	Uses  string         `yaml:"uses"`
+	If    string         `yaml:"if"`
 	Steps []workflowStep `yaml:"steps"`
 }
 
 type releaseWorkflow struct {
 	Jobs map[string]workflowJob `yaml:"jobs"`
+}
+
+func validateDefaultTenantMigrationAcceptanceWorkflow(raw []byte) error {
+	var workflow struct {
+		On yaml.Node `yaml:"on"`
+	}
+	if err := yaml.Unmarshal(raw, &workflow); err != nil {
+		return fmt.Errorf("decode default-tenant migration acceptance workflow: %w", err)
+	}
+	for index := 0; index+1 < len(workflow.On.Content); index += 2 {
+		if workflow.On.Content[index].Value == "workflow_call" {
+			return nil
+		}
+	}
+	return fmt.Errorf("default-tenant migration acceptance workflow must support workflow_call")
 }
 
 func validateReleaseWorkflowGraph(raw []byte) error {
@@ -83,10 +100,11 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 	}
 	for job, required := range map[string][]string{
 		"build-release":          {"release-please"},
+		"migration-interruption": {"release-please", "build-release"},
 		"upgrade-from-v2-12":     {"build-release"},
 		"publish-helm":           {"build-release"},
 		"verify-tracker-package": {"build-release"},
-		"finalize-release":       {"release-please", "build-release", "upgrade-from-v2-12", "publish-helm", "verify-tracker-package"},
+		"finalize-release":       {"release-please", "build-release", "migration-interruption", "upgrade-from-v2-12", "publish-helm", "verify-tracker-package"},
 		"sync-docs-release":      {"finalize-release"},
 		"deploy-cloud":           {"finalize-release"},
 	} {
@@ -99,6 +117,16 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 				return fmt.Errorf("release workflow job %s must need %s", job, dependency)
 			}
 		}
+	}
+	migrationInterruption := workflow.Jobs["migration-interruption"]
+	if migrationInterruption.Uses != "./.github/workflows/default-tenant-migration-acceptance.yml" {
+		return fmt.Errorf("release workflow migration-interruption must call the default-tenant migration acceptance workflow")
+	}
+	if !strings.Contains(migrationInterruption.If, "needs.release-please.outputs.release_created == 'true'") {
+		return fmt.Errorf("release workflow migration-interruption must be gated on release creation")
+	}
+	if !strings.Contains(migrationInterruption.If, "needs.build-release.result == 'success'") {
+		return fmt.Errorf("release workflow migration-interruption must be gated on a successful release build")
 	}
 	fixtureResolved := false
 	upgradeSmokes := map[string]bool{}
@@ -666,6 +694,13 @@ func validateReleaseMetadata(root string) error {
 		return err
 	}
 	if err := validateReleaseWorkflowGraph(releaseWorkflow); err != nil {
+		return err
+	}
+	migrationWorkflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "default-tenant-migration-acceptance.yml"))
+	if err != nil {
+		return err
+	}
+	if err := validateDefaultTenantMigrationAcceptanceWorkflow(migrationWorkflow); err != nil {
 		return err
 	}
 	for _, fragment := range []string{"gh run watch", "--log-failed", "::error::hitkeep-docs"} {

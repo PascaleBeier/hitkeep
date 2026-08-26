@@ -26,6 +26,15 @@ func TestValidateReleaseMetadata(t *testing.T) {
 		}
 	})
 
+	t.Run("migration workflow is not reusable", func(t *testing.T) {
+		root := releaseMetadataFixture(t)
+		writeFixtureFile(t, root, ".github/workflows/default-tenant-migration-acceptance.yml", "on:\n  workflow_dispatch:\njobs: {}\n")
+		err := validateReleaseMetadata(root)
+		if err == nil || !strings.Contains(err.Error(), "must support workflow_call") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
 	t.Run("mismatched version", func(t *testing.T) {
 		root := releaseMetadataFixture(t)
 		writeFixtureFile(t, root, "server.json", `{"version":"2.11.0"}`)
@@ -242,6 +251,12 @@ jobs:
   release-please: {}
   build-release:
     needs: release-please
+  migration-interruption:
+    needs:
+      - release-please
+      - build-release
+    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' }}
+    uses: ./.github/workflows/default-tenant-migration-acceptance.yml
   upgrade-from-v2-12:
     needs: build-release
     strategy:
@@ -285,6 +300,7 @@ jobs:
     needs:
       - release-please
       - build-release
+      - migration-interruption
       - upgrade-from-v2-12
       - publish-helm
       - verify-tracker-package
@@ -302,6 +318,10 @@ jobs:
     needs: finalize-release
   deploy-cloud:
     needs: finalize-release
+`)
+	writeFixtureFile(t, root, ".github/workflows/default-tenant-migration-acceptance.yml", `on:
+  workflow_call:
+jobs: {}
 `)
 	return root
 }
