@@ -53,6 +53,8 @@ func (needs *workflowNeeds) UnmarshalYAML(value *yaml.Node) error {
 		}
 		*needs = result
 		return nil
+	case yaml.DocumentNode, yaml.MappingNode, yaml.AliasNode:
+		return fmt.Errorf("workflow needs must be a string or list")
 	default:
 		return fmt.Errorf("workflow needs must be a string or list")
 	}
@@ -408,6 +410,8 @@ func configurationPublicationDefault(contents string, requirement runtimeconfig.
 			if found {
 				return strings.Trim(strings.TrimSpace(value), "\\\"'"), true
 			}
+		case runtimeconfig.ConfigurationPublicationHelm:
+			continue
 		}
 	}
 	if surface != runtimeconfig.ConfigurationPublicationHelm {
@@ -750,6 +754,23 @@ func validateCIWorkflowContract(root string) error {
 	for group, gateIDs := range groups {
 		if !bytes.Contains(workflows, []byte("--group "+group)) {
 			return fmt.Errorf("canonical CI group %s for gates %s is not referenced by a workflow", group, strings.Join(gateIDs, ", "))
+		}
+	}
+	govulncheck, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "govulncheck.yml"))
+	if err != nil {
+		return err
+	}
+	return validateGovulncheckWorkflowContract(govulncheck)
+}
+
+func validateGovulncheckWorkflowContract(workflow []byte) error {
+	const plan = "./hk qa plan pr --output json"
+	if !bytes.Contains(workflow, []byte(plan)) {
+		return fmt.Errorf(".github/workflows/govulncheck.yml must obtain a PR QA plan ID through %q", plan)
+	}
+	for _, line := range bytes.Split(workflow, []byte{'\n'}) {
+		if bytes.Contains(line, []byte("./hk qa ")) && !bytes.Contains(line, []byte("./hk qa plan ")) && !bytes.Contains(line, []byte("--plan-id")) {
+			return fmt.Errorf(".github/workflows/govulncheck.yml QA invocation must pass --plan-id")
 		}
 	}
 	return nil

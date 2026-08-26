@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -62,11 +64,23 @@ func TestSeedAndVerifyFixtureUseOnlyHTTPContracts(t *testing.T) {
 	}))
 	defer server.Close()
 
-	if err := seedFixture(server.URL, fixture); err != nil {
+	if err := seedFixture(context.Background(), server.URL, fixture); err != nil {
 		t.Fatal(err)
 	}
-	if err := verifyFixture(server.URL, fixture); err != nil {
+	if err := verifyFixture(context.Background(), server.URL, fixture); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestDoJSONUsesProvidedContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	client, err := newClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := doJSON(ctx, client, http.MethodGet, "http://example.test", nil, http.StatusOK, nil); !errors.Is(err, context.Canceled) {
+		t.Fatalf("doJSON() error = %v, want context cancellation", err)
 	}
 }
 

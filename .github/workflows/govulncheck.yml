@@ -33,4 +33,5 @@ jobs:
       - name: Run canonical vulnerability gate
         run: |
           gates="$(./hk ci qa-matrix --profile pr --group govulncheck --output json | jq -r '.data.gate_ids | join(",")')"
-          ./hk qa pr --gate "$gates"
+          plan_id="$(./hk qa plan pr --output json | jq -r '.data.plan_id')"
+          ./hk qa pr --plan-id "$plan_id" --gate "$gates"

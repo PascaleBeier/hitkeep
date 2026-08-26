@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"go.yaml.in/yaml/v3"
+
 	runtimeconfig "hitkeep/config"
 )
 
@@ -102,6 +104,31 @@ func TestValidateReleaseMetadata(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
+}
+
+func TestValidateGovulncheckWorkflowContract(t *testing.T) {
+	valid := []byte("plan_id=\"$(./hk qa plan pr --output json | jq -r '.data.plan_id')\"\n./hk qa pr --plan-id \"$plan_id\" --gate \"$gates\"\n")
+	if err := validateGovulncheckWorkflowContract(valid); err != nil {
+		t.Fatalf("validateGovulncheckWorkflowContract() error = %v", err)
+	}
+	for _, workflow := range [][]byte{
+		[]byte("./hk qa pr --gate \"$gates\"\n"),
+		[]byte("plan_id=\"$(./hk qa plan pr --output json | jq -r '.data.plan_id')\"\n./hk qa pr --gate \"$gates\"\n"),
+		[]byte("./hk qa pr --plan-id \"$plan_id\" --gate \"$gates\"\n"),
+	} {
+		if err := validateGovulncheckWorkflowContract(workflow); err == nil {
+			t.Fatalf("validateGovulncheckWorkflowContract() accepted %q", workflow)
+		}
+	}
+}
+
+func TestWorkflowNeedsRejectsUnsupportedYAMLNodes(t *testing.T) {
+	for _, kind := range []yaml.Kind{yaml.DocumentNode, yaml.MappingNode, yaml.AliasNode} {
+		var needs workflowNeeds
+		if err := needs.UnmarshalYAML(&yaml.Node{Kind: kind}); err == nil {
+			t.Errorf("UnmarshalYAML(%v) accepted unsupported node", kind)
+		}
+	}
 }
 
 func TestValidateContainerDataPath(t *testing.T) {

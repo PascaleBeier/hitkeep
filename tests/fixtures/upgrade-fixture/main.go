@@ -84,6 +84,7 @@ func main() {
 	if selected != 1 || strings.TrimSpace(*manifestPath) == "" || strings.TrimSpace(*previousImage) == "" || strings.TrimSpace(*platform) == "" {
 		fatalf("exactly one action plus --manifest, --previous-image, and --platform is required")
 	}
+	ctx := context.Background()
 	entry, err := loadFixture(*manifestPath, *previousImage, *platform)
 	if err != nil {
 		fatalf("loading upgrade fixture: %v", err)
@@ -93,22 +94,22 @@ func main() {
 		if strings.TrimSpace(*baseURL) == "" {
 			fatalf("--seed requires --url")
 		}
-		err = seedFixture(*baseURL, entry)
+		err = seedFixture(ctx, *baseURL, entry)
 	case *verify:
 		if strings.TrimSpace(*baseURL) == "" {
 			fatalf("--verify requires --url")
 		}
-		err = verifyFixture(*baseURL, entry)
+		err = verifyFixture(ctx, *baseURL, entry)
 	case *verifyImage:
 		if strings.TrimSpace(*image) == "" {
 			fatalf("--verify-image requires --image")
 		}
-		err = verifyPulledImage(*image, entry)
+		err = verifyPulledImage(ctx, *image, entry)
 	case *verifyStorageFlag:
 		if strings.TrimSpace(*dataPath) == "" || strings.TrimSpace(*metadataPath) == "" {
 			fatalf("--verify-storage requires --data-path and --metadata")
 		}
-		err = verifyStorage(*dataPath, *metadataPath, entry)
+		err = verifyStorage(ctx, *dataPath, *metadataPath, entry)
 	case *verifyLegacyStorageFlag:
 		if strings.TrimSpace(*dataPath) == "" || strings.TrimSpace(*metadataPath) == "" {
 			fatalf("--verify-legacy-storage requires --data-path and --metadata")
@@ -158,8 +159,8 @@ func (f fixture) valid() error {
 	return nil
 }
 
-func verifyPulledImage(image string, f fixture) error {
-	raw, err := exec.Command("docker", "image", "inspect", image).Output()
+func verifyPulledImage(ctx context.Context, image string, f fixture) error {
+	raw, err := exec.CommandContext(ctx, "docker", "image", "inspect", image).Output()
 	if err != nil {
 		return fmt.Errorf("inspect pulled image: %w", err)
 	}
@@ -213,7 +214,7 @@ func verifyLegacyStorage(dataPath, metadataPath string) error {
 	return nil
 }
 
-func verifyStorage(dataPath, metadataPath string, f fixture) error {
+func verifyStorage(ctx context.Context, dataPath, metadataPath string, f fixture) error {
 	controlPath := filepath.Join(dataPath, "hitkeep.db")
 	if err := verifyRegularFile(controlPath); err != nil {
 		return fmt.Errorf("control database: %w", err)
@@ -223,14 +224,14 @@ func verifyStorage(dataPath, metadataPath string, f fixture) error {
 		return fmt.Errorf("connect copied control database: %w", err)
 	}
 	defer store.Close()
-	complete, err := store.DefaultTenantSplitComplete(context.Background())
+	complete, err := store.DefaultTenantSplitComplete(ctx)
 	if err != nil {
 		return err
 	}
 	if !complete {
 		return errors.New("default tenant split markers are incomplete")
 	}
-	tenantID, err := store.GetDefaultTenantID(context.Background())
+	tenantID, err := store.GetDefaultTenantID(ctx)
 	if err != nil {
 		return fmt.Errorf("resolve default tenant: %w", err)
 	}
@@ -302,12 +303,12 @@ func loadFileMetadata(path string) (map[string]fileMetadata, error) {
 	}
 }
 
-func seedFixture(baseURL string, f fixture) error {
+func seedFixture(ctx context.Context, baseURL string, f fixture) error {
 	client, err := newClient()
 	if err != nil {
 		return err
 	}
-	if err := doJSON(client, http.MethodPost, baseURL+"/api/initial-user", map[string]string{
+	if err := doJSON(ctx, client, http.MethodPost, baseURL+"/api/initial-user", map[string]string{
 		"email": f.Fixture.Email, "password": f.Fixture.Password, "given_name": "Issue", "last_name": "Fixture",
 	}, http.StatusCreated, nil); err != nil {
 		return fmt.Errorf("creating fixture user: %w", err)
@@ -315,44 +316,44 @@ func seedFixture(baseURL string, f fixture) error {
 	var site struct {
 		ID string `json:"id"`
 	}
-	if err := doJSON(client, http.MethodPost, baseURL+"/api/sites", map[string]string{"domain": f.Fixture.Domain}, http.StatusOK, &site); err != nil {
+	if err := doJSON(ctx, client, http.MethodPost, baseURL+"/api/sites", map[string]string{"domain": f.Fixture.Domain}, http.StatusOK, &site); err != nil {
 		return fmt.Errorf("creating fixture site: %w", err)
 	}
 	if strings.TrimSpace(site.ID) == "" {
 		return errors.New("fixture site response omitted ID")
 	}
-	if err := doJSONWithHeaders(client, http.MethodPost, baseURL+"/ingest", map[string]string{
+	if err := doJSONWithHeaders(ctx, client, http.MethodPost, baseURL+"/ingest", map[string]string{
 		"path": f.Fixture.Path, "session_id": f.Fixture.SessionID, "page_id": f.Fixture.PageID,
 	}, http.StatusAccepted, nil, http.Header{"Origin": {"https://" + f.Fixture.Domain}}); err != nil {
 		return fmt.Errorf("ingesting fixture hit: %w", err)
 	}
-	return awaitHits(client, baseURL, site.ID, f)
+	return awaitHits(ctx, client, baseURL, site.ID, f)
 }
 
-func verifyFixture(baseURL string, f fixture) error {
+func verifyFixture(ctx context.Context, baseURL string, f fixture) error {
 	client, err := newClient()
 	if err != nil {
 		return err
 	}
-	if err := doJSON(client, http.MethodPost, baseURL+"/api/login", map[string]any{"email": f.Fixture.Email, "password": f.Fixture.Password, "remember_me": false}, http.StatusOK, nil); err != nil {
+	if err := doJSON(ctx, client, http.MethodPost, baseURL+"/api/login", map[string]any{"email": f.Fixture.Email, "password": f.Fixture.Password, "remember_me": false}, http.StatusOK, nil); err != nil {
 		return fmt.Errorf("logging in fixture user: %w", err)
 	}
 	var sites []struct {
 		ID     string `json:"id"`
 		Domain string `json:"domain"`
 	}
-	if err := doJSON(client, http.MethodGet, baseURL+"/api/sites", nil, http.StatusOK, &sites); err != nil {
+	if err := doJSON(ctx, client, http.MethodGet, baseURL+"/api/sites", nil, http.StatusOK, &sites); err != nil {
 		return fmt.Errorf("listing fixture sites: %w", err)
 	}
 	for _, site := range sites {
 		if site.Domain == f.Fixture.Domain {
-			return awaitHits(client, baseURL, site.ID, f)
+			return awaitHits(ctx, client, baseURL, site.ID, f)
 		}
 	}
 	return fmt.Errorf("fixture site %q was not preserved", f.Fixture.Domain)
 }
 
-func awaitHits(client *http.Client, baseURL, siteID string, f fixture) error {
+func awaitHits(ctx context.Context, client *http.Client, baseURL, siteID string, f fixture) error {
 	deadline := time.Now().Add(30 * time.Second)
 	for {
 		var page struct {
@@ -363,7 +364,7 @@ func awaitHits(client *http.Client, baseURL, siteID string, f fixture) error {
 			} `json:"data"`
 			Total int `json:"total"`
 		}
-		err := doJSON(client, http.MethodGet, baseURL+"/api/sites/"+siteID+"/hits?limit="+fmt.Sprint(f.Fixture.ExpectedHits), nil, http.StatusOK, &page)
+		err := doJSON(ctx, client, http.MethodGet, baseURL+"/api/sites/"+siteID+"/hits?limit="+fmt.Sprint(f.Fixture.ExpectedHits), nil, http.StatusOK, &page)
 		if err == nil && page.Total == f.Fixture.ExpectedHits && containsFixtureHit(page.Data, f) {
 			return nil
 		}
@@ -373,7 +374,11 @@ func awaitHits(client *http.Client, baseURL, siteID string, f fixture) error {
 			}
 			return fmt.Errorf("fixture hits = total %d/data %#v, want exactly %d with path=%q session_id=%q page_id=%q", page.Total, page.Data, f.Fixture.ExpectedHits, f.Fixture.Path, f.Fixture.SessionID, f.Fixture.PageID)
 		}
-		time.Sleep(250 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(250 * time.Millisecond):
+		}
 	}
 }
 
@@ -398,11 +403,11 @@ func newClient() (*http.Client, error) {
 	return &http.Client{Jar: jar, Timeout: 10 * time.Second}, nil
 }
 
-func doJSON(client *http.Client, method, url string, input any, wantStatus int, output any) error {
-	return doJSONWithHeaders(client, method, url, input, wantStatus, output, nil)
+func doJSON(ctx context.Context, client *http.Client, method, url string, input any, wantStatus int, output any) error {
+	return doJSONWithHeaders(ctx, client, method, url, input, wantStatus, output, nil)
 }
 
-func doJSONWithHeaders(client *http.Client, method, url string, input any, wantStatus int, output any, headers http.Header) error {
+func doJSONWithHeaders(ctx context.Context, client *http.Client, method, url string, input any, wantStatus int, output any, headers http.Header) error {
 	var body io.Reader
 	if input != nil {
 		raw, err := json.Marshal(input)
@@ -411,7 +416,7 @@ func doJSONWithHeaders(client *http.Client, method, url string, input any, wantS
 		}
 		body = bytes.NewReader(raw)
 	}
-	req, err := http.NewRequest(method, url, body)
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		return err
 	}
