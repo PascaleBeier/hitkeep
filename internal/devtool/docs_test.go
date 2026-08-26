@@ -63,6 +63,18 @@ func TestValidateReleaseMetadata(t *testing.T) {
 	})
 }
 
+func TestValidateContainerDataPath(t *testing.T) {
+	if err := validateContainerDataPath("Dockerfile", "ENV HITKEEP_DATA_PATH=\"/var/lib/hitkeep/data\"\nVOLUME [\"/var/lib/hitkeep\"]"); err != nil {
+		t.Fatalf("validateContainerDataPath() error = %v, want nil", err)
+	}
+	if err := validateContainerDataPath("Dockerfile", "VOLUME [\"/var/lib/hitkeep\"]"); err == nil {
+		t.Fatal("validateContainerDataPath() succeeded without a HITKEEP_DATA_PATH image default")
+	}
+	if err := validateContainerDataPath("Dockerfile", "ENV HITKEEP_DATA_PATH=\"/var/lib/hitkeep/data\""); err == nil {
+		t.Fatal("validateContainerDataPath() succeeded without a persistent volume")
+	}
+}
+
 func TestValidateConfigurationDocument(t *testing.T) {
 	known := map[string]runtimeconfig.ConfigurationSetting{
 		"HITKEEP_LOG_LEVEL": {Environment: "HITKEEP_LOG_LEVEL", Default: "info"},

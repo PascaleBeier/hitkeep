@@ -16,6 +16,9 @@ import (
 var releaseVersionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 var configurationEnvironmentPattern = regexp.MustCompile(`\bHITKEEP_[A-Z0-9_]+\b`)
 var composeConfigurationDefaultPattern = regexp.MustCompile(`\$\{(HITKEEP_[A-Z0-9_]+):-([^}]*)\}`)
+var dockerfileDataPathPattern = regexp.MustCompile(`(?m)^\s*ENV\s+HITKEEP_DATA_PATH(?:=|\s+)(?:"([^"]+)"|'([^']+)'|([^\s#]+))`)
+var dockerfileVolumePattern = regexp.MustCompile(`(?m)^\s*VOLUME\s+(.+)$`)
+var dockerfileQuotedPathPattern = regexp.MustCompile(`"([^"]+)"`)
 
 type releasePleaseConfig struct {
 	Packages map[string]struct {
@@ -121,12 +124,57 @@ func validateConfigurationDocumentation(root string) error {
 			return readErr
 		}
 		relative, _ := filepath.Rel(root, path)
+		if filepath.ToSlash(relative) == "Dockerfile" {
+			if _, ok := known["HITKEEP_DATA_PATH"]; !ok {
+				return fmt.Errorf("configuration catalog is missing HITKEEP_DATA_PATH")
+			}
+			if err := validateContainerDataPath(filepath.ToSlash(relative), string(raw)); err != nil {
+				return err
+			}
+		}
 		checkDefaults := filepath.Base(path) != "compose.dev.yaml"
 		if err := validateConfigurationDocument(filepath.ToSlash(relative), string(raw), known, nonRuntime, checkDefaults); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func validateContainerDataPath(path, contents string) error {
+	matches := dockerfileDataPathPattern.FindAllStringSubmatch(contents, -1)
+	if len(matches) != 1 {
+		return fmt.Errorf("%s must declare exactly one HITKEEP_DATA_PATH image default", path)
+	}
+	dataPath := firstNonEmpty(matches[0][1:])
+	for _, match := range dockerfileVolumePattern.FindAllStringSubmatch(contents, -1) {
+		for _, volume := range dockerfileVolumePaths(match[1]) {
+			if dataPath == volume || strings.HasPrefix(dataPath, strings.TrimRight(volume, "/")+"/") {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("%s HITKEEP_DATA_PATH image default %q is not beneath a declared persistent VOLUME", path, dataPath)
+}
+
+func dockerfileVolumePaths(instruction string) []string {
+	quoted := dockerfileQuotedPathPattern.FindAllStringSubmatch(instruction, -1)
+	if len(quoted) > 0 {
+		paths := make([]string, 0, len(quoted))
+		for _, match := range quoted {
+			paths = append(paths, match[1])
+		}
+		return paths
+	}
+	return strings.Fields(strings.TrimSpace(instruction))
+}
+
+func firstNonEmpty(values []string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func validateConfigurationDocument(path, contents string, known map[string]runtimeconfig.ConfigurationSetting, nonRuntime map[string]bool, checkDefaults bool) error {

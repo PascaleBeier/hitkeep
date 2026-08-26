@@ -1,0 +1,81 @@
+# Configuration Refactor Progress
+
+Branch: `feat/config_refactor`
+
+Implementation plan: [Cobra, Viper, configuration, filesystem, release, and layout migration](../architecture/cobra-viper-config-go-layout-migration.md)
+
+This folder is the durable progress ledger for the migration. Update it in the same slice that changes implementation state. Do not use it as a second command, configuration, dependency, or QA catalog; those remain owned by code and `hk`.
+
+## Compatibility invariants
+
+- Existing `HITKEEP_*` variables, flags, defaults, parsing, warnings, normalization, and build-variant behavior remain compatible throughout 2.x.
+- Repeated canonical/deprecated aliases retain sequential last-occurrence-wins behavior.
+- Config files are additive and explicitly selected in 2.x; existing env/flag deployments do not discover files implicitly.
+- Persistence-sensitive defaults remain consistent across binary, image, Compose, Helm, examples, and docs, with issue #288 covered by container deletion/recreation upgrade tests.
+- Every slice is independently releasable and reversible. Contraction is deferred until separately authorized.
+- Runtime packages receive typed configuration; Viper and Cobra stay at assembly/routing boundaries.
+- Storage durability, authorization, redaction, and production/developer dependency boundaries are never simplified away.
+
+## Slice ledger
+
+| Slice | State | Scope | Evidence |
+|---|---|---|---|
+| 0A | Completed | Characterize current config/catalog/flag contracts; inventory CLI and release surfaces | `go test -race ./internal/config`; table-driven canonical/deprecated order contract; Gortex CLI/release discovery |
+| 0B | Completed | Add configuration-surface drift fixture and issue #288 failure-shaped upgrade fixture | Dockerfile data path must be image-defined beneath a declared volume; `go test -race ./internal/devtool` |
+| 0C | In progress | Inventory filesystem operations and dependency-ordered `internal/` move manifest | Initial domain/risk classification complete; full bounded per-domain manifest pending |
+| 1 | In progress | Make catalog authoritative and generate neutral `hitkeep.example.yaml` | Catalog `config_file_key` added; schema `hitkeep.config/v2`; example generation pending |
+| 2 | Pending | Add instance-based Viper assembler in shadow parity | — |
+| 3 | Pending | Production Cobra root with legacy config loader | — |
+| 4 | Pending | Switch production assembly to parity-proven Viper | — |
+| 5 | Pending | Normalize `hk` Cobra factories and preserve MCP/JSON contracts | — |
+| 6 | Pending | Project catalog into Docker, Compose, Helm, examples, and docs artifact | — |
+| 7 | Pending | Enforce issue #288 container recreation and migration interruption gates | — |
+| 8 | Pending | GoReleaser artifact parity, then cutover; Homebrew/Scoop-ready layout | — |
+| 9 | Pending | Afero/fileflow/pathologize migration by operation risk | — |
+| 10 | Pending | Flatten `internal/` in dependency-order move-only slices | — |
+| 11 | Pending | Stabilize, full QA, CI, docs validation, completion audit | — |
+
+## Completed discovery
+
+- Production uses manual top-level dispatch; `cmd/hitkeep.Run` owns no-subcommand server startup and `config.Load` currently consumes `os.Args`.
+- Recovery has five manual stdlib flag subcommands whose names, confirmation behavior, and output remain compatibility contracts.
+- `hk` already uses Cobra factories, centralized JSON/NDJSON envelopes, and a generated command catalog; preserve and normalize this implementation.
+- Repeated canonical/deprecated config flags share one destination and resolve sequentially: the last occurrence wins in either spelling order.
+- Current release binaries are CGO-enabled Linux amd64/arm64 self-hosted and cloud variants. Version injection targets `hitkeep/cmd.Version`.
+- Release checksums are sorted SHA-256 entries in `SHA256SUMS`; GoReleaser parity must preserve artifact names and this format before cutover.
+- Release Please remains the tag/changelog owner; image, Helm, and downstream jobs retain their existing dependency sequencing.
+- Filesystem migration separates ordinary injectable reads/writes from native DuckDB/WAL/fsync/lock durability; fileflow never receives Afero-only paths.
+- `internal/appurl` is the leading first move-only leaf candidate; `config`, `database`, and `devtool` move only after their behavioral boundaries stabilize.
+
+## Current slice: 1
+
+### Test-first work
+
+1. Generate a deterministic, comment-rich `hitkeep.example.yaml` from catalog v2.
+2. Keep derived/runtime-generated and sensitive settings commented/unset so the example is behaviorally neutral.
+3. Prove every catalog setting appears exactly once with its synchronized description/default metadata.
+4. Add explicit render/check ownership through the existing developer service; do not introduce Viper runtime loading yet.
+
+### Decisions
+
+- Extend the existing configuration catalog; do not create a parallel schema.
+- No Viper runtime switch until old/new typed results, warnings, and normalization match.
+- No `internal/` moves in behavioral slices.
+- The generated example config must validate and remain behaviorally neutral versus no config file, excluding intentionally generated runtime values.
+- GoReleaser must reproduce the existing artifact manifest before replacing the legacy builder.
+
+### Verification
+
+Record focused commands as stable test targets or `hk` gate IDs, not pasted successful logs.
+
+| Date | Slice | Check | Result |
+|---|---|---|---|
+| 2026-08-26 | 0A | Workspace and live QA catalog inspected (`3ef33158d8113930`) | Passed; existing dev supervisor failed, finite QA remains available |
+| 2026-08-26 | 0A | `go test -race ./internal/config` | Passed; canonical/deprecated flags proven last-occurrence-wins in both orders |
+| 2026-08-26 | 0B | `go test -race ./internal/devtool -count=1` | Passed; Docker data path default and volume containment enforced |
+| 2026-08-26 | 1 | `go test -race ./internal/config` | Passed; deterministic unique catalog v2 config-file keys enforced |
+| 2026-08-26 | 0A–1 | Changed QA `20260826T111826-92e002b4` | Passed: `go-format`, `go-fix`, `go-lint`, `go-vet`, `go-staticcheck`, `developer-mcp`, `developer-docs` |
+
+## Next update
+
+Run changed QA and push the contract slice, then implement the generated neutral `hitkeep.example.yaml` against catalog v2.

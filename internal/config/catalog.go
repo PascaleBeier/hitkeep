@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-const ConfigurationCatalogSchemaVersion = "hitkeep.config/v1"
+const ConfigurationCatalogSchemaVersion = "hitkeep.config/v2"
 
 type ConfigurationCategory struct {
 	ID    string `json:"id"`
@@ -17,6 +17,7 @@ type ConfigurationCategory struct {
 type ConfigurationSetting struct {
 	Field           string   `json:"field"`
 	Category        string   `json:"category"`
+	ConfigFileKey   string   `json:"config_file_key"`
 	Environment     string   `json:"environment,omitempty"`
 	Flag            string   `json:"flag"`
 	DeprecatedFlags []string `json:"deprecated_flags,omitempty"`
@@ -55,6 +56,7 @@ func Catalog() ConfigurationCatalog {
 		setting := ConfigurationSetting{
 			Field:          field.Name,
 			Category:       configurationCategory(field),
+			ConfigFileKey:  configFileKey(environment, flag),
 			Environment:    environment,
 			Flag:           flag,
 			Type:           configurationType(field.Type.Kind()),
@@ -80,6 +82,13 @@ func Catalog() ConfigurationCatalog {
 		Categories:    configurationCategories(),
 		Settings:      settings,
 	}
+}
+
+func configFileKey(environment, flag string) string {
+	if environment == "" {
+		return flag
+	}
+	return strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(environment, "HITKEEP_")), "_", "-")
 }
 
 func configurationCategories() []ConfigurationCategory {

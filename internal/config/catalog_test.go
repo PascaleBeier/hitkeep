@@ -2,6 +2,7 @@ package config
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -41,6 +42,38 @@ func TestConfigurationCatalogCoversRuntimeAnnotations(t *testing.T) {
 			t.Errorf("duplicate flag --%s", setting.Flag)
 		}
 		flags[setting.Flag] = true
+	}
+}
+
+func TestConfigurationCatalogConfigFileKeys(t *testing.T) {
+	catalog := Catalog()
+	if catalog.SchemaVersion != "hitkeep.config/v2" {
+		t.Fatalf("schema version = %q, want hitkeep.config/v2", catalog.SchemaVersion)
+	}
+	seen := make(map[string]bool, len(catalog.Settings))
+	second := Catalog()
+	for index, setting := range catalog.Settings {
+		if setting.ConfigFileKey == "" {
+			t.Errorf("%s has no config-file key", setting.Field)
+		}
+		if seen[setting.ConfigFileKey] {
+			t.Errorf("duplicate config-file key %q", setting.ConfigFileKey)
+		}
+		seen[setting.ConfigFileKey] = true
+
+		want := setting.Flag
+		if setting.Environment != "" {
+			want = strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(setting.Environment, "HITKEEP_")), "_", "-")
+		}
+		if setting.ConfigFileKey != want {
+			t.Errorf("%s config-file key = %q, want %q", setting.Field, setting.ConfigFileKey, want)
+		}
+		if strings.Contains(setting.ConfigFileKey, "_") || setting.ConfigFileKey != strings.ToLower(setting.ConfigFileKey) {
+			t.Errorf("%s config-file key is not lowercase kebab-case: %q", setting.Field, setting.ConfigFileKey)
+		}
+		if setting.ConfigFileKey != second.Settings[index].ConfigFileKey {
+			t.Errorf("%s config-file key is not deterministic: %q then %q", setting.Field, setting.ConfigFileKey, second.Settings[index].ConfigFileKey)
+		}
 	}
 }
 
