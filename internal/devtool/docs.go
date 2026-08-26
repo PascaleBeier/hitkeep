@@ -244,7 +244,7 @@ func validateConfigurationDocumentation(root string) error {
 			if valuesErr != nil {
 				return ""
 			}
-			contents += "\n" + string(values)
+			contents += helmPublicationValuesSeparator + string(values)
 		}
 		return contents
 	}); err != nil {
@@ -304,7 +304,8 @@ func validateConfigurationDocumentation(root string) error {
 }
 
 var helmDataPathTemplatePattern = regexp.MustCompile(`(?ms)- name:\s*HITKEEP_DATA_PATH\s*\n\s*value:\s*\{\{\s*\.Values\.persistence\.mountPath\s*\|\s*quote\s*\}\}`)
-var helmMountPathPattern = regexp.MustCompile(`(?m)^\s*mountPath:\s*(?:\"([^\"]+)\"|'([^']+)'|([^\s#]+))`)
+
+const helmPublicationValuesSeparator = "\n--- hitkeep-publication-values ---\n"
 
 func validateRequiredConfigurationPublications(requirements []runtimeconfig.ConfigurationPublication, contents func(string) string) error {
 	for _, requirement := range requirements {
@@ -381,16 +382,23 @@ func configurationPublicationDefault(contents string, requirement runtimeconfig.
 			}
 		}
 	}
-	if surface != runtimeconfig.ConfigurationPublicationHelm || !helmDataPathTemplatePattern.MatchString(contents) {
+	if surface != runtimeconfig.ConfigurationPublicationHelm {
 		return "", false
 	}
-	for _, match := range helmMountPathPattern.FindAllStringSubmatch(contents, -1) {
-		value := strings.Trim(strings.Join(match[1:], ""), "\\\"'")
-		if value != "" && !strings.HasPrefix(value, "{") {
-			return value, true
-		}
+	template, values, found := strings.Cut(contents, helmPublicationValuesSeparator)
+	if !found || !helmDataPathTemplatePattern.MatchString(template) {
+		return "", false
 	}
-	return "", false
+	var chartValues struct {
+		Persistence struct {
+			MountPath string `yaml:"mountPath"`
+		} `yaml:"persistence"`
+	}
+	if err := yaml.Unmarshal([]byte(values), &chartValues); err != nil {
+		return "", false
+	}
+	mountPath := strings.TrimSpace(chartValues.Persistence.MountPath)
+	return mountPath, mountPath != ""
 }
 
 func validateContainerDataPath(path, contents string) error {
