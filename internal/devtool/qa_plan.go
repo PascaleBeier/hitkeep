@@ -79,6 +79,8 @@ func classifyChangedPath(path string) ([]string, bool) {
 	switch {
 	case path == "go.mod" || path == "go.sum":
 		return []string{changeDependencies}, true
+	case path == "hitkeep.example.yaml":
+		return []string{changeBackend, changeDocumentation}, true
 	case path == "frontend/dashboard/package.json" || path == "frontend/dashboard/package-lock.json":
 		return []string{changeDependencies, changeDashboard}, true
 	case strings.HasPrefix(path, "internal/database/"):

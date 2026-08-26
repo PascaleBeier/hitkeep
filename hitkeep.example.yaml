@@ -1,0 +1,228 @@
+# HitKeep self-hosted configuration.
+# Generated from hitkeep.config/v2; environment variables and flags remain supported.
+
+# general settings
+# Remember-me session lifetime in days (type: integer; default: "30")
+auth-remember-me-days: 30
+# Authenticated dashboard session lifetime in minutes (type: integer; default: "15")
+auth-session-minutes: 15
+# Seconds before session expiry to warn users (type: integer; default: "120")
+auth-session-warning-seconds: 120
+# Run as healthcheck client (type: boolean; default: "false")
+healthcheck: false
+# HTTP listen address (type: string; default: ":8080")
+http-addr: ":8080"
+# Secret key for JWT (type: string; default: "unset"; sensitive; derived)
+# jwt-secret:
+# Log level (debug/info/warn/error) (type: string; default: "info")
+log-level: "info"
+# Public URL (type: string; default: "unset"; sensitive)
+# public-url:
+
+# data settings
+# Data archive path (type: string; default: "archive")
+archive-path: "archive"
+# Local writable base directory for per-tenant database files (type: string; default: "data")
+data-path: "data"
+# Default data retention in days (type: integer; default: "365")
+data-retention-days: 365
+# Automatically recover recognized DuckDB non-unique index invalidations after creating a local recovery bundle (type: boolean; default: "true")
+db-auto-recover: true
+# After retaining a recovery bundle, automatically bypass a recognized non-migration WAL and accept loss of WAL-only changes (type: boolean; default: "false")
+db-auto-recover-wal: false
+# Minutes between periodic DuckDB checkpoints; 0 disables periodic checkpoints (type: integer; default: "5")
+db-checkpoint-interval: 5
+# Rewrite fragmented database files on startup and tenant open to return space freed by retention and deletes to the operating system (type: boolean; default: "true")
+db-compact-on-start: true
+# Database file path (type: string; default: "hitkeep.db")
+db-path: "hitkeep.db"
+# Directory for permission-restricted DuckDB recovery bundles; defaults to <data-path>/recovery (type: string; default: "<data-path>/recovery"; derived)
+# db-recovery-path:
+# DuckDB memory limit per database (e.g. 2GB); empty derives a container-aware default, 'none' keeps the DuckDB default of 80% of system RAM (type: string; default: "derived"; derived)
+# duckdb-memory-limit:
+# DuckDB threads per database; 0 derives the default from GOMAXPROCS (type: integer; default: "GOMAXPROCS"; derived)
+# duckdb-threads:
+# Maximum staged import upload size in bytes (type: integer; default: "107374182400")
+import-max-stage-bytes: 107374182400
+# Days to keep stale staged import upload files; 0 disables import staging cleanup (type: integer; default: "7")
+import-stage-retention-days: 7
+
+# custom-tracking settings
+# Bearer-free path token for Caddy on-demand TLS ask endpoint (type: string; default: "unset"; sensitive)
+# caddy-tls-ask-token:
+# DNS host or IP custom tracking domains must point at; defaults to public URL host (type: string; default: "")
+custom-tracking-dns-target: ""
+# TLS mode for custom tracking domains: external or caddy-on-demand (type: string; default: "external")
+custom-tracking-tls-mode: "external"
+
+# spam-filtering settings
+# Automatically refresh OSS spam filter feeds on the leader node (disabled by default for airgapped/offline installs) (type: boolean; default: "false")
+spam-filter-auto-update: false
+# Path to cached spam filter data (defaults to <data-path>/spam-filter.json) (type: string; default: "")
+spam-filter-path: ""
+# Minutes between OSS spam filter feed refreshes (type: integer; default: "1440")
+spam-filter-update-interval: 1440
+
+# backups settings
+# Minutes between backups (type: integer; default: "60")
+backup-interval: 60
+# Backup snapshot destination (local directory or s3://); live databases remain on the local data path (type: string; default: "unset"; sensitive)
+# backup-path:
+# Number of backup snapshots to keep (type: integer; default: "24")
+backup-retention: 24
+
+# s3 settings
+# S3 access key ID (static credentials) (type: string; default: "unset"; sensitive)
+# s3-access-key-id:
+# S3 custom endpoint (MinIO, R2, Spaces) (type: string; default: "unset"; sensitive)
+# s3-endpoint:
+# S3 region (type: string; default: "us-east-1")
+s3-region: "us-east-1"
+# S3 secret access key (static credentials) (type: string; default: "unset"; sensitive)
+# s3-secret-access-key:
+# S3 session token (STS temporary credentials) (type: string; default: "unset"; sensitive)
+# s3-session-token:
+# S3 URL style: path or vhost (type: string; default: "")
+s3-url-style: ""
+# S3 use SSL (set false for local MinIO over HTTP) (type: boolean; default: "true")
+s3-use-ssl: true
+
+# clustering settings
+# Address for cluster gossip (type: string; default: "0.0.0.0:7946")
+bind-addr: "0.0.0.0:7946"
+# Address of a peer to join (type: string; default: "")
+join-addr: ""
+# Unique node name (type: string; default: "hostname-timestamp"; derived)
+# node-name:
+
+# mcp settings
+# Minutes to cache fetched docs for MCP tools (type: integer; default: "60")
+mcp-docs-cache-minutes: 60
+# Enable MCP tools and resources that read official HitKeep docs (type: boolean; default: "true")
+mcp-docs-enabled: true
+# Base URL for official HitKeep docs used by MCP docs tools (type: string; default: "unset"; sensitive)
+# mcp-docs-url:
+# Enable the optional leader-only MCP server (type: boolean; default: "false")
+mcp-enabled: false
+# Maximum analytics date range in days for MCP tools (type: integer; default: "366")
+mcp-max-range-days: 366
+# MCP server HTTP path on the main HitKeep HTTP server (type: string; default: "/mcp")
+mcp-path: "/mcp"
+
+# ai settings
+# Optional explicit AI provider API key, bearer token, or gateway key; provider-native goAI env vars are preferred (type: string; default: "unset"; sensitive)
+# ai-api-key:
+# Optional explicit AI provider or gateway base URL (type: string; default: "unset"; sensitive)
+# ai-base-url:
+# AI local budget window in minutes (type: integer; default: "1440")
+ai-budget-window: 1440
+# Enable optional AI-powered product features (type: boolean; default: "false")
+ai-enabled: false
+# AI model identifier for the configured provider (type: string; default: "")
+ai-model: ""
+# AI provider key supported by HitKeep's GoAI router (type: string; default: "")
+ai-provider: ""
+# Optional explicit AI provider region override (type: string; default: "")
+ai-region: ""
+# Maximum AI requests per budget window; 0 disables local request cap (type: integer; default: "100")
+ai-request-limit: 100
+# AI provider request timeout in seconds (type: integer; default: "30")
+ai-timeout-seconds: 30
+# Maximum AI tokens per budget window; 0 disables local token cap (type: integer; default: "100000")
+ai-token-limit: 100000
+# Enable the optional dashboard Ask AI assistant; requires HITKEEP_AI_ENABLED and a configured AI model (type: boolean; default: "false")
+ask-ai-enabled: false
+
+# webhooks settings
+# Allow HTTP and private webhook destinations for explicit development/self-host testing (type: boolean; default: "false")
+webhook-allow-development-targets: false
+# Maximum concurrent outbound webhook deliveries (type: integer; default: "8")
+webhook-delivery-concurrency: 8
+# Outbound webhook request timeout in seconds (type: integer; default: "10")
+webhook-delivery-timeout: 10
+# Maximum outbound webhook delivery attempts (type: integer; default: "6")
+webhook-max-attempts: 6
+# Maximum concurrent deliveries for one webhook (type: integer; default: "1")
+webhook-per-endpoint-concurrency: 1
+# Days to retain webhook delivery logs (type: integer; default: "30")
+webhook-retention-days: 30
+# Initial outbound webhook retry delay in seconds (type: integer; default: "30")
+webhook-retry-base-seconds: 30
+# Maximum outbound webhook retry delay in seconds (type: integer; default: "21600")
+webhook-retry-max-seconds: 21600
+# Seconds between pending webhook delivery recovery sweeps (type: integer; default: "30")
+webhook-sweep-seconds: 30
+
+# search-console settings
+# Google Search Console OAuth client ID (type: string; default: "")
+google-search-console-client-id: ""
+# Google Search Console OAuth client secret (type: string; default: "unset"; sensitive)
+# google-search-console-client-secret:
+# Google Search Console OAuth callback URL override (type: string; default: "unset"; sensitive)
+# google-search-console-redirect-url:
+
+# social-sign-in settings
+# GitHub social sign-in OAuth client ID (type: string; default: "")
+social-github-client-id: ""
+# GitHub social sign-in OAuth client secret (type: string; default: "unset"; sensitive)
+# social-github-client-secret:
+# Google social sign-in OAuth client ID (type: string; default: "")
+social-google-client-id: ""
+# Google social sign-in OAuth client secret (type: string; default: "unset"; sensitive)
+# social-google-client-secret:
+# Microsoft social sign-in OAuth client ID (type: string; default: "")
+social-microsoft-client-id: ""
+# Microsoft social sign-in OAuth client secret (type: string; default: "unset"; sensitive)
+# social-microsoft-client-secret:
+# Microsoft tenant selector: common, organizations, consumers, or tenant UUID (type: string; default: "common")
+social-microsoft-tenant: "common"
+# Enable managed-cloud account creation through configured social providers (type: boolean; default: "false")
+social-signup-enabled: false
+
+# email settings
+# Mail driver (type: string; default: "smtp")
+mail-driver: "smtp"
+# Mail encryption (type: string; default: "tls")
+mail-encryption: "tls"
+# From Email (type: string; default: "hitkeep@localhost")
+mail-from-address: "hitkeep@localhost"
+# From Name (type: string; default: "HitKeep")
+mail-from-name: "HitKeep"
+# SMTP Host (type: string; default: "")
+mail-host: ""
+# Disable Cert validation (type: boolean; default: "false")
+mail-insecure-skip-verify: false
+# SMTP Password (type: string; default: "unset"; sensitive)
+# mail-password:
+# SMTP Port (type: integer; default: "587")
+mail-port: 587
+# SMTP Username (type: string; default: "")
+mail-username: ""
+
+# rate-limits settings
+# API burst (type: integer; default: "20")
+api-burst: 20
+# API rate limit (type: number; default: "10")
+api-rate-limit: 10
+# Auth burst (type: integer; default: "5")
+auth-burst: 5
+# Auth rate limit (type: number; default: "2")
+auth-rate-limit: 2
+# Ingest burst (type: integer; default: "40")
+ingest-burst: 40
+# Ingest rate limit (type: number; default: "20")
+ingest-rate-limit: 20
+# Webhook burst (type: integer; default: "60")
+webhook-burst: 60
+# Webhook rate limit (type: number; default: "30")
+webhook-rate-limit: 30
+
+# trusted-proxies settings
+# Trusted proxy CIDRs (comma-separated) or '*' to trust all (type: string; default: "*")
+trusted-proxies: "*"
+
+# internals settings
+# Internal NSQ HTTP (type: string; default: "127.0.0.1:4151")
+nsq-http-address: "127.0.0.1:4151"
+# Internal NSQ TCP (type: string; default: "127.0.0.1:4150")
+nsq-tcp-address: "127.0.0.1:4150"

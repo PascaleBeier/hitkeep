@@ -60,6 +60,16 @@ func TestUnknownPathRequiresDecision(t *testing.T) {
 	}
 }
 
+func TestExampleConfigurationSelectsBackendAndDocumentationAreas(t *testing.T) {
+	areas, known := classifyChangedPath("hitkeep.example.yaml")
+	if !known {
+		t.Fatal("hitkeep.example.yaml is not classified")
+	}
+	if len(areas) != 2 || areas[0] != changeBackend || areas[1] != changeDocumentation {
+		t.Fatalf("areas = %v, want backend and documentation", areas)
+	}
+}
+
 func TestFrontendManifestsSelectDependencyAndDashboardAreas(t *testing.T) {
 	want := []string{changeDependencies, changeDashboard}
 	for _, path := range []string{"frontend/dashboard/package.json", "frontend/dashboard/package-lock.json"} {

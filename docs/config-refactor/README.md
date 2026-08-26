@@ -23,8 +23,8 @@ This folder is the durable progress ledger for the migration. Update it in the s
 | 0A | Completed | Characterize current config/catalog/flag contracts; inventory CLI and release surfaces | `go test -race ./internal/config`; table-driven canonical/deprecated order contract; Gortex CLI/release discovery |
 | 0B | Completed | Add configuration-surface drift fixture and issue #288 failure-shaped upgrade fixture | Dockerfile data path must be image-defined beneath a declared volume; `go test -race ./internal/devtool` |
 | 0C | In progress | Inventory filesystem operations and dependency-ordered `internal/` move manifest | Initial domain/risk classification complete; full bounded per-domain manifest pending |
-| 1 | In progress | Make catalog authoritative and generate neutral `hitkeep.example.yaml` | Catalog `config_file_key` added; schema `hitkeep.config/v2`; example generation pending |
-| 2 | Pending | Add instance-based Viper assembler in shadow parity | — |
+| 1 | Completed | Make catalog authoritative and generate neutral `hitkeep.example.yaml` | Catalog `config_file_key` added; schema `hitkeep.config/v2`; deterministic example covers each self-hosted key once |
+| 2 | In progress | Add instance-based Viper assembler in shadow parity | Preserve the legacy loader as runtime owner until typed parity is proven |
 | 3 | Pending | Production Cobra root with legacy config loader | — |
 | 4 | Pending | Switch production assembly to parity-proven Viper | — |
 | 5 | Pending | Normalize `hk` Cobra factories and preserve MCP/JSON contracts | — |
@@ -51,10 +51,10 @@ This folder is the durable progress ledger for the migration. Update it in the s
 
 ### Test-first work
 
-1. Generate a deterministic, comment-rich `hitkeep.example.yaml` from catalog v2.
-2. Keep derived/runtime-generated and sensitive settings commented/unset so the example is behaviorally neutral.
-3. Prove every catalog setting appears exactly once with its synchronized description/default metadata.
-4. Add explicit render/check ownership through the existing developer service; do not introduce Viper runtime loading yet.
+1. Generated a deterministic, comment-rich `hitkeep.example.yaml` from catalog v2.
+2. Kept derived/runtime-generated and sensitive settings commented/unset so the example is behaviorally neutral.
+3. Proved every self-hosted catalog setting appears exactly once with synchronized description, type, and default metadata.
+4. Kept Viper and runtime loading out of this slice; the catalog remains the sole schema.
 
 ### Decisions
 
@@ -73,9 +73,10 @@ Record focused commands as stable test targets or `hk` gate IDs, not pasted succ
 | 2026-08-26 | 0A | Workspace and live QA catalog inspected (`3ef33158d8113930`) | Passed; existing dev supervisor failed, finite QA remains available |
 | 2026-08-26 | 0A | `go test -race ./internal/config` | Passed; canonical/deprecated flags proven last-occurrence-wins in both orders |
 | 2026-08-26 | 0B | `go test -race ./internal/devtool -count=1` | Passed; Docker data path default and volume containment enforced |
-| 2026-08-26 | 1 | `go test -race ./internal/config` | Passed; deterministic unique catalog v2 config-file keys enforced |
+| 2026-08-26 | 1 | `go test -race ./internal/config` | Passed; deterministic unique catalog v2 keys and checked-in neutral example YAML enforced |
 | 2026-08-26 | 0A–1 | Changed QA `20260826T111826-92e002b4` | Passed: `go-format`, `go-fix`, `go-lint`, `go-vet`, `go-staticcheck`, `developer-mcp`, `developer-docs` |
+| 2026-08-26 | 1 | Changed QA `20260826T113313-3af5ab8a` | Passed; root example config classified into backend and documentation areas; same seven gates passed |
 
 ## Next update
 
-Run changed QA and push the contract slice, then implement the generated neutral `hitkeep.example.yaml` against catalog v2.
+Run changed QA and push the completed catalog/example slice, then add the instance-based Viper assembler in shadow parity without switching runtime ownership.
