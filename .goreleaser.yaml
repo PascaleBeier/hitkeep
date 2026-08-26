@@ -1,0 +1,56 @@
+version: 2
+
+project_name: hitkeep
+
+builds:
+  - id: self-hosted
+    main: ./cmd/hitkeep/main.go
+    binary: hitkeep-linux-{{ .Arch }}
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    tags:
+      - hashicorpmetrics
+      - timetzdata
+    flags:
+      - -trimpath
+    ldflags:
+      - -w -s -X hitkeep/cmd.Version={{ .Env.HITKEEP_VERSION }}
+  - id: cloud
+    main: ./cmd/hitkeep/main.go
+    binary: hitkeep-cloud-linux-{{ .Arch }}
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    tags:
+      - hashicorpmetrics
+      - timetzdata
+      - s3
+      - billing
+      - tenancy
+    flags:
+      - -trimpath
+    ldflags:
+      - -w -s -X hitkeep/cmd.Version={{ .Env.HITKEEP_VERSION }}
+
+archives:
+  - formats:
+      - binary
+
+checksum:
+  name_template: SHA256SUMS
+  algorithm: sha256
+
+changelog:
+  disable: true
+
+release:
+  disable: true

@@ -30,7 +30,7 @@ This folder is the durable progress ledger for the migration. Update it in the s
 | 5 | Completed | Normalize `hk` Cobra factories and preserve MCP/JSON contracts | No rewrite required: `hk` already has one factory root, centralized render/envelope handling, deterministic command catalog, and guarded production boundary |
 | 6 | Completed | Project catalog into Docker, Compose, Helm, examples, and docs artifact | Catalog-derived root example plus repository-wide env/default validation covers Dockerfile, Compose, charts, examples, and reader-facing Markdown/YAML |
 | 7 | Completed | Enforce issue #288 container recreation and migration interruption gates | Existing self-hosted image smoke now recreates a container on the same named volume and verifies marker/database persistence; full profile pairs it with fault-injected migration resume acceptance |
-| 8 | Pending | GoReleaser artifact parity, then cutover; Homebrew/Scoop-ready layout | — |
+| 8 | Completed | GoReleaser artifact parity and build cutover; Homebrew/Scoop-ready artifact layout | GoReleaser v2.18.0 snapshots produced all four legacy binary names; existing checksum/verification commands accepted the complete six-file release contract |
 | 9 | Pending | Afero/fileflow/pathologize migration by operation risk | — |
 | 10 | Pending | Flatten `internal/` in dependency-order move-only slices | — |
 | 11 | Pending | Stabilize, full QA, CI, docs validation, completion audit | — |
@@ -47,11 +47,15 @@ This folder is the durable progress ledger for the migration. Update it in the s
 - Filesystem migration separates ordinary injectable reads/writes from native DuckDB/WAL/fsync/lock durability; fileflow never receives Afero-only paths.
 - `internal/appurl` is the leading first move-only leaf candidate; `config`, `database`, and `devtool` move only after their behavioral boundaries stabilize.
 
-## Most recently completed slice: 7
+## Most recently completed slice: 8
 
 ### Test-first work
 
-1. Extended the existing image smoke rather than adding a second Docker harness: a unique named volume survives forced container removal and recreation, then the marker, real database, and healthcheck are verified.
+1. Added one GoReleaser v2 configuration with separate self-hosted and cloud build IDs, preserving Linux architectures, CGO, build tags, version injection, raw binary names, and Release Please ownership.
+2. Reused the existing `BuildReleaseBinaries` API and native-architecture runners; only its build implementation now delegates to the pinned GoReleaser release contract.
+3. Added a PR/full `goreleaser-check` gate and delivery-path classification without creating a second release orchestrator.
+4. Built both variants on Linux amd64 and arm64, generated the public configuration catalog, and passed the existing sorted SHA-256 release verifier over all six required artifacts.
+5. Extended the existing image smoke rather than adding a second Docker harness: a unique named volume survives forced container removal and recreation, then the marker, real database, and healthcheck are verified.
 2. Paired the recreation smoke with the existing opt-in default-tenant fault-boundary resume acceptance in the full profile.
 3. Reused the existing catalog-derived example generator and configuration documentation validator instead of adding a second projection system.
 2. Verified every published `HITKEEP_*` name is catalog-known, Compose-style defaults match runtime defaults unless explicitly justified, and the image data path remains beneath a declared volume.
@@ -100,7 +104,11 @@ Record focused commands as stable test targets or `hk` gate IDs, not pasted succ
 | 2026-08-26 | 7 | `bash -n scripts/docker-smoke.sh`; `go test -race ./internal/devtool` | Passed; gate wiring and bounded recreation contract preflight verified |
 | 2026-08-26 | 7 | Full-profile selected gates `20260826T123333-1282e6d1` | Passed: `default-tenant-migration-acceptance`, `self-hosted-image` (real build, deletion/recreation, persistence) |
 | 2026-08-26 | 7 | Changed QA `20260826T124011-6bb97907` | Passed: `go-format`, `go-fix`, `go-lint`, `go-vet`, `go-staticcheck`, `developer-mcp`, `developer-docs`; Docker smoke path is now classified as delivery |
+| 2026-08-26 | 8 | `go test -race ./cmd/hk ./internal/devtool ./internal/devtool/cli` | Passed; release builder, CLI envelope, QA classification, and production/developer boundary coverage |
+| 2026-08-26 | 8 | GoReleaser v2.18.0 `check` plus Linux amd64/arm64 snapshots | Passed; self-hosted/cloud tags, CGO, version linker value, and exact four binary names preserved |
+| 2026-08-26 | 8 | `hk ci release-checksums` and `hk ci verify-release` | Passed over four binaries, `hitkeep-configuration.json`, and sorted `SHA256SUMS` |
+| 2026-08-26 | 8 | Changed QA planning | Blocked before gate execution: persisted plan snapshot remains stale after deterministic replanning; focused race and release checks above passed and the guard was not bypassed |
 
 ## Next update
 
-Add GoReleaser snapshot artifact parity, preserving current binary names, variants, version injection, and sorted SHA-256 manifest before release cutover.
+Migrate ordinary injectable filesystem operations to Afero and reserve fileflow/pathologize for safe native cross-filesystem and untrusted-path operations; keep DuckDB/WAL/fsync/lock durability OS-backed.

@@ -166,6 +166,29 @@ func TestRaceTestArgsUseGateBoundedPackageTimeout(t *testing.T) {
 	}
 }
 
+func TestGoReleaserConfigPreservesReleaseArtifactContract(t *testing.T) {
+	gate, err := GateByID("goreleaser-check")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(gate.Profiles, "pr") || !slices.Contains(gate.Profiles, "full") || !slices.Contains(gate.Paths, ".goreleaser.yaml") {
+		t.Fatalf("GoReleaser gate is not wired to PR/full release coverage: %#v", gate)
+	}
+	raw, err := os.ReadFile(filepath.Join("..", "..", ".goreleaser.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{
+		"version: 2", "id: self-hosted", "binary: hitkeep-linux-{{ .Arch }}",
+		"id: cloud", "binary: hitkeep-cloud-linux-{{ .Arch }}", "HITKEEP_VERSION",
+		"hashicorpmetrics", "timetzdata", "s3", "billing", "tenancy", "name_template: SHA256SUMS",
+	} {
+		if !bytes.Contains(raw, []byte(required)) {
+			t.Fatalf("GoReleaser config is missing release contract %q", required)
+		}
+	}
+}
+
 func TestSelfHostedImageGateCoversContainerRecreation(t *testing.T) {
 	gate, err := GateByID("self-hosted-image")
 	if err != nil {
