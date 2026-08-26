@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	runtimeconfig "hitkeep/internal/config"
+	runtimeconfig "hitkeep/config"
 )
 
 func TestRepositoryDevelopmentDocs(t *testing.T) {

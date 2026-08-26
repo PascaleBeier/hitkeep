@@ -16,7 +16,7 @@ import (
 	jose "github.com/go-jose/go-jose/v4"
 	"golang.org/x/oauth2"
 
-	"hitkeep/internal/config"
+	"hitkeep/config"
 	"hitkeep/internal/sso"
 	json "hitkeep/jsonapi"
 )

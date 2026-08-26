@@ -15,9 +15,9 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/config"
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"

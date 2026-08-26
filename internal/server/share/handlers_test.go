@@ -10,9 +10,9 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/config"
 	"hitkeep/exportfmt"
 	"hitkeep/internal/api"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/testutil/testdb"

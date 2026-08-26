@@ -15,8 +15,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/klauspost/compress/zstd"
 
+	"hitkeep/config"
 	"hitkeep/internal/api"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/worker"
 )

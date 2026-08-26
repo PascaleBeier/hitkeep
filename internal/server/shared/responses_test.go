@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"hitkeep/internal/config"
+	"hitkeep/config"
 	"hitkeep/internal/database"
 )
 

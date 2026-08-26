@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
-	runtimeconfig "hitkeep/internal/config"
+	runtimeconfig "hitkeep/config"
 )
 
 type rootActions struct {

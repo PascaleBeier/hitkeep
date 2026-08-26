@@ -15,10 +15,10 @@ import (
 	"github.com/nsqio/go-nsq"
 	"golang.org/x/time/rate"
 
+	"hitkeep/config"
 	hitai "hitkeep/internal/ai"
 	"hitkeep/internal/blocking"
 	"hitkeep/internal/cluster"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailer"

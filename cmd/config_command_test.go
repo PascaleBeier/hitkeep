@@ -12,7 +12,7 @@ import (
 
 	"github.com/spf13/afero"
 
-	runtimeconfig "hitkeep/internal/config"
+	runtimeconfig "hitkeep/config"
 )
 
 func executeProductionCommand(t *testing.T, args ...string) (string, error) {

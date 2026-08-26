@@ -6,8 +6,8 @@ import (
 	"context"
 	"time"
 
+	"hitkeep/config"
 	"hitkeep/hklog"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 )

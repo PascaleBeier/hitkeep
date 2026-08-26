@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/nsqio/go-nsq"
 
+	"hitkeep/config"
 	"hitkeep/hklog"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	json "hitkeep/jsonapi"
 )

@@ -8,9 +8,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"hitkeep/config"
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/server/shared"

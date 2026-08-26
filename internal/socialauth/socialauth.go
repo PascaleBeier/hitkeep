@@ -18,7 +18,7 @@ import (
 	"golang.org/x/oauth2"
 
 	"hitkeep/appurl"
-	"hitkeep/internal/config"
+	"hitkeep/config"
 	"hitkeep/internal/security"
 	"hitkeep/internal/sso"
 	json "hitkeep/jsonapi"

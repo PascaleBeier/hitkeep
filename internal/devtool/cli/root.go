@@ -15,7 +15,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	runtimeconfig "hitkeep/internal/config"
+	runtimeconfig "hitkeep/config"
 	"hitkeep/internal/devtool"
 	"hitkeep/internal/devtool/devmcp"
 	json "hitkeep/jsonapi"

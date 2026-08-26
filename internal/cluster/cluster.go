@@ -12,8 +12,8 @@ import (
 
 	"github.com/hashicorp/memberlist"
 
+	"hitkeep/config"
 	"hitkeep/hklog"
-	"hitkeep/internal/config"
 )
 
 type Manager struct {

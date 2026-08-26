@@ -84,7 +84,7 @@ func keyOccurrences(contents, key string) int {
 }
 
 func TestExampleYAMLMatchesCheckedInFile(t *testing.T) {
-	got, err := os.ReadFile("../../hitkeep.example.yaml")
+	got, err := os.ReadFile("../hitkeep.example.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}

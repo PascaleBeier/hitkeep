@@ -20,7 +20,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/klauspost/compress/zstd"
 
-	"hitkeep/internal/config"
+	"hitkeep/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/worker"
 	json "hitkeep/jsonapi"

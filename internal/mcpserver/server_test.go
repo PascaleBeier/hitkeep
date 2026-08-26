@@ -22,9 +22,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"hitkeep/config"
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/mcptest"
 	"hitkeep/internal/server/filterparams"

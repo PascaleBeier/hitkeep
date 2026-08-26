@@ -14,9 +14,9 @@ import (
 	stripe "github.com/stripe/stripe-go/v86"
 
 	"hitkeep/appurl"
+	"hitkeep/config"
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/server/shared"

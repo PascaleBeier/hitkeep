@@ -5,7 +5,7 @@ package entitlements
 import (
 	"strings"
 
-	"hitkeep/internal/config"
+	"hitkeep/config"
 )
 
 func NewProvider(conf *config.Config) Provider {

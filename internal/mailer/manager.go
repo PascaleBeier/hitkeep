@@ -16,7 +16,7 @@ import (
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 
-	"hitkeep/internal/config"
+	"hitkeep/config"
 	"hitkeep/internal/mailer/drivers"
 )
 

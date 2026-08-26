@@ -109,7 +109,7 @@ func TestRaceShardsAreDisjointAndComplete(t *testing.T) {
 func TestTestBearingGoPackagesExcludeProductionOnlyAndFrontendDependencies(t *testing.T) {
 	output := []byte(`{"ImportPath":"hitkeep/internal/database","TestGoFiles":["store_test.go"]}
 {"ImportPath":"hitkeep/internal/server","XTestGoFiles":["server_test.go"]}
-{"ImportPath":"hitkeep/internal/config"}
+{"ImportPath":"hitkeep/config"}
 {"ImportPath":"hitkeep/frontend/dashboard/node_modules/flatted/golang/pkg/flatted","TestGoFiles":["flatted_test.go"]}
 `)
 	got, err := testBearingGoPackages(output, "self-hosted")

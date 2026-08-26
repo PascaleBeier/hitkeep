@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"hitkeep/internal/config"
+	"hitkeep/config"
 )
 
 func TestRunHealthcheckUsesHeadRequest(t *testing.T) {

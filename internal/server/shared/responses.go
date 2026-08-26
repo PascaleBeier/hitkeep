@@ -9,10 +9,10 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/config"
 	hitai "hitkeep/internal/ai"
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 )
 

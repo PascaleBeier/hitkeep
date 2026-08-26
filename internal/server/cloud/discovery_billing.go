@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"hitkeep/appurl"
-	"hitkeep/internal/config"
+	"hitkeep/config"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/server/system"
 	json "hitkeep/jsonapi"

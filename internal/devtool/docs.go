@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	runtimeconfig "hitkeep/internal/config"
+	runtimeconfig "hitkeep/config"
 	json "hitkeep/jsonapi"
 )
 

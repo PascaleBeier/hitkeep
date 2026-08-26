@@ -18,10 +18,10 @@ import (
 	"github.com/nsqio/go-nsq"
 	"golang.org/x/time/rate"
 
+	"hitkeep/config"
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
 	"hitkeep/internal/blocking"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/ipmeta"
 	"hitkeep/internal/server/shared"
