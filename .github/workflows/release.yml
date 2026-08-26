@@ -151,6 +151,66 @@ jobs:
           fi
           HITKEEP_PREVIOUS_IMAGE="$previous" ./scripts/compose-smoke.sh "$candidate" self-hosted
 
+  upgrade-helm-from-v2-12:
+    name: Helm upgrade from v2.12.0
+    needs:
+      - release-please
+      - build-release
+    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ needs.release-please.outputs.tag_name }}
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+
+      - name: Install kind
+        shell: bash
+        run: |
+          set -euo pipefail
+          go install sigs.k8s.io/kind@v0.29.0
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Smoke Helm upgrade from supported floor
+        env:
+          CANDIDATE_DIGEST: ${{ needs.build-release.outputs.image_digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="tests/fixtures/release-fixtures.json"
+          if [[ ! "$CANDIDATE_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            echo "invalid candidate image digest" >&2
+            exit 1
+          fi
+          candidate="ghcr.io/${GITHUB_REPOSITORY}@${CANDIDATE_DIGEST}"
+          docker pull "$candidate"
+          platform="linux/$(docker image inspect "$candidate" --format '{{.Architecture}}')"
+          previous="$(jq -r --arg platform "$platform" '.fixtures[] | select(.previous_version == "2.12.0" and .platform == $platform) | .previous_image' "$manifest")"
+          if [[ -z "$previous" || "$previous" == "null" || "$previous" != *@sha256:* ]]; then
+            echo "release fixture has no immutable v2.12.0 image for ${platform}" >&2
+            exit 1
+          fi
+          cluster="hitkeep-helm-upgrade-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          trap '"$(go env GOPATH)/bin/kind" delete cluster --name "$cluster"' EXIT
+          "$(go env GOPATH)/bin/kind" create cluster --name "$cluster"
+          HITKEEP_PREVIOUS_IMAGE="$previous" ./scripts/helm-smoke.sh "$candidate" self-hosted
+
   link-release-blog:
     name: Link release blog
     needs: release-please
@@ -311,9 +371,10 @@ jobs:
       - build-release
       - upgrade-from-v2-12
       - upgrade-compose-from-v2-12
+      - upgrade-helm-from-v2-12
       - publish-helm
       - verify-tracker-package
-    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' && needs.upgrade-from-v2-12.result == 'success' && needs.upgrade-compose-from-v2-12.result == 'success' && needs.publish-helm.result == 'success' && needs.verify-tracker-package.result == 'success' }}
+    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' && needs.upgrade-from-v2-12.result == 'success' && needs.upgrade-compose-from-v2-12.result == 'success' && needs.upgrade-helm-from-v2-12.result == 'success' && needs.publish-helm.result == 'success' && needs.verify-tracker-package.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

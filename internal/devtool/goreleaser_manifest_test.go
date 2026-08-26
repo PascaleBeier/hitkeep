@@ -100,6 +100,8 @@ func TestGoReleaserBranchArchiveWorkflowContract(t *testing.T) {
 		"git rev-parse --verify \"refs/tags/${RELEASE_SOURCE_TAG}^{commit}\"",
 		"test \"$tag_commit\" = \"$RELEASE_SOURCE_SHA\"",
 		"--snapshot",
+		"GORELEASER_CURRENT_TAG=\"$RELEASE_TAG_NAME\"",
+		"release_version=\"${RELEASE_TAG_NAME#v}\"",
 		"runner.temp",
 		"runner.temp }}/public-assets",
 		"go version -m \"$binary\"",

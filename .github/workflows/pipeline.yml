@@ -281,13 +281,13 @@ jobs:
             test "$tag_commit" = "$RELEASE_SOURCE_SHA"
             test "$tag_commit" = "$(git rev-parse HEAD)"
             test "$RELEASE_SOURCE_TAG" = "$RELEASE_TAG_NAME"
-            release_args=(release --clean --skip=publish --config .goreleaser.yaml)
             release_version="${RELEASE_SOURCE_TAG#v}"
+            env -u GOROOT go run github.com/goreleaser/goreleaser/v2@v2.18.0 release --clean --skip=publish --config .goreleaser.yaml
           else
-            release_args=(release --snapshot --clean --skip=publish --config .goreleaser.yaml)
-            release_version="${HITKEEP_VERSION#v}"
+            test -n "$RELEASE_TAG_NAME"
+            release_version="${RELEASE_TAG_NAME#v}"
+            GORELEASER_CURRENT_TAG="$RELEASE_TAG_NAME" env -u GOROOT go run github.com/goreleaser/goreleaser/v2@v2.18.0 release --snapshot --clean --skip=publish --config .goreleaser.yaml
           fi
-          env -u GOROOT go run github.com/goreleaser/goreleaser/v2@v2.18.0 "${release_args[@]}"
           for arch in amd64 arm64; do
             if [[ -n "$RELEASE_TAG_NAME" ]]; then
               archive="hitkeep_${release_version}_Linux_${arch}.tar.gz"
