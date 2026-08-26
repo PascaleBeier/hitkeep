@@ -82,8 +82,12 @@ func TestValidateReleaseMetadata(t *testing.T) {
 
 	t.Run("downstream docs failure isolation", func(t *testing.T) {
 		root := releaseMetadataFixture(t)
-		writeFixtureFile(t, root, ".github/workflows/release.yml", "sync-docs-release:\nneeds.build-release.result == 'success'\nsync-hitkeep-release.yml\ngh run watch\n")
-		err := validateReleaseMetadata(root)
+		workflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "release.yml"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		writeFixtureFile(t, root, ".github/workflows/release.yml", string(workflow)+"\n# gh run watch\n")
+		err = validateReleaseMetadata(root)
 		if err == nil || !strings.Contains(err.Error(), "must not surface downstream documentation workflow failures") {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -135,12 +139,31 @@ func releaseMetadataFixture(t *testing.T) string {
 	writeFixtureFile(t, root, "charts/hitkeep/README.md", "tag: 2.12.0 # x-release-please-version\n")
 	writeFixtureFile(t, root, "release-please-config.json", fixtureReleasePleaseConfig())
 	writeFixtureFile(t, root, ".github/workflows/pipeline.yml", "github.com/goreleaser/goreleaser/v2@v2.18.0\n--snapshot\n--clean\n--single-target\n--id self-hosted\n--id cloud\n./hk catalog configuration --output json\nhitkeep-configuration.json\nhitkeep.example.yaml\nrelease_tag: $tag\nrelease_version: $version\n")
-	writeFixtureFile(t, root, ".github/workflows/release.yml", "sync-docs-release:\nneeds.build-release.result == 'success'\nsync-hitkeep-release.yml\n")
+	writeFixtureFile(t, root, ".github/workflows/release.yml", `# sync-hitkeep-release.yml
+jobs:
+  release-please: {}
+  build-release:
+    needs: release-please
+  publish-helm:
+    needs: build-release
+  verify-tracker-package:
+    needs: build-release
+  finalize-release:
+    needs:
+      - release-please
+      - build-release
+      - publish-helm
+      - verify-tracker-package
+  sync-docs-release:
+    needs: finalize-release
+  deploy-cloud:
+    needs: finalize-release
+`)
 	return root
 }
 
 func fixtureReleasePleaseConfig() string {
-	return `{"packages":{".":{"extra-files":[{"type":"json","path":"server.json","jsonpath":"$.version"},{"type":"json","path":"frontend/dashboard/package.json","jsonpath":"$.version"},{"type":"json","path":"frontend/dashboard/package-lock.json","jsonpath":"$['packages']['']['version']"},{"type":"json","path":"frontend/tracker/package.json","jsonpath":"$.version"},{"type":"generic","path":"frontend/dashboard/src/tracker/version.ts"},{"type":"yaml","path":"charts/hitkeep/Chart.yaml","jsonpath":"$.version"},{"type":"yaml","path":"charts/hitkeep/Chart.yaml","jsonpath":"$.appVersion"},{"type":"generic","path":"charts/hitkeep/README.md"}]}}}`
+	return `{"draft":true,"packages":{".":{"extra-files":[{"type":"json","path":"server.json","jsonpath":"$.version"},{"type":"json","path":"frontend/dashboard/package.json","jsonpath":"$.version"},{"type":"json","path":"frontend/dashboard/package-lock.json","jsonpath":"$['packages']['']['version']"},{"type":"json","path":"frontend/tracker/package.json","jsonpath":"$.version"},{"type":"generic","path":"frontend/dashboard/src/tracker/version.ts"},{"type":"yaml","path":"charts/hitkeep/Chart.yaml","jsonpath":"$.version"},{"type":"yaml","path":"charts/hitkeep/Chart.yaml","jsonpath":"$.appVersion"},{"type":"generic","path":"charts/hitkeep/README.md"}]}}}`
 }
 
 func writeFixtureFile(t *testing.T, root, name, contents string) {

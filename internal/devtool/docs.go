@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 
+	"go.yaml.in/yaml/v3"
+
 	runtimeconfig "hitkeep/config"
 	json "hitkeep/jsonapi"
 )
@@ -21,6 +23,7 @@ var dockerfileVolumePattern = regexp.MustCompile(`(?m)^\s*VOLUME\s+(.+)$`)
 var dockerfileQuotedPathPattern = regexp.MustCompile(`"([^"]+)"`)
 
 type releasePleaseConfig struct {
+	Draft    bool `json:"draft"`
 	Packages map[string]struct {
 		ExtraFiles []releasePleaseExtraFile `json:"extra-files"`
 	} `json:"packages"`
@@ -30,6 +33,62 @@ type releasePleaseExtraFile struct {
 	Type     string `json:"type"`
 	Path     string `json:"path"`
 	JSONPath string `json:"jsonpath"`
+}
+
+type workflowNeeds []string
+
+func (needs *workflowNeeds) UnmarshalYAML(value *yaml.Node) error {
+	switch value.Kind {
+	case yaml.ScalarNode:
+		*needs = []string{value.Value}
+		return nil
+	case yaml.SequenceNode:
+		result := make([]string, 0, len(value.Content))
+		for _, child := range value.Content {
+			if child.Kind != yaml.ScalarNode {
+				return fmt.Errorf("workflow needs entry must be a string")
+			}
+			result = append(result, child.Value)
+		}
+		*needs = result
+		return nil
+	default:
+		return fmt.Errorf("workflow needs must be a string or list")
+	}
+}
+
+type workflowJob struct {
+	Needs workflowNeeds `yaml:"needs"`
+}
+
+type releaseWorkflow struct {
+	Jobs map[string]workflowJob `yaml:"jobs"`
+}
+
+func validateReleaseWorkflowGraph(raw []byte) error {
+	var workflow releaseWorkflow
+	if err := yaml.Unmarshal(raw, &workflow); err != nil {
+		return fmt.Errorf("decode release workflow: %w", err)
+	}
+	for job, required := range map[string][]string{
+		"build-release":          {"release-please"},
+		"publish-helm":           {"build-release"},
+		"verify-tracker-package": {"build-release"},
+		"finalize-release":       {"release-please", "build-release", "publish-helm", "verify-tracker-package"},
+		"sync-docs-release":      {"finalize-release"},
+		"deploy-cloud":           {"finalize-release"},
+	} {
+		definition, ok := workflow.Jobs[job]
+		if !ok {
+			return fmt.Errorf("release workflow is missing %s", job)
+		}
+		for _, dependency := range required {
+			if !slices.Contains(definition.Needs, dependency) {
+				return fmt.Errorf("release workflow job %s must need %s", job, dependency)
+			}
+		}
+	}
+	return nil
 }
 
 func ValidateDevelopmentDocs(root string) error {
@@ -320,6 +379,9 @@ func validateReleaseMetadata(root string) error {
 	if err := readJSONFile(filepath.Join(root, "release-please-config.json"), &config); err != nil {
 		return err
 	}
+	if !config.Draft {
+		return fmt.Errorf("release-please-config.json must create draft releases")
+	}
 	rootPackageConfig, ok := config.Packages["."]
 	if !ok {
 		return fmt.Errorf("release-please-config.json is missing packages['.']")
@@ -354,8 +416,7 @@ func validateReleaseMetadata(root string) error {
 			"release_version: $version",
 		},
 		".github/workflows/release.yml": {
-			"sync-docs-release:",
-			"needs.build-release.result == 'success'",
+			"finalize-release:",
 			"sync-hitkeep-release.yml",
 		},
 	}
@@ -375,6 +436,9 @@ func validateReleaseMetadata(root string) error {
 	}
 	releaseWorkflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "release.yml"))
 	if err != nil {
+		return err
+	}
+	if err := validateReleaseWorkflowGraph(releaseWorkflow); err != nil {
 		return err
 	}
 	for _, fragment := range []string{"gh run watch", "--log-failed", "::error::hitkeep-docs"} {

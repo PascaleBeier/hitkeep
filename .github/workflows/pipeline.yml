@@ -2,6 +2,10 @@ name: Build Pipeline
 
 on:
   workflow_call:
+    outputs:
+      image_digest:
+        description: "Immutable digest of the exact-version candidate image"
+        value: ${{ jobs.build-and-push-image.outputs.image_digest }}
     inputs:
       version:
         required: true
@@ -315,6 +319,8 @@ jobs:
 
   build-and-push-image:
     name: Build and push Docker image
+    outputs:
+      image_digest: ${{ steps.push.outputs.digest }}
     needs:
       - build-dashboard
       - build-binaries

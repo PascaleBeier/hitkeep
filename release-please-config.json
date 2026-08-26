@@ -1,4 +1,5 @@
 {
+  "draft": true,
   "packages": {
     ".": {
       "changelog-path": "CHANGELOG.md",

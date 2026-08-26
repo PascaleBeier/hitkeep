@@ -42,10 +42,7 @@ jobs:
     with:
       version: ${{ needs.release-please.outputs.tag_name }}
       meta_config: |
-        type=raw,value=latest
         type=semver,pattern={{version}},value=${{ needs.release-please.outputs.tag_name }}
-        type=semver,pattern={{major}}.{{minor}},value=${{ needs.release-please.outputs.tag_name }}
-        type=semver,pattern={{major}},value=${{ needs.release-please.outputs.tag_name }}
       upload_to_release: true
       release_tag_name: ${{ needs.release-please.outputs.tag_name }}
     secrets:
@@ -114,8 +111,10 @@ jobs:
           gh release edit "$TAG" --notes-file updated-release-notes.md
 
   publish-helm:
-    needs: release-please
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs:
+      - release-please
+      - build-release
+    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -145,10 +144,12 @@ jobs:
         run: |
           helm push "hitkeep-${VERSION}.tgz" "oci://ghcr.io/pascalebeier/charts"
 
-  publish-npm:
-    name: Publish @hitkeep/tracker to npm
-    needs: release-please
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+  verify-tracker-package:
+    name: Verify @hitkeep/tracker release package
+    needs:
+      - release-please
+      - build-release
+    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -184,17 +185,84 @@ jobs:
             exit 1
           fi
 
-      - name: Publish to npm
+  finalize-release:
+    name: Promote and publish release
+    needs:
+      - release-please
+      - build-release
+      - publish-helm
+      - verify-tracker-package
+    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' && needs.publish-helm.result == 'success' && needs.verify-tracker-package.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ needs.release-please.outputs.tag_name }}
+
+      - uses: ./.github/actions/setup-node-npm
+
+      - name: Publish @hitkeep/tracker
         working-directory: frontend/tracker
         run: npm publish
+
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHT }}
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Promote immutable image to mutable tags
+        env:
+          CANDIDATE_DIGEST: ${{ needs.build-release.outputs.image_digest }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          VERSION: ${{ needs.release-please.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "invalid release version: $VERSION" >&2
+            exit 1
+          fi
+          if [[ ! "$CANDIDATE_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            echo "invalid candidate image digest" >&2
+            exit 1
+          fi
+          IFS=. read -r major minor _ <<< "$VERSION"
+          source="ghcr.io/${GITHUB_REPOSITORY}@${CANDIDATE_DIGEST}"
+          for base in "ghcr.io/${GITHUB_REPOSITORY}" "${DOCKERHUB_USERNAME}/hitkeep"; do
+            docker buildx imagetools create \
+              --tag "${base}:latest" \
+              --tag "${base}:${major}" \
+              --tag "${base}:${major}.${minor}" \
+              "$source"
+          done
+
+      - name: Publish draft GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GHT }}
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: gh release edit "$TAG" --draft=false --latest
 
   sync-docs-release:
     name: Publish release and configuration metadata to docs
     needs:
       - release-please
-      - build-release
-      - publish-helm
-    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' && needs.publish-helm.result == 'success' }}
+      - finalize-release
+    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.finalize-release.result == 'success' }}
     runs-on: ubuntu-latest
     continue-on-error: true
     timeout-minutes: 5
@@ -260,9 +328,8 @@ jobs:
     name: Trigger cloud deploy
     needs:
       - release-please
-      - build-release
-      - publish-helm
-    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' && needs.publish-helm.result == 'success' }}
+      - finalize-release
+    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.finalize-release.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
