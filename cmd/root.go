@@ -17,10 +17,18 @@ import (
 
 type rootActions struct {
 	run                func([]string, string) error
+	runContext         func(context.Context, []string, string) error
 	recover            func([]string)
 	updateSpamLists    func([]string)
 	updateAIAgentLists func([]string)
 	importData         func([]string)
+}
+
+func (actions rootActions) runWithContext(ctx context.Context, args []string, configFile string) error {
+	if actions.runContext != nil {
+		return actions.runContext(ctx, args, configFile)
+	}
+	return actions.run(args, configFile)
 }
 
 // NewRootCommand routes production commands while their existing parsers remain authoritative.
@@ -31,6 +39,9 @@ func NewRootCommand(logger *slog.Logger) *cobra.Command {
 	root := newRootCommand(rootActions{
 		run: func(args []string, configFile string) error {
 			return run(logger, args, configFile)
+		},
+		runContext: func(ctx context.Context, args []string, configFile string) error {
+			return runContext(ctx, logger, args, configFile)
 		},
 		recover: func(_ []string) {
 			Recover(logger)
@@ -53,7 +64,7 @@ func NewRootCommand(logger *slog.Logger) *cobra.Command {
 	return root
 }
 
-func newHealthcheckCommand(run func([]string, string) error) *cobra.Command {
+func newHealthcheckCommand(run func(context.Context, []string, string) error) *cobra.Command {
 	return &cobra.Command{
 		Use:                "healthcheck",
 		Short:              "Check whether HitKeep is healthy",
@@ -67,7 +78,7 @@ func newHealthcheckCommand(run func([]string, string) error) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return run(append(serverArgs, "--healthcheck"), configFile)
+			return run(command.Context(), append(serverArgs, "--healthcheck"), configFile)
 		},
 	}
 }
@@ -145,7 +156,7 @@ func newRootCommand(actions rootActions) *cobra.Command {
 		Args:               cobra.ArbitraryArgs,
 		RunE: func(command *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				return actions.run(args, "")
+				return actions.runWithContext(command.Context(), args, "")
 			}
 			switch args[0] {
 			case "recover":
@@ -166,15 +177,15 @@ func newRootCommand(actions rootActions) *cobra.Command {
 					return err
 				}
 				if len(serverArgs) > 0 && serverArgs[0] == "healthcheck" {
-					return actions.run(append(serverArgs[1:], "--healthcheck"), configFile)
+					return actions.runWithContext(command.Context(), append(serverArgs[1:], "--healthcheck"), configFile)
 				}
-				return actions.run(serverArgs, configFile)
+				return actions.runWithContext(command.Context(), serverArgs, configFile)
 			}
 			return nil
 		},
 		CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
 	}
-	root.AddCommand(newHealthcheckCommand(actions.run))
+	root.AddCommand(newHealthcheckCommand(actions.runWithContext))
 	root.SetHelpCommand(&cobra.Command{
 		Use:                "help",
 		Hidden:             true,

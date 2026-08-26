@@ -47,6 +47,10 @@ func Run(logger *slog.Logger) {
 }
 
 func run(logger *slog.Logger, args []string, configFile string) error {
+	return runContext(context.Background(), logger, args, configFile)
+}
+
+func runContext(ctx context.Context, logger *slog.Logger, args []string, configFile string) error {
 	if logger == nil {
 		panic("hitkeepcmd: logger is required")
 	}
@@ -67,11 +71,10 @@ func run(logger *slog.Logger, args []string, configFile string) error {
 	}))
 
 	if conf.Healthcheck {
-		if err := runHealthcheck(conf); err != nil {
-			fmt.Fprintf(os.Stderr, "Healthcheck failed: %v\n", err)
-			os.Exit(1)
+		if err := runHealthcheck(ctx, conf); err != nil {
+			return &HealthcheckError{Err: err}
 		}
-		os.Exit(0)
+		return nil
 	}
 
 	defer func() {
@@ -449,7 +452,19 @@ func validateLiveDatabasePaths(conf *config.Config) error {
 	return nil
 }
 
-func runHealthcheck(conf *config.Config) error {
+type HealthcheckError struct {
+	Err error
+}
+
+func (err *HealthcheckError) Error() string {
+	return fmt.Sprintf("Healthcheck failed: %v", err.Err)
+}
+
+func (err *HealthcheckError) Unwrap() error {
+	return err.Err
+}
+
+func runHealthcheck(ctx context.Context, conf *config.Config) error {
 	_, port, err := net.SplitHostPort(conf.HTTPAddr)
 	if err != nil {
 		port = "8080"
@@ -467,7 +482,7 @@ func runHealthcheck(conf *config.Config) error {
 		Transport: transport,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	//nolint:gosec // The healthcheck target is trusted operator configuration.

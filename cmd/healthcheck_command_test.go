@@ -53,14 +53,23 @@ func TestHealthcheckCommandSubprocessParity(t *testing.T) {
 	if legacyErr == nil || commandErr == nil {
 		t.Fatalf("healthcheck exit errors = %v, %v; both commands must fail", legacyErr, commandErr)
 	}
-	if legacyExit, commandExit := legacyErr.(*exec.ExitError).ExitCode(), commandErr.(*exec.ExitError).ExitCode(); legacyExit != commandExit {
-		t.Errorf("healthcheck exit codes = %d, %d", legacyExit, commandExit)
+	if got := legacyErr.(*exec.ExitError).ExitCode(); got != 1 {
+		t.Errorf("legacy healthcheck exit code = %d, want 1", got)
 	}
-	if legacyStdout.String() != commandStdout.String() {
-		t.Errorf("healthcheck stdout differs: legacy %q, command %q", legacyStdout.String(), commandStdout.String())
+	if got := commandErr.(*exec.ExitError).ExitCode(); got != 1 {
+		t.Errorf("healthcheck command exit code = %d, want 1", got)
 	}
-	if legacyStderr.String() != commandStderr.String() {
-		t.Errorf("healthcheck stderr differs: legacy %q, command %q", legacyStderr.String(), commandStderr.String())
+	if got := legacyStdout.String(); got != "" {
+		t.Errorf("legacy healthcheck stdout = %q, want empty", got)
+	}
+	if got := commandStdout.String(); got != "" {
+		t.Errorf("healthcheck command stdout = %q, want empty", got)
+	}
+	if got := legacyStderr.String(); got != "healthcheck failed\n" {
+		t.Errorf("legacy healthcheck stderr = %q, want %q", got, "healthcheck failed\n")
+	}
+	if got := commandStderr.String(); got != "healthcheck failed\n" {
+		t.Errorf("healthcheck command stderr = %q, want %q", got, "healthcheck failed\n")
 	}
 }
 
@@ -82,11 +91,17 @@ func TestHealthcheckCommandSubprocessSuccessParity(t *testing.T) {
 	if err := command.Run(); err != nil {
 		t.Fatalf("healthcheck command error = %v", err)
 	}
-	if legacyStdout.String() != commandStdout.String() {
-		t.Errorf("healthcheck stdout differs: legacy %q, command %q", legacyStdout.String(), commandStdout.String())
+	if got := legacyStdout.String(); got != "" {
+		t.Errorf("legacy healthcheck stdout = %q, want empty", got)
 	}
-	if legacyStderr.String() != commandStderr.String() {
-		t.Errorf("healthcheck stderr differs: legacy %q, command %q", legacyStderr.String(), commandStderr.String())
+	if got := commandStdout.String(); got != "" {
+		t.Errorf("healthcheck command stdout = %q, want empty", got)
+	}
+	if got := legacyStderr.String(); got != "" {
+		t.Errorf("legacy healthcheck stderr = %q, want empty", got)
+	}
+	if got := commandStderr.String(); got != "" {
+		t.Errorf("healthcheck command stderr = %q, want empty", got)
 	}
 }
 
@@ -153,6 +168,30 @@ func TestRootCommandCompatibilityContract(t *testing.T) {
 	}
 }
 
+func TestRootCommandNoSubcommandUsesLegacyRuntime(t *testing.T) {
+	called := false
+	root := newRootCommand(rootActions{
+		run: func(args []string, configFile string) error {
+			called = true
+			if len(args) != 0 {
+				t.Errorf("root args = %q, want empty", args)
+			}
+			if configFile != "" {
+				t.Errorf("root config file = %q, want empty", configFile)
+			}
+			return nil
+		},
+	})
+	root.SetArgs([]string{})
+
+	if err := root.ExecuteContext(t.Context()); err != nil {
+		t.Fatalf("ExecuteContext: %v", err)
+	}
+	if !called {
+		t.Fatal("legacy runtime was not called without a subcommand")
+	}
+}
+
 func TestHealthcheckCommandHonorsCanceledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
@@ -171,6 +210,33 @@ func TestHealthcheckCommandHonorsCanceledContext(t *testing.T) {
 	}
 	if called {
 		t.Fatal("run was called after command context was canceled")
+	}
+}
+
+func TestHealthcheckCommandPassesCommandContext(t *testing.T) {
+	ctx := context.WithValue(t.Context(), "healthcheck-context", "present")
+	called := false
+	root := newRootCommand(rootActions{
+		runContext: func(got context.Context, args []string, configFile string) error {
+			called = true
+			if got.Value("healthcheck-context") != "present" {
+				t.Errorf("healthcheck context value = %v, want present", got.Value("healthcheck-context"))
+			}
+			if configFile != "" {
+				t.Errorf("healthcheck config file = %q, want empty", configFile)
+			}
+			if len(args) != 1 || args[0] != "--healthcheck" {
+				t.Errorf("healthcheck args = %q, want [--healthcheck]", args)
+			}
+			return nil
+		},
+	})
+	root.SetArgs([]string{"healthcheck"})
+	if err := root.ExecuteContext(ctx); err != nil {
+		t.Fatalf("ExecuteContext: %v", err)
+	}
+	if !called {
+		t.Fatal("healthcheck context-aware runtime was not called")
 	}
 }
 

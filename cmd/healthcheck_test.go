@@ -31,7 +31,7 @@ func TestRunHealthcheckUsesHeadRequest(t *testing.T) {
 	server.Start()
 	defer server.Close()
 
-	if err := runHealthcheck(&config.Config{HTTPAddr: listener.Addr().String()}); err != nil {
+	if err := runHealthcheck(t.Context(), &config.Config{HTTPAddr: listener.Addr().String()}); err != nil {
 		t.Fatalf("runHealthcheck: %v", err)
 	}
 
