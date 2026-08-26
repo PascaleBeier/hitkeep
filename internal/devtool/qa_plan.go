@@ -97,7 +97,7 @@ func classifyChangedPath(path string) ([]string, bool) {
 		return []string{changeDashboard}, true
 	case strings.HasPrefix(path, "docs/") || path == "README.md" || path == "CONTRIBUTING.md" || path == "AGENTS.md":
 		return []string{changeDocumentation}, true
-	case strings.HasPrefix(path, ".github/") || strings.HasPrefix(path, "charts/") || path == "Dockerfile" || strings.HasPrefix(path, "compose"):
+	case strings.HasPrefix(path, ".github/") || strings.HasPrefix(path, "charts/") || path == "Dockerfile" || path == "scripts/docker-smoke.sh" || strings.HasPrefix(path, "compose"):
 		return []string{changeDelivery}, true
 	case strings.HasSuffix(path, ".go") || strings.HasSuffix(path, ".sql") || strings.HasPrefix(path, "cmd/") || strings.HasPrefix(path, "internal/"):
 		return []string{changeBackend}, true

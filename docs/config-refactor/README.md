@@ -29,7 +29,7 @@ This folder is the durable progress ledger for the migration. Update it in the s
 | 4 | Completed | Switch production assembly to parity-proven Viper | `config.Load` uses instance-based Viper through an OS-backed Afero boundary; leading `--config PATH`/`--config=PATH` selection is explicit-only and returns bounded startup errors |
 | 5 | Completed | Normalize `hk` Cobra factories and preserve MCP/JSON contracts | No rewrite required: `hk` already has one factory root, centralized render/envelope handling, deterministic command catalog, and guarded production boundary |
 | 6 | Completed | Project catalog into Docker, Compose, Helm, examples, and docs artifact | Catalog-derived root example plus repository-wide env/default validation covers Dockerfile, Compose, charts, examples, and reader-facing Markdown/YAML |
-| 7 | Pending | Enforce issue #288 container recreation and migration interruption gates | — |
+| 7 | Completed | Enforce issue #288 container recreation and migration interruption gates | Existing self-hosted image smoke now recreates a container on the same named volume and verifies marker/database persistence; full profile pairs it with fault-injected migration resume acceptance |
 | 8 | Pending | GoReleaser artifact parity, then cutover; Homebrew/Scoop-ready layout | — |
 | 9 | Pending | Afero/fileflow/pathologize migration by operation risk | — |
 | 10 | Pending | Flatten `internal/` in dependency-order move-only slices | — |
@@ -47,11 +47,13 @@ This folder is the durable progress ledger for the migration. Update it in the s
 - Filesystem migration separates ordinary injectable reads/writes from native DuckDB/WAL/fsync/lock durability; fileflow never receives Afero-only paths.
 - `internal/appurl` is the leading first move-only leaf candidate; `config`, `database`, and `devtool` move only after their behavioral boundaries stabilize.
 
-## Most recently completed slice: 6
+## Most recently completed slice: 7
 
 ### Test-first work
 
-1. Reused the existing catalog-derived example generator and configuration documentation validator instead of adding a second projection system.
+1. Extended the existing image smoke rather than adding a second Docker harness: a unique named volume survives forced container removal and recreation, then the marker, real database, and healthcheck are verified.
+2. Paired the recreation smoke with the existing opt-in default-tenant fault-boundary resume acceptance in the full profile.
+3. Reused the existing catalog-derived example generator and configuration documentation validator instead of adding a second projection system.
 2. Verified every published `HITKEEP_*` name is catalog-known, Compose-style defaults match runtime defaults unless explicitly justified, and the image data path remains beneath a declared volume.
 3. Audited `hk` before editing and retained its existing factory-built Cobra root, avoiding a behavior-neutral rewrite.
 2. Verified centralized JSON/NDJSON envelopes, invalid-output rejection, command-catalog generation, MCP manifest routing, and production/developer dependency separation.
@@ -95,7 +97,10 @@ Record focused commands as stable test targets or `hk` gate IDs, not pasted succ
 | 2026-08-26 | 4 | Changed QA `20260826T122352-73c142f6` | Passed: `go-format`, `go-fix`, `go-lint`, `go-vet`, `go-staticcheck`, `developer-mcp`, `developer-docs` |
 | 2026-08-26 | 5 | `go test -race ./internal/devtool/cli ./cmd/hk`; structured command catalog and MCP manifest smoke | Passed; existing Cobra factories and machine contracts retained without source changes |
 | 2026-08-26 | 6 | `go test -race ./internal/config ./internal/devtool`; `./hk docs check --output json` | Passed; generated example and Docker/Compose/chart/example/docs drift contracts are current |
+| 2026-08-26 | 7 | `bash -n scripts/docker-smoke.sh`; `go test -race ./internal/devtool` | Passed; gate wiring and bounded recreation contract preflight verified |
+| 2026-08-26 | 7 | Full-profile selected gates `20260826T123333-1282e6d1` | Passed: `default-tenant-migration-acceptance`, `self-hosted-image` (real build, deletion/recreation, persistence) |
+| 2026-08-26 | 7 | Changed QA `20260826T124011-6bb97907` | Passed: `go-format`, `go-fix`, `go-lint`, `go-vet`, `go-staticcheck`, `developer-mcp`, `developer-docs`; Docker smoke path is now classified as delivery |
 
 ## Next update
 
-Add the issue #288 container deletion/recreation and interrupted-migration acceptance gates, reusing the existing image-volume invariant as the fast preflight.
+Add GoReleaser snapshot artifact parity, preserving current binary names, variants, version injection, and sorted SHA-256 manifest before release cutover.

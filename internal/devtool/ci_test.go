@@ -1,6 +1,7 @@
 package devtool
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"os"
@@ -162,6 +163,25 @@ func TestRaceTestArgsUseGateBoundedPackageTimeout(t *testing.T) {
 	want := []string{"go", "test", "-race", "-count=1", "-timeout", "20m", "hitkeep/internal/database"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("race arguments = %v, want %v", got, want)
+	}
+}
+
+func TestSelfHostedImageGateCoversContainerRecreation(t *testing.T) {
+	gate, err := GateByID("self-hosted-image")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(gate.Profiles, "full") || !slices.Contains(gate.Paths, "scripts/docker-smoke.sh") {
+		t.Fatalf("self-hosted image gate is not wired to full recreation coverage: %#v", gate)
+	}
+	raw, err := os.ReadFile(filepath.Join("..", "..", "scripts", "docker-smoke.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{"--recreate", "docker volume create", "docker rm -f", "docker cp", "cmp ", "recreated.db"} {
+		if !bytes.Contains(raw, []byte(required)) {
+			t.Fatalf("docker smoke script is missing recreation contract %q", required)
+		}
 	}
 }
 

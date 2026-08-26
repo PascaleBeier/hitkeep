@@ -70,6 +70,13 @@ func TestExampleConfigurationSelectsBackendAndDocumentationAreas(t *testing.T) {
 	}
 }
 
+func TestDockerSmokeScriptSelectsDeliveryArea(t *testing.T) {
+	areas, known := classifyChangedPath("scripts/docker-smoke.sh")
+	if !known || len(areas) != 1 || areas[0] != changeDelivery {
+		t.Fatalf("areas = %v, known = %t, want delivery", areas, known)
+	}
+}
+
 func TestFrontendManifestsSelectDependencyAndDashboardAreas(t *testing.T) {
 	want := []string{changeDependencies, changeDashboard}
 	for _, path := range []string{"frontend/dashboard/package.json", "frontend/dashboard/package-lock.json"} {

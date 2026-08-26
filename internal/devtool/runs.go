@@ -696,6 +696,8 @@ func (a *App) executeSmoke(ctx context.Context, variantID string, writer io.Writ
 	args := []string{"scripts/docker-smoke.sh", a.localImageRef(variant), variant.ID}
 	if variant.ID == "cloud" {
 		args = append(args, "--cloud")
+	} else {
+		args = append(args, "--recreate")
 	}
 	return a.runCommand(ctx, writer, commandSpec{Args: args})
 }
