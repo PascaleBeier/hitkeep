@@ -17,12 +17,12 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
-	"hitkeep/internal/localization"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
 	serverauth "hitkeep/internal/server/auth"
 	"hitkeep/internal/server/shared"
 	json "hitkeep/jsonapi"
+	"hitkeep/localization"
 )
 
 const (

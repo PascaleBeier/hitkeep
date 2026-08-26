@@ -21,10 +21,10 @@ import (
 	"hitkeep/appurl"
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
-	"hitkeep/internal/localization"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
 	json "hitkeep/jsonapi"
+	"hitkeep/localization"
 )
 
 type handler struct {

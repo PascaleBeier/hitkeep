@@ -34,7 +34,7 @@ This folder is the durable progress ledger for the migration. Update it in the s
 | 7 | Completed | Enforce issue #288 container recreation and migration interruption gates | Existing self-hosted image smoke now recreates a container on the same named volume and verifies marker/database persistence; full profile pairs it with fault-injected migration resume acceptance |
 | 8 | Completed | GoReleaser artifact parity and build cutover; Homebrew/Scoop-ready artifact layout | GoReleaser v2.18.0 snapshots produced all four legacy binary names; existing checksum/verification commands accepted the complete six-file release contract |
 | 9 | Completed | Afero/fileflow/pathologize migration by operation risk | Runtime config already uses injected Afero; the one real cross-filesystem release relocation now uses fileflow; fixed trusted names need no pathologize; database/WAL/fsync/lock operations remain native |
-| 10 | In progress | Flatten `internal/` in dependency-order move-only slices | Pure foundations moved: `internal/appurl` → `appurl`, `internal/exportfmt` → `exportfmt`, `internal/hklog` → `hklog`, `internal/analyticscatalog` → `analyticscatalog`, and `internal/jsonapi` → `jsonapi`; no compatibility shims because Go already prohibited external imports |
+| 10 | In progress | Flatten `internal/` in dependency-order move-only slices | Pure foundations moved: `internal/appurl` → `appurl`, `internal/exportfmt` → `exportfmt`, `internal/hklog` → `hklog`, `internal/analyticscatalog` → `analyticscatalog`, `internal/jsonapi` → `jsonapi`, and `internal/localization` → `localization`; no compatibility shims because Go already prohibited external imports |
 | 11 | Pending | Stabilize, full QA, CI, docs validation, completion audit | — |
 
 ## Completed discovery
@@ -122,6 +122,7 @@ Record focused commands as stable test targets or `hk` gate IDs, not pasted succ
 | 2026-08-26 | 10 | `internal/jsonapi` → `jsonapi` guarded high-fanout package move | Full-module compile and focused race tests passed across commands, AI, database, MCP, every server package, social auth, SSO, takeout, webhook dispatch, and workers; all 160 old imports removed |
 | 2026-08-26 | 4A | Production `config init` and `config validate` | Canonical-byte, exclusive no-overwrite, strict missing/malformed/unknown-key, and sensitive-value redaction tests passed; Gortex-prescribed startup/config race suite passed |
 | 2026-08-26 | 4B | Config command and Viper raw-key hardening | Focused command/config race suite passed; exact fallback, replacement-safe write errors, and pre-normalization underscore/uppercase-key rejection are covered |
+| 2026-08-26 | 10 | `internal/localization` → `localization` guarded pure-leaf move | Passed package/auth race tests plus OSS and `billing`-tag cloud race tests; old import path absent; the package has no filesystem operations and needs neither Afero nor fileflow |
 
 ## Next update
 
