@@ -65,6 +65,7 @@ func main() {
 	verify := flag.Bool("verify", false, "verify the migrated fixture through the candidate HTTP API")
 	verifyImage := flag.Bool("verify-image", false, "verify the pulled previous image identity")
 	verifyStorageFlag := flag.Bool("verify-storage", false, "verify stopped candidate storage after migration")
+	verifyLegacyStorageFlag := flag.Bool("verify-legacy-storage", false, "verify stopped restored pre-split storage")
 	manifestPath := flag.String("manifest", "", "path to release fixture manifest")
 	previousImage := flag.String("previous-image", "", "immutable previous image digest")
 	platform := flag.String("platform", "", "Docker platform for the previous image")
@@ -75,7 +76,7 @@ func main() {
 	flag.Parse()
 
 	selected := 0
-	for _, enabled := range []bool{*seed, *verify, *verifyImage, *verifyStorageFlag} {
+	for _, enabled := range []bool{*seed, *verify, *verifyImage, *verifyStorageFlag, *verifyLegacyStorageFlag} {
 		if enabled {
 			selected++
 		}
@@ -108,6 +109,11 @@ func main() {
 			fatalf("--verify-storage requires --data-path and --metadata")
 		}
 		err = verifyStorage(*dataPath, *metadataPath, entry)
+	case *verifyLegacyStorageFlag:
+		if strings.TrimSpace(*dataPath) == "" || strings.TrimSpace(*metadataPath) == "" {
+			fatalf("--verify-legacy-storage requires --data-path and --metadata")
+		}
+		err = verifyLegacyStorage(*dataPath, *metadataPath)
 	}
 	if err != nil {
 		fatalf("upgrade fixture: %v", err)
@@ -174,6 +180,35 @@ func verifyImageInspection(raw []byte, f fixture) error {
 	}
 	if actual := inspection.Config.Labels["org.opencontainers.image.version"]; actual != f.PreviousVersion {
 		return fmt.Errorf("previous image version = %q, want %q", actual, f.PreviousVersion)
+	}
+	return nil
+}
+
+func verifyLegacyStorage(dataPath, metadataPath string) error {
+	controlPath := filepath.Join(dataPath, "hitkeep.db")
+	if err := verifyRegularFile(controlPath); err != nil {
+		return fmt.Errorf("control database: %w", err)
+	}
+	if _, err := os.Stat(filepath.Join(dataPath, "tenants")); err == nil {
+		return errors.New("legacy storage contains split tenant data")
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("inspect legacy tenant directory: %w", err)
+	}
+	for _, path := range []string{filepath.Join(dataPath, "archive"), filepath.Join(dataPath, "recovery")} {
+		if err := verifyCleanOptionalDirectory(path); err != nil {
+			return err
+		}
+	}
+	metadata, err := loadFileMetadata(metadataPath)
+	if err != nil {
+		return err
+	}
+	actual, ok := metadata["data/hitkeep.db"]
+	if !ok {
+		return errors.New("tar metadata omitted \"data/hitkeep.db\"")
+	}
+	if actual.UID != 65532 || actual.GID != 65532 || actual.Mode != 0644 {
+		return fmt.Errorf("data/hitkeep.db ownership/mode = %d:%d:%#o, want 65532:65532:0644", actual.UID, actual.GID, actual.Mode)
 	}
 	return nil
 }

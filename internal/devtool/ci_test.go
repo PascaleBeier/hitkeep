@@ -201,10 +201,22 @@ func TestSelfHostedImageGateCoversContainerRecreation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, required := range []string{"--recreate", "HITKEEP_PREVIOUS_IMAGE", "@sha256:", "docker volume create", "docker pull --platform \"$platform\"", "docker stop -t 15", "release-fixtures.json", "upgrade-fixture", "--platform \"$platform\"", "fixture --verify-image", "fixture --verify-storage", "fixture --seed", "fixture --verify", "verify_stopped_storage", "start_container \"$image\""} {
+	for _, required := range []string{"--recreate", "HITKEEP_PREVIOUS_IMAGE", "@sha256:", "docker volume create", "docker pull --platform \"$platform\"", "docker stop -t 15", "release-fixtures.json", "upgrade-fixture", "--platform \"$platform\"", "fixture --verify-image", "fixture --verify-storage", "fixture --verify-legacy-storage", "fixture --seed", "fixture --verify", "verify_stopped_storage", "verify_legacy_stopped_storage", "snapshot_volume()", "restore_snapshot()", "type=volume,src=$volume,dst=/source,readonly", "type=volume,src=$rollback_volume,dst=/target", "start_container \"$previous_image\" \"$rollback_volume\"", "start_container \"$image\""} {
 		if !bytes.Contains(raw, []byte(required)) {
 			t.Fatalf("docker smoke script is missing recreation contract %q", required)
 		}
+	}
+	rollbackStart := bytes.Index(raw, []byte(`start_container "$previous_image" "$rollback_volume"`))
+	if rollbackStart < 0 {
+		t.Fatal("docker smoke does not start the restored volume with the historical image")
+	}
+	candidateStart := bytes.Index(raw[rollbackStart:], []byte(`start_container "$image"`))
+	if candidateStart < 0 {
+		t.Fatal("docker smoke does not resume the candidate volume after rollback verification")
+	}
+	rollback := raw[rollbackStart : rollbackStart+candidateStart]
+	if bytes.Count(rollback, []byte("verify_legacy_stopped_storage")) != 1 || bytes.Contains(rollback, []byte("verify_stopped_storage")) {
+		t.Fatal("restored legacy volume must use only the legacy stopped-storage verifier")
 	}
 	if bytes.Contains(raw, []byte("remove_container() {\n  docker rm -f")) || bytes.Contains(raw, []byte("verify_stopped_storage() {\n  docker rm -f")) {
 		t.Fatal("docker smoke normal recreation lifecycle must not force-remove containers")
