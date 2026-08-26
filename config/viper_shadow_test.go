@@ -137,8 +137,13 @@ func TestViperShadowCatalogEnvironmentAndFlagParity(t *testing.T) {
 
 			emptyEnv := cloneEnv(baseEnv)
 			emptyEnv[setting.Environment] = ""
-			empty, _ := loadViperShadowParity(t, args, emptyEnv)
-			assertSameConfigSetting(t, setting, empty, absent)
+			var empty *Config
+			if hasGeneratedValue(setting) {
+				empty, _ = loadViperShadowParity(t, args, emptyEnv, setting.Field)
+			} else {
+				empty, _ = loadViperShadowParity(t, args, emptyEnv)
+				assertSameConfigSetting(t, setting, empty, absent)
+			}
 
 			envValue := alternateConfigValue(t, setting, absent)
 			configuredEnv := cloneEnv(baseEnv)
@@ -180,6 +185,22 @@ func TestViperShadowCatalogEnvironmentAndFlagParity(t *testing.T) {
 				assertConfigSetting(t, setting, canonicalThenDeprecated, aliasValue)
 			}
 		})
+	}
+}
+
+func TestViperShadowRedactsInvalidMCPDocsURL(t *testing.T) {
+	const invalidURL = "not-a-valid-url"
+	_, env := catalogParityInputs(ConfigurationSetting{})
+	env["HITKEEP_MCP_DOCS_URL"] = invalidURL
+	conf, log := loadViperShadowParity(t, nil, env)
+	if conf.MCPDocsURL != "https://hitkeep.com" {
+		t.Fatalf("invalid MCP docs URL = %q, want default", conf.MCPDocsURL)
+	}
+	if !strings.Contains(log, "Invalid MCP docs URL, using default") {
+		t.Fatalf("missing invalid MCP docs URL warning: %q", log)
+	}
+	if strings.Contains(log, invalidURL) {
+		t.Fatalf("invalid MCP docs URL leaked into warning: %q", log)
 	}
 }
 
@@ -307,7 +328,7 @@ func TestViperShadowLoadsEveryCatalogType(t *testing.T) {
 	}
 }
 
-func loadViperShadowParity(t *testing.T, args []string, env map[string]string) (*Config, string) {
+func loadViperShadowParity(t *testing.T, args []string, env map[string]string, generatedFields ...string) (*Config, string) {
 	t.Helper()
 	getEnv := mapEnv(env)
 	var legacyLog, shadowLog bytes.Buffer
@@ -322,7 +343,17 @@ func loadViperShadowParity(t *testing.T, args []string, env map[string]string) (
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(shadow, legacy) {
+	legacyComparable, shadowComparable := *legacy, *shadow
+	for _, name := range generatedFields {
+		legacyField := configField(t, name, &legacyComparable)
+		shadowField := configField(t, name, &shadowComparable)
+		if legacyField.String() == "" || shadowField.String() == "" {
+			t.Fatalf("generated %s is empty", name)
+		}
+		legacyField.SetZero()
+		shadowField.SetZero()
+	}
+	if !reflect.DeepEqual(&shadowComparable, &legacyComparable) {
 		t.Fatalf("shadow config differs from legacy\nshadow: %#v\nlegacy: %#v", shadow, legacy)
 	}
 	if shadowLog.String() != legacyLog.String() {
@@ -332,18 +363,19 @@ func loadViperShadowParity(t *testing.T, args []string, env map[string]string) (
 }
 
 func catalogParityInputs(setting ConfigurationSetting) ([]string, map[string]string) {
-	if setting.Field != "Healthcheck" {
-		return []string{"--healthcheck"}, nil
-	}
-	return nil, map[string]string{
+	env := map[string]string{
 		"HITKEEP_JWT_SECRET":          "fixed-secret",
 		"HITKEEP_NODE_NAME":           "fixed-node",
 		"HITKEEP_DUCKDB_MEMORY_LIMIT": "none",
 		"HITKEEP_DUCKDB_THREADS":      "2",
 		"HITKEEP_TRUSTED_PROXIES":     "127.0.0.1/32",
-		"HITKEEP_MCP_DOCS_URL":        "https://example.com/",
+		"HITKEEP_MCP_DOCS_URL":        "https://example.com",
 		"HITKEEP_DB_RECOVERY_PATH":    "/recovery",
 	}
+	if setting.Field != "JWTSecret" && setting.Field != "NodeName" {
+		delete(env, setting.Environment)
+	}
+	return nil, env
 }
 
 func cloneEnv(values map[string]string) map[string]string {
@@ -356,14 +388,37 @@ func cloneEnv(values map[string]string) map[string]string {
 
 func canonicalFlag(t *testing.T, setting ConfigurationSetting) string {
 	t.Helper()
-	if setting.Environment != "" {
-		return strings.ToLower(strings.ReplaceAll(strings.TrimPrefix(setting.Environment, "HITKEEP_"), "_", "-"))
-	}
-	field, ok := reflect.TypeOf(Config{}).FieldByName(setting.Field)
-	if !ok || field.Tag.Get("flag") == "" {
+	if setting.Flag == "" {
 		t.Fatalf("catalog field %q has no canonical flag", setting.Field)
 	}
-	return field.Tag.Get("flag")
+	return setting.Flag
+}
+
+var exceptionalViperParityStringValues = map[string][]string{
+	"HTTPAddr":                       {":8181", ":8282"},
+	"BindAddr":                       {"127.0.0.1:7946", "127.0.0.1:7947"},
+	"JoinAddr":                       {"127.0.0.1:7948", "127.0.0.1:7949"},
+	"NodeName":                       {"parity-node", "parity-node-next"},
+	"DuckDBMemoryLimit":              {"1024MiB", "2048MiB"},
+	"DBRecoveryPath":                 {"/parity-recovery", "/parity-recovery-next"},
+	"DataPath":                       {"parity-data", "parity-data-next"},
+	"ArchivePath":                    {"parity-archive", "parity-archive-next"},
+	"PublicURL":                      {"https://parity.example", "https://next.parity.example"},
+	"LogLevel":                       {"debug", "warn"},
+	"TrustedProxies":                 {"127.0.0.1/32", "10.0.0.0/8"},
+	"NSQTCPAddress":                  {"127.0.0.1:4150", "127.0.0.1:4250"},
+	"NSQHTTPAddress":                 {"127.0.0.1:4151", "127.0.0.1:4251"},
+	"SocialMicrosoftTenant":          {"organizations", "consumers"},
+	"SpamFilterPath":                 {"parity-spam-filter.json", "parity-spam-filter-next.json"},
+	"GoogleSearchConsoleRedirectURL": {"https://parity.example/callback", "https://next.parity.example/callback"},
+	"BackupPath":                     {"parity-backups", "parity-backups-next"},
+	"S3Endpoint":                     {"https://s3.parity.example", "https://s3-next.parity.example"},
+	"S3URLStyle":                     {"path", "vhost"},
+	"MCPPath":                        {"/mcp-parity", "/mcp-parity-next"},
+	"MCPDocsURL":                     {"https://docs.parity.example", "https://docs-next.parity.example"},
+	"CustomTrackingDNSTarget":        {"tracking.parity.example", "tracking-next.parity.example"},
+	"CustomTrackingTLSMode":          {"external", "caddy-on-demand"},
+	"AIBaseURL":                      {"https://ai.parity.example", "https://ai-next.parity.example"},
 }
 
 func alternateConfigValue(t *testing.T, setting ConfigurationSetting, conf *Config) string {
@@ -371,10 +426,16 @@ func alternateConfigValue(t *testing.T, setting ConfigurationSetting, conf *Conf
 	field := configSettingValue(t, setting, conf)
 	switch setting.Type {
 	case "string":
-		if field.String() == "configured-viper-parity" {
-			return "configured-viper-parity-next"
+		values := exceptionalViperParityStringValues[setting.Field]
+		if len(values) == 0 {
+			values = []string{"configured-viper-parity", "configured-viper-parity-next"}
 		}
-		return "configured-viper-parity"
+		for _, value := range values {
+			if field.String() != value {
+				return value
+			}
+		}
+		t.Fatalf("no alternate test value for %s", setting.Field)
 	case "integer":
 		if field.Int() == 42 {
 			return "43"
@@ -389,8 +450,8 @@ func alternateConfigValue(t *testing.T, setting ConfigurationSetting, conf *Conf
 		return "12.5"
 	default:
 		t.Fatalf("unsupported catalog type %q", setting.Type)
-		return ""
 	}
+	return ""
 }
 
 func assertConfigSetting(t *testing.T, setting ConfigurationSetting, conf *Config, want string) {
@@ -437,11 +498,20 @@ func assertSameConfigSetting(t *testing.T, setting ConfigurationSetting, got, wa
 	}
 }
 
+func hasGeneratedValue(setting ConfigurationSetting) bool {
+	return setting.Field == "JWTSecret" || setting.Field == "NodeName"
+}
+
 func configSettingValue(t *testing.T, setting ConfigurationSetting, conf *Config) reflect.Value {
 	t.Helper()
-	field := reflect.ValueOf(conf).Elem().FieldByName(setting.Field)
+	return configField(t, setting.Field, conf)
+}
+
+func configField(t *testing.T, name string, conf *Config) reflect.Value {
+	t.Helper()
+	field := reflect.ValueOf(conf).Elem().FieldByName(name)
 	if !field.IsValid() {
-		t.Fatalf("catalog field %q does not exist", setting.Field)
+		t.Fatalf("config field %q does not exist", name)
 	}
 	return field
 }
