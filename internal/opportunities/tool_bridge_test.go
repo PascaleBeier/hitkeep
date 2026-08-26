@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/internal/analyticscatalog"
+	"hitkeep/analyticscatalog"
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
 	"hitkeep/internal/database"

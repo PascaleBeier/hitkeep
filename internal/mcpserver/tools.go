@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"hitkeep/internal/analyticscatalog"
+	"hitkeep/analyticscatalog"
 	"hitkeep/internal/analyticstools"
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
