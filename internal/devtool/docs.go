@@ -60,6 +60,7 @@ func (needs *workflowNeeds) UnmarshalYAML(value *yaml.Node) error {
 
 type workflowStep struct {
 	Name string            `yaml:"name"`
+	Run  string            `yaml:"run"`
 	Env  map[string]string `yaml:"env"`
 	With map[string]string `yaml:"with"`
 }
@@ -80,9 +81,10 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 	}
 	for job, required := range map[string][]string{
 		"build-release":          {"release-please"},
+		"upgrade-from-v2-12":     {"build-release"},
 		"publish-helm":           {"build-release"},
 		"verify-tracker-package": {"build-release"},
-		"finalize-release":       {"release-please", "build-release", "publish-helm", "verify-tracker-package"},
+		"finalize-release":       {"release-please", "build-release", "upgrade-from-v2-12", "publish-helm", "verify-tracker-package"},
 		"sync-docs-release":      {"finalize-release"},
 		"deploy-cloud":           {"finalize-release"},
 	} {
@@ -96,6 +98,20 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 			}
 		}
 	}
+	upgradeSmoke := false
+	for _, step := range workflow.Jobs["upgrade-from-v2-12"].Steps {
+		if step.Name == "Smoke upgrade from supported floor" &&
+			strings.Contains(step.Run, "tests/fixtures/release-fixtures.json") &&
+			strings.Contains(step.Run, "2.12.0") &&
+			strings.Contains(step.Env["CANDIDATE_DIGEST"], "needs.build-release.outputs.image_digest") &&
+			strings.Contains(step.Run, "./scripts/docker-smoke.sh") {
+			upgradeSmoke = true
+		}
+	}
+	if !upgradeSmoke {
+		return fmt.Errorf("release workflow upgrade-from-v2-12 must smoke the v2.12.0 fixture against the candidate digest")
+	}
+
 	finalizer := workflow.Jobs["finalize-release"]
 	for _, step := range finalizer.Steps {
 		for _, values := range []map[string]string{step.Env, step.With} {
