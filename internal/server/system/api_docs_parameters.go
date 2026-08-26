@@ -1,6 +1,6 @@
 package system
 
-import "hitkeep/internal/exportfmt"
+import "hitkeep/exportfmt"
 
 func openAPIV1Parameters() map[string]any {
 	return map[string]any{
