@@ -110,7 +110,9 @@ func TestGoReleaserBranchArchiveWorkflowContract(t *testing.T) {
 		"HITKEEP_ARCHIVE_VERSION=\"${RELEASE_TAG_NAME#v}\"",
 		"runner.temp",
 		"runner.temp }}/public-assets",
-		"go version -m \"$binary\"",
+		"build_metadata=\"$(go version -m \"$binary\")\"",
+		"binary build metadata is missing expected HitKeep version",
+		"grep -E '^[[:space:]]*(path|build.*(-ldflags|GOOS|GOARCH))'",
 		"\"$binary\" --version",
 	} {
 		if !strings.Contains(workflow, want) {

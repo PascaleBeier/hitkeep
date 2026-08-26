@@ -313,7 +313,12 @@ jobs:
             binary_dir="$(mktemp -d)"
             tar -xzf "$archive" -C "$binary_dir" "hitkeep-linux-${arch}"
             binary="$binary_dir/hitkeep-linux-${arch}"
-            go version -m "$binary" | grep -F "hitkeep/cmd.Version=${HITKEEP_VERSION}"
+            build_metadata="$(go version -m "$binary")"
+            if ! grep -Fq "hitkeep/cmd.Version=${HITKEEP_VERSION}" <<<"$build_metadata"; then
+              echo "binary build metadata is missing expected HitKeep version: ${HITKEEP_VERSION}" >&2
+              printf '%s\n' "$build_metadata" | grep -E '^[[:space:]]*(path|build.*(-ldflags|GOOS|GOARCH))' >&2 || true
+              exit 1
+            fi
             if [[ "$arch" == "amd64" ]]; then
               "$binary" --version | grep -F "$HITKEEP_VERSION"
             fi
