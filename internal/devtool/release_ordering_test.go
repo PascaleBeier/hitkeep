@@ -25,6 +25,10 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
     needs: build-release
   verify-tracker-package:
     needs: build-release
+    steps:
+      - name: Pack verified tracker artifact
+        run: npm pack --json
+      - name: Upload verified tracker artifact
   link-release-blog:
     needs: release-please
   finalize-release:
@@ -35,7 +39,12 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
       - publish-helm
       - verify-tracker-package
     steps:
+      - name: Download verified tracker artifact
       - name: Publish immutable tracker candidate
+        run: |
+          integrity="$(openssl dgst -sha512 -binary \"$tarball\")"
+          npm publish "$tarball"
+          npm view @hitkeep/tracker dist.integrity
       - name: Promote tracker latest dist-tag
       - name: Promote immutable image to mutable tags
       - name: Publish draft GitHub release
@@ -63,12 +72,19 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
 		t.Fatal("validateReleaseWorkflowGraph() accepted an upgrade job that does not invoke the smoke fixture")
 	}
 
+	missingTrackerArtifact := strings.Replace(workflow, "      - name: Download verified tracker artifact\n", "", 1)
+	if err := validateReleaseWorkflowGraph([]byte(missingTrackerArtifact)); err == nil {
+		t.Fatal("validateReleaseWorkflowGraph() accepted a finalizer without the verified tracker artifact")
+	}
+
 	earlyPublish := strings.Replace(workflow, "      - name: Promote immutable image to mutable tags\n      - name: Publish draft GitHub release", "      - name: Publish draft GitHub release\n      - name: Promote immutable image to mutable tags", 1)
 	if err := validateReleaseWorkflowGraph([]byte(earlyPublish)); err == nil {
 		t.Fatal("validateReleaseWorkflowGraph() accepted a draft publication before mutable tag promotion")
 	}
 
-	latestBeforeCandidate := strings.Replace(workflow, "      - name: Publish immutable tracker candidate\n      - name: Promote tracker latest dist-tag", "      - name: Promote tracker latest dist-tag\n      - name: Publish immutable tracker candidate", 1)
+	latestBeforeCandidate := strings.Replace(workflow, "      - name: Publish immutable tracker candidate", "      - name: candidate-placeholder", 1)
+	latestBeforeCandidate = strings.Replace(latestBeforeCandidate, "      - name: Promote tracker latest dist-tag", "      - name: Publish immutable tracker candidate", 1)
+	latestBeforeCandidate = strings.Replace(latestBeforeCandidate, "      - name: candidate-placeholder", "      - name: Promote tracker latest dist-tag", 1)
 	if err := validateReleaseWorkflowGraph([]byte(latestBeforeCandidate)); err == nil {
 		t.Fatal("validateReleaseWorkflowGraph() accepted a latest dist-tag promotion before retry-safe candidate publication")
 	}

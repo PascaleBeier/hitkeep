@@ -169,6 +169,10 @@ jobs:
     needs: build-release
   verify-tracker-package:
     needs: build-release
+    steps:
+      - name: Pack verified tracker artifact
+        run: npm pack --json
+      - name: Upload verified tracker artifact
   finalize-release:
     needs:
       - release-please
@@ -177,7 +181,12 @@ jobs:
       - publish-helm
       - verify-tracker-package
     steps:
+      - name: Download verified tracker artifact
       - name: Publish immutable tracker candidate
+        run: |
+          integrity="$(openssl dgst -sha512 -binary \"$tarball\")"
+          npm publish "$tarball"
+          npm view @hitkeep/tracker dist.integrity
       - name: Promote tracker latest dist-tag
       - name: Promote immutable image to mutable tags
       - name: Publish draft GitHub release

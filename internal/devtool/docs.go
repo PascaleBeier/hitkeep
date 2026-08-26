@@ -112,7 +112,31 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 		return fmt.Errorf("release workflow upgrade-from-v2-12 must smoke the v2.12.0 fixture against the candidate digest")
 	}
 
+	trackerArtifact := map[string]bool{}
+	for _, step := range workflow.Jobs["verify-tracker-package"].Steps {
+		trackerArtifact[step.Name] = true
+	}
+	if !trackerArtifact["Pack verified tracker artifact"] || !trackerArtifact["Upload verified tracker artifact"] {
+		return fmt.Errorf("release workflow verify-tracker-package must pack and upload the verified tracker artifact")
+	}
+
 	finalizer := workflow.Jobs["finalize-release"]
+	trackerDownload := false
+	trackerPublish := false
+	for _, step := range finalizer.Steps {
+		if step.Name == "Download verified tracker artifact" {
+			trackerDownload = true
+		}
+		if step.Name == "Publish immutable tracker candidate" &&
+			strings.Contains(step.Run, "npm publish \"$tarball\"") &&
+			strings.Contains(step.Run, "dist.integrity") &&
+			strings.Contains(step.Run, "openssl dgst -sha512") {
+			trackerPublish = true
+		}
+	}
+	if !trackerDownload || !trackerPublish {
+		return fmt.Errorf("release workflow finalizer must publish the verified tracker artifact with npm integrity verification")
+	}
 	for _, step := range finalizer.Steps {
 		for _, values := range []map[string]string{step.Env, step.With} {
 			for _, value := range values {
@@ -133,15 +157,17 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 		"Publish draft GitHub release",
 	}
 	previous := -1
+	previousName := ""
 	for _, name := range orderedSteps {
 		position, ok := positions[name]
 		if !ok {
 			return fmt.Errorf("release workflow finalizer is missing step %q", name)
 		}
 		if position <= previous {
-			return fmt.Errorf("release workflow finalizer must run %q before %q", orderedSteps[previous], name)
+			return fmt.Errorf("release workflow finalizer must run %q before %q", previousName, name)
 		}
 		previous = position
+		previousName = name
 	}
 	return nil
 }

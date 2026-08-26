@@ -233,6 +233,25 @@ jobs:
             exit 1
           fi
 
+      - name: Pack verified tracker artifact
+        working-directory: frontend/tracker
+        shell: bash
+        run: |
+          set -euo pipefail
+          metadata="$(npm pack --json)"
+          tarball="$(jq -r '.[0].filename' <<< "$metadata")"
+          test -n "$tarball"
+          test -f "$tarball"
+          mv "$tarball" verified-tracker.tgz
+
+      - name: Upload verified tracker artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tracker-package-${{ needs.release-please.outputs.version }}
+          path: frontend/tracker/verified-tracker.tgz
+          retention-days: 5
+          compression-level: 0
+
   finalize-release:
     name: Promote and publish release
     needs:
@@ -255,22 +274,35 @@ jobs:
 
       - uses: ./.github/actions/setup-node-npm
 
+      - name: Download verified tracker artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: tracker-package-${{ needs.release-please.outputs.version }}
+          path: tracker-package
+
       - name: Publish immutable tracker candidate
-        working-directory: frontend/tracker
         env:
           VERSION: ${{ needs.release-please.outputs.version }}
         shell: bash
         run: |
           set -euo pipefail
-          existing="$(npm view "@hitkeep/tracker@${VERSION}" version 2>/dev/null || true)"
-          if [[ "$existing" != "$VERSION" ]]; then
-            npm publish --tag "release-${VERSION}"
-            existing="$(npm view "@hitkeep/tracker@${VERSION}" version)"
+          tarball="tracker-package/verified-tracker.tgz"
+          test -f "$tarball"
+          integrity="sha512-$(openssl dgst -sha512 -binary "$tarball" | base64 | tr -d '\n')"
+          existing="$(npm view "@hitkeep/tracker@${VERSION}" dist.integrity 2>/dev/null || true)"
+          if [[ -z "$existing" ]]; then
+            if ! npm publish "$tarball" --tag "release-${VERSION}"; then
+              existing="$(npm view "@hitkeep/tracker@${VERSION}" dist.integrity 2>/dev/null || true)"
+            else
+              existing="$(npm view "@hitkeep/tracker@${VERSION}" dist.integrity)"
+            fi
           fi
-          test "$existing" = "$VERSION"
+          if [[ "$existing" != "$integrity" ]]; then
+            echo "published @hitkeep/tracker@${VERSION} does not match the verified artifact" >&2
+            exit 1
+          fi
 
       - name: Promote tracker latest dist-tag
-        working-directory: frontend/tracker
         env:
           VERSION: ${{ needs.release-please.outputs.version }}
         run: npm dist-tag add "@hitkeep/tracker@${VERSION}" latest
