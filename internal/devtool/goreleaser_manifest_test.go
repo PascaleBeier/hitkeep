@@ -66,7 +66,7 @@ func TestGoReleaserReleaseWorkflowContract(t *testing.T) {
 		"build-release-archives:",
 		"runs-on: ubuntu-22.04",
 		"gcc-aarch64-linux-gnu g++-aarch64-linux-gnu",
-		"goreleaser/v2@v2.18.0 release",
+		"release_args=(release --clean --skip=publish --config .goreleaser.yaml)",
 		"--clean",
 		"--skip=publish",
 		"sha256sum --check goreleaser-SHA256SUMS",
@@ -80,6 +80,29 @@ func TestGoReleaserReleaseWorkflowContract(t *testing.T) {
 	} {
 		if !strings.Contains(workflow, want) {
 			t.Errorf("release workflow missing %q", want)
+		}
+	}
+}
+
+func TestGoReleaserBranchArchiveWorkflowContract(t *testing.T) {
+	path := filepath.Join("..", "..", ".github", "workflows", "pipeline.yml")
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workflow := string(contents)
+	for _, want := range []string{
+		"if: ${{ !cancelled() }}",
+		"fetch-depth: 0",
+		"ref: ${{ inputs.release_tag_name || inputs.checkout_ref || github.sha }}",
+		"git rev-parse --verify \"refs/tags/${RELEASE_TAG_NAME}^{commit}\"",
+		"--snapshot",
+		"runner.temp",
+		"go version -m \"$binary\"",
+		"\"$binary\" --version",
+	} {
+		if !strings.Contains(workflow, want) {
+			t.Errorf("branch archive workflow missing %q", want)
 		}
 	}
 }
