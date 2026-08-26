@@ -122,9 +122,27 @@ func TestViperShadowMatchesLegacyLoader(t *testing.T) {
 }
 
 func TestViperShadowCatalogEnvironmentAndFlagParity(t *testing.T) {
+	cloudSettings := 0
 	for _, setting := range Catalog().Settings {
-		if setting.CloudOnly && !includeCloudConfigFields() {
-			continue
+		if setting.CloudOnly {
+			cloudSettings++
+			if !includeCloudConfigFields() {
+				t.Run(setting.Field+" self-hosted ignored", func(t *testing.T) {
+					if setting.Environment == "" {
+						t.Fatalf("cloud-only catalog field %q has no environment variable", setting.Field)
+					}
+					args, baseEnv := catalogParityInputs(setting)
+					absent, _ := loadViperShadowParity(t, args, baseEnv)
+					value := alternateConfigValue(t, setting, absent)
+					configuredEnv := cloneEnv(baseEnv)
+					configuredEnv[setting.Environment] = value
+					ignoredEnv, _ := loadViperShadowParity(t, args, configuredEnv)
+					assertSameConfigSetting(t, setting, ignoredEnv, absent)
+					ignoredFlag, _ := loadViperShadowParity(t, append(args, "--"+canonicalFlag(t, setting)+"="+value), configuredEnv)
+					assertSameConfigSetting(t, setting, ignoredFlag, absent)
+				})
+				continue
+			}
 		}
 		t.Run(setting.Field, func(t *testing.T) {
 			args, baseEnv := catalogParityInputs(setting)
@@ -186,6 +204,9 @@ func TestViperShadowCatalogEnvironmentAndFlagParity(t *testing.T) {
 				assertConfigSetting(t, setting, canonicalThenDeprecated, aliasValue)
 			}
 		})
+	}
+	if includeCloudConfigFields() && cloudSettings == 0 {
+		t.Fatal("cloud build has no cloud-only configuration descriptors")
 	}
 }
 
