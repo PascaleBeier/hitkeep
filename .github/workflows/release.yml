@@ -162,7 +162,6 @@ jobs:
           HITKEEP_PREVIOUS_IMAGE: ${{ steps.fixture.outputs.previous }}
           HITKEEP_PREVIOUS_CHART: ${{ steps.fixture.outputs.previous_chart }}
           HITKEEP_PREVIOUS_CHART_DIGEST: ${{ steps.fixture.outputs.previous_chart_digest }}
-          GHCR_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -176,7 +175,6 @@ jobs:
           candidate_chart="$chart_dir/hitkeep-${CANDIDATE_VERSION}.tgz"
           test -f "$candidate_chart"
 
-          printf '%s' "$GHCR_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
           previous_output="$(helm pull "$HITKEEP_PREVIOUS_CHART" --version 2.12.0 --destination "$chart_dir" 2>&1)"
           printf '%s\n' "$previous_output"
           grep -Fqx "Digest: $HITKEEP_PREVIOUS_CHART_DIGEST" <<< "$previous_output"

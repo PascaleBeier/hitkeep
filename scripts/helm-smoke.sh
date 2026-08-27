@@ -52,7 +52,7 @@ fi
 
 platform="linux/$(docker image inspect "$image" --format '{{.Architecture}}')"
 docker pull --platform "$platform" "$previous_image" >/dev/null
-kind load docker-image --name "$kind_cluster" "$image" "$previous_image"
+kind load docker-image --name "$kind_cluster" "$image"
 fixture --verify-image --manifest "$fixture_manifest" --previous-image "$previous_image" --platform "$platform" --image "$previous_image"
 
 for selected_image in "$image" "$previous_image"; do
