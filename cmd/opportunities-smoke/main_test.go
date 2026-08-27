@@ -155,21 +155,93 @@ func TestSmokeCommandEnvironmentValues(t *testing.T) {
 
 func TestSmokeCommandHelpAndValidation(t *testing.T) {
 	stdout := new(bytes.Buffer)
-	if code := executeSmoke(t.Context(), []string{"--help"}, stdout, new(bytes.Buffer), runSmoke); code != 0 {
+	stderr := new(bytes.Buffer)
+	if code := executeSmoke(t.Context(), []string{"--help"}, stdout, stderr, runSmoke); code != 0 {
 		t.Fatalf("help exit code = %d, want 0", code)
 	}
+	if stdout.Len() != 0 {
+		t.Fatalf("help stdout = %q, want empty", stdout.String())
+	}
 	for _, want := range []string{"--db string", "--provider string", "--window-days int"} {
-		if !strings.Contains(stdout.String(), want) {
-			t.Errorf("help output missing %q: %s", want, stdout.String())
+		if !strings.Contains(stderr.String(), want) {
+			t.Errorf("help output missing %q: %s", want, stderr.String())
 		}
 	}
 
-	stderr := new(bytes.Buffer)
+	stderr.Reset()
 	if code := executeSmoke(t.Context(), nil, new(bytes.Buffer), stderr, runSmoke); code != 1 {
 		t.Fatalf("missing db exit code = %d, want 1", code)
 	}
 	if got := stderr.String(); !strings.Contains(got, "-db is required") || strings.Contains(got, "Usage:") {
 		t.Fatalf("validation stderr = %q", got)
+	}
+}
+
+func TestSmokeCommandLegacyParseBoundary(t *testing.T) {
+	tests := []struct {
+		name       string
+		args       []string
+		wantCode   int
+		wantStdout string
+		wantUsage  bool
+	}{
+		{name: "short help", args: []string{"-h"}, wantCode: 0, wantUsage: true},
+		{name: "long help", args: []string{"--help"}, wantCode: 0, wantUsage: true},
+		{name: "unknown flag", args: []string{"-unknown"}, wantCode: 2, wantUsage: true},
+		{name: "invalid integer", args: []string{"-window-days=not-a-number"}, wantCode: 2, wantUsage: true},
+		{name: "invalid boolean", args: []string{"-ai=not-a-bool"}, wantCode: 2, wantUsage: true},
+		{name: "runtime failure", args: []string{"-db", "restored.db", "-out", filepath.Join(t.TempDir(), "report.md")}, wantCode: 1},
+		{name: "release not ready", args: []string{"-db", "restored.db", "-out", filepath.Join(t.TempDir(), "not-ready.md")}, wantCode: 2, wantStdout: "not-ready.md\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stdout := new(bytes.Buffer)
+			stderr := new(bytes.Buffer)
+			code := executeSmoke(t.Context(), tt.args, stdout, stderr, func(_ context.Context, _ smokeConfig) (smokegate.Report, error) {
+				if tt.name == "runtime failure" {
+					return smokegate.Report{}, errors.New("runtime failure")
+				}
+				return smokegate.Report{}, nil
+			})
+			if code != tt.wantCode {
+				t.Fatalf("exit code = %d, want %d", code, tt.wantCode)
+			}
+			if tt.wantUsage != strings.Contains(stderr.String(), "Usage") {
+				t.Fatalf("stderr usage = %q, want usage=%t", stderr.String(), tt.wantUsage)
+			}
+			if tt.wantUsage && stdout.Len() != 0 {
+				t.Fatalf("syntax stdout = %q, want empty", stdout.String())
+			}
+			if tt.name == "runtime failure" && (strings.Contains(stderr.String(), "Usage") || stderr.String() != "runtime failure\n") {
+				t.Fatalf("runtime stderr = %q", stderr.String())
+			}
+			if tt.wantStdout != "" && !strings.HasSuffix(stdout.String(), tt.wantStdout) {
+				t.Fatalf("stdout = %q, want suffix %q", stdout.String(), tt.wantStdout)
+			}
+		})
+	}
+}
+
+func TestSmokeCommandUsesCanonicalCatalogAIEnvironmentMetadata(t *testing.T) {
+	for _, binding := range smokeCatalogBindings {
+		setting := smokeCatalogSetting(binding.field)
+		if setting.Environment == "" {
+			t.Fatalf("catalog setting %s has no environment variable", binding.field)
+		}
+	}
+	apiKey := smokeCatalogSetting("AIAPIKey")
+	if apiKey.Default != "" || apiKey.Sensitive != "redact" {
+		t.Fatalf("AI API key catalog metadata = %+v", apiKey)
+	}
+
+	t.Setenv(smokeCatalogSetting("AIProvider").Environment, "catalog-provider")
+	var got smokeConfig
+	code := executeSmoke(t.Context(), []string{"-db", "restored.db", "-out", filepath.Join(t.TempDir(), "report.md")}, new(bytes.Buffer), new(bytes.Buffer), func(_ context.Context, conf smokeConfig) (smokegate.Report, error) {
+		got = conf
+		return smokegate.Report{}, nil
+	})
+	if code != 2 || got.Provider != "catalog-provider" {
+		t.Fatalf("catalog environment binding result = code %d, config %+v", code, got)
 	}
 }
 

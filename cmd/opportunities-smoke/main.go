@@ -14,8 +14,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	"hitkeep/config"
 	hitai "hitkeep/internal/ai"
 	"hitkeep/internal/auth"
 	"hitkeep/internal/database"
@@ -56,6 +58,10 @@ func main() {
 	os.Exit(executeSmoke(ctx, os.Args[1:], os.Stdout, os.Stderr, runSmoke))
 }
 
+type smokeSyntaxError struct{ err error }
+
+func (e *smokeSyntaxError) Error() string { return e.err.Error() }
+
 func executeSmoke(ctx context.Context, args []string, stdout, stderr io.Writer, run smokeRunner) int {
 	cmd := newSmokeCommand(run)
 	cmd.SetArgs(normalizeLegacySmokeArgs(args))
@@ -65,14 +71,24 @@ func executeSmoke(ctx context.Context, args []string, stdout, stderr io.Writer, 
 		if errors.Is(err, errSmokeNotReleaseReady) {
 			return 2
 		}
+		var syntaxError *smokeSyntaxError
+		if errors.As(err, &syntaxError) {
+			fmt.Fprintln(stderr, syntaxError)
+			writeSmokeUsage(stderr, cmd)
+			return 2
+		}
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
 	return 0
 }
 
+func writeSmokeUsage(stderr io.Writer, cmd *cobra.Command) {
+	fmt.Fprint(stderr, cmd.UsageString())
+}
+
 func newSmokeCommand(run smokeRunner) *cobra.Command {
-	v := newSmokeViper()
+	var v *viper.Viper
 	cmd := &cobra.Command{
 		Use:           "opportunities-smoke",
 		Short:         "Run the opportunities release smoke gate",
@@ -97,6 +113,12 @@ func newSmokeCommand(run smokeRunner) *cobra.Command {
 			return nil
 		},
 	}
+	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
+		return &smokeSyntaxError{err: err}
+	})
+	cmd.SetHelpFunc(func(cmd *cobra.Command, _ []string) {
+		writeSmokeUsage(cmd.ErrOrStderr(), cmd)
+	})
 	flags := cmd.Flags()
 	flags.String("db", "", "restored shared HitKeep database path")
 	flags.String("out", "tmp/prod-eu-opportunities-smoke/release-hardening-smoke.md", "markdown report output path")
@@ -109,45 +131,48 @@ func newSmokeCommand(run smokeRunner) *cobra.Command {
 	flags.Bool("ai", true, "enable AI provider calls")
 	flags.Int("window-days", 30, "analysis window in days")
 	flags.String("to", "2026-05-09T19:05:42Z", "analysis end timestamp")
-	for _, name := range []string{"db", "out", "domains", "provider", "model", "region", "base-url", "data-path", "ai", "window-days", "to"} {
-		if err := v.BindPFlag(name, flags.Lookup(name)); err != nil {
-			panic(err)
-		}
-	}
+	v = newSmokeViper(flags)
 	return cmd
 }
 
-func newSmokeViper() *viper.Viper {
+type smokeCatalogBinding struct {
+	key   string
+	field string
+}
+
+var smokeCatalogBindings = []smokeCatalogBinding{
+	{key: "provider", field: "AIProvider"},
+	{key: "model", field: "AIModel"},
+	{key: "region", field: "AIRegion"},
+	{key: "base-url", field: "AIBaseURL"},
+	{key: "data-path", field: "DataPath"},
+	{key: "api-key", field: "AIAPIKey"},
+}
+
+func newSmokeViper(flags *pflag.FlagSet) *viper.Viper {
 	v := viper.New()
-	for key, value := range map[string]any{
-		"db":          "",
-		"out":         "tmp/prod-eu-opportunities-smoke/release-hardening-smoke.md",
-		"domains":     "hitkeep.com,cloud.hitkeep.eu",
-		"provider":    "openai-compatible",
-		"model":       "openai.gpt-oss-120b",
-		"region":      "eu-central-1",
-		"base-url":    "",
-		"data-path":   "data",
-		"api-key":     "",
-		"ai":          true,
-		"window-days": 30,
-		"to":          "2026-05-09T19:05:42Z",
-	} {
-		v.SetDefault(key, value)
+	if err := v.BindPFlags(flags); err != nil {
+		panic(err)
 	}
-	for key, environment := range map[string]string{
-		"provider":  "HITKEEP_AI_PROVIDER",
-		"model":     "HITKEEP_AI_MODEL",
-		"region":    "HITKEEP_AI_REGION",
-		"base-url":  "HITKEEP_AI_BASE_URL",
-		"data-path": "HITKEEP_DATA_PATH",
-		"api-key":   "HITKEEP_AI_API_KEY",
-	} {
-		if err := v.BindEnv(key, environment); err != nil {
+	for _, binding := range smokeCatalogBindings {
+		setting := smokeCatalogSetting(binding.field)
+		if err := v.BindEnv(binding.key, setting.Environment); err != nil {
 			panic(err)
+		}
+		if binding.key == "api-key" {
+			v.SetDefault(binding.key, setting.Default)
 		}
 	}
 	return v
+}
+
+func smokeCatalogSetting(field string) config.ConfigurationSetting {
+	for _, setting := range config.Catalog().Settings {
+		if setting.Field == field {
+			return setting
+		}
+	}
+	panic("missing configuration catalog setting " + field)
 }
 
 type smokeViperConfig struct {
