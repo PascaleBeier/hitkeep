@@ -20,6 +20,7 @@ func TestCachePruneIsDryRunFirstAndManaged(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Setenv("PATH", t.TempDir())
 	snapshot := filepath.Join(stateRoot, "shared", "frontend", "old-snapshot")
 	if err := os.MkdirAll(snapshot, 0o700); err != nil {
 		t.Fatal(err)
@@ -70,6 +71,7 @@ func TestCachePruneRechecksFrontendSnapshotUseAfterLock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Setenv("PATH", t.TempDir())
 	snapshot := filepath.Join(stateRoot, "shared", "frontend", "newly-linked")
 	if err := os.MkdirAll(filepath.Join(snapshot, "node_modules"), 0o700); err != nil {
 		t.Fatal(err)
@@ -142,11 +144,11 @@ volume:ls)
 	;;
 volume:inspect)
 	cat <<'JSON'
-{"Name":"stale-go-build","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"hitkeep-deadbeef","com.docker.compose.volume":"go-build"}}
-{"Name":"current-go-mod","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"CURRENT_PROJECT","com.docker.compose.volume":"go-mod"}}
-{"Name":"data-volume","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"hitkeep-deadbeef","com.docker.compose.volume":"data"}}
-{"Name":"archive-volume","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"hitkeep-deadbeef","com.docker.compose.volume":"archive"}}
-{"Name":"foreign-go-mod","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"other-project","com.docker.compose.volume":"go-mod"}}
+{"Name":"stale-go-build","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"hitkeep-deadbeef","com.docker.compose.volume":"hitkeep-dev-go-build"}}
+{"Name":"current-go-mod","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"CURRENT_PROJECT","com.docker.compose.volume":"hitkeep-dev-go-mod"}}
+{"Name":"data-volume","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"hitkeep-deadbeef","com.docker.compose.volume":"hitkeep-dev-data"}}
+{"Name":"archive-volume","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"hitkeep-deadbeef","com.docker.compose.volume":"hitkeep-dev-archive"}}
+{"Name":"foreign-go-mod","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"other-project","com.docker.compose.volume":"hitkeep-dev-go-mod"}}
 {"Name":"unlabeled","CreatedAt":"2020-01-01T00:00:00Z","Labels":{}}
 JSON
 	;;
@@ -226,6 +228,22 @@ esac
 	}
 }
 
+func TestDockerComposeCacheRole(t *testing.T) {
+	for _, test := range []struct {
+		role string
+		want bool
+	}{
+		{role: "go-build", want: true},
+		{role: "hitkeep-dev-go-build", want: true},
+		{role: "hitkeep-dev-data", want: false},
+		{role: "hitkeep-dev-archive", want: false},
+	} {
+		if got := isDockerComposeCacheRole(test.role); got != test.want {
+			t.Errorf("isDockerComposeCacheRole(%q) = %t, want %t", test.role, got, test.want)
+		}
+	}
+}
+
 func TestCacheStatusIgnoresUnavailableDocker(t *testing.T) {
 	workspace := initTestRepository(t)
 	stateRoot := filepath.Join(t.TempDir(), "state")
@@ -259,6 +277,7 @@ func TestCacheStatusKeepsCurrentManagedToolchains(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	t.Setenv("PATH", t.TempDir())
 	report, err := app.CacheStatus()
 	if err != nil {
 		t.Fatal(err)

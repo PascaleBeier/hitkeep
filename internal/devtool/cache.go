@@ -251,6 +251,7 @@ func isHitKeepComposeProject(project string) bool {
 }
 
 func isDockerComposeCacheRole(role string) bool {
+	role = strings.TrimPrefix(role, "hitkeep-dev-")
 	switch role {
 	case "go-build", "go-mod", "npm-cache", "node-modules":
 		return true
