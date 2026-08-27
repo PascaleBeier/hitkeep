@@ -29,12 +29,11 @@ func TestProductionMainSignalCancelsRunningApplication(t *testing.T) {
 		{name: "SIGTERM", sig: syscall.SIGTERM},
 	} {
 		t.Run(signal.name, func(t *testing.T) {
-			t.Parallel()
 			command := exec.Command(os.Args[0], "-test.run=^TestProductionMainSignalCancelsRunningApplication$")
 			command.Env = append(os.Environ(),
 				"HITKEEP_PRODUCTION_SIGNAL_SUBPROCESS=1",
 				"HITKEEP_HTTP_ADDR=127.0.0.1:0",
-				"HITKEEP_BIND_ADDR="+testSignalAddress(t),
+				"HITKEEP_BIND_ADDR=127.0.0.1",
 				"HITKEEP_NSQ_TCP_ADDRESS="+testSignalAddress(t),
 				"HITKEEP_NSQ_HTTP_ADDRESS="+testSignalAddress(t),
 				"HITKEEP_DB_PATH="+t.TempDir()+"/hitkeep.db",
@@ -51,20 +50,19 @@ func TestProductionMainSignalCancelsRunningApplication(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			exited := false
-			done := make(chan error, 1)
-			go func() { done <- command.Wait() }()
+			drained := make(chan error, 1)
+			drainComplete := false
+			waited := false
 			defer func() {
-				if exited {
+				if waited {
 					return
 				}
 				_ = command.Process.Kill()
-				timer := time.NewTimer(5 * time.Second)
-				defer timer.Stop()
-				select {
-				case <-done:
-				case <-timer.C:
+				if !drainComplete {
+					_ = stdout.Close()
+					<-drained
 				}
+				_ = command.Wait()
 			}()
 
 			ready := make(chan error, 1)
@@ -83,6 +81,7 @@ func TestProductionMainSignalCancelsRunningApplication(t *testing.T) {
 				if !readySent {
 					ready <- fmt.Errorf("application readiness log not found: %v; logs: %s", scanner.Err(), strings.Join(logs, "\n"))
 				}
+				drained <- scanner.Err()
 			}()
 
 			readyTimer := time.NewTimer(30 * time.Second)
@@ -99,36 +98,45 @@ func TestProductionMainSignalCancelsRunningApplication(t *testing.T) {
 			if err := command.Process.Signal(signal.sig); err != nil {
 				t.Fatal(err)
 			}
-			exitTimer := time.NewTimer(15 * time.Second)
-			defer exitTimer.Stop()
+			drainTimer := time.NewTimer(15 * time.Second)
+			defer drainTimer.Stop()
 			select {
-			case err := <-done:
-				exited = true
+			case err := <-drained:
+				drainComplete = true
 				if err != nil {
-					t.Fatalf("production application exit = %v, want graceful exit; stderr: %s", err, stderr.String())
+					t.Fatalf("production application stdout drain = %v; stderr: %s", err, stderr.String())
 				}
-			case <-exitTimer.C:
-				t.Fatalf("production application did not exit after %s; stderr: %s", signal.name, stderr.String())
+			case <-drainTimer.C:
+				_ = command.Process.Kill()
+				_ = stdout.Close()
+				<-drained
+				drainComplete = true
+				t.Fatalf("production application stdout did not drain after %s; stderr: %s", signal.name, stderr.String())
 			}
+			if err := command.Wait(); err != nil {
+				waited = true
+				t.Fatalf("production application exit = %v, want graceful exit; stderr: %s", err, stderr.String())
+			}
+			waited = true
 		})
 	}
 }
 
 type lockedBuffer struct {
-	mu sync.Mutex
-	bytes.Buffer
+	mu     sync.Mutex
+	buffer bytes.Buffer
 }
 
 func (buffer *lockedBuffer) Write(data []byte) (int, error) {
 	buffer.mu.Lock()
 	defer buffer.mu.Unlock()
-	return buffer.Buffer.Write(data)
+	return buffer.buffer.Write(data)
 }
 
 func (buffer *lockedBuffer) String() string {
 	buffer.mu.Lock()
 	defer buffer.mu.Unlock()
-	return buffer.Buffer.String()
+	return buffer.buffer.String()
 }
 
 func testSignalAddress(t *testing.T) string {
