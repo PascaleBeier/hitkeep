@@ -59,6 +59,9 @@ func (a *App) registerArtifactPaths(kind, ownerID, sourceFingerprint string, pat
 	}
 	now := time.Now().UTC()
 	for _, path := range paths {
+		if strings.HasPrefix(path, "image://") {
+			continue
+		}
 		clean, info, err := a.safeArtifactPath(path)
 		if err != nil {
 			return err
