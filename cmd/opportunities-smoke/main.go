@@ -126,8 +126,8 @@ func newSmokeCommand(run smokeRunner) *cobra.Command {
 	flags.String("provider", "openai-compatible", "AI provider")
 	flags.String("model", "openai.gpt-oss-120b", "AI model")
 	flags.String("region", "eu-central-1", "AI provider region")
-	flags.String("base-url", "", "AI provider base URL")
-	flags.String("data-path", "data", "restored HitKeep data directory containing tenant databases")
+	flags.String("base-url", smokeCatalogSetting("AIBaseURL").Default, "AI provider base URL")
+	flags.String("data-path", smokeCatalogSetting("DataPath").Default, "restored HitKeep data directory containing tenant databases")
 	flags.Bool("ai", true, "enable AI provider calls")
 	flags.Int("window-days", 30, "analysis window in days")
 	flags.String("to", "2026-05-09T19:05:42Z", "analysis end timestamp")
@@ -242,10 +242,20 @@ func normalizeLegacySmokeArgs(args []string) []string {
 	}
 	normalized := append([]string(nil), args...)
 	for index, arg := range normalized {
-		if !strings.HasPrefix(arg, "-") || strings.HasPrefix(arg, "--") {
+		if arg == "--" {
+			break
+		}
+		if !strings.HasPrefix(arg, "-") {
 			continue
 		}
-		name, _, _ := strings.Cut(strings.TrimPrefix(arg, "-"), "=")
+		name, _, _ := strings.Cut(strings.TrimLeft(arg, "-"), "=")
+		if name == "h" || name == "help" {
+			normalized[index] = "--help"
+			continue
+		}
+		if strings.HasPrefix(arg, "--") {
+			continue
+		}
 		if _, ok := legacyLongFlags[name]; ok {
 			normalized[index] = "-" + arg
 		}

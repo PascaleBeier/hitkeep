@@ -12,6 +12,13 @@ import (
 	"hitkeep/internal/opportunities/smokegate"
 )
 
+func clearSmokeEnvironment(t *testing.T) {
+	t.Helper()
+	for _, binding := range smokeCatalogBindings {
+		t.Setenv(smokeCatalogSetting(binding.field).Environment, "")
+	}
+}
+
 func TestPrepareWorkingDBCopiesSourceWithoutMutatingIt(t *testing.T) {
 	dir := t.TempDir()
 	source := filepath.Join(dir, "source.db")
@@ -63,6 +70,7 @@ func TestResolveSmokeAIBaseURLPreservesExplicitURLAndOtherProviders(t *testing.T
 }
 
 func TestSmokeCommandUsesDefaultsAndDoesNotPrintAPIKey(t *testing.T) {
+	clearSmokeEnvironment(t)
 	const apiKey = "super-secret-api-key"
 	t.Setenv("HITKEEP_AI_API_KEY", " "+apiKey+" ")
 
@@ -78,7 +86,7 @@ func TestSmokeCommandUsesDefaultsAndDoesNotPrintAPIKey(t *testing.T) {
 		t.Fatalf("exit code = %d, want 2", exitCode)
 	}
 	if got.Provider != "openai-compatible" || got.Model != "openai.gpt-oss-120b" || got.Region != "eu-central-1" || got.DataPath != "data" {
-		t.Fatalf("unexpected defaults: %+v", got)
+		t.Fatalf("unexpected defaults: provider=%q model=%q region=%q data-path=%q", got.Provider, got.Model, got.Region, got.DataPath)
 	}
 	if got.APIKey != apiKey {
 		t.Fatal("API key was not passed through typed configuration")
@@ -89,6 +97,7 @@ func TestSmokeCommandUsesDefaultsAndDoesNotPrintAPIKey(t *testing.T) {
 }
 
 func TestSmokeCommandRetainsSingleDashLongFlagsAndRedactsRunnerErrors(t *testing.T) {
+	clearSmokeEnvironment(t)
 	const apiKey = "super-secret-api-key"
 	t.Setenv("HITKEEP_AI_API_KEY", apiKey)
 	stderr := new(bytes.Buffer)
@@ -104,6 +113,7 @@ func TestSmokeCommandRetainsSingleDashLongFlagsAndRedactsRunnerErrors(t *testing
 }
 
 func TestSmokeCommandFlagPrecedenceOverEnvironment(t *testing.T) {
+	clearSmokeEnvironment(t)
 	t.Setenv("HITKEEP_AI_PROVIDER", "from-env")
 	t.Setenv("HITKEEP_AI_MODEL", "env-model")
 	t.Setenv("HITKEEP_AI_REGION", "eu-west-1")
@@ -128,11 +138,12 @@ func TestSmokeCommandFlagPrecedenceOverEnvironment(t *testing.T) {
 		t.Fatalf("exit code = %d, want 2", exitCode)
 	}
 	if got.Provider != "from-flag" || got.Model != "flag-model" || got.Region != "us-east-1" || got.BaseURL != "https://flag.example/v1" || got.DataPath != "flag-data" {
-		t.Fatalf("flag values did not win: %+v", got)
+		t.Fatalf("flag values did not win: provider=%q model=%q region=%q base-url=%q data-path=%q", got.Provider, got.Model, got.Region, got.BaseURL, got.DataPath)
 	}
 }
 
 func TestSmokeCommandEnvironmentValues(t *testing.T) {
+	clearSmokeEnvironment(t)
 	t.Setenv("HITKEEP_AI_PROVIDER", "from-env")
 	t.Setenv("HITKEEP_AI_MODEL", "env-model")
 	t.Setenv("HITKEEP_AI_REGION", "eu-west-1")
@@ -149,11 +160,12 @@ func TestSmokeCommandEnvironmentValues(t *testing.T) {
 		t.Fatalf("exit code = %d, want 2", exitCode)
 	}
 	if got.Provider != "from-env" || got.Model != "env-model" || got.Region != "eu-west-1" || got.BaseURL != "https://env.example/v1" || got.DataPath != "env-data" {
-		t.Fatalf("environment values missing: %+v", got)
+		t.Fatalf("environment values missing: provider=%q model=%q region=%q base-url=%q data-path=%q", got.Provider, got.Model, got.Region, got.BaseURL, got.DataPath)
 	}
 }
 
 func TestSmokeCommandHelpAndValidation(t *testing.T) {
+	clearSmokeEnvironment(t)
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 	if code := executeSmoke(t.Context(), []string{"--help"}, stdout, stderr, runSmoke); code != 0 {
@@ -178,6 +190,7 @@ func TestSmokeCommandHelpAndValidation(t *testing.T) {
 }
 
 func TestSmokeCommandLegacyParseBoundary(t *testing.T) {
+	clearSmokeEnvironment(t)
 	tests := []struct {
 		name       string
 		args       []string
@@ -187,6 +200,9 @@ func TestSmokeCommandLegacyParseBoundary(t *testing.T) {
 	}{
 		{name: "short help", args: []string{"-h"}, wantCode: 0, wantUsage: true},
 		{name: "long help", args: []string{"--help"}, wantCode: 0, wantUsage: true},
+		{name: "legacy help", args: []string{"-help"}, wantCode: 0, wantUsage: true},
+		{name: "false short help", args: []string{"-h=false"}, wantCode: 0, wantUsage: true},
+		{name: "false long help", args: []string{"--help=false"}, wantCode: 0, wantUsage: true},
 		{name: "unknown flag", args: []string{"-unknown"}, wantCode: 2, wantUsage: true},
 		{name: "invalid integer", args: []string{"-window-days=not-a-number"}, wantCode: 2, wantUsage: true},
 		{name: "invalid boolean", args: []string{"-ai=not-a-bool"}, wantCode: 2, wantUsage: true},
@@ -223,6 +239,7 @@ func TestSmokeCommandLegacyParseBoundary(t *testing.T) {
 }
 
 func TestSmokeCommandUsesCanonicalCatalogAIEnvironmentMetadata(t *testing.T) {
+	clearSmokeEnvironment(t)
 	for _, binding := range smokeCatalogBindings {
 		setting := smokeCatalogSetting(binding.field)
 		if setting.Environment == "" {
@@ -241,11 +258,28 @@ func TestSmokeCommandUsesCanonicalCatalogAIEnvironmentMetadata(t *testing.T) {
 		return smokegate.Report{}, nil
 	})
 	if code != 2 || got.Provider != "catalog-provider" {
-		t.Fatalf("catalog environment binding result = code %d, config %+v", code, got)
+		t.Fatalf("catalog environment binding result = code %d, provider=%q", code, got.Provider)
+	}
+}
+
+func TestSmokeCommandUsesCanonicalCatalogDefaults(t *testing.T) {
+	clearSmokeEnvironment(t)
+	cmd := newSmokeCommand(runSmoke)
+	for _, field := range []string{"AIBaseURL", "DataPath"} {
+		setting := smokeCatalogSetting(field)
+		flag := map[string]string{"AIBaseURL": "base-url", "DataPath": "data-path"}[field]
+		value, err := cmd.Flags().GetString(flag)
+		if err != nil {
+			t.Fatalf("read %s default: %v", flag, err)
+		}
+		if value != setting.Default {
+			t.Fatalf("%s default = %q, catalog = %q", flag, value, setting.Default)
+		}
 	}
 }
 
 func TestSmokeCommandPassesExecutionContext(t *testing.T) {
+	clearSmokeEnvironment(t)
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	var got context.Context
