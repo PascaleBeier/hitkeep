@@ -15,7 +15,16 @@ func TestHelmSmokeLifecycleContract(t *testing.T) {
 	script := string(raw)
 	for _, want := range []string{
 		"HITKEEP_PREVIOUS_IMAGE:?HITKEEP_PREVIOUS_IMAGE must name an immutable supported 2.x image digest",
+		"HITKEEP_PREVIOUS_CHART:?HITKEEP_PREVIOUS_CHART must name the immutable supported 2.12 chart artifact",
+		"HITKEEP_PREVIOUS_CHART_DIGEST:?HITKEEP_PREVIOUS_CHART_DIGEST must name the immutable supported 2.12 chart manifest",
+		"HITKEEP_CANDIDATE_CHART:?HITKEEP_CANDIDATE_CHART must name the exact candidate chart artifact",
+		"HITKEEP_CANDIDATE_CHART_VERSION:?HITKEEP_CANDIDATE_CHART_VERSION must name the candidate chart version",
+		"HITKEEP_KIND_CLUSTER:?HITKEEP_KIND_CLUSTER must name the disposable Kind cluster",
+		"grep -Fqx 'version: 2.12.0'",
+		"grep -Fqx \"version: $candidate_chart_version\"",
 		"if [[ \"$image\" != *@sha256:* || \"$previous_image\" != *@sha256:* ]]",
+		"kind load docker-image --name \"$kind_cluster\" \"$image\" \"$previous_image\"",
+		"helm upgrade --install \"$release\" \"$chart\"",
 		"fixture --verify-image",
 		"fixture --seed",
 		"statefulset/$release",
@@ -40,7 +49,18 @@ func TestReleaseWorkflowAuthenticatesHelmSmoke(t *testing.T) {
 	}
 
 	workflow := string(raw)
-	for _, want := range []string{"docker/login-action", "scripts/helm-smoke.sh", "ghcr.io"} {
+	for _, want := range []string{
+		"docker/login-action",
+		"previous_chart_digest",
+		"HITKEEP_PREVIOUS_CHART:",
+		"GHCR_TOKEN: ${{ github.token }}",
+		"HITKEEP_CANDIDATE_CHART=\"$candidate_chart\"",
+		"HITKEEP_CANDIDATE_CHART_VERSION=\"$CANDIDATE_VERSION\"",
+		"HITKEEP_KIND_CLUSTER=\"$cluster\"",
+		"helm package charts/hitkeep",
+		"helm pull \"$HITKEEP_PREVIOUS_CHART\"",
+		"scripts/helm-smoke.sh",
+	} {
 		if !strings.Contains(workflow, want) {
 			t.Errorf("release workflow must contain %q", want)
 		}

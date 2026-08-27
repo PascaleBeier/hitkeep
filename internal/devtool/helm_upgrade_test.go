@@ -16,7 +16,7 @@ func TestHelmUpgradeSmokeUsesChartPersistenceAndImmutableImages(t *testing.T) {
 		"HITKEEP_PREVIOUS_IMAGE",
 		"@sha256:",
 		"hitkeep-helm-smoke-$$-${RANDOM}",
-		"helm upgrade --install \"$release\" charts/hitkeep",
+		"helm upgrade --install \"$release\" \"$chart\"",
 		"--namespace \"$namespace\"",
 		"--set-string image.repository=\"$repository\"",
 		"--set-string image.digest=\"$digest\"",

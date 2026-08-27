@@ -32,9 +32,11 @@ type manifest struct {
 }
 
 type fixture struct {
-	PreviousImage   string `json:"previous_image"`
-	Platform        string `json:"platform"`
-	PreviousVersion string `json:"previous_version"`
+	PreviousImage       string `json:"previous_image"`
+	PreviousChart       string `json:"previous_chart"`
+	PreviousChartDigest string `json:"previous_chart_digest"`
+	Platform            string `json:"platform"`
+	PreviousVersion     string `json:"previous_version"`
 	Fixture         struct {
 		Email        string `json:"email"`
 		Password     string `json:"password"`
@@ -44,6 +46,18 @@ type fixture struct {
 		SessionID    string `json:"session_id"`
 		PageID       string `json:"page_id"`
 	} `json:"fixture"`
+}
+
+func (f fixture) chartValid() error {
+	expected := "oci://ghcr.io/pascalebeier/charts/hitkeep:" + f.PreviousVersion
+	if f.PreviousChart != expected {
+		return fmt.Errorf("previous chart %q must be %q", f.PreviousChart, expected)
+	}
+	digest := strings.TrimPrefix(f.PreviousChartDigest, "sha256:")
+	if len(digest) != 64 || strings.Trim(digest, "0123456789abcdef") != "" {
+		return fmt.Errorf("previous chart digest %q is not immutable", f.PreviousChartDigest)
+	}
+	return nil
 }
 
 type imageInspection struct {
@@ -136,6 +150,9 @@ func loadFixture(path, previousImage, platform string) (fixture, error) {
 	for _, entry := range parsed.Fixtures {
 		if entry.PreviousImage == previousImage && entry.Platform == platform {
 			if err := entry.valid(); err != nil {
+				return fixture{}, err
+			}
+			if err := entry.chartValid(); err != nil {
 				return fixture{}, err
 			}
 			return entry, nil

@@ -125,12 +125,20 @@ jobs:
           docker pull "$candidate"
           platform="linux/$(docker image inspect "$candidate" --format '{{.Architecture}}')"
           previous="$(jq -r --arg platform "$platform" '.fixtures[] | select(.previous_version == "2.12.0" and .platform == $platform) | .previous_image' "$manifest")"
+          previous_chart="$(jq -r --arg platform "$platform" '.fixtures[] | select(.previous_version == "2.12.0" and .platform == $platform) | .previous_chart' "$manifest")"
+          previous_chart_digest="$(jq -r --arg platform "$platform" '.fixtures[] | select(.previous_version == "2.12.0" and .platform == $platform) | .previous_chart_digest' "$manifest")"
           if [[ -z "$previous" || "$previous" == "null" || "$previous" != *@sha256:* ]]; then
             echo "release fixture has no immutable v2.12.0 image for ${platform}" >&2
             exit 1
           fi
+          if [[ "$previous_chart" != "oci://ghcr.io/pascalebeier/charts/hitkeep:2.12.0" || ! "$previous_chart_digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            echo "release fixture has no immutable v2.12.0 chart for ${platform}" >&2
+            exit 1
+          fi
           printf 'candidate=%s\n' "$candidate" >> "$GITHUB_OUTPUT"
           printf 'previous=%s\n' "$previous" >> "$GITHUB_OUTPUT"
+          printf 'previous_chart=%s\n' "$previous_chart" >> "$GITHUB_OUTPUT"
+          printf 'previous_chart_digest=%s\n' "$previous_chart_digest" >> "$GITHUB_OUTPUT"
 
       - name: Smoke Docker upgrade from supported floor
         if: ${{ matrix.surface == 'docker' }}
@@ -150,14 +158,35 @@ jobs:
         if: ${{ matrix.surface == 'helm' }}
         env:
           CANDIDATE_IMAGE: ${{ steps.fixture.outputs.candidate }}
+          CANDIDATE_VERSION: ${{ needs.release-please.outputs.version }}
           HITKEEP_PREVIOUS_IMAGE: ${{ steps.fixture.outputs.previous }}
+          HITKEEP_PREVIOUS_CHART: ${{ steps.fixture.outputs.previous_chart }}
+          HITKEEP_PREVIOUS_CHART_DIGEST: ${{ steps.fixture.outputs.previous_chart_digest }}
+          GHCR_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
+          kind_bin="$(go env GOPATH)/bin/kind"
           cluster="hitkeep-helm-upgrade-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          trap '"$(go env GOPATH)/bin/kind" delete cluster --name "$cluster"' EXIT
-          "$(go env GOPATH)/bin/kind" create cluster --name "$cluster"
-          ./scripts/helm-smoke.sh "$CANDIDATE_IMAGE" self-hosted
+          chart_dir="$(mktemp -d)"
+          trap '"$kind_bin" delete cluster --name "$cluster"; rm -rf "$chart_dir"' EXIT
+          "$kind_bin" create cluster --name "$cluster"
+
+          helm package charts/hitkeep --version "$CANDIDATE_VERSION" --app-version "$CANDIDATE_VERSION" --destination "$chart_dir" >/dev/null
+          candidate_chart="$chart_dir/hitkeep-${CANDIDATE_VERSION}.tgz"
+          test -f "$candidate_chart"
+
+          printf '%s' "$GHCR_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          previous_output="$(helm pull "$HITKEEP_PREVIOUS_CHART" --version 2.12.0 --destination "$chart_dir" 2>&1)"
+          printf '%s\n' "$previous_output"
+          grep -Fqx "Digest: $HITKEEP_PREVIOUS_CHART_DIGEST" <<< "$previous_output"
+          previous_chart="$chart_dir/hitkeep-2.12.0.tgz"
+          test -f "$previous_chart"
+
+          HITKEEP_CANDIDATE_CHART="$candidate_chart" \
+            HITKEEP_CANDIDATE_CHART_VERSION="$CANDIDATE_VERSION" \
+            HITKEEP_KIND_CLUSTER="$cluster" \
+            ./scripts/helm-smoke.sh "$CANDIDATE_IMAGE" self-hosted
 
   link-release-blog:
     name: Link release blog
