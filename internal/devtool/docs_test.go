@@ -310,7 +310,7 @@ jobs:
       - name: Dispatch and verify exact documentation attestation
         env:
           DOCS_REPOSITORY: PascaleBeier/hitkeep-docs
-          DOCS_WORKFLOW_SHA256: 80083d2a22d46da085b9c2197a3ba4750be85c22f588e25f5296602a421a3c95
+          DOCS_WORKFLOW_SHA256: 394bedb5cf9b30c79a9eff03ada1bc28b50f6d9fba495a7e2218f1a36e074fc8
         run: |
           gh workflow run sync-hitkeep-release.yml --ref main \\
             -f prepublication=true \\
