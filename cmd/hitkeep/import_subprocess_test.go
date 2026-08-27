@@ -16,11 +16,12 @@ import (
 
 func TestExecuteImportSubprocessParity(t *testing.T) {
 	if mode := os.Getenv("HITKEEP_IMPORT_SUBPROCESS"); mode != "" {
-		root := hitkeepcmd.NewRootCommand(slog.New(slog.NewTextHandler(io.Discard, nil)))
 		args := []string{"import", "list", "--help"}
 		if mode == "missing-token" {
 			args = []string{"import", "list", "--site", "site"}
 		}
+		os.Args = append([]string{os.Args[0]}, args...)
+		root := hitkeepcmd.NewRootCommand(slog.New(slog.NewTextHandler(io.Discard, nil)))
 		root.SetArgs(args)
 		root.SetOut(os.Stdout)
 		root.SetErr(os.Stderr)

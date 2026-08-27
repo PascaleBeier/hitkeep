@@ -15,6 +15,7 @@ import (
 
 func TestExecuteUpdateListHelpSubprocessParity(t *testing.T) {
 	if commandName := os.Getenv("HITKEEP_UPDATE_LIST_HELP_SUBPROCESS"); commandName != "" {
+		os.Args = []string{os.Args[0], commandName, os.Getenv("HITKEEP_UPDATE_LIST_HELP_FLAG")}
 		root := hitkeepcmd.NewRootCommand(slog.New(slog.NewTextHandler(io.Discard, nil)))
 		root.SetArgs([]string{commandName, os.Getenv("HITKEEP_UPDATE_LIST_HELP_FLAG")})
 		root.SetOut(os.Stdout)

@@ -16,6 +16,7 @@ import (
 
 func TestExecuteUpdateListFlagSubprocessParity(t *testing.T) {
 	if commandName := os.Getenv("HITKEEP_UPDATE_LIST_SUBPROCESS"); commandName != "" {
+		os.Args = []string{os.Args[0], commandName, "--unknown"}
 		root := hitkeepcmd.NewRootCommand(slog.New(slog.NewTextHandler(io.Discard, nil)))
 		root.SetArgs([]string{commandName, "--unknown"})
 		root.SetOut(os.Stdout)
