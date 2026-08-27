@@ -53,6 +53,7 @@ func TestReleaseWorkflowAuthenticatesHelmSmoke(t *testing.T) {
 		"docker/login-action",
 		"previous_chart_digest",
 		"HITKEEP_PREVIOUS_CHART:",
+		"HITKEEP_PREVIOUS_CHART=\"$previous_chart\"",
 		"GHCR_TOKEN: ${{ github.token }}",
 		"HITKEEP_CANDIDATE_CHART=\"$candidate_chart\"",
 		"HITKEEP_CANDIDATE_CHART_VERSION=\"$CANDIDATE_VERSION\"",

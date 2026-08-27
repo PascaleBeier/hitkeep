@@ -204,6 +204,7 @@ restart_stateful_pod() {
     printf 'StatefulSet %s has no pod to recreate\n' "$release" >&2
     exit 1
   fi
+  stop_port_forward
   kubectl -n "$namespace" delete pod "$pod" --wait=true
   kubectl -n "$namespace" rollout status statefulset/$release --timeout=2m
   pod="$(kubectl -n "$namespace" get pods -l app.kubernetes.io/instance="$release" -o jsonpath='{.items[0].metadata.name}')"
@@ -212,6 +213,7 @@ restart_stateful_pod() {
     printf 'Expected recreated pod %s to use PVC %s, got %s\n' "$pod" "$pvc" "$actual_pvc" >&2
     exit 1
   fi
+  await_healthy
 }
 
 deploy "$previous_image" "$previous_chart"
