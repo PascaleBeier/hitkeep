@@ -3,7 +3,9 @@ package devtool
 import (
 	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -79,6 +81,57 @@ func TestHelmChartSupportsDigestPinnedSmokeImages(t *testing.T) {
 	}
 	if !bytes.Contains(values, []byte("  digest: \"\"")) {
 		t.Fatal("chart values must expose an empty digest default for tagged deployments")
+	}
+}
+
+func TestHelmTemplateRendersImmutableReferencesForLegacyAndCandidateCharts(t *testing.T) {
+	if os.Getenv("HITKEEP_HELM_TEMPLATE_CONTRACT") != "1" {
+		t.Skip("set HITKEEP_HELM_TEMPLATE_CONTRACT=1 to render the immutable v2.12 chart fixture")
+	}
+	helm, err := exec.LookPath("helm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const repository = "registry.example/hitkeep"
+	const digest = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	want := `image: "` + repository + `@sha256:` + digest + `"`
+
+	legacyDir := t.TempDir()
+	if output, err := exec.Command(helm, "pull", "oci://ghcr.io/pascalebeier/charts/hitkeep", "--version", "2.12.0", "--destination", legacyDir).CombinedOutput(); err != nil {
+		t.Fatalf("pull v2.12 chart: %v\n%s", err, output)
+	}
+	renders := []struct {
+		chart  string
+		values []string
+	}{
+		{
+			chart: filepath.Join(legacyDir, "hitkeep-2.12.0.tgz"),
+			values: []string{
+				"--set-string", "image.repository=" + repository + "@sha256",
+				"--set-string", "image.tag=" + digest,
+			},
+		},
+		{
+			chart: filepath.Join("..", "..", "charts", "hitkeep"),
+			values: []string{
+				"--set-string", "image.repository=" + repository,
+				"--set-string", "image.digest=sha256:" + digest,
+			},
+		},
+	}
+	for _, render := range renders {
+		args := append([]string{"template", "hitkeep", render.chart}, render.values...)
+		output, err := exec.Command(helm, args...).CombinedOutput()
+		if err != nil {
+			t.Fatalf("render %s: %v\n%s", render.chart, err, output)
+		}
+		rendered := string(output)
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("rendered image for %s does not preserve the immutable digest %q\n%s", render.chart, want, rendered)
+		}
+		if strings.Contains(rendered, repository+":2.12.0:") || strings.Contains(rendered, repository+"@sha256@") {
+			t.Fatalf("rendered image for %s is malformed\n%s", render.chart, rendered)
+		}
 	}
 }
 

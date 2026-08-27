@@ -65,20 +65,35 @@ done
 
 image_values() {
   local reference="$1"
+  if [[ ! "$reference" =~ ^[^@]+@sha256:[a-f0-9]{64}$ ]]; then
+    printf 'Image %s must be an immutable sha256 digest reference\n' "$reference" >&2
+    return 2
+  fi
   repository="${reference%@*}"
   digest="${reference#*@}"
 }
 
 deploy() {
   local chart="$2"
+  local image_args=()
   image_values "$1"
+  if helm show chart "$chart" | grep -Fqx 'version: 2.12.0'; then
+    image_args=(
+      --set-string image.repository="${repository}@sha256"
+      --set-string image.tag="${digest#sha256:}"
+    )
+  else
+    image_args=(
+      --set-string image.repository="$repository"
+      --set-string image.digest="$digest"
+    )
+  fi
   helm upgrade --install "$release" "$chart" \
     --namespace "$namespace" \
     --create-namespace \
     --wait \
     --timeout 5m \
-    --set-string image.repository="$repository" \
-    --set-string image.digest="$digest" \
+    "${image_args[@]}" \
     --set-string env.HITKEEP_JWT_SECRET=hitkeep-local-helm-smoke-secret \
     --set-string env.HITKEEP_MAIL_DRIVER=log \
     --set-string env.HITKEEP_SPAM_FILTER_AUTO_UPDATE=false
