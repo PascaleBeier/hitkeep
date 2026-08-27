@@ -71,15 +71,18 @@ func TestProductionMainSignalCancelsRunningApplication(t *testing.T) {
 			go func() {
 				scanner := bufio.NewScanner(stdout)
 				var logs []string
+				readySent := false
 				for scanner.Scan() {
 					line := scanner.Text()
 					logs = append(logs, line)
-					if strings.Contains(line, `"msg":"Application is running. Press Ctrl+C to exit."`) {
+					if !readySent && strings.Contains(line, `"msg":"Application is running. Press Ctrl+C to exit."`) {
 						ready <- nil
-						return
+						readySent = true
 					}
 				}
-				ready <- fmt.Errorf("application readiness log not found: %v; logs: %s", scanner.Err(), strings.Join(logs, "\n"))
+				if !readySent {
+					ready <- fmt.Errorf("application readiness log not found: %v; logs: %s", scanner.Err(), strings.Join(logs, "\n"))
+				}
 			}()
 
 			readyTimer := time.NewTimer(30 * time.Second)
