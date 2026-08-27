@@ -223,7 +223,12 @@ func (a *App) isRunTempRoot(root string) bool {
 	if err := validateRunID(runID); err != nil || filepath.Clean(root) != a.runTempRoot(runID) {
 		return false
 	}
-	info, err := os.Stat(root)
+	base, err := os.OpenRoot(a.runTempBase())
+	if err != nil {
+		return false
+	}
+	defer base.Close()
+	info, err := base.Stat(runID)
 	return err == nil && info.IsDir()
 }
 
