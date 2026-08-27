@@ -310,9 +310,10 @@ jobs:
       - name: Dispatch and verify exact documentation attestation
         env:
           DOCS_REPOSITORY: PascaleBeier/hitkeep-docs
-          DOCS_WORKFLOW_SHA256: 222ee0a991741b076d9571d2315e7859daf20b3176742420b748ab2c5c53f291
+          DOCS_WORKFLOW_SHA256: 80083d2a22d46da085b9c2197a3ba4750be85c22f588e25f5296602a421a3c95
         run: |
           gh workflow run sync-hitkeep-release.yml --ref main \\
+            -f prepublication=true \\
             -f source_run_id="$source_run_id" \\
             -f source_head_sha="$GITHUB_SHA" \\
             -f source_workflow_sha256="$source_workflow_sha256" \\
@@ -345,15 +346,25 @@ jobs:
       - name: Promote immutable image to mutable tags
       - name: Publish draft GitHub release
   sync-docs-release:
-    needs: finalize-release
+    needs:
+      - finalize-release
+      - docs-attestation
     steps:
       - name: Dispatch hitkeep-docs release synchronization
+        env:
+          SOURCE_WORKFLOW_SHA256: ${{ needs.docs-attestation.outputs.source_workflow_sha256 }}
+          SOURCE_CATALOG_SHA256: ${{ needs.docs-attestation.outputs.source_catalog_sha256 }}
+          SOURCE_EXAMPLE_SHA256: ${{ needs.docs-attestation.outputs.source_example_sha256 }}
+          SOURCE_MANIFEST_SHA256: ${{ needs.docs-attestation.outputs.source_manifest_sha256 }}
         run: |
-          source_workflow_sha256="$(gh api -H 'Accept: application/vnd.github.raw+json' \"repos/$GITHUB_REPOSITORY/contents/.github/workflows/release.yml?ref=$GITHUB_SHA\" | sha256sum | awk '{print $1}')"
           gh workflow run sync-hitkeep-release.yml \\
+            -f prepublication=false \\
             -f source_run_id="${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}" \\
             -f source_head_sha="${GITHUB_SHA}" \\
-            -f source_workflow_sha256="${source_workflow_sha256}"
+            -f source_workflow_sha256="${SOURCE_WORKFLOW_SHA256}" \\
+            -f source_catalog_sha256="${SOURCE_CATALOG_SHA256}" \\
+            -f source_example_sha256="${SOURCE_EXAMPLE_SHA256}" \\
+            -f source_manifest_sha256="${SOURCE_MANIFEST_SHA256}"
   deploy-cloud:
     needs: finalize-release
 `)

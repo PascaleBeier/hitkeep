@@ -253,6 +253,32 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 	if !attestedRelease {
 		return fmt.Errorf("release workflow must block publication on an immutable documentation attestation")
 	}
+	if !strings.Contains(workflowText, "-f prepublication=true") {
+		return fmt.Errorf("release workflow documentation attestation must be prepublication-only")
+	}
+	postPublicationSync := false
+	for _, step := range workflow.Jobs["sync-docs-release"].Steps {
+		required := []string{
+			"-f prepublication=false",
+			"source_workflow_sha256=\"${SOURCE_WORKFLOW_SHA256}\"",
+			"source_catalog_sha256=\"${SOURCE_CATALOG_SHA256}\"",
+			"source_example_sha256=\"${SOURCE_EXAMPLE_SHA256}\"",
+			"source_manifest_sha256=\"${SOURCE_MANIFEST_SHA256}\"",
+		}
+		if slices.ContainsFunc(required, func(fragment string) bool { return !strings.Contains(step.Run, fragment) }) {
+			continue
+		}
+		if step.Env["SOURCE_WORKFLOW_SHA256"] == "${{ needs.docs-attestation.outputs.source_workflow_sha256 }}" &&
+			step.Env["SOURCE_CATALOG_SHA256"] == "${{ needs.docs-attestation.outputs.source_catalog_sha256 }}" &&
+			step.Env["SOURCE_EXAMPLE_SHA256"] == "${{ needs.docs-attestation.outputs.source_example_sha256 }}" &&
+			step.Env["SOURCE_MANIFEST_SHA256"] == "${{ needs.docs-attestation.outputs.source_manifest_sha256 }}" {
+			postPublicationSync = true
+			break
+		}
+	}
+	if !postPublicationSync {
+		return fmt.Errorf("release workflow post-publication documentation synchronization must use the attested immutable inputs")
+	}
 	return nil
 }
 

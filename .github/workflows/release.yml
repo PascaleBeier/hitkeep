@@ -314,6 +314,11 @@ jobs:
 
   docs-attestation:
     name: Attest release documentation before publication
+    outputs:
+      source_workflow_sha256: ${{ steps.dispatch.outputs.source_workflow_sha256 }}
+      source_catalog_sha256: ${{ steps.dispatch.outputs.source_catalog_sha256 }}
+      source_example_sha256: ${{ steps.dispatch.outputs.source_example_sha256 }}
+      source_manifest_sha256: ${{ steps.dispatch.outputs.source_manifest_sha256 }}
     needs:
       - release-please
       - build-release
@@ -328,9 +333,10 @@ jobs:
       contents: read
     steps:
       - name: Dispatch and verify exact documentation attestation
+        id: dispatch
         env:
           DOCS_REPOSITORY: PascaleBeier/hitkeep-docs
-          DOCS_WORKFLOW_SHA256: 222ee0a991741b076d9571d2315e7859daf20b3176742420b748ab2c5c53f291
+          DOCS_WORKFLOW_SHA256: 80083d2a22d46da085b9c2197a3ba4750be85c22f588e25f5296602a421a3c95
           GH_TOKEN: ${{ secrets.HITKEEP_DOCS_DISPATCH_TOKEN }}
           TAG: ${{ needs.release-please.outputs.tag_name }}
         shell: bash
@@ -366,12 +372,17 @@ jobs:
             echo 'invalid immutable documentation attestation policy' >&2
             exit 1
           fi
+          printf 'source_workflow_sha256=%s\n' "$source_workflow_sha256" >> "$GITHUB_OUTPUT"
+          printf 'source_catalog_sha256=%s\n' "$catalog_sha256" >> "$GITHUB_OUTPUT"
+          printf 'source_example_sha256=%s\n' "$example_sha256" >> "$GITHUB_OUTPUT"
+          printf 'source_manifest_sha256=%s\n' "$manifest_sha256" >> "$GITHUB_OUTPUT"
           source_run_id="${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
           gh workflow run sync-hitkeep-release.yml \
             --repo "$DOCS_REPOSITORY" \
             --ref main \
             -f tag="$TAG" \
             -f dry_run=false \
+            -f prepublication=true \
             -f source_run_id="$source_run_id" \
             -f source_head_sha="$GITHUB_SHA" \
             -f source_workflow_sha256="$source_workflow_sha256" \
@@ -379,7 +390,7 @@ jobs:
             -f source_example_sha256="$example_sha256" \
             -f source_manifest_sha256="$manifest_sha256"
           docs_run_id=""
-          expected_title="Finalize HitKeep $TAG (publish) · source $source_run_id"
+          expected_title="Finalize HitKeep $TAG (attest) · source $source_run_id"
           for attempt in {1..30}; do
             docs_run_id="$(gh run list --repo "$DOCS_REPOSITORY" --workflow sync-hitkeep-release.yml --event workflow_dispatch --limit 50 --json databaseId,displayTitle,createdAt | jq -r --arg title "$expected_title" 'map(select(.displayTitle == $title)) | sort_by(.createdAt) | last.databaseId // empty')"
             if [[ -n "$docs_run_id" ]]; then
@@ -528,7 +539,8 @@ jobs:
     needs:
       - release-please
       - finalize-release
-    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.finalize-release.result == 'success' }}
+      - docs-attestation
+    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.finalize-release.result == 'success' && needs.docs-attestation.result == 'success' }}
     runs-on: ubuntu-latest
     continue-on-error: true
     timeout-minutes: 5
@@ -540,6 +552,10 @@ jobs:
           DOWNSTREAM_REPOSITORY: PascaleBeier/hitkeep-docs
           GH_TOKEN: ${{ secrets.HITKEEP_DOCS_DISPATCH_TOKEN }}
           TAG: ${{ needs.release-please.outputs.tag_name }}
+          SOURCE_WORKFLOW_SHA256: ${{ needs.docs-attestation.outputs.source_workflow_sha256 }}
+          SOURCE_CATALOG_SHA256: ${{ needs.docs-attestation.outputs.source_catalog_sha256 }}
+          SOURCE_EXAMPLE_SHA256: ${{ needs.docs-attestation.outputs.source_example_sha256 }}
+          SOURCE_MANIFEST_SHA256: ${{ needs.docs-attestation.outputs.source_manifest_sha256 }}
         run: |
           set -uo pipefail
 
@@ -548,12 +564,11 @@ jobs:
             exit 0
           fi
 
-          source_workflow_sha256="$(
-            gh api -H 'Accept: application/vnd.github.raw+json' \
-              "repos/$GITHUB_REPOSITORY/contents/.github/workflows/release.yml?ref=$GITHUB_SHA" \
-              | sha256sum | awk '{print $1}'
-          )"
-          if [[ ! "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ || ! "$source_workflow_sha256" =~ ^[a-f0-9]{64}$ ]]; then
+          if [[ ! "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ ||
+            ! "$SOURCE_WORKFLOW_SHA256" =~ ^[a-f0-9]{64}$ ||
+            ! "$SOURCE_CATALOG_SHA256" =~ ^[a-f0-9]{64}$ ||
+            ! "$SOURCE_EXAMPLE_SHA256" =~ ^[a-f0-9]{64}$ ||
+            ! "$SOURCE_MANIFEST_SHA256" =~ ^[a-f0-9]{64}$ ]]; then
             echo "::warning::Documentation synchronization was not dispatched because the immutable producer attestation is invalid"
             exit 0
           fi
@@ -563,9 +578,13 @@ jobs:
             --ref main \
             -f tag="${TAG}" \
             -f dry_run=false \
+            -f prepublication=false \
             -f source_run_id="${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}" \
             -f source_head_sha="${GITHUB_SHA}" \
-            -f source_workflow_sha256="${source_workflow_sha256}"; then
+            -f source_workflow_sha256="${SOURCE_WORKFLOW_SHA256}" \
+            -f source_catalog_sha256="${SOURCE_CATALOG_SHA256}" \
+            -f source_example_sha256="${SOURCE_EXAMPLE_SHA256}" \
+            -f source_manifest_sha256="${SOURCE_MANIFEST_SHA256}"; then
             echo "::warning::Documentation synchronization could not be dispatched; the HitKeep release remains successful"
             exit 0
           fi
