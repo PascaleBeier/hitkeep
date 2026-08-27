@@ -42,8 +42,10 @@ func TestExecuteUpdateListFlagSubprocessParity(t *testing.T) {
 			if got := stdout.String(); got != "" {
 				t.Errorf("stdout = %q, want empty", got)
 			}
-			if got := stderr.String(); !strings.HasPrefix(got, "flag provided but not defined: -unknown\nUsage of "+commandName+":\n") {
-				t.Errorf("stderr = %q, want stdlib flag failure without duplicate command error", got)
+			expectedError := "flag provided but not defined: -unknown\n"
+			expectedUsage := "Usage of " + commandName + ":\n"
+			if got := stderr.String(); !strings.HasPrefix(got, expectedError+expectedUsage) || strings.Count(got, expectedError) != 1 || strings.Count(got, expectedUsage) != 1 || strings.Contains(got, "\nError:") {
+				t.Errorf("stderr = %q, want one flag error and usage block without command error", got)
 			}
 		})
 	}

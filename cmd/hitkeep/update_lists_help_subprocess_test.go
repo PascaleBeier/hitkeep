@@ -45,8 +45,9 @@ func TestExecuteUpdateListHelpSubprocessParity(t *testing.T) {
 			if got := stdout.String(); got != "" {
 				t.Errorf("stdout = %q, want empty", got)
 			}
-			if got := stderr.String(); !strings.HasPrefix(got, "Usage of "+tt.commandName+":\n") {
-				t.Errorf("stderr = %q, want stdlib help", got)
+			expectedUsage := "Usage of " + tt.commandName + ":\n"
+			if got := stderr.String(); !strings.HasPrefix(got, expectedUsage) || strings.Count(got, expectedUsage) != 1 || strings.Contains(got, "\nError:") {
+				t.Errorf("stderr = %q, want one usage block without command error", got)
 			}
 		})
 	}

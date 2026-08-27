@@ -33,8 +33,9 @@ func TestExecuteImportSubprocessParity(t *testing.T) {
 		mode       string
 		wantCode   int
 		wantPrefix string
+		wantUsage  bool
 	}{
-		{name: "help", mode: "help", wantCode: 0, wantPrefix: "Usage of import:\n"},
+		{name: "help", mode: "help", wantCode: 0, wantPrefix: "Usage of import:\n", wantUsage: true},
 		{name: "missing token", mode: "missing-token", wantCode: 2, wantPrefix: "--token or HITKEEP_API_TOKEN is required\n"},
 	}
 	for _, tt := range tests {
@@ -55,8 +56,13 @@ func TestExecuteImportSubprocessParity(t *testing.T) {
 			if got := stdout.String(); got != "" {
 				t.Errorf("stdout = %q, want empty", got)
 			}
-			if got := stderr.String(); !strings.HasPrefix(got, tt.wantPrefix) {
-				t.Errorf("stderr = %q, want prefix %q", got, tt.wantPrefix)
+			expectedUsage := "Usage of import:\n"
+			wantUsageCount := 0
+			if tt.wantUsage {
+				wantUsageCount = 1
+			}
+			if got := stderr.String(); !strings.HasPrefix(got, tt.wantPrefix) || strings.Count(got, tt.wantPrefix) != 1 || strings.Count(got, expectedUsage) != wantUsageCount || strings.Contains(got, "\nError:") {
+				t.Errorf("stderr = %q, want one expected message and %d usage blocks without command error", got, wantUsageCount)
 			}
 		})
 	}
