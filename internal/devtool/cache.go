@@ -201,7 +201,7 @@ func (a *App) dockerComposeCacheVolumes() []CacheEntry {
 	}
 
 	entries := make([]CacheEntry, 0, len(names))
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		var volume dockerVolume
 		if json.Unmarshal([]byte(line), &volume) != nil || !isPrunableDockerComposeCacheVolume(volume, a.workspace.ComposeProject) {
 			continue

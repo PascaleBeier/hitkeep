@@ -3,15 +3,19 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
 	"testing"
 	"time"
+
+	"hitkeep/internal/database"
 )
 
 func TestProductionMainSignalCancelsRunningApplication(t *testing.T) {
@@ -20,6 +24,8 @@ func TestProductionMainSignalCancelsRunningApplication(t *testing.T) {
 		main()
 		return
 	}
+
+	dbPath, dataPath := prepareSplitCompleteSignalDatabase(t)
 
 	for _, signal := range []struct {
 		name string
@@ -36,8 +42,8 @@ func TestProductionMainSignalCancelsRunningApplication(t *testing.T) {
 				"HITKEEP_BIND_ADDR="+testSignalAddress(t),
 				"HITKEEP_NSQ_TCP_ADDRESS="+testSignalAddress(t),
 				"HITKEEP_NSQ_HTTP_ADDRESS="+testSignalAddress(t),
-				"HITKEEP_DB_PATH="+t.TempDir()+"/hitkeep.db",
-				"HITKEEP_DATA_PATH="+t.TempDir(),
+				"HITKEEP_DB_PATH="+dbPath,
+				"HITKEEP_DATA_PATH="+dataPath,
 				"HITKEEP_DB_COMPACT_ON_START=false",
 			)
 			stdout, err := command.StdoutPipe()
@@ -120,6 +126,27 @@ func TestProductionMainSignalCancelsRunningApplication(t *testing.T) {
 			waited = true
 		})
 	}
+}
+
+// prepareSplitCompleteSignalDatabase keeps this test focused on full application readiness and signal shutdown; default-tenant migration has dedicated acceptance coverage.
+func prepareSplitCompleteSignalDatabase(t *testing.T) (string, string) {
+	t.Helper()
+
+	ctx := context.Background()
+	root := t.TempDir()
+	dbPath := filepath.Join(root, "hitkeep.db")
+	dataPath := filepath.Join(root, "data")
+	store, err := database.OpenDefaultSplitControlStore(ctx, dbPath)
+	if err != nil {
+		t.Fatalf("open default split control store: %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("close default split control store: %v", err)
+	}
+	if err := database.RunDefaultTenantSplit(ctx, dbPath, dataPath); err != nil {
+		t.Fatalf("prepare split-complete signal database: %v", err)
+	}
+	return dbPath, dataPath
 }
 
 type lockedBuffer struct {
