@@ -187,7 +187,7 @@ jobs:
             HITKEEP_CANDIDATE_CHART="$candidate_chart" \
             HITKEEP_CANDIDATE_CHART_VERSION="$CANDIDATE_VERSION" \
             HITKEEP_KIND_CLUSTER="$cluster" \
-            ./scripts/helm-smoke.sh "$CANDIDATE_IMAGE" self-hosted
+            bash ./scripts/helm-smoke.sh "$CANDIDATE_IMAGE" self-hosted
 
   link-release-blog:
     name: Link release blog

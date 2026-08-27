@@ -72,7 +72,7 @@ image_values() {
 deploy() {
   local chart="$2"
   image_values "$1"
-  helm upgrade --install "$release" "$chart" \\
+  helm upgrade --install "$release" "$chart" \
     --namespace "$namespace" \
     --create-namespace \
     --wait \
