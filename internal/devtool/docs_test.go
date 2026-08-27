@@ -107,9 +107,10 @@ func TestValidateReleaseMetadata(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		writeFixtureFile(t, root, ".github/workflows/release.yml", string(workflow)+"\n# gh run watch\n")
+		invalid := strings.Replace(string(workflow), "  deploy-cloud:", "      - name: Watch downstream docs\n        run: gh run watch\n  deploy-cloud:", 1)
+		writeFixtureFile(t, root, ".github/workflows/release.yml", invalid)
 		err = validateReleaseMetadata(root)
-		if err == nil || !strings.Contains(err.Error(), "must not surface downstream documentation workflow failures") {
+		if err == nil || !strings.Contains(err.Error(), "post-publication docs notification must not surface downstream failures") {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
@@ -297,6 +298,33 @@ jobs:
       - name: Pack verified tracker artifact
         run: npm pack --json
       - name: Upload verified tracker artifact
+  docs-attestation:
+    needs:
+      - release-please
+      - build-release
+      - migration-interruption
+      - upgrade-from-v2-12
+      - publish-helm
+      - verify-tracker-package
+    steps:
+      - name: Dispatch and verify exact documentation attestation
+        env:
+          DOCS_REPOSITORY: PascaleBeier/hitkeep-docs
+          DOCS_WORKFLOW_SHA256: 222ee0a991741b076d9571d2315e7859daf20b3176742420b748ab2c5c53f291
+        run: |
+          gh workflow run sync-hitkeep-release.yml --ref main \\
+            -f source_run_id="$source_run_id" \\
+            -f source_head_sha="$GITHUB_SHA" \\
+            -f source_workflow_sha256="$source_workflow_sha256" \\
+            -f source_catalog_sha256="$catalog_sha256" \\
+            -f source_example_sha256="$example_sha256" \\
+            -f source_manifest_sha256="$manifest_sha256"
+          gh run list --event workflow_dispatch
+          gh run watch "$docs_run_id"
+          gh api "repos/$DOCS_REPOSITORY/actions/runs/$docs_run_id"
+          gh api "repos/$DOCS_REPOSITORY/check-suites/$check_suite_id"
+          gh run download "$docs_run_id" --name hitkeep-docs-release-attestation
+          jq '.id == $run_id and .head_sha == $docs_head_sha and .app.id == 15368 and .conclusion == "success" and .source.tag == $tag and .source.run_id == $source_run_id'
   finalize-release:
     needs:
       - release-please
@@ -305,6 +333,7 @@ jobs:
       - upgrade-from-v2-12
       - publish-helm
       - verify-tracker-package
+      - docs-attestation
     steps:
       - name: Download verified tracker artifact
       - name: Publish immutable tracker candidate

@@ -16,6 +16,7 @@ import (
 )
 
 var releaseVersionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
+var workflowSHA256Pattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 var configurationEnvironmentPattern = regexp.MustCompile(`\bHITKEEP_[A-Z0-9_]+\b`)
 var composeConfigurationDefaultPattern = regexp.MustCompile(`\$\{(HITKEEP_[A-Z0-9_]+):-([^}]*)\}`)
 var dockerfileDataPathPattern = regexp.MustCompile(`(?m)^\s*ENV\s+HITKEEP_DATA_PATH(?:=|\s+)(?:"([^"]+)"|'([^']+)'|([^\s#]+))`)
@@ -104,7 +105,8 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 		"upgrade-from-v2-12":     {"build-release"},
 		"publish-helm":           {"build-release"},
 		"verify-tracker-package": {"build-release"},
-		"finalize-release":       {"release-please", "build-release", "migration-interruption", "upgrade-from-v2-12", "publish-helm", "verify-tracker-package"},
+		"docs-attestation":       {"release-please", "build-release", "migration-interruption", "upgrade-from-v2-12", "publish-helm", "verify-tracker-package"},
+		"finalize-release":       {"release-please", "build-release", "migration-interruption", "upgrade-from-v2-12", "publish-helm", "verify-tracker-package", "docs-attestation"},
 		"sync-docs-release":      {"finalize-release"},
 		"deploy-cloud":           {"finalize-release"},
 	} {
@@ -216,21 +218,40 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 		previous = position
 		previousName = name
 	}
-	docsDispatch := workflow.Jobs["sync-docs-release"]
-	attestedDispatch := false
-	for _, step := range docsDispatch.Steps {
-		if strings.Contains(step.Run, "sync-hitkeep-release.yml") &&
-			strings.Contains(step.Run, "source_run_id=\"${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}\"") &&
-			strings.Contains(step.Run, "source_head_sha=\"${GITHUB_SHA}\"") &&
-			strings.Contains(step.Run, "source_workflow_sha256=\"${source_workflow_sha256}\"") &&
-			strings.Contains(step.Run, "repos/$GITHUB_REPOSITORY/contents/.github/workflows/release.yml?ref=$GITHUB_SHA") &&
-			strings.Contains(step.Run, "sha256sum") {
-			attestedDispatch = true
+	docsAttestation := workflow.Jobs["docs-attestation"]
+	attestedRelease := false
+	for _, step := range docsAttestation.Steps {
+		required := []string{
+			"gh workflow run sync-hitkeep-release.yml",
+			"--ref main",
+			"--event workflow_dispatch",
+			"source_run_id=\"$source_run_id\"",
+			"source_head_sha=\"$GITHUB_SHA\"",
+			"source_workflow_sha256=\"$source_workflow_sha256\"",
+			"source_catalog_sha256=\"$catalog_sha256\"",
+			"source_example_sha256=\"$example_sha256\"",
+			"source_manifest_sha256=\"$manifest_sha256\"",
+			"gh run watch \"$docs_run_id\"",
+			"actions/runs/$docs_run_id",
+			".id == $run_id",
+			".head_sha == $docs_head_sha",
+			"check-suites/$check_suite_id",
+			".app.id == 15368",
+			"hitkeep-docs-release-attestation",
+			".conclusion == \"success\"",
+			".source.tag == $tag",
+			".source.run_id == $source_run_id",
+		}
+		if slices.ContainsFunc(required, func(fragment string) bool { return !strings.Contains(step.Run, fragment) }) {
+			continue
+		}
+		if step.Env["DOCS_REPOSITORY"] == "PascaleBeier/hitkeep-docs" && workflowSHA256Pattern.MatchString(step.Env["DOCS_WORKFLOW_SHA256"]) {
+			attestedRelease = true
 			break
 		}
 	}
-	if !attestedDispatch {
-		return fmt.Errorf("release workflow docs dispatch must send the immutable source run, head SHA, and workflow hash")
+	if !attestedRelease {
+		return fmt.Errorf("release workflow must block publication on an immutable documentation attestation")
 	}
 	return nil
 }
@@ -716,11 +737,11 @@ func validateReleaseMetadata(root string) error {
 			return fmt.Errorf(".goreleaser.yaml is missing release configuration artifact %q", artifact)
 		}
 	}
-	releaseWorkflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "release.yml"))
+	releaseWorkflowRaw, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "release.yml"))
 	if err != nil {
 		return err
 	}
-	if err := validateReleaseWorkflowGraph(releaseWorkflow); err != nil {
+	if err := validateReleaseWorkflowGraph(releaseWorkflowRaw); err != nil {
 		return err
 	}
 	migrationWorkflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "default-tenant-migration-acceptance.yml"))
@@ -730,9 +751,15 @@ func validateReleaseMetadata(root string) error {
 	if err := validateDefaultTenantMigrationAcceptanceWorkflow(migrationWorkflow); err != nil {
 		return err
 	}
-	for _, fragment := range []string{"gh run watch", "--log-failed", "::error::hitkeep-docs"} {
-		if bytes.Contains(releaseWorkflow, []byte(fragment)) {
-			return fmt.Errorf(".github/workflows/release.yml must not surface downstream documentation workflow failures through %q", fragment)
+	var parsedReleaseWorkflow releaseWorkflow
+	if err := yaml.Unmarshal(releaseWorkflowRaw, &parsedReleaseWorkflow); err != nil {
+		return fmt.Errorf("decode release workflow: %w", err)
+	}
+	for _, step := range parsedReleaseWorkflow.Jobs["sync-docs-release"].Steps {
+		for _, fragment := range []string{"gh run watch", "--log-failed", "::error::hitkeep-docs"} {
+			if strings.Contains(step.Run, fragment) {
+				return fmt.Errorf("release workflow post-publication docs notification must not surface downstream failures through %q", fragment)
+			}
 		}
 	}
 	return nil

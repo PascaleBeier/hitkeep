@@ -56,6 +56,33 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
       - name: Upload verified tracker artifact
   link-release-blog:
     needs: release-please
+  docs-attestation:
+    needs:
+      - release-please
+      - build-release
+      - migration-interruption
+      - upgrade-from-v2-12
+      - publish-helm
+      - verify-tracker-package
+    steps:
+      - name: Dispatch and verify exact documentation attestation
+        env:
+          DOCS_REPOSITORY: PascaleBeier/hitkeep-docs
+          DOCS_WORKFLOW_SHA256: 222ee0a991741b076d9571d2315e7859daf20b3176742420b748ab2c5c53f291
+        run: |
+          gh workflow run sync-hitkeep-release.yml --ref main \\
+            -f source_run_id="$source_run_id" \\
+            -f source_head_sha="$GITHUB_SHA" \\
+            -f source_workflow_sha256="$source_workflow_sha256" \\
+            -f source_catalog_sha256="$catalog_sha256" \\
+            -f source_example_sha256="$example_sha256" \\
+            -f source_manifest_sha256="$manifest_sha256"
+          gh run list --event workflow_dispatch
+          gh run watch "$docs_run_id"
+          gh api "repos/$DOCS_REPOSITORY/actions/runs/$docs_run_id"
+          gh api "repos/$DOCS_REPOSITORY/check-suites/$check_suite_id"
+          gh run download "$docs_run_id" --name hitkeep-docs-release-attestation
+          jq '.id == $run_id and .head_sha == $docs_head_sha and .app.id == 15368 and .conclusion == "success" and .source.tag == $tag and .source.run_id == $source_run_id'
   finalize-release:
     needs:
       - release-please
@@ -64,6 +91,7 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
       - upgrade-from-v2-12
       - publish-helm
       - verify-tracker-package
+      - docs-attestation
     steps:
       - name: Download verified tracker artifact
       - name: Publish immutable tracker candidate
@@ -158,8 +186,30 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
 		t.Fatal("validateReleaseWorkflowGraph() accepted secrets.GHT in the finalizer")
 	}
 
-	missingDocsAttestation := strings.Replace(workflow, "source_workflow_sha256=\"${source_workflow_sha256}\"", "source_workflow_sha256=\"\"", 1)
-	if err := validateReleaseWorkflowGraph([]byte(missingDocsAttestation)); err == nil {
-		t.Fatal("validateReleaseWorkflowGraph() accepted a docs dispatch without the immutable source workflow hash")
+	for _, test := range []struct {
+		name string
+		old  string
+		new  string
+	}{
+		{"missing gate", "  docs-attestation:\n", "  docs-attestation-missing:\n"},
+		{"wrong repository", "DOCS_REPOSITORY: PascaleBeier/hitkeep-docs", "DOCS_REPOSITORY: other/docs"},
+		{"wrong workflow", "sync-hitkeep-release.yml", "other.yml"},
+		{"wrong ref", "--ref main", "--ref release"},
+		{"wrong event", "--event workflow_dispatch", "--event push"},
+		{"stale trusted producer run", ".source.run_id == $source_run_id", ".source.run_id == \"old-run\""},
+		{"different tag", ".source.tag == $tag", ".source.tag == \"v9.9.9\""},
+		{"wrong head", ".head_sha == $docs_head_sha", ".head_sha == \"bad\""},
+		{"wrong run", ".id == $run_id", ".id == 0"},
+		{"wrong conclusion", ".conclusion == \"success\"", ".conclusion == \"failure\""},
+		{"wrong app", ".app.id == 15368", ".app.id == 1"},
+		{"wrong workflow hash", "DOCS_WORKFLOW_SHA256: 222ee0a991741b076d9571d2315e7859daf20b3176742420b748ab2c5c53f291", "DOCS_WORKFLOW_SHA256: invalid"},
+		{"missing artifact", "hitkeep-docs-release-attestation", "missing-attestation"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			invalid := strings.Replace(workflow, test.old, test.new, 1)
+			if err := validateReleaseWorkflowGraph([]byte(invalid)); err == nil {
+				t.Fatalf("validateReleaseWorkflowGraph() accepted %s", test.name)
+			}
+		})
 	}
 }

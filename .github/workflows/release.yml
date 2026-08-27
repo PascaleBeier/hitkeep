@@ -312,6 +312,113 @@ jobs:
           retention-days: 5
           compression-level: 0
 
+  docs-attestation:
+    name: Attest release documentation before publication
+    needs:
+      - release-please
+      - build-release
+      - migration-interruption
+      - upgrade-from-v2-12
+      - publish-helm
+      - verify-tracker-package
+    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' && needs.migration-interruption.result == 'success' && needs.upgrade-from-v2-12.result == 'success' && needs.publish-helm.result == 'success' && needs.verify-tracker-package.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Dispatch and verify exact documentation attestation
+        env:
+          DOCS_REPOSITORY: PascaleBeier/hitkeep-docs
+          DOCS_WORKFLOW_SHA256: 222ee0a991741b076d9571d2315e7859daf20b3176742420b748ab2c5c53f291
+          GH_TOKEN: ${{ secrets.HITKEEP_DOCS_DISPATCH_TOKEN }}
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo 'documentation attestation requires HITKEEP_DOCS_DISPATCH_TOKEN' >&2
+            exit 1
+          fi
+          workdir="$(mktemp -d)"
+          trap 'rm -rf "$workdir"' EXIT
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir "$workdir" \
+            --pattern hitkeep-configuration.json \
+            --pattern hitkeep.example.yaml \
+            --pattern hitkeep-configuration-manifest.json
+          catalog_sha256="$(sha256sum "$workdir/hitkeep-configuration.json" | awk '{print $1}')"
+          example_sha256="$(sha256sum "$workdir/hitkeep.example.yaml" | awk '{print $1}')"
+          manifest_sha256="$(sha256sum "$workdir/hitkeep-configuration-manifest.json" | awk '{print $1}')"
+          source_workflow_sha256="$(
+            gh api -H 'Accept: application/vnd.github.raw+json' \
+              "repos/$GITHUB_REPOSITORY/contents/.github/workflows/release.yml?ref=$GITHUB_SHA" \
+              | sha256sum | awk '{print $1}'
+          )"
+          docs_head_sha="$(gh api "repos/$DOCS_REPOSITORY/git/ref/heads/main" --jq .object.sha)"
+          docs_workflow_sha256="$(
+            gh api -H 'Accept: application/vnd.github.raw+json' \
+              "repos/$DOCS_REPOSITORY/contents/.github/workflows/sync-hitkeep-release.yml?ref=$docs_head_sha" \
+              | sha256sum | awk '{print $1}'
+          )"
+          if [[ ! "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ || ! "$docs_head_sha" =~ ^[a-f0-9]{40}$ ||
+            ! "$source_workflow_sha256" =~ ^[a-f0-9]{64}$ || ! "$docs_workflow_sha256" =~ ^[a-f0-9]{64}$ ||
+            "$docs_workflow_sha256" != "$DOCS_WORKFLOW_SHA256" ]]; then
+            echo 'invalid immutable documentation attestation policy' >&2
+            exit 1
+          fi
+          source_run_id="${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
+          gh workflow run sync-hitkeep-release.yml \
+            --repo "$DOCS_REPOSITORY" \
+            --ref main \
+            -f tag="$TAG" \
+            -f dry_run=false \
+            -f source_run_id="$source_run_id" \
+            -f source_head_sha="$GITHUB_SHA" \
+            -f source_workflow_sha256="$source_workflow_sha256" \
+            -f source_catalog_sha256="$catalog_sha256" \
+            -f source_example_sha256="$example_sha256" \
+            -f source_manifest_sha256="$manifest_sha256"
+          docs_run_id=""
+          expected_title="Finalize HitKeep $TAG (publish) · source $source_run_id"
+          for attempt in {1..30}; do
+            docs_run_id="$(gh run list --repo "$DOCS_REPOSITORY" --workflow sync-hitkeep-release.yml --event workflow_dispatch --limit 50 --json databaseId,displayTitle,createdAt | jq -r --arg title "$expected_title" 'map(select(.displayTitle == $title)) | sort_by(.createdAt) | last.databaseId // empty')"
+            if [[ -n "$docs_run_id" ]]; then
+              break
+            fi
+            sleep 2
+          done
+          if [[ -z "$docs_run_id" ]]; then
+            echo 'timed out locating documentation attestation run' >&2
+            exit 1
+          fi
+          gh run watch "$docs_run_id" --repo "$DOCS_REPOSITORY" --exit-status
+          gh api "repos/$DOCS_REPOSITORY/actions/runs/$docs_run_id" > "$workdir/docs-run.json"
+          check_suite_id="$(jq -r '.check_suite_id // empty' "$workdir/docs-run.json")"
+          if [[ ! "$check_suite_id" =~ ^[1-9][0-9]*$ ]]; then
+            echo 'documentation run has no check suite' >&2
+            exit 1
+          fi
+          gh api "repos/$DOCS_REPOSITORY/check-suites/$check_suite_id" > "$workdir/docs-check-suite.json"
+          jq -e --argjson run_id "$docs_run_id" --arg docs_head_sha "$docs_head_sha" '
+            .id == $run_id and .repository.full_name == "PascaleBeier/hitkeep-docs" and
+            .path == ".github/workflows/sync-hitkeep-release.yml" and .event == "workflow_dispatch" and
+            .head_branch == "main" and .head_sha == $docs_head_sha and .status == "completed" and .conclusion == "success"
+          ' "$workdir/docs-run.json" >/dev/null
+          jq -e '.app.id == 15368 and .app.slug == "github-actions"' "$workdir/docs-check-suite.json" >/dev/null
+          gh run download "$docs_run_id" --repo "$DOCS_REPOSITORY" --name hitkeep-docs-release-attestation --dir "$workdir"
+          attestation="$workdir/hitkeep-docs-release-attestation.json"
+          jq -e --arg tag "$TAG" --arg source_commit "$GITHUB_SHA" --arg source_run_id "$source_run_id" \
+            --arg catalog_sha256 "$catalog_sha256" --arg example_sha256 "$example_sha256" --arg manifest_sha256 "$manifest_sha256" '
+            .schema_version == "hitkeep.docs-attestation/v1" and
+            .source.repository == "PascaleBeier/hitkeep" and .source.tag == $tag and
+            .source.commit == $source_commit and .source.run_id == $source_run_id and
+            .source.catalog_sha256 == $catalog_sha256 and .source.example_sha256 == $example_sha256 and
+            .source.manifest_sha256 == $manifest_sha256 and .docs.repository == "PascaleBeier/hitkeep-docs" and
+            (.docs.commit | test("^[a-f0-9]{40}$"))
+          ' "$attestation" >/dev/null
+          docs_commit="$(jq -r '.docs.commit' "$attestation")"
+          [[ "$(gh api "repos/$DOCS_REPOSITORY/commits/$docs_commit" --jq .sha)" == "$docs_commit" ]]
+
   finalize-release:
     name: Promote and publish release
     needs:
@@ -321,7 +428,8 @@ jobs:
       - upgrade-from-v2-12
       - publish-helm
       - verify-tracker-package
-    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' && needs.migration-interruption.result == 'success' && needs.upgrade-from-v2-12.result == 'success' && needs.publish-helm.result == 'success' && needs.verify-tracker-package.result == 'success' }}
+      - docs-attestation
+    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' && needs.migration-interruption.result == 'success' && needs.upgrade-from-v2-12.result == 'success' && needs.publish-helm.result == 'success' && needs.verify-tracker-package.result == 'success' && needs.docs-attestation.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
