@@ -71,8 +71,7 @@ func executeSmoke(ctx context.Context, args []string, stdout, stderr io.Writer, 
 		if errors.Is(err, errSmokeNotReleaseReady) {
 			return 2
 		}
-		var syntaxError *smokeSyntaxError
-		if errors.As(err, &syntaxError) {
+		if syntaxError, ok := errors.AsType[*smokeSyntaxError](err); ok {
 			fmt.Fprintln(stderr, syntaxError)
 			writeSmokeUsage(stderr, cmd)
 			return 2

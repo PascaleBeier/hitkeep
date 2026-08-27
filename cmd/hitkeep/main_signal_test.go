@@ -33,7 +33,7 @@ func TestProductionMainSignalCancelsRunningApplication(t *testing.T) {
 			command.Env = append(os.Environ(),
 				"HITKEEP_PRODUCTION_SIGNAL_SUBPROCESS=1",
 				"HITKEEP_HTTP_ADDR=127.0.0.1:0",
-				"HITKEEP_BIND_ADDR=127.0.0.1",
+				"HITKEEP_BIND_ADDR="+testSignalAddress(t),
 				"HITKEEP_NSQ_TCP_ADDRESS="+testSignalAddress(t),
 				"HITKEEP_NSQ_HTTP_ADDRESS="+testSignalAddress(t),
 				"HITKEEP_DB_PATH="+t.TempDir()+"/hitkeep.db",
