@@ -216,6 +216,22 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 		previous = position
 		previousName = name
 	}
+	docsDispatch := workflow.Jobs["sync-docs-release"]
+	attestedDispatch := false
+	for _, step := range docsDispatch.Steps {
+		if strings.Contains(step.Run, "sync-hitkeep-release.yml") &&
+			strings.Contains(step.Run, "source_run_id=\"${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}\"") &&
+			strings.Contains(step.Run, "source_head_sha=\"${GITHUB_SHA}\"") &&
+			strings.Contains(step.Run, "source_workflow_sha256=\"${source_workflow_sha256}\"") &&
+			strings.Contains(step.Run, "repos/$GITHUB_REPOSITORY/contents/.github/workflows/release.yml?ref=$GITHUB_SHA") &&
+			strings.Contains(step.Run, "sha256sum") {
+			attestedDispatch = true
+			break
+		}
+	}
+	if !attestedDispatch {
+		return fmt.Errorf("release workflow docs dispatch must send the immutable source run, head SHA, and workflow hash")
+	}
 	return nil
 }
 

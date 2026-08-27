@@ -76,6 +76,14 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
       - name: Publish draft GitHub release
   sync-docs-release:
     needs: finalize-release
+    steps:
+      - name: Dispatch hitkeep-docs release synchronization
+        run: |
+          source_workflow_sha256="$(gh api -H 'Accept: application/vnd.github.raw+json' \"repos/$GITHUB_REPOSITORY/contents/.github/workflows/release.yml?ref=$GITHUB_SHA\" | sha256sum | awk '{print $1}')"
+          gh workflow run sync-hitkeep-release.yml \\
+            -f source_run_id="${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}" \\
+            -f source_head_sha="${GITHUB_SHA}" \\
+            -f source_workflow_sha256="${source_workflow_sha256}"
   deploy-cloud:
     needs: finalize-release
 `
@@ -148,5 +156,10 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
 	patFinalizer := strings.Replace(workflow, "      - name: Publish draft GitHub release", "      - name: Publish draft GitHub release\n        env:\n          GH_TOKEN: ${{ secrets.GHT }}", 1)
 	if err := validateReleaseWorkflowGraph([]byte(patFinalizer)); err == nil {
 		t.Fatal("validateReleaseWorkflowGraph() accepted secrets.GHT in the finalizer")
+	}
+
+	missingDocsAttestation := strings.Replace(workflow, "source_workflow_sha256=\"${source_workflow_sha256}\"", "source_workflow_sha256=\"\"", 1)
+	if err := validateReleaseWorkflowGraph([]byte(missingDocsAttestation)); err == nil {
+		t.Fatal("validateReleaseWorkflowGraph() accepted a docs dispatch without the immutable source workflow hash")
 	}
 }

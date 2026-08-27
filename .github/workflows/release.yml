@@ -440,12 +440,24 @@ jobs:
             exit 0
           fi
 
+          source_workflow_sha256="$(
+            gh api -H 'Accept: application/vnd.github.raw+json' \
+              "repos/$GITHUB_REPOSITORY/contents/.github/workflows/release.yml?ref=$GITHUB_SHA" \
+              | sha256sum | awk '{print $1}'
+          )"
+          if [[ ! "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ || ! "$source_workflow_sha256" =~ ^[a-f0-9]{64}$ ]]; then
+            echo "::warning::Documentation synchronization was not dispatched because the immutable producer attestation is invalid"
+            exit 0
+          fi
+
           if ! gh workflow run sync-hitkeep-release.yml \
             --repo "$DOWNSTREAM_REPOSITORY" \
             --ref main \
             -f tag="${TAG}" \
             -f dry_run=false \
-            -f source_run_id="${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"; then
+            -f source_run_id="${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}" \
+            -f source_head_sha="${GITHUB_SHA}" \
+            -f source_workflow_sha256="${source_workflow_sha256}"; then
             echo "::warning::Documentation synchronization could not be dispatched; the HitKeep release remains successful"
             exit 0
           fi
