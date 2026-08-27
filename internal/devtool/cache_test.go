@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -108,6 +109,101 @@ func TestCachePruneRechecksFrontendSnapshotUseAfterLock(t *testing.T) {
 	}
 	if _, err := os.Stat(snapshot); err != nil {
 		t.Fatalf("newly linked snapshot is missing: %v", err)
+	}
+}
+
+func TestCacheStatusAndPruneDockerComposeCacheVolumes(t *testing.T) {
+	workspace := initTestRepository(t)
+	stateRoot := filepath.Join(t.TempDir(), "state")
+	t.Setenv("HK_STATE_DIR", stateRoot)
+	app, err := NewApp(workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bin := t.TempDir()
+	removed := filepath.Join(t.TempDir(), "removed")
+	docker := filepath.Join(bin, "docker")
+	script := strings.ReplaceAll(`#!/bin/sh
+case "$1:$2" in
+volume:ls)
+	printf '%s\n' stale-go-build current-go-mod active-npm data-volume archive-volume foreign-go-mod unlabeled
+	;;
+volume:inspect)
+	cat <<'JSON'
+{"Name":"stale-go-build","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"hitkeep-deadbeef","com.docker.compose.volume":"go-build"},"UsageData":{"Size":42,"RefCount":0}}
+{"Name":"current-go-mod","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"CURRENT_PROJECT","com.docker.compose.volume":"go-mod"},"UsageData":{"Size":43,"RefCount":0}}
+{"Name":"active-npm","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"hitkeep-deadbeef","com.docker.compose.volume":"npm-cache"},"UsageData":{"Size":44,"RefCount":1}}
+{"Name":"data-volume","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"hitkeep-deadbeef","com.docker.compose.volume":"data"},"UsageData":{"Size":45,"RefCount":0}}
+{"Name":"archive-volume","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"hitkeep-deadbeef","com.docker.compose.volume":"archive"},"UsageData":{"Size":46,"RefCount":0}}
+{"Name":"foreign-go-mod","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"other-project","com.docker.compose.volume":"go-mod"},"UsageData":{"Size":47,"RefCount":0}}
+{"Name":"unlabeled","CreatedAt":"2020-01-01T00:00:00Z","Labels":{},"UsageData":{"Size":48,"RefCount":0}}
+JSON
+	;;
+volume:rm)
+	printf '%s\n' "$3" >> "$HK_DOCKER_CACHE_REMOVED"
+	printf '%s\n' "$3"
+	;;
+esac
+`, "CURRENT_PROJECT", app.workspace.ComposeProject)
+	if err := os.WriteFile(docker, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("HK_DOCKER_CACHE_REMOVED", removed)
+
+	report, err := app.CacheStatus()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var dockerEntries []CacheEntry
+	for _, entry := range report.Entries {
+		if entry.Kind == dockerComposeCacheKind {
+			dockerEntries = append(dockerEntries, entry)
+		}
+	}
+	if len(dockerEntries) != 1 || dockerEntries[0].Key != "stale-go-build" || !dockerEntries[0].Prunable || dockerEntries[0].InUse || dockerEntries[0].Bytes != 42 {
+		t.Fatalf("unexpected Docker cache entries: %+v", dockerEntries)
+	}
+
+	preview, err := app.PruneCache(time.Hour, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(preview.Candidates) != 1 || preview.Candidates[0].Key != "stale-go-build" {
+		t.Fatalf("unexpected Docker cache preview: %+v", preview)
+	}
+	if _, err := os.Stat(removed); !os.IsNotExist(err) {
+		t.Fatalf("dry run removed Docker volume: %v", err)
+	}
+
+	applied, err := app.PruneCache(time.Hour, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(applied.Removed) != 1 || applied.Removed[0].Key != "stale-go-build" {
+		t.Fatalf("unexpected Docker cache prune: %+v", applied)
+	}
+	contents, err := os.ReadFile(removed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(contents) != "stale-go-build\n" {
+		t.Fatalf("unexpected Docker volume removal: %q", contents)
+	}
+}
+
+func TestCacheStatusIgnoresUnavailableDocker(t *testing.T) {
+	workspace := initTestRepository(t)
+	stateRoot := filepath.Join(t.TempDir(), "state")
+	t.Setenv("HK_STATE_DIR", stateRoot)
+	app, err := NewApp(workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", t.TempDir())
+	if _, err := app.CacheStatus(); err != nil {
+		t.Fatalf("cache status should stay available without Docker: %v", err)
 	}
 }
 

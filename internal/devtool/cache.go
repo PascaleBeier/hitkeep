@@ -1,6 +1,8 @@
 package devtool
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -11,7 +13,24 @@ import (
 	"time"
 )
 
-const defaultCacheMaxAge = 30 * 24 * time.Hour
+const (
+	defaultCacheMaxAge     = 30 * 24 * time.Hour
+	dockerComposeCacheKind = "docker-compose-cache"
+	composeProjectLabel    = "com.docker.compose.project"
+	composeVolumeLabel     = "com.docker.compose.volume"
+)
+
+type dockerVolume struct {
+	Name      string             `json:"Name"`
+	CreatedAt time.Time          `json:"CreatedAt"`
+	Labels    map[string]string  `json:"Labels"`
+	UsageData *dockerVolumeUsage `json:"UsageData"`
+}
+
+type dockerVolumeUsage struct {
+	Size     int64 `json:"Size"`
+	RefCount int   `json:"RefCount"`
+}
 
 func (a *App) CacheStatus() (CacheReport, error) {
 	root := filepath.Dir(filepath.Dir(a.workspace.StateDir))
@@ -67,6 +86,8 @@ func (a *App) CacheStatus() (CacheReport, error) {
 		}
 	}
 
+	report.Entries = append(report.Entries, a.dockerComposeCacheVolumes()...)
+
 	workspaces, err := cacheChildren(filepath.Join(root, "workspaces"), "workspace-state", func(entry os.DirEntry) bool { return entry.IsDir() })
 	if err != nil {
 		return report, err
@@ -121,6 +142,14 @@ func (a *App) pruneCacheReport(report CacheReport, olderThan time.Duration, appl
 	}
 	defer unlockStateRoot(lock)
 	for _, entry := range result.Candidates {
+		if entry.Kind == dockerComposeCacheKind {
+			if !a.removeDockerComposeCacheVolume(entry.Key) {
+				continue
+			}
+			result.Removed = append(result.Removed, entry)
+			result.RemovedBytes += entry.Bytes
+			continue
+		}
 		if !pathWithin(report.Root, entry.Path) {
 			return result, fmt.Errorf("refuse cache path outside managed root: %s", entry.Path)
 		}
@@ -159,6 +188,89 @@ func (a *App) pruneCacheReport(report CacheReport, olderThan time.Duration, appl
 		result.RemovedBytes += entry.Bytes
 	}
 	return result, nil
+}
+
+func (a *App) dockerComposeCacheVolumes() []CacheEntry {
+	names := strings.Fields(commandOutput(context.Background(), "docker", "volume", "ls", "--quiet", "--filter", "label="+composeProjectLabel))
+	if len(names) == 0 {
+		return nil
+	}
+	output := commandOutput(context.Background(), "docker", append([]string{"volume", "inspect", "--format", "{{json .}}"}, names...)...)
+	if output == "" {
+		return nil
+	}
+
+	entries := make([]CacheEntry, 0, len(names))
+	for _, line := range strings.Split(output, "\n") {
+		var volume dockerVolume
+		if json.Unmarshal([]byte(line), &volume) != nil || !isPrunableDockerComposeCacheVolume(volume, a.workspace.ComposeProject) {
+			continue
+		}
+		entries = append(entries, CacheEntry{
+			Kind:       dockerComposeCacheKind,
+			Key:        volume.Name,
+			Path:       volume.Name,
+			Bytes:      volume.UsageData.Size,
+			LastUsedAt: volume.CreatedAt,
+			Prunable:   true,
+		})
+	}
+	return entries
+}
+
+func (a *App) removeDockerComposeCacheVolume(name string) bool {
+	if !validDockerVolumeName(name) {
+		return false
+	}
+	if !slices.ContainsFunc(a.dockerComposeCacheVolumes(), func(entry CacheEntry) bool {
+		return entry.Key == name
+	}) {
+		return false
+	}
+	return slices.Contains(strings.Fields(commandOutput(context.Background(), "docker", "volume", "rm", name)), name)
+}
+
+func isPrunableDockerComposeCacheVolume(volume dockerVolume, currentProject string) bool {
+	if !validDockerVolumeName(volume.Name) || volume.CreatedAt.IsZero() || volume.UsageData == nil || volume.UsageData.RefCount != 0 {
+		return false
+	}
+	project := volume.Labels[composeProjectLabel]
+	return project != currentProject && isHitKeepComposeProject(project) && isDockerComposeCacheRole(volume.Labels[composeVolumeLabel])
+}
+
+func isHitKeepComposeProject(project string) bool {
+	const prefix = "hitkeep-"
+	if !strings.HasPrefix(project, prefix) || len(project) != len(prefix)+8 {
+		return false
+	}
+	for _, character := range project[len(prefix):] {
+		if !((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f')) {
+			return false
+		}
+	}
+	return true
+}
+
+func isDockerComposeCacheRole(role string) bool {
+	switch role {
+	case "go-build", "go-mod", "npm-cache", "node-modules":
+		return true
+	default:
+		return false
+	}
+}
+
+func validDockerVolumeName(name string) bool {
+	if name == "" {
+		return false
+	}
+	for _, character := range name {
+		if character >= 'a' && character <= 'z' || character >= 'A' && character <= 'Z' || character >= '0' && character <= '9' || character == '_' || character == '-' || character == '.' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func makeTreeOwnerWritable(root string) error {
