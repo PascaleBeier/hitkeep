@@ -155,12 +155,10 @@ func recoveryExitCode(err error) int {
 	if err == nil {
 		return 0
 	}
-	var recoveryErr *RecoveryError
-	if errors.As(err, &recoveryErr) {
+	if recoveryErr, ok := errors.AsType[*RecoveryError](err); ok {
 		return recoveryErr.Code
 	}
-	var processErr *exec.ExitError
-	if errors.As(err, &processErr) {
+	if processErr, ok := errors.AsType[*exec.ExitError](err); ok {
 		return processErr.ExitCode()
 	}
 	return -1

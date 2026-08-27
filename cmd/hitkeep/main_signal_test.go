@@ -8,8 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"syscall"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 )
