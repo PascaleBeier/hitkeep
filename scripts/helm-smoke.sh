@@ -177,6 +177,24 @@ YAML
   kubectl -n "$namespace" delete pod archive-restore --wait=true >/dev/null
 }
 
+restart_stateful_pod() {
+  local pod actual_pvc
+  kubectl -n "$namespace" rollout status statefulset/$release --timeout=2m
+  pod="$(kubectl -n "$namespace" get pods -l app.kubernetes.io/instance="$release" -o jsonpath='{.items[0].metadata.name}')"
+  if [[ -z "$pod" ]]; then
+    printf 'StatefulSet %s has no pod to recreate\n' "$release" >&2
+    exit 1
+  fi
+  kubectl -n "$namespace" delete pod "$pod" --wait=true
+  kubectl -n "$namespace" rollout status statefulset/$release --timeout=2m
+  pod="$(kubectl -n "$namespace" get pods -l app.kubernetes.io/instance="$release" -o jsonpath='{.items[0].metadata.name}')"
+  actual_pvc="$(kubectl -n "$namespace" get pod "$pod" -o jsonpath='{.spec.volumes[?(@.persistentVolumeClaim)].persistentVolumeClaim.claimName}')"
+  if [[ "$actual_pvc" != "$pvc" ]]; then
+    printf 'Expected recreated pod %s to use PVC %s, got %s\n' "$pod" "$pvc" "$actual_pvc" >&2
+    exit 1
+  fi
+}
+
 deploy "$previous_image"
 await_healthy
 fixture --seed --manifest "$fixture_manifest" --previous-image "$previous_image" --platform "$platform" --url "$service_url"
@@ -187,12 +205,14 @@ archive_pvc "$legacy_archive"
 
 deploy "$image"
 await_healthy
+restart_stateful_pod
 fixture --verify --manifest "$fixture_manifest" --previous-image "$previous_image" --platform "$platform" --url "$service_url"
 quiesce_release
 verify_stopped_storage verify-storage
 
 deploy "$image"
 await_healthy
+restart_stateful_pod
 fixture --verify --manifest "$fixture_manifest" --previous-image "$previous_image" --platform "$platform" --url "$service_url"
 quiesce_release
 verify_stopped_storage verify-storage
@@ -206,6 +226,7 @@ verify_stopped_storage verify-legacy-storage
 
 deploy "$image"
 await_healthy
+restart_stateful_pod
 fixture --verify --manifest "$fixture_manifest" --previous-image "$previous_image" --platform "$platform" --url "$service_url"
 quiesce_release
 verify_stopped_storage verify-storage
