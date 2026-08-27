@@ -2,15 +2,19 @@ package main
 
 import (
 	"context"
-	"flag"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	hitai "hitkeep/internal/ai"
 	"hitkeep/internal/auth"
@@ -42,66 +46,186 @@ func (r *recordingRecorder) GetAIUsageSince(ctx context.Context, since time.Time
 	return r.base.GetAIUsageSince(ctx, since)
 }
 
+var errSmokeNotReleaseReady = errors.New("opportunities smoke gate did not pass")
+
+type smokeRunner func(context.Context, smokeConfig) (smokegate.Report, error)
+
 func main() {
-	var dbPath string
-	var outPath string
-	var domains string
-	var provider string
-	var model string
-	var region string
-	var baseURL string
-	var dataPath string
-	var aiEnabled bool
-	var windowDays int
-	var toValue string
-	flag.StringVar(&dbPath, "db", "", "restored shared HitKeep database path")
-	flag.StringVar(&outPath, "out", "tmp/prod-eu-opportunities-smoke/release-hardening-smoke.md", "markdown report output path")
-	flag.StringVar(&domains, "domains", "hitkeep.com,cloud.hitkeep.eu", "comma-separated site domains to smoke")
-	flag.StringVar(&provider, "provider", envOrDefault("HITKEEP_AI_PROVIDER", "openai-compatible"), "AI provider")
-	flag.StringVar(&model, "model", envOrDefault("HITKEEP_AI_MODEL", "openai.gpt-oss-120b"), "AI model")
-	flag.StringVar(&region, "region", envOrDefault("HITKEEP_AI_REGION", "eu-central-1"), "AI provider region")
-	flag.StringVar(&baseURL, "base-url", strings.TrimSpace(os.Getenv("HITKEEP_AI_BASE_URL")), "AI provider base URL")
-	flag.StringVar(&dataPath, "data-path", envOrDefault("HITKEEP_DATA_PATH", "data"), "restored HitKeep data directory containing tenant databases")
-	flag.BoolVar(&aiEnabled, "ai", true, "enable AI provider calls")
-	flag.IntVar(&windowDays, "window-days", 30, "analysis window in days")
-	flag.StringVar(&toValue, "to", "2026-05-09T19:05:42Z", "analysis end timestamp")
-	flag.Parse()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	os.Exit(executeSmoke(ctx, os.Args[1:], os.Stdout, os.Stderr, runSmoke))
+}
 
-	if strings.TrimSpace(dbPath) == "" {
-		fatalf("-db is required")
+func executeSmoke(ctx context.Context, args []string, stdout, stderr io.Writer, run smokeRunner) int {
+	cmd := newSmokeCommand(run)
+	cmd.SetArgs(normalizeLegacySmokeArgs(args))
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+	if err := cmd.ExecuteContext(ctx); err != nil {
+		if errors.Is(err, errSmokeNotReleaseReady) {
+			return 2
+		}
+		fmt.Fprintln(stderr, err)
+		return 1
 	}
-	to, err := time.Parse(time.RFC3339, toValue)
+	return 0
+}
+
+func newSmokeCommand(run smokeRunner) *cobra.Command {
+	v := newSmokeViper()
+	cmd := &cobra.Command{
+		Use:           "opportunities-smoke",
+		Short:         "Run the opportunities release smoke gate",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			conf, err := smokeConfigFromViper(v)
+			if err != nil {
+				return err
+			}
+			report, err := run(cmd.Context(), conf)
+			if err != nil {
+				return redactSmokeError(err, conf.APIKey)
+			}
+			if err := writeSmokeReport(conf.OutPath, report); err != nil {
+				return err
+			}
+			fmt.Fprintln(cmd.OutOrStdout(), conf.OutPath)
+			if !smokegate.Evaluate(report).ReleaseReady {
+				return errSmokeNotReleaseReady
+			}
+			return nil
+		},
+	}
+	flags := cmd.Flags()
+	flags.String("db", "", "restored shared HitKeep database path")
+	flags.String("out", "tmp/prod-eu-opportunities-smoke/release-hardening-smoke.md", "markdown report output path")
+	flags.String("domains", "hitkeep.com,cloud.hitkeep.eu", "comma-separated site domains to smoke")
+	flags.String("provider", "openai-compatible", "AI provider")
+	flags.String("model", "openai.gpt-oss-120b", "AI model")
+	flags.String("region", "eu-central-1", "AI provider region")
+	flags.String("base-url", "", "AI provider base URL")
+	flags.String("data-path", "data", "restored HitKeep data directory containing tenant databases")
+	flags.Bool("ai", true, "enable AI provider calls")
+	flags.Int("window-days", 30, "analysis window in days")
+	flags.String("to", "2026-05-09T19:05:42Z", "analysis end timestamp")
+	for _, name := range []string{"db", "out", "domains", "provider", "model", "region", "base-url", "data-path", "ai", "window-days", "to"} {
+		if err := v.BindPFlag(name, flags.Lookup(name)); err != nil {
+			panic(err)
+		}
+	}
+	return cmd
+}
+
+func newSmokeViper() *viper.Viper {
+	v := viper.New()
+	for key, value := range map[string]any{
+		"db":          "",
+		"out":         "tmp/prod-eu-opportunities-smoke/release-hardening-smoke.md",
+		"domains":     "hitkeep.com,cloud.hitkeep.eu",
+		"provider":    "openai-compatible",
+		"model":       "openai.gpt-oss-120b",
+		"region":      "eu-central-1",
+		"base-url":    "",
+		"data-path":   "data",
+		"api-key":     "",
+		"ai":          true,
+		"window-days": 30,
+		"to":          "2026-05-09T19:05:42Z",
+	} {
+		v.SetDefault(key, value)
+	}
+	for key, environment := range map[string]string{
+		"provider":  "HITKEEP_AI_PROVIDER",
+		"model":     "HITKEEP_AI_MODEL",
+		"region":    "HITKEEP_AI_REGION",
+		"base-url":  "HITKEEP_AI_BASE_URL",
+		"data-path": "HITKEEP_DATA_PATH",
+		"api-key":   "HITKEEP_AI_API_KEY",
+	} {
+		if err := v.BindEnv(key, environment); err != nil {
+			panic(err)
+		}
+	}
+	return v
+}
+
+type smokeViperConfig struct {
+	DBPath     string `mapstructure:"db"`
+	OutPath    string `mapstructure:"out"`
+	Domains    string `mapstructure:"domains"`
+	Provider   string `mapstructure:"provider"`
+	Model      string `mapstructure:"model"`
+	Region     string `mapstructure:"region"`
+	BaseURL    string `mapstructure:"base-url"`
+	DataPath   string `mapstructure:"data-path"`
+	APIKey     string `mapstructure:"api-key"`
+	AIEnabled  bool   `mapstructure:"ai"`
+	WindowDays int    `mapstructure:"window-days"`
+	To         string `mapstructure:"to"`
+}
+
+func smokeConfigFromViper(v *viper.Viper) (smokeConfig, error) {
+	var values smokeViperConfig
+	if err := v.Unmarshal(&values); err != nil {
+		return smokeConfig{}, fmt.Errorf("decode command configuration: %w", err)
+	}
+	if strings.TrimSpace(values.DBPath) == "" {
+		return smokeConfig{}, errors.New("-db is required")
+	}
+	to, err := time.Parse(time.RFC3339, values.To)
 	if err != nil {
-		fatalf("parse -to: %v", err)
+		return smokeConfig{}, fmt.Errorf("parse -to: %w", err)
 	}
-	baseURL = resolveSmokeAIBaseURL(provider, region, baseURL)
-
-	report, err := runSmoke(context.Background(), smokeConfig{
-		DBPath:     dbPath,
-		OutPath:    outPath,
-		Domains:    splitCSV(domains),
-		Provider:   provider,
-		Model:      model,
-		Region:     region,
-		BaseURL:    baseURL,
-		DataPath:   dataPath,
-		AIEnabled:  aiEnabled,
-		WindowDays: windowDays,
+	return smokeConfig{
+		DBPath:     values.DBPath,
+		OutPath:    values.OutPath,
+		Domains:    splitCSV(values.Domains),
+		Provider:   values.Provider,
+		Model:      values.Model,
+		Region:     values.Region,
+		BaseURL:    resolveSmokeAIBaseURL(values.Provider, values.Region, values.BaseURL),
+		DataPath:   values.DataPath,
+		APIKey:     strings.TrimSpace(values.APIKey),
+		AIEnabled:  values.AIEnabled,
+		WindowDays: values.WindowDays,
 		To:         to,
-	})
-	if err != nil {
-		fatalf("%v", err)
+	}, nil
+}
+
+func redactSmokeError(err error, apiKey string) error {
+	apiKey = strings.TrimSpace(apiKey)
+	if apiKey == "" {
+		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
-		fatalf("create output dir: %v", err)
+	return errors.New(strings.ReplaceAll(err.Error(), apiKey, "[REDACTED]"))
+}
+
+func writeSmokeReport(path string, report smokegate.Report) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("create output dir: %w", err)
 	}
-	if err := os.WriteFile(outPath, []byte(smokegate.RenderMarkdown(report)), 0o600); err != nil {
-		fatalf("write report: %v", err)
+	if err := os.WriteFile(path, []byte(smokegate.RenderMarkdown(report)), 0o600); err != nil {
+		return fmt.Errorf("write report: %w", err)
 	}
-	fmt.Println(outPath)
-	if !smokegate.Evaluate(report).ReleaseReady {
-		os.Exit(2)
+	return nil
+}
+
+func normalizeLegacySmokeArgs(args []string) []string {
+	legacyLongFlags := map[string]struct{}{
+		"db": {}, "out": {}, "domains": {}, "provider": {}, "model": {}, "region": {}, "base-url": {}, "data-path": {}, "ai": {}, "window-days": {}, "to": {},
 	}
+	normalized := append([]string(nil), args...)
+	for index, arg := range normalized {
+		if !strings.HasPrefix(arg, "-") || strings.HasPrefix(arg, "--") {
+			continue
+		}
+		name, _, _ := strings.Cut(strings.TrimPrefix(arg, "-"), "=")
+		if _, ok := legacyLongFlags[name]; ok {
+			normalized[index] = "-" + arg
+		}
+	}
+	return normalized
 }
 
 type smokeConfig struct {
@@ -113,6 +237,7 @@ type smokeConfig struct {
 	Region     string
 	BaseURL    string
 	DataPath   string
+	APIKey     string
 	AIEnabled  bool
 	WindowDays int
 	To         time.Time
@@ -150,7 +275,7 @@ func runSmoke(ctx context.Context, conf smokeConfig) (smokegate.Report, error) {
 			Model:               conf.Model,
 			BaseURL:             conf.BaseURL,
 			Region:              conf.Region,
-			APIKey:              strings.TrimSpace(os.Getenv("HITKEEP_AI_API_KEY")),
+			APIKey:              conf.APIKey,
 			Timeout:             45 * time.Second,
 			RequestLimit:        80,
 			TokenLimit:          240000,
@@ -275,13 +400,6 @@ func splitCSV(value string) []string {
 	return out
 }
 
-func envOrDefault(name, fallback string) string {
-	if value := strings.TrimSpace(os.Getenv(name)); value != "" {
-		return value
-	}
-	return fallback
-}
-
 func resolveSmokeAIBaseURL(provider, region, baseURL string) string {
 	baseURL = strings.TrimSpace(baseURL)
 	if baseURL != "" || !strings.EqualFold(strings.TrimSpace(provider), "openai-compatible") {
@@ -330,9 +448,4 @@ func copyFile(source, target string) error {
 		return fmt.Errorf("copy: %w", err)
 	}
 	return nil
-}
-
-func fatalf(format string, args ...any) {
-	fmt.Fprintf(os.Stderr, format+"\n", args...)
-	os.Exit(1)
 }
