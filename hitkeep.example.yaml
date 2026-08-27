@@ -20,6 +20,10 @@ log-level: "info"
 # public-url:
 
 # data settings
+# API client token used by the offline import client (type: string; default: "unset"; sensitive)
+# api-token:
+# Base URL used by the offline import client; falls back to public-url (type: string; default: "unset"; sensitive)
+# api-url:
 # Data archive path (type: string; default: "archive")
 archive-path: "archive"
 # Local writable base directory for per-tenant database files (type: string; default: "data")
