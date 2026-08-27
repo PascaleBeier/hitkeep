@@ -208,7 +208,23 @@ func (a *App) SharedCacheEnvironment() []string {
 }
 
 func (a *App) commandEnvironment(overrides []string) []string {
-	return mergedCommandEnvironment(append(a.SharedCacheEnvironment(), overrides...))
+	environment := a.SharedCacheEnvironment()
+	if root := os.Getenv("HK_RUN_TEMP_ROOT"); a.isRunTempRoot(root) {
+		environment = append(environment, runTempEnvironment(root)...)
+	}
+	return mergedCommandEnvironment(append(environment, overrides...))
+}
+
+func (a *App) isRunTempRoot(root string) bool {
+	if root == "" {
+		return false
+	}
+	runID := filepath.Base(root)
+	if err := validateRunID(runID); err != nil || filepath.Clean(root) != a.runTempRoot(runID) {
+		return false
+	}
+	info, err := os.Stat(root)
+	return err == nil && info.IsDir()
 }
 
 func (a *App) ComposeEnvironment(variant Variant) []string {
