@@ -3,71 +3,140 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"context"
-	"errors"
 	"fmt"
-	"io"
-	"log/slog"
+	"net"
 	"os"
 	"os/exec"
-	"os/signal"
+	"strings"
 	"syscall"
+	"sync"
 	"testing"
-
-	"github.com/spf13/cobra"
-
-	hitkeepcmd "hitkeep/cmd"
+	"time"
 )
 
-func TestExecuteSignalCancelsRecoveryAction(t *testing.T) {
-	if os.Getenv("HITKEEP_EXECUTE_SIGNAL_SUBPROCESS") == "1" {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-		defer stop()
-		root := &cobra.Command{Use: "hitkeep", SilenceErrors: true, SilenceUsage: true}
-		root.AddCommand(&cobra.Command{
-			Use: "recover",
-			RunE: func(command *cobra.Command, _ []string) error {
-				_, _ = fmt.Fprintln(command.OutOrStdout(), "ready")
-				<-command.Context().Done()
-				return &hitkeepcmd.ExitError{Code: 1}
-			},
-		})
-		root.SetArgs([]string{"recover"})
-		root.SetOut(os.Stdout)
-		root.SetErr(os.Stderr)
-		logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-		os.Exit(execute(ctx, root, logger))
+func TestProductionMainSignalCancelsRunningApplication(t *testing.T) {
+	if os.Getenv("HITKEEP_PRODUCTION_SIGNAL_SUBPROCESS") == "1" {
+		os.Args = []string{"hitkeep"}
+		main()
+		return
 	}
 
-	command := exec.Command(os.Args[0], "-test.run=^TestExecuteSignalCancelsRecoveryAction$")
-	command.Env = append(os.Environ(), "HITKEEP_EXECUTE_SIGNAL_SUBPROCESS=1")
-	stdin, err := command.StdinPipe()
+	for _, signal := range []struct {
+		name string
+		sig  os.Signal
+	}{
+		{name: "SIGINT", sig: os.Interrupt},
+		{name: "SIGTERM", sig: syscall.SIGTERM},
+	} {
+		t.Run(signal.name, func(t *testing.T) {
+			t.Parallel()
+			command := exec.Command(os.Args[0], "-test.run=^TestProductionMainSignalCancelsRunningApplication$")
+			command.Env = append(os.Environ(),
+				"HITKEEP_PRODUCTION_SIGNAL_SUBPROCESS=1",
+				"HITKEEP_HTTP_ADDR=127.0.0.1:0",
+				"HITKEEP_BIND_ADDR="+testSignalAddress(t),
+				"HITKEEP_NSQ_TCP_ADDRESS="+testSignalAddress(t),
+				"HITKEEP_NSQ_HTTP_ADDRESS="+testSignalAddress(t),
+				"HITKEEP_DB_PATH="+t.TempDir()+"/hitkeep.db",
+				"HITKEEP_DATA_PATH="+t.TempDir(),
+				"HITKEEP_DB_COMPACT_ON_START=false",
+			)
+			stdout, err := command.StdoutPipe()
+			if err != nil {
+				t.Fatal(err)
+			}
+			var stderr lockedBuffer
+			command.Stderr = &stderr
+			if err := command.Start(); err != nil {
+				t.Fatal(err)
+			}
+
+			exited := false
+			done := make(chan error, 1)
+			go func() { done <- command.Wait() }()
+			defer func() {
+				if exited {
+					return
+				}
+				_ = command.Process.Kill()
+				timer := time.NewTimer(5 * time.Second)
+				defer timer.Stop()
+				select {
+				case <-done:
+				case <-timer.C:
+				}
+			}()
+
+			ready := make(chan error, 1)
+			go func() {
+				scanner := bufio.NewScanner(stdout)
+				var logs []string
+				for scanner.Scan() {
+					line := scanner.Text()
+					logs = append(logs, line)
+					if strings.Contains(line, `"msg":"Application is running. Press Ctrl+C to exit."`) {
+						ready <- nil
+						return
+					}
+				}
+				ready <- fmt.Errorf("application readiness log not found: %v; logs: %s", scanner.Err(), strings.Join(logs, "\n"))
+			}()
+
+			readyTimer := time.NewTimer(30 * time.Second)
+			defer readyTimer.Stop()
+			select {
+			case err := <-ready:
+				if err != nil {
+					t.Fatalf("production application did not become ready: %v; stderr: %s", err, stderr.String())
+				}
+			case <-readyTimer.C:
+				t.Fatalf("timed out waiting for production application readiness; stderr: %s", stderr.String())
+			}
+
+			if err := command.Process.Signal(signal.sig); err != nil {
+				t.Fatal(err)
+			}
+			exitTimer := time.NewTimer(15 * time.Second)
+			defer exitTimer.Stop()
+			select {
+			case err := <-done:
+				exited = true
+				if err != nil {
+					t.Fatalf("production application exit = %v, want graceful exit; stderr: %s", err, stderr.String())
+				}
+			case <-exitTimer.C:
+				t.Fatalf("production application did not exit after %s; stderr: %s", signal.name, stderr.String())
+			}
+		})
+	}
+}
+
+type lockedBuffer struct {
+	mu sync.Mutex
+	bytes.Buffer
+}
+
+func (buffer *lockedBuffer) Write(data []byte) (int, error) {
+	buffer.mu.Lock()
+	defer buffer.mu.Unlock()
+	return buffer.Buffer.Write(data)
+}
+
+func (buffer *lockedBuffer) String() string {
+	buffer.mu.Lock()
+	defer buffer.mu.Unlock()
+	return buffer.Buffer.String()
+}
+
+func testSignalAddress(t *testing.T) string {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	_ = stdin.Close()
-	stdout, err := command.StdoutPipe()
-	if err != nil {
+	address := listener.Addr().String()
+	if err := listener.Close(); err != nil {
 		t.Fatal(err)
 	}
-	var stderr bytes.Buffer
-	command.Stderr = &stderr
-	if err := command.Start(); err != nil {
-		t.Fatal(err)
-	}
-	reader := bufio.NewReader(stdout)
-	if line, err := reader.ReadString('\n'); err != nil || line != "ready\n" {
-		t.Fatalf("recovery readiness = %q, %v; want ready", line, err)
-	}
-	if err := command.Process.Signal(os.Interrupt); err != nil {
-		t.Fatal(err)
-	}
-	if err := command.Wait(); err == nil {
-		t.Fatal("signal subprocess succeeded, want exit code 1")
-	} else if exitErr, ok := errors.AsType[*exec.ExitError](err); !ok || exitErr.ExitCode() != 1 {
-		t.Fatalf("signal subprocess error = %v, want exit code 1", err)
-	}
-	if got := stderr.String(); got != "" {
-		t.Errorf("stderr = %q, want empty", got)
-	}
+	return address
 }

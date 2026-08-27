@@ -8,9 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/nsqio/go-nsq"
@@ -86,8 +84,6 @@ func runContext(ctx context.Context, logger *slog.Logger, args []string, configF
 
 	logger.Info("Starting HitKeep", "version", Version, "log_level", logLevel.String(), "config", conf)
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
 	ctx = hklog.WithLogger(ctx, logger)
 
 	g, gCtx := errgroup.WithContext(ctx)
