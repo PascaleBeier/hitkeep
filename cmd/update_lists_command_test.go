@@ -27,7 +27,7 @@ func TestUpdateListCommandsUseCobraContextAndStreams(t *testing.T) {
 			var stdout, stderr bytes.Buffer
 			called := false
 			actions := rootActions{
-				updateSpamLists: func(got context.Context, args []string, out, errOut io.Writer) error {
+				updateSpamLists: func(got context.Context, args []string, out, errOut io.Writer, configFile string) error {
 					called = true
 					if got.Value(contextKey{}) != "value" {
 						t.Fatal("spam command did not receive the Cobra context")
@@ -41,7 +41,7 @@ func TestUpdateListCommandsUseCobraContextAndStreams(t *testing.T) {
 					_, _ = io.WriteString(out, "spam output\n")
 					return nil
 				},
-				updateAIAgentLists: func(got context.Context, args []string, out, errOut io.Writer) error {
+				updateAIAgentLists: func(got context.Context, args []string, out, errOut io.Writer, configFile string) error {
 					called = true
 					if got.Value(contextKey{}) != "value" {
 						t.Fatal("AI-agent command did not receive the Cobra context")
@@ -74,7 +74,7 @@ func TestUpdateListCommandsPreserveFlagExitCode(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	tests := []struct {
 		name string
-		run  func(context.Context, []string, io.Writer, io.Writer, *slog.Logger) error
+		run  func(context.Context, []string, io.Writer, io.Writer, string, *slog.Logger) error
 	}{
 		{name: "spam", run: UpdateSpamLists},
 		{name: "AI agents", run: UpdateAIAgentLists},
@@ -83,7 +83,7 @@ func TestUpdateListCommandsPreserveFlagExitCode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			err := tt.run(t.Context(), []string{"--unknown"}, &stdout, &stderr, logger)
+			err := tt.run(t.Context(), []string{"--unknown"}, &stdout, &stderr, "", logger)
 			exitErr, ok := errors.AsType[*ExitError](err)
 			if !ok || exitErr.Code != 2 {
 				t.Fatalf("error = %v, want ExitError code 2", err)
@@ -101,8 +101,8 @@ func TestUpdateListCommandsPreserveFlagExitCode(t *testing.T) {
 func TestUpdateListCommandsReturnActionErrors(t *testing.T) {
 	want := errors.New("update failed")
 	root := newRootCommand(rootActions{
-		updateSpamLists:    func(context.Context, []string, io.Writer, io.Writer) error { return want },
-		updateAIAgentLists: func(context.Context, []string, io.Writer, io.Writer) error { return want },
+		updateSpamLists:    func(context.Context, []string, io.Writer, io.Writer, string) error { return want },
+		updateAIAgentLists: func(context.Context, []string, io.Writer, io.Writer, string) error { return want },
 	})
 	root.SetArgs([]string{"update-spam-lists"})
 	if err := root.ExecuteContext(t.Context()); !errors.Is(err, want) {

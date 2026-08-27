@@ -2,21 +2,30 @@ package hitkeepcmd
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"log/slog"
 	"time"
 
+	runtimeconfig "hitkeep/config"
 	"hitkeep/internal/aianalytics"
 )
 
-func UpdateAIAgentLists(ctx context.Context, args []string, out, errOut io.Writer, logger *slog.Logger) error {
+func UpdateAIAgentLists(ctx context.Context, args []string, out, errOut io.Writer, configFile string, logger *slog.Logger) error {
+	if _, err := runtimeconfig.LoadArgs(nil, configFile, logger); err != nil {
+		return err
+	}
+
 	fs := flag.NewFlagSet("update-ai-agent-lists", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 
 	outputPath := fs.String("output", "internal/aianalytics/default_ai_agents.json", "Output path for the assembled AI agent master list")
 	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return nil
+		}
 		return &ExitError{Code: 2}
 	}
 

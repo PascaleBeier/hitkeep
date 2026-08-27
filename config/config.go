@@ -80,8 +80,10 @@ type Config struct {
 	SpamFilterPath              string `env:"HITKEEP_SPAM_FILTER_PATH"                 default:""     desc:"Path to cached spam filter data (defaults to <data-path>/spam-filter.json)"`
 	SpamFilterUpdateIntervalMin int    `env:"HITKEEP_SPAM_FILTER_UPDATE_INTERVAL"      default:"1440" desc:"Minutes between OSS spam filter feed refreshes"`
 
-	ImportMaxStageBytes      int `env:"HITKEEP_IMPORT_MAX_STAGE_BYTES"        default:"107374182400" desc:"Maximum staged import upload size in bytes"`
-	ImportStageRetentionDays int `env:"HITKEEP_IMPORT_STAGE_RETENTION_DAYS" default:"7"            desc:"Days to keep stale staged import upload files; 0 disables import staging cleanup"`
+	ImportMaxStageBytes      int    `env:"HITKEEP_IMPORT_MAX_STAGE_BYTES"        default:"107374182400" desc:"Maximum staged import upload size in bytes"`
+	ImportStageRetentionDays int    `env:"HITKEEP_IMPORT_STAGE_RETENTION_DAYS" default:"7"            desc:"Days to keep stale staged import upload files; 0 disables import staging cleanup"`
+	ImportAPIURL             string `env:"HITKEEP_API_URL"                      default:""             desc:"Base URL used by the offline import client; falls back to public-url" sensitive:"url" deprecatedenv:"HITKEEP_URL"`
+	ImportAPIToken           string `env:"HITKEEP_API_TOKEN"                    default:""             desc:"API client token used by the offline import client" sensitive:"redact"`
 
 	WebhookAllowDevelopmentTargets bool `env:"HITKEEP_WEBHOOK_ALLOW_DEVELOPMENT_TARGETS" default:"false" desc:"Allow HTTP and private webhook destinations for explicit development/self-host testing"`
 	WebhookDeliveryTimeoutSeconds  int  `env:"HITKEEP_WEBHOOK_DELIVERY_TIMEOUT"           default:"10"    desc:"Outbound webhook request timeout in seconds"`

@@ -2,31 +2,36 @@ package hitkeepcmd
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
 	"time"
 
+	runtimeconfig "hitkeep/config"
 	"hitkeep/internal/blocking"
 )
 
-func UpdateSpamLists(ctx context.Context, args []string, out, errOut io.Writer, logger *slog.Logger) error {
+func UpdateSpamLists(ctx context.Context, args []string, out, errOut io.Writer, configFile string, logger *slog.Logger) error {
+	conf, err := runtimeconfig.LoadArgs(nil, configFile, logger)
+	if err != nil {
+		return err
+	}
+
 	fs := flag.NewFlagSet("update-spam-lists", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 
-	defaultOutput := os.Getenv("HITKEEP_SPAM_FILTER_PATH")
+	defaultOutput := conf.SpamFilterPath
 	if defaultOutput == "" {
-		dataPath := os.Getenv("HITKEEP_DATA_PATH")
-		if dataPath == "" {
-			dataPath = "data"
-		}
-		defaultOutput = dataPath + "/spam-filter.json"
+		defaultOutput = conf.DataPath + "/spam-filter.json"
 	}
 
 	outputPath := fs.String("output", defaultOutput, "Output path for the compiled spam filter cache")
 	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return nil
+		}
 		return &ExitError{Code: 2}
 	}
 

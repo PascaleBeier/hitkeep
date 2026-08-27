@@ -26,7 +26,7 @@ func TestRootCommandPreservesFirstArgumentRouting(t *testing.T) {
 		{name: "interspersed version remains server input", args: []string{"serve", "--version"}, wantCall: "run", wantArgs: []string{"serve", "--version"}},
 		{name: "command after flag is server input", args: []string{"--http-addr=:9090", "update-spam-lists"}, wantCall: "run", wantArgs: []string{"--http-addr=:9090", "update-spam-lists"}},
 		{name: "explicit config", args: []string{"--config", "/etc/hitkeep.yaml", "--healthcheck"}, wantCall: "run", wantArgs: []string{"--healthcheck"}, wantConfig: "/etc/hitkeep.yaml"},
-		{name: "explicit config equals", args: []string{"--config=/etc/hitkeep.yaml", "recover"}, wantCall: "run", wantArgs: []string{"recover"}, wantConfig: "/etc/hitkeep.yaml"},
+		{name: "explicit config equals", args: []string{"--config=/etc/hitkeep.yaml", "recover"}, wantCall: "recover"},
 		{name: "config after another flag remains server input", args: []string{"--healthcheck", "--config", "/etc/hitkeep.yaml"}, wantCall: "run", wantArgs: []string{"--healthcheck", "--config", "/etc/hitkeep.yaml"}},
 		{name: "missing config path", args: []string{"--config"}, wantErr: true},
 		{name: "empty config path", args: []string{"--config="}, wantErr: true},
@@ -41,10 +41,11 @@ func TestRootCommandPreservesFirstArgumentRouting(t *testing.T) {
 			var called string
 			var gotArgs []string
 			var gotConfig string
-			record := func(name string) func(context.Context, []string, io.Writer, io.Writer) error {
-				return func(_ context.Context, args []string, _, _ io.Writer) error {
+			record := func(name string) func(context.Context, []string, io.Writer, io.Writer, string) error {
+				return func(_ context.Context, args []string, _, _ io.Writer, configFile string) error {
 					called = name
 					gotArgs = append([]string(nil), args...)
+					gotConfig = configFile
 					return nil
 				}
 			}
@@ -63,15 +64,16 @@ func TestRootCommandPreservesFirstArgumentRouting(t *testing.T) {
 				recover:            recordRecover,
 				updateSpamLists:    record("spam"),
 				updateAIAgentLists: record("ai"),
-				importData: func(args []string) {
+				importData: func(_ context.Context, args []string, _ io.Reader, _, _ io.Writer, configFile string) error {
 					called = "import"
 					gotArgs = append([]string(nil), args...)
+					gotConfig = configFile
+					return nil
 				},
 			})
-			root.SetArgs(tt.args)
 			root.SetOut(io.Discard)
 			root.SetErr(io.Discard)
-			err := root.Execute()
+			err := ExecuteRoot(t.Context(), root, tt.args)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("Execute() error = %v, wantErr %v", err, tt.wantErr)
 			}

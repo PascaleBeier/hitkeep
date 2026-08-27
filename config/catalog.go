@@ -15,19 +15,20 @@ type ConfigurationCategory struct {
 }
 
 type ConfigurationSetting struct {
-	Field           string                        `json:"field"`
-	Category        string                        `json:"category"`
-	ConfigFileKey   string                        `json:"config_file_key"`
-	Environment     string                        `json:"environment,omitempty"`
-	Flag            string                        `json:"flag"`
-	DeprecatedFlags []string                      `json:"deprecated_flags,omitempty"`
-	Type            string                        `json:"type"`
-	Default         string                        `json:"default"`
-	DisplayDefault  string                        `json:"display_default,omitempty"`
-	Description     string                        `json:"description"`
-	Sensitive       string                        `json:"sensitive,omitempty"`
-	CloudOnly       bool                          `json:"cloud_only,omitempty"`
-	Publication     ConfigurationPublicationClass `json:"publication"`
+	Field                  string                        `json:"field"`
+	Category               string                        `json:"category"`
+	ConfigFileKey          string                        `json:"config_file_key"`
+	Environment            string                        `json:"environment,omitempty"`
+	Flag                   string                        `json:"flag"`
+	DeprecatedFlags        []string                      `json:"deprecated_flags,omitempty"`
+	DeprecatedEnvironments []string                      `json:"deprecated_environments,omitempty"`
+	Type                   string                        `json:"type"`
+	Default                string                        `json:"default"`
+	DisplayDefault         string                        `json:"display_default,omitempty"`
+	Description            string                        `json:"description"`
+	Sensitive              string                        `json:"sensitive,omitempty"`
+	CloudOnly              bool                          `json:"cloud_only,omitempty"`
+	Publication            ConfigurationPublicationClass `json:"publication"`
 }
 
 type ConfigurationCatalog struct {
@@ -70,6 +71,9 @@ func Catalog() ConfigurationCatalog {
 		}
 		if deprecated := field.Tag.Get("deprecated"); deprecated != "" {
 			setting.DeprecatedFlags = []string{deprecated}
+		}
+		if deprecated := field.Tag.Get("deprecatedenv"); deprecated != "" {
+			setting.DeprecatedEnvironments = strings.Split(deprecated, ",")
 		}
 		settings = append(settings, setting)
 	}
@@ -173,7 +177,7 @@ func configurationPublication(field reflect.StructField) ConfigurationPublicatio
 		return ConfigurationPublicationCommand
 	case "CloudHosted", "CloudSignupEnabled", "CloudJurisdiction", "CloudRegion", "CloudUpgradeURL", "CloudSupportURL", "CloudPlanCode", "CloudPlanName", "CloudMaxTeams", "CloudMaxSitesPerTeam", "CloudMaxRetentionDays", "CloudMaxTeamMembers", "CloudAllowSSO", "CloudAllowCustomBranding", "StripeSecretKey", "StripePublishableKey", "StripeWebhookSecret", "StripePortalConfigurationID", "StripePriceProMonthly", "StripePriceBusinessMonthly", "StripePriceProAnnual", "StripePriceBusinessAnnual", "CloudCheckoutSuccessURL", "CloudCheckoutCancelURL":
 		return ConfigurationPublicationCloud
-	case "HTTPAddr", "DBPath", "BindAddr", "JoinAddr", "IngestRateLimit", "ApiRateLimit", "AuthRateLimit", "WebhookRateLimit", "DataRetentionDays", "NodeName", "DuckDBMemoryLimit", "DuckDBThreads", "DBCompactOnStart", "DBAutoRecover", "DBAutoRecoverWAL", "DBCheckpointIntervalMinutes", "DBRecoveryPath", "ArchivePath", "PublicURL", "LogLevel", "JWTSecret", "TrustedProxies", "NSQTCPAddress", "NSQHTTPAddress", "ApiBurst", "AuthBurst", "IngestBurst", "WebhookBurst", "AuthRememberMeDays", "AuthSessionMinutes", "AuthSessionWarningSeconds", "SocialGoogleClientID", "SocialGoogleClientSecret", "SocialGitHubClientID", "SocialGitHubClientSecret", "SocialMicrosoftClientID", "SocialMicrosoftClientSecret", "SocialMicrosoftTenant", "SocialSignupEnabled", "MailDriver", "MailEncryption", "MailInsecureSkipVerify", "MailHost", "MailPort", "MailUsername", "MailPassword", "MailFromAddress", "MailFromName", "SpamFilterAutoUpdate", "SpamFilterPath", "SpamFilterUpdateIntervalMin", "ImportMaxStageBytes", "ImportStageRetentionDays", "WebhookAllowDevelopmentTargets", "WebhookDeliveryTimeoutSeconds", "WebhookDeliveryConcurrency", "WebhookPerEndpointConcurrency", "WebhookMaxAttempts", "WebhookRetryBaseSeconds", "WebhookRetryMaxSeconds", "WebhookRetentionDays", "WebhookSweepSeconds", "GoogleSearchConsoleClientID", "GoogleSearchConsoleClientSecret", "GoogleSearchConsoleRedirectURL", "BackupPath", "BackupIntervalMinutes", "BackupRetentionCount", "S3AccessKeyID", "S3SecretAccessKey", "S3SessionToken", "S3Region", "S3Endpoint", "S3URLStyle", "S3UseSSL", "MCPEnabled", "MCPPath", "MCPMaxRangeDays", "MCPDocsEnabled", "MCPDocsURL", "MCPDocsCacheMinutes", "CustomTrackingDNSTarget", "CustomTrackingTLSMode", "CaddyTLSAskToken", "AIEnabled", "AskAIEnabled", "AIProvider", "AIModel", "AIBaseURL", "AIRegion", "AIAPIKey", "AITimeoutSeconds", "AIRequestLimit", "AITokenLimit", "AIBudgetWindowMinutes":
+	case "HTTPAddr", "DBPath", "BindAddr", "JoinAddr", "IngestRateLimit", "ApiRateLimit", "AuthRateLimit", "WebhookRateLimit", "DataRetentionDays", "NodeName", "DuckDBMemoryLimit", "DuckDBThreads", "DBCompactOnStart", "DBAutoRecover", "DBAutoRecoverWAL", "DBCheckpointIntervalMinutes", "DBRecoveryPath", "ArchivePath", "PublicURL", "LogLevel", "JWTSecret", "TrustedProxies", "NSQTCPAddress", "NSQHTTPAddress", "ApiBurst", "AuthBurst", "IngestBurst", "WebhookBurst", "AuthRememberMeDays", "AuthSessionMinutes", "AuthSessionWarningSeconds", "SocialGoogleClientID", "SocialGoogleClientSecret", "SocialGitHubClientID", "SocialGitHubClientSecret", "SocialMicrosoftClientID", "SocialMicrosoftClientSecret", "SocialMicrosoftTenant", "SocialSignupEnabled", "MailDriver", "MailEncryption", "MailInsecureSkipVerify", "MailHost", "MailPort", "MailUsername", "MailPassword", "MailFromAddress", "MailFromName", "SpamFilterAutoUpdate", "SpamFilterPath", "SpamFilterUpdateIntervalMin", "ImportMaxStageBytes", "ImportStageRetentionDays", "ImportAPIURL", "ImportAPIToken", "WebhookAllowDevelopmentTargets", "WebhookDeliveryTimeoutSeconds", "WebhookDeliveryConcurrency", "WebhookPerEndpointConcurrency", "WebhookMaxAttempts", "WebhookRetryBaseSeconds", "WebhookRetryMaxSeconds", "WebhookRetentionDays", "WebhookSweepSeconds", "GoogleSearchConsoleClientID", "GoogleSearchConsoleClientSecret", "GoogleSearchConsoleRedirectURL", "BackupPath", "BackupIntervalMinutes", "BackupRetentionCount", "S3AccessKeyID", "S3SecretAccessKey", "S3SessionToken", "S3Region", "S3Endpoint", "S3URLStyle", "S3UseSSL", "MCPEnabled", "MCPPath", "MCPMaxRangeDays", "MCPDocsEnabled", "MCPDocsURL", "MCPDocsCacheMinutes", "CustomTrackingDNSTarget", "CustomTrackingTLSMode", "CaddyTLSAskToken", "AIEnabled", "AskAIEnabled", "AIProvider", "AIModel", "AIBaseURL", "AIRegion", "AIAPIKey", "AITimeoutSeconds", "AIRequestLimit", "AITokenLimit", "AIBudgetWindowMinutes":
 		return ConfigurationPublicationOperator
 	default:
 		return ConfigurationPublicationUnclassified

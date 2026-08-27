@@ -6,9 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -21,13 +19,42 @@ type ExitError struct{ Code int }
 
 func (*ExitError) Error() string { return "command failed" }
 
+type rootConfigFileContextKey struct{}
+type rootLegacyServerArgsContextKey struct{}
+
+func rootConfigFile(ctx context.Context) string {
+	configFile, _ := ctx.Value(rootConfigFileContextKey{}).(string)
+	return configFile
+}
+
+// ExecuteRoot applies only the legacy leading --config grammar before Cobra routes a command.
+func ExecuteRoot(ctx context.Context, root *cobra.Command, args []string) error {
+	configFile, args, err := splitRootConfig(args)
+	if err != nil {
+		return err
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if configFile != "" {
+		ctx = context.WithValue(ctx, rootConfigFileContextKey{}, configFile)
+	} else if len(args) > 0 && strings.HasPrefix(args[0], "-") && args[0] != "--version" {
+		// Cobra scans past unknown flags when finding children. Preserve the legacy
+		// first-token grammar by forcing these server arguments to remain at root.
+		ctx = context.WithValue(ctx, rootLegacyServerArgsContextKey{}, true)
+		args = append([]string{"--"}, args...)
+	}
+	root.SetArgs(args)
+	return root.ExecuteContext(ctx)
+}
+
 type rootActions struct {
 	run                func([]string, string) error
 	runContext         func(context.Context, []string, string) error
 	recover            func(context.Context, []string, io.Reader, io.Writer, io.Writer) error
-	updateSpamLists    func(context.Context, []string, io.Writer, io.Writer) error
-	updateAIAgentLists func(context.Context, []string, io.Writer, io.Writer) error
-	importData         func([]string)
+	updateSpamLists    func(context.Context, []string, io.Writer, io.Writer, string) error
+	updateAIAgentLists func(context.Context, []string, io.Writer, io.Writer, string) error
+	importData         func(context.Context, []string, io.Reader, io.Writer, io.Writer, string) error
 }
 
 func (actions rootActions) runWithContext(ctx context.Context, args []string, configFile string) error {
@@ -42,7 +69,7 @@ func NewRootCommand(logger *slog.Logger) *cobra.Command {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	root := newRootCommand(rootActions{
+	actions := rootActions{
 		run: func(args []string, configFile string) error {
 			return run(logger, args, configFile)
 		},
@@ -52,22 +79,57 @@ func NewRootCommand(logger *slog.Logger) *cobra.Command {
 		recover: func(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer) error {
 			return Recover(ctx, args, in, out, errOut, logger)
 		},
-		updateSpamLists: func(ctx context.Context, args []string, out, errOut io.Writer) error {
-			return UpdateSpamLists(ctx, args, out, errOut, logger)
+		updateSpamLists: func(ctx context.Context, args []string, out, errOut io.Writer, configFile string) error {
+			return UpdateSpamLists(ctx, args, out, errOut, configFile, logger)
 		},
-		updateAIAgentLists: func(ctx context.Context, args []string, out, errOut io.Writer) error {
-			return UpdateAIAgentLists(ctx, args, out, errOut, logger)
+		updateAIAgentLists: func(ctx context.Context, args []string, out, errOut io.Writer, configFile string) error {
+			return UpdateAIAgentLists(ctx, args, out, errOut, configFile, logger)
 		},
-		importData: func(args []string) {
-			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-			defer stop()
-			Import(ctx, args)
+		importData: func(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer, configFile string) error {
+			return Import(ctx, args, in, out, errOut, configFile, logger)
 		},
-	})
+	}
+	root := newRootCommand(actions)
 	root.AddCommand(newConfigCommand(afero.NewOsFs(), logger, func(args []string) error {
 		return run(logger, args, "")
 	}))
 	return root
+}
+
+func newImportCommandRoute(run func(context.Context, []string, io.Reader, io.Writer, io.Writer, string) error) *cobra.Command {
+	return &cobra.Command{
+		Use:                "import",
+		Short:              "Import historical analytics data",
+		Args:               cobra.ArbitraryArgs,
+		DisableFlagParsing: true,
+		RunE: func(command *cobra.Command, args []string) error {
+			return run(command.Context(), args, command.InOrStdin(), command.OutOrStdout(), command.ErrOrStderr(), rootConfigFile(command.Context()))
+		},
+	}
+}
+
+func newUpdateSpamListsCommand(run func(context.Context, []string, io.Writer, io.Writer, string) error) *cobra.Command {
+	return &cobra.Command{
+		Use:                "update-spam-lists",
+		Short:              "Update spam filter lists",
+		Args:               cobra.ArbitraryArgs,
+		DisableFlagParsing: true,
+		RunE: func(command *cobra.Command, args []string) error {
+			return run(command.Context(), args, command.OutOrStdout(), command.ErrOrStderr(), rootConfigFile(command.Context()))
+		},
+	}
+}
+
+func newUpdateAIAgentListsCommand(run func(context.Context, []string, io.Writer, io.Writer, string) error) *cobra.Command {
+	return &cobra.Command{
+		Use:                "update-ai-agent-lists",
+		Short:              "Update AI agent lists",
+		Args:               cobra.ArbitraryArgs,
+		DisableFlagParsing: true,
+		RunE: func(command *cobra.Command, args []string) error {
+			return run(command.Context(), args, command.OutOrStdout(), command.ErrOrStderr(), rootConfigFile(command.Context()))
+		},
+	}
 }
 
 func newHealthcheckCommand(run func(context.Context, []string, string) error) *cobra.Command {
@@ -80,11 +142,7 @@ func newHealthcheckCommand(run func(context.Context, []string, string) error) *c
 			if err := command.Context().Err(); err != nil {
 				return err
 			}
-			configFile, serverArgs, err := splitRootConfig(args)
-			if err != nil {
-				return err
-			}
-			return run(command.Context(), append(serverArgs, "--healthcheck"), configFile)
+			return run(command.Context(), append(args, "--healthcheck"), rootConfigFile(command.Context()))
 		},
 	}
 }
@@ -161,48 +219,37 @@ func newRootCommand(actions rootActions) *cobra.Command {
 		DisableSuggestions: true,
 		Args:               cobra.ArbitraryArgs,
 		RunE: func(command *cobra.Command, args []string) error {
+			if escaped, _ := command.Context().Value(rootLegacyServerArgsContextKey{}).(bool); escaped && len(args) > 0 && args[0] == "--" {
+				args = args[1:]
+			}
+			configFile := rootConfigFile(command.Context())
 			if len(args) == 0 {
-				return actions.runWithContext(command.Context(), args, "")
+				return actions.runWithContext(command.Context(), args, configFile)
 			}
-			switch args[0] {
-			case "recover":
+			if args[0] == "recover" {
 				return actions.recover(command.Context(), args[1:], command.InOrStdin(), command.OutOrStdout(), command.ErrOrStderr())
-			case "update-spam-lists":
-				return actions.updateSpamLists(command.Context(), args[1:], command.OutOrStdout(), command.ErrOrStderr())
-			case "update-ai-agent-lists":
-				return actions.updateAIAgentLists(command.Context(), args[1:], command.OutOrStdout(), command.ErrOrStderr())
-			case "import":
-				actions.importData(args[1:])
-			default:
-				configFile, serverArgs, err := splitRootConfig(args)
-				if err != nil {
-					return err
-				}
-				if len(serverArgs) == 1 && serverArgs[0] == "--version" {
-					_, err := fmt.Fprintln(command.OutOrStdout(), Version)
-					return err
-				}
-				if len(serverArgs) > 0 && serverArgs[0] == "healthcheck" {
-					return actions.runWithContext(command.Context(), append(serverArgs[1:], "--healthcheck"), configFile)
-				}
-				return actions.runWithContext(command.Context(), serverArgs, configFile)
 			}
-			return nil
+			if len(args) == 1 && args[0] == "--version" {
+				_, err := fmt.Fprintln(command.OutOrStdout(), Version)
+				return err
+			}
+			return actions.runWithContext(command.Context(), args, configFile)
 		},
 		CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
 	}
-	root.AddCommand(newHealthcheckCommand(actions.runWithContext))
+	root.AddCommand(
+		newHealthcheckCommand(actions.runWithContext),
+		newImportCommandRoute(actions.importData),
+		newUpdateSpamListsCommand(actions.updateSpamLists),
+		newUpdateAIAgentListsCommand(actions.updateAIAgentLists),
+	)
 	root.SetHelpCommand(&cobra.Command{
 		Use:                "help",
 		Hidden:             true,
 		Args:               cobra.ArbitraryArgs,
 		DisableFlagParsing: true,
-		RunE: func(_ *cobra.Command, args []string) error {
-			configFile, serverArgs, err := splitRootConfig(args)
-			if err != nil {
-				return err
-			}
-			return actions.run(append([]string{"help"}, serverArgs...), configFile)
+		RunE: func(command *cobra.Command, args []string) error {
+			return actions.run(append([]string{"help"}, args...), rootConfigFile(command.Context()))
 		},
 	})
 	return root

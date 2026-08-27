@@ -95,6 +95,13 @@ func loadViper(
 		}
 		envValue := getEnv(setting.Environment, "")
 		if envValue == "" {
+			for _, legacyEnvironment := range setting.DeprecatedEnvironments {
+				if envValue = getEnv(legacyEnvironment, ""); envValue != "" {
+					break
+				}
+			}
+		}
+		if envValue == "" {
 			continue
 		}
 		values.Set(setting.ConfigFileKey, envValue)
