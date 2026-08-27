@@ -37,7 +37,7 @@ type fixture struct {
 	PreviousChartDigest string `json:"previous_chart_digest"`
 	Platform            string `json:"platform"`
 	PreviousVersion     string `json:"previous_version"`
-	Fixture         struct {
+	Fixture             struct {
 		Email        string `json:"email"`
 		Password     string `json:"password"`
 		Domain       string `json:"domain"`
