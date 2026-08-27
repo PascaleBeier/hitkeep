@@ -21,15 +21,9 @@ const (
 )
 
 type dockerVolume struct {
-	Name      string             `json:"Name"`
-	CreatedAt time.Time          `json:"CreatedAt"`
-	Labels    map[string]string  `json:"Labels"`
-	UsageData *dockerVolumeUsage `json:"UsageData"`
-}
-
-type dockerVolumeUsage struct {
-	Size     int64 `json:"Size"`
-	RefCount int   `json:"RefCount"`
+	Name      string            `json:"Name"`
+	CreatedAt time.Time         `json:"CreatedAt"`
+	Labels    map[string]string `json:"Labels"`
 }
 
 func (a *App) CacheStatus() (CacheReport, error) {
@@ -191,7 +185,13 @@ func (a *App) pruneCacheReport(report CacheReport, olderThan time.Duration, appl
 }
 
 func (a *App) dockerComposeCacheVolumes() []CacheEntry {
-	names := strings.Fields(commandOutput(context.Background(), "docker", "volume", "ls", "--quiet", "--filter", "label="+composeProjectLabel))
+	allNames := strings.Fields(commandOutput(context.Background(), "docker", "volume", "ls", "--quiet", "--filter", "dangling=true", "--filter", "label="+composeProjectLabel))
+	names := make([]string, 0, len(allNames))
+	for _, name := range allNames {
+		if validDockerVolumeName(name) {
+			names = append(names, name)
+		}
+	}
 	if len(names) == 0 {
 		return nil
 	}
@@ -210,7 +210,6 @@ func (a *App) dockerComposeCacheVolumes() []CacheEntry {
 			Kind:       dockerComposeCacheKind,
 			Key:        volume.Name,
 			Path:       volume.Name,
-			Bytes:      volume.UsageData.Size,
 			LastUsedAt: volume.CreatedAt,
 			Prunable:   true,
 		})
@@ -231,7 +230,7 @@ func (a *App) removeDockerComposeCacheVolume(name string) bool {
 }
 
 func isPrunableDockerComposeCacheVolume(volume dockerVolume, currentProject string) bool {
-	if !validDockerVolumeName(volume.Name) || volume.CreatedAt.IsZero() || volume.UsageData == nil || volume.UsageData.RefCount != 0 {
+	if !validDockerVolumeName(volume.Name) || volume.CreatedAt.IsZero() {
 		return false
 	}
 	project := volume.Labels[composeProjectLabel]

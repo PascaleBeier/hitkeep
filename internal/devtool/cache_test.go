@@ -123,21 +123,31 @@ func TestCacheStatusAndPruneDockerComposeCacheVolumes(t *testing.T) {
 
 	bin := t.TempDir()
 	removed := filepath.Join(t.TempDir(), "removed")
+	state := filepath.Join(t.TempDir(), "docker-state")
+	if err := os.WriteFile(state, []byte("dangling\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	docker := filepath.Join(bin, "docker")
 	script := strings.ReplaceAll(`#!/bin/sh
 case "$1:$2" in
 volume:ls)
-	printf '%s\n' stale-go-build current-go-mod active-npm data-volume archive-volume foreign-go-mod unlabeled
+	case " $* " in
+	*" dangling=true "*" label=com.docker.compose.project "*) ;;
+	*) exit 1 ;;
+	esac
+	if [ "$(cat "$HK_DOCKER_CACHE_STATE")" = linked ]; then
+		exit 0
+	fi
+	printf '%s\n' stale-go-build current-go-mod data-volume archive-volume foreign-go-mod unlabeled
 	;;
 volume:inspect)
 	cat <<'JSON'
-{"Name":"stale-go-build","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"hitkeep-deadbeef","com.docker.compose.volume":"go-build"},"UsageData":{"Size":42,"RefCount":0}}
-{"Name":"current-go-mod","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"CURRENT_PROJECT","com.docker.compose.volume":"go-mod"},"UsageData":{"Size":43,"RefCount":0}}
-{"Name":"active-npm","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"hitkeep-deadbeef","com.docker.compose.volume":"npm-cache"},"UsageData":{"Size":44,"RefCount":1}}
-{"Name":"data-volume","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"hitkeep-deadbeef","com.docker.compose.volume":"data"},"UsageData":{"Size":45,"RefCount":0}}
-{"Name":"archive-volume","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"hitkeep-deadbeef","com.docker.compose.volume":"archive"},"UsageData":{"Size":46,"RefCount":0}}
-{"Name":"foreign-go-mod","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"other-project","com.docker.compose.volume":"go-mod"},"UsageData":{"Size":47,"RefCount":0}}
-{"Name":"unlabeled","CreatedAt":"2020-01-01T00:00:00Z","Labels":{},"UsageData":{"Size":48,"RefCount":0}}
+{"Name":"stale-go-build","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"hitkeep-deadbeef","com.docker.compose.volume":"go-build"}}
+{"Name":"current-go-mod","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"CURRENT_PROJECT","com.docker.compose.volume":"go-mod"}}
+{"Name":"data-volume","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"hitkeep-deadbeef","com.docker.compose.volume":"data"}}
+{"Name":"archive-volume","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"hitkeep-deadbeef","com.docker.compose.volume":"archive"}}
+{"Name":"foreign-go-mod","CreatedAt":"2020-01-01T00:00:00Z","Labels":{"com.docker.compose.project":"other-project","com.docker.compose.volume":"go-mod"}}
+{"Name":"unlabeled","CreatedAt":"2020-01-01T00:00:00Z","Labels":{}}
 JSON
 	;;
 volume:rm)
@@ -151,6 +161,7 @@ esac
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("HK_DOCKER_CACHE_REMOVED", removed)
+	t.Setenv("HK_DOCKER_CACHE_STATE", state)
 
 	report, err := app.CacheStatus()
 	if err != nil {
@@ -162,7 +173,7 @@ esac
 			dockerEntries = append(dockerEntries, entry)
 		}
 	}
-	if len(dockerEntries) != 1 || dockerEntries[0].Key != "stale-go-build" || !dockerEntries[0].Prunable || dockerEntries[0].InUse || dockerEntries[0].Bytes != 42 {
+	if len(dockerEntries) != 1 || dockerEntries[0].Key != "stale-go-build" || !dockerEntries[0].Prunable || dockerEntries[0].InUse || dockerEntries[0].Bytes != 0 {
 		t.Fatalf("unexpected Docker cache entries: %+v", dockerEntries)
 	}
 
@@ -190,6 +201,28 @@ esac
 	}
 	if string(contents) != "stale-go-build\n" {
 		t.Fatalf("unexpected Docker volume removal: %q", contents)
+	}
+
+	recheckReport, err := app.CacheStatus()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(state, []byte("linked\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	skipped, err := app.pruneCacheReport(recheckReport, time.Hour, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(skipped.Removed) != 0 {
+		t.Fatalf("newly linked Docker volume was removed: %+v", skipped.Removed)
+	}
+	contents, err = os.ReadFile(removed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(contents) != "stale-go-build\n" {
+		t.Fatalf("linked Docker volume was removed: %q", contents)
 	}
 }
 
