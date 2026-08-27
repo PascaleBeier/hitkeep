@@ -120,6 +120,7 @@ func newSmokeCommand(run smokeRunner) *cobra.Command {
 		writeSmokeUsage(cmd.ErrOrStderr(), cmd)
 	})
 	flags := cmd.Flags()
+	flags.SetInterspersed(false)
 	flags.String("db", "", "restored shared HitKeep database path")
 	flags.String("out", "tmp/prod-eu-opportunities-smoke/release-hardening-smoke.md", "markdown report output path")
 	flags.String("domains", "hitkeep.com,cloud.hitkeep.eu", "comma-separated site domains to smoke")
@@ -237,28 +238,30 @@ func writeSmokeReport(path string, report smokegate.Report) error {
 }
 
 func normalizeLegacySmokeArgs(args []string) []string {
-	legacyLongFlags := map[string]struct{}{
-		"db": {}, "out": {}, "domains": {}, "provider": {}, "model": {}, "region": {}, "base-url": {}, "data-path": {}, "ai": {}, "window-days": {}, "to": {},
+	legacyLongFlags := map[string]bool{
+		"db": true, "out": true, "domains": true, "provider": true, "model": true, "region": true, "base-url": true, "data-path": true, "ai": false, "window-days": true, "to": true,
 	}
-	normalized := append([]string(nil), args...)
-	for index, arg := range normalized {
-		if arg == "--" {
-			break
-		}
-		if !strings.HasPrefix(arg, "-") {
+	normalized := make([]string, 0, len(args))
+	expectsValue := false
+	for index, arg := range args {
+		if expectsValue {
+			normalized = append(normalized, arg)
+			expectsValue = false
 			continue
 		}
-		name, _, _ := strings.Cut(strings.TrimLeft(arg, "-"), "=")
+		if arg == "--" || !strings.HasPrefix(arg, "-") {
+			return append(normalized, args[index:]...)
+		}
+		name, _, hasValue := strings.Cut(strings.TrimLeft(arg, "-"), "=")
 		if name == "h" || name == "help" {
-			normalized[index] = "--help"
-			continue
+			return append(normalized, "--help")
 		}
-		if strings.HasPrefix(arg, "--") {
-			continue
+		takesValue, known := legacyLongFlags[name]
+		if !strings.HasPrefix(arg, "--") && known {
+			arg = "-" + arg
 		}
-		if _, ok := legacyLongFlags[name]; ok {
-			normalized[index] = "-" + arg
-		}
+		normalized = append(normalized, arg)
+		expectsValue = known && takesValue && !hasValue
 	}
 	return normalized
 }

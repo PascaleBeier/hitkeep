@@ -196,6 +196,7 @@ func TestSmokeCommandLegacyParseBoundary(t *testing.T) {
 		args       []string
 		wantCode   int
 		wantStdout string
+		wantStderr string
 		wantUsage  bool
 	}{
 		{name: "short help", args: []string{"-h"}, wantCode: 0, wantUsage: true},
@@ -203,6 +204,9 @@ func TestSmokeCommandLegacyParseBoundary(t *testing.T) {
 		{name: "legacy help", args: []string{"-help"}, wantCode: 0, wantUsage: true},
 		{name: "false short help", args: []string{"-h=false"}, wantCode: 0, wantUsage: true},
 		{name: "false long help", args: []string{"--help=false"}, wantCode: 0, wantUsage: true},
+		{name: "help wins over later unknown", args: []string{"-h", "--unknown"}, wantCode: 0, wantUsage: true},
+		{name: "earlier unknown wins over help", args: []string{"--unknown", "-h"}, wantCode: 2, wantUsage: true},
+		{name: "positional stops help parsing", args: []string{"positional", "-h"}, wantCode: 1, wantStderr: "-db is required\n"},
 		{name: "unknown flag", args: []string{"-unknown"}, wantCode: 2, wantUsage: true},
 		{name: "invalid integer", args: []string{"-window-days=not-a-number"}, wantCode: 2, wantUsage: true},
 		{name: "invalid boolean", args: []string{"-ai=not-a-bool"}, wantCode: 2, wantUsage: true},
@@ -233,6 +237,9 @@ func TestSmokeCommandLegacyParseBoundary(t *testing.T) {
 			}
 			if tt.wantStdout != "" && !strings.HasSuffix(stdout.String(), tt.wantStdout) {
 				t.Fatalf("stdout = %q, want suffix %q", stdout.String(), tt.wantStdout)
+			}
+			if tt.wantStderr != "" && stderr.String() != tt.wantStderr {
+				t.Fatalf("stderr = %q, want %q", stderr.String(), tt.wantStderr)
 			}
 		})
 	}
