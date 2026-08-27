@@ -27,24 +27,42 @@ This folder is the durable progress ledger for the migration. Update it in the s
 | 0C | In progress | Inventory filesystem operations and dependency-ordered `internal/` move manifest | The durable filesystem/package manifest records remaining families, classifications, native exclusions, and four rejected move candidates; further Phase 9/10 waves remain frozen until every remaining direct child and operation has complete dependency/owner/build-tag/generated-file evidence |
 | 1 | Completed | Make catalog authoritative and generate neutral `hitkeep.example.yaml` | Catalog `config_file_key` added; schema `hitkeep.config/v2`; deterministic example covers each self-hosted key once |
 | 2 | Completed | Add instance-based Viper assembler in shadow parity | Viper 1.21.0 + Afero explicit YAML; full catalog types, strict keys, normalization, warnings, and precedence proven |
-| 3 | In progress | Production Cobra root with legacy-compatible routing | Factory-built Cobra root owns top-level execution and exact first-argument routing; healthcheck now inherits Cobra context and returns a typed result to the executable boundary with exact subprocess parity; recovery and remaining actions still need context/error/stream ownership |
+| 3 | Completed | Production Cobra root with legacy-compatible routing | Factory-built Cobra root owns top-level execution, exact first-argument routing, leading-only config bootstrap normalization, Cobra recovery/import/updater routes, typed Viper client configuration, and the sole process signal owner with real SIGINT/SIGTERM cancellation proof |
 | 4 | In progress | Switch production assembly to Viper with complete legacy parity | `config.Load` uses instance-based Viper through an OS-backed Afero boundary; catalog-wide tests cover self-hosted and cloud env/flag/default/alias/invalid-value parity and prove cloud-only descriptors are inert in self-hosted builds; stabilization and final legacy-oracle contraction remain pending |
 | 4A | Completed | Add production configuration-file UX | Cobra-owned `config init --output` writes the canonical catalog-derived example without overwrite; `config validate --config` uses the strict explicit Viper loader without starting services or exposing values |
 | 4B | Completed | Harden production configuration commands and raw-key validation | Only exact `config init` and `config validate` use Cobra; all other `config` argv falls back unchanged; write/close failures retain their pathname; raw YAML keys must exactly match catalog kebab-case names before Viper normalization |
 | 4C | Completed | Make the explicit YAML trust boundary deterministic | Valid flat scalar files remain compatible; duplicate keys, multiple documents, aliases, merge keys, nulls, mappings, and sequences are rejected before Viper normalization without exposing values |
 | 5 | Completed | Normalize `hk` Cobra factories and preserve MCP/JSON contracts | No rewrite required: `hk` already has one factory root, centralized render/envelope handling, deterministic command catalog, and guarded production boundary |
-| 6 | In progress | Project catalog into Docker, Compose, Helm, examples, and docs artifact | Catalog-owned data-path policy now rejects missing files, omitted declarations, and default drift across exact Docker, all root/example Compose, real Helm template/values, and canonical-example paths; remaining-setting classification, identical artifact distribution, and private-doc attestation remain pending |
+| 6 | In progress | Project catalog into Docker, Compose, Helm, examples, and docs artifact | `10045411` records catalog publication classification; catalog-owned data-path policy rejects missing files, omitted declarations, and default drift across exact Docker, all root/example Compose, real Helm template/values, and canonical-example paths; private-doc attestation remains pending |
 | 7 | In progress | Enforce issue #288 upgrade, rollback, recreation, and migration interruption gates | Digest-pinned v2.12 migration, two candidate recreations, quiescent fresh-volume rollback, and forced process-kill/restart recovery across all 19 durable split boundaries are proven; release finalization now transitively requires the reusable interruption acceptance workflow; authenticated Helm lifecycle execution remains pending |
-| 8 | In progress | GoReleaser release ownership while preserving future package-manager compatibility | Tagged Linux amd64/arm64 archives, checksums, raw cloud assets, version metadata, and exact-SHA snapshot publication are proven; a stabilization release plus Darwin/Windows CGO feasibility remain pending |
+| 8 | In progress | GoReleaser release ownership while preserving future package-manager compatibility | `a3f71980` adds the release digest manifest; tagged Linux amd64/arm64 archives, checksums, raw cloud assets, version metadata, and exact-SHA snapshot publication are proven; a stabilization release plus Darwin/Windows CGO feasibility and Homebrew/Scoop lifecycle proof remain pending |
 | 8A | In progress | Review and simplify the release process with Ponytail and spf13 Go guidance | Interim review removed three duplicated upgrade job definitions and exact-SHA snapshot `33017615814` passed on `c09d2c6d`; the requested whole-release review must be repeated after docs attestation, Helm lifecycle proof, final graph assembly, and stabilization evidence |
 | 9 | In progress | Afero/fileflow/pathologize migration by operation risk | Runtime config uses injected Afero and one cross-filesystem release relocation uses fileflow; the complete operation inventory and remaining justified waves are pending, while database/WAL/fsync/lock operations stay native |
 | 10 | In progress | Flatten `internal/` in dependency-order move-only slices | Pure foundations moved: `internal/appurl` → `appurl`, `internal/exportfmt` → `exportfmt`, `internal/hklog` → `hklog`, `internal/analyticscatalog` → `analyticscatalog`, `internal/jsonapi` → `jsonapi`, `internal/localization` → `localization`, `internal/mcptest` → `mcptest`, and stabilized `internal/config` → `config`; no compatibility shims because Go already prohibited external imports |
 | 11 | Pending | Stabilize, full QA, CI, docs validation, completion audit | — |
 
+## Current delivery status
+
+- `10045411`: catalog publication classification recorded for distribution-surface synchronization.
+- `c05df878`: recovery migrated through the Cobra boundary while retaining its legacy command contract.
+- `a3f71980`: release digest manifest added for release-surface verification.
+- `6347ccbc`: import and both updater routes are real Cobra children; import client settings resolve through typed Viper/catalog configuration; `ExecuteRoot` is the compatibility adapter for only leading `--config` and first-token server grammar.
+- `570bb9aa`: `main` is the sole signal owner; a bounded child-process test invokes the production executable/root, waits for the real application-ready log, then proves graceful SIGINT and SIGTERM cancellation. No production hook or fake Cobra root is used.
+- Pushed SHA `0f4ff2d5`: Snapshot run `33022662630` passed. CI `33022594311` failed once only on `TestMCPStdioActionRunLifecycle` TempDir cleanup race; its rerun passed. This ledger does not claim that cleanup race is fixed.
+
+### Explicitly unproven gates
+
+- Private-doc attestation.
+- Authenticated disposable Helm lifecycle.
+- Stabilization release.
+- Darwin/Windows CGO artifacts and Homebrew/Scoop install, upgrade, and uninstall lifecycle proof.
+- Remaining dependency-ordered `internal/` layout and filesystem migration waves.
+- Final Ponytail and spf13 Go review after the remaining gates close.
+
 ## Completed discovery
 
-- Production uses manual top-level dispatch; `cmd/hitkeep.Run` owns no-subcommand server startup and `config.Load` currently consumes `os.Args`.
-- Recovery has five manual stdlib flag subcommands whose names, confirmation behavior, and output remain compatibility contracts.
+- Production uses a Cobra factory root; `ExecuteRoot` is the only leading-`--config`/first-token compatibility bootstrap before Cobra selects a route, and no config path is a persistent Cobra flag.
+- Recovery (`c05df878`) and the import/updater routes (`6347ccbc`) preserve their legacy stdlib parsers, names, confirmations, streams, help, and exit behavior while Cobra owns context and routing.
 - `hk` already uses Cobra factories, centralized JSON/NDJSON envelopes, and a generated command catalog; preserve and normalize this implementation.
 - Repeated canonical/deprecated config flags share one destination and resolve sequentially: the last occurrence wins in either spelling order.
 - Current release binaries are CGO-enabled Linux amd64/arm64 self-hosted and cloud variants. Version injection targets `hitkeep/cmd.Version`.
@@ -145,6 +163,12 @@ Record focused commands as stable test targets or `hk` gate IDs, not pasted succ
 | 2026-08-27 | 8A | Ponytail/Go release workflow consolidation | Five-file change removed 84 net lines while preserving parallel Docker, Compose, and Helm gates; focused/full developer tests, YAML parsing, zizmor, and the broader affected-package race contract passed |
 | 2026-08-27 | 8A | Changed QA `20260826T215429-d0a8cfa3` | Passed: `go-format`, `go-fix`, `go-lint`, `go-vet`, `go-staticcheck`, `developer-mcp`, `developer-docs` |
 | 2026-08-27 | 8A | Exact-SHA snapshot `33017615814` | Passed on `c09d2c6d`: deterministic dashboard, native Linux amd64/arm64 binaries and version checks, multi-architecture GoReleaser archives, multi-platform image, attestations, and release upload |
+| 2026-08-27 | 3 | Recovery Cobra boundary (`c05df878`) | Recovery now retains its exact legacy command/parser/stream contract through Cobra-owned context and executable error handling |
+| 2026-08-27 | 6 | Publication classification (`10045411`) | Catalog classification is recorded as the distribution-surface source of truth; private-doc attestation remains unproven |
+| 2026-08-27 | 8 | Release digest manifest (`a3f71980`) | Release verification has a digest manifest; stabilization release and Darwin/Windows/Homebrew/Scoop evidence remain unproven |
+| 2026-08-27 | 3 | Import/updater Cobra and typed Viper client configuration (`6347ccbc`) | Focused command race and subprocess parity tests passed; compatibility bootstrap is limited to leading `--config` and first-token server grammar |
+| 2026-08-27 | 3 | Sole signal owner and production SIGINT/SIGTERM proof (`570bb9aa`) | Bounded real-main child-process test passed for both signals; focused race execution was bounded but longer than the interactive harness output window |
+| 2026-08-27 | Delivery | Pushed SHA `0f4ff2d5` | Snapshot run `33022662630` passed; CI `33022594311` failed once only on `TestMCPStdioActionRunLifecycle` TempDir cleanup race and its rerun passed—no fix is claimed |
 
 ## Interim release simplification: 8A
 
@@ -161,4 +185,4 @@ Record focused commands as stable test targets or `hk` gate IDs, not pasted succ
 
 ## Next update
 
-Migrate recovery to Cobra-owned arguments, context, errors, and streams while preserving its five legacy commands and exact process behavior, then finish the remaining action closures. Follow with the versioned catalog/example digest manifest and exact-source private-docs attestation. Complete the operation/package inventories before any further filesystem or `internal/` wave. Run the Helm upgrade/recreation/rollback smoke in an authenticated disposable cluster before claiming Phase 7 complete. Enable Homebrew tap and Scoop bucket publishing only after real Darwin/Windows CGO artifacts pass install/upgrade/uninstall lifecycle smokes.
+Close the private-doc attestation and run the Helm upgrade/recreation/rollback smoke in an authenticated disposable cluster before claiming Phase 7 complete. Produce a stabilization release, then prove Darwin/Windows CGO artifacts and Homebrew/Scoop install, upgrade, and uninstall lifecycle behavior. Complete the operation/package inventories before any further filesystem or `internal/` wave, then repeat the final Ponytail and spf13 Go review against the finished release graph.
