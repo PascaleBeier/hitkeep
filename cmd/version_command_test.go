@@ -2,6 +2,7 @@ package hitkeepcmd
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"os/exec"
 	"strings"
@@ -37,7 +38,7 @@ func TestVersionCommand(t *testing.T) {
 			root.SetErr(&stderr)
 			root.SetArgs(test.args)
 
-			if err := root.Execute(); err != nil {
+			if err := ExecuteRoot(context.Background(), root, test.args); err != nil {
 				t.Fatalf("Execute() error = %v", err)
 			}
 			if got, want := strings.Join(gotArgs, "\n"), strings.Join(test.wantRun, "\n"); got != want {
@@ -69,7 +70,7 @@ func TestVersionCommandSubprocess(t *testing.T) {
 		root.SetOut(os.Stdout)
 		root.SetErr(os.Stderr)
 		root.SetArgs(strings.Split(os.Getenv(versionCommandSubprocessEnv+"_ARGS"), "\n"))
-		if err := root.Execute(); err != nil {
+		if err := ExecuteRoot(context.Background(), root, strings.Split(os.Getenv(versionCommandSubprocessEnv+"_ARGS"), "\n")); err != nil {
 			_, _ = os.Stderr.WriteString(err.Error() + "\n")
 			os.Exit(1)
 		}

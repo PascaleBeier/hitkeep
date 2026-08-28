@@ -29,7 +29,7 @@ func TestHealthcheckCommandSubprocessParity(t *testing.T) {
 			},
 		})
 		root.SetArgs(args)
-		if err := root.Execute(); err != nil {
+		if err := ExecuteRoot(context.Background(), root, args); err != nil {
 			_, _ = fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
@@ -122,7 +122,7 @@ func TestRootCommandCompatibilityContract(t *testing.T) {
 		{name: "non-leading config remains server input", input: []string{"--listen-address=:8090", "--config", "testdata/hitkeep.yaml"}, wantArgs: []string{"--listen-address=:8090", "--config", "testdata/hitkeep.yaml"}},
 		{name: "interspersed server flags remain server input", input: []string{"--listen-address=:8090", "--log-level=debug"}, wantArgs: []string{"--listen-address=:8090", "--log-level=debug"}},
 		{name: "root config selects healthcheck configuration", input: []string{"--config", "testdata/hitkeep.yaml", "healthcheck"}, wantArgs: []string{"--healthcheck"}, wantConfig: "testdata/hitkeep.yaml"},
-		{name: "healthcheck config selects configuration", input: []string{"healthcheck", "--config", "testdata/hitkeep.yaml"}, wantArgs: []string{"--healthcheck"}, wantConfig: "testdata/hitkeep.yaml"},
+		{name: "healthcheck config remains legacy input", input: []string{"healthcheck", "--config", "testdata/hitkeep.yaml"}, wantArgs: []string{"--config", "testdata/hitkeep.yaml", "--healthcheck"}},
 		{name: "healthcheck help remains legacy input", input: []string{"healthcheck", "--help"}, wantArgs: []string{"--help", "--healthcheck"}},
 		{name: "help healthcheck remains legacy input", input: []string{"help", "healthcheck"}, wantArgs: []string{"help", "healthcheck"}},
 	}
@@ -142,7 +142,7 @@ func TestRootCommandCompatibilityContract(t *testing.T) {
 			})
 			root.SetArgs(tt.input)
 
-			err := root.Execute()
+			err := ExecuteRoot(context.Background(), root, tt.input)
 			if tt.wantErr != "" {
 				if err == nil || err.Error() != tt.wantErr {
 					t.Fatalf("Execute() error = %v, want %q", err, tt.wantErr)
@@ -294,7 +294,7 @@ func TestHealthcheckCommandPreservesRootBootstrapGrammar(t *testing.T) {
 			})
 			root.SetArgs(tt.input)
 
-			if err := root.Execute(); err != nil {
+			if err := ExecuteRoot(context.Background(), root, tt.input); err != nil {
 				t.Fatalf("Execute() error = %v", err)
 			}
 			if !slices.Equal(gotArgs, tt.wantArgs) {
