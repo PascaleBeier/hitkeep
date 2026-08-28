@@ -58,6 +58,30 @@ Not a leaf. It imports the analytics catalog, API, database, JSON API, and GoAI,
 
 Not a leaf. It crosses configuration, database, worker, and cloud/OSS build-tag variants. All variants and consumers must move atomically in a later coordinated wave.
 
+### `internal/devtool`
+
+Owner: the developer-only `hk` workspace, QA, build, cache, artifact, toolchain, development-session, CLI, and MCP platform. Consumers: `cmd/hk`, with `internal/devtool/cli` and `internal/devtool/devmcp` depending inward; production-boundary tests exclude all three from `cmd/hitkeep`. Build tags/OS-CGO: no build tags, OS-specific files, or direct CGO were found. Filesystem: ordinary metadata reads, the `copyTree` fileflow candidate, and artifact/screenshot containment boundaries are distinct from native PID/lock/process/toolchain/cancellation state and embedded `tool-versions.json`. Tests: devsession, runs, cache, artifacts, CLI, MCP, and production-boundary tests. Coupling/cycle: workspace state and process orchestration are broad; no import cycle is proven. Disposition: **decomposition required / stay internal**; split core state, artifacts/cache, source/docs, CLI, and MCP before any move record.
+
+### `internal/importables`
+
+Owner: Plausible and Simple Analytics source parsing, validation, and import manifests. Consumers: database imported-analytics storage, server import handlers, and takeout/retention/tenant-manager tests. Build tags/OS-CGO: none found. Filesystem: provider `scanCSVFile` paths call `os.Open(source.Path)`, and `PlausibleProvider.scanZip` calls `zip.OpenReader(source.Path)`; classify CSV and ZIP source reads as ordinary injectable reads plus an untrusted staging/source-path containment boundary. Tests: Plausible and Simple Analytics parser/import tests plus fixture-path containment tests; focused archive-entry containment coverage remains a pre-move proof gap. Coupling/cycle: source validation, server staging, persistence, and cleanup are coupled; no import cycle is proven. Disposition: **stay internal / blocked** pending exact path-containment evidence.
+
+### `internal/ingest`
+
+Owner: `Batcher` and `Consumer` runtime ingestion coordination. Consumers: production startup in `cmd/hitkeep`. Build tags/OS-CGO: none found. Filesystem: no direct filesystem operations found. Tests: consumer and consumer-configuration tests. Coupling/cycle: `cmd/hitkeep` is the direct production consumer, and the exported batching/consumer surface coordinates queue and database behavior; no import cycle is proven. Disposition: **stay internal / blocked** pending review of that public surface and its direct consumer.
+
+### `internal/ipmeta` and `internal/ipmeta/ipmetagen`
+
+Owner: `internal/ipmeta` provides runtime IP metadata lookup; `ipmetagen` owns generated lookup assets. Consumers: server ingest and QR handlers plus shared country lookup for runtime, and `cmd/ipmeta-generate` for generation; production-dependency tests prohibit generator linkage into the application. Build tags/OS-CGO: none found. Filesystem: runtime lookup data is embedded `io/fs` and stays unchanged; generator `writePublicGeneratedFile` and embed-source writers are ordinary generated-file candidates. Tests: runtime block-asset/IP metadata tests, packed benchmarks, generator tests, and framed-asset tests. Coupling/cycle: runtime and generator boundaries are intentionally separate; no import cycle is proven. Disposition: **stay internal / blocked**; runtime and generator require separate move records.
+
+### `internal/mailables`
+
+Owner: product-specific mail construction for authentication, signup, invitations, reporting, and cloud billing lifecycle. Consumers: preview-email tooling, server auth/admin/cloud/user handlers, and report/cloud workers. Build tags/OS-CGO: cloud lifecycle and signup files use the `billing` build tag; the remainder is unconditional, with no OS/CGO files found. Filesystem: no direct filesystem operations found; it consumes `internal/mailer`. Tests: cloud lifecycle and report mailables plus consuming handler/worker tests. Coupling/cycle: product events, localization, billing variants, and delivery are coupled; no import cycle is proven. Disposition: **stay internal / blocked**; any move must preserve the billing variant and consuming handlers/workers.
+
+### `internal/mailer` and `internal/mailer/drivers`
+
+Owner: mail manager, types/errors, localization/template rendering, and SMTP delivery. Consumers: `cmd/hitkeep`, preview-email tooling, `internal/mailables`, server setup/handlers, and workers. Build tags/OS-CGO: none found. Filesystem: locales and MJML/text templates are embedded `io/fs` and stay unchanged; SMTP is a network boundary. Tests: manager/errors, SMTP driver, mailables, and consuming handler tests. Coupling/cycle: runtime configuration, template localization, product mail construction, and network delivery are broad; no import cycle is proven. Disposition: **stay internal / blocked**; core manager and driver require separate move records.
+
 ### `internal/realtime`
 
 Owner: `Broker`, `Publish`, and `Subscription` coordinate live delivery. Consumers: the site and shared realtime handlers in `internal/server`, plus the dashboard coordinator. Build tags: unconditional. Filesystem: none; its in-memory channels and HTTP delivery are native runtime semantics. Coupling/cycle: server-handler and channel-lifetime coupling make it non-leaf; no import cycle is proven. Tests: the site and shared realtime-handler tests. Disposition: **stay internal / blocked**; no move is approved until those consumers move together.

@@ -171,6 +171,38 @@ func TestFilesystemLayoutManifestPinsBuildOwnershipSurfaces(t *testing.T) {
 	}
 }
 
+// TestFilesystemLayoutManifestPinsReviewedFamilyRecords is a prose-presence sentinel, not semantic evidence validation.
+func TestFilesystemLayoutManifestPinsReviewedFamilyRecords(t *testing.T) {
+	contents, err := os.ReadFile(filepath.Join("..", "..", "docs", "config-refactor", "filesystem-layout-manifest.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest := string(contents)
+	records := map[string][]string{
+		"### `internal/devtool`":                                {"decomposition required / stay internal", "native PID/lock/process/toolchain/cancellation state"},
+		"### `internal/importables`":                            {"`os.Open(source.Path)`", "`zip.OpenReader(source.Path)`", "untrusted staging/source-path containment boundary", "stay internal / blocked"},
+		"### `internal/ingest`":                                 {"no direct filesystem operations found", "stay internal / blocked"},
+		"### `internal/ipmeta` and `internal/ipmeta/ipmetagen`": {"embedded `io/fs`", "ordinary generated-file candidates", "stay internal / blocked"},
+		"### `internal/mailables`":                              {"`billing` build tag", "stay internal / blocked"},
+		"### `internal/mailer` and `internal/mailer/drivers`":   {"SMTP is a network boundary", "stay internal / blocked"},
+	}
+	for heading, fragments := range records {
+		if count := strings.Count(manifest, heading); count != 1 {
+			t.Errorf("reviewed family heading %s appears %d times, want exactly once", heading, count)
+			continue
+		}
+		section := manifest[strings.Index(manifest, heading)+len(heading):]
+		if next := strings.Index(section, "\n### "); next >= 0 {
+			section = section[:next]
+		}
+		for _, fragment := range fragments {
+			if !strings.Contains(section, fragment) {
+				t.Errorf("reviewed family %s is missing %q", heading, fragment)
+			}
+		}
+	}
+}
+
 func TestGoReleaserReleaseArchiveAssetsStayInWorkspace(t *testing.T) {
 	path := filepath.Join("..", "..", ".github", "workflows", "pipeline.yml")
 	contents, err := os.ReadFile(path)
