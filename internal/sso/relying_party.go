@@ -113,7 +113,8 @@ func (r *RelyingParty) Complete(ctx context.Context, config TeamConfig, state Fl
 	if err != nil {
 		return Identity{}, err
 	}
-	requestCtx := r.client.Context(ctx)
+	requestCtx, cancel := context.WithTimeout(r.client.Context(ctx), providerTimeout)
+	defer cancel()
 	token, err := oauthConfig(provider, config).Exchange(requestCtx, strings.TrimSpace(code), oauth2.VerifierOption(state.CodeVerifier))
 	if err != nil {
 		return Identity{}, fmt.Errorf("%w: %v", ErrTokenExchange, err)

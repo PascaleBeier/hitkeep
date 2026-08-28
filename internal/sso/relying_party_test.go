@@ -1,6 +1,7 @@
 package sso
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"net/http"
@@ -68,6 +69,7 @@ func TestRelyingPartyCompleteExchangesAndVerifiesIdentity(t *testing.T) {
 	var server *httptest.Server
 	var expectedNonce string
 	var receivedVerifier string
+	var tokenRequestHasDeadline bool
 	discoveryRequests := 0
 	server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -106,6 +108,14 @@ func TestRelyingPartyCompleteExchangesAndVerifiesIdentity(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 	providerHandler.SetIssuer(server.URL)
+	httpClient := server.Client()
+	transport := httpClient.Transport
+	httpClient.Transport = roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+		if request.URL.Path == "/token" {
+			_, tokenRequestHasDeadline = request.Context().Deadline()
+		}
+		return transport.RoundTrip(request)
+	})
 
 	config := TeamConfig{
 		IssuerURL:        server.URL,
@@ -115,14 +125,14 @@ func TestRelyingPartyCompleteExchangesAndVerifiesIdentity(t *testing.T) {
 		EmailClaim:       "email",
 		DisplayNameClaim: "profile.display_name",
 	}
-	relyingParty := NewRelyingParty(NewClient(server.Client()))
-	authorization, err := relyingParty.Begin(t.Context(), config)
+	relyingParty := NewRelyingParty(NewClient(httpClient))
+	authorization, err := relyingParty.Begin(context.Background(), config)
 	if err != nil {
 		t.Fatalf("begin SSO authorization: %v", err)
 	}
 	expectedNonce = authorization.FlowState.Nonce
 
-	identity, err := relyingParty.Complete(t.Context(), config, authorization.FlowState, "test-code")
+	identity, err := relyingParty.Complete(context.Background(), config, authorization.FlowState, "test-code")
 	if err != nil {
 		t.Fatalf("complete SSO authorization: %v", err)
 	}
@@ -132,7 +142,16 @@ func TestRelyingPartyCompleteExchangesAndVerifiesIdentity(t *testing.T) {
 	if receivedVerifier != authorization.FlowState.CodeVerifier {
 		t.Fatalf("token exchange verifier %q does not match flow state", receivedVerifier)
 	}
+	if !tokenRequestHasDeadline {
+		t.Fatal("token exchange request has no deadline")
+	}
 	if discoveryRequests != 1 {
 		t.Fatalf("expected Begin and Complete to share one provider discovery, got %d", discoveryRequests)
 	}
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return f(request)
 }
