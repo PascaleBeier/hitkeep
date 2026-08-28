@@ -76,7 +76,7 @@ jobs:
             test "${#archives[@]}" -eq 1
             extract_dir="$(mktemp -d)"
             tar -xzf "${archives[0]}" -C "$extract_dir"
-            binary="$extract_dir/hitkeep"
+            binary="$extract_dir/hitkeep-linux-${arch}"
             test -x "$binary"
             build_metadata="$(go version -m "$binary")"
             grep -Fq 'GOOS=linux' <<< "$build_metadata"
@@ -185,4 +185,4 @@ jobs:
           HITKEEP_CANDIDATE_CHART="$candidate_chart" \
           HITKEEP_CANDIDATE_CHART_VERSION="$CANDIDATE_VERSION" \
           HITKEEP_KIND_CLUSTER="$cluster" \
-            ./scripts/helm-smoke.sh "$candidate" self-hosted
+            bash ./scripts/helm-smoke.sh "$candidate" self-hosted

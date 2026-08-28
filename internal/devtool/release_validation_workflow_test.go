@@ -21,6 +21,7 @@ func TestReleaseValidationWorkflowContract(t *testing.T) {
 		"goreleaser/goreleaser/v2@v2.18.0 release",
 		"--snapshot --clean --skip=publish --config .goreleaser.yaml",
 		`find dist -maxdepth 1 -type f -name "hitkeep_*_Linux_${arch}.tar.gz"`,
+		`binary="$extract_dir/hitkeep-linux-${arch}"`,
 		"GOARCH=${arch}",
 		"CGO_ENABLED=1",
 		"sha256sum --check SHA256SUMS",
@@ -40,7 +41,7 @@ func TestReleaseValidationWorkflowContract(t *testing.T) {
 		"HITKEEP_CANDIDATE_CHART=",
 		"HITKEEP_CANDIDATE_CHART_VERSION=",
 		"HITKEEP_KIND_CLUSTER=",
-		`./scripts/helm-smoke.sh "$candidate" self-hosted`,
+		`bash ./scripts/helm-smoke.sh "$candidate" self-hosted`,
 	} {
 		if !strings.Contains(workflow, want) {
 			t.Errorf("release validation workflow missing %q", want)
