@@ -19,10 +19,26 @@ Remaining indexed families:
 - `ai`, `aianalytics`, `analyticstools`, `api`, `assetstore`, `auth`
 - `blocking`, `cluster`, `database`, `devtool`, `entitlements`
 - `importables`, `ingest`, `ipmeta`, `mailables`, `mailer`
-- `mcpserver`, `opportunities`, `server`, `socialauth`, `sso`
-- `testutil`, `webhookdispatcher`, `worker`
+- `mcpserver`, `opportunities`, `realtime`, `reporting`, `searchconsole`
+- `security`, `server`, `socialauth`, `sso`, `takeout`
+- `testutil`, `webhookdispatcher`, `webhooks`, `worker`
 
 No remaining Go package-import cycle is currently proven. Reported Go cycles are call recursion or test-mock cycles, not import cycles; that does not make a package leaf-safe.
+
+## Build and cloud configuration ownership
+
+These surfaces form one build-time chain. The developer catalog owns supported build variants; every other surface projects or consumes that decision. None of these build defaults replaces production runtime configuration, whose settings remain owned by the runtime configuration catalog and loader.
+
+| Surface | Role | Contract |
+| --- | --- | --- |
+| `internal/devtool/catalog.go::variants` | Canonical developer build owner | Defines variant IDs, build tags, developer-container environment, local image names, and publishability metadata. Its cloud values are developer/build defaults, not runtime settings. |
+| `internal/devtool/app.go::App.ComposeEnvironment` | Workspace projection | Projects the selected variant plus workspace-scoped paths and ports into Compose variables; it does not define supported variants or production configuration precedence. |
+| `internal/devtool/runs.go::App.executeBuild` | Build orchestrator | Resolves a catalog variant, enforces the production/developer dependency boundary, and invokes the selected binary or image build without redefining tags or defaults. |
+| `Dockerfile` | Image-build consumer | Consumes explicit build arguments and produces the selected application image; it is not a configuration catalog or runtime parser. |
+| `.goreleaser.yaml` | Release-build projection | Maps the canonical self-hosted and cloud build identities to release tags, CGO targets, archive contents, and names; it must remain aligned with the developer catalog. |
+| `.github/workflows/pipeline.yml` | Delivery consumer | Supplies explicit version/ref inputs, restores verified assets, and invokes the canonical build projections. Publication and attestation policy lives here, but variant semantics do not. |
+
+Disposition: **stay explicit / validate projections**. Do not consolidate these surfaces into production runtime configuration or move developer-only cloud defaults into the application binary.
 
 ## Rejected next move candidates
 
@@ -62,9 +78,9 @@ Owner: TOTP, recovery-code, and passkey primitives. Consumers: user security/aut
 
 Owner: `TakeoutService` and its export query builders. Consumers: server takeout handlers. Build tags: unconditional. Filesystem: user-derived export paths and file creation require existing containment, permissions, and cleanup behavior. Coupling/cycle: database, authorization, export, and persistence semantics make it non-leaf; no import cycle is proven. Tests: focused takeout service and handler tests. Disposition: **stay internal / blocked**; do not move or abstract its filesystem behavior without a separately reviewed export-security slice.
 
-### `internal/webhookdispatcher/webhooks`
+### `internal/webhookdispatcher` and `internal/webhooks`
 
-Owner: webhook `Dispatcher`, `Emitter`, `Worker`, and `Sweeper`. Consumers: `cmd/hitkeep` leader-service startup, `internal/server.New`, and the webhook database store/migration. Build tags: unconditional. Filesystem: no ordinary filesystem boundary. Coupling/cycle: database, queue, network-delivery, and concurrent worker lifecycle coupling make it non-leaf; no import cycle is proven. Tests: dispatcher, emitter, worker, sweeper, and server webhook-handler tests. Disposition: **stay internal / blocked**; no move is approved outside a coordinated persistence and delivery slice.
+Owner: `internal/webhookdispatcher` owns the delivery `Dispatcher`, `Worker`, and `Sweeper`; `internal/webhooks` owns event emission through `Emitter`. Consumers: `cmd/hitkeep` leader-service startup, `internal/server.New`, and the webhook database store/migration. Build tags: unconditional. Filesystem: no ordinary filesystem boundary. Coupling/cycle: database, queue, network-delivery, and concurrent worker lifecycle coupling make it non-leaf; no import cycle is proven. Tests: dispatcher, emitter, worker, sweeper, and server webhook-handler tests. Disposition: **stay internal / blocked**; no move is approved outside a coordinated persistence and delivery slice.
 
 Conclusion: no currently reviewed candidate is approved for the next move-only wave. Select a different low-coupling package only after authoritative dependency evidence is available.
 

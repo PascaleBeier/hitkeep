@@ -130,6 +130,47 @@ func TestGoReleaserBranchArchiveWorkflowContract(t *testing.T) {
 	}
 }
 
+func TestFilesystemLayoutManifestPinsBuildOwnershipSurfaces(t *testing.T) {
+	root := filepath.Join("..", "..")
+	contents, err := os.ReadFile(filepath.Join(root, "docs", "config-refactor", "filesystem-layout-manifest.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest := string(contents)
+	for _, row := range []string{
+		"| `internal/devtool/catalog.go::variants` | Canonical developer build owner | Defines variant IDs, build tags, developer-container environment, local image names, and publishability metadata. Its cloud values are developer/build defaults, not runtime settings. |",
+		"| `internal/devtool/app.go::App.ComposeEnvironment` | Workspace projection | Projects the selected variant plus workspace-scoped paths and ports into Compose variables; it does not define supported variants or production configuration precedence. |",
+		"| `internal/devtool/runs.go::App.executeBuild` | Build orchestrator | Resolves a catalog variant, enforces the production/developer dependency boundary, and invokes the selected binary or image build without redefining tags or defaults. |",
+		"| `Dockerfile` | Image-build consumer | Consumes explicit build arguments and produces the selected application image; it is not a configuration catalog or runtime parser. |",
+		"| `.goreleaser.yaml` | Release-build projection | Maps the canonical self-hosted and cloud build identities to release tags, CGO targets, archive contents, and names; it must remain aligned with the developer catalog. |",
+		"| `.github/workflows/pipeline.yml` | Delivery consumer | Supplies explicit version/ref inputs, restores verified assets, and invokes the canonical build projections. Publication and attestation policy lives here, but variant semantics do not. |",
+	} {
+		if count := strings.Count(manifest, row); count != 1 {
+			t.Errorf("build ownership row appears %d times, want exactly once: %s", count, row)
+		}
+	}
+
+	for path, anchors := range map[string][]string{
+		"internal/devtool/catalog.go":    {"var variants = []Variant{"},
+		"internal/devtool/app.go":        {"func (a *App) ComposeEnvironment(variant Variant) []string"},
+		"internal/devtool/runs.go":       {"func (a *App) executeBuild(ctx context.Context, request RunRequest, writer io.Writer) error"},
+		"Dockerfile":                     nil,
+		".goreleaser.yaml":               {"id: self-hosted", "id: cloud", "CGO_ENABLED=1"},
+		".github/workflows/pipeline.yml": {"build-release-archives:", "build-and-push-image:"},
+	} {
+		source, err := os.ReadFile(filepath.Join(root, path))
+		if err != nil {
+			t.Errorf("read build ownership surface %s: %v", path, err)
+			continue
+		}
+		for _, anchor := range anchors {
+			if !strings.Contains(string(source), anchor) {
+				t.Errorf("build ownership surface %s is missing %q", path, anchor)
+			}
+		}
+	}
+}
+
 func TestGoReleaserReleaseArchiveAssetsStayInWorkspace(t *testing.T) {
 	path := filepath.Join("..", "..", ".github", "workflows", "pipeline.yml")
 	contents, err := os.ReadFile(path)
