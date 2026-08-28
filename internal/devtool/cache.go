@@ -69,6 +69,14 @@ func (a *App) CacheStatus() (CacheReport, error) {
 	}
 	report.Entries = append(report.Entries, toolchains...)
 
+	bootstrapCaches, err := cacheChildren(filepath.Join(root, "bootstrap"), "bootstrap-cache", func(entry os.DirEntry) bool {
+		return entry.IsDir() && (entry.Name() == "go-build" || entry.Name() == "go-mod")
+	})
+	if err != nil {
+		return report, err
+	}
+	report.Entries = append(report.Entries, bootstrapCaches...)
+
 	for _, name := range []string{"go-build", "go-mod", "npm", "playwright"} {
 		path := filepath.Join(root, "shared", name)
 		entry, statErr := cachePath(path, "managed-cache", name)

@@ -29,12 +29,40 @@ func TestCachePruneIsDryRunFirstAndManaged(t *testing.T) {
 	if err := os.WriteFile(content, []byte("old-snapshot\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	old := time.Now().Add(-48 * time.Hour)
-	if err := os.Chtimes(content, old, old); err != nil {
+	bootstrapCache := filepath.Join(stateRoot, "bootstrap", "go-build")
+	unrelatedBootstrapPath := filepath.Join(stateRoot, "bootstrap", "keep")
+	if err := os.MkdirAll(bootstrapCache, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chtimes(snapshot, old, old); err != nil {
+	if err := os.MkdirAll(unrelatedBootstrapPath, 0o700); err != nil {
 		t.Fatal(err)
+	}
+	bootstrapContent := filepath.Join(bootstrapCache, "old-build")
+	if err := os.WriteFile(bootstrapContent, []byte("old-build\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-48 * time.Hour)
+	for _, path := range []string{content, snapshot, bootstrapContent, bootstrapCache} {
+		if err := os.Chtimes(path, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	report, err := app.CacheStatus()
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed := false
+	for _, entry := range report.Entries {
+		if entry.Path == bootstrapCache {
+			if entry.Kind != "bootstrap-cache" || entry.Prunable {
+				t.Fatalf("unexpected bootstrap cache status: %+v", entry)
+			}
+			listed = true
+		}
+	}
+	if !listed {
+		t.Fatalf("bootstrap cache is not reported: %+v", report.Entries)
 	}
 
 	preview, err := app.PruneCache(24*time.Hour, false)
@@ -44,8 +72,10 @@ func TestCachePruneIsDryRunFirstAndManaged(t *testing.T) {
 	if !preview.DryRun || len(preview.Candidates) != 1 || preview.Candidates[0].Path != snapshot {
 		t.Fatalf("unexpected preview: %+v", preview)
 	}
-	if _, err := os.Stat(snapshot); err != nil {
-		t.Fatalf("dry run removed snapshot: %v", err)
+	for _, path := range []string{snapshot, bootstrapCache} {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("dry run removed cache: %v", err)
+		}
 	}
 
 	applied, err := app.PruneCache(24*time.Hour, true)
@@ -58,8 +88,10 @@ func TestCachePruneIsDryRunFirstAndManaged(t *testing.T) {
 	if _, err := os.Stat(snapshot); !os.IsNotExist(err) {
 		t.Fatalf("snapshot was not removed: %v", err)
 	}
-	if _, err := os.Stat(workspace); err != nil {
-		t.Fatalf("cache prune affected workspace: %v", err)
+	for _, path := range []string{bootstrapCache, bootstrapContent, filepath.Dir(bootstrapCache), unrelatedBootstrapPath, workspace} {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("cache prune affected unrelated path: %v", err)
+		}
 	}
 }
 
