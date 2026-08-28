@@ -186,6 +186,7 @@ func TestFilesystemLayoutManifestPinsReviewedFamilyRecords(t *testing.T) {
 		"### `internal/mailables`":                              {"`billing` build tag", "stay internal / blocked"},
 		"### `internal/mailer` and `internal/mailer/drivers`":   {"SMTP is a network boundary", "stay internal / blocked"},
 		"### `internal/testutil`":                               {"Subrecord — `passkeys.go`", "no compatibility shim", "Subrecord — `testdb/testdb.go`", "Rollback: retain the existing native fixture path; no shim.", "stay internal / blocked"},
+		"### `internal/aianalytics`":                            {"Runtime subrecord", "Updater subrecord", "successful body `Close` delegates to the underlying `resp.Body`", "Rollback for this documentation decision is removal of the record", "decomposition required / stay internal / blocked"},
 	}
 	for heading, fragments := range records {
 		if count := strings.Count(manifest, heading); count != 1 {
