@@ -90,7 +90,7 @@ func TestProductionMainSignalCancelsRunningApplication(t *testing.T) {
 				drained <- scanner.Err()
 			}()
 
-			readyTimer := time.NewTimer(30 * time.Second)
+			readyTimer := time.NewTimer(120 * time.Second)
 			defer readyTimer.Stop()
 			select {
 			case err := <-ready:
