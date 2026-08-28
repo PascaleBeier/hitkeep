@@ -42,6 +42,30 @@ Not a leaf. It imports the analytics catalog, API, database, JSON API, and GoAI,
 
 Not a leaf. It crosses configuration, database, worker, and cloud/OSS build-tag variants. All variants and consumers must move atomically in a later coordinated wave.
 
+### `internal/realtime`
+
+Owner: `Broker`, `Publish`, and `Subscription` coordinate live delivery. Consumers: the site and shared realtime handlers in `internal/server`, plus the dashboard coordinator. Build tags: unconditional. Filesystem: none; its in-memory channels and HTTP delivery are native runtime semantics. Coupling/cycle: server-handler and channel-lifetime coupling make it non-leaf; no import cycle is proven. Tests: the site and shared realtime-handler tests. Disposition: **stay internal / blocked**; no move is approved until those consumers move together.
+
+### `internal/reporting`
+
+Owner: report scheduling and period helpers (`ValidateSchedule`, `NextOccurrence`, `PeriodBounds`, `CatchUpWindow`) and reporting tokens. Consumers: database report stores, worker reports/scheduler, user report handlers, and API reporting. Build tags: unconditional. Filesystem: none. Coupling/cycle: it crosses API, handlers, worker scheduling, and persistence; no import cycle is proven. Tests: schedule, database, handler, and worker reporting tests. Disposition: **stay internal / blocked** pending a coordinated reporting-domain move.
+
+### `internal/searchconsole`
+
+Owner: Search Console OAuth client, token/property operations, and error classification/diagnosis. Consumers: `cmd/hitkeep`, `internal/server`, shared server context, and report handlers. Build tags: unconditional. Filesystem: none. Coupling/cycle: OAuth, network, configuration, server wiring, and report-handler coupling make it non-leaf; no import cycle is proven. Tests: focused Search Console client/error tests and consuming server-handler tests. Disposition: **stay internal / blocked**; this security-sensitive integration must move atomically with its wiring.
+
+### `internal/security`
+
+Owner: TOTP, recovery-code, and passkey primitives. Consumers: user security/auth handlers and database security storage. Build tags: unconditional. Filesystem: none. Coupling/cycle: authentication and credential-persistence coupling is security-sensitive; no import cycle is proven. Tests: focused TOTP, recovery, passkey, handler, and storage tests. Disposition: **stay internal / blocked**; no move is approved outside a security-reviewed slice.
+
+### `internal/takeout`
+
+Owner: `TakeoutService` and its export query builders. Consumers: server takeout handlers. Build tags: unconditional. Filesystem: user-derived export paths and file creation require existing containment, permissions, and cleanup behavior. Coupling/cycle: database, authorization, export, and persistence semantics make it non-leaf; no import cycle is proven. Tests: focused takeout service and handler tests. Disposition: **stay internal / blocked**; do not move or abstract its filesystem behavior without a separately reviewed export-security slice.
+
+### `internal/webhookdispatcher/webhooks`
+
+Owner: webhook `Dispatcher`, `Emitter`, `Worker`, and `Sweeper`. Consumers: `cmd/hitkeep` leader-service startup, `internal/server.New`, and the webhook database store/migration. Build tags: unconditional. Filesystem: no ordinary filesystem boundary. Coupling/cycle: database, queue, network-delivery, and concurrent worker lifecycle coupling make it non-leaf; no import cycle is proven. Tests: dispatcher, emitter, worker, sweeper, and server webhook-handler tests. Disposition: **stay internal / blocked**; no move is approved outside a coordinated persistence and delivery slice.
+
 Conclusion: no currently reviewed candidate is approved for the next move-only wave. Select a different low-coupling package only after authoritative dependency evidence is available.
 
 ## Filesystem operation classes
