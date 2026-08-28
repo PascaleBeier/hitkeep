@@ -90,8 +90,8 @@ func NewRootCommand(logger *slog.Logger) *cobra.Command {
 		},
 	}
 	root := newRootCommand(actions)
-	root.AddCommand(newConfigCommand(afero.NewOsFs(), logger, func(args []string) error {
-		return run(logger, args, "")
+	root.AddCommand(newConfigCommand(afero.NewOsFs(), logger, func(command *cobra.Command, args []string) error {
+		return actions.runWithContext(command.Context(), args, rootConfigFile(command.Context()))
 	}))
 	return root
 }
@@ -147,14 +147,14 @@ func newHealthcheckCommand(run func(context.Context, []string, string) error) *c
 	}
 }
 
-func newConfigCommand(fs afero.Fs, logger *slog.Logger, fallback func([]string) error) *cobra.Command {
+func newConfigCommand(fs afero.Fs, logger *slog.Logger, fallback func(*cobra.Command, []string) error) *cobra.Command {
 	command := &cobra.Command{
 		Use:                "config",
 		Short:              "Create and validate HitKeep configuration files",
 		Args:               cobra.ArbitraryArgs,
 		DisableFlagParsing: true,
-		RunE: func(_ *cobra.Command, args []string) error {
-			return fallback(append([]string{"config"}, args...))
+		RunE: func(command *cobra.Command, args []string) error {
+			return fallback(command, append([]string{"config"}, args...))
 		},
 	}
 	command.AddCommand(newConfigInitCommand(fs), newConfigValidateCommand(logger))

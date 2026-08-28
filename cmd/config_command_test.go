@@ -2,6 +2,7 @@ package hitkeepcmd
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"log/slog"
@@ -11,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/spf13/afero"
+	"github.com/spf13/cobra"
 
 	runtimeconfig "hitkeep/config"
 )
@@ -107,30 +109,71 @@ func TestConfigValidateUsesStrictExplicitFileLoader(t *testing.T) {
 	}
 }
 
+func TestConfigFallbackUsesPublicRootRuntime(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	configPath := filepath.Join(t.TempDir(), "missing.yaml")
+	args := []string{"config", "foo"}
+	want := runContext(context.Background(), logger, args, configPath)
+	if want == nil {
+		t.Fatal("legacy runtime accepted missing explicit configuration")
+	}
+
+	root := NewRootCommand(logger)
+	root.SetOut(io.Discard)
+	root.SetErr(io.Discard)
+	got := ExecuteRoot(context.Background(), root, []string{"--config", configPath, "config", "foo"})
+	if got == nil {
+		t.Fatal("public root accepted missing explicit configuration")
+	}
+	if got.Error() != want.Error() {
+		t.Fatalf("public root error = %q, want legacy error %q", got, want)
+	}
+	if !strings.Contains(got.Error(), configPath) {
+		t.Fatalf("public root error = %q, want selected config path %q", got, configPath)
+	}
+}
+
 func TestConfigCommandPreservesLegacyFallback(t *testing.T) {
-	tests := [][]string{{}, {"foo"}, {"--legacy-flag"}}
-	for _, args := range tests {
-		t.Run(strings.Join(args, "_"), func(t *testing.T) {
-			var got []string
-			command := newConfigCommand(
-				afero.NewMemMapFs(),
-				slog.New(slog.NewTextHandler(io.Discard, nil)),
-				func(args []string) error {
-					got = append([]string(nil), args...)
-					return nil
-				},
-			)
-			command.SetOut(io.Discard)
-			command.SetErr(io.Discard)
-			command.SetArgs(args)
-			if _, err := command.ExecuteC(); err != nil {
-				t.Fatalf("execute config fallback: %v", err)
-			}
-			want := append([]string{"config"}, args...)
-			if strings.Join(got, "\x00") != strings.Join(want, "\x00") {
-				t.Fatalf("fallback args = %q, want %q", got, want)
-			}
-		})
+	for _, configArgs := range [][]string{{"--config", "leading.yaml"}, {"--config=leading.yaml"}} {
+		for _, args := range [][]string{{}, {"foo"}, {"--legacy-flag"}} {
+			t.Run(strings.Join(append(append([]string(nil), configArgs...), args...), "_"), func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				var got []string
+				var gotConfig string
+				actions := rootActions{
+					runContext: func(gotCtx context.Context, args []string, configFile string) error {
+						if gotCtx.Err() != context.Canceled {
+							t.Fatalf("fallback context error = %v, want %v", gotCtx.Err(), context.Canceled)
+						}
+						got = append([]string(nil), args...)
+						gotConfig = configFile
+						return nil
+					},
+				}
+				root := newRootCommand(actions)
+				root.AddCommand(newConfigCommand(
+					afero.NewMemMapFs(),
+					slog.New(slog.NewTextHandler(io.Discard, nil)),
+					func(command *cobra.Command, args []string) error {
+						return actions.runWithContext(command.Context(), args, rootConfigFile(command.Context()))
+					},
+				))
+				root.SetOut(io.Discard)
+				root.SetErr(io.Discard)
+				commandArgs := append(append(append([]string(nil), configArgs...), "config"), args...)
+				if err := ExecuteRoot(ctx, root, commandArgs); err != nil {
+					t.Fatalf("execute config fallback: %v", err)
+				}
+				want := append([]string{"config"}, args...)
+				if strings.Join(got, "\x00") != strings.Join(want, "\x00") {
+					t.Fatalf("fallback args = %q, want %q", got, want)
+				}
+				if gotConfig != "leading.yaml" {
+					t.Fatalf("fallback config = %q, want %q", gotConfig, "leading.yaml")
+				}
+			})
+		}
 	}
 }
 
