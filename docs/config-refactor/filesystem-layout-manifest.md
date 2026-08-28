@@ -42,6 +42,18 @@ Disposition: **stay explicit / validate projections**. Do not consolidate these 
 
 ## Rejected next move candidates
 
+### `internal/api`
+
+- **Old → new path:** `internal/api` → `internal/api`; no move is approved.
+- **Files:** exactly three indexed Go files: `types.go`, `reporting.go`, and `google_search_console_test.go`.
+- **Owner and purpose:** pure API/DTO contract ownership, including JSON/date serialization (`DateOnly`) and request/response/report types. No service implementation or runtime orchestration is owned here.
+- **Importers:** `types.go` has 210 importing files in Gortex’s bounded graph; the returned list is truncated after 205 additional entries. This is a lower bound, not a complete closure.
+- **Imports/cycles:** `types.go` imports `strconv`, `time`, UUID, and `hitkeep/jsonapi`; `reporting.go` imports `time` and UUID. No cycle is returned, but the graph is incomplete.
+- **Runtime behavior:** no filesystem, process, network, database, persistence, or other runtime I/O is evidenced in this package.
+- **Build constraints:** no build tags, OS-specific files, CGO, generated Go source, or embeds were returned.
+- **Tests/gaps:** one indexed test file: `google_search_console_test.go`. Complete test-function and DTO serialization/validation coverage is unavailable; do not claim broader closure.
+- **Rollback/disposition:** retain `internal/api` at its current path; rollback is removal of this record. No compatibility shim or forwarding package is justified. **stay internal / blocked** pending complete importer and test evidence.
+
 ### `internal/assetstore`
 
 Not a leaf. Its one implementation file has broad command, server QR-code, recovery, seed, and smoke consumers. It owns deletion and user/site-derived path construction. A future wave must review path containment and server wiring before moving it.
