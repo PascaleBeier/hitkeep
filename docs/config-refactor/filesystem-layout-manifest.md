@@ -170,7 +170,7 @@ Owner: TOTP, recovery-code, and passkey primitives. Consumers: user security/aut
 
 - **Old → new path:** `internal/cluster` → `internal/cluster`; no move is approved.
 - **Owner and purpose:** `Manager` owns memberlist-based cluster membership, deterministic leader election, peer address tracking, and graceful leave on shutdown.
-- **Direct and transitive dependents:** the two direct importers are `cmd/hitkeep.go` and `internal/server/server.go`. Bounded transitive impact reaches application startup and server wiring; exhaustive closure is not claimed.
+- **Direct and transitive dependents:** the two direct importers are `cmd/hitkeep.go` and `internal/server/server.go`. bounded transitive impact reaches application startup and server wiring; exhaustive closure is not claimed.
 - **Imports and cycle state:** imports `fmt`, `log/slog`, `net`, `sort`, `strconv`, `strings`, `sync`, `time`, `github.com/hashicorp/memberlist`, `hitkeep/config`, and `hitkeep/hklog`. No import cycle is evidenced in the bounded graph; reconfirm before any move.
 - **Build/runtime classification:** `cluster.go` and `cluster_test.go` are unconditional files with no build tags, OS/CGO split, generated source, or embedded assets. This is production runtime infrastructure, not a developer-only boundary.
 - **Filesystem/process/persistence:** no filesystem, subprocess, or persistence operations are owned by this package. Memberlist provides network membership/join/leave; peer and leader state are in-memory and synchronized with `sync.RWMutex`. `Shutdown` leaves with a 1-second timeout.
@@ -205,7 +205,7 @@ Owner: TOTP, recovery-code, and passkey primitives. Consumers: user security/aut
 - **Old → new path:** `internal/server` → `internal/server`; no move is approved.
 - **Required decomposition:** core HTTP/router/middleware; access/auth/socialauth/SSO; admin/system and disk usage; user/site/analytics/ingest/report/share handlers; AI/MCP/opportunities integrations; cloud/billing variants; tracking-domain and webhook surfaces.
 - **Indexed scope:** Gortex returned 50 files in a bounded result, with the file query truncated; this is not a complete inventory.
-- **Importers/transitive impact:** direct and transitive consumers span `cmd/hitkeep`, database, auth/security, socialauth/SSO, AI/opportunities, worker, cloud, and dashboard-facing HTTP wiring. Exact closure is not established. A bounded direct-importer inventory is unavailable from this record; the indexed file result is truncated.
+- **Importers/transitive impact:** confirmed bounded outward impact reaches `cmd/hitkeep` and its server wiring. Database, auth/security, socialauth/SSO, AI/opportunities, worker, cloud, and dashboard-facing HTTP are inward dependencies or integration surfaces, not asserted direct consumers. Exhaustive closure is unavailable; a bounded direct-importer inventory is unavailable from this record because the indexed file result is truncated.
 - **Import/cycle evidence gap:** imports are heterogeneous across handler families and integrations (heterogeneous imports), and complete cycle proof is unavailable; do not infer leaf safety from the bounded inventory.
 - **Rollback boundary:** direct rollback is to retain or restore the current package path; no compatibility shim is justified.
 - **Focused targets and closure gap:** concrete focused subpackage targets must be selected per decomposition slice, with affected-consumer closure refreshed before each move; the current record does not establish that closure.
@@ -241,6 +241,19 @@ Owner: TOTP, recovery-code, and passkey primitives. Consumers: user security/aut
 ### `internal/takeout`
 
 Owner: `TakeoutService` and its export query builders. Consumers: server takeout handlers. Build tags: unconditional. Filesystem: user-derived export paths and file creation require existing containment, permissions, and cleanup behavior. Coupling/cycle: database, authorization, export, and persistence semantics make it non-leaf; no import cycle is proven. Tests: focused takeout service and handler tests. Disposition: **stay internal / blocked**; do not move or abstract its filesystem behavior without a separately reviewed export-security slice.
+
+### `internal/worker`
+
+- **Old → new path:** `internal/worker` → `internal/worker`; no move is approved.
+- **Indexed scope/owner:** exactly 21 indexed files. Owns background backup, retention, rollup/backfill, reports/Search Console scheduling, import-stage cleanup, and cloud lifecycle/retention synchronization.
+- **Required decomposition:** backup; retention/archive; rollup/backfill; reports/Search Console; import-stage cleanup; cloud billing/OSS variants; and shared lifecycle timing (`lifecycle.go::waitForDelay`). A single move would overclaim distinct ownership.
+- **Direct/transitive dependents:** bounded direct importer list: `cmd/hitkeep.go`, `cmd/recover.go`, `cmd/recover_test.go`, `cmd/seed/main.go`, `internal/database/client_fixture_manual_test.go`, `internal/server/admin/system_action_handlers.go`, `internal/server/admin/system_handlers.go`, `internal/server/user/google_search_console_handlers.go`, and `internal/server/user/report_definitions_handlers.go`. exhaustive transitive closure is not claimed.
+- **Imports/cycles:** imports differ by subfamily: lifecycle uses only `context`/`time`; backup and retention include database/sql, native filesystem/path handling, database/logging, and optional S3/asset-store dependencies. no import cycle is proven; reconfirm per subfamily.
+- **Build/runtime boundary:** billing and OSS cloud files are separate build/runtime variants. The complete build-tag/CGO matrix is not yet proven and must not be generalized; generated inputs and OS-specific files remain unproven at the top level.
+- **Filesystem/network/persistence:** backup owns native DuckDB export, local snapshot paths/pruning, and optional S3 delivery. Retention owns archive path layout, local/S3 archive writes, DuckDB retention queries/deletes, and archived-asset pruning. Reports/Search Console own scheduling, persistence, and external API behavior. Import cleanup owns staged-file lifecycle. `waitForDelay` is cancellation-aware timer logic with no I/O. Preserve native cleanup, retry, transaction, and lifecycle semantics.
+- **Tests/gaps:** 8 indexed test files are in scope; focused coverage is distributed across backup, cloud lifecycle/retention variants, import cleanup, lifecycle, reports, retention, and Search Console tests. Exact affected-package/test closure beyond these indexed files and the full billing/OSS build matrix remain gaps.
+- **Generated/embed gap:** no package-wide claim is made about generated inputs or embedded assets; their presence/absence remains unproven across the complete worker family.
+- **Rollback/disposition:** direct revert to existing worker paths and scheduler wiring; no compatibility shim. **decomposition required / stay internal / blocked** until each subfamily has independent I/O, persistence, build-variant, lifecycle, and test evidence.
 
 ### `internal/webhookdispatcher` and `internal/webhooks`
 
