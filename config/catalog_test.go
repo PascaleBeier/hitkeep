@@ -56,22 +56,40 @@ func TestConfigurationPublicationRequirementsCoverPersistentDataPath(t *testing.
 	if requirement.Environment != "HITKEEP_DATA_PATH" {
 		t.Fatalf("publication requirement environment = %q, want HITKEEP_DATA_PATH", requirement.Environment)
 	}
-	for _, surface := range []ConfigurationPublicationSurface{
-		ConfigurationPublicationDocker,
-		ConfigurationPublicationCompose,
-		ConfigurationPublicationHelm,
-		ConfigurationPublicationExample,
-		ConfigurationPublicationCanonicalExample,
-	} {
-		declared := slices.Contains(requirement.Surfaces, surface)
-		if !declared {
+
+	catalogDefault := ""
+	for _, setting := range Catalog().Settings {
+		if setting.Environment == requirement.Environment {
+			catalogDefault = setting.Default
+			break
+		}
+	}
+	if catalogDefault == "" {
+		t.Fatalf("catalog setting %s is missing or has no usable default", requirement.Environment)
+	}
+
+	want := map[ConfigurationPublicationSurface]struct {
+		defaultValue string
+		paths        []string
+	}{
+		ConfigurationPublicationDocker:           {"/var/lib/hitkeep/data", []string{"Dockerfile"}},
+		ConfigurationPublicationCompose:          {"/var/lib/hitkeep/data", []string{"compose.yaml", "compose.cluster.yaml", "compose.dev.yaml"}},
+		ConfigurationPublicationHelm:             {"/var/lib/hitkeep/data", []string{"charts/hitkeep/templates/statefulset.yaml"}},
+		ConfigurationPublicationExample:          {"/var/lib/hitkeep/data", []string{"examples/compose.yml", "examples/compose.caddy-on-demand.yml", "examples/compose.caddy.yml", "examples/compose.nginx-custom-tracking.yml", "examples/compose.traefik-custom-tracking.yml"}},
+		ConfigurationPublicationCanonicalExample: {catalogDefault, []string{"config.example.yaml"}},
+	}
+	if len(requirement.Surfaces) != len(want) || len(requirement.Defaults) != len(want) || len(requirement.Paths) != len(want) {
+		t.Fatalf("publication requirement membership changed: surfaces=%d defaults=%d paths=%d, want %d", len(requirement.Surfaces), len(requirement.Defaults), len(requirement.Paths), len(want))
+	}
+	for surface, expected := range want {
+		if !slices.Contains(requirement.Surfaces, surface) {
 			t.Errorf("publication requirement does not require %s", surface)
 		}
-		if requirement.Defaults[surface] == "" {
-			t.Errorf("publication requirement has no default for %s", surface)
+		if got := requirement.Defaults[surface]; got != expected.defaultValue {
+			t.Errorf("publication requirement default for %s = %q, want %q", surface, got, expected.defaultValue)
 		}
-		if len(requirement.Paths[surface]) == 0 {
-			t.Errorf("publication requirement has no paths for %s", surface)
+		if got := requirement.Paths[surface]; !slices.Equal(got, expected.paths) {
+			t.Errorf("publication requirement paths for %s = %q, want %q", surface, got, expected.paths)
 		}
 	}
 }
