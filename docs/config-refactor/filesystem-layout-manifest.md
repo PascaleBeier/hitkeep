@@ -130,6 +130,17 @@ Owner: TOTP, recovery-code, and passkey primitives. Consumers: user security/aut
 - **Disposition.** Decomposition is required before any move: give each subrecord an independently owned contract. Until then, stay internal / blocked; do not add a compatibility shim or public wrapper.
 - **Rollback.** This record may be removed while retaining `internal/auth` at its existing path and no shim. Retain the HS256 restriction: reverting algorithm hardening requires a separate approved compatibility decision.
 
+### `internal/cluster`
+
+- **Old → new path:** `internal/cluster` → `internal/cluster`; no move is approved.
+- **Owner and purpose:** `Manager` owns memberlist-based cluster membership, deterministic leader election, peer address tracking, and graceful leave on shutdown.
+- **Direct and transitive dependents:** the two direct importers are `cmd/hitkeep.go` and `internal/server/server.go`. Bounded transitive impact reaches application startup and server wiring; exhaustive closure is not claimed.
+- **Imports and cycle state:** imports `fmt`, `log/slog`, `net`, `sort`, `strconv`, `strings`, `sync`, `time`, `github.com/hashicorp/memberlist`, `hitkeep/config`, and `hitkeep/hklog`. No import cycle is evidenced in the bounded graph; reconfirm before any move.
+- **Build/runtime classification:** `cluster.go` and `cluster_test.go` are unconditional files with no build tags, OS/CGO split, generated source, or embedded assets. This is production runtime infrastructure, not a developer-only boundary.
+- **Filesystem/process/persistence:** no filesystem, subprocess, or persistence operations are owned by this package. Memberlist provides network membership/join/leave; peer and leader state are in-memory and synchronized with `sync.RWMutex`. `Shutdown` leaves with a 1-second timeout.
+- **Tests and affected targets:** focused target is `go test ./internal/cluster`; application startup/server wiring tests are affected consumers. Exact test names and exhaustive transitive test closure are not claimed from the bounded evidence.
+- **Rollback and disposition:** retain the current native package and directly revert any future move; no compatibility shim or forwarding package is justified. **stay internal / blocked** because memberlist lifecycle and startup/server wiring are operationally coupled.
+
 ### `internal/socialauth`
 
 - **Old → new path:** `internal/socialauth` → `internal/socialauth`; the approved current disposition is **stay internal / blocked**, not a package move.

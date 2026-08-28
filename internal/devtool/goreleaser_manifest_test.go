@@ -181,6 +181,7 @@ func TestFilesystemLayoutManifestPinsReviewedFamilyRecords(t *testing.T) {
 	records := map[string][]string{
 		"### `internal/devtool`":                                {"decomposition required / stay internal", "native PID/lock/process/toolchain/cancellation state"},
 		"### `internal/importables`":                            {"`os.Open(source.Path)`", "`zip.OpenReader(source.Path)`", "untrusted staging/source-path containment boundary", "stay internal / blocked"},
+		"### `internal/cluster`":                                {"the two direct importers", "memberlist", "in-memory", "stay internal / blocked"},
 		"### `internal/ingest`":                                 {"no direct filesystem operations found", "stay internal / blocked"},
 		"### `internal/ipmeta` and `internal/ipmeta/ipmetagen`": {"embedded `io/fs`", "ordinary generated-file candidates", "stay internal / blocked"},
 		"### `internal/mailables`":                              {"`billing` build tag", "stay internal / blocked"},
