@@ -1,11 +1,13 @@
 package assetstore
 
 import (
+	"errors"
 	"fmt"
 	"mime"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/google/uuid"
 )
@@ -42,22 +44,26 @@ func (s *Store) PutQRCodeAsset(siteID, qrID uuid.UUID, checksum, filename, conte
 		qrID.String(),
 		safeChecksum(checksum)+ext,
 	))
-	fullPath, err := s.pathForKey(key)
+	if err := os.MkdirAll(s.root, 0755); err != nil {
+		return "", fmt.Errorf("create asset root: %w", err)
+	}
+	root, err := s.openRoot()
 	if err != nil {
 		return "", err
 	}
-	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+	defer root.Close()
+	if err := root.MkdirAll(filepath.Dir(key), 0755); err != nil {
 		return "", fmt.Errorf("create asset directory: %w", err)
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(fullPath), ".qr-asset-*")
+	tmpKey := filepath.ToSlash(filepath.Join(filepath.Dir(key), ".qr-asset-"+uuid.NewString()))
+	tmp, err := root.OpenFile(tmpKey, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		return "", fmt.Errorf("create temporary asset: %w", err)
 	}
-	tmpName := tmp.Name()
 	cleanup := true
 	defer func() {
 		if cleanup {
-			_ = os.Remove(tmpName)
+			_ = root.Remove(tmpKey)
 		}
 	}()
 	if _, err := tmp.Write(data); err != nil {
@@ -67,7 +73,7 @@ func (s *Store) PutQRCodeAsset(siteID, qrID uuid.UUID, checksum, filename, conte
 	if err := tmp.Close(); err != nil {
 		return "", fmt.Errorf("close temporary asset: %w", err)
 	}
-	if err := os.Rename(tmpName, fullPath); err != nil {
+	if err := root.Rename(tmpKey, key); err != nil {
 		return "", fmt.Errorf("store asset: %w", err)
 	}
 	cleanup = false
@@ -75,11 +81,11 @@ func (s *Store) PutQRCodeAsset(siteID, qrID uuid.UUID, checksum, filename, conte
 }
 
 func (s *Store) Open(key string) (*os.File, error) {
-	fullPath, err := s.pathForKey(key)
+	key, err := assetKey(key)
 	if err != nil {
 		return nil, err
 	}
-	file, err := os.Open(fullPath)
+	file, err := os.OpenInRoot(s.root, key)
 	if err != nil {
 		return nil, fmt.Errorf("open asset: %w", err)
 	}
@@ -90,14 +96,22 @@ func (s *Store) Delete(key string) error {
 	if strings.TrimSpace(key) == "" {
 		return nil
 	}
-	fullPath, err := s.pathForKey(key)
+	key, err := assetKey(key)
 	if err != nil {
 		return err
 	}
-	if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
+	root, err := s.openRoot()
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	if err := root.Remove(key); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("delete asset: %w", err)
 	}
-	_ = pruneEmptyParents(filepath.Dir(fullPath), s.root)
+	_ = pruneEmptyParents(root, filepath.Dir(key))
 	return nil
 }
 
@@ -110,31 +124,39 @@ func (s *Store) DeleteQRCodeAssetsForSite(siteID uuid.UUID) error {
 }
 
 func (s *Store) removeAll(relative string) error {
-	fullPath, err := s.pathForKey(filepath.ToSlash(relative))
+	key, err := assetKey(relative)
 	if err != nil {
 		return err
 	}
-	if err := os.RemoveAll(fullPath); err != nil && !os.IsNotExist(err) {
+	root, err := s.openRoot()
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	if err := root.RemoveAll(key); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("delete asset directory: %w", err)
 	}
-	_ = pruneEmptyParents(filepath.Dir(fullPath), s.root)
+	_ = pruneEmptyParents(root, filepath.Dir(key))
 	return nil
 }
 
-func (s *Store) pathForKey(key string) (string, error) {
+func (s *Store) openRoot() (*os.Root, error) {
+	root, err := os.OpenRoot(s.root)
+	if err != nil {
+		return nil, fmt.Errorf("open asset root: %w", err)
+	}
+	return root, nil
+}
+
+func assetKey(key string) (string, error) {
 	key = filepath.Clean(filepath.FromSlash(strings.TrimSpace(key)))
 	if key == "." || key == "" || filepath.IsAbs(key) || strings.HasPrefix(key, ".."+string(filepath.Separator)) || key == ".." {
 		return "", fmt.Errorf("invalid asset key")
 	}
-	root, err := filepath.Abs(s.root)
-	if err != nil {
-		return "", fmt.Errorf("resolve asset root: %w", err)
-	}
-	fullPath := filepath.Join(root, key)
-	if !strings.HasPrefix(fullPath, root+string(filepath.Separator)) && fullPath != root {
-		return "", fmt.Errorf("asset key escapes root")
-	}
-	return fullPath, nil
+	return key, nil
 }
 
 func assetExtension(filename, contentType string) string {
@@ -170,25 +192,15 @@ func safeChecksum(checksum string) string {
 	return b.String()
 }
 
-func pruneEmptyParents(dir, root string) error {
-	rootAbs, err := filepath.Abs(root)
-	if err != nil {
-		return err
-	}
-	for {
-		dirAbs, err := filepath.Abs(dir)
-		if err != nil {
-			return err
-		}
-		if dirAbs == rootAbs || !strings.HasPrefix(dirAbs, rootAbs+string(filepath.Separator)) {
-			return nil
-		}
-		if err := os.Remove(dirAbs); err != nil {
-			if os.IsNotExist(err) || strings.Contains(err.Error(), "directory not empty") {
+func pruneEmptyParents(root *os.Root, dir string) error {
+	for dir != "." {
+		if err := root.Remove(dir); err != nil {
+			if os.IsNotExist(err) || errors.Is(err, syscall.ENOTEMPTY) {
 				return nil
 			}
 			return err
 		}
-		dir = filepath.Dir(dirAbs)
+		dir = filepath.Dir(dir)
 	}
+	return nil
 }
