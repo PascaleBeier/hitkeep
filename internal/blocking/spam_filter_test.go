@@ -3,13 +3,16 @@ package blocking
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -484,6 +487,408 @@ func TestFetchSpamFeedDataAllFeedsFail(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), rawFailure) {
 		t.Fatalf("raw upstream failure appeared in returned error: %v", err)
+	}
+}
+
+type trackedReadCloser struct {
+	reader io.Reader
+	closed bool
+}
+
+func (r *trackedReadCloser) Read(p []byte) (int, error) { return r.reader.Read(p) }
+func (r *trackedReadCloser) Close() error {
+	r.closed = true
+	return nil
+}
+
+type failingReader struct{}
+
+func (failingReader) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
+
+type singleResponseClient struct {
+	response *http.Response
+}
+
+func (c singleResponseClient) Do(*http.Request) (*http.Response, error) { return c.response, nil }
+
+func TestFetchURLClosesResponseBodiesAndRejectsOversize(t *testing.T) {
+	tests := []struct {
+		name       string
+		statusCode int
+		reader     io.Reader
+		wantErr    string
+		wantBody   string
+	}{
+		{name: "success", statusCode: http.StatusOK, reader: strings.NewReader("ok"), wantBody: "ok"},
+		{name: "status failure", statusCode: http.StatusBadGateway, reader: strings.NewReader("failure"), wantErr: "unexpected HTTP status"},
+		{name: "read failure", statusCode: http.StatusOK, reader: failingReader{}, wantErr: "unexpected EOF"},
+		{name: "oversize", statusCode: http.StatusOK, reader: strings.NewReader(strings.Repeat("x", maxFeedResponseBytes+1)), wantErr: "response body exceeds"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			body := &trackedReadCloser{reader: tc.reader}
+			got, err := fetchURL(context.Background(), singleResponseClient{response: &http.Response{StatusCode: tc.statusCode, Body: body}}, "https://example.com/feed")
+			if tc.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("expected error containing %q, got %v", tc.wantErr, err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("fetch URL: %v", err)
+				}
+				raw, err := io.ReadAll(got)
+				if err != nil {
+					t.Fatalf("read bounded response: %v", err)
+				}
+				if string(raw) != tc.wantBody {
+					t.Fatalf("expected body %q, got %q", tc.wantBody, raw)
+				}
+			}
+			if !body.closed {
+				t.Fatal("expected original response body to close")
+			}
+		})
+	}
+
+	exact := &trackedReadCloser{reader: strings.NewReader(strings.Repeat("x", maxFeedResponseBytes))}
+	got, err := fetchURL(context.Background(), singleResponseClient{response: &http.Response{StatusCode: http.StatusOK, Body: exact}}, "https://example.com/feed")
+	if err != nil {
+		t.Fatalf("fetch exactly capped response: %v", err)
+	}
+	raw, err := io.ReadAll(got)
+	if err != nil || len(raw) != maxFeedResponseBytes {
+		t.Fatalf("expected exactly %d readable bytes, got %d, %v", maxFeedResponseBytes, len(raw), err)
+	}
+	if !exact.closed {
+		t.Fatal("expected exact-cap response body to close")
+	}
+}
+
+func TestFetchSpamhausCIDRsClosesBodyAfterParserFailure(t *testing.T) {
+	body := &trackedReadCloser{reader: strings.NewReader(`{"cidr":`)}
+	_, err := fetchSpamhausCIDRs(context.Background(), singleResponseClient{response: &http.Response{StatusCode: http.StatusOK, Body: body}}, "https://example.com/feed", 32)
+	if err == nil || !strings.Contains(err.Error(), "decode spamhaus JSON") {
+		t.Fatalf("expected parser failure, got %v", err)
+	}
+	if !body.closed {
+		t.Fatal("expected parser failure response body to close")
+	}
+}
+
+func TestSaveSpamFeedDataIsAtomicAndPreservesMode(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "spam-filter.json")
+	old := completeTestSpamFeedData()
+	old.ReferrerHostDenylist = []string{"old.example"}
+	if err := SaveSpamFeedData(path, old); err != nil {
+		t.Fatalf("save old cache: %v", err)
+	}
+	if err := os.Chmod(path, 0o640); err != nil {
+		t.Fatalf("set old cache mode: %v", err)
+	}
+
+	updated := completeTestSpamFeedData()
+	updated.ReferrerHostDenylist = []string{"new.example"}
+	if err := SaveSpamFeedData(path, updated); err != nil {
+		t.Fatalf("replace old cache: %v", err)
+	}
+	loaded, err := LoadSpamFeedData(path)
+	if err != nil {
+		t.Fatalf("load replaced cache: %v", err)
+	}
+	if diff := cmp.Diff(updated.ReferrerHostDenylist, loaded.ReferrerHostDenylist); diff != "" {
+		t.Fatalf("cache was not replaced atomically (-want +got):\n%s", diff)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat replaced cache: %v", err)
+	}
+	if got := info.Mode().Perm(); got != 0o640 {
+		t.Fatalf("expected existing cache mode 0640 to survive, got %04o", got)
+	}
+
+	blocked := filepath.Join(dir, "blocked-cache")
+	if err := os.Mkdir(blocked, 0o700); err != nil {
+		t.Fatalf("make blocked target: %v", err)
+	}
+	sentinel := filepath.Join(blocked, "old-cache")
+	if err := os.WriteFile(sentinel, []byte("old"), 0o600); err != nil {
+		t.Fatalf("write old target marker: %v", err)
+	}
+	if err := SaveSpamFeedData(blocked, updated); err == nil {
+		t.Fatal("expected replacement of directory target to fail")
+	}
+	if raw, err := os.ReadFile(sentinel); err != nil || string(raw) != "old" {
+		t.Fatalf("existing target changed after failed replacement: %q, %v", raw, err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("read cache directory: %v", err)
+	}
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), ".spam-filter-") {
+			t.Fatalf("temporary cache file %q was not cleaned up", entry.Name())
+		}
+	}
+}
+
+func TestSaveSpamFeedDataWritesNewFile0600AndReplacesFinalSymlink(t *testing.T) {
+	dir := t.TempDir()
+	data := completeTestSpamFeedData()
+	data.ReferrerHostDenylist = []string{"replacement.example"}
+
+	newPath := filepath.Join(dir, "new-cache.json")
+	if err := SaveSpamFeedData(newPath, data); err != nil {
+		t.Fatalf("save new cache: %v", err)
+	}
+	info, err := os.Stat(newPath)
+	if err != nil {
+		t.Fatalf("stat new cache: %v", err)
+	}
+	if got := info.Mode().Perm(); got != 0o600 {
+		t.Fatalf("expected new cache mode 0600, got %04o", got)
+	}
+
+	formerTarget := filepath.Join(dir, "former-target.json")
+	if err := os.WriteFile(formerTarget, []byte("unchanged"), 0o600); err != nil {
+		t.Fatalf("write former symlink target: %v", err)
+	}
+	linkPath := filepath.Join(dir, "cache-link.json")
+	if err := os.Symlink(formerTarget, linkPath); err != nil {
+		t.Skipf("create final cache symlink: %v", err)
+	}
+	if err := SaveSpamFeedData(linkPath, data); err != nil {
+		t.Fatalf("replace final cache symlink: %v", err)
+	}
+	linkInfo, err := os.Lstat(linkPath)
+	if err != nil {
+		t.Fatalf("lstat replaced symlink path: %v", err)
+	}
+	if linkInfo.Mode()&os.ModeSymlink != 0 {
+		t.Fatal("final cache symlink was followed instead of replaced")
+	}
+	if got := linkInfo.Mode().Perm(); got != 0o600 {
+		t.Fatalf("expected replacement cache mode 0600, got %04o", got)
+	}
+	if raw, err := os.ReadFile(formerTarget); err != nil || string(raw) != "unchanged" {
+		t.Fatalf("former symlink target changed: %q, %v", raw, err)
+	}
+	loaded, err := LoadSpamFeedData(linkPath)
+	if err != nil {
+		t.Fatalf("load replacement cache: %v", err)
+	}
+	if diff := cmp.Diff(data.ReferrerHostDenylist, loaded.ReferrerHostDenylist); diff != "" {
+		t.Fatalf("unexpected replacement cache data (-want +got):\n%s", diff)
+	}
+}
+
+func TestSpamFilterSerializesWholeUpdateGeneration(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "spam-filter.json")
+	filter := NewSpamFilter(path, testBlockingLogger())
+	first := completeTestSpamFeedData()
+	first.ReferrerHostDenylist = []string{"first.example"}
+	second := completeTestSpamFeedData()
+	second.ReferrerHostDenylist = []string{"second.example"}
+
+	firstFetched := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	secondFetched := make(chan struct{})
+	var fetchMu sync.Mutex
+	fetchCount := 0
+	filter.fetch = func(context.Context) (SpamFeedData, error) {
+		fetchMu.Lock()
+		fetchCount++
+		call := fetchCount
+		fetchMu.Unlock()
+		if call == 1 {
+			close(firstFetched)
+			<-releaseFirst
+			return first, nil
+		}
+		close(secondFetched)
+		return second, nil
+	}
+
+	firstDone := make(chan error, 1)
+	go func() { firstDone <- filter.Update(context.Background()) }()
+	select {
+	case <-firstFetched:
+	case <-time.After(time.Second):
+		t.Fatal("first update did not begin its fetch")
+	}
+
+	secondStarted := make(chan struct{})
+	secondDone := make(chan error, 1)
+	go func() {
+		close(secondStarted)
+		secondDone <- filter.Update(context.Background())
+	}()
+	select {
+	case <-secondStarted:
+	case <-time.After(time.Second):
+		t.Fatal("second update did not start")
+	}
+	close(releaseFirst)
+	if err := <-firstDone; err != nil {
+		t.Fatalf("finish first update: %v", err)
+	}
+	select {
+	case <-secondFetched:
+	case <-time.After(time.Second):
+		t.Fatal("second update did not fetch after the first transition completed")
+	}
+	if err := <-secondDone; err != nil {
+		t.Fatalf("finish second update: %v", err)
+	}
+
+	fromDisk, err := LoadSpamFeedData(path)
+	if err != nil {
+		t.Fatalf("load final cache: %v", err)
+	}
+	filter.mu.RLock()
+	inMemory := filter.data
+	filter.mu.RUnlock()
+	expected := second
+	expected.normalize()
+	if diff := cmp.Diff(expected, fromDisk); diff != "" {
+		t.Fatalf("older update committed after newer result (-want +disk):\n%s", diff)
+	}
+	if diff := cmp.Diff(fromDisk, inMemory); diff != "" {
+		t.Fatalf("disk and memory generations interleaved (-disk +memory):\n%s", diff)
+	}
+}
+
+func TestSpamFilterQueuedUpdateCancellationDoesNotFetchOrCommit(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "spam-filter.json")
+	filter := NewSpamFilter(path, testBlockingLogger())
+	first := completeTestSpamFeedData()
+	first.ReferrerHostDenylist = []string{"first.example"}
+	firstFetched := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	var fetchMu sync.Mutex
+	fetchCount := 0
+	filter.fetch = func(context.Context) (SpamFeedData, error) {
+		fetchMu.Lock()
+		fetchCount++
+		fetchMu.Unlock()
+		close(firstFetched)
+		<-releaseFirst
+		return first, nil
+	}
+
+	firstDone := make(chan error, 1)
+	go func() { firstDone <- filter.Update(context.Background()) }()
+	select {
+	case <-firstFetched:
+	case <-time.After(time.Second):
+		t.Fatal("first update did not begin its fetch")
+	}
+
+	secondCtx, cancelSecond := context.WithCancel(context.Background())
+	secondStarted := make(chan struct{})
+	secondDone := make(chan error, 1)
+	go func() {
+		close(secondStarted)
+		secondDone <- filter.Update(secondCtx)
+	}()
+	select {
+	case <-secondStarted:
+	case <-time.After(time.Second):
+		t.Fatal("second update did not start")
+	}
+	cancelSecond()
+	select {
+	case err := <-secondDone:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("queued update error = %v, want context canceled", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("queued canceled update did not return")
+	}
+	fetchMu.Lock()
+	gotFetches := fetchCount
+	fetchMu.Unlock()
+	if gotFetches != 1 {
+		t.Fatalf("queued canceled update invoked fetch %d times, want 1", gotFetches)
+	}
+
+	close(releaseFirst)
+	if err := <-firstDone; err != nil {
+		t.Fatalf("finish first update: %v", err)
+	}
+	fromDisk, err := LoadSpamFeedData(path)
+	if err != nil {
+		t.Fatalf("load final cache: %v", err)
+	}
+	expected := first
+	expected.normalize()
+	if diff := cmp.Diff(expected, fromDisk); diff != "" {
+		t.Fatalf("queued canceled update committed data (-want +disk):\n%s", diff)
+	}
+}
+
+func TestSpamFilterQueuedTransitionCancellationReleasesGate(t *testing.T) {
+	filter := NewSpamFilter(filepath.Join(t.TempDir(), "spam-filter.json"), testBlockingLogger())
+
+	<-filter.transition
+
+	ctx, cancel := context.WithCancel(context.Background())
+	acquired := make(chan error, 1)
+	go func() {
+		acquired <- filter.acquireTransition(ctx)
+	}()
+
+	cancel()
+	select {
+	case err := <-acquired:
+		if err != context.Canceled {
+			t.Fatalf("queued transition acquisition error = %v, want context.Canceled", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("queued transition acquisition did not return after cancellation")
+	}
+
+	filter.transition <- struct{}{}
+	if err := filter.acquireTransition(context.Background()); err != nil {
+		t.Fatalf("transition acquisition after release: %v", err)
+	}
+	filter.transition <- struct{}{}
+}
+
+func TestSpamFilterInitialRefreshIsAsyncAndCancellationAware(t *testing.T) {
+	filter := NewSpamFilter("", testBlockingLogger())
+	started := make(chan struct{})
+	stopped := make(chan struct{})
+	filter.fetch = func(ctx context.Context) (SpamFeedData, error) {
+		close(started)
+		<-ctx.Done()
+		close(stopped)
+		return SpamFeedData{}, ctx.Err()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	returned := make(chan struct{})
+	go func() {
+		filter.StartRefreshLoop(ctx, true, time.Hour, func() bool { return true })
+		close(returned)
+	}()
+	select {
+	case <-returned:
+	case <-time.After(time.Second):
+		t.Fatal("initial refresh blocked startup")
+	}
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("initial refresh did not start asynchronously")
+	}
+	cancel()
+	select {
+	case <-stopped:
+	case <-time.After(time.Second):
+		t.Fatal("cancellation did not reach initial refresh")
 	}
 }
 

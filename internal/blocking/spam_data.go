@@ -55,7 +55,8 @@ func LoadSpamFeedData(path string) (SpamFeedData, error) {
 func SaveSpamFeedData(path string, data SpamFeedData) error {
 	data.normalize()
 
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("create spam filter cache dir: %w", err)
 	}
 
@@ -65,8 +66,33 @@ func SaveSpamFeedData(path string, data SpamFeedData) error {
 	}
 	raw = append(raw, '\n')
 
-	if err := os.WriteFile(path, raw, 0o600); err != nil {
+	mode := os.FileMode(0o600)
+	if info, err := os.Lstat(path); err == nil && info.Mode().IsRegular() {
+		mode = info.Mode().Perm()
+	} else if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("write spam feed data: inspect existing cache: %w", err)
+	}
+
+	temp, err := os.CreateTemp(dir, ".spam-filter-*")
+	if err != nil {
+		return fmt.Errorf("write spam feed data: create temp: %w", err)
+	}
+	tempPath := temp.Name()
+	defer os.Remove(tempPath)
+
+	if _, err := temp.Write(raw); err != nil {
+		temp.Close()
 		return fmt.Errorf("write spam feed data: %w", err)
+	}
+	if err := temp.Chmod(mode); err != nil {
+		temp.Close()
+		return fmt.Errorf("write spam feed data: set temp permissions: %w", err)
+	}
+	if err := temp.Close(); err != nil {
+		return fmt.Errorf("write spam feed data: close temp: %w", err)
+	}
+	if err := os.Rename(tempPath, path); err != nil {
+		return fmt.Errorf("write spam feed data: replace cache: %w", err)
 	}
 	return nil
 }
