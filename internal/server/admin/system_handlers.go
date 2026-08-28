@@ -650,7 +650,7 @@ func (h *handler) handleGetMail() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cfg := h.ctx.Config
 		status := api.SystemMailStatus{
-			Configured:  cfg.MailHost != "" || cfg.MailDriver != "",
+			Configured:  h.ctx.Mailer != nil && strings.TrimSpace(cfg.MailHost) != "",
 			Driver:      cfg.MailDriver,
 			Host:        cfg.MailHost,
 			Port:        cfg.MailPort,

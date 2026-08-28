@@ -58,15 +58,17 @@ func (h *handler) handleForgotPassword() http.HandlerFunc {
 		resetLink := appurl.Path(h.ctx.Config.PublicURL, "/reset-password?token="+token)
 		locale := h.preferredMailLocale(r, user.ID)
 
-		err = h.ctx.Mailer.Send(user.Email, mailables.NewPasswordReset(resetLink, locale))
-		if err != nil {
-			details := mailer.DescribeError(err)
-			shared.LoggerFromContext(r.Context()).Error("Failed to send password reset email", "error_code", "smtp_send_failed", "error_stage", details.Stage, "error_kind", details.Kind, "error_message", details.Message, "smtp_code", details.SMTPCode)
-			http.Error(w, "Failed to send email. Check server logs.", http.StatusBadGateway)
-			return
+		if h.ctx.Mailer == nil {
+			shared.LoggerFromContext(r.Context()).Error("Failed to send password reset email", "error_code", "mailer_unavailable")
+		} else {
+			err = h.ctx.Mailer.Send(user.Email, mailables.NewPasswordReset(resetLink, locale))
+			if err != nil {
+				details := mailer.DescribeError(err)
+				shared.LoggerFromContext(r.Context()).Error("Failed to send password reset email", "error_code", "smtp_send_failed", "error_stage", details.Stage, "error_kind", details.Kind, "error_message", details.Message, "smtp_code", details.SMTPCode)
+			} else {
+				shared.LoggerFromContext(r.Context()).Info("Password reset requested", "user_id", user.ID)
+			}
 		}
-
-		shared.LoggerFromContext(r.Context()).Info("Password reset requested", "user_id", user.ID)
 
 		w.WriteHeader(http.StatusOK)
 		if err := json.MarshalWrite(w, map[string]string{"message": "If an account exists, a reset link has been sent."}); err != nil {
