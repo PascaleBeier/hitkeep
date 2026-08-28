@@ -60,13 +60,14 @@ func ValidateToken(tokenString string, secret string, issuer string) (uuid.UUID,
 
 func ValidateTokenClaims(tokenString string, secret string, issuer string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (any, error) {
-		// Validate the algorithm is what we expect
+		// Validate the algorithm is what we expect.
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return []byte(secret), nil
 	},
-		// Validate Audience and Issuer match our Public URL
+		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+		// Validate Audience and Issuer match our Public URL.
 		jwt.WithAudience(issuer),
 		jwt.WithIssuer(issuer),
 		jwt.WithExpirationRequired(),

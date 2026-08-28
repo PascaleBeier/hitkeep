@@ -188,6 +188,7 @@ func TestFilesystemLayoutManifestPinsReviewedFamilyRecords(t *testing.T) {
 		"### `internal/testutil`":                               {"Subrecord — `passkeys.go`", "no compatibility shim", "Subrecord — `testdb/testdb.go`", "Rollback: retain the existing native fixture path; no shim.", "stay internal / blocked"},
 		"### `internal/socialauth`":                             {"`crypto/subtle`", "`Client.Complete` gives provider completion a 10s timeout", "custom Microsoft JWKS and GitHub JSON reads", "not general OIDC discovery or OAuth token exchange", "no compatibility shim", "stay internal / blocked"},
 		"### `internal/aianalytics`":                            {"Runtime subrecord", "Updater subrecord", "successful body `Close` delegates to the underlying `resp.Body`", "Rollback for this documentation decision is removal of the record", "decomposition required / stay internal / blocked"},
+		"### `internal/auth`":                                   {"`internal/auth` → `internal/auth` (no move)", "Combined package imports are stdlib `fmt`, `net/http`, `slices`, `sort`, `strings`, and `time`", "It imports no HitKeep package, so it introduces no internal dependency cycle.", "jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()})", "RenderTypeScriptCapabilities", "TestGeneratedTypeScriptCapabilitiesAreCurrent", "Retain the HS256 restriction", "separate approved compatibility decision", "stay internal / blocked"},
 	}
 	for heading, fragments := range records {
 		if count := strings.Count(manifest, heading); count != 1 {
