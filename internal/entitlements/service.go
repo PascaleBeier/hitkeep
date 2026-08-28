@@ -113,6 +113,20 @@ func (s *Service) TeamEntitlements(ctx context.Context, teamID uuid.UUID) *Entit
 	}
 }
 
+// TeamSiteLimit returns the bounded site capacity for a managed-cloud team.
+// A non-positive result is unlimited, including self-hosted and operator-owned
+// teams. TeamEntitlements preserves cloud billing precedence.
+func (s *Service) TeamSiteLimit(ctx context.Context, teamID uuid.UUID) int {
+	if !s.cloudHosted() || s.TeamBypassesCloudLimits(ctx, teamID) {
+		return 0
+	}
+	ent := s.TeamEntitlements(ctx, teamID)
+	if ent == nil {
+		return 0
+	}
+	return ent.MaxSitesPerTeam
+}
+
 // AllowsCustomTrackingDomains reports whether the actor may manage custom
 // tracking domains for the team. Free cloud teams must upgrade to Pro or
 // higher; self-hosted deployments are never gated.
