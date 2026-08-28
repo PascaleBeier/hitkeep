@@ -91,7 +91,11 @@ Disposition: **stay explicit / validate projections**. Do not consolidate these 
 
 ### `internal/analyticstools`
 
-Not a leaf. It imports the analytics catalog, API, database, JSON API, and GoAI, with dependents in MCP, opportunities, and Ask AI server wiring. It has no direct filesystem work and belongs in a later coordinated domain wave.
+- **Inventory and graph:** `internal/analyticstools` is exactly `tools.go` and has zero local test files. Its exact direct importer files are `internal/mcpserver/tools.go`, `internal/opportunities/tool_bridge.go`, and `internal/server/askai/handlers.go`. The bounded direct graph returns no import cycle; reconfirm that result before any move.
+- **Dependency and operation ownership:** The full direct import union is stdlib `context`, `fmt`, `strings`, and `time`; `github.com/google/uuid`; `github.com/zendev-sh/goai`; and `hitkeep/analyticscatalog`, `hitkeep/internal/api`, `hitkeep/internal/database`, and `hitkeep/jsonapi`. It has no direct filesystem, network, subprocess, environment, `go:embed`, generator, or build-tag ownership. `Bridge` owns typed analytics-tool adaptation and response shaping over its injected `*database.Store`; MCP, opportunities, and Ask AI each own their own transport and presentation boundary.
+- **Runtime invariants and gaps:** `Config` carries caller-provided site/user scope, time range, filters, and `BeforeExecute`; the bridge must retain that injected scope/callback boundary. Its event-breakdown tool maximum is 25, built-in ecommerce and web-vitals limits are 10, and the correlation window maximum is 90 days. This record does not prove comparison-range construction or authorization at every consumer, `EventNamesData`/`toolJSON` name-set bounds, exported-helper output bounds, complete affected-consumer test closure, or direct `internal/analyticstools` package proof.
+- **Tests and gaps:** Focused affected-consumer proof is `go test -race ./internal/mcpserver ./internal/opportunities ./internal/server/askai`; there are no direct `internal/analyticstools` tests. No move/build-tag/generated-file matrix or exhaustive transitive-graph proof is claimed.
+- **Rollback, compatibility, and disposition:** Rollback for this documentation/sentinel decision is removal of this record. A future move must restore the old package and imports atomically; no compatibility shim or forwarding package is justified. **decomposition required / stay internal / blocked**.
 
 ### `internal/entitlements`
 
