@@ -1,6 +1,7 @@
 package devtool
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"slices"
@@ -50,6 +51,40 @@ func TestHelmSmokeDeployPassesLegacyChartDigestCompatibleTag(t *testing.T) {
 	}
 	if slices.Contains(got, "image.digest=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") {
 		t.Fatal("legacy chart must receive image.tag, not unsupported image.digest")
+	}
+}
+
+func TestHelmSmokeDeployReportsBoundedDiagnosticsOnFailure(t *testing.T) {
+	raw, err := os.ReadFile("../../scripts/helm-smoke.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	command := strings.Join([]string{
+		"release=hitkeep",
+		"namespace=smoke",
+		shellFunction(t, string(raw), "image_values"),
+		shellFunction(t, string(raw), "helm_failure_diagnostics"),
+		shellFunction(t, string(raw), "deploy"),
+		"helm() { if [[ \"$1\" == show ]]; then printf 'version: 2.13.12\\n'; else return 23; fi; }",
+		"kubectl() { printf 'kubectl %s\\n' \"$*\"; }",
+		"deploy registry.example/hitkeep@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa candidate.tgz",
+	}, "\n")
+	output, err := exec.Command("bash", "-c", command).CombinedOutput()
+	exitErr, ok := errors.AsType[*exec.ExitError](err)
+	if !ok {
+		t.Fatalf("deploy error = %v, want Helm exit error; output:\n%s", err, output)
+	}
+	if exitErr.ExitCode() != 23 {
+		t.Fatalf("deploy exit code = %d, want Helm failure 23; output:\n%s", exitErr.ExitCode(), output)
+	}
+	for _, required := range []string{
+		"kubectl -n smoke get pod hitkeep-0 -o wide",
+		"kubectl -n smoke get events --field-selector involvedObject.name=hitkeep-0",
+		"kubectl -n smoke logs hitkeep-0 --tail=200",
+	} {
+		if !strings.Contains(string(output), required) {
+			t.Fatalf("failure diagnostics missing %q; output:\n%s", required, output)
+		}
 	}
 }
 

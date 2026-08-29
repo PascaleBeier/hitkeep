@@ -73,6 +73,14 @@ image_values() {
   digest="${reference#*@}"
 }
 
+helm_failure_diagnostics() {
+  local pod="${release}-0"
+  printf 'Helm upgrade failed; bounded diagnostics for pod %s:\n' "$pod" >&2
+  kubectl -n "$namespace" get pod "$pod" -o wide >&2 || true
+  kubectl -n "$namespace" get events --field-selector "involvedObject.name=$pod" --sort-by=.lastTimestamp --no-headers 2>&1 | tail -n 50 >&2 || true
+  kubectl -n "$namespace" logs "$pod" --tail=200 >&2 || true
+}
+
 deploy() {
   local chart="$2"
   local image_args=()
@@ -89,7 +97,7 @@ deploy() {
     )
   fi
   for replicas in 0 1; do
-    helm upgrade --install "$release" "$chart" \
+    if helm upgrade --install "$release" "$chart" \
       --namespace "$namespace" \
       --create-namespace \
       --wait \
@@ -98,7 +106,13 @@ deploy() {
       --set replicaCount="$replicas" \
       --set-string env.HITKEEP_JWT_SECRET=hitkeep-local-helm-smoke-secret \
       --set-string env.HITKEEP_MAIL_DRIVER=log \
-      --set-string env.HITKEEP_SPAM_FILTER_AUTO_UPDATE=false
+      --set-string env.HITKEEP_SPAM_FILTER_AUTO_UPDATE=false; then
+      continue
+    else
+      local status=$?
+      helm_failure_diagnostics
+      return "$status"
+    fi
   done
 }
 
