@@ -40,7 +40,7 @@ func TestReleaseValidationWorkflowContract(t *testing.T) {
 		"HITKEEP_PREVIOUS_CHART_DIGEST=",
 		"HITKEEP_CANDIDATE_CHART=",
 		"HITKEEP_CANDIDATE_CHART_VERSION=",
-		"HITKEEP_KIND_CLUSTER=",
+		`candidate="localhost:${registry_port}/hitkeep@${candidate_digest}"`,
 		`bash ./scripts/helm-smoke.sh "$candidate" self-hosted`,
 	} {
 		if !strings.Contains(workflow, want) {
@@ -60,6 +60,7 @@ func TestReleaseValidationWorkflowContract(t *testing.T) {
 		"npm publish",
 		"gh release",
 		"repository_dispatch",
+		"HITKEEP_KIND_CLUSTER=",
 	} {
 		if strings.Contains(workflow, forbidden) {
 			t.Errorf("release validation workflow must not contain %q", forbidden)

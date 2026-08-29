@@ -185,5 +185,4 @@ jobs:
           HITKEEP_PREVIOUS_CHART_DIGEST="$previous_chart_digest" \
           HITKEEP_CANDIDATE_CHART="$candidate_chart" \
           HITKEEP_CANDIDATE_CHART_VERSION="$CANDIDATE_VERSION" \
-          HITKEEP_KIND_CLUSTER="$cluster" \
             bash ./scripts/helm-smoke.sh "$candidate" self-hosted

@@ -9,7 +9,6 @@ previous_chart="${HITKEEP_PREVIOUS_CHART:?HITKEEP_PREVIOUS_CHART must name the i
 previous_chart_digest="${HITKEEP_PREVIOUS_CHART_DIGEST:?HITKEEP_PREVIOUS_CHART_DIGEST must name the immutable supported 2.12 chart manifest}"
 candidate_chart="${HITKEEP_CANDIDATE_CHART:?HITKEEP_CANDIDATE_CHART must name the exact candidate chart artifact}"
 candidate_chart_version="${HITKEEP_CANDIDATE_CHART_VERSION:?HITKEEP_CANDIDATE_CHART_VERSION must name the candidate chart version}"
-kind_cluster="${HITKEEP_KIND_CLUSTER:?HITKEEP_KIND_CLUSTER must name the disposable Kind cluster}"
 fixture_manifest="tests/fixtures/release-fixtures.json"
 rollback_helper_image="busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662"
 namespace="hitkeep-helm-smoke-$$-${RANDOM}"
@@ -52,7 +51,6 @@ fi
 
 platform="linux/$(docker image inspect "$image" --format '{{.Architecture}}')"
 docker pull --platform "$platform" "$previous_image" >/dev/null
-kind load docker-image --name "$kind_cluster" "$image"
 fixture --verify-image --manifest "$fixture_manifest" --previous-image "$previous_image" --platform "$platform" --image "$previous_image"
 
 for selected_image in "$image" "$previous_image"; do
