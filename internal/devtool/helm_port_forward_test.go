@@ -38,3 +38,20 @@ func TestHelmSmokeRefreshesPortForwardAfterPodRecreation(t *testing.T) {
 		t.Fatalf("restart followed by authenticated fixture verification occurrences = %d, want 3", got)
 	}
 }
+
+func TestHelmSmokeForwardsNamedHTTPServicePort(t *testing.T) {
+	raw, err := os.ReadFile("../../scripts/helm-smoke.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	script := string(raw)
+	const namedPortForward = "kubectl -n \"$namespace\" port-forward --address 127.0.0.1 service/\"$release\" 0:http"
+	if !strings.Contains(script, namedPortForward) {
+		t.Fatalf("helm smoke must forward the release Service's named http port: %q", namedPortForward)
+	}
+	const numericPortForward = "kubectl -n \"$namespace\" port-forward --address 127.0.0.1 service/\"$release\" 0:8080"
+	if strings.Contains(script, numericPortForward) {
+		t.Fatalf("helm smoke must not forward hardcoded Service port 8080: %q", numericPortForward)
+	}
+}

@@ -24,7 +24,7 @@ func TestHelmUpgradeSmokeUsesChartPersistenceAndImmutableImages(t *testing.T) {
 		"--namespace \"$namespace\"",
 		"--set-string image.repository=\"$repository\"",
 		"--set-string image.digest=\"$digest\"",
-		"kubectl -n \"$namespace\" port-forward --address 127.0.0.1 service/\"$release\" 0:8080",
+		"kubectl -n \"$namespace\" port-forward --address 127.0.0.1 service/\"$release\" 0:http",
 		"fixture --seed",
 		"fixture --verify",
 		"quiesce_release",

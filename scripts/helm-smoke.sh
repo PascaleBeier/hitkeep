@@ -102,7 +102,7 @@ deploy() {
 await_healthy() {
   kubectl -n "$namespace" rollout status statefulset/"$release" --timeout=5m
   port_forward_log="$temp_dir/port-forward.log"
-  kubectl -n "$namespace" port-forward --address 127.0.0.1 service/"$release" 0:8080 >"$port_forward_log" 2>&1 &
+  kubectl -n "$namespace" port-forward --address 127.0.0.1 service/"$release" 0:http >"$port_forward_log" 2>&1 &
   port_forward_pid=$!
   for _ in {1..60}; do
     port="$(sed -nE 's/.*127\.0\.0\.1:([0-9]+).*/\1/p' "$port_forward_log" | head -n1)"
