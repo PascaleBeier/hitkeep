@@ -55,3 +55,21 @@ func TestHelmSmokeForwardsNamedHTTPServicePort(t *testing.T) {
 		t.Fatalf("helm smoke must not forward hardcoded Service port 8080: %q", numericPortForward)
 	}
 }
+
+func TestHelmSmokeQuiescesWithoutContainerShell(t *testing.T) {
+	raw, err := os.ReadFile("../../scripts/helm-smoke.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	script := string(raw)
+	for _, forbidden := range []string{"/bin/sh -c", "kill -TERM 1"} {
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("helm smoke must not assume an in-container shell or PID 1: %q", forbidden)
+		}
+	}
+	const quiesce = "quiesce_release() {\n  stop_port_forward\n  kubectl -n \"$namespace\" scale statefulset/\"$release\" --replicas=0\n  kubectl -n \"$namespace\" wait --for=delete pod/\"${release}-0\" --timeout=5m\n}"
+	if !strings.Contains(script, quiesce) {
+		t.Fatalf("helm smoke must quiesce through StatefulSet scale-to-zero and pod deletion wait: %q", quiesce)
+	}
+}
