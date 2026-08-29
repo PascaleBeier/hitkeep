@@ -43,6 +43,8 @@ func TestBrokerPublishesOnlyToSiteSubscribers(t *testing.T) {
 func TestBrokerReplaysEventsAfterLastEventID(t *testing.T) {
 	broker := NewBroker()
 	siteID := uuid.New()
+	active, _, _ := broker.Subscribe(siteID, "")
+	defer active.Close()
 
 	broker.Publish(Event{SiteID: siteID, Kinds: []string{KindHits}, Counts: map[string]int{KindHits: 1}})
 	broker.Publish(Event{SiteID: siteID, Kinds: []string{KindEvents}, Counts: map[string]int{KindEvents: 1}})

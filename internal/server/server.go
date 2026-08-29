@@ -273,6 +273,9 @@ func (s *Server) ImportStageCleanupStatus() *database.ImportStageCleanupStatusTr
 
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.logger.Info("HTTP server shutting down.")
+	if s.ctx.Realtime != nil {
+		s.ctx.Realtime.Close()
+	}
 
 	if s.importRunnerStop != nil {
 		if err := s.importRunnerStop(ctx); err != nil {
