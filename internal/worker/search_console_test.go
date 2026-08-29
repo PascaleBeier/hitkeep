@@ -729,6 +729,45 @@ type fakeSearchConsoleQuery struct {
 	Query searchconsole.SearchAnalyticsQuery
 }
 
+func TestSearchConsoleSyncWorkerStartStopsBlockedSyncWhenContextExpires(t *testing.T) {
+	fixture := newSearchConsoleWorkerFixture(t, "gsc-worker-cancel@test.dev", "gsc-worker-cancel.example.com")
+	source := &blockingSearchConsoleSource{started: make(chan struct{}, 1)}
+	worker := NewSearchConsoleSyncWorker(fixture.tenantMgr, source)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		worker.Start(ctx)
+		close(done)
+	}()
+
+	select {
+	case <-source.started:
+	case <-time.After(time.Second):
+		t.Fatal("blocked Search Console sync did not start")
+	}
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Search Console worker did not stop after its parent context expired")
+	}
+}
+
+type blockingSearchConsoleSource struct {
+	fakeSearchConsoleSource
+	started chan struct{}
+}
+
+func (s *blockingSearchConsoleSource) QuerySearchAnalytics(ctx context.Context, token searchconsole.Token, query searchconsole.SearchAnalyticsQuery) ([]searchconsole.SearchAnalyticsRow, error) {
+	select {
+	case s.started <- struct{}{}:
+	default:
+	}
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
 type fakeSearchConsoleSource struct {
 	rows          []searchconsole.SearchAnalyticsRow
 	rowsBySiteURL map[string][]searchconsole.SearchAnalyticsRow

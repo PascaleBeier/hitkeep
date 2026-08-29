@@ -126,7 +126,11 @@ func (w *SearchConsoleSyncWorker) runDueAndLog(ctx context.Context, limit int, l
 	}
 }
 
+const searchConsoleRunDueTimeout = time.Minute
+
 func (w *SearchConsoleSyncWorker) RunDue(ctx context.Context, limit int) (SearchConsoleSyncRunSummary, error) {
+	ctx, cancel := context.WithTimeout(ctx, searchConsoleRunDueTimeout)
+	defer cancel()
 	if w == nil || w.tenantMgr == nil || w.source == nil {
 		return SearchConsoleSyncRunSummary{}, fmt.Errorf("search console sync worker is not configured")
 	}

@@ -84,6 +84,12 @@ func VerifyRecoveryCode(code, encodedHash string) (bool, error) {
 		return false, nil
 	}
 
+	// Recovery-code hashes have one exact canonical encoding. Check it before
+	// splitting so corrupted persisted input cannot allocate by delimiter count.
+	const canonicalEncodedHashLength = 97
+	if len(encodedHash) != canonicalEncodedHashLength {
+		return false, errors.New("invalid hash format")
+	}
 	parts := strings.Split(encodedHash, "$")
 	if len(parts) != 6 {
 		return false, errors.New("invalid hash format")
@@ -91,35 +97,36 @@ func VerifyRecoveryCode(code, encodedHash string) (bool, error) {
 	if parts[1] != "argon2id" {
 		return false, errors.New("incompatible variant")
 	}
-
-	var version int
-	if _, err := fmt.Sscanf(parts[2], "v=%d", &version); err != nil {
-		return false, err
-	}
-	if version != argon2.Version {
+	if parts[2] != fmt.Sprintf("v=%d", argon2.Version) {
 		return false, errors.New("incompatible version")
 	}
-
-	var memory uint32
-	var time uint32
-	var threads uint8
-	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &time, &threads); err != nil {
-		return false, err
+	if parts[3] != fmt.Sprintf("m=%d,t=%d,p=%d", recoveryCodeHashMemory, recoveryCodeHashTime, recoveryCodeHashThreads) {
+		return false, errors.New("incompatible parameters")
 	}
 
+	const saltLength = 16
+	if len(parts[4]) != base64.RawStdEncoding.EncodedLen(saltLength) {
+		return false, errors.New("invalid salt encoding")
+	}
+	if len(parts[5]) != base64.RawStdEncoding.EncodedLen(int(recoveryCodeHashKeyLen)) {
+		return false, errors.New("invalid hash encoding")
+	}
 	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
 	if err != nil {
 		return false, err
+	}
+	if len(salt) != saltLength || base64.RawStdEncoding.EncodeToString(salt) != parts[4] {
+		return false, errors.New("invalid salt")
 	}
 	decodedHash, err := base64.RawStdEncoding.DecodeString(parts[5])
 	if err != nil {
 		return false, err
 	}
-	if len(decodedHash) != int(recoveryCodeHashKeyLen) {
-		return false, errors.New("invalid hash length")
+	if len(decodedHash) != int(recoveryCodeHashKeyLen) || base64.RawStdEncoding.EncodeToString(decodedHash) != parts[5] {
+		return false, errors.New("invalid hash")
 	}
 
-	comparisonHash := argon2.IDKey([]byte(normalized), salt, time, memory, threads, recoveryCodeHashKeyLen)
+	comparisonHash := argon2.IDKey([]byte(normalized), salt, recoveryCodeHashTime, recoveryCodeHashMemory, recoveryCodeHashThreads, recoveryCodeHashKeyLen)
 	return subtle.ConstantTimeCompare(decodedHash, comparisonHash) == 1, nil
 }
 

@@ -85,3 +85,24 @@ func TestVerifyRecoveryCodeRejectsUnexpectedHashLength(t *testing.T) {
 		t.Fatal("expected invalid hash length to fail verification")
 	}
 }
+
+func TestVerifyRecoveryCodeRejectsNonCanonicalParameters(t *testing.T) {
+	hash, err := HashRecoveryCode("ABCD-EFGH")
+	if err != nil {
+		t.Fatalf("HashRecoveryCode() error = %v", err)
+	}
+
+	parts := strings.Split(hash, "$")
+	if len(parts) != 6 {
+		t.Fatalf("expected encoded hash with 6 parts, got %d", len(parts))
+	}
+	parts[3] = "m=1,t=1,p=4"
+	invalidHash := fmt.Sprintf("$%s", strings.Join(parts[1:], "$"))
+	match, err := VerifyRecoveryCode("ABCD-EFGH", invalidHash)
+	if err == nil {
+		t.Fatal("expected non-canonical parameters error")
+	}
+	if match {
+		t.Fatal("expected non-canonical parameters to fail verification")
+	}
+}
