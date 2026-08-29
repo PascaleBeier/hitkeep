@@ -73,3 +73,20 @@ func TestHelmSmokeQuiescesWithoutContainerShell(t *testing.T) {
 		t.Fatalf("helm smoke must quiesce through StatefulSet scale-to-zero and pod deletion wait: %q", quiesce)
 	}
 }
+
+func TestHelmSmokePreservesMetadataAndRestoreTarPaths(t *testing.T) {
+	raw, err := os.ReadFile("../../scripts/helm-smoke.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	script := string(raw)
+	const metadataTar = "kubectl -n \"$namespace\" exec \"$pod\" -- tar -C / -cf - data >\"$metadata\""
+	if !strings.Contains(script, metadataTar) {
+		t.Fatalf("metadata archive must preserve data/ path names: %q", metadataTar)
+	}
+	const archiveTar = "kubectl -n \"$namespace\" exec archive-source -- tar -C /data -cf - . >\"$archive\""
+	if !strings.Contains(script, archiveTar) {
+		t.Fatalf("PVC archive must remain relative to /data for restore: %q", archiveTar)
+	}
+}

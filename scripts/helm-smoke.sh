@@ -158,7 +158,7 @@ verify_stopped_storage() {
   mkdir -p "$data_path"
   mount_pvc "$pod"
   kubectl -n "$namespace" cp "$pod:/data/." "$data_path"
-  kubectl -n "$namespace" exec "$pod" -- tar -C /data -cf - . >"$metadata"
+  kubectl -n "$namespace" exec "$pod" -- tar -C / -cf - data >"$metadata"
   kubectl -n "$namespace" delete pod "$pod" --wait=true >/dev/null
   fixture --"$mode" --manifest "$fixture_manifest" --previous-image "$previous_image" --platform "$platform" --data-path "$data_path" --metadata "$metadata"
 }
