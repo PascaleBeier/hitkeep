@@ -1,5 +1,5 @@
 import { ImportManifest, ImportProviderDescriptor } from '@services/imports.service';
-import { acceptsImportFileExtension, importGuideUrl, importManifestHasDatasetEvents, importManifestHasEventCoverage, importManifestHasEventDimensions, importManifestHasEventProperties } from './imports';
+import { acceptsImportFileExtension, importGuideUrl, importManifestHasDatasetEvents, importManifestHasEventCoverage, importManifestHasEventDimensions, importManifestHasEventProperties } from './import';
 
 describe('ImportsPage file acceptance', () => {
     const plausible: ImportProviderDescriptor = {

@@ -83,11 +83,11 @@ function safeList<T>(value: readonly T[] | null | undefined): T[] {
 @Component({
     selector: 'app-imports',
     imports: [DatePipe, DecimalPipe, TranslocoPipe, ButtonModule, CardModule, FileUploadModule, IconFieldModule, InputIconModule, InputTextModule, MessageModule, ProgressBarModule, TagModule, TableModule, PageState],
-    templateUrl: './imports.html',
-    styleUrl: './imports.css',
+    templateUrl: './import.html',
+    styleUrl: './import.css',
     changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ImportsPage {
+export class ImportPage {
     private readonly fileUpload = viewChild<FileUpload>('fileUpload');
     private readonly imports = inject(ImportsService);
     private readonly siteService = inject(SiteService);
