@@ -1184,6 +1184,7 @@
     },
     "user": {
       "breadcrumb": "Paramètres",
+      "title": "Paramètres",
       "subtitle": "Gérez la sécurité et les préférences de votre compte.",
       "profile": {
         "title": "Profil",

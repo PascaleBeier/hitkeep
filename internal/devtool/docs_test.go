@@ -259,7 +259,7 @@ jobs:
       - build-release
     if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' }}
     uses: ./.github/workflows/default-tenant-migration-acceptance.yml
-  upgrade-from-v2-12:
+  upgrade-from-supported-floor:
     needs: build-release
     strategy:
       matrix:
@@ -303,7 +303,7 @@ jobs:
       - release-please
       - build-release
       - migration-interruption
-      - upgrade-from-v2-12
+      - upgrade-from-supported-floor
       - publish-helm
       - verify-tracker-package
     steps:
@@ -331,7 +331,7 @@ jobs:
       - release-please
       - build-release
       - migration-interruption
-      - upgrade-from-v2-12
+      - upgrade-from-supported-floor
       - publish-helm
       - verify-tracker-package
       - docs-attestation

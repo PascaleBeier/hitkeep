@@ -159,11 +159,12 @@ jobs:
 
           platform="linux/$(docker image inspect "$candidate" --format '{{.Architecture}}')"
           manifest=tests/fixtures/release-fixtures.json
-          previous="$(jq -r --arg platform "$platform" '.fixtures[] | select(.previous_version == "2.12.0" and .platform == $platform) | .previous_image' "$manifest")"
-          previous_chart="$(jq -r --arg platform "$platform" '.fixtures[] | select(.previous_version == "2.12.0" and .platform == $platform) | .previous_chart' "$manifest")"
-          previous_chart_digest="$(jq -r --arg platform "$platform" '.fixtures[] | select(.previous_version == "2.12.0" and .platform == $platform) | .previous_chart_digest' "$manifest")"
+          previous_version="$(jq -r '.supported_upgrade_floor' "$manifest")"
+          previous="$(jq -r --arg platform "$platform" --arg version "$previous_version" '.fixtures[] | select(.previous_version == $version and .platform == $platform) | .previous_image' "$manifest")"
+          previous_chart="$(jq -r --arg platform "$platform" --arg version "$previous_version" '.fixtures[] | select(.previous_version == $version and .platform == $platform) | .previous_chart' "$manifest")"
+          previous_chart_digest="$(jq -r --arg platform "$platform" --arg version "$previous_version" '.fixtures[] | select(.previous_version == $version and .platform == $platform) | .previous_chart_digest' "$manifest")"
           [[ "$previous" == *@sha256:* ]]
-          [[ "$previous_chart" == 'oci://ghcr.io/pascalebeier/charts/hitkeep:2.12.0' ]]
+          [[ "$previous_chart" == oci://* ]]
           [[ "$previous_chart_digest" =~ ^sha256:[a-f0-9]{64}$ ]]
           docker pull "$previous"
 
@@ -173,10 +174,10 @@ jobs:
             --destination "$chart_dir" >/dev/null
           candidate_chart="$chart_dir/hitkeep-${CANDIDATE_VERSION}.tgz"
           test -f "$candidate_chart"
-          previous_output="$(helm pull "$previous_chart" --version 2.12.0 --destination "$chart_dir" 2>&1)"
+          previous_output="$(helm pull "$previous_chart" --version "$previous_version" --destination "$chart_dir" 2>&1)"
           printf '%s\n' "$previous_output"
           grep -Fqx "Digest: $previous_chart_digest" <<< "$previous_output"
-          previous_chart_file="$chart_dir/hitkeep-2.12.0.tgz"
+          previous_chart_file="$chart_dir/hitkeep-${previous_version#v}.tgz"
           test -f "$previous_chart_file"
 
           HITKEEP_PREVIOUS_IMAGE="$previous" \

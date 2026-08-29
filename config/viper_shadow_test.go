@@ -17,7 +17,6 @@ import (
 func TestLoadUsesViperWithLegacyParity(t *testing.T) {
 	originalArgs := os.Args
 	t.Cleanup(func() { os.Args = originalArgs })
-	os.Args = []string{"hitkeep", "--healthcheck"}
 
 	getEnv := func(key, fallback string) string {
 		if value := os.Getenv(key); value != "" {
@@ -25,22 +24,53 @@ func TestLoadUsesViperWithLegacyParity(t *testing.T) {
 		}
 		return fallback
 	}
-	if got, want := Load(), load(os.Args[1:], getEnv); !reflect.DeepEqual(got, want) {
-		t.Fatalf("Load() differs from legacy loader:\n got: %#v\nwant: %#v", got, want)
+
+	for _, tt := range []struct {
+		name           string
+		healthcheckEnv string
+	}{
+		{name: "CLI flag overrides environment", healthcheckEnv: "false"},
+		{name: "CLI flag uses default environment", healthcheckEnv: ""},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("HITKEEP_HEALTHCHECK", tt.healthcheckEnv)
+			os.Args = []string{"hitkeep", "--healthcheck"}
+
+			if got, want := Load(), load(os.Args[1:], getEnv); !reflect.DeepEqual(got, want) {
+				t.Fatalf("Load() differs from legacy loader:\n got: %#v\nwant: %#v", got, want)
+			}
+		})
 	}
+
+	t.Run("HTTP address CLI flag overrides environment", func(t *testing.T) {
+		t.Setenv("HITKEEP_HTTP_ADDR", ":8181")
+		os.Args = []string{"hitkeep", "--http-addr=:9191"}
+
+		got, want := Load(), load(os.Args[1:], getEnv)
+		gotComparable := comparableConfig(t, got, "JWTSecret", "NodeName")
+		wantComparable := comparableConfig(t, want, "JWTSecret", "NodeName")
+		if !reflect.DeepEqual(&gotComparable, &wantComparable) {
+			t.Fatalf("Load() differs from legacy loader:\n got: %#v\nwant: %#v", got, want)
+		} else if got.HTTPAddr != ":9191" {
+			t.Fatalf("HTTPAddr = %q, want :9191", got.HTTPAddr)
+		}
+	})
 }
 
 func TestLoadArgsReadsExplicitOSFile(t *testing.T) {
 	configFile := filepath.Join(t.TempDir(), "hitkeep.yaml")
-	if err := os.WriteFile(configFile, []byte("http-addr: ':7070'\nhealthcheck: true\n"), 0o600); err != nil {
+	if err := os.WriteFile(configFile, []byte("http-addr: ':7070'\nmail-port: 2020\napi-rate-limit: 7.5\nhealthcheck: true\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	conf, err := LoadArgs(nil, configFile)
+	t.Setenv("HITKEEP_MAIL_PORT", "3030")
+	t.Setenv("HITKEEP_MCP_DOCS_URL", "")
+
+	conf, err := LoadArgs([]string{"--http-addr=:9090"}, configFile)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if conf.HTTPAddr != ":7070" || !conf.Healthcheck {
-		t.Fatalf("explicit config was not loaded: %#v", conf)
+	if conf.HTTPAddr != ":9090" || conf.MailPort != 3030 || conf.ApiRateLimit != 7.5 || !conf.Healthcheck || conf.MCPDocsURL != "https://hitkeep.com" {
+		t.Fatalf("configuration precedence mismatch: %#v", conf)
 	}
 }
 
@@ -350,6 +380,19 @@ func TestViperShadowLoadsEveryCatalogType(t *testing.T) {
 	}
 }
 
+func comparableConfig(t *testing.T, conf *Config, generatedFields ...string) Config {
+	t.Helper()
+	comparable := *conf
+	for _, name := range generatedFields {
+		field := configField(t, name, &comparable)
+		if field.String() == "" {
+			t.Fatalf("generated %s is empty", name)
+		}
+		field.SetZero()
+	}
+	return comparable
+}
+
 func loadViperShadowParity(t *testing.T, args []string, env map[string]string, generatedFields ...string) (*Config, string) {
 	t.Helper()
 	getEnv := mapEnv(env)
@@ -365,16 +408,8 @@ func loadViperShadowParity(t *testing.T, args []string, env map[string]string, g
 	if err != nil {
 		t.Fatal(err)
 	}
-	legacyComparable, shadowComparable := *legacy, *shadow
-	for _, name := range generatedFields {
-		legacyField := configField(t, name, &legacyComparable)
-		shadowField := configField(t, name, &shadowComparable)
-		if legacyField.String() == "" || shadowField.String() == "" {
-			t.Fatalf("generated %s is empty", name)
-		}
-		legacyField.SetZero()
-		shadowField.SetZero()
-	}
+	legacyComparable := comparableConfig(t, legacy, generatedFields...)
+	shadowComparable := comparableConfig(t, shadow, generatedFields...)
 	if !reflect.DeepEqual(&shadowComparable, &legacyComparable) {
 		t.Fatalf("shadow config differs from legacy\nshadow: %#v\nlegacy: %#v", shadow, legacy)
 	}

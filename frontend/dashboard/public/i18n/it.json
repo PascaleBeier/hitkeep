@@ -1181,6 +1181,7 @@
     },
     "user": {
       "breadcrumb": "Impostazioni",
+      "title": "Impostazioni",
       "subtitle": "Gestisci sicurezza e preferenze del tuo account.",
       "profile": {
         "title": "Profilo",

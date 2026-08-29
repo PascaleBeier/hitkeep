@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"hitkeep/jsonapi"
 )
 
 func TestHelmUpgradeSmokeUsesChartPersistenceAndImmutableImages(t *testing.T) {
@@ -86,7 +88,7 @@ func TestHelmChartSupportsDigestPinnedSmokeImages(t *testing.T) {
 
 func TestHelmTemplateRendersImmutableReferencesForLegacyAndCandidateCharts(t *testing.T) {
 	if os.Getenv("HITKEEP_HELM_TEMPLATE_CONTRACT") != "1" {
-		t.Skip("set HITKEEP_HELM_TEMPLATE_CONTRACT=1 to render the immutable v2.12 chart fixture")
+		t.Skip("set HITKEEP_HELM_TEMPLATE_CONTRACT=1 to render the immutable supported-floor chart fixture")
 	}
 	helm, err := exec.LookPath("helm")
 	if err != nil {
@@ -94,18 +96,47 @@ func TestHelmTemplateRendersImmutableReferencesForLegacyAndCandidateCharts(t *te
 	}
 	const repository = "registry.example/hitkeep"
 	const digest = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	manifestBytes, err := os.ReadFile(filepath.Join("..", "..", "tests", "fixtures", "release-fixtures.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		SupportedUpgradeFloor string `json:"supported_upgrade_floor"`
+		Fixtures              []struct {
+			PreviousVersion string `json:"previous_version"`
+			PreviousChart   string `json:"previous_chart"`
+		} `json:"fixtures"`
+	}
+	if err := jsonapi.Unmarshal(manifestBytes, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest.SupportedUpgradeFloor == "" {
+		t.Fatal("release fixture has no supported upgrade floor")
+	}
+	previousChart := ""
+	for _, fixture := range manifest.Fixtures {
+		if fixture.PreviousVersion == manifest.SupportedUpgradeFloor {
+			if previousChart != "" && previousChart != fixture.PreviousChart {
+				t.Fatalf("release fixture has conflicting charts for supported floor %q", manifest.SupportedUpgradeFloor)
+			}
+			previousChart = fixture.PreviousChart
+		}
+	}
+	if !strings.HasPrefix(previousChart, "oci://") {
+		t.Fatalf("release fixture has invalid chart for supported floor: %q", previousChart)
+	}
 	want := `image: "` + repository + `@sha256:` + digest + `"`
 
 	legacyDir := t.TempDir()
-	if output, err := exec.Command(helm, "pull", "oci://ghcr.io/pascalebeier/charts/hitkeep", "--version", "2.12.0", "--destination", legacyDir).CombinedOutput(); err != nil {
-		t.Fatalf("pull v2.12 chart: %v\n%s", err, output)
+	if output, err := exec.Command(helm, "pull", previousChart, "--version", manifest.SupportedUpgradeFloor, "--destination", legacyDir).CombinedOutput(); err != nil {
+		t.Fatalf("pull supported-floor chart: %v\n%s", err, output)
 	}
 	renders := []struct {
 		chart  string
 		values []string
 	}{
 		{
-			chart: filepath.Join(legacyDir, "hitkeep-2.12.0.tgz"),
+			chart: filepath.Join(legacyDir, "hitkeep-"+manifest.SupportedUpgradeFloor+".tgz"),
 			values: []string{
 				"--set-string", "image.repository=" + repository + "@sha256",
 				"--set-string", "image.tag=" + digest,
@@ -129,7 +160,7 @@ func TestHelmTemplateRendersImmutableReferencesForLegacyAndCandidateCharts(t *te
 		if !strings.Contains(rendered, want) {
 			t.Fatalf("rendered image for %s does not preserve the immutable digest %q\n%s", render.chart, want, rendered)
 		}
-		if strings.Contains(rendered, repository+":2.12.0:") || strings.Contains(rendered, repository+"@sha256@") {
+		if strings.Contains(rendered, repository+":"+manifest.SupportedUpgradeFloor+":") || strings.Contains(rendered, repository+"@sha256@") {
 			t.Fatalf("rendered image for %s is malformed\n%s", render.chart, rendered)
 		}
 	}
@@ -141,13 +172,12 @@ func TestReleaseWorkflowGatesHelmUpgradeFromSupportedFloor(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, required := range []string{
-		"name: Helm upgrade from v2.12.0",
-		"name: Helm upgrade from v2.12.0",
+		"name: Helm upgrade from supported floor",
 		"go install sigs.k8s.io/kind@v0.29.0",
 		"create cluster --name \"$cluster\"",
 		"./scripts/helm-smoke.sh \"$CANDIDATE_IMAGE\" self-hosted",
 		"- surface: helm",
-		"needs.upgrade-from-v2-12.result == 'success'",
+		"needs.upgrade-from-supported-floor.result == 'success'",
 	} {
 		if !bytes.Contains(raw, []byte(required)) {
 			t.Fatalf("release workflow is missing Helm upgrade contract %q", required)

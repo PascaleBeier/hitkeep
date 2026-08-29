@@ -97,6 +97,9 @@ func (a *App) StartRun(ctx context.Context, request RunRequest) (RunStart, error
 	}
 	childEnvironment := []string{"HK_CHILD_RUN=1", "HK_STATE_DIR=" + stateRoot, "HK_EXPECTED_SCHEMA=" + SchemaVersion, "HK_WORKER_PROTOCOL=1", "HK_WORKSPACE_ID=" + a.workspace.ID, "HK_SOURCE_FINGERPRINT=" + fingerprint}
 	childEnvironment = append(childEnvironment, runTempEnvironment...)
+	if previousImage := os.Getenv("HITKEEP_PREVIOUS_IMAGE"); previousImage != "" {
+		childEnvironment = append(childEnvironment, "HITKEEP_PREVIOUS_IMAGE="+previousImage)
+	}
 	if os.Getenv("GITHUB_ACTIONS") == "true" {
 		childEnvironment = append(childEnvironment, "GITHUB_ACTIONS=true")
 	}
@@ -777,7 +780,7 @@ func (a *App) executeSmoke(ctx context.Context, variantID string, writer io.Writ
 	} else {
 		args = append(args, "--recreate")
 	}
-	return a.runCommand(ctx, writer, commandSpec{Args: args})
+	return a.runCommand(ctx, writer, commandSpec{Args: args, Env: []string{"HITKEEP_PREVIOUS_IMAGE=" + os.Getenv("HITKEEP_PREVIOUS_IMAGE")}})
 }
 
 func (a *App) VerifyVariantBuild(ctx context.Context, variantID string, writer io.Writer) error {

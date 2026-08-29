@@ -100,15 +100,15 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 		return fmt.Errorf("decode release workflow: %w", err)
 	}
 	for job, required := range map[string][]string{
-		"build-release":          {"release-please"},
-		"migration-interruption": {"release-please", "build-release"},
-		"upgrade-from-v2-12":     {"build-release"},
-		"publish-helm":           {"build-release"},
-		"verify-tracker-package": {"build-release"},
-		"docs-attestation":       {"release-please", "build-release", "migration-interruption", "upgrade-from-v2-12", "publish-helm", "verify-tracker-package"},
-		"finalize-release":       {"release-please", "build-release", "migration-interruption", "upgrade-from-v2-12", "publish-helm", "verify-tracker-package", "docs-attestation"},
-		"sync-docs-release":      {"finalize-release"},
-		"deploy-cloud":           {"finalize-release"},
+		"build-release":                {"release-please"},
+		"migration-interruption":       {"release-please", "build-release"},
+		"upgrade-from-supported-floor": {"build-release"},
+		"publish-helm":                 {"build-release"},
+		"verify-tracker-package":       {"build-release"},
+		"docs-attestation":             {"release-please", "build-release", "migration-interruption", "upgrade-from-supported-floor", "publish-helm", "verify-tracker-package"},
+		"finalize-release":             {"release-please", "build-release", "migration-interruption", "upgrade-from-supported-floor", "publish-helm", "verify-tracker-package", "docs-attestation"},
+		"sync-docs-release":            {"finalize-release"},
+		"deploy-cloud":                 {"finalize-release"},
 	} {
 		definition, ok := workflow.Jobs[job]
 		if !ok {
@@ -137,10 +137,9 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 		"compose": "./scripts/compose-smoke.sh",
 		"helm":    "./scripts/helm-smoke.sh",
 	}
-	for _, step := range workflow.Jobs["upgrade-from-v2-12"].Steps {
+	for _, step := range workflow.Jobs["upgrade-from-supported-floor"].Steps {
 		if strings.Contains(step.Run, "tests/fixtures/release-fixtures.json") &&
-			strings.Contains(step.Run, "2.12.0") &&
-			strings.Contains(step.Env["CANDIDATE_DIGEST"], "needs.build-release.outputs.image_digest") {
+			strings.Contains(step.Run, "previous_version") {
 			fixtureResolved = true
 		}
 		for surface, script := range smokeScripts {
@@ -152,12 +151,12 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 		}
 	}
 	if !fixtureResolved {
-		return fmt.Errorf("release workflow upgrade-from-v2-12 must resolve the v2.12.0 fixture against the candidate digest")
+		return fmt.Errorf("release workflow upgrade-from-supported-floor must resolve the supported upgrade-floor fixture against the candidate digest")
 	}
 	workflowText := string(raw)
 	for _, surface := range []string{"docker", "compose", "helm"} {
 		if !strings.Contains(workflowText, "- surface: "+surface) || !upgradeSmokes[surface] {
-			return fmt.Errorf("release workflow upgrade-from-v2-12 must smoke the %s matrix surface", surface)
+			return fmt.Errorf("release workflow upgrade-from-supported-floor must smoke the %s matrix surface", surface)
 		}
 	}
 

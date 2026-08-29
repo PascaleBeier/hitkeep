@@ -17,6 +17,7 @@ func TestStartRunIsolatesWorkerTemporaryAndGoCaches(t *testing.T) {
 	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "global-tmp"))
 	t.Setenv("GOTMPDIR", filepath.Join(t.TempDir(), "global-go-tmp"))
 	t.Setenv("GOCACHE", filepath.Join(t.TempDir(), "global-go-cache"))
+	t.Setenv("HITKEEP_PREVIOUS_IMAGE", "ghcr.io/pascalebeier/hitkeep:2.12.0@sha256:test")
 	original := map[string]string{"TMPDIR": os.Getenv("TMPDIR"), "GOTMPDIR": os.Getenv("GOTMPDIR"), "GOCACHE": os.Getenv("GOCACHE")}
 
 	worker := filepath.Join(t.TempDir(), "hk-worker")
@@ -43,10 +44,11 @@ func TestStartRunIsolatesWorkerTemporaryAndGoCaches(t *testing.T) {
 	tempRoot := app.runTempRoot(start.RunID)
 	workerEnvironment := waitForWorkerEnvironment(t, filepath.Join(tempRoot, "worker-env"))
 	for key, want := range map[string]string{
-		"HK_RUN_TEMP_ROOT": tempRoot,
-		"TMPDIR":           filepath.Join(tempRoot, "tmp"),
-		"GOTMPDIR":         filepath.Join(tempRoot, "go-tmp"),
-		"GOCACHE":          filepath.Join(tempRoot, "go-cache"),
+		"HK_RUN_TEMP_ROOT":       tempRoot,
+		"HITKEEP_PREVIOUS_IMAGE": "ghcr.io/pascalebeier/hitkeep:2.12.0@sha256:test",
+		"TMPDIR":                 filepath.Join(tempRoot, "tmp"),
+		"GOTMPDIR":               filepath.Join(tempRoot, "go-tmp"),
+		"GOCACHE":                filepath.Join(tempRoot, "go-cache"),
 	} {
 		if got := workerEnvironmentValue(workerEnvironment, key); got != want {
 			t.Fatalf("worker %s = %q, want %q", key, got, want)

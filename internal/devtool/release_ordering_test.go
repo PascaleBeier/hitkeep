@@ -16,7 +16,7 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
       - build-release
     if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' }}
     uses: ./.github/workflows/default-tenant-migration-acceptance.yml
-  upgrade-from-v2-12:
+  upgrade-from-supported-floor:
     needs: build-release
     strategy:
       matrix:
@@ -61,7 +61,7 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
       - release-please
       - build-release
       - migration-interruption
-      - upgrade-from-v2-12
+      - upgrade-from-supported-floor
       - publish-helm
       - verify-tracker-package
     steps:
@@ -89,7 +89,7 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
       - release-please
       - build-release
       - migration-interruption
-      - upgrade-from-v2-12
+      - upgrade-from-supported-floor
       - publish-helm
       - verify-tracker-package
       - docs-attestation
@@ -135,7 +135,7 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
 		t.Fatal("validateReleaseWorkflowGraph() accepted a finalizer that can run before Helm publication")
 	}
 
-	missingUpgrade := strings.Replace(workflow, "      - upgrade-from-v2-12\n", "", 1)
+	missingUpgrade := strings.Replace(workflow, "      - upgrade-from-supported-floor\n", "", 1)
 	if err := validateReleaseWorkflowGraph([]byte(missingUpgrade)); err == nil {
 		t.Fatal("validateReleaseWorkflowGraph() accepted a finalizer that can run before the upgrade smoke")
 	}

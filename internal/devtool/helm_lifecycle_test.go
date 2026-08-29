@@ -46,6 +46,36 @@ func TestHelmSmokeLifecycleContract(t *testing.T) {
 	}
 }
 
+func TestReleaseWorkflowsUseManifestUpgradeFloor(t *testing.T) {
+	for _, path := range []string{"../../.github/workflows/release.yml", "../../.github/workflows/release-validation.yml"} {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		workflow := string(raw)
+		requiredFragments := []string{"supported_upgrade_floor"}
+		if strings.HasSuffix(path, "release.yml") {
+			requiredFragments = append(requiredFragments, "PREVIOUS_VERSION: ${{ steps.fixture.outputs.previous_version }}")
+		}
+		for _, required := range requiredFragments {
+			if !strings.Contains(workflow, required) {
+				t.Errorf("%s must propagate manifest floor as %q", path, required)
+			}
+		}
+		for _, forbidden := range []string{
+			`select(.previous_version == "2.12.0"`,
+			`--version 2.12.0`,
+			`hitkeep-2.12.0.tgz`,
+			`Upgrade from v2.12.0`,
+			`upgrade-from-v2-12`,
+		} {
+			if strings.Contains(workflow, forbidden) {
+				t.Errorf("%s must derive predecessor from manifest, found %q", path, forbidden)
+			}
+		}
+	}
+}
+
 func TestReleaseWorkflowAuthenticatesHelmSmoke(t *testing.T) {
 	raw, err := os.ReadFile("../../.github/workflows/release.yml")
 	if err != nil {

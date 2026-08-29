@@ -1174,6 +1174,7 @@
     },
     "user": {
       "breadcrumb": "Configurações",
+      "title": "Configurações",
       "subtitle": "Gerencie a segurança e as preferências da sua conta.",
       "profile": {
         "title": "Perfil",

@@ -1193,6 +1193,7 @@
     },
     "user": {
       "breadcrumb": "Configuración",
+      "title": "Configuración",
       "subtitle": "Administra la seguridad y las preferencias de tu cuenta.",
       "profile": {
         "title": "Perfil",

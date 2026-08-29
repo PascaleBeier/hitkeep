@@ -1181,6 +1181,7 @@
     },
     "user": {
       "breadcrumb": "Instellingen",
+      "title": "Instellingen",
       "subtitle": "Beheer je accountbeveiliging en voorkeuren.",
       "profile": {
         "title": "Profiel",

@@ -10,6 +10,8 @@ import { DashboardTitleService } from '@services/dashboard-title.service';
 import { ShareService } from '@services/share.service';
 import { TeamService } from '@services/team.service';
 
+import en from '../../../../public/i18n/en.json';
+
 @Component({
     standalone: true,
     template: ''
@@ -28,15 +30,7 @@ describe('DashboardTitleService', () => {
             imports: [
                 DummyComponent,
                 TranslocoTestingModule.forRoot({
-                    langs: {
-                        en: {
-                            login: { signIn: 'Sign in' },
-                            nav: {
-                                dashboard: 'Dashboard',
-                                overview: 'Overview'
-                            }
-                        }
-                    },
+                    langs: { en },
                     translocoConfig: {
                         availableLangs: ['en'],
                         defaultLang: 'en'
@@ -49,7 +43,8 @@ describe('DashboardTitleService', () => {
                 provideRouter([
                     { path: 'login', component: DummyComponent, data: { titleKey: 'login.signIn' } },
                     { path: 'dashboard', component: DummyComponent, data: { titleKey: 'nav.dashboard', titleScope: 'site' } },
-                    { path: 'overview', component: DummyComponent, data: { titleKey: 'nav.overview', titleScope: 'team' } }
+                    { path: 'overview', component: DummyComponent, data: { titleKey: 'nav.overview', titleScope: 'team' } },
+                    { path: 'settings', component: DummyComponent, data: { titleKey: 'settings.user.title' } }
                 ])
             ]
         }).compileComponents();
@@ -67,6 +62,13 @@ describe('DashboardTitleService', () => {
         flushEffects();
 
         expect(TestBed.inject(Title).getTitle()).toBe('Sign in - HitKeep');
+    });
+
+    it('resolves the user settings title from the production locale', async () => {
+        await TestBed.inject(Router).navigateByUrl('/settings');
+        flushEffects();
+
+        expect(TestBed.inject(Title).getTitle()).not.toBe('settings.user.title - HitKeep');
     });
 
     it('adds the active site and updates when the selected site changes', async () => {
