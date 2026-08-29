@@ -202,7 +202,6 @@ spec:
       storage: 10Gi
   storageClassName: ${storage_class}
 YAML
-  kubectl -n "$namespace" wait --for=jsonpath='{.status.phase}'=Bound pvc/"$pvc" --timeout=2m
   mount_pvc archive-restore
   kubectl -n "$namespace" exec -i archive-restore -- tar -C /data -xpf - <"$archive"
   kubectl -n "$namespace" delete pod archive-restore --wait=true >/dev/null

@@ -118,3 +118,31 @@ func TestHelmSmokeDeploysThroughHelmAtZeroBeforeOneReplica(t *testing.T) {
 		t.Fatal("deploy must not pre-resume the live release outside Helm")
 	}
 }
+
+func TestHelmSmokeRestoreCreatesConsumerBeforePVCBound(t *testing.T) {
+	raw, err := os.ReadFile("../../scripts/helm-smoke.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	script := string(raw)
+	const declaration = "restore_pvc() {\n"
+	start := strings.Index(script, declaration)
+	if start < 0 {
+		t.Fatal("restore_pvc is missing")
+	}
+	start += len(declaration)
+	end := strings.Index(script[start:], "\n}\n\n")
+	if end < 0 {
+		t.Fatal("restore_pvc body is unterminated")
+	}
+	body := script[start : start+end]
+	apply := strings.Index(body, "cat <<YAML | kubectl -n \"$namespace\" apply -f - >/dev/null")
+	consumer := strings.Index(body, "mount_pvc archive-restore")
+	if apply < 0 || consumer < 0 || apply >= consumer {
+		t.Fatal("restore_pvc must apply the PVC before creating its archive restore consumer")
+	}
+	if strings.Contains(body, "wait --for=jsonpath='{.status.phase}'=Bound pvc/\"$pvc\"") {
+		t.Fatal("restore_pvc must not wait for Bound before the WaitForFirstConsumer pod")
+	}
+}
