@@ -90,3 +90,31 @@ func TestHelmSmokePreservesMetadataAndRestoreTarPaths(t *testing.T) {
 		t.Fatalf("PVC archive must remain relative to /data for restore: %q", archiveTar)
 	}
 }
+
+func TestHelmSmokeDeploysThroughHelmAtZeroBeforeOneReplica(t *testing.T) {
+	raw, err := os.ReadFile("../../scripts/helm-smoke.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	script := string(raw)
+	const declaration = "deploy() {\n"
+	start := strings.Index(script, declaration)
+	if start < 0 {
+		t.Fatal("deploy is missing")
+	}
+	start += len(declaration)
+	end := strings.Index(script[start:], "\n}\n\n")
+	if end < 0 {
+		t.Fatal("deploy body is unterminated")
+	}
+	body := script[start : start+end]
+	const replicaLoop = "for replicas in 0 1; do"
+	const helmReplicaValue = "--set replicaCount=\"$replicas\""
+	if !strings.Contains(body, replicaLoop) || !strings.Contains(body, helmReplicaValue) {
+		t.Fatalf("deploy must apply desired replicas 0 before 1 through Helm: %q and %q", replicaLoop, helmReplicaValue)
+	}
+	if strings.Contains(body, "kubectl") {
+		t.Fatal("deploy must not pre-resume the live release outside Helm")
+	}
+}

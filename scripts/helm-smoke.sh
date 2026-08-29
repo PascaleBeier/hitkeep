@@ -88,15 +88,18 @@ deploy() {
       --set-string image.digest="$digest"
     )
   fi
-  helm upgrade --install "$release" "$chart" \
-    --namespace "$namespace" \
-    --create-namespace \
-    --wait \
-    --timeout 5m \
-    "${image_args[@]}" \
-    --set-string env.HITKEEP_JWT_SECRET=hitkeep-local-helm-smoke-secret \
-    --set-string env.HITKEEP_MAIL_DRIVER=log \
-    --set-string env.HITKEEP_SPAM_FILTER_AUTO_UPDATE=false
+  for replicas in 0 1; do
+    helm upgrade --install "$release" "$chart" \
+      --namespace "$namespace" \
+      --create-namespace \
+      --wait \
+      --timeout 5m \
+      "${image_args[@]}" \
+      --set replicaCount="$replicas" \
+      --set-string env.HITKEEP_JWT_SECRET=hitkeep-local-helm-smoke-secret \
+      --set-string env.HITKEEP_MAIL_DRIVER=log \
+      --set-string env.HITKEEP_SPAM_FILTER_AUTO_UPDATE=false
+  done
 }
 
 await_healthy() {

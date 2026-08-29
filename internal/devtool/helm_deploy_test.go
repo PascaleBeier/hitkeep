@@ -8,17 +8,32 @@ import (
 	"testing"
 )
 
-func TestHelmSmokeDeployPassesCandidateChartDigestFlags(t *testing.T) {
-	got := helmDeployArgs(t, "2.13.12", "registry.example/hitkeep@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "candidate.tgz")
-	want := []string{
-		"upgrade", "--install", "hitkeep", "candidate.tgz",
+func helmTwoPhaseArgs(chart string, imageArgs []string) []string {
+	prefix := []string{
+		"upgrade", "--install", "hitkeep", chart,
 		"--namespace", "smoke", "--create-namespace", "--wait", "--timeout", "5m",
-		"--set-string", "image.repository=registry.example/hitkeep",
-		"--set-string", "image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+	}
+	prefix = append(prefix, imageArgs...)
+	suffix := []string{
 		"--set-string", "env.HITKEEP_JWT_SECRET=hitkeep-local-helm-smoke-secret",
 		"--set-string", "env.HITKEEP_MAIL_DRIVER=log",
 		"--set-string", "env.HITKEEP_SPAM_FILTER_AUTO_UPDATE=false",
 	}
+	var want []string
+	for _, replicas := range []string{"0", "1"} {
+		want = append(want, prefix...)
+		want = append(want, "--set", "replicaCount="+replicas)
+		want = append(want, suffix...)
+	}
+	return want
+}
+
+func TestHelmSmokeDeployPassesCandidateChartDigestFlags(t *testing.T) {
+	got := helmDeployArgs(t, "2.13.12", "registry.example/hitkeep@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "candidate.tgz")
+	want := helmTwoPhaseArgs("candidate.tgz", []string{
+		"--set-string", "image.repository=registry.example/hitkeep",
+		"--set-string", "image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+	})
 	if !slices.Equal(got, want) {
 		t.Fatalf("helm argv = %#v, want %#v", got, want)
 	}
@@ -26,15 +41,10 @@ func TestHelmSmokeDeployPassesCandidateChartDigestFlags(t *testing.T) {
 
 func TestHelmSmokeDeployPassesLegacyChartDigestCompatibleTag(t *testing.T) {
 	got := helmDeployArgs(t, "2.12.0", "registry.example/hitkeep@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "legacy.tgz")
-	want := []string{
-		"upgrade", "--install", "hitkeep", "legacy.tgz",
-		"--namespace", "smoke", "--create-namespace", "--wait", "--timeout", "5m",
+	want := helmTwoPhaseArgs("legacy.tgz", []string{
 		"--set-string", "image.repository=registry.example/hitkeep@sha256",
 		"--set-string", "image.tag=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-		"--set-string", "env.HITKEEP_JWT_SECRET=hitkeep-local-helm-smoke-secret",
-		"--set-string", "env.HITKEEP_MAIL_DRIVER=log",
-		"--set-string", "env.HITKEEP_SPAM_FILTER_AUTO_UPDATE=false",
-	}
+	})
 	if !slices.Equal(got, want) {
 		t.Fatalf("helm argv = %#v, want %#v", got, want)
 	}
