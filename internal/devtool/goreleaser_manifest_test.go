@@ -95,6 +95,25 @@ func TestGoReleaserReleaseWorkflowContract(t *testing.T) {
 	}
 }
 
+func TestPipelineRetargetsExistingPrereleaseTagBeforeReleaseEdit(t *testing.T) {
+	path := filepath.Join("..", "..", ".github", "workflows", "pipeline.yml")
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const existingRelease = "if gh release view \"${RELEASE_TAG_NAME}\" >/dev/null 2>&1; then"
+	branchStart := strings.Index(string(contents), existingRelease)
+	if branchStart < 0 {
+		t.Fatal("pipeline prerelease update branch is missing")
+	}
+	branch := string(contents)[branchStart:]
+	retarget := strings.Index(branch, "gh api --method PATCH \"repos/${GITHUB_REPOSITORY}/git/refs/tags/${RELEASE_TAG_NAME}\" -f sha=\"${RELEASE_TARGET_SHA}\" -F force=true")
+	edit := strings.Index(branch, "gh release edit \"${RELEASE_TAG_NAME}\"")
+	if retarget < 0 || edit < 0 || retarget > edit {
+		t.Fatal("existing prerelease tag must be retargeted through the GitHub API before release edit")
+	}
+}
+
 func TestGoReleaserBranchArchiveWorkflowContract(t *testing.T) {
 	path := filepath.Join("..", "..", ".github", "workflows", "pipeline.yml")
 	contents, err := os.ReadFile(path)

@@ -495,6 +495,7 @@ jobs:
             fi
 
             if gh release view "${RELEASE_TAG_NAME}" >/dev/null 2>&1; then
+              gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${RELEASE_TAG_NAME}" -f sha="${RELEASE_TARGET_SHA}" -F force=true
               gh release edit "${RELEASE_TAG_NAME}" \
                 --prerelease \
                 --target "${RELEASE_TARGET_SHA}" \
