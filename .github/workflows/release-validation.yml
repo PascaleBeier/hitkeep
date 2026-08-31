@@ -14,10 +14,55 @@ on:
       - hitkeep.example.yaml
       - scripts/helm-smoke.sh
       - tests/fixtures/release-fixtures.json
+      - .release-please-manifest.json
 
 permissions: {}
 
 jobs:
+  homebrew-candidate:
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release-please--branches--main')
+    runs-on: macos-14
+    permissions:
+      contents: read
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Prepare candidate formula
+        env:
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          candidate_version="$(jq -er '."."' .release-please-manifest.json)"
+          [[ "$candidate_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          candidate_url="https://github.com/PascaleBeier/hitkeep/archive/${CANDIDATE_SHA}.tar.gz"
+          candidate_checksum="$(curl --fail --silent --show-error --location "$candidate_url" | shasum -a 256 | awk '{print $1}')"
+          brew tap PascaleBeier/hitkeep
+          formula="$(brew --repository PascaleBeier/hitkeep)/Formula/hitkeep.rb"
+          candidate_formula="$(mktemp)"
+          awk -v version="$candidate_version" -v url="$candidate_url" -v checksum="$candidate_checksum" '
+            /^  version "/ { print "  version \"" version "\""; versions++; next }
+            /^  url "/ {
+              if (versions == 0) { print "  version \"" version "\""; versions++ }
+              print "  url \"" url "\""; urls++; next
+            }
+            /^  sha256 "/ { print "  sha256 \"" checksum "\""; checksums++; next }
+            { print }
+            END { if (versions != 1 || urls != 1 || checksums != 1) exit 1 }
+          ' "$formula" > "$candidate_formula"
+          mv "$candidate_formula" "$formula"
+          ruby -c "$formula"
+      - name: Install and test candidate
+        run: |
+          set -euo pipefail
+          candidate_version="$(jq -er '."."' .release-please-manifest.json)"
+          brew install --build-from-source PascaleBeier/hitkeep/hitkeep
+          test "$(hitkeep --version)" = "$candidate_version"
+          brew test PascaleBeier/hitkeep/hitkeep
+          brew uninstall hitkeep
+
   cross-cgo:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-22.04
