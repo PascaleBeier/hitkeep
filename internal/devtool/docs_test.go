@@ -64,12 +64,22 @@ func TestValidateReleaseMetadata(t *testing.T) {
 		}
 	})
 
-	t.Run("draft candidate is rejected", func(t *testing.T) {
+	t.Run("published candidate is rejected", func(t *testing.T) {
 		root := releaseMetadataFixture(t)
-		config := strings.Replace(fixtureReleasePleaseConfig(), `".":{"draft":false`, `".":{"draft":true`, 1)
+		config := strings.Replace(fixtureReleasePleaseConfig(), `".":{"draft":true`, `".":{"draft":false`, 1)
 		writeFixtureFile(t, root, "release-please-config.json", config)
 		err := validateReleaseMetadata(root)
-		if err == nil || !strings.Contains(err.Error(), "effective packages['.'].draft must be false") {
+		if err == nil || !strings.Contains(err.Error(), "effective packages['.'].draft must be true") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("missing forced tag creation", func(t *testing.T) {
+		root := releaseMetadataFixture(t)
+		config := strings.Replace(fixtureReleasePleaseConfig(), `"force-tag-creation":true`, `"force-tag-creation":false`, 1)
+		writeFixtureFile(t, root, "release-please-config.json", config)
+		err := validateReleaseMetadata(root)
+		if err == nil || !strings.Contains(err.Error(), "force-tag-creation must be true") {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
@@ -326,6 +336,8 @@ jobs:
           CANDIDATE_DIGEST: ${{ needs.build-release.outputs.image_digest }}
         run: |
           manifest="tests/fixtures/release-fixtures.json"
+          repository="${GITHUB_REPOSITORY,,}"
+          candidate="ghcr.io/${repository}@${CANDIDATE_DIGEST}"
           previous_version="2.12.0"
       - name: Smoke Docker upgrade from supported floor
         env:
@@ -347,6 +359,10 @@ jobs:
   verify-tracker-package:
     needs: build-release
     steps:
+      - name: Build and verify package
+        run: |
+          plan_id="$(./hk qa plan pr --output json | jq -r '.data.plan_id')"
+          ./hk qa pr --plan-id "$plan_id" --gate tracker-package
       - name: Pack verified tracker artifact
         run: npm pack --json
       - name: Upload verified tracker artifact
@@ -397,7 +413,7 @@ jobs:
       - name: Promote tracker latest dist-tag
       - name: Promote immutable image to mutable tags
       - name: Promote GitHub release
-        run: gh release edit "$TAG" --prerelease=false --latest
+        run: gh release edit "$TAG" --draft=false --latest
   sync-docs-release:
     needs:
       - finalize-release
@@ -429,7 +445,7 @@ jobs: {}
 }
 
 func fixtureReleasePleaseConfig() string {
-	return `{"draft":false,"prerelease":true,"packages":{".":{"draft":false,"prerelease":true,"extra-files":[{"type":"json","path":"server.json","jsonpath":"$.version"},{"type":"json","path":"frontend/dashboard/package.json","jsonpath":"$.version"},{"type":"json","path":"frontend/dashboard/package-lock.json","jsonpath":"$['packages']['']['version']"},{"type":"json","path":"frontend/tracker/package.json","jsonpath":"$.version"},{"type":"generic","path":"frontend/dashboard/src/tracker/version.ts"},{"type":"yaml","path":"charts/hitkeep/Chart.yaml","jsonpath":"$.version"},{"type":"yaml","path":"charts/hitkeep/Chart.yaml","jsonpath":"$.appVersion"},{"type":"generic","path":"charts/hitkeep/README.md"}]}}}`
+	return `{"draft":true,"prerelease":false,"force-tag-creation":true,"packages":{".":{"draft":true,"prerelease":false,"extra-files":[{"type":"json","path":"server.json","jsonpath":"$.version"},{"type":"json","path":"frontend/dashboard/package.json","jsonpath":"$.version"},{"type":"json","path":"frontend/dashboard/package-lock.json","jsonpath":"$['packages']['']['version']"},{"type":"json","path":"frontend/tracker/package.json","jsonpath":"$.version"},{"type":"generic","path":"frontend/dashboard/src/tracker/version.ts"},{"type":"yaml","path":"charts/hitkeep/Chart.yaml","jsonpath":"$.version"},{"type":"yaml","path":"charts/hitkeep/Chart.yaml","jsonpath":"$.appVersion"},{"type":"generic","path":"charts/hitkeep/README.md"}]}}}`
 }
 
 func writeFixtureFile(t *testing.T, root, name, contents string) {

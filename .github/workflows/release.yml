@@ -121,7 +121,8 @@ jobs:
             echo "invalid candidate image digest" >&2
             exit 1
           fi
-          candidate="ghcr.io/${GITHUB_REPOSITORY}@${CANDIDATE_DIGEST}"
+          repository="${GITHUB_REPOSITORY,,}"
+          candidate="ghcr.io/${repository}@${CANDIDATE_DIGEST}"
           docker pull "$candidate"
           platform="linux/$(docker image inspect "$candidate" --format '{{.Architecture}}')"
           previous_version="$(jq -r '.supported_upgrade_floor' "$manifest")"
@@ -310,7 +311,11 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Build and verify package
-        run: ./hk qa pr --gate tracker-package
+        shell: bash
+        run: |
+          set -euo pipefail
+          plan_id="$(./hk qa plan pr --output json | jq -r '.data.plan_id')"
+          ./hk qa pr --plan-id "$plan_id" --gate tracker-package
 
       - name: Verify release version matches package
         env:
@@ -549,8 +554,9 @@ jobs:
             exit 1
           fi
           IFS=. read -r major minor _ <<< "$VERSION"
-          source="ghcr.io/${GITHUB_REPOSITORY}@${CANDIDATE_DIGEST}"
-          for base in "ghcr.io/${GITHUB_REPOSITORY}" "${DOCKERHUB_USERNAME}/hitkeep"; do
+          repository="${GITHUB_REPOSITORY,,}"
+          source="ghcr.io/${repository}@${CANDIDATE_DIGEST}"
+          for base in "ghcr.io/${repository}" "${DOCKERHUB_USERNAME}/hitkeep"; do
             docker buildx imagetools create \
               --tag "${base}:latest" \
               --tag "${base}:${major}" \
@@ -562,7 +568,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.release-please.outputs.tag_name }}
-        run: gh release edit "$TAG" --prerelease=false --latest
+        run: gh release edit "$TAG" --draft=false --latest
 
   sync-docs-release:
     name: Publish release and configuration metadata to docs

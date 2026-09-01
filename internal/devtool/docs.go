@@ -24,9 +24,10 @@ var dockerfileVolumePattern = regexp.MustCompile(`(?m)^\s*VOLUME\s+(.+)$`)
 var dockerfileQuotedPathPattern = regexp.MustCompile(`"([^"]+)"`)
 
 type releasePleaseConfig struct {
-	Draft      bool `json:"draft"`
-	Prerelease bool `json:"prerelease"`
-	Packages   map[string]struct {
+	Draft            bool `json:"draft"`
+	Prerelease       bool `json:"prerelease"`
+	ForceTagCreation bool `json:"force-tag-creation"`
+	Packages         map[string]struct {
 		Draft      *bool                    `json:"draft"`
 		Prerelease *bool                    `json:"prerelease"`
 		ExtraFiles []releasePleaseExtraFile `json:"extra-files"`
@@ -141,6 +142,8 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 	}
 	for _, step := range workflow.Jobs["upgrade-from-supported-floor"].Steps {
 		if strings.Contains(step.Run, "tests/fixtures/release-fixtures.json") &&
+			strings.Contains(step.Run, `repository="${GITHUB_REPOSITORY,,}"`) &&
+			strings.Contains(step.Run, `candidate="ghcr.io/${repository}@${CANDIDATE_DIGEST}"`) &&
 			strings.Contains(step.Run, "previous_version") {
 			fixtureResolved = true
 		}
@@ -163,8 +166,16 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 	}
 
 	trackerArtifact := map[string]bool{}
+	trackerPlanBound := false
 	for _, step := range workflow.Jobs["verify-tracker-package"].Steps {
 		trackerArtifact[step.Name] = true
+		if strings.Contains(step.Run, `plan_id="$(./hk qa plan pr --output json | jq -r '.data.plan_id')"`) &&
+			strings.Contains(step.Run, `./hk qa pr --plan-id "$plan_id" --gate tracker-package`) {
+			trackerPlanBound = true
+		}
+	}
+	if !trackerPlanBound {
+		return fmt.Errorf("release workflow verify-tracker-package must run tracker QA with its persisted plan ID")
 	}
 	if !trackerArtifact["Pack verified tracker artifact"] || !trackerArtifact["Upload verified tracker artifact"] {
 		return fmt.Errorf("release workflow verify-tracker-package must pack and upload the verified tracker artifact")
@@ -187,14 +198,14 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 	if !trackerDownload || !trackerPublish {
 		return fmt.Errorf("release workflow finalizer must publish the verified tracker artifact with npm integrity verification")
 	}
-	prereleasePromotion := false
+	draftPublication := false
 	for _, step := range finalizer.Steps {
-		if step.Name == "Promote GitHub release" && strings.Contains(step.Run, `gh release edit "$TAG" --prerelease=false --latest`) {
-			prereleasePromotion = true
+		if step.Name == "Promote GitHub release" && strings.Contains(step.Run, `gh release edit "$TAG" --draft=false --latest`) {
+			draftPublication = true
 		}
 	}
-	if !prereleasePromotion {
-		return fmt.Errorf("release workflow finalizer must promote the prerelease to latest")
+	if !draftPublication {
+		return fmt.Errorf("release workflow finalizer must publish the draft as latest")
 	}
 	for _, step := range finalizer.Steps {
 		for _, values := range []map[string]string{step.Env, step.With} {
@@ -711,15 +722,18 @@ func validateReleaseMetadata(root string) error {
 	if rootPackageConfig.Draft != nil {
 		effectiveDraft = *rootPackageConfig.Draft
 	}
-	if effectiveDraft {
-		return fmt.Errorf("release-please-config.json effective packages['.'].draft must be false")
+	if !effectiveDraft {
+		return fmt.Errorf("release-please-config.json effective packages['.'].draft must be true")
 	}
 	effectivePrerelease := config.Prerelease
 	if rootPackageConfig.Prerelease != nil {
 		effectivePrerelease = *rootPackageConfig.Prerelease
 	}
-	if !effectivePrerelease {
-		return fmt.Errorf("release-please-config.json effective packages['.'].prerelease must be true")
+	if effectivePrerelease {
+		return fmt.Errorf("release-please-config.json effective packages['.'].prerelease must be false")
+	}
+	if !config.ForceTagCreation {
+		return fmt.Errorf("release-please-config.json force-tag-creation must be true")
 	}
 	expectedFiles := []releasePleaseExtraFile{
 		{Type: "json", Path: "server.json", JSONPath: "$.version"},

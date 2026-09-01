@@ -30,6 +30,8 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
           CANDIDATE_DIGEST: ${{ needs.build-release.outputs.image_digest }}
         run: |
           manifest="tests/fixtures/release-fixtures.json"
+          repository="${GITHUB_REPOSITORY,,}"
+          candidate="ghcr.io/${repository}@${CANDIDATE_DIGEST}"
           previous_version="2.12.0"
       - name: Smoke Docker upgrade from supported floor
         env:
@@ -51,6 +53,10 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
   verify-tracker-package:
     needs: build-release
     steps:
+      - name: Build and verify package
+        run: |
+          plan_id="$(./hk qa plan pr --output json | jq -r '.data.plan_id')"
+          ./hk qa pr --plan-id "$plan_id" --gate tracker-package
       - name: Pack verified tracker artifact
         run: npm pack --json
       - name: Upload verified tracker artifact
@@ -103,7 +109,7 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
       - name: Promote tracker latest dist-tag
       - name: Promote immutable image to mutable tags
       - name: Promote GitHub release
-        run: gh release edit "$TAG" --prerelease=false --latest
+        run: gh release edit "$TAG" --draft=false --latest
   sync-docs-release:
     needs:
       - finalize-release
@@ -186,9 +192,19 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
 		t.Fatal("validateReleaseWorkflowGraph() accepted a draft publication before mutable tag promotion")
 	}
 
-	missingPrereleasePromotion := strings.Replace(workflow, "--prerelease=false", "--draft=false", 1)
-	if err := validateReleaseWorkflowGraph([]byte(missingPrereleasePromotion)); err == nil {
-		t.Fatal("validateReleaseWorkflowGraph() accepted a finalizer that does not promote the prerelease")
+	missingDraftPublication := strings.Replace(workflow, "--draft=false", "--prerelease=false", 1)
+	if err := validateReleaseWorkflowGraph([]byte(missingDraftPublication)); err == nil {
+		t.Fatal("validateReleaseWorkflowGraph() accepted a finalizer that does not publish the draft")
+	}
+
+	unnormalizedRepository := strings.Replace(workflow, `repository="${GITHUB_REPOSITORY,,}"`, `repository="$GITHUB_REPOSITORY"`, 1)
+	if err := validateReleaseWorkflowGraph([]byte(unnormalizedRepository)); err == nil {
+		t.Fatal("validateReleaseWorkflowGraph() accepted a candidate image repository without lowercase normalization")
+	}
+
+	missingTrackerPlan := strings.Replace(workflow, `--plan-id "$plan_id"`, "", 1)
+	if err := validateReleaseWorkflowGraph([]byte(missingTrackerPlan)); err == nil {
+		t.Fatal("validateReleaseWorkflowGraph() accepted tracker QA without its persisted plan ID")
 	}
 
 	latestBeforeCandidate := strings.Replace(workflow, "      - name: Publish immutable tracker candidate", "      - name: candidate-placeholder", 1)
