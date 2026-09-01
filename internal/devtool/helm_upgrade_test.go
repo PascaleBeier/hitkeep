@@ -85,6 +85,23 @@ func TestHelmChartSupportsDigestPinnedSmokeImages(t *testing.T) {
 	}
 }
 
+func TestHelmChartDefersLivenessDuringUpgradeStartup(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "charts", "hitkeep", "templates", "statefulset.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{
+		"startupProbe:",
+		"path: /healthz",
+		"periodSeconds: 5",
+		"failureThreshold: 48",
+	} {
+		if !bytes.Contains(raw, []byte(required)) {
+			t.Fatalf("chart startup probe is missing contract %q", required)
+		}
+	}
+}
+
 func TestHelmTemplateRendersImmutableReferencesForLegacyAndCandidateCharts(t *testing.T) {
 	if os.Getenv("HITKEEP_HELM_TEMPLATE_CONTRACT") != "1" {
 		t.Skip("set HITKEEP_HELM_TEMPLATE_CONTRACT=1 to render the immutable supported-floor chart fixture")

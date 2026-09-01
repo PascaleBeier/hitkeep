@@ -145,6 +145,13 @@ spec:
           args:
             {{- toYaml .Values.extraArgs | nindent 12 }}
           {{- end }}
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 48
           livenessProbe:
             httpGet:
               path: /healthz
