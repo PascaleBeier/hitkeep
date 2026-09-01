@@ -1,7 +1,6 @@
 name: Default Tenant Migration Acceptance
 
 on:
-  workflow_call:
   workflow_dispatch:
 
 concurrency:

@@ -6,45 +6,33 @@ import (
 	"testing"
 )
 
-func TestValidateDefaultTenantMigrationAcceptanceWorkflowRequiresCallableTrigger(t *testing.T) {
-	raw, err := os.ReadFile("../../.github/workflows/default-tenant-migration-acceptance.yml")
-	if err != nil {
-		t.Fatal(err)
+func TestValidateDefaultTenantMigrationAcceptanceWorkflowIsManualOnly(t *testing.T) {
+	if err := validateDefaultTenantMigrationAcceptanceWorkflow([]byte("on:\n  workflow_dispatch:\n")); err != nil {
+		t.Fatalf("validateDefaultTenantMigrationAcceptanceWorkflow() error = %v", err)
 	}
-	if err := validateDefaultTenantMigrationAcceptanceWorkflow([]byte(strings.Replace(string(raw), "workflow_call:", "# workflow_call:", 1))); err == nil {
-		t.Fatal("validateDefaultTenantMigrationAcceptanceWorkflow() error = nil, want callable trigger error")
+	if err := validateDefaultTenantMigrationAcceptanceWorkflow([]byte("on:\n  workflow_call:\n")); err == nil {
+		t.Fatal("validateDefaultTenantMigrationAcceptanceWorkflow() error = nil, want reusable trigger error")
+	}
+	if err := validateDefaultTenantMigrationAcceptanceWorkflow([]byte("on:\n  workflow_dispatch:\n  push:\n")); err == nil {
+		t.Fatal("validateDefaultTenantMigrationAcceptanceWorkflow() error = nil, want automatic trigger error")
 	}
 }
 
-func TestValidateReleaseWorkflowGraphRequiresMigrationInterruptionGate(t *testing.T) {
+func TestValidateReleaseWorkflowGraphRejectsMigrationInterruptionGate(t *testing.T) {
 	raw, err := os.ReadFile("../../.github/workflows/release.yml")
 	if err != nil {
 		t.Fatal(err)
 	}
+	workflow := strings.Replace(string(raw), "\n  upgrade-from-supported-floor:\n", `
+  manual-migration-check:
+    needs:
+      - release-please
+      - build-release
+    uses: ./.github/workflows/default-tenant-migration-acceptance.yml
 
-	tests := []struct {
-		name     string
-		workflow string
-	}{
-		{
-			name:     "missing release job",
-			workflow: strings.Replace(string(raw), "migration-interruption:", "# migration-interruption:", 1),
-		},
-		{
-			name: "missing finalizer dependency",
-			workflow: func() string {
-				const dependency = "\n      - migration-interruption\n"
-				index := strings.LastIndex(string(raw), dependency)
-				return string(raw[:index]) + "\n" + string(raw[index+len(dependency):])
-			}(),
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if err := validateReleaseWorkflowGraph([]byte(test.workflow)); err == nil {
-				t.Fatal("validateReleaseWorkflowGraph() error = nil, want migration-interruption contract error")
-			}
-		})
+  upgrade-from-supported-floor:
+`, 1)
+	if err := validateReleaseWorkflowGraph([]byte(workflow)); err == nil {
+		t.Fatal("validateReleaseWorkflowGraph() error = nil, want manual migration workflow coupling error")
 	}
 }

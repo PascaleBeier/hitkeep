@@ -89,12 +89,21 @@ func validateDefaultTenantMigrationAcceptanceWorkflow(raw []byte) error {
 	if err := yaml.Unmarshal(raw, &workflow); err != nil {
 		return fmt.Errorf("decode default-tenant migration acceptance workflow: %w", err)
 	}
+	manual := false
 	for index := 0; index+1 < len(workflow.On.Content); index += 2 {
-		if workflow.On.Content[index].Value == "workflow_call" {
-			return nil
+		switch event := workflow.On.Content[index].Value; event {
+		case "workflow_dispatch":
+			manual = true
+		case "workflow_call":
+			return fmt.Errorf("default-tenant migration acceptance workflow must not support workflow_call")
+		default:
+			return fmt.Errorf("default-tenant migration acceptance workflow must not support %s", event)
 		}
 	}
-	return fmt.Errorf("default-tenant migration acceptance workflow must support workflow_call")
+	if !manual {
+		return fmt.Errorf("default-tenant migration acceptance workflow must support workflow_dispatch")
+	}
+	return nil
 }
 
 func validateReleaseWorkflowGraph(raw []byte) error {
@@ -104,12 +113,11 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 	}
 	for job, required := range map[string][]string{
 		"build-release":                {"release-please"},
-		"migration-interruption":       {"release-please", "build-release"},
 		"upgrade-from-supported-floor": {"build-release"},
 		"publish-helm":                 {"build-release"},
 		"verify-tracker-package":       {"build-release"},
-		"docs-attestation":             {"release-please", "build-release", "migration-interruption", "upgrade-from-supported-floor", "publish-helm", "verify-tracker-package"},
-		"finalize-release":             {"release-please", "build-release", "migration-interruption", "upgrade-from-supported-floor", "publish-helm", "verify-tracker-package", "docs-attestation"},
+		"docs-attestation":             {"release-please", "build-release", "upgrade-from-supported-floor", "publish-helm", "verify-tracker-package"},
+		"finalize-release":             {"release-please", "build-release", "upgrade-from-supported-floor", "publish-helm", "verify-tracker-package", "docs-attestation"},
 		"sync-docs-release":            {"finalize-release"},
 		"deploy-cloud":                 {"finalize-release"},
 	} {
@@ -123,15 +131,10 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 			}
 		}
 	}
-	migrationInterruption := workflow.Jobs["migration-interruption"]
-	if migrationInterruption.Uses != "./.github/workflows/default-tenant-migration-acceptance.yml" {
-		return fmt.Errorf("release workflow migration-interruption must call the default-tenant migration acceptance workflow")
-	}
-	if !strings.Contains(migrationInterruption.If, "needs.release-please.outputs.release_created == 'true'") {
-		return fmt.Errorf("release workflow migration-interruption must be gated on release creation")
-	}
-	if !strings.Contains(migrationInterruption.If, "needs.build-release.result == 'success'") {
-		return fmt.Errorf("release workflow migration-interruption must be gated on a successful release build")
+	for job, definition := range workflow.Jobs {
+		if definition.Uses == "./.github/workflows/default-tenant-migration-acceptance.yml" {
+			return fmt.Errorf("release workflow job %s must not call the manual default-tenant migration acceptance workflow", job)
+		}
 	}
 	fixtureResolved := false
 	upgradeSmokes := map[string]bool{}
