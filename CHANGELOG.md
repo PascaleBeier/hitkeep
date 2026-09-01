@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.13.17](https://github.com/PascaleBeier/hitkeep/compare/v2.13.16...v2.13.17) (2026-09-01)
+
+
+### Bug Fixes
+
+* **helm:** defer liveness during upgrades ([504636b](https://github.com/PascaleBeier/hitkeep/commit/504636b775a298692af8bbfe2410a9ac1adf702d))
+
 ## [2.13.16](https://github.com/PascaleBeier/hitkeep/compare/v2.13.15...v2.13.16) (2026-09-01)
 
 
